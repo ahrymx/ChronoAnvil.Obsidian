@@ -1,0 +1,10 @@
+{
+  "id": "ahrymx.almanac",
+  "name": "Almanac",
+  "version": "4.18.1",
+  "minAppVersion": "1.7.0",
+  "description": "Keep a daily diary and your own journal types with one shared tracker registry, and render calendars, charts, tables and period dashboards natively. Includes quick capture, full-text search, an entry navigator and vault scaffolding.",
+  "author": "AhryMX",
+  "authorUrl": "https://github.com/AhryMX/Almanac.Obsidian",
+  "isDesktopOnly": false
+}

@@ -1,0 +1,232 @@
+/* ── 3. Card surface — shared by every card-like component ──────────
+   [!note] and its semantic siblings (Attachments/Today's focus/etc.),
+   the calendar, tracker settings rows, and tag-index groups all use the
+   exact same background/border/radius. Kept as one declaration here
+   rather than repeated per component; padding, margin and hover — which
+   genuinely differ per component — stay local to each one below.
+
+   The `highlights` / `challenges` / `learnings` / `goals` kinds were removed in
+   2.11. All four were Monthly Review callouts and none of them are shipped by a
+   template any more: goals became Almanac tasks (2.10), learnings folded into
+   the Notes field, and highlights/challenges became the joined `note:` pair
+   above. `focus`, `log` and `chart-empty` are also unshipped, but they predate
+   this work — see the dev log before removing them. */
+.callout[data-callout="note"],
+.callout[data-callout="focus"],
+.callout[data-callout="log"],
+.callout[data-callout="chart-empty"],
+.journal-calendar {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+}
+.callout[data-callout="note"],
+.callout[data-callout="focus"],
+.callout[data-callout="log"],
+.callout[data-callout="chart-empty"] {
+  margin: 0.75em 0 1.5em;
+  transition: border-color 0.15s ease;
+}
+.callout[data-callout="note"]:hover,
+.callout[data-callout="focus"]:hover,
+.callout[data-callout="log"]:hover,
+.callout[data-callout="chart-empty"]:hover {
+  border-color: var(--interactive-accent);
+}
+.callout[data-callout="note"] .callout-title,
+.callout[data-callout="focus"] .callout-title,
+.callout[data-callout="log"] .callout-title,
+.callout[data-callout="chart-empty"] .callout-title {
+  font-weight: 600;
+  padding: 0.75em 1em 0.4em;
+  border-bottom: 1px solid var(--background-modifier-border);
+  gap: 8px;
+}
+.callout[data-callout="note"] .callout-content,
+.callout[data-callout="focus"] .callout-content,
+.callout[data-callout="log"] .callout-content,
+.callout[data-callout="chart-empty"] .callout-content {
+  padding: 1em;
+  min-height: 5em;
+  line-height: 1.7;
+}
+
+/* ── 3b. AND NOT INSIDE ANOTHER ONE (4.13 §2) ─────────────────────────
+ *
+ * 4.11 removed the six rules that unboxed an empty state inside a section card,
+ * on the argument recorded below: *a card whose contents are one grey sentence
+ * with no edge reads as a widget that failed rather than as one with nothing in
+ * it.* That sentence is not wrong, and it was written without a render.
+ *
+ * THE RENDER SETTLED IT THE OTHER WAY. On the journals dashboard, where every
+ * section is already a card, the doubled edge appeared three times on one screen
+ * — and the one empty state that did NOT draw its own box, the review queue's,
+ * was the one that read correctly. `40-journal-views.css` had already made
+ * exactly this argument for that one widget and applied it nowhere else, so the
+ * page carried both decisions at once.
+ *
+ * WHAT 4.11 WAS ACTUALLY RIGHT ABOUT is kept: the glyph, the coloured heading and
+ * the sentence all stay. An unboxed empty state reads as a widget that has
+ * nothing in it because it still SAYS so — it was never the border doing that
+ * work. What goes is only the second edge, and only where there is a first one.
+ *
+ * AND THE THIRD SCOPE IS `.has-head`, ADDED IN 4.13.5 — because the sentence that
+ * stood here was wrong and the render said so in the plainest way available. It
+ * read: *"an empty state outside a section card — on the homepage, inside a group
+ * — is exactly what §3a below makes it"*, on the premise that a homepage widget
+ * has no first edge for this to be a second one of. It has: `cardWidget` puts a
+ * `.journal-widget-card` around every widget in a row and `attachBlockHead` makes
+ * the block itself one, and both draw `--background-secondary` inside
+ * `--am-rule` — the SAME fill and the SAME border §3a gives the info card. So
+ * Open tasks rendered as a bordered box inside a bordered box of identical
+ * colour, and On this day as three of them, `.jdr-otd-body` between the two.
+ * Measured off the render: borders at x=747, 763 and 1085, 1101, one fill.
+ *
+ * `.has-head` IS THE WHOLE CONDITION AND IT IS NOT A NEW ONE. 05-inline-widgets
+ * .css already unboxes four composite cards through exactly this class, with the
+ * note that it "is worn by a block that drew its own head AND by the card
+ * `cardWidget` puts around a widget inside a row — one condition, both scales".
+ * The same sentence is the reason it is right here: `has-head` is set at the
+ * moment a head is drawn, which is the moment a first edge exists.
+ *
+ * The info card itself is still untouched, so a widget with NO head and no
+ * section around it — a bare `tasks-table` in a reader's own note — draws the
+ * first edge and keeps it. That is the case §3a is for. */
+.journal-sec-block .callout[data-callout="empty"],
+.journal-sec-fold-body .callout[data-callout="empty"],
+.has-head .callout[data-callout="empty"],
+.journal-sec-block .jjs-empty,
+.journal-sec-fold-body .jjs-empty,
+.has-head .jjs-empty,
+.journal-sec-block .journal-chart-empty,
+.journal-sec-fold-body .journal-chart-empty,
+.has-head .journal-chart-empty,
+.journal-sec-block .jrc-empty,
+.journal-sec-fold-body .jrc-empty,
+.has-head .jrc-empty,
+.journal-sec-block .jrq-empty,
+.journal-sec-fold-body .jrq-empty,
+.has-head .jrq-empty {
+  background: none;
+  border: none;
+  border-radius: 0;
+  /* The padding `.jrq-empty` already uses inside a card, so the two agree. */
+  padding: 2px 0 4px;
+}
+
+/* ── 3. AN INFO CARD IS A CARD (4.11) ─────────────────────────────────
+ *
+ * WHAT WENT WRONG, FROM A VAULT RENDER OF THE HOMEPAGE. Three widgets with
+ * nothing to show, three different appearances on one screen: *No notes here
+ * yet* was bare text at the panel's edge, *Nothing on this day yet* sat in a
+ * box, and *📚 No journals enabled* sat in a different box — one hand-rolled at
+ * 1px where every card in the plugin draws 2px. Each of the three was defensible
+ * where it was written and the set of them was not.
+ *
+ * SO THERE IS ONE BOX, AND IT IS THE WIDGET FRAME'S. `--am-rule`,
+ * `--background-secondary`, `--am-radius-md` and the same 12/14 padding as
+ * `.journal-widget-card` — because an empty state stands IN FOR a widget, so it
+ * should read as one that has nothing in it rather than as a note left on the
+ * page. The three ad-hoc boxes are deleted in favour of joining this list, which
+ * is what makes this one rule rather than a fourth appearance.
+ *
+ * WHICH THINGS ARE INFO CARDS, and the exclusions are the argued half:
+ *
+ *   `[!empty]` — `emptyCallout`, which REPLACES content. Split out of the four
+ *   groups above because those four are `[!note]`, `[!focus]`, `[!log]` and the
+ *   calendar: two are fields a reader types into and one is a month grid, and
+ *   none of them is standing in for something absent.
+ *   `.jjs-empty`, `.journal-chart-empty` — the same shape written by hand,
+ *   inside the Journals card and under a charts toolbar.
+ *
+ *   NOT `emptyLine`'s callers, which ANNOTATE content: one muted sentence inside
+ *   chrome that already drew itself and already says what the widget is. `empty.ts`
+ *   opens by arguing that the two shapes are a STRUCTURAL difference rather than a
+ *   style choice, and boxing thirty annotations would be that argument lost by
+ *   accident. `.jrq-empty` is the one such line that draws its own box and its own
+ *   comment calls that the tell; it is left exactly as it was.
+ *   NOT `.almanac-empty-state`, the settings tab's, which is deliberately
+ *   unshared and says so where it is written.
+ *   NOT `.journal-frame-error`, which is the block explaining ITSELF rather than
+ *   showing something, and keeps its `--text-error` edge.
+ *
+ * COMMA-APPENDED RATHER THAN `:is()`, for the reason 05-inline-widgets.css gives:
+ * several tests read these selectors as literals. */
+.callout[data-callout="empty"],
+.jjs-empty,
+.journal-chart-empty,
+.jrc-empty {
+  /* THE HEADING'S COLOUR IS OURS NOW (4.13 §2). `empty` is not one of Obsidian's
+     callout types, so with no `--callout-color` of its own the title fell through
+     to whatever the reader's THEME paints an unknown callout — blue in the vault
+     this was found in, and something else on the next theme. Fifteen empty states
+     took their colour from a decision nobody in this project made, while
+     `.jjs-empty-title` two files over was hand-set to the accent, so one screen
+     showed two colours for one object. `[!study]` already declares its own; this
+     is the same line for the same reason.
+     `--interactive-accent-rgb` is declared on `body`, and this is a rule on an
+     element inside it, so the 3.6-patch-1 trap does not apply — see 00-tokens.
+     THE FALLBACK IS 00-TOKENS' AND NOT THE SHEET'S MAJORITY, which is worth a
+     line because they disagree: nine rules elsewhere fall back to 130, 120, 255,
+     and `--am-area-diary-rgb` falls back to 138, 92, 245. The second is
+     Obsidian's actual default accent (#8a5cf5); the first is `[!study]`'s own
+     hue, copied outward. This follows the token file, and the other nine are a
+     drift worth its own sweep rather than a silent third answer from here. */
+  --callout-color: var(--interactive-accent-rgb, 138, 92, 245);
+  padding: 12px 14px;
+  background: var(--background-secondary);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+}
+/* AND IT IS COMPACT WHEREVER IT IS DRAWN, which is the second half of the same
+ * unification. These three declarations used to apply only inside a section card
+ * (70-section-surface.css) and the reason given there was the box: a callout in a
+ * card was a box in a box. The box is the point now, so what is left is the part
+ * that was always about the CONTENT — a `border-bottom` under the title and a
+ * `min-height: 5em` floor, both inherited from the writable callouts, where a
+ * field you type into must not grow under the cursor. An empty state is read-only
+ * and one sentence long, so it takes neither, on a dashboard or on its own. */
+.callout[data-callout="empty"] > .callout-title {
+  font-weight: 600;
+  gap: 8px;
+  padding: 0 0 2px;
+  border-bottom: none;
+}
+.callout[data-callout="empty"] > .callout-content {
+  padding: 0;
+  min-height: 0;
+  line-height: 1.55;
+}
+/* The 5em floor above exists for the *writable* callouts — [!focus] and [!log]
+   are fields you type into, and a box that grows from one line as you write
+   reads as unstable, so they reserve their height up front. A `[!note]` used as
+   a section's empty state is read-only and one sentence long, so that floor
+   just inflates it into the largest object on the page: on a fresh vault the
+   "No custom journal yet" card outweighed every real journal beside it, which
+   is exactly backwards. Scoped to the Journals section's inset body so the
+   editable fields elsewhere on the home keep their reserved height. */
+.journal-section-l2-body .callout[data-callout="note"] .callout-content {
+  min-height: 0;
+  padding: 0.6em 1em 0.75em;
+  line-height: 1.6;
+}
+.journal-section-l2-body .callout[data-callout="note"] {
+  margin: 0.35em 0 0.6em;
+}
+.journal-section-l2-body .callout[data-callout="note"] .callout-title {
+  padding: 0.5em 1em 0.45em;
+}
+
+.callout[data-callout="note"] .callout-icon {
+  display: none;
+}
+.callout[data-callout="empty"] .callout-icon,
+.callout[data-callout="focus"] .callout-icon,
+.callout[data-callout="log"] .callout-icon,
+.callout[data-callout="chart-empty"] .callout-icon {
+  color: var(--text-muted);
+  width: 15px;
+  height: 15px;
+}
+.callout[data-callout="log"] { --callout-icon: pen-line; }
+.callout[data-callout="chart-empty"] { --callout-icon: bar-chart-3; }

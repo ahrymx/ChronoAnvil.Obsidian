@@ -1,0 +1,1201 @@
+/* ── 1. Inline widgets ─────────────────────────────────────── */
+.journal-widget {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  gap: 6px;
+}
+
+/* A ```almanac block: composite widgets (nav/calendar/etc.) stack full
+   width; simple widgets (slider/time/date/select/button) on consecutive
+   lines are grouped into a single wrapping row by journal-widget-bar. */
+.journal-widget-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-widget-gap);
+  margin: 0.5em 0 1em;
+  /* Establish an inline-size query container so the tracker grid below can
+     collapse to one column based on the pane width, not the viewport. */
+  container-type: inline-size;
+}
+.journal-widget-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+
+/* ── The block modifier: who supplies the chrome (4.1 §3) ──────────────
+ *
+ * ONE CLASS, NOT ONE PER WIDGET, and not one per frame value. The shape this
+ * was chosen against adds `.journal-calendar-standalone`,
+ * `.journal-activity-standalone` and `.journal-habits-standalone` — three
+ * classes for one idea, and three places to forget the fourth widget. These
+ * rules key off the BLOCK instead, so they cover everything it can hold,
+ * including the widgets not written yet.
+ *
+ * `frame: section` NEEDS NO CLASS OF ITS OWN. It withholds the composite
+ * modifier and adds `is-unframed` exactly as `frame: none` does, then puts the
+ * block's content inside a `.journal-sec-fold` body. The section's look is
+ * 70-section-surface.css's already and does not change here.
+ *
+ * `frame: card` — the default — touches nothing. A fence with no `frame:` line
+ * renders exactly as it did before the modifier existed, which is what makes
+ * this a minor rather than a breaking change. */
+.journal-widget-block.is-unframed {
+  /* The four things the composite cards paint, given up. `background: none`
+     rather than a colour, so the block takes whatever it has landed on — a
+     canvas node, a third-party tile, or the section surface above it. */
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+/* NOTHING ABOUT WIDTH. The container query below already handles it, and a
+   fixed width is how a widget stops fitting a tile.
+ *
+ * AND `container-type` IS NOT TOUCHED, which is the one rule that has to
+ * survive all three frames: `.journal-widget-block` establishes the
+ * inline-size query container every `@container` rule in styles/ depends on,
+ * and it is the easiest thing to lose when the card rules are stripped. It
+ * lives on the base class above and no rule here overrides it. */
+
+/* The summary, entry and journals widgets give up the frames they drew for
+   themselves, exactly as they do inside a card — `.journal-overview-card
+   .journal-overview-summary` two files over makes the same move for the same
+   reason. Without this an unframed block still shows the widget's own box.
+
+   THIS LIST IS THE ONE THING HERE THAT HAS TO BE KEPT IN STEP, and it is worth
+   naming as the cost of the shape §5 chose. Keying off the BLOCK covers every
+   widget for the block's own chrome, but a widget that draws a card INSIDE the
+   block has to be named, because only the widget knows it drew one. Three
+   today. The tell is a rule with a background, a border and a padding that a
+   band beneath it cancels with a negative margin — see the next rule.
+
+   TWO CONDITIONS NOW, ONE DECLARATION BLOCK. A block with a titled head (4.7.2)
+   draws the card itself, so a widget's own card inside it is the same box in a
+   box from the other side.
+
+   WRITTEN OUT TWICE RATHER THAN AS `:is(.is-unframed, .has-head)`, which was
+   the first shape and is the tidier one. Three tests in two files read these
+   selectors BY NAME — `.journal-widget-block.is-unframed .journals-card` is
+   asserted as a literal, because this list is the thing most likely to go stale
+   and those tests are what says so. Collapsing the condition takes the literal
+   with it and the tests stop watching. The halves are adjacent, share one set of
+   declarations, and a test compares them to each other.
+
+   THE SECOND HALF IS NOT SCOPED TO THE BLOCK, and that is the whole of what it
+   buys: `has-head` is worn by a block that drew its own head AND by the card
+   `cardWidget` puts around a widget inside a row. One condition, both scales,
+   and nothing to add here when a third thing grows a head. */
+.journal-widget-block.is-unframed .journal-overview-summary,
+.journal-widget-block.is-unframed .journal-entry-card,
+.journal-widget-block.is-unframed .journals-card,
+.journal-widget-block.is-unframed .jtc-card,
+.has-head .journal-overview-summary,
+.has-head .journal-entry-card,
+.has-head .journals-card,
+.has-head .jtc-card {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+/* AND THE BANDS STOP BLEEDING, because there is nothing left to bleed through.
+   `.journal-overview-banner` carries `margin: -12px -14px 0` to cancel the
+   padding of the card it sits in and run to that card's edges, and `.jjs-hero`
+   carries the same two lines for the same reason — 60-heroes-and-banners.css
+   says so where it defines them. The rule above takes that padding away, so the
+   negative margin has nothing to cancel and the band hangs 14px outside the
+   section on each side and pulls 12px up into its own header bar.
+   A margin that exists to cancel a padding has to go with it. */
+.journal-widget-block.is-unframed .journal-overview-banner,
+.journal-widget-block.is-unframed .jjs-hero {
+  margin: 0;
+  border-radius: 0;
+}
+
+/* ── The unframed empty state (§4) ─────────────────────────────────────
+ *
+ * §12 calls this "the part most likely to be skipped, and the first thing a
+ * new reader sees in a tile", so it is written out rather than assumed.
+ *
+ * `emptyLine` ANNOTATES content: `empty.ts` says it is for a region inside a
+ * widget that "still drew its card, its header and its controls", which is why
+ * `.am-empty-line` carries `padding: 6px 0` and takes its left inset from that
+ * card. The rule above sets that card's padding to zero, so in a canvas node
+ * the sentence sits flush against the node's own border — which is §4's
+ * "reads as a rendering bug" exactly.
+ *
+ * NO BOX, NO BORDER, and that is the point rather than an omission. A dashed
+ * placeholder would be a box inside the node's box, which is the doubling this
+ * whole part exists to remove. An inset and a centre are enough to read as a
+ * state rather than a stray line, and they add nothing to look at.
+ *
+ * `emptyCallout` needs nothing here: it builds Obsidian's own `.callout`, which
+ * brings its own box and is themed by the host. That split is `empty.ts`'s
+ * "TWO SHAPES, AND THE DIFFERENCE IS STRUCTURAL", and it pays off here. */
+.journal-widget-block.is-unframed .am-empty-line {
+  padding: 10px 12px;
+  text-align: center;
+}
+/* …EXCEPT UNDER `frame: section`, WHICH §4 SAYS NEEDS NO TREATMENT: "the
+   section's own body supplies the padding, so that case needs no third
+   treatment — which is one more reason the section value earns its place."
+   `is-unframed` is on the block under BOTH values (§5: section needs no class
+   of its own), so the two are told apart by the wrapper the section value
+   actually builds. Restoring the default rather than adding a third look. */
+.journal-widget-block.is-unframed .journal-sec-fold-body .am-empty-line {
+  padding: 6px 0;
+  text-align: left;
+}
+
+/* ── The self-titled section a `frame: section` block wraps itself in ── */
+.journal-sec-fold-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-widget-gap);
+}
+.journal-sec-fold.is-collapsed > .journal-sec-fold-body {
+  display: none;
+}
+/* The chevron rotates rather than swapping glyph, so the fold reads as one
+   control changing state instead of two icons alternating. */
+/* The `frame: section` twin of `.journal-header-toggle`, and it now says the
+   same things that one says (4.13 §1b): right-hand end via `margin-left: auto`,
+   sized against the bar's own scale rather than inheriting Obsidian's
+   `--icon-size` — this rule had no width, height or `svg` size at all, so it fell
+   back to ~18px and dominated an 11.2px title. */
+.journal-sec-fold-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--am-bar-glyph);
+  width: 1.4em;
+  height: 1.4em;
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--text-muted);
+  transition: transform 120ms ease;
+}
+.journal-sec-fold-toggle .svg-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+/* Down means closed, up means open — see `.journal-header-toggle` for why the
+   direction was re-chosen when the control moved to the right. */
+.journal-sec-fold:not(.is-collapsed) > .journal-sec > .journal-sec-fold-toggle {
+  transform: rotate(180deg);
+}
+.journal-sec-fold > .journal-sec.is-foldable {
+  cursor: pointer;
+}
+
+/* A fence that asked twice (§3.3). The grammar refuses a contradiction rather
+   than resolving it silently, and the refusal has to be visible where the
+   fence is — a reader who has just written two lines that disagree is looking
+   at this spot. */
+.journal-frame-error {
+  padding: 8px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--text-error);
+  border-radius: var(--am-radius-md);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+/* ── The row modifier: this block's widgets, side by side (4.2 §2) ─────
+ *
+ * `.journal-widget-block` is a flex COLUMN and every page Almanac composes is
+ * that column repeated. This is the one place it becomes a row, and it is a
+ * wrapper the processor puts around what a fence drew rather than a mode of the
+ * block itself — a block still holds a `header:` bar full width above its row,
+ * and `is-unframed` still means what it meant.
+ *
+ * THE GAP IS THE BLOCK'S OWN, so a row of widgets is spaced like the column it
+ * replaced and a page with both does not read as two rhythms.  */
+.journal-block-row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: var(--am-widget-gap);
+}
+
+/* Equal cells, and the declarations that make them behave.
+ *
+ * `flex: 1 1 var(--am-row-cell-min)` — the cells share the row rather than
+ * sizing to their content, so three widgets of very different heaviness read as
+ * three columns. The BASIS is a floor rather than `0`, and that is what makes
+ * the wrap below work: a cell asks for the floor, and cells that cannot all
+ * have it go onto the next line instead of all getting thinner.
+ *
+ * `min-width: 0` — WITHOUT WHICH NONE OF IT WORKS. A flex item's floor is its
+ * content's min-content width, so one wide table in a cell pushes the row past
+ * the pane and the note scrolls sideways instead of the cell getting narrower.
+ *
+ * `container-type: inline-size` — THE CELL IS THE QUERY CONTAINER, and this is
+ * the rule the whole primitive rests on. Every `@container (max-width: …)` rule
+ * in styles/ resolves against the nearest inline-size ancestor, which until this
+ * existed was always `.journal-widget-block` — the pane. A widget in a third of
+ * a pane is narrow while the block is wide, so without this the tracker grid,
+ * the header bars and the calendar would all go on measuring the pane and stay
+ * in their wide layout at a third of the width. 4.1 §4 names the block's own
+ * `container-type` as the rule every frame value must keep; a row extends it
+ * rather than moving it: the block is still a container, and each cell is one
+ * too. */
+.journal-block-row > .journal-block-cell {
+  /* SHARES, AND WHY BOTH HALVES CARRY THE WEIGHT (4.4 §2). A cell may ask for
+     `cell: 2`, and an exact 2:1 needs the weight on the BASIS as well as on the
+     grow: width = N x floor + N/total x leftover, which is proportional to N
+     only when both are. Weight on the grow alone gives a ratio that drifts with
+     the leftover — 1.3:1 where 2:1 was asked for on a 1100px page — which is
+     the kind of nearly-right that reads as a rendering fault.
+     AND THE WRAP SURVIVES IT: a two-share cell asks for two floors, so a row
+     that cannot give it that wraps instead of squeezing, exactly as before.
+     `var(--am-cell-weight, 1)` — set per cell from row.ts, absent on an
+     ordinary one, so the fallback is the common case rather than a shadow of a
+     token (see test/tokens.test.ts's two rules about fallbacks). */
+  flex-grow: var(--am-cell-weight, 1);
+  flex-shrink: 1;
+  flex-basis: calc(var(--am-row-cell-min) * var(--am-cell-weight, 1));
+  min-width: 0;
+  container-type: inline-size;
+  /* A CELL IS A COLUMN, because 4.4 §1 lets it hold more than one widget. The
+     block it was cut out of is a flex column with this exact gap, so a stacked
+     cell keeps the rhythm the page had before the row existed — two widgets
+     one above the other read the same whether they are in a cell or in a block
+     of their own, which is what stops a page with both looking like two pages.
+
+     A cell holding ONE widget is unchanged by this: a flex column of one item
+     lays out exactly where a block item did. */
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-widget-gap);
+  /* AND IT IS THE GROUND ITS SLOTS STAND ON (4.8 §1.2). The landing places at
+     either side of a column are absolute, so they take no width, move nothing
+     and exist only while something is in the air. Without this they would
+     resolve against the block, and every one of them would sit at the row's
+     own left edge. */
+  position: relative;
+}
+/* THE SHORT COLUMN DOES NOT FILL, AND 4.13 §4 IS RETIRED HERE (4.13.5).
+ *
+ * It read `.journal-block-cell > :last-child { flex: 1 1 auto }`, and its
+ * argument was that a column with less in it ended early and left a band of
+ * nothing between its last card and the group's foot. That argument was made
+ * from a screenshot of the hole and never from a screenshot of the fix.
+ *
+ * THE FIX MOVED THE HOLE INSIDE THE CARD, which is worse and is why there is no
+ * replacement rule. Stretching the last CARD does not stretch what is in it: a
+ * month grid is the height of a month. On the render that retired this, the
+ * homepage's diary card ran to y=805 to match the column beside it while its
+ * content stopped at y=717 — 88px of filled, bordered card with nothing in it.
+ * A short column reads as a column that is shorter. A card with a bordered empty
+ * band at the bottom reads as a widget that failed to draw.
+ *
+ * AND THE FOOT WAS NEVER THE PROBLEM. `2 COLUMNS` is a full-width band across
+ * the bottom of the group; it sits under the taller column because that is where
+ * the bottom of the group is, and there is nothing under the shorter one but the
+ * group's own ground.
+ *
+ * THE OTHER FIX, IF THIS EVER COMES BACK, is to make the stretch reach the
+ * CONTENT — the card a column, its body `flex: 1`, the month grid's rows growing
+ * — and that is a change to how a calendar sizes rather than to how a cell
+ * lays out. It is not free and it was not asked for. */
+
+/* AND A ROW WRAPS RATHER THAN SQUEEZING — 4.2 §2.2's collapse, arrived at from
+ * the other side after 4.3.0's homepage was looked at in a vault.
+ *
+ * THE FIRST SHAPE WAS A BREAKPOINT AND IT WAS WRONG. It read
+ * `@container (max-width: 520px) { flex-direction: column }` — the row became a
+ * column when the BLOCK was narrow. But a cell is the block divided by however
+ * many cells there are, so a three-cell row in a 720px pane gave each widget
+ * 225px while the rule sat quiet, waiting for a width it would never see. At
+ * 225px the diary calendar's quarter rail has about 28px per month name and
+ * renders `JaFeMar` on top of itself. The rule was measuring the wrong thing:
+ * what matters is what a CELL gets, and no container query can know how many
+ * cells are sharing the block.
+ *
+ * `flex-wrap` NEEDS NO COUNT. Each cell asks for `--am-row-cell-min`; as many
+ * as fit take a line and the rest go to the next one. A three-cell row is three
+ * across on a wide page, two and one at 720px, and a plain column on a phone —
+ * and the last of those is the collapse the old rule was written for, reached
+ * without a number that has to be kept in step with anything.
+ *
+ * ONE MECHANISM, NOT TWO. The breakpoint is gone rather than kept alongside
+ * this: below the floor every cell is already on its own line, so a rule saying
+ * so as well would be a second answer to a question this one has answered. */
+.journal-block-row {
+  flex-wrap: wrap;
+}
+
+/* ── The group: the box a row is drawn in (4.9 §2) ──────────────────────
+ *
+ * A row has been a grammar since 4.2 and rearrangeable since 4.8, and it has
+ * never been a thing a reader can SEE. The block paints no chrome for it, so
+ * what is on the page is two cards side by side with nothing saying they are one
+ * object — and the two gestures this release adds, resizing a column and making
+ * a group out of two blocks, are both gestures on an object that was not drawn.
+ *
+ * ── THE DOUBLING IS THE POINT OF CARE ──────────────────────────────────
+ *
+ * Cards keep their own boxes, so this is a card inside a card — which 4.7.2
+ * spent a patch removing in the other direction, when a head sat on the page's
+ * own background and read as a label floating above a card. It reads as
+ * intentional here only if the box is unmistakably QUIETER than what it holds,
+ * and quieter is three specific things:
+ *
+ *   A GROUND THE CARDS SIT ON RATHER THAN MATCH. The cards take
+ *   `--background-secondary`; the box takes `--background-primary-alt`, which is
+ *   the shade next to the page's own. The box recedes towards the note and the
+ *   cards stand off it, which is the relationship a container and its contents
+ *   should have and the opposite of what two boxes of the same colour show.
+ *
+ *   A THINNER LINE THAN THE THINGS INSIDE IT. `--am-rule-hair` rather than the
+ *   `--am-rule` every card in this file uses. The roadmap asked for `--am-rule`
+ *   and the reason for departing is its own sentence: an outer border as heavy
+ *   as the inner ones makes the box compete with its contents, and the whole
+ *   argument for drawing it at all is that it must not.
+ *
+ *   NO SHADOW AND NO ACCENT. The two banners on a homepage are the loud things
+ *   on that page, and a container that out-shouts them has moved the reader's
+ *   eye to the furniture.
+ *
+ * THE PADDING IS THE WIDGET GAP, so the space between the box's edge and the
+ * cards is the space between the cards — one rhythm rather than a border with
+ * its own idea of breathing room. */
+.journal-group {
+  background: var(--background-primary-alt);
+  border: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  padding: var(--am-widget-gap);
+  /* The foot sits under the row, and the grip in the foot resolves against the
+     box — see `.journal-group-foot`. */
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-widget-gap);
+}
+
+/* WITHHELD WHERE THE BLOCK ALREADY PAINTS, which is the four-case rule the block
+   head already follows two rules down and the `is-unframed` reset list follows
+   above. A canvas tile and a section run are both surfaces somebody else owns:
+   `frame: none` says this block has given up its chrome, and a box inside it
+   would be the chrome arriving again under a different name; a `journal-sec-block`
+   is already inside a section's own card, and a second border there is the
+   doubling this whole comment is about, one level out.
+
+   GROUND, BORDER AND PADDING ONLY. The flex column stays — it is what puts the
+   foot under the row rather than beside it, and that is true wherever the box is
+   drawn. */
+.journal-widget-block.is-unframed .journal-group,
+.journal-sec-block .journal-group {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+/* ── The foot (4.9 §2.2) ────────────────────────────────────────────────
+ *
+ * A slim ruled strip under the columns, carrying the two things the group has to
+ * say about ITSELF: how many columns it has, and where to pick it up.
+ *
+ * UNDER RATHER THAN OVER. The top of a group is where every card inside it draws
+ * its own head, and a bar across that would be a title above a row of titles.
+ * The foot is the one edge of the box with nothing already on it.
+ *
+ * IT IS ALSO THE GRIP'S HOST, which is what retired `.jbd-aside`: a block's grip
+ * used to be shoved off the centre line to avoid landing on the middle widget's,
+ * and a strip that belongs to the box has no such collision to avoid. */
+.journal-group-foot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 14px;
+  /* 8px SINCE 4.13.8 §36, and it moved because the section bar's strip did. The
+     two are the same object at two scales — 30-header-bars.css carries the
+     measurement that forced it — and a pair that is one decision has to move
+     together or it stops being one. This band holds a word and did not need the
+     extra four pixels; the other holds controls with edges and did. */
+  padding-top: 8px;
+  border-top: var(--am-rule-hair) solid var(--background-modifier-border);
+}
+/* The label idiom `.journal-block-head-title` already uses, and for its reason:
+   a line of type that has to sit in a 14px strip says what the thing is without
+   competing with the titles inside it. */
+/* THE FOURTH COPY OF THE BAR'S VOICE, NOW READING IT (4.13 §1). This was written
+   out by hand — 0.7em / 600 / uppercase / 0.06em — with a comment saying it was
+   the idiom `.journal-block-head-title` uses, which was true and was not enforced
+   by anything. When §1 moved the two title rules onto tokens this one stayed
+   behind on `--text-faint`, a step of contrast away from the bars it was written
+   to match. */
+.journal-group-foot-count {
+  font-size: var(--am-bar-text);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--am-bar-track);
+  color: var(--am-bar-ink);
+}
+/* The grip itself is dressed with the other grip rules below, after the
+   `.jbd-handle` base it overrides. */
+
+/* ── The divider: setting a column's width (4.9 §3) ─────────────────────
+ *
+ * `cell: 2` has worked since 4.4 §2 and shipped unused in every build since
+ * 4.7.0, because the only way to ask for one was to type it. This is the gesture
+ * that sets one: the edge between two columns, dragged.
+ *
+ * A CHILD OF THE CELL ON ITS RIGHT, positioned back into the gap — the same
+ * trick `.jbd-slot-before` uses a few rules down. Being sealed inside a cell is
+ * the SAFE side of 4.8 §8.3's rule: a cell is an inline-size query container,
+ * containment makes it a stacking context, and a `z-index` cannot lift anything
+ * out of one. That cost the drop slots a release; it costs this nothing, because
+ * nothing else is drawn in the gap at rest and there is no argument about
+ * numbers to have.
+ *
+ * WIDER THAN IT LOOKS, which is 4.8.3's lesson about the slots said again: the
+ * hit area is 12px and the mark is a 2px line, because the generosity belongs in
+ * the target and the precision in the drawing.
+ *
+ * ── AND IT IS INERT WHILE SOMETHING IS IN THE AIR ──────────────────────
+ *
+ * 4.8 §3 deferred this whole gesture on the grounds that the divider a reader
+ * would drag is the strip the drop slots already use. It is not, twice over: a
+ * slot is `display: none` until `is-slotting`, which only a drag already in the
+ * air adds, and a pointer drag and an HTML5 drag are different event families
+ * that cannot both be in progress. The rule below is belt and braces on top of
+ * both. */
+.journal-group-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--am-widget-gap) / -2 - 6px);
+  width: 12px;
+  z-index: 3;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.journal-group-divider::after {
+  content: "";
+  width: 2px;
+  height: 28px;
+  border-radius: 1px;
+  background: var(--background-modifier-border);
+}
+/* ON HOVER OF THE GROUP, not of the 12px strip. A divider a reader has to find
+   before it appears is a control that is only discoverable by accident; the
+   group is the object it belongs to and hovering that is what says "this thing
+   has edges you can move". */
+.journal-group:hover .journal-group-divider,
+.journal-group-divider.is-resizing {
+  opacity: 1;
+}
+.journal-group-divider:hover::after,
+.journal-group-divider.is-resizing::after {
+  background: var(--interactive-accent);
+}
+/* WHILE THE COLUMNS ARE MOVING, the pointer keeps its meaning everywhere and
+   nothing highlights as text. A resize that selects the diary card's prose on
+   the way past is a gesture fighting the page. */
+.journal-block-row.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+.journal-widget-block.is-slotting .journal-group-divider {
+  pointer-events: none;
+}
+/* Touch has no hover to reveal it with — the policy `.jbd-handle` follows, at
+   the resting opacity every hover-revealed affordance in this file takes. */
+@media (hover: none) {
+  .journal-group-divider {
+    opacity: 0.3;
+  }
+}
+
+/* ── The seam: where a cell's widgets divide (4.13.1 §4) ────────────────
+ *
+ * A group said where its COLUMNS divide and not where its WIDGETS do. The
+ * homepage's right-hand cell stacks three of them — Go to, Open tasks, On this
+ * day — with the same gap between each pair that sits between the columns, and
+ * only one of those gaps had a mark in it.
+ *
+ * THE SAME LINE, TURNED. 2px, 28px, the divider's colour, its opacity and its
+ * transition, revealed by a hover on the GROUP exactly as the divider is. That
+ * is the whole specification: the maintainer asked for "the same as the vertical
+ * line between columns", and two marks that mean "here is a boundary inside this
+ * box" have no business being drawn two ways.
+ *
+ * AND IT IS INERT, WHICH IS THE DIFFERENCE. The vertical one is a control — it
+ * sets a column's width through `cell: N`. This one sets nothing: there is no
+ * grammar for a widget's height and inventing one to give a seam something to do
+ * would be a feature arriving inside a patch about how the page looks. So it is
+ * a pseudo-element rather than an element, takes no hit area, and says
+ * `pointer-events: none` — a seam that swallowed a click on the card's top edge
+ * would be 4.8.3's fault in a new costume.
+ *
+ * ON THE CARD, NOT ON `> * + *`. The first child of every cell after the first is
+ * `.journal-group-divider`, so a universal sibling selector would draw a seam
+ * above that cell's FIRST card, which is the one place there is no boundary. A
+ * widget with no name is not wrapped by `cardWidget` and gets none either, which
+ * is right — this is a line between cards.
+ *
+ * NO `z-index`, AND IT DOES NOT NEED ONE. 4.8 §8.3: a cell is an inline-size
+ * query container, containment makes it a stacking context, and nothing can be
+ * lifted out of one. This is drawn INSIDE the cell it belongs to, which is the
+ * safe side of that rule — the same side the divider is on. */
+.journal-block-cell > .journal-widget-card + .journal-widget-card::before {
+  content: "";
+  position: absolute;
+  /* Centred in the gap the cell already lays between its children: back up half
+     the gap, then half the mark's own thickness. */
+  top: calc(var(--am-widget-gap) / -2 - 1px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--background-modifier-border);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.journal-group:hover .journal-block-cell > .journal-widget-card + .journal-widget-card::before {
+  opacity: 1;
+}
+/* Touch has no hover, and the same resting opacity the divider takes. */
+@media (hover: none) {
+  .journal-block-cell > .journal-widget-card + .journal-widget-card::before {
+    opacity: 0.3;
+  }
+}
+
+/* ── The block drag handle (4.7) ────────────────────────────────────────
+ *
+ * A HANDLE, NOT THE BLOCK. A block is full of controls — day cells, steppers,
+ * tiles, a click-to-edit title — and making the block itself draggable would
+ * put a drag one slip away from every one of them.
+ *
+ * ON HOVER ONLY, as a strip laid over the block's own top edge. A grip
+ * permanently visible on every block on the page would make a dashboard read as
+ * a form under construction.
+ *
+ * ── A STRIP ACROSS THE TOP, NOT A TAB IN THE CORNER ─────────────────────
+ *
+ * The first two versions were a 16px square: first in the block's left margin —
+ * which exists on a wide window and does not on a page that has capped its own
+ * width, so a vault reported it "too far right" when what showed was half a grip
+ * — then inside the top-left corner, over whatever the block drew there.
+ *
+ * BOTH WERE THE WRONG SIZE FOR THE THING THEY PICK UP. The unit that moves is a
+ * whole block, cells and all, and a control the size of a checkbox says it is
+ * about the corner it sits in. Full width says the block, and it is a target a
+ * reader can hit without aiming.
+ *
+ * ── OVER THE EDGE, NOT ABOVE IT, AND THE SAME EVERYWHERE ────────────────
+ *
+ * The version between them was a strip in flow: 14px of reserved column with a
+ * fill and a ring. Two vault reports retired it. It ADDED HEIGHT, which inside a
+ * section landed between the card's top edge and the bar under it — *"the grip
+ * handle has expanded the height of the bar itself"*. And the fill it took was
+ * `--background-secondary`, the section surface's own colour, so on a card all
+ * that ever showed of it was two rules ruled across the header.
+ *
+ * A strip absolutely positioned over the block's first 10px costs no height at
+ * all, and with no ground of its own it is the dots and nothing else — which is
+ * the version the same vault asked to have everywhere: *"much more low-profile
+ * and sleek."*
+ *
+ * NO FLEX PROPERTY DECIDES WHERE IT SITS, which is not a preference. The strip
+ * used `order: -1` to draw first while staying attached last (attached before
+ * `layOutRow` it would be collected into a cell, and 20-charts.css reads the
+ * block's first child) — and `.journal-sec-block` sets `display: flow-root`,
+ * winning over this file's `display: flex` on file order at equal specificity.
+ * Inside a section the order was therefore inert and the grip drew at the FOOT
+ * of its block; a run is one continuous surface, so that foot is the next
+ * block's head. A position holds in every display mode.
+ *
+ * ── AND THE STRIP GREW A HEAD TO SIT IN ────────────────────────────────
+ *
+ * A block with a `header:` bar has somewhere for a grip to sit and a name for
+ * what it is holding. A block without one had neither, so the grip was dots
+ * floating over a card — which works, and says nothing. A block now draws its
+ * own `.journal-block-head`: a slim bar with the block's name in it, where
+ * `blockTitle` can name the block.
+ *
+ * ── THE BAR OUTLIVED THE BLOCK GRIP (4.8.1) ────────────────────────────
+ *
+ * The block drag is gone — a block is moved from the section editor, which
+ * plans and previews where a drag could only write — so no `.jbd-handle` is
+ * built into a block's head any more. The head stayed, because it was never
+ * only a handle rail: the labels are the ones the section editor uses, so what
+ * a reader rearranges in that window is named the same as what they see here.
+ *
+ * WHAT STILL HAS A GRIP is a `.journal-widget-card` — a widget inside a row —
+ * because there the gesture is the only way to say which column something is
+ * in. The rules below therefore dress two heads with one class and only one of
+ * them has anything to grab.
+ *
+ * A HEAD WITH NOTHING TO SAY IS NOT DRAWN, and there are four ways to have
+ * nothing to say. Two are settled at render by `attachBlockHead`, which simply
+ * builds no head: the block's first child is already a bar, or `blockTitle`
+ * could not name the block. The other two are this file's, because the classes
+ * that decide them are added after the render:
+ *
+ *   `.journal-sec-block` — a block inside a section RUN, under someone else's
+ *   bar. `SectionPass` adds that class AFTER the render, so only CSS can see it,
+ *   and the head the block was built with is hidden here rather than never
+ *   drawn.
+ *
+ *   `.is-unframed` — `frame: none` and `frame: section` give up the block's
+ *   chrome, and a head is chrome. Handing one back would put a bar on a canvas
+ *   tile that asked for none.
+ *
+ * Those two are `display: none` as of 4.8.1. They used to keep the grip and
+ * give up the bar, laid over the block's own first 10px; with no grip left to
+ * keep, what remains is a bar that must not be drawn. */
+.journal-widget-block {
+  /* THE GRIP IS POSITIONED AGAINST THE BLOCK AND NOTHING ELSE, and this line is
+     load-bearing rather than tidy. It was lost for one build to a comment that
+     closed early, and an absolute strip with no positioned ancestor anchors to
+     whatever IS positioned above it: in Live Preview that is the code-block
+     widget, which sits exactly where the block does, so it looked perfect. In
+     reading view it is the note's sizer, so the grip drew at the top of the page
+     and every section on the note appeared to have lost it. The bug reads as
+     "works in one mode, missing in the other", which is what a positioning
+     context does when it is inherited by accident.
+
+     `container-type: inline-size` on the base rule does NOT do this: that is
+     layout containment, not position. */
+  position: relative;
+}
+/* THE BLOCK BECOMES A CARD, because a titled bar on the page's own background
+   is a label floating over a card rather than the head of one — reported from a
+   vault as *"I was expecting it to be the same consistent card style surface,
+   not a blank background."*
+ *
+ * THE SAME FOUR LINES THE THREE COMPOSITE CARDS USE, and the same two numbers:
+ * `12px 14px` of padding, `--am-rule` on `--background-modifier-border`,
+ * `--am-radius-md`. That is not a coincidence to be tidied — the head bleeds
+ * those exact numbers below, the way `.journal-entry-header` and
+ * `.journal-study-header` bleed their own cards' padding, so one set of numbers
+ * covers a head on any of them.
+ *
+ * AND ONLY WHERE THE BLOCK HAS NO CHROME ALREADY. The three composite cards
+ * paint this themselves; `is-unframed` gave it up on purpose and a canvas tile
+ * must not be handed a card back; a block inside a section RUN is already on
+ * someone else's surface. All four also take their heads down to a grip below,
+ * so the exclusions are the same set said twice — once about the card, once
+ * about the bar. */
+.journal-widget-block.has-head:not(
+    .is-unframed,
+    .journal-sec-block,
+    .journal-overview-card,
+    .journal-entry-banner,
+    .journal-study-banner
+  ),
+/* And a widget's own card inside a row, which is the same object one level down
+   and needs no exclusions: `cardWidget` builds it, so it is never anything
+   else. */
+.journal-widget-card {
+  padding: 12px 14px;
+  background: var(--background-secondary);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+}
+/* A CARD IS A COLUMN, so a widget that fills its cell fills this too — without
+   it a stack of cards in one cell is a stack of shrink-wrapped boxes of
+   different widths.
+   AND IT IS THE GROUND ITS SEAM STANDS ON (4.13.1 §4), the same sentence
+   `.journal-block-cell` already carries about its drop slots: the seam is drawn
+   into the gap ABOVE the card, so with nothing positioned here it would resolve
+   against the cell and every seam in a column would land at the same height. */
+.journal-widget-card {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+/* AND THE HEAD GIVES BACK THE PADDING IT CANCELLED (4.13.6 §1).
+ *
+ * `.journal-block-head` bleeds `margin: -12px -14px 0` so its rule meets the
+ * card's edges — and the top `-12px` eats the card's `padding-top` outright,
+ * with nothing put back below the rule. Whatever the card holds therefore starts
+ * on the hairline. Measured on the Go-to launcher: card border at y=1, head rule
+ * at y=32, the first tile's own border at y=33. **One pixel**, and on the focused
+ * tile the accent ring and the hairline are adjacent rows of pixels — which is
+ * what a reader sees as a tile overlapping the header.
+ *
+ * The card's own bottom padding was 12px on that same render, so the fix is the
+ * number the card already uses rather than a new one: the body sits 12px below
+ * the rule and 12px above the bottom edge, and the head's bleed is paid back
+ * exactly where it was taken.
+ *
+ * SCOPED TO THE CARD, NOT PUT ON THE HEAD. `.journal-widget-block.has-head` is
+ * the same head one level up, and that block is a flex column with
+ * `gap: var(--am-widget-gap)` — so it has always had air under its head and a
+ * margin here would add a second helping. The card is the one container with no
+ * gap, which is exactly why it is the one that showed the defect.
+ *
+ * `margin-bottom` RATHER THAN A `gap` ON THE CARD, because the head is
+ * `order: -1` while being appended LAST: a gap would also open between the head
+ * and anything else the card comes to hold, and the head is the only child whose
+ * spacing is in question. */
+.journal-widget-card > .journal-block-head {
+  margin-bottom: 12px;
+}
+/* THE HEAD AS THE CARD'S TOP BAND. `order: -1` draws it first while it stays
+   attached last, which is what keeps `layOutRow` from collecting it into a cell
+   and keeps 20-charts.css's `:first-child` reading the toolbar it was written
+   about. The grip-only forms below are absolute and do not depend on it — which
+   matters, because `.journal-sec-block` is not a flex container and an order
+   there is inert. */
+.journal-block-head {
+  order: -1;
+  align-self: stretch;
+  /* The grip centres against the head, in every one of its forms. */
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* Cancels the card's padding so the rule meets its edges, then re-applies it
+     inside — the two lines every band in this project uses, and the reason the
+     card above is 12/14 rather than a set of numbers of its own. */
+  margin: -12px -14px 0;
+  padding: 6px 14px 5px;
+  /* THE HAIRLINE, AS OF 4.13 §1. This drew `--am-rule` (2px) while the section
+     bar drew `--am-rule-hair` (1px) — so the quieter of the two bars divided
+     itself with the heavier line, which is an inversion nobody would defend once
+     the two are one object. */
+  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  gap: 8px;
+}
+/* The label idiom `.am-ev-section` already uses, and for the same reason: a
+   title that has to sit in 18px says what the block is without competing with
+   the titles inside it. */
+.journal-block-head-title {
+  /* THE SAME FOUR VALUES `.journal-header-title` READS (4.13 §1). This bar's
+     look did not change; the OTHER one came to meet it. What did change is the
+     ink — `--text-faint` to `--am-bar-ink` — because two bars that are one
+     object cannot sit two steps of contrast apart. */
+  font-size: var(--am-bar-text);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--am-bar-track);
+  color: var(--am-bar-ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The glyph's slot, matching `.journal-header-glyph` (4.13 §1). It could not
+   BE that class: `test/section-frame.test.ts` asserts that no module but
+   `section-frame.ts` emits that literal, and that ownership is worth more than
+   sharing a name. The values are the same because they read the same tokens. */
+.journal-block-head-glyph {
+  flex: 0 0 auto;
+  width: var(--am-sec-glyph);
+  text-align: center;
+  font-size: var(--am-bar-glyph);
+  line-height: 1.35;
+}
+/* THE TWO CASES ONLY CSS CAN SEE. A block inside a section run is already under
+   a bar, and an unframed block has given up its chrome; either way the head was
+   built before the class arrived, so it is hidden rather than never drawn. */
+.journal-widget-block.journal-sec-block > .journal-block-head,
+.journal-widget-block.is-unframed > .journal-block-head {
+  display: none;
+}
+
+/* The grip, which now belongs to a widget's card and to nothing else. */
+.jbd-handle {
+  position: absolute;
+  /* THE TOP EDGE, not the whole height of the host: the host is now the card or
+     the block itself rather than an 18px head, and a full-height drag target
+     over a widget would swallow every click in it. */
+  top: 0;
+  height: 10px;
+  z-index: 2;
+  /* AROUND THE DOTS, NOT ACROSS THE BLOCK. Full width was right while the strip
+     was the whole affordance; in a head it would lay an invisible drag target
+     over the title. */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  color: var(--text-faint);
+}
+/* The dots stay a grip rather than becoming a texture: a rail of them the width
+   of a dashboard is a pattern, not a thing to grab. A patch in the middle is
+   where a hand expects one, and one row is what 10px holds. */
+.jbd-handle::before {
+  content: "";
+  width: 32px;
+  height: 5px;
+  background: radial-gradient(currentColor 1px, transparent 1px) 0 0 / 5px 5px;
+}
+/* THE GRIP IS POSITIONED AGAINST THE THING IT DRAGS, and never inside its head
+   (4.8.3). It used to sit in the head where there was one — which read well and
+   had a fault only the stylesheet could reach: a head is HIDDEN on a block
+   inside a section run and on an unframed block, and a grip inside a hidden head
+   is a hidden grip. A vault saw that as most of a dashboard losing its drag
+   icons at once.
+
+   A head is a LABEL and a grip is a CONTROL; hanging one inside something four
+   rules may hide is a shared fate they have no reason to have. `jbd-host` is
+   added by the script, which is the only thing that knows which element drew the
+   thing being dragged. */
+.jbd-host {
+  position: relative;
+}
+/* EACH GRIP ANSWERS TO ITS OWN HOST. Unscoped, hovering anywhere in a row lit
+   every grip in it at once, which is the "form under construction" this
+   affordance is built to avoid. A grip appears where the hand already is. */
+.jbd-host:hover > .jbd-handle {
+  opacity: 1;
+}
+/* A GROUP'S GRIP LIVES IN ITS FOOT (4.9 §2.2), AND `.jbd-aside` IS GONE WITH THE
+   PROBLEM IT DODGED.
+
+   What was here: a rule moving a row block's own grip off the centre line,
+   because every grip is centred over the top edge of what it drags and on a row
+   of three that put the block's grip and the middle widget's at the same two
+   coordinates — two sets of dots on top of each other, read from a vault as one
+   duplicated. Its whole content was "get out of the way of grips I cannot see".
+
+   What replaces it is not a better hiding place. The foot is the group's OWN
+   edge, the one strip on the box with nothing else on it, so the collision
+   cannot arise there at all — and a rule that exists only to work around a
+   collision is deleted with it rather than carried forward as an exception
+   nobody can re-derive.
+
+   FULL HEIGHT rather than the 10px a grip laid over a block's top edge takes:
+   there the height is small because everything under it is a widget with
+   controls of its own, and here the foot IS the target, with nothing beneath it
+   for a taller hit area to swallow. */
+.journal-group-foot > .jbd-handle {
+  top: 0;
+  bottom: 0;
+  height: auto;
+  left: 0;
+  transform: none;
+  justify-content: flex-start;
+}
+/* AND IT ANSWERS TO THE WHOLE BOX. `.jbd-host:hover` reveals a grip when the
+   thing it drags is hovered, and the thing this one drags is the group — where
+   that rule alone would ask a reader to find a 14px strip before it showed them
+   what the strip was for. */
+.journal-group:hover .journal-group-foot > .jbd-handle {
+  opacity: 1;
+}
+.jbd-handle:active {
+  cursor: grabbing;
+}
+/* Touch has no hover to reveal it with — 3.9 §3.3's policy, at the resting
+   opacity every hover-revealed affordance takes. */
+@media (hover: none) {
+  .jbd-handle {
+    opacity: 0.3;
+  }
+}
+
+/* Whatever is being carried, dimmed. Keyed on `jbd-host` rather than on the card
+   class, because the thing with a grip on it is a card, a bare widget with a
+   band of its own, or a whole block — one rule for all three, and nothing to add
+   here when a fourth grows a grip.
+
+   There was a ring around a whole block here too, for the drop that swapped two
+   of them; 4.8.1 removed that gesture, and a highlight for a drop that cannot
+   happen is worse than none — the next reader believes it. What is in the air
+   points at a slot now, and the slot lights itself. */
+.jbd-host.is-dragging {
+  opacity: 0.5;
+}
+
+/* ── Where a widget can land (4.8 §1.2, geometry redone in 4.8.3) ───────
+ *
+ * A SLOT IS DRAWN, AND THAT IS THE WHOLE ARGUMENT. 4.7 removed a drop line
+ * between blocks because it was a two-pixel seam whose meaning came from which
+ * half of a block the pointer was in — invisible, and ambiguous while you were
+ * still deciding. Neither is true of these: a slot is a visible bar, it is a
+ * drop target in its own right, and it points at one place in the file.
+ *
+ * BUT THE FIRST VERSION MADE THE BAR AND THE TARGET THE SAME 18px, and that is
+ * what a vault reported as *"drag and drop does not work at all"*. An 18px strip
+ * lying half outside the block, revealed only once the pointer is already
+ * inside, is not a target a hand can find — and the column slots were 18px wide
+ * in a 10px gap, which is worse.
+ *
+ * SO THE HIT AREA IS LARGE AND THE INDICATOR IS SMALL. Every point of a block is
+ * inside some slot: the top half means "above this block", the bottom half
+ * "below it", and inside a row each half-cell means "this column". What is
+ * PAINTED is a 3px bar at the edge the drop would land on, so the reader still
+ * sees one exact place. The generosity is in the target and the precision is in
+ * the drawing, which is the only arrangement of the two that a pointer can use.
+ *
+ * ABSOLUTE, SO NOTHING MOVES. The alternative — real flex items that widen when
+ * a drag starts — opens a gap under the pointer, which shifts the row, which can
+ * move the row out from under the pointer, which closes the gap again.
+ *
+ * AND ONLY WHILE SOMETHING IS IN THE AIR. `is-slotting` is put on the block by a
+ * drag arriving over it, so a page at rest has no landing places drawn on it and
+ * nothing is covered by an invisible target. */
+.jbd-slot {
+  position: absolute;
+  display: none;
+  background: transparent;
+}
+.journal-widget-block.is-slotting .jbd-slot {
+  display: block;
+}
+/* THE BAR IS THE SLOT'S WHOLE APPEARANCE, drawn on the edge the arrival would
+   sit against. The slot itself stays transparent until the pointer is in it,
+   because a page of tinted rectangles during a drag hides the thing being
+   arranged. */
+.jbd-slot::after {
+  content: "";
+  position: absolute;
+  background: var(--background-modifier-border);
+  border-radius: 2px;
+}
+.jbd-slot.is-live {
+  background: var(--background-modifier-hover);
+  border-radius: var(--am-radius-sm);
+}
+.jbd-slot.is-live::after {
+  background: var(--interactive-accent);
+}
+/* Out of the row, into a block of its own — the half a swap could not say. The
+   two of them tile the block, so there is nowhere on it that means nothing. */
+.jbd-slot-above,
+.jbd-slot-below {
+  left: 0;
+  right: 0;
+  height: 50%;
+  z-index: 3;
+}
+.jbd-slot-above {
+  top: 0;
+}
+.jbd-slot-below {
+  top: 50%;
+}
+/* ON A ROW BLOCK THEY ARE BANDS ALONG ITS EDGES, not halves (4.8.5). The cells
+   tile the middle, so what is left for "above" and "below" is the block's own
+   padding — the strip that is visibly outside the row, which is where a reader
+   would aim to say "outside the row".
+
+   AND ABOVE THE CELLS, WHICH TAKES NO ARGUMENT ABOUT NUMBERS: a cell is a
+   stacking context (`container-type: inline-size` implies layout containment),
+   so every slot inside one is sealed in it and any positive z-index on a direct
+   child of the block clears them all. */
+.jbd-slot-edge {
+  /* A SHARE OF THE BLOCK WITH A FLOOR AND A CEILING (4.8.7). It was a flat
+     16px, which is the block's own padding and about a fingertip — reachable in
+     principle and not in practice, and the one number in this design picked
+     without seeing it. A quarter of the block is a target a hand finds; the
+     floor keeps it usable on a short row and the ceiling keeps it from eating
+     the columns on a tall one. */
+  height: clamp(24px, 25%, 72px);
+  z-index: 5;
+}
+.jbd-slot-above.jbd-slot-edge {
+  top: 0;
+}
+.jbd-slot-below.jbd-slot-edge {
+  top: auto;
+  bottom: 0;
+}
+.jbd-slot-above::after,
+.jbd-slot-below::after {
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+.jbd-slot-above::after {
+  top: -2px;
+}
+.jbd-slot-below::after {
+  bottom: -2px;
+}
+/* FIVE PLACES ON EVERY WIDGET IN A ROW (4.8.6), reading outward: the widget's
+   edges are the row, and its middle is the widget itself.
+
+     left / right edge  — a column of its own, before or after this cell
+     top / bottom       — the same column, above or below this widget
+     the middle         — trade places with this widget
+
+   THE EDGES ARE A FIFTH OF THE WIDTH EACH and the bands a fifth of the height,
+   which leaves the middle the largest of the five. That is the right way round:
+   a swap is the one drop that needs no aim — it is about the widget rather than
+   about a place beside it — and the four that DO need aim are the ones drawn
+   against an edge, where a hand already knows where to go.
+
+   THEY SIT ON THE WIDGET, NOT ON THE CELL, because a cell may hold two widgets
+   and "above this one" is not a fact about the column. That is also what makes
+   the arithmetic exact: each slot closes over the line that drew the widget it
+   is drawn on. */
+.jbd-slot-before,
+.jbd-slot-after {
+  top: 0;
+  bottom: 0;
+  width: 20%;
+  z-index: 4;
+}
+.jbd-slot-before {
+  left: 0;
+}
+.jbd-slot-after {
+  right: 0;
+}
+.jbd-slot-before::after,
+.jbd-slot-after::after {
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+.jbd-slot-before::after {
+  left: calc(var(--am-widget-gap) / -2 - 1px);
+}
+.jbd-slot-after::after {
+  right: calc(var(--am-widget-gap) / -2 - 1px);
+}
+/* The two that stack, between the edges. */
+.jbd-slot-over,
+.jbd-slot-under {
+  left: 20%;
+  right: 20%;
+  height: 20%;
+  z-index: 4;
+}
+.jbd-slot-over {
+  top: 0;
+}
+.jbd-slot-under {
+  bottom: 0;
+}
+.jbd-slot-over::after,
+.jbd-slot-under::after {
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+.jbd-slot-over::after {
+  top: 0;
+}
+.jbd-slot-under::after {
+  bottom: 0;
+}
+/* And the middle, which is a swap. Its mark is a ring rather than a bar: a bar
+   says "the arrival goes on this side of that line" and a swap has no side. */
+.jbd-slot-swap {
+  left: 20%;
+  right: 20%;
+  top: 20%;
+  bottom: 20%;
+  z-index: 4;
+}
+.jbd-slot-swap::after {
+  inset: 0;
+  background: none;
+  border: 2px dashed var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+}
+.jbd-slot-swap.is-live::after {
+  background: none;
+  border-color: var(--interactive-accent);
+  border-style: solid;
+}
+.jbd-slot-before {
+  left: calc(var(--am-widget-gap) / -2 - 9px);
+}
+.jbd-slot-after {
+  right: calc(var(--am-widget-gap) / -2 - 9px);
+}
+
+/* ── Making a group on the page (4.9 §4) ────────────────────────────────
+ *
+ * Until now a group could only be made in the section editor — two clicks away
+ * from the page it is about, under a label describing a list. A block that is
+ * NOT already a group now offers two side quarters, and its above/below halves
+ * give up their outer quarters to make room.
+ *
+ * FOUR ZONES, READING OUTWARD, which is the same grammar the five places on a
+ * widget inside a group already use: the sides are BESIDE this block and the
+ * middle is ABOVE and BELOW it. A reader who has learnt one has learnt the
+ * other.
+ *
+ * ── DRAWN ONLY WHERE THERE IS ROOM TO SPLIT ────────────────────────────
+ *
+ * 660px is two cells at the `--am-row-cell-min` floor plus the gap between them,
+ * which is the narrowest a two-column group can be without wrapping straight
+ * back into a stack. A quarter offering a group that would collapse the instant
+ * it was made is a control that cannot do its job, and `empty.ts`'s rule is that
+ * such a control is not drawn greyed — it is not drawn.
+ *
+ * ASKED OF THE BLOCK, NOT OF THE PANE, and that is 4.3.1's lesson honoured
+ * rather than repeated: a query resolves against the nearest inline-size
+ * ancestor, `.journal-widget-block` establishes one, and the block is exactly
+ * the thing that has to hold two columns. The one thing a container query still
+ * cannot know is how many cells will share the result — which is why this
+ * governs whether the quarters exist at all and not what they do.
+ *
+ * THE OVERRIDE IS SCOPED, not a bare `display: none`. `.is-slotting .jbd-slot`
+ * turns every slot on at three classes of specificity, so the rule that holds
+ * these back has to match it and win on order. */
+.jbd-slot-side {
+  top: 0;
+  bottom: 0;
+  width: 25%;
+  z-index: 3;
+}
+.jbd-slot-side-left {
+  left: 0;
+}
+.jbd-slot-side-right {
+  right: 0;
+}
+.jbd-slot-side::after {
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+.jbd-slot-side-left::after {
+  left: -2px;
+}
+.jbd-slot-side-right::after {
+  right: -2px;
+}
+.journal-widget-block.is-slotting .jbd-slot-side {
+  display: none;
+}
+@container (min-width: 660px) {
+  .journal-widget-block.is-slotting .jbd-slot-side {
+    display: block;
+  }
+  /* AND THE HALVES STAND BACK. Without this the block's own above/below slots
+     tile its whole width and the quarters would sit under them — the two kinds
+     would overlap, which is exactly the fault 4.8.4 spent a release on. They are
+     given different GROUND rather than different numbers, which is that
+     release's own conclusion.
+
+     `:not(.jbd-slot-edge)` because a ROW block's halves are already bands along
+     its top and bottom, it has no side quarters, and narrowing them would take
+     away the only place a widget can be dropped to leave the group. */
+  .journal-widget-block.is-slotting .jbd-slot-above:not(.jbd-slot-edge),
+  .journal-widget-block.is-slotting .jbd-slot-below:not(.jbd-slot-edge) {
+    left: 25%;
+    right: 25%;
+  }
+}

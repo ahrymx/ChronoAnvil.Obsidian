@@ -1,0 +1,1800 @@
+/* ── Mood emoji-face picker (built-in Mood tracker) ─────────────────────── */
+.journal-mood-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.journal-scale-faces {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+/* The context-note pencil: a badge pinned to the corner of the SELECTED face,
+   rather than a button sitting after the row. It marks the reading it belongs
+   to instead of the widget as a whole, and gives the cell back the width the
+   old button cost on every scale tracker. Muted until a note exists, accented
+   once one does — so a filled pencil is a glanceable "this reading has a why".
+
+   pointer-events: none, deliberately: the badge is a mark, not a control. The
+   face underneath takes the click, which is what makes "press the value again
+   to annotate it" a single target rather than a 14px one sitting on a 28px
+   one. */
+.journal-scale-note-mark {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.95em;
+  height: 0.95em;
+  border-radius: var(--am-radius-pill);
+  background: var(--background-secondary);
+  box-shadow: 0 0 0 1.5px var(--background-secondary);
+  color: var(--text-faint);
+  pointer-events: none;
+  transition: color 0.12s;
+}
+.journal-scale-note-mark .svg-icon {
+  width: 0.62em;
+  height: 0.62em;
+  stroke-width: 2.6;
+}
+.journal-scale-note-mark.has-note {
+  color: var(--interactive-accent);
+}
+.journal-mood-face {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: var(--am-radius-sm);
+  background: transparent;
+  padding: 1px 4px;
+  font-size: 1.25em;
+  line-height: 1.1;
+  cursor: pointer;
+  filter: grayscale(0.7) opacity(0.55);
+  transition: filter 0.12s, transform 0.12s, background 0.12s, border-color 0.12s;
+}
+/* The glyph is its own node so the badge above can be a sibling rather than a
+   stray child of a button whose text gets rewritten. */
+.journal-mood-face-glyph {
+  display: inline-block;
+}
+.journal-mood-face:hover {
+  filter: grayscale(0) opacity(1);
+  transform: translateY(-1px);
+  background: var(--background-modifier-hover);
+}
+.journal-mood-face.is-selected {
+  filter: grayscale(0) opacity(1);
+  transform: scale(1.15);
+  background: var(--background-secondary);
+  border-color: var(--interactive-accent);
+}
+/* The selected face carries the badge, so it must not clip it — and the scale
+   transform above would otherwise shrink the mark with it, which is why the
+   badge sizes in `em` off the face's own font size and lands consistent. */
+.journal-mood-face.is-selected {
+  overflow: visible;
+}
+
+/* ── Habit / boolean checkbox ───────────────────────────────────────────────
+   Three visual states, matching the widget's unset → done → not-done cycle.
+   Unset is an empty bordered box; done is an accent-filled ✓; not-done is a
+   muted ✗, so "I didn't do it" reads as a logged answer distinct from a blank
+   day rather than looking the same as unset. Sized to sit on the tracker
+   grid's baseline next to steppers and pickers. */
+.journal-habit {
+  display: inline-flex;
+  align-items: center;
+}
+.journal-habit-box {
+  width: 1.6em;
+  height: 1.6em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  /* `--am-rule-hair`, and this is a no-op on screen rather than a retune.
+     It read `1.5px` from the day it was written and has never drawn 1.5px:
+     Chromium floors border-width to whole CSS pixels, so 1.4, 1.5 and 1.6 all
+     compute to 1px at every device pixel ratio. The declaration said one thing
+     and the browser did another for as long as it existed, which is precisely
+     the state the 3.6 scale is for — a weight nobody chose, that nobody could
+     see, that a reader of this file would have taken for a decision. */
+  border: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 0.95em;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.12s;
+}
+.journal-habit-box:hover {
+  border-color: var(--interactive-accent);
+  transform: translateY(-1px);
+}
+.journal-habit-box.is-done {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.journal-habit-box.is-not-done {
+  color: var(--text-muted);
+  border-color: var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+/* ── The Habits cell ──────────────────────────────────────────────────────
+   Every boolean tracker on a note folds into ONE logging cell titled "Habits",
+   each becoming a named chip inside it. A boolean is one bit of information
+   and was being given a whole cell — an eyebrow, 76px of height and half the
+   grid's width — to hold it, so four habits filled the entry banner and pushed
+   the things that actually have a magnitude off the first screen.
+
+   The cell is a normal grid cell (it does NOT span both columns): the banner's
+   welded-panel rules draw its borders from :nth-child parity, and a spanning
+   cell would put every cell after it on the wrong side of that. Chips wrap
+   instead, so the cell grows in height only, and only when it has to. */
+.journal-habits-cell {
+  /* Content-height rather than centred: chips wrapping to a second row should
+     grow the cell downward from the label, not push the label off-centre. */
+  justify-content: flex-start;
+  gap: 7px;
+}
+.journal-habits-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* A chip is a pill, not a checkbox with a caption. The tracker's own name
+   lives in it — an eyebrow reading "EXERCISE" over a lone checkbox says the
+   same thing twice — and the whole pill tints with the state, so a row of them
+   is readable at a glance rather than a row of small boxes you have to look
+   *at*. */
+.journal-habit-chip {
+  /* Anchor for the remove ×, which floats on the corner rather than taking a
+     slot in the pill: a chip is a few characters wide, and a control inline
+     with the name would either crowd it or truncate it. */
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+.journal-habit-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--am-space-2) var(--am-space-5) var(--am-space-2) var(--am-space-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-primary);
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.journal-habit-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The box inside a chip is smaller than the standalone one and never grows:
+   the pill carries the state now, and the box is the mark on it. */
+.journal-habit-chip .journal-habit-box {
+  flex: 0 0 auto;
+  width: 1.15em;
+  height: 1.15em;
+  font-size: 0.85em;
+  /* Same non-decision as the standalone box above; see the note there. */
+  border-width: var(--am-rule-hair);
+}
+.journal-habit-chip-btn:hover {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+.journal-habit-chip.is-done .journal-habit-chip-btn {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-weight: 500;
+}
+.journal-habit-chip.is-not-done .journal-habit-chip-btn {
+  color: var(--text-faint);
+}
+.journal-habit-chip.is-not-done .journal-habit-chip-name {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* Per-chip removal. The generic cell rule already positions
+   .journal-tracker-remove absolutely and hides it until hover — but the cell
+   here holds many trackers, so the anchor is the chip and the reveal is the
+   chip's own hover, or every × in the cell would light up at once. */
+.journal-tracker-bar .journal-habits-cell .journal-tracker-remove {
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--am-radius-pill);
+  background: var(--background-secondary);
+  box-shadow: 0 0 0 1px var(--background-modifier-border);
+}
+.journal-tracker-bar .journal-habits-cell .journal-tracker-remove .svg-icon {
+  width: 10px;
+  height: 10px;
+}
+/* Cancel the cell-wide reveal, then re-grant it per chip. */
+.journal-tracker-bar
+  .journal-habits-cell:hover
+  .journal-habit-chip
+  .journal-tracker-remove {
+  opacity: 0;
+}
+.journal-tracker-bar
+  .journal-habits-cell
+  .journal-habit-chip:hover
+  .journal-tracker-remove,
+.journal-tracker-bar
+  .journal-habits-cell
+  .journal-habit-chip
+  .journal-tracker-remove:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .journal-tracker-bar
+    .journal-habits-cell
+    .journal-habit-chip
+    .journal-tracker-remove {
+    opacity: 0.45;
+  }
+}
+
+/* ── Derived value chip (Sleep, when shown as a bare tracker) ───────────── */
+.journal-derived-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* ── Coupled Wake-Up + Bedtime sleep control ───────────────────────────────
+   The Sleep module is a full logging cell (it carries .journal-tracker-cell),
+   so the bordered card, background and padding all come from the cell rule
+   above — .journal-sleep itself is a transparent internal layout wrapper. It
+   stacks a single row of both time fields over the live readout, filling the
+   shared cell height rather than being an inline island of its own. */
+.journal-sleep {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 6px;
+  /* Neutralise the standalone chrome now that the cell provides it. */
+  padding: 0;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  min-width: 0;
+}
+/* Bedtime and Wake-Up sit side by side, each an eyebrow label over its own
+   time input — matching the eyebrow treatment of every other cell. They drop
+   to a stacked pair only on genuinely tiny cells. */
+.journal-sleep-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px 12px;
+  flex-wrap: wrap;
+}
+.journal-sleep-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.journal-sleep-label {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.journal-sleep-field input[type="time"] {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--am-text-sm);
+  padding: var(--am-space-1) var(--am-space-3);
+  cursor: pointer;
+}
+.journal-sleep-readout {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+}
+.journal-sleep-asleep {
+  color: var(--am-mood-5);
+}
+.journal-sleep-awake {
+  color: var(--text-muted);
+}
+.journal-sleep-hint {
+  color: var(--text-faint);
+  font-weight: 400;
+  font-style: italic;
+}
+
+/* ── Sleep summary (aggregate over daily entries) ──────────────────────── */
+.journal-sleep-summary h3 {
+  margin: 0 0 8px;
+}
+.journal-sleep-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.journal-sleep-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 6.5em;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-secondary);
+}
+.journal-sleep-stat-value {
+  font-size: 1.2em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+.journal-sleep-stat-label {
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* One radius, one weight, no fill.
+   RADIUS: was `--am-radius-pill`, then the card's `--am-radius-md`. It is the
+   CONTROL corner now (4.13.1 §1) — the tier `--am-radius-sm` was defined for,
+   "inputs, selects, steppers, ghost icon buttons". A button is one of those and
+   was the only one drawing itself at the card's corner, which on a 22px box is
+   most of the way back to the pill this rule's first line took it off.
+   PADDING: was `3px 12px`, two literals typed against a desktop label. It reads
+   the control scale now — the scale 3.9 §3.3 added for exactly this and which
+   the mobile floor overrides in one place. Slimmer by a pixel vertically and
+   four horizontally, which is what "slimmer" was asked for.
+   FILL: was `--background-secondary`, which is exactly what a section card is
+   painted with as of §1.6. A secondary button was drawing itself in the card's
+   own colour and surviving on its border alone; saying `transparent` makes that
+   the intent rather than a collision waiting to be "fixed" by someone who
+   notices the button has no contrast.
+   WEIGHT: 600 was heavier than any label around it. */
+.journal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  padding: var(--am-control-pad-y) var(--am-space-4);
+  font-size: var(--am-text-xs);
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+
+/* MONOCHROME ON HOVER TOO (4.13.1 §1). This lit the accent, which is the colour
+   the rule below has just given up — a button that is grey at rest and violet
+   under the pointer has not stopped being an accent control, it has moved the
+   accent somewhere a screenshot does not show. */
+.journal-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+/* THE PRIMARY TIER IS NOT A COLOUR ANY MORE (4.13.1 §1).
+ *
+ * `mod-cta` used to fill with `--interactive-accent`, which put two violet
+ * capsules on a homepage whose every other edge is a hairline — and the same
+ * two on a dashboard, where *Add chart* shouted next to a section title drawn in
+ * 11px faint caps.
+ *
+ * THE VALUES ARE NOT NEW. `90-nav-and-study-cards.css` worked them out for the
+ * study table in 2.56, under a comment saying that "repeated on every topic row
+ * that accent becomes noise" and drawing both actions as quiet pills instead.
+ * That was right about one table for a reason that is true of every page, so the
+ * exception is hoisted here and DELETED there — an exception that has become the
+ * rule is not kept as both.
+ *
+ * THE RULE STAYS, RATHER THAN THE CLASS BEING DROPPED FROM THE MARKUP. Obsidian
+ * styles `button.mod-cta` with the accent from its own stylesheet, so "flat"
+ * has to be said out loud here or the host says the opposite. The class also
+ * still MEANS something the sheet reads: 50-entry-header.css keeps a section's
+ * one primary action's label in a narrow pane and takes the words off the
+ * others. Flat is a look, not an erasure. */
+.journal-btn.mod-cta {
+  background: var(--background-secondary);
+  border-color: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.journal-btn.mod-cta:hover {
+  opacity: 1;
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+/* Icon-language (Phase 2): a button carries either a Lucide icon (chrome —
+   refresh, add, edit, remove, prev/next) or an identity emoji (a journal
+   kind's own glyph, e.g. a custom type's "New Lesson" button) — never
+   both. Both sit in a fixed-size slot so mixed icon/emoji/plain buttons
+   in the same row line up. */
+.journal-btn-icon {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+}
+.journal-btn-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.journal-btn-emoji {
+  line-height: 1;
+}
+
+/* Icon-only ghost buttons — shared by every directional/utility icon button
+   in the plugin. `.jc-arrow` was a second selector here until 2.26: the home
+   calendar's month prev/next arrows were its only users, and the quarter rail
+   retired them (every month is one tap away, so a stepper had nothing left to
+   do). The rule stands on its own rather than overriding `.journal-btn`
+   because these buttons are used standalone, without the wrapper class. */
+.journal-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  padding: var(--am-space-3);
+  border-radius: var(--am-radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.journal-btn-ghost:hover {
+  background: var(--background-modifier-hover);
+  border-color: transparent;
+  color: var(--text-normal);
+}
+.journal-btn-ghost .journal-btn-icon {
+  width: 0.9em;
+  height: 0.9em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SETTINGS TAB
+   ═══════════════════════════════════════════════════════════════════════
+
+   The tab is built from three repeating parts, in this order of nesting:
+
+     group   — a collapsible <details> section (Trackers, Journal types…)
+     list    — a stack of rows inside a group
+     row     — one tracker / journal type / event: token, text, pills, actions
+
+   A row is a *summary*, never a form. Every field belongs to the editor
+   modal (.almanac-editor-modal, below), which is what stopped the page
+   reflowing under the cursor every time an item was expanded or its type
+   changed. The rule that keeps this honest: nothing inside .almanac-list
+   is an input, a dropdown or a textarea — only toggles, which are one
+   click and change nothing else's height. */
+
+.almanac-settings {
+  --am-set-gap: 10px;
+}
+
+/* --- Hero + general block ---------------------------------------------- */
+
+.almanac-settings-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 4px;
+}
+.almanac-hero-text h2 {
+  margin: 0;
+  font-size: 1.5em;
+  line-height: 1.2;
+}
+.almanac-hero-text p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+}
+
+.almanac-settings-general {
+  margin-bottom: 18px;
+}
+.almanac-settings-general .setting-item:last-child {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* --- Collapsible groups ------------------------------------------------
+   Native <details> rather than a custom widget: this is a plain settings
+   tab, not a note, so there's no need for the header bars' fold state /
+   levels machinery — just something that remembers whether the user left
+   it open or closed.
+
+   The summary is a card in its own right: icon token, title + one-line
+   description, a count badge and a chevron. A collapsed tab therefore
+   still answers "how many trackers do I have?" without opening anything,
+   which the old bare text summaries could not. */
+
+.almanac-settings-group {
+  margin: var(--am-set-gap) 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-primary);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+.almanac-settings-group:hover {
+  border-color: var(--background-modifier-border-hover);
+}
+.almanac-settings-group[open] {
+  background: var(--background-primary);
+}
+
+.almanac-settings-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background 0.12s ease;
+}
+.almanac-settings-summary::-webkit-details-marker { display: none; }
+.almanac-settings-summary:hover {
+  background: var(--background-modifier-hover);
+}
+.almanac-settings-group[open] > .almanac-settings-summary {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.almanac-settings-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--am-radius-sm);
+  background: var(--background-secondary);
+  font-size: 1.05em;
+  line-height: 1;
+}
+
+.almanac-settings-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.almanac-settings-title {
+  font-weight: 600;
+  color: var(--text-normal);
+  line-height: 1.25;
+}
+.almanac-settings-sub {
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  margin-top: 1px;
+}
+
+.almanac-settings-badge {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: var(--am-radius-pill);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.almanac-settings-chevron {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  transition: transform 0.18s ease;
+}
+.almanac-settings-chevron svg {
+  width: 18px;
+  height: 18px;
+}
+.almanac-settings-group[open] > .almanac-settings-summary .almanac-settings-chevron {
+  transform: rotate(180deg);
+}
+
+.almanac-settings-body {
+  padding: 4px 14px 14px;
+}
+/* The first setting in a body already sits under the summary's border. */
+.almanac-settings-body > .setting-item:first-child {
+  border-top: none;
+}
+
+/* Explanatory preamble. One muted block rather than three loose
+   descriptions, so the wall of text before the Trackers list reads as a
+   note and not as three settings that lost their controls. */
+.almanac-settings-note {
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--am-radius-sm);
+  background: var(--background-secondary);
+  border-left: 2px solid var(--background-modifier-border);
+}
+.almanac-settings-note p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  line-height: 1.5;
+}
+.almanac-settings-note p + p {
+  margin-top: 7px;
+}
+
+/* --- Section header (label + optional action) --------------------------- */
+
+.almanac-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0 8px;
+}
+/* A foldable section inside a settings group. The head keeps the same
+   small-caps look as a plain .almanac-section-head; what it gains is a chevron
+   on the left, an optional count on the right of the title, and <details>
+   behaviour. */
+.almanac-section-fold {
+  margin: 0;
+}
+summary.almanac-section-head-fold {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  border-radius: var(--am-radius-sm);
+}
+/* Safari/WebKit draws its own disclosure triangle; ours is the chevron. */
+summary.almanac-section-head-fold::-webkit-details-marker {
+  display: none;
+}
+summary.almanac-section-head-fold:hover .almanac-section-title,
+summary.almanac-section-head-fold:hover .almanac-section-chevron {
+  color: var(--text-muted);
+}
+summary.almanac-section-head-fold:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 3px;
+}
+/* The chevron leads the title, so the title stays where the eye already
+   expects it; the count sits immediately after so it reads as part of the
+   label rather than as a right-aligned statistic. Any action button keeps the
+   far right, pushed there by the spacer below. */
+.almanac-section-chevron {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-faint);
+  transition: transform 0.14s ease, color 0.12s ease;
+}
+.almanac-section-chevron svg {
+  width: 13px;
+  height: 13px;
+}
+details[open] > summary .almanac-section-chevron {
+  transform: rotate(90deg);
+}
+/* The head is a flex row with space-between, which is right for
+   title-then-action but puts the count against the far edge. Growing the title
+   instead keeps title and count together and leaves the action alone. */
+.almanac-section-head-fold .almanac-section-title {
+  flex: 0 0 auto;
+}
+.almanac-section-count {
+  flex: 1 1 auto;
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.almanac-section-head-fold .almanac-section-action {
+  flex: 0 0 auto;
+}
+.almanac-section-fold-body {
+  padding-bottom: 2px;
+}
+/* A collapsed section shouldn't leave the gap its open body had. */
+.almanac-section-fold:not([open]) + .almanac-section-fold > .almanac-section-head {
+  margin-top: 10px;
+}
+.almanac-section-title {
+  font-size: var(--am-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.almanac-section-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: var(--am-space-2) var(--am-space-6);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.almanac-section-action:hover {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.almanac-section-action-icon {
+  display: grid;
+  place-items: center;
+}
+.almanac-section-action-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* --- List rows ----------------------------------------------------------
+   One row per tracker / journal type / event. Left to right: a token
+   (emoji or coloured event icon), the text column (title, subtitle,
+   pills), then the action cluster. The actions only appear on hover on
+   desktop — a list of eight trackers with four buttons each is a lot of
+   visual noise for controls you use once a month — but they stay visible
+   whenever the row has focus inside it, so keyboard users never chase a
+   button they can't see, and always on touch, which has no hover. */
+
+.almanac-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.almanac-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-secondary);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.almanac-list-row:hover {
+  border-color: var(--background-modifier-border-hover);
+}
+/* A disabled item stays legible but visibly inert — it's still listed
+   because turning it back on is the point. */
+.almanac-list-row.is-locked {
+  opacity: 0.6;
+}
+.almanac-list-row.is-locked:hover {
+  opacity: 1;
+}
+
+/* ── The dense variant: a row on a NOTE rather than in Settings (2.56.5) ──
+   The component was written for a settings list — a bordered card with 10px
+   of padding and a background, which is right when six of them fill a modal
+   and wrong when a dozen sit under a section header on a dashboard. Twelve
+   cards is a page of cards.
+
+   Only spacing and the token change. Not the shape: the whole value of one
+   component is that a row is a row, so a reader who has seen the section
+   editor's list already knows how to read a lesson list. */
+.almanac-list-row.is-dense {
+  gap: 8px;
+  padding: 6px;
+  border: none;
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0;
+  background: none;
+  align-items: baseline;
+}
+.almanac-list-row.is-dense:hover {
+  background: var(--background-modifier-hover);
+}
+.almanac-list-row.is-dense:last-child {
+  border-bottom: none;
+}
+/* An empty token takes no space. A note row has no glyph of its own — its
+   identity is its name — and a 30px empty box in front of every row would
+   indent the whole list to reserve room for nothing. */
+.almanac-list-row.is-dense .almanac-list-token:empty {
+  display: none;
+}
+.almanac-list-row.is-dense .almanac-list-title {
+  font-weight: 500;
+}
+
+.almanac-list-token {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  font-size: 0.95em;
+  line-height: 1;
+}
+.almanac-list-token svg {
+  width: 16px;
+  height: 16px;
+}
+
+.almanac-list-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.almanac-list-title {
+  font-weight: 600;
+  color: var(--text-normal);
+  line-height: 1.3;
+  word-break: break-word;
+}
+.almanac-list-subtitle {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  line-height: 1.45;
+}
+
+.almanac-list-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.almanac-list-pill {
+  padding: var(--am-space-1) var(--am-space-4);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.almanac-list-pill.is-on {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+.almanac-list-pill.is-off {
+  color: var(--text-faint);
+  border-style: dashed;
+}
+.almanac-list-pill.is-muted {
+  color: var(--text-faint);
+}
+
+.almanac-list-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ── The actions row (4.15 §2) ───────────────────────────────────────────
+   The same layout the narrow-viewport rule at the foot of this file has
+   given every row below 620px since it was written — "a row's pills and
+   four action buttons no longer fit beside the text, so the actions drop
+   to their own line" — offered to a caller that wants it at every width.
+
+   The section editor is the caller. It puts a dropdown or a text field in
+   that slot beside a group button and a Remove button, and a field and a
+   title dividing one line is the title's loss: it is the one that may
+   shrink. Three separate workarounds had been written for the symptom.
+
+   `flex-wrap` AND `order`, NOT A SECOND CONTAINER. The lead keeps its
+   place before the token, so "move this up" stays where list-row.ts put
+   it and away from "remove this"; only the actions move, to a full-width
+   third line under the text. */
+.almanac-list-row.has-actions-row {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.almanac-list-row.has-actions-row .almanac-list-main {
+  /* The text takes the rest of the first line; the actions take the next.
+     `100%` on the main region would push the token onto a line of its own. */
+  flex: 1 1 0;
+}
+.almanac-list-row.has-actions-row .almanac-list-actions {
+  order: 3;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--am-space-2);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: var(--am-rule-hair) solid var(--background-modifier-border);
+}
+/* Nothing dead is drawn: a row whose actions slot stayed empty draws no
+   divider and pays no padding for it. The section editor produces these —
+   a locked row has no Remove button and may have no questions either. */
+.almanac-list-row.has-actions-row .almanac-list-actions:empty {
+  display: none;
+}
+
+.almanac-list-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--am-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  /* Dimmed rather than hidden. A fully transparent control makes the row
+     look inert — there is nothing to tell you a tracker can be edited at
+     all until you happen to hover it. Faint-but-present reads as quiet
+     while still advertising that the row has actions. */
+  opacity: 0.45;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.almanac-list-row:hover .almanac-list-btn,
+.almanac-list-row:focus-within .almanac-list-btn {
+  opacity: 1;
+}
+.almanac-list-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.almanac-list-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.almanac-list-btn.is-danger:hover {
+  background: var(--background-modifier-error);
+  color: var(--text-error);
+}
+/* A move button at the end of the list stays in place so the cluster
+   doesn't reflow, but reads as unavailable. */
+.almanac-list-btn.is-disabled,
+.almanac-list-row:hover .almanac-list-btn.is-disabled,
+.almanac-list-row:focus-within .almanac-list-btn.is-disabled {
+  opacity: 0.15;
+  cursor: default;
+}
+/* Touch has no hover, so nothing would ever reach the full-strength state. */
+@media (hover: none) {
+  .almanac-list-btn { opacity: 1; }
+}
+
+/* A toggle inside a row's action cluster. Obsidian's Setting always draws
+   a full-width flex row with its own padding and border; stripped back
+   here to just the switch. */
+.almanac-list-toggle {
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
+}
+.almanac-list-toggle .setting-item {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: block;
+}
+.almanac-list-toggle .setting-item-info { display: none; }
+.almanac-list-toggle .setting-item-control {
+  padding: 0;
+  justify-content: flex-end;
+}
+
+/* --- Empty state -------------------------------------------------------- */
+
+.almanac-empty-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 14px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  line-height: 1.5;
+}
+.almanac-empty-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+.almanac-empty-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* A secondary action that belongs to the section but isn't part of the
+   list — "Sync now" under the trackers. Sits below with a rule above it so
+   it doesn't read as another list row. */
+.setting-item.almanac-settings-footer-action {
+  margin-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+  border-bottom: none;
+}
+
+/* --- Editor modals ------------------------------------------------------
+   The shared frame behind the tracker, mood, journal-type and study-emoji
+   editors. A fixed max height with only the body scrolling keeps the
+   footer's Cancel/Save reachable no matter how many fields a type has —
+   the whole point of moving these off the settings page was that the
+   controls stopped being where you left them. */
+
+.almanac-editor-modal {
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  padding-top: 4px;
+}
+
+.almanac-editor-head {
+  flex: 0 0 auto;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.almanac-editor-head h3 {
+  margin: 0;
+  font-size: 1.15em;
+}
+.almanac-editor-subtitle {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  line-height: 1.5;
+}
+
+.almanac-editor-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 2px 2px 4px;
+  margin: 0 -2px;
+}
+.almanac-editor-body .setting-item {
+  padding: 12px 0;
+}
+.almanac-editor-body > .setting-item:first-child {
+  border-top: none;
+}
+
+/* Grouped fields inside a longer editor (the journal type's Identity /
+   Folders / Structure / Note kinds), so a form with ten fields reads as
+   four short ones. */
+.almanac-editor-section + .almanac-editor-section {
+  margin-top: 6px;
+}
+.almanac-editor-section-title {
+  margin: 14px 0 0;
+  font-size: var(--am-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.almanac-editor-section-title + .setting-item {
+  border-top: none;
+}
+
+/* Rows whose control is several small inputs side by side (min/max/step/
+   unit, noun + emoji) rather than one wide one. */
+.almanac-editor-inline-fields .setting-item-control {
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.almanac-editor-inline-fields input.almanac-editor-num {
+  width: 5.5em;
+  text-align: center;
+}
+input.almanac-editor-emoji {
+  width: 3.4em;
+  text-align: center;
+}
+
+/* Textarea rows stack: a label above a full-width field, since an emoji
+   map or a kinds list needs the whole width and several lines. */
+.almanac-editor-textarea .setting-item-control {
+  width: 100%;
+}
+.almanac-editor-textarea textarea {
+  width: 100%;
+  min-height: 7em;
+  resize: vertical;
+}
+.almanac-editor-mono {
+  font-family: var(--font-monospace);
+  font-size: var(--am-text-sm);
+}
+
+/* Validation message. Hidden until a save is blocked, so the modal doesn't
+   pre-emptively scold anyone for a form they haven't finished. */
+.almanac-editor-error {
+  flex: 0 0 auto;
+  margin: 8px 0 0;
+  padding: 8px 11px;
+  border-radius: var(--am-radius-sm);
+  /* RED TEXT ON A TINTED PANEL, NOT ON A RED ONE.
+
+     This was `background: var(--background-modifier-error)` with
+     `color: var(--text-error)`, and in Obsidian's current default themes those
+     two resolve to the same red — so the bar rendered as a solid red block with
+     its message invisible inside it. A validation message nobody can read is
+     worse than no message: the reader sees that something is wrong and is told
+     nothing about what, which is exactly the state a form is not allowed to
+     leave someone in.
+
+     The tint is composed from the theme's own red rather than from a fixed
+     colour, so it follows a custom theme the way the old rule intended to. The
+     border carries the strong red the fill used to, which is what keeps the bar
+     as visible as it was. */
+  background: rgba(var(--color-red-rgb), 0.12);
+  border: 1px solid rgba(var(--color-red-rgb), 0.35);
+  color: var(--text-error);
+  font-size: var(--am-text-xs);
+}
+/* A message is the only reason this exists, so an empty one is a bug rather
+   than a state — but it renders as a bare red bar if it ever happens again, and
+   a bar with nothing in it should take up no room. */
+.almanac-editor-error:empty {
+  display: none;
+}
+
+/* A refusal that can be acted on (4.17 §1). The message is now its own element
+   because a button had to sit under it rather than beside it: the strings here
+   run to two sentences, and a control on the same line as two sentences either
+   wraps into them or squeezes them. */
+.almanac-editor-error-text {
+  white-space: pre-line;
+}
+/* NOT `mod-cta`, AND NOT `mod-warning`. This button sits inside a red panel that
+   is already saying "something is wrong" — a second alarm colour on top of it
+   reads as a second problem, and the accent CTA reads as the thing the reader
+   came here to press, which is the SAVE button in the footer. So it is an
+   ordinary button on a red ground: available, clearly a control, and not
+   competing with the one below it. */
+.almanac-editor-error-action {
+  margin-top: 8px;
+  font-size: var(--am-text-xs);
+}
+.almanac-editor-error-action[disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* --- Derived folder paths ------------------------------------------------
+   A journal's folders follow its name, so they are shown rather than typed —
+   the same treatment Settings → Paths gives every path that follows a root. */
+.almanac-derived-paths {
+  padding: 9px 11px;
+  border-radius: var(--am-radius-sm);
+  background: var(--background-secondary);
+}
+.almanac-derived-path {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+.almanac-derived-path-label {
+  flex: 0 0 5.5em;
+  color: var(--text-faint);
+  font-size: var(--am-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.almanac-derived-path-value {
+  font-family: var(--font-monospace);
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+  word-break: break-all;
+}
+.almanac-derived-path-note {
+  margin-top: 7px;
+  color: var(--text-faint);
+  font-size: var(--am-text-2xs);
+  line-height: 1.45;
+}
+
+.almanac-editor-hint {
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  line-height: 1.5;
+  padding: 8px 0 2px;
+}
+
+/* --- Note kinds, as rows -------------------------------------------------
+   Replaced a textarea with a grammar of its own. The rating is the choice
+   that matters most (Recall grades into it, the trend chart plots it), so it
+   is a dropdown of the journal's real trackers rather than an asterisk. */
+.almanac-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+.almanac-kind {
+  padding: 9px 11px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  background: var(--background-secondary);
+}
+.almanac-kind-head {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+input.almanac-kind-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+}
+.almanac-kind-remove {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.almanac-kind-remove:hover:not(:disabled) {
+  color: var(--text-error);
+}
+.almanac-kind-remove:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.almanac-kind-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  align-items: center;
+  margin-top: 8px;
+}
+.almanac-kind-field-label {
+  flex: 0 0 4.6em;
+  color: var(--text-faint);
+  font-size: var(--am-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding-top: 4px;
+}
+.almanac-kind-field select.dropdown {
+  font-size: var(--am-text-sm);
+  height: auto;
+  padding: 3px 22px 3px 7px;
+}
+.almanac-kind-field-note {
+  flex: 1 1 100%;
+  margin-left: 5.6em;
+  color: var(--text-faint);
+  font-size: var(--am-text-2xs);
+  line-height: 1.4;
+}
+.almanac-kind-add {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--am-text-sm);
+  cursor: pointer;
+}
+
+/* A suggester row with a second line, for pickers whose choices need a
+   sentence (the section catalogue). The description is the section's own
+   blurb, the same string the wizard's checklist shows. */
+.almanac-choice-detailed .almanac-choice-label {
+  font-weight: 600;
+}
+.almanac-choice-detailed .almanac-choice-desc {
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  line-height: 1.4;
+}
+/* The run heading (4.15 §3, corrected in 4.16). It is a SIBLING of the first
+   row of its group, not a child of it: as a child it sat inside the suggestion's
+   own hover and selection highlight, so the heading lit up as part of the row
+   below it and could be clicked as that row.
+
+   Selected on the class alone, so it is styled the same whether it landed beside
+   the row or — where the item was not in the tree yet — inside it.
+
+   The section bar's own spec, from the tokens rather than by eye, because this
+   is the same object one surface over: a small ruled label over the things it
+   indexes. */
+.almanac-choice-group {
+  /* ITS OWN PADDING, because a sibling of the rows is not indented by them.
+     Horizontal matches Obsidian's own suggestion padding so the heading and the
+     names below it start at one x position; the fallback is that variable's
+     shipped value, for a theme that has dropped it. */
+  padding: 10px var(--size-4-3, 12px) 4px;
+  margin-bottom: 2px;
+  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border-hover);
+  color: var(--am-bar-ink);
+  font-size: var(--am-bar-text);
+  font-weight: 600;
+  letter-spacing: var(--am-bar-track);
+  text-transform: uppercase;
+}
+/* The first heading in the list needs no space above it — the modal's own
+   padding is already there, and a run heading is not a gap between two runs
+   when there is nothing before it. */
+.almanac-choice-group:first-child {
+  padding-top: 2px;
+}
+
+/* --- The journal designer's Sections step -------------------------------
+   A step rail in the head, then a two-pane body: the type's templates on
+   the left, and the sections applicable to the selected one on the right
+   above a schematic of the arrangement. The schematic is deliberately a
+   drawing rather than a render — a live `topics-table` in a journal with no
+   notes is a column of empty states, which teaches nothing about layout. */
+
+.almanac-wizard-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+.almanac-wizard-pip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 4px;
+  border-radius: 999px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.almanac-wizard-pip.is-done {
+  cursor: pointer;
+}
+.almanac-wizard-pip.is-done:hover {
+  color: var(--text-normal);
+}
+.almanac-wizard-pip.is-current {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.almanac-wizard-pip-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: var(--background-primary);
+  color: inherit;
+}
+.almanac-wizard-pip.is-current .almanac-wizard-pip-n {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.almanac-wizard-sections {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding-top: 12px;
+}
+
+.almanac-wizard-templates {
+  flex: 0 0 30%;
+  min-width: 8.5em;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.almanac-wizard-template {
+  padding: 7px 9px;
+  border-radius: var(--am-radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  line-height: 1.3;
+}
+.almanac-wizard-template:hover {
+  background: var(--background-modifier-hover);
+}
+.almanac-wizard-template.is-active {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border);
+}
+.almanac-wizard-template-name {
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+}
+.almanac-wizard-template-count {
+  color: var(--text-faint);
+  font-size: var(--am-text-2xs);
+}
+
+.almanac-wizard-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.almanac-wizard-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.almanac-wizard-check {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 6px 2px;
+}
+.almanac-wizard-check input[type="checkbox"] {
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+.almanac-wizard-check-text {
+  min-width: 0;
+}
+.almanac-wizard-check-label {
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+}
+.almanac-wizard-check-blurb {
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  line-height: 1.45;
+}
+
+.almanac-wizard-schematic {
+  margin-top: 14px;
+  padding-top: 11px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.almanac-wizard-schematic-title {
+  font-size: var(--am-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 7px;
+}
+.almanac-wizard-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.almanac-wizard-block {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: var(--am-radius-sm);
+  background: var(--background-secondary);
+  border-left: 3px solid var(--interactive-accent);
+  font-size: var(--am-text-xs);
+}
+.almanac-wizard-block.is-frontmatter {
+  border-left-color: var(--background-modifier-border);
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-size: var(--am-text-2xs);
+}
+.almanac-wizard-block-icon {
+  flex: 0 0 auto;
+}
+
+/* A block for somewhere the thing will NOT appear. The tracker editor's
+   placement schematic draws the negatives as well as the positives, because
+   "not a Diary.base column" is the half a reader gets wrong — and a list of
+   only the positives cannot be told apart from a list that is missing one. */
+.almanac-wizard-block.is-off {
+  background: transparent;
+  border-left-style: dashed;
+  border-left-color: var(--background-modifier-border);
+  color: var(--text-faint);
+}
+.almanac-wizard-block.is-off .almanac-wizard-block-icon {
+  opacity: 0.45;
+}
+
+.almanac-wizard-schematic-note {
+  margin-top: 8px;
+  color: var(--text-faint);
+  font-size: var(--am-text-2xs);
+  line-height: 1.45;
+}
+
+/* --- The chart editor's size preview ------------------------------------
+   Four cells, because four is the widest a dashboard row gets before it
+   wraps — so "Large (2×2)" fills the drawing exactly and the other three
+   sizes read as fractions of something rather than as abstract dimensions.
+   The label already says 2×1; this says two columns of what. */
+.almanac-wizard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: 2.4em;
+  gap: 4px;
+  max-width: 17em;
+}
+.almanac-wizard-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: var(--am-radius-sm);
+  background: var(--background-secondary);
+  border: 1px solid var(--interactive-accent);
+  color: var(--text-normal);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.almanac-wizard-tile.is-w2 {
+  grid-column: span 2;
+}
+.almanac-wizard-tile.is-h2 {
+  grid-row: span 2;
+}
+.almanac-wizard-ghost {
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+}
+
+.almanac-editor-footer {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+/* ── The "+ Add tracker" picker ───────────────────────────────────────────
+   A window rather than a suggester, because the list is only half the
+   question: the other half is "what if the thing I want to log isn't a
+   tracker yet", and a suggester has nowhere to put the answer. Its footer
+   carries "New tracker…" as the CTA, which is why the create path costs one
+   press from here instead of a round trip through Settings.
+
+   It USES .almanac-editor-modal's frame (head / scrolling body / footer) so the
+   two windows read as the same kind of object — pressing New tracker… opens the
+   editor, and the second window should look like the first one grew fields
+   rather than like a different app.
+
+   It said "borrows" until 2.56.11, and meant it: the window extended `Modal`
+   and then built `.almanac-editor-head`, `.almanac-editor-subtitle` and
+   `.almanac-editor-footer` by hand, copying the class names of a frame it could
+   not reach. A component that wanted the shared thing badly enough to
+   reimplement its markup, described accurately in a comment by someone who
+   could see the problem and had no cheap way to fix it. That sentence was the
+   sharpest evidence in the 2.56 plan (§5.1) and it was already in this file.
+   `TrackerPickerModal extends EditorModal` now, so the word is "uses". */
+.almanac-tracker-picker .almanac-picker-search {
+  flex: 0 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 12px 0 8px;
+}
+.almanac-tracker-picker .almanac-picker-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 80px;
+  /* Bleed to the modal's edges so a hovered row's tint runs the full width,
+     the way a suggester's rows do. */
+  margin: 0 -6px;
+  padding: 2px 6px;
+}
+.almanac-picker-row {
+  padding: var(--am-space-4) var(--am-space-5);
+  border-radius: var(--am-radius-md);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.almanac-picker-row:hover {
+  background: var(--background-modifier-hover);
+}
+.almanac-picker-row-label {
+  color: var(--text-normal);
+  font-weight: 500;
+}
+/* The second line says what the choice WRITES — its type, its unit, its
+   property. A suggester could only fit that by cramming both into one string
+   with a separator, which is what it used to do. */
+.almanac-picker-row-detail {
+  margin-top: 1px;
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+}
+.almanac-picker-empty {
+  padding: 18px 10px;
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  text-align: center;
+}
+/* The CTA leads with a + so it reads as "make one" rather than as the save
+   button of a form that isn't there. */
+.almanac-tracker-picker .almanac-editor-footer .mod-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.almanac-picker-new-icon {
+  display: inline-flex;
+}
+.almanac-picker-new-icon .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* --- Narrow viewports ---------------------------------------------------
+   Below the mobile breakpoint a row's pills and four action buttons no
+   longer fit beside the text, so the actions drop to their own line. */
+@media (max-width: 620px) {
+  .almanac-list-row {
+    flex-wrap: wrap;
+  }
+  .almanac-list-main {
+    flex: 1 1 100%;
+    order: 2;
+  }
+  .almanac-list-actions {
+    order: 3;
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 4px;
+    border-top: 1px solid var(--background-modifier-border);
+  }
+  .almanac-settings-sub {
+    display: none;
+  }
+}
+
+/* ── The grain row (2.58.2) ──────────────────────────────────────────────
+   Five labelled checkboxes on one line: "which diary entries can carry this
+   tracker".
+
+   A ROW, NOT A COLUMN. The five grains are one question with five answers, and
+   stacking them makes the tracker editor's third step twice as tall for a
+   question that reads at a glance. It wraps rather than scrolls or truncates,
+   because a sixth grain is a table edit away and a layout that only works at
+   five is a layout that breaks silently when the table grows.
+
+   The label wraps the input, so the text is part of the hit target. A 13px
+   checkbox on its own is a small target on a laptop trackpad and a hostile one
+   on a touch screen — and this plugin ships `isDesktopOnly: false`. */
+
+/* Obsidian's `.setting-item` is a two-column flex — text left, control right —
+   which fits one widget and fights five. Stacked, the description gets the full
+   width and the row below it gets the full width, so neither is competing for
+   space with the other. */
+.almanac-setting-stacked {
+  display: block;
+}
+
+.almanac-setting-stacked .setting-item-control {
+  justify-content: flex-start;
+  margin-top: var(--size-4-2);
+  padding-top: 0;
+  width: 100%;
+}
+
+.almanac-grain-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  /* Left, because it now sits under the description and reads with it as one
+     block. Right-alignment was a consequence of living in the control column,
+     not a decision. */
+  justify-content: flex-start;
+  gap: var(--size-4-2) var(--size-4-3);
+}
+
+.almanac-grain-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-2);
+  cursor: var(--cursor);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  white-space: nowrap;
+}
+
+/* Ticked reads as normal text, unticked as muted: the row's state is legible
+   without reading the boxes, which is the whole reason the labels are here. */
+.almanac-grain-option:has(input:checked) {
+  color: var(--text-normal);
+}
+
+.almanac-grain-option input {
+  margin: 0;
+}
+
+/* The wizard's reorder arrows (3.18 §2). Sized and toned like the section
+   editor's, which is the control they were lifted from — a reader who has used
+   one should not have to learn the other. Inert rather than absent at the ends
+   of the list, on the same rule the chart range cycle follows. */
+.almanac-wizard-arrows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.almanac-wizard-arrow {
+  padding: 0 var(--am-space-2);
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  font-size: var(--am-text-2xs);
+  line-height: 1.1;
+  cursor: pointer;
+}
+.almanac-wizard-arrow:hover:not(:disabled) {
+  color: var(--text-normal);
+}
+.almanac-wizard-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}

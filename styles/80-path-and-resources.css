@@ -1,0 +1,238 @@
+/* ── Learning Path (path: widget) ─────────────────────────────────────────
+   A re-orderable checklist. Shares the task-line store with `tasks:` but is
+   presented as an ordered table: a step number, checkbox, editable text, and
+   up/down/delete controls. Order is the content, so the move buttons are a
+   first-class control rather than the priority/due pair a `tasks:` row carries. */
+.journal-path-add {
+  margin-bottom: 6px;
+}
+.journal-path-add-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--am-text-base);
+  padding: var(--am-space-4) var(--am-space-6);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.journal-path-add-input::placeholder {
+  color: var(--text-faint);
+}
+.journal-path-add-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  background: var(--background-primary);
+}
+.journal-path-empty {
+  color: var(--text-faint);
+  font-size: var(--am-text-base);
+  padding: 4px 8px;
+}
+.journal-path-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--am-radius-sm);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.journal-path-row:hover {
+  background: var(--background-secondary);
+  border-color: var(--background-modifier-border);
+}
+/* Step number: a muted, fixed-width index so the sequence reads even before the
+   move buttons are used. Tabular figures keep 1 and 10 the same width. */
+.journal-path-num {
+  flex: 0 0 auto;
+  min-width: 1.4em;
+  text-align: right;
+  color: var(--text-faint);
+  font-size: var(--am-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.journal-path-check {
+  flex: 0 0 auto;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+.journal-path-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--am-text-base);
+  padding: 3px 4px;
+  border-radius: var(--am-radius-sm);
+}
+.journal-path-text:hover {
+  background: var(--background-primary);
+}
+.journal-path-text:focus {
+  outline: none;
+  background: var(--background-primary);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+.journal-path-row.is-done .journal-path-text {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+.journal-path-row.is-done .journal-path-num {
+  opacity: 0.55;
+}
+/* Move buttons sit together as a pair; delete is set slightly apart. Same ghost-
+   button shape as the task row's controls. */
+.journal-path-moves {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: 1px;
+}
+.journal-path-move,
+.journal-path-del {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7em;
+  height: 1.7em;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--am-radius-sm);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.journal-path-move:hover,
+.journal-path-del:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.journal-path-move:disabled {
+  opacity: 0.3;
+  cursor: default;
+  background: transparent;
+  color: var(--text-faint);
+}
+.journal-path-del:hover {
+  color: var(--text-error, #e05561);
+}
+.journal-path-move .svg-icon,
+.journal-path-del .svg-icon {
+  width: 1em;
+  height: 1em;
+}
+
+/* ── Resources: three attachment sections ─────────────────────────────────
+   Docs / Tutorials / Practice sit under one collapsible "Resources" header,
+   each with its own uppercase label and a fully-rounded input bar. The header
+   plus the labels do the grouping, so — unlike the monthly review's joined
+   highlights/challenges box — the sections are NOT fused into one squared-off
+   box: fusing them clipped each bar's inner corners, which read as a rendering
+   fault next to the per-section labels. Storage is three regions on disk. */
+.journal-attach--res-docs .journal-attach-zone,
+.journal-attach--res-tutorials .journal-attach-zone,
+.journal-attach--res-practice .journal-attach-zone {
+  transition: border-color 0.15s ease;
+}
+/* Section sub-labels (Docs/Tutorials/Practice) use the same uppercase, muted,
+   outside-the-box treatment as every other standalone field's label, so the
+   three read as siblings under the Resources header. */
+.journal-attach--res-docs .journal-attach-label,
+.journal-attach--res-tutorials .journal-attach-label,
+.journal-attach--res-practice .journal-attach-label {
+  margin: 2px 0 4px;
+}
+
+.journal-stepper {
+  gap: 2px;
+}
+
+.journal-step-btn {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  width: 1.6em;
+  height: 1.6em;
+  line-height: 1;
+  font-size: var(--am-text-base);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.journal-step-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.journal-step-value {
+  min-width: 3em;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  padding: 0 2px;
+}
+
+/* The task table's scope cycle — Below / Journal / Path (3.18 §5.3).
+   A quiet control that states the scope whether or not it can be changed, so a
+   reader always knows what the table below is counting.
+
+   NO LONGER ABSOLUTELY POSITIONED (3.21.2). It was `position: absolute; top: 0;
+   right: 0`, which is what pinned it to the top-right corner of the table's own
+   wrapper — correct for as long as it lived inside the table. 3.19.2 moved it
+   into the section's header bar and left this rule behind, so the button was
+   still created and still in the DOM, and still absolutely positioned against
+   whatever the nearest positioned ancestor happened to be: it landed on top of
+   the section frame's own corner, behind the fold chevron, or nowhere visible
+   at all. The section appeared to have lost its control entirely.
+
+   An ordinary flex item now, because the actions strip is a flex row that
+   already spaces and aligns what it holds — the same treatment every other
+   header-anchored button gets, and the reason none of them carries coordinates
+   of its own. */
+/* `background: transparent` since 4.13.1 §1. It filled with
+   `--background-primary` — the NOTE's colour, under a section card painted
+   `--background-secondary` — so the one control on the strip that is not a
+   `.journal-btn` was also the only one with a fill, and read as sunk into the
+   bar rather than sitting on it. */
+.journal-tasks-scope {
+  flex: 0 0 auto;
+  padding: 2px var(--am-space-3);
+  border-radius: var(--am-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  cursor: pointer;
+}
+.journal-tasks-scope:hover {
+  color: var(--text-normal);
+}
+.journal-tasks-scope.is-static {
+  cursor: default;
+  opacity: 0.6;
+}
+/* The positioning context for the scope button in the ONE place it is still
+   drawn inside the table: a fence carrying `tasks-table` with no `header:`
+   above it, which has no actions strip to host the control. Kept rather than
+   removed with the absolute rule, because that case is legal and must not lose
+   the button — it is the fallback `buildTasksTableRegion` renders when
+   `hostedControls` is false. */
+.journal-tasks-table {
+  position: relative;
+}
+.journal-tasks-table > .journal-tasks-scope {
+  position: absolute;
+  top: 0;
+  right: 0;
+}

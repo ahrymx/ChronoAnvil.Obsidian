@@ -1,0 +1,61 @@
+filters:
+  and:
+    - journal != null
+    - or:
+        - file.inFolder("02 - Diary/Weekly")
+        - file.inFolder("02 - Diary/Monthly")
+formulas:
+  Type: 'if(journal == "Monthly Entry", "📆 Monthly", "📝 Daily")'
+properties:
+  file.name:
+    displayName: Entry
+  journal-date:
+    displayName: Date
+  formula.Type:
+    displayName: Type
+  Mood:
+    displayName: ☀️ Mood
+  Wake-Up:
+    displayName: 😴 Wake-Up
+  Bedtime:
+    displayName: 🌙 Bedtime
+  Sleep:
+    displayName: 🛌 Sleep
+views:
+  - type: table
+    name: Recent Entries
+    order:
+      - journal-date
+      - formula.Type
+      - file.name
+      - Mood
+      - Wake-Up
+      - Bedtime
+      - Sleep
+    sort:
+      - property: journal-date
+        direction: DESC
+    limit: 20
+  - type: table
+    name: Daily Entries
+    filters: journal == "Daily Notes"
+    order:
+      - journal-date
+      - file.name
+      - Mood
+      - Wake-Up
+      - Bedtime
+      - Sleep
+    sort:
+      - property: journal-date
+        direction: DESC
+    limit: 30
+  - type: table
+    name: Monthly Entries
+    filters: journal == "Monthly Entry"
+    order:
+      - journal-date
+      - file.name
+    sort:
+      - property: journal-date
+        direction: DESC

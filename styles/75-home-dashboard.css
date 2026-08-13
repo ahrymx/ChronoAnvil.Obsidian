@@ -1,0 +1,923 @@
+/* ── Home dashboard rhythm (2.8) ─────────────────────────────────────────
+   Reads the home as one continuous dashboard rather than a stack of
+   collapsible cards: it evens out the vertical spacing between a section and
+   the next so the page flows at a single rhythm. Scoped to the block that
+   carries the diary card, so only the home page is affected.
+
+   THE HOOK MOVED, AND THE OTHER HALF OF THIS BLOCK IS DELETED (4.13.1 §3).
+   Both were keyed on `:has(.jc-diary-header)` — the hero band — which no longer
+   exists on any page, so both would have gone on being written and matching
+   nothing. `.jc-actions` is the same marker for the same block: the diary card
+   is the only widget in the plugin that draws one, and it draws one on exactly
+   the surfaces the hero did.
+
+   The half that went was `border-bottom-width: 1px` on every section bar after
+   this one, which "softens the divider … the rest drop to a hairline" against a
+   2px default. 4.13 §1 made a hairline the default for every bar in the plugin,
+   so the rule had been restating it for a release — and a rule that agrees with
+   the default is one nobody can tell has stopped working. */
+.journal-widget-block:has(.jc-actions) ~ .journal-widget-block {
+  margin-top: 1.1em;
+}
+
+
+/* note: a full-width free-text field whose text persists to the note body
+   (see notestore.ts) — the widget-based replacement for editable
+   `>[!focus]`-style callouts. Several stack inside one ```almanac block as a
+   section of labelled fields; the rhythm below keeps them reading as one
+   grouped unit rather than four disconnected cards. */
+.journal-note {
+  display: block;
+  margin: 0 0 0.9em;
+}
+.journal-note:last-child {
+  margin-bottom: 0;
+}
+.journal-note-label {
+  font-size: var(--am-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+.journal-note-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.6em;
+  resize: none; /* height is managed by auto-grow; no manual handle or scrollbar */
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--am-text-base);
+  line-height: 1.5;
+  padding: var(--am-space-4) var(--am-space-6);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.journal-note-input::placeholder {
+  color: var(--text-faint);
+}
+.journal-note-input:hover {
+  border-color: var(--background-modifier-border-hover, var(--interactive-accent));
+}
+.journal-note-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  background: var(--background-primary);
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 130, 120, 255), 0.15);
+}
+.journal-note-input:disabled {
+  color: var(--text-error, var(--text-faint));
+  font-style: italic;
+  cursor: not-allowed;
+}
+
+/* --- Per-purpose note field specialization ------------------------------- */
+
+/* Single-line variant (note:key#line): fixed height, no growth, no wrap —
+   behaves like a text field. Used for short one-liners like Today's focus. */
+.journal-note--line .journal-note-input {
+  min-height: 0;
+  height: auto;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+/* Today's focus: one emphasized intent line. Larger, weightier text — it's the
+   day's headline, so it should read like one. */
+.journal-note--focus .journal-note-input {
+  font-size: 1.05em;
+  font-weight: 500;
+  color: var(--text-normal);
+  padding-top: var(--am-space-5);
+  padding-bottom: var(--am-space-5);
+}
+
+/* Log: long-form reflections. Generous minimum so it invites paragraphs, and a
+   comfortable max before it scrolls rather than pushing the page endlessly. */
+.journal-note--log .journal-note-input {
+  min-height: 5em;
+  max-height: 24em;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+
+/* list: a list of prose entries, one row per line (2.12). Sits between `note:`
+   (one blob of free text) and `tasks:` (a list of things with state). The
+   markup is a label, then one row per entry, each a bullet plus an
+   auto-growing textarea — see widgets.ts::buildList. */
+.journal-list {
+  display: block;
+  margin: 0 0 0.9em;
+}
+.journal-list:last-child {
+  margin-bottom: 0;
+}
+.journal-list-label {
+  font-size: var(--am-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+.journal-list-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 3px 0;
+}
+/* The bullet is a fixed-size dot on its own baseline rather than a text
+   character, so a wrapped entry's second line aligns to the text and not under
+   the marker. `margin-top` centres it on the first line of a 1.55 line-height
+   row; it is not a magic number so much as half a line minus half the dot. */
+.journal-list-bullet {
+  flex: 0 0 auto;
+  width: 4px;
+  height: 4px;
+  margin-top: 0.62em;
+  border-radius: 50%;
+  background: var(--text-faint);
+  transition: background 0.15s ease;
+}
+.journal-list-row:focus-within .journal-list-bullet {
+  background: var(--interactive-accent);
+}
+/* The trailing "type here" row: its bullet is hollow until it has content, so
+   an empty list doesn't show a dot pointing at nothing. */
+.journal-list-row.is-empty .journal-list-bullet {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+}
+.journal-list-input {
+  flex: 1 1 auto;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  resize: none;
+  overflow: hidden;
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--am-text-base);
+  line-height: 1.55;
+  min-height: 1.55em;
+}
+.journal-list-input::placeholder {
+  color: var(--text-faint);
+}
+.journal-list-input:hover,
+.journal-list-input:focus {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+/* Highlights + Challenges: two regions, one box (2.11, widened 2.12).
+   ------------------------------------------------------------------------
+   These were `>[!highlights]` / `>[!challenges]` callouts until 2.11. As
+   callouts they rendered as two near-empty titled boxes that couldn't be typed
+   into from reading view, and nothing else in Almanac could read them. They're
+   now `list:` fields — but a monthly retrospective is *one* thought ("how did
+   the month go"), so they're presented as one box with a divider rather than
+   two stacked cards.
+
+   Deliberately still two regions on disk. Merging them into a single field
+   would read the same and be simpler, but it would make "pull twelve months of
+   highlights" (a year-in-review digest) a prose-parsing problem rather than a
+   region read — and un-merging later would mean hand-editing every month note.
+   The presentation is the cheap thing to change; the storage is not.
+
+   Two things this got wrong on the way here, worth stating so they aren't
+   reintroduced:
+
+   1. The halves are flex items of `.journal-widget-block`, which separates its
+      children with `gap`, not margin. Zeroing `margin-bottom` did nothing and
+      the box rendered as two boxes with a 10px trough between them. The gap has
+      to be cancelled explicitly — hence `--am-widget-gap` above.
+
+   2. Every other field in an entry puts its label *outside* its box, uppercase
+      and muted. Sentence-case labels inside the box made this pair read as a
+      foreign component rather than one more field. The labels here match the
+      page's label typography exactly; the shared border and divider do the
+      grouping, without a second competing label style. */
+.journal-list--highlights,
+.journal-list--challenges {
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  padding: 9px 12px 10px;
+  transition: border-color 0.15s ease;
+}
+.journal-list--highlights {
+  border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
+  border-bottom: none;
+  margin-bottom: 0;
+}
+/* Cancels the container's flex gap so the two halves actually touch. The
+   divider the user sees is the challenges half's own top border. */
+.journal-list--challenges {
+  border-radius: 0 0 var(--am-radius-md) var(--am-radius-md);
+  margin-top: calc(-1 * var(--am-widget-gap));
+}
+.journal-list--highlights .journal-list-label,
+.journal-list--challenges .journal-list-label {
+  margin-bottom: 3px;
+}
+
+/* Hover and focus light the *whole* box, not the half under the cursor.
+   Accenting one half alone draws the accent along the shared seam and makes the
+   join look like a rendering fault — the opposite of what the join is for.
+   Forward propagation (top half active -> bottom half follows) is a plain
+   adjacent-sibling selector. */
+.journal-list--highlights:hover,
+.journal-list--highlights:focus-within,
+.journal-list--challenges:hover,
+.journal-list--challenges:focus-within,
+.journal-list--highlights:hover + .journal-list--challenges,
+.journal-list--highlights:focus-within + .journal-list--challenges {
+  border-color: var(--interactive-accent);
+}
+
+/* Backward propagation (bottom half active -> top half follows) needs `:has()`,
+   which is kept in its own rule on purpose: an unsupported selector invalidates
+   the *entire* group it appears in, so folding this into the list above would
+   take ordinary hover down with it on any renderer that lacks `:has()`. Isolated
+   like this, the worst case is that the top half doesn't light up — a cosmetic
+   asymmetry rather than a dead interaction. */
+.journal-list--highlights:has(+ .journal-list--challenges:hover),
+.journal-list--highlights:has(+ .journal-list--challenges:focus-within) {
+  border-color: var(--interactive-accent);
+}
+
+/* --- Settings: derived paths under a root -------------------------------
+   Read-only rows showing where each path that follows a root currently
+   resolves. Indented under their root's text field with a rule down the left,
+   so the list reads as "these belong to the field above" rather than as more
+   settings. */
+
+.almanac-path-children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: -6px 0 14px 14px;
+  padding-left: 12px;
+  border-left: 2px solid var(--background-modifier-border);
+}
+.almanac-path-child {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: var(--am-text-xs);
+}
+.almanac-path-child-label {
+  color: var(--text-muted);
+  min-width: 11ch;
+}
+.almanac-path-child-value {
+  font-family: var(--font-monospace);
+  color: var(--text-faint);
+  word-break: break-word;
+}
+
+/* --- Attachments (attach:) ----------------------------------------------
+   Two zones inside one dashed drop area: a thumbnail gallery for images and
+   a chip row for links, vault files and any legacy free text. The whole area
+   is a drop/paste target, so it stays visible (and obviously droppable) even
+   when empty. */
+
+.journal-attach {
+  display: block;
+  margin: 0 0 0.9em;
+}
+.journal-attach-label {
+  font-size: var(--am-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  /* A row since 3.19.2, so the shelf's remove control can sit at its end. The
+     text keeps every type rule it had; only the box around it changed. */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--am-space-2);
+}
+
+/* Remove this category.
+
+   FAINT UNTIL HOVER, on the same reasoning as .jsh-title-edit: it is an
+   affordance on a row that is mostly a label, and a always-visible ✕ beside
+   every shelf would read as three ways to delete something. */
+.journal-attach-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: none;
+  box-shadow: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  border-radius: var(--am-radius-sm);
+  transition: opacity 0.12s, color 0.12s, background 0.12s;
+}
+.journal-attach-remove svg {
+  width: 13px;
+  height: 13px;
+}
+.journal-attach:hover .journal-attach-remove {
+  opacity: 1;
+}
+.journal-attach-remove:hover:not(:disabled) {
+  color: var(--text-error);
+  background: var(--background-modifier-hover);
+}
+/* Still shown, still explained by its tooltip, but plainly not available —
+   a control that vanished on the shelves with files in them would read as an
+   inconsistency rather than as a rule. */
+.journal-attach-remove.is-static {
+  cursor: default;
+  opacity: 0.35;
+}
+.journal-attach:hover .journal-attach-remove.is-static {
+  opacity: 0.35;
+}
+
+.journal-attach-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-secondary);
+  transition: border-color 0.15s ease, background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.journal-attach-zone:focus-visible {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 130, 120, 255), 0.15);
+}
+/* Dragging a file over the field: solid accent edge + a faint accent wash, so
+   the target is unmistakable without the layout shifting. */
+.journal-attach-zone.is-dragover {
+  border-style: solid;
+  border-color: var(--interactive-accent);
+  background: rgba(var(--interactive-accent-rgb, 130, 120, 255), 0.08);
+}
+
+/* Gallery: auto-fitting tiles, so a single image doesn't stretch across the
+   note and a dozen wrap into neat rows at any pane width. */
+.journal-attach-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+.journal-attach-gallery.is-empty {
+  display: none;
+}
+@container (max-width: 380px) {
+  .journal-attach-gallery {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
+}
+
+.journal-attach-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  overflow: hidden;
+  background: var(--background-primary);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.journal-attach-tile:hover {
+  border-color: var(--background-modifier-border-hover, var(--interactive-accent));
+}
+.journal-attach-tile.is-dragging {
+  opacity: 0.4;
+}
+.journal-attach-tile.is-drop-target,
+.journal-attach-chip.is-drop-target {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.journal-attach-thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-secondary-alt, var(--background-secondary));
+  cursor: zoom-in;
+}
+.journal-attach-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.journal-attach-thumb.is-missing {
+  flex-direction: column;
+  gap: 4px;
+  cursor: default;
+  color: var(--text-faint);
+}
+.journal-attach-missing-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.journal-attach-missing-text {
+  font-size: var(--am-text-2xs);
+}
+
+.journal-attach-caption {
+  padding: 5px 7px;
+  font-size: var(--am-text-2xs);
+  line-height: 1.35;
+  color: var(--text-muted);
+  cursor: text;
+  /* Two lines maximum: captions are labels, not paragraphs, and an uneven
+     tile height would break the grid's rhythm. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.journal-attach-caption:hover {
+  color: var(--text-normal);
+}
+
+/* The ⋯ button: hidden until the tile/chip is hovered or keyboard-focused, so
+   a wall of thumbnails stays calm. */
+.journal-attach-menu {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: pointer;
+  box-shadow: var(--am-elev-1);
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.journal-attach-menu svg {
+  width: 14px;
+  height: 14px;
+}
+.journal-attach-tile:hover .journal-attach-menu,
+.journal-attach-chip:hover .journal-attach-menu,
+.journal-attach-menu:focus-visible {
+  opacity: 1;
+}
+.journal-attach-menu:hover {
+  color: var(--text-normal);
+}
+
+/* Chips: links, vault files, and legacy text lines. */
+.journal-attach-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.journal-attach-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: var(--am-space-3) 26px var(--am-space-3) var(--am-space-5);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-primary);
+  font-size: var(--am-text-sm);
+  color: var(--text-normal);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.journal-attach-chip.is-openable {
+  cursor: pointer;
+}
+.journal-attach-chip:hover {
+  border-color: var(--interactive-accent);
+}
+.journal-attach-chip.is-dragging {
+  opacity: 0.4;
+}
+.journal-attach-chip-icon {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.journal-attach-chip-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.journal-attach-chip--link .journal-attach-chip-icon {
+  color: var(--interactive-accent);
+}
+.journal-attach-chip-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.journal-attach-chip-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 34ch;
+}
+.journal-attach-chip-sub {
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A free-text line left over from when this field was a plain textarea: shown
+   muted and un-pilled so it reads as a leftover to tidy, not an attachment. */
+.journal-attach-chip--text {
+  border-radius: var(--am-radius-sm);
+  border-style: dashed;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.journal-attach-chip .journal-attach-menu {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  box-shadow: none;
+  background: transparent;
+}
+
+/* Toolbar + empty/busy hints. */
+.journal-attach-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.journal-attach-file-input {
+  display: none;
+}
+.journal-attach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: var(--am-space-2) var(--am-space-5);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.journal-attach-btn:hover {
+  color: var(--text-normal);
+  border-color: var(--interactive-accent);
+}
+.journal-attach-btn-icon {
+  display: inline-flex;
+}
+.journal-attach-btn-icon svg {
+  width: 13px;
+  height: 13px;
+}
+.journal-attach-hint {
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+}
+.journal-attach-empty,
+.journal-attach-busy {
+  font-size: var(--am-text-sm);
+  color: var(--text-faint);
+  font-style: italic;
+  padding: 2px;
+}
+
+/* Lightbox: full-viewport image viewer, appended to <body> so no note-level
+   overflow or transform can clip it. Removed from the DOM on close. */
+.journal-attach-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: var(--layer-modal, 100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4vmin;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(2px);
+}
+.journal-attach-lightbox:focus {
+  outline: none;
+}
+.journal-attach-lightbox-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  max-height: 100%;
+}
+.journal-attach-lightbox-stage img {
+  max-width: 100%;
+  max-height: 82vh;
+  object-fit: contain;
+  border-radius: var(--am-radius-md);
+  box-shadow: var(--am-elev-3);
+}
+.journal-attach-lightbox-caption {
+  color: var(--text-on-accent, #fff);
+  font-size: var(--am-text-sm);
+  opacity: 0.85;
+  text-align: center;
+}
+.journal-attach-lightbox-nav,
+.journal-attach-lightbox-close {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: var(--am-radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.journal-attach-lightbox-nav:hover,
+.journal-attach-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+.journal-attach-lightbox-nav.is-prev {
+  left: 3vmin;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.journal-attach-lightbox-nav.is-next {
+  right: 3vmin;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.journal-attach-lightbox-close {
+  top: 3vmin;
+  right: 3vmin;
+}
+
+/* --- Tasks manager ------------------------------------------------------- */
+
+.journal-tasks {
+  display: block;
+  margin: 0 0 0.9em;
+}
+.journal-tasks-label {
+  font-size: var(--am-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+.journal-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.journal-tasks-empty {
+  font-size: var(--am-text-sm);
+  color: var(--text-faint);
+  font-style: italic;
+  padding: 6px 2px;
+}
+.journal-task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--am-radius-sm);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.journal-task-row:hover {
+  background: var(--background-secondary);
+  border-color: var(--background-modifier-border);
+}
+.journal-task-check {
+  flex: 0 0 auto;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+.journal-task-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--am-text-base);
+  padding: 3px 4px;
+  border-radius: var(--am-radius-sm);
+}
+.journal-task-text:hover {
+  background: var(--background-primary);
+}
+.journal-task-text:focus {
+  outline: none;
+  background: var(--background-primary);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+.journal-task-row.is-done .journal-task-text {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+/* Priority pip: a small ghost button whose icon colour encodes priority. */
+.journal-task-prio,
+.journal-task-del {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7em;
+  height: 1.7em;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--am-radius-sm);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.journal-task-prio:hover,
+.journal-task-del:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.journal-task-prio .svg-icon,
+.journal-task-del .svg-icon {
+  width: 1em;
+  height: 1em;
+}
+/* Priority colour: high = accent/red-ish, low = muted, normal = faint. Uses the
+   row modifier class set by the widget. */
+.journal-task-high .journal-task-prio {
+  color: var(--color-red, #e05561);
+}
+.journal-task-low .journal-task-prio {
+  color: var(--text-faint);
+}
+.journal-task-normal .journal-task-prio {
+  color: var(--text-faint);
+  opacity: 0.6;
+}
+.journal-task-due {
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: var(--am-radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.journal-task-due:hover {
+  border-color: var(--background-modifier-border);
+}
+.journal-task-due:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+/* Empty date input reads as faint until a date is chosen. */
+.journal-task-due:not([value=""]) {
+  color: var(--text-normal);
+}
+.journal-task-del:hover {
+  color: var(--text-error, #e05561);
+}
+.journal-tasks-add {
+  margin-bottom: 6px;
+}
+.journal-tasks-add-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--am-text-base);
+  padding: var(--am-space-4) var(--am-space-6);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.journal-tasks-add-input::placeholder {
+  color: var(--text-faint);
+}
+.journal-tasks-add-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  background: var(--background-primary);
+}
+
+/* Touch has no hover to reveal this with — and on a wall of thumbnails this is
+   the ONLY route to a chip's menu, so with no branch here the attachment
+   actions were unreachable on a phone rather than merely faint. See 3.9 §3.3. */
+@media (hover: none) {
+  .journal-attach-menu {
+    opacity: 0.55;
+  }
+  /* Same rule, same reason (3.19.2): on a phone there is no hover to reveal
+     this, so a shelf's remove control would be invisible rather than faint —
+     and unlike the pencils, there is no second route to it anywhere. Kept
+     dimmer than the menu because it deletes something and the menu does not. */
+  .journal-attach-remove {
+    opacity: 0.45;
+  }
+}
+
+/* ── A page of widgets sets its own width (4.2 §2) ─────────────────────
+ *
+ * `cssclasses: almanac-wide` in a note's frontmatter, which `composeHomeNote`
+ * writes onto the homepage. The width lives on Obsidian's sizer — an ancestor
+ * of every element this plugin renders — so a post-processor cannot reach it
+ * and this is the supported way in. See HOME_CSS_CLASS in home-sections.ts for
+ * why the alternative (a class put on the view at render time) is refused.
+ *
+ * IT OVERRIDES THE SETTING IN BOTH DIRECTIONS, which is the whole intent. With
+ * *readable line length* on, Obsidian caps the sizer at `--file-line-width` —
+ * a number about how many characters read comfortably in a line, applied here
+ * to a calendar. With it off there is no cap at all and the month grid stretches
+ * as far as the monitor does. Neither is a decision about this page, so the page
+ * makes its own.
+ *
+ * BOTH VIEWS, because a note is read in one and edited in the other and a page
+ * that changed width when you clicked into it would read as a rendering fault.
+ *
+ * THE SPECIFICITY IS DELIBERATE AND EXACTLY MATCHED. Obsidian's own rule is
+ * `.markdown-preview-view.is-readable-line-width .markdown-preview-sizer`; this
+ * is the same shape and therefore the same weight, and plugin CSS is applied
+ * after the app's, so this wins on order. It is NOT written with `!important`,
+ * because a theme that deliberately sets a width should be able to have the
+ * last word — a reader who installs a theme for its layout did not ask this
+ * plugin to overrule it.
+ *
+ * ── AND ANY PAGE MAY ASK FOR IT, FROM ITS OWN HEAD (4.11) ─────────────
+ *
+ * The frontmatter half above reaches exactly one note, because `composeHomeNote`
+ * is the only thing that writes `cssclasses:` and a post-processor cannot write
+ * frontmatter at all. So the width was a property of one composed page rather
+ * than a setting. The second pair of selectors is that setting: a `wide` line in
+ * the block that draws the page's title, marked on the card as `.jtc-wide`, read
+ * from here with `:has()`.
+ *
+ * DERIVED FROM THE CARD RATHER THAN DECLARED ON THE PAGE, which is the same route
+ * `:has(.jtc-card) .inline-title` already takes and the same reason: the width
+ * follows the head, so removing the section narrows the page and there is no
+ * stale declaration left saying otherwise.
+ *
+ * ONE CLASS INSIDE `:has()`, AND THAT IS LOAD-BEARING. `:has()` takes the
+ * specificity of its most specific argument, so `:has(.jtc-card.jtc-wide)` would
+ * weigh (0,4,0) and quietly outrank the theme this rule promises not to overrule
+ * three paragraphs up. `:has(.jtc-wide)` weighs (0,3,0) — exactly what
+ * `.markdown-preview-view.is-readable-line-width .markdown-preview-sizer` weighs,
+ * and exactly what the `almanac-wide` half beside it weighs. Do not add a second
+ * class in there.
+ *
+ * ONE DECLARATION FOR BOTH, because it is one width. Two rules with the same
+ * `max-width` would be two places to retune it. */
+.markdown-preview-view.almanac-wide .markdown-preview-sizer,
+.markdown-source-view.almanac-wide .cm-sizer,
+.markdown-preview-view:has(.jtc-wide) .markdown-preview-sizer,
+.markdown-source-view:has(.jtc-wide) .cm-sizer {
+  max-width: var(--am-page-width);
+}

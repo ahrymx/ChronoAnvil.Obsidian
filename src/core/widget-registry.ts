@@ -1,0 +1,559 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+//
+// Licensed under the GNU Affero General Public License v3.0 or later, with
+// attribution and naming terms under its section 7. See LICENSE and
+// LICENSING.md.
+
+// Every directive Almanac dispatches, named — 4.12 §B.
+//
+// WHY THIS EXISTS. The 48 valid directive keywords existed only as `case`
+// labels in one `switch` (`ui/widgets/index.ts::buildFromSpec`). Nothing
+// enumerated them, `docs/reference.md`'s table had drifted in both directions,
+// and a reader who wanted `events` or `activity-chart` on a page had to know
+// the word and type the fence. A `case` label is not a list: you cannot offer
+// it, you cannot check the documentation against it, and you cannot tell a new
+// one from a forgotten one.
+//
+// IN `core`, NOT `ui/widgets/`. `ui/widgets/index.ts` imports half the plugin —
+// every builder, the chart stack, the note store — and `core/note-sections.ts`
+// plus the four flat catalogues need this table. A table that lived beside the
+// switch would drag the whole render layer into the section model.
+//
+// THE SHAPE IS `BUTTON_LABELS`' (`ui/widgets/button-widgets.ts`): one record
+// keyed by the word that appears in the file, holding what a list of them needs
+// to draw a row. That table has been the plugin's answer to "name the things
+// this switch dispatches" since 2.56 and it has not drifted once, because a
+// test scrapes the switch and compares.
+//
+// AND IT IS A TABLE WITH NO FUNCTIONS IN IT. Everything here is data a test can
+// read and a reader can edit. Anything that has to ASK the vault something —
+// which folders exist, which trackers are registered, whether a catalogue
+// already claims this keyword — is computed by the caller. `note-sections.ts`
+// holds the probe; this file holds the words.
+
+// A choice a reader can be offered, in the shape `ChoiceQuestion.values` and
+// `FolderQuestion.keywords` both already use.
+export interface WidgetChoice {
+  value: string;
+  label: string;
+}
+
+// What a directive's argument is, for the one question the section window will
+// ask about it.
+//
+// THERE IS NO `required` FIELD, and that is deliberate rather than an omission.
+// `questionIsRequired` (`core/section-model.ts`) answers it from the kind —
+// a `choice` is required because an unanswered one composes a block that looks
+// broken, a `folder` never is because its empty state is a working directive
+// scoped to the host note's own folder. A second spelling of that fact here
+// would be one more thing that can disagree with it.
+export type WidgetArg =
+  // A folder, drawn as a text field with type-ahead. The answer is a path from
+  // the VAULT root — that is what `ArgSuggest` offers and therefore what the
+  // editor writes. Empty means the host note's own folder, which is why this is
+  // never required.
+  //
+  // `emptyLabel` OVERRIDES WHAT EMPTY IS CALLED, and exists because one argument
+  // in this table has a different empty state: `level-index`'s second piece
+  // falls back to the JOURNAL's root, not the note's folder, so a box saying
+  // "This note's folder" would be describing a rule it does not follow. Absent
+  // is the ordinary case and every other folder argument leaves it absent.
+  | {
+      kind: "folder";
+      label: string;
+      keywords?: readonly WidgetChoice[];
+      emptyLabel?: string;
+    }
+  // One of a fixed set the plugin itself defines. NOT a set the vault defines —
+  // see `vault` below, which is the kind that is.
+  | { kind: "choice"; label: string; values: readonly WidgetChoice[] }
+  // One of a set THIS VAULT defines, named rather than listed. 4.15 §4.
+  //
+  // THE DEFERRAL UNDER `needs-vault-answer` IS WHAT THIS LIFTS, and it is worth
+  // reading that note beside this one: five keywords are withheld from the add
+  // list because they must name a tracker or a note kind and the section window
+  // had nothing to build the list from. The price it quoted was widening
+  // `FlatNoteSpec` and threading the lists through the model constructors and
+  // `modelForSurface`, and that is exactly what was paid.
+  //
+  // A NAME, NOT A LIST, WHICH IS THE WHOLE OF WHY IT CAN LIVE HERE. This file
+  // opens by saying it is "a table with no functions in it — everything here is
+  // data a test can read and a reader can edit", and a `values` computed from
+  // the plugin would end that. `source` says WHICH list; the caller that holds
+  // the vault resolves it, and `argQuestion` turns the pair into an ordinary
+  // `ChoiceQuestion` that nothing downstream can tell apart from a fixed one.
+  //
+  // ONE SOURCE SO FAR. `journals` is what this release needs. Trackers and note
+  // kinds are the same shape and are deliberately not added speculatively —
+  // each has its own question about what an id means when the thing is renamed.
+  | { kind: "vault"; label: string; source: "journals" };
+
+// Which of this vault's lists a `vault` argument draws its answers from.
+export type WidgetArgVaultSource = Extract<
+  WidgetArg,
+  { kind: "vault" }
+>["source"];
+
+// What this vault can answer with, as the caller that holds it supplies them.
+//
+// ONE OPTIONAL FIELD PER SOURCE, and every one optional for the same reason: a
+// caller with no vault in hand — a journal template, a test fixture — supplies
+// none of them, and a question with nothing to offer is drawn as the sentence
+// saying so rather than as an empty menu. Derived from the source names above,
+// so adding a source to `WidgetArg` fails to compile until this grows the list
+// it promises.
+export type VaultLists = {
+  [K in WidgetArgVaultSource]?: readonly WidgetChoice[];
+};
+
+// One widget, as a list of widgets needs it.
+export interface WidgetSpec {
+  // A NOUN, and this is the one field most easily got wrong. `SECTION_TITLES`
+  // (`ui/widgets/index.ts`) also maps a keyword to a name and answers a
+  // different question: what the bar over this block on THIS PAGE should say.
+  // `tasks-table` is "⏳ Open tasks" there — a heading — and "Open tasks" here,
+  // an item in a list of things you could add. The two tables are kept apart on
+  // purpose; a test asserts every `SECTION_TITLES` key is a keyword this one
+  // knows, which is as far as they may agree.
+  label: string;
+  // The glyph a row is tokened with, on `FlatSection.icon`'s idiom. An emoji,
+  // because every glyph the catalogues write is one and a section list that
+  // mixed emoji with Lucide ids would draw two sizes of the same slot.
+  glyph: string;
+  // One sentence, for `DetailedChoice.description` in the add prompt and for
+  // `FlatSection.blurb` in the row. Says what the widget puts on the page, in
+  // the reader's words rather than the directive's.
+  blurb: string;
+  // The argument this directive takes, where the window can ask about it.
+  arg?: WidgetArg;
+  // A SECOND question, answered into the same argument. 4.16.
+  //
+  // A DIRECTIVE HAS ONE ARGUMENT — `keyword:argument` is the whole grammar — so
+  // this is not a second slot in the line, it is a second piece of the one
+  // argument. `level-index:study/Maths` is the journal and then the folder
+  // inside it, on the compound the tree already writes elsewhere
+  // (`launcher:diary,search`).
+  //
+  // NAMED `arg2` RATHER THAN MADE A LIST, because two is what a directive can
+  // carry legibly and a list invites a third: at three pieces the argument stops
+  // being something a reader could type or read back off the page, and the
+  // honest answer then is a second directive rather than more separators.
+  //
+  // THE SEPARATOR IS DECLARED HERE, once, and both questions are built from it —
+  // see `argQuestions`. The last piece takes the remainder, so a folder with
+  // slashes in it survives.
+  arg2?: WidgetArg;
+  argJoin?: string;
+  // Whether a page may hold more than one of these. 4.15 §4.
+  //
+  // ABSENT MEANS ONE, which is what every widget in this table meant before the
+  // field existed and is the honest default: a section is located by one anchor,
+  // and `parseFlatSections` gives a keyword's second fence to nobody precisely
+  // so that two runs answering to one id cannot swap a reader's content on Save.
+  //
+  // A WIDGET THAT REPEATS DOES NOT RELAX THAT RULE — it gets an id per
+  // occurrence, so each id still has exactly one run. See `instanceSection` in
+  // `widget-sections.ts` for how the id is spelled and why it is derived from
+  // the text rather than stored in it.
+  //
+  // AND IT IS NOT THE SAME QUESTION AS `region`. A widget excluded for `region`
+  // owns a keyed span of the note BODY and two would overwrite each other; this
+  // says a widget is a pure render of something it names, so a second one is a
+  // second view rather than a second writer.
+  repeats?: true;
+}
+
+// Why a keyword that dispatches is not offered as a page widget.
+//
+// FIVE REASONS, AND THE REASON IS THE POINT. A flat list of exclusions is a
+// list somebody will "tidy" — the entry looks arbitrary, so it looks removable.
+// Each of these says what would go wrong, at the entry it would go wrong for.
+export type WidgetExclusionReason =
+  // Bound to one frontmatter property, and drawn as a control inside a line
+  // rather than as a block. A page-level `slider:Mood` would write to the
+  // dashboard's own frontmatter, which is not where a reading lives.
+  | "inline"
+  // Owns a keyed region of the note BODY (`<!--almanac:<key>-->`). Two of one
+  // kind on one page share the region and overwrite each other — which is
+  // `addableSections`' own argument for withholding a section already present,
+  // one level down.
+  | "region"
+  // What a page IS rather than something on it. A second banner is a second
+  // answer to "which note is this".
+  | "banner"
+  // Structure rather than content: the page's own name, and the inert strip
+  // that gives the cursor somewhere to land.
+  | "structural"
+  // Dispatches, but is a second spelling of a widget already in the table.
+  // Offering both would be a choice between two names for one thing.
+  | "alias"
+  // Takes an argument naming something only THIS VAULT can list — a tracker, a
+  // registered journal, a note kind. `FlatNoteSpec` carries no vault data by
+  // design (`note-sections.ts` opens by forbidding it), so the section window
+  // has nothing to build the list from, and a bare directive would render a
+  // refusal in the reader's note. Not "never" — see the note under
+  // `NOT_PAGE_WIDGETS`.
+  | "needs-vault-answer";
+
+export interface WidgetExclusion {
+  reason: WidgetExclusionReason;
+  // Said once more in this entry's own terms, because the reason above is a
+  // category and this is the sentence a reader needs.
+  note: string;
+}
+
+// ── the widgets a page can be given ───────────────────────────────────
+
+export const WIDGETS: Record<string, WidgetSpec> = {
+  // ── the diary ───────────────────────────────────────────────────────
+  diary: {
+    label: "Diary card",
+    glyph: "📆",
+    blurb:
+      "The greeting, today's numbers, the month grid and what is coming up, as one card.",
+  },
+  "diary-search": {
+    label: "Diary search",
+    glyph: "🔍",
+    blurb: "Full-text search across every diary entry, filters typed into the box.",
+  },
+  timeline: {
+    label: "Entry timeline",
+    glyph: "📜",
+    blurb: "Every entry, newest first, grouped by the month it was written in.",
+  },
+  "on-this-day": {
+    label: "On this day",
+    glyph: "🕘",
+    blurb: "This date in earlier years, one group per year that has an entry.",
+  },
+  events: {
+    label: "Events",
+    glyph: "🎉",
+    blurb: "The special-events manager: every recurring and one-off event, with an Add button.",
+  },
+  "sleep-summary": {
+    label: "Sleep summary",
+    glyph: "😴",
+    blurb:
+      "Nights logged, average sleep, typical bedtime and wake-up, across every daily entry.",
+  },
+
+  // ── the period dashboards ───────────────────────────────────────────
+  "week-summary": {
+    label: "Week summary",
+    glyph: "📅",
+    blurb: "The seven-day table in a banner card, driven by this note's week-start.",
+  },
+  "month-summary": {
+    label: "Month summary",
+    glyph: "🗓️",
+    blurb: "The day grid and the year of reviews in a banner card, driven by month-start.",
+  },
+  "quarter-summary": {
+    label: "Quarter summary",
+    glyph: "📊",
+    blurb: "The quarter's banner over a rollup of the three months it spans.",
+  },
+  "year-summary": {
+    label: "Year summary",
+    glyph: "🗓️",
+    blurb:
+      "The year's statistics band: entries, coverage, longest streak and a twelve-month density strip.",
+  },
+  "entry-rollup": {
+    label: "Entry rollup",
+    glyph: "📋",
+    blurb:
+      "One dated line per day in this period that wrote something worth rolling up, oldest first.",
+  },
+  "period-recap": {
+    label: "Period recap",
+    glyph: "📝",
+    blurb: "Goals, highlights and challenges gathered from the months this period covers.",
+    arg: {
+      kind: "choice",
+      label: "the period to recap",
+      // A FIXED SET THE PLUGIN DEFINES, which is what makes this askable where
+      // a tracker is not: `period-recap` routes on the word, and the two words
+      // it routes on are these. See `needs-vault-answer`.
+      values: [
+        { value: "quarter", label: "Quarter — the three months it spans" },
+        { value: "year", label: "Year — all twelve months" },
+      ],
+    },
+  },
+  "period-nav": {
+    label: "Period navigator",
+    glyph: "⏮️",
+    blurb:
+      "A prev/next pair around a date picker that re-scopes this page to another week, month, quarter or year.",
+    arg: {
+      kind: "choice",
+      label: "the period this page steps through",
+      // ASKED RATHER THAN DEFAULTED, unlike the dispatcher, which falls back to
+      // `week` for an unrecognised argument. That fallback is right for a line
+      // somebody typed and wrong for a line this window writes: a navigator
+      // silently stepping weeks on a year dashboard writes `week-start` onto
+      // it, which is the bug 2.57 fixed one layer down.
+      values: [
+        { value: "week", label: "Week" },
+        { value: "month", label: "Month" },
+        { value: "quarter", label: "Quarter" },
+        { value: "year", label: "Year" },
+      ],
+    },
+  },
+
+  // ── the journals ────────────────────────────────────────────────────
+  journals: {
+    label: "Journals",
+    glyph: "📚",
+    blurb: "Every enabled journal, with its notes and where to go next.",
+  },
+  "journal-card": {
+    label: "Journal card",
+    glyph: "📓",
+    blurb:
+      "One journal as a card — its banner, its containers and where to go next. Add as many as you like.",
+    // THE FIRST `vault` ARGUMENT, and the first repeating widget. `journals`
+    // draws every journal as one card and `journals:cards` draws a grid of all
+    // of them; this draws ONE, chosen, so a page can put two side by side or
+    // hold three of the six a vault has. Neither of the others can express that,
+    // which is why this is a keyword rather than a third argument to one of
+    // them.
+    //
+    // NOT `journals:card`. That spelling is REFUSED by the dispatcher on purpose
+    // — "a near-miss that renders reads as the feature not working rather than
+    // as the word being wrong" — and turning a deliberate refusal into a feature
+    // would make every vault that ever typed it get something they did not ask
+    // for. The refusal now names this word instead.
+    arg: { kind: "vault", label: "the journal to show", source: "journals" },
+    repeats: true,
+  },
+  "journals-header": {
+    label: "Journals activity",
+    glyph: "🔥",
+    blurb:
+      "At-a-glance numbers over a 53-week activity strip covering every enabled journal at once.",
+  },
+  "level-index": {
+    label: "Journal level index",
+    glyph: "🗂️",
+    blurb:
+      "What is below this note, as a live table — the folders inside it, or its notes where there are no folders left.",
+    // WHAT IT REPLACED SAYS WHY IT IS GENERAL. `topics-table` asked "what topics
+    // are under this subject" and was already answering it in every journal's
+    // own nouns; what it could not do was be pointed anywhere, or say anything
+    // at the level below, where the catalogue had to emit a different widget
+    // entirely. One question — what is below this? — had two widgets and a
+    // compose-time branch choosing between them. See `RETIRED_WIDGETS`.
+    //
+    // TWO PIECES, JOURNAL THEN FOLDER. The pair is unambiguous because a journal
+    // id has no `/` in it, so the first one separates them.
+    //
+    // AND THE SECOND PIECE TAKES EITHER SPELLING, which 4.16.1 fixed after
+    // shipping only one of them. `study/Maths` is journal-relative, is what this
+    // comment originally promised and is the shorter thing to hand-type; a path
+    // from the vault root is what the folder CONTROL writes, because that is
+    // what `kind: "folder"` means everywhere else in this table and what
+    // `ArgSuggest` offers. Declaring the first and building a control that emits
+    // the second gave the journal's root twice over. `levelScope` resolves both
+    // and requires the answer to land inside the journal either way.
+    arg: { kind: "vault", label: "the journal to index", source: "journals" },
+    arg2: {
+      kind: "folder",
+      label: "the folder inside it",
+      // EMPTY IS THE JOURNAL'S ROOT HERE, not the host note's folder — this is
+      // the one argument in the table whose fallback is the sibling answer
+      // rather than the page, and the box has to say so.
+      emptyLabel: "the whole journal",
+    },
+    argJoin: "/",
+    // MORE THAN ONE IS THE POINT once it can be pointed: a page can carry
+    // Study's subjects beside Cooking's recipes.
+    repeats: true,
+  },
+  "topic-stats": {
+    label: "Topic statistics",
+    glyph: "📈",
+    blurb: "The stats band for the topics under this folder.",
+  },
+  "pages-table": {
+    label: "Pages table",
+    glyph: "📄",
+    blurb: "The pages beneath this folder, one row each.",
+  },
+  "review-queue": {
+    label: "Review queue",
+    glyph: "🔁",
+    blurb: "What is due for recall, soonest first.",
+    arg: {
+      kind: "folder",
+      label: "the folder to review",
+      keywords: [{ value: "all", label: "Every journal" }],
+    },
+  },
+  "journal-search": {
+    label: "Journal search",
+    glyph: "🔎",
+    blurb: "Full-text search over journal notes — what did I write about this?",
+    arg: {
+      kind: "folder",
+      label: "the folder to search",
+      keywords: [{ value: "all", label: "Every journal" }],
+    },
+  },
+
+  // ── across the vault ────────────────────────────────────────────────
+  "tasks-table": {
+    label: "Open tasks",
+    glyph: "⏳",
+    blurb: "Every still-open Almanac task from the notes under a folder, grouped by note.",
+    arg: {
+      kind: "folder",
+      label: "the folder to collect tasks from",
+      // NO `all` KEYWORD, unlike the two above, and the journals dashboard's
+      // own catalogue says why in full: `buildTasksTableRegion` takes
+      // `folders[0]`, so a keyword naming several roots resolves to the first
+      // one rather than to all of them. Offering it would promise a scope the
+      // widget silently truncates.
+    },
+  },
+  "tag-index": {
+    label: "Tag index",
+    glyph: "🏷️",
+    blurb: "A table of tags, most-used first, counted under a folder.",
+    arg: { kind: "folder", label: "the folder to count tags under" },
+  },
+  "activity-chart": {
+    label: "Activity chart",
+    glyph: "📊",
+    blurb: "Open and completed tasks bucketed by date, drawn as three month heatmaps.",
+  },
+  launcher: {
+    label: "Launcher",
+    glyph: "🧭",
+    blurb: "A grid of the places this vault goes.",
+  },
+  links: {
+    label: "Quick links",
+    glyph: "🔗",
+    blurb: "A row of destination pills.",
+  },
+};
+
+// ── the ones a page is not offered, and why ───────────────────────────
+
+// Every other keyword the switch dispatches, with the reason at the entry.
+//
+// `WIDGETS` and this table are DISJOINT and their UNION IS THE SWITCH — which
+// is asserted, not claimed, so a new `case` fails the suite until somebody
+// classifies it. That is the whole mechanism: this file cannot go stale
+// silently, because going stale is a test failure.
+//
+// THE RETIRED WIDGETS ARE NOT HERE. `RETIRED_WIDGETS` (`core/constants.ts`)
+// holds four keywords that no longer dispatch at all; they have no `case`, so
+// they are in neither table and the union still holds. That table already
+// carries their `since` and their replacement, which is the data, in the table
+// whose job it is.
+//
+// AND `needs-vault-answer` IS A DEFERRAL, NOT A JUDGEMENT. Those five are
+// perfectly good page widgets; what is missing is a way to ask their question.
+// `FlatNoteSpec` carries the catalogue, the host folder and two nouns, and
+// `note-sections.ts` opens by forbidding it to carry anything that would tell
+// it which note it is on or what this vault contains. Offering a tracker
+// requires widening that spec and threading the lists through four model
+// constructors and `modelForSurface` — a coherent release, with its own
+// argument, and not this one. Until then the honest answer is that the door
+// does not open onto them, said here rather than by their absence.
+export const NOT_PAGE_WIDGETS: Record<string, WidgetExclusion> = {
+  // Bound to one frontmatter property.
+  slider: { reason: "inline", note: "writes a number onto the note it is in" },
+  select: { reason: "inline", note: "writes a chosen value onto the note it is in" },
+  time: { reason: "inline", note: "writes a time onto the note it is in" },
+  date: { reason: "inline", note: "writes a date onto the note it is in" },
+  tracker: {
+    reason: "inline",
+    note: "the control for one Settings → Trackers entry, on the note that records it",
+  },
+  sleep: {
+    reason: "inline",
+    note: "the coupled wake-up and bedtime pair, on the entry whose night it is",
+  },
+  button: { reason: "inline", note: "one action, drawn beside what it acts on" },
+
+  // Owns a keyed body region.
+  note: { reason: "region", note: "a free-text field; two would share one region and overwrite each other" },
+  list: { reason: "region", note: "a list field; two would share one region and overwrite each other" },
+  tasks: {
+    reason: "region",
+    note: "the per-note task editor; two would share one region and overwrite each other",
+  },
+  path: { reason: "region", note: "a path field; two would share one region and overwrite each other" },
+  recall: {
+    reason: "region",
+    note: "recall cards; two would share one region and overwrite each other",
+  },
+  attach: {
+    reason: "region",
+    note: "the attachments field; two would share one region and overwrite each other",
+  },
+
+  // What a page is.
+  "entry-header": { reason: "banner", note: "the strip that makes a note a diary entry" },
+  "journal-header": { reason: "banner", note: "the strip that makes a note a journal note" },
+
+  // Structure.
+  title: { reason: "structural", note: "the page's own name — added and removed as the page head" },
+  spacer: { reason: "structural", note: "an inert strip that gives the cursor somewhere to land" },
+
+  // A second spelling.
+  "confidence-trend": {
+    reason: "alias",
+    note: "the preset spelling of journal-chart, kept because it sits in shipped Topic notes",
+  },
+  // SUPERSEDED, STILL DRAWING, AND DELIBERATELY NOT RETIRED (4.16 §3). Every
+  // Subject index note in every vault carries a bare `topics-table`, and it goes
+  // on rendering — routed to `level-index`, which draws the same table when it
+  // is given the same question. What it no longer does is appear in the add
+  // list, because offering both would be a choice between two names for one
+  // thing, which is what this reason means.
+  //
+  // NOT IN `RETIRED_WIDGETS`, and the distinction is the whole of §3: an entry
+  // there tells `planLayout` to REMOVE the directive, so retiring a word that
+  // still renders would have repair delete a working table out of a reader's
+  // note. Retired means "gone and repair cleans it up"; this is "superseded and
+  // still honoured".
+  "topics-table": {
+    reason: "alias",
+    note: "the older spelling of level-index, kept because it sits in every shipped Subject index note",
+  },
+
+  // Needs a list only the vault can supply.
+  "journal-chart": {
+    reason: "needs-vault-answer",
+    note: "must name a tracker, and the section window has no list of this vault's trackers",
+  },
+  "journal-breakdown": {
+    reason: "needs-vault-answer",
+    note: "must name a tracker, and the section window has no list of this vault's trackers",
+  },
+  "bridge-readings": {
+    reason: "needs-vault-answer",
+    note: "must name a tracker, and the section window has no list of this vault's trackers",
+  },
+  "bridge-notes": {
+    reason: "needs-vault-answer",
+    note: "must name a note type, and the section window has no list of this vault's journals",
+  },
+  "kind-table": {
+    reason: "needs-vault-answer",
+    note: "must name a note type, and the section window has no list of this vault's journals",
+  },
+};
+
+// Whether this keyword is one a page can be given from the section window.
+export const isPageWidget = (keyword: string): boolean =>
+  Object.prototype.hasOwnProperty.call(WIDGETS, keyword);

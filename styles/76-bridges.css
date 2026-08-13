@@ -1,0 +1,86 @@
+/* ── Bridges (2.57.0) ────────────────────────────────────────────────────
+   A block showing what the OTHER surface holds inside this note's period.
+
+   THE WINDOW LABEL IS NOT DECORATION. It sits in the header of every bridge,
+   always, and it is the one piece of chrome here that is load-bearing: the
+   reader did not choose this window, the host note did, so a bridge that does
+   not name its period is indistinguishable from one that has quietly lost most
+   of its rows. Same argument formatPeriodLabel was extracted for in 2.52,
+   binding harder because the scope is implicit rather than typed.
+
+   Deliberately NOT its own card. A bridge is normally written inside a section
+   that already drew a surface (70-section-surface.css paints the run), and a
+   second background inside that one is the box-in-a-box the empty-state rule
+   names. So: a title row, a muted period, rows. Nothing that competes with the
+   section it sits in.
+
+   Numbered 76 to land after the section surface and before the path/resources
+   block, so the muted colours here resolve against a surface that has already
+   been painted. */
+
+.am-bridge {
+  display: flow-root;
+}
+
+.am-bridge-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-bridge-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--size-4-2);
+  padding: var(--size-2-1) 0;
+}
+
+.am-bridge-row + .am-bridge-row {
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.am-bridge-date,
+.am-bridge-value {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The value is the answer on a readings bridge, so it keeps the normal text
+   colour where the date beside it stays muted. */
+.am-bridge-value {
+  color: var(--text-normal);
+}
+
+/* ── 3.8: a readings bridge drawn as a trend ─────────────────────────────
+   `bridge-readings:<tracker>#trend`. The same Chart.js canvas the diary's chart
+   tiles draw, over the window the host note declares.
+
+   IT NEEDS AN EXPLICIT HEIGHT AND A CHART TILE DOES NOT. A tile is a grid cell
+   whose height comes from the grid; `.journal-chart-canvas-wrap` is `flex: 1 1
+   auto; min-height: 0` and fills whatever it is given. A bridge sits in the
+   ordinary flow of a note, so there is nothing above it deciding how tall it
+   is — and a Chart.js canvas in a zero-height box draws nothing at all and
+   reports no error, which is the failure mode this rule exists to prevent.
+
+   `flex` rather than `display: block`, because that is the shape the wrap
+   expects to be a child of. The height is the tile's small span, so a trend on
+   a journal note and a trend on a dashboard read at the same scale. */
+.am-bridge-trend {
+  display: flex;
+  align-items: stretch;
+  height: 180px;
+  margin-top: var(--size-4-2);
+}
+.am-bridge-trend > .journal-chart-canvas-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* The title bar, the count pill, the muted window phrase and the overflow are
+   ALL the section frame's as of 2.57.7 — see `bridgeHeader`. Everything this
+   file used to declare for them is gone rather than corrected, including the
+   hover rule that made freeze unreachable on touch. A second mechanism for a
+   solved problem is not fixed by making it work; it is fixed by deleting it. */

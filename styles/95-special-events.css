@@ -1,0 +1,1626 @@
+/* ── 7. Special events — lists, chips and the editor ─────────────────
+   The calendar's own event decoration lives up in section 5, beside the grid
+   it draws on. This section is everything else: the two list widgets, the
+   settings rows, and the picker controls inside the edit modal. */
+
+/* The coloured icon token. One definition, used by the `events` manager, the
+   upcoming list and the settings rows, so an event looks like itself wherever
+   it turns up. */
+.am-ev-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--am-ev-grey);
+  background: var(--background-modifier-hover);
+}
+.am-ev-chip svg {
+  width: 14px;
+  height: 14px;
+}
+.am-ev-chip-red { color: var(--am-ev-red); }
+.am-ev-chip-amber { color: var(--am-ev-amber); }
+.am-ev-chip-green { color: var(--am-ev-green); }
+.am-ev-chip-teal { color: var(--am-ev-teal); }
+.am-ev-chip-blue { color: var(--am-ev-blue); }
+.am-ev-chip-purple { color: var(--am-ev-purple); }
+.am-ev-chip-pink { color: var(--am-ev-pink); }
+.am-ev-chip-grey { color: var(--am-ev-grey); }
+
+/* An event's token in the settings list takes the same am-ev-chip-* colour
+   class the calendar chips use, so the icon reads the same colour in both
+   places. The token supplies its own box (.almanac-list-token) — only the
+   colour comes from the shared class. */
+.almanac-list-token[class*="am-ev-chip-"] svg {
+  width: 17px;
+  height: 17px;
+}
+
+.am-ev-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.am-ev-count {
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+}
+.am-ev-empty {
+  padding: 10px 2px;
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+}
+.am-ev-section {
+  margin: 14px 0 6px;
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.am-ev-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.am-ev-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--am-radius-sm);
+}
+.am-ev-row:hover {
+  background: var(--background-modifier-hover);
+}
+/* A disabled event stays in the list — it's still defined, just not drawn —
+   so it's dimmed rather than hidden. */
+.am-ev-row.is-disabled {
+  opacity: 0.5;
+}
+.am-ev-text {
+  flex: 1;
+  min-width: 0;
+}
+.am-ev-title {
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.am-ev-meta {
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.am-ev-edit {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  border-radius: var(--am-radius-sm);
+  opacity: 0;
+}
+.am-ev-row:hover .am-ev-edit {
+  opacity: 1;
+}
+.am-ev-edit:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+.am-ev-edit svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* The relative time on the right of an upcoming row — the one thing that list
+   says which the calendar can't. */
+.am-ev-when {
+  flex-shrink: 0;
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.am-ev-upcoming-row.is-ongoing .am-ev-when {
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+/* ── The editor's pickers ─────────────────────────────────────
+   Both are grids of buttons rather than dropdowns: choosing a decoration is a
+   visual decision, and a <select> listing "cake, gift, party-popper" makes you
+   translate names back into pictures in your head. */
+.almanac-icon-picker {
+  margin: 4px 0 12px;
+}
+.almanac-icon-group-label {
+  margin: 8px 0 4px;
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.almanac-icon-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.almanac-icon-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.almanac-icon-swatch:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.almanac-icon-swatch.is-active {
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+.almanac-icon-swatch svg {
+  width: 16px;
+  height: 16px;
+}
+
+.almanac-color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 12px;
+}
+.almanac-color-swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+/* The selected swatch is ringed rather than ticked: a checkmark drawn on top
+   of the colour has to be readable against all eight of them. */
+.almanac-color-swatch.is-active {
+  border-color: var(--text-normal);
+  box-shadow: 0 0 0 2px var(--background-primary) inset;
+}
+.almanac-color-red { background: var(--am-ev-red); }
+.almanac-color-amber { background: var(--am-ev-amber); }
+.almanac-color-green { background: var(--am-ev-green); }
+.almanac-color-teal { background: var(--am-ev-teal); }
+.almanac-color-blue { background: var(--am-ev-blue); }
+.almanac-color-purple { background: var(--am-ev-purple); }
+.almanac-color-pink { background: var(--am-ev-pink); }
+.almanac-color-grey { background: var(--am-ev-grey); }
+
+.almanac-event-hint {
+  margin: -4px 0 8px;
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+}
+/* `.almanac-chart-error` and `.almanac-event-error` retired in 2.56.10 and
+   2.56.12. Both windows use `EditorModal`'s error line now, which is the one
+   these rules were written to avoid drifting from — the comment that used to
+   sit here said the chart editor "shares the event editor's error line, same
+   job, same place in the window, so it should not be a second style that
+   drifts", while being exactly that: two selectors kept in step by hand rather
+   than one element. There is one element now. */
+
+/* The chart editor's empty state stands in for the whole form when the vault
+   has no chartable tracker yet: a window of dropdowns with nothing in them
+   explains less than one sentence does. */
+.almanac-chart-empty {
+  margin: 4px 0 12px;
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+}
+
+/* ── Diary retrieval: search, on-this-day, timeline ──────────────────────
+   The three views over the diary index (diary-retrieval.ts). They share one
+   row (.jdr-row) deliberately — an entry should look the same wherever it's
+   listed, so the row is styled once and the three views only differ in what
+   wraps it. */
+
+/* Search box. A single input carries both terms and filters, so it's sized
+   like a real search field rather than a form control tucked in a row. */
+.jdr-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-primary);
+}
+.jdr-search-bar:focus-within {
+  border-color: var(--interactive-accent);
+}
+.jdr-search-icon {
+  display: flex;
+  color: var(--text-muted);
+}
+.jdr-search-icon .svg-icon {
+  width: 16px;
+  height: 16px;
+}
+.jdr-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 4px 0;
+  font-size: var(--am-text-base);
+  color: var(--text-normal);
+}
+/* Obsidian styles bare inputs with a border and background of their own;
+   the wrapper above is the visible field, so the input inside stays flat in
+   every state including focus. */
+.jdr-search-input:focus,
+.jdr-search-input:hover {
+  border: none;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+}
+.jdr-search-hint {
+  margin: 6px 2px 0;
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+}
+.jdr-search-status {
+  margin: 8px 2px 4px;
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+}
+
+/* Result / entry row. A date gutter that lines up down the list, then the
+   entry's own content. */
+.jdr-row {
+  display: flex;
+  gap: 12px;
+  padding: 8px 4px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.jdr-row:first-child {
+  border-top: none;
+}
+.jdr-row:hover {
+  background: var(--background-modifier-hover);
+  border-radius: var(--am-radius-sm);
+}
+.jdr-gutter {
+  flex: 0 0 auto;
+  width: 86px;
+  text-align: right;
+  padding-top: 1px;
+}
+.jdr-date {
+  font-size: var(--am-text-xs);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.jdr-dow {
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+}
+.jdr-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.jdr-title {
+  display: inline-block;
+  font-size: var(--am-text-base);
+  font-weight: 600;
+}
+.jdr-snippet {
+  margin-top: 2px;
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+  /* Two lines, then clip: a snippet is an identification aid, not the entry. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Which field the snippet came from ("log", "highlights") — so a fragment
+   isn't decontextualised. */
+.jdr-snippet-key {
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: var(--am-radius-pill);
+  background: var(--background-modifier-border);
+  font-size: var(--am-text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.jdr-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.jdr-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+}
+.jdr-fact-icon {
+  display: inline-flex;
+}
+.jdr-fact-icon .svg-icon {
+  width: 12px;
+  height: 12px;
+}
+.jdr-fact-tag {
+  color: var(--text-accent);
+}
+.jdr-fact-kind {
+  padding: 0 6px;
+  border-radius: var(--am-radius-pill);
+  background: var(--background-modifier-border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.jdr-loading {
+  padding: 10px 4px;
+  font-size: var(--am-text-sm);
+  color: var(--text-faint);
+}
+
+/* On this day. Tinted so it reads as something offered rather than something
+   queried — it's the one view here the user didn't ask a question to reach. */
+.jdr-otd-body {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  padding: 10px 12px;
+  background: var(--background-secondary);
+}
+/* AND IT GIVES THAT UP WHEREVER SOMETHING ALREADY DREW AN EDGE (4.13.5).
+   The tint above is the widget saying "this was offered to you", and it says it
+   by being a filled, bordered rectangle. Inside a card it is the same filled,
+   bordered rectangle the card already is — `--background-secondary` within
+   `--am-rule`, twice, in the same colour — and on the homepage's On this day it
+   was the MIDDLE of three: the widget card, this, and the empty state's own info
+   card inside it. Three borders, one fill, nothing between them said.
+   THE SAME THREE SCOPES AS 91-card-surface.css's §3b, and deliberately the same
+   list rather than a shorter one that happens to cover today's pages: `has-head`
+   for a headed block or a widget's card in a row, and the two section containers
+   for a `header:` run and a `frame: section` block. `on-this-day` is composed by
+   the homepage AND by the diary dashboard, which reach it through different
+   halves of that list.
+   The head, the year captions and the rows are untouched — what goes is the
+   second edge only, which is the whole of 4.13's empty-state argument applied to
+   the one body that is not an empty state. */
+.has-head .jdr-otd-body,
+.journal-sec-block .jdr-otd-body,
+.journal-sec-fold-body .jdr-otd-body {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: none;
+}
+.jdr-otd-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.jdr-otd-icon {
+  display: inline-flex;
+  color: var(--text-accent);
+}
+.jdr-otd-icon .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.jdr-otd-title {
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.jdr-otd-year {
+  margin: 8px 0 2px;
+  font-size: var(--am-text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.jdr-otd-group .jdr-row {
+  border-top: none;
+}
+
+/* Timeline. Grouped by month, since that's the unit people recall in. */
+.jdr-timeline-summary {
+  margin: 0 2px 8px;
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+}
+.jdr-timeline-month {
+  margin-bottom: 14px;
+}
+.jdr-timeline-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--background-modifier-border);
+}
+.jdr-timeline-month-name {
+  font-size: var(--am-text-base);
+  font-weight: 600;
+}
+.jdr-timeline-count {
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+}
+.jdr-timeline-more {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* Narrow panes: the date gutter costs more than it gives, so it goes inline
+   above the title rather than shrinking to a column of wrapped fragments. */
+@media (max-width: 500px) {
+  .jdr-row {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .jdr-gutter {
+    width: auto;
+    display: flex;
+    gap: 6px;
+    text-align: left;
+  }
+}
+
+/* ── Quick capture ───────────────────────────────────────────────────── */
+
+/* `.almanac-capture-hint` retired in 2.56.12 — the hint is the frame's subtitle
+   now. It said what this window writes and where, which is the job
+   `.almanac-editor-subtitle` already had in every other editor; two rules for
+   one sentence in one kind of window is how they end up at different sizes. */
+.almanac-capture-input {
+  width: 100%;
+  min-height: 7em;
+  resize: vertical;
+  font-size: var(--am-text-base);
+  line-height: 1.5;
+}
+
+/* Collapsible note field (`note:key#collapse`). The label becomes the fold
+   control; the content hides beneath it. */
+.journal-note--collapsible > .journal-note-collapse-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  /* Padding rather than margin so the whole strip is a hit target. */
+  padding: 2px 0;
+}
+.journal-note--collapsible > .journal-note-collapse-bar:hover {
+  color: var(--text-normal);
+}
+.journal-note--collapsible > .journal-note-collapse-bar .journal-note-label {
+  margin: 0;
+  cursor: pointer;
+}
+.journal-note-chevron {
+  display: flex;
+  color: var(--text-faint);
+  transition: transform 120ms ease;
+}
+.journal-note-chevron .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.journal-note--collapsible.is-collapsed .journal-note-chevron {
+  transform: rotate(-90deg);
+}
+/* Hide the field itself, not the bar, so the label stays clickable and the
+   entry keeps a visible anchor for where captures live. */
+.journal-note--collapsible.is-collapsed > .journal-note-input {
+  display: none;
+}
+
+/* Captures are a chronological strip rather than prose: a monospace-ish,
+   slightly tighter block reads as a log of stamped moments and visually
+   distinguishes it from the Notes field above. */
+.journal-note--capture .journal-note-input {
+  font-size: var(--am-text-sm);
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Year view ─────────────────────────────────────────────────────────
+   The page has no header bars (see 2.18.1), so its structure has to come from
+   the content itself. Everything below follows the diary card's stat-strip
+   convention: ONE bordered surface with internal dividers, rather than a set of
+   detached cards floating on the page background. Separate cards at equal depth
+   with only gaps between them is what made the first pass feel unanchored —
+   nothing said which pieces belonged together. */
+
+.jyr-loading {
+  padding: 10px 4px;
+  font-size: var(--am-text-sm);
+  color: var(--text-faint);
+}
+
+/* 2.52: the bordered panel these rules built is gone — the year is a
+   banner-over-body card like the other three scopes now, so the container is
+   `.journal-overview-summary` and the frame comes from it. What remains here
+   is the stat band and the density strip, which were always the year's own.
+   `.jyr-head` / `.jyr-title` / `.jyr-range` went with the panel: the banner
+   carries the title, and the range line is a `.journal-period-stats` inside it,
+   the same element the other three dashboards put there.
+
+   The stat band and density strip sat flush against the old panel's edges
+   under its `overflow: hidden`. Inside the shared body they need their own
+   inset frame, or a four-up grid of stat cells runs to the text width while
+   every section below it is inset. */
+.jyr-stats-wrap {
+  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+/* `.jyr-stats`, `.jyr-stat` and their three inner rules retired in 3.6 patch 6.
+   The year's stat band was the only stat band in the plugin, so it was written
+   here under this page's prefix; §4.1 gives the same object to three more
+   grains, and it moved to `.am-stats` in 96-stat-strip.css rather than three
+   pages reaching across for a name that says "year".
+
+   Seven rules became four. Five of the seven existed to make a wrapping flex
+   behave like a grid — a top border on the third and fourth cells, no left
+   border on the odd ones, and half a pixel shaved off the width to make room
+   for the divider they shared. A grid states its column count and divides on
+   the gap, so none of those have anything to do.
+
+   The collapse ALSO moved from `@media` to `@container`, which is the half of
+   this that was a defect rather than a tidy-up: `max-width: 480px` measured the
+   window, so a four-up strip in a narrow note pane never collapsed unless the
+   whole of Obsidian was phone-width. */
+
+/* Density sits in the same frame as the stat cells, below a divider — part of
+   the object, not a separate floating block. */
+.jyr-density {
+  padding: 10px 14px 12px;
+  border-top: var(--am-rule) solid var(--background-modifier-border);
+}
+/* `.jyr-section-*` retired in 2.56.2. See the note on `.jq-section-*`. */
+
+.jyr-months {
+  display: flex;
+  gap: 3px;
+}
+.jyr-month {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* Bars sit in a track, so a low month reads as a low bar in a slot rather than
+   a small floating rectangle — the track is what gives the row its baseline. */
+.jyr-month-track {
+  height: 30px;
+  border-radius: var(--am-radius-sm);
+  background: var(--background-modifier-border);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.jyr-month-bar {
+  width: 100%;
+  border-radius: var(--am-radius-sm);
+  background: var(--interactive-accent);
+  min-height: 2px;
+}
+/* A month that happened with nothing in it: the empty track alone says it. */
+.jyr-month-track.is-empty .jyr-month-bar {
+  display: none;
+}
+/* A month that hasn't happened yet means "not yet", not "you didn't write" —
+   so it's an outline rather than a filled trough. */
+.jyr-month-track.is-future {
+  background: transparent;
+  border: 1px dashed var(--background-modifier-border);
+}
+.jyr-month-label {
+  margin-top: 4px;
+  text-align: center;
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+}
+
+.jyr-empty {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--background-modifier-border);
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+}
+
+/* ── A journal note's charts region (journal-charts.ts) ──────────────────
+   The managed area holding `journal-chart` / `journal-breakdown` widgets, and
+   its editor. The section shell — header bar, toolbar, empty state — is the
+   diary's Trends section verbatim (.journal-header-bar, .journal-chart-toolbar,
+   .journal-chart-empty), so the two read as one family and neither can drift
+   into its own look. Only what genuinely differs is styled here. */
+
+/* A stack, not a grid: a weakest-first ranking is a horizontal bar chart whose
+   readability is bar length, and a trend at half width is a trend you squint
+   at. The gap matches the grid's so the spacing is shared even though the
+   layout isn't. */
+.journal-jchart-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Where the chart reads from, stated in the editor rather than asked. Sits
+   where the chart editor's dependent fields would be, and reads as the same
+   kind of quiet explanatory line. */
+.almanac-chart-scope {
+  margin: 10px 0 2px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--background-modifier-border);
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+}
+
+/* ── Import caveats: what the importer had to guess ──────────────────── */
+/* Deliberately warm rather than red. This is not an error — the folder was
+   read successfully — it is a short list of values worth a second look
+   before they are committed. */
+.almanac-editor-caveats {
+  border: 1px solid var(--color-yellow);
+  border-radius: var(--radius-m);
+  background: rgba(var(--color-yellow-rgb), 0.08);
+  padding: 0.75em 0.9em;
+  margin-bottom: 1em;
+}
+.almanac-editor-caveats-title {
+  font-weight: var(--font-semibold);
+  margin-bottom: 0.25em;
+}
+.almanac-editor-caveats-blurb {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  margin-bottom: 0.5em;
+}
+.almanac-editor-caveats-list {
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: var(--font-ui-smaller);
+}
+.almanac-editor-caveats-list li {
+  margin: 0.15em 0;
+}
+
+/* ── entry-rollup (2.52) ─────────────────────────────────────────────────
+   What the days in this period actually said — the rung below the quarter's
+   rollup of three monthly reviews. It exists because the Monthly Overview
+   showed nothing the monthly review is made of: two calendars and a stats
+   line, aggregating nothing, while writing August meant opening thirty-one
+   notes.
+
+   Built as a list of dated lines rather than a table. A table implies columns
+   worth comparing across rows, and these rows share only their date — the
+   content is one phrase per day and its length is whatever the day's was. */
+.jer-rollup {
+  padding: 2px 0;
+}
+.jer-loading,
+.jer-empty {
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  padding: 6px 2px;
+}
+/* A light in-widget line, not a section title: this widget sits under a
+   collapsible `header:` bar that already names the section, so a bold heading
+   here would be the same words twice. Mirrors .jtt-head, which states the same
+   rule — a small muted label on the left, a count pill on the right. */
+.jer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 0.7em;
+}
+.jer-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+}
+.jer-title-icon {
+  display: inline-flex;
+}
+.jer-title-icon .svg-icon {
+  width: 0.95em;
+  height: 0.95em;
+}
+.jer-pill {
+  font-size: var(--am-text-2xs);
+  line-height: 1.4;
+  padding: var(--am-space-1) var(--am-space-5);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* Past about a dozen rows the list stops being a panel and starts being the
+   page — a 31-day month pushed Open Tasks and Trends below the fold entirely.
+   Capped and scrolled instead, so the section keeps a size the rest of the
+   dashboard can sit beside. The cap is in `em` so it tracks the reader's font
+   size rather than fixing a row count. */
+.jer-days {
+  max-height: 24em;
+  overflow-y: auto;
+  /* Own scroll context, so a wheel over the list doesn't scroll the note the
+     moment it hits the end. */
+  overscroll-behavior: contain;
+  /* Room for the scrollbar so the last character of a long line isn't under
+     it, and a hairline that makes the cap look intentional rather than like
+     content that ran out. */
+  padding-right: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
+}
+.jer-day {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 5px 6px 5px 2px;
+}
+/* Zebra rather than rules between rows. A dated line can wrap to two or three
+   lines while its neighbour is one, so a hairline leaves the eye guessing which
+   text belongs to which date; a band is unambiguous at any row height. Very low
+   alpha — this is a reading aid, not a table. */
+.jer-day:nth-child(even) {
+  background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+}
+/* The date is the link, and the rollup's only affordance: a derived page sends
+   you to the entry to change it, never writes into itself. Fixed width and
+   tabular figures so the lines beside it start on one edge — a ragged left
+   margin is what stops a list of thirty-one rows scanning. */
+.jer-date {
+  flex: 0 0 auto;
+  width: 42px;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 5px;
+  padding-top: 1px;
+  color: var(--text-normal) !important;
+  text-decoration: none !important;
+  cursor: pointer;
+}
+.jer-date:hover .jer-date-day {
+  color: var(--am-area-diary);
+}
+.jer-date-day {
+  font-size: var(--am-text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.jer-date-dow {
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+}
+.jer-lines {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.jer-line {
+  font-size: var(--am-text-sm);
+  color: var(--text-normal);
+  line-height: 1.45;
+}
+.jer-line + .jer-line {
+  margin-top: 2px;
+}
+/* Which field a line came from. Drawn only when more than one daily field
+   rolls up — with the shipped `focus` alone it would be thirty-one repetitions
+   of a word the section title already said. */
+.jer-line-key {
+  margin-right: 6px;
+  font-size: var(--am-text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.jer-goal {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.jer-goal-icon {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+.jer-goal-icon svg {
+  width: 13px;
+  height: 13px;
+}
+.jer-goal.is-done .jer-line-text {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+/* The year's quarter cards (2.52). Same card as the quarter's month cards —
+   literally the same `.jq-month` rules — because it is the same object one
+   zoom out, and giving the year its own would be how the two drift. Only the
+   column count differs. */
+.jyr-quarters {
+  /* auto-fit rather than a hard repeat(4): four cards at the quarter page's
+     three-up card width overflow a narrow pane, and the year is the one scope
+     whose card row can legitimately wrap to 2x2. */
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+/* The card is a door to that quarter, so it should say so on hover the way the
+   quarter's month cards do. */
+.jyr-quarters .jq-month {
+  cursor: pointer;
+}
+.jyr-quarters .jq-month:hover {
+  border-color: var(--am-area-diary);
+}
+
+/* "You are here" in the scope ladder (2.52). Every period dashboard carries the
+   same six pills, so the row is a position indicator rather than a menu — which
+   only works if the current page is present and marked. Flat, dimmed and
+   non-clickable, the same treatment .jn-muted gives a destination that doesn't
+   exist yet; the difference is that this one is deliberate, so it keeps full
+   text contrast and loses only the pill chrome. */
+.journal-nav .jn-here {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-normal);
+  font-weight: 600;
+  cursor: default;
+}
+.journal-nav .jn-here .jn-icon {
+  color: var(--am-area-diary);
+}
+
+/* A directive this plugin used to ship (2.53). Not an error — the note is old,
+   not broken — so it reads as a notice rather than a failure, and names the
+   command that fixes it. Muted rather than red for the same reason the
+   navigator uses a muted pill for a destination that doesn't exist yet. */
+.journal-widget-retired {
+  display: block;
+  padding: 6px 10px;
+  border-radius: var(--am-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+}
+
+/* A month cell that re-scopes the page rather than opening its review (2.53).
+   The grid does two things on left click and the difference should be legible
+   before the click, not after. `.cal-cell:hover` already tints the background
+   for every cell; this adds the diary accent on the edge, so a cell that will
+   *select* is marked and a cell that will *open* keeps the plain hover it has
+   everywhere else in the plugin. The tooltip carries the rest — "Show August"
+   against "Open review". */
+.cal-cell-month.cal-cell-selects:hover {
+  box-shadow: inset 0 0 0 1px var(--am-area-diary);
+}
+
+/* The scope menu button (2.53). Labelled with the scope you are on, so the row
+   keeps the position indicator the six-pill ladder was widened for while
+   fitting a phone. Bordered, unlike the plain pills beside it — it opens a
+   menu rather than going somewhere, and that difference should be visible
+   before the click. */
+.journal-nav .jn-scopes {
+  border: 1px solid var(--background-modifier-border);
+  gap: 5px;
+}
+.journal-nav .jn-scopes.is-here {
+  color: var(--text-normal) !important;
+  font-weight: 500;
+}
+.journal-nav .jn-scopes .jn-caret {
+  display: inline-flex;
+  margin-left: -1px;
+  color: var(--text-faint);
+}
+.journal-nav .jn-scopes .jn-caret svg {
+  width: 14px;
+  height: 14px;
+}
+.journal-nav .jn-scopes:hover {
+  border-color: var(--am-area-diary);
+}
+
+
+/* ── Template editor (2.54.3) ─────────────────────────────────────────────
+   Two columns: what the file has on the left, what a save would do on the
+   right. Reuses .almanac-editor-mono and .almanac-wizard-block rather than
+   restyling them — the Layout tab IS the wizard's schematic, and a reader who
+   has seen one should recognise the other. */
+.almanac-tpl-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.almanac-tpl-edited {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--background-modifier-error-hover);
+  color: var(--text-normal);
+  font-size: var(--am-text-sm);
+}
+.almanac-tpl-edited-icon {
+  flex: 0 0 auto;
+  display: flex;
+  margin-top: 1px;
+}
+/* ONE PANE AT A TIME (3.0.1), where this was a two-column grid.
+   `1fr 1.2fr` inside a ~560px modal left the list about 250px wide, which is
+   not enough for a row carrying a reorder control, a token, a title, a
+   subtitle, a pill and a Remove button — titles wrapped mid-word and blurbs
+   ran to seven lines. The two halves are never read at once (you arrange,
+   then you check what that would do), so splitting the width bought nothing
+   and cost legibility everywhere below a wide desktop. */
+/* Struck through rather than removed from the list: a reader deciding to take
+   a section out should be able to see what they are taking out, and put it
+   back without hunting for it in the Add menu. */
+.almanac-tpl-row-removed .almanac-list-title {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+.almanac-tpl-row-added .almanac-list-title {
+  color: var(--text-accent);
+}
+.almanac-tpl-toggle {
+  font-size: var(--am-text-xs);
+  padding: var(--am-space-1) var(--am-space-4);
+}
+/* A row that has been asked something and not yet answered (3.8 patch 7).
+   NOT styled as an addition, because it is not one yet: the "adding" accent
+   promises a block that Save would write, and this row contributes no op until
+   its dropdown has a value. Faint plus the pill, which is the same pairing the
+   removed row uses — visible, in its place, wearing the reason. */
+.almanac-tpl-row-waiting .almanac-list-title {
+  color: var(--text-muted);
+}
+/* THE CEILING CAME OFF IN 4.15 §2, AND THE FLOOR DID NOT.
+
+   What was here read: "14em was cut for a placeholder that restated `q.label`
+   in full and clipped it to 'Choose a journal to p'; a floor as well as a
+   ceiling, because this shares a row with two arrows and a Remove button and a
+   <select> is happy to shrink to nothing under them."
+
+   Both halves were about a slot one line too short. The control now sits on the
+   row's own actions line under a field label, so there is nothing beside it to
+   be crowded by and nothing to clip against — the 12em was compensation, and a
+   ceiling kept after its cause is gone is a control that refuses room it has.
+
+   The FLOOR stays, and the second half of that sentence is why: this is still a
+   flex child, and a <select> with no basis is still happy to shrink to nothing. */
+.almanac-tpl-choice {
+  font-size: var(--am-text-xs);
+  min-width: 7em;
+  text-overflow: ellipsis;
+}
+/* The title box (3.18 §3), sized like the dropdown beside it so a row holding
+   either reads as one row. Its ceiling came off with that one and for the same
+   reason; 3.0 §"250px" was about a control given more room than its SLOT had,
+   and the slot is now a line. */
+.almanac-tpl-title-input {
+  font-size: var(--am-text-xs);
+  min-width: 7em;
+  flex: 1 1 auto;
+  text-overflow: ellipsis;
+}
+/* A field: what the box is called, over the box (4.15 §2).
+
+   THE LABEL IS NOT THE PILL. "needs a journal to pull from" says the row is
+   incomplete and stops being true once it is answered; "Journal" says what the
+   control is and stays true. Two claims, so two pieces of text — the test the
+   `count` pill's own rule sets for whether a second label is doubling.
+
+   COLUMN, so the label sits over its control rather than in front of it: the
+   actions line already runs several fields and two buttons across it, and
+   label-beside-box would make each field twice as wide for the same box. */
+.almanac-tpl-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 9em;
+  max-width: 20em;
+}
+.almanac-tpl-field-label {
+  color: var(--am-bar-ink);
+  font-size: var(--am-bar-text);
+  font-weight: 600;
+  letter-spacing: var(--am-bar-track);
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+/* The two controls fill the field they are labelled by, rather than sitting at
+   their own intrinsic width under a label that is wider or narrower than they
+   are. */
+.almanac-tpl-field > select,
+.almanac-tpl-field > input {
+  width: 100%;
+  min-width: 0;
+}
+/* The inert form, for a section already in the file: its answer is written in
+   the note and this window cannot read it. Styled as text rather than as a
+   disabled control, because a greyed dropdown reads as "broken" where a phrase
+   reads as "not here" — and the tooltip carries the route that does work. */
+.almanac-tpl-choice-fixed {
+  font-size: var(--am-text-xs);
+  color: var(--text-faint);
+  font-style: italic;
+  cursor: help;
+}
+/* Nothing in the vault to answer with. A sentence, not an empty menu. Allowed
+   to wrap, since it names what is missing and where to get it. */
+.almanac-tpl-choice-empty {
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+  max-width: 22em;
+  text-wrap: pretty;
+}
+.almanac-tpl-add {
+  margin-top: 8px;
+}
+/* A BUTTON, NOT A DROPDOWN (4.15 §3). Full width for the reason the `<select>`
+   was: it is the one thing under a list of rows and a control that ended
+   halfway across would read as belonging to the last row rather than to the
+   list. Dashed, because it adds rather than acts — the same distinction
+   `.almanac-list-pill.is-off` draws with the same border-style. */
+.almanac-tpl-add button {
+  width: 100%;
+  padding: var(--am-space-2) var(--am-space-4);
+  border: var(--am-rule-hair) dashed var(--background-modifier-border-hover);
+  border-radius: var(--am-radius-sm);
+  background: none;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.almanac-tpl-add button:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.almanac-section-editor {
+  width: min(760px, 92vw);
+  max-width: 92vw;
+}
+
+/* A real tab strip as of 3.0.1: four panes, one at a time, each the full
+   width of the window. */
+.almanac-tpl-tabs {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 10px;
+}
+.almanac-tpl-tab {
+  font-size: var(--am-text-xs);
+  padding: var(--am-space-1) var(--am-space-4);
+  background: transparent;
+  box-shadow: none;
+}
+.almanac-tpl-tab.is-active {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  box-shadow: inset 0 -2px 0 0 var(--text-accent);
+}
+.almanac-tpl-pane {
+  min-height: 220px;
+}
+.almanac-tpl-md {
+  margin: 0;
+  white-space: pre;
+  font-size: var(--am-text-xs);
+}
+.almanac-tpl-op {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 3px 0;
+  font-size: var(--am-text-sm);
+}
+.almanac-tpl-op-mark {
+  width: 1em;
+  flex: 0 0 auto;
+  text-align: center;
+}
+.almanac-tpl-op-label {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+.almanac-tpl-op-detail {
+  color: var(--text-muted);
+}
+.almanac-tpl-op-keep .almanac-tpl-op-label,
+.almanac-tpl-op-keep .almanac-tpl-op-detail {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+.almanac-tpl-op-add .almanac-tpl-op-mark {
+  color: var(--color-green);
+}
+.almanac-tpl-op-remove .almanac-tpl-op-mark {
+  color: var(--color-red);
+}
+.almanac-tpl-op-foreign .almanac-tpl-op-mark {
+  color: var(--color-yellow);
+}
+/* An extension adds without removing, so it reads with add's colour rather
+   than a fourth one — the difference from `add` is that the section was
+   already there, and that is what the row's words say. (3.18 §1) */
+.almanac-tpl-op-extend .almanac-tpl-op-mark {
+  color: var(--color-green);
+}
+.almanac-tpl-empty {
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  padding: 4px 0 8px;
+}
+
+
+/* ── Kinds change confirmation (2.54.4) ───────────────────────────────────
+   Grouped rather than one paragraph: adding, removing and changing are three
+   different questions and a reader answering the destructive one should not
+   have to find it in prose. */
+.almanac-kind-group {
+  margin: 10px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border-left: 3px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+.almanac-kind-add {
+  border-left-color: var(--color-green);
+}
+.almanac-kind-remove {
+  border-left-color: var(--color-red);
+}
+.almanac-kind-group-title {
+  font-size: var(--am-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.almanac-kind-row + .almanac-kind-row {
+  margin-top: 6px;
+}
+.almanac-kind-count {
+  color: var(--text-muted);
+}
+.almanac-kind-detail {
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+}
+/* The guarantee. The only box in the window about what does NOT change, which
+   is why it gets the accent border rather than a tone that means danger. */
+.almanac-kind-promise {
+  margin: 12px 0;
+  padding: 10px;
+  border-radius: 6px;
+  border-left: 3px solid var(--interactive-accent);
+  background: var(--background-primary-alt);
+  font-size: var(--am-text-sm);
+}
+.almanac-kind-cost {
+  margin: 8px 0;
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+}
+.almanac-kind-cost div + div {
+  margin-top: 2px;
+}
+
+
+/* ── Section launcher rail (2.54.5) ───────────────────────────────────────
+   The Sections step of an existing journal. Reuses .almanac-list-row wholesale
+   — it is the same kind of thing as a tracker row or a journal row, and a
+   reader who has used those should not have to learn a third list. */
+.almanac-launcher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.almanac-launcher-list .almanac-list-subtitle {
+  font-family: var(--font-monospace);
+  font-size: var(--am-text-xs);
+}
+
+
+/* ── Reorder controls (2.54.6) ────────────────────────────────────────────
+   Up/down rather than drag: the list is short, the rows are a fixed height,
+   and a button is keyboard-reachable in a way a drag handle is not. */
+.almanac-tpl-arrow {
+  padding: 0 4px;
+  min-height: 0;
+  line-height: 1.1;
+  font-size: var(--am-text-xs);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+}
+.almanac-tpl-arrow:hover:not(:disabled) {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+.almanac-tpl-arrow:disabled {
+  opacity: 0.3;
+}
+.almanac-tpl-op-move .almanac-tpl-op-mark {
+  color: var(--text-accent);
+}
+
+/* ── The section editor's bands and drag states (3.0) ────────────────────
+   A diary entry has two bands — the structural fences above the horizontal
+   rule and the reader's own widgets below it — and a section may not be
+   dragged between them. The heading is drawn only where there is more than
+   one, so a journal note and a dashboard render the flat list they always
+   did. */
+.almanac-tpl-band {
+  font-size: var(--am-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin: 10px 0 4px;
+}
+.almanac-tpl-band:first-child {
+  margin-top: 0;
+}
+/* A section that cannot go says why in its subtitle rather than on Save.
+   Muted rather than red: it is a fact about the section, not an error the
+   reader has made. */
+.almanac-tpl-row-locked .almanac-list-subtitle {
+  color: var(--text-faint);
+  font-style: italic;
+}
+/* Drag reorders the list; nothing is written until Save. The cursor says the
+   row is draggable, and only rows inside the same band ever light up as a
+   drop target — a row in the other band is not a target at all, so the
+   gesture refuses the way every other drag does rather than accepting the
+   drop and then explaining itself. */
+.almanac-tpl-list .almanac-list-row[draggable="true"] {
+  cursor: grab;
+}
+.almanac-tpl-list .almanac-list-row.is-dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+.almanac-tpl-list .almanac-list-row.is-drop-target {
+  box-shadow: inset 0 2px 0 0 var(--text-accent);
+}
+
+/* ── A block that holds more than one section (4.8 §2.2) ─────────────────
+   THE CARD IS THE BLOCK. What the reader is looking at is one thing on their
+   page — the homepage's top row is a single fence holding three widgets side
+   by side — and three list rows each wearing an "in a row" pill would be
+   describing that thing three times without ever drawing it.
+   Inset rather than raised: the rows inside are the same rows they were, and a
+   heavier surface than the list they sit in would read as a different kind of
+   item rather than as a container for the same kind. */
+.almanac-tpl-block {
+  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-primary-alt);
+  margin: 6px 0;
+  overflow: hidden;
+}
+.almanac-tpl-block-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+}
+.almanac-tpl-block-title {
+  flex: 1 1 auto;
+  font-size: var(--am-text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.almanac-tpl-block-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+}
+/* A CLASS OF ITS OWN, NOT THE REMOVE BUTTON'S. These three act on where a
+   section SITS; Remove acts on whether it is there at all. They also sit on
+   opposite sides of the refusal — a locked section can still leave a row,
+   because the lock is on existence and not on order (2.60.2) — so sharing a
+   class would have put the two either side of `if (refusal) return;` and made
+   the assertion about that line ambiguous. */
+.almanac-tpl-move {
+  font-size: var(--am-text-2xs);
+  padding: 2px 8px;
+  border-radius: var(--am-radius-sm);
+  background: transparent;
+  border: var(--am-rule) solid var(--background-modifier-border);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.almanac-tpl-move:hover:not(:disabled) {
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover);
+}
+.almanac-tpl-move:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* And the same block in the Layout pane, where the point is the SHAPE: three
+   widgets across the page are drawn across it. */
+.almanac-wizard-row {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+.almanac-wizard-row > .almanac-wizard-block {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+
+/* ── Banner overflow control (2.55.2) ─────────────────────────────────────
+   Far right of the crumb row, not beside the title — the title is
+   click-to-edit, and a control next to it is a control one slip away from
+   renaming the note.
+
+   Faint until hover, on the same reasoning as .jsh-title-edit: it is an
+   affordance for the reader who wants it and clutter for the one who doesn't,
+   and it sits on every journal note in the vault. */
+/* Date + overflow control as one trailing group, so the row stays two items
+   and `space-between` keeps doing what it did before this control existed. */
+.jsh-nav-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+/* The overflow control, on both banners. One rule rather than two, because the
+   two are the same control — see `overflowButton` in section-frame.ts for why
+   the button is shared and the menus are not. It stays quiet until the banner
+   is hovered: it is a second door to commands the palette already has, and a
+   permanently lit one on every entry in the vault would compete with the
+   controls that are the point of the row. */
+.jsh-more,
+.jeh-more {
+  display: flex;
+  align-items: center;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--text-faint);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+/* The hover that reveals it is the BANNER's, not the control's own row — and as
+   of 3.7 the entry's control is in the card's footer rather than in its title
+   band, so the selector follows it there. It was left pointing at
+   `.journal-entry-header` for one draft, which is a hover target the button is
+   no longer inside: the `⋯` simply never lit, on any entry in the vault. */
+.journal-study-header:hover .jsh-more,
+.journal-entry-header:hover .jeh-more,
+.journal-entry-banner:hover .jeh-more {
+  color: var(--text-muted);
+}
+.jsh-more:hover,
+.jeh-more:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+/* On a touch screen there is no hover to reveal it, so it sits at the resting
+   colour the others reach only on hover. Same reason the plugin's other
+   hover-revealed affordances have a `(hover: none)` branch. */
+@media (hover: none) {
+  .jsh-more,
+  .jeh-more {
+    color: var(--text-muted);
+  }
+}
+
+
+/* ── Empty states (2.55.3) ────────────────────────────────────────────────
+   The default line shape, for a region inside a card that drew itself. Callers
+   with a class their own stylesheet already targets keep it — see empty.ts. */
+.am-empty-line {
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  padding: 6px 0;
+}
+
+
+/* ── List row: leading slot (2.55.4) ─────────────────────────────────────
+   Before the token, for controls that act on the row's POSITION rather than on
+   what it describes. Collapsed when empty, so every row written before this
+   slot existed is laid out exactly as it was. */
+.almanac-list-lead {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+.almanac-list-lead:empty {
+  display: none;
+}
+
+/* Touch has no hover to reveal this with. See 3.9 §3.3's policy. */
+@media (hover: none) {
+  .am-ev-edit {
+    opacity: 0.45;
+  }
+}
+
+/* ── The repair window (4.18.1 §7) ──────────────────────────────────────────
+   Four groups of work with a tick each, and every file in them openable to the
+   literal lines it would gain or lose.
+
+   BUILT ON `.almanac-list-row`, NOT BESIDE IT. A group head is a settings-style
+   row — a token, a title, a blurb, a count pill — and a file under it is the
+   dense variant, which is what that variant is for: a dozen of them under a
+   header without the header becoming the page. Nothing here restyles the row;
+   it adds the states the row does not have opinions about (off, open) and the
+   diff body, which is a new thing. */
+.almanac-repair-lead {
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  margin: 0 0 12px;
+}
+.almanac-repair-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* The window is a list of unknown length inside a modal of known height. The
+     button row must stay reachable without scrolling past forty files, so the
+     LIST scrolls and the chrome does not — the same split `.almanac-plan` never
+     made, which is why a fresh vault's plan used to push the buttons off. */
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.almanac-repair-group {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  overflow: hidden;
+}
+/* The head row IS the tick target, so it has to read as pressable. Its border
+   is the group's, not its own. */
+.almanac-repair-head.almanac-list-row {
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+/* An unticked group stays fully legible — it is still a list of what WOULD
+   happen, and the reader may be reading it to decide. Only the certainty
+   drops, which is what the strike on the count says and the fade reinforces. */
+.almanac-repair-group.is-off .almanac-repair-items,
+.almanac-repair-group.is-off .almanac-list-subtitle {
+  opacity: 0.45;
+}
+.almanac-repair-group.is-off .almanac-list-title {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-faint);
+}
+.almanac-repair-items {
+  padding: 0 12px 4px;
+}
+.almanac-repair-more {
+  padding: 6px 6px 2px;
+  color: var(--text-faint);
+  font-size: var(--am-text-xs);
+}
+
+/* ── one file ─────────────────────────────────────────────────────────── */
+.almanac-repair-item .almanac-list-row.is-openable {
+  cursor: pointer;
+}
+.almanac-repair-item:last-child .almanac-list-row {
+  border-bottom: none;
+}
+.almanac-repair-caret {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+}
+.almanac-repair-caret .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+/* The count sits where a row's actions go, which is where the eye already
+   looks for a number on these rows. */
+.almanac-repair-count {
+  font-family: var(--font-monospace);
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── the differential ─────────────────────────────────────────────────── */
+.almanac-repair-diff {
+  margin: 0 0 8px 22px;
+  padding: 6px 8px;
+  border-left: 2px solid var(--background-modifier-border);
+  border-radius: 0 var(--am-radius-sm) var(--am-radius-sm) 0;
+  background: var(--background-primary-alt);
+  font-family: var(--font-monospace);
+  font-size: var(--am-text-xs);
+  /* A directive line is short; a fence a reader hand-wrapped is not. Scroll it
+     rather than wrap it — a wrapped diff line reads as two changes. */
+  overflow-x: auto;
+}
+.almanac-repair-line {
+  display: flex;
+  gap: 8px;
+  white-space: pre;
+  line-height: 1.5;
+}
+.almanac-repair-mark {
+  flex: 0 0 auto;
+  width: 1ch;
+  opacity: 0.7;
+}
+/* COLOUR IS NOT THE ONLY SIGNAL — the +/− marker carries it too, so the diff
+   is readable where the two greens and reds are not distinguishable. The tones
+   are Obsidian's own success/error so a theme moves them together. */
+.almanac-repair-line.is-add {
+  color: var(--text-success, var(--color-green));
+}
+.almanac-repair-line.is-remove {
+  color: var(--text-error, var(--color-red));
+}
+.almanac-repair-text {
+  flex: 1 1 auto;
+}
+.almanac-repair-truncated {
+  margin-top: 4px;
+  font-family: var(--font-interface);
+  color: var(--text-faint);
+}

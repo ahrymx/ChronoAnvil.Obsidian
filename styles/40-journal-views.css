@@ -1,0 +1,576 @@
+/* ── Journal trend (`journal-chart`, and its `confidence-trend` preset) ───
+   A single line, drawn outside the chart system (see renderJournalTrend), so
+   it borrows the chart body's canvas rules without the grid or the tile
+   chrome around them. `.journal-confidence-trend` is still emitted by the
+   preset spelling so a CSS snippet written against it keeps working. */
+.journal-trend {
+  margin: 0;
+}
+.journal-trend .journal-chart-body {
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+}
+/* Only present when the directive names a tracker (or carries an explicit
+   label). The preset stays untitled: it sits under a header bar in the shipped
+   Topic template, and a second title there would stutter. */
+.journal-trend-title {
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+/* ── Review queue ─────────────────────────────────────────────────────────
+   A short list of notes worth reopening. Rows rather than a table: there are
+   only two things to say per item (which note, how cold) and a table would
+   spend a header row saying so. The check button is the whole interaction, so
+   it keeps a fixed slot on the right rather than appearing on hover — this is
+   the one control on the page you came here to press. */
+.journal-review-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.jrq-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  overflow: hidden;
+}
+.jrq-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  background: var(--background-secondary);
+  border-top: 1px solid var(--background-modifier-border);
+}
+.jrq-row:first-child {
+  border-top: none;
+}
+.jrq-row:hover {
+  background: var(--background-modifier-hover);
+}
+.jrq-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.jrq-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Deliberately muted, and deliberately the same muted at any lateness. A row
+   that reddens as it ages turns a prompt into a reproach — see the design note
+   in review-queue.ts. */
+.jrq-meta {
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jrq-done {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: var(--am-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.jrq-done:hover:not(:disabled) {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.jrq-done:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.jrq-done .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.jrq-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+}
+/* THIS RULE MOVED TO `91-card-surface.css` IN 4.13 §2, and the move is the whole
+   release in miniature. It said — correctly — that inside a section card the box
+   is a box-in-a-box and the card is the edge, and it said it for ONE widget while
+   every callout beside it kept its own. So the journals dashboard drew both
+   answers at once, and this was the one that read right.
+   It is now one rule covering every empty state and both kinds of section card:
+   this variant only ever handled `.journal-sec-block`, so a review queue inside a
+   `frame: section` still drew its dashed box. */
+.jrq-empty-icon {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+.jrq-empty-icon .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.jrq-more {
+  font-size: var(--am-text-xs);
+  color: var(--text-faint);
+}
+
+/* ── Journal breakdown ────────────────────────────────────────────────────
+   Weakest-first bars. Horizontal rather than vertical because the labels are
+   folder names of arbitrary length, and a vertical bar chart with six topic
+   names under it is six rotated labels. The bar is a plain fill with no axis:
+   the number is printed at the end of the row, so an axis would be a second
+   way of reading the same value. */
+.journal-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.jbd-title {
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.jbd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.jbd-row {
+  display: grid;
+  grid-template-columns: minmax(6em, 11em) 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+.jbd-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--am-text-sm);
+}
+.jbd-track {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+/* One colour at every value. A bar that reddens as it drops turns a ranking
+   into a scolding, which is the same objection review-queue.ts makes to an
+   overdue counter — and the ranking already puts the worst one at the top, so
+   colour would be a second, louder way of saying what the order says. */
+.jbd-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: var(--interactive-accent);
+}
+.jbd-value {
+  font-size: var(--am-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  min-width: 3.5em;
+  text-align: right;
+}
+
+/* ── Journal search ───────────────────────────────────────────────────────
+   The journals' counterpart to `diary-search`. Rows rather than the diary's
+   date-gutter layout: a journal result is located by its crumb trail, not by
+   when it was written, and half of them have no date at all. */
+.jjs-search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.jjs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-secondary);
+}
+.jjs-bar:focus-within {
+  border-color: var(--interactive-accent);
+}
+.jjs-icon {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+.jjs-icon .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.jjs-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  padding: 2px 0;
+  box-shadow: none;
+}
+.jjs-input:focus {
+  box-shadow: none;
+  outline: none;
+}
+.jjs-hint {
+  font-size: var(--am-text-xs);
+  color: var(--text-faint);
+}
+.jjs-status {
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+}
+.jjs-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.jjs-row {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--am-radius-sm);
+}
+.jjs-row:hover {
+  background: var(--background-modifier-hover);
+}
+.jjs-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.jjs-title {
+  font-weight: 600;
+}
+/* Where the hit lives. On a page this names the lesson it belongs to, so a
+   match three pages into a long lesson says which lesson without being
+   opened — the crumb trail doing the job pages made necessary. */
+.jjs-crumbs {
+  font-size: var(--am-text-xs);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jjs-snippet {
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.jjs-snippet-key {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: var(--am-radius-sm);
+  background: var(--background-modifier-border);
+  color: var(--text-faint);
+  font-size: var(--am-text-xs);
+}
+.jjs-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--am-text-xs);
+  color: var(--text-faint);
+}
+.jjs-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.jjs-fact-icon .svg-icon {
+  width: 12px;
+  height: 12px;
+}
+.jjs-fact-kind {
+  text-transform: lowercase;
+}
+.jjs-fact-tag {
+  color: var(--text-accent);
+}
+
+/* ── Recall cards ─────────────────────────────────────────────────────────
+   Question/answer cards with the answer behind a reveal. Cards rather than
+   rows: a row is for scanning a list, and the one thing this widget must not
+   let you do is take in the answer while reading the question. So each card is
+   a bounded block with the answer occupying space only once you have asked for
+   it, and the grade buttons appear in that same space rather than sitting
+   permanently on the right where they could be pressed by reflex. */
+.journal-recall {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.journal-recall-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.journal-recall-label {
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.jrc-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.jrc-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--am-radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.jrc-tool:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.jrc-tool.is-active {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+.jrc-tool .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.jrc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.jrc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-secondary);
+}
+/* The only colour in the widget, and it marks what you said rather than how
+   you are doing. There is no running colour on the tally line for the same
+   reason the review queue does not redden with lateness — see review-queue.ts. */
+.jrc-card.is-got {
+  border-left-color: var(--color-green, var(--interactive-accent));
+}
+.jrc-card.is-missed {
+  border-left-color: var(--color-orange, var(--text-faint));
+}
+.jrc-q {
+  font-weight: 600;
+  line-height: 1.4;
+}
+.jrc-a {
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding-top: 6px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.jrc-reveal {
+  align-self: flex-start;
+  padding: 4px 10px;
+  font-size: var(--am-text-xs);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+}
+.jrc-reveal:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.jrc-grade {
+  display: flex;
+  gap: 6px;
+}
+.jrc-grade button {
+  padding: var(--am-space-2) var(--am-space-6);
+  font-size: var(--am-text-xs);
+  border-radius: var(--am-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  box-shadow: none;
+}
+.jrc-got:hover {
+  border-color: var(--color-green, var(--interactive-accent));
+  color: var(--color-green, var(--interactive-accent));
+}
+.jrc-missed:hover {
+  border-color: var(--color-orange, var(--text-muted));
+  color: var(--color-orange, var(--text-muted));
+}
+.jrc-verdict {
+  font-size: var(--am-text-xs);
+  color: var(--text-faint);
+}
+/* The recall deck's empty state. Its box moved to the info card in 4.13 §2 —
+   this was the last 1px-dashed empty state in the tree, and 4.11's own inventory
+   had missed it while deleting three others exactly like it. Only the type and
+   the ink stay here; the edge, the ground and the padding come from
+   `91-card-surface.css` with everything else that stands in for a widget. */
+.jrc-empty {
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+}
+.jrc-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.jrc-edit-q,
+.jrc-edit-a {
+  flex: 1 1 50%;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: var(--am-text-sm);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+.jrc-edit-q {
+  font-weight: 600;
+}
+.jrc-edit-del {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--am-radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  box-shadow: none;
+}
+.jrc-edit-del:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-error, var(--text-normal));
+}
+.jrc-edit-del .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+.jrc-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+}
+/* Where the grades land. Only shown when it isn't this note — on a page, which
+   carries no rating of its own. */
+.jrc-target {
+  color: var(--text-faint);
+}
+.jrc-inert {
+  font-style: italic;
+}
+
+/* ── Topic stats band ─────────────────────────────────────────────────────
+   The four numbers under a Topic dashboard's banner. Its own bordered strip
+   rather than more cells welded into the banner above it, because the banner's
+   grid is where a reader *changes* things (Status) and this is only ever read
+   — mixing the two would make the card a place where some cells respond to a
+   click and the rest don't. Sits tight under the banner so the pair still
+   reads as one header block. */
+.journal-topic-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  overflow: hidden;
+  margin-top: -4px;
+}
+.jts-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 9px 13px;
+  min-width: 0;
+}
+.jts-cell + .jts-cell {
+  border-left: 1px solid var(--background-modifier-border);
+}
+.jts-value {
+  font-size: 1.15em;
+  font-weight: 600;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.jts-sub {
+  font-size: var(--am-text-xs);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.jts-label {
+  font-size: var(--am-text-2xs);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Narrow panes: four numbers in a row get crushed long before the rest of
+   the page does, so fold to two rows of two rather than let them wrap
+   raggedly. */
+@container (max-width: 520px) {
+  .journal-topic-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .jts-cell:nth-child(3) {
+    border-left: none;
+  }
+  .jts-cell:nth-child(n + 3) {
+    border-top: 1px solid var(--background-modifier-border);
+  }
+}
+
+/* Related-lessons: a Practice banner's own property cell — removable pill
+   chips over a body-backed list (see widgets.ts::buildRelatedLessons), plus
+   a dashed circular add button matching the tracker grid's add-tile
+   language at a scale that fits inside one cell. */

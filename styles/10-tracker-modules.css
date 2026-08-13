@@ -1,0 +1,179 @@
+/* ── Daily tracker modules ───────────────────────────────────────────────
+   A bar made up of `tracker:` directives (Mood, steppers, times, selects)
+   is the daily note's logging grid. Each module becomes a bordered cell of
+   equal width and height, laid out exactly two per row. An odd final cell
+   sits alone in the left column. Below a narrow threshold the grid drops to
+   a single column so cells never get crushed. Only bars tagged by the
+   code-block processor get this — header and dashboard bars keep their
+   inline flow. */
+.journal-widget-bar.journal-tracker-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  gap: 10px;
+}
+/* Narrow panes (split view, mobile, small popouts): one column so a cell's
+   label + control never overflow or wrap awkwardly. */
+@container (max-width: 520px) {
+  .journal-widget-bar.journal-tracker-bar {
+    grid-template-columns: 1fr;
+  }
+}
+.journal-tracker-bar .journal-tracker-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  /* Anchor for the per-cell remove button, which is pinned to the corner
+     rather than given a slot in the flow — a logging cell is already a label
+     over a control, and a third row for a button you almost never press would
+     cost every cell height for one cell's benefit. */
+  position: relative;
+  /* Every logging cell — Mood, steppers, times, selects, and the coupled
+     Sleep module — shares one row height so the grid reads as an even set of
+     tiles rather than a ragged mix. Each cell is an eyebrow label pinned to
+     the top-left over a control that owns the full width beneath it; the
+     Sleep cell (two labelled time fields + a live readout) is the tallest
+     natural content, so this min-height is sized to hold it, and shorter
+     cells centre their label+control block within the same box. */
+  min-height: var(--am-tracker-cell-h, 76px);
+  min-width: 0; /* let a cell shrink within its grid track instead of overflowing */
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  /* `--background-primary`, not `--background-secondary`.
+     The cells sit inside a banner and, since §1.6, inside a section card —
+     both painted with `--background-secondary`. Filled with the same colour,
+     two adjacent cells had nothing between them but their two borders, so a
+     logging grid read as one box with dividers ruled through it rather than as
+     a set of tiles. The gap was there all along; it just had no colour to be.
+     Same collision the secondary button had, one surface up. */
+  background: var(--background-primary);
+}
+/* Eyebrow label: small, muted, uppercase, tucked at the top-left so the
+   metric control below is the cell's focus. The emoji/icon that leads each
+   label keeps its colour (uppercasing only affects letters). */
+.journal-tracker-bar .journal-tracker-cell > .journal-widget-label {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+/* The control group beneath the eyebrow spans the cell's full width so the
+   input/stepper/picker — the thing being logged — is the visual priority. */
+.journal-tracker-bar .journal-tracker-cell > .journal-widget-label + .journal-widget {
+  width: 100%;
+}
+/* Steppers space out their −/value/+ across the freed width; the mood picker
+   and other pickers stay left-aligned rather than stretching their glyphs. */
+.journal-tracker-bar .journal-tracker-cell > .journal-widget-label + .journal-stepper {
+  justify-content: space-between;
+}
+/* Time/date/select controls fill the row so the field is easy to hit. */
+.journal-tracker-bar .journal-tracker-cell .journal-time input,
+.journal-tracker-bar .journal-tracker-cell .journal-date input,
+.journal-tracker-bar .journal-tracker-cell .journal-select select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Per-entry tracker controls ──────────────────────────────────────────
+   The grid is editable per note: a trailing "+ Add tracker" tile appends a
+   module to *this* entry, and each cell carries a corner × that removes it
+   again. Both act on the note's own `tracker:` directives — Settings decides
+   what a *new* entry starts with, these decide what this one carries. */
+
+/* The × is chrome, so it stays out of the way until the cell is hovered or
+   the button itself is keyboard-focused. It never overlaps the eyebrow label,
+   which is why the label above reserves its own line. */
+.journal-tracker-bar .journal-tracker-cell .journal-tracker-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+.journal-tracker-bar .journal-tracker-cell .journal-tracker-remove .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+.journal-tracker-bar .journal-tracker-cell:hover .journal-tracker-remove,
+.journal-tracker-bar .journal-tracker-cell .journal-tracker-remove:focus-visible {
+  opacity: 1;
+}
+.journal-tracker-bar .journal-tracker-cell .journal-tracker-remove:hover {
+  color: var(--text-error);
+  background: var(--background-modifier-hover);
+  opacity: 1;
+}
+/* Touch devices have no hover, so a control revealed by it is a control that
+   does not exist. Show it faintly instead — still quiet, still reachable. */
+@media (hover: none) {
+  .journal-tracker-bar .journal-tracker-cell .journal-tracker-remove {
+    opacity: 0.45;
+  }
+}
+
+/* The add tile reads as an empty slot rather than a filled cell: dashed
+   border, no fill, muted text. It sits in the grid as a real cell so it
+   inherits the two-per-row rhythm instead of orphaning itself on its own row,
+   and it lifts to the accent colour on hover so it's clearly pressable. */
+.journal-tracker-bar .journal-tracker-cell.journal-tracker-add {
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-style: dashed;
+  background: transparent;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.journal-tracker-bar .journal-tracker-cell.journal-tracker-add:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+.journal-tracker-add .journal-tracker-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  min-height: var(--am-tracker-cell-h, 76px);
+  padding: var(--am-space-4) var(--am-space-6);
+  border: none;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+.journal-tracker-add:hover .journal-tracker-add-btn {
+  color: var(--text-normal);
+}
+.journal-tracker-add .journal-tracker-add-btn .svg-icon {
+  width: 15px;
+  height: 15px;
+}

@@ -1,0 +1,795 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+//
+// Licensed under the GNU Affero General Public License v3.0 or later, with
+// attribution and naming terms under its section 7. See LICENSE and
+// LICENSING.md.
+
+import { describe, expect, it } from "vitest";
+import { STUDY_JOURNAL, JournalType } from "../src/journals/journal";
+import {
+  buildJournalType,
+  composeTemplate,
+  freshCustomJournal,
+  journalTemplateFiles,
+} from "../src/journals/custom-journal";
+import {
+  defaultSectionIds,
+  detectSections,
+  findSection,
+  sectionContext,
+  sectionsFor,
+  templateTargets,
+} from "../src/journals/journal-sections";
+import type { SectionContext } from "../src/journals/journal-sections";
+import {
+  applySections,
+  isHandEdited,
+  parseSections,
+  planSections,
+  sectionsPresent,
+} from "../src/journals/journal-plan";
+
+// ── the section planner ───────────────────────────────────────────────────
+//
+// The read-only half of the designer, and the reason "generates, never
+// regenerates" can stop being the rule. What is asserted here is not that the
+// module produces nice output — it is that the plan and the write cannot
+// disagree, and that nothing the plugin did not write is ever touched. Those
+// are the two properties a reader is trusting when they press Save.
+
+const cooking = buildJournalType({
+  ...freshCustomJournal(new Set()),
+  id: "cooking",
+  name: "Cooking",
+  levels: [
+    { id: "cuisine", noun: "Cuisine", fallbackEmoji: "🍳" },
+    { id: "dish", noun: "Dish", fallbackEmoji: "🍲" },
+  ],
+  kinds: [
+    {
+      id: "recipe",
+      emoji: "🍽️",
+      label: "Recipe",
+      rating: "confidence",
+      pages: true,
+    },
+    { id: "attempt", emoji: "🔥", label: "Attempt" },
+  ],
+});
+const plain = buildJournalType(freshCustomJournal(new Set()));
+
+// Every template of every fixture type, with the surface it was composed for.
+const allTemplates = (): {
+  type: JournalType;
+  file: string;
+  ctx: SectionContext;
+  text: string;
+}[] => {
+  const out = [];
+  for (const type of [STUDY_JOURNAL, cooking, plain]) {
+    const files = journalTemplateFiles(type);
+    for (const target of templateTargets(type)) {
+      const f = files.find((x) => x.name === target.file);
+      if (f) out.push({ type, file: target.file, ctx: target.ctx, text: f.content });
+    }
+  }
+  return out;
+};
+
+describe("reading a template back", () => {
+  it("agrees with detectSections on every composed template", () => {
+    // The inverse of composeTemplate, cross-checked against the detector that
+    // was already trusted. detectSections asks each section's own `locate`
+    // regex; sectionsPresent asks the block model. Two independent routes to
+    // the same answer is worth more than either checked against a fixture,
+    // and it is what makes replacing the older one later a measurable step
+    // rather than a leap.
+    for (const { type, file, ctx, text } of allTemplates()) {
+      const viaBlocks = [...sectionsPresent(text, ctx)].sort();
+      const viaLocate = [...detectSections(text, ctx)].sort();
+      expect(viaBlocks, `${type.id}/${file}`).toEqual(viaLocate);
+    }
+  });
+
+  it("attributes every block of a freshly composed template", () => {
+    // Zero foreign runs on a file the plugin just wrote. A non-zero count here
+    // means the parser cannot recognise something the composer emits, and the
+    // preview would tell a reader their own template contains blocks that
+    // aren't the catalogue's.
+    for (const { type, file, ctx, text } of allTemplates()) {
+      const foreign = parseSections(text, ctx).filter(
+        (r) => r.sectionId === null && !r.filler
+      );
+      expect(foreign.map((f) => f.from), `${type.id}/${file}`).toEqual([]);
+    }
+  });
+
+  it("does not count blank separators or frontmatter as content", () => {
+    // Every template has both, and reporting them would have each clean file
+    // announce "two blocks here aren't the catalogue's" — true, useless and
+    // alarming.
+    for (const { ctx, text } of allTemplates()) {
+      const runs = parseSections(text, ctx);
+      expect(runs.some((r) => r.filler)).toBe(true);
+    }
+  });
+
+  it("calls a freshly composed template unedited", () => {
+    for (const { type, file, ctx, text } of allTemplates()) {
+      expect(isHandEdited(text, ctx), `${type.id}/${file}`).toBe(false);
+    }
+  });
+
+  it("calls a template with an added widget edited", () => {
+    const { ctx, text } = allTemplates()[0];
+    const hacked = text + "\n```almanac\ntag-index\n```\n";
+    expect(isHandEdited(hacked, ctx)).toBe(true);
+  });
+
+  it("keeps a retitled header attributed to its section", () => {
+    // Headers are retitleable, which layout.ts settled for dashboards. A
+    // reader who renamed a section's bar still has that section, and a parser
+    // that disagreed would offer to add a second copy.
+    const topic = allTemplates().find((t) => t.file.includes("topic"))!;
+    const renamed = topic.text.replace("header:🔁 Review", "header:🔁 Come back to");
+    expect(sectionsPresent(renamed, topic.ctx)).toContain("review");
+  });
+});
+
+describe("the plan and the write cannot disagree", () => {
+  const topic = () => allTemplates().find((t) => t.file.includes("topic"))!;
+
+  it("returns null when asked for what is already there", () => {
+    // Idempotence made structural rather than claimed: applyLayout's and
+    // mergeTrendsSection's convention, and the reason a second call is safe.
+    for (const { type, file, ctx, text } of allTemplates()) {
+      const present = sectionsPresent(text, ctx);
+      expect(applySections(text, ctx, present), `${type.id}/${file}`).toBeNull();
+    }
+  });
+
+  it("changes exactly the sections the plan named", () => {
+    const { ctx, text } = topic();
+    const present = sectionsPresent(text, ctx);
+    const want = present.filter((id) => id !== "review");
+
+    const named = planSections(text, ctx, want)
+      .filter((o) => o.kind === "remove" || o.kind === "add")
+      .map((o) => o.sectionId);
+    expect(named).toEqual(["review"]);
+
+    const after = applySections(text, ctx, want)!;
+    const before = new Set(present);
+    const now = new Set(sectionsPresent(after, ctx));
+    const changed = [
+      ...[...before].filter((id) => !now.has(id)),
+      ...[...now].filter((id) => !before.has(id)),
+    ];
+    expect(changed).toEqual(named);
+  });
+
+  it("is idempotent", () => {
+    const { ctx, text } = topic();
+    const want = sectionsPresent(text, ctx).filter((id) => id !== "review");
+    const once = applySections(text, ctx, want)!;
+    expect(applySections(once, ctx, want)).toBeNull();
+  });
+
+  it("restores the file exactly when a section is removed and re-added", () => {
+    // The round-trip, and the reason insertionPoint stops at the first section
+    // that outranks the new one instead of scanning the whole file: Study's
+    // Topic index puts `children` after `path`, so a whole-file scan landed a
+    // re-added `review` at the bottom.
+    const { ctx, text } = topic();
+    const present = sectionsPresent(text, ctx);
+    const without = present.filter((id) => id !== "review");
+    const removed = applySections(text, ctx, without)!;
+    expect(applySections(removed, ctx, present)).toBe(text);
+  });
+});
+
+describe("nothing the plugin did not write is touched", () => {
+  const topic = () => allTemplates().find((t) => t.file.includes("topic"))!;
+
+  it("leaves a hand-added block exactly where it was", () => {
+    const { ctx, text } = topic();
+    const mine = "```almanac\ntag-index\n```";
+    const hacked = `${text}\n${mine}\n`;
+    const want = sectionsPresent(hacked, ctx).filter((id) => id !== "review");
+    const after = applySections(hacked, ctx, want)!;
+    expect(after).toContain(mine);
+  });
+
+  it("reports foreign blocks rather than removing them", () => {
+    const { ctx, text } = topic();
+    // `on-this-day` RATHER THAN `tag-index` SINCE 3.11 §6, which gave the
+    // journal catalogue a Tags section — so the old fixture stopped being
+    // foreign and started being a section the planner recognises. The
+    // assertion is about what happens to a block the catalogue does NOT own,
+    // so the fixture has to be a directive no journal section claims: this one
+    // is diary-only and there is no plausible journal reading of it.
+    const hacked = `${text}\n\`\`\`almanac\non-this-day\n\`\`\`\n`;
+    const ops = planSections(hacked, ctx, sectionsPresent(hacked, ctx));
+    const foreign = ops.find((o) => o.kind === "foreign");
+    expect(foreign?.detail).toContain("left alone");
+  });
+
+  it("refuses to remove a section that has the reader's writing in it", () => {
+    // WAS "keeps a region…", which took the fence and left the text. The rule
+    // it served is unchanged and is the reason this changed: NEVER DELETE A
+    // NON-EMPTY REGION. Keeping the orphan satisfied it; refusing satisfies it
+    // more strongly, and leaves the note in a state where every region still
+    // has an owner.
+    //
+    // What tipped it: an orphaned region is INVISIBLE in reading mode, so after
+    // the one report that mentions it the reader cannot see it exists — and
+    // re-adding the section later silently resurrects the old text.
+    const { ctx, text } = topic();
+    const written = text.replace(
+      "<!--almanac:path\n-->",
+      "<!--almanac:path\nStart with quadratics, then factorising.\n-->"
+    );
+    const want = sectionsPresent(written, ctx).filter((id) => id !== "path");
+    const ops = planSections(written, ctx, want);
+    const remove = ops.find((o) => o.sectionId === "path")!;
+    expect(remove.kind).toBe("keep");
+    expect(remove.detail).toContain("has your writing in it");
+    // The refusal names what is in the way and what to do about it — a refusal
+    // that only says no sends someone looking for a setting that does not exist.
+    expect(remove.detail).toContain("path");
+    expect(remove.detail).toContain("clear it first");
+
+    // And the write is a NO-OP, not a partial one. `applySections` returns null
+    // for "nothing to change", so a plan whose only change was refused leaves
+    // the file untouched rather than rewriting it identically — which matters
+    // because a rewrite would still bump the note's mtime and, on the diary
+    // side, mtime is the source of truth for what is stale.
+    expect(applySections(written, ctx, want)).toBeNull();
+  });
+
+  it("takes an empty region with the section that owns it", () => {
+    // The other half: an untouched region is the plugin's own scaffolding and
+    // leaving it behind would litter the file with dead comments.
+    const { ctx, text } = topic();
+    const want = sectionsPresent(text, ctx).filter((id) => id !== "path");
+    const after = applySections(text, ctx, want)!;
+    expect(after).not.toContain("<!--almanac:path");
+  });
+
+  it("never offers to remove a section that writes ordinary markdown", () => {
+    // Derived from the block model rather than special-cased here: `headings`
+    // emits `## ` markdown, which is indistinguishable from the reader's own
+    // prose, so removal is refused and said so rather than silently ignored.
+    const lesson = allTemplates().find((t) => t.file.includes("lesson"))!;
+    const present = sectionsPresent(lesson.text, lesson.ctx);
+    const ops = planSections(lesson.ctx ? lesson.text : "", lesson.ctx, []);
+    for (const op of ops) {
+      if (op.sectionId === "headings" || op.sectionId === "banner") {
+        expect(op.kind).toBe("keep");
+        expect(op.detail).not.toBe("unchanged");
+      }
+      expect(op.kind, `${op.sectionId}`).not.toBe("remove_markdown");
+    }
+    expect(present).toContain("banner");
+  });
+
+  it("refuses to remove a required section and says why", () => {
+    const { ctx, text } = topic();
+    const ops = planSections(text, ctx, []);
+    const banner = ops.find((o) => o.sectionId === "banner")!;
+    expect(banner.kind).toBe("keep");
+    expect(banner.detail).toContain("required");
+  });
+});
+
+describe("adding", () => {
+  const topic = () => allTemplates().find((t) => t.file.includes("topic"))!;
+
+  it("puts a new section where the catalogue would have", () => {
+    const { ctx, text } = topic();
+    const present = sectionsPresent(text, ctx);
+    expect(present).not.toContain("find");
+    const after = applySections(text, ctx, [...present, "find"])!;
+    const order = sectionsPresent(after, ctx);
+    expect(order).toContain("find");
+    // Between the sections that flank it in the catalogue, not appended.
+    expect(order.indexOf("find")).toBeLessThan(order.indexOf("review"));
+  });
+
+  it("separates what it adds with one blank line", () => {
+    const { ctx, text } = topic();
+    const present = sectionsPresent(text, ctx);
+    const after = applySections(text, ctx, [...present, "find"])!;
+    expect(after).not.toMatch(/\n{3,}/);
+  });
+
+  it("names the addition in the plan", () => {
+    const { ctx, text } = topic();
+    const present = sectionsPresent(text, ctx);
+    const op = planSections(text, ctx, [...present, "find"]).find(
+      (o) => o.kind === "add"
+    )!;
+    expect(op.sectionId).toBe("find");
+    expect(op.label).toBe(findSection("find")!.label);
+  });
+});
+
+describe("fence signatures", () => {
+  it("gives no two sections on one surface the same signature", () => {
+    // What makes parseSections a match rather than a guess. Two sections with
+    // identical directive sets would be indistinguishable in a file, and the
+    // parser would attribute both runs to whichever it checked first.
+    for (const type of [STUDY_JOURNAL, cooking, plain]) {
+      const surfaces = [
+        ...type.levels.map((_l, i) => sectionContext(type, { depth: i })),
+        ...type.kinds.map((k) => sectionContext(type, { kind: k })),
+      ];
+      for (const ctx of surfaces) {
+        const seen = new Map<string, string>();
+        for (const s of sectionsFor(ctx)) {
+          const f = s.render(ctx).find((b) => b.kind === "fence");
+          if (!f || f.kind !== "fence") continue;
+          const sig = `${f.info}|${f.lines
+            .map((l) => l.split(":")[0])
+            .filter((k) => k && k !== "header")
+            .sort()
+            .join(",")}`;
+          const prev = seen.get(sig);
+          expect(prev, `${type.id}: ${s.id} collides with ${prev}`).toBeUndefined();
+          seen.set(sig, s.id);
+        }
+      }
+    }
+  });
+});
+
+describe("reordering", () => {
+  const topic = () => allTemplates().find((t) => t.file.includes("topic"))!;
+
+  it("returns null when the order is unchanged", () => {
+    const { ctx, text } = topic();
+    expect(applySections(text, ctx, sectionsPresent(text, ctx))).toBeNull();
+  });
+
+  it("swaps two sections", () => {
+    const { ctx, text } = topic();
+    const present = sectionsPresent(text, ctx);
+    const i = present.indexOf("review");
+    const j = present.indexOf("charts");
+    const want = [...present];
+    [want[i], want[j]] = [want[j], want[i]];
+
+    const after = applySections(text, ctx, want)!;
+    expect(sectionsPresent(after, ctx)).toEqual(want);
+  });
+
+  it("names only the sections that actually moved", () => {
+    // A move shifts the index of everything between, so a plan that reported
+    // those would say "moves Charts, Path, Resources" when the reader nudged
+    // Review once. The minimal set comes from a longest common subsequence.
+    const { ctx, text } = topic();
+    const present = sectionsPresent(text, ctx);
+    const want = present.filter((id) => id !== "review");
+    want.push("review");
+
+    const moved = planSections(text, ctx, want)
+      .filter((o) => o.kind === "move")
+      .map((o) => o.sectionId);
+    expect(moved).toEqual(["review"]);
+  });
+
+  it("says where a section is going", () => {
+    const { ctx, text } = topic();
+    const present = sectionsPresent(text, ctx);
+    const want = present.filter((id) => id !== "review");
+    want.push("review");
+    const op = planSections(text, ctx, want).find((o) => o.kind === "move")!;
+    expect(op.detail).toBe("moves to the end");
+  });
+
+  it("is idempotent", () => {
+    const { ctx, text } = topic();
+    const present = sectionsPresent(text, ctx);
+    const want = [...present].reverse();
+    const once = applySections(text, ctx, want)!;
+    expect(applySections(once, ctx, want)).toBeNull();
+  });
+
+  it("restores the file exactly when a swap is undone", () => {
+    const { ctx, text } = topic();
+    const present = sectionsPresent(text, ctx);
+    const want = [...present];
+    [want[1], want[2]] = [want[2], want[1]];
+    const swapped = applySections(text, ctx, want)!;
+    expect(applySections(swapped, ctx, present)).toBe(text);
+  });
+
+  it("leaves a hand-added block where the reader put it", () => {
+    // The one undecidable case, decided out loud: a reader's own fence between
+    // two sections being swapped has no correct destination, so it keeps its
+    // index and the sections trade the slots they had.
+    const { ctx, text } = topic();
+    const mine = "```almanac\ntag-index\n```";
+    const hacked = `${text}\n${mine}\n`;
+    const present = sectionsPresent(hacked, ctx);
+    const want = [...present].reverse();
+    const after = applySections(hacked, ctx, want)!;
+    // Still there, and still the last block: nothing moved it.
+    expect(after).toContain(mine);
+    expect(after.trimEnd().endsWith("```")).toBe(true);
+  });
+
+  it("keeps a section's regions with it", () => {
+    // A section is a contiguous run — fence plus the regions its fields write
+    // to — so permuting chunks moves the whole thing. A region left behind
+    // would orphan the reader's text.
+    const { ctx, text } = topic();
+    const written = text.replace(
+      "<!--almanac:path\n-->",
+      "<!--almanac:path\nQuadratics first.\n-->"
+    );
+    const present = sectionsPresent(written, ctx);
+    const want = [...present].reverse();
+    const after = applySections(written, ctx, want)!;
+    const fenceAt = after.indexOf("path:path");
+    const regionAt = after.indexOf("<!--almanac:path");
+    expect(fenceAt).toBeGreaterThanOrEqual(0);
+    expect(regionAt).toBeGreaterThan(fenceAt);
+    expect(after).toContain("Quadratics first.");
+  });
+
+  it("does not drop a section the reorder never mentioned", () => {
+    const { ctx, text } = topic();
+    const present = sectionsPresent(text, ctx);
+    // A `want` missing `resources` entirely — not unticked, just absent from
+    // the list. It must survive rather than being read as a removal.
+    const partial = present.filter((id) => id !== "resources").reverse();
+    const after = applySections(text, ctx, [...partial, "resources"])!;
+    expect(sectionsPresent(after, ctx)).toContain("resources");
+  });
+});
+
+// ── extending a section that is present and short of a part (3.18 §1) ──────
+//
+// `children` emits one header, button and table PER NOTE KIND, so a dashboard
+// written before a journal gained a kind is present, wanted, and missing a
+// table. Until 3.18 the planner could not say that: exact keyword matching
+// called the short fence nobody's, the section read as ABSENT, and the plan
+// said `add` — which appends a SECOND copy of the whole section beside the
+// short one. The roadmap predicted a silent `keep`; the tree did something
+// worse, and it wrote. These tests pin the fixed behaviour and, first, the
+// property that makes the fix trustworthy.
+
+describe("parts and the extend op", () => {
+  // The Study Topic index — the deepest index, where children is per-kind.
+  const topic = (): { ctx: SectionContext; text: string } => {
+    const target = templateTargets(STUDY_JOURNAL).find((t) => t.key === "index:1")!;
+    const files = journalTemplateFiles(STUDY_JOURNAL);
+    return {
+      ctx: target.ctx,
+      text: files.find((f) => f.name === target.file)!.content,
+    };
+  };
+  const want = (ctx: SectionContext): string[] => sectionsPresent(topic().text, ctx);
+  // A file written before `practice` existed.
+  const dropPractice = (text: string): string =>
+    text
+      .split("\n")
+      .filter(
+        (l) =>
+          !/^(header:🛠️|button:study:new-practice|kind-table:practice)/.test(
+            l.trim()
+          )
+      )
+      .join("\n");
+
+  it("composes its fence out of exactly the parts it declares", () => {
+    // A TRIPWIRE, NOT A CHECK, and the difference is worth stating because it
+    // is easy to read this as stronger than it is.
+    //
+    // Today `children.render` and `children.parts` both call `childrenParts`,
+    // so this assertion CANNOT fail: a mutation to that helper moves both sides
+    // together. That is the point — the invariant is held by the code's shape
+    // rather than by this test, which is what §11.1 asked for. What this
+    // catches is the refactor that gives a section its own second `parts`
+    // implementation and lets the two start disagreeing; that is the day the
+    // planner would report a gap that filling could not close, and the day this
+    // line goes red.
+    //
+    // It is stronger than "no gaps in fresh output" below, which only pins the
+    // PROBES: a `parts` whose `lines` had drifted would still report nothing
+    // missing, and would then splice the wrong lines into a file.
+    for (const t of allTemplates()) {
+      for (const s of sectionsFor(t.ctx)) {
+        const parts = s.parts?.(t.ctx) ?? [];
+        if (!parts.length) continue;
+        const rendered = s
+          .render(t.ctx)
+          .flatMap((b) => (b.kind === "fence" ? b.lines : []));
+        expect(
+          parts.flatMap((p) => p.lines),
+          `${s.id}'s parts and render disagree on ${t.file}`
+        ).toEqual(rendered);
+        // And the probe closes its group, which is what makes "insert after
+        // the preceding part" land between groups rather than inside one.
+        for (const p of parts) {
+          expect(p.lines[p.lines.length - 1]).toBe(p.probe);
+        }
+      }
+    }
+  });
+
+  it("reports no missing parts on anything it just composed", () => {
+    // THE PROPERTY THAT KEEPS `parts` AND `render` FROM DRIFTING (§11.1).
+    //
+    // `missing` says which pieces are absent and `render` composes all of them.
+    // If the two disagree about what a piece IS, a file gains a duplicate or
+    // keeps a gap the editor claims to have filled — and the plan would report
+    // a change that saving cannot close, so Save would never disable. A section
+    // that cannot say this about its own fresh output has the bug already.
+    for (const t of allTemplates()) {
+      const ops = planSections(t.text, t.ctx, sectionsPresent(t.text, t.ctx));
+      expect(
+        ops.filter((o) => o.kind === "extend"),
+        `${t.file} reports a gap in what it was just composed with`
+      ).toEqual([]);
+    }
+  });
+
+  it("no two sections can be confused by the sub-multiset fallback", () => {
+    // Attribution falls back to a sub-multiset match for extensible sections
+    // only, and only after every exact match has failed. That is safe exactly
+    // while no OTHER section's keywords are a sub-multiset of an extensible
+    // one's — otherwise a `tasks-table` fence could be read as a short
+    // `children` and get note tables spliced into it.
+    for (const t of allTemplates()) {
+      const sections = sectionsFor(t.ctx);
+      const extensible = sections.filter(
+        (s) => (s.parts?.(t.ctx) ?? []).length > 0
+      );
+      for (const ext of extensible) {
+        const full = new Set(
+          (ext.parts?.(t.ctx) ?? []).flatMap((p) =>
+            p.lines.map((l) => l.split(":")[0]).filter((k) => k !== "header")
+          )
+        );
+        for (const other of sections) {
+          if (other.id === ext.id) continue;
+          const kws = other
+            .render(t.ctx)
+            .flatMap((b) => (b.kind === "fence" ? b.lines : []))
+            .map((l) => l.split(":")[0])
+            .filter((k) => k !== "header");
+          if (!kws.length) continue;
+          expect(
+            kws.every((k) => full.has(k)),
+            `${other.id} would be mistaken for a short ${ext.id} on ${t.file}`
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("calls a short fence an extend, not an add", () => {
+    const { ctx, text } = topic();
+    const stale = dropPractice(text);
+    const ops = planSections(stale, ctx, want(ctx));
+    const children = ops.find((o) => o.sectionId === "children")!;
+    expect(children.kind).toBe("extend");
+    expect(children.detail).toContain("Practice");
+    // The failure this replaces: a second copy of the whole section.
+    expect(ops.filter((o) => o.kind === "add")).toEqual([]);
+  });
+
+  it("writes exactly the file the catalogue would have composed", () => {
+    const { ctx, text } = topic();
+    const out = applySections(dropPractice(text), ctx, want(ctx));
+    expect(out).toBe(text);
+  });
+
+  it("is idempotent, and a pristine file is not a write at all", () => {
+    const { ctx, text } = topic();
+    // Nothing to do on a file that already has every part — the property that
+    // stops this becoming a formatter that changes a file every time it runs.
+    expect(applySections(text, ctx, want(ctx))).toBeNull();
+    const once = applySections(dropPractice(text), ctx, want(ctx))!;
+    expect(applySections(once, ctx, want(ctx))).toBeNull();
+  });
+
+  it("keeps a reader's order and a reader's retitled header", () => {
+    // The rule at the top of journal-plan.ts: no reflowing, no reordering
+    // blocks it did not move. An extension may INSERT lines; it may not tidy
+    // the ones around them.
+    const type = buildJournalType({
+      ...freshCustomJournal(new Set()),
+      id: "s3",
+      levels: [
+        { id: "subject", noun: "Subject", fallbackEmoji: "📚" },
+        { id: "topic", noun: "Topic", fallbackEmoji: "📂" },
+      ],
+      kinds: [
+        { id: "lesson", emoji: "📖", label: "Lesson" },
+        { id: "quiz", emoji: "❓", label: "Quiz" },
+        { id: "practice", emoji: "🛠️", label: "Practice" },
+      ],
+    });
+    const target = templateTargets(type).find((t) => t.key === "index:1")!;
+    const ctx = target.ctx;
+    const composed = journalTemplateFiles(type).find(
+      (f) => f.name === target.file
+    )!.content;
+    // Practice above Lessons, Lessons retitled by hand, and no Quiz yet.
+    const edited = composed.replace(
+      /```almanac\nheader:📖[\s\S]*?```/,
+      [
+        "```almanac",
+        "header:🛠️ Practice",
+        "button:s3:new-practice",
+        "kind-table:practice",
+        "header:📖 My Own Title",
+        "button:s3:new-lesson",
+        "kind-table:lesson",
+        "```",
+      ].join("\n")
+    );
+    const out = applySections(edited, ctx, sectionsPresent(edited, ctx))!;
+    const fence = out.split("\n").map((l) => l.trim());
+    expect(out).toContain("header:📖 My Own Title");
+    // Their order survives: Practice still before Lessons.
+    expect(fence.indexOf("kind-table:practice")).toBeLessThan(
+      fence.indexOf("kind-table:lesson")
+    );
+    // And Quiz lands after the kind it follows in the CATALOGUE, expressed
+    // against the file's own order rather than imposed on it.
+    expect(fence.indexOf("kind-table:lesson")).toBeLessThan(
+      fence.indexOf("kind-table:quiz")
+    );
+  });
+
+  it("never extends a leaf note or a page, whatever the catalogue says", () => {
+    // §1.4, and the gate is on the SURFACE rather than on the catalogue.
+    // `children` is index-only today, so this arm is unreachable through the
+    // shipped sections — which is exactly why it is asserted. A rule that holds
+    // by accident of the catalogue stops holding the day somebody adds a leaf
+    // section with parts.
+    for (const t of allTemplates()) {
+      if (t.ctx.noteKind === "index") continue;
+      const ops = planSections(t.text, t.ctx, sectionsPresent(t.text, t.ctx));
+      expect(
+        ops.some((o) => o.kind === "extend"),
+        `${t.file} is a ${t.ctx.noteKind} and must never be extended`
+      ).toBe(false);
+    }
+  });
+});
+
+// ── a section's title is a question with an answer in the file (3.18 §3) ───
+
+describe("renameable section titles", () => {
+  const topic = (): { ctx: SectionContext; text: string } => {
+    const target = templateTargets(STUDY_JOURNAL).find(
+      (t) => t.key === "index:1"
+    )!;
+    return {
+      ctx: target.ctx,
+      text: journalTemplateFiles(STUDY_JOURNAL).find(
+        (f) => f.name === target.file
+      )!.content,
+    };
+  };
+
+  it("writes the answer into the header the section emitted", () => {
+    const { ctx, text } = topic();
+    const present = sectionsPresent(text, ctx);
+    const want = present.map((id) =>
+      id === "path" ? { id, options: { label: "🗺️ Route" } } : id
+    );
+    const ops = planSections(text, ctx, want);
+    const path = ops.find((o) => o.sectionId === "path")!;
+    expect(path.kind).toBe("reconfigure");
+    const out = applySections(text, ctx, want)!;
+    expect(out).toContain("header:🗺️ Route");
+    // Only that header. The section's own directive and every other section's
+    // heading are untouched — a title change is not a licence to reflow.
+    expect(out).toContain("path:path");
+    expect(out).toContain("header:📚 Resources");
+  });
+
+  it("leaves the catalogue's heading when the answer is empty", () => {
+    // Empty means "whatever the catalogue writes", which is why the control is
+    // a placeholder rather than a pre-filled box: seeding it would freeze
+    // today's default into the note as though it had been chosen.
+    const { ctx, text } = topic();
+    expect(applySections(text, ctx, sectionsPresent(text, ctx))).toBeNull();
+  });
+
+  it("survives an extension, because extend never rewrites a header", () => {
+    // §3.4. A reader who renamed a heading and then gains a note kind keeps
+    // the name: `missing` reports parts by their `kind-table:` probe, and the
+    // header above it is neither matched nor re-emitted.
+    const { ctx, text } = topic();
+    const renamed = text.replace("header:📖 Lessons", "header:📖 My Lessons");
+    const stale = renamed
+      .split("\n")
+      .filter(
+        (l) =>
+          !/^(header:🛠️|button:study:new-practice|kind-table:practice)/.test(
+            l.trim()
+          )
+      )
+      .join("\n");
+    const out = applySections(stale, ctx, sectionsPresent(stale, ctx))!;
+    expect(out).toContain("header:📖 My Lessons");
+    expect(out).not.toContain("header:📖 Lessons\n");
+    expect(out).toContain("kind-table:practice");
+  });
+});
+
+// ── the wizard's chosen order reaches the file (3.18 §2) ──────────────────
+
+describe("a chosen order is composed, and no order is still catalogue order", () => {
+  const target = (): { key: string; ctx: SectionContext } => {
+    const t = templateTargets(STUDY_JOURNAL).find((x) => x.key === "index:1")!;
+    return { key: t.key, ctx: t.ctx };
+  };
+
+  it("leaves output byte-identical when nothing was reordered", () => {
+    // THE ROW THAT MUST NOT MOVE. Ordering is opt-in: a reader who never
+    // touches an arrow gets exactly the templates 3.17.1 wrote, which is what
+    // the Study-equivalence check is measuring elsewhere.
+    const { ctx } = target();
+    const ids = defaultSectionIds(ctx);
+    expect(composeTemplateOrdered(ctx, ids, ids)).toBe(
+      composeTemplateOrdered(ctx, ids, undefined)
+    );
+  });
+
+  it("writes the sections in the order the wizard collected", () => {
+    const { ctx } = target();
+    const ids = defaultSectionIds(ctx);
+    // Move `resources` to the front — a real reordering, not a no-op.
+    const moved = ["resources", ...ids.filter((i) => i !== "resources")];
+    const out = composeTemplateOrdered(ctx, ids, moved);
+    const at = (needle: string): number => out.indexOf(needle);
+    expect(at("attach:")).toBeLessThan(at("kind-table:lesson"));
+    // AND THE BANNER IS STILL FIRST, even though the order asked for Resources
+    // ahead of it. That is not the composer ignoring the reader: the banner's
+    // first block is `almanac:spacer`, which has to be on line 0 of the body or
+    // a click at the top of the note renders the fence as raw source. The
+    // wizard's arrows cannot express this order; presets and saved variants
+    // could, so `sectionsFor` enforces it for every caller.
+    expect(at("journal-header")).toBeLessThan(at("attach:"));
+    expect(at("`almanac:spacer`")).toBe(
+      out.indexOf("\n---\n") + "\n---\n".length
+    );
+  });
+
+  it("does not freeze which sections exist, only where they go", () => {
+    // `order`, not `sections` (§2.4). A layout that named the SET would stop a
+    // journal ever gaining a section the catalogue adds later; one that names
+    // only positions leaves the set to the catalogue.
+    //
+    // On `cooking` rather than Study, and the reason is worth recording: Study
+    // declares per-section OPTIONS in its layout (three resource shelves), and
+    // `sectionsPresent` builds its signatures from those options. Composing
+    // with an order but without them yields a one-shelf Resources that the
+    // three-shelf signature does not match — an artifact of the fixture, not of
+    // ordering. `cooking` has no options, so the two agree.
+    const ctx = templateTargets(cooking).find((t) => t.key === "index:1")!.ctx;
+    const ids = defaultSectionIds(ctx);
+    const out = composeTemplateOrdered(ctx, ids, ["resources"]);
+    for (const id of ids) {
+      expect(sectionsPresent(out, ctx)).toContain(id);
+    }
+  });
+});
+
+// Compose with an explicit `order`, the way the wizard now does on Create.
+function composeTemplateOrdered(
+  ctx: SectionContext,
+  ids: string[],
+  order: string[] | undefined
+): string {
+  return composeTemplate(ctx, ids, order ? { order } : undefined);
+}

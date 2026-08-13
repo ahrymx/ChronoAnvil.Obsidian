@@ -1,0 +1,547 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+ *
+ * Licensed under the GNU Affero General Public License v3.0 or later, with
+ * attribution and naming terms under its section 7. See LICENSE and
+ * LICENSING.md.
+ */
+
+/* ============================================================
+ *  Almanac plugin — bundled styles
+ *  Obsidian loads this automatically; no CSS snippets required.
+ *  Sections:
+ *    1. Inline widgets (sliders, pickers, selects, buttons)
+ *    2. [!nav] pills + [!study] cards        (was nav-buttons.css)
+ *    3. [!note] cards                         (was note-cards.css)
+ *    4. Per-entry navigator                   (was journal-nav.css)
+ *    5. Diary / year calendars                (was journal-calendar.css)
+ *    6. Native tables (tag-index / topics-table / confidence-summary)
+ *    7. Tokens (radius / type scale / mood palette) — defined once below,
+ *       referenced everywhere above no longer applies; every section now
+ *       reads these instead of its own magic numbers.
+ * ============================================================ */
+
+:root {
+  /* Radius: three tiers only — small controls, cards, and pills. Nothing
+     in this file should use a raw px radius outside these three. */
+  --am-radius-sm: 6px;   /* inputs, selects, steppers, ghost icon buttons */
+  --am-radius-md: 10px;  /* cards: callouts, calendar, tracker rows, tag groups */
+  --am-radius-pill: 999px; /* every pill-shaped button, link and badge */
+
+  /* Vertical rhythm between stacked widgets in one ```almanac block. Named
+     because it is a flex `gap`, not a margin — a widget that wants to butt up
+     against its neighbour (the joined highlights/challenges box) has to cancel
+     it with a negative margin of exactly this size, and a magic -10px there
+     silently breaks the day someone retunes the spacing here. */
+  --am-widget-gap: 10px;
+
+  /* How wide a page of widgets is allowed to get (4.2 §2). Read by the
+     homepage's `almanac-wide` class and by nothing else yet.
+
+     THE NUMBER IS DERIVED, not chosen. A row splits the page into equal cells,
+     and 520px is the width at which every widget in this plugin collapses to
+     its narrow layout — the number the tracker modules, the journal views, the
+     header bars and the heroes all already use. Two cells above that threshold
+     is 2 x 520 + one --am-widget-gap = 1050, and this is that rounded up so the
+     cells clear it rather than sit on it.
+
+     TWO, because two is what a row of full-size widgets is: the reference
+     design's big row is a pair, and a row of three at this width gives 360px
+     cells, which is the collapsed layout ON PURPOSE — three small widgets are
+     small. A width that kept three cells wide would be 1600px, which is not a
+     page, it is a wall.
+
+     NOT `--file-line-width`. That is a number about TEXT — how many characters
+     read comfortably in one line — and this page is a calendar, a card and a
+     grid. Borrowing it would make the dashboard's shape a consequence of a
+     prose setting; see HOME_CSS_CLASS in home-sections.ts. */
+  --am-page-width: 1100px;
+
+  /* The narrowest a cell of a `row` may get before the row wraps (4.3.1).
+
+     MEASURED, NOT PICKED. A three-cell homepage row in a 720px pane gives each
+     widget 225px, and at 225px the diary calendar's quarter rail — two quarter
+     groups per line, a label and three month names in each — has about 28px per
+     month and renders `JaFeMar` on top of itself. The same row at 355px per cell
+     reads correctly. The floor sits above the broken width and below the known
+     good one, which is the most that can honestly be claimed for it.
+
+     IT IS NOT 520px, the width at which the widgets themselves switch to their
+     narrow layout. Below 520 a widget is compact; below roughly 300 it is
+     broken, and those are different questions. A row wants the second number:
+     a compact widget in a narrow cell is the point of the primitive. */
+  --am-row-cell-min: 320px;
+
+  /* Type: four sizes. Micro meta -> emphasized numbers/titles. */
+  --am-text-2xs: 0.7em;
+
+  /* ── The page head's own two, and it is the only object with any (4.10) ──
+   *
+   * THE FACE. The plugin's UI is one sans everywhere else, deliberately — a
+   * dashboard of widgets that each chose a typeface is the "assembled from
+   * parts" fault the caps voice below was written to end. The head is the one
+   * exception, and it earns it by being the one thing on the page that is about
+   * the PAGE rather than about something on it: a different voice is how a
+   * reader tells the two apart without being told.
+   *
+   * An almanac is a printed annual reference, so a book face is the subject's
+   * own vernacular rather than a decoration borrowed from somewhere else.
+   *
+   * A STACK, SO NOTHING IS SHIPPED. Every entry is a face an OS already has and
+   * the last two are generic, so this resolves everywhere and adds no asset to
+   * a plugin that has never had one. A webfont here would be a download on every
+   * vault for one line of text.
+   */
+  --am-head-face: "Iowan Old Style", "Palatino Linotype", Palatino,
+                  "Book Antiqua", Georgia, ui-serif, serif;
+
+  /* HOW STRONGLY THE HEAD'S GROUND IS FIGURED, as ONE number.
+   *
+   * The head is drawn on a hatched ground, which is the other half of what
+   * stops it reading as one more card. A figure is the easiest thing in a
+   * stylesheet to get wrong by a factor of two, and the easiest to want to turn
+   * off — so it is a dial rather than a value baked into a gradient, and the
+   * light theme raises it (dark ink on a light ground needs more of it to read
+   * as texture) instead of redefining the pattern.
+   *
+   * NOT AN OPACITY ON THE ELEMENT. The figure is a layer of its own so no text
+   * ever inherits it; see `.jtc-card::before`. */
+  --am-head-figure: 0.045;
+
+  /* One small-caps voice for every key label in the plugin: the diary eyebrow,
+     the stat captions, the weekday header, the agenda heading and its month
+     abbreviation. Up to 2.51.1 these ran at 0.04em / 0.06em / 0.08em / 0.12em
+     with weights 600 and 700 — five labels all saying the same thing ("this is
+     a key, not content") set five different ways, which is most of why the card
+     read as assembled from parts. The tracking is the widest of the old values
+     because these are 0.7em words: at that size letter-spacing is what makes
+     small caps legible rather than merely small. */
+  --am-caps-weight: 700;
+  --am-caps-tracking: 0.12em;
+
+  /* `--am-band-recess` STOOD HERE AND IS DELETED (4.13.1 §3b). It named the
+     recess every band on the diary card was sunk by — the stats readout, the
+     navigator, the agenda — after those three had been written out separately at
+     0.13 / 0.13 / 0.12 with three light-theme overrides to match. Naming it was
+     right and it did the job it was named for: all three moved together, once,
+     when the card stopped being made of sunk bands. Its last reader went with
+     the agenda's fill, and a token nothing reads is the dangling reference the
+     guard in `test/tokens.test.ts` exists to catch, arrived at from the other
+     end. The light-theme override below went with it. */
+
+  --am-text-xs: 0.8em;
+  --am-text-sm: 0.85em;
+  --am-text-base: 0.95em;
+
+  /* The section frame (2.56). A section header used to spend about 52px of
+     vertical block on a 1.25em/700 title, 16px of padding and a 2px rule —
+     five of those on one journal note is a third of a phone viewport spent on
+     chrome. Named here rather than written into .journal-header-bar because
+     §1 of the 2.56 plan retires 39 header-shaped components onto one frame,
+     and the whole point of one frame is that its rhythm is one number.
+
+     The indent is what replaces the full-width rule as the thing that says
+     "this belongs to that heading" — a rule under every title draws five
+     horizontal lines down a page and separates nothing in particular.
+
+     THE PADDING CAME DOWN A PIXEL IN 4.11, when the section bar was brought into
+     line with the widget head — the slim band `.journal-block-head` draws over
+     every widget on a page, which a section bar sat beside looking like a
+     different kind of object.
+
+     AND 4.11 SAID THE BAND COULD NOT BE MATCHED, because "a section keeps a
+     readable title". 4.13 gave that up, and the reason is a picture rather than
+     an argument: the first vault render of all three dashboards showed the SAME
+     widget titled two ways — `tasks-table` as `⏳ OPEN TASKS` at 11.2px on the
+     homepage, which composes a bare directive, and as `⏳ Open Tasks` at 15.2px
+     on both dashboards, which compose a `header:` line. One string in
+     `SECTION_TITLES`, two objects on screen, and nobody had decided it. So the
+     bar is now ONE thing at ONE scale — the smaller one — and `--am-bar-*` below
+     is where that scale lives. What 4.11 took from the head was its rule weight
+     and its padding; 4.13 takes the rest. */
+  --am-sec-gap: 4px;
+  --am-sec-pad: 2px;
+  --am-sec-indent: 1.1em;
+  /* A WIDTH, ON AN ELEMENT WHOSE OWN FONT-SIZE RESOLVES IT — which is the whole
+     reason this number moved in 4.13 rather than staying put. `em` on a `width`
+     is relative to the element's own type, so when the glyph came down from
+     `--am-text-base` to `--am-bar-glyph` the slot would have silently shrunk
+     from ~19.8px to ~17.7px and taken the title alignment with it. 1.5 × 0.85em
+     lands back at ~20px, so the slot is the same on the page and only the
+     spelling changed. See `.journal-header-glyph`. */
+  --am-sec-glyph: 1.5em;
+
+  /* ── ONE HEADER BAR, AT ONE SCALE (4.13 §1) ────────────────────────────
+     Two implementations title a block and they must not drift: `sectionFrame`
+     draws `.journal-header-title` for a `header:` or `frame: section` fence, and
+     `buildHead` draws `.journal-block-head-title` for a bare one. They cannot be
+     merged — `NOT_A_CELL` evicts a `.journal-sec` from a row cell by design, so a
+     widget inside a group can only ever be titled by a block head — so instead
+     they read one set of tokens and agree by construction rather than by
+     inspection.
+
+     THE GLYPH IS DELIBERATELY LARGER THAN THE TITLE, and it is the one place
+     "one scale" is not literal. An emoji at 11.2px is a smudge; the slot exists
+     to align a column of titles, and it can only do that if what sits in it is
+     legible. 0.85em is the smallest size at which the shipped glyphs still read.
+
+     NO THEME VARIABLE IS READ HERE, which is why these may live in `:root` — see
+     the `body` block at the end of this file for the one that cannot. */
+  --am-bar-text: var(--am-text-2xs);
+  --am-bar-track: 0.06em;
+  --am-bar-ink: var(--text-muted);
+  --am-bar-glyph: var(--am-text-sm);
+  /* Added in 2.53 for the week table's date, the first place in the sheet that
+     wanted type *above* body size. Named rather than written as a literal so
+     the next one that does agrees with it. */
+  --am-text-lg: 1.15em;
+
+  /* The rule-weight scale (3.6). Three tiers, and like the radii above,
+     nothing in this sheet should type a raw px border width outside them.
+
+     WHY THIS IS A SCALE AND NOT A NUMBER. §4.3 and §4.4 of the 3.6 plan both
+     ask for "slightly larger", and there was nowhere to put the answer — the
+     token file had three radii and no weight at all. Applying "slightly" by
+     hand across dividers, tables, day cells, month cells and tracker cells is
+     how a plugin ends up with borders nobody chose, and that is not a
+     hypothetical here. A survey of this sheet before the scale existed found
+     163 borders at 1px, two at 1.5px, six at 2px and five at 3px — and the 2px
+     and 3px sets are doing THE SAME JOB. Every one of the eleven is a
+     `border-left` spine on an inset block: a quoted region, a nav rail, an
+     event row, the overview card's own accent edge. Eleven marks, one meaning,
+     two weights, and no rule anywhere saying which. That is what the scale is
+     for; §4.3's "make the dividers heavier" is the smaller half of it.
+
+     THE THREE TIERS ARE JOBS, NOT SIZES.
+
+     `hair` subdivides one object — the rows inside a table, the cells inside
+     one grid. It stays at the theme's own hairline because that is what a
+     subdivision should be: present, and not a boundary.
+
+     `rule` divides one object from the next — a card's bands from each other,
+     one card from its neighbour, a grid of cells from the surface it sits on.
+     This is the number §4.3 and §4.4 want, and the ONE number worth tuning:
+     when it lands wrong it lands wrong everywhere at once, which is the whole
+     reason for putting it here rather than at twenty call sites. It is also
+     the one value in this file with no defensible answer in advance — 1px
+     against a hairline is a doubling on some themes and invisible on others,
+     and Almanac renders inside whatever theme the reader has.
+
+     `edge` is the species marker and the spine: the accent bar that says "this
+     page summarises", the left rail on a quoted block. Already 3px at five
+     call sites and 2px at six more; naming it is what stops the twelfth from
+     picking a third value.
+
+     THE SCALE HAS NO HALF STEP, AND CANNOT. Chromium — which is what Obsidian
+     is — floors border-width to whole CSS pixels: 1.4px, 1.5px and 1.6px all
+     compute to 1px, at every device pixel ratio. A box-shadow's spread does
+     not floor. So a `--am-rule` of 1.5px would draw every divider at 1px while
+     drawing every cell ring at 1.5px, and the one number this scale exists to
+     keep in step would be out of step by construction. The two borders in this
+     sheet that were written at 1.5px had been drawing 1px since the day they
+     were typed; they read `--am-rule-hair` now, which changed nothing on
+     screen and stopped the file claiming a weight it never had.
+
+     Rings may still be 1.5px where a control wants a stroke rather than a
+     rule — that is the drawing of a control, not a division between things,
+     and folding it in would make the scale mean "every edge", which is how a
+     scale stops being able to say anything. */
+  --am-rule-hair: 1px;
+  --am-rule: 2px;
+  --am-rule-edge: 3px;
+
+  /* Mood palette — the only hardcoded hues in the sheet, named once so
+     the tracker chart's barColor and any future use point at the same
+     five values instead of a copy-pasted hex literal. */
+  --am-mood-1: #e0575b;
+  --am-mood-2: #e0925a;
+  --am-mood-3: #d9b64e;
+  --am-mood-4: #8bbf5d;
+  --am-mood-5: #4caf7d;
+
+  /* Activity ramp — the study heatmap's four shades, light to dark. Separate
+     from the mood palette on purpose: mood runs red→green because low mood is
+     bad, whereas a low task count is simply less work, so it wants a single
+     hue at increasing strength. The darkest stop is the green the old activity
+     chart used for completed tasks, so the section's colour story is unchanged. */
+  --am-act-1: #c7e3ae;
+  --am-act-2: #94ca7c;
+  --am-act-3: #5aa84c;
+  --am-act-4: #22c55e;
+
+  /* Event palette — the eight swatches a special event can be decorated with.
+     Named rather than free-form on purpose: a hex picker lets you choose
+     something that vanishes into one of the two themes, and these have to stay
+     legible as a 3px bar and an 11px icon on both. Mid-tone, roughly equal
+     luminance, and distinguishable from the mood ramp above so a red event
+     doesn't read as a bad day. */
+  --am-ev-red: #d9534f;
+  --am-ev-amber: #d98b34;
+  --am-ev-green: #58a55c;
+  --am-ev-teal: #3fa3a3;
+  --am-ev-blue: #4a8fd4;
+  --am-ev-purple: #8b6fd1;
+  --am-ev-pink: #cc6699;
+  --am-ev-grey: #8a8f98;
+
+  /* ── The spacing scale (3.9 §4) ────────────────────────────────────────
+     DEFINED HERE AND READ BY NOTHING IN THE PATCH THAT ADDS IT. That is the
+     same shape 3.8's patch 4 used and it is deliberate: a scale is reviewable
+     on its own, and a scale plus two hundred edits is not. This block changes
+     no rendered pixel. Patch 6 is the list of deliberate moves.
+
+     NUMERIC, WHERE THE OTHER SCALES IN THIS FILE ARE NAMED — and the house
+     precedent does not reach this one. Radii are `sm`/`md`/`pill`, type is
+     `2xs`..`lg`, rules are `hair`/`rule`/`edge`, and every one of those is
+     ORDINAL: there is no arithmetic relating a card's radius to a pill's, and
+     the rule scale says so out loud ("the three tiers are jobs, not sizes").
+     Names are right for a set of jobs.
+
+     This scale is arithmetic. `--am-space-N` is exactly `2N` px, and that
+     property is the whole reason it is a scale rather than a list of seven
+     numbers someone liked. Spelling it `sm`/`md`/`lg` would hide the one thing
+     worth knowing about it and would make "one step tighter" a lookup instead
+     of a subtraction.
+
+     WHY SEVEN STEPS, AND WHY EVEN. A survey of this sheet before the scale
+     existed found 250 padding declarations carrying a literal, using every
+     whole pixel from 1 to 14, with 110 of those uses at an odd value. The
+     peaks are unambiguous and they are all even: 2px (51 uses), 4px (48),
+     6px (34), 8px (53), 10px (55), 12px (45), 14px (33). The design language
+     already IS a 2px grid; the odd values are where it was typed by hand.
+
+     So this scale DESCRIBES the sheet rather than reforming it, and that is a
+     decision rather than a shortfall. A more opinionated ladder — 4/8/12/16,
+     or a doubling — would move 6px, 10px and 14px, which is 122 declarations
+     at three of the seven peaks, and every moved pixel would be a design
+     change arriving inside a diff described as mechanical. Fewer steps is a
+     real argument and it is a DESIGN argument; it should be made on its own,
+     against a sheet that already reads from a scale, and not smuggled in by
+     the patch that introduces one. */
+  --am-space-1: calc(var(--am-space-unit) * 1);
+  --am-space-2: calc(var(--am-space-unit) * 2);
+  --am-space-3: calc(var(--am-space-unit) * 3);
+  --am-space-4: calc(var(--am-space-unit) * 4);
+  --am-space-5: calc(var(--am-space-unit) * 5);
+  --am-space-6: calc(var(--am-space-unit) * 6);
+  --am-space-7: calc(var(--am-space-unit) * 7);
+
+  /* THE STEP, AND THE WHOLE OF PATCH 7's RATIO FIX (3.9 §3).
+     `--am-space-N` is N of these, which is what makes the numeric naming
+     honest and what makes the mobile override one line rather than seven. */
+  --am-space-unit: 2px;
+
+  /* ── The control scale (3.9 §3.3 / §4.3) ───────────────────────────────
+     What an interactive control is padded by, and how small it may get.
+
+     THE PREREQUISITE FOR §3, which is why it lands with the spacing scale
+     rather than with the mobile work that needs it. "Fine on PC, way too large
+     on mobile" is not one complaint but two, and neither is about the box
+     being too big:
+
+       - Font sizes here are RELATIVE (`--am-text-xs: 0.8em`) and paddings are
+         ABSOLUTE. So a control on a phone renders 16px text inside a box padded
+         for 13px text: proportionally LESS padding than the same control on a
+         desktop, while looking like more, because the eye reads the ratio.
+       - Nothing anywhere asserts a touch target. The pill buttons get their
+         height from vertical padding chosen against desktop text, so they are
+         simultaneously too tall and too small to hit.
+
+     One place to change that decision instead of forty. Values here are the
+     desktop ones and are exactly what the controls already compute to, so this
+     block also changes nothing. The mobile override is patch 7's, and the
+     floor is deliberately unset until then — a `min-height` invented here
+     would be patch 7 arriving early and unreviewed. */
+  --am-control-pad-y: var(--am-space-1);
+  --am-control-pad-x: var(--am-space-4);
+  /* The touch-target floor, off by default. `auto` rather than a number
+     because a desktop control's height should stay whatever its content and
+     padding make it — asserting 40px on a pointer device would grow every pill
+     in the plugin to no purpose. The mobile scope below is the only thing that
+     turns this on. */
+  --am-control-min: auto;
+  /* A floored control's corner. Full capsule by default, which is what a pill
+     has always been and what it should stay while controls are short: at a
+     desktop control's ~26px height, 999px resolves to a 13px corner and reads
+     as a pill.
+     It stops reading as one when the box gets tall. 3.10 gave mobile controls
+     a 40px floor and a capsule on a 40×62 button is a lozenge — 3.12 §14.1,
+     where the recap notice's two-word "Add it" came out as a blob.
+     So the corner is DERIVED FROM THE SAME TOKEN AS THE HEIGHT rather than
+     picked separately: both read `--am-control-min`, so a future change to the
+     floor moves the corner with it and the two cannot drift into disagreeing
+     about what shape a control is. 0.35 rather than 0.5 because 0.5 IS a
+     capsule — halving the height is the definition of the shape being fixed. */
+  --am-control-round: var(--am-radius-pill);
+
+  /* The calendar-heatmap width cap. DEFINED IN 3.12; before that it was
+     referenced once, in 20-charts.css, and set by nothing anywhere — the
+     `260px` fallback beside it was the only value it ever had, which made a
+     dangling reference look like a configurable knob.
+     3.10's own token test whitelisted it as "set from TypeScript" on exactly
+     that assumption, so the guard that exists to catch unresolvable tokens was
+     laundering this one. Both fixed together.
+     The value is unchanged and the argument for it is at the call site: cells
+     are squares sized by their COLUMN, so a wider wrap means bigger cells and
+     FEWER week rows in the same tile, not more. */
+  --am-heat-max-w: 260px;
+
+  /* ── The elevation scale (3.9 §4.1) ────────────────────────────────────
+     Three heights and one direction variant, for the four drop shadows this
+     sheet had written inline.
+
+     3.8's patch 11 wrote `0 -8px 24px rgba(0,0,0,0.4)` at a call site for one
+     drop-up menu, which is the shape of the problem §4.1 names: a value
+     invented where it was needed because there was nothing to reach for. It
+     was invented CORRECTLY — it is the existing menu shadow, mirrored — and
+     that is the point. The next one will not be.
+
+     `up` is a separate token rather than a sign flip because a drop-up is a
+     different object from a drop-down, not the same object upside down: only
+     the offset mirrors, and the blur and alpha must not.
+
+     THESE CARRY A DARK-THEME ASSUMPTION AND DO NOT SAY SO — `rgba(0,0,0,…)`
+     over a light theme is a heavier shadow than intended. That is the same
+     defect §6 recorded against `--am-band-recess`, which answered it with a
+     `.theme-light` override and has since been deleted outright; it is not fixed
+     here, and naming the values at least moves it from four call sites to one. */
+  --am-elev-1: 0 1px 4px rgba(0, 0, 0, 0.25);
+  --am-elev-2: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --am-elev-2-up: 0 -8px 24px rgba(0, 0, 0, 0.4);
+  --am-elev-3: 0 10px 40px rgba(0, 0, 0, 0.5);
+
+}
+
+/* ══ The mobile scope (3.9 §3) ══════════════════════════════════════════
+   THE ONLY PLATFORM READ IN THE PLUGIN. Before this, `Platform.isMobile` and
+   Obsidian's `.is-mobile` body class appeared nowhere in src/ or styles/, and
+   everything responsive was `@container` (right, and staying), five
+   `@media (max-width)` rules, and five `@media (hover: none)` branches added
+   one at a time as each hover-revealed control was noticed.
+
+   `(hover: none)` stays for what it actually means — a device with no hover —
+   which is NOT the same question as "is this a phone". A desktop with a
+   touchscreen answers one way and a phone the other, and the two questions had
+   been sharing an answer.
+
+   ── WHY THE STEP CHANGES AND NOT THE HEIGHTS ────────────────────────────
+   The complaint was "fine on PC, way too large on mobile", and the box is not
+   too large: the RATIO is wrong and the eye reads the ratio.
+
+   Type in this sheet is relative — `--am-text-xs: 0.8em` — and padding was
+   absolute. So a control that was tuned as 2px of padding around a 13px label
+   renders as 2px of padding around a 16px label on a phone: proportionally
+   LESS padding than the same control on a desktop, inside a box that grew.
+   That reads as bloated even though every number in it is unchanged, which is
+   why "make the pills smaller" would have made it worse — it would have taken
+   padding off a control that was already short of it.
+
+   So the step grows with the text instead. 2.5px is the 13→16px ratio, near
+   enough, applied in one place. Nothing about a pill's radius changes: a 999px
+   radius on a control of any height is a pill, and 34 controls use it.
+
+   ── WHAT THIS CAN REACH ─────────────────────────────────────────────────
+   Exactly the controls patch 6 converted, because they are the only rules in
+   the sheet reading the spacing scale — layout paddings still hold literals by
+   §4.3's decision. That is a real dependency and it is stated rather than
+   assumed: the day a layout padding reads `--am-space-N`, this block starts
+   moving it too, and that will be a decision to take deliberately rather than
+   a surprise. A test pins the scale's readership to controls for now. */
+body.is-mobile {
+  --am-space-unit: 2.5px;
+  --am-control-min: 40px;
+  --am-control-round: calc(var(--am-control-min) * 0.35);
+}
+
+/* The touch-target floor, asserted rather than hoped for (§3.3).
+   40px, not the 44px both mobile platforms publish: this is a dense
+   information app and a diary entry carries a lot of small controls, so the
+   floor is the top of the range that decision leaves — as close to the
+   guidance as the density allows rather than as far from it as possible.
+
+   TAP TARGETS ONLY. A display chip that reports a count is not a target and
+   growing it to 40px would push a table row half again as tall for nothing.
+   The list is what a reader clicks, types into or taps, and it is written out
+   so the diff is auditable against it. */
+body.is-mobile .journal-btn,
+body.is-mobile .journal-btn-ghost,
+body.is-mobile .journal-btn-subtle,
+body.is-mobile .jc-today-btn,
+body.is-mobile .jpn-now-btn,
+body.is-mobile a.jn-pill,
+body.is-mobile .almanac-section-action,
+body.is-mobile .almanac-tpl-tab,
+body.is-mobile .almanac-tpl-toggle,
+body.is-mobile .almanac-picker-row,
+body.is-mobile .journal-attach-btn,
+body.is-mobile .journal-tracker-add-btn,
+body.is-mobile .journal-habit-chip-btn,
+body.is-mobile .jq-recap-moved-btn,
+body.is-mobile .jc-jump-row button,
+body.is-mobile .jc-jump-row input,
+body.is-mobile .journal-select select,
+body.is-mobile .jrc-grade button {
+  min-height: var(--am-control-min);
+  /* Same list, same token, one rule: a control that got taller here is exactly
+     the control whose corner has to stop being a capsule. Splitting these into
+     two selector lists is how one of them would gain a member and the other
+     would not. */
+  border-radius: var(--am-control-round);
+}
+
+/* Vault-area hues — the one place the two home-page sections are allowed to
+   differ (see area-titlebar.ts). Only the titlebars read these; the banners
+   below them stay on the theme accent, so the page keeps one colour story.
+   Diary follows the theme's own accent because it is the page's default
+   subject; Journals borrows --am-ev-blue rather than introducing a ninth hue,
+   so it is already tuned for legibility against both themes. The -rgb pairs
+   exist because the bars tint with rgba() at low alpha.
+
+   ON `body`, NOT IN `:root`, AND THAT IS THE WHOLE OF 3.6 PATCH 1.
+
+   Obsidian defines `--interactive-accent` on `body`. These two tokens are the
+   only ones in this file that read a THEME variable rather than declaring a
+   literal, and a custom property is substituted where it is DECLARED, not
+   where it is used. Declared in `:root` — which is `html`, one level ABOVE
+   `body` — `var(--interactive-accent)` had nothing to resolve against, so
+   `--am-area-diary` computed to the guaranteed-invalid value and every
+   descendant inherited that, because custom properties inherit their computed
+   value rather than their declaration.
+
+   What that looked like is worse than it sounds, and it is why it survived
+   four releases: it fails SILENTLY and DIFFERENTLY per property. A
+   `color: var(--am-area-diary)` falls back to the inherited text colour, so
+   the DIARY eyebrow simply looked grey — a styling opinion, not a defect. A
+   `border-left: 3px solid var(--am-area-diary)` is invalid at computed-value
+   time as a whole shorthand, so it unsets to `border-left-style: none` and the
+   overview card's accent edge — the species marker 3.2 exists for — did not
+   paint at all. Nothing errors; one rule looks like a choice and the other
+   looks like it was never written.
+
+   The `-rgb` pairs hid it further. They carry a literal fallback, so they kept
+   working — at the fallback, meaning every tint in the plugin has been showing
+   Obsidian's DEFAULT accent rather than the reader's, and a reader on the
+   default accent could not have told the difference.
+
+   The fix is the declaration site, not a fallback. A fallback here would be a
+   second hardcoded hue that silently wins whenever the real lookup breaks,
+   which is the same failure with the evidence removed. */
+body {
+  --am-area-diary: var(--interactive-accent);
+  --am-area-diary-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+  --am-area-journals: var(--am-ev-blue);
+  --am-area-journals-rgb: 74, 143, 212;
+}
+
+/* NO TOKEN IN THIS FILE DIFFERS BY THEME ANY MORE (4.13.1 §3b). The one that did
+   was `--am-band-recess`, and it is deleted with the bands it sank.
+
+   THE RULE IT LEAVES BEHIND IS THE POINT, AND IT IS WHY THIS COMMENT STAYS:
+   anything theme-specific goes BELOW this line, after `:root` closes, and never
+   as a `.theme-light {` opened partway through the block. That is how 2.51.5
+   shipped — it closed `:root` early and swept the type scale, the mood palette,
+   the activity ramp and the event palette into the light-theme rule with it, so
+   every one of them went undefined on a dark theme: the study heatmap lost its
+   greens, the calendar its mood dots, the events their hues. The next
+   theme-specific token goes here. */

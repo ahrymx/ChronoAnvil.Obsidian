@@ -1,0 +1,51 @@
+{
+  "name": "obsidian-almanac-plugin",
+  "version": "4.18.1",
+  "description": "Keep a daily diary and your own journal types with one shared tracker registry, and render calendars, charts, tables and period dashboards natively. Includes quick capture, full-text search, an entry navigator and vault scaffolding.",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "package": "npm run build && node tools/package.mjs",
+    "typecheck": "tsc -noEmit -skipLibCheck",
+    "lint": "eslint src test",
+    "check:versions": "node tools/check-version-agreement.mjs",
+    "measure:css": "node tools/measure-css.mjs",
+    "pretest": "node tools/build-css.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "obsidian",
+    "journal",
+    "diary",
+    "study"
+  ],
+  "license": "AGPL-3.0-or-later",
+  "author": "AhryMX <contact@ahrymx.dev>",
+  "homepage": "https://github.com/AhryMX/Almanac.Obsidian#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AhryMX/Almanac.Obsidian.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AhryMX/Almanac.Obsidian/issues",
+    "email": "contact@ahrymx.dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^20.11.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^9.39.5",
+    "obsidian": "^1.5.7-1",
+    "typescript": "^5.4.0",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^2.1.9"
+  },
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "js-yaml": "^5.2.1"
+  }
+}

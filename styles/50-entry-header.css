@@ -1,0 +1,577 @@
+/* ── Entry header (the unified strip at the top of a diary entry) ─────────
+   Reuses the header-bar shell (border-bottom rule, flex row). The left side
+   is an editable title + a date subtitle; the right side is the quick links
+   and a compact prev/next navigator. No collapse chevron — it's top-of-note
+   chrome, not a foldable section. */
+.journal-entry-header {
+  padding-bottom: 8px;
+}
+.jeh-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 4px 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-right: auto; /* push the controls to the right edge */
+}
+.journal-entry-header .jeh-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 0;
+  cursor: text;
+  border-radius: var(--am-radius-sm);
+  padding: 1px 4px;
+  margin-left: -4px;
+  transition: background 0.12s;
+}
+.journal-entry-header .jeh-title:hover {
+  background: var(--background-modifier-hover);
+}
+.jeh-title-icon {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.jeh-title-icon svg {
+  width: 1em;
+  height: 1em;
+}
+.jeh-title-edit {
+  display: inline-flex;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.jeh-title-edit svg {
+  width: 0.72em;
+  height: 0.72em;
+}
+.journal-entry-header .jeh-title:hover .jeh-title-edit {
+  opacity: 1;
+}
+.jeh-subtitle {
+  font-size: var(--am-text-sm);
+  font-weight: 400;
+  color: var(--text-muted);
+  letter-spacing: 0;
+}
+.jeh-add-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-style: italic;
+  color: var(--text-faint);
+  cursor: text;
+}
+.jeh-add-hint svg {
+  width: 0.85em;
+  height: 0.85em;
+}
+.jeh-add-hint:hover {
+  color: var(--text-muted);
+}
+.jeh-title-input {
+  font-size: 1.2em;
+  font-weight: 600;
+  padding: var(--am-space-1) var(--am-space-4);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  min-width: 12em;
+}
+
+/* Segmented date stepper: three connected segments — prev chevron, a
+   "Jump to day/month" trigger, next chevron — that read as one control rather
+   than three free-floating pills. The group carries the outer rounding; each
+   segment shares its inner edges with its neighbour (collapsed borders) so
+   there's a single hairline between them, not a double one. */
+.jeh-nav.jeh-seg {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+}
+.jeh-navpill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2em;
+  height: 2em;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: none !important;
+  transition: background 0.12s, color 0.12s;
+}
+.jeh-navpill:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.jeh-navpill svg {
+  width: 1em;
+  height: 1em;
+}
+.jeh-navpill-empty {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+/* The shared inner hairlines between segments, and the outer rounding applied
+   per-end rather than via `overflow: hidden` on the group — clipping the group
+   would also clip the date picker's absolutely-positioned dropdown, which
+   descends from the middle segment. Rounding the two end segments to match the
+   group's radius gives the same one-pill look while leaving the dropdown free
+   to overflow below. */
+.jeh-seg .jeh-seg-start {
+  border-right: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill) 0 0 var(--am-radius-pill);
+}
+.jeh-seg .jeh-seg-end {
+  border-left: 1px solid var(--background-modifier-border);
+  border-radius: 0 var(--am-radius-pill) var(--am-radius-pill) 0;
+}
+
+/* ── "Select Date" navigator (between the arrows) ────────────
+   A pill trigger showing the current entry's date; click drops a scrollable
+   list of every day/month to jump to. */
+.jeh-datenav {
+  position: relative;
+  display: inline-flex;
+}
+.jeh-datenav-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 2em;
+  padding: 0 10px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: var(--am-text-sm);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.jeh-datenav-trigger .jeh-datenav-cal svg {
+  width: 1.05em;
+  height: 1.05em;
+}
+.jeh-datenav-trigger:hover,
+.jeh-datenav-trigger.is-open {
+  background: var(--background-modifier-hover);
+}
+.jeh-datenav-cal {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.jeh-datenav-cal svg {
+  width: 0.95em;
+  height: 0.95em;
+}
+.jeh-datenav-caret {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+.jeh-datenav-caret svg {
+  width: 0.85em;
+  height: 0.85em;
+}
+.jeh-datenav-trigger.is-open .jeh-datenav-caret {
+  color: var(--interactive-accent);
+}
+.jeh-datenav-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  min-width: 220px;
+  max-width: 280px;
+  padding: 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-primary);
+  box-shadow: var(--am-elev-2);
+}
+/* ── 3.7: the same list, opened from the card's last row ─────────────────
+   Centred-and-below is right for a trigger in the middle of a page. In the
+   footer it is wrong twice: the stepper is the leftmost thing in the card, so
+   a 220px menu centred on a ~110px control hangs off the card's left edge, and
+   the footer's underside is the bottom of the banner, so "below" is over the
+   note's first paragraph.
+
+   It drops UP and aligns LEFT — anchored to the control's own edge, over the
+   card it belongs to. The shadow flips with it, for the same reason it points
+   away from the trigger in the first place. */
+.journal-entry-actions .jeh-datenav-menu {
+  top: auto;
+  bottom: calc(100% + 6px);
+  left: 0;
+  transform: none;
+  box-shadow: var(--am-elev-2-up);
+}
+.jeh-datenav-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  scrollbar-width: thin;
+}
+.jeh-datenav-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--am-radius-sm);
+  background: transparent;
+  color: var(--text-normal);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.jeh-datenav-row:hover {
+  background: var(--background-modifier-hover);
+}
+.jeh-datenav-row.is-current {
+  background: var(--background-secondary);
+}
+.jeh-datenav-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.jeh-datenav-row-label {
+  font-size: var(--am-text-sm);
+  font-weight: 500;
+}
+.jeh-datenav-row.is-current .jeh-datenav-row-label {
+  color: var(--interactive-accent);
+}
+.jeh-datenav-row-sub {
+  font-size: 0.78em;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jeh-datenav-row-mark {
+  display: inline-flex;
+  color: var(--interactive-accent);
+}
+.jeh-datenav-row-mark svg {
+  width: 0.9em;
+  height: 0.9em;
+}
+.jeh-datenav-empty {
+  padding: 10px 8px;
+  font-size: var(--am-text-sm);
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* ── Header bar levels ───────────────────────────────────────
+   Level 1 is a top-level section (Diary, Journals, Trends, Tags). Level 2 is
+   a section nested inside a level-1 container — specifically a journal *type*
+   (Study, custom types) inside the "📚 Journals" container. Level 2 reads as
+   subordinate: smaller title, a lighter rule, and an indent + left bracket so
+   the type visibly belongs under Journals rather than sitting as its sibling. */
+/* The indent and the bracket are the BLOCK-OWNING variant's, which is why they
+   are scoped to the marker rather than to the look. They say "this section is
+   nested among the blocks that follow it" — a claim only a bar walking its
+   siblings can make. An inner dashboard section is already contained by the
+   widget drawing it, so indenting it would bracket a thing off from itself. */
+.journal-sec-l2.journal-header-bar {
+  margin-left: var(--am-sec-indent);
+  padding-left: 12px;
+  border-left: 2px solid var(--background-modifier-border);
+  /* No bottom rule. The left bracket already says where this section starts
+     and what it is inside; a second rule on the same element is the horizontal
+     line this frame exists to stop drawing five of. */
+  border-bottom: none;
+}
+/* LEVEL 2 SETS NO SIZE OF ITS OWN, AS OF 4.13 §1, and it is not an omission.
+   These two rules put the title at `--am-text-sm` and the glyph with it, on the
+   argument written just above — that a smaller title is what says "nested". That
+   argument died with the scale: level 1 is `--am-bar-text` (0.7em) now, and
+   0.85em under it would make a subject row LARGER than the section containing
+   it — a hierarchy inverted by a rule that used to state it.
+   So level 2 wears the one bar spec and is held apart by what is structural and
+   was always doing the real work: the indent, the 12px pad, the 2px left
+   bracket, and the bottom rule it does not draw. */
+
+/* On a phone the level-2 indent is 1.1em plus 12px plus a 2px rule of a ~360px
+   column, spent on saying "nested" — which the left bracket says too. It halves
+   rather than disappearing, because losing it entirely would make a type's
+   section indistinguishable from the Journals section containing it — and as of
+   4.13 the indent and that bracket are ALL that says it, since level 2 no longer
+   carries a smaller title. Halving is now the floor rather than a saving. */
+@media (max-width: 500px) {
+  .journal-sec {
+    gap: 3px 6px;
+  }
+  .journal-sec-l2.journal-header-bar {
+    margin-left: calc(var(--am-sec-indent) / 2);
+    padding-left: 8px;
+  }
+}
+
+/* ── A section's actions become icons when the row runs out (2.56.6) ──────
+   ITS PREMISE CHANGED IN 4.11 AND ITS RULE DID NOT, which is worth writing down
+   rather than leaving as a comment that has quietly become false.
+
+   WHAT IT WAS FOR: a collapsed section should cost one line, and in a ~460px pane
+   it was costing two — the title took the first, the buttons wrapped onto the
+   second, and a folded Charts section drew "Add chart / Edit…" floating in space
+   above its own rule. 2.53 fought the same thing from the other side; the comment
+   on `chart-edit` records three toolbar buttons wrapping under a section title and
+   pushing the first chart off the screen, and the answer then was to delete a
+   button.
+
+   WHAT IT IS FOR NOW: at level 1 the second line is DELIBERATE — 4.11 gives the
+   actions a strip of their own, so "costs one line" is no longer the promise being
+   kept. What this rule keeps is the strip to ONE line: four labelled buttons in a
+   440px sidebar wrap inside the strip, and a strip two rows deep is the same
+   floating-chrome problem one level in. The `:not(.mod-cta)` half is what makes
+   that readable — the section's one primary action keeps its words, and the quiet
+   ones become their icons.
+
+   Level 2 still keeps the original promise, because its buttons are still beside
+   its title.
+
+   There is nothing left to delete, so the LABELS go instead. `buildButton`
+   already sets `aria-label` and `title` from the same string, and
+   `journal-btn-ghost` is an established icon-only mode in this plugin, so the
+   affordance survives the label — which is more than burying Edit… in an
+   overflow would have done.
+
+   `:has()` rather than blanket, because a button spec is allowed to carry no
+   icon (`BUTTON_LABELS[action] ?? { label: action }` for a hand-written
+   directive). Hiding the label on one of those leaves an empty box that does
+   something. A button only goes icon-only if it has an icon.
+
+   Container-scoped, so a narrow sidebar on a wide screen collapses too — pane
+   width is what the row has to fit into, not the window's. */
+@container (max-width: 460px) {
+  .journal-sec .journal-header-widgets
+    .journal-btn:not(.mod-cta):has(.journal-btn-icon)
+    .journal-btn-label,
+  .journal-sec .journal-header-widgets
+    .journal-btn:not(.mod-cta):has(.journal-btn-emoji)
+    .journal-btn-label {
+    display: none;
+  }
+  .journal-sec .journal-header-widgets .journal-btn:not(.mod-cta) {
+    padding-left: var(--am-space-4);
+    padding-right: var(--am-space-4);
+  }
+  .journal-section-l2-body {
+    margin-left: calc(var(--am-sec-indent) / 2);
+    padding-left: 8px;
+  }
+}
+/* The type-management buttons in a level-2 journal bar (Study's New Subject /
+   New Topic / Refresh) are section chrome, not per-item actions — in the
+   compact 2.8 Journals layout they read as small pills so the nested bar stays
+   light against the subject cards below it, rather than a row of full-size
+   buttons competing with the level-1 Journals bar. New Subject keeps its accent
+   (it's the section's one primary action); the rest stay quiet.
+
+   THE RULE ITSELF MOVED TO 30-header-bars.css IN 4.11, and this comment is what
+   it took with it. The argument turned out to be about a PLACE rather than about a
+   level: chrome under or beside a title, as against an action on the thing itself.
+   4.11 gives a level-1 section's actions a strip of their own, which is that same
+   place, so the strip takes this scale and both levels are one decision instead of
+   one rule and one exception. A second copy of three declarations here would have
+   been the drift this file keeps removing. */
+/* The body of a level-2 section (the type's cards/table) shares the indent +
+   bracket, so the whole nested section is one inset column under Journals. A
+   block is "owned" by the preceding level-2 bar when the plugin tags it; we
+   approximate that with an indent on the blocks between a level-2 bar and the
+   next bar via the .journal-section-l2-body class the renderer applies. */
+.journal-section-l2-body {
+  margin-left: 1.1em;
+  padding-left: 12px;
+  border-left: 2px solid var(--background-modifier-border);
+}
+/* A study subject card carries its own full border + accent left-edge (2.8),
+   so the l2-body wrapper around it must not also draw the bracket + inset —
+   that stacks a second vertical line just outside the card. Drop them on
+   wrappers that hold a study card; the card's own accent edge is the section's
+   left rail. (Obsidian's Chromium supports :has(); the class sits on the block
+   wrapper and the callout is its child.) */
+.journal-section-l2-body:has(> .callout[data-callout="study"]) {
+  padding-left: 0;
+  border-left: none;
+}
+
+/* ── Collapsible header bars ─────────────────────────────────
+   A titled bar owns "everything after me up to the next same-or-higher-level
+   bar" and can fold it. The toggle is a custom chevron (Obsidian's native
+   fold arrow only exists on real markdown headings); it rotates when the
+   section is collapsed, matching the file-explorer/heading fold affordance. */
+.journal-header-collapsible {
+  cursor: pointer;
+}
+/* THE FOLD CONTROL, AT THE RIGHT-HAND END (4.13 §1b).
+ *
+ * `margin-left: auto` IS WHAT MOVES IT, and it has exactly one owner per row.
+ * `.journal-header-widgets` carries the same declaration at the base — two auto
+ * margins in one flex line means the first eats the free space and the second
+ * does nothing — so the actions give theirs up wherever this has it. At level 1
+ * that is free: the actions strip is `flex: 1 0 100%` and already sets
+ * `margin-left: 0` to become its own row.
+ *
+ * SIZED AGAINST THE TITLE, not against the note. This was `1.1em` of the BAR's
+ * inherited type — about 17.6px — which was reasonable beside a 15.2px title and
+ * is not beside the 11.2px one 4.13 §1 leaves. `em` here resolves against this
+ * element, so setting the font-size to the bar's scale makes the box follow the
+ * title wherever the title goes. */
+.journal-header-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--am-bar-glyph);
+  width: 1.4em;
+  height: 1.4em;
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--text-muted);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.journal-header-toggle svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+.journal-header-collapsible:hover .journal-header-toggle {
+  color: var(--text-normal);
+}
+/* WHICH WAY IT POINTS, RE-CHOSEN IN 4.13 §1b. It used to rotate -90° when
+   collapsed, so the chevron pointed RIGHT — which reads as "opens rightward"
+   when the control sits on the left of a heading, and reads as pointing off the
+   edge of the card now that it sits on the right. So it is the ordinary
+   accordion instead: down means closed, up means open, and the base icon is the
+   closed state. */
+.journal-header-bar:not(.is-collapsed) .journal-header-toggle {
+  transform: rotate(180deg);
+}
+/* Blocks the renderer/HeaderBar marks as belonging to a collapsed section. */
+.journal-section-hidden {
+  display: none !important;
+}
+
+.journal-widget-labeled {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.journal-chart-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.journal-widget-label {
+  font-size: var(--am-text-base);
+  color: var(--text-normal);
+}
+.journal-widget-error {
+  font-size: var(--am-text-xs);
+  font-family: var(--font-monospace);
+  color: var(--text-error);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  padding: 2px 8px;
+}
+
+/* A tracker directive that doesn't belong on this class of entry. It reuses
+   the error chip's colours, since it is genuinely wrong and should look it,
+   but not its monospace: this is a sentence addressed to the reader, with the
+   fix in it, rather than a malformed directive echoed back. Left to wrap so
+   the whole message is readable inside one grid cell. */
+.journal-tracker-misplaced {
+  font-family: inherit;
+  white-space: normal;
+  line-height: 1.35;
+  padding: 6px 10px;
+}
+
+.journal-slider input[type="range"] {
+  vertical-align: middle;
+  accent-color: var(--interactive-accent);
+  cursor: pointer;
+  max-width: 160px;
+}
+
+.journal-slider-value {
+  min-width: 1.4em;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+
+.journal-time input,
+.journal-date input {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--am-text-sm);
+  padding: var(--am-space-1) var(--am-space-3);
+  cursor: pointer;
+}
+
+.journal-select select {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--am-text-sm);
+  padding: var(--am-space-1) var(--am-space-4);
+  cursor: pointer;
+}
+
+/* spacer: a full-width branded line (almanac:spacer, inline on line 0). Its
+   primary job is to be where the cursor lands on open, so the first real
+   ```almanac block below it isn't rendered raw/expanded — but it doubles as a
+   light top boundary: the "Almanac" wordmark centered on a hairline rule. */
+.journal-spacer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0.2em 0 0.6em;
+  color: var(--text-faint);
+  user-select: none;
+}
+.journal-spacer::before,
+.journal-spacer::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--background-modifier-border);
+}
+.journal-spacer-mark {
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--interactive-accent);
+  white-space: nowrap;
+}
+
+/* Touch has no hover to reveal this with. See 3.9 §3.3's policy. */
+@media (hover: none) {
+  .jeh-title-edit {
+    opacity: 0.45;
+  }
+}

@@ -1,0 +1,343 @@
+/* ── The section surface (§1.6) ──────────────────────────────────────────
+   Each section reads as one object rather than as a heading with loose prose
+   under it. Asked for after device testing, and it reverses what the mockups
+   argued: I claimed flush sections with an indent were cheaper on a ~360px
+   column and that only content should get a surface. On a phone that is wrong
+   for a reason a mockup cannot show — with nothing behind them, three empty
+   widgets in a row read as one undifferentiated column of grey text.
+
+   IT IS PAINTED ON BLOCKS, not on a wrapper, because there is no wrapper: a
+   `header:` section's content is either welded into the bar's own fence or
+   sitting in the blocks after it, and Obsidian renders each of those
+   separately. headerbar.ts::markSectionBodies marks the run; the ends carry
+   the rounding.
+
+   Two failed attempts are the reason this is at block level. Painting the
+   bar's siblings inside its fence meant painting the children of a flex column
+   WITH A GAP, so the gaps showed through as stripes; and painting only sibling
+   blocks missed every section on a journal index, where the header and its
+   widgets are one fence. `display: flow-root` is here for the third: these
+   blocks have no vertical padding of their own, so a child's margins would
+   collapse straight through them and the seam would land outside the element
+   painting the background. Obsidian's own `.callout` — which every empty state
+   uses — carries exactly such a margin. */
+.journal-sec-block {
+  background: var(--background-secondary);
+  margin-top: 0;
+  margin-bottom: 0;
+  /* Named because the header rule below has to reach the card's edges, which
+     means cancelling exactly this much. §1.6 said the card's padding and the
+     frame's indent must resolve to the same left edge or every section's title
+     and body disagree by a few pixels; one variable is how that stays true when
+     the breakpoint changes it. */
+  --am-sec-pad-x: 12px;
+  padding: 0 var(--am-sec-pad-x);
+  display: flow-root;
+  /* THE EDGE IS THREE-SIDED, and that is not fussiness. A section is a RUN of
+     blocks, so a border on each of them draws a hairline between every pair —
+     the stripes this release has already produced twice, in a new costume. The
+     sides run the whole way down; only the ends of the run close it.
+
+     1px, NOT 0.5px. It shipped at 0.5px and was invisible, and the number came
+     from the mockup rather than from this plugin: it was the only sub-pixel
+     border among the 147 in this file. A 0.5px line has no pixel to occupy at
+     device-pixel-ratio 1, so the renderer approximates it by dropping the
+     alpha — against a border colour already chosen to be quiet, that is
+     nothing at all. Every other border here is 1px, which is the answer this
+     stylesheet had already worked out. */
+  border-left: 1px solid var(--background-modifier-border);
+  border-right: 1px solid var(--background-modifier-border);
+}
+.journal-sec-block.is-first {
+  border-top: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
+  padding-top: 2px;
+}
+.journal-sec-block.is-last {
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0 0 var(--am-radius-md) var(--am-radius-md);
+  padding-bottom: 10px;
+  margin-bottom: var(--am-widget-gap);
+}
+/* One block that is both — a fence carrying a header and everything under it,
+   or a section collapsed down to its bar. Four corners. */
+.journal-sec-block.is-first.is-last {
+  border-radius: var(--am-radius-md);
+}
+/* The spacing at the edges of the surface is the surface's to decide, so the
+   content gives its own up. */
+.journal-sec-block > :first-child {
+  margin-top: 0;
+}
+.journal-sec-block.is-last > :last-child {
+  margin-bottom: 0;
+}
+/* A block that renders nothing still exists: the storage regions
+   (`<!--almanac:path-->`) are real blocks with no visible content. Painted,
+   they draw an empty band at the foot of a section. */
+/* A COLLAPSED RUN STOPS PAYING FOR A BODY IT IS NOT DRAWING (4.13 §3).
+ *
+ * `.is-last` spends 10px of bottom padding on the gap between a section's last
+ * widget and its edge. Fold the section and there is no last widget — the run
+ * collapses to the one block holding the bar, which is exactly the
+ * `.is-first.is-last` case the comment above describes — and the 10px becomes a
+ * band of nothing under a title. Measured on the render that prompted this: a
+ * closed `header:` section cost ~57px of which ~38px was not the title, and one
+ * carrying an actions strip cost ~85. Five of those is most of a screen.
+ *
+ * THE ~85 CASE IS THE ~57 CASE NOW (4.13.1 §2). The strip used to draw while
+ * collapsed, which this comment recorded as "by design" and the next render
+ * disagreed with: a closed section showing a hairline and a button reads as a
+ * section that did not close. The two rules that fixed it are at the foot of
+ * this file, beside the fold they belong to.
+ *
+ * THE `frame: section` TWIN ALREADY DID THIS, at `.journal-sec-fold.is-collapsed`
+ * below, which is how the gap was found: two ways of collapsing one idea, one of
+ * them corrected and the other not.
+ *
+ * `:has()` RATHER THAN A CLASS, because the state is already in the DOM — the bar
+ * carries `is-collapsed` — and the alternative is `markSectionBodies` learning to
+ * mirror it onto the block, which is a second copy of a fact that can go stale.
+ * The selector is already load-bearing in this stylesheet; 60-heroes-and-banners
+ * calls it "the established mechanism".
+ *
+ * A DESCENDANT, NOT A CHILD, and this was written the wrong way round first.
+ * `claimOwnBlock` puts `journal-sec-block` on the NOTE's block element, and the
+ * bar is built inside the `.journal-widget-block` within it — so `:has(> …)`
+ * matches nothing at all and the rule reads as a decision that was made and never
+ * took. Every other rule in this file that reaches the bar from the block is a
+ * descendant selector for the same reason; this one now says so too. */
+.journal-sec-block.is-last:has(.journal-sec-l1.journal-header-bar.is-collapsed) {
+  padding-bottom: 0;
+}
+.journal-sec-block:empty {
+  padding: 0;
+}
+
+/* The bar sits INSIDE the surface, so it paints no background of its own — two
+   fills of the same colour with different radii is how a card grows a visible
+   corner.
+
+   IT DOES DRAW A RULE. 2.56.0 removed the full-width rule under every section
+   title on the grounds that five of them ruled a page into bands and separated
+   nothing in particular. That was right when a section was a title with loose
+   prose under it and wrong once the card arrived: inside a card the rule is not
+   dividing the page, it is dividing the header from the body, which is a real
+   boundary and the only one the card does not already draw.
+
+   FULL BLEED, by cancelling the block's inset rather than by living inside it.
+   A rule that stops 12px short of the card's edges reads as an underline on the
+   title; one that meets them reads as the edge of a header. */
+.journal-sec-block .journal-sec-l1.journal-header-bar {
+  background: none;
+  padding: 8px var(--am-sec-pad-x, 0px) 6px;
+  margin: 0 calc(-1 * var(--am-sec-pad-x, 0px)) 7px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+/* A collapsed section is its bar alone, and a rule along the bottom of a closed
+   card is an edge promising content that isn't there. */
+.journal-sec-block .journal-sec-l1.journal-header-bar.is-collapsed {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+/* Outside a card — an untitled bar anchoring widgets under a real heading —
+   there is no header to divide and nothing to bleed into. */
+.journal-sec-l1.journal-header-bar {
+  border-bottom: none;
+  padding: 8px 0 6px;
+  margin-bottom: 0;
+}
+
+/* ── WHERE THE EMPTY-STATE RULES WENT (4.11) ────────────────────────
+ *
+ * Six rules stood here. Their job was to take the box OFF an `[!empty]` callout
+ * inside a section card or under a widget head, on the argument that the card was
+ * the box now and a callout inside it was a box in a box — 4.7.2's rule about
+ * tiles, made true of every section.
+ *
+ * A vault render disagreed, and the disagreement is worth keeping. On one
+ * homepage: *No notes here yet* bare at the panel's edge, *Nothing on this day
+ * yet* in a box, *📚 No journals enabled* in a different box at 1px. The rule was
+ * right about DOUBLING and wrong about which box to remove — the widget frame is
+ * a head over a card, and a card whose contents are one grey sentence with no
+ * edge does not read as a widget with nothing in it. It reads as a widget that
+ * failed.
+ *
+ * So an info card is a card, stated once in 91-card-surface.css §3a, and it is the
+ * same card wherever it is drawn — which is what makes the three agree. What
+ * SURVIVED from these rules is the half that was never about the box: the
+ * title's divider and the `min-height: 5em` floor, both inherited from the
+ * writable callouts, both wrong for a read-only sentence. Those are unconditional
+ * now, and they moved to where the box is defined so a reader finds one rule
+ * instead of two halves in two files.
+ *
+ * Nothing about `.jjs-empty` or `.journal-chart-empty` was ever here; they
+ * hand-rolled their own boxes where they were written, and those are the two
+ * deletions that make §3a one rule rather than a fourth appearance. */
+
+/* Edge to edge on a phone. A card costs its horizontal padding twice on a
+   ~360px column, which was the mockups' objection and a real one — so below
+   the breakpoint the surface keeps its background and gives up its inset. */
+@container (max-width: 460px) {
+  .journal-sec-block {
+    --am-sec-pad-x: 8px;
+  }
+}
+
+/* Was: "narrow panes — the type row's buttons drop under the title rather than
+   squeezing the name to an ellipsis", written as `.jjs-type-head .jjs-actions`.
+   Retargeted to `.journal-sec-l1 .journal-header-widgets` in 2.56.3 when the
+   Journals section moved onto the frame, which generalised the SELECTOR without
+   checking that the ARGUMENT generalised. It did not. It was a claim about one
+   row carrying several buttons and a type name that must not truncate; applied
+   to every level-1 section it made a folded Charts section cost two lines —
+   title on one, buttons stranded on the next above the section's own rule.
+   Removed in 2.56.7: the buttons go icon-only in a narrow pane instead, so they
+   fit, and the title has had `min-width: 0` and an ellipsis since 2.56.0. */
+@container (max-width: 460px) {
+  .jjs-row {
+    flex-wrap: wrap;
+  }
+}
+
+/* ── A `frame: section` block IS its own wrapper (4.1 §3.1) ──────────────
+ *
+ * WHY THESE RULES ARE NOT THE ONES ABOVE. Everything in this file so far is
+ * painted at BLOCK level, and the comment at the top says why: a `header:`
+ * section has no wrapper, because its content is either welded into the bar's
+ * fence or sitting in the blocks after it, and Obsidian renders each of those
+ * separately. `headerbar.ts::markSectionBodies` marks the run and the ends
+ * carry the rounding.
+ *
+ * A `frame: section` block is the case that file was written before. It has a
+ * wrapper — `.journal-sec-fold`, built by `foldableSection` — because it owns
+ * its CHILDREN rather than its siblings: the bar and the widget are one
+ * subtree inside one fence. So the surface is painted on the wrapper, and it is
+ * always both ends of its own run.
+ *
+ * THE REGRESSION THIS FIXES, recorded because the shape of it is the lesson.
+ * `frame: section` shipped withholding the composite card — correctly — and
+ * relying on the block surface to replace it. It never arrived: the surface is
+ * applied by `claimOwnBlock` and `markSectionBodies`, both of which run for
+ * `HeaderBar` instances only, and a children-owning section registers no
+ * HeaderBar (deliberately — carrying `.journal-header-bar` would make an
+ * enclosing dashboard fold the wrong scope). The result was a widget with a
+ * title bar, no background, no border and no padding, sitting wider than every
+ * section around it. That is §3.1's "nothing replaces it" reached by a second
+ * route: the modifier gave the block a BAR and forgot to give it a SURFACE. */
+.journal-sec-fold {
+  background: var(--background-secondary);
+  /* Named so the bar below can cancel exactly this much and meet the edges.
+     Same variable name and same value as the block surface, because a
+     `frame: section` and a `header:` section side by side on one page must
+     resolve to the same left edge — §1.6's rule, and the two would otherwise
+     disagree by a few pixels down the whole column. */
+  --am-sec-pad-x: 12px;
+  padding: 0 var(--am-sec-pad-x) 10px;
+  display: flow-root;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  margin-bottom: var(--am-widget-gap);
+}
+/* FOUR SIDES, NOT THREE. The block surface draws its sides on every block of a
+   run and closes the ends only at the ends, so that a run of five blocks is one
+   box rather than five stacked ones. A `frame: section` is always exactly one
+   block, so it is always both ends — there is no run to avoid drawing a
+   hairline across. */
+
+/* The bar, full-bleed, dividing the header from the body. Mirrors
+   `.journal-sec-block .journal-sec-l1.journal-header-bar` — a rule that stops
+   12px short of the edges reads as an underline on the title; one that meets
+   them reads as the edge of a header. */
+.journal-sec-fold > .journal-sec {
+  background: none;
+  padding: 8px var(--am-sec-pad-x) 6px;
+  margin: 0 calc(-1 * var(--am-sec-pad-x)) 7px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+/* A collapsed section is its bar alone, and a rule along the bottom of a closed
+   card is an edge promising content that isn't there. The block surface makes
+   the same move for the same reason. */
+.journal-sec-fold.is-collapsed {
+  padding-bottom: 0;
+}
+.journal-sec-fold.is-collapsed > .journal-sec {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+/* ── AND THE ACTIONS STRIP CLOSES WITH IT (4.13.1 §2) ───────────────────
+ *
+ * 4.11 gave a level-1 section's controls a row of their own under its title, and
+ * that row went on drawing while the section was folded — deliberately, and it
+ * was wrong. A closed section that still shows a hairline, 4px of air and a
+ * button reads as a section that did not close: the render this patch came from
+ * has *OPEN TASKS* collapsed to its bar with *Below* sitting under it, and the
+ * only two lines in the object are the title and a control.
+ *
+ * The measurement is in the note above: a closed `header:` section cost ~57px,
+ * and one carrying a strip cost ~85. §3's padding fix took the first number
+ * down; this takes the second down to the first.
+ *
+ * A STRIP, WHICH IS TO SAY LEVEL 1 ONLY. At level 2 the buttons sit on the title
+ * LINE (30-header-bars.css keeps them inline there, on the density argument
+ * about twenty subjects), so there is no second row to close and hiding them
+ * would be taking a control off a bar that is still drawn.
+ *
+ * TWO RULES BECAUSE THERE ARE TWO FOLDS, and they mark different elements:
+ * `frame: section` puts `is-collapsed` on the WRAPPER (`section-frame.ts`) and a
+ * `header:` bar puts it on the BAR (`headerbar.ts`). The pair below is the same
+ * pattern the two `border-bottom` rules a few lines up already follow.
+ *
+ * NOTHING IN THE FOLD EXCLUSIONS CHANGES. `foldableSection` and `HeaderBar` both
+ * hard-code `.journal-header-widgets` so a click on a control does not fold the
+ * section; a hidden element is not clicked, so that guard is untouched and stays
+ * exactly as load-bearing as it was for the open case. */
+.journal-sec-fold.is-collapsed > .journal-sec > .journal-header-widgets {
+  display: none;
+}
+/* The `header:` half of the pair. UNSCOPED BY THE CARD, unlike the
+   `border-bottom` rule further up this file: a bar that folds outside a section
+   surface — under a real markdown heading, or in a fence with no card — folds
+   the same way, and there is no version of "closed" where a strip belongs. The
+   untitled variant has no strip to hide (30-header-bars.css excludes it), so it
+   is not named here either. */
+.journal-sec-l1.journal-header-bar.is-collapsed > .journal-header-widgets {
+  display: none;
+}
+/* AND THE THIRD FOLD, WHICH 4.13.1 COULD NOT SEE (4.13.2 §4).
+ *
+ * The pair above was written as "two rules because there are two folds". There
+ * are three. The Journals card rolls its own: `journals-section.ts::makeFoldable`
+ * toggles `is-collapsed` on `.jjs-type` / `.jjs-group`, and the bar inside them
+ * is built with `owns: "children"`, which withholds `.journal-header-bar` — so
+ * it matches neither selector, and a collapsed journal went on showing
+ * `+ Subject` and `+ Topic` while every other collapsed section on the page had
+ * stopped showing anything.
+ *
+ * That is not a third mechanism anybody chose; `section-frame.ts` explains why
+ * this one exists — an inner section folds its own CHILDREN and must not carry
+ * the marker HeaderBar's block walk looks for, or an enclosing dashboard would
+ * read its fold level off a descendant. The cost is that a rule about "a
+ * collapsed section" has to name all three, which is what this file now does.
+ *
+ * `.jjs-group` IS DELIBERATELY NOT NAMED, and it was written in and taken out
+ * once already. In 4.13.2 it would have matched nothing because a subject that
+ * had a create button never folded and a subject that folded had an empty slot
+ * `:empty` already hides. As of 4.13.3 it cannot match at all: a subject is a
+ * card, `makeFoldable` is not called for one, and there is no stack under a card
+ * for a chevron to close. A rule that cannot fire is indistinguishable from a
+ * decision that was made — the fault 4.13 §3 caught in this same file.
+ *
+ * If a subject ever folds again, this is the line it joins. */
+.jjs-type.is-collapsed > .journal-sec > .journal-header-widgets {
+  display: none;
+}
+/* The content gives up the spacing at the surface's edges, because the surface
+   decides it — `.journal-sec-block > :first-child` says the same thing about
+   the other kind of section. */
+.journal-sec-fold-body > :first-child {
+  margin-top: 0;
+}
+.journal-sec-fold-body > :last-child {
+  margin-bottom: 0;
+}

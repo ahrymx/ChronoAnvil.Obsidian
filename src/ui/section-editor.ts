@@ -1,0 +1,1457 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+//
+// Licensed under the GNU Affero General Public License v3.0 or later, with
+// attribution and naming terms under its section 7. See LICENSE and
+// LICENSING.md.
+
+// Editing one file's sections. Any file's.
+//
+// WHAT THIS IS
+//
+// The 3.0 editor: one window over a `SectionModel`, which is a journal note, a
+// diary dashboard or a diary entry with the difference already resolved. It
+// reads on open, plans on every change, shows the plan, and writes only what
+// the plan named.
+//
+// It is the successor to `template-editor.ts`, which did all of that for
+// journal notes alone. That file is now a caller — it builds a journal model
+// and opens this — because §6 of the 3.0 plan chose replace over beside, and
+// the reason to choose it out loud is that it is reversible only before the old
+// one is deleted. What is deleted is the second EDITOR; the entry point, its
+// signature and its callers are untouched.
+//
+// WHAT IT MUST NOT LEARN
+//
+//   Which surface it is on. Nothing below imports a catalogue, reads a grain,
+//   or tests for a note kind. If it asks, the interface is wrong — §2, and it
+//   is asserted by test rather than promised here.
+//
+// The two facts that ARE surface-shaped arrive as data: `group` on a section,
+// which says which band it may be reordered inside, and `handEdited`, which the
+// caller supplies because only a journal template can be measured against what
+// the catalogue would compose.
+//
+// ITS MODEL IS THE FILE
+//
+// Not a config. Nothing it does is stored anywhere except the markdown, which
+// is the decision the section catalogues already made and for the same reason:
+// two records of one arrangement is how they come to disagree.
+//
+// WHAT IT REFUSES TO BE
+//
+// A markdown editor. It edits STRUCTURE — which sections, and in what order.
+// The moment it edits body prose it is a worse editor than the one the reader
+// already has open behind it, and it acquires a reason to hold a document
+// model, which is the second representation this subsystem keeps declining to
+// build.
+//
+// WHAT MAKES THE WRITE SAFE
+//
+//   1. a section's extent is exact — declared blocks on the journal side, a
+//      declared directive and region on the diary side;
+//   2. `plan` names the change before the write;
+//   3. `apply` refuses anything the plan did not name;
+//   4. unproven blocks — a reader's own fence, a `## ` heading, a region with
+//      writing in it — are never deleted.
+//
+// The Changes tab is item 2 made visible. It is not decoration: it is the
+// reason "generates, never regenerates" was allowed to stop being the rule.
+
+import { App, Notice, TFile, setIcon } from "obsidian";
+import { EditorModal } from "./editor-modal";
+import { createListRow } from "./list-row";
+import { promptDetailedSuggester, promptLayoutSave } from "./modals";
+import type AlmanacPlugin from "../main";
+import { getFile } from "../core/util";
+import { fieldLabelOf, idsOf, questionIsRequired } from "../core/section-model";
+import { isPageWidgetId } from "../core/widget-sections";
+import type {
+  FolderQuestion,
+  SectionModel,
+  SectionOp,
+  SectionQuestion,
+  SectionView,
+  TitleQuestion,
+  SectionWant,
+} from "../core/section-model";
+import { readArg, soleArgSpanIn } from "../core/directive-grammar";
+import { ArgSuggest } from "./arg-suggest";
+
+// The four panes, one at a time.
+//
+// WHY NOT TWO COLUMNS, which is what this window had until 3.0.1.
+//
+// The list sat left and the preview right, in a grid of `1fr 1.2fr` inside a
+// modal that is about 560px wide on a default Obsidian setup. That is roughly
+// 250px for a list row that carries a reorder control, a token, a title, a
+// subtitle, a pill and a Remove button — so the titles wrapped mid-word
+// ("Focu / s", "Note / s") and the blurb below them ran to seven lines. It was
+// legible on a wide desktop and unusable everywhere else, and the diary
+// surfaces made it worse rather than better: an entry adds band headings and a
+// longer refusal string to the same 250px.
+//
+// Splitting the width was the wrong move for a window where the two halves are
+// never read at once. You arrange, then you check what that would do. So each
+// pane gets the whole width and the reader moves between them, which is also
+// what makes this work on a phone.
+type Pane = "sections" | "changes" | "markdown" | "layout";
+
+// Storing the arrangement under a name, where the surface has somewhere to
+// store one.
+//
+// OPAQUE ON PURPOSE. On the journal side this is a kind's saved layout and
+// carries per-section overrides; this window neither computes nor forwards
+// them, because overrides are a journal concept and reading one here would put
+// `sectionOverrides` — and with it the journal catalogue — inside a modal that
+// is supposed to be agnostic. The caller knows its own context and can resolve
+// them from the id list.
+export interface ArrangementSink {
+  // The button's own words, because "layout" and "variant" are the journal's
+  // vocabulary and another surface may not share it.
+  buttonLabel: string;
+  promptTitle: string;
+  promptPlaceholder: string;
+  // Where else this arrangement may be offered, and which of those the caller
+  // is saving FROM. 3.18 follow-ups §5.
+  //
+  // OPAQUE, LIKE EVERYTHING ELSE THAT CROSSES THIS SEAM. On the journal side
+  // these are note kinds; this window neither knows nor asks — it draws the
+  // labels the caller supplied, hands back the ids the reader ticked, and never
+  // learns what a kind is, exactly as it never learns what an override is. A
+  // caller with one target, or none, supplies one entry and the control is not
+  // drawn at all.
+  targets?: { id: string; label: string }[];
+  originTarget?: string;
+  save: (name: string, sections: string[], targets: string[]) => Promise<void>;
+}
+
+export interface SectionEditorSpec {
+  file: TFile;
+  text: string;
+  model: SectionModel;
+  // Shown in the window title.
+  title?: string;
+  // Whether the file differs from what the catalogue would compose for the
+  // sections it already has.
+  //
+  // SUPPLIED, NOT ASKED FOR. Only a surface with a composer to compare against
+  // can answer it, and the answer is the single most useful sentence in the
+  // window — so it is a parameter rather than a method on the interface that
+  // two of three implementations would have to return false from.
+  handEdited?: boolean;
+  onSaved?: () => void;
+  arrangement?: ArrangementSink;
+}
+
+export class SectionEditorModal extends EditorModal {
+  // What the file had when the window opened, the display order now, and which
+  // of those rows the reader actually wants.
+  //
+  // `rows` rather than `want` alone because a section the reader has just
+  // unticked has to stay visible — struck through, in its place — so they can
+  // see what they are taking out and put it back without hunting the Add menu.
+  // `want` is derived from the two: the rows still ticked, in row order, which
+  // is what makes reordering expressible at all.
+  private original: string[] = [];
+  private rows: string[] = [];
+  private removed = new Set<string>();
+  // What the reader has answered for the rows that asked something.
+  //
+  // A FOURTH PIECE OF STATE RATHER THAN A RICHER `rows`, for the reason `rows`
+  // and `removed` are two things rather than one: an id is what every other
+  // part of this window is written in terms of — `view(id)`, `bandOf(id)`,
+  // `swap(a, b)`, the drag payload — and threading a record through all of them
+  // to carry a field four of them would ignore is how a list of ids becomes a
+  // list of objects nobody remembers the shape of. `want` composes the three at
+  // the one place that needs them composed.
+  //
+  // KEYED BY ID AND NEVER PRUNED. A reader who picks a journal, unticks the
+  // row, then changes their mind gets their answer back rather than an empty
+  // dropdown — the same courtesy the struck-through row itself exists to
+  // extend.
+  private answers = new Map<string, Record<string, unknown>>();
+  // Which of those answers this window changed, as opposed to read out of the
+  // reader's file. See `answer` for why this is an interaction rather than a
+  // comparison, and `want` for what it decides.
+  private dirty = new Set<string>();
+  // OPENS ON THE ARRANGER, where the two-column version opened on Changes.
+  // With the list always visible, landing on the summary of changes was right:
+  // it was the half you could not see. Now it is a pane like the others and the
+  // reader came here to arrange, so that is what the window opens on.
+  private pane: Pane = "sections";
+  private dragging: string | null = null;
+  // Which rows share a block with the row above them. 4.8 §2.
+  //
+  // A FLAG PER ROW RATHER THAN A LIST OF BLOCKS, and the reason is `rows`
+  // itself: every other part of this window is written in terms of a flat list
+  // of ids — `swap`, `bandOf`, the drag payload, `want` — and a list of lists
+  // would have to be unpacked and repacked by all of them. A block is a RUN of
+  // consecutive rows, which is exactly what the catalogue means by one
+  // (`FlatSection.row`: "consecutive members only"), so "this one is with the
+  // one before it" says the whole of it with one bit.
+  //
+  // It also survives a reorder for free. Drag a row out of the middle of a
+  // block and it takes its flag with it; the row that followed it keeps a flag
+  // that now points at whatever is above it, which is the same answer the file
+  // would give.
+  private joined = new Set<string>();
+  // Which rows the WRITE could cut out of a shared block, from the file as it
+  // was opened. See `BlockView.loose` — a section whose extent is a guess is
+  // not offered a split rather than being offered one that quietly does
+  // nothing.
+  private loose = new Set<string>();
+
+  // Which rows may be a COLUMN of a group at all — 4.12 §A.
+  //
+  // `loose`'s SIBLING, AND A DIFFERENT QUESTION. That one answers "can this
+  // leave the block it is in" and gates **Take out of the group**; this answers
+  // "is it the kind of thing a column is" and gates **Make a group**. The window
+  // does not know what makes the answer no — a page head, two widgets in one
+  // fence, or a fence that draws its own title bar — and does not need to: it
+  // asks one question, disables one button and says one sentence.
+  private column = new Set<string>();
+
+  constructor(app: App, plugin: AlmanacPlugin, private spec: SectionEditorSpec) {
+    super(
+      app,
+      plugin,
+      spec.title ?? `Edit sections — ${spec.file.basename}`,
+      spec.file.path,
+      "Save"
+    );
+    this.original = spec.model.present(spec.text);
+    this.rows = [...this.original];
+    // The blocks the file already has, where the surface has any. A model that
+    // does not implement `blocks` leaves both sets empty, every group is one
+    // row long, and this window draws the list it always drew.
+    for (const block of spec.model.blocks?.(spec.text) ?? []) {
+      for (const id of block.ids.slice(1)) this.joined.add(id);
+      for (const id of block.loose) this.loose.add(id);
+      for (const id of block.column) this.column.add(id);
+    }
+  }
+
+  // A little wider than the shared frame, and only this window.
+  //
+  // The frame's default suits a form — a column of fields and a Save button.
+  // This is a list of rows that each carry six things, and a Markdown pane
+  // showing a file. Bounded by the viewport so a phone gets the full width and
+  // nothing more, which is the case the two-column layout failed hardest.
+  onOpen(): void {
+    super.onOpen();
+    this.modalEl.addClass("almanac-section-editor");
+  }
+
+  private get model(): SectionModel {
+    return this.spec.model;
+  }
+
+  // The rows still ticked, in row order, each with whatever the reader answered
+  // for it.
+  //
+  // WIDENED FROM `string[]` IN 3.8 PATCH 7, and it is the whole of the patch on
+  // this side: `SectionChoice` has been travelling from here to
+  // `EntrySection.directive` since patch 4 and this getter was the one place
+  // that could only ever say an id.
+  //
+  // STILL A BARE STRING WHERE THERE IS NOTHING TO SAY. `SectionWant`'s
+  // shorthand is not decoration — a plan over `["links", "log"]` and one over
+  // `[{id:"links"},{id:"log"}]` must produce identical ops, and the cheapest
+  // way to be sure of that is for the common case to keep passing the spelling
+  // it always passed. Only a row that was actually asked something changes
+  // shape.
+  //
+  // A ROW WITH AN UNANSWERED QUESTION IS NOT IN THE LIST AT ALL. See
+  // `unanswered`: it stays on screen, wearing the reason, and contributes no
+  // `add` op — so the footer will not offer to save it and `apply` is never
+  // handed a section it would have to render with a hole in it.
+  private get want(): SectionWant[] {
+    return this.rows
+      .filter((id) => !this.removed.has(id))
+      .filter((id) => this.unanswered(id).length === 0)
+      .map((id) => {
+        // A SETTLED ROW CARRIES OPTIONS ONLY IF THIS WINDOW CHANGED THEM, and
+        // that is the sentence §2.3 turns on. The plan reads options on a
+        // section it already has as "the answer moved" and rewrites that one
+        // line; a row seeded from the file and left alone has nothing to say,
+        // so it is copied out verbatim like every other untouched section.
+        //
+        // A row being ADDED always carries them: there is no line yet, the
+        // catalogue composes one, and its answers are what it composes from.
+        const settled = this.original.includes(id);
+        if (settled && !this.dirty.has(id)) return id;
+        const options = this.answers.get(id);
+        return options && Object.keys(options).length ? { id, options } : id;
+      });
+  }
+
+  // The questions this row declares that nobody has answered yet.
+  //
+  // EMPTY FOR A SECTION ALREADY IN THE FILE, whatever it declares, and that is
+  // the load-bearing half. A kept section's directive line is copied out of the
+  // reader's file verbatim — the property `applySections` has had since it was
+  // written and the one patch 4 was most likely to cost — so its answer is
+  // already there, in their words, possibly hand-edited. Asking again would
+  // either restate an answer this window cannot read or overwrite one it has no
+  // business touching. The row says so instead; see `renderQuestions`.
+  //
+  // Empty for every row on a surface that declares no questions, which is two
+  // of the three and eight of the nine sections on the third.
+  // `=== undefined` RATHER THAN FALSY, and the difference is a whole question
+  // type. `!answered[q.key]` reads an empty string as no answer, and empty is
+  // the folder question's DEFAULT — the host note's own folder, the spelling
+  // every journal index ships. A row answered "" would have stayed out of
+  // `want` and its section could never have been added.
+  //
+  // Equivalent for the `<select>`, which deletes the key rather than storing ""
+  // when nothing is chosen, so this is not a behaviour change on the control
+  // that already existed.
+  //
+  // AND `questionIsRequired` IS THE MODEL'S ANSWER, NOT THIS WINDOW'S (§4). A
+  // folder question is never unanswered because its empty state is a working
+  // directive; a choice question with no answer composes a block that looks
+  // broken. That difference is carried in the type rather than assumed here.
+  private unanswered(id: string): SectionQuestion[] {
+    if (this.original.includes(id)) return [];
+    const answered = this.answers.get(id) ?? {};
+    return (this.view(id)?.questions ?? []).filter(
+      (q) => questionIsRequired(q) && answered[q.key] === undefined
+    );
+  }
+
+  // ASKED OF THIS TEXT (4.15 §4). What a surface offers is a question about the
+  // note once a widget may repeat, because a repeating one has a section per
+  // occurrence — so the text goes in, and the three models that cannot repeat
+  // ignore it and answer exactly as they did.
+  private view(id: string): SectionView | undefined {
+    return this.model.sections(this.spec.text).find((s) => s.id === id);
+  }
+
+  // ── rows (4.8 §2) ─────────────────────────────────────────────────────
+
+  // These ids cut into blocks: a run starts wherever a row is not joined to the
+  // one before it.
+  //
+  // TAKES THE IDS IT IS GIVEN, because it is asked two different questions with
+  // the same rule. The LIST asks about every row on screen, struck-through ones
+  // included, so a reader can see the block they are taking something out of.
+  // The WRITE asks about `want`, where a removed row is already gone — and a
+  // block whose first member is being removed is opened by the next one, which
+  // falls out of the same walk rather than needing a case.
+  private groupsOf(ids: readonly string[]): string[][] {
+    const out: string[][] = [];
+    for (const id of ids) {
+      if (out.length && this.joined.has(id)) out[out.length - 1].push(id);
+      else out.push([id]);
+    }
+    return out;
+  }
+
+  // Whether this surface has rows at all.
+  private get hasRows(): boolean {
+    return Boolean(this.model.blocks && this.model.regroup);
+  }
+
+  // What regrouping would do, named the way every other change in this window
+  // is named: by asking for it and reading the answer.
+  //
+  // A DRY RUN, NOT A COMPARISON OF INTENTIONS. The obvious shape is to diff the
+  // blocks on screen against the blocks in the file and report the difference —
+  // and it would report moves that `regroup` declines to make. A section whose
+  // extent cannot be bounded stays where it is; a fence of another kind cannot
+  // take a directive. Running the write and reading its RESULT is the only way
+  // this pane can promise exactly what Save does, which is the whole reason the
+  // Changes tab exists.
+  private layoutOps(): SectionOp[] {
+    if (!this.hasRows) return [];
+    const base = this.model.apply(this.spec.text, this.want) ?? this.spec.text;
+    const want = this.groupsOf(idsOf(this.want));
+    const next = this.model.regroup?.(base, want);
+    if (!next) return [];
+    const openerIn = (text: string): Map<string, string> =>
+      new Map(
+        (this.model.blocks?.(text) ?? []).flatMap((b) =>
+          b.ids.map((id) => [id, b.ids[0]] as [string, string])
+        )
+      );
+    const from = openerIn(base);
+    const to = openerIn(next);
+    const ops: SectionOp[] = [];
+    for (const [id, opener] of to) {
+      if (from.get(id) === opener) continue;
+      const label = this.view(id)?.label ?? id;
+      ops.push({
+        kind: "regroup",
+        sectionId: id,
+        label,
+        detail:
+          opener === id
+            ? `${label} takes a block of its own`
+            : `${label} joins one block with ${this.view(opener)?.label ?? opener}`,
+      });
+    }
+    return ops;
+  }
+
+  // ── the plan ──────────────────────────────────────────────────────────
+
+  private ops(): SectionOp[] {
+    return [...this.model.plan(this.spec.text, this.want), ...this.layoutOps()];
+  }
+
+  // WHAT THE BUTTON COUNTS, and as of 3.15 a reconfigure is one of them. It
+  // has to be: the footer disables Save at zero, so a reader who changed an
+  // answer and nothing else would have been shown "No changes" over a plan
+  // that names one. See `SectionOpKind`.
+  //
+  // AN EXTEND IS ONE TOO, as of 3.18, for exactly that argument one release on.
+  // A reader who opens this window on a dashboard written before their journal
+  // gained a note kind has changed nothing themselves — the plan's one entry is
+  // the catalogue catching the file up — and a disabled Save over a row reading
+  // "Practice has no table here" is the same silence with a different cause.
+  private changeCount(): number {
+    return this.ops().filter(
+      (o) =>
+        o.kind === "add" ||
+        o.kind === "remove" ||
+        o.kind === "move" ||
+        o.kind === "reconfigure" ||
+        o.kind === "extend" ||
+        // 4.8: two blocks becoming one is a write like any other, and a reader
+        // whose only change is a row would otherwise be shown "No changes" over
+        // a plan that names three.
+        o.kind === "regroup"
+    ).length;
+  }
+
+  // ── body ──────────────────────────────────────────────────────────────
+
+  protected renderBody(): void {
+    const wrap = this.body.createDiv({ cls: "almanac-tpl-editor" });
+
+    if (this.spec.handEdited) {
+      // The single most useful sentence in the window, so it is a line of text
+      // and not a tooltip. A reader about to change a file they have been
+      // editing for months needs to know the plugin knows that.
+      const warn = wrap.createDiv({ cls: "almanac-tpl-edited" });
+      setIcon(warn.createSpan({ cls: "almanac-tpl-edited-icon" }), "pencil");
+      warn.createSpan({
+        text: "You've edited this file since it was written. Only the blocks listed under Changes are touched.",
+      });
+    }
+
+    this.renderTabs(wrap);
+
+    const pane = wrap.createDiv({ cls: "almanac-tpl-pane" });
+    if (this.pane === "sections") this.renderList(pane);
+    else if (this.pane === "changes") this.renderChanges(pane);
+    else if (this.pane === "markdown") this.renderMarkdown(pane);
+    else this.renderLayout(pane);
+  }
+
+  private renderTabs(host: HTMLElement): void {
+    const tabs = host.createDiv({ cls: "almanac-tpl-tabs" });
+    const n = this.changeCount();
+    const tab = (key: Pane, label: string): void => {
+      const b = tabs.createEl("button", {
+        text: label,
+        cls: this.pane === key ? "almanac-tpl-tab is-active" : "almanac-tpl-tab",
+      });
+      b.addEventListener("click", () => {
+        this.pane = key;
+        this.refreshBody();
+      });
+    };
+    tab("sections", "In this file");
+    // THE COUNT IS ON THE TAB, because the pane that would show it is now
+    // hidden most of the time. A reader who drags three rows and never opens
+    // Changes should still be able to see that three things are pending — the
+    // footer says so too, and saying it twice is right here: the footer is what
+    // they press and the tab is where they would go to check.
+    tab("changes", n === 0 ? "Changes" : `Changes (${n})`);
+    tab("markdown", "Markdown");
+    tab("layout", "Layout");
+  }
+
+  // The rows, in bands.
+  //
+  // A BAND IS DRAWN ONLY WHERE THERE IS MORE THAN ONE. On a journal note and a
+  // dashboard every section's `group` is null, so this renders exactly the flat
+  // list it always did; a diary entry has two and gets two headings. The
+  // difference is in the data, and this is the only place it shows.
+  private renderList(pane: HTMLElement): void {
+    // No heading of its own: the tab it sits behind is already called "In this
+    // file", and a pane that repeats its own tab as a title is a line of
+    // chrome that pushes the first row down for nothing.
+    const host = pane.createDiv({ cls: "almanac-tpl-list" });
+    const bands: (string | null)[] = [];
+    for (const id of this.rows) {
+      const g = this.view(id)?.group ?? null;
+      if (!bands.includes(g)) bands.push(g);
+    }
+
+    for (const band of bands) {
+      if (band !== null && bands.length > 1) {
+        host.createDiv({ cls: "almanac-tpl-band", text: band });
+      }
+      // THE ROWS OF THIS BAND, CUT INTO BLOCKS. A block is a run of consecutive
+      // rows, so it is grouped after the band filter rather than before it —
+      // a block cannot span a band any more than a fence can.
+      const inBand = this.rows.filter(
+        (id) => (this.view(id)?.group ?? null) === band && this.view(id)
+      );
+      for (const group of this.groupsOf(inBand)) {
+        if (group.length < 2) {
+          const section = this.view(group[0]);
+          if (section) this.renderRow(host, section);
+          continue;
+        }
+        this.renderBlock(host, group);
+      }
+    }
+
+    this.renderAdd(host);
+  }
+
+  // A block holding more than one section, drawn as the card it is. 4.8 §2.2.
+  //
+  // A CARD RATHER THAN A MARKER ON EACH ROW. What the reader is looking at is
+  // ONE THING on their page — the top row of the homepage is a single block
+  // holding three widgets side by side — and three rows each wearing a "in a
+  // row" pill would be describing that thing three times without ever drawing
+  // it. The card is the block, and the rows inside it are its cells.
+  //
+  // AND IT IS CALLED A GROUP, AS OF 4.9 §1. The object now draws itself on the
+  // page with a box and a foot, so the window and the page have to call it the
+  // same thing — "one block" describes the file, which is the one place a reader
+  // is not looking. The fence keyword stays `row`: that is how a group is
+  // written, and the documentation says so in those words.
+  private renderBlock(host: HTMLElement, group: readonly string[]): void {
+    const card = host.createDiv({ cls: "almanac-tpl-block" });
+    const bar = card.createDiv({ cls: "almanac-tpl-block-bar" });
+    bar.createSpan({
+      cls: "almanac-tpl-block-title",
+      text: `Group — ${group.length} columns`,
+    });
+    const split = bar.createEl("button", {
+      cls: "almanac-tpl-move",
+      text: "Break up the group",
+    });
+    // EVERY MEMBER LEAVES AT ONCE, which is the one operation on a block that
+    // needs no per-row judgement: they each get the block they would have had
+    // if nobody had put them together.
+    split.disabled = !group.slice(1).every((id) => this.loose.has(id));
+    // AND IT SAYS WHY, AS OF 4.12 §A. This button has been drawn disabled with
+    // no explanation since 4.8, which is the same defect the join button is
+    // getting fixed for in this release — a control that is visibly there and
+    // visibly refusing, with nothing saying what would make it work.
+    if (split.disabled) {
+      split.title =
+        "One of these sections' lines can't be told apart from the others in its block, so the group can't be broken up. Move it out of the block by hand first.";
+    }
+    split.addEventListener("click", () => {
+      for (const id of group) this.joined.delete(id);
+      this.refreshFrame();
+    });
+
+    const body = card.createDiv({ cls: "almanac-tpl-block-body" });
+    for (const id of group) {
+      const section = this.view(id);
+      if (section) this.renderRow(body, section);
+    }
+  }
+
+  // Which rows this one may trade places with: the ones in its own band, in
+  // display order.
+  //
+  // THE WHOLE OF THE REORDERING RULE, and it is one sentence with no surface
+  // test in it. On a surface with one band it is every other row, which is what
+  // the journal editor has always done. On a diary entry it is the rows on the
+  // same side of the rule — so a section cannot be dragged from the structural
+  // half into the personal one, because there is nowhere in that band to drop
+  // it, rather than because a check said no.
+  // AND AN IMMOVABLE ROW IS NOT IN ANY BAND. 3.2 §4 fixes navigation to the top
+  // row of every diary surface, and the cheapest way to say so is the way the
+  // rule above already works: not a check that refuses the drop, but a band it
+  // was never a member of. A fixed row is therefore not a drag source, not a
+  // drop target, and gets no arrows — three behaviours from one omission, and
+  // none of them asks what surface this is.
+  //
+  // It still RENDERS, with its refusal in the subtitle. A row that vanished
+  // would take the explanation with it, and "navigation is fixed" is exactly
+  // the thing a reader hunting for the setting needs to be told.
+  private bandOf(id: string): string[] {
+    if (this.view(id)?.movable === false) return [];
+    const band = this.view(id)?.group ?? null;
+    return this.rows.filter(
+      (x) => (this.view(x)?.group ?? null) === band && this.view(x)?.movable !== false
+    );
+  }
+
+  private renderRow(host: HTMLElement, section: SectionView): void {
+    const gone = this.removed.has(section.id);
+    const isNew = !this.original.includes(section.id);
+    // Asked of THIS text, not of the section alone: a section that is
+    // removable in principle can still be holding the reader's writing.
+    const refusal = this.model.refusal(section.id, this.spec.text);
+    // IN THE SAME PLACE AS THE REFUSAL, and for the same argument. "This will
+    // not be added yet, and here is what it is waiting for" is exactly the
+    // class of thing §3 says a graphical editor must state in place rather than
+    // discover on Save.
+    const waiting = gone ? [] : this.unanswered(section.id);
+
+    const { row, lead, actions } = createListRow(host, {
+      // THE ACTIONS GET A LINE OF THEIR OWN (4.15 §2). This is the caller the
+      // flag was added for: a row here carries a dropdown or a text field
+      // alongside a group button and a Remove button, and until now all four
+      // divided one line with the title and the blurb. See `ListRowOptions`.
+      actionsRow: true,
+      token: section.icon,
+      title: section.label,
+      // SHOWN IN PLACE, NOT ON SAVE. Discovering a refusal after committing to
+      // the change is the failure 2.59.7 fixed on the plan side, and §3 exists
+      // because a graphical editor is exactly where it would come back.
+      subtitle: refusal ?? section.blurb,
+      // AND AN IMMOVABLE ROW SAYS SO, LAST (4.11). `bandOf` already gives such a
+      // row two disabled arrows and no drag, and until this release nothing on
+      // the row said why — because the only immovable rows were also locked, and
+      // the removal refusal in the subtitle happened to explain both. The page
+      // head is immovable and REMOVABLE, so it had a control that plainly did
+      // not work and no sentence anywhere about it.
+      //
+      // AFTER the refusal in this chain rather than before it: a row that cannot
+      // be removed either has the more surprising fact to report, and two pills
+      // saying two things about one row is the doubling `count` refuses one file
+      // over.
+      pills: gone
+        ? [{ text: "removing", tone: "off" }]
+        : waiting.length
+          ? waiting.map((q) => ({ text: `needs ${q.label}`, tone: "muted" as const }))
+          : isNew
+            ? [{ text: "adding", tone: "on" }]
+            : refusal
+              ? [{ text: "can't be removed", tone: "muted" }]
+              : section.movable === false
+                ? [{ text: "fixed", tone: "muted" }]
+                : [],
+      cls: [
+        gone ? "almanac-tpl-row-removed" : "",
+        isNew && !gone && !waiting.length ? "almanac-tpl-row-added" : "",
+        refusal ? "almanac-tpl-row-locked" : "",
+        waiting.length ? "almanac-tpl-row-waiting" : "",
+      ],
+    });
+
+    this.attachDrag(row, section.id);
+
+    // ARROWS AS WELL AS DRAG, not instead of it.
+    //
+    // §3 of the plan assumes drag, and the row this replaces argued for arrows:
+    // "the list is short, the rows are a fixed height, and a button is
+    // keyboard-reachable in a way a handle is not". Both are right, and they
+    // are not in conflict — the argument against drag was never that it is a
+    // bad gesture, it was that it is the only one. So the gesture is added and
+    // the affordance is kept, and the keyboard path survives.
+    //
+    // In `lead` rather than beside the toggle: "move this up" next to "remove
+    // this" is a pairing one slip away from being expensive.
+    const band = this.bandOf(section.id);
+    const at = band.indexOf(section.id);
+    const nudge = (delta: number, label: string, icon: string): void => {
+      const b = lead.createEl("button", {
+        cls: "almanac-tpl-arrow",
+        attr: { "aria-label": label, title: label },
+      });
+      setIcon(b, icon);
+      b.disabled = at + delta < 0 || at + delta >= band.length;
+      b.addEventListener("click", () => {
+        this.swap(section.id, band[at + delta]);
+        this.refreshFrame();
+      });
+    };
+    nudge(-1, "Move up", "chevron-up");
+    nudge(1, "Move down", "chevron-down");
+
+    this.renderQuestions(actions, section);
+
+    // ── which block this row is in (4.8 §2.2) ──────────────────────────
+    //
+    // A BUTTON RATHER THAN A SECOND MEANING FOR THE DRAG. The drag reorders,
+    // and it has meant exactly that since 3.0; teaching a drop to sometimes
+    // join instead would make the outcome depend on where inside a row the
+    // pointer let go — which is the ambiguity 4.7 removed from the page and has
+    // no more business here. It is also the argument the arrows already won: a
+    // button is keyboard-reachable and a gesture is not.
+    //
+    // `movable !== false` CAME OUT IN 4.12 §A, and it was doing two jobs badly.
+    // It was the whole of the head's exclusion — and the head is now excluded in
+    // the MODEL, by `column`, where the write's own refusal already lives. What
+    // it also did was withhold the row entirely rather than disabling it, which
+    // is the one case where "nothing dead is drawn" is the wrong rule: the
+    // reader is looking for the control and its absence explains nothing.
+    if (this.hasRows && !gone) {
+      const at = this.rows.indexOf(section.id);
+      const above = this.rows[at - 1];
+      // AND THE ROW ABOVE HAS TO BE A COLUMN TOO. A group is made out of two
+      // blocks, so a destination that cannot be one is a join `moveCell` will
+      // decline at Save — and offering a button that plans a move the write
+      // refuses is the failure `loose` exists to have stopped one control over.
+      const sameBand =
+        above !== undefined &&
+        (this.view(above)?.group ?? null) === (section.group ?? null) &&
+        this.view(above)?.movable !== false &&
+        this.column.has(above);
+      if (this.joined.has(section.id)) {
+        const out = actions.createEl("button", {
+          cls: "almanac-tpl-move",
+          text: "Take out of the group",
+          attr: { title: "Give this section a block of its own" },
+        });
+        // A SECTION WHOSE EXTENT IS A GUESS IS NOT OFFERED THE SPLIT. See
+        // `BlockView.loose`: the alternative is a button that plans a move the
+        // write then declines to make.
+        out.disabled = !this.loose.has(section.id);
+        if (out.disabled) {
+          out.title =
+            "This section's lines can't be told apart from the others in its block, so it can't be split out.";
+        }
+        out.addEventListener("click", () => {
+          this.joined.delete(section.id);
+          this.refreshFrame();
+        });
+      } else if (sameBand) {
+        // TWO LABELS FOR ONE BUTTON (4.9 §1), because the click does two things
+        // and the old name described neither: "Join above" is about a LIST, and
+        // what a reader gets is a group on their page. Whether this makes one or
+        // adds to one is exactly what `joined.has(above)` already knows — the
+        // row above is in a block with ITS predecessor, or it is not — so the
+        // distinction costs a lookup that is already being done and saves the
+        // reader working out which happened after the fact.
+        const already = this.joined.has(above);
+        const join = actions.createEl("button", {
+          cls: "almanac-tpl-move",
+          text: already ? "Add to group" : "Make a group",
+          attr: {
+            title: already
+              ? "Put this section in the group above it, as another column"
+              : "Put this section and the one above it in one group, side by side",
+          },
+        });
+        // A SECTION THAT DRAWS ITS OWN TITLE BAR IS NOT A COLUMN (4.12 §A), and
+        // it is DISABLED WITH THE SENTENCE rather than omitted — which is the
+        // one place this window departs from "nothing dead is drawn", on the
+        // precedent three lines up. The page draws nothing at all for this rule:
+        // no quarter lights, no notice appears, and a reader who wants to know
+        // why has to be told somewhere. This is that somewhere, and it is the
+        // whole discoverability cost of the release.
+        join.disabled = !this.column.has(section.id);
+        if (join.disabled) {
+          join.title =
+            "This section draws its own title bar, so it can't be a column of a group — a group's columns each carry their own head. Add the widget on its own instead.";
+        }
+        join.addEventListener("click", () => {
+          this.joined.add(section.id);
+          this.refreshFrame();
+        });
+      }
+    }
+
+    if (refusal) return;
+
+    const toggle = actions.createEl("button", {
+      cls: "almanac-tpl-toggle",
+      text: gone ? "Keep" : "Remove",
+    });
+    toggle.addEventListener("click", () => {
+      if (gone) this.removed.delete(section.id);
+      else this.removed.add(section.id);
+      this.refreshFrame();
+    });
+  }
+
+  // The control a section that asks something gets, beside its row.
+  //
+  // WHAT THIS WINDOW KNOWS ABOUT IT: that there is a question, what it is
+  // called, and what may be answered. Not what the key means, not what the
+  // answer will be written into, not which surface asked. It puts a string
+  // under a string and hands both to the model — which is the same amount this
+  // window has always known about `group`, and it is deliberate that adding the
+  // first configurable section to any catalogue needed no branch here.
+  //
+  // A DROPDOWN RATHER THAN A PROMPT. Every value is a thing the vault already
+  // defines, so there is a list; a free-text field would let a reader type a
+  // kind that does not exist and find out at render time, which is the failure
+  // the whole "refuse by listing the alternatives" rule exists to avoid. It
+  // also sits in the row, so the answer is beside the thing it answers for
+  // rather than behind a second modal.
+  //
+  // IN `actions`, NOT `lead`. `lead` is for controls that act on the row's
+  // POSITION — that is list-row.ts's rule and the reason the arrows are there.
+  // This acts on the thing the row describes, which is the other slot.
+  //
+  // ON A SECTION ALREADY IN THE FILE IT USED TO BE INERT, and said why:
+  //
+  //   The answer is in the directive line, the directive line is copied out
+  //   verbatim on Save, and this window cannot read it.
+  //
+  // That was the right refusal for as long as it was true. 3.15 makes it false:
+  // a question now names the directive its answer is written into
+  // (`SectionQuestion.directive`), `core/directive-grammar.ts` finds the span,
+  // and the control is seeded from the reader's own line. So the affordance now
+  // has the capability behind it, which is 3.0 patch 1's rule satisfied rather
+  // than waived — and where it does NOT (a question with no `directive`, a
+  // folder question on a surface with no host folder) the old label is exactly
+  // what still gets drawn.
+  private renderQuestions(host: HTMLElement, section: SectionView): void {
+    const questions = section.questions ?? [];
+    if (!questions.length) return;
+    const settled = this.original.includes(section.id);
+
+    // A FIELD IS A LABEL AND A CONTROL (4.15 §2), which is what the row could
+    // not afford until the actions had a line of their own.
+    //
+    // THE PILL IS NOT THIS, AND BOTH STAY. "needs a journal to pull from" says
+    // the row is incomplete; "Journal" says what the box is. The first goes away
+    // when the box is filled and the second does not, so they are two statements
+    // rather than one said twice — which is the test the `count` pill's own rule
+    // sets for whether a second label is doubling.
+    //
+    // SENTENCE CASE OFF `q.label`, NOT A SECOND STRING. `label` is written as a
+    // noun phrase to sit inside a sentence — "a journal to pull from" — and the
+    // field name is its head word. Taking it here rather than adding a
+    // `fieldLabel` to `SectionQuestionCommon` keeps the catalogues writing one
+    // string: a second would drift from the first, and this window is the only
+    // place both would be read.
+    const field = (q: SectionQuestion): HTMLElement => {
+      const wrap = host.createDiv({ cls: "almanac-tpl-field" });
+      wrap.createSpan({
+        cls: "almanac-tpl-field-label",
+        text: fieldLabelOf(q),
+      });
+      return wrap;
+    };
+
+    for (const q of questions) {
+      // A settled section whose answer cannot be read back keeps the wording it
+      // has had since 3.8. The route it names still works.
+      if (settled && !this.readable(section, q)) {
+        const note = host.createSpan({
+          cls: "almanac-tpl-choice-fixed",
+          text: q.settled?.text ?? "set when added",
+        });
+        note.title =
+          q.settled?.hint ??
+          `This section's choice of ${q.label} is written into the note. Remove it, save, then add it again to change it.`;
+        continue;
+      }
+      if (q.kind === "folder") {
+        this.renderFolderQuestion(field(q), section, q);
+        continue;
+      }
+      if (q.kind === "title") {
+        this.renderTitleQuestion(field(q), section, q);
+        continue;
+      }
+      // NOTHING TO CHOOSE FROM IS A SENTENCE, NOT AN EMPTY MENU. A dropdown
+      // with no entries is a control that looks broken; the catalogue supplied
+      // wording for this case precisely so the reader is told what is missing
+      // and where to get it.
+      if (!q.values.length) {
+        host.createSpan({ cls: "almanac-tpl-choice-empty", text: q.empty });
+        continue;
+      }
+      const select = field(q).createEl("select", { cls: "almanac-tpl-choice" });
+      select.setAttribute("aria-label", `Choose ${q.label}`);
+      // THE PLACEHOLDER NAMES ITS QUESTION AGAIN (4.15 §2), and the reason it
+      // stopped is worth keeping rather than deleting:
+      //
+      //   Spelling it out inside a <select> made a 26-character placeholder in a
+      //   slot sharing its row with two arrows and a Remove button, and it
+      //   rendered as "Choose a journal to p" — a control whose visible text is
+      //   a truncated fragment of a question answered in full beside it.
+      //
+      // That was true of the slot it had. The control now sits on a line of its
+      // own under a field label, so the phrase can be measured rather than only
+      // read — which is what the note about `aria-label` was standing in for.
+      const none = select.createEl("option", {
+        text: `Choose ${q.label}…`,
+        value: "",
+      });
+      select.title = `Choose ${q.label}`;
+      none.disabled = true;
+      // SEEDED FROM THE FILE ON A SETTLED SECTION, which is the whole of patch
+      // 5 on this control: the answer is in their note, this window can now
+      // read it, so it shows what they chose rather than "Choose…" over an
+      // answer that already exists.
+      const current = this.shownAnswer(section, q);
+      none.selected = !current;
+      for (const v of q.values) {
+        const opt = select.createEl("option", { text: v.label, value: v.value });
+        opt.selected = current === v.value;
+      }
+      select.addEventListener("change", () => {
+        this.answer(section.id, q.key, select.value || undefined);
+        // A repaint rather than a local update, because answering the last
+        // open question turns this row into an `add`: the pill, the footer
+        // count, the Changes tab and the Markdown pane all move together, and
+        // the one that must not lag is the count on the button they press.
+        this.refreshFrame();
+      });
+    }
+  }
+
+  // The folder field, and Obsidian's type-ahead over it.
+  //
+  // A TEXT INPUT RATHER THAN A DROPDOWN (§3.1): a vault's folder list is
+  // unbounded and mostly irrelevant, the default is a rule rather than a folder
+  // name and has nowhere in a list to sit, and a folder that does not exist yet
+  // has to be typeable by a reader scaffolding a vault.
+  //
+  // THE PLACEHOLDER CARRIES THE DEFAULT, because empty is the one answer the
+  // control cannot show. It is kept SHORT and the resolved path goes on the
+  // title and the aria-label — the argument the `<select>` above already had to
+  // make, where a 26-character placeholder rendered as a truncated fragment of
+  // a question answered in full two lines above it. This slot is no wider.
+  // A free-text title, written into the section's `header:` argument. 3.18 §3.
+  //
+  // PLACEHOLDER, NEVER PRE-FILLED. Empty means "the catalogue's own heading",
+  // which is what every shipped template carries — so seeding the box with that
+  // heading would write it into the note as though the reader had chosen it,
+  // and a later change of default could never reach a file again. The
+  // placeholder says what empty gets you; the box says what you asked for.
+  //
+  // COMMITS ON `change`, NOT ON EVERY KEYSTROKE. `answer()` triggers a repaint
+  // of the frame, and repainting under the cursor moves the field being typed
+  // into — the same reason the folder control commits the way it does.
+  private renderTitleQuestion(
+    host: HTMLElement,
+    section: SectionView,
+    q: TitleQuestion
+  ): void {
+    const input = host.createEl("input", {
+      type: "text",
+      cls: "almanac-tpl-title-input",
+    });
+    input.placeholder = q.placeholder;
+    input.setAttribute("aria-label", `Set ${q.label}`);
+    input.title = `Set ${q.label}. Leave empty for “${q.placeholder}”.`;
+    input.value = this.shownAnswer(section, q) ?? "";
+    input.addEventListener("change", () => {
+      this.answer(section.id, q.key, input.value.trim() || undefined);
+      this.refreshFrame();
+    });
+  }
+
+  private renderFolderQuestion(
+    host: HTMLElement,
+    section: SectionView,
+    q: FolderQuestion
+  ): void {
+    const current = this.shownAnswer(section, q);
+    const input = host.createEl("input", {
+      cls: "almanac-tpl-folder",
+      type: "text",
+    });
+    input.value = current;
+    // WHAT EMPTY MEANS IS THE CATALOGUE'S TO SAY, not this window's. 4.16.1: the
+    // hard-coded wording below was right for every folder question but one, and
+    // wrong for the one — `level-index`'s second piece falls back to the journal
+    // its first piece names, so a box promising "This note's folder" described a
+    // rule it does not follow. `emptyLabel` is the model saying otherwise, and
+    // its absence is the ordinary case spelled exactly as it was.
+    input.placeholder = q.emptyLabel ?? "This note's folder";
+    const resolved = q.hostFolder ? q.hostFolder : "the vault root";
+    const empty = q.emptyLabel ?? `this note's own folder (${resolved})`;
+    input.title = `${q.label} — leave empty for ${empty}`;
+    input.setAttribute("aria-label", `${q.label}, empty for ${empty}`);
+    new ArgSuggest(this.app, input, q.keywords ?? [], (value) => {
+      this.answer(section.id, q.key, value);
+      this.refreshFrame();
+    });
+    // ON `change`, NOT ON `input`. Every keystroke is not an answer: repainting
+    // the frame under a cursor moves the field the reader is typing into, and
+    // the plan would name a folder half-spelled. Blur and Enter both fire this.
+    input.addEventListener("change", () => {
+      this.answer(section.id, q.key, input.value.trim());
+      this.refreshFrame();
+    });
+  }
+
+  // Record an answer, and remember that this window is the one that changed it.
+  //
+  // THE DIRTY SET IS THE WHOLE OF §2.3's MECHANISM. The rule — a directive line
+  // is re-rendered only when its section's answers changed HERE — needs
+  // something to carry "here", and the tempting carrier is a comparison: render
+  // what the catalogue would write, compare it to the file, rewrite on
+  // difference. That makes the editor a formatter. It would "fix" a reader's
+  // spacing, their label, their hand-typed folder — every line the catalogue
+  // would have spelled differently — and losing a hand edit is the one risk in
+  // this release that destroys work rather than annoying somebody.
+  //
+  // So dirtiness is an INTERACTION. Nothing but a control writes to this set,
+  // and a section that is not in it is copied out of the file byte for byte,
+  // which is the property `applySections` has had since it was written.
+  private answer(id: string, key: string, value: string | undefined): void {
+    const next = { ...(this.answers.get(id) ?? {}) };
+    if (value === undefined) delete next[key];
+    else next[key] = value;
+    this.answers.set(id, next);
+    this.dirty.add(id);
+  }
+
+  // Whether this window can show this question's current answer rather than
+  // asserting it can.
+  //
+  // TWO WAYS TO ANSWER NO, and both are the model's rather than this window's.
+  // A question with no `directive` names no line to read the answer out of. A
+  // folder question with no `hostFolder` is being asked on a surface with no
+  // host — a journal TEMPLATE, composed once and used in every folder of its
+  // level — where a path typed here would be written literally into every note
+  // made from it afterwards. Neither is a surface test: one field is absent and
+  // the other is null, and this window does not know why.
+  // THE MODEL'S ANSWER FIRST (4.15 §4). Where the model located the section it
+  // can say what that section's own line holds, and it is the only one that
+  // can: the read below finds a directive in the whole file and gives up when
+  // there are two, which is correct for this window and wrong for a widget a
+  // page may hold several of — every card would lose its selector as soon as a
+  // second one existed.
+  private readable(section: SectionView, q: SectionQuestion): boolean {
+    if (!q.directive) return false;
+    if (q.kind === "folder" && q.hostFolder == null) return false;
+    if (section.answered?.[q.key] !== undefined) return true;
+    return this.answerIn(q) !== null;
+  }
+
+  // What the control should be showing: what the reader has said in this
+  // window, else what their file already says, else nothing.
+  //
+  // READING THE FILE IS NOT ANSWERING IT. Seeding a control does not put the
+  // section in `dirty`, so a reader who opens the window, looks at the folder
+  // their note names and closes it again has changed nothing — and the plan
+  // says so, because the plan is built from `want` and `want` only carries
+  // options for rows this window touched.
+  private shownAnswer(section: SectionView, q: SectionQuestion): string {
+    const held = this.answers.get(section.id)?.[q.key];
+    if (typeof held === "string") return held;
+    if (!this.original.includes(section.id)) return "";
+    // THE MODEL'S READ OF THIS SECTION'S OWN LINE, where it has one. See
+    // `readable` — the whole-file read below cannot tell two cards apart.
+    return section.answered?.[q.key] ?? this.answerIn(q) ?? "";
+  }
+
+  // What the file already says for this question, or null when the directive it
+  // names is not in the file — or is in it more than once.
+  //
+  // OVER THE WHOLE TEXT RATHER THAN THE SECTION'S OWN LINES, because this
+  // window has the file and not the section's extent — `present()` returns ids
+  // and the runs are the catalogue's. It is only ever READ here; the write goes
+  // through `apply`, which does hold the section's lines and splices inside
+  // them.
+  //
+  // AMBIGUITY IS AN ABSENT ANSWER, NOT THE FIRST ONE (3.18 follow-ups §2). The
+  // justification above used to end "that is safe … because a content directive
+  // is unique per note", and 3.18 introduced the first question naming a
+  // directive that is not: `header:` is structural and repeats once per section.
+  // Study's Topic index carries six, so `argSpanIn` handed the Task Manager's
+  // box and the Resources box the same value — the first header in the file —
+  // and this window drew a control over another section's title, whose write
+  // would then commit somewhere other than where it was read from.
+  //
+  // `soleArgSpanIn` states the rule the seam actually needs, and it is a
+  // narrowing rather than a surface test: this window still does not know what
+  // a header is, what a title means, or which catalogue asked. It knows that an
+  // answer it cannot tell apart from another section's is one it must not
+  // claim to have read — and `readable()` therefore falls back to the honest
+  // wording exactly where the ambiguity is real.
+  private answerIn(q: SectionQuestion): string | null {
+    if (!q.directive) return null;
+    const lines = this.spec.text.split("\n");
+    const span = soleArgSpanIn(lines, q.directive);
+    return span ? readArg(lines, span) : null;
+  }
+
+  // Two rows trade places in `this.rows`.
+  //
+  // A SWAP OF SLOTS, not a splice-and-insert, and the difference matters on a
+  // banded surface: swapping two members of one band cannot disturb the
+  // positions of another band's rows, where re-inserting into a flat list
+  // could. The rule "a section cannot cross the rule" is therefore a property
+  // of the operation rather than something checked after it.
+  private swap(a: string, b: string): void {
+    if (!b || a === b) return;
+    const i = this.rows.indexOf(a);
+    const j = this.rows.indexOf(b);
+    if (i === -1 || j === -1) return;
+    [this.rows[i], this.rows[j]] = [this.rows[j], this.rows[i]];
+  }
+
+  // Drag to reorder — direct manipulation, and STILL PLANNED MANIPULATION.
+  //
+  // §3 of the plan says this explicitly and it is the thing most easily lost:
+  // drag-and-drop that writes on drop is the natural thing to build and it
+  // removes the preview. Nothing here writes. A drag reorders a list in the
+  // modal, the summary re-reads, and the reader can drag six times and change
+  // their mind before pressing Save.
+  private attachDrag(row: HTMLElement, id: string): void {
+    // `bandOf` already makes a fixed row an impossible drop, so the drag would
+    // fail on release rather than be accepted. That is one failure too late:
+    // `draggable = true` is a promise the cursor makes before the reader has
+    // committed to anything, and letting them lift a row that cannot land is
+    // the same class of lie as a refusal that offers a move (3.2 §4).
+    if (this.view(id)?.movable === false) return;
+    row.draggable = true;
+    row.addEventListener("dragstart", (e) => {
+      this.dragging = id;
+      row.addClass("is-dragging");
+      e.dataTransfer?.setData("text/plain", id);
+    });
+    row.addEventListener("dragend", () => {
+      this.dragging = null;
+      row.removeClass("is-dragging");
+    });
+    row.addEventListener("dragover", (e) => {
+      // Only inside the band. A row in another band is not a drop target at
+      // all, so the gesture reports "no" the way every other drag does rather
+      // than accepting the drop and then explaining itself.
+      if (!this.dragging || this.dragging === id) return;
+      if (!this.bandOf(id).includes(this.dragging)) return;
+      e.preventDefault();
+      row.addClass("is-drop-target");
+    });
+    row.addEventListener("dragleave", () => row.removeClass("is-drop-target"));
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      row.removeClass("is-drop-target");
+      const from = this.dragging;
+      this.dragging = null;
+      if (!from || from === id || !this.bandOf(id).includes(from)) return;
+      // Lifted out and re-inserted at the target's slot, so dragging a row
+      // three places up moves it three places rather than swapping it with
+      // whatever happened to be there. Restricted to one band throughout: both
+      // indices are read after the removal, from the same list.
+      const rest = this.rows.filter((x) => x !== from);
+      rest.splice(rest.indexOf(id), 0, from);
+      this.rows = rest;
+      this.refreshFrame();
+    });
+  }
+
+  private renderAdd(host: HTMLElement): void {
+    // A REPEATABLE WIDGET STAYS OFFERED (4.15 §4). Everything else drops out of
+    // this list the moment it is staged, because there is one of it and the
+    // reader has it. A widget a page may hold several of is the one case where
+    // "you already added this" is not a reason to stop offering it — and the
+    // flag is the model's, so this window still does not know what makes one.
+    const absent = this.model
+      .addable(this.spec.text)
+      .filter((s) => s.repeatable || !this.rows.includes(s.id));
+    if (!absent.length) return;
+
+    // THE CATALOGUE'S OWN SECTIONS FIRST, THEN THE WIDGETS (4.12 §C).
+    //
+    // A PAGE OFFERS TWO OR THREE OF ITS OWN AND ABOUT TWENTY-FIVE WIDGETS, and a
+    // flat list of twenty-eight buries the two the page was designed around under
+    // an alphabet of things it merely permits.
+    //
+    // PARTITIONED ON THE ID, WHICH IS THE ONE THING THIS WINDOW LEARNS ABOUT
+    // KINDS. It is a real departure from `SectionView`'s discipline and it is the
+    // smallest available one: the predicate is imported from the model layer
+    // rather than spelled here, the way `questionIsRequired` and `optionsFor`
+    // already are, so the rule has one home and this file does not know what
+    // makes an id a widget. The alternative was a `family` field on
+    // `SectionView` that three of the four models would never set.
+    const own = absent.filter((s) => !isPageWidgetId(s.id));
+    const widgets = absent.filter((s) => isPageWidgetId(s.id));
+
+    // A SUGGESTER, NOT A `<select>` (4.15 §3).
+    //
+    // WHAT THE `<select>` COULD NOT DO IS DRAW THE SENTENCE. Every section
+    // carries a `blurb` — one line saying what it puts on the page, in the
+    // reader's words — and `WidgetSpec.blurb`'s own comment says it is written
+    // for `DetailedChoice.description` and for the row. This control showed
+    // neither: twenty-eight entries of glyph and label, where "Entry rollup",
+    // "Entry timeline" and "Period recap" are three names for things a reader
+    // has no way to tell apart.
+    //
+    // IT WAS ADEQUATE WHEN IT WAS WRITTEN and stopped being so without being
+    // touched. It was a list of the two or three sections a catalogue declared;
+    // 4.12 §C made every page widget addable and multiplied it by ten, and the
+    // partition above was added in that release to cope — a label over a list
+    // that had outgrown the control it was in.
+    //
+    // AND `addSectionHere` HAS SHOWN THE BLURB ALL ALONG, through this exact
+    // modal, searching it too. `section-insert.ts` states the rule that makes
+    // that a defect rather than a difference: "One command knowing something
+    // its neighbour does not is the drift that keeps costing a release." Two
+    // routes to one write now use one control.
+    const row = host.createDiv({ cls: "almanac-tpl-add" });
+    const button = row.createEl("button", { text: "Add a section…" });
+    button.addEventListener("click", () => {
+      void this.promptAdd([...own, ...widgets], widgets.length > 0);
+    });
+  }
+
+  // The add prompt, and where what it returns lands.
+  private async promptAdd(
+    choices: readonly SectionView[],
+    grouped: boolean
+  ): Promise<void> {
+    const chosen = await promptDetailedSuggester(
+      this.app,
+      choices.map((s) => ({
+        value: s.id,
+        label: `${s.icon} ${s.label}`,
+        description: s.blurb,
+        // THE HEADING ONLY WHERE THERE IS SOMETHING TO SEPARATE. A page whose
+        // widgets are all present already offers its own sections alone, and
+        // "Sections" over an undivided list names a distinction that is not on
+        // screen.
+        ...(grouped
+          ? { group: isPageWidgetId(s.id) ? "Widgets" : "Sections" }
+          : {}),
+      })),
+      "Add a section…"
+    );
+    if (!chosen) return;
+    // THE ID TO STAGE IS THE MODEL'S TO SAY (4.15 §4). For a repeatable widget
+    // the offered id is whichever instance was free when the list was built, and
+    // a reader adding a third card in one session has already claimed it — so
+    // the model is asked for one nothing holds, given what this window holds.
+    // The window never learns how an instance id is spelled.
+    const view = this.model
+      .addable(this.spec.text)
+      .find((s) => s.id === chosen);
+    const id =
+      view?.repeatable && this.model.instanceOf
+        ? this.model.instanceOf(chosen, this.spec.text, this.rows)
+        : chosen;
+    // Appended to the END OF ITS OWN BAND, then nudgeable. Guessing a
+    // position from the catalogue would be right often enough to be annoying
+    // when it wasn't, and the reader is two clicks from where they want it —
+    // but a new section still has to land on the correct side of the rule,
+    // and its band is the only thing that says which that is.
+    const band = this.view(id)?.group ?? null;
+    const last = this.rows
+      .map((row, i) => ({ i, g: this.view(row)?.group ?? null }))
+      .filter((r) => r.g === band)
+      .pop();
+    const at = last ? last.i + 1 : this.rows.length;
+    this.rows = [...this.rows.slice(0, at), id, ...this.rows.slice(at)];
+    this.refreshFrame();
+  }
+
+  // ── the panes ─────────────────────────────────────────────────────────
+
+  private renderChanges(pane: HTMLElement): void {
+    const ops = this.ops();
+    if (!ops.some((o) => o.kind !== "keep")) {
+      pane.createDiv({
+        cls: "almanac-tpl-empty",
+        text: "No changes — this file already has exactly these sections.",
+      });
+    }
+    for (const op of ops) {
+      const row = pane.createDiv({
+        cls: `almanac-tpl-op almanac-tpl-op-${op.kind}`,
+      });
+      const mark =
+        op.kind === "add"
+          ? "＋"
+          : op.kind === "remove"
+            ? "－"
+            : op.kind === "move"
+              ? "↕"
+              : op.kind === "extend"
+                ? "⊕"
+                : op.kind === "regroup"
+                  ? "▥"
+                  : op.kind === "foreign"
+                    ? "⚠"
+                    : "";
+      row.createSpan({ cls: "almanac-tpl-op-mark", text: mark });
+      row.createSpan({ cls: "almanac-tpl-op-label", text: op.label });
+      row.createSpan({ cls: "almanac-tpl-op-detail", text: op.detail });
+    }
+  }
+
+  private renderMarkdown(pane: HTMLElement): void {
+    // The bytes, and it cannot fire a button. A live rendered preview would
+    // need every widget's action stubbed — a second render path through
+    // widgets.ts, which is a parallel implementation of the thing being
+    // previewed.
+    const next = this.model.apply(this.spec.text, this.want);
+    pane.createEl("pre", {
+      cls: "almanac-editor-mono almanac-tpl-md",
+      text: next ?? this.spec.text,
+    });
+  }
+
+  private renderLayout(pane: HTMLElement): void {
+    let band: string | null | undefined;
+    // IDS, because this pane draws the SHAPE of the note — which blocks, in
+    // which bands, in which order — and an answer changes what a block says
+    // rather than whether it is there or where it sits.
+    //
+    // AND A ROW IS DRAWN AS ONE, side by side (4.8 §2). This pane's whole job
+    // is the shape, and a block holding three widgets across the page drawn as
+    // three stacked bars is the one thing on screen that would still be lying
+    // about it.
+    for (const group of this.groupsOf(idsOf(this.want))) {
+      const first = this.view(group[0]);
+      if (!first) continue;
+      if (first.group !== undefined && first.group !== band) {
+        band = first.group;
+        if (band) pane.createDiv({ cls: "almanac-tpl-band", text: band });
+      }
+      const host =
+        group.length > 1
+          ? pane.createDiv({ cls: "almanac-wizard-row" })
+          : pane;
+      for (const id of group) {
+        const s = this.view(id);
+        if (!s) continue;
+        const block = host.createDiv({ cls: "almanac-wizard-block" });
+        block.createSpan({ cls: "almanac-wizard-block-icon", text: s.icon });
+        block.createSpan({ cls: "almanac-wizard-block-label", text: s.label });
+      }
+    }
+  }
+
+  // ── footer ────────────────────────────────────────────────────────────
+
+  protected renderFooter(footer: HTMLElement): void {
+    const cancel = footer.createEl("button", { text: "Cancel" });
+    cancel.addEventListener("click", () => this.close());
+
+    // SAVE THE ARRANGEMENT — what is on screen, kept under a name.
+    //
+    // The one place an arrangement is persisted, and the reason it is allowed
+    // to be: it is a recipe for a note that does not exist yet, so there is no
+    // file to be the record. Once that file has been written, it is the truth
+    // and this window edits it like any other. The stored arrangement is only
+    // ever the seed.
+    //
+    // Reads the rows rather than the file, so a reader can arrange, save the
+    // arrangement under a name, and leave this file untouched — which is the
+    // common case: you want the variant, not the change.
+    const sink = this.spec.arrangement;
+    if (sink) {
+      const b = footer.createEl("button", { text: sink.buttonLabel });
+      b.addEventListener("click", () => void this.saveArrangement(sink));
+    }
+
+    const n = this.changeCount();
+    const save = footer.createEl("button", {
+      text: n === 0 ? "No changes" : `Save ${n} change${n === 1 ? "" : "s"}`,
+      cls: "mod-cta",
+    });
+    save.disabled = n === 0;
+    save.addEventListener("click", () => void this.trySubmit());
+  }
+
+  private async saveArrangement(sink: ArrangementSink): Promise<void> {
+    // THE NAME AND WHERE IT APPLIES ARE ONE DECISION, so they are one window —
+    // `promptNewNote`'s rule, and the reason this is not a name prompt followed
+    // by a second modal a reader can cancel half-way through. With one target
+    // the kind list is not drawn and this is the name prompt it has always been.
+    const targets = sink.targets ?? [];
+    const origin = sink.originTarget ?? targets[0]?.id ?? "";
+    const details = await promptLayoutSave(
+      this.app,
+      sink.promptTitle,
+      sink.promptPlaceholder,
+      targets,
+      origin
+    );
+    const label = details?.label;
+    if (!label?.trim()) return;
+    // IDS, NOT CHOICES, and `ArrangementSink.save` still says so in its type.
+    // An arrangement is a recipe for a note that does not exist yet and is
+    // named by ids for the reason `SectionChoice`'s header gives: an id is
+    // stable and its options are not part of it, so a stored arrangement must
+    // not start disagreeing with the catalogue the day a reader renames a
+    // journal kind. The one surface with a sink is the journals', whose
+    // sections ask nothing — so nothing is dropped here today, and the day one
+    // does, the honest thing is to widen the sink rather than to have this
+    // window quietly store half an answer.
+    await sink.save(label.trim(), idsOf(this.want), details!.kinds);
+    this.close();
+  }
+
+  protected validate(): string | null {
+    return this.changeCount() === 0 ? "Nothing to save." : null;
+  }
+
+  protected async commit(): Promise<void> {
+    // RE-READ, rather than writing back the copy taken when the window opened.
+    // section-insert.ts learned this one first: "a suggester is modal but not
+    // instantaneous, and writing a stale body back would silently drop anything
+    // that arrived from sync in between". A window a reader can leave open is a
+    // much longer gap than a suggester — and on a diary entry the thing that
+    // would be dropped is a day's writing.
+    const current = await this.app.vault.read(this.spec.file);
+    if (current !== this.spec.text) {
+      new Notice(
+        "Almanac: this file changed while the window was open — nothing was written. Reopen it to see the current sections."
+      );
+      return;
+    }
+
+    const next = this.model.apply(current, this.want);
+    // THE SECTIONS FIRST, THEN THE BLOCKS THEY SIT IN. 4.8 §2.3.
+    //
+    // Two passes over the text rather than one operation that does both, and
+    // that is the design rather than a compromise. `apply` decides WHICH
+    // sections the note has and in what order, over whole blocks; `regroup`
+    // decides which of them share a block, by moving lines between the blocks
+    // `apply` left behind. Neither knows about the other, both return null for
+    // "nothing to do", and each is a reconciler on its own.
+    //
+    // ONE WRITE. The reader pressed Save once.
+    const base = next ?? current;
+    const regrouped = this.hasRows
+      ? this.model.regroup?.(base, this.groupsOf(idsOf(this.want))) ?? null
+      : null;
+    const final = regrouped ?? next;
+    if (final === null) {
+      new Notice("Almanac: nothing to change.");
+      return;
+    }
+
+    await this.app.vault.modify(this.spec.file, final);
+
+    const kept = this.ops().flatMap((o) => o.keepsContent ?? []);
+    const keptLines = kept.reduce((n, k) => n + k.lines, 0);
+    new Notice(
+      keptLines > 0
+        ? `Almanac: ${this.spec.file.basename} updated — kept ${keptLines} line${
+            keptLines === 1 ? "" : "s"
+          } of your text ✅`
+        : `Almanac: ${this.spec.file.basename} updated ✅`
+    );
+    this.spec.onSaved?.();
+  }
+}
+
+// Open the editor on a file whose model the caller has already resolved.
+//
+// Returns false when the path is not a file, so the caller can say so in its
+// own words — the refusal a command owes a reader is longer than the one a
+// settings row does, and neither of them is this function's to write.
+export async function openSectionEditor(
+  app: App,
+  plugin: AlmanacPlugin,
+  path: string,
+  spec: Omit<SectionEditorSpec, "file" | "text">
+): Promise<boolean> {
+  const file = getFile(app, path);
+  if (!file) return false;
+  const text = await app.vault.read(file as TFile);
+  new SectionEditorModal(app, plugin, {
+    ...spec,
+    file: file as TFile,
+    text,
+  }).open();
+  return true;
+}

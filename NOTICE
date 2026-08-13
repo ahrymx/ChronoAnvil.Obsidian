@@ -1,0 +1,133 @@
+Almanac
+A self-contained journaling and study-journal system for Obsidian.
+
+Originally developed by AhryMX.
+Copyright (c) 2026 AhryMX <contact@ahrymx.dev>
+
+https://github.com/AhryMX/Almanac.Obsidian
+
+
+===========================================================================
+LICENSING
+===========================================================================
+
+Almanac is licensed under the GNU Affero General Public License, version 3 or
+later (AGPL-3.0-or-later), with additional attribution and naming terms under
+its section 7. The full text of both is in LICENSE.
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+Fork freely, but pick your own name: section 7 of the LICENSE bars use of
+"Almanac" or "AhryMX" for publicity or in a way implying endorsement. See
+LICENSING.md for a plain-English explanation of what you may do.
+
+
+===========================================================================
+IF YOU REDISTRIBUTE THIS SOFTWARE
+===========================================================================
+
+Under the licence you must:
+
+  - keep this NOTICE file and the LICENSE file with the copy you
+    distribute;
+  - preserve every copyright, attribution and licence notice, in the source,
+    in the compiled main.js, and in the user interface;
+  - credit "Almanac, originally developed by AhryMX" in the documentation or
+    about information of the distributed copy;
+  - preserve the third-party notices reproduced below.
+
+Under the AGPL-3.0 these are additional terms under section 7, and they are
+binding — see the ADDITIONAL TERMS block at the top of LICENSE for the exact
+wording. In summary: keep the attribution, do not misrepresent the origin,
+mark a modified version as different, and do not use the project's names as
+your own product's name.
+
+Under the AGPL-3.0 you must additionally:
+
+  - state prominently that the copy has been modified, if it has;
+  - license your version, as a whole, under the AGPL-3.0;
+  - make the complete corresponding source available to every recipient,
+    including to users who interact with it remotely over a network.
+
+
+The name "Almanac" and the name "AhryMX" are not licensed for use as the name
+of your product, nor in any way suggesting endorsement. Factual attribution of
+origin is expected and permitted.
+
+
+===========================================================================
+THIRD-PARTY COMPONENTS
+===========================================================================
+
+The distributed main.js is a bundle. It contains, in addition to Almanac's own
+code, the following third-party components. Each is used under the MIT licence,
+which is compatible with both of Almanac's licensing tracks. Their notices are
+preserved inside main.js and are reproduced here. Almanac's licences do not
+extend to this code; your rights in it come from its own licence.
+
+---------------------------------------------------------------------------
+Chart.js v4.5.1
+https://www.chartjs.org
+Copyright (c) 2014-2025 Chart.js Contributors
+Licensed under the MIT licence.
+---------------------------------------------------------------------------
+@kurkle/color v0.3.4
+https://github.com/kurkle/color
+Copyright (c) 2018-2024 Jukka Kurkela
+Licensed under the MIT licence.
+---------------------------------------------------------------------------
+js-yaml v5.2.1
+https://github.com/nodeca/js-yaml
+Copyright (c) 2011-2015 Vitaly Puzrin
+Licensed under the MIT licence.
+---------------------------------------------------------------------------
+
+The MIT licence, applying to each of the above:
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+
+Obsidian itself is not bundled and is not covered by this notice. Almanac
+compiles against the `obsidian` API types, which are supplied by Obsidian and
+are external to the build.
+
+
+===========================================================================
+LICENSING HISTORY
+===========================================================================
+
+Almanac's licensing has changed over its life. Rights already granted under an
+earlier licence, for the versions distributed under it, are not withdrawn by a
+later change.
+
+  - Early releases            MIT License
+  - Interim releases          Almanac.Obsidian Personal Use License, Version 1.0
+                              (source-available, non-commercial; superseded)
+  - Current, from 2.56.25     AGPL-3.0-or-later, with section 7 attribution
+                              and naming terms
+
+If you are relying on rights granted by an earlier licence, those rights attach
+to the versions that were distributed under it, not to this one.
+
+
+===========================================================================
+CONTACT
+===========================================================================
+
+Use of the name, and anything else:       contact@ahrymx.dev
+Contribution terms:                       see CONTRIBUTING.md

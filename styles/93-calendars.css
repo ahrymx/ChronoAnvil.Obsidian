@@ -1,0 +1,2333 @@
+/* ── 5. Diary / year calendars ─────────────────────────────── */
+.journal-calendar {
+  padding: 12px 14px 10px;
+  margin: 0.5em 0 1.5em;
+}
+/* ── The actions strip (4.13.1 §3) ──────────────────────────────────────
+ *
+ * What the card opens with when it is a diary SECTION rather than a bare grid:
+ * Open today, Yesterday, Capture, and the two links that are not a calendar
+ * period. `.jc-diary-header` — an accent-washed band with a greeting, a status
+ * line and four numbers — stood here until this release; 60-heroes-and-banners
+ * .css and `src/diary/diary-header.ts` are the account of why it does not.
+ *
+ * THE THIRD COPY OF ONE STRIP, AND IT READS THE SAME FOUR VALUES.
+ * `.journal-group-foot` and `.journal-sec-l1`'s actions bar are the same object
+ * at two scales (4.11): right-aligned, 4px of air, a hairline, at the bar's
+ * scale. This is that object opening a card instead of closing a header, which
+ * is the whole of why the hairline is on the BOTTOM here and on the top there.
+ *
+ * NOT FULL-BLEED, for `.journal-sec-l1`'s reason: the bar above it on a
+ * dashboard already rules edge to edge, and two edge-to-edge hairlines 22px
+ * apart read as a banded table. */
+/* ONE AT EACH END, AS OF 4.13.3. The strip was right-aligned, which is what an
+   actions strip does when it holds a cluster of controls that all act on the
+   same thing. It holds two that do not: Capture WRITES, and Search NAVIGATES.
+   Pushed together at one end they read as a pair and the eye has to tell them
+   apart by their words; at opposite ends the strip says there are two kinds of
+   thing here before either is read.
+   `space-between` rather than an `auto` margin on the links row, because with
+   `flex-wrap` a wrapped row has to put each survivor at its own end — an auto
+   margin distributes free space and would strand a lone control mid-line. */
+.jc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  padding-bottom: 4px;
+  margin-bottom: 10px;
+  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+}
+/* The strip's scale is the section strip's, and it is one declaration rather
+   than a copy of the type ramp: 30-header-bars.css sizes a bar's buttons down at
+   `--am-text-2xs`, and a strip that is the same object has to be the same size
+   or the page has two kinds of strip again — which is the fault 4.11 fixed and
+   this one must not reintroduce. */
+.jc-actions .journal-btn {
+  font-size: var(--am-text-2xs);
+  padding: var(--am-space-1) var(--am-space-5);
+  gap: 4px;
+}
+/* The header is the period navigator: a year rail over a month row, closed by a
+   hairline so the rows read as one control band above the grid. Full-bleed to
+   the card edges (the card carries 14px of horizontal padding, cancelled here
+   and re-applied inside, as .jc-agenda does).
+ *
+ * NO RECESS AS OF 4.13.1 §3b, and the argument is `.journal-overview-banner`'s,
+ * arrived at three releases later on the widget that made the comparison
+ * unavoidable. This band carried `--am-band-recess` because the stats band above
+ * it did and the two were one instrument panel; the stats band is gone, so what
+ * was left was a single sunk strip under a card's own ground, on a page where
+ * the section eight pixels below draws its banner with no fill at all. The
+ * hairline was always what closed the panel against the grid. It still does, and
+ * it does it alone. */
+.jc-header {
+  margin: 0 -14px 12px;
+  padding: 2px 14px 13px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* ── Nav head: the year as the card's title ──────────────────────────────
+   2.26 retired the three-year rail and the `‹ July ›` month stepper below it.
+   The rail spent a whole row on two links you rarely take, and the stepper
+   became redundant the moment every month sat one tap away in the quarter rail.
+   What's left is a title: chevrons stepping the year, the year itself opening
+   The Year, and Today pinned right. No pill on the year — a filled segment at
+   this size reads as a floating object rather than as the page's heading. */
+/* Three columns: spacer, year stepper, Today. See the note in calendar.ts for
+   why this is a grid and not a centred flex row with an absolutely positioned
+   Today — the short version is that absolute positioning let the two clusters
+   occupy the same pixels once the row got narrow, and printed Today over the
+   year. Nothing here is out of flow, so that is no longer reachable. */
+.jc-navhead {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  margin: 0 0 13px;
+}
+/* ── The stepper pill (2.51.4) ────────────────────────────────────────────
+   Three loose buttons become one segmented control. They were already one
+   thing — step back, open, step forward, all operating on the year — but drawn
+   as a chevron, a word and a chevron floating 4px apart, which reads as a
+   label with decoration either side rather than as an instrument. Joined
+   inside a single pill and divided by hairlines, the two chevrons stop being
+   ornament and start being the ends of a control, and the year in the middle
+   is visibly a third segment you can press rather than the caption they
+   decorate.
+
+   Still centred, still the grid's middle column: this changes what the
+   navigator looks like, not where it sits, so the `1fr auto 1fr` reasoning in
+   calendar.ts survives intact. */
+.jc-yearnav {
+  grid-column: 2;
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  overflow: hidden;
+  /* A shade above the recessed band it sits on, so the pill reads as a control
+     resting on the navigator rather than a hole cut into it. */
+  background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+}
+.journal-calendar .jc-year-cur {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  /* rem, not the em-derived --am-text-lg: this segment sets the pill's height,
+     and the pill has to keep its proportions against a Today button and a rail
+     that are sized in rem beside it. */
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  height: auto;
+  margin: 0;
+  padding: 4px 14px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.journal-calendar .jc-year-cur:hover {
+  background: var(--background-modifier-hover);
+  color: var(--interactive-accent);
+}
+/* Faint at rest, full on hover: present enough to say the year is a door,
+   quiet enough not to compete with the figure it follows. */
+.jc-year-cur-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-faint);
+  transition: color 0.15s;
+}
+.jc-year-cur-icon svg {
+  width: 13px;
+  height: 13px;
+}
+.journal-calendar .jc-year-cur:hover .jc-year-cur-icon {
+  color: var(--interactive-accent);
+}
+.journal-calendar .jc-year-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  /* Stretches to the pill's height, set by the year segment beside it, so the
+     dividers run the full height rather than stopping short. */
+  height: auto;
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.journal-calendar .jc-year-step:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.jc-year-step svg {
+  width: 17px;
+  height: 17px;
+}
+/* The segment dividers. Last, and at the same specificity as the rules above,
+   so it beats their `border: none` on source order — those have to clear the
+   host's border before this can draw the one we want. */
+.journal-calendar .jc-yearnav > * + * {
+  border-left: 1px solid var(--background-modifier-border);
+}
+.jc-navhead .jc-today-btn {
+  grid-column: 3;
+  justify-self: end;
+}
+
+/* ── Quarter rail (2.51) ─────────────────────────────────────────────────
+   Twelve months in four bounded groups, the group holding the shown month
+   lit.
+
+   This reverses the shape 2.26 shipped, and the reversal is deliberate rather
+   than drift. That rail was four hairline-separated groups on the 2.18.2
+   argument — a row of detached bordered objects reads as floating pieces, one
+   surface with internal rules reads as an instrument. The argument holds for
+   what it was about: *detached* objects, each its own island. It does not
+   describe this, which is one rail whose four segments abut, share an outer
+   edge, and light one at a time. That is a segmented control, and a segmented
+   control is exactly the instrument the old note was reaching for.
+
+   What the hairlines couldn't do was say which quarter you're in. The Q label
+   took the accent for that and it was never enough — an eight-pixel word at
+   the left edge of a group is not how a region is marked.
+
+   TWO TINTS, NESTED, SO THEY ARE PITCHED APART. The selected month cell inside
+   the lit group is accent at 16%; the group is accent at 7%. They are not two
+   weights of the same signal but a container and the thing selected inside it,
+   so the gap between them has to survive both themes — if the group ever
+   creeps up to the cell's value the month stops reading as the selection and
+   the rail says only "somewhere in here". Both are color-mix — the month cell
+   was converted in the same release, for the reason in the note there. */
+/* ONE FRAME, FOUR SEGMENTS — not four framed boxes. 2.51.0 gave each group its
+   own border and a gap between them, and that is precisely the shape the note
+   above warns about: four detached bordered objects reading as pieces rather
+   than as an instrument. The border belongs to the rail; the divisions belong
+   to the segments. That is what makes a segmented control one object, and it is
+   what the paragraph above was actually describing. */
+/* ── Out-specificity-ing the host's button styles (2.51.3) ────────────────
+   Obsidian styles `button` from its own stylesheet — a fill, a border, a
+   radius, padding, and `box-shadow: var(--input-shadow)` — and it does so from
+   a descendant selector scoped to rendered markdown, not a bare element one.
+   That is specificity 0,1,1. Every rule in this section addressed its button by
+   a single class, which is 0,1,0, so the host won every property the plugin did
+   not happen to override — and, being higher specificity rather than merely
+   later, it won regardless of which stylesheet loads last.
+
+   Two symptoms, one cause. The month cells kept the host's fill, border and
+   shadow, so a rail meant to read as one instrument with twelve segments read
+   as twelve pills in a box. And the week chips inherited the host's padding and
+   fixed height, which is the same collision the .cal-week note below already
+   records — worked around there by stating the height, which fixed the height
+   and left everything else.
+
+   So the button rules in this section are scoped with `.journal-calendar `,
+   taking them to 0,2,0. Every calendar root in calendar.ts carries that class,
+   the embedded month and year grids included, so the scope excludes nothing.
+   Controls that want chrome — the Today pill's border — restate it themselves
+   at the same specificity.
+
+   Adding a class is a blunt instrument and the right one here: the alternatives
+   are `!important` on a dozen properties, or a bare-element reset that would
+   also catch buttons this file has never heard of. */
+.journal-calendar .jc-today-btn {
+  box-shadow: none;
+}
+
+/* GRID, NOT FLEX, AND THE REASON IS THE NARROW PANE. As a flex row the four
+   groups shrink together: there is no width at which the rail wraps, so on a
+   phone-width pane the three month names inside each group are squeezed until
+   `Jan Feb Mar` is unreadable, and the rail degrades into twelve illegible
+   stubs while still occupying one line. Four equal grid tracks reflow instead —
+   two over two at 460px, each group keeping its label and its three months at
+   full size. One rail becomes two stacked rails inside the same frame.
+
+   The frame stays one object either way, which is the whole of the 2.51.1
+   argument above: the border belongs to the rail, the divisions belong to the
+   segments. In the two-up configuration the divisions are simply a cross rather
+   than three verticals.
+
+   TWO-UP AT EVERY WIDTH, as of 2.51.3. 2.51.2 shipped four-across and dropped
+   to two only under 460px, which meant the wide rail spent about a quarter of
+   its width on four `Q` segments and left each month roughly 44px — legible,
+   but with nothing to spare, and the card read as tight. Two-up gives each
+   month around 72px on the same card for the price of one 34px row, and the
+   row is the cheapest thing on this surface: the navigator already had the
+   height when the labels sat above their months before 2.51.2.
+
+   The second thing it buys is one layout instead of two. A rail that is
+   four-across on a wide pane and two-up on a narrow one is two shapes to hold
+   in your head and two to keep working; this is the same shape everywhere and
+   simply gets narrower. The `@container` rule 2.51.2 added here is gone with
+   it — there is no longer a width at which anything changes. */
+/* ── AND IT IS NOT A FRAMED CONTROL ANY MORE (4.13.1 §3b) ────────────────
+   Everything above describes a segmented control: one frame, four segments, a
+   cross of hairlines inside it, and a wash on the lit quarter. It is the right
+   design for the object it describes and it is not the object this card wants to
+   be. `month-summary` — the same kind of card, on the same page — draws a
+   banner, a rule and a grid, and the diary calendar was answering it with a
+   boxed instrument in the middle of its own body.
+   So the rail loses its frame, its corners, its vertical divisions and its lit
+   wash, and keeps the ONE horizontal rule that says where the second row of
+   quarters begins. What is lost with the wash is a second saying of the selected
+   month, which the month cell itself says at 16% accent and says better — the
+   note above these rules is explicit that the pair are "a container and the
+   thing selected inside it", pitched apart so the container is the quieter. The
+   quieter of two signals is the one a subtraction takes. */
+/* ── THE FRAME COMES BACK, AND ONLY THE FRAME (4.14 §1) ──────────────────
+   4.13.1 §3b took off four things in one move — the frame, the corners, the
+   vertical divisions and the lit wash — because together they made a segmented
+   control. 4.13.6 §3 put the vertical divisions back when the label stacked over
+   its months, on the ground that nothing else marked where a quarter began. This
+   puts the frame back, and it is worth being exact about why that is not simply
+   undoing the release before last.
+
+   THE OBJECT CHANGED UNDER THE ARGUMENT. What 4.13.1 refused was a boxed
+   INSTRUMENT sitting in the middle of a card made of bands — a control with a
+   lit segment, competing with the grid below it. What is here now is a TABLE:
+   four cells in a 2x2, each with a header over its content, ruled by a cross.
+   A table's outer edge is not ornament, it is the fourth and first rule of a
+   grid that already has the second and third; without it the outermost months
+   are open on two sides and the cross reads as two stray lines rather than as
+   division. The frame was wrong on a control and is structural on a table.
+
+   AND IT IS DRAWN AT THE DAY GRID'S WEIGHT, not the card's. Measured off the
+   4.13.8 render: the cross was `--background-modifier-border` (#333333) on a
+   #282828 card, a 2.4% step in lightness — the structure 4.13.6 built was in
+   the stylesheet and not on the screen. `--background-modifier-border-hover`
+   (#3a3a3a) is what `.cal-cell`'s ring already resolves to one section below,
+   so the two halves of the card are now ruled alike rather than the rail being
+   the quiet one for no reason anybody chose. */
+.jc-qrail {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  border: 1px solid var(--background-modifier-border-hover);
+  border-radius: var(--am-radius-sm);
+  /* The corners have to clip, or the four groups' own edges square off the two
+     the radius just rounded. */
+  overflow: hidden;
+}
+/* A CELL: THE QUARTER IS ITS HEADER, THE MONTHS ARE ITS CONTENT (4.13.6 §3).
+ *
+ * THIS REVERSES "ONE ROW, NOT TWO", AND BOTH ARGUMENTS ARE WORTH KEEPING. The
+ * label was a full-width block above its months until 2.51; that was replaced by
+ * a leading segment on the argument that a stacked label "spent a whole line of
+ * the card on four eight-pixel words and left dead space either side of each",
+ * where a leading segment "costs no height at all".
+ *
+ * IT COSTS WIDTH INSTEAD, AND WIDTH IS THE SCARCE ONE. Each row of the rail was
+ * eight columns — six months and two labels at a `2.9rem` floor apiece — and the
+ * rail is the widest fixed object on the diary card. On a phone it is the thing
+ * that overflows. Stacked, a row is six columns; the ~93px the two labels held
+ * goes to the months, and the height it costs is one 18px band per row.
+ *
+ * AND THE DEAD SPACE THE OLD ARGUMENT WORRIED ABOUT IS WHAT MAKES IT READ AS A
+ * CELL. `Q3` is not a caption floating over three months once there is a
+ * hairline under it and one beside it: it is a header over its content, which is
+ * what it has always meant. The rail becomes four such cells in a 2x2, divided
+ * by a cross — which is also the answer to the second half of the report, that
+ * the rail has no bordering at all.
+ *
+ * `column`, NOT A GRID. The group already holds exactly two children in the
+ * right order, and a `flex-direction` swap is the whole change — the label's
+ * `align-self: stretch` goes on meaning "fill the cross axis" and simply fills a
+ * different one. */
+.jc-qgroup {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+  background: transparent;
+}
+/* THE CROSS, RESTORED (4.13.6 §3). 4.13.1 §3b took the rail's frame off and kept
+   only the horizontal half of this, on the argument that "a line between Q1 and
+   Q2 was dividing two things a whole row of months already separates". That was
+   true while the label sat at the head of the row and marked where a group
+   began. Stacked, nothing does: Q1's three months and Q2's three months are six
+   equal cells in a line, and the only thing saying where one quarter ends is the
+   label two rows up. So the vertical half comes back, and the two together are
+   what makes each quarter read as a cell rather than as a caption over a share
+   of one long strip.
+   `nth-child(2n)` — the rail is a two-column grid, so the even groups are the
+   ones with a neighbour to their left. */
+.jc-qgroup:nth-child(n + 3) {
+  border-top: 1px solid var(--background-modifier-border-hover);
+}
+.jc-qgroup:nth-child(2n) {
+  border-left: 1px solid var(--background-modifier-border-hover);
+}
+/* THE QUARTER LABEL IS THE CELL'S HEADER (4.14 §1), AND THIS REVERSES THE RULE
+   THAT IT SHOULD BE QUIET. It read "quiet by default, since the rail's job is
+   month navigation and the quarter is the secondary move" — and quiet was
+   delivered as SMALLER AND FAINTER THAN ITS OWN CONTENT: 11px `--text-faint`
+   over 12.8px `--text-muted`. That is not a header pitched down, it is a
+   caption, and 4.13.6 §3 had already stopped it being a caption structurally by
+   stacking it over its months and ruling it off. The type never followed.
+
+   SECONDARY IS ABOUT WHERE A CLICK GOES, NOT ABOUT SIZE. The quarter is still
+   the secondary move and still says so — by being one word against three, by
+   sitting in a band that holds nothing else, and by keeping `--text-muted` until
+   it is the current quarter. What it stops doing is competing DOWNWARD with the
+   thing it heads.
+
+   THE PAIR WITH `.cal-week` BREAKS HERE, and that is the cost. 4.13.1 §3b moved
+   the two together because "the two are the same kind of object — a key set off
+   from the things it indexes". They are not the same object any more: the week
+   chip is still a key beside a row, and this is a header over a cell's content,
+   with a rule under it and a rule beside it. One of them changed category, so
+   the pairing has to end rather than drag the other along. The week chip keeps
+   its transparent fill, and `test/appearance.test.ts` now pins the split. */
+.journal-calendar .jc-qlabel {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  /* ONE `font-size`, AS OF 4.14 §1. Two stood here — `--am-text-2xs` and then
+     the `0.6875rem` floor below it, which won — a leftover from the release that
+     added the floor without taking the em value out. */
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  /* A FLOOR, IN rem. Everything in this rail was sized from `em`: the label at
+     --am-text-2xs (0.7em) and the months at --am-text-xs (0.8em), both of a
+     button inside a note, so the segments came out at whatever the vault's font
+     size multiplied down to — visibly smaller than they were drawn, and smaller
+     on some vaults than others. Padding cannot fix that; padding is the part
+     that stays fixed while the text shrinks inside it. A rem minimum sets the
+     segment's size independent of the note, and the text is free to be
+     whatever the theme wants inside it. */
+  /* NO WIDTH FLOOR SINCE 4.13.6 §3. `min-width: 2.9rem` stood here to keep the
+     label a legible segment at the head of a row no matter what the vault's font
+     size did to it. Stacked, the label spans the group's full width — the floor
+     can only ever be smaller than what it gets, and leaving it in would say the
+     rail still has a horizontal budget for the label when the point of the
+     change is that it does not. The `rem` floor that mattered is on `.jc-mcell`,
+     which still shares a row with two others. */
+  /* LEFT-SET, NOT CENTRED (4.14 §1). A centred word over a row of three cells
+     lines up with nothing; set to the left it starts on the same x as the
+     group's first month and the band reads as that cell's head. */
+  justify-content: flex-start;
+  gap: 6px;
+  /* HEIGHT IS `auto` AND THE STRETCH IS ACROSS THE OTHER AXIS NOW. The rule below
+     was written for a flex ROW, where `align-self: stretch` filled the group's
+     height and the host's default button height defeated it. The group is a
+     COLUMN as of 4.13.6 §3, so the same two declarations fill the group's WIDTH
+     and let the band be as tall as its own text — which is the reason `height:
+     auto` has to stay: the host gives every button a height, and a definite one
+     would hold the band open past the 18px it needs. */
+  align-self: stretch;
+  height: auto;
+  font-size: 0.8125rem;
+  /* A BAND, NOT A LINE OF TEXT. 19px of header over a 42px row of months read as
+     a caption that had been squeezed in above them; 32px is the same floor the
+     months' own cells sit on, so the header is a row of the table rather than a
+     margin above one. */
+  min-height: 32px;
+  margin: 0;
+  padding: 8px 12px;
+  border: none;
+  /* THE HEADER/CONTENT DIVIDE, which is what makes this a cell rather than a
+     word sitting above three buttons. The same hairline the group's own two
+     edges draw, so the rail is ruled with one weight throughout. */
+  border-bottom: 1px solid var(--background-modifier-border-hover);
+  box-shadow: none;
+  /* A WASH, AS OF 4.14 §1 — AND IT IS NOT THE RECESS 4.13.1 §3b REMOVED. That
+     one was `--background-modifier-hover` at the head of each ROW of a framed
+     segmented control, and its fault was that it "reads as a button rather than
+     as a key": a filled patch beside three unfilled ones, all four of them
+     buttons, says press me. This fills a band that spans its cell and is ruled
+     off from it, where a wash says header — the same thing it says in every
+     table.
+     4% of `--text-normal` — the SAME VALUE `.jc-yearnav` already carries at the
+     top of this file, for the same reason stated the same way: "a shade above
+     the recessed band it sits on, so the pill reads as a control resting on the
+     navigator rather than a hole cut into it". This card had a house wash
+     already; the header takes it rather than inventing a second one.
+     A literal rgba would be a wash that only works on one theme;
+     `--background-secondary` would be a surface colour borrowed for a stripe,
+     and on themes that pitch it away from the card it is a different card
+     rather than a header. And it must stay well under
+     `--background-modifier-hover`, or the hover below has nothing left to say. */
+  background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+/* THE QUARTER'S TICK (4.14 §1), and a pseudo-element rather than a span: the
+   label already holds `.jc-qlabel-text` and the underline that says "this
+   quarter has an entry" has to land on that word alone (see 3.17 §2). A second
+   real child would be a second thing for that rule to miss.
+   IT REINFORCES `.is-current`, IT DOES NOT REPLACE IT. The word stays accent-
+   coloured. Two marks for one fact is usually a fault, and is not one here: this
+   is the only header on the card that is ever the current anything, the word is
+   three letters wide, and a hue shift on three letters is the weakest way a band
+   this size can say "you are in this one". The tick is a mark at a fixed 3x12px
+   that survives the reader's theme pitching `--interactive-accent` close to
+   `--text-muted`, which a coloured word does not. */
+.journal-calendar .jc-qlabel::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 3px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--background-modifier-border-hover);
+}
+.journal-calendar .jc-qlabel.is-current::before {
+  background: var(--interactive-accent);
+}
+/* THE DOOR, SAID ON HOVER. The label opens the Quarterly Overview and has never
+   said so anywhere but in its `title`. At rest it stays a header — a chevron on
+   all four would be four affordances competing with twelve months for the same
+   glance — so it appears only under the pointer or the focus ring.
+   The alt text is deliberately empty: `content` is announced by screen readers
+   in Chromium, and this glyph is decoration over a `title` that already says
+   "Open the Q3 2026 overview" in words. */
+.journal-calendar .jc-qlabel::after {
+  content: "\203A" / "";
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 1.1em;
+  line-height: 1;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.journal-calendar .jc-qlabel:hover::after,
+.journal-calendar .jc-qlabel:focus-visible::after {
+  opacity: 1;
+}
+/* A device with no pointer never gets the reveal, so the chevron rests visible
+   there — the same 0.45 the four other hover-revealed affordances in this sheet
+   rest at. Faint rather than full because on a phone all four headers show it at
+   once, and this is a hint about where a tap goes, not a control of its own. */
+@media (hover: none) {
+  .journal-calendar .jc-qlabel::after {
+    opacity: 0.45;
+  }
+}
+/* It is a door to the Quarterly Overview, so it takes a hover fill of its own
+   rather than only a colour change — at this size a text-colour shift alone is
+   not enough to say "this segment is the target, not the group". */
+/* One hover rule, not two: 2.51.3 added a fill beside the colour change the
+   rule already carried, in a second block a few lines below it. */
+.journal-calendar .jc-qlabel:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+/* The light-theme value of a fill that no longer exists went with it (4.13.1
+   §3b). A theme-specific override of a transparent background is a rule that can
+   only ever put the fill back on one theme. */
+.journal-calendar .jc-qlabel.is-current {
+  color: var(--interactive-accent);
+}
+.jc-qmonths {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  /* 6px and 3px as of 4.14 §1, up from 5px and 2px. The rail has a frame again
+     and each cell has a header band, so the months sit inside two edges rather
+     than floating between one and the card; a pixel on each side is what keeps
+     the ring `.is-selected` now draws off the cell's own border. */
+  gap: 3px;
+  padding: 6px;
+}
+.journal-calendar .jc-mcell {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* No `gap` since 3.9 §1: the cell holds one child. It held two — the label
+     and the review icon — and the gap was the space between them. */
+  font-size: var(--am-text-xs);
+  /* The same floor, on the other half of the rail — see .jc-qlabel above, and
+     the same `height: auto` for the same reason: these stretch inside
+     .jc-qmonths and cannot while the host's height stands.
+     2.25rem as of 4.14 §1: the header band above is a stated 32px, and a month
+     cell shorter than its own header is the inversion this release is undoing,
+     read at the other end. */
+  min-height: 2.25rem;
+  height: auto;
+  align-self: stretch;
+  margin: 0;
+  padding: 7px 0;
+  border: none;
+  border-radius: var(--am-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.journal-calendar .jc-mcell:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+/* A month that hasn't happened recedes — "not yet", not "you skipped it". */
+.journal-calendar .jc-mcell.is-future {
+  color: var(--text-faint);
+}
+/* Today's month, once you've navigated away from it, keeps a quiet ring so it
+   stays findable without competing with the selection. */
+.journal-calendar .jc-mcell.is-now {
+  box-shadow: inset 0 0 0 1px var(--background-modifier-border-hover);
+}
+/* The selected month is tinted, not merely underlined: with the month name
+   gone from the header this cell is the only thing on the card naming the
+   month the grid below belongs to, so it carries that weight alone.
+
+   color-mix as of 2.51, not `rgba(var(--interactive-accent-rgb, 130, 120,
+   255), 0.16)`. The old form carried a hard-coded fallback triple for a theme
+   that doesn't publish the -rgb variable, which meant that on such a theme the
+   selection was violet regardless of the accent it was supposed to be echoing.
+   The event tints have used color-mix since they were written; this is the one
+   accent wash that hadn't caught up.
+
+   AND IT IS THE ONLY ONE ON THE RAIL AS OF 4.13.1 §3b. It used to sit inside a
+   second wash — the lit quarter's, at 10% — which it had to stay clearly above:
+   "not two weights of the same signal but a container and the thing selected
+   inside it". The container's wash went with the rail's frame, and this one is
+   what the pair was always resting on. */
+/* AND IT GAINS AN EDGE (4.14 §1). Measured off the 4.13.8 render: the pixel at
+   this cell's boundary was #383149 on both sides — a flat tint and nothing else,
+   on a card where every other control is drawn with one. `.jc-mcell.is-now` one
+   rule above already rings itself at the border colour and today's day cell
+   rings itself in the accent; the selected month was the only state here saying
+   its piece in fill alone, which is the weakest channel at 16%. The ring is the
+   same construction `.is-now` uses, in the accent instead of the border, so the
+   two read as one idea at two strengths. */
+.journal-calendar .jc-mcell.is-selected,
+.journal-calendar .jc-mcell.is-selected:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+/* A month that already has an entry underlines its own name, so "which months
+   did I write up" is answerable without hovering twelve cells.
+                                                             3.9 §1.
+   THIS REPLACED A LUCIDE `notebook` AND FOUR OPACITY RULES. That icon was one
+   element carrying two meanings — an affordance at full opacity on the selected
+   cell's hover, a fact at 0.4 at rest — and it cost a fixed 12px in the cell
+   that is the whole width budget of the strip. See calendar.ts.
+
+   UNDERLINE RATHER THAN A DOT, A TINT OR A WEIGHT, by elimination:
+
+     - A dot is the calendar grid's vocabulary already (a day with an entry gets
+       one), and reusing it one row up for a MONTH would claim the two marks
+       mean the same thing at two zooms — which is the mistake this section is
+       about.
+     - A tint fights `.is-selected`, which owns this cell's background and needs
+       to keep owning it: with the month name gone from the header, the selected
+       cell is the only thing on the card naming the month below.
+     - A weight change is invisible next to `.is-now`, which is already one.
+
+   ONE RULE, NOT FOUR. The underline takes `currentColor`, so the selected
+   cell's accent and the future cell's faint grey are inherited rather than
+   restated — which is the property the icon's four opacity steps did not
+   have. */
+/* FOUR SCOPES, ONE MARK (3.17 §2). The rule above was written for the month
+   and stayed the month's alone for eight releases, while the card grew three
+   more doors beside it — the `Wk` gutter, the `Q` labels, the year figure —
+   each leading to a period that either has an entry or doesn't, and none of
+   them saying which. A mark that answers a question on one control and stays
+   silent on its three neighbours reads as decoration on the one, not as a
+   language.
+
+   It is the same declaration in all four places, on purpose. The underline
+   takes `currentColor` everywhere, so the selected month's accent, a future
+   month's faint grey, the week chip's muted figure and the year's full-strength
+   text are each inherited rather than restated — which is what lets one rule
+   cover controls that share no colour, no size and no shape.
+
+   OFFSET IS THE ONE THING THAT VARIES. 3px under a month label is a clear gap;
+   3px under the week chip's 0.7em figure would land on or past the chip's own
+   lower edge, since the chip is a fixed 1.625rem box with the number centred in
+   it. 2px keeps the rule inside the fill. */
+.jc-mcell.has-review .jc-mcell-label,
+.journal-calendar .jc-qlabel.has-review .jc-qlabel-text,
+.journal-calendar .jc-year-cur.has-review .jc-year-cur-label {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.journal-calendar .cal-week.has-review .cal-weeknum {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/* .jc-today-btn's rules live below, shared with .journal-btn-subtle, which
+   .jpn-now-btn (the Weekly/Monthly Overview's "This Week"/"This Month" button)
+   uses — both mean "jump to the current period" and shouldn't be an
+   accent-filled pill in one widget and a quiet outline in another. */
+/* THE SAME CORNER AND THE SAME SCALE AS EVERY OTHER BUTTON (4.13.1 §1). These
+   two were the last capsules on a dashboard: `--am-radius-pill` at
+   `--am-space-2` of vertical padding, which is a taller, rounder control than
+   the `.journal-btn` sitting beside it in the same strip. They take the control
+   corner and one step less padding, and the pair stays one rule — both mean
+   "jump to the current period" and telling them apart was never the point. */
+.journal-btn-subtle,
+.jc-today-btn {
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  padding: var(--am-space-1) var(--am-space-4);
+  border-radius: var(--am-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.journal-btn-subtle:hover,
+.jc-today-btn:hover {
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+  color: var(--text-normal);
+}
+/* When the view has been navigated off the current period, the button carries
+   the "you've moved away" cue, so the way back is what's highlighted. Shared by
+   .jc-today-btn (home calendar) and .jpn-now-btn (Weekly/Monthly Overview),
+   both meaning the same thing.
+   THE CUE IS WEIGHT, NOT HUE, as of 4.13.1 §1. It was an accent-tinted pill with
+   accent text and an accent edge — three sayings of one fact, in the one colour
+   this release is taking off the page's controls. A filled, full-contrast button
+   among outlined muted ones says the same thing and says it in the language the
+   rest of the strip is now written in. */
+.jc-today-btn.is-browsing,
+.journal-btn-subtle.is-browsing {
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+.jc-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  /* The same column gap .jc-grid uses. Without it the header lays seven columns
+     edge to edge while the grid lays seven columns with 3px between them, so
+     every label sat one gap left of its column — the second half of the
+     misalignment described above, and invisible for the same reason. The two
+     grids have to agree on their tracks *and* their gaps to be one table. */
+  column-gap: 3px;
+  text-align: center;
+  font-size: var(--am-text-2xs);
+  font-weight: var(--am-caps-weight);
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: var(--am-caps-tracking);
+  /* A hairline under the weekday labels separates the column key from the day
+     cells — the horizontal counterpart to the week-gutter rule below, so the
+     grid's top and left keys are framed by two matching hairlines. */
+  padding: 4px 0 8px;
+  margin-bottom: 7px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.jc-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  /* Rows breathe more than columns: the columns are already separated by the
+     weekday key above them, whereas consecutive weeks have nothing between
+     them but the gap. */
+  gap: 5px 3px;
+}
+
+/* WHY rem AND NOT em (2.51.3). `--jc-weekcol` was `2.25em`, read in two rules:
+   one on .jc-weekdays, which sets `font-size: var(--am-text-2xs)`, and one on
+   .jc-grid, which inherits the note's. So the same declaration produced a
+   ~25px gutter column in the header and a ~36px one in the grid, and every
+   weekday label sat left of the days it labelled — by 14px under Monday,
+   closing to 5px by Sunday as the seven 1fr columns absorbed the difference.
+   It looked like sloppy centring rather than a broken grid, which is why it
+   survived thirty releases.
+
+   rem is immune: one value, resolved against the root, identical in both
+   rules. It still tracks Obsidian's interface font size, which is the thing
+   the em was reaching for. The gutter rule below is positioned from the same
+   variable and would have inherited the same split. */
+
+/* ── Week gutter (2.21) ──────────────────────────────────────────────────
+   The home calendar is organised by weeks, not just days: every row opens with
+   a narrow gutter cell carrying the ISO week number, and clicking it opens that
+   week's Weekly Overview. Both the weekday header and the day grid grow a
+   matching leading column so the seven day columns stay aligned above and below.
+   Scoped to `.jc-has-weeks` / `.jc-grid-weeks` so the embedded month-summary
+   grids (which never set them) keep their seven-column layout untouched. */
+.jc-has-weeks .jc-weekdays.jc-weekdays-weeks {
+  grid-template-columns: var(--jc-weekcol, 2.75rem) repeat(7, 1fr);
+}
+.jc-grid.jc-grid-weeks {
+  grid-template-columns: var(--jc-weekcol, 2.75rem) repeat(7, 1fr);
+}
+/* ── The gutter rule, RETIRED (4.13.1 §3b) ──────────────────────────────
+   2.51 removed it, 2.51.3 restored it, and this takes it off again — so the
+   argument on both sides is worth keeping rather than the rule.
+
+   FOR: the weekday key above the grid is closed by a hairline, so a gutter key
+   closed by nothing was the odd one out, and with the two rules meeting at the
+   corner the grid read as a table.
+
+   AGAINST, AND IT IS WHY IT GOES: it is a VERTICAL rule, and this release's
+   whole subject is that the diary card should be drawn the way `month-summary`
+   is — no tint, and boundaries said with horizontal lines. It was also the last
+   thing left holding up the chips' fill: 2.51.3 traded the chip's outline for
+   this rule ("an outlined chip inside a ruled column is double-ruling"), the
+   fill replaced the outline, and now that the fill has gone with the card's
+   other fills a rule marking a column of bare numbers is marking a margin that
+   is already a margin.
+
+   `position: relative` goes with it. Nothing else in these two grids is
+   positioned, and a positioning context left behind for a pseudo-element that no
+   longer exists is the sort of residue that gets read as load-bearing. */
+
+/* The "Wk" header over the gutter: same faint, upper-cased weight as the
+   weekday labels, but nudged a hair smaller so the number column reads as a
+   margin rather than an eighth day. */
+.jc-weeknum-head {
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+/* The gutter cell: an outlined chip carrying the ISO week number, and the door
+   to that week's Weekly Overview.
+ *
+ * IT IS A BUTTON, so it looks like one at rest. Until 2.51 it was a bare number
+ * with hover-only feedback — nothing on the resting calendar said the numbers
+ * down the left were pressable, which is the whole of the affordance problem.
+ * The chip is an outline rather than a fill so the column still reads as a
+ * margin: a filled column of eight would compete with the days it indexes.
+ *
+ * AND ITS HEIGHT IS EXPLICIT, WHICH IS THE WHOLE OF THE ALIGNMENT FIX. It first
+ * carried `aspect-ratio: 1 / 1`, which capped it at the gutter's own width while
+ * the row beside it grew taller for every event bar, badge and mood dot, so the
+ * number rode the top of the row and drifted further off the day numbers the
+ * more decorated the week was. 2.51.0 dropped the aspect-ratio and expected the
+ * grid item to stretch — but a <button> is not an ordinary div here: Obsidian's
+ * base stylesheet gives every button a fixed height, which beats an `auto` this
+ * rule never set, so the chip kept its button height and was placed at the start
+ * of the row. The number sat at the top exactly as before, for a second and
+ * unrelated reason.
+ *
+ * So the height is stated outright and the chip is centred in its row. A chip
+ * the full height of the row was tried and is worse: at a row height set by
+ * `.cal-cell`'s 1:1 aspect ratio it is a tall thin box that competes with the
+ * days instead of indexing them. */
+.journal-calendar .cal-week {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* PLACED, NOT STRETCHED (2.51.3). The chip was a stretched grid item —
+     full-column width, `align-self: center`, content centred by its own flexbox
+     — which means its position was the sum of the host's padding, the host's
+     height and this rule's overrides, and any asymmetry in that sum moved the
+     number off both centre lines. With the gutter rule now drawn beside it that
+     drift became obvious: the numbers rode high and sat hard against the rule
+     instead of centred in their cell.
+
+     `place-self: center` with an explicit box takes the arithmetic away. The
+     chip is 2rem by 1.625rem, centred on both axes in a 2.75rem column and a
+     44px row, and there is nothing left for a stray padding to push. rem for
+     the same reason as --jc-weekcol above: it must not resolve against a font
+     size that differs between the header and the grid. */
+  place-self: center;
+  width: 2rem;
+  height: 1.625rem;
+  margin: 0;
+  padding: 0;
+  /* No outline as of 2.51.3. With the gutter rule restored beside it, an
+     outlined chip inside a ruled column is the double-ruling the 2.51 note
+     warned about, arrived at from the other direction. A quiet fill keeps the
+     affordance the outline was added for — it still looks like a control at
+     rest, which bare numbers did not — without a second edge in the column. */
+  border: none;
+  border-radius: var(--am-radius-sm);
+  /* NO FILL AS OF 4.13.1 §3b, AND IT MOVED WITH THE QUARTER LABEL, which is what
+     its own comment asked for: "the two are the same kind of object — a key set
+     off from the things it indexes — so reading them as one material matters
+     more than either looking good alone." The label lost its recess when the
+     rail lost its frame, and a chip that stayed sunk would have been the only
+     filled thing on a card that has given up its fills. What says it is a
+     control is what says it on every other key here: the hover, which stays. */
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  color: var(--text-faint);
+  /* It is a <button> now, so the UA's font stack has to be shown the door. */
+  font-family: inherit;
+  font-size: var(--am-text-2xs);
+  font-weight: var(--am-caps-weight);
+  font-variant-numeric: tabular-nums;
+  transition: background 0.12s, color 0.12s;
+}
+/* The light-theme value went with the fill, as the quarter label's did — for the
+   same reason, which is the reason the pair of them have always given for moving
+   together (4.13.1 §3b). */
+/* The week today is in, tinted so the way back stays visible once you have
+   navigated off it — the row-scale counterpart to .cal-cell-today's ring and
+   .jc-mcell.is-now's. */
+/* AND IT TAKES AN EDGE (4.14 §2), for the reason today's cell now takes a tint:
+   the tint alone put the week and the day at the SAME strength, and they are not
+   the same claim — the day is where you are, the row is merely the row it is in.
+   A 2px edge down the chip's leading side is a different channel rather than
+   more of the same one, so the pair can be told apart at a glance instead of
+   read as two cells that happen to match. It also points INTO the row it
+   indexes, which a fill does not. */
+.journal-calendar .cal-week.is-now {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  box-shadow: inset var(--am-rule) 0 0 0 var(--interactive-accent);
+  color: var(--interactive-accent);
+  font-weight: 700;
+}
+.journal-calendar .cal-week:hover {
+  background: var(--background-modifier-hover);
+  color: var(--interactive-accent);
+}
+.journal-calendar .cal-week:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+.cal-weeknum {
+  line-height: 1;
+}
+/* HEIGHT IS STATED, NOT DERIVED FROM THE WIDTH. `aspect-ratio: 1 / 1` ties the
+   row height to the column width, so the same month is 40px tall in a sidebar
+   and 88px tall in a wide editor — and at the wide end that is an inch of empty
+   cell under every date, which is most of why the grid read as loose. It also
+   put the mood dot's `bottom: 15%` a different distance from its number at
+   every pane width.
+
+   A fixed floor with a 1:1 minimum keeps the cells square until the pane is
+   wide enough that square would mean cavernous, then lets them go landscape.
+   min-height rather than height so a day carrying two event bars can still
+   grow, which is the one case where the row genuinely needs the space. */
+/* THE HAIRLINE (2.51.4). Every day carries a faint inset rule, so the grid is
+   a field of cells rather than numbers floating in space. It is not decoration:
+   the badge sits in the top-right corner of the cell and the event bar runs
+   along its top edge, and both were being drawn against nothing — an icon
+   4px from an edge that isn't there reads as an icon adrift near a number.
+   With an edge to sit against they read as marks on a day.
+
+   An inset shadow rather than a border because a border would join the grid's
+   `gap` and change every cell's box; and because .cal-cell-today already draws
+   its ring the same way, so today simply replaces this rule instead of wearing
+   both. The one consequence worth knowing: the two can't be tuned apart later
+   without moving one onto a pseudo-element.
+
+   color-mix on --text-normal rather than a fixed rgba, so it inverts with the
+   theme — a white hairline on dark, a black one on light, both at 5%. */
+.cal-cell {
+  position: relative;
+  min-height: 44px;
+  /* THE RING, NOT A BORDER, and §4.4 has to be written in this family or it
+     does not reach the surface it was written for. A box-shadow takes no
+     layout space and a border does: these cells sit in a grid with a fixed
+     44px floor and a gap, so converting them would resize all 31.
+
+     WEIGHT AND CONTRAST TOGETHER, because at 5% of the text colour no weight
+     helps — a 3px line at 5% is a wider wash, not an edge, and the grid still
+     reads as texture. 10% is the smallest step that makes the ring an edge on
+     a quiet theme, and it is the same colour: `--text-normal` at more of
+     itself, not a hue the sheet did not already have. */
+  box-shadow: inset 0 0 0 var(--am-rule)
+    color-mix(in srgb, var(--text-normal) 10%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-sm);
+  cursor: pointer;
+  font-size: var(--am-text-sm);
+  color: var(--text-normal);
+  transition: background 0.12s;
+}
+.cal-cell:hover {
+  background: var(--background-modifier-hover);
+}
+.cal-cell-outside {
+  color: var(--text-faint);
+  opacity: 0.55;
+}
+/* TODAY, AT THREE SIGNALS INSTEAD OF ONE (4.14 §2). It was a 1.5px accent ring
+   and a bold numeral on a cell otherwise identical to its thirty neighbours,
+   each of which already carries a ring of its own — so the whole of "today" was
+   one hairline's worth of hue against `.cal-cell`'s 10% ring, measured at
+   #8a5cf5 against #3a3a3a. At a phone's arm's length that is a cell you have to
+   look for on a grid you are looking at to find it.
+   The tint is the same 16% mix `.jc-mcell.is-selected` and `.cal-week.is-now`
+   both use, so the card's three "you are here" marks are one recipe at three
+   scales — day, week, month — rather than three inventions.
+   NOT `--text-on-accent`: at 16% the ground is a pale wash on a light theme and
+   a dark one on a dark theme, so the readable colour is the one that already
+   inverts. `--text-on-accent` is for a SOLID fill and would put white on
+   lavender for every light-theme reader. */
+.cal-cell-today {
+  box-shadow: inset 0 0 0 var(--am-rule) var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  color: var(--text-normal);
+  font-weight: 700;
+}
+.cal-cell-has-entry {
+  font-weight: 600;
+}
+/* An absolute offset now that the row height is fixed: at 15% the dot sat a
+   different distance below its number in every pane, and drifted further with
+   every event bar the cell grew for. */
+.cal-dot {
+  position: absolute;
+  bottom: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--interactive-accent);
+}
+.cal-mood-1 .cal-dot { background: var(--am-mood-1); }
+.cal-mood-2 .cal-dot { background: var(--am-mood-2); }
+.cal-mood-3 .cal-dot { background: var(--am-mood-3); }
+.cal-mood-4 .cal-dot { background: var(--am-mood-4); }
+.cal-mood-5 .cal-dot { background: var(--am-mood-5); }
+
+/* ── Special events on the day grid ──────────────────────────
+   Two treatments for two meanings. A multi-day span is a state the day is in,
+   so it tints the cell and runs a bar along the top edge that joins up with
+   its neighbours. A single-day event is a marker, so it sits as an icon in the
+   top-right corner, drawn over the bars rather than beside them (see
+   .cal-badge).
+
+   Everything here is laid *around* the three signals the cell already carried
+   — the centred day number, the mood dot at bottom-centre, the today ring
+   around the edge — and none of it lands on any of them. The one deliberate
+   exception is event-on-event: the badge overlaps the bars, which is a
+   collision between two decorations of the same system rather than between a
+   decoration and the day's own data. */
+.cal-bars {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+.cal-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--am-ev-grey);
+  /* The grid puts a 3px gap between cells. A bar that stopped at the cell edge
+     would leave a comb of gaps across a five-day trip, so the middle of a span
+     deliberately bleeds 4px each way to meet the next cell's bar. */
+  margin: 0 -4px;
+}
+.cal-bar-start { margin-left: 2px; border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
+.cal-bar-end { margin-right: 2px; border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
+.cal-bar-mid { border-radius: 0; }
+/* At a row boundary the bleed has nothing to meet — the next day of the span is
+   at the far side of the grid, on the line below — so the bar is capped there
+   instead of running off into the margin. */
+.cal-bar-clip-left { margin-left: 0; border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
+.cal-bar-clip-right { margin-right: 0; border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
+
+.cal-bar-red { background: var(--am-ev-red); }
+.cal-bar-amber { background: var(--am-ev-amber); }
+.cal-bar-green { background: var(--am-ev-green); }
+.cal-bar-teal { background: var(--am-ev-teal); }
+.cal-bar-blue { background: var(--am-ev-blue); }
+.cal-bar-purple { background: var(--am-ev-purple); }
+.cal-bar-pink { background: var(--am-ev-pink); }
+.cal-bar-grey { background: var(--am-ev-grey); }
+
+/* The wash behind a span. Kept very low-alpha: it has to survive being laid
+   under the mood tint and the today ring without fighting either, and its job
+   is only to say "this day is part of something" at a glance across the month.
+   color-mix keeps it honest in both themes — a fixed rgba() would be invisible
+   on dark and heavy on light. */
+.cal-cell[class*="cal-tint-"] { background: var(--am-ev-tint, transparent); }
+.cal-tint-red { --am-ev-tint: color-mix(in srgb, var(--am-ev-red) 14%, transparent); }
+.cal-tint-amber { --am-ev-tint: color-mix(in srgb, var(--am-ev-amber) 14%, transparent); }
+.cal-tint-green { --am-ev-tint: color-mix(in srgb, var(--am-ev-green) 14%, transparent); }
+.cal-tint-teal { --am-ev-tint: color-mix(in srgb, var(--am-ev-teal) 14%, transparent); }
+.cal-tint-blue { --am-ev-tint: color-mix(in srgb, var(--am-ev-blue) 14%, transparent); }
+.cal-tint-purple { --am-ev-tint: color-mix(in srgb, var(--am-ev-purple) 14%, transparent); }
+.cal-tint-pink { --am-ev-tint: color-mix(in srgb, var(--am-ev-pink) 14%, transparent); }
+.cal-tint-grey { --am-ev-tint: color-mix(in srgb, var(--am-ev-grey) 14%, transparent); }
+/* Hover must still read as hover on a tinted day. */
+.cal-cell[class*="cal-tint-"]:hover { background: var(--background-modifier-hover); }
+
+/* The single-day event marker. Top-right and larger as of 2.51; bottom-right
+   and 11px before that.
+
+   THE CORNER IT MOVED INTO WAS ALREADY OCCUPIED, and that is the whole of this
+   rule. Bottom-right was chosen by elimination — day number in the centre, mood
+   dot at bottom-centre, today ring around the edge, span bars along the top —
+   so the top-right corner is the one place on the cell that already had a
+   tenant. Two alternatives were costed and rejected: pushing the bars down when
+   a badge is present makes a trip's bar jog vertically on whichever day happens
+   to carry a birthday, and moving the bars to the bottom edge puts them under
+   the mood dot. Both trade a fixable overlap for a moving part.
+
+   So the badge overlaps, and is drawn to survive it: a disc of the page
+   background sits behind the glyph and punches it out of whatever bar runs
+   underneath. On a day that is both inside a trip and somebody's birthday, the
+   birthday reading as foreground is right rather than merely tolerable — the
+   span is a state the day is in, the marker is a thing that happens on it.
+
+   The disc is 85% rather than opaque so a tinted cell still shows through it
+   and the badge doesn't read as a hole cut in the day. */
+.cal-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--background-primary) 85%, transparent);
+  color: var(--am-ev-grey);
+  pointer-events: none;
+}
+.cal-badge svg {
+  width: 13px;
+  height: 13px;
+  /* Down from 2.4. A glyph two pixels wider at the same stroke weight reads
+     heavier than the size increase alone asked for. */
+  stroke-width: 2.1;
+}
+.cal-badge-red { color: var(--am-ev-red); }
+.cal-badge-amber { color: var(--am-ev-amber); }
+.cal-badge-green { color: var(--am-ev-green); }
+.cal-badge-teal { color: var(--am-ev-teal); }
+.cal-badge-blue { color: var(--am-ev-blue); }
+.cal-badge-purple { color: var(--am-ev-purple); }
+.cal-badge-pink { color: var(--am-ev-pink); }
+.cal-badge-grey { color: var(--am-ev-grey); }
+
+/* The overflow counter, for a day carrying more events than the cell can show.
+   Bottom-right as of 2.51 — it sat bottom-left only because the badge held the
+   opposite corner and the two had to stay apart. With the badge gone to the top
+   the corner is free, and the counter reads better opposite the day number than
+   tucked under the left edge, where on an outside-month cell it collided with
+   nothing but looked like it had fallen off. */
+.cal-more {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+/* The embedded month grid runs smaller, so the decoration comes down with it
+   rather than swamping a cell half the size. */
+.jc-embedded .cal-badge { width: 12px; height: 12px; }
+.jc-embedded .cal-badge svg { width: 11px; height: 11px; }
+.jc-embedded .cal-bar { height: 2px; }
+.jc-embedded .cal-more { font-size: 0.55em; }
+
+.jc-year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.cal-cell-month {
+  aspect-ratio: 1.6 / 1;
+  /* The tile holds two absolutely-placed marks as of 4.14 §3 — the corner count
+     and the foot bar — and the bar runs the full width of a rounded box. Without
+     this its square ends sit outside the radius at both bottom corners. Safe on
+     this cell and not on `.cal-cell`: the day cells deliberately let event bars
+     and badges reach their edges, and the month tiles draw neither. */
+  overflow: hidden;
+  font-size: var(--am-text-sm);
+  /* Transparent until the month has an entry, so this is a reserved slot
+     rather than a drawn edge — but it has to reserve the SAME width the drawn
+     edge will take, or a month gains a pixel the moment it is written in. */
+  border: var(--am-rule) solid transparent;
+}
+.cal-cell-month.cal-cell-has-entry {
+  border-color: var(--background-modifier-border);
+  background: var(--background-primary);
+}
+.cal-cell-month .cal-dot {
+  bottom: 10%;
+}
+/* THE TILE'S TALLY (4.14 §3) — the count in the corner and the bar along the
+   foot. The tile is the biggest object on the month view and was carrying one
+   word, so a month with forty entries drew the same picture as a month with
+   none; these two marks are what make a year of them readable as a shape.
+   The corner, not the middle: the month's name is the tile's subject and has
+   the centre. A figure set beside it competes; a figure in the corner annotates.
+   Tabular figures so a column of tiles lines up its digits — 8 and 21 in
+   proportional numerals wander by a couple of pixels, which is visible when
+   they are stacked four across and three down. */
+.cal-month-count {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-size: var(--am-text-2xs);
+  font-weight: var(--am-caps-weight);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--text-faint);
+}
+.cal-cell-month.cal-cell-has-entry .cal-month-count {
+  color: var(--text-muted);
+}
+/* A BAR, NOT A SECOND NUMBER. It is the same figure the corner already gives,
+   said as a length — which is the only one of the two that can be compared
+   across twelve tiles without reading any of them. It runs along the bottom
+   edge rather than floating inside the tile so it reads as a gauge on the
+   object rather than as a rule dividing it, and it is drawn under the tile's
+   own border by the `overflow: hidden` the radius needs anyway. */
+.cal-month-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--interactive-accent);
+  opacity: 0.55;
+}
+/* THE MONTH THE OVERVIEW IS SCOPED TO — AND ITS FILL WAS DEAD (4.14 §3).
+   This rule asked for a solid accent tile, "filled accent rather than the inset
+   ring `.cal-cell-today` uses, so selected and today stay visually distinct".
+   It has not drawn that since `.cal-cell-month.cal-cell-has-entry` was written:
+   that selector is 0,2,0 and this one is 0,1,0, so the moment the selected month
+   had a review note — which is most of the time, since you are usually looking
+   at a month you have written in — the fill was repainted
+   `--background-primary` and the tile went dark instead of accent. Measured off
+   the 4.13.8 render: the selected tile's interior is #1c1c1c, and the violet
+   edge a reader sees on it is `.cal-cell-today`'s ring, not this rule at all.
+
+   THE FIX IS NOT MORE SPECIFICITY. A solid accent tile 157x97px is the loudest
+   thing on either diary page, and it was loud by intention when the tile held
+   one word; the tile now holds a count and a gauge, and a solid accent ground
+   is where both of them stop being legible. So selection is drawn the way
+   everything else on these two cards draws it — the 16% tint, an accent ring,
+   and a leading edge — and the `.cal-cell-has-entry` fill no longer has anything
+   to overwrite, because this rule no longer competes for `background` at a
+   weight it loses. */
+.cal-cell-month.cal-cell-selected {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  box-shadow:
+    inset 0 0 0 1px var(--interactive-accent),
+    inset 3px 0 0 0 var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+  font-weight: 700;
+}
+.cal-cell-month.cal-cell-selected:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 24%, transparent);
+}
+.cal-cell-month.cal-cell-selected .cal-month-count {
+  color: var(--interactive-accent);
+}
+.cal-cell-month.cal-cell-selected .cal-month-bar {
+  opacity: 1;
+}
+/* ── Overview summary card (2.22) ────────────────────────────────────────
+   The Weekly / Monthly Overview dashboards' summary is one card now — an
+   accent-washed banner band welded atop a body that holds the week table or
+   the month + year grids. This is the construction the home page's calendar
+   card already uses (buildDiaryHeader inside .journal-calendar) and the entry
+   banner uses on a note; before 2.22 the overviews were the one place a title
+   bar, its stats and its content sat as three separate blocks with the note's
+   own spacing between them, so nothing could make them read as one object. */
+.journal-overview-summary {
+  background: var(--background-secondary);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  padding: 12px 14px;
+  margin: 0.5em 0 1.25em;
+}
+
+/* The banner band. Cancels the card's padding so it runs to the card's edges,
+   then re-applies it inside — the same two lines .jc-diary-header uses.
+
+   NO TINT AS OF 3.6, AND THE ARGUMENT IS SUBTRACTION. The band carried an
+   accent wash AND an accent edge AND sat under an accent-tinted titlebar:
+   three signals for one fact, "this page summarises". Except that it was never
+   three — patch 1 found the edge had never painted on any vault, so the band
+   has spent four releases saying it twice and looking like it said it once.
+
+   With the edge working, the wash is the one of the three that says least. It
+   is a 9%-alpha field the reader stops seeing by the second visit, it makes
+   the band a different SURFACE from the body when the band is the same object
+   as the body, and it competes with the titlebar directly above it — which is
+   the tint that survives, because a titlebar is a lid and is supposed to read
+   as one.
+
+   So the band takes the card's own ground and the edge works alone. The way
+   back is this one declaration, which is why §6 called it worth trying early.
+   What holds the band apart from the body now is the divider, which patch 5
+   had just doubled — the two changes were argued separately and land well
+   together, but the second is load-bearing for the first. */
+.journal-overview-banner {
+  margin: -12px -14px 0;
+  padding: 12px 14px 11px;
+  border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
+  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+}
+.job-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+}
+.job-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Eyebrow: the small-caps section name + its icon, in the diary accent — the
+   same eyebrow treatment the area titlebar and the diary header carry. */
+.job-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--am-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--am-area-diary);
+  margin-bottom: 3px;
+}
+.job-eyebrow-icon {
+  display: inline-flex;
+}
+.job-eyebrow-icon svg {
+  width: 13px;
+  height: 13px;
+}
+/* Title: the period name — the banner's loudest line, matched to the diary
+   header's greeting weight so the banners read as siblings. */
+.job-title {
+  font-size: 1.4em;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--text-normal);
+}
+/* The navigator rides the band's top-right corner. */
+.job-nav {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+/* The nav strip + its standalone "This Week"/"This Month" button, stacked and
+   right-aligned under the band's top-right corner — the button reads as its
+   own affordance below the stepper rather than a fourth segment welded to it. */
+.journal-period-nav-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+/* .jpn-now-btn's look comes from the shared .journal-btn-subtle rule further
+   down (a quiet outline pill, filled in with the accent wash when the shown
+   period isn't the current one — same cue .jc-today-btn gives). */
+/* `.journal-period-stats` and its `strong`, `.jms-tasks` and `.jms-notyet`
+   retired in 3.6 patch 6 — the band's third row is a stat strip on all four
+   grains now (see 96-stat-strip.css), and the prose line those rules styled has
+   no caller. Named rather than deleted silently, because the last time markup
+   outlived its rules on this page it took four releases and a screenshot to
+   notice; the reverse wants to be as visible. */
+/* The card body: the table / grids below the band. */
+.journal-overview-body {
+  padding-top: 10px;
+}
+
+/* ── Quarterly Overview body (2.26) ──────────────────────────────────────
+   A quarter has no entries of its own, so this body is entirely a rollup of
+   the three Monthly Reviews it spans: the months as cards, then goals,
+   highlights and challenges grouped under the month that wrote them. The
+   monthly `log` region is deliberately absent — three months of free prose
+   stacked is not a review. */
+.jq-loading {
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  padding: 6px 2px;
+}
+/* The span this page covers, above the month cards (2.52).
+   A single ruled line of muted facts, not a second stat grid: the banner
+   already carries the logged/tasks strip, and the quarter is a review page —
+   the numbers are context for the rollup below, not the point of it. Segments
+   are separated by the rule between them rather than by a middot, so the line
+   stays legible when it wraps on a narrow pane. */
+.jq-coverage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  padding: 0 2px 10px;
+  margin-bottom: 10px;
+  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+}
+/* `.jq-coverage-range` retired in 3.6 patch 2. It led this row because "3
+   entries" means nothing without the span it is three entries out of — which
+   was true when the band above printed a bare title, and stopped being true in
+   3.5 when the band grew a span line of its own. It was the third statement of
+   the same stretch of days on one screen; the rate now leads, and takes the
+   emphasis with it. */
+.jq-coverage-rate {
+  color: var(--text-normal);
+  font-weight: 500;
+}
+.jq-coverage-reviews {
+  margin-left: auto;
+}
+.jq-months {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+/* Each month is the door to its own review: the quarter shows what the months
+   said and sends you to the month to change it. */
+/* Quarter tiles and the year's four quarter cards: cells one level up, and on
+   the scale for the same reason the day grid is. */
+.jq-month {
+  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  padding: 8px 10px 9px;
+  min-width: 0;
+}
+.jq-month.is-future {
+  opacity: 0.55;
+}
+.jq-month-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+.jq-month-name {
+  font-weight: 600;
+  font-size: var(--am-text-sm);
+  color: var(--text-normal);
+}
+/* The same logged/empty read the week table's row dot and the calendar cell
+   give: filled when the review exists, a hollow ring when it doesn't. */
+.jq-month-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--background-modifier-border-hover);
+  margin-left: auto;
+}
+.jq-month-dot.is-logged {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+.jq-month-note {
+  font-size: var(--am-text-xs);
+  color: var(--text-faint);
+}
+.jq-month-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.jq-month-link:hover {
+  color: var(--interactive-accent);
+}
+.jq-month-icon {
+  display: inline-flex;
+}
+.jq-month-icon svg {
+  width: 13px;
+  height: 13px;
+}
+/* The month's theme, quoted under its link — the one piece of the review that
+   is short enough to reproduce here rather than link to. */
+.jq-month-focus {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--background-modifier-border);
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.jq-section {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: var(--am-rule) solid var(--background-modifier-border);
+}
+/* `.jq-section-head|-title|-note` retired in 2.56.2 — the quarter's inner
+   sections go through sectionFrame now. They and `.jyr-section-*` below were
+   the same three rules twice, differing at weight 600 vs 700, tracking 0.08em
+   vs 0.06em, and with muted and faint swapped between the title and the note.
+   Nobody chose any of that; it is what two files solving one problem privately
+   produces, and it is invisible precisely because the two never appear on the
+   same screen. */
+/* Grouped by month rather than pooled: an item is a fact about the month that
+   wrote it, and flattening the three lists would lose which month you were
+   answering to. */
+.jq-group + .jq-group {
+  margin-top: 8px;
+}
+.jq-group-label {
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+  margin-bottom: 3px;
+}
+.jq-items {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--am-text-sm);
+  color: var(--text-normal);
+  line-height: 1.55;
+}
+.jq-goals {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.jq-goal {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: var(--am-text-sm);
+  color: var(--text-normal);
+  line-height: 1.5;
+}
+.jq-goal-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--text-faint);
+}
+.jq-goal-icon svg {
+  width: 13px;
+  height: 13px;
+}
+.jq-goal.is-done .jq-goal-icon {
+  color: var(--interactive-accent);
+}
+.jq-goal.is-done .jq-goal-text {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.jq-empty {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+}
+
+/* ── the recap, as a block of its own (3.9 §2) ───────────────────────────
+   `period-recap` renders the three rollup sections the year and quarter
+   banners used to draw inline. It gets NO chrome: the sections inside it are
+   `sectionFrame`s already, exactly as they were, and wrapping them in a card
+   would make the recap a differently-shaped thing from the wall it replaced —
+   which is the opposite of the point. What it is now is foldable, movable and
+   removable, and none of those are drawn. */
+.journal-period-recap > .jq-section:first-child {
+  /* First inside its own fence rather than sixth inside a banner body, so the
+     top margin that separated it from the density chart is now a gap above
+     nothing. */
+  margin-top: 0;
+}
+
+/* "The recap moved" — 3.9 §2's migration notice.
+   Quiet by construction: this appears on a page a reader has already loaded
+   and did not ask a question of, so it is a muted line with one control, not a
+   callout. It removes itself the moment the section exists or there is nothing
+   to roll up — see renderRecapMoved, which is where that argument lives. */
+.jq-recap-moved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: var(--am-rule) solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+}
+.jq-recap-moved-text {
+  flex: 1;
+  min-width: 0;
+}
+.jq-recap-moved-btn {
+  flex: none;
+  font-size: var(--am-text-2xs);
+  padding: var(--am-space-2) var(--am-space-5);
+  border-radius: var(--am-radius-pill);
+  cursor: pointer;
+}
+.jq-recap-moved-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* An embedded calendar leads the month body — it brings its own top padding
+   (.jc-embedded), which the body's own already covers, so drop the duplicate. */
+.journal-overview-body .jc-embedded:first-child {
+  padding-top: 0;
+}
+/* The month + year grids sit flat inside the summary card. On their own they
+   are standalone cards (.journal-calendar: fill, border, radius, outer margin);
+   inside the card that would nest a card in a card, so they shed that chrome
+   and read as flat sections — the same way the home page's one calendar card
+   holds its grid flat rather than as a bordered inner box. */
+.journal-overview-body .journal-calendar {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+}
+
+/* Subheading introducing the year grid inside month-summary. Previously just
+   margin — inside the frameless embedded body (.journal-overview-body strips
+   the calendar's own card border/background, see above) that read as loose
+   whitespace rather than a deliberate break between the month grid and the
+   year-of-reviews section below it. A hairline + matching top padding gives
+   it the same "divided single surface" read the rest of the card uses
+   (.journal-overview-banner's own border-bottom, .jyr-stats's border-top). */
+.jms-year-heading {
+  margin: 1.2em 0 0.4em;
+  padding-top: 0.9em;
+  border-top: 1px solid var(--background-modifier-border-hover);
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.jc-embedded {
+  padding-top: 8px;
+}
+/* The weekday-label row's own hairline (.jc-weekdays, above) is fine at
+   top level, where it sits inside the calendar's bordered card and has that
+   frame to read against. Embedded here with the card chrome stripped, the
+   same subtle border reads as barely-there — bump it to the stronger token
+   so the header key stays visibly separated from the day grid beneath it. */
+.jc-embedded .jc-weekdays {
+  border-bottom-color: var(--background-modifier-border-hover);
+}
+
+/* ── Week table (2.23 border pass, v2) ───────────────────────────────────
+   The seven-day strip in the card body. It reads as a row of day lines rather
+   than a bare three-column grid: a status dot leads each row (filled when the
+   day is logged, a hollow ring when not — the calendar cell's own read), the
+   weekday is split from the date, the entry carries its title + a mood heat
+   dot, and the day's tasks roll up into a tinted count pill.
+
+   The first border pass just lowered the opacity of the existing full-bleed
+   `border-bottom` on every th/td — too subtle a change to actually stop
+   reading as a ruled spreadsheet. This pass changes the shape of the rule,
+   not just its weight: the header has no line at all (the uppercase,
+   letter-spaced label reads as a header on its own — no heading elsewhere in
+   the plugin underlines itself), and the row divider no longer runs edge to
+   edge — it starts after the Day column, under Entry/Tasks only, at a low
+   alpha via `color-mix`. That asymmetry is what reads as a deliberate rail
+   rather than a grid line; a full-width line at any opacity still looks like
+   "every cell is ruled", which is the spreadsheet tell. Padding is up too, so
+   rows breathe instead of sitting packed the way spreadsheet cells do. */
+.journal-week-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--am-text-sm);
+}
+.journal-week-table th {
+  text-align: left;
+  padding: 0 10px 9px;
+  font-size: var(--am-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.journal-week-table th:last-child {
+  text-align: right;
+}
+.journal-week-table td {
+  padding: 10px;
+  vertical-align: middle;
+}
+/* The divider: only under the content-heavy columns, not the compact Day
+   column — so it reads as a rail under the row's content rather than a rule
+   spanning the whole card edge to edge.
+
+   DELIBERATELY LEFT AT THE HAIRLINE by 3.6 patch 5, and named here so the
+   omission reads as a decision rather than a miss. §4.4 lists "tables", but
+   this line is not a cell edge: it is a row separator inside one object, which
+   is what `--am-rule-hair` means, and it is already drawn at 35% alpha and
+   only under two of three columns precisely so it stays a rail. Doubling it
+   would make seven days read as seven cards. */
+.journal-week-table .jw-entry,
+.journal-week-table .jw-tasks {
+  border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
+}
+.journal-week-table tbody tr:last-child .jw-entry,
+.journal-week-table tbody tr:last-child .jw-tasks {
+  border-bottom: none;
+}
+.journal-week-table tbody tr {
+  transition: background 0.12s;
+}
+.journal-week-table tbody tr:hover {
+  background: var(--background-modifier-hover);
+}
+/* Empty (unlogged) days recede; future days recede a touch more. Weekends are
+   deliberately NOT dimmed — a Saturday's entry is worth as much as a Tuesday's,
+   and dimming it dims content rather than chrome. */
+.journal-week-table tr.jw-empty .jw-date {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.journal-week-table tr.jw-future {
+  opacity: 0.72;
+}
+
+/* Day cell: the date over its three-letter weekday (2.53).
+   Right-aligned and tabular so the numbers form a column the eye runs down —
+   left-aligned, a 9 and a 26 start in different places and the run reads as
+   labels rather than as dates. */
+.journal-week-table .jw-day {
+  white-space: nowrap;
+  width: 1%;
+  text-align: right;
+  padding-right: 12px;
+}
+.jw-daylabel {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+.jw-date {
+  font-size: var(--am-text-lg);
+  font-weight: 600;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+.jw-dow {
+  font-size: var(--am-text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+/* A day carrying an event takes the calendar's own tint, so the same day is
+   the same colour on both surfaces. The tint sits on the date cell rather than
+   the whole row: it marks the *day*, and washing the row would compete with
+   today's accent wash and with the row hover. */
+.journal-week-table .jw-day-event {
+  background: var(--am-ev-tint, transparent);
+}
+/* Today's row: a faint accent wash, an accent rail on the leading edge, and
+   the date in the accent. */
+.journal-week-table tr.jw-today {
+  background: rgba(var(--am-area-diary-rgb), 0.06);
+}
+.journal-week-table tr.jw-today .jw-date {
+  color: var(--am-area-diary);
+}
+.journal-week-table tr.jw-today .jw-day {
+  box-shadow: inset 2px 0 0 var(--am-area-diary);
+}
+
+/* Entry cell. */
+.journal-week-table .jw-entry {
+  width: 100%;
+}
+.jw-entry-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  color: var(--text-normal) !important;
+  text-decoration: none !important;
+}
+/* The day's focus, under its entry title (2.52).
+   Deliberately the timeline's construction (.jdr-snippet) rather than a column
+   of its own: `.jw-entry` is already the table's `width: 100%` cell, so a
+   fourth column could only take width by fighting it, and a header advertising
+   a field that is blank on every unlogged day is a column that is mostly
+   empty. One line, clipped — this identifies the day, it isn't the entry. */
+.jw-entry-focus {
+  margin-top: 2px;
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jw-entry-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.jw-entry-icon svg {
+  width: 0.95em;
+  height: 0.95em;
+}
+.jw-entry-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jw-entry-link:hover .jw-entry-title {
+  color: var(--am-area-diary) !important;
+  text-decoration: underline;
+}
+.jw-entry-untitled {
+  color: var(--text-muted);
+  font-style: italic;
+}
+/* Mood heat dot on a logged entry (same palette the calendar cell uses). */
+.jw-mood {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 8px;
+  vertical-align: middle;
+  background: var(--text-faint);
+}
+.jw-mood.cal-mood-1 { background: var(--am-mood-1); }
+.jw-mood.cal-mood-2 { background: var(--am-mood-2); }
+.jw-mood.cal-mood-3 { background: var(--am-mood-3); }
+.jw-mood.cal-mood-4 { background: var(--am-mood-4); }
+.jw-mood.cal-mood-5 { background: var(--am-mood-5); }
+/* "＋ Add entry" on unlogged days — a quiet create affordance, matching the
+   calendar cells' create-on-click. */
+.jw-create {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-faint);
+  text-decoration: none;
+  cursor: pointer;
+  font-size: var(--am-text-xs);
+}
+.jw-create-icon {
+  display: inline-flex;
+}
+.jw-create-icon svg {
+  width: 0.9em;
+  height: 0.9em;
+}
+.jw-create:hover {
+  color: var(--am-area-diary);
+}
+
+/* Tasks cell: a compact count pill, tinted when any are still open. */
+.journal-week-table .jw-tasks {
+  white-space: nowrap;
+  width: 1%;
+  text-align: right;
+}
+.jw-taskpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--am-space-1) var(--am-space-4) var(--am-space-1) var(--am-space-3);
+  border-radius: var(--am-radius-pill);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  border: 1px solid var(--background-modifier-border);
+}
+.jw-taskpill-icon {
+  display: inline-flex;
+}
+.jw-taskpill-icon svg {
+  width: 0.85em;
+  height: 0.85em;
+}
+.jw-taskpill.has-open {
+  color: var(--am-area-diary);
+  border-color: rgba(var(--am-area-diary-rgb), 0.4);
+  background: rgba(var(--am-area-diary-rgb), 0.08);
+}
+.jw-taskpill.all-done {
+  color: var(--text-muted);
+  background: var(--background-primary);
+}
+
+.jc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.jc-jump-toggle {
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.jc-jump-toggle:hover {
+  color: var(--interactive-accent);
+}
+.jc-status {
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+}
+.jc-jump-row {
+  display: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 8px;
+}
+.jc-jump-row.open {
+  display: flex;
+}
+.jc-jump-row input {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--am-text-sm);
+  padding: var(--am-space-2) var(--am-space-3);
+}
+/* Open Day / Open Month, drawn as the plugin's button rather than as an
+   accent-filled capsule with no border (4.13.1 §1). They are two more actions in
+   a row of actions; there was nothing about opening a note that earned the one
+   fill on the card. */
+.jc-jump-row button {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  padding: var(--am-control-pad-y) var(--am-space-4);
+  font-size: var(--am-text-xs);
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.jc-jump-row button:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+@media (max-width: 420px) {
+  .cal-cell { font-size: 0.75em; }
+  .jc-footer { flex-wrap: wrap; gap: 4px; }
+}
+
+/* ── 5b. The calendar's agenda panel (calendar:agenda[:N]) ────
+   The upcoming-events list, folded into the bottom of the calendar card so
+   "what's coming" sits with the month it's coming in rather than in a section
+   of its own. It's a recessed zone: the card's own padding is cancelled and
+   re-applied inside, so the divider and the tint run edge to edge.
+
+   Rows reuse .am-ev-chip / .am-ev-text / .am-ev-title / .am-ev-meta from the
+   standalone widget (section 9) — only the date gutter and the relative-time
+   cell are new here. */
+.journal-calendar.jc-has-agenda {
+  padding-bottom: 0;
+}
+/* RETIRED WITH THE BAND (4.13.1 §3). `.journal-calendar.jc-has-header .jc-header
+   { margin-top: 12px }` opened a gap below the hero's closing rule, which the
+   hero needed because it was full-bleed and the navigator under it was too — two
+   edge-to-edge bands with nothing between them. `.jc-actions` is not full-bleed
+   and carries its own 10px below its hairline, so the gap is the strip's now and
+   there is nothing left for this rule to add. */
+/* NO RECESS AS OF 4.13.1 §3b. The section note above calls this "a recessed
+   zone", which is exactly what the card is no longer made of: with the hero and
+   the navigator's band both on the card's own ground, a sunk strip at the foot
+   was the last fill and it made the agenda read as an attachment rather than as
+   the card's last row. The rule at its top is what separates it, and that is the
+   same rule `month-summary`'s banner uses to separate itself from its grid.
+   The radius stays: the strip still meets the card's bottom corners, and a
+   square corner inside a rounded one is visible whether or not there is a fill
+   to see it against. */
+.jc-agenda {
+  margin: 10px -14px 0;
+  padding: 2px 14px 10px;
+  border-top: 1px solid var(--background-modifier-border);
+  border-radius: 0 0 var(--am-radius-md) var(--am-radius-md);
+}
+.jc-agenda-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 0 4px;
+}
+.jc-agenda-label {
+  font-size: var(--am-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.jc-agenda-manage {
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  cursor: pointer;
+}
+.jc-agenda-manage:hover {
+  color: var(--interactive-accent);
+}
+.jc-agenda-empty {
+  font-size: var(--am-text-xs);
+  color: var(--text-faint);
+  padding: 4px 0 6px;
+}
+
+/* One row: date gutter | chip | title+meta | relative time. */
+.jc-agenda-row {
+  display: grid;
+  grid-template-columns: 2.6em auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px;
+  margin: 0 -6px;
+  border-radius: var(--am-radius-sm);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.jc-agenda-row + .jc-agenda-row {
+  border-top: 1px solid var(--background-modifier-border);
+}
+.jc-agenda-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* The gutter's day number is deliberately the weight and figure style of a
+   calendar cell — it's the same date, read twice. */
+.jc-agenda-date {
+  text-align: center;
+  line-height: 1.05;
+}
+.jc-agenda-day {
+  font-size: var(--am-text-base);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+.jc-agenda-month {
+  font-size: var(--am-text-2xs);
+  font-weight: var(--am-caps-weight);
+  letter-spacing: var(--am-caps-tracking);
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-top: 1px;
+}
+/* Within a week, or already running: the near thing gets the accent so it
+   reads before the ones months out. */
+.jc-agenda-row.is-soon .jc-agenda-day,
+.jc-agenda-row.is-soon .jc-agenda-when {
+  color: var(--interactive-accent);
+}
+.jc-agenda-when {
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.jc-agenda-row.is-soon .jc-agenda-when {
+  font-weight: 700;
+}
+
+/* Narrow panes: drop the relative time — the gutter already carries the date,
+   and the title is the thing worth keeping legible. */
+@media (max-width: 420px) {
+  .jc-agenda-row {
+    grid-template-columns: 2.4em auto 1fr;
+  }
+  .jc-agenda-when {
+    display: none;
+  }
+}
+
+/* ── 3.2 patch 6: the overview masthead ───────────────────────────────────
+   THE CARD MOVES OUT ONE LEVEL. Until 3.2 the card is .journal-overview-summary
+   — the summary widget draws its own frame. A merged fence has two widgets in
+   it, so the frame has to belong to the container they share, which is the
+   block. The same move .journal-entry-banner made in 2.18.4, for the same
+   reason: one fence is one container, so the card is real rather than a
+   resemblance.
+
+   DESCENDANT SELECTORS, NOT CHILD ONES, and that is not a style preference.
+   All four period summaries are wrapped in a `.journal-live-widget` host by
+   liveFrontmatterWidget / liveDiaryWidget, so the summary is a GRANDCHILD of
+   the block. The first cut of this file used `>` throughout and matched
+   nothing on any grain — the frames stayed where they were and the release's
+   one visible change did not happen. */
+.journal-widget-block.journal-overview-card {
+  gap: 0;
+  padding: 12px 14px;
+  margin: 0.5em 0 1.25em;
+  background: var(--background-secondary);
+  /* "Between one card and the next" is this border, seen from either side. */
+  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+}
+/* The live host carries no layout of its own; it exists to be repainted. */
+.journal-overview-card > .journal-live-widget {
+  margin: 0;
+  padding: 0;
+}
+/* The links band — identical to the entry's. That identity IS the release:
+   above the rule the two page kinds are the same object, and everything that
+   distinguishes them sits below it. `links` is NOT live-wrapped, so this one
+   is genuinely a child. */
+.journal-overview-card > .journal-links-card {
+  margin: -12px -14px 0;
+  border: none;
+  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
+  background: none;
+}
+.journal-overview-card > .journal-links-card > .journal-links-bar {
+  padding: 7px 8px;
+}
+/* The summary widget gives up the frame it drew for itself. */
+.journal-overview-card .journal-overview-summary {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+/* The masthead band, full-bleed inside the card. It no longer rounds its top
+   (the links band owns that edge) and no longer needs the negative top margin,
+   because nothing between it and the card is padded any more.
+
+   THE SPECIES MARKER is the border-left: an accent edge under the nav strip
+   means "this page summarises the ones below it". The tint is the wash the
+   banner already carried — what is new is the edge, and the fact that an ENTRY
+   now has neither. */
+.journal-overview-card .journal-overview-banner {
+  margin: 0 -14px;
+  padding: 12px 14px 11px;
+  border-radius: 0;
+  border-left: var(--am-rule-edge) solid var(--am-area-diary);
+}
+/* The period actions row — "Keep this week" — welded to the banner's underside
+   so it reads as the masthead's last line rather than as a stray control.
+
+   A SIBLING WEARING THE BANNER'S CLOTHES, not a child of it. The button cannot
+   live inside the summary: `LiveWidget.rerender()` rebuilds that subtree
+   whenever the diary folders change, which would delete it. So it keeps the
+   parent the postprocessor gave it and borrows the band's ground, edge and
+   inset — the seam between them is invisible because there is no seam to draw:
+   the banner's bottom border is the only rule, and this sits under it. */
+.journal-overview-card > .journal-widget-bar.journal-overview-actions {
+  /* SPACE ABOVE, AND A RULE. Zeroing the summary's own padding — which the card
+     now supplies — left the body's last row sitting directly on the bar, so a
+     quarter tile's bottom border read as clipped by it. The bar keeps its
+     full-bleed footer shape and gains the gap the summary used to provide. */
+  margin: 10px -14px 0;
+  padding: 8px 14px;
+  border-top: var(--am-rule) solid var(--background-modifier-border);
+  justify-content: flex-end;
+  border-left: var(--am-rule-edge) solid var(--am-area-diary);
+  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+  background: var(--background-secondary-alt);
+}
+/* THE FOOTER'S LEFT EDGE, and `margin-right: auto` rather than
+   `justify-content: space-between` on the bar. The bar is right-aligned and
+   should stay so: a footer holding only "Keep this month" must keep it on the
+   right, and space-between would centre-strand a single child on whichever end
+   it happened to be. Pushing from the one control that wants the left edge
+   leaves the rule correct for one button, two, or three. */
+.journal-overview-actions > .jpn-now-btn {
+  margin-right: auto;
+  flex-shrink: 0;
+}
+.journal-overview-card > .journal-widget-bar.journal-overview-actions:last-child {
+  margin-bottom: -12px;
+  border-bottom: none;
+  border-radius: 0 0 var(--am-radius-md) var(--am-radius-md);
+}
+/* The body keeps its own inset now that the card, not the summary, is padded. */
+.journal-overview-card .journal-overview-body {
+  padding-top: 10px;
+}
+/* The period button takes the stack's shape: `.journal-btn` is a 10px-radius
+   outline pill by default, which beside two capsule controls reads as a third
+   design. */
+.journal-overview-actions > .journal-btn,
+.journal-period-nav-stack > .journal-btn {
+  border-radius: var(--am-radius-pill);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  padding: 3px 10px;
+  color: var(--text-muted);
+}
+.journal-overview-actions > .journal-btn:hover,
+.journal-period-nav-stack > .journal-btn:hover {
+  background: transparent;
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+/* ── 3.5: the span above, the value as a control ──────────────────────────
+   The band prints two lines where it used to print one. They answer different
+   questions — "what stretch of days is this" and "which one of these is it" —
+   and the old title tried to be both, which is why it was long enough to wrap
+   in a split pane and why it changed shape as a period ran ("Jul – Sep so
+   far"). The span takes the sentence; the navigator's own trigger takes the
+   name and, being a button already, takes the interaction with it. */
+.journal-overview-banner .job-span {
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+}
+/* Nothing rides the band's right edge, so the head is a single column and the
+   rows below it get the full width.
+
+   NOT SCOPED TO THE CARD, AS OF 4.1, AND THAT WAS A REAL BUG RATHER THAN A
+   TIDY-UP. Both of these rules read `.journal-overview-card .journal-overview-
+   banner …`, which was true of every banner that existed — a period summary
+   always took the card — and so the card scope cost nothing and said nothing.
+
+   It was doing load-bearing LAYOUT work under a scope that names a FRAME.
+   `.job-head` is a wrapping flex row, so `.job-text` inside it is a flex item
+   and shrink-to-fits; `display: block` is what makes it a full-width column,
+   and the stat strip inside it is a grid that fills whatever it is given. The
+   moment `frame: section` withheld the card class, `.job-head` fell back to
+   flex and the strip collapsed to the width of its own text — about a third of
+   the band — on a page where nothing about the frame was supposed to change
+   the layout.
+
+   So the scope moves to the thing the rule is actually about. `.job-head` is
+   only ever built inside `.journal-overview-banner` (calendar.ts), and every
+   banner today is inside a card, so this is behaviour-preserving for every
+   existing page and correct for the frames that have no card.
+
+   THE GENERAL RULE THIS IS AN INSTANCE OF: a selector scoped to
+   `.journal-overview-card` is claiming "this only applies when there is a
+   card". Where that is not what was meant, `frame:` will find it — the class
+   was a reliable proxy for "a period summary is here" for as long as the two
+   could not come apart, and they can now. */
+.journal-overview-banner .job-head {
+  display: block;
+}
+/* The strip's row. It held two controls until 3.6 — the navigator and "This
+   week", the second pushed to the far right — and holds one now: the button is
+   in the card's footer. The wrapper stays because it is what gives the strip
+   its own line under the span, and a flex row of one is still the shape this
+   band wants the day something else belongs beside the navigator. */
+.journal-overview-banner .journal-period-nav-stack {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+}
+/* ── 3.6 patch 8: the navigator measures as one control ──────────────────
+   THREE PARTS AT THREE SCALES, which is what four releases of moving things
+   into this band produced. `‹` and `›` are `.jeh-navpill`s built for the 12px
+   segmented strip they used to belong to: 2em square at the BAND's font size,
+   so 32px boxes around 16px glyphs. The trigger sits between them at 0.85em
+   with 2px of side padding, carrying a 1.6em label — a 22px headline in a 25px
+   box. Nothing shared a measurement with anything, so the strip's height came
+   from the chevrons rather than from the thing it is a control for, and the
+   air left of the title was 8px against the trigger's 2px.
+
+   ONE NUMBER, AND THE REST DERIVED FROM IT. `--jpn-headline` is the label's
+   size, declared once on the trigger. The caret reads it, so it scales with
+   the headline instead of with the pill it used to sit in; the segments stop
+   declaring heights and stretch, so the strip is as tall as its tallest
+   content and its content is the headline. The chevrons keep a fixed WIDTH,
+   because that is the air either side of the title and it is the number that
+   has to equal the trigger's padding — 8px against 8px, rather than 8px
+   against 2px. */
+.journal-overview-banner .journal-period-nav.jeh-seg {
+  align-items: stretch;
+  /* THE ONE NUMBER. The headline's size, stated once at the top of the control
+     so all three segments can reach it — the trigger's label, its caret, and
+     the chevrons that are not inside the trigger at all.
+
+     1.36em because that is what the label already measured: 1.6em of the
+     trigger's inherited 0.85em. Written against the BAND's font size rather
+     than the trigger's, which is why the trigger resets to 1em below. Without
+     that reset this token would mean two different pixel values depending on
+     which segment read it, which is the exact failure it exists to end. */
+  --jpn-headline: 1.36em;
+}
+/* No height of their own: the row's height belongs to the headline now. The
+   width stays fixed because it IS the optical air either side of the title,
+   and it has to equal the trigger's padding. */
+.journal-overview-banner .jeh-navpill {
+  width: 2em;
+  height: auto;
+}
+/* Cap-height, not font-size: a chevron drawn to the label's full em stands
+   taller than the letters beside it, which is most of why these floated
+   against the headline's baseline rather than aligning to anything. */
+.journal-overview-banner .jeh-navpill svg {
+  width: calc(var(--jpn-headline) * 0.7);
+  height: calc(var(--jpn-headline) * 0.7);
+}
+/* THE HEADLINE. A segmented-control trigger wearing the title's size — still a
+   button, so focus, keyboard and the announced role come for free.
+
+   THE DASHED UNDERLINE IS GONE, and it was wrong twice over. It was a text
+   decoration doing a control's job — the affordance belongs to the control's
+   edge, and this control HAS an edge: `.jeh-nav.jeh-seg`'s own capsule border,
+   which was already drawn around all three segments. So the dash sat about two
+   pixels above a solid line that meant the same thing, which is why it read as
+   a decoration that had failed rather than as a boundary. (The 3.6 plan has
+   this as "runs under the label and stops before the caret"; it ran the full
+   width of the trigger, caret included. The doubled line was the defect.)
+
+   What replaces it is a hover and open GROUND that the whole trigger owns,
+   caret included — the affordance is now the thing you are about to press. */
+.journal-overview-banner .jeh-datenav-trigger.jpn-value {
+  /* Back to the band's own em, so `--jpn-headline` means the same length here
+     as it does on the chevrons outside. The 0.85em this inherits from
+     `.jeh-datenav-trigger` is the 12px segmented strip's size, and it stopped
+     being the right base the moment this trigger became the headline. */
+  font-size: 1em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 3px 8px;
+  height: auto;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--text-normal);
+}
+.journal-overview-banner .jeh-datenav-trigger.jpn-value:hover,
+.journal-overview-banner .jeh-datenav-trigger.jpn-value.is-open {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+/* Keyboard reaches this control and always did — it is a button. It should be
+   able to SHOW that it has been reached, which a dashed underline that never
+   changed on focus could not. */
+.journal-overview-banner .jeh-datenav-trigger.jpn-value:focus-visible {
+  background: var(--background-modifier-hover);
+  outline: var(--am-rule) solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+.journal-overview-banner .jpn-value-label {
+  font-size: var(--jpn-headline);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+/* Sized off the headline rather than off the pill scale it inherited, and
+   muted rather than faint: it is part of the label, not a hint beside it. */
+.journal-overview-banner .jpn-value .jeh-datenav-caret {
+  color: var(--text-muted);
+}
+.journal-overview-banner .jpn-value .jeh-datenav-caret svg {
+  width: calc(var(--jpn-headline) * 0.55);
+  height: calc(var(--jpn-headline) * 0.55);
+}
+/* The strip's clearance from the navigator row above it lives with the strip,
+   in 96-stat-strip.css: it is the component's margin now rather than an
+   override this file applies to a paragraph. */

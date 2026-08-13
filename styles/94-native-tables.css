@@ -1,0 +1,552 @@
+/* ── 6. Native tables (tag-index / topics-table / confidence-summary) ──
+   Replaces the old dataviewjs tables (v1.5) — reuses the .journal-week-table
+   look and the existing [!note] callout styling above so it matches on day
+   one, without a dedicated design pass. */
+.journal-table {
+  margin: 0.4em 0 0.8em;
+}
+
+/* topics-table, and kind-table which is the same table one level down — one
+   lists the folders beneath a note, the other the notes. They sit on sibling
+   dashboards and a reader moves between them constantly, so they share the
+   chrome rather than each getting a pass of their own. That is the same
+   argument the block comment above makes for reusing .journal-week-table. */
+.journal-topics-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--am-text-base);
+}
+.journal-topics-tbl th,
+.journal-topics-tbl td {
+  text-align: left;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.journal-topics-tbl th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: var(--am-text-sm);
+}
+.journal-topics-tbl th:not(:first-child),
+.journal-topics-tbl td:not(:first-child) {
+  white-space: nowrap;
+}
+.journal-topics-tbl .jt-topic a.internal-link {
+  font-weight: 600;
+  text-decoration: none;
+}
+.journal-topics-tbl .jt-topic a.internal-link:hover {
+  color: var(--interactive-accent);
+}
+
+/* ── The kind table, which is a list of rows (2.56.5) ────────────────────
+   A four-column `<table>` at 380px either overflows the pane or squeezes a
+   lesson title to three characters, because table columns cannot shrink past
+   their content. A table of records IS a list of rows; what a wide viewport
+   adds is that the rows line up. So the wide layout is a grid over
+   createListRow's main region and the narrow one is the same DOM with the grid
+   dropped to one track — one render, no resize listener, no second copy. */
+/* A columned list of records. The slots below are the row component's, not
+   the kind table's: the heading strip, the value cell and the bounded-value bar
+   are what ANY list of records wants, and naming them after the first caller is
+   how the plugin got twenty-seven class-prefix families. */
+.almanac-list {
+  display: flex;
+  flex-direction: column;
+}
+.almanac-list-heads,
+.almanac-list-main.is-columned {
+  display: grid;
+  grid-template-columns: var(--am-row-cols, 1fr);
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.almanac-list-heads {
+  padding: 0 6px 4px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.almanac-list-heads-cell {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: var(--am-text-sm);
+}
+.almanac-list-cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* A cell holding words rather than a number — a status, a label. Slightly
+   smaller, because it competes with the title for the eye and the title should
+   win. */
+.almanac-list-cell.is-text {
+  font-size: var(--am-text-sm);
+}
+
+/* A finished note recedes rather than disappearing.
+   The ```base table this replaces opened on a "Not Completed" view, so its
+   default was to hide these outright. A LiveWidget rebuilds its whole subtree
+   whenever anything in scope changes, so a view tab would reset every time the
+   reader logged something — and muting says "done" at least as clearly while
+   leaving the note one click away. See tables.ts::buildKindTable. */
+/* A finished record recedes rather than disappearing. Scoped to
+   `.is-done-able` so `is-done` stays a generic row state — the task and path
+   widgets already use that class name for their own rows, and a bare
+   `.almanac-list-row.is-done` would have been a third meaning for it. */
+.almanac-list-row.is-done-able.is-done {
+  color: var(--text-faint);
+}
+.almanac-list-row.is-done-able.is-done .almanac-list-title a.internal-link {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.almanac-list .almanac-list-title a.internal-link {
+  font-weight: 600;
+  text-decoration: none;
+}
+.almanac-list .almanac-list-title a.internal-link:hover {
+  color: var(--interactive-accent);
+}
+
+/* A bounded rating, drawn rather than written. `3` on its own is not a reading
+   — three out of what — and the segments answer that without a second column
+   for the maximum. Built from the tracker's declared min/max, never from the
+   largest value present. */
+.almanac-list-gauge {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: -1px;
+}
+.almanac-list-seg {
+  width: 6px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--background-modifier-border);
+}
+.almanac-list-seg.is-on {
+  background: var(--interactive-accent);
+}
+.almanac-list-row.is-done-able.is-done .almanac-list-seg.is-on {
+  background: var(--text-faint);
+}
+
+/* The collapse. The heading strip goes, the grid drops to one track, and the
+   row's own reading order carries what the columns were saying — a date reads
+   as a date and a status reads as a status, so labelling them with
+   pseudo-content would cost a line of screen each to repeat the value. What
+   genuinely needed the header row is sorting, and that belongs in the
+   section's overflow rather than in a strip that vanishes at 460px. */
+@container (max-width: 460px) {
+  .almanac-list-heads {
+    display: none;
+  }
+  .almanac-list-main.is-columned {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1px;
+  }
+  .almanac-list-cell {
+    font-size: var(--am-text-sm);
+    color: var(--text-muted);
+  }
+}
+
+/* confidence-summary */
+.journal-confidence-summary .jt-confidence-line {
+  margin: 0.2em 0;
+  color: var(--text-normal);
+}
+
+/* tasks-table — folder-scoped open-task rollup grouped by note. Reuses the
+   per-note task widget's row chrome (.journal-task-row / -check / -text /
+   -prio) so a task reads the same here as in its own note, but rows are
+   read-only apart from the checkbox: text isn't an input, and there's no
+   priority-cycle / delete / due-picker — this is a dashboard view, not an
+   editor. Editing still happens in the source note (one click away via the
+   group heading link). */
+.journal-tasks-table .jtt-loading {
+  color: var(--text-faint);
+  font-size: var(--am-text-sm);
+  padding: 4px 2px;
+}
+/* Header line: a lighter, muted title (the collapsible `header:` bar above the
+   widget is the section's real heading) on the left, count / overdue pills on
+   the right. */
+.journal-tasks-table .jtt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 0.7em;
+}
+.journal-tasks-table .jtt-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+}
+.journal-tasks-table .jtt-title-icon {
+  display: inline-flex;
+}
+.journal-tasks-table .jtt-title-icon .svg-icon {
+  width: 0.95em;
+  height: 0.95em;
+}
+.journal-tasks-table .jtt-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.journal-tasks-table .jtt-pill {
+  font-size: var(--am-text-2xs);
+  line-height: 1.4;
+  padding: var(--am-space-1) var(--am-space-5);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+/* Danger pill: a low-alpha red tint so the red text stays readable in every
+   theme. `--background-modifier-error` resolves to a near-solid red in some
+   themes, which hid the text — a controlled rgba tint avoids that. */
+.journal-tasks-table .jtt-pill-danger {
+  background: rgba(var(--color-red-rgb, 224, 85, 97), 0.15);
+  border-color: transparent;
+  color: var(--text-error, #e05561);
+}
+.journal-tasks-table .jtt-group {
+  margin-bottom: 0.8em;
+}
+.journal-tasks-table .jtt-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.journal-tasks-table .jtt-group-head a.internal-link {
+  font-weight: 600;
+  text-decoration: none;
+}
+.journal-tasks-table .jtt-group-head a.internal-link:hover {
+  color: var(--interactive-accent);
+}
+/* Group count: a small neutral chip matching the header pills. */
+.journal-tasks-table .jtt-group-count {
+  font-size: var(--am-text-2xs);
+  line-height: 1.4;
+  padding: 1px 7px;
+  border-radius: var(--am-radius-pill);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+}
+/* Rows read as a light list, not filled bars: no surface fill, a hairline
+   separator between rows, and a thin priority accent on the left. Padding is
+   kept modest so rows don't feel chunky. */
+.journal-tasks-table .jtt-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 4px 5px 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-left: 2px solid transparent;
+}
+.journal-tasks-table .jtt-list .jtt-row:last-child {
+  border-bottom: none;
+}
+/* Priority accent on the left edge — only high priority gets a visible mark so
+   the list stays calm; normal/low read as plain rows. Amber is intentionally
+   left free for a future "due soon" state. */
+.journal-tasks-table .jtt-row.journal-task-high {
+  border-left-color: var(--color-red, #e05561);
+}
+.journal-tasks-table .jtt-row.journal-task-low {
+  opacity: 0.85;
+}
+/* Read-only text: not an <input>, so drop the field affordances the editable
+   per-note widget carries and let it sit as plain flowing text. */
+.journal-tasks-table .jtt-text {
+  cursor: default;
+  flex: 1;
+}
+.journal-tasks-table .jtt-row.is-done .jtt-text {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+.journal-tasks-table .jtt-row.is-done {
+  opacity: 0.55;
+}
+.journal-tasks-table .jtt-due {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.journal-tasks-table .jtt-due-icon {
+  display: inline-flex;
+}
+.journal-tasks-table .jtt-due-icon .svg-icon {
+  width: 0.9em;
+  height: 0.9em;
+}
+/* Overdue due date reads as a danger pill; low-alpha red tint keeps the red
+   text readable (see .jtt-pill-danger for why a raw theme error-bg fails). */
+.journal-tasks-table .jtt-due-overdue {
+  padding: 1px 8px;
+  border-radius: var(--am-radius-pill);
+  background: rgba(var(--color-red-rgb, 224, 85, 97), 0.15);
+  color: var(--text-error, #e05561);
+  font-weight: 600;
+}
+
+/* tag-index — a table of tags, most-used first. Each row is a
+   <details><summary> (click the row = expand the in-scope note list); the
+   search icon in the row is the click-to-search-the-whole-vault action, kept
+   as a separate control so "expand the local list" and "search everywhere"
+   stay two distinct, undoable clicks instead of overloading one.
+
+   IT WAS A CLOUD UNTIL 3.14, sized in three tiers by frequency. The tiers
+   went with it: they encoded the count as visual weight because a cloud has
+   no column for a number, and the count was drawn on every pill anyway. The
+   source column is what forced the change — two cells have to align down the
+   page, and aligned pills are a table. */
+.jt-tag-summary {
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+  margin: 0 0 0.5em;
+}
+.jt-tag-table {
+  display: flex;
+  flex-direction: column;
+}
+.journal-tag-index .jt-tag-group {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.journal-tag-index .jt-tag-group:last-child {
+  border-bottom: none;
+}
+/* Three columns, or four with a source. `minmax(0, …)` on the two text cells
+   so a long tag or a deep folder name wraps inside its cell instead of
+   pushing the count and the search control off the row. */
+.jt-tag-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--am-space-2) var(--am-space-4);
+  cursor: pointer;
+  list-style: none;
+  padding: var(--am-space-3) var(--am-space-2);
+  color: var(--text-normal);
+  transition: background 0.15s;
+}
+.has-source .jt-tag-row {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.1fr) auto;
+}
+.jt-tag-row::-webkit-details-marker { display: none; }
+.jt-tag-row:hover {
+  background: var(--background-modifier-hover);
+}
+.journal-tag-index details[open] > .jt-tag-row {
+  color: var(--interactive-accent);
+}
+.jt-tag-name {
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.jt-tag-count {
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+  font-weight: 400;
+  white-space: nowrap;
+}
+/* The sources cell wraps rather than truncating: a tag genuinely used in six
+   journals should say six, and a row that grows is honest where an ellipsis
+   is a number the reader cannot see. */
+.jt-tag-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-1) var(--am-space-2);
+  min-width: 0;
+}
+.jt-tag-source {
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  padding: 0 var(--am-space-3);
+  overflow-wrap: anywhere;
+}
+.jt-tag-list {
+  margin: 0 0 0.4em 0;
+  padding-left: 2em;
+  font-size: var(--am-text-sm);
+}
+.jt-tag-list li {
+  margin: 0.15em 0;
+}
+.jt-tag-list a.internal-link {
+  text-decoration: none;
+}
+.jt-tag-list a.internal-link:hover {
+  color: var(--interactive-accent);
+}
+.jt-tag-search {
+  flex-shrink: 0;
+}
+.jt-tag-search .journal-btn-icon {
+  width: 0.85em;
+  height: 0.85em;
+}
+
+/* The Tags tracker (3.16) — the control in a logging cell, and the window
+   that edits it. The control is a readout that IS the button: every other
+   tracker control edits in place because every other tracker holds one value
+   and a tap is the whole edit, where a list needs typing and therefore a
+   dialogue.
+
+   No label rule here: `tracker` is not a self-labelled kind, so the eyebrow
+   above this comes from the same wrapper every stepper and picker uses. */
+.journal-tags-field {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+/* Both states are one control filling the cell's width, so a Tags cell has
+   the same silhouette as the stepper beside it rather than a bordered block
+   under two lines of prose. */
+.journal-tags-chips,
+.journal-tags-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--am-space-2);
+  width: 100%;
+  min-width: 0;
+  padding: var(--am-space-2) 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-normal);
+  font-size: var(--am-text-2xs);
+}
+.journal-tags-add {
+  color: var(--text-muted);
+}
+.journal-tags-add:hover,
+.journal-tags-chips:hover {
+  color: var(--text-normal);
+  background: none;
+}
+.journal-tags-chip {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  padding: 0 var(--am-space-3);
+  overflow-wrap: anywhere;
+}
+.journal-tags-chips:hover .journal-tags-chip {
+  border-color: var(--interactive-accent);
+}
+/* The pencil trails the chips rather than sitting in a corner: it is the same
+   target as the chips, so it reads as the end of one control instead of a
+   second one competing with it. */
+.journal-tags-pencil {
+  width: 0.8em;
+  height: 0.8em;
+  opacity: 0;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.journal-tags-chips:hover .journal-tags-pencil,
+.journal-tags-chips:focus-visible .journal-tags-pencil {
+  opacity: 1;
+}
+
+.almanac-tags-editor .almanac-tags-section {
+  margin-bottom: var(--am-space-6);
+}
+.almanac-tags-heading {
+  font-size: var(--am-text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: var(--am-space-3);
+}
+.almanac-tags-empty {
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+}
+.almanac-tags-list {
+  display: flex;
+  flex-direction: column;
+}
+.almanac-tags-row {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-3);
+  padding: var(--am-space-2) 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.almanac-tags-row:last-child { border-bottom: none; }
+.almanac-tags-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.almanac-tags-remove:hover { color: var(--text-error, #e05561); }
+.almanac-tags-add {
+  display: flex;
+  gap: var(--am-space-3);
+  align-items: center;
+}
+.almanac-tags-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* The used-tags list is the directory survey, and a pill TOGGLES: the same
+   control adds and removes, so the list doubles as a picture of what this
+   note carries. Pressed means on this note. */
+.almanac-tags-used {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-2);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.almanac-tags-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--am-space-2);
+  cursor: pointer;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  padding: var(--am-space-2) var(--am-space-4);
+  color: var(--text-normal);
+  font-size: var(--am-text-xs);
+}
+.almanac-tags-pill:hover { border-color: var(--interactive-accent); }
+.almanac-tags-pill.is-on {
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+.almanac-tags-count {
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+}
+
+/* A phone has no hover, so the pencil that trails the chips would never
+   appear — and the chips would read as a static list rather than as the
+   control they are. It rests visible there instead, which is the same answer
+   every other hover-revealed affordance in this sheet gives. */
+@media (hover: none) {
+  .journal-tags-pencil {
+    opacity: 1;
+  }
+}
