@@ -854,36 +854,17 @@ export function meanClock(minutes: number[]): string | null {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-// Parse a `header:` directive body into its level + title. Grammar:
-//   `header:<title>`            → level 1 (a top-level section)
-//   `header:<1|2>:<title>`      → explicit level (2 = nested, e.g. a journal
-//                                 type inside the Journals container)
-// `rest` is everything after `header:` (already trimmed). Returns null title
-// for a bare `header:` (the legacy title-less anchor variant). Used by both the
-// widget renderer (to style/size the bar and drive collapse) and the home-page
-// section matchers in journal.ts / charts.ts (so a level prefix doesn't stop
-// them recognising "📚 Journals" / "📊 Trends and Statistics").
-export function parseHeaderDirective(rest: string): {
-  level: number;
-  title: string;
-} {
-  // Any leading `<digits>:` is a level, CLAMPED to the two that exist.
-  //
-  // The pattern was `/^([12]):/`, so `header:3:Sources` matched nothing and
-  // fell through to the default — rendering a level-1 bar literally titled
-  // "3:Sources". A number the grammar doesn't have should not become part of
-  // the text; clamping keeps the title clean and the bar somewhere sensible,
-  // and is what a reader reaching for a third level meant.
-  //
-  // Only digits, so a title that legitimately opens with a word and a colon
-  // ("Note: read this") is untouched.
-  const m = rest.match(/^(\d+):(.*)$/);
-  if (!m) return { level: 1, title: rest.trim() };
-  return {
-    level: Math.min(2, Math.max(1, Number(m[1]))),
-    title: m[2].trim(),
-  };
-}
+// MOVED TO `directive-grammar.ts` IN 4.30, unchanged, and re-exported here so
+// every existing caller is untouched — the shape `section-model.ts` used when
+// it took the section ops out of `journal-plan.ts`.
+//
+// It was always directive grammar; it lived here for the accident of having
+// been needed by a caller that already imported this file. The move is what
+// lets `plain-markdown.ts` read a `header:` title without importing a module
+// that imports Obsidian, and there is exactly one spelling of the grammar
+// either way.
+import { parseHeaderDirective } from "./directive-grammar";
+export { parseHeaderDirective };
 
 // If `lines[i]` opens an ```almanac fence whose first directive is a `header:`,
 // return that header's parsed {level, title}; otherwise null. Used to recognise
@@ -949,7 +930,7 @@ export interface LocatedSection {
 }
 
 // Locate a titled dashboard section (e.g. "📚 Journals", "📊 Trends and
-// Statistics") in a note's lines, tolerating both the header-bar form
+// statistics") in a note's lines, tolerating both the header-bar form
 // (```almanac / header:[level:]<title> / ```) and the legacy `<heading>`
 // markdown form. This is the single shared implementation behind the Journals
 // rebuild (journal.ts) and the chart region rewrite (charts.ts) — before it,
@@ -961,12 +942,35 @@ export interface LocatedSection {
 // default any other header bar ends the section; the Journals container passes
 // a predicate that treats its own per-type bars (Study, custom types) as
 // *inside* the section rather than boundaries.
+//
+// ── A TITLE MAY BE SPELLED MORE THAN ONE WAY, AS OF 4.26 ──────────────
+//
+// `title` and `heading` each take a LIST as well as a string, and the list is
+// "every spelling this section has ever shipped under, canonical first".
+//
+// This function is the only reason a display string could not be renamed. The
+// match was `hdr.title !== title` — exact — so a section whose name changed
+// stopped being findable in every note written before the change, and the
+// caller could not tell that from "the section is not there": both are null.
+// 4.25 tried to put `TRENDS_HEADING` into sentence case with the rest of the
+// plugin's titles, found this, and reverted rather than ship a rename that
+// silently unhooked the pre-2.1 Trends migrations from the notes that still
+// need them.
+//
+// A LIST RATHER THAN A NORMALISER. Case-insensitive comparison would have been
+// fewer lines and would quietly accept spellings this project never shipped —
+// including a reader's own retitling, which is theirs to keep and must not be
+// treated as a version of ours to rewrite. An explicit history says exactly
+// which strings are Almanac's old words, so a migration can rewrite those and
+// nothing else.
 export function locateSection(
   lines: string[],
-  title: string,
-  heading: string,
+  title: string | readonly string[],
+  heading: string | readonly string[],
   isBoundaryTitle: (t: string) => boolean = () => true
 ): LocatedSection | null {
+  const titles = typeof title === "string" ? [title] : title;
+  const headings = typeof heading === "string" ? [heading] : heading;
   let titleStart = -1;
   let titleEnd = -1;
   let viaHeaderBar = false;
@@ -974,7 +978,7 @@ export function locateSection(
   // Prefer the header-bar fence form.
   for (let i = 0; i < lines.length; i++) {
     const hdr = headerAtFence(lines, i);
-    if (!hdr || hdr.title !== title) continue;
+    if (!hdr || !titles.includes(hdr.title)) continue;
     for (let j = i + 2; j < lines.length; j++) {
       if (lines[j].trim() === FENCE_CLOSE) {
         titleStart = i;
@@ -988,7 +992,7 @@ export function locateSection(
 
   // Fall back to the legacy markdown heading.
   if (titleStart === -1) {
-    const h = lines.findIndex((l) => l.trim() === heading);
+    const h = lines.findIndex((l) => headings.includes(l.trim()));
     if (h === -1) return null;
     titleStart = h;
     titleEnd = h;

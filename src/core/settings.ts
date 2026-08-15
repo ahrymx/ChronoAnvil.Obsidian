@@ -39,10 +39,9 @@ import {
 } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
 import type { SectionChoice } from "./section-model";
-import {
-  offerableEntrySections,
-  sectionsForEntry,
-} from "../diary/entry-sections";
+import { entrySectionMatrix } from "../diary/entry-sections";
+import { bandWithSection } from "../diary/entry-template";
+import type { EntryLayoutConfig } from "../diary/entry-template";
 import type {
   EntrySection,
   EntrySectionContext,
@@ -179,6 +178,39 @@ export interface AlmanacSettings {
   //
   // Keyed by grain and sparse: an absent grain means "only what ships".
   entrySections: Partial<Record<TrackerClass, SectionChoice[]>>;
+  // The order of a grain's shared band, where the reader has saved one (4.29).
+  //
+  // THE SECOND HALF OF `entrySections`, AND DELIBERATELY NOT INSIDE IT. That
+  // list is additive by decision — see the paragraph above — so it cannot carry
+  // an order without freezing the shipped set. This one carries the order and
+  // nothing else, which means the two cannot contradict each other: an order
+  // naming a section that is not a member is inert, and a member the order does
+  // not name keeps catalogue order behind the ones it does.
+  //
+  // Written by "Save this page as the default" in the Template window, which is
+  // the only gesture that can produce one — the settings table decides
+  // membership and has never had anywhere to express a reorder.
+  //
+  // Sparse, and an absent grain composes byte-for-byte what it composed before
+  // this key existed. That is asserted rather than assumed
+  // (`test/entry-template.test.ts`), because five template files are written
+  // from the function that reads it.
+  entrySectionBand: Partial<Record<TrackerClass, string[]>>;
+  // Named entry layouts the reader saved, offered on the grains they chose.
+  //
+  // A SEPARATE ARRAY FROM `customJournals[].variants`, WHICH IS THE SAME IDEA.
+  // A journal variant is stored ON a journal config and scaffolds a template
+  // FILE of its own, because a journal kind can be created from any of several
+  // arrangements. A diary grain has exactly one template file, so half that
+  // shape has nothing to do here: a diary layout is a recipe you seed a page
+  // from, never a file. Sharing the storage would mean a diary layout living on
+  // a journal, which is the cross-catalogue transfer `layout-transfer.ts`
+  // exists to refuse.
+  entryLayouts: EntryLayoutConfig[];
+  // The version of Almanac recorded when settings were last saved / initialized.
+  // Used to detect plugin upgrades and prompt the reader when repairs or
+  // migrations are pending.
+  installedVersion?: string;
 }
 
 export const DEFAULT_SETTINGS: AlmanacSettings = {
@@ -206,6 +238,9 @@ export const DEFAULT_SETTINGS: AlmanacSettings = {
   captureCollapsedByDefault: true,
   collapsedSettingsGroups: {},
   entrySections: {},
+  entrySectionBand: {},
+  entryLayouts: [],
+  installedVersion: undefined,
 };
 
 let idCounter = 0;
@@ -479,6 +514,22 @@ export class AlmanacSettingTab extends PluginSettingTab {
     wrap.createSpan({ text });
   }
 
+  // A structured table container for dense, scannable lists (Trackers, Journals).
+  private createTable(
+    host: HTMLElement,
+    headers: string[]
+  ): { wrap: HTMLElement; table: HTMLElement; tbody: HTMLElement } {
+    const wrap = host.createDiv({ cls: "almanac-settings-table-wrap" });
+    const table = wrap.createEl("table", { cls: "almanac-settings-table" });
+    const thead = table.createEl("thead");
+    const tr = thead.createEl("tr");
+    for (const h of headers) {
+      tr.createEl("th", { text: h });
+    }
+    const tbody = table.createEl("tbody");
+    return { wrap, table, tbody };
+  }
+
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
@@ -501,12 +552,14 @@ export class AlmanacSettingTab extends PluginSettingTab {
     new Setting(general)
       .setName("Set up / repair vault")
       .setDesc(
-        "Create any missing folders, templates, base files and the homepage. Existing files are never overwritten — safe to run any time."
+        "Audit and repair your Almanac vault: create missing folders, update dashboard layouts, sync journal index notes, refresh templates, and run format migrations. Safe to run anytime with full change preview."
       )
       .addButton((b) =>
         b
-          .setButtonText("Run setup")
+          .setButtonText("Set up / repair vault")
+          .setIcon("wrench")
           .setCta()
+          .setTooltip("Audit and repair vault files")
           .onClick(async () => {
             await this.plugin.scaffold.setupVault();
           })
@@ -582,7 +635,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
         "capture",
         "✏️",
         "Quick capture",
-        "Getting a thought into today's entry without opening it",
+        "Getting a thought into an entry without opening it",
         false,
         s.captureCollapsedByDefault ? "Collapsed" : "Expanded"
       )
@@ -767,6 +820,11 @@ export class AlmanacSettingTab extends PluginSettingTab {
         name: "03 · Journals",
         desc: "One folder per journal — Study's, and each custom journal's.",
       },
+      {
+        key: "exportRoot",
+        name: "Plain markdown export",
+        desc: "Where “Maintenance: export as plain markdown” writes. Copies only — nothing here is read back.",
+      },
     ];
 
     for (const root of roots) {
@@ -907,8 +965,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
   private renderEntrySections(containerEl: HTMLElement): void {
     this.note(
       containerEl,
-      "Sections every new entry starts with, on top of the ones its grain already ships. This edits the entry TEMPLATES — it reaches entries you make from now on.",
-      "Entries you already have keep what they have. To add a section to one of those, open it and run \"Edit this note's sections…\"."
+      "Manage extra sections for new entry templates. Entries you already have keep what they have (to add a section, open the note and run “Edit this note's sections…”)."
     );
 
     new Setting(containerEl)
@@ -928,33 +985,102 @@ export class AlmanacSettingTab extends PluginSettingTab {
     // prints. A bridge on an entry reads the surface its host is not on.
     const journalKinds = bridgeCatalogue(this.plugin, otherSurface("diary")).kinds;
 
-    let drew = false;
-    for (const grain of TRACKER_CLASSES) {
-      const ctx: EntrySectionContext = { grain, journalKinds };
-      // What this grain's template does NOT already write. `sectionsForEntry`
-      // asked without `extra` is exactly "what a plain template ships with",
-      // and `offerableEntrySections` is "what this grain could be given,
-      // borrowing another grain's wording if it must" — so the difference is
-      // the offer, and it is nine sections' worth rather than the one this
-      // release added. `challenges` ships on monthly alone and is offerable
-      // everywhere; that has been true and unreachable since 2.60.1.
-      const ships = new Set(sectionsForEntry({ grain }).map((s) => s.id));
-      const offer = offerableEntrySections(ctx).filter(
-        (s) => !ships.has(s.id) && s.fence === "shared"
-      );
-      if (!offer.length) continue;
-      drew = true;
-      this.sectionHeader(containerEl, `${CLASS_DEFS[grain].label} entries`);
-      for (const section of offer) {
-        this.renderEntrySectionRow(containerEl, grain, section, ctx);
-      }
-    }
-    if (!drew) {
+    // ── ONE TABLE, NOT FIVE STACKS (4.27 §3) ──────────────────────────
+    //
+    // This was a headed stack per grain, and across all five grains exactly two
+    // sections are ever offerable — so it drew "From the journals" four times
+    // and "Captured" four times with a heading between each. The same facts are
+    // a grid: a row per section, a column per grain.
+    //
+    // EVERY DECISION IS `entrySectionMatrix`'S. The two calls that used to be
+    // inline here moved into the catalogue, where the suite can reach them —
+    // this loop draws what it is handed and works out nothing for itself.
+    //
+    // HEADERS DERIVED, NEVER FIVE LITERALS. `test/tracker-grains.test.ts`
+    // records the reason: "a sixth grain is a table edit away; a layout that
+    // only works at five breaks silently the moment the table grows".
+    const matrix = entrySectionMatrix(journalKinds);
+    if (!matrix.rows.length) {
       this.emptyState(
         containerEl,
         "layout-template",
         "Every grain's template already writes every section this catalogue offers."
       );
+      return;
+    }
+
+    const { tbody } = this.createTable(containerEl, [
+      "Section",
+      ...matrix.grains.map((g) => CLASS_DEFS[g].label),
+    ]);
+
+    for (const section of matrix.rows) {
+      const tr = tbody.createEl("tr");
+      const ctxFor = (grain: TrackerClass): EntrySectionContext => ({
+        grain,
+        journalKinds,
+      });
+
+      // Nothing in the vault to answer this section's question with — a
+      // sentence in the section's own words rather than an empty menu, exactly
+      // as the stacked row said it.
+      //
+      // SAID ONCE, IN THE ROW, rather than in each of four cells: the answer
+      // does not vary by grain (it is the same vault five times over, which is
+      // why `journalKinds` is assembled once above), so four copies would be
+      // one fact repeated until it read as noise. The grain cells then draw no
+      // control, because a dropdown whose only entry is "Not added" is a
+      // control that cannot do its job.
+      const offering = matrix.grains.find(
+        (g) => matrix.cell(section.id, g) === "offer"
+      );
+      const unanswerable = offering
+        ? (section.questions?.(ctxFor(offering)) ?? []).find(
+            (q) => q.kind === "choice" && !q.values.length
+          )
+        : undefined;
+
+      const nameCell = tr.createEl("td");
+      const name = nameCell.createDiv({ cls: "col-name" });
+      name.createSpan({ cls: "col-name-token", text: section.icon });
+      name.createSpan({ text: section.label });
+      nameCell.createDiv({
+        cls: "col-name-sub",
+        text:
+          unanswerable && unanswerable.kind === "choice"
+            ? `${section.blurb} — ${unanswerable.empty}`
+            : section.blurb,
+      });
+
+      for (const grain of matrix.grains) {
+        const td = tr.createEl("td", { cls: "col-grain" });
+        const state = matrix.cell(section.id, grain);
+        if (state === "ships") {
+          // A STATEMENT OF FACT IS NOT A STATUS CHIP. Plain muted text, with
+          // the reason on hover — five pills across a row is decoration where
+          // the eye is looking for the one cell that has a control in it.
+          td.createSpan({
+            cls: "almanac-cell-ships",
+            text: "Ships",
+            attr: {
+              title: `A new ${CLASS_DEFS[grain].adjective} entry already writes ${section.label}.`,
+            },
+          });
+          continue;
+        }
+        if (state === "absent") {
+          td.createSpan({
+            cls: "almanac-cell-absent",
+            text: "—",
+            attr: {
+              title: `${section.label} is not offered on ${CLASS_DEFS[grain].adjective} entries.`,
+            },
+          });
+          continue;
+        }
+        if (unanswerable) continue;
+        this.renderEntrySectionCell(td, grain, section, ctxFor(grain));
+      }
     }
   }
 
@@ -976,8 +1102,8 @@ export class AlmanacSettingTab extends PluginSettingTab {
   // entry is the reader's file, its directive line is copied out verbatim on
   // Save, and rewriting it would be this window editing prose it did not write.
   // Same field, two surfaces, and the difference is who owns the bytes.
-  private renderEntrySectionRow(
-    containerEl: HTMLElement,
+  private renderEntrySectionCell(
+    td: HTMLElement,
     grain: TrackerClass,
     section: EntrySection,
     ctx: EntrySectionContext
@@ -1020,13 +1146,30 @@ export class AlmanacSettingTab extends PluginSettingTab {
       // stays `{}` in fact as well as in name.
       if (list.length) s.entrySections[grain] = list;
       else delete s.entrySections[grain];
+      // AND THE SAVED BAND KEEPS UP (4.29).
+      //
+      // A grain whose reader has pressed "Save this page as the default" has a
+      // BAND, and a band is authoritative: it is the shared band, membership
+      // and order. So this toggle has to reach it, or ticking Captured for
+      // weekly here would change a setting and nothing else — the exact
+      // "built and unreachable" shape this table was added to fix, arriving by
+      // the other door.
+      //
+      // THE DECISION IS `bandWithSection`'S, not this closure's. A rule written
+      // inside a `write` handler is one the suite cannot reach, and a wrong
+      // answer here looks like a setting that does nothing rather than like a
+      // bug. A grain with no band gets `undefined` back and is left alone.
+      const band = bandWithSection(s.entrySectionBand[grain], section.id, next != null);
+      if (band) s.entrySectionBand[grain] = band;
       await this.plugin.saveSettings();
       this.display();
     };
 
-    const row = new Setting(containerEl)
-      .setName(`${section.icon} ${section.label}`)
-      .setDesc(section.blurb);
+    // The cell IS the control, and the name and blurb are the row's — see
+    // `renderEntrySections`. `almanac-list-toggle` inside a `<td>` is the
+    // pattern the trackers table already uses to put an Obsidian `Setting`
+    // control in a cell without its two-column flex fighting the column.
+    const row = new Setting(td.createDiv({ cls: "almanac-list-toggle" }));
 
     if (!questions.length) {
       row.addToggle((t) =>
@@ -1044,13 +1187,12 @@ export class AlmanacSettingTab extends PluginSettingTab {
       // store a section with no answer where the other two draw a control.
       // If one ever does, this row needs the field, not a skip.
       if (q.kind !== "choice") continue;
-      // Nothing in the vault to answer with. A sentence rather than an empty
-      // menu, in the section's own words — the same call `bridgeRefusal` makes
-      // when it lists what the vault has instead of reciting the syntax.
-      if (!q.values.length) {
-        row.setDesc(`${section.blurb} — ${q.empty}`);
-        continue;
-      }
+      // Nothing in the vault to answer with. THE ROW SAYS SO, ONCE, and the
+      // caller does not reach this cell at all in that case — see the
+      // `unanswerable` branch in `renderEntrySections`. Kept as a guard rather
+      // than deleted because this method is reachable from one caller today and
+      // an empty menu is a worse failure than an early return.
+      if (!q.values.length) continue;
       const answer = held[q.key];
       row.addDropdown((d) => {
         d.addOption("", "Not added");
@@ -1175,8 +1317,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
   private renderJournalTypes(containerEl: HTMLElement): void {
     this.note(
       containerEl,
-      "A journal is a folder tree with its own note types, its own section on the homepage, and its own commands and buttons — recipes, meeting notes, reading logs, anything.",
-      "After adding or changing a type, run “Set up / repair vault” to create its folders and starter templates."
+      "Custom journal folder structures with dedicated note templates, homepage sections, and commands. Run “Set up / repair vault” after making structural changes."
     );
 
     const journals = this.plugin.settings.customJournals;
@@ -1310,15 +1451,18 @@ export class AlmanacSettingTab extends PluginSettingTab {
       },
     ]);
 
-    // STUDY IS ONE OF THESE ROWS NOW (3.20), rather than a hardcoded first one
-    // ending in a toggle where every other ends in a delete. It reads as "just
-    // another journal" because it IS one — the comment above has claimed that
-    // since 2.39 and the row is what finally makes it true.
-    const list = containerEl.createDiv({ cls: "almanac-list" });
-    journals.forEach((cfg, i) => this.renderJournalRow(list, cfg, i));
-    if (!journals.length) {
+    if (journals.length) {
+      const { tbody } = this.createTable(containerEl, [
+        "Journal",
+        "Identifier",
+        "Root Folder",
+        "Structure",
+        "Actions",
+      ]);
+      journals.forEach((cfg, i) => this.renderJournalRow(tbody, cfg, i));
+    } else {
       this.note(
-        list,
+        containerEl,
         "No journals yet. “Presets” starts from a ready-made one, or “Add journal” starts a blank."
       );
     }
@@ -1415,25 +1559,43 @@ export class AlmanacSettingTab extends PluginSettingTab {
   }
 
   private renderJournalRow(
-    containerEl: HTMLElement,
+    tbody: HTMLElement,
     cfg: JournalConfig,
     index: number
   ): void {
     const journals = this.plugin.settings.customJournals;
     const kindNames = cfg.kinds.map((k) => k.label).join(", ");
+    const tr = tbody.createEl("tr");
 
-    const { actions } = createListRow(containerEl, {
-      token: cfg.emoji,
-      title: cfg.name,
-      subtitle: cfg.root,
-      pills: [
-        {
-          text: cfg.levels.length === 1 ? "Flat" : "Two levels",
-          tone: "muted",
-        },
-        { text: kindNames || "No note types", tone: "muted" },
-      ],
+    // 1. Journal
+    const tdJournal = tr.createEl("td");
+    const nameWrap = tdJournal.createDiv({ cls: "col-name" });
+    nameWrap.createSpan({ cls: "col-name-token", text: cfg.emoji });
+    nameWrap.createSpan({ text: cfg.name });
+
+    // 2. Identifier
+    const tdId = tr.createEl("td");
+    tdId.createEl("code", { text: cfg.id });
+
+    // 3. Root Folder
+    const tdFolder = tr.createEl("td");
+    tdFolder.createSpan({ text: cfg.root });
+
+    // 4. Structure
+    const tdStruct = tr.createEl("td");
+    const structWrap = tdStruct.createDiv({ cls: "almanac-list-pills" });
+    structWrap.createSpan({
+      cls: "almanac-list-pill is-muted",
+      text: cfg.levels.length === 1 ? "Flat" : "Two levels",
     });
+    structWrap.createSpan({
+      cls: "almanac-list-pill is-muted",
+      text: kindNames || "No note types",
+    });
+
+    // 5. Actions
+    const tdActions = tr.createEl("td", { cls: "col-actions-cell" });
+    const actions = tdActions.createDiv({ cls: "col-actions" });
 
     // The third door onto the section editor, after the banner control and the
     // command. A reader looking for configuration comes to Settings, and until
@@ -1582,19 +1744,10 @@ export class AlmanacSettingTab extends PluginSettingTab {
   private renderTrackers(containerEl: HTMLElement): void {
     this.note(
       containerEl,
-      "This page defines every tracker that exists, and decides which of them each NEW entry starts with. It is not the only way to use one: any tracker defined here can be added to a single entry on the day, with the “+ Add tracker” tile at the end of that entry's logging grid.",
-      "Every tracker has a surface — a kind of diary entry, or a journal — which is the only place it can be logged on. A daily tracker can't be put on a monthly entry, because the same property written from a day and from a month holds two different measurements; and a Study tracker can't be put on a note in another journal.",
-      "Within a diary class, turn “On every new entry” on for the handful of things you log every time, and leave it off for everything occasional — kilometres run, weight, a migraine. An occasional tracker still charts, still gets a Diary.base column, and is one tap away on the days it happened, without putting an empty widget on the other 350.",
-      "Journal trackers work the other way round: they aren't seeded onto templates from here, because a journal has several templates and this page can't say which one a tracker belongs on. Put them on a note with “+ Add tracker”, or add a tracker: line to that journal's template yourself.",
-      "To chart a number or time tracker, use the Add chart button in a note's Trends & Statistics section."
+      "Configure trackers across diary entries and custom journals. Additional trackers can be added to individual notes at any time with “+ Add tracker”."
     );
 
     // ── Built-in trackers (locked; on/off + scale/Sleep specials) ─────
-    // The three scale built-ins (Mood, Energy, Focus) each get their own row.
-    // Mood ships enabled; Energy and Focus ship off, one toggle away. Wake-Up +
-    // Bedtime + the derived Sleep are one superset — a single row with a single
-    // toggle — since they only make sense together (the two times feed the
-    // coupled control and the derived hours-asleep value).
     const diaryBuiltins = this.plugin.settings.trackers.filter(
       (t) => t.builtin && !JOURNAL_BUILTINS.includes(t.builtin)
     );
@@ -1607,30 +1760,36 @@ export class AlmanacSettingTab extends PluginSettingTab {
       "Built-in · diary",
       { badge: `${diaryOn} on` }
     );
-    const builtinList = diarySection.createDiv({ cls: "almanac-list" });
+    const { tbody: diaryTbody } = this.createTable(diarySection, [
+      "Tracker",
+      "Type",
+      "Surface",
+      "In Entries",
+      "Actions",
+    ]);
     for (const kind of SCALE_BUILTINS) {
       const t = this.plugin.settings.trackers.find((x) => x.builtin === kind);
-      if (t) this.renderScaleRow(builtinList, t);
+      if (t) this.renderScaleRow(diaryTbody, t);
     }
-    this.renderSleepSupersetRow(builtinList);
+    this.renderSleepSupersetRow(diaryTbody);
 
     // ── Built-in journal trackers ────────────────────────────────────
-    // Confidence and Status, on every registered journal. They have no
-    // on/off switch because the two flags a switch would set are diary-only:
-    // there is no journal template for this page to seed, and no Diary.base
-    // column for them to take. What the row is *for* is saying they exist,
-    // naming the property each writes, and being somewhere the label can be
-    // changed — the same job the scale rows do minus the toggle.
     const journalSection = this.foldableSection(
       containerEl,
       "trackers.builtin.journals",
       "Built-in · journals",
       { badge: "on every journal" }
     );
-    const journalList = journalSection.createDiv({ cls: "almanac-list" });
+    const { tbody: journalTbody } = this.createTable(journalSection, [
+      "Tracker",
+      "Type",
+      "Surface",
+      "In Entries",
+      "Actions",
+    ]);
     for (const kind of JOURNAL_BUILTINS) {
       const t = this.plugin.settings.trackers.find((x) => x.builtin === kind);
-      if (t) this.renderJournalBuiltinRow(journalList, t);
+      if (t) this.renderJournalBuiltinRow(journalTbody, t);
     }
 
     // ── Custom trackers ──────────────────────────────────────────────
@@ -1652,12 +1811,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
                 id: this.uniqueId(freshId()),
                 label: "🆕 New tracker",
                 type: "number",
-                // Unbounded by default: blank min/max mean "no limit" in that
-                // direction. A ceiling/floor is added only if wanted.
                 step: 1,
-                // The daily diary is the default surface because it is the
-                // overwhelmingly common one — most things you log, you log on
-                // a day. The dropdown is in the editor for the rest.
                 surface: diarySurface("daily"),
                 showInTemplate: true,
                 showInBase: true,
@@ -1681,29 +1835,14 @@ export class AlmanacSettingTab extends PluginSettingTab {
         "No custom trackers yet. Add one for anything you'd like to log and chart — including things you only log now and then, which you can leave off new entries and add per-entry when they happen."
       );
     } else {
-      // Grouped by surface, but only once there is more than one surface
-      // among them — a sub-header over a single group is a label for the
-      // section it is already inside. Each row carries a surface pill either
-      // way, so nothing is lost when the headers are absent.
-      const groups = new Map<string, TrackerDef[]>();
-      for (const t of customs) {
-        const key = surfaceKey(t.surface);
-        (groups.get(key) ?? groups.set(key, []).get(key)!).push(t);
-      }
-      const namer = journalTypeNamer(this.plugin);
-      if (groups.size <= 1) {
-        const list = customSection.createDiv({ cls: "almanac-list" });
-        customs.forEach((t) => this.renderCustomRow(list, t));
-      } else {
-        for (const group of groups.values()) {
-          this.sectionHeader(
-            customSection,
-            describeSurfaceLabel(group[0].surface, namer)
-          );
-          const list = customSection.createDiv({ cls: "almanac-list" });
-          group.forEach((t) => this.renderCustomRow(list, t));
-        }
-      }
+      const { tbody: customTbody } = this.createTable(customSection, [
+        "Tracker",
+        "Type",
+        "Surface",
+        "In Entries",
+        "Actions",
+      ]);
+      customs.forEach((t) => this.renderCustomRow(customTbody, t));
     }
 
     new Setting(containerEl)
@@ -1721,31 +1860,44 @@ export class AlmanacSettingTab extends PluginSettingTab {
 
   // A scale built-in (Mood, Energy, Focus): a locked identity + one on/off
   // switch, plus a button into the two editable settings (heat-map source,
-  // picker faces). No rename, retype, range or delete — those are fixed so the
-  // face-picker widget keeps working. Mood ships enabled and is the default
-  // heat-map source; Energy and Focus ship off. The row is otherwise identical
-  // for all three — the generalisation the scale family is for.
-  private renderScaleRow(containerEl: HTMLElement, t: TrackerDef): void {
+  // picker faces).
+  private renderScaleRow(tbody: HTMLElement, t: TrackerDef): void {
     const enabled = t.showInTemplate || t.showInBase;
     const heat = this.plugin.settings.moodTrackerId === t.id;
+    const tr = tbody.createEl("tr");
+    if (!enabled) tr.addClass("is-locked");
 
-    const { actions } = createListRow(containerEl, {
-      token: "🙂",
-      title: t.label,
-      subtitle: enabled
-        ? heat
-          ? "Face picker in the daily note, and the diary-calendar heat-map source."
-          : "Face picker in the daily note. Open its settings to make it the heat-map source or edit the faces."
-        : "Off — not added to new entries or Diary.base. You can still add it to a single entry with “+ Add tracker”.",
-      pills: [
-        { text: "Built-in", tone: "muted" },
-        { text: "Scale", tone: "muted" },
-        ...this.surfacePill(t),
-        ...(enabled && heat ? [{ text: "Heat map", tone: "on" as const }] : []),
-        ...(enabled ? [] : [{ text: "Disabled", tone: "off" as const }]),
-      ],
-      locked: !enabled,
-    });
+    const tdName = tr.createEl("td");
+    const nameWrap = tdName.createDiv({ cls: "col-name" });
+    nameWrap.createSpan({ cls: "col-name-token", text: "🙂" });
+    nameWrap.createSpan({ text: t.label });
+
+    const tdType = tr.createEl("td");
+    const typePills = tdType.createDiv({ cls: "almanac-list-pills" });
+    typePills.createSpan({ cls: "almanac-list-pill is-muted", text: "Scale" });
+
+    const tdSurface = tr.createEl("td");
+    const surfacePills = tdSurface.createDiv({ cls: "almanac-list-pills" });
+    const pills = [
+      { text: "Daily", tone: "muted" as const },
+      ...this.surfacePill(t),
+    ];
+    for (const p of pills) {
+      surfacePills.createSpan({ cls: `almanac-list-pill is-${p.tone}`, text: p.text });
+    }
+
+    const tdStatus = tr.createEl("td");
+    const statusPills = tdStatus.createDiv({ cls: "almanac-list-pills" });
+    if (enabled && heat) {
+      statusPills.createSpan({ cls: "almanac-list-pill is-on", text: "Heat map" });
+    } else if (enabled) {
+      statusPills.createSpan({ cls: "almanac-list-pill is-on", text: "Every entry" });
+    } else {
+      statusPills.createSpan({ cls: "almanac-list-pill is-off", text: "Disabled" });
+    }
+
+    const tdActions = tr.createEl("td", { cls: "col-actions-cell" });
+    const actions = tdActions.createDiv({ cls: "col-actions" });
 
     if (enabled) {
       rowButton(actions, "settings-2", `${t.label} settings`, () =>
@@ -1762,10 +1914,6 @@ export class AlmanacSettingTab extends PluginSettingTab {
         .setTooltip(`Include ${t.label} on every new entry`)
         .setValue(enabled)
         .onChange(async (v) => {
-          // One switch drives both surfaces — a built-in is either shown
-          // everywhere or nowhere. Turning a scale off also relinquishes the
-          // heat map if it held it, so the calendar doesn't keep trying to
-          // shade from a tracker no longer on any entry.
           t.showInTemplate = v;
           t.showInBase = v;
           if (!v && this.plugin.settings.moodTrackerId === t.id) {
@@ -1779,33 +1927,38 @@ export class AlmanacSettingTab extends PluginSettingTab {
   }
 
   // The Wake-Up + Bedtime + Sleep superset as a single locked row with one
-  // toggle. On: the daily note shows the coupled Bedtime/Wake-Up control and
-  // writes a derived Sleep value (a Diary.base column, chartable like any
-  // number). Off: all three are hidden and no Sleep value is written. Flipping
-  // it re-normalises the registry so wake/bed visibility and the derived Sleep
-  // entry all follow this one switch.
-  private renderSleepSupersetRow(containerEl: HTMLElement): void {
+  // toggle.
+  private renderSleepSupersetRow(tbody: HTMLElement): void {
     const on = this.plugin.settings.sleepEnabled;
     const bed = this.plugin.settings.trackers.find((x) => x.builtin === "bed");
     const wake = this.plugin.settings.trackers.find((x) => x.builtin === "wake");
-    // Name it from the built-ins' own labels so a relabelled Bedtime/Wake-Up
-    // still reads correctly, rather than hard-coding the emoji + words here.
     const name = `${bed?.label ?? "🌙 Bedtime"} + ${wake?.label ?? "😴 Wake-Up"} → Sleep`;
 
-    const { actions } = createListRow(containerEl, {
-      token: "🛌",
-      title: name,
-      subtitle: on
-        ? "One coupled control on every new entry: enter bedtime and wake time, and Sleep (hours asleep) is computed automatically — added as a Diary.base column and chartable like any number. Never entered by hand."
-        : "Off — no bedtime, wake time or Sleep value anywhere, and the pair can't be added per-entry either. Turn on to log all three together.",
-      pills: [
-        { text: "Built-in", tone: "muted" },
-        on
-          ? { text: "Derived value", tone: "on" }
-          : { text: "Disabled", tone: "off" },
-      ],
-      locked: !on,
+    const tr = tbody.createEl("tr");
+    if (!on) tr.addClass("is-locked");
+
+    const tdName = tr.createEl("td");
+    const nameWrap = tdName.createDiv({ cls: "col-name" });
+    nameWrap.createSpan({ cls: "col-name-token", text: "🛌" });
+    nameWrap.createSpan({ text: name });
+
+    const tdType = tr.createEl("td");
+    const typePills = tdType.createDiv({ cls: "almanac-list-pills" });
+    typePills.createSpan({ cls: "almanac-list-pill is-muted", text: "Derived (hours)" });
+
+    const tdSurface = tr.createEl("td");
+    const surfacePills = tdSurface.createDiv({ cls: "almanac-list-pills" });
+    surfacePills.createSpan({ cls: "almanac-list-pill is-muted", text: "Daily" });
+
+    const tdStatus = tr.createEl("td");
+    const statusPills = tdStatus.createDiv({ cls: "almanac-list-pills" });
+    statusPills.createSpan({
+      cls: on ? "almanac-list-pill is-on" : "almanac-list-pill is-off",
+      text: on ? "Every entry" : "Disabled",
     });
+
+    const tdActions = tr.createEl("td", { cls: "col-actions-cell" });
+    const actions = tdActions.createDiv({ cls: "col-actions" });
 
     const toggleHost = actions.createDiv({ cls: "almanac-list-toggle" });
     new Setting(toggleHost).addToggle((c) =>
@@ -1824,47 +1977,52 @@ export class AlmanacSettingTab extends PluginSettingTab {
     );
   }
 
-  // One custom tracker as a summary row. Move/delete operate within the
-  // contiguous block of custom trackers, which normalisation keeps after all
-  // built-ins — so a swap never crosses into a locked built-in. Positions are
-  // resolved fresh on click, since the array can change between render and
-  // click.
-  // A journal built-in (Confidence, Status): locked identity, no toggle, no
-  // delete. Offered on every registered journal, which is what the
-  // surface pill says — so a custom journal created tomorrow already has both
-  // without anything being seeded into its registry.
   private renderJournalBuiltinRow(
-    containerEl: HTMLElement,
+    tbody: HTMLElement,
     t: TrackerDef
   ): void {
-    createListRow(containerEl, {
-      token: t.builtin === "confidence" ? "🎯" : "📌",
-      title: t.label,
-      subtitle:
-        t.builtin === "confidence"
-          ? `A 1–5 rating on any journal note. Writes the ${t.id} property, which the confidence rail and the Lessons table read.`
-          : `Where a journal note has got to. Writes the ${t.id} property, which the Lessons and Practice tables filter on.`,
-      pills: [
-        { text: "Built-in", tone: "muted" },
-        { text: TRACKER_TYPE_LABELS[t.type].split(" ")[0], tone: "muted" },
-        ...this.surfacePill(t),
-      ],
+    const tr = tbody.createEl("tr");
+
+    const tdName = tr.createEl("td");
+    const nameWrap = tdName.createDiv({ cls: "col-name" });
+    nameWrap.createSpan({
+      cls: "col-name-token",
+      text: t.builtin === "confidence" ? "🎯" : "📌",
+    });
+    nameWrap.createSpan({ text: t.label });
+
+    const tdType = tr.createEl("td");
+    const typePills = tdType.createDiv({ cls: "almanac-list-pills" });
+    typePills.createSpan({
+      cls: "almanac-list-pill is-muted",
+      text: TRACKER_TYPE_LABELS[t.type].split(" ")[0],
+    });
+
+    const tdSurface = tr.createEl("td");
+    const surfacePills = tdSurface.createDiv({ cls: "almanac-list-pills" });
+    const pills = [
+      ...this.surfacePill(t),
+    ];
+    for (const p of pills) {
+      surfacePills.createSpan({ cls: `almanac-list-pill is-${p.tone}`, text: p.text });
+    }
+
+    const tdStatus = tr.createEl("td");
+    const statusPills = tdStatus.createDiv({ cls: "almanac-list-pills" });
+    statusPills.createSpan({
+      cls: "almanac-list-pill is-muted",
+      text: "Per-entry",
+    });
+
+    const tdActions = tr.createEl("td", { cls: "col-actions-cell" });
+    const actions = tdActions.createDiv({ cls: "col-actions" });
+    actions.createSpan({
+      cls: "almanac-list-pill is-muted",
+      text: "Built-in",
     });
   }
 
   // The surface pill, or nothing.
-  //
-  // DROPPED FOR DIARY TRACKERS IN 2.57.10. It read "Daily" — a grain — and the
-  // grain stopped being a single fact when a tracker gained a set of them in
-  // 2.57.8: on five grains the row would carry five pills beside the two it
-  // already has, to say something the reader can read off the editor's toggles.
-  // A row's pills are for what distinguishes this tracker from its neighbours
-  // in the same list, and the diary list is already all diary.
-  //
-  // KEPT FOR JOURNAL TRACKERS, because there it names WHICH journal — "Study"
-  // against "Cooking" — which is exactly what distinguishes neighbours, and is
-  // not a set. Same call rendered differently is the point: the pill was never
-  // "show the surface", it was "say the thing that is not obvious here".
   private surfacePill(
     t: TrackerDef
   ): { text: string; tone: "muted" }[] {
@@ -1877,40 +2035,75 @@ export class AlmanacSettingTab extends PluginSettingTab {
     ];
   }
 
-  private renderCustomRow(containerEl: HTMLElement, t: TrackerDef): void {
+  private renderCustomRow(tbody: HTMLElement, t: TrackerDef): void {
     const trackers = this.plugin.settings.trackers;
     const customsNow = () => trackers.filter((x) => !x.builtin);
     const customPos = customsNow().indexOf(t);
     const customCount = customsNow().length;
 
-    const { actions } = createListRow(containerEl, {
-      token: "📈",
-      title: t.label || t.id,
-      subtitle: this.describeTracker(t),
-      pills: [
-        { text: TRACKER_TYPE_LABELS[t.type].split(" ")[0], tone: "muted" },
-        // The surface first — it is the tracker's hard boundary, and the one
-        // thing you want to read off the row without opening the editor.
-        // Then whether new entries of that surface are seeded with it, which
-        // is a softer, separate question. The grain pill that used to sit here
-        // said where a tracker MAY go; "Every entry" vs "Per-entry only" says
-        // whether it goes there by default. The first became a set in 2.57.8
-        // and left the row (see surfacePill); the second is still one fact and
-        // stays. A journal tracker has no template to be seeded onto, so it
-        // gets neither — an absent answer rather than a false one.
-        ...this.surfacePill(t),
-        ...(diaryClassOf(t.surface) == null
-          ? []
-          : [
-              t.showInTemplate
-                ? { text: "Every entry", tone: "on" as const }
-                : { text: "Per-entry only", tone: "off" as const },
-            ]),
-        ...(t.showInBase
-          ? [{ text: "Diary.base column", tone: "muted" as const }]
-          : []),
-      ],
+    const tr = tbody.createEl("tr");
+
+    // 1. Tracker
+    const tdName = tr.createEl("td");
+    const nameWrap = tdName.createDiv({ cls: "col-name" });
+    nameWrap.createSpan({ cls: "col-name-token", text: "📈" });
+    nameWrap.createSpan({ text: t.label || t.id });
+
+    // 2. Type
+    const tdType = tr.createEl("td");
+    const typePills = tdType.createDiv({ cls: "almanac-list-pills" });
+    typePills.createSpan({
+      cls: "almanac-list-pill is-muted",
+      text: TRACKER_TYPE_LABELS[t.type].split(" ")[0],
     });
+
+    // 3. Surface
+    const tdSurface = tr.createEl("td");
+    const surfacePills = tdSurface.createDiv({ cls: "almanac-list-pills" });
+    const pills = [
+      ...(diaryClassOf(t.surface) != null
+        ? [
+            {
+              text: describeSurfaceLabel(
+                t.surface,
+                journalTypeNamer(this.plugin)
+              ),
+              tone: "muted" as const,
+            },
+          ]
+        : []),
+      ...this.surfacePill(t),
+    ];
+    for (const p of pills) {
+      surfacePills.createSpan({ cls: `almanac-list-pill is-${p.tone}`, text: p.text });
+    }
+
+    // 4. In Entries
+    const tdStatus = tr.createEl("td");
+    const statusPills = tdStatus.createDiv({ cls: "almanac-list-pills" });
+    if (diaryClassOf(t.surface) != null) {
+      statusPills.createSpan({
+        cls: t.showInTemplate
+          ? "almanac-list-pill is-on"
+          : "almanac-list-pill is-off",
+        text: t.showInTemplate ? "Every entry" : "Per-entry only",
+      });
+      if (t.showInBase) {
+        statusPills.createSpan({
+          cls: "almanac-list-pill is-muted",
+          text: "Diary.base",
+        });
+      }
+    } else {
+      statusPills.createSpan({
+        cls: "almanac-list-pill is-muted",
+        text: "Per-entry",
+      });
+    }
+
+    // 5. Actions
+    const tdActions = tr.createEl("td", { cls: "col-actions-cell" });
+    const actions = tdActions.createDiv({ cls: "col-actions" });
 
     rowButton(
       actions,
@@ -2029,30 +2222,5 @@ export class AlmanacSettingTab extends PluginSettingTab {
       { danger: true }
     );
   }
-
-  // The one-line summary under a custom tracker's name: property key plus
-  // whatever shape detail that type has (range and unit, or the select's
-  // options). Saves opening the editor to remember what a tracker is.
-  private describeTracker(t: TrackerDef): string {
-    // Surface first: it is the tracker's hard boundary, and the thing you
-    // most want to read off a collapsed row.
-    const parts = [
-      `${describeSurfaceLabel(t.surface, journalTypeNamer(this.plugin))} · property ${t.id}`,
-    ];
-    if (t.type === "number") {
-      const lo = t.min == null ? "–" : String(t.min);
-      const hi = t.max == null ? "–" : String(t.max);
-      const range = t.min == null && t.max == null ? "unbounded" : `${lo} to ${hi}`;
-      parts.push(t.unit ? `${range} ${t.unit}` : range);
-      if (t.step != null && t.step !== 1) parts.push(`step ${t.step}`);
-    }
-    if (t.type === "select" && t.options) {
-      const labels = t.options
-        .split(",")
-        .map((pair) => pair.split("=")[1]?.trim() || pair.trim())
-        .filter(Boolean);
-      if (labels.length) parts.push(labels.join(" / "));
-    }
-    return parts.join(" · ");
-  }
 }
+

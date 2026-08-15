@@ -247,6 +247,14 @@ function makeMoment(d: Date, valid: boolean): MomentShim {
         const day = c.getUTCDay();
         const diff = day === 0 ? -6 : 1 - day;
         c.setUTCDate(c.getUTCDate() + diff);
+      } else if (unit === "day") {
+        // Reachable as of 4.27: `currentEntryKey` drives `startOf` off
+        // `CLASS_DEFS[grain].unit`, which is the whole point of that table —
+        // so the daily grain now asks for the one unit nothing had asked for.
+        // A no-op on a date this stub already holds at midnight UTC, and
+        // written out rather than left to the throw so the omission cannot be
+        // read as "daily is not supported".
+        c.setUTCHours(0, 0, 0, 0);
       } else throw new Error(`obsidian-stub: startOf("${unit}") not implemented`);
       return makeMoment(c, valid);
     },

@@ -301,7 +301,7 @@ describe("§8: the risk, tested rather than intended", () => {
     const dash = diarySectionModel({ grain: "weekly", hostFolder: "02 - Diary/Weekly" });
     const text = [
       "```almanac",
-      "header:⏳ Open Tasks",
+      "header:⏳ Open tasks",
       "tasks-table: Reading, Writing ,period",
       "```",
       "",
@@ -326,7 +326,7 @@ describe("§8: the risk, tested rather than intended", () => {
       "```",
       "",
       "```almanac",
-      "header:⏳ Open Tasks",
+      "header:⏳ Open tasks",
       "tasks-table: Reading, Writing ,period",
       "```",
       "",

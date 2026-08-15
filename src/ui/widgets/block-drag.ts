@@ -79,6 +79,13 @@ import { moveCell, widgetRun } from "../../core/cell-move";
 import type { CellSource, CellTarget } from "../../core/cell-move";
 import { cellWidthsIn, snapRatio, widenCells } from "../../core/cell-width";
 import {
+  heightAbove,
+  resizeCell,
+  runWithHeight,
+  snapHeight,
+} from "../../core/cell-height";
+import {
+  CARD_DIVIDER_CLASS,
   DIVIDER_INDEX_ATTR,
   GROUP_CLASS,
   GROUP_DIVIDER_CLASS,
@@ -207,6 +214,46 @@ export function cardWidget(widget: HTMLElement, title: string): void {
   card.appendChild(widget);
 }
 
+// What a card wears when the note says how tall it is, and where the number
+// goes. 4.22 §3.
+//
+// AN INLINE CUSTOM PROPERTY, WHICH IS `--am-cell-weight`'s IDIOM — the
+// stylesheet holds the three declarations and this holds the one number, so the
+// common case leaves no mark in the DOM at all. A card with no height keeps the
+// markup it had before this release existed.
+export const SIZED_CLASS = "is-sized";
+const CARD_H_VAR = "--am-card-h";
+
+// Give every child that the note states a height for that height.
+//
+// CALLED BETWEEN `cardWidget` AND `layOutRow`, and index.ts says why in both
+// directions. What it walks is the block's children as they stand at that
+// moment: a card for a widget that could be named, the widget itself for one
+// that draws its own band, and both stamped with the line that drew them.
+//
+// THE BODY IS THE FENCE'S, UNFILTERED. `heightAbove` reads the line above the
+// widget's own, so it needs the file's numbering — the same numbering
+// `data-am-line` carries — and not the loop's.
+//
+// A DIRECTIVE THAT DREW NOTHING IS WHY THIS IS SAFE. It left no child, so there
+// is nothing here to walk, so a `height:` above it sizes nothing: §2's whole
+// argument, and it costs a line of code because the argument was won in the
+// arithmetic rather than here.
+export function applyCardHeights(
+  container: HTMLElement,
+  body: readonly string[]
+): void {
+  for (const child of Array.from(container.children)) {
+    if (!(child instanceof HTMLElement)) continue;
+    const line = lineOf(child);
+    if (line === null) continue;
+    const px = heightAbove(body, line);
+    if (px === null) continue;
+    child.addClass(SIZED_CLASS);
+    child.style.setProperty(CARD_H_VAR, `${px}px`);
+  }
+}
+
 // Tell every child of this block which line of the fence drew it. 4.8 §1.4.
 //
 // `drawn` is what the dispatcher recorded on its way past each line: the number
@@ -313,6 +360,25 @@ const BANDS = [
   "jjs-hero",
   "journal-entry-header",
   "journal-study-header",
+  // THE PAGE'S OWN NAME (4.19.1), AND THE OMISSION COST A HEAD READING "LINKS".
+  //
+  // 4.19 welded `title:` and `links:` into one banner fence. `blockTitle` reads
+  // a head off the fence by finding the one keyword with a `SECTION_TITLES`
+  // entry — `title` has none and `links` has "🔗 Links", so exactly one matched
+  // and every dashboard drew a bar naming the page after the smaller of the two
+  // widgets in it. `blockTitle`'s own comment names that failure: *"a head
+  // naming the wrong widget — the kind that gets noticed weeks later on
+  // somebody's dashboard."* It was noticed in the first render.
+  //
+  // THE FIX BELONGS HERE RATHER THAN IN `blockTitle`, because this list is
+  // already the answer to the question being asked. The paragraph at the top of
+  // this file states the rule — *a band a WIDGET drew has to be named, because
+  // only that widget knows it drew one* — and `.jtc-card` is exactly that: a
+  // band that says the page's name across the top of its block. Teaching
+  // `blockTitle` to skip a fence holding `title` would be a second mechanism
+  // deciding one fact, and the two would drift the first time a banner grew a
+  // third line.
+  "jtc-card",
 ];
 
 // Whether this element already announces itself, in which case a head of ours
@@ -580,6 +646,167 @@ function attachResize(
     const stop = (): void => {
       divider.removeClass("is-resizing");
       row.removeClass("is-resizing");
+      divider.releasePointerCapture?.(evt.pointerId);
+      divider.removeEventListener("pointermove", track);
+      divider.removeEventListener("pointerup", finish);
+      divider.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("keydown", onKey, true);
+    };
+
+    divider.addEventListener("pointermove", track);
+    divider.addEventListener("pointerup", finish);
+    divider.addEventListener("pointercancel", cancel);
+    // CAPTURING, so the note's own editor does not eat the key first.
+    window.addEventListener("keydown", onKey, true);
+  });
+}
+
+// The note with one widget's card set to this height, or with its height taken
+// away when `px` is null.
+//
+// `applyWidths`' PATH EXACTLY: read the file, rewrite one fence body, write it
+// back once, and do nothing at all when `resizeCell` says nothing would change.
+async function applyHeight(
+  plugin: AlmanacPlugin,
+  file: TFile,
+  block: number,
+  line: number,
+  px: number | null
+): Promise<void> {
+  const text = await plugin.app.vault.read(file);
+  const next = resizeCell(text.split("\n"), block, line, px);
+  if (!next) return;
+  await plugin.app.vault.modify(file, next.join("\n"));
+}
+
+// Dragging the mark under a card to set how tall it is. 4.22 §4.3.
+//
+// `attachResize`'s MIRROR, with the same five properties and for the same
+// reasons — a pointer drag rather than an HTML5 one, live preview through the
+// declaration the file will produce, the note re-read at `pointerdown` and never
+// before, Escape restores and writes nothing, and nothing moved is not a write.
+// Only what differs is argued below.
+function attachCardResize(
+  plugin: AlmanacPlugin,
+  file: TFile,
+  divider: HTMLElement,
+  card: HTMLElement,
+  noteNow: () => { block: number; lines: string[] } | null,
+  bodyNow: () => string[] | null
+): void {
+  divider.addEventListener("pointerdown", (evt) => {
+    if (evt.button !== 0) return;
+    // THE CARD KNOWS WHICH LINE IT IS, because `cardWidget` copied the widget's
+    // stamp onto it. There is no counting here and no boundary to locate — a
+    // height belongs to ONE line, which is the whole reason §4.1 puts a handle
+    // on every card instead of a mark on every seam.
+    const line = lineOf(card);
+    if (line === null) return;
+    const where = noteNow();
+    const body = bodyNow();
+    if (!where || !body) return;
+    // A LINE PAST THE END IS A STALE RENDER, which is `attachResize`'s count
+    // check asked about a line instead of a length. `setCellHeight` refuses a
+    // line that is not a widget as well, so the write cannot land wrong; this
+    // is only so a stale card does not take the pointer and pretend.
+    if (line >= body.length) return;
+
+    evt.preventDefault();
+    // THE BLOCK UNDER IT MUST NOT HEAR THIS, for `attachResize`'s reason.
+    evt.stopPropagation();
+    divider.setPointerCapture(evt.pointerId);
+    divider.addClass("is-resizing");
+    card.addClass("is-resizing");
+
+    const start = heightAbove(body, line);
+    const min = pxToken(card, "--am-card-h-min", 120);
+
+    // WHAT THE CARD WORE BEFORE, so Escape is a restore rather than a second
+    // write — and `row.ts`'s rule again: an unsized card has no inline style at
+    // all, so the empty string is a real value and means "take it off".
+    const was = card.style.getPropertyValue(CARD_H_VAR);
+    const wasSized = card.hasClass(SIZED_CLASS);
+
+    const restore = (): void => {
+      if (was) card.style.setProperty(CARD_H_VAR, was);
+      else card.style.removeProperty(CARD_H_VAR);
+      if (wasSized) card.addClass(SIZED_CLASS);
+      else card.removeClass(SIZED_CLASS);
+    };
+
+    // THE HEIGHT THE CARD WOULD HAVE IF NOBODY HAD ASKED, and it is what makes
+    // dragging downward past the content CLEAR the line rather than write an
+    // ever-larger number.
+    //
+    // MEASURED WITH THE STATED HEIGHT TAKEN OFF, which is the only way to ask
+    // it: a card wearing `is-sized` is exactly as tall as the number on it, so
+    // its `scrollHeight` would report that number straight back and every card
+    // would be its own natural height. One reflow, once, at `pointerdown` —
+    // never in `track`, where it would be sixty a second.
+    card.removeClass(SIZED_CLASS);
+    card.style.removeProperty(CARD_H_VAR);
+    const natural = card.scrollHeight;
+    restore();
+
+    let live: number | null = start;
+
+    // LIVE PREVIEW IS THE CLASS AND THE INLINE VARIABLE AND NOTHING ELSE —
+    // exactly what `applyCardHeights` will put back when the note re-renders, so
+    // what the reader sees during the drag is what the note will render as.
+    const show = (px: number | null): void => {
+      live = px;
+      if (px === null) {
+        card.removeClass(SIZED_CLASS);
+        card.style.removeProperty(CARD_H_VAR);
+        return;
+      }
+      card.addClass(SIZED_CLASS);
+      card.style.setProperty(CARD_H_VAR, `${px}px`);
+    };
+
+    const track = (e: PointerEvent): void => {
+      // THE CARD'S OWN TOP, measured every time for `attachResize`'s reason: the
+      // cards below this one move as it grows, and on a wrapped row the whole
+      // column can move. The top of the card is where its height is measured
+      // from, so it is what the pointer's distance is taken against.
+      const px = snapHeight(
+        e.clientY - card.getBoundingClientRect().top,
+        min,
+        natural
+      );
+      if (px !== live) show(px);
+    };
+
+    // ARROWS RATHER THAN DECLARATIONS, for `attachResize`'s reason.
+    const cancel = (): void => {
+      stop();
+      restore();
+    };
+
+    const finish = (e: PointerEvent): void => {
+      track(e);
+      stop();
+      // NOTHING MOVED IS NOT A WRITE. `resizeCell` would say so too, but the
+      // class and the inline style are this side's to clean up and leaving them
+      // on would put a mark in the DOM for the common case that `row.ts` and
+      // `applyCardHeights` both deliberately keep clear.
+      if (live === start) {
+        restore();
+        return;
+      }
+      void applyHeight(plugin, file, where.block, line, live);
+    };
+
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      cancel();
+    };
+
+    const stop = (): void => {
+      divider.removeClass("is-resizing");
+      card.removeClass("is-resizing");
       divider.releasePointerCapture?.(evt.pointerId);
       divider.removeEventListener("pointermove", track);
       divider.removeEventListener("pointerup", finish);
@@ -1062,11 +1289,25 @@ export function attachBlockHead(
       if (!(child instanceof HTMLElement)) continue;
       const line = lineOf(child);
       if (line === null) continue;
-      const at = { from: line, to: line + 1 };
-      source(child, "Drag to move this widget", false, () => ({
-        whole: at,
-        cell: at,
-      }));
+      // AND A STATED HEIGHT TRAVELS WITH THE WIDGET IT SIZES (4.22 §5.1, §5.2).
+      // A `height:` line is positional, so a range of one line would leave it
+      // behind sizing whatever moved up into its place — a layout gesture
+      // silently resizing an unrelated widget, which is the class of failure 4.8
+      // spent eight patches on. `runWithHeight` is the one answer, asked of the
+      // body at the moment of the drag rather than closed over, for the reason
+      // this comment block already gives about every other range here.
+      //
+      // ITS TWO RANGES STAY THE SAME RANGE. A widget dragged out to a block of
+      // its own still takes what it took to another column — and there its
+      // height cannot mean anything, which `parseHeights` says out loud rather
+      // than leaving a line that quietly does nothing.
+      source(child, "Drag to move this widget", false, () => {
+        const body = bodyNow();
+        const at = body
+          ? runWithHeight(body, line)
+          : { from: line, to: line + 1 };
+        return { whole: at, cell: at };
+      });
     }
   }
 
@@ -1147,6 +1388,24 @@ export function attachBlockHead(
       const n = Number(divider.getAttribute(DIVIDER_INDEX_ATTR));
       if (!Number.isInteger(n) || n < 1 || n >= cells.length) continue;
       attachResize(plugin, file, divider, row, cells, n, noteNow);
+    }
+
+    // ── AND SETTING A WIDGET'S HEIGHT (4.22 §4.3) ───────────────────────
+    //
+    // The same argument, one axis over: a pointer drag cannot collide with a
+    // native one, and `.is-slotting .journal-card-divider` is inert in the
+    // stylesheet for the same belt-and-braces reason.
+    //
+    // ASKED OF THE CARD RATHER THAN OF AN INDEX. A column divider needs to know
+    // which boundary it is on and carries `data-am-divider` to say so; a card
+    // divider needs only the card it is inside, and the card already knows which
+    // line it is. So there is no attribute here and nothing to keep in step.
+    for (const divider of Array.from(
+      row.querySelectorAll<HTMLElement>(`.${CARD_DIVIDER_CLASS}`)
+    )) {
+      const card = divider.parentElement;
+      if (!(card instanceof HTMLElement)) continue;
+      attachCardResize(plugin, file, divider, card, noteNow, bodyNow);
     }
   }
 }

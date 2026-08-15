@@ -35,7 +35,7 @@ const PAGE = [
   "```",
   "",
   "```almanac",
-  "header:⏳ Open Tasks",
+  "header:⏳ Open tasks",
   "tasks-table:,period",
   "```",
   "",
@@ -153,7 +153,7 @@ describe("putting a widget into a row", () => {
       "cell",
       "journals",
       "cell",
-      "header:⏳ Open Tasks",
+      "header:⏳ Open tasks",
       "tasks-table:,period",
     ]);
     // One block left, and no run of blank lines where the other one was.
@@ -205,7 +205,7 @@ describe("what it will not do", () => {
   it("leaves every line it did not move exactly as it read it", () => {
     const out = moveCell(PAGE, { block: 0, from: 5, to: 6 }, { kind: "block", at: 2 })!;
     expect(out[0]).toBe("`almanac:spacer`");
-    expect(out).toContain("header:⏳ Open Tasks");
+    expect(out).toContain("header:⏳ Open tasks");
     expect(out).toContain("tasks-table:,period");
   });
 });
@@ -233,7 +233,7 @@ describe("the page head is not a source and not a destination", () => {
     "```",
     "",
     "```almanac",
-    "header:⏳ Open Tasks",
+    "header:⏳ Open tasks",
     "tasks-table:,period",
     "```",
     "",
@@ -287,7 +287,7 @@ describe("the page head is not a source and not a destination", () => {
     // And the head is still the first fence.
     expect(out!.filter((l) => l.startsWith("```"))[0]).toBe("```almanac");
     expect(out!.indexOf("title:home,diary,journals")).toBeLessThan(
-      out!.indexOf("header:⏳ Open Tasks")
+      out!.indexOf("header:⏳ Open tasks")
     );
   });
 
@@ -343,7 +343,7 @@ describe("stacking a widget into a column that already has one", () => {
     expect(body(out, 0)).toEqual([
       "row",
       "diary:3",
-      "header:⏳ Open Tasks",
+      "header:⏳ Open tasks",
       "tasks-table:,period",
       "cell",
       "launcher",
@@ -384,7 +384,7 @@ describe("swapping two widgets", () => {
       "row",
       "diary:3",
       "cell",
-      "header:⏳ Open Tasks",
+      "header:⏳ Open tasks",
       "tasks-table:,period",
       "cell",
       "journals",
@@ -422,7 +422,7 @@ describe("what a whole block offers a row", () => {
     //
     // 4.12 §A: a section is not a widget. What a block gives a row is a widget
     // and nothing that draws a title over it.
-    expect(widgetRun(["header:⏳ Open Tasks", "tasks-table:,period"])).toBeNull();
+    expect(widgetRun(["header:⏳ Open tasks", "tasks-table:,period"])).toBeNull();
   });
 
   it("refuses a bare header: too, which is looser than the grammar's own test", () => {
@@ -458,6 +458,60 @@ describe("what a whole block offers a row", () => {
 
   it("refuses a modifier caught between two content lines", () => {
     expect(widgetRun(["header:x", "frame: none", "links:home"])).toBeNull();
+  });
+
+  it("leaves a height behind too (4.22 §5.3)", () => {
+    // A WHOLE BLOCK DRAGGED INTO A CELL. `HEIGHT_KEYWORD` is in `STRUCTURE`, so
+    // `isContent` says no and the content span stops short of it — which is the
+    // promise this file already makes about modifiers, and correct here for the
+    // same reason: a height describes a CARD, and the fence being emptied has
+    // none. The height that must travel is the one above a widget already inside
+    // a group, and `runWithHeight` carries that one.
+    expect(widgetRun(["height: 240", "links:home"])).toEqual({ from: 1, to: 2 });
+    expect(widgetRun(["height: 240"])).toBeNull();
+  });
+});
+
+describe("what a block keeps when a widget leaves it (4.22 §5.4)", () => {
+  // `pruned` is not exported — it is reached through `moveCell`, which is where
+  // the property actually matters: what the reader is left looking at.
+  const GROUP = [
+    "```almanac",
+    "row",
+    "diary:3",
+    "cell",
+    "height: 240",
+    "on-this-day:always",
+    "```",
+    "",
+  ];
+
+  it("drops a height that has stopped sizing anything", () => {
+    // The widget under it went to a block of its own and took its height with
+    // it. Nothing must be left describing a card that is not there.
+    const out = moveCell(
+      GROUP,
+      { block: 0, from: 3, to: 5 },
+      { kind: "block", at: 1 }
+    );
+    expect(out).not.toBeNull();
+    const left = (out ?? []).slice(0, (out ?? []).indexOf("```") + 1);
+    expect(left).not.toContain("height: 240");
+  });
+
+  it("drops them with the row, because a card is only drawn inside one", () => {
+    // A ROW OF ONE IS NOT A ROW, so the `row` line goes — and with no row there
+    // are no cards, so a height left here would draw `parseHeights`' refusal on a
+    // block the reader never touched.
+    const out = moveCell(
+      GROUP,
+      { block: 0, from: 1, to: 2 },
+      { kind: "block", at: 1 }
+    );
+    expect(out).not.toBeNull();
+    const left = (out ?? []).slice(0, (out ?? []).indexOf("```") + 1);
+    expect(left).not.toContain("row");
+    expect(left).not.toContain("height: 240");
   });
 });
 
@@ -992,7 +1046,7 @@ describe("a leading delimiter, which is the one that carries a width", () => {
       "header:🏷️ Tags",
       "tag-index",
       "cell",
-      "header:⏳ Open Tasks",
+      "header:⏳ Open tasks",
       "tasks-table",
       "cell",
       "journals",
@@ -1006,7 +1060,7 @@ describe("a leading delimiter, which is the one that carries a width", () => {
       "header:🏷️ Tags",
       "tag-index",
       "cell",
-      "header:⏳ Open Tasks",
+      "header:⏳ Open tasks",
       "tasks-table",
     ]);
   });
@@ -1022,7 +1076,7 @@ describe("how many widgets a block holds", () => {
     // title bar is now a different refusal with a different reason, and this
     // function does not make it. It still counts the directives and not the bar,
     // which is what a `header:` line being content-but-not-a-cell means.
-    expect(widgetCount(["header:⏳ Open Tasks", "tasks-table:,period"])).toBe(1);
+    expect(widgetCount(["header:⏳ Open tasks", "tasks-table:,period"])).toBe(1);
     expect(widgetCount(["row", "diary:3", "cell", "journals"])).toBe(2);
     expect(widgetCount(["frame: none", "# a note to self", "", "links:home"])).toBe(1);
   });

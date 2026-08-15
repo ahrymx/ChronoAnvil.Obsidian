@@ -40,7 +40,7 @@ dependencies first if they are missing.
 - **Charts** — line, bar, calendar heat map, scatter, streak and summary, drawn
   natively from your own frontmatter. Per-note chart sections on dashboards and
   journal index notes.
-- **Quick capture** straight into today's entry, review queues, recall decks,
+- **Quick capture** straight into any entry that can hold one, review queues, recall decks,
   attachments and task rollups.
 
 ## Documentation

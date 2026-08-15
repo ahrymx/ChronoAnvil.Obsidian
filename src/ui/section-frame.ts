@@ -115,6 +115,36 @@ export function overflowButton(
   return button;
 }
 
+// The control a BANNER carries: same glyph, same label, same menu position, on
+// every Almanac page. 4.20.
+//
+// ── WHY THIS IS ONE FUNCTION AND NOT THREE COPIES OF THREE LINES ──────
+//
+// `page-title.ts` has drawn a cog since 4.5 and said why: *"the control acts on
+// the PAGE — its name, its sections — where a ⋯ elsewhere in this plugin means
+// 'more things about this row'."* That argument was right and it was applied to
+// one of the three banners. A diary entry and a journal note carried the same
+// menu, opening the same section editor, behind the glyph that means something
+// else — so a reader who learned the cog on a dashboard had to learn the ⋯
+// separately on the two surfaces they spend the most time in.
+//
+// 4.20 settles that every Almanac page has a banner and that a banner is the
+// file's name, its navigation, and this. One meaning, one glyph.
+//
+// IT WRAPS `overflowButton` RATHER THAN REPLACING IT, because the ⋯ is still
+// right for what it was always for — a row, a cell, a card inside a page — and
+// the two differ by a glyph and a label rather than by behaviour.
+export function settingsButton(
+  host: HTMLElement,
+  cls: string,
+  build: (menu: Menu) => void
+): HTMLElement {
+  const button = overflowButton(host, cls, build);
+  setIcon(button, "settings");
+  button.setAttr("aria-label", "Page settings");
+  return button;
+}
+
 export function splitGlyph(title: string): { glyph: string; text: string } {
   const trimmed = title.trim();
   const m = /^(\S+)\s+(\S.*)$/.exec(trimmed);

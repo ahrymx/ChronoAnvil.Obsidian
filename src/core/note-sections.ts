@@ -57,8 +57,12 @@ import { moveCell, widgetRun } from "./cell-move";
 import type { CellTarget } from "./cell-move";
 import {
   CELL_KEYWORD,
+  LINKS_KEYWORD,
   ROW_KEYWORD,
+  TITLE_KEYWORD,
   WIDE_KEYWORD,
+  isHeightLine,
+  isLinksLine,
   isRowLine,
   isTitleLine,
   isWideLine,
@@ -319,37 +323,239 @@ function fenceHolding(
   return null;
 }
 
-// The head, as the three flat-note catalogues compose it.
+// ── THE BANNER (4.19) ─────────────────────────────────────────────────
 //
-// ONE DEFINITION, THREE CATALOGUES. Search, the diary folder note and the
-// journals folder note compose exactly the same section, and three copies is
-// three places for the ids to drift — which is the fault `resolveTarget` was
-// exported in 4.5 to prevent, one level up. The homepage keeps its own, because
-// it composes the BARE form: it already has the launcher doing this job as
-// content in a cell, and a second copy as chrome would be the same destinations
-// twice on one page.
+// ONE SECTION THAT SAYS WHICH NOTE THIS IS AND WHERE IT GOES. Until this
+// release a page answered that in two rows — a `title` section and, on the
+// dashboards, a `links` section in another band — and on Search in one and a
+// HALF, because the navigation row was a line inside the search block. Three
+// shapes for one idea, and a reader editing sections saw two rows where the
+// page shows one strip.
 //
-// NOT LOCKED, on the homepage's argument for the same object: a page without a
-// title card is a coherent thing to want — the note's name is in the tab, the
-// file explorer and the window.
+// THE WORD IS NOT NEW. `widget-registry.ts` has carried `banner` as a formal
+// exclusion reason since 4.12 — *"What a page IS rather than something on it. A
+// second banner is a second answer to 'which note is this'"* — and both
+// `entry-header` and `journal-header` have been labelled "Banner" in their
+// catalogues for longer than that. What 4.19 does is extend a name that covered
+// two of nine surfaces to all nine, not coin one. The alternatives were all
+// taken: `header:` is the section bar, "page head" was this object's name while
+// it was only half of itself (and "block head" is a third thing — every block
+// wears one), and "masthead" is the dashboard band plus a description
+// `page-title.ts` rejects for this card by name.
 //
-// PINNED, AND THAT IS 4.11's WHOLE CHANGE HERE. The four period dashboards have
-// said this since 4.10 (`DIARY_SECTIONS`' own `title`, `pinned: true` plus a band
-// of one); the four flat surfaces said nothing, so on the homepage, Search and
-// both folder notes the head could be dragged under the charts, arrowed down the
-// list, and pulled into a group by the row beneath it. One catalogue, one flag,
-// and the two heads are now one decision rather than two.
-export const PAGE_TITLE_SECTION: FlatSection = {
-  id: "title",
-  label: "Page title",
-  blurb:
-    "The page's own name, where it can go, and the control that renames it and edits its sections.",
-  icon: "🏷️",
-  locked: false,
-  pinned: true,
-  render: () => ({ fence: "almanac", lines: [PAGE_TITLE_LINE] }),
-  locate: locateTitle,
-};
+// LOCKED, WHICH IS 4.19's ONE LOSS AND IS STATED RATHER THAN BURIED. The head
+// was removable on the argument that *"a page without a title card is a coherent
+// thing to want — the note's name is in the tab, the file explorer and the
+// window"*, and `links` was locked on the argument that *"a vault where some
+// pages can get home and others cannot is worse than one with no links at all"*.
+// One block cannot be both, and the navigation argument is the stronger of the
+// two: a missing title card costs a reader a label they have three other copies
+// of, and a missing links row costs them the way out of the page. So the banner
+// is locked everywhere — including on the homepage, whose banner carries no
+// links row at all. That last case is the price of ONE rule instead of two, and
+// a rule that held on five surfaces and not the other four would be a rule a
+// reader has to learn per page.
+//
+// PINNED, unchanged from 4.11 and for its reason: a page whose own name is
+// somewhere other than the top is a page with its title in the middle of it.
+//
+// ONE BLOCK, STILL TWO DIRECTIVES. `title:` carries where you are in the VAULT
+// and `links:` carries where you are in TIME; `page-title.ts` argues that split
+// at length and `page-head.test.ts` pins it. What merges here is the FENCE, not
+// the grammar — `PAGE_TITLE_IDS` is untouched and neither line learns the
+// other's destinations. Obsidian renders a fence as one block, so one fence is
+// one strip, which is the whole of what "the same block" had to mean.
+// The id every catalogue's banner shares.
+//
+// SPELLED ONCE because five catalogues now use it and `repair-plan.ts` matches
+// sections by id: a sixth spelling would be a section repair could not find.
+export const BANNER_ID = "banner";
+
+export interface BannerSpec {
+  // The vault destinations the `title:` line carries, or absent for the BARE
+  // form.
+  //
+  // AND THE HOMEPAGE IS STILL BARE, WHICH 4.19 DELIBERATELY DID NOT "FIX". It
+  // looks like the one surface out of step and it is the one surface with an
+  // argument: the launcher is already on that page, as content in a cell, and it
+  // ships with Diary and Journals among its four tiles. Ids here would draw the
+  // same two destinations a second time as chrome, six lines above themselves.
+  // The other three flat pages have no launcher, so they carry the ids.
+  ids?: readonly string[];
+  // The `links:` argument this page's banner composes, or absent for a page
+  // whose time navigation is a widget of its own.
+  //
+  // ABSENT ON THREE OF THE FOUR FLAT PAGES, and each has already argued it. The
+  // homepage's navigation is the diary card's destination pills — which is why
+  // `diary` is the locked section there and no links section was ever written.
+  // Both folder notes' navigation is likewise the card they are a folder note
+  // for. Search is the one that carries a row, and until 4.19 it carried it
+  // INSIDE the search block, where no section owned it and the editor could not
+  // show it.
+  links?: string;
+  // Whether the banner seeds the page's width. `wide` is a fact about the NOTE
+  // read from the block that draws its title (4.11), so it belongs to whichever
+  // section that is — which is now this one.
+  wide?: boolean;
+}
+
+// The banner, as a flat note's catalogue composes it.
+//
+// A FACTORY RATHER THAN A CONSTANT, which is what 4.19 changes about the shape
+// of this export. `PAGE_TITLE_SECTION` was one frozen object three catalogues
+// shared and the homepage could not, so the homepage kept a near-copy — two
+// definitions of one decision, which is exactly the drift `resolveTarget` was
+// exported in 4.5 to prevent one level up. Every difference between the four
+// pages is now a field of `BannerSpec`, so there is one definition and four
+// arguments to it.
+export function bannerSection(spec: BannerSpec = {}): FlatSection {
+  return {
+    id: BANNER_ID,
+    label: "Banner",
+    blurb: spec.links
+      ? "The page's own name, where it can go in the vault and in time, and the control that renames it and edits its sections."
+      : "The page's own name, where it can go, and the control that renames it and edits its sections.",
+    icon: "🏷️",
+    locked: true,
+    pinned: true,
+    render: () => ({
+      fence: "almanac",
+      lines: [
+        // THE MODIFIER FIRST, where `composeFlatNote` already puts `row` and
+        // where `parseWide` reads it from regardless of order. A modifier at the
+        // top of a fence is also outside `widgetRun`'s content span, which is
+        // what keeps it behind when the widget under it leaves — and `setPageWide`
+        // splices at exactly this position.
+        ...(spec.wide ? [WIDE_KEYWORD] : []),
+        spec.ids?.length ? `${TITLE_KEYWORD}:${spec.ids.join(",")}` : TITLE_KEYWORD,
+        ...(spec.links ? [`${LINKS_KEYWORD}:${spec.links}`] : []),
+      ],
+    }),
+    // TWO ANCHORS, AND THE SECOND ONE IS NOT BELT-AND-BRACES.
+    //
+    // Anchoring on the title line is what reports the banner PRESENT on a note
+    // that still has its two lines in two fences — so repair adds nothing there
+    // and the note keeps rendering as it always has. The weld is a migration,
+    // not a repair (`mergeBannerFences`).
+    //
+    // BUT THE PAGE HEAD WAS REMOVABLE UNTIL THIS RELEASE, and a reader who took
+    // that offer has a note with a `links:` row and no title line — not a
+    // corrupted note, a note in a state 4.10 explicitly invited. On a title-only
+    // anchor the banner reports ABSENT there, repair composes a whole new one,
+    // and the reader ends up with two navigation rows: the 4.18 duplicate-page-
+    // head failure, re-made in the release that was cleaning up after it.
+    //
+    // So the banner is present if EITHER of its lines is. This is the "either
+    // spelling" rule `journal-sections.ts` already uses for a renamed section,
+    // applied to a merge instead of a rename — and it is why `parseDiarySections`
+    // needed the `claimed` set `parseFlatSections` has had since 4.12: two
+    // fences can now match one id, and the first run is the section.
+    locate: (text) => {
+      const at = locateTitle(text);
+      return at >= 0 ? at : text.search(/^links:/m);
+    },
+  };
+}
+
+// A note whose banner is still two fences, welded into one. Null when there is
+// nothing to do.
+//
+// ── WHY THIS IS A MIGRATION AND NOT PART OF REPAIR ────────────────────
+//
+// Repair is additive-and-retired-only, and `repairNote` asserts it — it may add
+// a section the release ships and the note lacks, strike a retired directive,
+// and rewrite an argument it owns. Moving a line from one block to another is
+// none of those three, and `layout.ts` says what to do with a change that is
+// none of those three: *"the answer is to ship it as a one-off migration next to
+// migrateTrends, not to teach this module a fourth verb."* So this is that, and
+// it runs in the `migrations` group where a reader opts into it separately.
+//
+// ── WHAT IT REFUSES, WHICH IS MOST OF WHAT IT COULD DO ────────────────
+//
+// It welds ONE links line out of the fence IMMEDIATELY BELOW the banner, and it
+// declines every other arrangement:
+//
+//   • no `title` line at all — nothing to weld onto, and no second sentence to
+//     invent. `setPageWide` answers the same way for the same reason;
+//   • a banner that already holds a links line — the note is on this release,
+//     and running twice must be the same as running once;
+//   • anything but blank lines between the two fences. A reader who put a widget
+//     between their title card and their navigation row ARRANGED that, and a
+//     migration that hoisted the row past it would be rewriting a page they
+//     made rather than one this plugin composed;
+//   • no links line below at all — the homepage and both folder notes compose
+//     no navigation row and never did, so on those this is correctly a no-op.
+//
+// The donor fence keeps everything else it had, in order, and is dropped only if
+// the links line was the whole of it — an empty fence renders as an empty block
+// and is worse than the seam this closes.
+//
+// PURE, AND NULL FOR "NOTHING TO DO", which is this file's convention
+// (`setPageWide`, `applyFlatSections`) and exists so a caller cannot touch a
+// reader's file to leave it identical — Obsidian's modified time is the thing
+// that then lies about it, and sync propagates the lie.
+export function mergeBannerFences(text: string): string | null {
+  const at = locateTitle(text);
+  if (at < 0) return null;
+  const lines = text.split("\n");
+  const titleLine = text.slice(0, at).split("\n").length - 1;
+
+  const { at: fenceAt, segs } = fencesOf(lines);
+  const startOf: number[] = [];
+  let start = 0;
+  for (let i = 0; i < segs.length; i++) {
+    startOf[i] = start;
+    start += segs[i].length;
+  }
+
+  // Which fence holds the title line. `fenceHolding` answers this one level up
+  // and in the note's own line numbers, which is what a splice takes; this needs
+  // the SEGMENT index, because the block it welds from is "the next segment"
+  // rather than "so many lines down".
+  const banner = fenceAt.find((seg) => {
+    const from = startOf[seg];
+    return titleLine >= from && titleLine < from + segs[seg].length;
+  });
+  if (banner === undefined) return null;
+
+  const bannerBody = segs[banner].slice(1, -1);
+  if (bannerBody.some(isLinksLine)) return null;
+
+  const donor = fenceAt.find((seg) => seg > banner);
+  if (donor === undefined) return null;
+  for (let i = banner + 1; i < donor; i++) {
+    if (segs[i].some((l) => l.trim() !== "")) return null;
+  }
+
+  const donorBody = segs[donor].slice(1, -1);
+  const row = donorBody.findIndex(isLinksLine);
+  if (row < 0) return null;
+
+  const rebuilt = (seg: string[], body: readonly string[]): string[] => [
+    seg[0],
+    ...body,
+    seg[seg.length - 1],
+  ];
+  const kept = donorBody.filter((_, i) => i !== row);
+
+  const out: string[] = [];
+  for (let i = 0; i < segs.length; i++) {
+    if (i === banner) {
+      out.push(...rebuilt(segs[i], [...bannerBody, donorBody[row]]));
+    } else if (i === donor) {
+      if (kept.length) out.push(...rebuilt(segs[i], kept));
+    } else if (kept.length === 0 && i > banner && i < donor) {
+      // The blank run that separated the two blocks goes with the block it
+      // separated. Left behind it would be a widening gap where a card used to
+      // be, which is a change to how the page LOOKS made by a migration that
+      // was only asked to move a line.
+      continue;
+    } else {
+      out.push(...segs[i]);
+    }
+  }
+  return out.join("\n");
+}
 
 // A flat note's whole markdown.
 //
@@ -488,15 +694,24 @@ const isBlank = (lines: string[]): boolean =>
 // `---` anywhere else is a thematic break a reader typed, and treating one as
 // frontmatter would silently swallow the prose beneath it — turning a run that
 // SHOULD be reported as the reader's into one that is not reported at all.
-const withoutFrontmatter = (lines: string[]): string[] => {
-  if (lines[0]?.trim() !== "---") return lines;
+// The index of the line the frontmatter CLOSES on, or -1 when there is none.
+//
+// EXPORTED IN 4.29 for the reader who needs the boundary rather than the tail:
+// reloading a page's body has to keep the frontmatter byte-for-byte, and
+// `journal-date`, the events stamp and the reader's alias all live in it. One
+// rule, one name — this is the same expression `withoutFrontmatter` has always
+// used, with the same care taken over the same edge, and both read it here.
+export function frontmatterEnd(lines: readonly string[]): number {
+  if (lines[0]?.trim() !== "---") return -1;
   // Where it closes, or -1 when it never does — an opening `---` with no close
   // is not frontmatter, and `slice(0)` hands the run back whole, which is the
   // right answer for it. Written as one expression rather than as a guard and a
   // branch: a second path here would be a path no test can tell from this one.
-  const close = lines.findIndex((l, i) => i > 0 && l.trim() === "---");
-  return lines.slice(close + 1);
-};
+  return lines.findIndex((l, i) => i > 0 && l.trim() === "---");
+}
+
+const withoutFrontmatter = (lines: string[]): string[] =>
+  lines.slice(frontmatterEnd(lines) + 1);
 
 // Which sections this fence holds, and which of its lines each one is on.
 //
@@ -649,13 +864,28 @@ export function flatRemovalRefusal(
   heldUnit: string
 ): string | null {
   if (section.locked) {
-    return `${section.label} is part of what ${noun} is and cannot be removed. You can move it, though.`;
+    // AND WHETHER IT CAN BE MOVED IS ASKED, NOT ASSUMED (4.19).
+    //
+    // This said "You can move it, though." unconditionally, and was true for as
+    // long as it was reachable: no flat section had ever been both `locked` and
+    // `pinned`, so the only sections that got here could all move. The banner is
+    // both — locked because it carries the way out of the page, pinned because a
+    // page's name belongs at the top — and the old sentence would answer a
+    // reader's "why can't I remove this" by sending them to do a thing the
+    // editor also refuses.
+    //
+    // `diaryRemovalRefusal` has branched on exactly this since 4.11, having hit
+    // exactly this bug one catalogue over and one release earlier. This is that
+    // fix, arriving here with the section that needed it.
+    return section.pinned
+      ? `Part of what ${noun} is, so it can't be removed or moved.`
+      : `Part of what ${noun} is, so it can't be removed. You can still move it.`;
   }
   const held = section.holds?.(text) ?? 0;
   if (held > 0) {
-    return `${section.label} has ${held} ${heldUnit}${
-      held === 1 ? "" : "s"
-    } in it. Remove ${held === 1 ? "it" : "them"} first, then remove the section.`;
+    return `Holds ${held} ${heldUnit}${held === 1 ? "" : "s"}. Remove ${
+      held === 1 ? "it" : "them"
+    } first, then remove the section.`;
   }
   return null;
 }
@@ -1053,11 +1283,25 @@ export function applyFlatSections(
     // takes exactly the line the catalogue wrote and nothing adjacent to it.
     // The block's own `row` line, its `frame:` line and anything the reader put
     // beside them are untouched, which is what keeps this a reconciler.
+    //
+    // ONE EXCEPTION, AND IT IS THE OTHER HALF OF THE SAME RULE (4.22 §5.4). A
+    // `height:` line immediately above the line being cut is not adjacent
+    // furniture that happens to be nearby — it IS that section's, because a
+    // height sizes the widget on the next line and nothing else. Left behind, it
+    // would size whatever moved up into the gap, which is a reader removing one
+    // widget from a group and watching a different one change shape.
+    //
+    // TAKEN HERE AS WELL AS IN `tidyHeights`, WHICH IS NOT A DOUBLE FIX. That
+    // one runs in `pruned`, on the drag paths; this reconciler never calls it,
+    // and the two answers together are what makes "a height cannot be orphaned"
+    // true of every path rather than of most of them.
     if (doomed.length && doomed.length !== run.sectionIds.length) {
       const cut = new Set<number>();
       for (const id of doomed) {
         const at = cellLineIn(byId.get(id), run);
-        if (at !== null) cut.add(at);
+        if (at === null) continue;
+        cut.add(at);
+        if (at > 0 && isHeightLine(lines[at - 1])) cut.add(at - 1);
       }
       lines = lines.filter((_, i) => !cut.has(i));
     }

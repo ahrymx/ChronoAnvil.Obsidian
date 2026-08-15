@@ -26,7 +26,9 @@ import type {
   DiaryDashboardContext,
   DiarySection,
 } from "../diary/diary-sections";
-import { CLASS_DEFS, noteKindOf } from "../trackers/trackers";
+import { CLASS_DEFS, TRACKER_CLASSES, noteKindOf } from "../trackers/trackers";
+import type { TrackerClass } from "../trackers/trackers";
+import { wantFromEntry } from "../diary/entry-template";
 import { surfacePathConfig } from "../trackers/entry-trackers";
 import { JournalType, registeredJournalTypes } from "../journals/journal";
 import {
@@ -42,6 +44,7 @@ import { bridgeCatalogue } from "./widgets/bridge-widgets";
 import { otherSurface } from "../core/bridge";
 import { folderNotePath, getFile, openFile } from "../core/util";
 import { openTemplateEditor, variantEligible } from "./template-editor";
+import { toPlainMarkdown } from "../core/plain-markdown";
 import { notify } from "../core/notify";
 
 // ── Add a section to this note ────────────────────────────────────────────
@@ -618,6 +621,59 @@ export class SectionInserter {
     await openSectionEditor(this.app, this.plugin, notePath, {
       model: modelForSurface(surface, this.hostFolderOf(notePath), this.vault())
         .model,
+      // THE SECOND DOOR ONTO SAVING A DIARY LAYOUT (4.29), and the seam it uses
+      // is the one 3.0 built agnostic and 3.18 gave a single caller. A reader
+      // who has just dragged an entry's sections into the order they want is
+      // standing in the window where that arrangement exists and nowhere else;
+      // until now the only way to keep it was to close this, open the cog again
+      // and pick Template.
+      //
+      // ONE FUNCTION, TWO DOORS — `entryTemplates.saveLayout` is what the
+      // Template window calls too. The journal side set exactly this precedent
+      // when the settings rail and the banner both gained "Save as layout…".
+      //
+      // THE TARGETS ARE THE FIVE GRAINS, which is what makes this the diary's
+      // own version of the same control rather than a copy: a journal offers a
+      // layout to its kinds, and a grain's neighbours are the other grains.
+      ...(surface.kind === "entry"
+        ? {
+            arrangement: {
+              buttonLabel: "Save as layout…",
+              promptTitle: "Save as layout",
+              promptPlaceholder: "e.g. Quiet Monday",
+              targets: TRACKER_CLASSES.map((g) => ({
+                id: g,
+                label: CLASS_DEFS[g].label,
+              })),
+              originTarget: surface.ctx.grain,
+              save: async (
+                label: string,
+                sections: string[],
+                targets: string[]
+              ): Promise<void> => {
+                // The window hands back ids and knows nothing about what they
+                // are, which is its contract. The options are resolved from the
+                // FILE rather than carried through the modal, exactly as the
+                // journal caller resolves its overrides from the context: an
+                // answer is a property of the note, and the agnostic window has
+                // no business learning what a bridge target is.
+                const file = getFile(this.app, notePath);
+                const text = file ? await this.app.vault.read(file) : "";
+                const { want } = wantFromEntry(text, surface.ctx);
+                const options = new Map(want.map((w) => [w.id, w.options]));
+                await this.plugin.entryTemplates.saveLayout(
+                  label,
+                  sections.map((id) =>
+                    options.get(id) ? { id, options: options.get(id) } : { id }
+                  ),
+                  targets.filter((t): t is TrackerClass =>
+                    (TRACKER_CLASSES as readonly string[]).includes(t)
+                  )
+                );
+              },
+            },
+          }
+        : {}),
     });
   }
 
@@ -648,6 +704,86 @@ export class SectionInserter {
   // end of the widget fence because a reader who rearranged their entry
   // arranged it. This used to append to the end of the file for all of them,
   // which on an entry would have put a fence below the reader's regions.
+  // This page, on the clipboard, as markdown anybody can read (4.30).
+  //
+  // HERE RATHER THAN IN A MODULE OF ITS OWN, because the one thing it needs
+  // that a pure function cannot have is `surfaceOfNote` — and that is PRIVATE.
+  // Exporting it so a new file could resolve a surface too would put a second
+  // copy of "what kind of note is this" in the vault, which is `RESUME §5`
+  // 1c-iii's scar exactly: two correct copies of a lookup did not make a third
+  // correct, and an entry banner printed "Daily" where a date belongs. The
+  // method goes where the lookup already is.
+  //
+  // WRITES NOTHING. No settings key, no file, no folder, no migration — which
+  // is the whole of the claim that this is reversible by not pressing it, and
+  // the reason it needs no confirmation where 4.29's reload needed one.
+  //
+  // A MANAGED TEMPLATE IS NOT REFUSED, unlike the two commands above it. They
+  // refuse because an edit there is overwritten by the next refresh; this reads
+  // and copies, so there is nothing to lose and no reason to decline. An entry
+  // template's export is its empty fields, which is a truthful answer.
+  async copyPlainMarkdownHere(notePath: string): Promise<void> {
+    const file = getFile(this.app, notePath);
+    if (!file) {
+      new Notice("Open a note first.");
+      return;
+    }
+
+    const resolved = this.modelForNote(notePath);
+    if (!resolved) {
+      new Notice(UNRECOGNISED);
+      return;
+    }
+    await this.copyAsPlainMarkdown(file, resolved.model);
+  }
+
+  // What catalogue reads this note, and which of the seven surfaces it is.
+  //
+  // THE ONE DOOR ONTO `surfaceOfNote` FOR EVERYTHING THAT ONLY READS (4.31).
+  // The clipboard copy asked it directly until this release, and the vault
+  // export would have been a fifth caller — so the question is asked once, here,
+  // and both go through it. `diary-sections.test.ts` counts the call sites and
+  // its own comment records that the total has broken twice before when a new
+  // caller appeared; this release adds a feature and does not move the count.
+  //
+  // A MANAGED TEMPLATE RESOLVES rather than being turned away. `modelForSurface`
+  // excludes it by TYPE, because the two editing commands refuse one — and they
+  // refuse a WRITE that the next refresh would undo. A read has nothing to lose,
+  // and an entry template's export is its empty fields, which is truthful.
+  modelForNote(
+    notePath: string
+  ): { model: SectionModel; surface: ResolvedSurface["kind"] } | null {
+    const surface = this.surfaceOfNote(notePath);
+    if (!surface) return null;
+    if (surface.kind === "managed") {
+      const ctx = this.entryContextFor(notePath);
+      return ctx
+        ? { model: entrySectionModel(ctx), surface: "managed" }
+        : null;
+    }
+    return {
+      model: modelForSurface(surface, this.hostFolderOf(notePath), this.vault())
+        .model,
+      surface: surface.kind,
+    };
+  }
+
+  // The read, the write to the clipboard and the notice — one copy of them, for
+  // the two doors above.
+  private async copyAsPlainMarkdown(file: TFile, model: SectionModel): Promise<void> {
+    const markdown = toPlainMarkdown(await this.app.vault.read(file), model);
+    await navigator.clipboard.writeText(markdown);
+    // Says HOW MUCH, because a copy that produced only frontmatter is a page
+    // nobody has written in yet, and a bare "Copied." would leave the reader to
+    // find that out in the paste.
+    const sections = markdown.split("\n").filter((l) => /^#{2,3}\s/.test(l)).length;
+    notify.ok(
+      sections === 0
+        ? "Copied as plain markdown — there is no writing on this page yet."
+        : `Copied as plain markdown — ${sections} section${sections === 1 ? "" : "s"}.`
+    );
+  }
+
   async addSectionHere(notePath: string): Promise<void> {
     const file = getFile(this.app, notePath);
     if (!file) {

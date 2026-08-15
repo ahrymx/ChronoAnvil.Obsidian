@@ -54,7 +54,7 @@ const CAT: FlatSection[] = [
   one("diary", "diary:3"),
   one("launcher", "launcher"),
   one("journals", "journals"),
-  two("tasks", "header:⏳ Open Tasks", "tasks-table:,period"),
+  two("tasks", "header:⏳ Open tasks", "tasks-table:,period"),
   // A plain widget with no title of its own — what a column IS, as of 4.12 §A.
   // The entry above it is the same shape a dashboard writes and is the thing
   // that is now refused, so the fixture carries one of each.
@@ -73,7 +73,7 @@ const PAGE = [
   "```",
   "",
   "```almanac",
-  "header:⏳ Open Tasks",
+  "header:⏳ Open tasks",
   "tasks-table:,period",
   "```",
   "",
@@ -120,11 +120,11 @@ describe("what the editor is shown", () => {
     // grammar's own contradiction test and still renders a bar that cannot be
     // cell content.
     const framed = PAGE.replace(
-      "```almanac\nheader:⏳ Open Tasks\ntasks-table:,period\n```",
+      "```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```",
       "```almanac\nframe: section\ntasks-table:,period\n```"
     );
     expect(flatBlocks(framed, CAT)[1].column).toEqual([]);
-    const bare = PAGE.replace("header:⏳ Open Tasks", "header:");
+    const bare = PAGE.replace("header:⏳ Open tasks", "header:");
     expect(flatBlocks(bare, CAT)[1].column).toEqual([]);
   });
 
@@ -133,7 +133,7 @@ describe("what the editor is shown", () => {
     // holding `title` separately and by name, so the model says it here rather
     // than letting the editor offer a join the write declines.
     const headed = PAGE.replace(
-      "```almanac\nheader:⏳ Open Tasks\ntasks-table:,period\n```",
+      "```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```",
       "```almanac\ntitle\n```"
     );
     const head = flatBlocks(headed, [...CAT, one("title", "title")]).find((b) =>
@@ -145,7 +145,7 @@ describe("what the editor is shown", () => {
   it("refuses to promise a split it could only make by guessing", () => {
     const shared = PAGE.replace(
       "cell\njournals",
-      "cell\nheader:⏳ Open Tasks\ntasks-table:,period"
+      "cell\nheader:⏳ Open tasks\ntasks-table:,period"
     );
     const block = flatBlocks(shared, CAT)[0];
     expect(block.ids).toContain("tasks");
@@ -165,7 +165,7 @@ describe("taking a section out of a row", () => {
   });
 
   it("leaves everything it did not move exactly as it read it", () => {
-    expect(out).toContain("header:⏳ Open Tasks");
+    expect(out).toContain("header:⏳ Open tasks");
     expect(out!.startsWith("`almanac:spacer`")).toBe(true);
   });
 });
@@ -186,7 +186,7 @@ describe("breaking a row up", () => {
 
 describe("putting a widget into a group", () => {
   // 4.12 §A REWROTE THIS DESCRIBE, AND THE OLD ONE WAS NOT WRONG ABOUT THE
-  // ARITHMETIC. It joined `tasks` — a `header:⏳ Open Tasks` bar over a
+  // ARITHMETIC. It joined `tasks` — a `header:⏳ Open tasks` bar over a
   // `tasks-table` — into the row, asserted that the bar travelled with its
   // widget, and passed. What it could not see is that `NOT_A_CELL` refuses a bar
   // as cell content at render, so the page drew that bar BELOW the group with
@@ -196,7 +196,7 @@ describe("putting a widget into a group", () => {
   // So the fixture is now a widget with no title of its own — which is what a
   // column is — and the titled case is asserted one describe down as a refusal.
   const OWN = PAGE.replace(
-    "```almanac\nheader:⏳ Open Tasks\ntasks-table:,period\n```",
+    "```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```",
     "```almanac\nevents\n```"
   );
   const out = regroupFlatNote(OWN, CAT, [
@@ -234,7 +234,7 @@ describe("a section that titles itself is not a column", () => {
     // modifier would stay behind with the fence being emptied and the section
     // would lose its bar, its title and its fold in one move.
     const framed = PAGE.replace(
-      "```almanac\nheader:⏳ Open Tasks\ntasks-table:,period\n```",
+      "```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```",
       "```almanac\nframe: section\ntasks-table:,period\n```"
     );
     expect(
@@ -248,7 +248,7 @@ describe("a section that titles itself is not a column", () => {
     // that. Reordering goes through `applyFlatSections`, not through `widgetRun`.
     const out = regroupFlatNote(PAGE, CAT, [["diary", "launcher"], ["journals"], ["tasks"]]);
     expect(out).not.toBeNull();
-    expect(out).toContain("header:⏳ Open Tasks");
+    expect(out).toContain("header:⏳ Open tasks");
   });
 });
 
@@ -304,7 +304,7 @@ describe("what a regroup will not do", () => {
   it("leaves a member it cannot bound where it is", () => {
     const shared = PAGE.replace(
       "cell\njournals",
-      "cell\nheader:⏳ Open Tasks\ntasks-table:,period"
+      "cell\nheader:⏳ Open tasks\ntasks-table:,period"
     );
     const out = regroupFlatNote(shared, CAT, [
       ["diary", "launcher"],

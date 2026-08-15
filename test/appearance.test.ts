@@ -364,7 +364,7 @@ describe("nothing is painted in its container's colour", () => {
     const at = t.indexOf(".journal-tracker-bar .journal-tracker-cell {");
     expect(at).toBeGreaterThan(0);
     const block = t.slice(at, t.indexOf("\n}", at));
-    expect(block).toContain("background: var(--background-primary)");
+    expect(block).toContain("background: var(--am-surface-inset)");
   });
 
   it("keeps the section card's own fill", () => {
@@ -1034,5 +1034,205 @@ describe("the diary calendar draws the state it claims", () => {
     expect(sel).not.toContain("background: var(--interactive-accent);");
     expect(sel).toContain("color-mix(in srgb, var(--interactive-accent) 16%");
     expect(sel).toContain("inset 3px 0 0 0 var(--interactive-accent)");
+  });
+});
+
+// ── 4.19.1: the banner treatments the render settled ──────────────────
+//
+// 4.19 shipped the banner unrendered and said so in its roadmap's §"What this
+// release owes". The first picture of a real vault answered three of the four
+// questions it listed and found one defect the suite could not see, because a
+// block's head is DRAWN rather than composed and every 4.19 test asserts what a
+// page composes to.
+
+describe("the banner is one material, and the minimal one is quiet", () => {
+  const body = (sel: string): string => {
+    const t = readCss();
+    const at = t.indexOf(`\n${sel} {`);
+    expect(at, `no rule for ${sel}`).toBeGreaterThan(0);
+    return t.slice(at, t.indexOf("}", at));
+  };
+
+  it("puts the figure on the block, and takes it off the card (V3)", () => {
+    // THE WASH AND THE HATCH RUN THE WHOLE BANNER. Stopping them at the rule
+    // made the banner read as a figured card with a plain strip bolted under
+    // it — two materials in one block, which is what the merge existed to end.
+    expect(body(".journal-page-banner::before")).toContain("repeating-linear-gradient");
+    expect(body(".journal-page-banner::before")).toContain("--interactive-accent");
+
+    // AND ONLY ONCE. Two figures over one banner is two 45° hatches at
+    // different origins, beating against each other at the seam — the one
+    // artefact a texture cannot survive, and invisible in any test that only
+    // asks whether the figure is present.
+    expect(body(".journal-page-banner > .jtc-card::before")).toContain("content: none");
+
+    // The children sit above it rather than under it. `inset: 0` needs a
+    // positioned ancestor or it resolves against the code-block widget in Live
+    // Preview, which is 4.7.0's grip bug.
+    for (const sel of [
+      ".journal-page-banner",
+      ".journal-page-banner > .jtc-card",
+      ".journal-page-banner > .journal-links-card",
+    ]) {
+      expect(body(sel), sel).toContain("position: relative");
+    }
+  });
+
+  it("separates the banner's two bands with a hairline, not a rule", () => {
+    // `--am-rule` is 2px and is what separates two CARDS. This separates two
+    // bands of one card, and at full weight it re-drew the seam the figure had
+    // just dissolved.
+    const pills = body(".journal-page-banner > .journal-links-card");
+    expect(pills).toContain("--am-rule-hair");
+    expect(pills).not.toContain("border-top: var(--am-rule) ");
+  });
+
+  it("gives the entry and the journal leaf one strip height and one name size (M2)", () => {
+    // ── THIS TEST PASSED WHILE THE THING IT CHECKS WAS FALSE ────────
+    //
+    // It read `padding: 7px 14px 8px` out of the entry's rule and out of the
+    // leaf's, and both were there — while a THIRD rule a few lines further down
+    // 30-header-bars.css overrode the entry's with `padding-top: 20px;
+    // padding-bottom: 19px`, a leftover from 3.7. The two strips differed by
+    // about 24px, under a comment on each saying they were the same numbers
+    // "because a reader moving between an entry and a journal note should not
+    // see the strip change height".
+    //
+    // TWO COPIES OF A VALUE CANNOT SEE A THIRD, which is the general form of
+    // that failure and the reason this assertion changed shape rather than
+    // gaining a case. Both bands carry `journal-banner-name` as of 4.21.1, so
+    // there is ONE rule; a padding that reaches one page kind reaches the other
+    // by construction, and no later rule can part them without naming the class
+    // they share.
+    const band = body(".journal-slim-banner .journal-banner-name");
+    expect(band).toContain("padding: 13px 14px 12px");
+    // AND NEITHER HEADER PADS ITSELF BACK APART. Both of the old per-banner
+    // rules are gone: the entry's entirely, and the leaf's down to the zeroing
+    // that lets its two bands bleed the card's padding themselves.
+    expect(readCss()).not.toContain(".journal-entry-banner .journal-entry-header {");
+    expect(body(".journal-study-banner .journal-study-header")).toContain(
+      "padding: 0"
+    );
+
+    // THE ENTRY'S NAME WAS THE SIZE OF A SECTION BAR'S LABEL. It inherited
+    // `--am-bar-text` (0.7em) from `.journal-header-title`, so the date — which
+    // is what the note IS — was set smaller than the words under it.
+    // The leaf's rule is a grouped selector — the name and the input it opens on
+    // rename have to be one object, or the strip jumps height on the first
+    // keystroke — so the rule is found by either spelling.
+    const rule = (sel: string): string => {
+      const t = readCss();
+      const at = Math.max(t.indexOf(`\n${sel} {`), t.indexOf(`\n${sel},`));
+      expect(at, `no rule for ${sel}`).toBeGreaterThan(0);
+      return t.slice(at, t.indexOf("}", at));
+    };
+    for (const sel of [
+      ".journal-entry-header .jeh-title",
+      ".journal-study-header .jsh-title-text",
+    ]) {
+      expect(rule(sel), sel).toContain("font-size: var(--am-text-lg)");
+      expect(rule(sel), sel).toContain("font-weight: 700");
+    }
+  });
+
+  it("sets the alias above the file's name, and nothing else above either", () => {
+    // ── 4.21.1 REVERSES 4.21 ON ONE POINT, DELIBERATELY ─────────────
+    //
+    // 4.21 moved the alias out of the banner and set it at `--am-text-sm`,
+    // reasoning that the file's name is what the note is called and this is a
+    // label on it. The first render showed the cost: a daily entry is named
+    // `Day-2026-08-13`, so the largest words on the page were an ADDRESS, and
+    // the one line saying what the day was sat under them at label size.
+    //
+    // The alias is the headline. Asserted as a RELATION rather than as a size,
+    // because the failure the release fixes is the ordering — a later retune
+    // that moved either token would satisfy two literals and break this.
+    const scale = (name: string): number => {
+      const t = readCss();
+      const at = t.indexOf(`${name}:`);
+      expect(at, name).toBeGreaterThan(0);
+      return Number(/([\d.]+)em/.exec(t.slice(at, at + 60))?.[1]);
+    };
+    expect(scale("--am-text-xl")).toBeGreaterThan(scale("--am-text-lg"));
+    expect(body(".jec-title-text")).toContain("font-size: var(--am-text-xl)");
+    for (const sel of [
+      ".journal-entry-header .jeh-title",
+      ".journal-study-header .jsh-title-text",
+    ]) {
+      const t = readCss();
+      const at = Math.max(t.indexOf(`\n${sel} {`), t.indexOf(`\n${sel},`));
+      expect(at, sel).toBeGreaterThan(0);
+      expect(t.slice(at, t.indexOf("}", at)), sel).toContain("--am-text-lg");
+    }
+    // AND THE INPUT IS THE SAME OBJECT AS THE TEXT IT REPLACES, or the strip
+    // jumps height on the first keystroke of a rename.
+    // AND THE SELECTOR IS SPECIFIC ENOUGH TO WIN (4.21.2). Obsidian styles
+    // `input[type="text"]` at (0,1,1) and a bare `.jec-title-input` is (0,1,0),
+    // so the size above was written, shipped, and never applied — clicking the
+    // title shrank it by a third and re-wrapped the row under the cursor. Pinned
+    // as a rule about the SELECTOR, because the declaration was already correct.
+    expect(body(".journal-entry-context input.jec-title-input")).toContain(
+      "font-size: var(--am-text-xl)"
+    );
+    expect(readCss()).not.toContain("\n.jec-title-input {");
+  });
+
+  it("captions the tracker grid in the strip's register, not a section bar's", () => {
+    // The grid is the only section in the plugin with a card and no name — it
+    // is a MARKED REGION rather than a directive, so there is no line in the
+    // fence for a `header:` title to be an argument to. The block says it
+    // instead, as a caption.
+    //
+    // SMALL CAPS AND FAINT, which is the register the page-context strip above
+    // it uses for its own facts. Anything louder would compete with the alias
+    // two lines up, which is the one piece of type on the card meant to be read.
+    const label = body(".jth-label");
+    expect(label).toContain("font-size: var(--am-text-2xs)");
+    expect(label).toContain("text-transform: uppercase");
+    expect(label).toContain("color: var(--text-faint)");
+
+    // ── AND IT IS PUSHED, NOT SPLIT (4.21.2) ────────────────────────
+    //
+    // The row's other half is the entry's date, and a journal note has no date
+    // to put there — so on that surface the row holds the label alone.
+    // `space-between` would strand it on the LEFT, where it reads as a heading
+    // over the whole card rather than as a caption on the grid beneath it.
+    expect(label).toContain("margin-left: auto");
+    expect(body(".journal-tracker-head")).not.toContain("space-between");
+  });
+
+  it("rules under the caption, not between it and the strip above it", () => {
+    // ── WHICH SIDE OF THE HAIRLINE THE CAPTION IS ON (4.21.3) ───────
+    //
+    // The card's head is the alias line and the caption line; the rule separates
+    // what the page knows about itself from the grid you fill in. It ran between
+    // the two halves of the head, which left "Fri 14 Aug 2026 / TRACKING:" on the
+    // grid's side of a rule it is the label for.
+    //
+    // THE CLAIM IS "THE LAST BAND ABOVE THE GRID OWNS THE DIVIDER", and the
+    // caption is always that band — a strip is optional on both page kinds, and
+    // the caption is not. So the rule moved rather than being duplicated.
+    expect(body(".journal-tracker-head")).toContain("border-bottom: var(--am-rule)");
+    // AND THE TWO STRIPS ARE ONE RULE, which is why this reads one body rather
+    // than two. They were two copies of five declarations, and a divider that
+    // moved in one copy would have left a journal note with a rule under its
+    // level line AND one under its caption.
+    const css = readCss();
+    const at = css.indexOf(".journal-tracker-section > .journal-entry-context,");
+    expect(at, "the two page-context strips are not one rule").toBeGreaterThan(0);
+    const strips = css.slice(at, css.indexOf("}", at));
+    expect(strips).toContain(".journal-tracker-section > .journal-note-context");
+    expect(strips).toContain("border-bottom: none");
+  });
+
+  it("applies subtle banner tinting and engraved texture to the slim banner", () => {
+    // The slim banner receives subtle accent tinting and fine engraved hatching
+    // texture on .journal-slim-banner::before, while child wrappers stay clean.
+    const css = readCss();
+    expect(css).toContain(".journal-slim-banner::before");
+    expect(css).toContain("--am-head-figure");
+    for (const sel of [".journal-entry-banner", ".journal-study-banner"]) {
+      expect(css, sel).not.toContain(`${sel}::before {`);
+    }
   });
 });

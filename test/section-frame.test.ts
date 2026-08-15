@@ -835,25 +835,24 @@ describe("one bar, at one scale (4.13 §1)", () => {
     return t.slice(at, t.indexOf("}", at));
   };
 
-  it("gives both titles their type from the same four tokens", () => {
-    for (const sel of [".journal-header-title {", ".journal-block-head-title {"]) {
-      const rule = body(sel);
-      expect(rule, sel).toContain("font-size: var(--am-bar-text)");
-      expect(rule, sel).toContain("letter-spacing: var(--am-bar-track)");
-      expect(rule, sel).toContain("color: var(--am-bar-ink)");
-      expect(rule, sel).toContain("text-transform: uppercase");
-    }
+  it("gives section and widget block titles their tokens with natural casing", () => {
+    const secRule = body(".journal-header-title {");
+    expect(secRule).toContain("font-size: var(--am-sec-title-size)");
+    expect(secRule).toContain("color: var(--am-sec-title-ink)");
+    expect(secRule).toContain("text-transform: none");
+
+    const blockRule = body(".journal-block-head-title {");
+    expect(blockRule).toContain("font-size: var(--am-bar-text)");
+    expect(blockRule).toContain("color: var(--am-bar-ink)");
+    expect(blockRule).toContain("text-transform: none");
   });
 
-  it("lets neither of them name a size of its own", () => {
-    // THE ASSERTION THAT ACTUALLY BITES. Reading the token is easy to keep; the
-    // way this drifts is somebody adding a size beside it for one surface.
-    for (const sel of [".journal-header-title {", ".journal-block-head-title {"]) {
-      const rule = body(sel);
-      expect(rule, sel).not.toContain("var(--am-text-base)");
-      expect(rule, sel).not.toContain("var(--am-text-sm)");
-      expect(rule, sel).not.toMatch(/font-size:\s*\d/);
-    }
+  it("reveals widget block heads on hover while keeping them discrete at rest", () => {
+    const cardHead = body(".journal-widget-card > .journal-block-head {");
+    expect(cardHead).toContain("opacity: 0");
+    expect(cardHead).toContain("max-height: 0");
+    const raw = rules();
+    expect(raw).toContain(".journal-widget-card:hover > .journal-block-head");
   });
 
   it("divides both of them with the same rule weight", () => {

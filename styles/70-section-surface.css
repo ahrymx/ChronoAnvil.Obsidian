@@ -36,25 +36,18 @@
   /* THE EDGE IS THREE-SIDED, and that is not fussiness. A section is a RUN of
      blocks, so a border on each of them draws a hairline between every pair —
      the stripes this release has already produced twice, in a new costume. The
-     sides run the whole way down; only the ends of the run close it.
-
-     1px, NOT 0.5px. It shipped at 0.5px and was invisible, and the number came
-     from the mockup rather than from this plugin: it was the only sub-pixel
-     border among the 147 in this file. A 0.5px line has no pixel to occupy at
-     device-pixel-ratio 1, so the renderer approximates it by dropping the
-     alpha — against a border colour already chosen to be quiet, that is
-     nothing at all. Every other border here is 1px, which is the answer this
-     stylesheet had already worked out. */
-  border-left: 1px solid var(--background-modifier-border);
-  border-right: 1px solid var(--background-modifier-border);
+     sides run the whole way down; only the ends of the run close it. */
+  border-left: 1px solid var(--am-border-subtle);
+  border-right: 1px solid var(--am-border-subtle);
 }
 .journal-sec-block.is-first {
-  border-top: 1px solid var(--background-modifier-border);
+  border-top: 1px solid var(--am-border-subtle);
   border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
   padding-top: 2px;
+  box-shadow: inset 0 1px 0 var(--am-edge-highlight);
 }
 .journal-sec-block.is-last {
-  border-bottom: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--am-border-subtle);
   border-radius: 0 0 var(--am-radius-md) var(--am-radius-md);
   padding-bottom: 10px;
   margin-bottom: var(--am-widget-gap);

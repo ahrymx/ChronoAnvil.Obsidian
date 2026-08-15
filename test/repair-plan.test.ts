@@ -75,12 +75,35 @@ describe("repairNote — the case the keyword reconciler could not reach", () =>
   });
 
   it("restores a period dashboard's masthead summary", () => {
-    // The masthead is one fence holding `links`, the summary and the scoped
-    // period button, so only `links` was ever insertable.
+    // The masthead was one fence holding `links`, the summary and the scoped
+    // period button, so only `links` was ever insertable and the summary was
+    // the section the keyword reconciler could not reach.
+    //
+    // ── 4.19 MOVED THE ROW OUT, AND THE OLD RECONCILER CAN NOW SEE THE
+    //    SUMMARY ──────────────────────────────────────────────────────
+    //
+    // The navigation row is the banner's now, so `month-summary` is the FIRST
+    // directive of the masthead fence — and `AssetUnit.insertable` is `n === 0`,
+    // so `planLayout` finds it. The `toEqual([])` that used to be here was
+    // asserting the LIMIT, and the limit has moved rather than gone: the scoped
+    // period button under the summary is still the second directive of that
+    // fence and is still invisible to it.
+    //
+    // WHAT IS ASSERTED INSTEAD: that the section model still restores it. That
+    // was always this test's subject; the `toEqual([])` beside it was evidence
+    // for why the model was needed, and the evidence expired while the claim
+    // did not. It is replaced by the honest statement of the new arrangement —
+    // the reconciler sees the summary now, and BOTH have to get it right.
+    //
+    // The scoped period button is not a second case to test here: it is a line
+    // of the summary section's own render, not a section, and repair works at
+    // section granularity. A note missing it has no missing SECTION, so neither
+    // path adds it back, which is correct and is `FlatSection.locate`'s rule
+    // about anchors rather than spans.
     const shipped = composeDiaryDashboard("monthly");
     const text = withoutLine(shipped, "month-summary");
 
-    expect(planLayout(L(text), L(shipped))).toEqual([]);
+    expect(planLayout(L(text), L(shipped)).map((o) => o.kind)).toContain("insert");
 
     const { ops, next } = repairNote(
       diarySectionModel({ grain: "monthly" }),
@@ -89,6 +112,10 @@ describe("repairNote — the case the keyword reconciler could not reach", () =>
     );
     expect(ops.map((o) => o.kind)).toContain("add");
     expect(next ?? "").toContain("month-summary");
+
+    // AND IT ADDS EXACTLY ONE. The masthead fence is welded, so an insert that
+    // carried the whole block would bring a second summary and a second button.
+    expect((next ?? "").match(/month-summary/g)).toHaveLength(1);
   });
 });
 
@@ -140,16 +167,21 @@ describe("a homepage written before the top row existed", () => {
     // both fences inserted wholesale, giving it two page heads and two diary
     // cards. It was never a missing insert; it was a wrong one.
     const shipped = home();
+    // COUNTED BY KEYWORD, NOT BY WHOLE LINE (4.20). `OLD_HOME` carries the bare
+    // `title` every pre-4.2 homepage has and the shipped page now composes
+    // `title:home,diary,journals`, so an exact-line count would report the two
+    // heads as one of each and pass while the duplication happened. The defect
+    // is TWO HEADS, whatever arguments they carry.
     const lines = (t: string, want: string): number =>
-      L(t).filter((l) => l.trim() === want).length;
+      L(t).filter((l) => l.trim().split(":")[0] === want).length;
 
     const old = applyLayout(L(OLD_HOME), L(shipped))?.join("\n") ?? OLD_HOME;
     expect(lines(old, "title")).toBe(2);
-    expect(lines(old, "diary:3")).toBe(2);
+    expect(lines(old, "diary")).toBe(2);
 
     const { next } = repairNote(homeModel(), OLD_HOME, shipped);
     expect(lines(next ?? "", "title")).toBe(1);
-    expect(lines(next ?? "", "diary:3")).toBe(1);
+    expect(lines(next ?? "", "diary")).toBe(1);
   });
 });
 

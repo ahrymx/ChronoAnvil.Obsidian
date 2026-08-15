@@ -35,6 +35,7 @@ import {
   parseQuery,
   readJournalIndex,
   searchEntries,
+  searchHintLine,
 } from "../diary/diary-index";
 import { journalFolderScope, registeredJournalTypes } from "./journal";
 import { emptyCallout } from "../ui/tables";
@@ -162,7 +163,11 @@ export function buildJournalSearch(
   const kinds = journalKinds(plugin);
   root.createDiv({
     cls: "jjs-hint",
-    text: `Filters: from:30d · tag:algebra · is:${kinds[0] ?? "lesson"} · has:task · confidence<=2`,
+    text: searchHintLine({
+      kind: kinds[0] ?? "lesson",
+      tag: "algebra",
+      tracker: "confidence",
+    }),
   });
 
   const status = root.createDiv({ cls: "jjs-status" });

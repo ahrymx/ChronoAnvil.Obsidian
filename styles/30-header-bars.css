@@ -57,12 +57,12 @@
    Everything else in the bar — the count pill, the action pills — was already at
    this size, so the band is now uniform. */
 .journal-header-title {
-  font-size: var(--am-bar-text);
+  font-size: var(--am-sec-title-size);
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: none;
   line-height: 1.35;
-  color: var(--am-bar-ink);
-  letter-spacing: var(--am-bar-track);
+  color: var(--am-sec-title-ink);
+  letter-spacing: normal;
   /* Shrinks before the actions do: a long section title should ellipsise on a
      phone rather than push the section's one button onto a second row. That
      wrap is what put the first chart below the fold in 2.53. */
@@ -339,71 +339,152 @@
   margin-left: auto;
 }
 
-/* ── The entry banner (2.18.4) ───────────────────────────────────────────
-   One card at the top of a diary entry holding the nav strip and, welded
-   beneath it, the note's logging grid.
+/* ── THE SLIM BANNER (2.18.4, and one card as of 4.21.1) ─────────────────
+   One card at the top of a note you WRITE IN — a diary entry or a journal leaf
+   — holding the note's name, the row that says where it can go, and, on notes
+   composed before 4.20, the logging grid welded beneath them.
 
-   Before this the two were separate ```almanac fences, so Obsidian rendered
+   Before 2.18.4 the bands were separate ```almanac fences, so Obsidian rendered
    them as sibling blocks with the note's own spacing between — the same limit
    journals-section.ts documents, where CSS can make a run of siblings resemble
    one card only until the run changes length or something in it is hidden.
    Merging the fences makes the block a single container, so the card is real
    and the rules below are dividers rather than seams.
 
-   Untinted, unlike the home page's two banners. Those are a dashboard and are
-   allowed to be the loudest thing on their page; this sits at the top of a note
-   you write in, and an accent wash there would compete with the entry itself.
-   The card earns its separation from the border and the surface change alone.
+   ── AND ONE CARD FOR BOTH PAGE KINDS, WHICH IS 4.21.1's WHOLE CHANGE ──
+
+   These numbers were written out twice, in two blocks a hundred lines apart,
+   under a comment on each saying they were the same numbers "because a reader
+   moving between an entry and a journal note should not see the strip change
+   height". They were not the same numbers. The entry's title band carried
+   `padding: 20px/19px` from a 3.7 rule further down the file and the leaf's
+   carried 7px/8px, so the two strips differed by about 24px — and the comment
+   claiming otherwise is why nobody looked.
+
+   TWO SELECTORS WERE THE MISTAKE, NOT TWO VALUES. `chromeClasses` puts
+   `journal-slim-banner` on both blocks now, so there is one card, one pair of
+   bands and one set of numbers, and a change to any of them cannot reach one
+   page kind without reaching the other.
+
+   Untinted, unlike the page banner. That is a dashboard and is allowed to be
+   the loudest thing on its page; this sits at the top of a note you write in,
+   and the wash there would compete with the entry itself. The card earns its
+   separation from the border and the surface change alone.
 
    The grid gives up its tiles for internal rules — the 2.18.2 lesson from the
    year summary, where a row of detached bordered cards read as floating pieces
    and one bordered surface with dividers read as an instrument. A logging grid
    is one instrument: the cells are read together, in one glance, every day. */
-.journal-widget-block.journal-entry-banner {
-  /* The block's usual inter-widget gap is what kept the strip and the grid
-     apart; inside the card the header's own rule is the divider. */
+.journal-widget-block.journal-slim-banner {
+  /* The block's usual inter-widget gap is what kept the bands apart; inside the
+     card each band's own rule is the divider. */
+  position: relative;
+  overflow: hidden;
   gap: 0;
   padding: 12px 14px;
   background: var(--background-secondary);
   border: var(--am-rule) solid var(--background-modifier-border);
   border-radius: var(--am-radius-md);
+  box-shadow: inset 0 1px 0 var(--am-edge-highlight);
 }
-/* The strip. Cancels the card's padding so its rule spans the full width, then
-   re-applies it inside — the same two lines the home page's bands use. The
-   header keeps the hairline it already drew; it is now the card's own divider
-   rather than an underline beneath a free-floating row. */
-.journal-entry-banner .journal-entry-header {
+.journal-slim-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: calc(var(--am-radius-md) - 1px);
+  background-image:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--interactive-accent) 8%, transparent) 0%,
+      transparent 45%
+    ),
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, var(--am-head-figure)) 0 1px,
+      transparent 1px 6px
+    );
+}
+.theme-light .journal-slim-banner::before {
+  background-image:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--interactive-accent) 6%, transparent) 0%,
+      transparent 45%
+    ),
+    repeating-linear-gradient(
+      135deg,
+      rgba(0, 0, 0, var(--am-head-figure)) 0 1px,
+      transparent 1px 6px
+    );
+}
+/* ── BAND 1: THE NOTE'S NAME, AND THE COG (4.21.1) ─────────────────────
+ *
+ * THE NAME IS FIRST NOW. Both slim banners opened with their navigation — the
+ * entry with its pill row, the leaf with its crumb trail — and put the name
+ * underneath, while the page banner opened with the name and welded its
+ * destinations below. Three surfaces, two arrangements, one concept. The name
+ * leads on all three: it is what a reader looks for on a page they opened
+ * deliberately, and the row that says where else they could be is a second
+ * fact about it.
+ *
+ * A FLEX ROW, WHICH IS ALSO A DEFECT FIX. `.journal-entry-header` was a plain
+ * block: `.jeh-title-wrap` and the cog are both `display: flex`, so they
+ * stacked, and 4.21's "the cog comes up beside the name it acts on" rendered as
+ * a cog on a line of its own under the name. `margin-left: auto` cannot push
+ * anything in a block container, which is why the rule meant to place it did
+ * nothing at all.
+ *
+ * IT BLEEDS THE CARD'S PADDING and re-applies it inside, so its rule spans the
+ * full width — the manoeuvre every band in this plugin makes. The bleed travels
+ * out through `.journal-live-widget` (and, on a leaf, `.journal-study-header`),
+ * both of which carry no padding or border of their own for exactly this
+ * reason; `.journal-overview-card > .journal-live-widget` states the same
+ * requirement one card over.
+ *
+ * THE AIR IS EVEN TOP AND BOTTOM, which is 3.7's rule for this band kept rather
+ * than dropped: nothing in it is anchored to either edge, so an asymmetric
+ * inset would read as the title having slipped rather than as emphasis. */
+.journal-slim-banner .journal-banner-name {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px 12px;
   margin: -12px -14px 0;
-  padding: 10px 14px 9px;
+  padding: 13px 14px 12px;
   border-bottom: var(--am-rule) solid var(--background-modifier-border);
 }
-/* No grid (a monthly review, until it has trackers of its own): the strip is
-   the whole card, so it takes the bottom edge and has nothing left to divide.
-   Since 3.7 the footer is always the last band, so this only fires on a card
-   that has neither — a hand-written note with a bare `entry-header` fence. */
-.journal-entry-banner:not(:has(.journal-tracker-bar)):not(:has(.journal-entry-actions))
-  .journal-entry-header {
-  margin-bottom: -12px;
-  border-bottom: none;
+/* ── BAND 2: WHERE THE NOTE CAN GO ─────────────────────────────────────
+ *
+ * An entry's is its `links:` pill row, a leaf's is its crumb trail; both are a
+ * row of destinations under the name, and this is the band they share. The pill
+ * card gives up its own frame — the banner supplies that — and keeps only the
+ * inset, which is 3.2 patch 5's handoff pointed the other way round now that
+ * the band is the card's LOWER edge rather than its upper one. */
+.journal-slim-banner .journal-banner-nav {
+  position: relative;
+  margin: 0 -14px;
+  padding: 7px 14px 8px;
+  border: none;
+  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: 0;
+  background: none;
 }
-
-/* ── 3.7: the title band is a title band ─────────────────────────────────
-   It held two rows until 3.7 — the title, then the date stepper and the `⋯`
-   stacked under it — and its 10px/9px padding was sized for that pair. With
-   the controls gone to the footer the band holds one line, and the same
-   padding left that line pressed against the rule above it and the rule below
-   it: a title in a 34px band reads as a label on a strip rather than as the
-   name of the thing under it.
-   The air is deliberately even top and bottom. This band sits between two
-   hairlines and nothing in it is anchored to either edge, so an asymmetric
-   inset would read as the title having slipped rather than as emphasis. */
-.journal-entry-banner .journal-entry-header {
-  padding-top: 20px;
-  padding-bottom: 19px;
+/* Nothing under it — a note composed by 4.20 or later, whose logging grid is a
+   section of its own — so the nav band IS the card's bottom edge and has
+   nothing left to divide. One rule where the two banners had one each, and the
+   `:has()` tests are theirs: a grid, or the page-context strip an entry drew as
+   a footer before 4.21. */
+.journal-slim-banner:not(:has(.journal-tracker-bar)):not(:has(.journal-entry-context))
+  .journal-banner-nav {
+  margin-bottom: -12px;
+  padding-bottom: 9px;
+  border-bottom: none;
+  border-radius: 0 0 var(--am-radius-md) var(--am-radius-md);
 }
 
 /* The grid, welded to the card's lower edge. */
-:is(.journal-entry-banner, .journal-study-banner) .journal-tracker-bar {
+.journal-slim-banner .journal-tracker-bar {
   margin: 0 -14px -12px;
   gap: 0;
 }
@@ -411,7 +492,7 @@
    the grid stops at the rule between them. The study banner keeps the weld —
    it has no footer — which is why this is scoped rather than folded into the
    rule above. */
-.journal-entry-banner:has(> .journal-entry-actions) .journal-tracker-bar {
+.journal-entry-banner:has(> .journal-entry-context) .journal-tracker-bar {
   margin-bottom: 0;
 }
 /* Cells lose their own shell — the card provides it — and gain rules between
@@ -420,7 +501,7 @@
    Widths are zeroed through the shorthand rather than `border: none`, which
    would leave the width at `medium` and hand any side a 3px rule the moment
    something downstream re-declared its style. */
-:is(.journal-entry-banner, .journal-study-banner) .journal-tracker-bar .journal-tracker-cell {
+.journal-slim-banner .journal-tracker-bar .journal-tracker-cell {
   border: 0 solid var(--background-modifier-border);
   border-radius: 0;
   background: transparent;
@@ -432,16 +513,16 @@
   border-top-width: var(--am-rule);
   border-left-width: var(--am-rule);
 }
-:is(.journal-entry-banner, .journal-study-banner) .journal-tracker-bar .journal-tracker-cell:nth-child(odd) {
+.journal-slim-banner .journal-tracker-bar .journal-tracker-cell:nth-child(odd) {
   border-left-width: 0;
 }
-:is(.journal-entry-banner, .journal-study-banner) .journal-tracker-bar .journal-tracker-cell:nth-child(-n + 2) {
+.journal-slim-banner .journal-tracker-bar .journal-tracker-cell:nth-child(-n + 2) {
   border-top-width: 0;
 }
 /* The add tile gives up its dashed outline here. Dashed reads as "an empty slot"
    against the note background, but inside a panel of solid rules it reads as a
    broken cell — and the tile is already legible as an action from its button. */
-:is(.journal-entry-banner, .journal-study-banner) .journal-tracker-bar .journal-tracker-cell.journal-tracker-add {
+.journal-slim-banner .journal-tracker-bar .journal-tracker-cell.journal-tracker-add {
   border-style: solid;
   min-height: 44px;
 }
@@ -449,7 +530,7 @@
    half — the one place an even grid of cells cannot stay even. It spans instead,
    which also makes the note's one *action* read as a footer to the grid rather
    than as another reading of it. */
-:is(.journal-entry-banner, .journal-study-banner)
+.journal-slim-banner
   .journal-tracker-bar
   .journal-tracker-cell.journal-tracker-add:nth-child(odd):last-child {
   grid-column: 1 / -1;
@@ -458,53 +539,99 @@
 /* One column (narrow panes, matching the grid's own breakpoint): every cell is
    in column 1, so the odd/even rules above no longer describe the layout. */
 @container (max-width: 520px) {
-  :is(.journal-entry-banner, .journal-study-banner) .journal-tracker-bar .journal-tracker-cell {
+  .journal-slim-banner .journal-tracker-bar .journal-tracker-cell {
     border-left-width: 0;
     border-top-width: var(--am-rule);
   }
-  :is(.journal-entry-banner, .journal-study-banner) .journal-tracker-bar .journal-tracker-cell:first-child {
+  .journal-slim-banner .journal-tracker-bar .journal-tracker-cell:first-child {
     border-top-width: 0;
   }
 }
 
-/* ── Study banner (Subject / Topic / Lesson / Practice) ────────────────────
-   Same welded-card shape as .journal-entry-banner above — one fence, one
-   bordered surface, a strip on top and a grid welded to its lower edge — and
-   now literally the same grid: the rules above name both banners.
-
-   This used to be a parallel set of .journal-property-* rules, deliberately
-   duplicated so a study banner could not pick up entry-trackers.ts's add/remove
-   machinery. That separation was right while a Lesson's confidence and status
-   were fixed fields the template declared. They are registry trackers now, so
-   the reason for the duplicate is gone and the duplicate went with it. The
-   class survives only because the two cards differ above the grid (a crumb
-   trail rather than a nav strip). */
-.journal-widget-block.journal-study-banner {
-  gap: 0;
-  padding: 12px 14px;
-  background: var(--background-secondary);
-  border: var(--am-rule) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
-}
+/* ── M2: THE MINIMAL BANNER (4.19.1), NOW THE SLIM ONE (4.21.1) ────────
+ *
+ * 4.19 gave every page a banner and then asked what an ENTRY's and a LEAF's
+ * should be, given that neither is a page you land on — they are pages you write
+ * in, and the banner's whole job there is to say which note this is and get out
+ * of the way. The answer chosen was the tight card: keep the card, so the block
+ * is still an object a reader can point at and the cog stays discoverable, and
+ * drop everything that was making it loud.
+ *
+ * IT KEEPS: the card, the rule, and every control.
+ *
+ * IT DROPS: the padding — down a third from the page banner's, which is what
+ * makes it read as a strip rather than as a band.
+ *
+ * AND IT NEVER HAD THE FIGURE, which is worth writing down because it looks like
+ * an omission next to `.journal-page-banner`. The wash and the hatch are how a
+ * page announces itself; a note you are writing in does not announce itself. The
+ * page banner is the loud one on purpose and this is the quiet one on purpose.
+ *
+ * WHAT 4.21.1 TOOK OUT OF THIS BLOCK. The card and the band lived here in one
+ * copy and in `30-header-bars.css`'s entry-banner block in another, under a
+ * comment on each pointing at the other. Both copies are gone; `.journal-slim-
+ * banner` above is the one that is left. What remains here is what is genuinely
+ * a JOURNAL LEAF's — its crumb trail, its title's face — and the wrapper, which
+ * now carries nothing so its two bands can bleed the card's padding themselves.
+ *
+ * THE ARRANGEMENT ALSO FLIPPED, and it flipped here rather than in CSS: 4.19.1's
+ * note above said this banner keeps "the crumb-above-name arrangement this
+ * header already had", and 4.21.1 is the release that stopped keeping it. See
+ * `buildStudyHeader`. */
 .journal-study-banner .journal-study-header {
-  margin: -12px -14px 0;
-  padding: 9px 14px 10px;
-  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+  margin: 0;
+  padding: 0;
+  border: none;
 }
-/* Row 1: the trail on the left, the date right-aligned. */
+/* The name, at the size the minimal banner settled on.
+ *
+ * 1.15em WAS ALREADY THIS HEADER'S, and it is now the entry's too — that one was
+ * inheriting `--am-bar-text` (0.7em), the size of a SECTION bar's label, which
+ * is the right size for "🔎 Search" and the wrong one for the note's own name.
+ * The weight goes to 700 so it holds its own against a crumb row that is now
+ * uppercase, and the tracking comes in a hair for the same reason `.jtc-title`
+ * carries some: a name set larger than its surroundings needs it. */
+.journal-study-header .jsh-title-text,
+.journal-study-header .jsh-title-input {
+  font-size: var(--am-text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+/* The crumb trail, as the context line — the same treatment `.jtc-link` gives
+ * the page banner's destination row.
+ *
+ * ONE LINE ABOVE THE NAME, DRAWN ONE WAY. The page banner puts its destinations
+ * in small caps above its title; this puts its crumbs there; and until now they
+ * were an accent-coloured row at reading size, which made the trail the loudest
+ * thing on a note whose subject is the title beneath it. Faint until hovered,
+ * for `.jtc-link`'s stated reason: a row you read at a glance to know where you
+ * are, rather than a menu you read every time.
+ *
+ * THE PADDING STAYS. It was doing the work the removed border used to do — the
+ * hit area — and shrinking a link's target to tidy its appearance is the trade
+ * this file already refused once when the pills became links. */
+.jsh-crumbs a.jn-pill {
+  font-size: var(--am-text-2xs);
+  font-weight: var(--am-caps-weight);
+  letter-spacing: var(--am-caps-tracking);
+  text-transform: uppercase;
+  color: var(--text-faint) !important;
+}
+.jsh-crumbs a.jn-pill:hover {
+  color: var(--text-normal) !important;
+}
+.jsh-sep {
+  font-size: var(--am-text-2xs);
+}
+/* Band 2 on a leaf: the trail on the left, the note's date right-aligned. The
+   inset, the rule and the bottom-edge handoff are `.journal-banner-nav`'s and
+   are not repeated here — this is only what is a TRAIL rather than a band. */
 .jsh-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px 16px;
   flex-wrap: wrap;
-}
-/* No property grid yet (a hand-written note with only a study-header): the
-   strip is the whole card, so it takes the bottom edge — same rule
-   .journal-entry-banner's own header carries when it has no tracker bar. */
-.journal-study-banner:not(:has(.journal-tracker-bar)) .journal-study-header {
-  margin-bottom: -12px;
-  border-bottom: none;
 }
 .jsh-crumbs {
   display: flex;
@@ -574,11 +701,27 @@
    entry's (.jeh-title): a hover wash over the whole hit area and a pencil
    that only appears on hover, so the control is discoverable without adding
    a permanent button to a strip that is otherwise all navigation. */
+/* The name band's own row. `.journal-banner-name` supplies the flex, the inset
+   and the rule; the 6px of top margin went with the flip, because the band is
+   the card's top edge now and its air is the inset's. */
 .jsh-titlerow {
+  min-width: 0;
+}
+/* THE NAME'S WRAPPER, ON BOTH SLIM BANNERS. It exists for a reason written in
+   `study-header.ts` — `attachNoteRename` empties the row it is given, so the cog
+   cannot be a sibling of the name inside it — and it earns a shared class
+   because it also carries the push that sends the cog to the far end.
+   `margin-right: auto` rather than `justify-content: space-between` on the band:
+   an entry drawn from a managed template has no cog at all, and a
+   space-between would strand the name in the middle of the band. */
+.journal-banner-name > .journal-banner-title {
+  min-width: 0;
+  margin-right: auto;
+}
+.jsh-title-wrap {
   display: flex;
   align-items: center;
   min-width: 0;
-  margin-top: 6px;
 }
 .jsh-title {
   display: inline-flex;
@@ -665,14 +808,18 @@
   display: none;
 }
 
-/* ── 3.2 patch 5: the links band, welded to the entry banner's top edge ────
+/* ── 3.2 patch 5: the links band, welded into the entry banner ─────────────
    The merged fence puts `links:…#diary` in the same container as
-   `entry-header`, so buildLinks' standalone card arrives as the banner's first
-   child rather than as a block of its own. It sheds its frame — the banner
-   supplies that now — and keeps only the divider under it, which is the same
-   two lines .journal-entry-header already uses one row down. The card's rounded
-   top edge transfers to the band, which since 4.8.1 is the whole of that
-   handoff — the area titlebar that used to take it first is gone.
+   `entry-header`, so buildLinks' standalone card arrives as one of the banner's
+   own children rather than as a block of its own. It sheds its frame — the
+   banner supplies that now — and keeps only its inset.
+
+   IT IS BAND 2 AS OF 4.21.1, WHERE IT WAS BAND 1. The card sat on the banner's
+   TOP edge from 3.2 patch 5 until then, and the rule that put it there is gone
+   rather than adjusted: everything about how the band is inset, ruled and
+   rounded is `.journal-banner-nav`'s now, applied to whichever row a page kind
+   uses for its destinations. This block keeps only what is a LINKS CARD's — the
+   frame it gives up, and the rhythm its pills are set to.
 
    A CHILD SELECTOR IS CORRECT HERE, unlike on the overview card: `links` is not
    live-wrapped, so buildLinks' card really is the banner block's own child.
@@ -681,24 +828,13 @@
    the tracker grid and left the links row outside. One fence is one container,
    so the card is real rather than a resemblance. */
 .journal-entry-banner > .journal-links-card {
-  margin: -12px -14px 0;
   border: none;
-  border-bottom: var(--am-rule) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
   background: none;
 }
-/* With a links band above it the entry strip is no longer the card's top edge:
-   it drops the negative top margin that pulled it against the card's padding
-   and keeps only the horizontal cancel. (It used to name the diary hero's twin
-   as the same rule one surface over; that rule and that hero are gone as of
-   4.13.1 §3, and this is now the only place the manoeuvre is made.) */
-.journal-entry-banner > .journal-links-card + .journal-entry-header {
-  margin-top: 0;
-}
-/* The pill row is now band 2 of 3 rather than the bottom of a small card, so it
-   breathes to the same rhythm as the strip beneath it. */
+/* The pill row is a band of the banner rather than the bottom of a small card,
+   so it breathes to the same rhythm as the name above it. */
 .journal-entry-banner > .journal-links-card > .journal-links-bar {
-  padding: 7px 8px;
+  padding: 0;
 }
 
 /* ── 3.7: the entry card's footer ─────────────────────────────────────────
@@ -719,7 +855,7 @@
 
    The ground and the top rule are shared, because those are what make it a
    footer rather than a stray row. */
-.journal-entry-banner > .journal-widget-bar.journal-entry-actions {
+.journal-entry-banner > .journal-widget-bar.journal-entry-context {
   margin: 0 -14px -12px;
   padding: 8px 14px;
   border-top: var(--am-rule) solid var(--background-modifier-border);
@@ -727,15 +863,20 @@
   background: var(--background-secondary-alt);
   gap: 6px 10px;
 }
-/* THE RIGHT EDGE, BY PUSHING. `justify-content: space-between` would strand the
-   stepper in the middle of the bar on a managed template, where the `⋯` is
-   deliberately not drawn at all (see attachEntryMenu: a control that opens a
-   menu to say no is worse than no control). The overview footer solves the same
-   problem from the other side with `margin-right: auto`; here the bar stays
-   left-aligned and the one trailing control pushes itself out. */
-.journal-entry-actions > .jeh-more {
-  margin-left: auto;
-}
+/* WHERE THE COG'S `margin-left: auto` WENT (4.21.1).
+ *
+ * It was here, on `.journal-entry-context > .jeh-more` and — after 4.21 moved
+ * the control up into the banner — on `.journal-entry-header > .jeh-more` too.
+ * The push is now `.journal-banner-title`'s `margin-right: auto`, one element
+ * to the left, and it had to become one or the other rather than both: two auto
+ * margins in one flex line do not compete, they SPLIT the free space equally,
+ * which would have parked the cog half way along the band. This file already
+ * records that failure at `.journal-sec-l2`, in the same words.
+ *
+ * THE NAME'S SIDE IS THE RIGHT SIDE OF THE PAIR TO KEEP, because an entry drawn
+ * from a managed template has no cog at all (see attachEntryMenu: a control that
+ * opens a menu to say no is worse than no control), and a push that lives on the
+ * control disappears with it. */
 
 /* Touch has no hover to reveal this with, so it rests at a visible-but-quiet
    opacity instead of at zero. 3.9 §3.3's policy rather than a fifth patch

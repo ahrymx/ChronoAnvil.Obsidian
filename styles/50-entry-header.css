@@ -1,19 +1,32 @@
-/* ── Entry header (the unified strip at the top of a diary entry) ─────────
-   Reuses the header-bar shell (border-bottom rule, flex row). The left side
-   is an editable title + a date subtitle; the right side is the quick links
-   and a compact prev/next navigator. No collapse chevron — it's top-of-note
-   chrome, not a foldable section. */
-.journal-entry-header {
-  padding-bottom: 8px;
-}
+/* ── Entry header: the name band of a diary entry's slim banner ───────────
+   The note's name on the left and the cog at the far edge. It is one of the two
+   bands `.journal-slim-banner` describes, and everything about how it is inset,
+   ruled and laid out is written there against `.journal-banner-name` — this
+   block holds only what is an ENTRY's: the wrapper's baseline alignment, and the
+   face the name is set in.
+
+   No collapse chevron: it is top-of-note chrome, not a foldable section. */
 .jeh-title-wrap {
   display: flex;
   align-items: baseline;
   gap: 4px 10px;
   flex-wrap: wrap;
-  min-width: 0;
-  margin-right: auto; /* push the controls to the right edge */
 }
+/* M2 (4.19.1): THE NOTE'S NAME AT THE NOTE'S NAME'S SIZE.
+ *
+ * This inherited `--am-bar-text` from `.journal-header-title` — 0.7em, the size
+ * of a section bar's LABEL. That was defensible while the entry header was read
+ * as a bar with controls on it, and it stopped being defensible the moment 4.19
+ * decided this block is the note's banner: the date is what the note IS, and it
+ * was set smaller than the words under it.
+ *
+ * `--am-text-lg` AND 700 ARE THE JOURNAL LEAF'S, spelled again rather than
+ * shared through a class, because these are two headers built by two builders
+ * and a shared class between them would be a third thing to keep in step. The
+ * numbers are in one comment in `30-header-bars.css`; if one moves, both move.
+ *
+ * The padding and the negative margin stay: they are the click-to-edit hit area
+ * and its optical correction, not spacing. */
 .journal-entry-header .jeh-title {
   display: inline-flex;
   align-items: center;
@@ -23,7 +36,17 @@
   border-radius: var(--am-radius-sm);
   padding: 1px 4px;
   margin-left: -4px;
+  font-size: var(--am-text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
   transition: background 0.12s;
+}
+/* The input a rename opens has to be the same object as the text it replaced, or
+   the strip jumps height on the first keystroke. */
+.journal-entry-header .jeh-title-input {
+  font-size: var(--am-text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 .journal-entry-header .jeh-title:hover {
   background: var(--background-modifier-hover);
@@ -207,7 +230,7 @@
    It drops UP and aligns LEFT — anchored to the control's own edge, over the
    card it belongs to. The shadow flips with it, for the same reason it points
    away from the trigger in the first place. */
-.journal-entry-actions .jeh-datenav-menu {
+.journal-entry-context .jeh-datenav-menu {
   top: auto;
   bottom: calc(100% + 6px);
   left: 0;
@@ -574,4 +597,293 @@
   .jeh-title-edit {
     opacity: 0.45;
   }
+}
+
+/* ── THE TRACKER SECTION, AND ITS PAGE-CONTEXT STRIP (4.21) ──────────────
+ *
+ * 4.20 moved the logging grid out of the banner and into a fence of its own,
+ * which took it out of the banner's card as well — that was the point — and the
+ * first render showed what it left: loose cards on the page background with
+ * nothing enclosing them. This is the frame they lost.
+ *
+ * THE SAME CARD THE BANNER TAKES, deliberately, and NOT the banner's figure. The
+ * two blocks sit one above the other on every entry and every journal note, so
+ * they have to read as siblings: same border, same radius, same ground, same
+ * padding. What separates them is the wash — a banner announces the page and
+ * this holds its contents — which is the distinction `widget-registry.ts` draws
+ * between the two banner formats, one level down. */
+.journal-widget-block.journal-tracker-section {
+  /* The block's usual inter-widget gap is what would keep the strip and the
+     grid apart; inside the card the strip's own rule is the divider. The same
+     three lines `.journal-entry-banner` takes, for the same reason. */
+  gap: 0;
+  padding: 12px 14px;
+  background: var(--background-secondary);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  box-shadow: inset 0 1px 0 var(--am-edge-highlight);
+}
+/* ── THE HEAD IS TWO ROWS ABOVE ONE RULE (4.21.3) ─────────────────────────
+ *
+ * The card's head holds the alias line and the caption line, and the hairline
+ * goes UNDER BOTH OF THEM — it separates what the page knows about itself from
+ * the grid you fill in, and until 4.21.3 it ran between the two halves of the
+ * first thing, leaving "Fri 14 Aug 2026 / TRACKING:" stranded on the grid's side
+ * of a rule it is the label for.
+ *
+ * SO THE RULE BELONGS TO THE LAST BAND ABOVE THE GRID, WHICH IS ALWAYS THE
+ * CAPTION. That is a stronger claim than "the strip has a border", and it is why
+ * the divider moved rather than being duplicated: a strip is optional on both
+ * page kinds — a journal note outside a registered root has no level to report,
+ * an entry template draws no alias — and the caption is not.
+ *
+ * The strip keeps the bleed and loses the rule. Its horizontal numbers are
+ * `.journal-banner-name`'s, one card up; the vertical ones are its own, because
+ * this band holds the biggest type on the page and 7px/8px was sized for a
+ * label. */
+.journal-tracker-section > .journal-entry-context,
+.journal-tracker-section > .journal-note-context {
+  display: flex;
+  align-items: center;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  margin: -12px -14px 0;
+  padding: 11px 14px 2px;
+  border-bottom: none;
+}
+/* ── The caption row over the grid (4.21.1; a ROW as of 4.21.2) ───────────
+   The section's name, said by the block rather than by the file — see the note
+   in `index.ts` for why this is a caption and not a `header:` line.
+
+   TWO HALVES: which period this note is, on the left, and what the block under
+   it holds, on the right. The date used to sit beside the alias one band up,
+   which put a title, a date and a navigator on one line — comfortable in a
+   desktop pane and two wrapped lines on a phone. Giving it this row is what
+   makes the alias line a title and a control, and nothing else.
+
+   PUSHED, NOT SPLIT. A journal note has no period of its own, so the row is the
+   label alone; `space-between` would strand it on the left, where it would read
+   as a heading for the whole card rather than as a caption on the grid.
+
+   NOT A `.journal-header-bar`. That carries a fold toggle, a rename and an
+   actions strip, none of which this has — a section bar that folds nothing and
+   renames nothing is three affordances promised and none delivered.
+
+   AND IT CARRIES THE CARD'S DIVIDER as of 4.21.3 — see the strip above for why
+   the rule is this band's rather than that one's. It bleeds the card's padding
+   to draw it full width, out through the `.journal-live-widget` host that makes
+   the row repaint; that host carries no layout, which is what lets the margin
+   through. */
+.journal-tracker-head {
+  display: flex;
+  align-items: baseline;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  margin: 0 -14px 12px;
+  padding: 2px 14px 8px;
+  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+}
+/* The live host is a passenger; the row inside it does the bleeding. Spelled for
+   the reason `.journal-overview-card > .journal-live-widget` is spelled: a host
+   with layout of its own would stop the negative margin at its own edge. */
+.journal-tracker-section > .journal-live-widget {
+  margin: 0;
+  padding: 0;
+}
+/* NO STRIP ABOVE IT means the caption is the card's top band as well as its
+   last, so it takes the top bleed the strip would have taken. A journal note
+   outside a registered journal root has no level and no kind to report, and an
+   entry template draws no alias — `:has()` asks which case this is rather than
+   depending on how many children happen to precede the row. */
+.journal-tracker-section:not(:has(> .journal-entry-context)):not(
+    :has(> .journal-note-context)
+  )
+  .journal-tracker-head {
+  margin-top: -12px;
+  padding-top: 11px;
+}
+/* AND NO HEAD AT ALL means no divider to place. A managed entry template draws
+   neither the caption nor the strip — `isManagedTemplate` withholds both — so
+   the grid is the whole card and has nothing above it to be separated from. */
+.journal-tracker-section > .journal-tracker-bar:first-child {
+  margin-top: 0;
+}
+/* The period, at the size the alias's subtitle was — this is the same fact in
+   the same words, one band lower. */
+.jth-period {
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+/* THE SMALL-CAPS REGISTER, WHICH IS THE STRIP'S. A journal note's level and kind
+   sit directly above it in exactly this face, and the two are the same kind of
+   thing: a word that labels what is under it, read once and then ignored. Set
+   any louder it would compete with the alias two lines up, which is the one
+   piece of type on this card that is meant to be read. */
+.jth-label {
+  margin-left: auto;
+  font-size: var(--am-text-2xs);
+  font-weight: var(--am-caps-weight);
+  letter-spacing: var(--am-caps-tracking);
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+/* The alias, on the left, pushing the navigator to the far edge. */
+.jec-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 4px 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-right: auto;
+}
+.jec-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: text;
+  border-radius: var(--am-radius-sm);
+  padding: 1px 4px;
+  margin-left: -4px;
+  transition: background 0.12s;
+}
+.jec-title:hover {
+  background: var(--background-modifier-hover);
+}
+/* ── THE PAGE'S HEADLINE (4.21.1) ──────────────────────────────────────
+ *
+ * LARGER THAN THE BANNER'S NAME, WHICH REVERSES 4.21. That release moved the
+ * alias out of the banner and set it at `--am-text-sm` on the reasoning that
+ * "the file's name is what the note is called now, and this is a label on it".
+ * The first render showed what that costs: a daily entry is called
+ * `Day-2026-08-13`, so the largest words on the page were an address, and the
+ * one line saying what the day WAS sat under them at label size beside a plus
+ * sign.
+ *
+ * BOTH FACTS ARE STILL WHERE 4.21 PUT THEM and that part was right — the name
+ * renames the file and belongs on the banner; the alias is a fact about the
+ * entry and belongs on the strip with its date. What changes is which of them
+ * is set larger, and the answer is the one a reader came to the page for.
+ *
+ * THE EMPTY STATE IS STILL AN OFFER, and at this size it has to work harder not
+ * to read as a heading: weight down to 400 and colour to `--text-faint`, which
+ * is where every other "there is nothing here yet" line in the plugin sits.
+ * `.jec-title-empty` is a state on the same element, so the band does not change
+ * height when a reader fills it in. */
+.jec-title-text {
+  font-size: var(--am-text-xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-normal);
+}
+.jec-title.jec-title-empty .jec-title-text {
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--text-faint);
+}
+.jec-title-icon,
+.jec-title-edit {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+/* IN `em`, NOT PIXELS. They were 13px flat, which was a reasonable literal
+   beside 0.85em type and is a smudge beside 1.35em. Sized against the word they
+   sit next to, like every other icon in a title. */
+.jec-title-icon svg {
+  width: 0.85em;
+  height: 0.85em;
+}
+.jec-title-edit svg {
+  width: 0.62em;
+  height: 0.62em;
+}
+.jec-title-edit {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.jec-title:hover .jec-title-edit {
+  opacity: 1;
+}
+/* WHERE `.jec-subtitle` WENT (4.21.2). It was the formatted date beside the
+   alias, and it is `.jth-period` on the caption row now — same fact, same three
+   declarations, one band lower, with a row to itself. Deleted rather than left:
+   an unused class in a 20-file stylesheet is the next reader's dead end. */
+/* ── The field is the same object as the text it replaces (4.21.2) ────────
+   Or the strip jumps on the first click, which is what it did: the title drew
+   at `--am-text-xl` and the input drew at Obsidian's own control size, so
+   clicking a title shrank it by a third and re-wrapped the row under the cursor.
+
+   THE SELECTOR IS WHY, NOT THE VALUE. The value below was already `--am-text-xl`
+   and never applied: Obsidian styles `input[type="text"]`, which is specificity
+   (0,1,1), and a bare `.jec-title-input` is (0,1,0) — so the app's rule won on
+   every keystroke. `.journal-entry-context` in front is (0,2,1) and settles it.
+
+   THE ENTRY BANNER'S OWN INPUT HAD THIS RIGHT BY ACCIDENT: its rule is written
+   `.journal-entry-header .jeh-title-input`, scoped for readability rather than
+   for weight, and the scope is what has been carrying it.
+
+   THE WIDTH IS NOT HERE. It comes from the input's `size` attribute, set from
+   the value's length — see `beginEdit`. This wrapper is shrink-to-fit, so a CSS
+   width would resolve against a box the input is itself sizing. */
+.journal-entry-context input.jec-title-input {
+  font-size: var(--am-text-xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: inherit;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  padding: 1px 6px;
+  min-width: 12ch;
+}
+/* A touch device has no hover, so a control revealed by one has no resting
+   state to be discovered from. The same branch `.jeh-title-edit` takes, and the
+   rule `hover-reveal.test.ts` enforces across the whole stylesheet. */
+@media (hover: none) {
+  .jec-title-edit {
+    opacity: 0.45;
+  }
+}
+
+/* The journal note's page-context strip: its level and its kind. Same band as
+   the entry's — one card, one strip, whatever the surface — with facts in place
+   of a control, because there is nothing here to operate.
+
+   IT IS THE SAME BAND IN ONE RULE AS OF 4.21.3, and it had to become one. This
+   block was a second copy of the entry strip's five declarations, and when the
+   divider moved down to the caption row only the copy that was edited moved:
+   a journal note would have kept a rule under its level line and gained a second
+   under its caption. It is a selector on that rule now, and the two page kinds
+   cannot drift again. What is left here is what is genuinely a LEVEL AND KIND
+   line's rather than a strip's. */
+.jnc-facts {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+/* Small caps, faint — the treatment the crumb row above it takes, so the two
+   read as one register rather than as two labels of different weights. */
+.jnc-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--am-text-2xs);
+  font-weight: var(--am-caps-weight);
+  letter-spacing: var(--am-caps-tracking);
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+/* The kind is the more specific of the two facts, so it is the one that reads
+   first — the level is the shelf and the kind is the thing on it. */
+.jnc-fact-kind {
+  color: var(--text-muted);
+}
+.jnc-fact-icon {
+  display: inline-flex;
+}
+.jnc-fact-icon svg {
+  width: 12px;
+  height: 12px;
 }

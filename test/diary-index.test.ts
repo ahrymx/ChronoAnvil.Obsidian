@@ -20,6 +20,8 @@ import {
   groupByMonth,
   buildEntry,
   IndexedEntry,
+  searchHintLine,
+  HAS_VALUES,
 } from "../src/diary/diary-index";
 
 // A minimal indexed entry, overridable per case.
@@ -451,3 +453,76 @@ describe("buildEntry", () => {
 // failed once. layout.ts diffs the note against the asset instead, so there is
 // nothing to keep in sync and nothing to test here; see test/layout.test.ts.
 
+
+// ── the hint line under the search box, 4.25 §4 ───────────────────────
+//
+// Both hints were literals before this, and both had gone wrong in the way a
+// literal does: the diary's froze `to:2026-03`, and the journal's dropped `to:`
+// altogether. These assert the two PROPERTIES that failure had — an example
+// that ages, and two surfaces disagreeing — rather than the text of the line,
+// which is free to change.
+describe("searchHintLine", () => {
+  it("dates its `to:` example from the clock, not from a literal", () => {
+    const then = searchHintLine({
+      kind: "monthly",
+      tag: "health",
+      tracker: "Mood",
+      now: "2026-03",
+    });
+    const later = searchHintLine({
+      kind: "monthly",
+      tag: "health",
+      tracker: "Mood",
+      now: "2031-11",
+    });
+    expect(then).toContain("to:2026-03");
+    expect(later).toContain("to:2031-11");
+    // The frozen month must not survive anywhere as a default.
+    expect(
+      searchHintLine({ kind: "monthly", tag: "health", tracker: "Mood" })
+    ).not.toContain("to:2026-03");
+  });
+
+  it("offers every filter key the parser accepts, on both surfaces", () => {
+    const diary = searchHintLine({
+      kind: "monthly",
+      tag: "health",
+      tracker: "Mood",
+      now: "2026-08",
+    });
+    const journal = searchHintLine({
+      kind: "lesson",
+      tag: "algebra",
+      tracker: "confidence",
+      now: "2026-08",
+    });
+    for (const key of ["from:", "to:", "tag:", "is:", "has:"]) {
+      expect(diary).toContain(key);
+      expect(journal).toContain(key);
+    }
+    // ...and the compare clause, which has no `key:` shape.
+    expect(diary).toContain("Mood<=2");
+    expect(journal).toContain("confidence<=2");
+  });
+
+  it("only shows a `has:` value the parser will actually take", () => {
+    const hint = searchHintLine({
+      kind: "monthly",
+      tag: "health",
+      tracker: "Mood",
+      now: "2026-08",
+    });
+    const shown = /has:(\w+)/.exec(hint)?.[1] ?? "";
+    expect(HAS_VALUES).toContain(shown);
+    // The parser keeps it as a filter rather than demoting it to a search term.
+    expect(parseQuery(`has:${shown}`).has).toEqual([shown]);
+    expect(parseQuery(`has:${shown}`).terms).toEqual([]);
+  });
+
+  it("teaches an `is:` value the surface it is drawn on will accept", () => {
+    // The diary's hint says `is:monthly`; the diary's parser knows daily and
+    // monthly. A hint promising a filter the page rejects is worse than none.
+    expect(parseQuery("is:monthly").kind).toBe("monthly");
+    expect(parseQuery("is:lesson", ["lesson", "practice"]).kind).toBe("lesson");
+  });
+});

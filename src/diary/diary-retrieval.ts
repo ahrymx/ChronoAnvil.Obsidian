@@ -31,6 +31,7 @@ import {
   parseQuery,
   readIndex,
   searchEntries,
+  searchHintLine,
   SearchHit,
 } from "./diary-index";
 import { emptyCallout } from "../ui/tables";
@@ -160,7 +161,7 @@ export function buildDiarySearch(
 
   root.createDiv({
     cls: "jdr-search-hint",
-    text: "Filters: from:30d · to:2026-03 · tag:health · is:monthly · has:attachment · Mood<=2",
+    text: searchHintLine({ kind: "monthly", tag: "health", tracker: "Mood" }),
   });
 
   const status = root.createDiv({ cls: "jdr-search-status" });

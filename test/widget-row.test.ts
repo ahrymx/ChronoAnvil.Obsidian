@@ -337,13 +337,15 @@ describe("the block lays itself out afterwards, knowing nothing", () => {
   // The `almanac` fence's processor, bounded — an order assertion over the
   // whole of a SPLIT module compares positions in an alphabetical
   // concatenation, which test/sources.ts warns is not a comparison at all.
+  //
+  // THE ANCHORS ARE `registerBlock`, NOT OBSIDIAN'S OWN REGISTRAR (4.18.2). The
+  // three fences now register through a wrapper that keeps each rendered block
+  // repaintable outside a markdown view; the bodies these bounds enclose did not
+  // move, only the call that introduces them.
   const processor = ((): string => {
-    const at = widgets.indexOf('registerMarkdownCodeBlockProcessor("almanac", ');
+    const at = widgets.indexOf('registerBlock("almanac", ');
     expect(at, "the almanac fence processor is gone").toBeGreaterThan(-1);
-    const end = widgets.indexOf(
-      'registerMarkdownCodeBlockProcessor(\n      "almanac-charts"',
-      at
-    );
+    const end = widgets.indexOf('registerBlock(\n      "almanac-charts"', at);
     expect(end, "the processor's end is gone").toBeGreaterThan(at);
     return widgets.slice(at, end);
   })();
@@ -505,6 +507,25 @@ describe("a cell is its own query container", () => {
     expect(rules).toMatch(
       /\.journal-widget-block\s*\{[^}]*container-type:\s*inline-size/
     );
+  });
+
+  it("gives every card in a column its own handle (4.22 §4.1)", () => {
+    // ONE PER CARD, NOT ONE PER SEAM. N cards have N-1 seams between them, so a
+    // mark between two of them cannot reach the LAST card in a column — which on
+    // the page this release is about is the widget with the most empty rows in
+    // it. A handle on every card's own bottom edge is N handles and reaches all
+    // of them.
+    //
+    // AND IT IS BUILT INTO THE CHILD, not beside it: the card is positioned and
+    // the cell is the wrong ground, so a mark hung on the cell would put every
+    // handle in a column at the same height.
+    const src = readSrc("row");
+    expect(src).toContain("export const CARD_DIVIDER_CLASS");
+    expect(src).toContain("cls: CARD_DIVIDER_CLASS");
+    expect(src).toContain('"aria-label": "Drag to set the height of this widget"');
+    // The column divider is the one child of a cell the reader did not put
+    // there, and it is skipped by name.
+    expect(src).toContain("if (child.hasClass(GROUP_DIVIDER_CLASS)) continue;");
   });
 
   it("marks a cell only when its width is not the default", () => {

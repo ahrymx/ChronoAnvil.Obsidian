@@ -81,6 +81,7 @@
 // id has never touched them. They are written into notes, where a rename would
 // be a migration rather than a patch.
 
+import type { TFile } from "obsidian";
 import type { IconName } from "obsidian";
 import { Notice } from "obsidian";
 import type AlmanacPlugin from "../main";
@@ -92,6 +93,7 @@ import { registeredJournalTypes } from "../journals/journal";
 import { journalTypeOfPath } from "../trackers/trackers";
 import { notify } from "./notify";
 import { openFile } from "./util";
+import { runVaultExport } from "./vault-export-manager";
 
 export type ActionGroup = "diary" | "journals" | "notes" | "maintenance";
 
@@ -180,12 +182,18 @@ export function menuTitle(name: string): string {
   return rest.charAt(0).toUpperCase() + rest.slice(1);
 }
 
-// An active markdown note's path, or null. The one piece of workspace state a
-// `when` may read.
-function activeNotePath(p: AlmanacPlugin): string | null {
+// The active markdown note, or null. The one piece of workspace state a `when`
+// may read — and, since 4.27, what the capture command hands the destination
+// list as the note it was pressed on.
+function activeMarkdownFile(p: AlmanacPlugin): TFile | null {
   const file = p.app.workspace.getActiveFile();
   if (!file || file.extension !== "md") return null;
-  return file.path;
+  return file;
+}
+
+// Its path, for the `when` predicates that only need the string.
+function activeNotePath(p: AlmanacPlugin): string | null {
+  return activeMarkdownFile(p)?.path ?? null;
 }
 
 // Is the active note inside a journal? Prefix matching over configured roots —
@@ -249,7 +257,13 @@ export const ACTIONS: Action[] = [
     icon: "pencil-line",
     group: "diary",
     ribbon: true,
-    run: (p) => openCapture(p),
+    // THE ONE DOOR THAT HAS TO ASK. A command and a ribbon click carry no note
+    // with them, so the workspace is the only source for "where am I" — and its
+    // imprecisions (the last file when the focused leaf is not a file view, null
+    // in an empty workspace) both resolve to "not an entry", which is the
+    // pre-4.27 destination anyway. The three widget doors pass the note they
+    // were drawn in instead; see `openCapture`.
+    run: (p) => openCapture(p, activeMarkdownFile(p)),
   },
   {
     id: "diary-open-week-overview",
@@ -382,6 +396,23 @@ export const ACTIONS: Action[] = [
     run: (p) =>
       p.actionWithNote((path: string) => p.entryTrackers.manageTrackers(path)),
   },
+  {
+    // 4.30. What a reader wrote, on the clipboard, as markdown anybody can read
+    // — the regions Obsidian hides in comments and the labels that only exist
+    // inside an ```almanac fence.
+    //
+    // NO ELLIPSIS. It opens nothing and asks nothing; the convention on this
+    // table is that `…` promises a window (`Edit sections…`, `Template…`).
+    //
+    // WRITES NOTHING, which is why it needs no `warning` and no confirmation.
+    id: "note-copy-plain-markdown",
+    name: "Note: copy as plain markdown",
+    icon: "clipboard-copy",
+    group: "notes",
+    when: hasNote,
+    run: (p) =>
+      p.actionWithNote((path: string) => p.sections.copyPlainMarkdownHere(path)),
+  },
 
   // ── maintenance ─────────────────────────────────────────────────────
   {
@@ -395,6 +426,19 @@ export const ACTIONS: Action[] = [
     icon: "folder-search",
     group: "maintenance",
     run: (p) => void p.actionImportJournals(),
+  },
+  {
+    // 4.31, and the vault-wide half of 4.30's clipboard copy.
+    //
+    // MAINTENANCE RATHER THAN NOTES, and no `when`: it is about the vault rather
+    // than about whatever note happens to be open, which is the same reason
+    // `maint-setup-vault` sits here. It surveys, shows and then writes — the
+    // shape every other command in this group has.
+    id: "maint-export-plain-markdown",
+    name: "Maintenance: export as plain markdown",
+    icon: "folder-down",
+    group: "maintenance",
+    run: (p) => runVaultExport(p),
   },
   {
     id: "maint-refresh-journals-home",
@@ -433,7 +477,7 @@ export const ACTIONS: Action[] = [
   },
   {
     id: "maint-refresh-entry-templates",
-    name: "Maintenance: refresh entry templates (overwrites)",
+    name: "Maintenance: refresh entry templates",
     icon: "refresh-cw",
     group: "maintenance",
     run: (p) => p.scaffold.refreshTemplates(),

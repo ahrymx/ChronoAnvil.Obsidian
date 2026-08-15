@@ -48,7 +48,7 @@ const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
 const composedIds = homeSections(ROOT)
   .filter((s) => !s.optIn)
   .map((s) => s.id);
-const withoutHead = composedIds.filter((id) => id !== "title");
+const withoutHead = composedIds.filter((id) => id !== "banner");
 
 // A page as the three shared catalogues compose one: a head carrying ids, then a
 // block of its own.
@@ -59,7 +59,7 @@ const HEADED = [
   "```",
   "",
   "```almanac",
-  "header:⏳ Open Tasks",
+  "header:⏳ Open tasks",
   "tasks-table:,period",
   "```",
   "",
@@ -138,8 +138,8 @@ describe("reading and writing a page's width", () => {
     // A `wide` line in another block is refused by the grammar, so it is not a
     // width — and this must agree with that rather than have its own opinion.
     const elsewhere = HEADED.replace(
-      "header:⏳ Open Tasks",
-      `${WIDE_KEYWORD}\nheader:⏳ Open Tasks`
+      "header:⏳ Open tasks",
+      `${WIDE_KEYWORD}\nheader:⏳ Open tasks`
     );
     expect(pageIsWide(elsewhere)).toBe(false);
   });
@@ -192,25 +192,27 @@ describe("reading and writing a page's width", () => {
     expect(setPageWide(twice, false)).toBe(HEADED);
   });
 
-  it("survives a section reorder, and goes when the head goes", () => {
-    // THE WIDTH FOLLOWS THE HEAD, which is what `:has(.jtc-card)` already means
-    // for Obsidian's own title: remove the section and the page narrows, with no
-    // stale declaration left saying otherwise. Asserted so nobody "fixes" it.
+  it("cannot be lost by removing the banner, because the banner cannot go", () => {
+    // ── WHAT THIS TEST USED TO ASSERT, AND WHY IT CHANGED (4.19) ───────
+    //
+    // It read *"the width follows the head — remove the section and the page
+    // narrows, with no stale declaration left saying otherwise"*, and it was
+    // right about the mechanism: `wide` lives in the block that draws the page's
+    // title, so it goes when that block goes.
+    //
+    // 4.19 locked the banner on every surface, so that block cannot go. The
+    // mechanism is untouched and is still what `setPageWide` writes into; what
+    // changed is that the reader has no route to the state this described.
+    //
+    // ASSERTED AS A REFUSAL RATHER THAN DELETED, because the coupling is the
+    // interesting part and it is now guaranteed rather than merely tidy: there
+    // is no way to end up with a `wide` line on a page whose head is gone.
     const model = homeSectionModel(ROOT);
     const home = composeHomeNote(ROOT);
     expect(pageIsWide(home)).toBe(true);
-    const gone = model.apply(home, withoutHead)!;
-    expect(gone).not.toContain("title");
-    expect(gone).not.toContain(WIDE_KEYWORD);
-    expect(pageIsWide(gone)).toBe(false);
-  });
-
-  it("comes back with the head, because the catalogue composes both", () => {
-    const model = homeSectionModel(ROOT);
-    const home = composeHomeNote(ROOT);
-    const gone = model.apply(home, withoutHead)!;
-    const back = model.apply(gone, composedIds);
-    expect(back).toBe(home);
+    expect(model.refusal("banner", home)).not.toBeNull();
+    expect(model.apply(home, withoutHead)).toBeNull();
+    expect(pageIsWide(home)).toBe(true);
   });
 
   it("leaves Search narrow until somebody asks", () => {

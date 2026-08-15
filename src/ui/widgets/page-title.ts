@@ -99,7 +99,7 @@ import { getFile, noExt, openFile } from "../../core/util";
 import { resolveTarget } from "../../core/links";
 import { setPageWide } from "../../core/note-sections";
 import { attachNoteRename } from "../header-title";
-import { overflowButton } from "../section-frame";
+import { settingsButton } from "../section-frame";
 
 // Whether this note has sections anything can edit, and the items if it does.
 //
@@ -281,14 +281,12 @@ export function buildPageTitle(
 
   const build = sectionsMenuFor(plugin, ctx.sourcePath, root);
   if (build) {
-    // `overflowButton` draws a ⋯ and builds its menu ON CLICK, which is what
-    // keeps this cheap on a note that renders it on every open and correct when
-    // the note has changed since it was drawn. The glyph is swapped for a cog
-    // afterwards: the control acts on the PAGE — its name, its sections — where
-    // a ⋯ elsewhere in this plugin means "more things about this row".
-    const cog = overflowButton(row, "jtc-cog", build);
-    setIcon(cog, "settings");
-    cog.setAttr("aria-label", "Page settings");
+    // `settingsButton` builds its menu ON CLICK, which is what keeps this cheap
+    // on a note that renders it on every open and correct when the note has
+    // changed since it was drawn. The cog rather than a ⋯ because the control
+    // acts on the PAGE — its name, its sections — and as of 4.20 it is the same
+    // control on all three banners rather than this one's alone.
+    settingsButton(row, "jtc-cog", build);
   }
 
   // THE SECOND ROW, AND ONLY WHERE THERE IS SOMETHING IN IT. An empty strip

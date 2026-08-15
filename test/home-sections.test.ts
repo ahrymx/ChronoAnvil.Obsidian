@@ -14,9 +14,13 @@ import {
   homeSectionModel,
   HOME_CSS_CLASS,
 } from "../src/diary/home-sections";
-import { DEFAULT_PATHS } from "../src/core/constants";
+import { DEFAULT_PATHS, HEADER_PREFIX, TRENDS_HEADING } from "../src/core/constants";
 import { planLayout, segment } from "../src/core/layout";
-import { composeFlatNote, parseFlatSections } from "../src/core/note-sections";
+import {
+  composeFlatNote,
+  parseFlatSections,
+  PAGE_TITLE_LINE,
+} from "../src/core/note-sections";
 import type { FlatSection } from "../src/core/note-sections";
 import {
   SEARCH_SECTIONS,
@@ -26,6 +30,7 @@ import { cellPlan } from "../src/ui/widgets/row";
 import { isPageWidgetId } from "../src/core/widget-sections";
 import type { SectionView } from "../src/core/section-model";
 import { readCss, readSrc } from "./sources";
+import { PAGE_TITLE_LINE } from "../src/core/note-sections";
 import { WIDE_KEYWORD } from "../src/core/directive-grammar";
 
 const ASSETS = resolve(__dirname, "..", "assets");
@@ -81,7 +86,14 @@ describe("the home catalogue is data, which is the point", () => {
     // A vault whose homepage has no way into the diary is worse than one with
     // no homepage: the diary card's destination pills are the note's only
     // navigation, since there is no `links:` row on it.
+    //
+    // AND THE BANNER IS LOCKED TOO AS OF 4.19, WHICH IS FELT HARDEST HERE. This
+    // page's banner carries no navigation, so the argument that locks it
+    // elsewhere does not apply — it is locked because ONE rule across nine
+    // surfaces beats a rule a reader has to learn per page. `bannerSection`
+    // states the trade and this is the test that records the cost.
     expect(HOME_SECTIONS.filter((s) => s.locked).map((s) => s.id)).toEqual([
+      "banner",
       "diary",
     ]);
   });
@@ -292,7 +304,7 @@ describe("what the homepage composes to", () => {
   });
 
   it("keeps the charts block in its own almanac-charts fence", () => {
-    expect(home()).toContain("```almanac-charts\nheader:📊 Trends and Statistics\n```");
+    expect(home()).toContain(`\`\`\`almanac-charts\n${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}\n\`\`\``);
   });
 
   it("separates every fence with exactly one blank line", () => {
@@ -319,7 +331,11 @@ describe("what the homepage composes to", () => {
       "`almanac:spacer`",
       "```almanac",
       WIDE_KEYWORD,
-      "title",
+      // AND IT CARRIES THE THREE DESTINATIONS AS OF 4.20, where it was the bare
+      // `title` from 4.5 onward. `home-sections.ts` has the argument: the
+      // banner means the same thing on this page as on the other eight, and the
+      // launcher's tiles are content rather than chrome.
+      "title:home,diary,journals",
     ]);
   });
 
@@ -394,7 +410,7 @@ const TOP_ROW = "```almanac\nrow\ndiary:3\ncell\nlauncher\ntasks-table\non-this-
 // is exactly why the refusal it triggers still needs a test.
 const MULTILINE_ROW = (): string =>
   home().replace(
-    "```almanac\njournals\n```",
+    "```almanac\nframe: section\njournals\n```",
     `\`\`\`almanac\nrow\njournals\nheader:🏷️ Tags\ntag-index:${ROOT}\n\`\`\``
   );
 
@@ -419,7 +435,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     expect(out).toContain("```almanac\nrow\ndiary:3\ncell\ntasks-table\n```");
     expect(out).not.toContain("on-this-day");
     // The rest of the page is untouched.
-    expect(out).toContain("```almanac\njournals\n```");
+    expect(out).toContain("```almanac\nframe: section\njournals\n```");
   });
 
   it("says it is removing it, and then removes it", () => {
@@ -454,7 +470,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     // out from where its neighbours' anchors sit — and inferring it wrong
     // deletes a line the reader wrote. `applyFlatSections` is a reconciler.
     const note = MULTILINE_ROW();
-    const keepAll = ["title", "diary", "launcher", "tasks", "on-this-day", "journals", "charts"];
+    const keepAll = ["banner", "diary", "launcher", "tasks", "on-this-day", "journals", "charts"];
     const ops = model.plan(note, keepAll);
     const tags = ops.find((o) => o.sectionId === "tags");
     expect(tags?.kind).toBe("keep");
@@ -508,12 +524,12 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     // move, because a plan names what the reader did.
     const shared = home()
       .replace(
-        `\`\`\`almanac\n${WIDE_KEYWORD}\ntitle\n\`\`\``,
-        `\`\`\`almanac\n${WIDE_KEYWORD}\ntitle\njournals\n\`\`\``
+        `\`\`\`almanac\n${WIDE_KEYWORD}\n${PAGE_TITLE_LINE}\n\`\`\``,
+        `\`\`\`almanac\n${WIDE_KEYWORD}\n${PAGE_TITLE_LINE}\njournals\n\`\`\``
       )
-      .replace("\n```almanac\njournals\n```\n", "");
+      .replace("\n```almanac\nframe: section\njournals\n```\n", "");
     const ops = model.plan(shared, [
-      "title",
+      "banner",
       "diary",
       "launcher",
       "tasks",
@@ -525,12 +541,12 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     const refusal = ops.find((o) => o.detail.includes("always first"));
     expect(refusal?.kind).toBe("keep");
     expect(refusal?.sectionId).toBe("journals");
-    expect(refusal?.detail).toContain("Page title");
+    expect(refusal?.detail).toContain("Banner");
     expect(refusal?.detail).toContain("Split the block first");
     // AND THE FILE IS UNCHANGED, which is the promise the sentence makes.
     expect(
       model.apply(shared, [
-        "title",
+        "banner",
         "diary",
         "launcher",
         "tasks",
@@ -547,7 +563,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     // written.
     const out = model.apply(home(), [
       "charts",
-      "title",
+      "banner",
       "diary",
       "launcher",
       "tasks",
@@ -648,7 +664,7 @@ describe("the home model", () => {
   it("offers what a stripped homepage is missing", () => {
     const bare = "`almanac:spacer`\n```almanac\ndiary:3\n```\n";
     expect(own(model.addable(bare))).toEqual([
-      "title",
+      "banner",
       "launcher",
       "tasks",
       "on-this-day",
@@ -673,7 +689,7 @@ describe("the home model", () => {
     // making: the pin is a SECOND rule, on one row, and the locked rows must not
     // be caught by it. `diary` is locked and still moves.
     for (const v of model.sections()) {
-      if (v.id === "title") continue;
+      if (v.id === "banner") continue;
       expect(v.movable, v.id).toBe(true);
     }
     const locked = model.sections().find((v) => v.id === "diary")!;
@@ -681,15 +697,15 @@ describe("the home model", () => {
     expect(locked.movable).toBe(true);
   });
 
-  it("fixes the page title in place, and still lets it go", () => {
+  it("fixes the banner in place, and no longer lets it go", () => {
     // 4.11. The two flags are two questions: a homepage without a title card is
     // a coherent thing to want, and a homepage with its title filed under the
     // charts is not. So the head is the one row that is removable and immovable
     // at once — which is also what makes the "fixed" pill in the editor
     // necessary, since the subtitle has no refusal to carry.
-    const head = model.sections().find((v) => v.id === "title")!;
+    const head = model.sections().find((v) => v.id === "banner")!;
     expect(head.movable).toBe(false);
-    expect(head.removable).toBe(true);
+    expect(head.removable).toBe(false);
     expect(model.refusal("title", home())).toBeNull();
   });
 
@@ -702,7 +718,7 @@ describe("the home model", () => {
     // and an add is a change — which would make this pass or fail for a reason
     // that has nothing to do with the pin.
     const ids = COMPOSED.map((s) => s.id);
-    const shuffled = [...ids.filter((id) => id !== "title"), "title"];
+    const shuffled = [...ids.filter((id) => id !== "banner"), "banner"];
     expect(model.apply(home(), shuffled)).toBeNull();
     expect(
       model.plan(home(), shuffled).some((op) => op.kind === "move")
@@ -711,15 +727,18 @@ describe("the home model", () => {
 
   it("refuses to remove the diary card, and names the fix", () => {
     const why = model.refusal("diary", home());
-    expect(why).toContain("cannot be removed");
+    expect(why).toContain("can't be removed");
     expect(why).toContain("move it");
   });
 
   it("refuses to remove charts that are holding the reader's own", () => {
-    const withCharts = home().replace(
-      "header:📊 Trends and Statistics",
-      "header:📊 Trends and Statistics\nchart:Mood"
-    );
+    // OFF THE CONSTANT, NOT A LITERAL (4.26). This built its fixture by
+    // replacing the title the homepage composes, so when the heading was
+    // renamed the replace silently matched nothing, the fixture came back
+    // without the chart line, and the assertion failed on `refusal` returning
+    // null — a stale literal reported as a behaviour change.
+    const bar = `${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`;
+    const withCharts = home().replace(bar, `${bar}\nchart:Mood`);
     expect(model.refusal("charts", withCharts)).toContain("Remove it first");
     // And allows it once they are gone.
     expect(model.refusal("charts", home())).toBeNull();
@@ -740,8 +759,33 @@ describe("the home model", () => {
       composedIds.filter((id) => id !== "journals")
     );
     expect(next).not.toBeNull();
-    expect(next).not.toContain("journals");
+    // THE DIRECTIVE, NOT THE WORD (4.20). The banner's own destination row names
+    // Journals, so a substring test now passes only by accident of the section
+    // still being there — and would keep passing if the removal silently failed.
+    expect((next ?? "").split("\n")).not.toContain("journals");
     expect(next).not.toContain("\n\n\n");
+  });
+
+  it("takes a removed widget's height with it (4.22 §5.4)", () => {
+    // THE FOURTH PLACE A HEIGHT MUST NOT BE ORPHANED, and the one no drag path
+    // covers: `applyFlatSections` cuts exactly the section's own line and touches
+    // nothing adjacent, which is what keeps it a reconciler — so a `height:` line
+    // above the removed directive would survive and size its neighbour.
+    //
+    // A reader removing one widget from a group and watching a DIFFERENT one
+    // change shape is the failure, and it is invisible until it happens.
+    const lines = home().split("\n");
+    const at = lines.indexOf("journals");
+    expect(at, "no bare journals directive on the homepage").toBeGreaterThan(-1);
+    const sized = [...lines.slice(0, at), "height: 240", ...lines.slice(at)];
+    const next = model.apply(
+      sized.join("\n"),
+      composedIds.filter((id) => id !== "journals")
+    );
+    expect(next).not.toBeNull();
+    expect((next ?? "").split("\n")).not.toContain("journals");
+    // AND THE HEIGHT IS GONE WITH IT, rather than left sizing whatever moved up.
+    expect((next ?? "").split("\n")).not.toContain("height: 240");
   });
 
   it("restores the file exactly on remove-then-re-add", () => {
@@ -844,7 +888,7 @@ describe("the home model", () => {
 
   it("applies only what the plan named", () => {
     // The property the whole preview rests on.
-    const want = ["title", "diary", "launcher", "tasks", "on-this-day", "charts"];
+    const want = ["banner", "diary", "launcher", "tasks", "on-this-day", "charts"];
     const ops = model.plan(home(), want);
     const removed = ops.filter((o) => o.kind === "remove").map((o) => o.sectionId);
     expect(removed).toEqual(["journals"]);

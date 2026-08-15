@@ -145,6 +145,15 @@ export interface SearchHit {
 const FILTER_RE = /^(from|to|tag|is|has):(.+)$/i;
 const COMPARE_RE = /^([A-Za-z][A-Za-z0-9_-]*)(<=|>=|<|>|=)(-?\d+(?:\.\d+)?)$/;
 
+// What `has:` accepts. NAMED SO THE HINT CAN READ IT — see `searchHintLine`
+// below. The switch arm and the line teaching a reader what to type are the
+// same fact, and a value added to one and not the other is a filter nobody
+// discovers or a hint that promises one the parser rejects.
+export const HAS_VALUES = ["attachment", "task", "event"] as const;
+export type HasValue = (typeof HAS_VALUES)[number];
+const isHasValue = (v: string): v is HasValue =>
+  (HAS_VALUES as readonly string[]).includes(v);
+
 // `knownKinds` is what `is:` will accept, and it is a parameter because the
 // valid set is surface-dependent: the diary has exactly two, a journal has
 // whatever its type declares plus its pages. Passing it keeps the actual rule
@@ -152,6 +161,39 @@ const COMPARE_RE = /^([A-Za-z][A-Za-z0-9_-]*)(<=|>=|<|>|=)(-?\d+(?:\.\d+)?)$/;
 // because a search box that rejects your query for a stray colon is worse than
 // one that searches for it. Hardcoding daily/monthly here would have made
 // `is:lesson` a literal string search on a journal.
+// The hint line under a search box, built from the grammar directly above it.
+//
+// DERIVED, NOT WRITTEN OUT — 4.25 §4. Both hints were literals and both had
+// gone wrong in the way a literal does. The diary's froze `to:2026-03`, a month
+// that stopped being an example of "up to recently" the moment it arrived and
+// would have read as stale in every vault from then on. The journal's offered
+// no `to:` at all, so the two surfaces taught two different syntaxes for this
+// one parser — the same defect as two names for one section, in prose.
+//
+// The example month is read off the clock and the `has:` value off
+// `HAS_VALUES`, so neither can age and neither can drift from what the switch
+// above actually accepts. What stays a parameter is what is genuinely
+// surface-dependent, and it is the same set `parseQuery` already takes as one:
+// the kind, because `is:` is validated against `knownKinds`, and the tag and
+// tracker, because a diary has moods and health tags where a Study journal has
+// confidence and topic tags. An example a reader cannot use on the page they
+// are reading it on teaches them the filter does not work.
+export function searchHintLine(opts: {
+  kind: string;
+  tag: string;
+  tracker: string;
+  now?: string;
+}): string {
+  return [
+    "Filters: from:30d",
+    `to:${opts.now ?? moment().format("YYYY-MM")}`,
+    `tag:${opts.tag}`,
+    `is:${opts.kind}`,
+    `has:${HAS_VALUES[0]}`,
+    `${opts.tracker}<=2`,
+  ].join(" · ");
+}
+
 export function parseQuery(
   raw: string,
   knownKinds: readonly string[] = ["daily", "monthly"]
@@ -192,7 +234,7 @@ export function parseQuery(
           } else q.terms.push(token);
           continue;
         case "has":
-          if (v === "attachment" || v === "task" || v === "event") q.has.push(v);
+          if (isHasValue(v)) q.has.push(v);
           else q.terms.push(token);
           continue;
       }

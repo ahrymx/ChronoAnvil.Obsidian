@@ -49,6 +49,8 @@ import {
   withAnswers,
 } from "../core/section-model";
 import { regionHasContent } from "../core/notestore";
+import { TRACKER_MARK_END, TRACKER_MARK_START } from "../core/constants";
+import { BANNER_ID } from "../core/note-sections";
 import type { TrackerClass } from "../trackers/trackers";
 
 export interface EntrySectionContext {
@@ -143,12 +145,26 @@ export interface EntrySection {
   pinned?: boolean;
   // Which fence this section's directive belongs in.
   //
-  // `own` means a fence of its own, above the rule; `shared` means the single
+  // `own` means the banner's fence, above the rule; `shared` means the single
   // fence below it that every editable widget lives in. This is the structural
   // difference between the two halves of an entry, and it is a property rather
   // than a position so that reordering within a half cannot accidentally move a
   // section across the rule.
-  fence: "own" | "shared";
+  //
+  // ── AND `trackers` IS A THIRD FENCE AS OF 4.20 ────────────────────
+  //
+  // The logging grid used to be lines inside the banner's fence, which made it
+  // part of the banner: one card holding the note's name, its navigation and
+  // every rating you keep. 4.20 settles what a banner IS — the file's name, its
+  // navigation and the control that edits it, and nothing else — so the grid
+  // had to leave, and a section cannot leave a card it shares a fence with.
+  //
+  // ABOVE THE RULE STILL. The rule separates what the plugin arranges from what
+  // the reader writes, and a rating is not writing: it is answered by clicking
+  // a cell, it belongs to the day rather than to a paragraph, and putting it
+  // below would file it with Highlights and Notes. So an entry has three fences
+  // above the rule's two, and the third is the one this field adds.
+  fence: "own" | "trackers" | "shared";
   // Whether this section persists into a note region of its own, keyed by its
   // id. True for every section that ships, and the assumption three separate
   // pieces of machinery were written on before 3.8 made one that isn't.
@@ -188,6 +204,44 @@ export interface EntrySection {
     ctx: EntrySectionContext,
     opts?: Record<string, unknown>
   ) => string | null;
+  // Extra lines this section writes into its own fence, above and below its
+  // directive. 4.19.
+  //
+  // WHAT THESE CLOSE. `composeEntryTemplate` used to carry a branch on a
+  // section's NAME — `sec.id === "entry-header" ? trackerBlock(...) : []` — and
+  // it carried its own apology beside it: *"a composer that special-cased a
+  // section by name would be the catalogue with a hole in it"*. It was written
+  // when the tracker markers were the only thing that did not fit; 4.19's banner
+  // needs a second such line (the navigation row it absorbed), and adding a
+  // second name to that branch would have been the hole twice.
+  //
+  // So the composer asks instead of knowing, and the catalogue answers. That is
+  // the same seam `render` already is on the other three section shapes — a
+  // section says what it composes, and the composer only decides how the pieces
+  // are joined.
+  //
+  // NOT PART OF THE SECTION'S IDENTITY. `probeFor` and `detectEntrySections`
+  // still key on `directive`, so a banner is found by its `entry-header` line
+  // and not by the row above it. That matters for the same reason `locate`
+  // matches a directive rather than a header everywhere else: these lines can
+  // change, and a section found by them would go missing when they did.
+  above?: (ctx: EntrySectionContext) => string[];
+  below?: (ctx: EntrySectionContext) => string[];
+  // How to find this section in a note, for the one section whose directive is
+  // not a directive. 4.20.
+  //
+  // `probeFor` derives a probe from the directive by taking everything before
+  // the first colon, which is the whole grammar for `note:log` and
+  // `tasks:todo|Tasks`. The tracker section's "directive" is the marker comment
+  // `# almanac:trackers:start`, whose first token is `# almanac` — and a probe
+  // of `^# almanac\b` matches the END marker too, so the section was found
+  // twice in its own fence and reported twice to the editor.
+  //
+  // AN OVERRIDE RATHER THAN A SMARTER DERIVATION, because the derivation is
+  // right for every section that has a directive and this one does not have one.
+  // Teaching `probeFor` about marker comments would make a rule about the
+  // directive grammar answerable for a thing that is outside it.
+  probe?: RegExp;
   // What this section cannot write a directive without being told.
   //
   // THE OTHER HALF OF `opts`. 3.8 patch 5 gave a section's directive somewhere
@@ -217,29 +271,105 @@ const on = (
 // Ordered as they appear in the fence, which is the order on screen.
 export const ENTRY_SECTIONS: EntrySection[] = [
   {
-    id: "links",
-    label: "Navigation",
-    blurb: "Home, today, and the scope switcher.",
-    icon: "🧭",
-    // LOCKED. A vault where some entries can get home and others cannot is
-    // worse than one with no links at all.
-    locked: true,
-    // PINNED, as of 3.2 §4. The only section in either diary catalogue that is.
-    pinned: true,
-    fence: "own",
-    directive: () => "links:home,today,scopes#diary",
-  },
-  {
-    id: "entry-header",
+    id: BANNER_ID,
     label: "Banner",
-    blurb: "The date navigator, the title, and this entry's tracker grid.",
-    icon: "🗓",
+    // WHAT THIS SENTENCE USED TO SAY, AND WHY IT IS WORTH A NOTE. It listed the
+    // date navigator and the tracker grid — one left in 4.20 and the other in
+    // 4.21 — so the editor described this row by naming two blocks that are now
+    // the row below it. A blurb is the only description of a section a reader
+    // ever sees, and it is the part of a catalogue entry that a change to the
+    // RENDERER cannot break loudly.
+    blurb:
+      "The note's own name, the row back to Home and today, and the control that renames it and edits its sections.",
+    // 🏷️ RATHER THAN 🗓 (4.21.1): the same glyph the other three catalogues'
+    // banners carry. A calendar page said "diary entry", which the note's own
+    // name already says, and made one section look like four in the one place
+    // they are drawn the same way.
+    icon: "🏷️",
     // LOCKED, and the one that most obviously has to be: without it the note
     // has no date navigation, no trackers and no title editing — it stops being
-    // an Almanac entry rather than losing a feature.
+    // an Almanac entry rather than losing a feature. The navigation row it
+    // absorbed in 4.19 was locked for its own reason, which survives unchanged
+    // inside this one: a vault where some entries can get home and others
+    // cannot is worse than one with no links at all.
     locked: true,
+    // PINNED, as of 3.2 §4 — the flag arrives here with the row that carried it.
+    pinned: true,
     fence: "own",
+    // ── WHAT 4.19 CHANGED HERE, AND WHAT IT DID NOT ──────────────────
+    //
+    // NOT THE MARKDOWN. `composeEntryTemplate` has welded every `fence: "own"`
+    // section into ONE fence since 3.2 patch 2, so `links:` and `entry-header`
+    // were already one block on screen — an entry has been showing a banner and
+    // reporting two sections for eight releases. What merges is the CATALOGUE
+    // ENTRY, and the composed template comes out byte-identical; the test asserts
+    // that rather than trusting it.
+    //
+    // AND NOT THE DIRECTIVE, which is still `entry-header` alone. That is the
+    // keyword `probeFor`, `detectEntrySections` and the renderer all key on, and
+    // the thing that makes a note an entry. Only the section's ID changed, to the
+    // one every other catalogue's banner now uses.
+    //
+    // NO `title:` LINE, WHICH IS THE ONE ASYMMETRY WORTH STATING. Seven surfaces
+    // compose their banner as `title:` + `links:`; an entry composes
+    // `links:` + `entry-header`, because `entry-header` ALREADY draws an editable
+    // name — a `title:` line above it would be the note's name twice, which is
+    // the doubling this release removes rather than a shape it should copy.
+    // `masthead.test.ts` pins the consequence: an entry's row keeps `home` where
+    // a dashboard's dropped it, because on an entry nothing else offers it.
+    above: () => ["links:home,today,scopes#diary"],
     directive: () => "entry-header",
+  },
+  {
+    id: "trackers",
+    label: "Trackers",
+    // THE STRIP IS NAMED TOO, because it is the half of this block a reader is
+    // most likely to be looking for: 4.21 moved the entry's alias and its date
+    // navigator here out of the banner, and a blurb that mentions only the grid
+    // sends someone hunting for them in the row above.
+    blurb:
+      "The title you give this entry, the navigator between entries, and the grid of ratings and logs you fill in.",
+    icon: "📊",
+    // ── ITS OWN SECTION AS OF 4.20, WHERE IT WAS LINES IN THE BANNER ───
+    //
+    // WHY IT HAD TO MOVE. `EntrySection.fence` states the argument: a banner is
+    // the file's name, its navigation and the control that edits it. The grid is
+    // none of those — it is the note's most-used CONTENT — and it was in the
+    // banner for a reason that had nothing to do with what it is: the markers
+    // needed somewhere to live, and the banner's fence was the only fence above
+    // the rule.
+    //
+    // LOCKED, WHICH IS NOT INHERITED FROM THE BANNER BUT ARGUED FOR ITSELF. A
+    // daily entry with no tracker grid cannot record a mood, a sleep time or
+    // anything else the diary charts read — every chart on every dashboard is a
+    // view over these cells, so removing the section silently empties the pages
+    // above it. That is `entry-header`'s argument in a different currency: the
+    // note stops being an Almanac entry rather than losing a feature.
+    //
+    // NOT PINNED. It has one neighbour above the rule and nowhere to go, so
+    // `isMovable` answers false by arithmetic — the state `entry-header` was in
+    // before 4.19, and the reason nobody writes the flag by hand.
+    locked: true,
+    fence: "trackers",
+    // NO DIRECTIVE OF ITS OWN. The section IS the marked region, and the
+    // directives inside it are the reader's trackers rather than the
+    // catalogue's — `entryTrackers.addTracker` writes them and this composes the
+    // pair of markers it writes between. `below` is what puts them there, for
+    // the same reason the banner uses `above` for its links row: the composer
+    // joins pieces and does not know any section's name.
+    //
+    // AND THE PROBE HAS TO FIND THE MARKER, not a directive, because a note
+    // whose trackers a reader has all removed still HAS this section — an empty
+    // marked region is the section waiting to be filled, and reporting it absent
+    // would offer to add a second one.
+    directive: () => TRACKER_MARK_START,
+    below: (ctx) => [...trackerLines(ctx), TRACKER_MARK_END],
+    // The OPENING marker only — see `EntrySection.probe`. Anchored whole so the
+    // closing one, which shares every character up to the last token, cannot
+    // match and report the section a second time.
+    probe: new RegExp(`^${TRACKER_MARK_START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`),
+    // Nothing of the reader's PROSE lives here, so there is no region to keep.
+    ownsRegion: false,
   },
   {
     id: "focus",
@@ -452,7 +582,16 @@ export const ENTRY_SECTIONS: EntrySection[] = [
     icon: "⚡",
     locked: false,
     fence: "shared",
-    // Daily alone, and structurally so: capture writes to the day you are on.
+    // SHIPPED ON DAILY, OFFERED ON ALL FIVE — and until 4.27 that asymmetry was
+    // defended here as structural: "capture writes to the day you are on", so a
+    // Captured field on a weekly entry could never be filled. That is no longer
+    // true. The capture box asks which entry it is writing to, and its list is
+    // the grains whose template declares this section — so ticking Captured for
+    // weekly in Settings → Diary entries is what puts "This week" in the box.
+    //
+    // Daily still SHIPS it because a day is the grain a passing thought belongs
+    // to by default; the other four are opt-in because most vaults do not want
+    // four more places for one to land.
     directive: on({
       daily: "note:capture#collapse:Captured thoughts land here…|Captured",
     }),
@@ -528,13 +667,28 @@ function trackerBlock(
   ctx: EntrySectionContext,
   where: "frontmatter" | "header"
 ): string[] {
-  const seeded =
-    ctx.grain !== "daily"
-      ? []
-      : where === "frontmatter"
-        ? ["Mood:", "Wake-Up:", "Bedtime:", "Sleep:"]
-        : ["tracker:Mood", "sleep"];
-  return ["# almanac:trackers:start", ...seeded, "# almanac:trackers:end"];
+  return [TRACKER_MARK_START, ...trackerLines(ctx, where), TRACKER_MARK_END];
+}
+
+// What a fresh entry of this grain is seeded with, between the markers.
+//
+// SPLIT OUT OF `trackerBlock` IN 4.20, because the section now composes the
+// markers itself — `directive` is the opening one and `below` is the rest — and
+// the frontmatter caller still wants the whole block in one string. One list of
+// seeds, two wrappers around it, rather than two lists that would drift the
+// first time a grain gained a default.
+//
+// ONLY A DAILY ENTRY IS SEEDED. Mood and sleep are things you record once a day;
+// a weekly or monthly entry gets the markers and an empty region, which is the
+// section present and waiting rather than the section missing.
+function trackerLines(
+  ctx: EntrySectionContext,
+  where: "frontmatter" | "header" = "header"
+): string[] {
+  if (ctx.grain !== "daily") return [];
+  return where === "frontmatter"
+    ? ["Mood:", "Wake-Up:", "Bedtime:", "Sleep:"]
+    : ["tracker:Mood", "sleep"];
 }
 
 // A body region, empty. The blank line between the markers is not decoration:
@@ -551,7 +705,39 @@ function region(id: string): string {
 // the regions each separated by a blank line.
 export function composeEntryTemplate(
   grain: TrackerClass,
-  extra: readonly SectionWant[] = []
+  extra: readonly SectionWant[] = [],
+  // THE GRAIN'S SAVED SHARED BAND, WHERE THERE IS ONE (4.29).
+  //
+  // AUTHORITATIVE WHEN PRESENT: these ids ARE the shared band, in this order.
+  // Not an ordering laid over the catalogue's membership — that was the first
+  // design and it cannot express the gesture the feature exists for. A reader
+  // who deletes Challenges from their page and presses "Save this page as the
+  // default" is saying their entries do not have Challenges; a store that could
+  // only add would put it back on tomorrow's entry and say nothing.
+  //
+  // WHICH MEANS IT FREEZES, AND THAT IS THE DELIBERATE PART. The comment at
+  // `EntrySectionContext.extra` argues the opposite case and is still right for
+  // what it describes: an additive list means a later release adding a section
+  // to daily entries reaches a reader who once ticked a checkbox. A band is
+  // written by a different gesture — a full-page save behind a confirmation
+  // that says *"every new entry will be built from this page's sections, in
+  // this page's order"* — and a reader who has said that has chosen to freeze.
+  // `refreshTemplates` still shows them the diff, so a section a later release
+  // would have added is visible rather than silent.
+  //
+  // THE TWO STORES CANNOT DISAGREE, because the settings table keeps this in
+  // step: ticking a section for a grain that has a band appends the id to it,
+  // and unticking removes it. See `renderEntrySectionCell`.
+  //
+  // BYTE-INERT WHEN ABSENT. Every existing caller passes nothing and composes
+  // exactly what it composed before, which is what makes this safe to add to a
+  // function five template files are written from.
+  //
+  // SHARED BAND ONLY. The structural band holds `links`, pinned by 3.2 §4, and
+  // `entry-header`, which `isMovable` therefore derives to be alone among its
+  // band's movable members — every permutation of that band is the identity, so
+  // there is nothing there for a band to say.
+  band: readonly string[] = []
 ): string {
   // WHERE THE SETTING BECOMES A TEMPLATE, as of 3.8 patch 6. `extra` has been
   // documented since 2.60.1 as "a setting the composer reads" and was a
@@ -561,10 +747,52 @@ export function composeEntryTemplate(
   for (const want of extra) {
     if (typeof want !== "string" && want.options) options[want.id] = want.options;
   }
-  const ctx: EntrySectionContext = { grain, extra: idsOf(extra), options };
-  const all = sectionsForEntry(ctx);
+  // THE BAND JOINS `extra`, which is what lets it name a section this grain
+  // does not ship: `directiveFor`'s borrowing rule only fires for an id the
+  // context asks for, so a band naming `challenges` on a weekly entry has to
+  // arrive here as a request rather than as an ordering hint.
+  const ctx: EntrySectionContext = {
+    grain,
+    extra: [...idsOf(extra), ...band],
+    options,
+  };
+  // A SECTION WITH NO DIRECTIVE TO WRITE IS NOT COMPOSED (4.29).
+  //
+  // DEFENSIVE AND CURRENTLY UNREACHABLE, which is worth writing down because it
+  // reads as load-bearing and is not — the same honesty `entrySectionMatrix`'s
+  // fence test was given in 4.27, and for the same reason: deleting this leaves
+  // the suite green, and a mutation proved it rather than a reading.
+  //
+  // What it encodes is real. `ownLines` and the shared map both end in
+  // `directiveFor(...) as string`, so a section admitted here that cannot
+  // render would put the literal string "null" into five template files. Today
+  // nothing is: every member of `ENTRY_SECTIONS` renders on every grain once
+  // borrowing is allowed, which is exactly what `offerableEntrySections`
+  // asserts. An id that is not in the catalogue at all never becomes a section
+  // object, so it is stopped one line down instead, where `byId.get` misses —
+  // and THAT filter is covered.
+  //
+  // A future section returning null for one grain would make this the only
+  // thing between a reader and a broken template, and it would arrive with no
+  // test to notice.
+  const all = sectionsForEntry(ctx).filter((s) => directiveFor(s, ctx) != null);
   const own = all.filter((s) => s.fence === "own");
-  const shared = all.filter((s) => s.fence === "shared");
+  const trackers = all.filter((s) => s.fence === "trackers");
+  // A SAVED BAND REPLACES THE CATALOGUE'S, rather than reordering it. An id the
+  // grain cannot compose has already been filtered out of `all` above, so a
+  // band naming one composes the rest — the manager reports which, because
+  // silently meaning something different on each grain is the failure
+  // `layout-transfer.ts` names.
+  //
+  // Deduplicated: two of one section is one region shared by two widgets, which
+  // `addableEntrySections` refuses to create for the same reason.
+  const sharedAll = all.filter((s) => s.fence === "shared");
+  const byId = new Map(sharedAll.map((s) => [s.id, s]));
+  const shared = band.length
+    ? [...new Set(band)]
+        .map((id) => byId.get(id))
+        .filter((s): s is EntrySection => s != null)
+    : sharedAll;
 
   // Built from the catalogue rather than from a hardcoded skeleton as of
   // 2.60.2, and written into ONE fence as of 3.2 patch 2.
@@ -582,14 +810,32 @@ export function composeEntryTemplate(
   // sentence `mergeEntryFences` uses about the merge it performs, because it is
   // the same merge one row up.
   //
-  // `entry-header` carries the header's tracker block. That is a property of
-  // that section rather than of the composer: no other section has one, and a
-  // composer that special-cased a section by name would be the catalogue with a
-  // hole in it.
+  // AND THE HOLE THAT SENTENCE NAMED IS CLOSED (4.19). This read
+  // `sec.id === "entry-header" ? trackerBlock(ctx, "header") : []` and said so
+  // itself: *"a composer that special-cased a section by name would be the
+  // catalogue with a hole in it"*. `EntrySection.above`/`below` are that
+  // property moved onto the section it belongs to, so the composer joins pieces
+  // and no longer knows any section's name.
   const ownLines = (sec: EntrySection): string[] => [
+    ...(sec.above?.(ctx) ?? []),
     directiveFor(sec, ctx) as string,
-    ...(sec.id === "entry-header" ? trackerBlock(ctx, "header") : []),
+    ...(sec.below?.(ctx) ?? []),
   ];
+
+  // THE TRACKER FENCE, BETWEEN THE BANNER AND THE RULE (4.20).
+  //
+  // A BLOCK OF ITS OWN, WHICH IS THE WHOLE CHANGE. It sat inside the banner's
+  // fence, so it was inside the banner's card; the grid is the note's most-used
+  // content and the banner is meant to be the file's name, its navigation and
+  // its cog. One fence is one card, so the only way out of the card is out of
+  // the fence.
+  //
+  // OMITTED ENTIRELY WHEN NOTHING WANTS IT, rather than composed empty. A reader
+  // who removes the section gets no fence, and an empty ```almanac block renders
+  // as a bordered gap where a card used to be.
+  const trackerFence = trackers.length
+    ? ["```almanac", ...trackers.flatMap(ownLines), "```", ""]
+    : [];
 
   return (
     [
@@ -599,6 +845,7 @@ export function composeEntryTemplate(
       ...own.flatMap(ownLines),
       "```",
       "",
+      ...trackerFence,
       "---",
       "",
       "```almanac",
@@ -659,20 +906,33 @@ export function isMovable(section: EntrySection): boolean {
 // there — except deliberately, which is worse. So the sentence is asked for
 // rather than assumed, and the pinned section says what fixes it: nothing, and
 // here is why.
+// ── ONE SHAPE FOR EVERY REFUSAL, ON EVERY SURFACE (4.21) ─────────────
+//
+// THE SENTENCE NO LONGER OPENS WITH THE LABEL, and that fixes two things at
+// once. It read `${label} is part of every entry`, which put a singular verb
+// after whatever the section happened to be called — so the tracker section,
+// added in 4.20, produced *"Trackers is part of every entry"* in the window.
+// Every label is a candidate for that; the plural one just arrived first.
+//
+// AND THE LABEL WAS REDUNDANT ANYWAY. The refusal is drawn as the row's
+// subtitle, directly under the row's own title, so it repeated the word
+// immediately above it in order to break its own grammar.
+//
+// FOUR CATALOGUES, ONE SHAPE: what it is part of, then what that costs, then —
+// only when it is true — what the reader can still do. The four used to say it
+// four ways ("is required and cannot be removed", "is the first thing on every
+// dashboard", "is part of what the homepage is"), which read as four rules.
 export function entryRemovalRefusal(
   section: EntrySection,
   fileText: string
 ): string | null {
-  if (section.pinned) {
-    return `${section.label} is the first thing on every entry. It can't be removed or moved.`;
-  }
   if (section.locked) {
     return isMovable(section)
-      ? `${section.label} is part of every entry and cannot be removed. You can move it, though.`
-      : `${section.label} is part of every entry and cannot be removed.`;
+      ? "Part of every entry, so it can't be removed. You can still move it."
+      : "Part of every entry, so it can't be removed or moved.";
   }
   if (section.ownsRegion !== false && regionHasContent(fileText, section.id)) {
-    return `${section.label} has your writing in it. Clear it first, then remove the section.`;
+    return "Holds your writing. Clear it first, then remove the section.";
   }
   return null;
 }
@@ -854,6 +1114,7 @@ interface EntryShape {
 // arguments — a prompt, a `|Title` the reader retitled — and matching on those
 // would make a renamed section invisible and then offer to add a second copy.
 function probeFor(section: EntrySection, ctx: EntrySectionContext): RegExp | null {
+  if (section.probe) return section.probe;
   const directive = directiveFor(section, { ...ctx, extra: [section.id] });
   if (directive == null) return null;
   const keyword = escapeForLine(directive.split(":")[0]);
@@ -877,8 +1138,20 @@ export function parseEntry(
   const probes = offerableEntrySections(ctx)
     .map((s) => ({ s, re: probeFor(s, ctx) }))
     .filter((p): p is { s: EntrySection; re: RegExp } => p.re !== null);
-  const ownerOf = (line: string, half: "own" | "shared"): string | null =>
+  const ownerOf = (line: string, half: EntrySection["fence"]): string | null =>
     probes.find((p) => p.s.fence === half && p.re.test(line.trim()))?.s.id ??
+    null;
+  // ANY SECTION ABOVE THE RULE, WHICH IS TWO FENCES AS OF 4.20 (the banner's and
+  // the tracker grid's) where it was one.
+  //
+  // WHY THIS IS ASKED AS "NOT SHARED" RATHER THAN AS A LIST. What every reader
+  // of it wants to know is whether a fence is the READER'S widget fence or one
+  // the catalogue arranges — `candidates` below picks the widget fence by
+  // elimination — and the answer is "everything that is not below the rule". A
+  // list of two fence names would need a third entry the next time a structural
+  // fence is added, in a function whose whole job is to not care.
+  const structuralOwner = (line: string): string | null =>
+    probes.find((p) => p.s.fence !== "shared" && p.re.test(line.trim()))?.s.id ??
     null;
 
   const shape: EntryShape = { own: [], shared: null, regions: new Map() };
@@ -929,7 +1202,7 @@ export function parseEntry(
     return {
       ...f,
       owns: body
-        .map((l, n) => ({ id: ownerOf(l, "own"), at: f.open + 1 + n }))
+        .map((l, n) => ({ id: structuralOwner(l), at: f.open + 1 + n }))
         .filter((o): o is { id: string; at: number } => o.id !== null),
       shares: body.some((l) => ownerOf(l, "shared") !== null),
     };
@@ -994,6 +1267,77 @@ export function offerableEntrySections(
   return ENTRY_SECTIONS.filter(
     (s) => directiveFor(s, { ...ctx, extra: [s.id] }) != null
   );
+}
+
+// ── the offer, as a grid (4.27 §3) ────────────────────────────────────
+//
+// What a section is to a grain: already written by its template, offerable, or
+// impossible.
+export type EntrySectionOffer = "ships" | "offer" | "absent";
+
+export interface EntrySectionMatrix {
+  grains: TrackerClass[];
+  // Only sections some grain can be offered — the ones a settings table would
+  // have a control for. A row every grain ships is a row of "Ships" five times
+  // over, which says nothing the group's own subtitle ("beyond what its grain
+  // ships") has not already said.
+  rows: EntrySection[];
+  cell(sectionId: string, grain: TrackerClass): EntrySectionOffer;
+}
+// The settings tab renders one table from this rather than a headed stack per
+// grain, and it renders NOTHING it decides for itself.
+//
+// WHY THE DECISIONS ARE HERE AND NOT THERE. The suite has no DOM, so anything
+// computed inside a renderer is untestable — and what a grain may be offered is
+// exactly the kind of rule that rots quietly, because a wrong cell looks like a
+// deliberate blank. Hoisting the two calls the renderer already made turns
+// "which controls appear" into a value a test can hold.
+//
+// `grains` is a parameter so the derivation can be tested with a list that is
+// not five long. `test/tracker-grains.test.ts` records the standing claim — "a
+// sixth grain is a table edit away; a layout that only works at five breaks
+// silently the moment the table grows" — and a default of `TRACKER_CLASSES`
+// keeps every real caller reading bare.
+export function entrySectionMatrix(
+  journalKinds?: EntrySectionContext["journalKinds"],
+  grains: TrackerClass[] = [...TRACKER_CLASSES]
+): EntrySectionMatrix {
+  const per = new Map<TrackerClass, { ships: Set<string>; offer: Set<string> }>();
+  for (const grain of grains) {
+    const ships = new Set(sectionsForEntry({ grain }).map((s) => s.id));
+    // THE FENCE TEST IS DEFENSIVE AND CURRENTLY UNREACHABLE, which is worth
+    // writing down because it reads as load-bearing and is not. The only two
+    // sections that are not `shared` — `banner` and `trackers` — ship on all
+    // five grains, so `!ships.has` has already removed them by the time the
+    // fence is asked about. Deleting the clause leaves every test green, and it
+    // was carried over from the code this replaced rather than proven here.
+    //
+    // It stays because the condition it encodes is real: a section in its own
+    // fence is not something a settings toggle can add to a shared one. A
+    // future `fence: "own"` section that does NOT ship everywhere would make
+    // this the only thing standing between the reader and a broken template,
+    // and it would arrive with no test to notice.
+    const offer = new Set(
+      offerableEntrySections({ grain, journalKinds })
+        .filter((s) => !ships.has(s.id) && s.fence === "shared")
+        .map((s) => s.id)
+    );
+    per.set(grain, { ships, offer });
+  }
+  const cell = (sectionId: string, grain: TrackerClass): EntrySectionOffer => {
+    const g = per.get(grain);
+    if (!g) return "absent";
+    if (g.ships.has(sectionId)) return "ships";
+    return g.offer.has(sectionId) ? "offer" : "absent";
+  };
+  return {
+    grains,
+    // Catalogue order, so the table reads in the order an entry is composed.
+    rows: ENTRY_SECTIONS.filter((s) =>
+      grains.some((grain) => cell(s.id, grain) === "offer")
+    ),
+    cell,
+  };
 }
 
 // Which of this entry's sections the note already has, in the order they
@@ -1313,8 +1657,20 @@ export function applyEntrySections(
 // reorder only within one — so the rule that a section cannot cross the rule is
 // enforced by the model, stated in the UI, and needs no surface test in either.
 const BANDS: Record<EntrySection["fence"], string> = {
-  own: "Above the rule",
-  shared: "Below the rule",
+  own: "The banner",
+  // ITS OWN BAND, NOT THE BANNER'S (4.20). Three bands where there were two, and
+  // the third exists for the reason `fence` gives: the grid is above the rule
+  // and is not part of the banner, so it cannot share a band with it — a band is
+  // what the editor lets a row move WITHIN, and one band would let the grid be
+  // dragged back into the card it was just taken out of.
+  trackers: "The trackers",
+  // "THE PAGE BELOW", NOT "BELOW THE RULE" (4.21). Every band on every surface
+  // is named for WHAT IT HOLDS — the banner, the trackers, the overview — and
+  // this one was named for where it sits relative to a horizontal rule the
+  // reader may not have thought of as a landmark. `DIARY_SECTIONS`' third band
+  // has read "The page below" since 4.19; this is the same band on the other
+  // diary surface and now says so.
+  shared: "The page below",
 };
 
 // TAKES THE CONTEXT, as of 3.8 patch 7, where it used to take a section alone.

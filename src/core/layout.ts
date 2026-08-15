@@ -244,12 +244,12 @@ export interface AssetUnit {
 // `header:` is not a unit. It repeats within a note, so it is not a unique key
 // — but it is never independent either: it sits in the same fence as the
 // directive it titles (`header:📖 What the days said` + `entry-rollup`) or in
-// the fence immediately before it (`header:⏳ Open Tasks`, then
+// the fence immediately before it (`header:⏳ Open tasks`, then
 // `tasks-table:,period`). So it is an *attribute of the block it titles*, and
 // keying the content directive alone is enough. A header-only fence is held
 // pending and attached to whatever unit comes next.
 //
-// The consequence worth stating: a user who renames `header:⏳ Open Tasks` to
+// The consequence worth stating: a user who renames `header:⏳ Open tasks` to
 // something of their own keeps it. Headers are never rewritten, only inserted
 // alongside a block that was missing entirely.
 export function assetUnits(assetLines: string[]): AssetUnit[] {

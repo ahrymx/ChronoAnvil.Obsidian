@@ -12,6 +12,7 @@
 // wrong somewhere subtle and patch 4 — where scaffold stops copying and starts
 // composing — must not start.
 
+import { HEADER_PREFIX, TRENDS_HEADING } from "../src/core/constants";
 import { describe, it, expect } from "vitest";
 import { existsSync } from "node:fs";
 import { readCode, readSrc } from "./sources";
@@ -122,7 +123,7 @@ describe("what the catalogue made visible", () => {
     // count, just a loose toolbar that read as belonging to the section above.
     const year = composeDiaryDashboard("yearly");
     expect(year).not.toContain("tasks-table");
-    expect(year).toContain("header:📊 Trends and Statistics");
+    expect(year).toContain(`${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`);
   });
 
   it("titles every grain's charts block the same way", () => {
@@ -132,7 +133,7 @@ describe("what the catalogue made visible", () => {
     // release in which the quarter quietly lost its own.
     for (const g of ["weekly", "monthly", "quarterly", "yearly"] as const) {
       expect(composeDiaryDashboard(g), g).toContain(
-        "```almanac-charts\nheader:📊 Trends and Statistics"
+        `\`\`\`almanac-charts\n${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`
       );
     }
   });
@@ -309,7 +310,7 @@ describe("what a dashboard already has, and what it could gain", () => {
     // section is addable on a dashboard that has everything.
     const ctx = { grain: "weekly" } as const;
     const without = composeDiaryDashboard("weekly").replace(
-      /```almanac\nheader:⏳ Open Tasks\ntasks-table:,period\n```\n\n/,
+      /```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```\n\n/,
       ""
     );
     expect(addableDiarySections(ctx, without).map((s) => s.id)).toEqual([
@@ -323,7 +324,7 @@ describe("what a dashboard already has, and what it could gain", () => {
     // `header:` argument is for, and matching on it would make a renamed
     // section invisible and then offer a second copy of it.
     const retitled = composeDiaryDashboard("weekly").replace(
-      "header:⏳ Open Tasks",
+      "header:⏳ Open tasks",
       "header:📋 Things to do"
     );
     expect(
@@ -339,7 +340,7 @@ describe("what a dashboard already has, and what it could gain", () => {
       renderDiarySection(section as NonNullable<typeof section>, {
         grain: "weekly",
       })
-    ).toBe("```almanac\nheader:⏳ Open Tasks\ntasks-table:,period\n```");
+    ).toBe("```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```");
   });
 
   it("offers nothing for a grain that has no dashboard", () => {
@@ -429,16 +430,28 @@ describe("editing sections routes all three surfaces", () => {
     // it that broke the moment a third caller appeared which is not a command
     // at all — `canEditSections`, the predicate the page title card asks before
     // drawing a control it might have to apologise for.
-    for (const fn of ["async editSectionsHere(", "async addSectionHere("]) {
+    // 4.30 ADDED A THIRD COMMAND AND 4.31 HOISTED THE QUESTION IT ASKS. The
+    // clipboard copy resolved the surface itself until the vault export would
+    // have been a fifth caller — so both now go through `modelForNote`, which is
+    // the door, and the count below does not move for a whole new feature. This
+    // is the reason `surfaceOfNote` stayed private: a second copy of "what kind
+    // of note is this" is the drift this assertion exists to stop.
+    for (const fn of [
+      "async editSectionsHere(",
+      "async addSectionHere(",
+      "  modelForNote(",
+    ]) {
       const at = body.indexOf(fn);
       expect(at, fn).toBeGreaterThan(0);
       const end = body.indexOf("\n  }", at);
       const asks = body.slice(at, end).match(/this\.surfaceOfNote\(notePath\)/g) ?? [];
       expect(asks, fn).toHaveLength(1);
     }
-    // And the third caller is that predicate and nothing else — one line, so it
-    // cannot grow a second opinion about which notes are editable.
-    expect(body.match(/this\.surfaceOfNote\(notePath\)/g) ?? []).toHaveLength(3);
+    // And the remaining caller is that predicate and nothing else — one line, so
+    // it cannot grow a second opinion about which notes are editable. Two
+    // editing commands, the read-only door, and the predicate: four, as of 4.31,
+    // and unchanged by that release adding a vault-wide export.
+    expect(body.match(/this\.surfaceOfNote\(notePath\)/g) ?? []).toHaveLength(4);
     expect(body).toContain("return this.surfaceOfNote(notePath) !== null;");
     // And the refusals are written once rather than once per command. Through
     // readCode, which strips comments: the paragraph above `addSectionHere`

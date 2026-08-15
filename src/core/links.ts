@@ -158,7 +158,7 @@ export function resolveTarget(
         icon: "pencil-line",
         label: "Capture",
         file: null,
-        action: () => openCapture(plugin),
+        action: () => openCapture(plugin, file),
       };
     case "search":
       return {

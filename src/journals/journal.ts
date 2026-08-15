@@ -1087,7 +1087,7 @@ export function ensureJournalsBlock(source: string): string {
     .split("\n")
     .some((l) => l.trim() === JOURNALS_DIRECTIVE);
   if (has) return source;
-  const block = [FENCE_OPEN, JOURNALS_DIRECTIVE, FENCE_CLOSE].join("\n");
+  const block = [FENCE_OPEN, "frame: section", JOURNALS_DIRECTIVE, FENCE_CLOSE].join("\n");
   return `${source.trimEnd()}\n\n${block}\n`;
 }
 

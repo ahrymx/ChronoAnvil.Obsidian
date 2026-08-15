@@ -44,7 +44,10 @@ describe("the search catalogue", () => {
     // The note is named Search, is the target of the ribbon entry and of the
     // "Search the diary" command. A Search note with no search box is a broken
     // link rather than a customisation.
+    // AND THE BANNER, AS OF 4.19 — it carries this page's navigation row now, so
+    // it inherited that row's lock. `bannerSection` argues the trade.
     expect(SEARCH_SECTIONS.filter((s) => s.locked).map((s) => s.id)).toEqual([
+      "banner",
       "search",
     ]);
   });
@@ -55,21 +58,30 @@ describe("the search catalogue", () => {
     for (const s of SEARCH_SECTIONS) expect(s.holds, s.id).toBeUndefined();
   });
 
-  it("keeps the links row inside the search fence", () => {
-    // Not promoted to a section of its own: that would mean inventing a band
-    // for a single row on a note with no masthead. `layout.ts` rewrites
-    // `links:` wherever it finds one, so the row is maintained without a
-    // catalogue entry holding it — which is also what applied 4.10's change to
-    // this line on every note that already existed, with no migration.
+  it("moved the links row out of the search fence and into the banner", () => {
+    // ── THE PARAGRAPH THIS REPLACES WAS WRONG BY 4.19, IN BOTH HALVES ──
     //
-    // FOUND BY WHAT IT HOLDS. It was `fences[0]` until 4.10 put the page head
-    // above it, and position was never what this test was about.
+    // It read: *"Not promoted to a section of its own: that would mean inventing
+    // a band for a single row on a note with no masthead. `layout.ts` rewrites
+    // `links:` wherever it finds one, so the row is maintained without a
+    // catalogue entry holding it."*
+    //
+    // The first half stopped applying when the banner arrived: there is no band
+    // to invent, because the row joins the section that draws the page's name.
+    // The second half stopped being TRUE in 4.18, when repair moved onto
+    // `SectionModel` — `MANAGED_ARGS` is read only by `planLayout`/`applyLayout`,
+    // and no composed note reaches those any more. So the row was maintained by
+    // nothing, and belonged to a section a reader could remove.
     const fences = segment(search().split("\n")).filter((s) => s.kind === "fence");
-    const box = fences
-      .map((f) => f.lines.join("\n"))
-      .find((f) => f.includes("diary-search"))!;
-    expect(box).toContain("links:today,scopes#diary");
-    expect(box).toContain("diary-search");
+    const at = (probe: string): string =>
+      fences.map((f) => f.lines.join("\n")).find((f) => f.includes(probe))!;
+
+    const box = at("diary-search");
+    expect(box).not.toContain("links:");
+    expect(box).toContain("header:🔎 Search the diary");
+
+    const banner = at("title:");
+    expect(banner).toContain("links:today,scopes#diary");
     // `home` moved to the head rather than being dropped — the pairing this
     // release has to keep true on every page that gave the pill up.
     expect(search()).toContain("title:home,diary,journals");
@@ -159,7 +171,7 @@ describe("the two flat notes, where they overlap", () => {
     const shared = HOME_SECTIONS.map((s) => s.id).filter((id) =>
       SEARCH_SECTIONS.some((s) => s.id === id)
     );
-    expect(shared).toEqual(["title", "on-this-day"]);
+    expect(shared).toEqual(["banner", "on-this-day"]);
   });
 });
 
@@ -199,7 +211,7 @@ describe("the search model", () => {
 
   it("refuses to remove the search box, and names the fix", () => {
     const why = model.refusal("search", search());
-    expect(why).toContain("cannot be removed");
+    expect(why).toContain("can't be removed");
     expect(why).toContain("move it");
   });
 
@@ -227,20 +239,22 @@ describe("the search model", () => {
     // reason `FlatSection` grew a flag instead of a band model.
     for (const v of model.sections()) {
       expect(v.group, v.id).toBeNull();
-      if (v.id === "title") continue;
+      if (v.id === "banner") continue;
       expect(v.movable, v.id).toBe(true);
     }
   });
 
-  it("fixes the page title in place, and still lets it go", () => {
-    const head = model.sections().find((v) => v.id === "title")!;
+  it("fixes the banner in place, and no longer lets it go", () => {
+    const head = model.sections().find((v) => v.id === "banner")!;
     expect(head.movable).toBe(false);
-    expect(head.removable).toBe(true);
-    expect(model.refusal("title", search())).toBeNull();
+    expect(head.removable).toBe(false);
+    // AND IT NO LONGER LETS IT GO (4.19). The banner carries this page's
+    // navigation row, so `links`' lock travels with it — see `bannerSection`.
+    expect(model.refusal("banner", search())).not.toBeNull();
     // And a `want` that asks for it last is not a move.
     const ids = SEARCH_SECTIONS.map((s) => s.id);
     expect(
-      model.apply(search(), [...ids.filter((id) => id !== "title"), "title"])
+      model.apply(search(), [...ids.filter((id) => id !== "banner"), "banner"])
     ).toBeNull();
   });
 });

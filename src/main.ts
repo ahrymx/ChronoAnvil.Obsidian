@@ -27,6 +27,7 @@ import {
 import { danglingTypeIds } from "./trackers/trackers";
 import { Charts } from "./charts/charts-manager";
 import { EntryTrackers } from "./trackers/entry-tracker-manager";
+import { EntryTemplates } from "./diary/entry-template-manager";
 import { normalizeTrackers } from "./trackers/trackers";
 import { JournalCharts } from "./charts/journal-charts-manager";
 import { JournalImporter } from "./journals/journal-import";
@@ -49,6 +50,11 @@ export default class AlmanacPlugin extends Plugin {
   // each logging cell. Settings decides what every *new* entry starts with;
   // this decides what *this* entry carries.
   entryTrackers!: EntryTrackers;
+  // The Template window's writes: this page as a grain's default, as a named
+  // layout, or a template written back over this page. Settings decides which
+  // sections a new entry starts with; `entryTrackers` decides what THIS entry
+  // carries; this decides what the template itself is.
+  entryTemplates!: EntryTemplates;
   widgets!: Widgets;
   scaffold!: Scaffold;
   sections!: SectionInserter;
@@ -103,6 +109,7 @@ export default class AlmanacPlugin extends Plugin {
     this.charts = new Charts(this.app, this);
     this.journalCharts = new JournalCharts(this.app, this);
     this.entryTrackers = new EntryTrackers(this.app, this);
+    this.entryTemplates = new EntryTemplates(this.app, this);
     this.widgets = new Widgets(this.app, this);
     this.scaffold = new Scaffold(this.app, this);
     this.sections = new SectionInserter(this.app, this);
@@ -144,7 +151,46 @@ export default class AlmanacPlugin extends Plugin {
       // re-registers the very type those trackers name, so reporting first
       // would warn about scopes that are about to become valid again.
       void this.importJournalsThenReport();
+      void this.checkUpgrade();
     });
+  }
+
+  // Check whether Almanac was upgraded from a previous version, and prompt
+  // the reader if layout repairs, format migrations, or template updates
+  // are available to review.
+  private async checkUpgrade(): Promise<void> {
+    const installed = this.settings.installedVersion;
+    const current = this.manifest.version;
+
+    if (installed === current) return;
+
+    // Check if the vault is initialized with any Almanac folders
+    const p = this.settings.paths;
+    const isInitialized = Boolean(
+      this.app.vault.getAbstractFileByPath(p.staging) ||
+      this.app.vault.getAbstractFileByPath(p.diaryDaily)
+    );
+
+    if (isInitialized && installed !== undefined) {
+      try {
+        const { survey } = await this.scaffold.surveyRepair();
+        const count = survey.groups
+          .filter((g) => g.id !== "create")
+          .reduce((acc, g) => acc + g.items.length, 0);
+
+        if (count > 0) {
+          new Notice(
+            `Almanac: updated to v${current} — ${count} update(s) available. Run 'Set up / repair vault' to review.`,
+            10000
+          );
+        }
+      } catch (e) {
+        console.error("[Almanac] upgrade repair check failed", e);
+      }
+    }
+
+    this.settings.installedVersion = current;
+    await this.saveSettings();
   }
 
   // Put a recognised page into reading mode, if it is not already.

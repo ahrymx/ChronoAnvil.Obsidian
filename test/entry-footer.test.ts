@@ -5,7 +5,16 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// 3.7: the entry card grows the footer the overview card already had.
+// 3.7: the entry card grows the footer the overview card already had — and
+// 4.21, where that footer became the tracker section's page-context strip.
+//
+// WHAT 4.21 CHANGED AND WHAT IT KEPT. 4.20 settled that a banner is the file's
+// name, its navigation and the cog; 4.21 acted on it. The alias title and the
+// date stepper left the banner and joined the tracker section as its head strip;
+// the cog went the other way, up into the banner beside the name it acts on.
+//
+// The three failure modes below are unchanged, because they are about the SEAM
+// rather than about where the seam is:
 //
 // Another visual release, and masthead.test.ts's opening note applies here
 // unchanged: what a suite can hold is not the look but everything the look
@@ -31,32 +40,216 @@ import { CLASS_DEFS, TRACKER_CLASSES } from "../src/trackers/trackers";
 describe("the controls leave the title band", () => {
   const entry = () => readCode("entryheader");
 
-  it("builds the footer as its own element, beside the header", () => {
-    expect(entry()).toContain("export function buildEntryFooter(");
-    expect(entry()).toContain('cls: "journal-widget-bar journal-entry-actions"');
+  it("builds the strip as its own element, beside the header", () => {
+    expect(entry()).toContain("export function buildEntryContext(");
+    expect(entry()).toContain('cls: "journal-widget-bar journal-entry-context"');
   });
 
-  it("and the header keeps nothing but the title", () => {
+  it("and the banner keeps the file's name, the cog, and nothing else", () => {
     // The row that used to hold them. Its class is gone from the stylesheet
     // too, so a stray copy would render unstyled rather than looking right.
     expect(entry()).not.toContain("jeh-controls");
     expect(readCss()).not.toContain("jeh-controls");
-    // The stepper is assembled once, in the footer. `buildEntryHeader` runs
+    // The stepper is assembled once, on the strip. `buildEntryHeader` runs
     // inside a LiveWidget; a second copy there is a second stepper.
     expect(entry().match(/buildDatePicker\(plugin, navGroup/g) ?? []).toHaveLength(1);
     const head = entry().slice(
       entry().indexOf("export function buildEntryHeader("),
-      entry().indexOf("export function buildEntryFooter(")
+      entry().indexOf("export function buildEntryContext(")
     );
     expect(head).not.toContain("navPill(");
-    expect(head).not.toContain("attachEntryMenu(");
+
+    // ── THE NAME IS THE FILE'S (4.21) ───────────────────────────────
+    //
+    // The banner drew the `title` FRONTMATTER PROPERTY until this release,
+    // falling back to a formatted date — so an entry was the one Almanac page
+    // whose banner did not show what the note is called, against a rule
+    // `page-title.ts` had already settled for every other surface. The alias is
+    // not deleted; it is on the strip, where the entry's other facts are.
+    expect(head).toContain("attachNoteRename(app, titleWrap, file");
+    expect(head).not.toContain("TITLE_PROP");
   });
 
-  it("and the `⋯` goes with it, through the same shared button", () => {
+  it("and the cog comes UP into the banner, through the same shared button", () => {
     // discoverability.test.ts asserts the control exists and that its guard
-    // comes first. This one asserts it moved: same call, new host.
-    const foot = entry().slice(entry().indexOf("export function buildEntryFooter("));
-    expect(foot).toContain("attachEntryMenu(plugin, bar,");
+    // comes first. This one asserts where it is: beside the name it acts on,
+    // rather than under the logging grid two bands away from it.
+    const head = entry().slice(
+      entry().indexOf("export function buildEntryHeader("),
+      entry().indexOf("export function buildEntryContext(")
+    );
+    expect(head).toContain("attachEntryMenu(plugin, wrap,");
+    const strip = entry().slice(entry().indexOf("export function buildEntryContext("));
+    expect(strip).not.toContain("attachEntryMenu(");
+  });
+
+  it("puts the alias on the strip rather than in the banner", () => {
+    const strip = entry().slice(entry().indexOf("export function buildEntryContext("));
+    expect(strip).toContain("TITLE_PROP");
+    expect(strip).toContain("buildDatePicker(plugin, navGroup");
+  });
+
+  it("and gives the rename a wrapper of its own, so it cannot eat the cog", () => {
+    // ── THE TRAP `attachNoteRename` SETS FOR ITS CALLERS (4.21.1) ────
+    //
+    // It swaps the name for an input with `row.empty()` and swaps it back the
+    // same way, so anything else parented in the row it is handed is destroyed
+    // by the first rename and does not come back. That is silent: the banner
+    // renders correctly, and the cog disappears the first time someone renames
+    // their note and never returns until the file is reopened.
+    //
+    // All three banners take the same precaution — the name goes in a wrapper
+    // and the control goes beside the wrapper — and it is asserted here because
+    // the natural way to write the flip that put the cog in the leaf's title row
+    // is the way that walks into it.
+    for (const [file, wrapper] of [
+      ["entryheader", "titleWrap"],
+      ["study-header", "titleWrap"],
+      ["page-title", "titleRow"],
+    ] as const) {
+      const src = readCode(file);
+      expect(src, file).toContain(`attachNoteRename(`);
+      // Whatever the wrapper is called, it is not the element the control is
+      // attached to: `wrap`/`row` hold both, the wrapper holds only the name.
+      const call = new RegExp(`attachNoteRename\\((?:plugin\\.)?app, ${wrapper},`);
+      expect(src, file).toMatch(call);
+    }
+    // And the two that carry a cog put it on the PARENT of that wrapper.
+    expect(readCode("entryheader")).toContain("attachEntryMenu(plugin, wrap,");
+    expect(readCode("study-header")).toContain(
+      "attachBannerMenu(plugin, titleRow,"
+    );
+  });
+});
+
+describe("the two slim banners are one banner (4.21.1)", () => {
+  it("draws the name band before the row of destinations, on both", () => {
+    // THE ARRANGEMENT WAS TWO ARRANGEMENTS. The page banner opened with the
+    // note's name and welded its destinations beneath; both slim banners opened
+    // with navigation and put the name under it. One concept, drawn three ways
+    // on nine surfaces.
+    //
+    // A LEAF FLIPS IN ITS BUILDER, because its two bands are that builder's own
+    // children and their order is source order.
+    const leaf = readCode("study-header");
+    const head = leaf.slice(leaf.indexOf("export function buildStudyHeader("));
+    expect(head.indexOf('cls: "jsh-titlerow')).toBeGreaterThan(0);
+    expect(head.indexOf('cls: "jsh-titlerow')).toBeLessThan(
+      head.indexOf('cls: "jsh-nav')
+    );
+
+    // AN ENTRY FLIPS IN THE DOM, because its nav band is a separate widget and
+    // the fence composes `links:` above `entry-header`. Swapping the composed
+    // lines would need a migration — repair is additive-and-retired-only — and
+    // until every note took it the vault would hold BOTH arrangements, which is
+    // the defect rather than the fix. Moving the node changes no file and keeps
+    // reading order equal to screen order, which a CSS `order` would not.
+    const w = readCode("widgets");
+    const at = w.indexOf("if (isEntryBanner) {");
+    expect(at).toBeGreaterThan(0);
+    const move = w.slice(at, w.indexOf("// ── THE CHROME", at));
+    expect(move).toContain("container.insertBefore(host, nav)");
+    expect(move).toContain('addClass("journal-banner-nav")');
+    expect(w).not.toContain("order: 2");
+  });
+
+  it("and the caption goes on the section, never on a banner", () => {
+    // Every entry composed before 4.20 keeps its markers in the banner's fence,
+    // where the grid is welded to the name band — captioning it there would be
+    // labelling part of a banner. The guard is `chromeClasses`', spelled the
+    // same way, so the caption and the card cannot disagree about which blocks
+    // are the section.
+    const w = readCode("widgets");
+    const at = w.indexOf("buildTrackerHead(this.plugin, ctx, grain)");
+    expect(at).toBeGreaterThan(0);
+    const guard = w.slice(w.lastIndexOf("if (", at), at);
+    for (const flag of ["isEntryBanner", "isStudyBanner", "isPageBanner"]) {
+      expect(guard, flag).toContain(`!${flag}`);
+    }
+    expect(guard).toContain("hasTrackerRegion");
+  });
+
+  it("and the caption row is live, because the strip above it cannot be", () => {
+    // ── WHY ONE OF THEM REPAINTS AND THE OTHER MUST NOT ─────────────
+    //
+    // The caption row reads the note's own frontmatter for the date, and
+    // Obsidian has not always indexed a note it has just created by the time the
+    // postprocessor runs — which is how a fresh daily entry drew its caption
+    // with no date. A LiveWidget repaints on the next metadata change.
+    //
+    // The page-context strip cannot take the same treatment, and this is the
+    // distinction the whole file is about: the alias editor WRITES frontmatter,
+    // so a live host would rebuild the input the reader is typing in.
+    const w = readCode("widgets");
+    const at = w.indexOf("buildTrackerHead(this.plugin, ctx, grain)");
+    expect(w.slice(at - 200, at)).toContain("liveFrontmatterWidget");
+    const strip = w.indexOf("buildEntryContext(this.plugin, ctx)");
+    expect(w.slice(strip - 200, strip)).not.toContain("liveFrontmatterWidget");
+  });
+
+  it("and saving puts the band back, because nothing else will (4.21.3)", () => {
+    // ── THE BUG: ENTER WROTE THE FILE AND LEFT THE FIELD OPEN ───────
+    //
+    // Only the CANCEL branch restored the rendered band. The SAVE branch wrote
+    // frontmatter and returned, on the unstated assumption that something would
+    // re-render the strip — and nothing does, because this strip is deliberately
+    // not a LiveWidget (a live host would rebuild the input mid-edit). Leaving
+    // the note and coming back "fixed" it, because that is the rebuild the code
+    // had been waiting for.
+    const src = readCode("entryheader");
+    const at = src.indexOf("const commit = async (save: boolean)");
+    expect(at).toBeGreaterThan(0);
+    const commit = src.slice(at, src.indexOf("input.addEventListener", at));
+    // ONE RESTORE, AFTER EITHER OUTCOME — not a second copy in the save branch,
+    // which is how the two would start disagreeing about what "restored" means.
+    expect(commit.match(/renderTitle\(\);/g) ?? []).toHaveLength(1);
+    expect(commit).toContain("titleWrap.appendChild(titleEl)");
+    // And the captured value is updated, or the band it re-renders would show
+    // what was there before the edit.
+    expect(commit).toContain("title = next;");
+    expect(src).toContain("let title = typeof fm[TITLE_PROP]");
+    // The state class is CLEARED as well as set: `titleEl` is the same element
+    // across renders, so a note that was empty when the strip was built would
+    // otherwise draw its first saved title in the "nothing here yet" face.
+    expect(src).toContain('titleEl.removeClass("jec-title-empty")');
+    // AND NOTHING IS WRITTEN WHEN NOTHING WOULD CHANGE: a no-op
+    // `processFrontMatter` still moves the file's modified time, which sync then
+    // propagates as a change the reader did not make.
+    expect(commit).toContain("if (next !== title)");
+  });
+
+  it("and the field a click opens is the width of the words it is editing", () => {
+    // The CSS half of this is the selector weight (appearance.test.ts). The
+    // other half is the WIDTH, and it cannot be CSS: an input's box comes from
+    // its `size` attribute, and the wrapper around it is shrink-to-fit — it
+    // carries the `margin-right: auto` that pushes the navigator to the far edge
+    // — so a percentage width would resolve against a box the input is itself
+    // sizing.
+    const src = readCode("entryheader");
+    expect(src).toContain("input.size = Math.max(input.value.length + 1, 18)");
+    // AND IT TRACKS WHAT IS TYPED, so a title that outgrows the field widens it
+    // rather than scrolling its own beginning out of view.
+    expect(src).toContain('input.addEventListener("input", fit)');
+  });
+
+  it("and a date it cannot read is drawn as nothing, not as the grain's name", () => {
+    // THE REPORT: a new daily entry's caption read **"Daily"** and became
+    // "Fri 14 Aug 2026" the moment a title was saved. `subtitleFor` fell back to
+    // `entryContext`'s `dateTitle`, which is `CLASS_DEFS[grain].label` when
+    // there is no key — so a page-kind noun was standing in for a date.
+    //
+    // AND IT WAS PERMANENT ON THREE GRAINS, not just cold-cache-brief on one:
+    // that function read `journal-date` alone, while weekly, quarterly and
+    // yearly entries keep their key under `week-start` / `quarter-start` /
+    // `year-start`. It was the third copy of a lookup `entryDateKey` now owns.
+    const src = readCode("entryheader");
+    expect(src).not.toContain("function subtitleFor(");
+    expect(src).toContain("entryDateKey(frontmatterOf(app, file), grain)");
+    expect(src).toContain("if (!key) return null;");
+    // The one lookup, and the two other callers that had it right now share it
+    // rather than spelling it a second and third time.
+    expect(readCode("nav")).toContain("export function entryDateKey(");
+    expect(src.match(/def\.dateProperty/g) ?? []).toHaveLength(0);
   });
 });
 
@@ -68,31 +261,43 @@ describe("the footer is welded by the block that owns the card", () => {
     // which is to say, every time the reader edits the title the footer is
     // there to sit beneath.
     const w = readCode("widgets");
-    expect(w).toContain("buildEntryFooter(this.plugin, ctx)");
-    expect(w).toContain("container.appendChild(footer)");
+    expect(w).toContain("buildEntryContext(this.plugin, ctx)");
+    expect(w).toContain("container.appendChild(strip)");
   });
 
-  it("after the grid and after the add tile, which is what makes it a footer", () => {
-    // Appending before either would put it in the middle of the card — the
-    // exact placement 3.7 exists to undo, one band lower down.
+  it("heads the tracker section on a new note and foots the banner on an old one", () => {
+    // ONE CONDITION, BOTH SHAPES. A note composed by 4.20 or later keeps its
+    // markers in a fence of their own, so the strip heads that block; every
+    // entry that already exists keeps them in the banner's fence, so the strip
+    // is the footer it has been since 3.7 — under the grid, where that release
+    // put it. Neither reader sees anything move, and nothing is migrated.
     const w = readCode("widgets");
-    const tile = w.indexOf("buildTrackerAddCell(this, ctx)");
-    const footer = w.indexOf("buildEntryFooter(this.plugin, ctx)");
-    expect(tile).toBeGreaterThan(0);
-    expect(footer).toBeGreaterThan(tile);
+    const at = w.indexOf("buildEntryContext(this.plugin, ctx)");
+    const after = w.slice(at, at + 260);
+    expect(after).toContain("if (isEntryBanner) container.appendChild(strip)");
+    expect(after).toContain("else container.prepend(strip)");
   });
 
-  it("and only on an entry card", () => {
+  it("and only where there is a tracker region, and only on a diary entry", () => {
+    // `hasTrackerRegion` is true on a journal note too — 4.20 gave that surface
+    // a tracker section as well — and an entry's strip would tell it which day
+    // it was.
     const w = readCode("widgets");
-    const at = w.indexOf("buildEntryFooter(this.plugin, ctx)");
-    expect(w.slice(at - 200, at)).toContain("if (isEntryBanner) {");
+    const at = w.indexOf("buildEntryContext(this.plugin, ctx)");
+    const guard = w.slice(at - 400, at);
+    expect(guard).toContain("hasTrackerRegion");
+    expect(guard).toContain("entryContextFor(ctx.sourcePath)");
   });
 });
 
+// THE OLD SHAPE'S LOOK, WHICH 4.21 DID NOT TOUCH. Every entry that already
+// exists keeps its markers in the banner's fence, so the strip is still that
+// card's footer there — same band, same rules, renamed class. What follows
+// asserts the shape a reader's existing notes still render in.
 describe("the band reads as a footer and not as the overview's", () => {
   const css = readCss();
   const rule = (): string => {
-    const at = css.indexOf(".journal-entry-banner > .journal-widget-bar.journal-entry-actions");
+    const at = css.indexOf(".journal-entry-banner > .journal-widget-bar.journal-entry-context");
     expect(at).toBeGreaterThan(0);
     return css.slice(at, css.indexOf("}", at));
   };
@@ -113,27 +318,37 @@ describe("the band reads as a footer and not as the overview's", () => {
     // The grid's own `-12px` bottom margin welds it to the card's edge. With a
     // footer under it that margin pulls it THROUGH the footer's top rule.
     expect(css).toContain(
-      ".journal-entry-banner:has(> .journal-entry-actions) .journal-tracker-bar"
+      ".journal-entry-banner:has(> .journal-entry-context) .journal-tracker-bar"
     );
   });
 
   it("and the trailing control pushes rather than the bar splitting", () => {
-    // `space-between` would strand the stepper mid-row on a managed template,
-    // where the `⋯` is deliberately not drawn at all.
-    const at = css.indexOf(".journal-entry-actions > .jeh-more");
-    expect(at).toBeGreaterThan(0);
-    expect(css.slice(at, css.indexOf("}", at))).toContain("margin-left: auto");
+    // `space-between` would strand the alias mid-row on a note with no
+    // navigator, which is the shape this band has always had to survive.
     expect(rule()).not.toContain("space-between");
+    // AND THERE IS EXACTLY ONE AUTO MARGIN IN THE ROW (4.21.1). Flexbox does
+    // not let two of them compete — it splits the free space equally between
+    // them — so a second one does not lose, it parks its element half way
+    // along the band. 4.21 left one on the alias wrapper and one on the cog,
+    // and 4.21.1 took the control's when the control moved to the banner.
+    const push = ".jec-title-wrap";
+    const at = css.indexOf(`\n${push} {`);
+    expect(at, push).toBeGreaterThan(0);
+    expect(css.slice(at, css.indexOf("}", at))).toContain("margin-right: auto");
+    expect(css).not.toContain(".journal-entry-context > .jeh-more,");
   });
 
   it("and the control it holds can still be revealed by hovering the card", () => {
-    // The `⋯` is faint until hover. Its reveal was scoped to the title band,
-    // which is a hover target it is no longer inside.
-    expect(css).toContain(".journal-entry-banner:hover .jeh-more");
+    // The `⋯` is faint until hover, and the rule that reveals it names the CARD
+    // rather than a band inside it. That distinction has been got wrong twice —
+    // once after 3.7 moved the control to the footer and once after 4.21 moved
+    // it to the name band — and both times the control simply never lit.
+    expect(css).toContain(".journal-slim-banner:hover .jeh-more");
+    expect(css).toContain(".journal-slim-banner:hover .jsh-more");
   });
 
   it("and the date list opens over the card rather than off its edge", () => {
-    const at = css.indexOf(".journal-entry-actions .jeh-datenav-menu");
+    const at = css.indexOf(".journal-entry-context .jeh-datenav-menu");
     expect(at).toBeGreaterThan(0);
     const menu = css.slice(at, css.indexOf("}", at));
     expect(menu).toContain("bottom: calc(100% + 6px)");
@@ -142,13 +357,25 @@ describe("the band reads as a footer and not as the overview's", () => {
 });
 
 describe("the title band is given room for the title", () => {
-  it("pads evenly, now that it holds one line instead of two", () => {
+  it("pads evenly, and on one rule for both slim banners", () => {
+    // 3.7 GAVE THE ENTRY'S BAND ITS OWN 20/19 PADDING and the reason still
+    // holds: the band holds one line, sitting between two hairlines with
+    // nothing anchored to either edge, so an asymmetric inset reads as the
+    // title having slipped rather than as emphasis.
+    //
+    // WHAT CHANGED IN 4.21.1 IS WHERE IT IS WRITTEN. That rule was an entry's
+    // alone, which is how the leaf's band ended up 24px shorter under a comment
+    // claiming the two matched. The air belongs to the band, not to the page
+    // kind, so it is on the shared class and there is nowhere left for one of
+    // them to keep a private copy.
     const css = readCss();
-    const at = css.lastIndexOf(".journal-entry-banner .journal-entry-header {");
+    const at = css.indexOf(".journal-slim-banner .journal-banner-name {");
     expect(at).toBeGreaterThan(0);
     const rule = css.slice(at, css.indexOf("}", at));
-    expect(rule).toContain("padding-top");
-    expect(rule).toContain("padding-bottom");
+    const pad = /padding:\s*(\d+)px\s+\d+px\s+(\d+)px/.exec(rule);
+    expect(pad, "no shorthand padding on the name band").not.toBeNull();
+    // Even, to within the optical correction a cap-height line wants.
+    expect(Math.abs(Number(pad?.[1]) - Number(pad?.[2]))).toBeLessThanOrEqual(1);
   });
 });
 

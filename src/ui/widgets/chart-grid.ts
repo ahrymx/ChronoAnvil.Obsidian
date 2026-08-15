@@ -33,6 +33,18 @@ import { LiveWidget } from "../livewidget";
 import { HeaderBar } from "../headerbar";
 import { sectionFrame } from "../section-frame";
 
+// What the charts region says with no `chart:` lines in it.
+//
+// EXPORTED BECAUSE THERE ARE TWO OF THESE REGIONS — 4.25 §2. `buildChartGrid`
+// here and `buildJournalChartStack` in widgets/index.ts are separate render
+// paths for the same fence, and each had written this sentence out for itself.
+// The empty state is deliberately hand-rolled rather than an `emptyCallout`
+// (test/empty-states.test.ts names it as one of the two survivors, and says
+// why) — but "hand-rolled" was never meant to mean "written twice". Two copies
+// of one sentence drift the moment anyone improves one of them, and only the
+// copy in this file is the one the dashboard test pins.
+export const CHART_GRID_EMPTY = "No charts yet — use Add chart above.";
+
 export function buildChartGrid(
   deps: EntryControlHost,
   container: HTMLElement,
@@ -93,7 +105,7 @@ export function buildChartGrid(
   if (specs.length === 0) {
     container.createDiv({
       cls: "journal-chart-empty",
-      text: "No charts yet — use Add chart above.",
+      text: CHART_GRID_EMPTY,
     });
     return;
   }

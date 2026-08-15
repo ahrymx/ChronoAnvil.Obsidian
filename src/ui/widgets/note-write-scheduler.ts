@@ -39,7 +39,18 @@ export interface NoteWriteTarget {
   writeNoteRegionToFile(
     ctx: MarkdownPostProcessorContext,
     key: string,
-    value: string
+    value: string,
+    // The region text the caller's buffer was derived from, when the caller
+    // has one. Carried through untouched so the write can tell an append that
+    // arrived underneath the buffer from an edit to the buffer itself (4.27 §1).
+    //
+    // OPTIONAL, AND ABSENT IS A REAL ANSWER. The list-shaped widgets — entries,
+    // tasks, attachments, recall — serialise a whole structure they did not read
+    // as text, so they have no baseline to offer and must not pretend one:
+    // treating "" as their baseline would make every write look like it had the
+    // entire region appended under it. Absent means "do not merge", which is
+    // exactly what those five callers did before this parameter existed.
+    baseline?: string
   ): Promise<void>;
 }
 
@@ -72,26 +83,37 @@ export class NoteWriteScheduler {
   schedule(
     ctx: MarkdownPostProcessorContext,
     key: string,
-    value: string
+    value: string,
+    baseline?: string
   ): void {
     const tk = this.keyFor(ctx, key);
     const existing = this.timers.get(tk);
     if (existing != null) window.clearTimeout(existing);
     const timer = window.setTimeout(() => {
       this.timers.delete(tk);
-      void this.target.writeNoteRegionToFile(ctx, key, value);
+      void this.target.writeNoteRegionToFile(ctx, key, value, baseline);
     }, NoteWriteScheduler.DEBOUNCE_MS);
     this.timers.set(tk, timer);
   }
 
-  /** Write now, cancelling anything queued. Used on blur, where waiting is wrong. */
-  flush(ctx: MarkdownPostProcessorContext, key: string, value: string): void {
+  /**
+   * Write now, cancelling anything queued. Used on blur, where waiting is wrong.
+   *
+   * Returns the write rather than voiding it (4.27) so a caller that needs to
+   * act after the bytes have landed can. Nothing is obliged to await it.
+   */
+  flush(
+    ctx: MarkdownPostProcessorContext,
+    key: string,
+    value: string,
+    baseline?: string
+  ): Promise<void> {
     const tk = this.keyFor(ctx, key);
     const existing = this.timers.get(tk);
     if (existing != null) {
       window.clearTimeout(existing);
       this.timers.delete(tk);
     }
-    void this.target.writeNoteRegionToFile(ctx, key, value);
+    return this.target.writeNoteRegionToFile(ctx, key, value, baseline);
   }
 }

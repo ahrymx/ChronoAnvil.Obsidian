@@ -19,11 +19,16 @@ import {
 } from "./util";
 import { composeDiaryDashboard } from "../diary/diary-sections";
 import { DEFAULT_PATHS } from "./constants";
-import { mergeEntryFences } from "../trackers/entry-trackers";
+import { splitEntryFences } from "../trackers/entry-trackers";
+import { mergeBannerFences } from "./note-sections";
 import { CLASS_DEFS, TRACKER_CLASSES } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
 import type { SectionWant } from "./section-model";
-import { composeEntryTemplate } from "../diary/entry-sections";
+import {
+  composeEntryTemplate,
+  ENTRY_SECTIONS,
+  detectEntrySections,
+} from "../diary/entry-sections";
 import {
   JournalConfig,
   buildJournalType,
@@ -39,10 +44,13 @@ import {
 } from "../journals/journal-sections";
 import type { SectionContext } from "../journals/journal-sections";
 import { sectionsPresent } from "../journals/journal-plan";
-import { confirmAction } from "../ui/modals";
-import { migrateTrends, migrateTrendsHeader } from "../charts/charts";
+import {
+  migrateTrends,
+  migrateTrendsHeader,
+  migrateTrendsTitle,
+} from "../charts/charts";
 import { applyLayout, planLayout } from "./layout";
-import { RepairOp, pendingGroups, repairNote } from "./repair-plan";
+import { RepairOp, repairNote } from "./repair-plan";
 import type {
   RepairFileChange,
   RepairGroupId,
@@ -61,6 +69,7 @@ import { manifestCarriesTracker } from "../journals/journal-import";
 import {
   ensureTrendsHeader,
   mergeTrendsSection,
+  retitleTrends,
 } from "../charts/charts";
 import { eventsNoteTemplate } from "../events/eventstore";
 import {
@@ -202,9 +211,18 @@ export function isReconcilable(note: ShippedNote): boolean {
 // `AlmanacSettings.entrySections`. Defaulted to none rather than made required,
 // because the three call sites in this file all have it and the shape of the
 // list is a fact about a configured vault, not about what the plugin ships.
+//
+// `orders` is the other half of the same fact as of 4.29 —
+// `AlmanacSettings.entrySectionBand`, which decides the shared band's ORDER
+// where `extras` decides its membership. Defaulted for the same reason, and it
+// must travel with `extras` everywhere: a caller that passed one and not the
+// other would compose a template that differs from the one on disk by a
+// reorder, and `surveyDiaryTemplatesDrift` would then offer to undo every save
+// the reader had made.
 export function shippedNotes(
   p: typeof DEFAULT_PATHS,
-  extras: Partial<Record<TrackerClass, readonly SectionWant[]>> = {}
+  extras: Partial<Record<TrackerClass, readonly SectionWant[]>> = {},
+  bands: Partial<Record<TrackerClass, readonly string[]>> = {}
 ): ShippedNote[] {
   return [
     // COMPOSED AS OF 3.11 §1, and `assets/home.md` is gone with it. The same
@@ -267,7 +285,7 @@ export function shippedNotes(
     // which is an edit to a template you cannot make to a file the plugin only
     // copies.
     ...TRACKER_CLASSES.map((cls) => ({
-      content: composeEntryTemplate(cls, extras[cls] ?? []),
+      content: composeEntryTemplate(cls, extras[cls] ?? [], bands[cls] ?? []),
       dest: `${p.templatesDiary}/${CLASS_DEFS[cls].templateFile}`,
       template: true,
     })),
@@ -342,23 +360,49 @@ export class Scaffold {
   // silently keeps the old page forever. Testing for what the page should
   // contain catches every older layout, including the ones between 2.8 and
   // 2.13.7 that had `home-hero` and `diary-links` as separate blocks.
-  // Fold the tracker fence into the entry banner across every existing entry.
+  // Separate the tracker grid from the entry banner across existing entries (4.20+ format).
   // Both diary folders, because a monthly review gains a banner of its own the
   // moment it has trackers to show. Failures are logged per note and never stop
   // the walk — one unparseable entry shouldn't abort a repair.
-  private async mergeEntryBanners(): Promise<void> {
+  private async splitEntryBanners(): Promise<void> {
     const p = this.paths;
     for (const root of [p.diaryDaily, p.diaryMonthly]) {
       for (const file of filesUnder(this.app, root)) {
         try {
           const original = await this.app.vault.read(file);
-          const merged = mergeEntryFences(original);
-          if (merged != null) await this.app.vault.modify(file, merged);
+          const split = splitEntryFences(original);
+          if (split != null) await this.app.vault.modify(file, split);
         } catch (e) {
           console.error(`[Almanac] entry banner migration failed for ${file.path}`, e);
         }
       }
     }
+  }
+
+  // One composed page's banner, welded from two fences into one. 4.19.
+  //
+  // `mergeEntryBanners` ONE METHOD UP IS THE SHAPE THIS COPIES, and deliberately
+  // so: read, call a pure function, write only on a non-null answer. That one
+  // performed the same merge on an entry in 3.2 — the nav strip and the tracker
+  // grid becoming one card — so this is the fourth surface to have it done and
+  // the second to have it done by a migration.
+  //
+  // TAKES A PATH RATHER THAN WALKING A FOLDER, because the caller already has
+  // the list: `shippedNotes(...).filter(isReconcilable)` is the set of pages
+  // this plugin composes, which is exactly the set that can have a banner. The
+  // entry version walks two folders because entries are a reader's files and
+  // there is no list of them.
+  //
+  // ERRORS ARE THE CALLER'S. It runs inside the same `try` as the two Trends
+  // migrations, so one page's failure does not stop the others — and a page
+  // that throws here is a page left exactly as it was, which is the right
+  // outcome for a migration nobody has to run.
+  private async weldBanner(path: string): Promise<void> {
+    const file = getFile(this.app, path);
+    if (!(file instanceof TFile)) return;
+    const original = await this.app.vault.read(file);
+    const welded = mergeBannerFences(original);
+    if (welded != null) await this.app.vault.modify(file, welded);
   }
 
   // Overwrite the shipped diary assets with the current bundled versions,
@@ -375,32 +419,138 @@ export class Scaffold {
   // The overviews are excluded: they hold user chart definitions in their
   // `almanac-charts` regions, so blowing them away costs real work. Templates
   // are the ones under active development and are cheap to lose.
-  async refreshTemplates(): Promise<void> {
-    const p = this.paths;
-    // Every class's diary template, derived from the class table so a new
-    // class is scaffolded and refreshed without a second edit here.
-    const extras = this.plugin.settings.entrySections ?? {};
-    const files = TRACKER_CLASSES.map((cls) => ({
-      content: composeEntryTemplate(cls, extras[cls] ?? []),
-      dest: `${p.templatesDiary}/${CLASS_DEFS[cls].templateFile}`,
-    }));
+  // The diary equivalent of describeSectionDrift: what would change in an
+  // entry template, said in sections rather than in bytes.
+  private describeDiaryDrift(
+    disk: string,
+    shipped: string,
+    cls: TrackerClass
+  ): string {
+    const ctx = { grain: cls };
+    const have = detectEntrySections(disk, ctx);
+    const want = detectEntrySections(shipped, ctx);
+    const gained = want.filter((id) => !have.includes(id));
+    const lost = have.filter((id) => !want.includes(id));
+    const label = (id: string): string =>
+      ENTRY_SECTIONS.find((s) => s.id === id)?.label ?? id;
 
-    const written: string[] = [];
-    for (const { content, dest } of files) {
-      // Composed, so there is no missing-asset path to handle any more. That
-      // branch existed because three Study templates were listed here as assets
-      // after 2.42 deleted the files, and every repair silently counted them.
+    const parts: string[] = [];
+    if (gained.length) parts.push(`adds ${gained.map(label).join(", ")}`);
+    if (lost.length) parts.push(`loses ${lost.map(label).join(", ")}`);
+    if (!parts.length) return "same sections, edited in place";
+    return parts.join("; ");
+  }
+
+  private async surveyDiaryTemplatesDrift(): Promise<{
+    items: RepairFileChange[];
+    files: { dest: string; content: string }[];
+  }> {
+    const p = this.paths;
+    const extras = this.plugin.settings.entrySections ?? {};
+    const bands = this.plugin.settings.entrySectionBand ?? {};
+    const items: RepairFileChange[] = [];
+    const files: { dest: string; content: string }[] = [];
+
+    for (const cls of TRACKER_CLASSES) {
+      const dest = `${p.templatesDiary}/${CLASS_DEFS[cls].templateFile}`;
+      const content = composeEntryTemplate(cls, extras[cls] ?? [], bands[cls] ?? []);
       const existing = getFile(this.app, dest);
-      if (existing) await this.app.vault.modify(existing, content);
-      else await createFileEnsuringFolders(this.app, dest, content);
-      written.push(dest.split("/").pop() ?? dest);
+      if (!existing) continue;
+      const disk = await this.app.vault.read(existing);
+      if (disk === content) continue;
+
+      const diff = diffText(disk, content);
+      const detail = this.describeDiaryDrift(disk, content, cls);
+      items.push({
+        path: dest,
+        label: CLASS_DEFS[cls].templateFile,
+        ops: [{ kind: "template", detail }],
+        diff,
+      });
+      files.push({ dest, content });
+    }
+    return { items, files };
+  }
+
+  private async surveyJournalTemplatesDrift(): Promise<{
+    items: RepairFileChange[];
+    files: { dest: string; content: string }[];
+  }> {
+    const items: RepairFileChange[] = [];
+    const files: { dest: string; content: string }[] = [];
+    const jFiles = await this.journalTemplateFiles();
+
+    for (const f of jFiles) {
+      const existing = getFile(this.app, f.dest);
+      if (!existing) continue;
+      const disk = await this.app.vault.read(existing);
+      if (disk === f.content) continue;
+
+      const diff = diffText(disk, f.content);
+      const detail = this.describeSectionDrift(disk, f.content, f.ctx);
+      items.push({
+        path: f.dest,
+        label: f.label,
+        ops: [{ kind: "template", detail }],
+        diff,
+      });
+      files.push({ dest: f.dest, content: f.content });
+    }
+    return { items, files };
+  }
+
+  async surveyTemplatesDrift(): Promise<{
+    items: RepairFileChange[];
+    files: { dest: string; content: string }[];
+  }> {
+    const diary = await this.surveyDiaryTemplatesDrift();
+    const journal = await this.surveyJournalTemplatesDrift();
+    return {
+      items: [...diary.items, ...journal.items],
+      files: [...diary.files, ...journal.files],
+    };
+  }
+
+  // Refresh entry templates with diff preview in the repair window (4.23).
+  //
+  // PARITY WITH REPAIR AND JOURNAL TEMPLATES. The old version overwrote
+  // immediately with no confirmation and no diff, so a reader who added
+  // custom frontmatter or prose to an entry template lost it with one click.
+  // Now it surveys drift, previews exact added and removed lines, and requires
+  // confirmation through the standard repair window.
+  async refreshTemplates(): Promise<void> {
+    const { items, files } = await this.surveyDiaryTemplatesDrift();
+    if (items.length === 0) {
+      notify.ok("Almanac: diary templates are already current");
+      return;
     }
 
-    new Notice(
-      written.length
-        ? `Almanac: refreshed ${written.join(", ")} from bundled assets ✅`
-        : "Almanac: no templates refreshed — bundled assets missing, check the console."
-    );
+    const survey: RepairSurvey = {
+      groups: [
+        {
+          id: "templates",
+          title: "Refresh diary templates",
+          blurb:
+            "Templates for diary entries that differ from the current composition. Custom edits will be replaced.",
+          glyph: "📋",
+          noun: "template",
+          items,
+        },
+      ],
+    };
+
+    const chosen = await openRepairWindow(this.app, survey);
+    if (!chosen || !chosen.has("templates")) return;
+
+    let updated = 0;
+    for (const { dest, content } of files) {
+      const existing = getFile(this.app, dest);
+      if (existing) {
+        await this.app.vault.modify(existing, content);
+        updated++;
+      }
+    }
+    notify.ok(`Almanac: refreshed ${updated} diary template${updated === 1 ? "" : "s"} ✅`);
   }
 
   // Every journal template the plugin can generate, paired with the vault path
@@ -661,82 +811,47 @@ export class Scaffold {
   }
 
   async refreshJournalTemplates(): Promise<void> {
-    const files = await this.journalTemplateFiles();
-    if (files.length === 0) {
+    const journalFiles = await this.journalTemplateFiles();
+    if (journalFiles.length === 0) {
       new Notice("Almanac: no journals are enabled.");
       return;
     }
 
-    const drifted: typeof files = [];
-    const missing: typeof files = [];
-    // What each drifted file would lose, in sections. Keyed by dest because
-    // labels are not unique across types.
-    const drift = new Map<string, string>();
-    for (const f of files) {
-      const existing = getFile(this.app, f.dest);
-      if (!existing) {
-        missing.push(f);
-        continue;
-      }
-      const disk = await this.app.vault.read(existing);
-      if (disk === f.content) continue;
-      drifted.push(f);
-      drift.set(f.dest, this.describeSectionDrift(disk, f.content, f.ctx));
-    }
-
-    if (drifted.length === 0 && missing.length === 0) {
+    const { items, files } = await this.surveyJournalTemplatesDrift();
+    if (items.length === 0) {
       notify.ok("Almanac: journal templates are already current");
       return;
     }
 
-    if (drifted.length > 0) {
-      const list = drifted
-        .map((f) => `• ${f.label} — ${drift.get(f.dest) ?? "edited"}`)
-        .join("\n");
-      const ok = await confirmAction(
-        this.app,
-        `Overwrite ${drifted.length} journal template${drifted.length === 1 ? "" : "s"}?`,
-        `These differ from the versions this release ships:\n\n${list}\n\n` +
-          "They will be replaced with the shipped versions. Any edits you made to them are lost — notes already created from them are never touched. " +
-          // A custom journal has no shipped asset: its "current version" is
-          // whatever the section catalogue composes by DEFAULT. So overwriting
-          // one discards more than hand edits — it discards the section
-          // choices made in the designer, which are deliberately stored
-          // nowhere but in the markdown being replaced. Saying "any edits you
-          // made" alone would understate that.
-          (drifted.some((f) => f.designed)
-            ? "For a custom journal this also resets its sections to the standard set, including any you chose when you created it. "
-            : "") +
-          (missing.length > 0
-            ? `${missing.length} missing template${missing.length === 1 ? "" : "s"} will be created either way.`
-            : ""),
-        "Overwrite them",
-        true
-      );
-      if (!ok) {
-        // Missing files are still worth creating: nothing is lost by writing a
-        // template that isn't there, and refusing the whole run because one
-        // *edited* file was declined would leave the type broken.
-        await this.writeTemplates(missing);
-        return;
+    const survey: RepairSurvey = {
+      groups: [
+        {
+          id: "templates",
+          title: "Refresh journal templates",
+          blurb:
+            "Templates for journal notes that differ from the current composition. Custom edits will be replaced.",
+          glyph: "📋",
+          noun: "template",
+          items,
+        },
+      ],
+    };
+
+    const chosen = await openRepairWindow(this.app, survey);
+    if (!chosen || !chosen.has("templates")) return;
+
+    let updated = 0;
+    for (const { dest, content } of files) {
+      const existing = getFile(this.app, dest);
+      if (existing) {
+        await this.app.vault.modify(existing, content);
+        updated++;
+      } else {
+        await createFileEnsuringFolders(this.app, dest, content);
+        updated++;
       }
     }
-
-    await this.writeTemplates([...missing, ...drifted]);
-  }
-
-  private async writeTemplates(
-    files: { dest: string; content: string; label: string }[]
-  ): Promise<void> {
-    if (files.length === 0) return;
-    for (const f of files) {
-      const existing = getFile(this.app, f.dest);
-      if (existing) await this.app.vault.modify(existing, f.content);
-      else await createFileEnsuringFolders(this.app, f.dest, f.content);
-    }
-    new Notice(
-      `Almanac: refreshed ${files.length} journal template${files.length === 1 ? "" : "s"} ✅`
-    );
+    notify.ok(`Almanac: refreshed ${updated} journal template${updated === 1 ? "" : "s"} ✅`);
   }
 
   // Create all folders + any missing files. Never overwrites existing notes,
@@ -761,7 +876,11 @@ export class Scaffold {
   // YAML with no directives to reconcile.
   async reconcileLayouts(dryRun = false): Promise<LayoutChange[]> {
     const out: LayoutChange[] = [];
-    for (const note of shippedNotes(this.paths, this.plugin.settings.entrySections)) {
+    for (const note of shippedNotes(
+      this.paths,
+      this.plugin.settings.entrySections,
+      this.plugin.settings.entrySectionBand
+    )) {
       const { asset, dest } = note;
       if (!isReconcilable(note)) continue;
       const file = getFile(this.app, dest);
@@ -910,7 +1029,11 @@ export class Scaffold {
       files.push({ dest, content: journalNotesBase(type, type.root) });
     }
 
-    for (const note of shippedNotes(p, this.plugin.settings.entrySections)) {
+    for (const note of shippedNotes(
+      p,
+      this.plugin.settings.entrySections,
+      this.plugin.settings.entrySectionBand
+    )) {
       const { asset, dest } = note;
       if (getFile(this.app, dest)) continue; // don't overwrite
       const content =
@@ -964,12 +1087,13 @@ export class Scaffold {
     return { folders, files, missingAssets };
   }
 
-  // Which notes the two format migrations would rewrite, without rewriting one.
+  // Which notes the three format migrations would rewrite, without rewriting one.
   //
-  // BOTH MIGRATIONS HAVE A PURE HALF ALREADY — `mergeEntryFences`,
-  // `mergeTrendsSection` and `ensureTrendsHeader` are all text-in, text-or-null-
-  // out — so the dry run is the migration with the write taken off, which is the
-  // same property `repairNote` has and for the same reason.
+  // EVERY MIGRATION HAS A PURE HALF ALREADY — `mergeEntryFences`,
+  // `mergeTrendsSection`, `ensureTrendsHeader` and `mergeBannerFences` are all
+  // text-in, text-or-null-out — so the dry run is the migration with the write
+  // taken off, which is the same property `repairNote` has and for the same
+  // reason.
   private async planMigrations(): Promise<RepairFileChange[]> {
     const out: RepairFileChange[] = [];
     const p = this.paths;
@@ -978,13 +1102,13 @@ export class Scaffold {
       for (const file of filesUnder(this.app, root)) {
         try {
           const original = await this.app.vault.read(file);
-          const merged = mergeEntryFences(original);
-          if (merged == null || merged === original) continue;
+          const split = splitEntryFences(original);
+          if (split == null || split === original) continue;
           out.push({
             path: file.path,
             label: file.basename,
-            ops: [{ kind: "migrate", detail: "fold the tracker fence into the entry banner" }],
-            diff: diffText(original, merged),
+            ops: [{ kind: "migrate", detail: "separate the tracker grid from the entry banner" }],
+            diff: diffText(original, split),
           });
         } catch (e) {
           console.error(`[Almanac] entry banner scan failed for ${file.path}`, e);
@@ -1003,12 +1127,51 @@ export class Scaffold {
         // and then merge a second title onto it.
         const merged = mergeTrendsSection(original.split("\n"))?.join("\n") ?? original;
         const titled = ensureTrendsHeader(merged.split("\n"))?.join("\n") ?? merged;
-        if (titled === original) continue;
+        // AND THE TITLE'S SPELLING, FOURTH IN THE SAME CHAIN (4.26). Last of the
+        // three Trends steps because it is the only one that assumes a title is
+        // already there: the merge writes the current spelling when it folds, and
+        // `ensureTrendsHeader` writes it when it titles an untitled fence, so
+        // running before either would leave this nothing to do and then let them
+        // put the right words in anyway. After both, the only titles left are the
+        // ones a note arrived with.
+        const respelled = retitleTrends(titled.split("\n"))?.join("\n") ?? titled;
+        // AND THE BANNER WELD, THIRD, EXACTLY AS THE WRITE RUNS IT (4.19).
+        //
+        // CHAINED ON THE SAME TEXT RATHER THAN SCANNED SEPARATELY, because the
+        // two migrations touch one file and a reader reads one diff. Two entries
+        // for one page would be two rows in the window offering to change the
+        // same note, and the second diff would be computed against a text the
+        // first had not been applied to — a preview that could not happen.
+        const welded = mergeBannerFences(respelled) ?? respelled;
+        if (welded === original) continue;
+        // ONE OP PER MIGRATION THAT ACTUALLY FIRED. `ops` is a list precisely so
+        // a file can report more than one, and a page that only needs the weld
+        // must not be labelled with the Trends sentence — the window's rows are
+        // what a reader decides on.
+        const ops: RepairOp[] = [];
+        if (titled !== original) {
+          ops.push({
+            kind: "migrate",
+            detail: "bring the Trends section up to the self-titled layout",
+          });
+        }
+        if (respelled !== titled) {
+          ops.push({
+            kind: "migrate",
+            detail: "spell the Trends heading the way this version writes it",
+          });
+        }
+        if (welded !== respelled) {
+          ops.push({
+            kind: "migrate",
+            detail: "weld the page's name and its navigation row into one banner",
+          });
+        }
         out.push({
           path: dash,
           label: dash.split("/").pop() ?? dash,
-          ops: [{ kind: "migrate", detail: "bring the Trends section up to the self-titled layout" }],
-          diff: diffText(original, titled),
+          ops,
+          diff: diffText(original, welded),
         });
       } catch (e) {
         console.error(`[Almanac] Trends scan failed for ${dash}`, e);
@@ -1028,11 +1191,13 @@ export class Scaffold {
     survey: RepairSurvey;
     byType: { type: JournalType; pending: DashboardCatchup[] }[];
     create: Awaited<ReturnType<Scaffold["planCreate"]>>;
+    templates: { dest: string; content: string }[];
   }> {
     const create = await this.planCreate();
     const pages = await this.reconcileLayouts(true);
     const byType = await this.findCatchups();
     const migrations = await this.planMigrations();
+    const templatesDrift = await this.surveyTemplatesDrift();
 
     const survey: RepairSurvey = {
       groups: [
@@ -1103,15 +1268,24 @@ export class Scaffold {
           id: "migrations",
           title: "Run format migrations",
           blurb:
-            "Notes written by an older release, brought up to the shape this one reads: entry banners fused with their tracker grid, Trends sections given their title.",
+            "Notes written by an older release, brought up to the shape this one reads: entry banners separated from their tracker grid, Trends sections given their title, page names welded to their navigation row.",
           glyph: "🔧",
           noun: "note",
           items: migrations,
         },
+        {
+          id: "templates",
+          title: "Update templates to this release",
+          blurb:
+            "Templates for diary entries and journal notes that differ from the versions this release composes. Edits you made to these templates will be replaced; existing notes created from them are never touched.",
+          glyph: "📋",
+          noun: "template",
+          items: templatesDrift.items,
+        },
       ],
     };
 
-    return { survey, byType, create };
+    return { survey, byType, create, templates: templatesDrift.files };
   }
 
   async setupVault(): Promise<void> {
@@ -1124,27 +1298,34 @@ export class Scaffold {
     // different risk were behind one button, so a reader who wanted the safe
     // half had to accept the rest or none of it.
     //
-    // WHAT CHANGED ABOUT "NOTHING TO CHANGE OPENS NOTHING". The old rule was
-    // narrower than it read: it opened nothing when no note would be REWRITTEN,
-    // and then created files without saying which. That was right for a bare
-    // confirm — "a dialog that appears to say there is nothing to confirm is how
-    // a reader learns to dismiss confirm dialogs without reading them" — and it
-    // is wrong for a window that lists what it is about to add and lets you
-    // decline any part of it. A window naming forty files it will create is not
-    // a dialog saying there is nothing to confirm. So it opens whenever there is
-    // ANYTHING pending, and still opens nothing when the vault is current.
-    const { survey, byType, create } = await this.surveyRepair();
-    const pending = pendingGroups(survey);
-
-    if (!pending.length) {
-      notify.ok("Almanac: everything already in place");
-      return;
-    }
+    // AND IT ALWAYS OPENS (4.18.2), which is the end of a rule that moved twice.
+    //
+    // It began as "open only when a note would be REWRITTEN", which was right
+    // for a bare confirm: a dialog that appears to say there is nothing to
+    // confirm is how a reader learns to dismiss confirm dialogs without reading
+    // them. 4.18.1 widened it to "open whenever anything is pending", because a
+    // window naming forty files it will create is not that dialog. The last case
+    // left was a current vault, which reported itself in a notice instead.
+    //
+    // WHY THE NOTICE WAS THE WRONG ANSWER. A notice is the same words with less
+    // standing: it appears in the corner, it leaves on its own, and it arrives
+    // in the one place a reader cannot ask it anything. And this command is not
+    // only run to fix a known problem — it is run to ASK, which makes "nothing
+    // is wrong" an answer to the question rather than a reason to stay silent.
+    // A reader who invoked repair and got a corner toast has to decide whether
+    // the command ran at all; the window that says the same thing, in the place
+    // the answer was going to appear, cannot be missed and cannot be doubted.
+    //
+    // The window earns this because it is not a confirm — it is a report that
+    // can also act. `RepairModal` draws the empty case as an empty state and
+    // offers one button that closes it, so nothing dead is drawn and there is no
+    // yes/no to answer.
+    const { survey, byType, create, templates } = await this.surveyRepair();
 
     const chosen = await openRepairWindow(this.app, survey);
     if (!chosen || chosen.size === 0) return;
 
-    await this.applyRepair(survey, chosen, byType, create);
+    await this.applyRepair(survey, chosen, byType, create, templates);
   }
 
   // Do the groups the reader ticked, and nothing else.
@@ -1152,7 +1333,8 @@ export class Scaffold {
     survey: RepairSurvey,
     chosen: Set<RepairGroupId>,
     byType: { type: JournalType; pending: DashboardCatchup[] }[],
-    create: Awaited<ReturnType<Scaffold["planCreate"]>>
+    create: Awaited<ReturnType<Scaffold["planCreate"]>>,
+    templates: { dest: string; content: string }[] = []
   ): Promise<void> {
     const parts: string[] = [];
     let created = 0;
@@ -1222,12 +1404,21 @@ export class Scaffold {
       }
     }
 
+    if (chosen.has("templates")) {
+      let updatedTemplates = 0;
+      for (const { dest, content } of templates) {
+        const existing = getFile(this.app, dest);
+        if (existing) {
+          await this.app.vault.modify(existing, content);
+          updatedTemplates++;
+        }
+      }
+      if (updatedTemplates > 0) parts.push(`updated ${updatedTemplates} template(s)`);
+    }
+
     if (chosen.has("migrations")) {
-      // Fold each existing entry's tracker fence into its entry banner (2.18.4).
-      // Entries written before then carry two consecutive ```almanac fences, and
-      // Obsidian renders each as its own block — so the banner cannot enclose
-      // the grid until they are one fence.
-      await this.mergeEntryBanners();
+      // Separate each existing entry's tracker fence from its entry banner (4.20+).
+      await this.splitEntryBanners();
 
       // Converge each shipped page's Trends & Statistics section on the 2.1
       // self-titled layout. User charts are preserved verbatim.
@@ -1246,6 +1437,31 @@ export class Scaffold {
           // merge a second title onto it.
           await migrateTrends(this.app, dash);
           await migrateTrendsHeader(this.app, dash);
+          // THIRD, AND THE DRY RUN CHAINS THEM IN THIS ORDER TOO (4.26). The
+          // first two put a title on the fence where there was none; this one
+          // only ever changes words that are already there, so it must run
+          // after both or it would find nothing and then be overtaken.
+          await migrateTrendsTitle(this.app, dash);
+          // AND THE BANNER'S TWO FENCES BECOME ONE (4.19).
+          //
+          // THIRD IN THE ORDER, AND INDEPENDENT OF THE OTHER TWO. Those converge
+          // the Trends section at the foot of the page; this welds the page's
+          // name to its navigation row at the top, and the two touch no common
+          // line. It runs last only because a migration added later runs later,
+          // which keeps the list readable as a history.
+          //
+          // WHY IT IS HERE AND NOT IN `reconcileLayouts`. Repair is additive: it
+          // may add a section this release ships and the note lacks, and
+          // `repairNote` throws on a `move` op rather than performing one.
+          // Welding is a move. `layout.ts` names this exact escape — *"ship it as
+          // a one-off migration next to migrateTrends"* — and this is where
+          // `migrateTrends` is.
+          //
+          // AND IT IS OPT-IN, which matters more than usual. The `migrations`
+          // group is ticked separately in the repair window, so a reader who
+          // wants their two blocks left alone simply does not tick it — and
+          // nothing else in this release writes to their notes.
+          await this.weldBanner(dash);
         } catch (e) {
           console.error(`[Almanac] Trends migration failed for ${dash}`, e);
         }

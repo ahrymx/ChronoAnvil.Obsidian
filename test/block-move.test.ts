@@ -118,6 +118,36 @@ describe("what a block's head calls it", () => {
     ).toBe("⏳ Open tasks");
   });
 
+  it("never names a banner after a widget inside it", () => {
+    // ── THE DEFECT, AND THE TWO PLACES IT WAS FIXED ────────────────────
+    //
+    // 4.19 welded `title:` and `links:` into one fence. `title` has no
+    // `SECTION_TITLES` entry and `links` has "🔗 Links", so exactly one keyword
+    // matched and every dashboard drew a bar naming the page after the smaller
+    // of the two widgets in it. It shipped, and a render found it.
+    //
+    // 4.19.1 FIXED IT IN `hasOwnBar`, BY ADDING `.jtc-card` — right for the
+    // surface it was tested on and the wrong mechanism. `hasOwnBar` asks only
+    // about a block's FIRST CHILD, deliberately; an ENTRY's banner opens with
+    // its links row, so the entry banner drew the same wrong head and the next
+    // render found THAT.
+    //
+    // 4.21 PUTS IT WHERE THE NAME IS CHOSEN. A banner names the note, so it is
+    // never named by a widget in it — one rule, asked of the fence, and it holds
+    // whatever order the directives are in.
+    for (const fence of [
+      ["title:home,diary,journals", "links:today,scopes#diary"],
+      ["links:home,today,scopes#diary", "entry-header"],
+      ["journal-header", "links:home,up"],
+    ]) {
+      expect(blockTitle(fence), fence.join(" + ")).toBeNull();
+    }
+
+    // AND A FENCE WITH NO BANNER IN IT IS UNAFFECTED, which is what keeps this a
+    // rule about banners rather than a rule about navigation rows.
+    expect(blockTitle(["links:today,scopes#diary"])).toBe("🔗 Links");
+  });
+
   it("says nothing rather than something wrong for what it cannot name", () => {
     // Every block gets a head, including the ones nobody declared anything
     // about — an untitled head is the honest answer for a fence of sliders.

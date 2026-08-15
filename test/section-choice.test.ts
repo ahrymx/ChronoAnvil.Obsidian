@@ -33,6 +33,7 @@ import {
   composeEntryTemplate,
   detectEntrySections,
   entryRemovalRefusal,
+  entrySectionMatrix,
   entrySectionModel,
   offerableEntrySections,
   sectionsForEntry,
@@ -172,7 +173,9 @@ describe("patch 6: the setting `extra` has been describing since 2.60.1", () => 
     // command whose whole job is to bring the template up to date.
     const src = readSrc("scaffold");
     expect(
-      src.match(/composeEntryTemplate\(cls, extras\[cls\] \?\? \[\]\)/g)?.length
+      src.match(
+        /composeEntryTemplate\(cls, extras\[cls\] \?\? \[\], bands\[cls\] \?\? \[\]\)/g
+      )?.length
     ).toBe(2);
   });
 
@@ -614,5 +617,109 @@ describe("patch 7 follow-up: the control is sized for the answer", () => {
     );
     // And the narrow-viewport rule this promotes is still there for them.
     expect(css).toContain("@media (max-width: 620px)");
+  });
+});
+
+// ── the offer as a grid, and the table that draws it (4.27 §3) ────────
+//
+// The Diary entries group was a headed stack per grain and is now one table:
+// a row per offerable section, a column per grain. These assert the MATRIX,
+// which is where every decision moved to — the renderer above it works nothing
+// out for itself, because the suite has no DOM and anything decided in a
+// renderer is a rule that rots unwatched.
+describe("entrySectionMatrix", () => {
+  it("has a row only for a section some grain can be offered", () => {
+    // Six of the ten shared sections ship on all five grains, so a row for one
+    // would read "Ships" five times — which is what the group's own subtitle,
+    // "beyond what its grain ships", already says.
+    expect(entrySectionMatrix().rows.map((r) => r.id)).toEqual([
+      "bridge",
+      "capture",
+    ]);
+  });
+
+  it("says a grain SHIPS what its template already writes", () => {
+    expect(entrySectionMatrix().cell("capture", "daily")).toBe("ships");
+  });
+
+  it("OFFERS a section another grain lends the wording for", () => {
+    // `capture` has a daily-only directive; `directiveFor` borrows it, which is
+    // what makes "add Captured to my weekly entries" reachable at all.
+    expect(entrySectionMatrix().cell("capture", "weekly")).toBe("offer");
+  });
+
+  it("marks a cell ABSENT where the section cannot exist", () => {
+    // `bridge` returns null on yearly AND cannot be borrowed (its directive
+    // needs `extra`, which the borrow loop does not pass), so no grain lends
+    // it. A year of journal notes is a page-long list — see its own comment.
+    expect(entrySectionMatrix().cell("bridge", "yearly")).toBe("absent");
+    expect(entrySectionMatrix().cell("bridge", "daily")).toBe("offer");
+  });
+
+  it("draws the columns it is given rather than always five", () => {
+    // The reason this is a parameter: "a sixth grain is a table edit away; a
+    // layout that only works at five breaks silently the moment the table
+    // grows" (test/tracker-grains.test.ts).
+    const two = entrySectionMatrix(undefined, ["daily", "weekly"]);
+    expect(two.grains).toEqual(["daily", "weekly"]);
+    expect(two.cell("capture", "monthly")).toBe("absent");
+  });
+
+  it("answers for every grain in the class table", () => {
+    const m = entrySectionMatrix();
+    expect(m.grains).toEqual([...TRACKER_CLASSES]);
+    for (const grain of TRACKER_CLASSES) {
+      expect(["ships", "offer", "absent"], grain).toContain(
+        m.cell("capture", grain)
+      );
+    }
+  });
+});
+
+describe("the Diary entries group is a derived table", () => {
+  // Scoped to the method body — a bare match over a file this size finds a
+  // word somewhere and proves nothing (RESUME §6).
+  const renderer = (): string => {
+    const src = readCode("settings");
+    const at = src.indexOf("private renderEntrySections(");
+    expect(at).toBeGreaterThan(0);
+    const end = src.indexOf("\n  private ", at + 1);
+    return src.slice(at, end === -1 ? src.length : end);
+  };
+
+  it("takes its rows and cells from the matrix", () => {
+    expect(renderer()).toContain("entrySectionMatrix(");
+    expect(renderer()).toContain("matrix.cell(");
+  });
+
+  it("derives its column headings from the class table", () => {
+    expect(renderer()).toContain("CLASS_DEFS[");
+    // Not five literals. A sixth grain must need no edit here.
+    expect(renderer()).not.toContain('"Daily"');
+    expect(renderer()).not.toContain('"Weekly"');
+  });
+
+  it("reuses the settings table rather than a second one", () => {
+    expect(renderer()).toContain("this.createTable(");
+  });
+
+  it("keeps the blurb, which is the only thing saying what a section is", () => {
+    expect(renderer()).toContain("col-name-sub");
+    expect(renderer()).toContain("section.blurb");
+  });
+});
+
+describe("the settings tables are theme-coloured", () => {
+  it("picks no colour by hand in the pill rules", () => {
+    // 4.27: every colour in this block was a literal, so the Trackers and
+    // Journals tables drew a light-mode chip over whatever the reader's theme
+    // was doing. Asserted over the rule bodies rather than the file, so an
+    // unrelated hex elsewhere in the stylesheet does not fail this.
+    const css = readCss();
+    const at = css.indexOf(".almanac-settings-table .almanac-list-pill {");
+    expect(at).toBeGreaterThan(0);
+    const end = css.indexOf(".almanac-settings-table .col-actions-cell", at);
+    expect(end).toBeGreaterThan(at);
+    expect(css.slice(at, end)).not.toContain("#");
   });
 });

@@ -565,15 +565,16 @@
   margin: var(--am-set-gap) 0;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--am-radius-md);
-  background: var(--background-primary);
+  background: var(--background-secondary);
   overflow: hidden;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--am-elev-1);
 }
 .almanac-settings-group:hover {
   border-color: var(--background-modifier-border-hover);
 }
 .almanac-settings-group[open] {
-  background: var(--background-primary);
+  background: var(--background-secondary);
 }
 
 .almanac-settings-summary {
@@ -584,6 +585,7 @@
   cursor: pointer;
   list-style: none;
   user-select: none;
+  background: var(--background-secondary);
   transition: background 0.12s ease;
 }
 .almanac-settings-summary::-webkit-details-marker { display: none; }
@@ -601,7 +603,8 @@
   width: 34px;
   height: 34px;
   border-radius: var(--am-radius-sm);
-  background: var(--background-secondary);
+  background: var(--am-surface-inset);
+  border: 1px solid var(--background-modifier-border);
   font-size: 1.05em;
   line-height: 1;
 }
@@ -625,8 +628,9 @@
   flex: 0 0 auto;
   padding: 2px 9px;
   border-radius: var(--am-radius-pill);
-  background: var(--background-secondary);
-  color: var(--text-muted);
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
   font-size: var(--am-text-2xs);
   font-weight: 600;
   white-space: nowrap;
@@ -648,7 +652,8 @@
 }
 
 .almanac-settings-body {
-  padding: 4px 14px 14px;
+  padding: 8px 14px 14px;
+  background: var(--am-surface-card);
 }
 /* The first setting in a body already sits under the summary's border. */
 .almanac-settings-body > .setting-item:first-child {
@@ -659,11 +664,12 @@
    descriptions, so the wall of text before the Trackers list reads as a
    note and not as three settings that lost their controls. */
 .almanac-settings-note {
-  margin: 10px 0 14px;
-  padding: 10px 12px;
+  margin: 8px 0 12px;
+  padding: 8px 12px;
   border-radius: var(--am-radius-sm);
-  background: var(--background-secondary);
-  border-left: 2px solid var(--background-modifier-border);
+  background: var(--am-surface-inset);
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--interactive-accent);
 }
 .almanac-settings-note p {
   margin: 0;
@@ -672,7 +678,201 @@
   line-height: 1.5;
 }
 .almanac-settings-note p + p {
-  margin-top: 7px;
+  margin-top: 5px;
+}
+
+/* --- Settings Tables (for Trackers, Journals, etc.) -------------------- */
+.almanac-settings-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin: 6px 0 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--am-surface-inset);
+  box-shadow: var(--am-elev-1);
+}
+
+.almanac-settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: var(--am-text-xs);
+}
+
+.almanac-settings-table th {
+  padding: 7px 12px;
+  font-size: var(--am-text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  background: var(--am-surface-card);
+  border-bottom: 1px solid var(--background-modifier-border);
+  white-space: nowrap;
+}
+
+.almanac-settings-table td {
+  padding: 7px 12px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.almanac-settings-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.almanac-settings-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+.almanac-settings-table tbody tr:hover {
+  background: var(--background-modifier-hover);
+}
+
+.almanac-settings-table tbody tr.is-locked {
+  opacity: 0.65;
+}
+.almanac-settings-table tbody tr.is-locked:hover {
+  opacity: 1;
+}
+
+.almanac-settings-table .col-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.almanac-settings-table .col-name-token {
+  flex: 0 0 auto;
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.almanac-settings-table .almanac-list-pills {
+  margin-top: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+/* THE PILLS ARE THEME TOKENS NOW (4.27). Every colour in this block was a
+   literal — #e2e8f0, #ddd6fe, #1e293b and nine more — so the Trackers and
+   Journals tables drew a light-mode chip on top of whatever the reader's theme
+   was doing. Legible in dark mode by luck (light chip, dark text) and plainly
+   not the plugin's, which is the tell: nothing else in this stylesheet picks a
+   colour without going through a variable.
+   The base `.almanac-list-pill` a few hundred lines down already had this
+   right; these overrode it. What is left overridden is the SHAPE — a table cell
+   wants a tighter pill than a card does — and the colours go back to the base
+   rule's vocabulary. */
+.almanac-settings-table .almanac-list-pill {
+  padding: var(--am-space-1) var(--am-space-4);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-secondary);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  color: var(--text-normal);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.almanac-settings-table .almanac-list-pill.is-muted {
+  background: var(--background-secondary);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+/* The one pill that means "on", so it is the one that takes the accent. */
+.almanac-settings-table .almanac-list-pill.is-on {
+  background: rgba(var(--interactive-accent-rgb, 138, 92, 245), 0.15);
+  border: var(--am-rule) solid
+    rgba(var(--interactive-accent-rgb, 138, 92, 245), 0.4);
+  color: var(--text-accent);
+  font-weight: 600;
+}
+
+/* Dashed, because "off" is an absence — the border says so without needing a
+   second colour to mean it. */
+.almanac-settings-table .almanac-list-pill.is-off {
+  background: transparent;
+  border: var(--am-rule) dashed var(--background-modifier-border);
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+.almanac-settings-table code {
+  padding: 2px 6px;
+  border-radius: var(--am-radius-sm);
+  background: var(--background-secondary);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  color: var(--text-normal);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+}
+
+.almanac-settings-table .col-actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.almanac-settings-table .col-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+}
+
+.almanac-settings-table .col-actions .almanac-list-toggle {
+  margin-left: 6px;
+}
+
+/* --- A grain column (4.27: Diary entries) -------------------------------
+   One cell per grain, holding either a control or a word about why there
+   isn't one. Centred, because a column of toggles reads as a column only if
+   they line up on their own axis rather than on their labels' — which is what
+   `.col-actions` does one rule above, correctly, for a cluster pinned to the
+   right-hand edge of a row.
+   `.setting-item-control` is overridden for the same reason: `.almanac-list-
+   toggle`'s own rule justifies it to flex-end, right for an actions cluster
+   and wrong for a cell whose whole width belongs to one control. */
+.almanac-settings-table .col-grain {
+  text-align: center;
+}
+.almanac-settings-table .col-grain .almanac-list-toggle {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+}
+.almanac-settings-table .col-grain .setting-item {
+  border: none;
+  padding: 0;
+}
+.almanac-settings-table .col-grain .setting-item-control {
+  justify-content: center;
+}
+
+/* The blurb under a row's name. THE ROW KEEPS ITS WORDS: a table of emoji and
+   toggles with nothing to read is a worse settings page than the stacked rows
+   it replaced, and the blurb is the only thing saying what a section IS. */
+.almanac-settings-table .col-name-sub {
+  margin-top: 2px;
+  font-weight: 400;
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+  white-space: normal;
+  max-width: 34ch;
+}
+
+/* "Ships" and "—". Plain and quiet on purpose — see `renderEntrySections`:
+   a statement of fact is not a status chip, and the eye is scanning for the
+   cells that DO have a control. */
+.almanac-cell-ships,
+.almanac-cell-absent {
+  color: var(--text-faint);
+  font-size: var(--am-text-2xs);
 }
 
 /* --- Section header (label + optional action) --------------------------- */
@@ -921,6 +1121,13 @@ details[open] > summary .almanac-section-chevron {
 .almanac-list-pill.is-muted {
   color: var(--text-faint);
 }
+.almanac-list-pill.is-accent,
+.almanac-list-pill.is-section {
+  color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  border-color: rgba(var(--interactive-accent-rgb, 139, 92, 246), 0.35);
+  font-weight: 600;
+}
 
 .almanac-list-actions {
   flex: 0 0 auto;
@@ -1105,8 +1312,19 @@ details[open] > summary .almanac-section-chevron {
 .almanac-editor-body {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 2px 2px 4px;
+  padding: 4px 6px;
   margin: 0 -2px;
+  scrollbar-gutter: stable;
+}
+.almanac-editor-body::-webkit-scrollbar {
+  width: 6px;
+}
+.almanac-editor-body::-webkit-scrollbar-thumb {
+  background: var(--background-modifier-border-hover);
+  border-radius: var(--am-radius-pill);
+}
+.almanac-editor-body::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
 }
 .almanac-editor-body .setting-item {
   padding: 12px 0;

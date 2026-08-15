@@ -5,11 +5,15 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// Quick capture — get a thought into today's entry without navigating there.
+// Quick capture — get a thought into an entry without navigating there.
 //
 // The problem it solves: a thought at 3pm costs a deliberate detour (open the
-// diary, find today, create it if absent, click into a field), so it doesn't
-// get written. Capture collapses that to a hotkey, a box and Cmd/Ctrl+Enter.
+// diary, find the entry, create it if absent, click into a field), so it
+// doesn't get written. Capture collapses that to a hotkey, a box and
+// Cmd/Ctrl+Enter.
+//
+// The box also asks WHERE, as of 4.27 — see `captureDestinations` below for
+// what it offers and why the list is gated the way it is.
 //
 // Captures land in their own `capture` region rather than in `log`. They were
 // nearly put in `attachments` for tidiness, which would have been a quiet
@@ -27,9 +31,18 @@ import { App, Notice, TFile } from "obsidian";
 import { EditorModal } from "../ui/editor-modal";
 import type AlmanacPlugin from "../main";
 import { CAPTURE_NOTE_KEY } from "../core/constants";
-import { appendToNoteRegion, ensureNoteRegions } from "../core/notestore";
+import {
+  appendToNoteRegion,
+  ensureNoteRegions,
+  hasNoteRegion,
+} from "../core/notestore";
 import { formatScaleNoteTag, type ScaleNote } from "../journals/scale-notes";
-import { moment } from "../core/util";
+import { frontmatterOf, moment } from "../core/util";
+import { CLASS_DEFS, TRACKER_CLASSES } from "../trackers/trackers";
+import type { TrackerClass } from "../trackers/trackers";
+import { sectionsForEntry } from "./entry-sections";
+import { currentEntryKey, entryDateKey, labelForGrain } from "./nav";
+import { isManagedTemplate } from "../trackers/entry-trackers";
 
 // Format one capture for the region: a single timestamp heading the block,
 // with any further lines carried underneath it.
@@ -75,26 +88,34 @@ async function appendCapture(
   });
 }
 
-// Write a capture into today's entry, creating the entry from the template if
+// Write a capture into a chosen entry, creating that entry from its template if
 // it doesn't exist yet.
+//
+// RENAMED FROM `captureToToday` IN 4.27, because the old name stopped being
+// true the moment the box could be pointed somewhere else, and a function whose
+// name says "today" while its argument says otherwise is the kind of thing a
+// reader trusts and should not.
+//
+// The target resolves here rather than when the list was drawn: naming a grain
+// in a dropdown must not create five notes for a reader who opens the box,
+// reads the options and presses Escape.
 //
 // The whole append happens inside `vault.process`, the same serialised path
 // every other body write uses, so a capture can't interleave with a `note:`
 // field's write and lose either side.
-export async function captureToToday(
+export async function captureTo(
   plugin: AlmanacPlugin,
-  text: string
+  text: string,
+  target: CaptureTarget
 ): Promise<TFile | null> {
   const body = text.replace(/\s+$/, "");
   if (!body) return null;
 
-  // Reuses the diary's own create-or-open path, so a capture-created entry is
+  // Reuses the diary's own create-or-open paths, so a capture-created entry is
   // identical to one made any other way — same template, same folder, same
-  // frontmatter. `reveal: false` because capture must not steal focus: the
-  // whole point is that you don't leave what you were doing.
-  const file = await plugin.diary.openOrCreateDay(moment().format("YYYY-MM-DD"), {
-    reveal: false,
-  });
+  // frontmatter. None of them reveals: capture must not steal focus, because
+  // the whole point is that you don't leave what you were doing.
+  const file = await target.resolve();
   if (!file) return null;
 
   const block = formatCapture(body, moment().format("HH:mm"));
@@ -130,6 +151,152 @@ export async function captureScaleNote(
   return true;
 }
 
+// ── where a capture goes (4.27) ──────────────────────────────────────
+//
+// Until 4.27 the answer was "today's daily entry", always, and the box could not
+// say so. Two consequences a reader met: a `Captured` section added to a weekly
+// entry — which the section catalogue offers on every grain — was unreachable,
+// and capturing while reading a past entry landed somewhere else silently.
+//
+// The other capture path had already disagreed for releases. `captureScaleNote`
+// writes to the entry the picker sits on, "not today's — the picker may be on a
+// back-filled past day". Two writers, one feature, opposite rules, one of them
+// undefended.
+//
+// SO THE BOX ASKS, rather than inferring and hoping the reader reads a subtitle.
+// A destination is a control, and the same keystroke means the same thing every
+// time.
+export interface CaptureTarget {
+  // Stable across a rebuild of the list, so the dropdown can round-trip a
+  // choice: `grain:weekly`, or `note` for the entry the reader is on.
+  id: string;
+  label: string;
+  // Resolved late, on save. A grain's entry may not exist yet and must not be
+  // created just because its name was drawn in a list — a reader who opens the
+  // box, reads the options and presses Escape has not asked for five notes.
+  resolve: () => Promise<TFile | null>;
+}
+
+// Which grains can *show* a capture: the ones whose template writes the field.
+//
+// THE GATE, AND WHY IT IS THIS ONE. A capture appended to a note that does not
+// draw the region is text on disk and nothing on screen — `appendCapture` seeds
+// the region so nothing is lost, but a reader would have to search to find it.
+// "Nothing dead is drawn", read from the other end: do not offer a destination
+// that swallows the thought.
+//
+// It is also what ties this to the Diary entries settings table: ticking
+// `Captured` for weekly there is what adds "This week" here.
+export function grainsShowingCapture(plugin: AlmanacPlugin): TrackerClass[] {
+  return TRACKER_CLASSES.filter((grain) =>
+    sectionsForEntry({
+      grain,
+      extra: (plugin.settings.entrySections[grain] ?? []).map((c) => c.id),
+    }).some((s) => s.id === "capture")
+  );
+}
+
+// The destinations to offer, in grain order, with the note the reader is on
+// last when it is not already one of them.
+//
+// THE HOST IS OFFERED ONLY WHEN IT IS AN ENTRY THAT ALREADY HAS THE REGION.
+// Three refusals, each for its own reason: a dashboard is not an entry and has
+// no capture log; a managed template is composed from the catalogue and
+// rewritten by "Refresh entry templates", so anything captured into one is
+// deleted on the next refresh; and an entry with no region is the "swallows the
+// thought" case above.
+//
+// AND IT IS NOT OFFERED TWICE. When the reader is on this week's weekly entry,
+// "This note" and "This week" are the same file — so the host row is added only
+// when its own date key differs from its grain's current one. Two rows writing
+// to one note is a choice that is not a choice.
+export async function captureDestinations(
+  plugin: AlmanacPlugin,
+  host: TFile | null
+): Promise<CaptureTarget[]> {
+  const out: CaptureTarget[] = grainsShowingCapture(plugin).map((grain) => {
+    const key = currentEntryKey(grain);
+    return {
+      id: `grain:${grain}`,
+      label: `${grain === "daily" ? "Today" : `This ${CLASS_DEFS[grain].periodNoun}`} · ${labelForGrain(grain, key)}`,
+      resolve: () => resolveGrainEntry(plugin, grain, key),
+    };
+  });
+
+  const entry = host ? plugin.sections.entryContextFor(host.path) : null;
+  if (host && entry) {
+    const key = entryDateKey(frontmatterOf(plugin.app, host), entry.grain);
+    // Read last, and only if the cheap answers have not already refused — a
+    // vault read per capture-box open is not much, but it is not nothing, and
+    // three of the four refusals need no bytes at all.
+    const cheap = offersHostEntry({
+      isManagedTemplate: isManagedTemplate(plugin, host.path),
+      hasCaptureRegion: true,
+      hostKey: key,
+      currentKey: currentEntryKey(entry.grain),
+      grainAlreadyListed: out.some((t) => t.id === `grain:${entry.grain}`),
+    });
+    if (
+      cheap &&
+      hasNoteRegion(await plugin.app.vault.cachedRead(host), CAPTURE_NOTE_KEY)
+    ) {
+      out.push({
+        id: "note",
+        label: `This note · ${key ? labelForGrain(entry.grain, key) : host.basename}`,
+        resolve: async () => host,
+      });
+    }
+  }
+  return out;
+}
+
+// Whether the note the reader is on earns a row of its own.
+//
+// PURE, AND SEPARATE FROM THE READ THAT FEEDS IT, because the suite has no DOM
+// and no vault: every refusal here is a decision worth pinning, and none of them
+// is testable through `captureDestinations`, which needs a plugin, a workspace
+// and a file. The caller supplies the four facts; this weighs them.
+//
+// Note that "is it an entry at all" is not among them. `entryContextFor`
+// returns null for a dashboard, a journal note and anything outside the diary,
+// so the caller has already refused those by having nothing to pass — and
+// re-asking here as a boolean would be a second, weaker copy of a
+// classification that module exists to own.
+export function offersHostEntry(facts: {
+  // Composed from the catalogue and rewritten by "Refresh entry templates", so
+  // a capture into one survives until the next refresh and then vanishes.
+  isManagedTemplate: boolean;
+  // No region means the text lands on disk and draws nowhere.
+  hasCaptureRegion: boolean;
+  hostKey: string;
+  currentKey: string;
+  grainAlreadyListed: boolean;
+}): boolean {
+  if (facts.isManagedTemplate) return false;
+  if (!facts.hasCaptureRegion) return false;
+  // The reader is on this week's weekly entry and "This week" is already in the
+  // list: two rows writing to one file is a choice that is not a choice.
+  if (facts.hostKey === facts.currentKey && facts.grainAlreadyListed) return false;
+  return true;
+}
+
+// A grain's current entry, created from its template if it isn't there yet and
+// never revealed — capture exists so you don't leave what you were doing.
+//
+// Three openers rather than one because the diary has three, split by how a
+// grain names its period; this is the only place that needs all of them at once.
+async function resolveGrainEntry(
+  plugin: AlmanacPlugin,
+  grain: TrackerClass,
+  key: string
+): Promise<TFile | null> {
+  const d = plugin.diary;
+  if (grain === "daily") return d.openOrCreateDay(key, { reveal: false });
+  if (grain === "monthly") return d.openOrCreateMonth(key, { reveal: false });
+  const unit = grain === "weekly" ? "week" : grain === "quarterly" ? "quarter" : "year";
+  return d.openOrCreatePeriodEntry(unit, key, { reveal: false });
+}
+
 // Options that turn the generic capture box into a specific one. Defaults
 // reproduce the quick-capture behaviour exactly, so `new CaptureModal(app,
 // plugin)` is unchanged; the scale-note path supplies its own title, hint,
@@ -139,6 +306,11 @@ export async function captureScaleNote(
 export interface CaptureModalOptions {
   title?: string;
   hint?: string;
+  // The destinations to offer, and the one selected when the box opens. Absent
+  // means "no picker" — which is the scale-note path, whose destination is the
+  // entry its reading is on and is not the reader's to change.
+  destinations?: CaptureTarget[];
+  onDestination?: (target: CaptureTarget) => void;
   placeholder?: string;
   initialValue?: string;
   // Save the text. Returns true on success (modal closes), false to keep it
@@ -176,33 +348,49 @@ export class CaptureModal extends EditorModal {
     // The hint becomes the frame's subtitle. It was a div of its own with its
     // own class, saying what this window writes and where — which is the job
     // the subtitle already has in every other editor.
-    super(
-      app,
-      plugin,
-      options.title ?? "Quick capture",
-      options.hint ??
-        `Appends to today's entry with the current time. ${moment().format("D MMMM")}`,
-      "Capture"
-    );
-    this.opts = {
+    //
+    // DEFAULTED ONCE, AS OF 4.27. Every default below was written twice — once
+    // as a `super()` argument and once into `this.opts` — so the title and hint
+    // the frame drew and the ones the modal held were two copies of one string,
+    // kept equal by hand. `filled` is computed first and both read it.
+    const filled = {
       title: options.title ?? "Quick capture",
-      hint:
-        options.hint ??
-        `Appends to today's entry with the current time. ${moment().format("D MMMM")}`,
+      hint: options.hint ?? "Appends to the chosen entry with the current time.",
       placeholder: options.placeholder ?? "What's on your mind?",
       initialValue: options.initialValue ?? "",
-      onSave:
-        options.onSave ??
-        (async (text) => (await captureToToday(this.plugin, text)) != null),
+      destinations: options.destinations ?? [],
+      onDestination: options.onDestination ?? ((): void => undefined),
+      onSave: options.onSave ?? (async (): Promise<boolean> => false),
       persistDraft: options.persistDraft ?? true,
-      successNotice:
-        options.successNotice ??
-        (() => `Captured to ${moment().format("D MMM")}`),
+      successNotice: options.successNotice ?? ((): string => "Captured"),
     };
+    super(app, plugin, filled.title, filled.hint, "Capture");
+    this.opts = filled;
   }
 
   protected renderBody(): void {
     const contentEl = this.body;
+
+    // ── where this goes ────────────────────────────────────────────────
+    //
+    // ABOVE THE BOX, NOT BESIDE THE BUTTON. The destination is a fact about
+    // what you are about to type, so it belongs where you read before typing
+    // rather than where you look after. Drawn only when there is a choice to
+    // make: one destination is not a decision, and a select with a single
+    // option is a control that cannot do its job.
+    if (this.opts.destinations.length > 1) {
+      const row = contentEl.createDiv({ cls: "almanac-capture-dest" });
+      row.createSpan({ cls: "almanac-capture-dest-label", text: "Capture to" });
+      const select = row.createEl("select", { cls: "dropdown" });
+      for (const target of this.opts.destinations) {
+        select.createEl("option", { value: target.id, text: target.label });
+      }
+      select.value = this.opts.destinations[0].id;
+      select.addEventListener("change", () => {
+        const picked = this.opts.destinations.find((t) => t.id === select.value);
+        if (picked) this.opts.onDestination(picked);
+      });
+    }
 
     // A persisted draft only applies to the quick-capture instance; a scale
     // note starts from whatever text it was given (an existing note, or blank).
@@ -284,8 +472,33 @@ export class CaptureModal extends EditorModal {
   }
 }
 
-export function openCapture(plugin: AlmanacPlugin): void {
-  new CaptureModal(plugin.app, plugin).open();
+// `host` is the note the door was pressed on, when the door knows it. The
+// command and the ribbon do not (they ask the workspace); the links pill, the
+// launcher tile and the diary card's action strip all already hold the note
+// they were drawn in, and that is strictly better than the active file — a pill
+// in a hover preview or an unfocused split must resolve against its own note
+// rather than against whatever leaf has focus.
+//
+// Resolved BEFORE the modal opens, because opening one takes focus and a later
+// read of the workspace would answer about the modal.
+export function openCapture(plugin: AlmanacPlugin, host?: TFile | null): void {
+  void captureDestinations(plugin, host ?? null).then((destinations) => {
+    // ONE RESOLVED TARGET FEEDS THE SENTENCE, THE WRITE AND THE TOAST, so the
+    // box cannot name one entry and write to another.
+    let chosen = destinations[0] ?? null;
+    new CaptureModal(plugin.app, plugin, {
+      destinations,
+      hint: chosen
+        ? `Appends to ${chosen.label} with the current time.`
+        : "No entry here can show a capture — add a Captured section first.",
+      onDestination: (target) => {
+        chosen = target;
+      },
+      onSave: async (text) =>
+        chosen != null && (await captureTo(plugin, text, chosen)) != null,
+      successNotice: () => `Captured to ${chosen?.label ?? "your entry"}`,
+    }).open();
+  });
 }
 
 // Open the capture overlay to attach a context note to one scale reading. Same

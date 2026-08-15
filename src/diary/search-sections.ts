@@ -27,7 +27,7 @@
 // maintained without a catalogue entry to hold it.
 
 import { composeFlatNote, flatNoteModel } from "../core/note-sections";
-import { PAGE_TITLE_SECTION } from "../core/note-sections";
+import { bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
 import type { SectionModel } from "../core/section-model";
@@ -35,11 +35,19 @@ import type { SectionModel } from "../core/section-model";
 const probe = (text: string, re: RegExp): number => text.search(re);
 
 export const SEARCH_SECTIONS: FlatSection[] = [
-  // THE HEAD, FIRST. 4.10 — see `PAGE_TITLE_SECTION`. Until this release the
-  // only route to the section editor on this note was the command palette:
+  // THE BANNER, FIRST. 4.10 — the head; 4.19 — the banner. Until 4.10 the only
+  // route to the section editor on this note was the command palette:
   // `canEditSections` has answered yes for Search since 3.11, and nothing on
   // the page said so.
-  PAGE_TITLE_SECTION,
+  //
+  // AND IT CARRIES THE NAVIGATION ROW THAT USED TO BE A LINE INSIDE THE SEARCH
+  // BLOCK. That is the whole of 4.19's change to this page, and it is the
+  // clearest case the release has: `links:today,scopes#diary` was composed
+  // between `header:` and `diary-search`, so it belonged to the `search`
+  // section — a section a reader may remove, whose blurb says nothing about
+  // navigation, and which the editor could not show as a nav row because it was
+  // not one. The page rendered two strips and reported one section.
+  bannerSection({ ids: PAGE_TITLE_IDS, links: "today,scopes#diary" }),
   {
     id: "search",
     label: "Search the diary",
@@ -53,11 +61,10 @@ export const SEARCH_SECTIONS: FlatSection[] = [
     locked: true,
     render: () => ({
       fence: "almanac",
-      lines: [
-        "header:🔎 Search the Diary",
-        "links:today,scopes#diary",
-        "diary-search",
-      ],
+      // THE NAVIGATION ROW LEFT THIS FENCE IN 4.19 and is the banner's now. What
+      // stays is what this section is actually about: a titled bar and the
+      // search box under it.
+      lines: ["header:🔎 Search the diary", "diary-search"],
     }),
     locate: (text) => probe(text, /^diary-search\b/m),
   },
@@ -82,7 +89,7 @@ export const SEARCH_SECTIONS: FlatSection[] = [
     // a note's opinions go.
     render: () => ({
       fence: "almanac",
-      lines: ["header:🕘 On This Day", "on-this-day:always"],
+      lines: ["header:🕘 On this day", "on-this-day:always"],
     }),
     locate: (text) => probe(text, /^on-this-day\b/m),
   },
@@ -98,7 +105,7 @@ export const SEARCH_SECTIONS: FlatSection[] = [
     locked: false,
     render: () => ({
       fence: "almanac",
-      lines: ["header:📜 All Entries", "timeline"],
+      lines: ["header:📜 All entries", "timeline"],
     }),
     locate: (text) => probe(text, /^timeline\b/m),
   },

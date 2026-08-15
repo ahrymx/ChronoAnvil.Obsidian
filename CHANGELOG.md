@@ -7,6 +7,512 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.32.0] - 2026-08-15
+
+**A refined surface hierarchy for diary pages and subsystems.**
+- **Banner Tinting & Texture**: Grain headers (`.journal-slim-banner`) now feature subtle theme-driven accent gradient tinting combined with fine engraved diagonal hatching texture and top edge highlights.
+- **Recessed Tracker Cells**: Tracker widgets (`.journal-tracker-cell`) now use the semantic recessed inset surface (`--am-surface-inset`), giving the logging grid crisp visual containment that no longer punches through to the note page ground.
+- **Accent-Washed Captured Cards**: The captured log cards (`.journal-capture-card`) now sport a subtle accent background wash, crisp border, accent left spine, and refined elevation.
+- **Global Surface Token Harmony**: Standardized `--am-surface-card` and `--am-surface-inset` tokens across Settings tables, notes, icon tokens, and groups for consistent depth across light and dark themes.
+
+## [4.31.0] - 2026-08-15
+
+**Now the whole lot at once.** 4.30 gave you one page on the clipboard. There is
+now **Maintenance: export as plain markdown**, which writes every diary entry and
+every journal note into one folder — `Almanac Export` by default, and you can
+move it in Settings → Paths — as ordinary markdown anybody can read.
+
+**You see the full list before a single file is written.** The same window a
+vault repair uses: every file it would create, every one it would refresh, and
+the line-by-line difference for anything already there. Say no and nothing
+happens. Files that already match are not listed at all, so running it a second
+time on an unchanged vault tells you so and stops.
+
+**Your properties come with the note, written into the page.** This is the one
+place the export differs from the clipboard copy, and it matters: a copy that
+kept its properties as properties would still say `journal: Daily Notes`, and
+Almanac would read it as a second Tuesday — in your calendar, your rollups and
+every chart. So the properties become a short block at the top of the page
+instead. Nothing is lost, everything is visible, and no copy can be mistaken for
+the entry it came from.
+
+**It only ever writes inside the export folder.** Nothing else in your vault is
+touched, read back, or changed by any of it — the copies are copies, and Almanac
+never reads them again.
+
+**Entries and journal notes only.** Dashboards, the homepage and Search are
+views built out of those pages rather than pages you write on, so exporting them
+would just fill a folder with empty scaffolding.
+
+Two things it deliberately does not do: it does not delete an exported copy when
+you delete the note it came from, and it does not copy your images and
+attachments — an exported note's `![[picture.png]]` still points into the vault.
+
+## [4.30.0] - 2026-08-15
+
+**Your writing can leave.** Almanac keeps what you type in two places a reader
+cannot see without the plugin: the words themselves sit inside HTML comments,
+which Obsidian hides, and the name of each field — *Today's focus*, *Highlights*
+— lives inside a fenced block that shows up as code. Uninstall the plugin, or
+open a year of entries in anything else, and a page you wrote every morning is a
+stack of code blocks over nothing.
+
+There is a new command, **Note: copy as plain markdown**. Run it on a diary
+entry or a journal note and the whole page goes to your clipboard as ordinary
+markdown: a heading per field, with the field's name as you see it on the page,
+and your words underneath. Paste it into anything.
+
+**It is your writing that comes out, and only that.** Task lists become real
+markdown checkboxes, your lists become lists, recall cards become a question in
+bold with its answer under it, and attachments are already links so they come
+through as they are. Calendars, charts, tables, summaries and the like are left
+out — they are views built from the rest of your vault rather than something you
+wrote on this page, and a copy of them would mean nothing away from it.
+
+**Nothing is written anywhere.** No new file, no new folder, no setting, nothing
+to migrate, and no window to confirm — the command reads the page and fills your
+clipboard. If you don't like what comes out, don't press it again.
+
+**Your properties come through untouched**, exactly as they are on the page. The
+date, the title, your tracker readings and any events stamped on an entry are
+copied byte for byte at the top. Readings are not repeated as text further down:
+they are already in the properties, and one number in two places is one number
+that can end up disagreeing with itself.
+
+If you have renamed a section — the header bar on any field is editable — the
+copy uses **your** name for it, not the one Almanac shipped.
+
+## [4.29.0] - 2026-08-15
+
+**Your entries can decide what an entry looks like.** Until now the shape of a
+daily, weekly, monthly, quarterly or yearly entry was the plugin's, with two
+checkboxes in Settings to soften it. There is a new **Template…** item on every
+entry's cog, next to *Edit sections…*, and it does three things.
+
+**Save this page as the default.** Arrange an entry however you like — drag its
+sections into the order you want, take out the ones you never use, point *From
+the journals* at the journal you actually read — then save that page as the
+default for its grain. Every new entry of that grain is built from it. Entries
+you already have keep what they have.
+
+**Keep named layouts.** Save an arrangement under a name and choose which grains
+it is offered on, so a "Quiet Monday" saved from a daily entry can be reloaded
+onto a weekly one too. The section editor's own *Save as layout…* button now
+works on diary entries as well, so you can arrange and keep in one go.
+
+**Reload a template onto an entry you have not written in.** Pick the grain's
+default or any saved layout and the entry is rebuilt from it. **This is only
+offered when the entry is genuinely empty**, and "empty" is strict: a word in
+any section, a tracker you added to that one entry, a line you typed under the
+rule, or a directive of your own in the widget fence all count. When something
+is in the way the window says exactly what, and points you at *Edit sections…*,
+which changes an entry's sections without losing anything.
+
+Nothing about a reload touches your properties. The date, the title, and any
+special events stamped on the entry are kept exactly as they are — only the body
+is rebuilt — and you see the full diff and confirm before anything is written.
+
+Saving a default finishes by opening the usual template-refresh window, so you
+can see precisely what the entry templates on disk gain and lose before saying
+yes. Nothing else in your vault is read or changed.
+
+## [4.28.0] - 2026-08-15
+
+**Every capture is its own card now.** The Captured section was one text box
+holding the lot, so there was no way to cross one thought off, delete one, or
+fix a typo in one without editing all of them as text. Each capture is now a
+card with its timestamp, and three controls that appear when you hover it:
+**cross off**, **edit**, and **delete**.
+
+Crossing one off draws a line through it and records the date — useful if you
+use the capture log the way a lot of people do, as the day's running to-do list.
+Press it again to bring it back. Editing opens that one capture for typing;
+Cmd/Ctrl+Enter saves it, Escape abandons it, and multi-line captures stay
+multi-line.
+
+**Your existing captures are untouched.** The region on disk keeps the exact
+format it has always had — a card list is a new way of showing it, not a new way
+of storing it. Open an entry, change nothing, and nothing is written. A capture
+you crossed off gains a small `[done:: date]` at the end of its first line, and
+that is the only addition.
+
+**The section still folds** where it always did, and remembers it per entry
+exactly as before.
+
+## [4.27.0] - 2026-08-15
+
+**The capture box asks where it is going.** It has always written to today's
+daily entry and never said so, which meant a *Captured* section added to a
+weekly or monthly entry could never be filled, and capturing while you read a
+past entry quietly landed somewhere else. There is now a **Capture to** row at
+the top of the box. Cmd/Ctrl+Enter still captures in one keystroke without
+touching it.
+
+It offers the entries that can actually show a capture: today always, plus any
+grain you tick *Captured* for in **Settings → Almanac → Diary entries**, plus
+the note you are on when it is an entry with a Captured field of its own. A
+destination that would swallow the text into a note that draws nothing is not
+offered at all.
+
+**A capture can no longer be overwritten by the field it landed in.** If a
+capture arrived while a Captured box was open — from another device, another
+pane, or the mood-note pencil — the next edit to that box could write over it.
+The text now appears in the open field as it arrives, and any write that would
+have replaced it carries it along instead.
+
+**Diary entries settings are one table.** Five stacked lists repeating the same
+two rows are now a grid: a row per section, a column per grain, with *Ships*
+where a grain's template already writes it and a dash where it cannot have one.
+
+**Settings tables follow your theme.** The pills in Trackers, Journals and the
+new table had their colours written in by hand, so they drew a light-mode chip
+whatever theme you use.
+
+## [4.26.0] - 2026-08-15
+
+**Trends and statistics now matches every other heading.** 4.25 put the whole
+plugin's section titles into sentence case and had to leave this one behind: it
+is the heading Almanac uses to *find* your chart section, not only to show it,
+and renaming it would have quietly unhooked two old repairs from the notes that
+still need them. Almanac now remembers every spelling a heading has shipped
+under, so the words could change without anything losing track of the section.
+
+**Nothing on your pages changes until you say so.** Existing dashboards keep
+reading "Trends and Statistics" and keep working exactly as they do — the charts
+draw, the toolbar appears, the section folds. To take the new spelling, run
+**Almanac: Maintenance: set up / repair vault** and tick *migrations*; you get
+the usual line-by-line preview first, and declining costs you nothing but a
+capital S.
+
+**A Trends bar you renamed yourself is left alone.** If your chart section is
+called "My numbers", it stays "My numbers". Almanac only rewrites headings it
+wrote itself, which is why it keeps a list of its own past wording rather than
+guessing from the shape of the words.
+
+## [4.25.0] - 2026-08-15
+
+**A section is called the same thing on every page it appears on.** "Open Tasks"
+and "Open tasks" were both on screen, on adjacent pages, in the same session —
+one section could carry four separate display strings and nothing compared them.
+The headings written into your dashboards, the rows in the section editor and
+the bar over a folded block now agree: *Open tasks*, *On this day*, *All
+entries*, *Search the diary*.
+
+Your notes keep whatever their headings currently say — nothing is rewritten
+behind you. To take the new wording, run **Almanac: Maintenance: set up / repair
+vault** and accept the changes it lists; each one shows you the exact line
+before and after. Declining leaves everything working, and a heading you
+retitled yourself is still yours.
+
+**Trends and Statistics deliberately keeps its capitals.** It is the one heading
+the plugin uses to *find* a section rather than only to display it, so renaming
+it would hide your charts on every dashboard written before the rename.
+
+**A Subject Index wore the charts icon over its open tasks.** 📊 where every
+other page in the plugin uses ⏳ — in the section editor's list and in the
+heading it wrote into the note.
+
+**The search box's example filters had a date frozen in them.** The diary's hint
+line read `to:2026-03` — a month in the past, written into the source rather
+than read off the calendar — and the journal's *Find* box omitted `to:`
+entirely, so the two boxes taught different syntaxes for the same search. Both
+are now built from the search grammar itself, so neither can go stale.
+
+**Internal:** the charts region's "No charts yet" sentence existed in two files;
+it is one constant now.
+
+## [4.24.0] - 2026-08-14
+
+**Visual excellence: frames, depth hierarchy, and interface consolidation.**
+- **Surface Elevation**: Defined a structured 3-tier surface depth system (`--am-surface-card`, `--am-surface-raised`, `--am-surface-inset`) with subtle top-edge highlights (`--am-edge-highlight`) across all callouts, cards, and section blocks.
+- **Card Frames & Boundaries**: Standardized 1px borders with smooth 10px radius (`--am-radius-md`) and seamless hover transitions.
+- **Modal Scaffolding**: Consolidated dialog architectures (`RepairModal`, `EditorModal`, pickers) with isolated scrollports, discrete 6px webkit scrollbars, and pinned footer action rows.
+- **Accessible Focus Rings**: Modern `:focus-visible` rings for buttons, inputs, and selects.
+
+## [4.23.0] - 2026-08-14
+
+**Template drift detection, unified refresh parity, and upgrade safety.**
+- **Unified Repair Window**: Integrated template drift into `surveyRepair()` with exact added and removed line diffs (`+N −N`).
+- **Safety Parity**: Standalone template refresh commands now open the diff-based repair modal before modifying files.
+- **Upgrade Detection**: Added `installedVersion` tracking to surface pending migrations upon plugin updates.
+
+## [4.22.0] - 2026-08-14
+
+**You can set how tall a widget is now.** A group's columns have been resizable
+since 4.9 and its rows have not, so every widget in a column was exactly as tall
+as its content wanted and nothing on the page could say otherwise — a table with
+five empty topics still drew five rows and took the space, and *On this day*, the
+widget whose whole value is showing more of itself, stayed two lines.
+
+**Hover a group and every card draws a mark on its bottom edge**, the last one in
+each column included. Drag it and the card follows, snapping to twenties; letting
+go writes a `height: 240` line above the widget, which is a line you could have
+typed. The card's contents scroll inside the height you chose — a card scrolls
+rather than stretching, because stretching a card does not stretch what is in it.
+
+**Drag it back past the card's own height and the line goes away.** A card that
+is already the height it wants needs no number, and one left behind would go
+stale the first time the widget had more in it. Escape mid-drag puts it back and
+writes nothing.
+
+**A height travels with the widget it sizes.** Drag a sized card to another
+column and its `height` line goes too; remove that section in the page's section
+editor and the line goes with the section. Nothing is left behind sizing the
+widget that moved up into its place. Drag one out to a block of its own and it
+tells you why a height cannot mean anything there, rather than leaving a line
+that quietly does nothing.
+
+The mark you drag is the one that has been drawn between stacked widgets since
+4.13.1 — it was inert then because there was no way to write a height down. It is
+the same mark, in the same place, doing the job it was drawn for.
+
+## [4.21.3] - 2026-08-14
+
+**A diary entry and a journal note said their name twice.** Obsidian draws the
+note's name above the note and the banner draws it again, larger, with a rename
+on it. Almanac has hidden Obsidian's copy on its dashboards since 4.5.1; the rule
+only ever recognised the dashboard banner, so the two page kinds you are in most
+have been showing both names ever since. Remove the banner and Obsidian's title
+comes back, exactly as on a dashboard.
+
+**Pressing Enter on an entry's title now closes the field.** It saved correctly
+and left the input open — the title only appeared after you left the note and
+came back.
+
+**And the date and "Tracking:" moved above the card's hairline**, where they
+belong: the rule now separates everything the page says about itself from the
+grid you fill in, rather than running between the two halves of that.
+
+## [4.21.2] - 2026-08-14
+
+**A diary entry showed "Daily" where its date belongs.** On a daily note that
+lasted until you next saved something; on a weekly, quarterly or yearly entry it
+was permanent, because those three keep their date under a property the strip
+never looked at. All four are fixed, and a date that genuinely cannot be read is
+now left blank rather than replaced with the word for what kind of note it is.
+
+**Clicking the title of an entry no longer shrinks it.** The field that opened
+was a third smaller than the words it was editing, so the row re-wrapped under
+your cursor. It is now the same size as the title, and it widens as you type.
+
+**The date moved down to the "Tracking" row.** Your title for the day, the date
+and the navigator between entries were three things on one line — fine in a wide
+pane, two wrapped lines on a phone. The date now sits at the left of the caption
+over the logging grid, opposite **Tracking:**, and the title line is a title and
+one control.
+
+## [4.21.1] - 2026-08-13
+
+**There are two banners now, where there were four.** A page you land on gets the
+large one; a note you write in gets the slim one. Diary entries and journal notes
+were drawing two different slim banners that were meant to be identical and were
+not — their strips differed by about 24 pixels and the cog sat in a different
+place on each. They are one drawing now, so a change to how a note identifies
+itself cannot reach one page kind without reaching the other.
+
+**Every banner opens with the note's name.** Dashboards already did; entries and
+journal notes opened with their navigation and put the name underneath. The name
+leads and the row of destinations is welded beneath it, on all nine surfaces.
+Nothing in your notes is rewritten to do this.
+
+**The cog is beside the name, and on an entry it now looks it.** 4.21 moved it
+there and it rendered on a line of its own underneath, because the band it moved
+into was not laid out as a row.
+
+**The title you give a day is the biggest thing on the page.** 4.21 moved it out
+of the banner and set it small, which left `Day-2026-08-13` as the largest words
+on a diary entry and the line saying what the day actually was reduced to a
+label. Both are still where 4.21 put them; the alias is now set above the file
+name, with the date beside it.
+
+**The logging grid says "Tracking".** It was the only section in the plugin with
+a card around it and no name on it.
+
+**And the section editor stopped describing rows by what used to be in them.** A
+diary entry's Banner still listed the date navigator and the tracker grid, which
+left it in 4.20 and 4.21; a journal note's still listed its tracker grid, and
+wore a different icon from the same section on every other page.
+
+## [4.21.0] - 2026-08-13
+
+**A diary entry's banner shows what the note is called.** It used to show a
+`title` property from the frontmatter, falling back to a formatted date — so an
+entry was the one Almanac page whose banner did not show its own file name, and
+the one place renaming from the banner did not rename the file. It does now, like
+every other page. **Your existing titles are not lost**: they moved down to the
+tracker section, along with the prev/next date stepper, and the cog came up to
+sit beside the name it acts on.
+
+**The tracker section has a frame.** Moving the grid out of the banner in 4.20
+left it as loose cards on the page with nothing around them. It is a card now,
+matching the banner above it, with a strip across its top carrying what the page
+knows about itself — on a diary entry the title and the date navigator, on a
+journal note its level and its kind.
+
+**A journal note now says what it is.** Its level (Subject, Topic, Lesson) and,
+on a leaf, its kind were only ever written in frontmatter; two notes with
+identical breadcrumbs could be a Lesson and a Practice with nothing on the page
+saying which.
+
+**And the banner stopped calling itself "Links".** Every dashboard, every entry
+and the Search note drew a bar reading **🔗 LINKS** above the page's own name.
+4.19.1 fixed it for the dashboards and the fix could not reach an entry, whose
+banner opens with its navigation row; it is fixed for all of them now.
+
+**The section editor reads the same on every page type.** The bands are named for
+what they hold rather than where they sit, and every refusal is one sentence in
+one shape. One of them read *"Trackers is part of every entry"* — every refusal
+opened with the section's own name, so the first plural name to arrive broke the
+sentence. They no longer repeat the name the row already shows above them.
+
+## [4.20.0] - 2026-08-13
+
+**A banner is now three things: the file's name, its navigation, and the cog that
+edits the page.** Those three, and nothing else — which is the sentence the rest
+of this release follows from.
+
+**Your trackers are their own section.** The grid of ratings you fill in on a
+diary entry or a journal note used to live inside the banner's card, and it was
+there because of where the plugin needed to put some markers in 2018, not because
+anybody decided the banner should hold it. It is a block of its own now, directly
+under the banner and still above the rule — so you can move it, and the section
+editor lists it by name. On a diary entry it cannot be removed: every chart on
+every dashboard reads these cells, so a note without the grid quietly empties the
+pages above it.
+
+**The homepage's banner carries the same row as every other page** — Home, Diary,
+Journals — where it used to show only the name. It overlaps two tiles of the
+**Go to** grid, and that is the price: the banner means the same thing on every
+page now, instead of being one thing on eight pages and something else on the
+ninth. The two are not really the same object anyway — the banner's row is chrome
+you read to know where you are, and Go to is content you click.
+
+**One control on every page.** A diary entry and a journal note had the same menu
+as a dashboard, opening the same section editor, behind a `⋯` instead of a cog.
+It is the cog everywhere now.
+
+**Two formats, and they are named.** A **Dashboard banner** on the homepage,
+Search, the two folder notes and the four period overviews — drawn loud, because
+those are pages you land on. An **Entry banner** on diary entries and journal
+notes — drawn quiet, because those are pages you write in.
+
+**Nothing in your vault is rewritten.** Entries you already have keep their
+trackers where they are and go on working; the new arrangement is what a new entry
+gets. An existing homepage keeps its current banner until you re-make it.
+
+## [4.19.1] - 2026-08-13
+
+**The banner was drawing a bar that said "Links" above your page's name.** Every
+dashboard and the Search note showed it. When 4.19 welded the page's name and its
+navigation row into one block, the block took its heading from the only widget in
+it that had a name to give — and that was the navigation row, not the page. The
+banner says the page's name now, and nothing above it.
+
+**The banner is one material rather than two.** The accent wash and the hatch
+behind the page's name used to stop at the divider, so the pills underneath sat
+on a plain strip and the block read as two things stacked. They run the whole
+banner now, and the divider between the name and the pills is a hairline instead
+of a full rule.
+
+**Diary entries and journal notes get the quieter banner they should have had.**
+Both keep their card, and both lose a third of their height. The date on a diary
+entry was being drawn at the size of a section label — smaller than the words
+underneath it — and is now the same size as the name on a journal note, so the
+two read as the same kind of thing. A journal note's breadcrumb trail becomes a
+small-caps line above the title, matching the row of destinations a dashboard
+banner draws in the same place.
+
+**No note is rewritten by any of this.** It is all in how the blocks are drawn.
+
+## [4.19.0] - 2026-08-13
+
+**Every page now opens with a Banner — one block that says which note this is
+and where it goes, and one row in the section editor.** Until now a page's own
+name and its navigation row were two separate sections in two separate blocks,
+and the section editor showed you two rows for what the page draws as one strip.
+On Search the navigation row was worse than separate: it was a line inside the
+search block, so it belonged to a section you could remove, and no row in the
+editor described it.
+
+**One thing is taken away, and it is the reason this is worth reading.** The
+banner carries the way out of the page, so it cannot be removed. On the four
+period overviews, Search and the homepage you could remove the plain title card
+before this release, and you can't now. A page you cannot get home from is worse
+than a page with a name you did not want, and one rule across every page beats a
+rule that held on five of them.
+
+**Your existing notes are not rewritten.** Pages made before 4.19 keep their two
+blocks and render exactly as they always have. To bring them to the new shape,
+run **Set up / repair vault** and tick **Run format migrations** — it shows you
+every line it would move before it moves one, and moves the row rather than
+rewriting it, so your own destinations survive. Ordinary repair adds nothing to
+these pages and never gives one two navigation rows.
+
+**Diary entries and journal notes are almost unchanged.** Their banner already
+did this job — it is what names the note and renames it — so what changed there
+is that the editor stops listing it twice. The composed entry templates come out
+byte-for-byte identical to 4.18's.
+
+**What is deliberately not in the banner:** the **Go to** grid, the diary
+calendar card, and the period overview's date navigator. Those are widgets you
+chose, and they stay their own sections.
+
+**Also in this release**
+
+- A dashboard's section list called two different things the banner — the block
+  at the top, and the period summary beneath it. The summary's description no
+  longer claims the word.
+- A refusal on the homepage, Search and both folder notes could say *"You can
+  move it, though."* about a section that cannot move. It now says which
+  restriction it means.
+- Fixed a fault that could have swapped two blocks' contents on a period
+  overview: a page with two blocks matching one section could have the second
+  written over the first when you reordered anything, with nothing in the
+  preview saying so. The first block in the file is the section now, and the
+  second is reported as a block Almanac does not manage.
+
+## [4.18.2] - 2026-08-13
+
+**Renaming something now updates it everywhere it is on screen, not just in the
+tab you are reading.** Almanac blocks can be drawn outside an ordinary note tab —
+by a dashboard or homepage plugin that embeds your notes, or anywhere else a note
+is rendered inside another view. Until now those copies kept whatever words they
+were drawn with: rename a note type from *Lessons* to *Seminars* and the heading
+in your note updated while the same section, embedded in a dashboard beside it,
+still said *Lessons* until something happened to redraw it.
+
+**This includes the buttons.** The per-topic buttons Almanac writes into table
+cells are the ones a rename renames, and they were the most visible half of the
+disagreement.
+
+**And *set up / repair vault* now always opens its window.** If your vault was
+already up to date the command used to say so in a corner notice and open
+nothing, which left you deciding whether it had run at all. This command is as
+often a question — *is anything out of date?* — as it is a fix, so it now answers
+in the window, where the answer was going to appear. A vault with nothing to do
+gets a window saying so, naming what it looked for, and one button that closes
+it. Nothing is written on that path, exactly as before.
+
+### Fixed
+- **Blocks rendered outside a markdown tab now repaint with everything else.**
+  The repaint that follows a note-type or heading rename could only reach notes
+  open in a markdown tab, because re-rendering the note was the only way it knew
+  to redraw a block. Each rendered block now knows how to draw itself again, so
+  the repaint reaches embeds, dashboards and any other host that renders a note.
+- **Inline `almanac:` widgets repaint too**, including the table-cell buttons
+  that a rename gives new labels.
+
+### Changed
+- **The repair window opens every time the command is run.** It previously
+  stayed shut when there was nothing to do and reported that as a notice. The
+  window now carries that answer itself, as an empty state that names what it
+  checked for, with a single Close button — no ticks and no confirmation to
+  answer, because there is nothing being proposed.
+- **A block redrawn in place no longer leaves its old watchers behind.** Each
+  drawing of a block owns the live widgets inside it, and the previous drawing is
+  discarded before the next one starts — so a block that is redrawn many times
+  keeps one set of watchers rather than accumulating a set per redraw.
+
 ## [4.18.1] - 2026-08-13
 
 **Repair asks before it acts, and shows you the lines.** *Maintenance: set up /

@@ -61,7 +61,7 @@
 
 import { HEADER_PREFIX, TRENDS_HEADING } from "../core/constants";
 import { SCOPE_ALL } from "../core/directive-grammar";
-import { composeFlatNote, flatNoteModel, PAGE_TITLE_SECTION } from "../core/note-sections";
+import { composeFlatNote, flatNoteModel, bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
 import type { SectionModel } from "../core/section-model";
@@ -74,11 +74,16 @@ const chartLinesIn = (text: string): number =>
   text.split("\n").filter((l) => /^\s*chart:/.test(l)).length;
 
 export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
-  // THE HEAD, FIRST. 4.10 — see `PAGE_TITLE_SECTION`. It is also the only
-  // navigation this page has ever had: unlike the diary folder note, whose
-  // diary card carries destination pills of its own, this one composed no
-  // `links:` row and nothing else here goes anywhere.
-  PAGE_TITLE_SECTION,
+  // THE BANNER, FIRST. 4.10 gave this page a head; 4.19 made the head a banner
+  // — see `bannerSection`. It is also the only navigation this page has ever
+  // had: unlike the diary folder note, whose diary card carries destination
+  // pills of its own, this one composed no `links:` row and nothing else here
+  // goes anywhere.
+  //
+  // SO ITS BANNER CARRIES THE VAULT'S THREE AND NO TIME ROW, which is this
+  // page's whole navigation in one block rather than in none — the state 4.19
+  // was written to reach, arrived at here by the page already being close.
+  bannerSection({ ids: PAGE_TITLE_IDS }),
   {
     id: "journals",
     label: "Journals",
@@ -128,7 +133,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
   },
   {
     id: "open-tasks",
-    label: "Open Tasks",
+    label: "Open tasks",
     blurb: "Still-open Almanac tasks from every note under the journals root.",
     icon: "⏳",
     // BARE, unlike the queue above it, and the two are not inconsistent.
@@ -162,13 +167,13 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     ],
     render: () => ({
       fence: "almanac",
-      lines: ["header:⏳ Open Tasks", "tasks-table"],
+      lines: ["header:⏳ Open tasks", "tasks-table"],
     }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },
   {
     id: "charts",
-    label: "Trends and Statistics",
+    label: "Trends and statistics",
     blurb: "The charts manager for the journals.",
     icon: "📊",
     // NOT LOCKED, AND NOT FREELY REMOVABLE EITHER, on the argument every other

@@ -16,22 +16,23 @@
 .callout[data-callout="log"],
 .callout[data-callout="chart-empty"],
 .journal-calendar {
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
+  background: var(--am-surface-card);
+  border: 1px solid var(--am-border-subtle);
   border-radius: var(--am-radius-md);
+  box-shadow: inset 0 1px 0 var(--am-edge-highlight);
 }
 .callout[data-callout="note"],
 .callout[data-callout="focus"],
 .callout[data-callout="log"],
 .callout[data-callout="chart-empty"] {
   margin: 0.75em 0 1.5em;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .callout[data-callout="note"]:hover,
 .callout[data-callout="focus"]:hover,
 .callout[data-callout="log"]:hover,
 .callout[data-callout="chart-empty"]:hover {
-  border-color: var(--interactive-accent);
+  border-color: var(--am-border-hover);
 }
 .callout[data-callout="note"] .callout-title,
 .callout[data-callout="focus"] .callout-title,

@@ -161,10 +161,57 @@ describe("every model answers the same six questions", () => {
         if (why !== null) {
           expect(typeof why, `${name}/${s.id}`).toBe("string");
           expect(why.length, `${name}/${s.id}`).toBeGreaterThan(0);
-          // A refusal that only says no sends someone looking for a setting
-          // that does not exist. Every one of them names the section.
-          expect(why, `${name}/${s.id}`).toContain(s.label);
+          // ── WHAT A REFUSAL OWES, RESTATED (4.21) ──────────────────
+          //
+          // This asserted that every refusal NAMES THE SECTION, on the rule
+          // that "a refusal which only says no sends someone looking for a
+          // setting that does not exist". The rule is right and naming the
+          // section was the wrong way to satisfy it — the refusal is drawn as
+          // the row's subtitle, directly under the row's own title, so it
+          // repeated the word immediately above it. And it opened the sentence
+          // with a label of unknown number, which is how the tracker section
+          // came to say *"Trackers is part of every entry"*.
+          //
+          // WHAT IS ASSERTED INSTEAD is the property that rule was for: a
+          // refusal says what the section is part of, and says what cannot be
+          // done — so it is a reason rather than a no.
+          // WHAT IT IS, then what that costs, then — where there is one — the
+          // thing the reader can still do. The third shape is the journal
+          // catalogue's "Written as ordinary markdown", which names the fix
+          // instead of an alternative because there is no control that can do
+          // it: that is still a reason rather than a no.
+          expect(why, `${name}/${s.id}`).toMatch(/^(Part of|Holds|Written as)/);
+          expect(why, `${name}/${s.id}`).toMatch(
+            /can't be removed|Remove .* first|delete it by hand/
+          );
+          // And it does not open by repeating the row's own title.
+          expect(why.startsWith(s.label), `${name}/${s.id}`).toBe(false);
         }
+      }
+    }
+  });
+
+  it("reads as a sentence whatever the section is called (4.21)", () => {
+    // ── THE DEFECT, NAMED ─────────────────────────────────────────────
+    //
+    // 4.20 added a section labelled "Trackers", and the window rendered
+    // *"Trackers is part of every entry and cannot be removed."* Every refusal
+    // opened with `${section.label}` followed by a singular verb, so the first
+    // plural label to arrive broke the sentence. Nothing caught it because the
+    // suite asserted the label was PRESENT — which it was.
+    //
+    // ASSERTED AGAINST A HOSTILE LABEL rather than against today's catalogue,
+    // because the catalogue is what changes. A refusal that cannot be broken by
+    // renaming a section is a refusal that does not depend on the name.
+    for (const { name, model, text } of surfaces()) {
+      for (const s of model.sections()) {
+        const why = model.refusal(s.id, text);
+        if (why === null) continue;
+        // No copy of the label anywhere in it, so no verb can disagree with it.
+        expect(why.includes(s.label), `${name}/${s.id}`).toBe(false);
+        // And it is a sentence: opens capitalised, ends stopped.
+        expect(why[0], `${name}/${s.id}`).toBe(why[0].toUpperCase());
+        expect(why.trim().endsWith("."), `${name}/${s.id}`).toBe(true);
       }
     }
   });
@@ -354,13 +401,15 @@ describe("bands are data, not a branch", () => {
     }
   });
 
-  it("is two on a diary entry, because a section may not cross the rule", () => {
+  it("is three on a diary entry, because a section may not cross the rule", () => {
     const model = entrySectionModel({ grain: "daily" });
     const groups = new Set(model.sections().map((s) => s.group));
-    // STILL TWO AFTER 4.10, which is the scope boundary asserted from the model
-    // rather than from the markdown: an entry gained no page head, so it gained
-    // no band. See masthead.test.ts for the same boundary in the composed note.
-    expect(groups.size).toBe(2);
+    // TWO UNTIL 4.20, WHEN THE GRID GOT A BAND OF ITS OWN. The rule is unchanged
+    // — a section may not cross the rule — and there is now a third band ABOVE
+    // it, because the trackers left the banner and a band is what the editor
+    // lets a row move within. One band for the two would let the grid be dragged
+    // back into the card it was just taken out of.
+    expect(groups.size).toBe(3);
     expect([...groups].every((g) => typeof g === "string")).toBe(true);
   });
 

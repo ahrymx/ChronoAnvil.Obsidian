@@ -181,6 +181,36 @@ export type WidgetExclusionReason =
   | "region"
   // What a page IS rather than something on it. A second banner is a second
   // answer to "which note is this".
+  //
+  // ── AND AS OF 4.20 EVERY ALMANAC PAGE HAS ONE, IN TWO FORMATS ───────
+  //
+  // A banner is the file's NAME, its NAVIGATION and the CONTROL that edits the
+  // page — those three, and nothing else. That last clause is what 4.20 settled
+  // and it is the reason the tracker grid left both minimal banners: a rating is
+  // content, and content that lives in the banner's fence lives in its card.
+  //
+  //   DASHBOARD BANNER — the homepage, Search, both folder notes and the four
+  //   period overviews. Composed from `title:` and `links:` in one fence, drawn
+  //   loud: an accent wash and a hatch across the whole block, because these are
+  //   pages you land on and a page you land on announces itself.
+  //   `.journal-page-banner`.
+  //
+  //   ENTRY BANNER — diary entries and journal notes. Composed from
+  //   `entry-header` or `journal-header`, each of which already draws an
+  //   editable name, and drawn quiet: a tight card, no wash, no hatch, a
+  //   small-caps context line above the name. These are pages you WRITE in, and
+  //   a note you are writing in does not announce itself.
+  //   `.journal-entry-banner` and `.journal-study-banner`.
+  //
+  // TWO FORMATS AND NOT THREE, which is why the two classes in the second
+  // paragraph are one entry: they take the same padding, the same name size and
+  // the same context row, so a reader moving between an entry and a journal note
+  // sees one object. They stay two classes because they are built by two
+  // builders; `30-header-bars.css` spells the shared numbers once.
+  //
+  // NEITHER FORMAT CARRIES SPECIAL NAVIGATION. The launcher, the diary calendar
+  // card and the period overview's date navigator are widgets a reader chose,
+  // and they are sections of their own on the pages that have them.
   | "banner"
   // Structure rather than content: the page's own name, and the inert strip
   // that gives the cursor somewhere to land.

@@ -48,7 +48,7 @@ import {
   setIcon,
   TFile,
 } from "obsidian";
-import { overflowButton } from "../ui/section-frame";
+import { settingsButton } from "../ui/section-frame";
 import { attachNoteRename } from "../ui/header-title";
 import type AlmanacPlugin from "../main";
 import {
@@ -310,7 +310,7 @@ function attachBannerMenu(
   if (!ctx) return;
 
   const isTemplate = plugin.sections.isTemplate(notePath);
-  overflowButton(host, "jsh-more", (menu: Menu) => {
+  settingsButton(host, "jsh-more", (menu: Menu) => {
     menu.addItem((i: MenuItem) =>
       i
         .setTitle("Edit sections…")
@@ -377,8 +377,46 @@ export function buildStudyHeader(
   // answered one way across the plugin.
   const isIndex = !!file.parent && file.basename === file.parent.name;
 
-  // ── Row 1: the trail + this note's date or activity ──────────────────
-  const nav = wrap.createDiv({ cls: "jsh-nav" });
+  // ── Band 1: the note's name, and the cog (4.21.1) ────────────────────
+  //
+  // EXTRACTED IN 4.5 and called rather than kept here. Every line of what this
+  // used to hold — the pencil, the input, the commit guard, the collision
+  // checks, the folder-note pair rename — now lives in `attachNoteRename`,
+  // because the page title card wanted the same control and a second copy of a
+  // rename is how two callers start disagreeing about which characters a name
+  // may have. The classes are unchanged: `jsh-title` names the same four.
+  //
+  // AND IT IS FIRST NOW, WHERE THE TRAIL WAS. Three surfaces drew a banner and
+  // two of them opened with navigation; the page banner opened with the name.
+  // 4.21.1 settled it the page banner's way on all of them — the name is what a
+  // reader looks for on a note they opened deliberately, and the trail is a
+  // second fact about it. `journal-banner-name` is the class that says so, and
+  // it is the same one `buildEntryHeader` puts on its band.
+  const titleRow = wrap.createDiv({ cls: "jsh-titlerow journal-banner-name" });
+  // A WRAPPER OF ITS OWN, WHICH IS LOAD-BEARING AND NOT TIDINESS.
+  // `attachNoteRename` calls `row.empty()` to swap the name for an input and
+  // `row.empty()` again to swap it back, so anything else parented in that row
+  // is destroyed by the first rename and never comes back. The cog is now in
+  // this band; it goes beside the wrapper rather than inside it. `page-title.ts`
+  // and `buildEntryHeader` both take the same precaution, which is why neither
+  // has ever lost its control to a rename.
+  const titleWrap = titleRow.createDiv({
+    cls: "jsh-title-wrap journal-banner-title",
+  });
+  attachNoteRename(app, titleWrap, file, "jsh-title");
+
+  // THE COG SITS BESIDE THE NAME, and this reverses a decision rather than
+  // drifting from one. It was in the crumb row on the argument that the title is
+  // click-to-edit, so "a control next to it would be a control one slip away
+  // from renaming the note". The page banner has had a cog beside a
+  // click-to-edit title since 4.5 and an entry's since 4.21, both without the
+  // slip the argument predicted — the two are a hand's width apart at the
+  // band's opposite ends, and the rename needs a click ON the name. Three
+  // banners placing one control three ways was the larger cost.
+  attachBannerMenu(plugin, titleRow, ctx.sourcePath, isIndex);
+
+  // ── Band 2: the trail + this note's date or activity ─────────────────
+  const nav = wrap.createDiv({ cls: "jsh-nav journal-banner-nav" });
   const crumbs = nav.createDiv({ cls: "jsh-crumbs" });
   const type = journalTypeOfNote(plugin, ctx.sourcePath);
   const trail = journalCrumbs(app, plugin, file, isIndex);
@@ -401,27 +439,76 @@ export function buildStudyHeader(
     // folder that has nothing to do with Study.
     (type?.kinds ?? []).map((k) => k.id)
   );
-  // Date and overflow control share a trailing group rather than sitting as
-  // two more children of the row. `.jsh-nav` is `justify-content:
-  // space-between`, so a third child would have pushed the date to the CENTRE
-  // of the banner — correct per the flexbox rule and wrong on the screen.
-  const navEnd = nav.createDiv({ cls: "jsh-nav-end" });
-  if (meta) navEnd.createDiv({ cls: "jsh-date", text: meta });
-
-  // In the crumb row rather than beside the title, which is click-to-edit — a
-  // control next to it would be a control one slip away from renaming the note.
-  attachBannerMenu(plugin, navEnd, ctx.sourcePath, isIndex);
-
-  // ── Row 2: the click-to-edit title ───────────────────────────────────
+  // The date keeps its trailing group even now that the cog has left it. The
+  // group exists because `.jsh-nav` is `justify-content: space-between`, and a
+  // row of three children would push the middle one to the CENTRE of the band —
+  // correct per the flexbox rule and wrong on the screen. It is still two
+  // children today (the trail and this), and the group is what keeps that true
+  // if anything else ever joins the end of the row.
   //
-  // EXTRACTED IN 4.5 and called rather than kept here. Every line of what this
-  // used to hold — the pencil, the input, the commit guard, the collision
-  // checks, the folder-note pair rename — now lives in `attachNoteRename`,
-  // because the page title card wanted the same control and a second copy of a
-  // rename is how two callers start disagreeing about which characters a name
-  // may have. The classes are unchanged: `jsh-title` names the same four.
-  const titleRow = wrap.createDiv({ cls: "jsh-titlerow" });
-  attachNoteRename(app, titleRow, file, "jsh-title");
+  // AND IT IS NOT DRAWN EMPTY. With the cog gone there is nothing else in it, so
+  // a note with no date to report would otherwise contribute a zero-width flex
+  // child to a `space-between` row — invisible, and one more thing for the trail
+  // to be spaced against.
+  if (meta) {
+    const navEnd = nav.createDiv({ cls: "jsh-nav-end" });
+    navEnd.createDiv({ cls: "jsh-date", text: meta });
+  }
 
   return wrap;
+}
+
+// ── THE JOURNAL NOTE'S PAGE-CONTEXT STRIP (4.21) ─────────────────────
+//
+// The counterpart of `buildEntryContext`, and the same argument one surface
+// over: 4.20 settled that a banner is the file's name, its navigation and the
+// cog, so everything ELSE a page knows about itself moved onto the tracker
+// section — the block that holds what this page type is.
+//
+// WHAT AN ENTRY PUTS THERE is its alias and the navigator between days. What a
+// JOURNAL NOTE puts there is the pair that says where it sits in its journal:
+// its LEVEL — Subject, Topic, Lesson — and, on a leaf, its KIND.
+//
+// WHY THOSE TWO. A journal's crumb trail says which subject and topic a note is
+// under; it does not say what the note IS. Two notes with identical trails can
+// be a Lesson and a Practice, and until now the only place that was written was
+// a `type:` line in frontmatter. It is the same fact `children` groups a table
+// by and `bridge` pulls across, said on the note it describes.
+//
+// READ THROUGH `contextFor`, which is the same question `section-insert.ts` asks
+// to decide which catalogue a note has — so the strip cannot disagree with the
+// section editor about what level a note is at.
+//
+// NOTHING TO SAY IS NOTHING DRAWN. A note outside a registered journal root has
+// no level and no kind, and an empty strip is a rule ruled across a card for no
+// reason — `buildEntryContext` returns null on the same grounds.
+export function buildJournalContext(
+  plugin: AlmanacPlugin,
+  ctx: MarkdownPostProcessorContext
+): HTMLElement | null {
+  const sctx = plugin.sections.contextFor(ctx.sourcePath);
+  if (!sctx) return null;
+
+  const level = sctx.type.levels[sctx.depth ?? 0];
+  const kind = sctx.kind ?? null;
+  // A page is a part of the note above it rather than a note of its own, so it
+  // has no level of its own to report.
+  const levelNoun = sctx.noteKind === "page" ? null : (level?.noun ?? null);
+  if (!levelNoun && !kind) return null;
+
+  const bar = createDiv({ cls: "journal-widget-bar journal-note-context" });
+  const facts = bar.createDiv({ cls: "jnc-facts" });
+
+  if (levelNoun) {
+    const el = facts.createSpan({ cls: "jnc-fact" });
+    setIcon(el.createSpan({ cls: "jnc-fact-icon" }), "layers");
+    el.createSpan({ cls: "jnc-fact-text", text: levelNoun });
+  }
+  if (kind) {
+    const el = facts.createSpan({ cls: "jnc-fact jnc-fact-kind" });
+    setIcon(el.createSpan({ cls: "jnc-fact-icon" }), "file-text");
+    el.createSpan({ cls: "jnc-fact-text", text: kind.label });
+  }
+
+  return bar;
 }

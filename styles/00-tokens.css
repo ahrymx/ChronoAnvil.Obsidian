@@ -29,6 +29,21 @@
   --am-radius-md: 10px;  /* cards: callouts, calendar, tracker rows, tag groups */
   --am-radius-pill: 999px; /* every pill-shaped button, link and badge */
 
+  /* ── Surface depth hierarchy & Frames (4.24 §1) ── */
+  --am-surface-card: var(--background-secondary);
+  --am-surface-raised: var(--background-secondary-alt);
+  --am-surface-inset: var(--background-primary-alt);
+
+  /* Subtle border & edge highlight */
+  --am-border-subtle: var(--background-modifier-border);
+  --am-border-hover: var(--background-modifier-border-hover);
+  --am-border-focus: var(--interactive-accent);
+  --am-edge-highlight: rgba(255, 255, 255, 0.04);
+
+  /* Card shadow elevation */
+  --am-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --am-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+
   /* Vertical rhythm between stacked widgets in one ```almanac block. Named
      because it is a flex `gap`, not a margin — a widget that wants to butt up
      against its neighbour (the joined highlights/challenges box) has to cancel
@@ -72,6 +87,24 @@
      broken, and those are different questions. A row wants the second number:
      a compact widget in a narrow cell is the point of the primitive. */
   --am-row-cell-min: 320px;
+
+  /* The shortest a widget's card may be dragged to (4.22 §3.2).
+
+     A HEAD AND A FEW LINES UNDER IT, which is the least a card can be and still
+     be a card rather than a strip. The head is 6px and 5px of padding around one
+     line of small type over a hairline, which measures about 30px; the card's
+     own padding is 12px top and bottom; and what is left of 120 is a body of
+     roughly three lines. Below that a scrolling card shows less than it costs to
+     draw.
+
+     ROUNDED TO THE SNAP. `HEIGHT_STEP` is 20, so a floor that is not a multiple
+     of it would be a height the drag can reach and then never return to.
+
+     READ BACK THROUGH `pxToken` AND NEVER COPIED INTO TYPESCRIPT, which is the
+     rule block-drag.ts states where it defines that function: a length written
+     in the stylesheet is derived rather than repeated, so there is no second
+     place for the two to disagree. */
+  --am-card-h-min: 120px;
 
   /* Type: four sizes. Micro meta -> emphasized numbers/titles. */
   --am-text-2xs: 0.7em;
@@ -192,10 +225,21 @@
   --am-bar-track: 0.06em;
   --am-bar-ink: var(--text-muted);
   --am-bar-glyph: var(--am-text-sm);
+  --am-sec-title-size: var(--am-text-lg);
+  --am-sec-title-ink: var(--text-normal);
   /* Added in 2.53 for the week table's date, the first place in the sheet that
      wanted type *above* body size. Named rather than written as a literal so
-     the next one that does agrees with it. */
+     the next one that does agrees with it. It is now the size a NOTE'S NAME is
+     set at, on all three banners. */
   --am-text-lg: 1.15em;
+  /* One step further up, added in 4.21.1 for the page-context strip's alias.
+     It is the only type in the plugin set larger than a note's own name, and
+     that is the decision rather than an oversight: the file's name identifies
+     the note and the alias SAYS WHAT THE DAY WAS, which is what a reader came
+     to the page to read. `2026-08-13` is an address; "Started the new job" is
+     the entry. A ratio rather than a size a band happened to need — 1.35 to
+     1.15 is the same step 1.15 takes over body text. */
+  --am-text-xl: 1.35em;
 
   /* The rule-weight scale (3.6). Three tiers, and like the radii above,
      nothing in this sheet should type a raw px border width outside them.
@@ -532,6 +576,11 @@ body {
   --am-area-diary-rgb: var(--interactive-accent-rgb, 138, 92, 245);
   --am-area-journals: var(--am-ev-blue);
   --am-area-journals-rgb: 74, 143, 212;
+  --am-surface-accent-subtle: color-mix(
+    in srgb,
+    var(--interactive-accent) 6%,
+    var(--background-secondary)
+  );
 }
 
 /* NO TOKEN IN THIS FILE DIFFERS BY THEME ANY MORE (4.13.1 §3b). The one that did
@@ -545,3 +594,11 @@ body {
    every one of them went undefined on a dark theme: the study heatmap lost its
    greens, the calendar its mood dots, the events their hues. The next
    theme-specific token goes here. */
+body.theme-light {
+  --am-edge-highlight: rgba(0, 0, 0, 0.03);
+  --am-surface-accent-subtle: color-mix(
+    in srgb,
+    var(--interactive-accent) 5%,
+    var(--background-secondary)
+  );
+}

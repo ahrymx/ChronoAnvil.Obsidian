@@ -159,7 +159,7 @@ export interface TemplatePlan {
 // that just wrote it.
 //
 // Headers are excluded because they are retitleable: layout.ts settled that
-// for dashboards ("a user who renames `header:⏳ Open Tasks` keeps it") and the
+// for dashboards ("a user who renames `header:⏳ Open tasks` keeps it") and the
 // same holds here. What identifies a fence is the widgets in it.
 function fenceKeywords(lines: string[]): string[] {
   return lines.map(keywordOf).filter((k) => k.length > 0 && k !== "header");
@@ -1186,8 +1186,8 @@ function journalRefusal(
 ): string | null {
   if (!sectionRemovable(section, ctx, sectionOverrides(ctx, section.id))) {
     return section.required
-      ? `${section.label} is required and cannot be removed. You can move it, though.`
-      : `${section.label} is written as ordinary markdown — the plugin cannot tell it from your own prose, so delete it by hand.`;
+      ? "Part of every journal note, so it can't be removed. You can still move it."
+      : "Written as ordinary markdown — the plugin cannot tell it from your own prose, so delete it by hand.";
   }
   // Asked of the plan rather than of the file, so the answer is the one that
   // will actually be acted on: `planSections` is what decides, and it reports a
@@ -1196,7 +1196,15 @@ function journalRefusal(
   const op = planSections(text, ctx, want).find(
     (o) => o.sectionId === section.id
   );
-  if (op?.kind === "keep") return `${section.label} ${op.detail}.`;
+  // THE DETAIL ALONE, SENTENCE-CASED (4.21). This read `${label} ${detail}` and
+  // the details are written as predicates — "holds 3 charts", "is required" — so
+  // the sentence opened with a label of unknown number, which is the grammar
+  // break `entryRemovalRefusal` records at length. The row's own title says
+  // which section this is.
+  if (op?.kind === "keep") {
+    const d = op.detail;
+    return `${d.charAt(0).toUpperCase()}${d.slice(1)}.`;
+  }
   return null;
 }
 

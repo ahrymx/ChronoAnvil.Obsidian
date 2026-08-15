@@ -37,8 +37,12 @@
 // building a page of their own — see 3.11 §8.
 
 import { HEADER_PREFIX, TRENDS_HEADING } from "../core/constants";
-import { WIDE_KEYWORD } from "../core/directive-grammar";
-import { composeFlatNote, flatNoteModel, locateTitle } from "../core/note-sections";
+import {
+  composeFlatNote,
+  flatNoteModel,
+  bannerSection,
+  PAGE_TITLE_IDS,
+} from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
 import type { SectionModel } from "../core/section-model";
@@ -166,41 +170,48 @@ const HOME_TOP_ROW = "today";
 const HOME_ASIDE = "aside";
 
 const HOME_SECTION_DEFS: FlatSection[] = [
-  {
-    id: "title",
-    label: "Page title",
-    blurb: "The page's own name, with the control that renames it and edits its sections.",
-    icon: "🏷️",
-    // NOT LOCKED. A homepage without a title card is a coherent thing to want —
-    // the note's name is in the tab, the file explorer and the window — where a
-    // homepage with no way into the diary is not. `diary` is locked for that
-    // reason and this is the counterpart.
-    locked: false,
-    // PINNED (4.11), which is the other half of `locked: false` rather than a
-    // contradiction of it: the card can go, and while it is there it is first.
-    // `PAGE_TITLE_SECTION` carries the same flag for the three catalogues that
-    // share it and `DIARY_SECTIONS` has carried it since 4.10 — this is the
-    // homepage's own copy of one decision, not a fourth one.
-    pinned: true,
-    // FIRST, AND IN NO ROW. It names the page, so it sits above everything the
-    // page contains rather than beside one of the things it contains.
-    //
-    // AND IT CARRIES THE PAGE'S WIDTH (4.11). `wide` is a fact about the note and
-    // is read from the block that draws its title, so the homepage's width is now
-    // a line in the homepage rather than a key in its frontmatter — see
-    // `HOME_CSS_CLASS` for what that replaces and what it does not.
-    //
-    // BEFORE THE DIRECTIVE, where `composeFlatNote` already puts `row` and where
-    // both other modifiers are read from regardless of order. Removing this
-    // section takes the width with it, which is the honest outcome: the width is
-    // derived from the card, so a page with no head is a page with no head's
-    // opinion about its width.
-    render: () => ({ fence: "almanac", lines: [WIDE_KEYWORD, "title"] }),
-    // SHARED WITH EVERY OTHER PAGE'S HEAD (4.10). The homepage composes the
-    // BARE form and the others carry ids, so the rule has to admit both — and
-    // `locateTitle` is where that is decided, once.
-    locate: locateTitle,
-  },
+  // THE BANNER, FIRST — and as of 4.19 it is `bannerSection`'s, not a fourth
+  // near-copy of one. The homepage carried its own until this release because
+  // the shared object could not express the two things this page wants: the BARE
+  // title form, and the `wide` line. Both are `BannerSpec` fields now, so the
+  // difference is an argument rather than a duplicate definition.
+  //
+  // AND IT CARRIES THE THREE DESTINATIONS AS OF 4.20, WHERE IT WAS BARE.
+  //
+  // THE ARGUMENT THAT KEPT IT BARE, AND WHY IT LOST. From 4.5 to 4.19 this page
+  // composed the bare `title` on the grounds that the launcher is already here,
+  // as content in a cell, shipping with Diary and Journals among its four tiles
+  // — so ids would draw the same destinations twice on one screen. That is a
+  // true observation and it was weighed against the wrong thing.
+  //
+  // WHAT IT WEIGHED AGAINST: doubling. What it cost: the banner meaning
+  // something different on this page than on the other eight. A reader learns
+  // the banner once — name, destinations, cog — and the homepage was the one
+  // place that row was missing, which reads as the page being unfinished rather
+  // than as a considered omission. A row you can predict is worth more than a
+  // row that is never redundant.
+  //
+  // AND THE TWO ARE NOT THE SAME OBJECT ANYWAY, which is what makes the
+  // doubling tolerable: the banner's row is chrome you read to know where you
+  // are, drawn small-caps and faint; the launcher is content you click, drawn as
+  // tiles. `page-title.ts` makes exactly this distinction between its row and
+  // the `links:` row, and it holds one step further out.
+  //
+  // NO `links:` ROW EITHER, for the reason `diary` is the locked section here:
+  // the diary card's destination pills ARE this page's time navigation, and
+  // always were. So the homepage banner is a title and nothing else, which is
+  // the honest answer for a page whose navigation is two widgets a reader chose.
+  //
+  // AND IT NOW CANNOT BE REMOVED, which is 4.19's one loss and is felt hardest
+  // here. The old `title` section was unlocked on the argument that a homepage
+  // without a title card is a coherent thing to want; that is still true, and
+  // the banner is locked anyway because ONE rule across nine surfaces beats a
+  // rule a reader has to learn per page. `bannerSection` states the trade.
+  //
+  // IT STILL CARRIES THE PAGE'S WIDTH (4.11). `wide` is a fact about the note,
+  // read from the block that draws its title — see `HOME_CSS_CLASS` for what
+  // that replaced and what it did not.
+  bannerSection({ ids: PAGE_TITLE_IDS, wide: true }),
   {
     id: "diary",
     label: "Diary",
@@ -351,12 +362,12 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // homepage without this section is a coherent thing to want. The widget
     // already agrees: it renders nothing when no journals are enabled.
     locked: false,
-    render: () => ({ fence: "almanac", lines: ["journals"] }),
+    render: () => ({ fence: "almanac", lines: ["frame: section", "journals"] }),
     locate: (text) => probe(text, /^journals\s*$/m),
   },
   {
     id: "charts",
-    label: "Trends and Statistics",
+    label: "Trends and statistics",
     blurb: "The charts manager for the whole vault.",
     icon: "📊",
     // NOT LOCKED, AND NOT FREELY REMOVABLE EITHER — the one section here where

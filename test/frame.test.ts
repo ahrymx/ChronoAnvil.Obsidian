@@ -160,7 +160,35 @@ describe("what each frame does to the block's classes", () => {
       "journal-entry-banner",
       "journal-overview-card",
       "journal-study-banner",
+      // TWO BANNERS, NOT FOUR (4.21.1). The two slim banners share every rule
+      // about the card they draw and the two bands in it, so they share the
+      // class those rules are written against. The specific classes survive
+      // beside it for what genuinely differs — an entry welds a links card into
+      // the band, a leaf does not.
+      "journal-slim-banner",
     ]);
+  });
+
+  it("gives both slim banners the shared class and the page banner none of it", () => {
+    // THE RULE THIS PINS is the one 4.21.1 exists for: a change to how a note
+    // you write in identifies itself cannot reach one page kind without
+    // reaching the other. Asserted from each side alone, because the failure
+    // that mattered was a fix applied to the surface it was reported on.
+    const only = (drewOne: Record<string, boolean>): string[] =>
+      chromeClasses("card", {
+        entryBanner: false,
+        overviewCard: false,
+        studyBanner: false,
+        pageBanner: false,
+        trackerSection: false,
+        ...drewOne,
+      });
+    expect(only({ entryBanner: true })).toContain("journal-slim-banner");
+    expect(only({ studyBanner: true })).toContain("journal-slim-banner");
+    // AND THE LARGE ONE IS NOT SLIM. A page you navigate to announces itself
+    // with the wash and the hatch; a note you write in does not announce itself
+    // at all. Sharing the class would give a dashboard the tight card.
+    expect(only({ pageBanner: true })).not.toContain("journal-slim-banner");
   });
 
   it("section and none both withhold every composite class", () => {
@@ -422,6 +450,27 @@ describe("nothing that is not about the frame is scoped to the frame", () => {
     expect(body).not.toContain("querySelectorAll");
   });
 
+  it("does not reach a widget's height through the frame (4.22 §3.2)", () => {
+    // A GROUP INSIDE A SECTION RUN AND ONE UNDER `frame: none` BEHAVE
+    // IDENTICALLY — the cards are the same object, only the box around them is
+    // withheld. So the three declarations that make a stated height scroll are
+    // scoped to the CARD and to nothing else; scoping any of them to the block's
+    // frame would be §5's shape all over again, and the symptom would be a card
+    // that keeps its height on one page and loses it on another.
+    for (const sel of [
+      ".journal-widget-card.is-sized",
+      ".journal-widget-card.is-sized > .journal-block-head",
+      ".journal-widget-card.is-sized > :not(.journal-block-head)",
+      ".journal-card-divider",
+    ]) {
+      const at = ruleAt(rules, sel);
+      expect(at, `no rule for ${sel}`).toBeGreaterThan(-1);
+    }
+    expect(rules).not.toContain(".is-unframed .journal-card-divider");
+    expect(rules).not.toContain(".is-unframed .journal-widget-card.is-sized");
+    expect(rules).not.toContain(".journal-overview-card .is-sized");
+  });
+
   it("gives up the journals card's own frame too", () => {
     // `.journals-card` is the third widget that draws a card INSIDE the block,
     // and it was missing from the reset list — which is the cost of keying off
@@ -526,7 +575,7 @@ describe("a fence that titles itself — 4.12 §A", () => {
   // the page.
 
   it("recognises a header line exactly, never as a prefix", () => {
-    expect(isHeaderLine("header:⏳ Open Tasks")).toBe(true);
+    expect(isHeaderLine("header:⏳ Open tasks")).toBe(true);
     expect(isHeaderLine("header:")).toBe(true);
     // A future `header-something` directive is not swallowed — `isFrameLine`'s
     // own rule, and the reason both go through `splitDirective`.
@@ -535,7 +584,7 @@ describe("a fence that titles itself — 4.12 §A", () => {
   });
 
   it("tells a named bar from a bare one, which is what the grammar needs", () => {
-    expect(hasTitledBar(["header:⏳ Open Tasks", "tasks-table"])).toBe(true);
+    expect(hasTitledBar(["header:⏳ Open tasks", "tasks-table"])).toBe(true);
     // A bare `header:` renders the anchored control row and no title, so it does
     // not compete with `frame: section` for who names the block.
     expect(hasTitledBar(["header:", "tasks-table"])).toBe(false);

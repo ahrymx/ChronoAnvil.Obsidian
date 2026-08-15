@@ -108,6 +108,21 @@ export const GROUP_DIVIDER_CLASS = "journal-group-divider";
 // which needs the pair either side of it and gets one of them from the DOM.
 export const DIVIDER_INDEX_ATTR = "data-am-divider";
 
+// The bottom edge of one card, which is where a height is set (4.22 §4).
+//
+// ONE PER CARD, NOT ONE PER SEAM, and `cell-height.ts`'s header has the whole
+// argument. The short of it: N cards have N-1 seams between them, so a mark
+// between two cards can never reach the LAST card in a column — and on the page
+// this release is about, that is the widget with the most empty rows in it.
+//
+// A CHILD OF THE CARD, NOT OF THE CELL, which is the opposite choice from the
+// column divider above and made for the reason the seam's own comment already
+// gives: the mark sits in the gap at the card's edge, and with nothing positioned
+// between it and the cell every mark in a column would resolve against the cell
+// and land at the same height. The card is positioned; the cell is the wrong
+// ground.
+export const CARD_DIVIDER_CLASS = "journal-card-divider";
+
 // What a block can hold that is furniture rather than a widget.
 //
 // `journal-sec` — every section bar, titled or not, block-owning or not. See
@@ -262,6 +277,33 @@ export function layOutRow(
       cell.style.setProperty("--am-cell-weight", String(weights[n]));
     }
     for (const i of group) cell.appendChild(children[i]);
+    // ONE HANDLE PER CARD, ON THE CARD, APPENDED LAST (4.22 §4.1).
+    //
+    // AFTER the append, because it goes INSIDE each child rather than beside
+    // them — so the child has to be here first — and because appending it last
+    // is what keeps it out of the way of everything that reads a card's own
+    // children: `applyCardHeights` and the drag walk both skip it, since it
+    // carries no line stamp, and the `is-sized` scroll rule in the stylesheet
+    // never sees it because an absolutely positioned child of a flex container
+    // is not a flex item.
+    //
+    // AND ON EVERY CHILD OF THE CELL, including the last one in the column and
+    // including a widget that draws its own band and wears no card. Both came
+    // through `isCellContent`, so both are things the reader put in the fence.
+    //
+    // THE ONE CHILD THAT IS NOT is the column divider this loop just built, and
+    // it is skipped by name rather than by asking about the line stamp — the
+    // stamp is block-drag.ts's word and this file has no reason to learn it, and
+    // the divider is the only thing `layOutRow` puts in a cell that the reader
+    // did not.
+    for (const child of Array.from(cell.children)) {
+      if (!(child instanceof HTMLElement)) continue;
+      if (child.hasClass(GROUP_DIVIDER_CLASS)) continue;
+      child.createDiv({
+        cls: CARD_DIVIDER_CLASS,
+        attr: { "aria-label": "Drag to set the height of this widget" },
+      });
+    }
   });
 
   // ── THE FOOT (4.9 §2.2) ─────────────────────────────────────────────

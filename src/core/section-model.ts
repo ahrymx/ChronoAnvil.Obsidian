@@ -39,7 +39,7 @@
 // interface would give the editor a method whose only correct use is to destroy
 // the thing it is editing.
 
-import { argSpanIn, readArg, spliceArg } from "./directive-grammar";
+import { argSpanIn, readArg, soleArgSpanIn, spliceArg } from "./directive-grammar";
 
 // ── operations ────────────────────────────────────────────────────────
 //
@@ -408,6 +408,29 @@ export function fieldLabelOf(q: SectionQuestion): string {
   const head = /^(the|a|an)$/i.test(words[0]) ? words[1] : words[0];
   if (!head) return q.label;
   return head.charAt(0).toUpperCase() + head.slice(1);
+}
+
+// What a file already says for one question, or null when the directive it
+// names is absent — or present more than once.
+//
+// HOISTED OUT OF `SectionEditorModal.answerIn` IN 4.29, unchanged in what it
+// does and in the care it takes. It was a private method on the window, and
+// 4.29 needs the same read from a second place: saving a page as a grain's
+// default has to carry the reader's answers with it, or the save would quietly
+// reset a bridge they had pointed at a journal kind — a loss at the exact
+// moment they asked to keep something.
+//
+// AMBIGUITY IS AN ABSENT ANSWER, NOT THE FIRST ONE (3.18 follow-ups §2). The
+// original comment is worth keeping whole: `header:` is structural and repeats
+// once per section, so Study's Topic index carries six and `argSpanIn` would
+// hand two different boxes the same value — the first header in the file. An
+// answer that cannot be told apart from another section's is one this must not
+// claim to have read. `soleArgSpanIn` states exactly that rule.
+export function answerInText(text: string, q: SectionQuestion): string | null {
+  if (!q.directive) return null;
+  const lines = text.split("\n");
+  const span = soleArgSpanIn(lines, q.directive);
+  return span ? readArg(lines, span) : null;
 }
 
 export function questionIsRequired(q: SectionQuestion): boolean {

@@ -20,9 +20,15 @@ import {
   setIcon,
 } from "obsidian";
 import type { App } from "obsidian";
+import type AlmanacPlugin from "../../main";
 import type { PluginNoteRegionHost } from "./note-regions";
 import type { NoteWriteScheduler } from "./note-write-scheduler";
-import { isValidNoteKey, readNoteRegion } from "../../core/notestore";
+import {
+  appendedSince,
+  isValidNoteKey,
+  joinRegionBlocks,
+  readNoteRegion,
+} from "../../core/notestore";
 import { CAPTURE_NOTE_KEY } from "../../core/constants";
 
 /**
@@ -64,6 +70,61 @@ export class NoteFieldWatcher extends MarkdownRenderChild {
 }
 
 
+// ── the fold, as three functions rather than three closures (4.28) ────
+//
+// Extracted from `buildNote` when the capture region stopped being a textarea:
+// the card list folds where the field folded, remembers what it remembered, and
+// honours the same `captureCollapsedByDefault` setting. Two widgets computing
+// one storage key from the same three parts is how the two come to disagree
+// about which entry a fold belongs to — and the key is `::note:<key>` for both,
+// deliberately, because the fold belongs to the REGION rather than to whichever
+// control is currently drawing it. A reader who folded Captured and then
+// upgraded keeps it folded.
+export function noteFoldKey(sourcePath: string, key: string): string {
+  return `${sourcePath}::note:${key}`;
+}
+
+// Absent means "not yet touched in this entry", which falls back to the global
+// default rather than to a hardcoded one — that is what makes the setting a
+// *default* and not just an initial value for new vaults.
+export function noteFoldState(
+  plugin: AlmanacPlugin,
+  sourcePath: string,
+  key: string
+): boolean {
+  const stored =
+    plugin.settings.collapsedNoteSections?.[noteFoldKey(sourcePath, key)];
+  if (stored != null) return stored;
+  return key === CAPTURE_NOTE_KEY
+    ? plugin.settings.captureCollapsedByDefault
+    : false;
+}
+
+// Stored explicitly either way: once a field has been toggled by hand in this
+// entry, that choice sticks even if the global default later changes.
+export async function setNoteFold(
+  plugin: AlmanacPlugin,
+  sourcePath: string,
+  key: string,
+  value: boolean
+): Promise<void> {
+  if (!plugin.settings.collapsedNoteSections) {
+    plugin.settings.collapsedNoteSections = {};
+  }
+  plugin.settings.collapsedNoteSections[noteFoldKey(sourcePath, key)] = value;
+  await plugin.saveSettings();
+}
+
+// MOVED TO `core/notestore.ts` IN 4.30, unchanged, and re-exported here so
+// every existing caller is untouched.
+//
+// It belongs beside the store it names into: reading a region key off a
+// directive is the binding between a widget and its text, and 4.30's export
+// asks exactly that question of every directive on a page. A second spelling of
+// it there would have been a second answer to "which region is this widget's",
+// which is the one thing the two must never disagree about.
+export { noteKeyOf } from "../../core/notestore";
+
 export function buildNote(
   deps: NoteFieldHost,
   rest: string,
@@ -98,18 +159,9 @@ export function buildNote(
   });
 
   // Per-(note,key) collapsed state, sharing the store header bars use so
-  // there's one place a fold is remembered. Absent means "not yet touched in
-  // this entry", which falls back to the global default rather than to a
-  // hardcoded one — that's what makes the setting a *default* and not just an
-  // initial value for new vaults.
-  const collapseKey = `${ctx.sourcePath}::note:${key}`;
-  const isCollapsed = (): boolean => {
-    const stored = deps.plugin.settings.collapsedNoteSections?.[collapseKey];
-    if (stored != null) return stored;
-    return key === CAPTURE_NOTE_KEY
-      ? deps.plugin.settings.captureCollapsedByDefault
-      : false;
-  };
+  // there's one place a fold is remembered. See `noteFoldState` above.
+  const isCollapsed = (): boolean =>
+    noteFoldState(deps.plugin, ctx.sourcePath, key);
 
   if (collapsible && label) {
     const bar = wrap.createDiv({ cls: "journal-note-collapse-bar" });
@@ -126,14 +178,7 @@ export function buildNote(
       evt.preventDefault();
       const next = !isCollapsed();
       apply(next);
-      if (!deps.plugin.settings.collapsedNoteSections) {
-        deps.plugin.settings.collapsedNoteSections = {};
-      }
-      // Store explicitly either way: once a field has been toggled by hand in
-      // this entry, that choice should stick even if the global default later
-      // changes underneath it.
-      deps.plugin.settings.collapsedNoteSections[collapseKey] = next;
-      void deps.plugin.saveSettings();
+      void setNoteFold(deps.plugin, ctx.sourcePath, key, next);
     });
   } else if (label) {
     wrap.createDiv({ cls: "journal-note-label", text: label });
@@ -172,10 +217,19 @@ export function buildNote(
   // Populate from the body region once, after mount. Reads the raw file (the
   // text lives between markers in the body, not in the metadata cache), then
   // ensures the region exists so hand-editing has a stable anchor.
+  // The region text this buffer was derived from. Every write carries it so the
+  // write can tell an append that landed underneath the buffer from an edit to
+  // the buffer itself — see `reconcileRegionWrite`. It advances only when the
+  // buffer advances, which is the invariant the whole scheme rests on: a
+  // baseline ahead of the buffer would make the next write look like it had
+  // already absorbed a capture it has never seen.
+  let baseline = "";
+
   const file = deps.fileOf(ctx);
   if (file) {
     void deps.app.vault.read(file).then((text) => {
       input.value = readNoteRegion(text, key);
+      baseline = input.value;
       autoGrow();
       void deps.ensureNoteRegion(file, key);
     });
@@ -200,16 +254,55 @@ export function buildNote(
   // flushes the pending write synchronously, so the field's value is on disk
   // before the modal (which writes only on save, much later) appends to it,
   // and the append preserves it.
+  //
+  // ── AND SKIPPING IS NO LONGER THE END OF IT (4.27 §1) ────────────────
+  //
+  // Both skips used to return and never retry, so the buffer stayed stale and
+  // the next blur wrote the whole region back from it — deleting the append.
+  // `test/capture.test.ts` asserted that loss and located the fix. Three things
+  // changed here:
+  //
+  // THE BUSY TEST MOVED BELOW THE READ. It was evaluated synchronously and the
+  // assignment happened inside the `.then()`, so focusing and typing during the
+  // read overwrote the keystrokes and threw the caret to the end — the exact
+  // "rebuild under the cursor" this function exists to prevent, in the code
+  // preventing it.
+  //
+  // A BUSY FIELD NOW TAKES AN APPEND ANYWAY, spliced onto the END of its
+  // buffer. Appending strictly past the end and restoring the selection moves
+  // nothing at or before the caret, so the property is kept in the sense that
+  // matters rather than in the sense of never touching `value`. It is also the
+  // half that makes the write-time merge sufficient: without the buffer
+  // learning, `baseline` would go stale and the SECOND write would lose the
+  // capture even though the first merged it correctly.
+  //
+  // A DIVERGENCE THAT IS NOT AN APPEND IS STILL LEFT ALONE. Two writers rewrote
+  // the same prose; the write-time merge declines it too, and declining is what
+  // this code did about everything before today.
   if (file) {
     const refresh = (): void => {
-      if (document.activeElement === input) return;
-      if (deps.noteWrites.isPending(ctx, key)) return;
       void deps.app.vault.read(file).then((text) => {
         const onDisk = readNoteRegion(text, key);
-        if (onDisk !== input.value) {
+        if (onDisk === baseline) return;
+        const busy =
+          document.activeElement === input || deps.noteWrites.isPending(ctx, key);
+        if (!busy) {
           input.value = onDisk;
+          baseline = onDisk;
           autoGrow();
+          return;
         }
+        const tail = appendedSince(baseline, onDisk);
+        if (tail == null) return;
+        const at = input.selectionStart;
+        const to = input.selectionEnd;
+        input.value = joinRegionBlocks(input.value, tail);
+        input.setSelectionRange(
+          Math.min(at, input.value.length),
+          Math.min(to, input.value.length)
+        );
+        baseline = onDisk;
+        autoGrow();
       });
     };
     // Registered through a render child so the listener is torn down with the
@@ -220,12 +313,12 @@ export function buildNote(
 
   input.addEventListener("input", () => {
     autoGrow();
-    deps.noteWrites.schedule(ctx, key, input.value);
+    deps.noteWrites.schedule(ctx, key, input.value, baseline);
   });
   // Flush immediately on blur so a value is never left only in the debounce
   // timer if the view is torn down (e.g. switching notes) before it fires.
   input.addEventListener("blur", () => {
-    deps.noteWrites.flush(ctx, key, input.value);
+    void deps.noteWrites.flush(ctx, key, input.value, baseline);
   });
   return wrap;
 }

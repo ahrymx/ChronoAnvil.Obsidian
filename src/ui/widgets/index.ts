@@ -19,7 +19,7 @@ import { keywordOf } from "../../core/layout";
 import {
   buildDiarySearch,
 } from "../../diary/diary-retrieval";
-import { buildStudyHeader } from "../../journals/study-header";
+import { buildStudyHeader, buildJournalContext } from "../../journals/study-header";
 import {
   buildMonthSummary,
   buildWeekSummary,
@@ -31,11 +31,14 @@ import { HeaderBar } from "../headerbar";
 import { buildScopeCycle } from "../tables";
 import { HeaderSite, attachHeaderRename, boundsOf } from "../header-title";
 import {
+  CAPTURE_NOTE_KEY,
   HEADER_PREFIX,
   RETIRED_WIDGETS,
   TRACKER_MARK_START,
 } from "../../core/constants";
 import {
+  readNoteRegion,
+  reconcileRegionWrite,
   writeNoteRegion,
   ensureNoteRegions,
 } from "../../core/notestore";
@@ -58,11 +61,18 @@ import {
 } from "./attachment-widgets";
 import { buildRecall } from "./recall-widgets";
 import { NoteWriteScheduler } from "./note-write-scheduler";
-import { NoteFieldHost, buildNote } from "./note-field";
+import {
+  NoteFieldHost,
+  buildNote,
+  noteFoldState,
+  noteKeyOf,
+  setNoteFold,
+} from "./note-field";
 import { buildButton } from "./button-widgets";
 import { buildNowButton } from "../../diary/periodnav";
 import type { Unit as PeriodGrain } from "../../diary/periodnav";
-import { buildChartGrid } from "./chart-grid";
+import { buildChartGrid, CHART_GRID_EMPTY } from "./chart-grid";
+import { buildCaptureLog } from "./capture-log-widget";
 import {
   buildBridgeNotesRegion,
   buildBridgeReadingsRegion,
@@ -95,6 +105,7 @@ import {
   liveFrontmatterWidget,
   liveDiaryWidget,
 } from "./live-widgets";
+import { mountBlock, mountInline, type BlockRenderer } from "../livewidget";
 import { resolvePeriodBounds } from "../../charts/chart-widgets";
 import {
   attachTrackerRemove,
@@ -109,6 +120,7 @@ import {
   getBuiltinTracker,
   recomputeSleepInFrontmatter,
 } from "../../trackers/trackers";
+import type { TrackerClass } from "../../trackers/trackers";
 import { buildSleepSummary } from "../../trackers/sleep";
 import {
   describeSurfaceMismatch,
@@ -121,27 +133,39 @@ import {
 import {
   parseChartDirectives,
 } from "../../charts/charts";
-import { buildEntryHeader, buildEntryFooter } from "../../diary/entryheader";
+import {
+  buildEntryHeader,
+  buildEntryContext,
+  entryDateLabel,
+} from "../../diary/entryheader";
 import { buildPeriodNav } from "../../diary/periodnav";
 import { foldableSection, sectionFrame } from "../section-frame";
 import type { FoldStore } from "../section-frame";
 import {
   CELL_KEYWORD,
+  TITLE_KEYWORD,
   cellWeightOf,
   isFrameLine,
+  isHeightLine,
   isRowLine,
   isSectionFence,
   isTitleLine,
   isWideLine,
   parseCells,
   parseFrame,
+  parseHeights,
   parseRow,
   parseWide,
 } from "../../core/directive-grammar";
 import type { FrameValue } from "../../core/directive-grammar";
 import { layOutRow } from "./row";
 import type { CellBound } from "./row";
-import { attachBlockHead, cardWidget, stampLines } from "./block-drag";
+import {
+  applyCardHeights,
+  attachBlockHead,
+  cardWidget,
+  stampLines,
+} from "./block-drag";
 import { buildPageTitle } from "./page-title";
 import { buildLauncher, LAUNCHER_DEFAULT } from "./launcher";
 import {
@@ -157,6 +181,37 @@ import {
 // tracker grid beneath it, and entry-trackers.ts's region placement — and a
 // literal in each is how the second spelling gets forgotten in one of them.
 export const JOURNAL_BANNER_KINDS = new Set(["journal-header"]);
+
+// Every directive that makes its fence a BANNER. 4.21.
+//
+// ── WHY THIS EXISTS, AND WHY `hasOwnBar` COULD NOT ANSWER IT ──────────
+//
+// 4.19.1 fixed a dashboard drawing a head reading "🔗 Links" above the page's
+// own name, by adding `.jtc-card` to `hasOwnBar`'s list of bands. That was the
+// right fix for the surface it was tested on and the wrong mechanism, and the
+// next render found out: an ENTRY's banner fence opens with the links row, so
+// the block's first child is `.journal-links-card` — and `hasOwnBar` asks only
+// about the FIRST CHILD, deliberately, because "a band deeper inside belongs to
+// something further in".
+//
+// So the entry banner drew the same wrong head, and the journal banner would
+// have the day anything was composed above `journal-header`.
+//
+// THE QUESTION `hasOwnBar` ANSWERS IS "IS THE TOP OF THIS BLOCK A BAND". The
+// question that had to be answered is "IS THIS BLOCK A BANNER", and those come
+// apart the moment a banner has more than one row. A banner is never named by a
+// widget inside it — it names the note — so the rule belongs where the name is
+// chosen, which is `blockTitle`.
+//
+// `title` IS IN THE SET, AND IT IS NOT A "BANNER WIDGET". It is structural in
+// `widget-registry.ts` and the two others are `reason: "banner"`. What this set
+// answers is not "which widgets are banners" but "which directives make the
+// fence holding them one", and the page's own name does exactly that.
+export const BANNER_KINDS = new Set([
+  TITLE_KEYWORD,
+  "entry-header",
+  ...JOURNAL_BANNER_KINDS,
+]);
 
 // The widget kinds that sit INLINE in a widget-bar row — sliders, selects,
 // steppers, buttons, tracker cells. Everything else renders as its own
@@ -224,6 +279,34 @@ export interface BlockComposites {
   entryBanner: boolean;
   overviewCard: boolean;
   studyBanner: boolean;
+  // A tracker section: the fence holds a marked tracker region and is not a
+  // banner (4.21).
+  //
+  // WHY IT NEEDED A CLASS. 4.20 moved the logging grid out of the banner into a
+  // fence of its own, which took it out of the banner's CARD as well — that was
+  // the point — and left it as loose widget cards on the page background with
+  // nothing enclosing them. A section that is a section should look like one.
+  //
+  // NOT ON A BANNER THAT STILL HOLDS THE MARKERS. Every entry composed before
+  // 4.20 keeps its region inside the banner's fence, where the banner's own card
+  // already frames it; a second frame there would be a card inside a card.
+  trackerSection: boolean;
+  // A page banner: the fence holds this page's own name (4.19).
+  //
+  // THE FOURTH OF A FAMILY, and the reason it had to join it is the reason the
+  // other three exist. `title` draws `.jtc-card` — its own border, radius,
+  // background and figure — and `links:` draws `.journal-links-card` with a
+  // border and radius of its own. Welded into one fence by 4.19's banner, and
+  // left alone, they render as TWO cards stacked with no gap: the exact
+  // "resemblance instead of a card" this file's `isEntryBanner` comment
+  // describes, arriving on the surface that had avoided it by keeping its two
+  // halves in two blocks.
+  //
+  // So the block draws the box and the children go flat, which is what
+  // `.journal-entry-banner > .journal-links-card` and
+  // `.journal-overview-card > .journal-links-card` already do for the two
+  // surfaces that got here first.
+  pageBanner: boolean;
 }
 
 // Which classes a block's frame adds, given what it drew.
@@ -252,7 +335,87 @@ export function chromeClasses(
   if (drew.entryBanner) out.push("journal-entry-banner");
   if (drew.overviewCard) out.push("journal-overview-card");
   if (drew.studyBanner) out.push("journal-study-banner");
+  // ── TWO BANNERS, NOT FOUR (4.21.1) ─────────────────────────────────
+  //
+  // THE COUNT WAS THE DEFECT. 4.19 settled that every page gets ONE banner and
+  // 4.20 settled what a banner holds, and neither asked how many banners the
+  // plugin DRAWS. The answer was three — `.journal-page-banner` for the eight
+  // dashboard-shaped surfaces, `.journal-entry-banner` for the five entry
+  // grains, `.journal-study-banner` for journal notes — plus the overview band,
+  // which is not one and is named as if it were. Three implementations of one
+  // idea is three places a change has to be made and two places it will be
+  // forgotten, which is exactly what the "🔗 LINKS" head was: a fix applied to
+  // the surface it was reported on and to neither of the other two.
+  //
+  // SO THERE ARE TWO: the LARGE banner a page you navigate to announces itself
+  // with, and this, the SLIM one a note you write in identifies itself with. An
+  // entry and a journal leaf are the same kind of page — a note with a name, a
+  // way back, and a cog — and every rule that says how that looks is written
+  // once, against this class.
+  //
+  // THE OLD TWO SURVIVE ALONGSIDE IT rather than being renamed away. They still
+  // carry what genuinely differs: an entry welds a links card to the band and a
+  // journal note does not, and every note composed before 4.20 keeps its logging
+  // grid inside whichever of the two its fence is. A rename would have touched
+  // eight files for no rendered change, which 4.19 declined for the overview
+  // band and declines again here.
+  if (drew.entryBanner || drew.studyBanner) out.push("journal-slim-banner");
+  // LAST, AND IT NEVER SHARES A BLOCK WITH THE OTHER THREE. A page's own name
+  // and a note's identity strip are two answers to "which note is this", and a
+  // fence holding both would be the doubling 4.19 exists to remove — the entry
+  // and journal catalogues compose no `title:` line for exactly that reason.
+  // The order still matters for a hand-written fence that does it anyway: the
+  // page banner's box is the outer one, so it is applied after.
+  if (drew.pageBanner) out.push("journal-page-banner");
+  // AFTER THE BANNERS, AND NEVER WITH ONE. A fence is a banner or it is the
+  // tracker section; the flag below is computed from "has markers AND is not a
+  // banner", so the two cannot both be set — this order is what a reader of the
+  // class list sees rather than a tie being broken.
+  if (drew.trackerSection) out.push("journal-tracker-section");
   return out;
+}
+
+// ── THE CAPTION ROW OVER THE LOGGING GRID (4.21.1, a row in 4.21.2) ──────
+//
+// WHY THE GRID NEEDS A CAPTION AT ALL. It is the only section in the plugin with
+// a card and no name, and it cannot have a `header:` line: the section is a
+// MARKED REGION rather than a directive, so there is nothing in the fence for a
+// title to be an argument to, and adding one would put a second thing inside the
+// markers `addTracker` writes between. The block says it instead.
+//
+// TWO HALVES, AND THE ROW IS THE POINT. Left is which PERIOD this note is —
+// "Fri 14 Aug 2026" — and right is what the block under it HOLDS. The date was
+// beside the alias until 4.21.2, which put a title, a date and a navigator on
+// one line: fine in a desktop pane, two wrapped lines on a phone.
+//
+// THE COLON IS DELIBERATE. The label sits at the far right of a row whose
+// content is directly beneath it, so it reads as an introduction to the grid
+// rather than as a heading floating over nothing.
+//
+// NOTHING TO SAY ON A JOURNAL NOTE, which has no period of its own — its level
+// and its kind are on the strip above. The row is then the label alone, pushed
+// right by its own margin rather than by a `space-between` that would have
+// stranded it on the left.
+export const TRACKING_LABEL = "Tracking:";
+
+function buildTrackerHead(
+  plugin: AlmanacPlugin,
+  ctx: MarkdownPostProcessorContext,
+  grain: TrackerClass | undefined
+): HTMLElement {
+  const row = createDiv({ cls: "journal-tracker-head" });
+  const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
+  const period =
+    grain && file instanceof TFile
+      ? entryDateLabel(plugin.app, file, grain)
+      : null;
+  // A DATE THAT IS NOT THERE IS NOT DRAWN, and it used to be drawn as the
+  // GRAIN'S NAME — "Daily" where "Fri 14 Aug 2026" belongs. See
+  // `entryDateLabel`: an absent caption is honest and this row is live, so it
+  // fills itself in the moment the note is indexed.
+  if (period) row.createSpan({ cls: "jth-period", text: period });
+  row.createSpan({ cls: "jth-label", text: TRACKING_LABEL });
+  return row;
 }
 
 const SECTION_TITLES: Record<string, string> = {
@@ -344,11 +507,17 @@ const SECTION_TITLES: Record<string, string> = {
 // failure it guards against — a head naming the wrong widget — is the kind that
 // gets noticed weeks later on somebody's dashboard.
 export function blockTitle(lines: readonly string[]): string | null {
-  const named = new Set(
-    lines
-      .map((l) => l.split("|")[0].split(":")[0].trim())
-      .filter((k) => SECTION_TITLES[k])
-  );
+  const keywords = lines.map((l) => l.split("|")[0].split(":")[0].trim());
+  // A BANNER IS NEVER NAMED BY A WIDGET INSIDE IT — see `BANNER_KINDS`. It names
+  // the note, so a head above it is a second answer to the question it exists to
+  // answer, and the head this drew was "🔗 Links" on every page whose banner
+  // carries a navigation row.
+  //
+  // ASKED FIRST, before the one-nameable-thing rule, because it is not a tie to
+  // break: a banner fence with exactly one nameable widget in it is the failing
+  // case rather than the safe one.
+  if (keywords.some((k) => BANNER_KINDS.has(k))) return null;
+  const named = new Set(keywords.filter((k) => SECTION_TITLES[k]));
   const only = [...named];
   return only.length === 1 ? SECTION_TITLES[only[0]] : null;
 }
@@ -434,20 +603,38 @@ export class Widgets implements
     };
   }
 
+  // Every fenced Almanac language goes through here rather than through
+  // `registerMarkdownCodeBlockProcessor` directly, so that each rendered block
+  // keeps the arguments it was drawn with and can draw itself again later. That
+  // is what lets `repaintOpenNotes` reach a block rendered outside a markdown
+  // view — an embed, an export, a dashboard plugin calling
+  // `MarkdownRenderer.render` — where there is no note to re-render. See
+  // ui/livewidget.ts for the registry and why each drawing is scoped to its own
+  // component.
+  private registerBlock(lang: string, render: BlockRenderer): void {
+    this.plugin.registerMarkdownCodeBlockProcessor(lang, (source, el, ctx) =>
+      mountBlock(source, el, ctx, render)
+    );
+  }
+
   register(): void {
     // Legacy single-widget syntax: `almanac:kind:...` written as inline
     // code. Still needed for spots that must stay on one line — e.g. the
     // per-topic buttons the plugin writes into the homepage's study table,
     // where a table cell can't contain a fenced block. New notes should
     // prefer the ```almanac block below.
+    //
+    // `mountInline` does the replacement that used to be written out here, for
+    // the same reason `registerBlock` exists: a widget that swapped itself in
+    // and was never heard from again could not be repainted, and these are
+    // precisely the buttons whose labels a kind rename changes.
     this.plugin.registerMarkdownPostProcessor((el, ctx) => {
       const codes = Array.from(el.querySelectorAll("code"));
       for (const code of codes) {
         if (code.closest("pre")) continue; // skip fenced code blocks
         const text = code.textContent ?? "";
         if (!text.startsWith("almanac:")) continue;
-        const widget = this.build(text, ctx);
-        if (widget) code.replaceWith(widget);
+        mountInline(code, ctx, (scoped) => this.build(text, scoped));
       }
     });
 
@@ -456,7 +643,7 @@ export class Widgets implements
     // of a section's plugin-rendered controls collapse into a single call
     // site, and it reads cleanly in source/edit mode the same way a
     // `dataviewjs` or `tracker` block does.
-    this.plugin.registerMarkdownCodeBlockProcessor("almanac", (source, el, ctx) => {
+    this.registerBlock("almanac", (source, el, ctx) => {
       const rawLines = source.split("\n").map((l) => l.trim());
       // The managed region's markers are comments, so they are filtered out of
       // `lines` below with every other `#` line. They are still worth knowing
@@ -495,6 +682,20 @@ export class Widgets implements
       const wideSpec = parseWide(
         rawLines.filter((l) => l.length > 0 && !l.startsWith("#"))
       );
+      // AND HOW TALL ONE WIDGET IS (4.22 §1). Read here for the refusals only:
+      // unlike the four above, this modifier has no block-wide fact to hand back
+      // — a fence may hold as many heights as it has cards, and each belongs to
+      // the line under it. `applyCardHeights` reads them one at a time, from the
+      // body, after the cards exist.
+      //
+      // DROPPED FROM `lines`, like `frame:`, `row` and `wide` and unlike `cell`.
+      // A height means "here" the way a delimiter does, but nothing in the LOOP
+      // needs to meet it: the delimiter has to be met in sequence because it
+      // divides the children being appended, and a height is read off the body
+      // afterwards by the line it sits above.
+      const heightSpec = parseHeights(
+        rawLines.filter((l) => l.length > 0 && !l.startsWith("#"))
+      );
       // WHAT THE LOOP DISPATCHES, AND WHERE EACH OF IT CAME FROM. 4.8 §1.4.
       //
       // The filter is unchanged and `lines` is the same list it always was. What
@@ -515,7 +716,8 @@ export class Widgets implements
             !l.startsWith("#") &&
             !isFrameLine(l) &&
             !isRowLine(l) &&
-            !isWideLine(l)
+            !isWideLine(l) &&
+            !isHeightLine(l)
         );
       const lines = kept.map((k) => k.l);
       const lineAt = kept.map((k) => k.at);
@@ -579,6 +781,17 @@ export class Widgets implements
         container.createDiv({
           cls: "journal-frame-error",
           text: `Almanac: ${cellSpec.error}`,
+        });
+      }
+      // And the height modifier's. This is the one a reader meets by ACCIDENT —
+      // §5.2: a sized widget dragged out of a group into a block of its own
+      // carries its `height:` with it and lands somewhere it cannot mean
+      // anything. Saying so is the difference between a gesture that explains
+      // itself and a line that quietly does nothing.
+      if (heightSpec.error) {
+        container.createDiv({
+          cls: "journal-frame-error",
+          text: `Almanac: ${heightSpec.error}`,
         });
       }
       // And the width modifier's, in the same class for the same reason — a
@@ -671,6 +884,11 @@ export class Widgets implements
       // add-tile and the remove-× off this banner is the reasoning for putting
       // them on it.
       let isStudyBanner = false;
+      // Set once a `title` has been rendered into this block. 4.19 welded the
+      // page's name and its navigation row into one fence, and this is what
+      // makes that fence one card rather than two — `BlockComposites.pageBanner`
+      // has the argument.
+      let isPageBanner = false;
       // How many TITLED header bars this fence has already drawn. It is the
       // handle a rename uses to find its own line back in the file, so it counts
       // exactly what the file counts: an untitled `header:` renders no title,
@@ -938,6 +1156,11 @@ export class Widgets implements
           headerGroup = null;
           if (kind === "entry-header") isEntryBanner = true;
           if (JOURNAL_BANNER_KINDS.has(kind)) isStudyBanner = true;
+          if (kind === TITLE_KEYWORD) isPageBanner = true;
+          // The three flags above and `BANNER_KINDS` are one fact told twice —
+          // which of them a block drew, and whether it drew any. They are kept
+          // apart because the flags choose CHROME (three classes, three looks)
+          // and the set answers a question about the block's NAME.
           // A fence holding a period summary is a masthead, and the card
           // belongs to the fence rather than to the summary — one fence is one
           // container, which is the whole of 3.2. Set before the append so a
@@ -1000,6 +1223,60 @@ export class Widgets implements
         trackerBar.appendChild(buildTrackerAddCell(this, ctx));
       }
 
+      // ── THE GRID SAYS WHAT IT IS (4.21.1) ───────────────────────────
+      //
+      // 4.20 made the logging grid a section of its own and 4.21 gave it a card,
+      // and it is the only section in the plugin with a card and no name. Every
+      // other one opens with a `header:` line — "📆 Today", "✨ Highlights" — and
+      // this one could not, because the section is a MARKED REGION rather than a
+      // directive: there is no line in the fence for a title to be an argument
+      // to, and adding one would put a second thing inside the markers that
+      // `addTracker` writes between.
+      //
+      // SO THE BLOCK SAYS IT RATHER THAN THE FILE. The word is not stored, not
+      // editable and not a `header:` — it is a caption on a grid, in the same
+      // register the page-context strip above it uses for its facts, and a
+      // reader who deletes it has nothing to delete.
+      //
+      // ONLY ON THE SECTION, NEVER IN A BANNER. Every entry composed before 4.20
+      // keeps its markers in the banner's fence, where the grid is welded to the
+      // name band and captioning it would be labelling part of a banner. The test
+      // is `chromeClasses`', spelled the same way as the class it chooses, so the
+      // caption and the card cannot disagree about which blocks are the section.
+      //
+      // ── AND IT IS A ROW, NOT A WORD (4.21.2) ────────────────────────
+      //
+      // The caption shares its line with the entry's DATE, which sat beside the
+      // alias until this release and made that line a title, a date and a
+      // navigator — three things a desktop pane fits and a phone wraps onto two.
+      // The date has a row to itself here and the caption has the far end of it,
+      // so both halves of the row say what the block under them is: which period
+      // it belongs to, and what it holds.
+      //
+      // LIVE, WHICH THE STRIP ABOVE IT CANNOT BE. `entryDateLabel` reads the
+      // note's own frontmatter, and Obsidian has not always indexed a note it has
+      // only just created by the time the postprocessor runs — which is how a
+      // fresh daily entry rendered its caption with no date at all. A LiveWidget
+      // repaints on the note's next metadata change, so the row fills itself in.
+      // The page-context strip cannot take the same treatment: the alias editor
+      // WRITES frontmatter, so a live host would rebuild the input mid-edit.
+      if (
+        trackerBar &&
+        trackerBar.parentElement === container &&
+        hasTrackerRegion &&
+        !isEntryBanner &&
+        !isStudyBanner &&
+        !isPageBanner
+      ) {
+        const grain = this.plugin.sections.entryContextFor(ctx.sourcePath)?.grain;
+        container.insertBefore(
+          liveFrontmatterWidget(this.plugin, ctx, () =>
+            buildTrackerHead(this.plugin, ctx, grain)
+          ),
+          trackerBar
+        );
+      }
+
       // The entry card's footer — the date stepper and the entry's `⋯`, 3.7.
       //
       // LAST, AND THAT IS THE WHOLE POINT. The controls used to be a second row
@@ -1013,9 +1290,57 @@ export class Widgets implements
       // subtree is deleted on the next frontmatter change. The header no longer
       // builds these controls at all — it hands back a band with the title in
       // it — so there is nothing here to reparent and nothing to stack up.
-      if (isEntryBanner) {
-        const footer = buildEntryFooter(this.plugin, ctx);
-        if (footer) container.appendChild(footer);
+      // ── THE PAGE-CONTEXT STRIP, ON THE TRACKER BLOCK (4.21) ─────────
+      //
+      // It was the entry BANNER's footer until 4.21 — the stepper and the `⋯`
+      // under the logging grid. 4.20 moved the grid into a section of its own
+      // and 4.21 finished the thought: the banner is the file's name, its
+      // navigation and the cog, so the alias and the stepper went with the grid
+      // rather than being left behind in a band that no longer holds anything
+      // they belong to. The cog went the other way, up into the banner.
+      //
+      // ON THE TRACKER BLOCK, WHICH IS WHY THIS IS KEYED ON `hasTrackerRegion`
+      // RATHER THAN ON THE BANNER. On a note composed by 4.20 or later they are
+      // two blocks; on every entry that already exists the markers are still
+      // inside the banner's fence, so the strip lands there — the same place it
+      // has always been drawn, on the same note it has always been drawn on.
+      // One condition, both shapes, and nothing to migrate.
+      //
+      // A SIBLING THE POSTPROCESSOR OWNS, unchanged: `entry-header` is a
+      // LiveWidget, and the alias editor writes frontmatter, so a control
+      // parented into its subtree would delete itself mid-edit.
+      // AND ONLY ON A DIARY ENTRY. `hasTrackerRegion` is true on a journal note
+      // too — 4.20 gave that surface a tracker section as well — and an entry's
+      // strip would tell it which day it was. `entryContextFor` is the same
+      // question `section-insert.ts` asks to decide which catalogue a note has,
+      // so the two cannot disagree about what an entry is.
+      if (
+        hasTrackerRegion &&
+        this.plugin.sections.entryContextFor(ctx.sourcePath) &&
+        !isManagedTemplate(this.plugin, ctx.sourcePath)
+      ) {
+        const strip = buildEntryContext(this.plugin, ctx);
+        // PREPENDED ON THE NEW SHAPE, APPENDED ON THE OLD ONE, and the two are
+        // the same decision rather than a special case. On a note composed by
+        // 4.20 or later this block is the tracker section and the strip is its
+        // HEAD; on every entry that already exists the markers are still in the
+        // banner's fence, so this block is the banner and the strip is the
+        // FOOTER it has been since 3.7 — under the grid, where that release put
+        // it. Neither reader sees anything move.
+        if (strip) {
+          if (isEntryBanner) container.appendChild(strip);
+          else container.prepend(strip);
+        }
+      }
+
+      // AND THE JOURNAL NOTE'S OWN, which says its level and its kind. Same
+      // block, same reason, different facts — `buildJournalContext` has the
+      // argument. Guarded on the tracker section rather than on a banner because
+      // a journal note's markers moved out of its banner in 4.20 and, unlike an
+      // entry's, were never composed anywhere else.
+      if (hasTrackerRegion && !isEntryBanner && !isStudyBanner && !isPageBanner) {
+        const facts = buildJournalContext(this.plugin, ctx);
+        if (facts) container.prepend(facts);
       }
 
       // ── THE ROW, LAID OUT AFTER THE LOOP ────────────────────────────
@@ -1042,9 +1367,57 @@ export class Widgets implements
       // about to put a wrapper where a widget was.
       stampLines(container, drawn, rawLines.length);
 
+      // AND EVERY SIZED CARD IS TOLD ITS HEIGHT (4.22 §3.1), between the two,
+      // and the order is load-bearing in both directions. AFTER the cards,
+      // because the height belongs to the CARD — `cardWidget` copies the
+      // widget's `data-am-line` onto the wrapper it builds, so by now the card is
+      // the stamped thing and there is nothing to look up. BEFORE the row,
+      // because after it the children have been moved into cells and the walk
+      // would have to find them again — the same sentence the comment above
+      // already makes about `cardWidget` itself.
       if (rowSpec.row) {
         for (const { el, title } of named) cardWidget(el, title);
+        applyCardHeights(container, rawLines);
         layOutRow(container, cellBounds);
+      }
+
+      // ── THE ENTRY BANNER'S BANDS, IN BANNER ORDER (4.21.1) ──────────
+      //
+      // THE NAME LEADS. An entry's fence composes `links:` above `entry-header`
+      // and has since 3.2, so the pill row was drawn first and the note's name
+      // sat under it — while the page banner drew its name first and welded its
+      // destinations below. 4.21.1 settled the arrangement one way for all three
+      // banners, and this is where an entry gets it.
+      //
+      // IN THE DOM RATHER THAN IN THE MARKDOWN, and that is the whole reason
+      // this is here instead of in `entry-sections.ts`. Swapping the composed
+      // lines would need a migration — repair is additive-and-retired-only and
+      // cannot move one — and until every note took it the vault would hold both
+      // arrangements at once, which is the defect rather than the fix. Moving
+      // the node keeps ONE arrangement on every entry ever written, changes no
+      // file, and keeps reading order and tab order equal to what is on screen,
+      // which a CSS `order` would not.
+      //
+      // AFTER `stampLines`, WHICH IS NOT AN ACCIDENT. That maps children to
+      // source lines BY INDEX; once it has run each element carries its own line
+      // and can be moved without the mapping following it.
+      if (isEntryBanner) {
+        const nav = container.querySelector<HTMLElement>(
+          ":scope > .journal-links-card"
+        );
+        // The band class is applied here rather than in `buildLinks`, because
+        // this is the only place that knows the card landed in a banner: the
+        // same card drawn on a dashboard is a block of its own and styles
+        // itself.
+        nav?.addClass("journal-banner-nav");
+        // The header is live-wrapped, so what sits in the container is the host
+        // rather than the band — see `liveFrontmatterWidget`.
+        const host = container
+          .querySelector<HTMLElement>(".journal-banner-name")
+          ?.closest<HTMLElement>(".journal-live-widget");
+        if (nav && host && host.parentElement === container) {
+          container.insertBefore(host, nav);
+        }
       }
 
       // ── THE CHROME, CHOSEN AFTER THE LOOP ───────────────────────────
@@ -1062,6 +1435,9 @@ export class Widgets implements
         entryBanner: isEntryBanner,
         overviewCard: isOverviewCard,
         studyBanner: isStudyBanner,
+        pageBanner: isPageBanner,
+        trackerSection:
+          hasTrackerRegion && !isEntryBanner && !isStudyBanner && !isPageBanner,
       })) {
         container.addClass(cls);
       }
@@ -1164,7 +1540,7 @@ export class Widgets implements
     // toolbar renders on its own so the title isn't duplicated. Each chart is
     // drawn straight into its cell by chart-render.ts (Chart.js for line/bar,
     // plain DOM for the summary + calendar heatmap) — no Tracker plugin.
-    this.plugin.registerMarkdownCodeBlockProcessor(
+    this.registerBlock(
       "almanac-charts",
       (source, el, ctx) => {
         const lines = source.split("\n");
@@ -1191,7 +1567,7 @@ export class Widgets implements
     // trend / breakdown widgets under an Add / Edit… / Remove… toolbar. The
     // diary's section above and this one are deliberately parallel rather than
     // merged — see journal-charts.ts for why the two spec shapes stay apart.
-    this.plugin.registerMarkdownCodeBlockProcessor(
+    this.registerBlock(
       "almanac-journal-charts",
       (source, el, ctx) => {
         const lines = source.split("\n");
@@ -1263,7 +1639,7 @@ export class Widgets implements
     if (specs.length === 0) {
       container.createDiv({
         cls: "journal-chart-empty",
-        text: "No charts yet — use Add chart above.",
+        text: CHART_GRID_EMPTY,
       });
       return;
     }
@@ -1519,7 +1895,32 @@ export class Widgets implements
         // frontmatter, so long prose stays readable in the raw file. Not
         // live-wrapped: the box is the edit surface, so we don't rebuild it out
         // from under the cursor on every write. Full-width (a COMPOSITE_KIND).
-        widget = buildNote(this, rest, ctx, label);
+        //
+        // ── EXCEPT THE CAPTURE REGION, WHICH IS A LIST (4.28) ──────────
+        //
+        // Dispatched on the KEY rather than on a verb of its own, and that is
+        // the decision worth defending. `note:capture#collapse:…|Captured` is
+        // written into five template assets, three catalogue directives and a
+        // dozen assertions that pin it byte for byte; a new verb would rewrite
+        // all of them to change nothing a reader can see, because the region,
+        // the key, the fold and the label all stay exactly as they were. What
+        // changed is only how the same text is drawn.
+        //
+        // And the key IS the identity here: `constants.ts` gives capture its
+        // own region precisely so it is not confused with prose written on
+        // purpose, and this is that distinction becoming visible. The
+        // precedent is one file over — `note-field.ts` already reads
+        // `key === CAPTURE_NOTE_KEY` to decide the fold default.
+        widget =
+          noteKeyOf(rest) === CAPTURE_NOTE_KEY
+            ? buildCaptureLog(this, rest, ctx, label, {
+                collapsible: rest.includes("#collapse"),
+                startCollapsed: () =>
+                  noteFoldState(this.plugin, ctx.sourcePath, CAPTURE_NOTE_KEY),
+                onFold: (v: boolean) =>
+                  void setNoteFold(this.plugin, ctx.sourcePath, CAPTURE_NOTE_KEY, v),
+              })
+            : buildNote(this, rest, ctx, label);
         break;
       case "tasks":
         // Almanac's own task manager. Reads/writes real task lines stored in the
@@ -1831,15 +2232,36 @@ export class Widgets implements
   // Atomic body write: read-modify-write the whole file, replacing just this
   // key's region. vault.process serializes concurrent edits, so two fields
   // writing near-simultaneously can't lose each other's content.
+  //
+  // AND IT NO LONGER OVERWRITES A CAPTURE THAT ARRIVED UNDERNEATH IT (4.27 §1).
+  // `baseline` is the region text the caller's buffer was derived from. Anything
+  // appended since then rides along after the value being written, so a field
+  // that never saw the append cannot delete it. `test/capture.test.ts` has
+  // asserted that loss since it was written and said in its own comment that
+  // the fix belongs here — "never letting the field write a value older than
+  // what's on disk" — rather than in `writeNoteRegion`, which is right to do
+  // what it is told.
+  //
+  // THE RE-READ IS THE TEXT `vault.process` HANDS US, never a `vault.read`
+  // before the call. Reading outside would re-open the read-modify-write window
+  // `notestore.ts` warns about in `appendToNoteRegion`'s own header, and would
+  // make the merge itself the race it exists to close.
   async writeNoteRegionToFile(
     ctx: MarkdownPostProcessorContext,
     key: string,
-    value: string
+    value: string,
+    baseline?: string
   ): Promise<void> {
     const file = this.fileOf(ctx);
     if (!file) return;
     await this.app.vault.process(file, (text) =>
-      writeNoteRegion(text, key, value)
+      writeNoteRegion(
+        text,
+        key,
+        baseline == null
+          ? value
+          : reconcileRegionWrite(readNoteRegion(text, key), baseline, value)
+      )
     );
   }
 

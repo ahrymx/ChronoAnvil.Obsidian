@@ -68,9 +68,17 @@ describe("the composer is what scaffold writes", () => {
     // refresh that composed WITHOUT the extras would silently strip every
     // section a reader had added to their grain, on a command whose whole job
     // is to bring the template up to date.
+    //
+    // AND THE ORDER TRAVELS WITH THEM, as of 4.29. Membership and order are two
+    // settings keys, and a path that read one without the other would compose a
+    // template differing from the one on disk by a reorder — so the drift
+    // survey would offer to undo every save the reader had made. That is the
+    // same failure one field over, which is why it is the same assertion.
     const src = readSrc("scaffold");
     expect(
-      src.match(/composeEntryTemplate\(cls, extras\[cls\] \?\? \[\]\)/g)?.length
+      src.match(
+        /composeEntryTemplate\(cls, extras\[cls\] \?\? \[\], bands\[cls\] \?\? \[\]\)/g
+      )?.length
     ).toBe(2);
     expect(src).not.toContain("composeEntryTemplate(cls)");
   });
@@ -224,22 +232,30 @@ describe("what the catalogue made visible", () => {
 });
 
 describe("locked means unremovable, not unmovable", () => {
-  it("locks exactly the two structural sections", () => {
+  it("locks exactly the one structural section", () => {
     // 2.60.0 left these out of the catalogue on the grounds that they own no
     // region. True, and the wrong reason: a section an editor cannot SEE cannot
     // be reordered either, and §2's claim is that the lock is on existence
     // rather than position.
+    //
+    // TWO BECAME ONE IN 4.19. `links` and `entry-header` composed into a single
+    // fence from 3.2 onward, so an entry has drawn one banner and reported two
+    // sections for eight releases; the merge closed that. The lock is unchanged
+    // and its argument is unchanged — there is one section carrying it now.
+    // AND THE TRACKER GRID, AS OF 4.20. It left the banner's fence to become a
+    // section, and it carries a lock of its own rather than an inherited one:
+    // every diary chart on every dashboard is a view over these cells, so a note
+    // with no grid silently empties the pages above it.
     expect(ENTRY_SECTIONS.filter((s) => s.locked).map((s) => s.id)).toEqual([
-      "links",
-      "entry-header",
+      "banner",
+      "trackers",
     ]);
   });
 
   it("offers every other section for removal", () => {
     for (const g of TRACKER_CLASSES) {
       const removable = removableEntrySections({ grain: g }).map((s) => s.id);
-      expect(removable, g).not.toContain("links");
-      expect(removable, g).not.toContain("entry-header");
+      expect(removable, g).not.toContain("banner");
       expect(removable, g).toContain("focus");
     }
   });
@@ -248,8 +264,13 @@ describe("locked means unremovable, not unmovable", () => {
     // The two halves of an entry as an invariant: a section holding the
     // reader's writing is theirs to remove, and a section that is structure has
     // no writing to lose.
+    // "OWNS NO REGION" IS THE RULE, AND `fence` STOPPED BEING ITS PROXY IN 4.20.
+    // The two coincided while `own` was the only fence above the rule; the
+    // tracker grid now has a third, owns no region either, and is locked for its
+    // own reason. Asked directly rather than through a fence, which is what the
+    // sentence above always meant.
     for (const s of ENTRY_SECTIONS) {
-      expect(s.locked, s.id).toBe(s.fence === "own");
+      expect(s.locked, s.id).toBe(s.fence !== "shared");
     }
   });
 
@@ -294,7 +315,7 @@ describe("removal refuses on the reader's writing", () => {
 
   it("refuses once there is writing in it", () => {
     const why = entryRemovalRefusal(sec("log"), written);
-    expect(why).toContain("has your writing in it");
+    expect(why).toContain("Holds your writing");
     expect(why).toContain("Clear it first");
   });
 
@@ -309,8 +330,8 @@ describe("removal refuses on the reader's writing", () => {
   it("refuses a locked section for being locked, not for its contents", () => {
     // Order matters: telling someone to clear their notes before removing a
     // banner that was never going anywhere sends them to do pointless work.
-    const why = entryRemovalRefusal(sec("entry-header"), written);
-    expect(why).toContain("cannot be removed");
+    const why = entryRemovalRefusal(sec("banner"), written);
+    expect(why).toContain("can't be removed");
     expect(why).not.toContain("Clear it first");
   });
 
@@ -321,19 +342,15 @@ describe("removal refuses on the reader's writing", () => {
     // now alone among its band's movable members. A refusal that promises a
     // move nothing performs is the exact defect 3.0 was built to correct, so
     // both messages drop it and the pinned one says what the rule is.
-    const links = entryRemovalRefusal(sec("links"), fresh)!;
-    expect(links).toContain("first thing on every entry");
-    expect(links).not.toContain("move it");
-
-    const banner = entryRemovalRefusal(sec("entry-header"), fresh)!;
-    expect(banner).toContain("cannot be removed");
-    expect(banner).not.toContain("move it");
+    const banner = entryRemovalRefusal(sec("banner"), fresh)!;
+    expect(banner).toContain("Part of every entry");
+    expect(banner).not.toContain("You can still move it");
   });
 
   it("narrows what an editor offers on THIS note", () => {
     const ids = removableFrom({ grain: "daily" }, written).map((s) => s.id);
     expect(ids).not.toContain("log");
-    expect(ids).not.toContain("entry-header");
+    expect(ids).not.toContain("banner");
     expect(ids).toContain("focus");
   });
 });
@@ -461,39 +478,41 @@ describe("adding a section to one note", () => {
   });
 
   it("refuses a locked section, which belongs above the rule", () => {
-    expect(addSectionToNote(daily, { grain: "daily" }, sec("links"))).toBeNull();
+    expect(addSectionToNote(daily, { grain: "daily" }, sec("banner"))).toBeNull();
   });
 });
 
 // ── 3.2 §4: what "fixed" is derived from ──────────────────────────────
 
 describe("immovability is derived, not declared", () => {
-  it("pins exactly one section, and it is navigation", () => {
+  it("pins exactly one section, and it is the banner", () => {
     expect(ENTRY_SECTIONS.filter((s) => s.pinned).map((s) => s.id)).toEqual([
-      "links",
+      "banner",
     ]);
   });
 
-  it("makes the banner immovable without anyone saying so", () => {
+  it("makes the banner immovable, and by decision now rather than arithmetic", () => {
     // TWO WAYS TO HAVE NOWHERE TO GO, AND ONLY ONE OF THEM IS A DECISION.
-    // `links` is fixed because 3.2 §4 says so. `entry-header` is fixed because
-    // the pin leaves it alone among its band's movable members — arithmetic,
-    // not policy. Writing `movable: false` on it by hand would encode today's
-    // arithmetic as tomorrow's rule.
-    const banner = ENTRY_SECTIONS.find((s) => s.id === "entry-header")!;
-    expect(banner.pinned).toBeUndefined();
+    // `links` was fixed because 3.2 §4 said so; `entry-header` was fixed because
+    // the pin left it alone among its band's movable members — arithmetic, not
+    // policy, and the reason nobody wrote `movable: false` on it by hand.
+    //
+    // 4.19 MERGED THE PAIR, SO THE ARITHMETIC HAS NOTHING LEFT TO COMPUTE. The
+    // band has one member, it carries the pin the navigation row brought with
+    // it, and `isMovable` answers from the flag rather than from the count. Both
+    // routes still lead to the same answer, which is what the next test checks.
+    const banner = ENTRY_SECTIONS.find((s) => s.id === "banner")!;
+    expect(banner.pinned).toBe(true);
     expect(isMovable(banner)).toBe(false);
   });
 
-  it("would give the banner its freedom back if it gained a neighbour", () => {
-    // The test that makes the previous one worth having. A third unpinned
-    // structural section means two of them can trade places, and `isMovable`
-    // has to notice — which a hand-written flag could not. Asserted against a
-    // hypothetical rather than the catalogue, because adding one for real is
-    // not this release's business.
+  it("would still derive immovability if the pin were ever lifted", () => {
+    // The test that makes the previous one worth having. `isMovable` must not
+    // become "read the flag": a band of one has nowhere to trade places to
+    // whatever the flag says, and the day a second structural section arrives
+    // the rule has to notice on its own.
     const band = ENTRY_SECTIONS.filter((s) => s.fence === "own");
-    expect(band.map((s) => s.id)).toEqual(["links", "entry-header"]);
-    expect(band.filter((s) => !s.pinned).length).toBe(1);
+    expect(band.map((s) => s.id)).toEqual(["banner"]);
     // One unpinned member is what makes it false; the rule reads "more than
     // one", so the day a second arrives it flips on its own.
     expect(readSrc("entry-sections")).toContain("!s.pinned).length >");
@@ -544,23 +563,36 @@ describe("the structural half is one fence", () => {
     }
   });
 
-  it("and there is only one of it above the rule", () => {
+  it("and there are exactly two of them above the rule (4.20)", () => {
+    // ONE UNTIL 4.20, AND THE SECOND IS THE POINT OF THAT RELEASE. The banner is
+    // the file's name, its navigation and the control that edits it; the tracker
+    // grid is the note's most-used content and was in that fence only because
+    // the fence was the only place above the rule for its markers to live.
+    //
+    // STILL EXACTLY TWO, not "at least". A third fence above the rule means
+    // something has been composed there without an argument, and the rule this
+    // guards — that the reader's own writing is what lives below — is easiest to
+    // erode by adding structure a line at a time.
     for (const g of TRACKER_CLASSES) {
       const text = composeEntryTemplate(g);
       const rule = text.indexOf("\n---\n", text.indexOf("`almanac:spacer`"));
       const above = text.slice(0, rule);
-      expect((above.match(/```almanac/g) ?? []).length, g).toBe(1);
+      expect((above.match(/```almanac/g) ?? []).length, g).toBe(2);
     }
   });
 
-  it("keeps the tracker markers inside it", () => {
-    // The grid is welded to the strip's lower edge by being in the same
-    // container. Adding a third directive above the markers must not evict
-    // them, or 2.18.4's merge comes undone while 3.2's is being made.
+  it("keeps the tracker markers out of the banner and in a block of their own", () => {
+    // The inverse of what this asserted until 4.20, and for the argument in the
+    // test above. What has NOT changed is that the markers are composed at all
+    // and are above the rule — `locateTrackerRegion` needs them to exist and
+    // `EntrySection.fence` needs them to be structure rather than writing.
     for (const g of TRACKER_CLASSES) {
-      const body = structuralFence(composeEntryTemplate(g));
-      expect(body, g).toContain("# almanac:trackers:start");
-      expect(body, g).toContain("# almanac:trackers:end");
+      const text = composeEntryTemplate(g);
+      expect(structuralFence(text), g).not.toContain("# almanac:trackers:start");
+      const rule = text.indexOf("\n---\n", text.indexOf("`almanac:spacer`"));
+      const above = text.slice(0, rule);
+      expect(above, g).toContain("# almanac:trackers:start");
+      expect(above, g).toContain("# almanac:trackers:end");
     }
   });
 
@@ -582,7 +614,7 @@ describe("the parser reads both shapes", () => {
     // that was about to rewrite around it.
     for (const g of TRACKER_CLASSES) {
       const ids = detectEntrySections(composeEntryTemplate(g), { grain: g });
-      expect(ids.slice(0, 2), g).toEqual(["links", "entry-header"]);
+      expect(ids.slice(0, 1), g).toEqual(["banner"]);
     }
   });
 
@@ -593,7 +625,7 @@ describe("the parser reads both shapes", () => {
     // fixes, and would ship in the same release.
     for (const g of TRACKER_CLASSES) {
       const ids = detectEntrySections(legacyEntry(g), { grain: g });
-      expect(ids.slice(0, 2), g).toEqual(["links", "entry-header"]);
+      expect(ids.slice(0, 1), g).toEqual(["banner"]);
     }
   });
 

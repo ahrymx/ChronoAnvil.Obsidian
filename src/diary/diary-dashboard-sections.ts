@@ -82,7 +82,7 @@
 // the whole reason the modifier takes three values rather than two.
 
 import { HEADER_PREFIX, TRENDS_HEADING } from "../core/constants";
-import { composeFlatNote, flatNoteModel, PAGE_TITLE_SECTION } from "../core/note-sections";
+import { composeFlatNote, flatNoteModel, bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
 import type { SectionModel } from "../core/section-model";
@@ -109,10 +109,17 @@ const chartLinesIn = (text: string): number =>
 const DASHBOARD_AGENDA = 3;
 
 export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
-  // THE HEAD, FIRST. 4.10 — see `PAGE_TITLE_SECTION`. This page's own name is
-  // the folder's, which is worth knowing before it is read: a default vault
-  // shows "02 - Diary" here, because a folder note is named for its folder.
-  PAGE_TITLE_SECTION,
+  // THE BANNER, FIRST. 4.10 gave this page a head; 4.19 made the head a banner
+  // — see `bannerSection`. This page's own name is the folder's, which is worth
+  // knowing before it is read: a default vault shows "02 - Diary" here, because
+  // a folder note is named for its folder.
+  //
+  // NO `links:` ROW, which is what this banner's spec says by leaving the field
+  // out and is not an omission. The diary card below carries destination pills
+  // of its own — 4.10 made the same call here and wrote it down — so a
+  // navigation row in the banner would be the second answer on one page that
+  // the whole release is about removing.
+  bannerSection({ ids: PAGE_TITLE_IDS }),
   {
     id: "today",
     label: "Today",
@@ -137,7 +144,9 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
   {
     id: "this-month",
     label: "This month",
-    blurb: "The month's banner: what it holds, and its date navigator.",
+    // "banner" LEFT THIS SENTENCE IN 4.19 — see `DIARY_SECTIONS`' summary for
+    // the argument. This page's banner is the section at the top of it.
+    blurb: "What the month holds, and its date navigator.",
     icon: "📅",
     // `frame: section`, not a `header:` bar — a period summary takes the
     // overview card, and a bar in the same fence would nest that card inside a
@@ -163,7 +172,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
   },
   {
     id: "open-tasks",
-    label: "Open Tasks",
+    label: "Open tasks",
     blurb: "Still-open Almanac tasks from every entry under the diary.",
     icon: "⏳",
     // The tasks live in the entries this aggregates, not here, so removing the
@@ -186,7 +195,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     ],
     render: () => ({
       fence: "almanac",
-      lines: ["header:⏳ Open Tasks", "tasks-table"],
+      lines: ["header:⏳ Open tasks", "tasks-table"],
     }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },
@@ -206,13 +215,13 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     locked: false,
     render: () => ({
       fence: "almanac",
-      lines: ["header:🕘 On This Day", "on-this-day:always"],
+      lines: ["header:🕘 On this day", "on-this-day:always"],
     }),
     locate: (text) => probe(text, /^on-this-day\b/m),
   },
   {
     id: "charts",
-    label: "Trends and Statistics",
+    label: "Trends and statistics",
     blurb: "The charts manager for the diary.",
     icon: "📊",
     // NOT LOCKED, AND NOT FREELY REMOVABLE EITHER — the one section here where

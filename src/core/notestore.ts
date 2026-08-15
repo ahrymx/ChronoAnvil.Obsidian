@@ -34,6 +34,27 @@ export function isValidNoteKey(key: string): boolean {
   return /^[A-Za-z0-9_-]+$/.test(key);
 }
 
+// The region key out of a region-backed directive's argument —
+// `key[#variant][:placeholder]`.
+//
+// MOVED HERE FROM `ui/widgets/note-field.ts` IN 4.30, unchanged, and
+// re-exported from there so every existing caller is untouched. It reads the
+// binding between a directive and the region below it, which is this file's
+// subject, and it was in the widget for the accident of the widget having
+// needed it first.
+//
+// THE ONE SPELLING OF THAT BINDING, deliberately. The dispatch in index.ts asks
+// it to tell a capture region from prose; 4.30's export asks it of every
+// directive on a page to decide which region a heading is named for. A second
+// copy would be two answers to "which region is this widget's" — and the export
+// would then disagree with the widget about where a reader's words are.
+export function noteKeyOf(rest: string): string {
+  const colon = rest.indexOf(":");
+  const head = (colon === -1 ? rest : rest.slice(0, colon)).trim();
+  const hash = head.indexOf("#");
+  return (hash === -1 ? head : head.slice(0, hash)).trim();
+}
+
 function openMarker(key: string): string {
   return `<!--almanac:${key}`;
 }
@@ -212,9 +233,89 @@ export function appendToNoteRegion(
 ): string {
   const body = addition.replace(/\s+$/, "");
   if (!body) return fileText;
-  const current = readNoteRegion(fileText, key).replace(/\s+$/, "");
-  const next = current.length === 0 ? body : `${current}\n\n${body}`;
-  return writeNoteRegion(fileText, key, next);
+  const current = readNoteRegion(fileText, key);
+  return writeNoteRegion(fileText, key, joinRegionBlocks(current, body));
+}
+
+// The spacing rule for two blocks in one region: exactly one blank line
+// between them, and none before the first.
+//
+// EXTRACTED FROM `appendToNoteRegion` IN 4.27, and the extraction is the point.
+// A second caller needed the same rule — `reconcileRegionWrite` below, which
+// re-attaches an appended capture on top of a field's whole-region write — and
+// the alternative was spelling `${a}\n\n${b}` twice. Two spellings of one
+// spacing rule is how a capture ends up with a different gap depending on which
+// writer got there last, and the eight cases in `test/capture.test.ts:59-107`
+// would only have been guarding one of them.
+export function joinRegionBlocks(current: string, addition: string): string {
+  const head = current.replace(/\s+$/, "");
+  const tail = addition.replace(/\s+$/, "");
+  if (!tail) return head;
+  return head.length === 0 ? tail : `${head}\n\n${tail}`;
+}
+
+// What was appended to `baseline` to arrive at `onDisk`, or null if the change
+// between them is not an append.
+//
+// WHY "IS IT AN APPEND" IS THE QUESTION. A `note:` field holds its own buffer
+// after mount so it never rebuilds under the cursor, which means a second
+// writer to the same region — a capture — is something the field has to be told
+// about rather than something it sees. It cannot merge an arbitrary divergence:
+// two writers rewriting the same prose is a conflict, and resolving one is a
+// bigger decision than the release that added this. But the one divergence that
+// actually happens in this plugin is an append, and an append is trivially
+// mergeable: it is text strictly after everything both sides agree on.
+//
+// So: recognise exactly that, and refuse everything else by returning null. The
+// caller then falls back to its old behaviour, which is what it would have done
+// with no merge at all.
+//
+// THE BASELINE IS TRIMMED because `appendToNoteRegion` trims before it joins
+// (see `joinRegionBlocks`). A field whose buffer ends in a newline — which is
+// most of them, since a textarea invites a trailing return — would otherwise
+// never match its own region on disk, and every append would read as a
+// conflict.
+export function appendedSince(baseline: string, onDisk: string): string | null {
+  const base = baseline.replace(/\s+$/, "");
+  if (base.length === 0) return onDisk.length === 0 ? null : onDisk;
+  if (!onDisk.startsWith(base)) return null;
+  const rest = onDisk.slice(base.length);
+  if (rest.length === 0) return null;
+  // Only a rest that begins with the block separator is an append. Anything
+  // else is an edit that happens to share a prefix — "A" → "Ax" is one word
+  // being typed, not a second block arriving.
+  if (!rest.startsWith("\n\n")) return null;
+  return rest.slice(2);
+}
+
+// What a field should write, given what it means to write (`next`), the region
+// it last agreed with (`baseline`), and what is on disk right now.
+//
+// THE FIX `test/capture.test.ts:193` ASKED FOR. That test asserts a whole-region
+// write drops a capture appended underneath it, and says in its own comment that
+// `writeNoteRegion` is right to do what it is told and that the fix belongs in
+// "never letting the field write a value older than what's on disk". This is
+// that: the write still says what the field means, and anything appended since
+// the field last looked rides along after it.
+export function reconcileRegionWrite(
+  onDisk: string,
+  baseline: string,
+  next: string
+): string {
+  const tail = appendedSince(baseline, onDisk);
+  return tail == null ? next : joinRegionBlocks(next, tail);
+}
+
+// Whether `key`'s region exists in this text.
+//
+// A PREDICATE, RATHER THAN READING ONE OUT OF A WRITER. `ensureNoteRegions(text,
+// [key]) == null` answers the same question and answers it as a side effect of
+// being willing to create one, which is a different thing to ask and a worse
+// thing to read. Quick capture's destination list needs the question on its own:
+// a note whose region is absent is one where a capture would land on disk and
+// render nowhere.
+export function hasNoteRegion(fileText: string, key: string): boolean {
+  return findRegion(fileText, key) != null;
 }
 
 // Ensure every key in `keys` has a (possibly empty) region, appending any that

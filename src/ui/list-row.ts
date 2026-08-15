@@ -43,7 +43,7 @@ export interface ListRowOptions {
   // and the truncation are shared and only the contents are the caller's.
   titleRender?: (slot: HTMLElement) => void;
   subtitle?: string;
-  pills?: { text: string; tone?: "on" | "off" | "muted" }[];
+  pills?: { text: string; tone?: "on" | "off" | "muted" | "accent" | "section" }[];
   locked?: boolean;
   // Extra classes for row state — added, removed, disabled. The caller's own
   // stylesheet targets these; the component only has to not fight them.

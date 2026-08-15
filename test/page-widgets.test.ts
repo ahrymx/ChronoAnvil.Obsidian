@@ -48,7 +48,13 @@ describe("the launcher shares one destination table", () => {
     expect(arm).toContain("folderNotePath(paths.journalsRoot)");
     // Capture is not a file — the shape `today` already uses for a destination
     // that is a window rather than a note.
-    expect(arm).toContain("openCapture(plugin)");
+    //
+    // ANCHORED ON THE CLAIM, NOT ON THE CALL'S ARITY (4.27). This read
+    // `openCapture(plugin)` and broke when capture learned to take the note the
+    // pill was drawn in — a change that leaves the claim above entirely intact.
+    // The assertion is "this destination opens a window instead of resolving a
+    // file", so it says that. Same move as section-choice.test.ts:511.
+    expect(arm).toContain("action: () => openCapture(");
     expect(arm).toContain("file: null");
   });
 
@@ -152,6 +158,23 @@ describe("the page title is the file's name", () => {
     // the same defect with a smaller audience.
     expect(rule).toContain(".markdown-source-view:has(.jtc-card) .inline-title");
     expect(rule).toContain("display: none");
+    // ── AND ON EVERY SURFACE THAT DRAWS A NAME, NOT JUST THIS ONE ────
+    //
+    // The rule shipped in 4.5.1 naming `.jtc-card`, which is the LARGE banner's
+    // name card and appears on the eight dashboard-shaped surfaces only. A diary
+    // entry and a journal leaf drew Obsidian's inline title AND their banner's
+    // copy of the same name for eleven releases — the exact doubling this rule
+    // exists to remove, on the two page kinds a reader is in most.
+    //
+    // The condition is "a block on this page already draws the file's name with
+    // a rename on it", and `journal-banner-name` is what marks that on both slim
+    // banners. Asserted for both views, like the pair above, because that is the
+    // half of this rule that has been forgotten before.
+    for (const view of ["markdown-preview-view", "markdown-source-view"]) {
+      expect(rule, view).toContain(
+        `.${view}:has(.journal-banner-name) .inline-title`
+      );
+    }
     // And no second frontmatter class was invented for it.
     expect(readCode("home-sections")).not.toContain("almanac-titled");
     expect(rules).not.toContain(".almanac-titled");

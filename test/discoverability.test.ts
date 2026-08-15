@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { describe, expect, it } from "vitest";
-import { readSrc } from "./sources";
+import { readCode, readSrc } from "./sources";
 import { ACTIONS } from "../src/core/actions";
 import { journalActions } from "../src/core/journal-actions";
 import { pluginWith } from "./journal-action-stub";
@@ -64,10 +64,28 @@ describe("where the control appears", () => {
     // The thing the relocation could quietly lose: a banner that kept its own
     // hand-rolled control would still pass the assertion above by not being
     // looked at.
-    expect(header()).toContain('overflowButton(host, "jsh-more"');
-    expect(readSrc("entryheader")).toContain(
-      "overflowButton("
-    );
+    //
+    // `settingsButton` AS OF 4.20, WHERE THIS WAS `overflowButton`. It wraps
+    // that one and swaps the glyph for a cog — the control acts on the PAGE, and
+    // 4.20 made it the same control on all three banners rather than the page
+    // banner's alone. The ⋯ is still right for a row, a cell or a card inside a
+    // page, which is why the wrapper exists instead of a change to the base.
+    expect(header()).toContain('settingsButton(host, "jsh-more"');
+    expect(readSrc("entryheader")).toContain("settingsButton(");
+  });
+
+  it("draws one glyph for one meaning, on every banner", () => {
+    // THE DEFECT THIS CLOSES. A diary entry and a journal note carried the same
+    // menu, opening the same section editor, behind the ⋯ that means "more
+    // things about this row" — so a reader who learned the cog on a dashboard
+    // had to learn it again on the two surfaces they spend the most time in.
+    const frame = readSrc("section-frame");
+    expect(frame).toContain("export function settingsButton");
+    expect(frame).toContain('setIcon(button, "settings")');
+    // And no banner reaches past it to the bare button.
+    for (const f of ["entryheader", "study-header", "page-title"]) {
+      expect(readSrc(f), f).not.toContain("overflowButton(");
+    }
   });
 });
 
@@ -196,17 +214,22 @@ describe("the other doors", () => {
     // enumeration for them to disagree over.
     expect(head).toContain("await this.surveyRepair()");
     expect(head).toContain("openRepairWindow(this.app, survey)");
-    expect(head).toContain("this.applyRepair(survey, chosen, byType, create)");
+    expect(head).toContain("this.applyRepair(survey, chosen, byType, create, templates)");
 
-    // Nothing to do opens nothing — a window that says there is nothing to
-    // confirm teaches a reader to dismiss windows unread.
-    expect(head).toContain("if (!pending.length) {");
+    // AND IT OPENS UNCONDITIONALLY (4.18.2). The old rule returned early on a
+    // current vault and reported it as a notice; the window now carries that
+    // answer itself, so there is no branch here that can decline to open.
+    expect(head).not.toContain("pendingGroups");
+    expect(head).not.toContain("everything already in place");
+    expect(head.indexOf("openRepairWindow")).toBeGreaterThan(
+      head.indexOf("await this.surveyRepair()")
+    );
     // Declining writes nothing, and so does unticking every group.
     expect(head).toContain("if (!chosen || chosen.size === 0) return;");
   });
 
   it("does every group it offered, and only the ones that were ticked", () => {
-    // THE HALF A PREVIEW CANNOT PROMISE ON ITS OWN. A window that lists four
+    // THE HALF A PREVIEW CANNOT PROMISE ON ITS OWN. A window that lists five
     // groups and then runs work belonging to a group the reader unticked is
     // worse than no window — so every branch in the apply is gated on the set
     // the window returned, and every group the survey can offer has a branch.
@@ -214,18 +237,77 @@ describe("the other doors", () => {
     const at = t.indexOf("private async applyRepair(");
     const body = t.slice(at, t.indexOf("\n  }", t.indexOf("parts.join", at)));
 
-    for (const id of ["create", "pages", "journals", "migrations"]) {
+    for (const id of ["create", "pages", "journals", "migrations", "templates"]) {
       expect(body, id).toContain(`chosen.has("${id}")`);
     }
-    // And the survey offers exactly those four, so neither list can grow a
+    // And the survey offers exactly those five, so neither list can grow a
     // member the other does not have.
     const survey = t.slice(
       t.indexOf("const survey: RepairSurvey = {"),
-      t.indexOf("return { survey, byType, create };")
+      t.indexOf("return { survey, byType, create, templates: templatesDrift.files };")
     );
-    for (const id of ["create", "pages", "journals", "migrations"]) {
+    for (const id of ["create", "pages", "journals", "migrations", "templates"]) {
       expect(survey, id).toContain(`id: "${id}"`);
     }
+  });
+
+  // The window answers a current vault too. 4.18.2.
+  //
+  // The command is run to ASK at least as often as it is run to fix, so "nothing
+  // is wrong" is the answer rather than a reason to stay silent. It used to
+  // arrive as a corner notice, which is the same words with less standing and in
+  // the one place a reader cannot ask a follow-up.
+  it("opens the window even when there is nothing to repair", () => {
+    const t = readCode("repair-modal");
+    const at = t.indexOf("onOpen(): void {");
+    const open = t.slice(at, t.indexOf("private renderNothingToDo", at));
+    // The branch is IN the window, so nothing upstream has to decide.
+    expect(open).toContain("if (!this.pending().length) {");
+    expect(open).toContain("this.renderNothingToDo();");
+  });
+
+  it("says what it looked for rather than only that it found nothing", () => {
+    // `empty.ts`'s rule: an empty state names what will appear here. "Nothing to
+    // do" alone leaves a reader unsure the command examined anything.
+    const t = readSrc("repair-modal");
+    const fn = t.slice(t.indexOf("private renderNothingToDo"));
+    expect(fn).toContain("emptyCallout(");
+    expect(fn).toMatch(/add, bring up to date, catch/);
+  });
+
+  it("draws one live button rather than a greyed confirm and a cancel", () => {
+    // The asking shape greys its button when the answer is momentarily
+    // unactionable, which is the narrow case the "nothing dead is drawn" rule
+    // allows. There is no question here, so a disabled "Repair 0 things" beside
+    // a Cancel would be two dead controls dressed as a choice.
+    const t = readCode("repair-modal");
+    const fn = t.slice(
+      t.indexOf("private renderNothingToDo"),
+      t.indexOf("private refreshButton")
+    );
+    expect(fn).toContain('text: "Close"');
+    expect(fn).not.toContain("disabled");
+    expect(fn).not.toContain('text: "Cancel"');
+    expect(fn).not.toContain("mod-warning");
+  });
+
+  it("writes nothing when the empty window is closed", () => {
+    // `confirmed` is never set on this path, so it resolves null exactly as
+    // Cancel does — and `setupVault` already returns on null.
+    const t = readCode("repair-modal");
+    const fn = t.slice(
+      t.indexOf("private renderNothingToDo"),
+      t.indexOf("private refreshButton")
+    );
+    expect(fn).not.toContain("this.confirmed = true");
+    expect(readCode("scaffold")).toContain(
+      "if (!chosen || chosen.size === 0) return;"
+    );
+  });
+
+  it("no longer reports a current vault as a notice", () => {
+    // The window carries the answer now; both would be the same sentence twice.
+    expect(readCode("scaffold")).not.toContain("everything already in place");
   });
 
   it("makes cancel the default on the plan dialog", () => {
@@ -390,8 +472,8 @@ describe("the other doors", () => {
 describe("the diary entry offers its own commands", () => {
   const entry = () => readSrc("entryheader");
 
-  it("draws an overflow on the entry banner", () => {
-    expect(entry()).toContain('overflowButton(host, "jeh-more"');
+  it("draws the settings control on the entry banner", () => {
+    expect(entry()).toContain('settingsButton(host, "jeh-more"');
   });
 
   it("offers the two tracker commands that name this entry", () => {
@@ -419,7 +501,7 @@ describe("the diary entry offers its own commands", () => {
     const t = entry();
     const fn = t.slice(t.indexOf("function attachEntryMenu("));
     const guard = fn.indexOf("if (isManagedTemplate(plugin, notePath)) return;");
-    const draw = fn.indexOf("overflowButton(");
+    const draw = fn.indexOf("settingsButton(");
     expect(guard).toBeGreaterThan(0);
     expect(draw).toBeGreaterThan(guard);
   });

@@ -136,21 +136,16 @@ describe("every name names its owner", () => {
     }
   });
 
-  it("keeps a parenthetical that warns or asks, drops one that explains", () => {
-    // Three survived the rename and three did not, and the rule is which
-    // question the parenthetical answers. `(overwrites)` warns; `(pick a
-    // date)` says what you are about to be asked. `(template + Diary.base)`,
-    // `(asks first)` and `(it can then hold pages)` describe mechanism, which
-    // is what a reader finds out by running the thing — and a name is read in
-    // a list of twenty-seven.
-    expect(byId("maint-refresh-entry-templates")?.name).toContain("(overwrites)");
+  it("keeps a parenthetical that asks, drops one that explains", () => {
+    // `(pick a date)` says what you are about to be asked. `(template + Diary.base)`,
+    // `(asks first)` and `(it can then hold pages)` describe mechanism.
+    // In 4.23, `(overwrites)` was retired from entry templates as it gained diff-preview
+    // parity with journal templates.
     expect(byId("diary-new-entry")?.name).toContain("(pick a date)");
     expect(byId("diary-new-month-entry")?.name).toContain("(pick a month)");
-    // `study-new-journal` carried `(subject)` because "new journal" did not
-    // say what it made. Generated names say it outright — "Study: new subject"
-    // — so the parenthetical it needed is gone with the hand-written entry.
 
     expect(byId("maint-sync-trackers")?.name).not.toContain("Diary.base");
+    expect(byId("maint-refresh-entry-templates")?.name).not.toContain("overwrites");
     expect(byId("maint-refresh-journal-templates")?.name).not.toContain("asks");
     expect(byId("note-convert-to-dashboard")?.name).not.toContain("pages");
   });
@@ -231,19 +226,29 @@ describe("the destructive item is declared, not detected", () => {
 describe("the table holds what cannot be derived", () => {
   it("counts what is left after the journals moved out", () => {
     // 27 until 3.21, then Study's four left for `journal-actions.ts`. The
-    // remaining 23 are the ones that are true of the PLUGIN rather than of a
-    // journal, which is now the whole membership rule for this table.
-    expect(ACTIONS).toHaveLength(23);
+    // remaining ones are those true of the PLUGIN rather than of a journal,
+    // which is now the whole membership rule for this table.
+    //
+    // 23 until 4.30, which added `note-copy-plain-markdown` — a command about
+    // any note the plugin recognises — and 24 until 4.31's
+    // `maint-export-plain-markdown`, which is about the vault. Both belong here
+    // by that same rule.
+    expect(ACTIONS).toHaveLength(25);
   });
 
-  it("splits them 13 / 0 / 4 / 6", () => {
+  it("splits them 13 / 0 / 5 / 7", () => {
     // `maint-find-journals` is the one that moved groups: it was with the
     // journals because of its subject, and everything else there MAKES a
     // journal note where this one reconciles the vault. It stays in the table
     // for the same reason — it belongs to no journal in particular.
     expect(groupOf("diary")).toHaveLength(13);
-    expect(groupOf("notes")).toHaveLength(4);
-    expect(groupOf("maintenance")).toHaveLength(6);
+    // 4 until 4.30's `note-copy-plain-markdown`, which is note-scoped in the
+    // strictest sense: it reads the note in front of the reader and writes
+    // nothing anywhere.
+    expect(groupOf("notes")).toHaveLength(5);
+    // 6 until 4.31's export, which surveys, shows and then writes — the shape
+    // every other command in this group already has.
+    expect(groupOf("maintenance")).toHaveLength(7);
   });
 
   it("holds no journal-specific action at all", () => {

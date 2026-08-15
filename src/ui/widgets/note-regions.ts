@@ -65,7 +65,9 @@ export interface NoteRegionHost {
   writeNoteRegionToFile(
     ctx: MarkdownPostProcessorContext,
     key: string,
-    value: string
+    value: string,
+    // See note-write-scheduler.ts: absent means "no baseline, do not merge".
+    baseline?: string
   ): Promise<void>;
 }
 

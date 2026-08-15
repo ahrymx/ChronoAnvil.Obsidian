@@ -527,53 +527,100 @@ const TITLE_SETTLED = {
     "cannot tell which one is this section's.",
 };
 
+// Which ratings a fresh note of this kind is seeded with.
+//
+// SPLIT OUT OF THE BANNER IN 4.20, and it is asked TWICE — once by `applies`, to
+// decide whether this note has a grid at all, and once by `render`, to fill it.
+// Two readings of one rule, which is why it is a function rather than two lists:
+// a section that applied when it had nothing to compose would write an empty
+// marked region, and one that composed what it had not applied for could not
+// happen at all.
+function trackerSeeds(ctx: SectionContext): string[] {
+  // A page carries no tracker grid: its ratings belong to the note it is a page
+  // of, and a per-page Confidence would mean the note's own average silently
+  // counted its parts as peers.
+  if (ctx.noteKind === "page") return [];
+  const out: string[] = [];
+  // A leaf note seeds the rating it is graded on; an index note is not graded,
+  // so it gets Status alone — which is what both shipped Study index templates
+  // carry.
+  if (ctx.noteKind === "leaf" && ctx.rating) out.push(`tracker:${ctx.rating}`);
+  if (
+    ctx.rating !== "status" &&
+    kindAllowsTracker(ctx.type, ctx.kind?.id ?? null, "status")
+  ) {
+    out.push("tracker:status");
+  }
+  return out;
+}
+
 export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "banner",
-    icon: "🪧",
+    // ONE GLYPH FOR ONE SECTION (4.21.1). This was 🪧 while the three other
+    // catalogues' banners were 🏷️ — four catalogues, one section, and the
+    // editor is the one place a reader compares them, because it is the only
+    // screen that draws a section as a row with an icon on it.
+    icon: "🏷️",
     label: "Banner",
-    blurb: "Title, breadcrumbs and the note's tracker grid.",
+    // THE TRACKER GRID LEFT IN 4.20 and this sentence did not, so the editor
+    // described the block by naming something that is now the row beneath it.
+    blurb:
+      "The note's own name, the trail back through its journal, and the control that renames it and edits its sections.",
     surface: "both",
     required: true,
     default: always,
-    claims: ["journal-header", "tracker"],
+    // THE TRACKER GRID LEFT THIS SECTION IN 4.20 — see `trackers` below. What is
+    // claimed here is now exactly what the banner draws: the strip that names
+    // the note.
+    claims: ["journal-header"],
     locate: (t) => probe(t, /^journal-header\s*$/m),
-    render: (ctx) => {
-      const trackers: string[] = [];
-      // A page carries no tracker grid at all: its ratings belong to the note
-      // it is a page of, and a per-page Confidence would mean the note's own
-      // average silently counted its parts as peers.
-      if (ctx.noteKind !== "page") {
-        // A leaf note seeds the rating it is graded on; an index note is not
-        // graded, so it gets Status alone — which is what both shipped Study
-        // index templates carry.
-        if (ctx.noteKind === "leaf" && ctx.rating) {
-          trackers.push(`tracker:${ctx.rating}`);
-        }
-        if (
-          ctx.rating !== "status" &&
-          kindAllowsTracker(ctx.type, ctx.kind?.id ?? null, "status")
-        ) {
-          trackers.push("tracker:status");
-        }
-      }
-      return [
-        // Tight against the fence below it: the spacer is documented as
-        // sitting on line 0 of the body, directly above the banner it stops a
-        // top-of-note click landing inside.
-        markdown(["`almanac:spacer`"], true),
-        fence([
-          "journal-header",
-          // No markers at all when there is nothing to mark. The region exists
-          // so "+ Add tracker" has somewhere to write; an empty one on a page,
-          // which is never graded, would be an invitation to put a rating
-          // somewhere its parent's average cannot see it.
-          ...(trackers.length
-            ? [TRACKER_MARK_START, ...trackers, TRACKER_MARK_END]
-            : []),
-        ]),
-      ];
-    },
+    render: () => [
+      // Tight against the fence below it: the spacer is documented as
+      // sitting on line 0 of the body, directly above the banner it stops a
+      // top-of-note click landing inside.
+      markdown(["`almanac:spacer`"], true),
+      fence(["journal-header"]),
+    ],
+  },
+
+  {
+    id: "trackers",
+    icon: "📊",
+    label: "Trackers",
+    // The level and the kind are named for `entry-sections.ts`' reason one
+    // catalogue over: 4.21 put them on this block's own strip, and a blurb that
+    // mentions only the ratings sends a reader looking for them in the banner.
+    blurb: "What kind of note this is, and the ratings it is graded on.",
+    surface: "both",
+    // ── ITS OWN SECTION AS OF 4.20 ────────────────────────────────────
+    //
+    // It was lines inside the banner's fence, which made it part of the banner's
+    // card. 4.20 settles what a banner is — the file's name, its navigation and
+    // the control that edits it — and a rating is none of those. The diary
+    // catalogue makes the same move in the same release, for the same reason and
+    // with the same consequence: one fence is one card, so the only way out of
+    // the card is out of the fence.
+    //
+    // NOT `required`, WHERE THE BANNER IS. A journal note with no
+    // `journal-header` has no title, no crumbs and nowhere to render a rating —
+    // that is the defect 2.28 existed to end. A journal note with no RATING is a
+    // reader who does not grade their notes, which is a preference.
+    //
+    // APPLIES WHERE THERE IS SOMETHING TO GRADE. A page carries no grid at all:
+    // its ratings belong to the note it is a page of, and a per-page Confidence
+    // would mean the note's own average silently counted its parts as peers.
+    // Below that, an index or leaf with nothing to seed gets no section rather
+    // than an empty marked region — the region exists so "+ Add tracker" has
+    // somewhere to write, and `spliceMarkedRegion` inserts one when it finds
+    // none, so an empty pair of markers buys nothing and renders as a gap.
+    applies: (ctx) => trackerSeeds(ctx).length > 0,
+    default: always,
+    claims: ["tracker"],
+    locate: (t) => probe(t, new RegExp(`^${TRACKER_MARK_START}\\s*$`, "m")),
+    render: (ctx) => [
+      fence([TRACKER_MARK_START, ...trackerSeeds(ctx), TRACKER_MARK_END]),
+    ],
   },
 
   {
@@ -587,6 +634,32 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // way up. Kept in the catalogue because a flat journal — whose banner has
     // one crumb and nothing above it — is a reasonable place to want one.
     default: never,
+    // ── AND IT STAYED ITS OWN SECTION IN 4.19, WHICH IS THE ONE PLACE THAT
+    //    RELEASE DID NOT REACH ─────────────────────────────────────────
+    //
+    // 4.19 merged every page's title and navigation into one Banner section, and
+    // the intent was for this row to fold into the banner above it as a reader's
+    // option. A journal note already satisfies the rule — `banner` is one
+    // top-level section drawing the note's name AND its crumb trail — so what
+    // was left was this row, and it does not fit through the door.
+    //
+    // WHY NOT: a `SectionQuestion` answers "what goes in this directive's
+    // ARGUMENT". `SectionQuestionCommon.directive` says so and says what happens
+    // without one — *"Absent means nothing can read this answer back and the
+    // editor says so rather than drawing a control over it"* — so a question
+    // cannot express "and this line may not exist at all". Folding the row in
+    // as an option therefore needs a new question kind, a presence answer, and
+    // write-back for it in all four catalogues. That is a release, not a field.
+    //
+    // AND THE ALTERNATIVE IS WORSE THAN THE SEAM. Composing the row
+    // unconditionally would put a second way up under a crumb trail on every
+    // journal note in every vault — which is the doubling 4.19 exists to remove,
+    // arriving in the name of tidiness. The row is supplementary navigation, the
+    // same class of thing as the launcher and the period navigator, and 4.19
+    // deliberately left those outside the banner too.
+    //
+    // So this is a seam, it is named, and it is small: one off-by-default row on
+    // one surface. It goes when a presence question does.
     claims: ["links"],
     locate: (t) => probe(t, /^links:/m),
     render: (ctx) => [
@@ -820,7 +893,13 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
 
   {
     id: "tasks",
-    icon: "📊",
+    // ⏳ AND NOT 📊 — 4.25 §1. This was the charts glyph on the open-tasks
+    // section, and it was the only one: `widget-registry.ts`, both dashboard
+    // catalogues and `home-sections.ts` all token this widget with the hourglass.
+    // The `header:` line two dozen lines below carried the same mistake, so one
+    // section drew the wrong icon in the section editor AND wrote the wrong one
+    // into the note.
+    icon: "⏳",
     label: "Open tasks",
     blurb: "Every unfinished task in the notes beneath this one.",
     surface: "index",
@@ -843,7 +922,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     ],
     claims: ["header", "tasks-table"],
     locate: (t) => probe(t, /^tasks-table\b/m),
-    render: () => [fence(["header:📊 Open Tasks", "tasks-table"])],
+    render: () => [fence(["header:⏳ Open tasks", "tasks-table"])],
   },
 
   {
@@ -896,7 +975,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // and the region key stays `path` — an id with a name in it has an
     // unbounded space, so a saved layout would stop matching the day the label
     // moved, and the region key is where readers' existing text lives.
-    label: "Task Manager",
+    label: "Task manager",
     blurb: "An ordered route through the notes here, for working in sequence.",
     surface: "index",
     // The deepest index is where the notes actually are, so it is the only

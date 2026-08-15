@@ -141,7 +141,14 @@ export class Diary {
   }
 
   // ── Monthly ───────────────────────────────────────────────────────────
-  async openOrCreateMonth(monthStr: string): Promise<TFile | null> {
+  // `reveal: false` for the same reason the daily opener has it (see above):
+  // quick capture needs the entry to exist and must not take the reader out of
+  // whatever they were doing. 4.27, when capture gained a destination picker
+  // and could be pointed at a grain other than daily.
+  async openOrCreateMonth(
+    monthStr: string,
+    opts: { reveal?: boolean } = {}
+  ): Promise<TFile | null> {
     if (!MONTH_RE.test(monthStr)) {
       new Notice("Use the format YYYY-MM");
       return null;
@@ -163,7 +170,7 @@ export class Diary {
         fillMonthlyTemplate(tpl, monthStr)
       );
     }
-    await openFile(this.app, file);
+    if (opts.reveal !== false) await openFile(this.app, file);
     return file;
   }
 
@@ -198,9 +205,12 @@ export class Diary {
   // Created with the period property already set, which is the entire point: it
   // is what makes the note *about* that period rather than a second dashboard
   // that happens to sit in a folder.
+  // `reveal: false` as on the daily and monthly openers, and for the same
+  // caller — see `openOrCreateDay`. 4.27.
   async openOrCreatePeriodEntry(
     unit: "week" | "quarter" | "year",
-    startIso: string
+    startIso: string,
+    opts: { reveal?: boolean } = {}
   ): Promise<TFile | null> {
     const p = this.paths;
     const at = moment(startIso);
@@ -254,7 +264,7 @@ export class Diary {
             );
       file = await createFileEnsuringFolders(this.app, path, body);
     }
-    await openFile(this.app, file);
+    if (opts.reveal !== false) await openFile(this.app, file);
     return file;
   }
 

@@ -1185,6 +1185,132 @@ a.jjs-row-link:hover {
   color: var(--text-normal);
 }
 
+/* ── THE PAGE BANNER: the name and the navigation row, welded (4.19) ────
+ *
+ * 4.19 made the page's own name and its `links:` row ONE section composed into
+ * ONE fence. Obsidian renders a fence as one block, so the container was already
+ * right — but the two widgets inside it each draw a card of their own, so left
+ * alone the fence renders as `.jtc-card` and `.journal-links-card` stacked, two
+ * boxes with two borders where the page means one strip.
+ *
+ * THE MANOEUVRE IS NOT NEW AND IS DELIBERATELY THE SAME ONE. The block takes the
+ * box, the children go flat: `.journal-entry-banner > .journal-links-card` in
+ * 30-header-bars.css and `.journal-overview-card > .journal-links-card` in
+ * 93-calendars.css have done exactly this since 3.2, and the comment on the
+ * first — *"one fence is one container, so the card is real rather than a
+ * resemblance"* — is the whole argument here too.
+ *
+ * WHAT IS DIFFERENT IS WHICH END THE BAND IS ON. Those two surfaces open with
+ * navigation and put the identity strip beneath it; this one opens with the
+ * page's NAME, because that is what a reader looks for on a page they navigated
+ * to deliberately. So the links band is welded to the BOTTOM edge, and takes a
+ * `border-top` divider where the others take `border-bottom`.
+ *
+ * THE FIGURE STAYS WITH THE NAME. `.jtc-card::before` is `inset: 0` on a
+ * positioned `.jtc-card`, so it covers the name half and stops at the divider —
+ * which is right: the hatch is what makes the name read as engraved, and running
+ * it under a row of pills would make the pills look printed on.
+ *
+ * ONLY WHEN THE BLOCK IS A CARD. `chromeClasses` withholds this class for
+ * `frame: section` and `frame: none`, which take `is-unframed` instead — so a
+ * reader who unframes their banner gets two plain widgets and no box, the same
+ * answer every other composite gives. */
+.journal-page-banner {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-secondary);
+}
+/* ── THE FIGURE IS THE BLOCK'S, NOT THE NAME CARD'S (4.19.1 — V3) ──────
+ *
+ * The wash and the hatch used to stop at the rule, so the banner read as a
+ * figured card with a plain strip bolted under it — two materials, one block.
+ * Running them across the whole banner is what makes it one object, and it is
+ * the reading `60-heroes-and-banners.css` opens by claiming for this file:
+ * *the loud bands: what a page or a card opens with*.
+ *
+ * MOVED RATHER THAN COPIED. `.jtc-card::before` is suppressed below, because two
+ * figures over one banner is two hatches at slightly different origins — the
+ * 45° repeat would beat against itself at the seam, which is the one artefact a
+ * texture cannot survive.
+ *
+ * THE POSITIONING RULE IS THE ONE `.jtc-card` ALREADY DOCUMENTED. `inset: 0`
+ * needs a positioned ancestor or it resolves against whatever happens to be
+ * positioned — in Live Preview the code-block widget, in reading view the note's
+ * sizer. That is 4.7.0's grip bug, and it is why `position: relative` is on the
+ * block and on both of its children. */
+.journal-page-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--interactive-accent) 13%, transparent) 0%,
+      transparent 42%
+    ),
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, var(--am-head-figure)) 0 1px,
+      transparent 1px 6px
+    );
+}
+/* Dark ink on a light ground needs more of it to read as texture, and the wash
+   needs less before it reads as a colour rather than as light. The same pair
+   `.jtc-card` carries, keyed on Obsidian's own theme class. */
+.theme-light .journal-page-banner {
+  --am-head-figure: 0.055;
+}
+.theme-light .journal-page-banner::before {
+  background-image:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--interactive-accent) 10%, transparent) 0%,
+      transparent 42%
+    ),
+    repeating-linear-gradient(
+      135deg,
+      rgba(0, 0, 0, var(--am-head-figure)) 0 1px,
+      transparent 1px 6px
+    );
+}
+/* The name card gives up the frame AND the figure it drew for itself; the block
+   has both now. It keeps `position: relative` so it sits above the block's
+   figure rather than under it. */
+.journal-page-banner > .jtc-card {
+  position: relative;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+.journal-page-banner > .jtc-card::before {
+  content: none;
+}
+/* The pill row, welded under the name.
+ *
+ * A HAIRLINE INSIDE THE FIGURE RATHER THAN A RULE ACROSS IT. `--am-rule` is 2px
+ * and is what separates two CARDS; this separates two bands of one card, and at
+ * full weight it re-drew the seam the figure had just dissolved. Muted with
+ * `color-mix` rather than `opacity`, because opacity on a border with a
+ * gradient behind it lets the hatch through the line and makes it look broken
+ * rather than quiet. */
+.journal-page-banner > .journal-links-card {
+  position: relative;
+  margin: 0;
+  border: none;
+  border-top: var(--am-rule-hair) solid
+    color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
+  border-radius: 0;
+  background: none;
+}
+/* Band 2 of 2 rather than the whole of a small card, so it breathes to the same
+   rhythm the entry banner's row does. */
+.journal-page-banner > .journal-links-card > .journal-links-bar {
+  padding: 7px 8px;
+}
+
 /* ── The page's name is said ONCE (4.5.1) ──────────────────────────────
  *
  * Obsidian draws the note's name above the note — its inline title — and the
@@ -1206,9 +1332,31 @@ a.jjs-row-link:hover {
  *
  * `:has()` IS ALREADY LOAD-BEARING HERE — 75-home-dashboard.css keys the home
  * rhythm off `:has(.jc-diary-header)` — so this is the established mechanism
- * rather than a new dependency. */
+ * rather than a new dependency.
+ *
+ * ── AND IT IS THE SLIM BANNER'S TOO, AS OF 4.21.3 ────────────────────
+ *
+ * This rule shipped in 4.5.1 naming `.jtc-card`, which is the LARGE banner's
+ * name card and only ever appears on the eight dashboard-shaped surfaces. So a
+ * diary entry and a journal leaf drew Obsidian's inline title AND their own
+ * banner's copy of the same name — the exact defect this rule exists to remove,
+ * on the two page kinds a reader spends the most time in, for eleven releases.
+ *
+ * Nobody wrote it down because the two surfaces were the ones that had "always
+ * had a banner": 4.19's own table lists them as the two that already had the
+ * right thing, and what nobody checked was what sat ABOVE it.
+ *
+ * `.journal-banner-name` IS THE RIGHT ANCHOR AND `.jtc-card` IS NOT A SECOND
+ * ONE. The condition this rule wants is "a block on this page is already drawing
+ * the file's name, large, with a rename on it" — which is exactly what that
+ * class marks on both slim banners. The large banner's name card carries no such
+ * class (its row is `.jtc-titlerow`), so both names stay in the selector; a
+ * third banner format would join it here rather than being noticed by a render
+ * two releases later. */
 .markdown-preview-view:has(.jtc-card) .inline-title,
-.markdown-source-view:has(.jtc-card) .inline-title {
+.markdown-source-view:has(.jtc-card) .inline-title,
+.markdown-preview-view:has(.journal-banner-name) .inline-title,
+.markdown-source-view:has(.journal-banner-name) .inline-title {
   display: none;
 }
 

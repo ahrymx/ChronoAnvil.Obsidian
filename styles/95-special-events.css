@@ -516,6 +516,32 @@
   line-height: 1.5;
 }
 
+/* The destination row (4.27) — "Capture to [ Today · 15 Aug ▾ ]".
+   ABOVE THE BOX, so it is read before typing rather than looked for after, and
+   drawn only when there is more than one destination (see `renderBody`): a
+   select with one option is a control that cannot do its job.
+   The label is small-caps like every other caption in the plugin, and the
+   select takes the remaining width so a long period label — a week is
+   "27 Jul – 2 Aug 2026" — is not truncated to its first date. */
+.almanac-capture-dest {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-2);
+  margin-bottom: var(--am-space-2);
+}
+.almanac-capture-dest-label {
+  font-size: var(--am-text-2xs);
+  font-weight: var(--am-caps-weight);
+  letter-spacing: var(--am-caps-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.almanac-capture-dest select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 /* Collapsible note field (`note:key#collapse`). The label becomes the fold
    control; the content hides beneath it. */
 .journal-note--collapsible > .journal-note-collapse-bar {
@@ -547,18 +573,148 @@
   transform: rotate(-90deg);
 }
 /* Hide the field itself, not the bar, so the label stays clickable and the
-   entry keeps a visible anchor for where captures live. */
-.journal-note--collapsible.is-collapsed > .journal-note-input {
+   entry keeps a visible anchor for where captures live.
+   Two children, one rule: the capture log (4.28) folds with the same bar and
+   the same remembered state, so it hides here rather than in a rule of its own
+   that would have to be kept agreeing with this one. */
+.journal-note--collapsible.is-collapsed > .journal-note-input,
+.journal-note--collapsible.is-collapsed > .journal-capture-list {
   display: none;
 }
 
 /* Captures are a chronological strip rather than prose: a monospace-ish,
    slightly tighter block reads as a log of stamped moments and visually
-   distinguishes it from the Notes field above. */
+   distinguishes it from the Notes field above.
+   STILL LIVE: the `note:` field renders the capture region on any note whose
+   template predates 4.28's card list, and on any region a reader points a
+   plain `note:` at. */
 .journal-note--capture .journal-note-input {
   font-size: var(--am-text-sm);
   line-height: 1.45;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── The capture log (4.28) ─────────────────────────────────────────────
+   One card per capture, where the region used to be one textarea. The card is
+   `.jrc-card`'s shape — a bordered surface with a coloured left edge — because
+   a recall card and a capture are the same object at a glance: a small piece
+   of the reader's own text with controls on it. What it does NOT copy is the
+   task row, which is a line: a capture is multi-line by construction and a row
+   that assumes one line would clip the second. */
+.journal-capture-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-space-2);
+  margin-top: var(--am-space-1);
+}
+.journal-capture-empty {
+  padding: var(--am-space-2) 0;
+  font-size: var(--am-text-sm);
+  color: var(--text-faint);
+}
+.journal-capture-card {
+  padding: var(--am-space-2) var(--am-space-3);
+  background: color-mix(in srgb, var(--interactive-accent) 5%, var(--background-secondary));
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
+  border-left: 3px solid var(--interactive-accent);
+  border-radius: var(--am-radius-md);
+  box-shadow: var(--am-elev-1);
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+.journal-capture-card:hover {
+  border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border-hover));
+  box-shadow: var(--am-shadow-md);
+}
+.journal-capture-head {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-2);
+}
+/* Tabular so a column of stamps lines up, which is what makes the list read as
+   a chronology rather than as a stack of paragraphs. */
+.journal-capture-time {
+  font-size: var(--am-text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  letter-spacing: var(--am-caps-tracking);
+}
+/* A hand-typed capture has no stamp. The slot is kept so the bodies below
+   still align down the column. */
+.journal-capture-time.is-empty::before {
+  content: "—";
+  color: var(--text-faint);
+}
+.journal-capture-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  /* Revealed on hover, like the section controls elsewhere: three buttons on
+     every card is a lot of chrome for a list you mostly read. Focus-visible
+     keeps them reachable from the keyboard while hidden. */
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.journal-capture-card:hover .journal-capture-actions,
+.journal-capture-actions:focus-within {
+  opacity: 1;
+}
+/* A phone has no hover, so the three controls would be permanently invisible
+   and the card unusable. Faint-but-present, the same resting state the title
+   pencil and the tracker cell's remove-× take. */
+@media (hover: none) {
+  .journal-capture-actions {
+    opacity: 0.45;
+  }
+}
+.journal-capture-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7em;
+  height: 1.7em;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--am-radius-sm);
+  color: var(--text-faint);
+  cursor: pointer;
+  box-shadow: none;
+}
+.journal-capture-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.journal-capture-btn .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.journal-capture-text {
+  margin-top: 2px;
+  font-size: var(--am-text-sm);
+  line-height: 1.45;
+  /* The region is plain text by contract, so a capture keeps the line breaks
+     the reader typed rather than being reflowed into one paragraph. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* Crossed off. The whole body, not the stamp: the time it happened is still
+   true. */
+.journal-capture-card.is-done {
+  border-left-color: var(--background-modifier-border);
+  background: var(--background-secondary);
+  box-shadow: none;
+}
+.journal-capture-card.is-done .journal-capture-text {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+.journal-capture-edit {
+  width: 100%;
+  margin-top: 2px;
+  font-size: var(--am-text-sm);
+  line-height: 1.45;
+  resize: vertical;
 }
 
 /* ── Year view ─────────────────────────────────────────────────────────
@@ -1010,6 +1166,13 @@
 .almanac-tpl-row-added .almanac-list-title {
   color: var(--text-accent);
 }
+.almanac-tpl-row-section {
+  border-left: 3px solid var(--interactive-accent);
+}
+.almanac-tpl-row-section .almanac-list-title {
+  font-weight: 600;
+  color: var(--text-normal);
+}
 .almanac-tpl-toggle {
   font-size: var(--am-text-xs);
   padding: var(--am-space-1) var(--am-space-4);
@@ -1443,14 +1606,15 @@
   cursor: pointer;
   flex: 0 0 auto;
 }
-/* The hover that reveals it is the BANNER's, not the control's own row — and as
-   of 3.7 the entry's control is in the card's footer rather than in its title
-   band, so the selector follows it there. It was left pointing at
-   `.journal-entry-header` for one draft, which is a hover target the button is
-   no longer inside: the `⋯` simply never lit, on any entry in the vault. */
-.journal-study-header:hover .jsh-more,
-.journal-entry-header:hover .jeh-more,
-.journal-entry-banner:hover .jeh-more {
+/* The hover that reveals it is the BANNER's, not the control's own row. That
+   distinction has been got wrong twice — the selector was left pointing at
+   `.journal-entry-header` for one draft after 3.7 moved the control to the
+   card's footer, and the `⋯` simply never lit on any entry in the vault — and
+   both times because the rule named a BAND and the control had moved to another
+   one. It names the card now, on both slim banners and in one rule: wherever
+   inside it the control is placed next, hovering the card is what reveals it. */
+.journal-slim-banner:hover .jsh-more,
+.journal-slim-banner:hover .jeh-more {
   color: var(--text-muted);
 }
 .jsh-more:hover,
@@ -1509,58 +1673,147 @@
    header without the header becoming the page. Nothing here restyles the row;
    it adds the states the row does not have opinions about (off, open) and the
    diff body, which is a new thing. */
+.modal-content.almanac-repair,
+.almanac-repair {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden !important;
+  max-height: 75vh;
+}
+.almanac-repair-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.almanac-repair-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.almanac-repair-title-wrap h3 {
+  margin: 0;
+}
+.almanac-repair-header-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-accent);
+}
+.almanac-repair-header-icon .svg-icon {
+  width: 20px;
+  height: 20px;
+}
+.almanac-repair-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
 .almanac-repair-lead {
   color: var(--text-muted);
   font-size: var(--am-text-sm);
-  margin: 0 0 12px;
+  margin: 0;
+  flex: 1 1 auto;
+}
+.almanac-repair-toggles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.almanac-repair-toggle-btn {
+  font-size: var(--am-text-xs);
+  padding: 2px 8px;
+  height: auto;
+  border-radius: var(--am-radius-sm);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.almanac-repair-toggle-btn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
 }
 .almanac-repair-groups {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 55vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /* The window is a list of unknown length inside a modal of known height. The
-     button row must stay reachable without scrolling past forty files, so the
-     LIST scrolls and the chrome does not — the same split `.almanac-plan` never
-     made, which is why a fresh vault's plan used to push the buttons off. */
-  max-height: 50vh;
-  overflow-y: auto;
   padding-right: 4px;
+}
+.almanac-repair .modal-button-container {
+  flex: 0 0 auto;
+  margin-top: 14px;
 }
 .almanac-repair-group {
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--am-radius-md);
+  background: var(--background-secondary-alt);
   overflow: hidden;
+  transition: border-color 0.15s ease, opacity 0.15s ease;
 }
 /* The head row IS the tick target, so it has to read as pressable. Its border
    is the group's, not its own. */
 .almanac-repair-head.almanac-list-row {
   border: none;
   border-radius: 0;
+  background: transparent;
   cursor: pointer;
+  padding: 8px 12px;
+}
+.almanac-repair-head.almanac-list-row:hover {
+  background: var(--background-modifier-hover);
 }
 /* An unticked group stays fully legible — it is still a list of what WOULD
    happen, and the reader may be reading it to decide. Only the certainty
    drops, which is what the strike on the count says and the fade reinforces. */
+.almanac-repair-group.is-off {
+  opacity: 0.55;
+}
 .almanac-repair-group.is-off .almanac-repair-items,
 .almanac-repair-group.is-off .almanac-list-subtitle {
-  opacity: 0.45;
+  opacity: 0.6;
 }
 .almanac-repair-group.is-off .almanac-list-title {
   text-decoration: line-through;
   text-decoration-color: var(--text-faint);
 }
 .almanac-repair-items {
-  padding: 0 12px 4px;
+  padding: 0 12px 6px;
+  background: var(--background-primary);
+  border-top: 1px solid var(--background-modifier-border-focus);
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
-.almanac-repair-more {
-  padding: 6px 6px 2px;
-  color: var(--text-faint);
-  font-size: var(--am-text-xs);
+.almanac-repair-items::-webkit-scrollbar {
+  width: 6px;
+}
+.almanac-repair-items::-webkit-scrollbar-thumb {
+  background: var(--background-modifier-border-hover);
+  border-radius: var(--am-radius-pill);
+}
+.almanac-repair-items::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
 }
 
 /* ── one file ─────────────────────────────────────────────────────────── */
 .almanac-repair-item .almanac-list-row.is-openable {
   cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--am-radius-sm);
+}
+.almanac-repair-item .almanac-list-row.is-openable:hover {
+  background: var(--background-modifier-hover);
 }
 .almanac-repair-item:last-child .almanac-list-row {
   border-bottom: none;
@@ -1585,9 +1838,9 @@
 
 /* ── the differential ─────────────────────────────────────────────────── */
 .almanac-repair-diff {
-  margin: 0 0 8px 22px;
-  padding: 6px 8px;
-  border-left: 2px solid var(--background-modifier-border);
+  margin: 2px 0 8px 22px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--text-accent);
   border-radius: 0 var(--am-radius-sm) var(--am-radius-sm) 0;
   background: var(--background-primary-alt);
   font-family: var(--font-monospace);
@@ -1600,21 +1853,25 @@
   display: flex;
   gap: 8px;
   white-space: pre;
-  line-height: 1.5;
+  line-height: 1.6;
+  border-radius: 3px;
+  padding: 1px 4px;
 }
 .almanac-repair-mark {
   flex: 0 0 auto;
-  width: 1ch;
-  opacity: 0.7;
+  width: 1.2ch;
+  font-weight: var(--font-bold, 600);
 }
 /* COLOUR IS NOT THE ONLY SIGNAL — the +/− marker carries it too, so the diff
    is readable where the two greens and reds are not distinguishable. The tones
    are Obsidian's own success/error so a theme moves them together. */
 .almanac-repair-line.is-add {
   color: var(--text-success, var(--color-green));
+  background: rgba(var(--color-green-rgb, 74, 189, 137), 0.08);
 }
 .almanac-repair-line.is-remove {
   color: var(--text-error, var(--color-red));
+  background: rgba(var(--color-red-rgb, 233, 94, 94), 0.08);
 }
 .almanac-repair-text {
   flex: 1 1 auto;
@@ -1623,4 +1880,57 @@
   margin-top: 4px;
   font-family: var(--font-interface);
   color: var(--text-faint);
+}
+
+/* ── The Template window (4.29) ───────────────────────────────────────────
+   Borrows `.almanac-tpl-band`, `.almanac-tpl-toggle`, `.almanac-list-row` and
+   the editor-modal frame rather than restyling them: this window sits one item
+   below "Edit sections…" on the same menu, and a reader who has seen that one
+   should recognise this. What is new here is only what that window has no
+   equivalent of — a sentence about the grain, a pair of full-width actions, and
+   the block that stands in for the reload controls when the page is not empty. */
+.almanac-entry-tpl-note {
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+  margin: 0 0 var(--am-space-2);
+}
+.almanac-entry-tpl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-2);
+  margin-bottom: var(--am-space-3);
+}
+/* NOT AN ERROR TONE. The reader has written in their entry, which is what an
+   entry is for — this is the window declining to do something destructive, not
+   the reader having made a mistake. Same reasoning as `.almanac-tpl-row-locked`
+   one screen up, at the weight a whole block needs rather than a subtitle. */
+.almanac-entry-tpl-loss {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--am-surface-inset);
+  padding: var(--am-space-3);
+  font-size: var(--am-text-sm);
+}
+.almanac-entry-tpl-loss-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--am-space-2);
+  color: var(--text-normal);
+}
+.almanac-entry-tpl-loss-icon {
+  flex: 0 0 auto;
+  display: flex;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+.almanac-entry-tpl-loss-list {
+  margin: var(--am-space-2) 0 var(--am-space-2) var(--am-space-5);
+  padding: 0;
+  color: var(--text-muted);
+}
+.almanac-entry-tpl-loss-list li {
+  margin: 2px 0;
+}
+.almanac-entry-tpl-loss .almanac-entry-tpl-note {
+  margin: 0;
 }

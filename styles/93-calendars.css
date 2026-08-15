@@ -1270,7 +1270,23 @@
    back is this one declaration, which is why §6 called it worth trying early.
    What holds the band apart from the body now is the divider, which patch 5
    had just doubled — the two changes were argued separately and land well
-   together, but the second is load-bearing for the first. */
+   together, but the second is load-bearing for the first.
+
+   ── AND THE NAME IS HISTORICAL AS OF 4.19 ─────────────────────────────
+
+   This is the period summary's band — what a week, month, quarter or year
+   holds, with its date navigator. It is NOT the page's banner. 4.19 made
+   "banner" mean one thing across every surface — the block that says which note
+   this is and where it goes — and gave the four dashboards one, as
+   `.journal-page-banner` at the top of the note. This class predates that word
+   by six minors.
+
+   NOT RENAMED, DELIBERATELY. It is a class rather than anything a reader reads,
+   the two never appear in one selector, and the rename would touch three
+   stylesheets, two builders and three tests to change no rendered pixel. The
+   reader-facing collision was in the section blurbs, and that is where it was
+   fixed — `DIARY_SECTIONS`' summary says so. Read this one as "the overview
+   band" and nothing here will surprise you. */
 .journal-overview-banner {
   margin: -12px -14px 0;
   padding: 12px 14px 11px;

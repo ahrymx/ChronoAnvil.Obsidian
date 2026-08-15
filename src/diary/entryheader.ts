@@ -48,17 +48,18 @@
 //   ```
 
 import { App, MarkdownPostProcessorContext, setIcon, TFile, Menu, MenuItem} from "obsidian";
-import { overflowButton } from "../ui/section-frame";
+import { settingsButton } from "../ui/section-frame";
+import { attachNoteRename } from "../ui/header-title";
 import { isManagedTemplate } from "../trackers/entry-trackers";
+import { openEntryTemplateWindow } from "../ui/entry-template-modal";
 import type AlmanacPlugin from "../main";
 import { CLASS_DEFS } from "../trackers/trackers";
-import { labelForGrain } from "./nav";
+import { labelForGrain, entryDateKey } from "./nav";
 import type { TrackerClass } from "../trackers/trackers";
 import { entryContext } from "./nav";
 import {
   filesUnder,
   frontmatterOf,
-  isoDate,
   moment,
   folderNotePath,
   openFile,
@@ -69,24 +70,48 @@ import {
 // so per-day titles don't flood the quick-switcher / link autocomplete.
 export const TITLE_PROP = "title";
 
-// The date shown as the header's subtitle. Daily notes get the weekday + date;
-// monthly reviews get the month name. Falls back to the entry's computed date
-// title when there's no explicit date to format.
-function subtitleFor(
+// WHAT PERIOD THIS ENTRY IS — the date, formatted, for the caption over the
+// logging grid. Null when the note has no readable date, which is a real state
+// and not an error: see below.
+//
+// IT MOVED WITH THE ALIAS IN 4.21 rather than being deleted with the banner band
+// that held it, and MOVED AGAIN IN 4.21.2 down to the tracker section's caption
+// row, so the alias line is a title and a navigator rather than three things
+// wrapping onto two lines on a phone.
+//
+// ── IT USED TO FALL BACK TO THE GRAIN'S NAME, AND THAT WAS THE BUG ────
+//
+// The old `subtitleFor` read `journal-date` alone and returned `c.dateTitle` —
+// which is `CLASS_DEFS[grain].label` when there is no key — when it found
+// nothing. So the strip printed **"Daily"** where a date belongs, and on a
+// weekly, quarterly or yearly entry it printed the grain's name ALWAYS, because
+// those grains keep their key under `week-start` / `quarter-start` /
+// `year-start` and this never looked there.
+//
+// TWO FIXES, AND THE SECOND IS THE ONE THAT LASTS. The key now comes from
+// `entryDateKey`, which is the one function that knows where each grain keeps
+// its date — the fault was a third, divergent copy of that lookup. And a missing
+// date draws NOTHING: a grain label is the answer to a different question, and a
+// caption that silently substitutes one for the other is worse than a caption
+// that is briefly absent. It IS briefly absent, on a note Obsidian has only just
+// created and not yet indexed, which is why the row that carries it is live.
+export function entryDateLabel(
   app: App,
   file: TFile,
-  grain: TrackerClass,
-  fallback: string
-): string {
-  const fm = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-  if (grain === "monthly") {
-    const key = (
-      fm["month"] ? String(fm["month"]) : isoDate(fm["journal-date"]) ?? ""
-    ).slice(0, 7);
-    return key ? moment(key + "-01").format("MMMM YYYY") : fallback;
+  grain: TrackerClass
+): string | null {
+  const key = entryDateKey(frontmatterOf(app, file), grain);
+  if (!key) return null;
+  // DAILY IS THE ONE GRAIN WITH ITS OWN FORMAT HERE. `labelForGrain` gives it
+  // "Friday 14 August 2026" — right for a nav pill you read once, too long for a
+  // caption on a note you open every day and for the phone this row exists to
+  // fit. The other four are read from the shared table, so a grain whose title
+  // format is retuned takes the change here too.
+  if (grain === "daily") {
+    const d = moment(key);
+    return d.isValid() ? d.format("ddd D MMM YYYY") : null;
   }
-  const d = isoDate(fm["journal-date"]);
-  return d ? moment(d).format("ddd D MMM YYYY") : fallback;
+  return labelForGrain(grain, key);
 }
 
 // A single icon-only chevron — the left/right end of the segmented date
@@ -157,17 +182,10 @@ function dateOptions(
   const def = CLASS_DEFS[grain];
   const folder = paths[def.folderKey];
   const dashboard = folderNotePath(folder);
-  const keyOf = (fm: Record<string, unknown>): string => {
-    const raw = fm[def.dateProperty];
-    const primary = raw == null ? "" : String(raw);
-    const value =
-      (isoDate(primary) ?? primary) || (isoDate(fm["journal-date"]) ?? "");
-    return grain === "monthly" ? value.slice(0, 7) : value;
-  };
 
   return filesUnder(app, folder)
     .filter((f) => f.path !== dashboard)
-    .map((f) => ({ file: f, key: keyOf(frontmatterOf(app, f)) }))
+    .map((f) => ({ file: f, key: entryDateKey(frontmatterOf(app, f), grain) }))
     .filter((x) => x.key)
     .sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0))
     .map((x) => ({
@@ -285,7 +303,7 @@ function buildDatePicker(
 // items are journal-shaped: the template change preview, "Convert to a
 // dashboard". Neither means anything on a daily entry. Two menus sharing some
 // items is not one menu with a flag; that is the shape §4.3 declined for the
-// chart models. The BUTTON is shared (`overflowButton`), the lists are not.
+// chart models. The BUTTON is shared (`settingsButton`), the lists are not.
 //
 // ONE ITEM CROSSED OVER IN 3.0, and the sentence above used to say it never
 // would. "Edit sections…" was journal-shaped because the editor was: it opened
@@ -322,12 +340,25 @@ function attachEntryMenu(
   // control.
   if (isManagedTemplate(plugin, notePath)) return;
 
-  overflowButton(host, "jeh-more", (menu: Menu) => {
+  settingsButton(host, "jeh-more", (menu: Menu) => {
     menu.addItem((i: MenuItem) =>
       i
         .setTitle("Edit sections…")
         .setIcon("layout-list")
         .onClick(() => void plugin.sections.editSectionsHere(notePath))
+    );
+    // BESIDE IT, NOT INSTEAD OF IT, and the pairing is the point: the item
+    // above changes THIS note and destroys nothing, and this one is about the
+    // GRAIN — what tomorrow's entry will be built from. They are two questions
+    // that a reader arrives at from the same thought ("this isn't the shape I
+    // want"), so they are adjacent, and each window names the other.
+    //
+    // WITH AN ELLIPSIS, like every other item on this menu that opens a window.
+    menu.addItem((i: MenuItem) =>
+      i
+        .setTitle("Template…")
+        .setIcon("layout-template")
+        .onClick(() => openEntryTemplateWindow(plugin.app, plugin, notePath, grain))
     );
     menu.addSeparator();
     menu.addItem((i: MenuItem) =>
@@ -355,79 +386,202 @@ function attachEntryMenu(
   });
 }
 
+// ── THE ENTRY BANNER'S TITLE BAND (4.21) ─────────────────────────────
+//
+// THE FILE'S NAME, AND THAT IS THE WHOLE CHANGE. This band used to draw the
+// `title` FRONTMATTER PROPERTY, falling back to a formatted date with an "Add a
+// title…" hint beside it — so an entry was the one Almanac page whose banner did
+// not show what the note is called.
+//
+// AND IT CONTRADICTED A RULE THE PLUGIN HAD ALREADY SETTLED. `page-title.ts`
+// states it for the dashboards: *"THE NAME IS THE FILE'S. Not a `title`
+// property… the filename is what the quick switcher, the graph, every backlink
+// and every table display, and storing a second title in frontmatter would let
+// those disagree."* An entry's `title:` property is exactly that second title.
+// It is not deleted — a reader who wants a name for a day should have one — it
+// is MOVED, onto the page-context strip where the entry's other facts live.
+//
+// SO THE BANNER IS THE FILE'S NAME, THE NAVIGATION ROW ABOVE IT, AND THE COG.
+// The same three things a dashboard banner carries, drawn slimmer. Everything
+// that was here and is not those three is on the strip: see `buildEntryContext`.
+//
+// `attachNoteRename` IS THE SAME CONTROL THE OTHER TWO BANNERS USE, taken
+// rather than reimplemented — which also means an entry's name is renameable
+// from the note for the first time, and renaming it moves the file.
 export function buildEntryHeader(
   plugin: AlmanacPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   const app = plugin.app;
-  const wrap = createDiv({ cls: "journal-header-bar journal-header-l1 journal-entry-header" });
+  // `journal-banner-name` IS THE SHARED CLASS, and it is what makes this band
+  // and a journal leaf's one object: 4.21.1 collapsed three banner drawings into
+  // two, and every rule about how a slim banner's name band is inset, ruled and
+  // laid out is written once against that class. See `.journal-slim-banner` in
+  // `30-header-bars.css`.
+  const wrap = createDiv({
+    cls: "journal-header-bar journal-header-l1 journal-entry-header journal-banner-name",
+  });
 
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (!(file instanceof TFile)) return wrap;
-
   const c = entryContext(plugin, file);
-  const fm = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-  const title = typeof fm[TITLE_PROP] === "string" ? (fm[TITLE_PROP] as string).trim() : "";
-  const subtitle = subtitleFor(app, file, c.grain, c.dateTitle);
 
-  // ── Left: editable title + date subtitle ─────────────────────────────
-  const titleWrap = wrap.createDiv({ cls: "jeh-title-wrap" });
-  const titleEl = titleWrap.createDiv({ cls: "journal-header-title jeh-title" });
+  const titleWrap = wrap.createDiv({
+    cls: "jeh-title-wrap journal-banner-title",
+  });
+  attachNoteRename(app, titleWrap, file, "jeh-title");
+
+  // THE COG COMES UP FROM THE FOOTER. A banner carries the control that edits
+  // the page — `settingsButton` says so — and until 4.21 an entry's sat under
+  // the logging grid, which is neither the banner nor near the name it acts on.
+  attachEntryMenu(plugin, wrap, ctx.sourcePath, c.grain);
+
+  return wrap;
+}
+
+// ── THE ENTRY'S PAGE-CONTEXT STRIP (4.21) ────────────────────────────
+//
+// WHAT IT IS. The strip across the top of the tracker section, carrying the two
+// things that are about THIS entry rather than about the note as a file: its
+// alias title, and the navigator that moves between entries of this grain.
+//
+// WHY THEY ARE TOGETHER AND WHY THEY ARE HERE. 4.20 settled that a banner is the
+// file's name, its navigation and the cog — so the alias and the date stepper
+// both had to leave it, and neither is a tracker either. What they are is the
+// entry's own context, which is what the tracker section became: the block that
+// holds what this page type knows about itself. A journal note's strip carries
+// the same kind of thing — its level and its kind — for the same reason.
+//
+// THE STEPPER IS PAGE-SPECIFIC NAVIGATION, which the banner has excluded since
+// 4.19 on the same rule that keeps the launcher and the period navigator out of
+// it: a control that moves between INSTANCES of a page is not the row that says
+// where this page sits in the vault.
+//
+// A SIBLING THE POSTPROCESSOR OWNS, unchanged from the footer this replaces and
+// for the reason that one recorded: `entry-header` is a LiveWidget, so anything
+// parented into its subtree is deleted on the next frontmatter change — and the
+// alias editor writes frontmatter, so it would delete itself mid-edit.
+//
+// LEFT AND RIGHT BY PUSHING, NOT BY SPLITTING. `justify-content: space-between`
+// would strand the stepper in the middle on a note with no alias offered.
+export function buildEntryContext(
+  plugin: AlmanacPlugin,
+  ctx: MarkdownPostProcessorContext
+): HTMLElement | null {
+  const app = plugin.app;
+  const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
+  if (!(file instanceof TFile)) return null;
+
+  const bar = createDiv({ cls: "journal-widget-bar journal-entry-context" });
+  const c = entryContext(plugin, file);
+
+  // ── the alias, on the left ──────────────────────────────────────────
+  //
+  // AND NOTHING ELSE BESIDE IT AS OF 4.21.2. The formatted date used to sit here
+  // as a subtitle, which made this row a title, a date and a navigator — three
+  // things that fit a desktop pane and wrap onto two lines on a phone. The date
+  // is on the caption row over the grid now, where it has a row to itself.
+  const fm = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+  // ── MUTABLE, AND THAT IS THE FIX (4.21.3) ───────────────────────────
+  //
+  // This was a `const` captured when the strip was built, and `renderTitle` read
+  // it — so the only way to see a saved title was a rebuild of the whole strip.
+  // Which never came: this strip is deliberately NOT a LiveWidget (a live host
+  // would rebuild the input mid-edit), so pressing Enter wrote the file and left
+  // the field sitting there with the text in it. Leaving the note and coming back
+  // "fixed" it, because that is the rebuild the code was waiting for.
+  //
+  // The editor owns the value now: it writes the file AND updates this, so the
+  // band it re-renders shows what was just saved without asking anyone.
+  let title = typeof fm[TITLE_PROP] === "string" ? (fm[TITLE_PROP] as string).trim() : "";
+  const titleWrap = bar.createDiv({ cls: "jec-title-wrap" });
+  const titleEl = titleWrap.createDiv({ cls: "jec-title" });
 
   const renderTitle = (): void => {
     titleEl.empty();
-    titleEl.removeClass("jeh-title-empty");
+    // THE STATE CLASS IS CLEARED, NOT JUST SET. `titleEl` is the same element
+    // across every render — the click handler is bound to it — so a note that
+    // was empty when the strip was built kept `jec-title-empty` after its first
+    // title was saved, and drew that title in the "nothing here yet" face.
+    titleEl.removeClass("jec-title-empty");
     if (title) {
-      setIcon(titleEl.createSpan({ cls: "jeh-title-icon" }), "notebook");
-      titleEl.createSpan({ cls: "jeh-title-text", text: title });
-      const pencil = titleEl.createSpan({ cls: "jeh-title-edit" });
+      setIcon(titleEl.createSpan({ cls: "jec-title-icon" }), "notebook");
+      titleEl.createSpan({ cls: "jec-title-text", text: title });
+      const pencil = titleEl.createSpan({ cls: "jec-title-edit" });
       setIcon(pencil, "pencil");
-      titleWrap.createSpan({ cls: "jeh-subtitle", text: `· ${subtitle}` });
     } else {
-      // No title — the date IS the title, with an "Add a title…" hint.
-      setIcon(titleEl.createSpan({ cls: "jeh-title-icon" }), "calendar");
-      titleEl.createSpan({ cls: "jeh-title-text", text: subtitle });
-      const hint = titleWrap.createSpan({ cls: "jeh-subtitle jeh-add-hint" });
-      setIcon(hint.createSpan(), "plus");
-      hint.createSpan({ text: "Add a title…" });
+      // NO DATE FALLBACK ANY MORE. The old band printed the formatted date here
+      // when the alias was empty, which is why it read as the note's title; the
+      // banner above now says what the note is called, so an empty alias is
+      // simply an offer.
+      titleEl.addClass("jec-title-empty");
+      setIcon(titleEl.createSpan({ cls: "jec-title-icon" }), "plus");
+      titleEl.createSpan({ cls: "jec-title-text", text: "Add a title…" });
     }
   };
 
-  // Click the title (or the "Add a title…" hint) → inline edit.
   const beginEdit = (): void => {
     titleWrap.empty();
     const input = titleWrap.createEl("input", {
       type: "text",
-      cls: "jeh-title-input",
+      cls: "jec-title-input",
       attr: { placeholder: "Title this entry…" },
     });
     input.value = title;
-    titleWrap.createSpan({ cls: "jeh-subtitle", text: `· ${subtitle}` });
+    // ── THE FIELD IS THE SIZE OF THE TITLE IT REPLACES (4.21.2) ─────
+    //
+    // A text input's width comes from its `size` attribute — 20 characters at
+    // the FORM CONTROL's font, which is not the font this input is set in — so
+    // the box collapsed to roughly two thirds of the words it was editing and a
+    // title that fitted on one line before the click no longer did.
+    //
+    // AN ATTRIBUTE RATHER THAN A CSS WIDTH, because the wrapper is shrink-to-fit
+    // (it carries the `margin-right: auto` that pushes the navigator out), so a
+    // percentage width on the input resolves against a box the input is itself
+    // sizing. `size` is measured in characters, which is the unit the content is
+    // actually in.
+    //
+    // AND IT TRACKS WHAT IS TYPED, so the field grows with the title rather than
+    // scrolling it out of view. The floor is the placeholder's length: an empty
+    // field still has to be wide enough to invite one.
+    const fit = (): void => {
+      input.size = Math.max(input.value.length + 1, 18);
+    };
+    fit();
+    input.addEventListener("input", fit);
 
     // One commit per edit — see the note on the same guard in study-header.ts.
     // Escape calls commit(false), which empties this wrapper, which detaches a
-    // focused input, which fires `blur`, which calls commit(true) and writes
-    // the title the reader had just cancelled. The save path is idempotent
-    // enough that nobody noticed; the cancel path was not.
+    // focused input, which fires `blur`, which calls commit(true) and writes the
+    // title the reader had just cancelled.
     let settled = false;
-
     const commit = async (save: boolean): Promise<void> => {
       if (settled) return;
       settled = true;
       if (save) {
         const next = input.value.trim();
-        await app.fileManager.processFrontMatter(file, (f) => {
-          if (next) f[TITLE_PROP] = next;
-          else delete f[TITLE_PROP];
-        });
-        // The LiveWidget re-render (on the frontmatter change) rebuilds the
-        // whole header, so no manual repaint needed here.
-      } else {
-        // Cancelled — restore the static title without touching the file.
-        titleWrap.empty();
-        titleWrap.appendChild(titleEl);
-        renderTitle();
+        // NOTHING IS WRITTEN WHEN NOTHING WOULD CHANGE. A `processFrontMatter`
+        // that leaves a file identical still moves its modified time, which is a
+        // lie about the reader's vault that sync then propagates — the rule
+        // `setWide` states one file over.
+        if (next !== title) {
+          await app.fileManager.processFrontMatter(file, (f) => {
+            if (next) f[TITLE_PROP] = next;
+            else delete f[TITLE_PROP];
+          });
+          title = next;
+        }
       }
+      // ── BOTH PATHS PUT THE BAND BACK (4.21.3) ─────────────────────
+      //
+      // Only the CANCEL path used to. Saving wrote the file and returned, on the
+      // unstated assumption that something would re-render the strip; nothing
+      // does, because it is not live. One restore, after either outcome, and the
+      // difference between them is `title` — which the save branch has already
+      // updated.
+      titleWrap.empty();
+      titleWrap.appendChild(titleEl);
+      renderTitle();
     };
 
     input.addEventListener("keydown", (evt) => {
@@ -446,44 +600,15 @@ export function buildEntryHeader(
 
   renderTitle();
   titleEl.addEventListener("click", beginEdit);
-  titleWrap.addEventListener("click", (evt) => {
-    if ((evt.target as HTMLElement).closest(".jeh-add-hint")) beginEdit();
-  });
 
-  // The stepper and the `⋯` used to be a second row inside this band. They are
-  // the card's footer now — see buildEntryFooter below.
-  return wrap;
-}
-
-// The card's footer band: the date stepper on the left, the entry's own `⋯` on
-// the right. Returned to the block's postprocessor, which appends it after the
-// logging grid; see the note at the top of this file for why it is a sibling
-// the postprocessor owns rather than something this widget parents.
-//
-// LEFT AND RIGHT BY PUSHING, NOT BY SPLITTING. `justify-content: space-between`
-// would centre-strand the stepper on a managed template, where `attachEntryMenu`
-// deliberately draws nothing — the same reason the overview footer pushes its
-// now-button with `margin-right: auto` instead of re-aligning the bar. The bar
-// stays left-aligned and the `⋯` pushes itself to the far edge.
-export function buildEntryFooter(
-  plugin: AlmanacPlugin,
-  ctx: MarkdownPostProcessorContext
-): HTMLElement | null {
-  const app = plugin.app;
-  const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
-  if (!(file instanceof TFile)) return null;
-
-  const bar = createDiv({ cls: "journal-widget-bar journal-entry-actions" });
-  const c = entryContext(plugin, file);
-
+  // ── the navigator, on the right ─────────────────────────────────────
+  //
   // Three connected segments — prev chevron, "Jump to day/month" trigger, next
   // chevron — that read as one control.
   const navGroup = bar.createDiv({ cls: "jeh-nav jeh-seg" });
   navPill(navGroup, app, c.prev, "chevron-left", `Earliest ${CLASS_DEFS[c.grain].periodNoun}`, "left");
   buildDatePicker(plugin, navGroup, file, c.grain);
   navPill(navGroup, app, c.next, "chevron-right", `Latest ${CLASS_DEFS[c.grain].periodNoun}`, "right");
-
-  attachEntryMenu(plugin, bar, ctx.sourcePath, c.grain);
 
   return bar;
 }

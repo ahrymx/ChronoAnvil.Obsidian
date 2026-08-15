@@ -521,61 +521,136 @@
   }
 }
 
-/* ── The seam: where a cell's widgets divide (4.13.1 §4) ────────────────
+/* ── The seam, which is a control now (4.22 §4.2) ──────────────────────
  *
- * A group said where its COLUMNS divide and not where its WIDGETS do. The
- * homepage's right-hand cell stacks three of them — Go to, Open tasks, On this
- * day — with the same gap between each pair that sits between the columns, and
- * only one of those gaps had a mark in it.
+ * 4.13.1 §4 drew a mark between two stacked widgets and left it inert, and said
+ * in this file why: "there is no grammar for a widget's height and inventing one
+ * to give a seam something to do would be a feature arriving inside a patch
+ * about how the page looks". 4.22 is the release where the grammar arrives, so
+ * the mark gets the job it was drawn for.
  *
- * THE SAME LINE, TURNED. 2px, 28px, the divider's colour, its opacity and its
- * transition, revealed by a hover on the GROUP exactly as the divider is. That
- * is the whole specification: the maintainer asked for "the same as the vertical
- * line between columns", and two marks that mean "here is a boundary inside this
- * box" have no business being drawn two ways.
+ * THE DRAWING IS MOVED, NOT ADDED. The same 28x2px mark, the same colour, the
+ * same reveal on a hover of the GROUP, the same accent and the same transition —
+ * it has simply stopped being a `::before` on the second of two cards and become
+ * an element on the bottom edge of every one. Two marks meaning "here is a
+ * boundary you can pull on" have no business being drawn two ways, which is the
+ * rule 4.13.1 wrote when it made the seam match the divider in the first place.
+ * One mark, one owner.
  *
- * AND IT IS INERT, WHICH IS THE DIFFERENCE. The vertical one is a control — it
- * sets a column's width through `cell: N`. This one sets nothing: there is no
- * grammar for a widget's height and inventing one to give a seam something to do
- * would be a feature arriving inside a patch about how the page looks. So it is
- * a pseudo-element rather than an element, takes no hit area, and says
- * `pointer-events: none` — a seam that swallowed a click on the card's top edge
- * would be 4.8.3's fault in a new costume.
+ * ONE PER CARD, ON ITS OWN BOTTOM EDGE, and `cell-height.ts`'s header has the
+ * argument. The short of it: a mark BETWEEN two cards can never reach the last
+ * card in a column, and that is the widget on the homepage with the most empty
+ * rows in it.
  *
- * ON THE CARD, NOT ON `> * + *`. The first child of every cell after the first is
- * `.journal-group-divider`, so a universal sibling selector would draw a seam
- * above that cell's FIRST card, which is the one place there is no boundary. A
- * widget with no name is not wrapped by `cardWidget` and gets none either, which
- * is right — this is a line between cards.
+ * A 12PX HIT AREA AGAINST A 2PX MARK — the generosity belongs in the target and
+ * the precision in the drawing, which is the column divider's proportions
+ * exactly, turned ninety degrees.
  *
- * NO `z-index`, AND IT DOES NOT NEED ONE. 4.8 §8.3: a cell is an inline-size
- * query container, containment makes it a stacking context, and nothing can be
- * lifted out of one. This is drawn INSIDE the cell it belongs to, which is the
- * safe side of that rule — the same side the divider is on. */
-.journal-block-cell > .journal-widget-card + .journal-widget-card::before {
-  content: "";
+ * NO `z-index` FIGHT, for the divider's reason (4.8 §8.3): this is drawn inside
+ * the cell it belongs to, which is the safe side of a stacking context. */
+.journal-card-divider {
   position: absolute;
-  /* Centred in the gap the cell already lays between its children: back up half
-     the gap, then half the mark's own thickness. */
-  top: calc(var(--am-widget-gap) / -2 - 1px);
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  /* Centred in the gap the cell already lays between its children: down half the
+     gap, then half the strip's own thickness. */
+  bottom: calc(var(--am-widget-gap) / -2 - 6px);
+  height: 12px;
+  z-index: 3;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.journal-card-divider::after {
+  content: "";
   width: 28px;
   height: 2px;
   border-radius: 1px;
   background: var(--background-modifier-border);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 120ms ease;
 }
-.journal-group:hover .journal-block-cell > .journal-widget-card + .journal-widget-card::before {
+/* ON HOVER OF THE GROUP, not of the 12px strip — the divider's rule, and for its
+   reason: a control a reader has to find before it appears is not an
+   affordance. */
+.journal-group:hover .journal-card-divider,
+.journal-card-divider.is-resizing {
   opacity: 1;
 }
-/* Touch has no hover, and the same resting opacity the divider takes. */
+.journal-card-divider:hover::after,
+.journal-card-divider.is-resizing::after {
+  background: var(--interactive-accent);
+}
+.journal-widget-card.is-resizing {
+  cursor: row-resize;
+  user-select: none;
+}
+/* Belt and braces, as for the column divider: a mark under a drag is inert. */
+.journal-widget-block.is-slotting .journal-card-divider {
+  pointer-events: none;
+}
+/* Touch has no hover to reveal it with — the policy `.jbd-handle` follows, at
+   the resting opacity every hover-revealed affordance in this file takes. */
 @media (hover: none) {
-  .journal-block-cell > .journal-widget-card + .journal-widget-card::before {
+  .journal-card-divider {
     opacity: 0.3;
   }
+}
+
+/* ── A card the note states a height for (4.22 §3.2) ────────────────────
+ *
+ * THE THREE DECLARATIONS 4.13.4 PROVED, applied to a widget's card instead of a
+ * subject's, and all three are load-bearing — the middle one is the one a reader
+ * deletes as redundant.
+ *
+ * The height is STATED, because a box sized by its content cannot be scrolled
+ * inside. The card does not DIVIDE that height with its siblings, which is what
+ * `flex: 0 0 auto` says in a column that is itself a flex container. And the
+ * head does not SHRINK to make room for a body that has too much in it — without
+ * the second rule a full card's title strip is squeezed to nothing, which is the
+ * one failure of the three that looks like a rendering glitch rather than a
+ * layout choice.
+ *
+ * AND THE FURNITURE NEEDS NO EXCLUSION FROM THE THIRD RULE, which is worth
+ * writing down because the selector looks like it is missing four: the grip, the
+ * five drop slots and the divider above are all absolutely positioned, and an
+ * absolutely positioned child of a flex container is NOT a flex item. `flex` and
+ * `min-height` on it are inert, and `overflow-y: auto` on a 12px strip with
+ * nothing in it draws nothing. Naming them would be four exclusions that could
+ * each go stale independently, protecting against nothing.
+ *
+ * NOTHING ABOUT THE CARD'S STRUCTURE CHANGES: it is already a positioned flex
+ * column, and its head is already `order: -1` while being appended last. */
+.journal-widget-card.is-sized {
+  height: var(--am-card-h);
+  flex: 0 0 auto;
+}
+.journal-widget-card.is-sized > .journal-block-head {
+  flex: 0 0 auto;
+}
+.journal-widget-card.is-sized > :not(.journal-block-head) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* AND A WIDGET THAT DREW ITS OWN BAND SCROLLS AS ONE THING.
+ *
+ * `cardWidget` gives no card to a widget that already has a band of its own —
+ * the diary card says DIARY across its own top and does not need "Today" said
+ * above it in smaller letters — so there is no head here to pin and no body to
+ * pin it against. The honest answer is that the whole widget is the body: it is
+ * one object, it is as tall as the note says, and it scrolls.
+ *
+ * A LIST OF THE BANDS WOULD BE THE ALTERNATIVE, and it is the wrong one. This
+ * file already carries one such list and says what it costs; a second copy, kept
+ * in step so that a `height` could pin six different widgets' own titles, would
+ * go stale the first time a widget grew a band and nothing would say so. */
+.journal-block-cell > .is-sized:not(.journal-widget-card) {
+  height: var(--am-card-h);
+  flex: 0 0 auto;
+  overflow-y: auto;
 }
 
 /* ── The block drag handle (4.7) ────────────────────────────────────────
@@ -708,8 +783,13 @@
 .journal-widget-card {
   padding: 12px 14px;
   background: var(--background-secondary);
-  border: var(--am-rule) solid var(--background-modifier-border);
+  border: var(--am-rule) solid var(--am-border-subtle);
   border-radius: var(--am-radius-md);
+  box-shadow: inset 0 1px 0 var(--am-edge-highlight);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.journal-widget-card:hover {
+  border-color: var(--am-border-hover);
 }
 /* A CARD IS A COLUMN, so a widget that fills its cell fills this too — without
    it a stack of cards in one cell is a stack of shrink-wrapped boxes of
@@ -749,7 +829,41 @@
  * and anything else the card comes to hold, and the head is the only child whose
  * spacing is in question. */
 .journal-widget-card > .journal-block-head {
-  margin-bottom: 12px;
+  margin-top: 0;
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 0;
+  max-height: 0;
+  padding: 0;
+  border-bottom: 0 solid transparent;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: max-height 0.2s ease, margin 0.2s ease, padding 0.2s ease, opacity 0.18s ease;
+}
+.journal-widget-card:hover > .journal-block-head,
+.journal-widget-card:focus-within > .journal-block-head,
+.journal-widget-card.is-resizing > .journal-block-head,
+.journal-widget-card.is-dragging > .journal-block-head,
+.journal-widget-block.is-slotting .journal-widget-card > .journal-block-head {
+  max-height: 48px;
+  margin: -12px -14px 12px;
+  padding: 6px 14px 5px;
+  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  opacity: 1;
+  overflow: visible;
+  pointer-events: auto;
+}
+@media (hover: none) {
+  .journal-widget-card > .journal-block-head {
+    max-height: 48px;
+    margin: -12px -14px 12px;
+    padding: 6px 14px 5px;
+    border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+    opacity: 1;
+    overflow: visible;
+    pointer-events: auto;
+  }
 }
 /* THE HEAD AS THE CARD'S TOP BAND. `order: -1` draws it first while it stays
    attached last, which is what keeps `layOutRow` from collecting it into a cell
@@ -776,6 +890,38 @@
   border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
   gap: 8px;
 }
+.journal-widget-block.has-head:not(.journal-widget-card) > .journal-block-head {
+  margin: 0;
+  max-height: 0;
+  padding: 0;
+  border-bottom: 0 solid transparent;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: max-height 0.2s ease, margin 0.2s ease, padding 0.2s ease, opacity 0.18s ease;
+}
+.journal-widget-block.has-head:not(.journal-widget-card):hover > .journal-block-head,
+.journal-widget-block.has-head:not(.journal-widget-card):focus-within > .journal-block-head,
+.journal-widget-block.is-slotting .journal-block-head {
+  max-height: 48px;
+  margin: -12px -14px 0;
+  padding: 6px 14px 5px;
+  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  opacity: 1;
+  overflow: visible;
+  pointer-events: auto;
+}
+@media (hover: none) {
+  .journal-widget-block.has-head:not(.journal-widget-card) > .journal-block-head {
+    max-height: 48px;
+    margin: -12px -14px 0;
+    padding: 6px 14px 5px;
+    border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+    opacity: 1;
+    overflow: visible;
+    pointer-events: auto;
+  }
+}
 /* The label idiom `.am-ev-section` already uses, and for the same reason: a
    title that has to sit in 18px says what the block is without competing with
    the titles inside it. */
@@ -786,8 +932,8 @@
      object cannot sit two steps of contrast apart. */
   font-size: var(--am-bar-text);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: var(--am-bar-track);
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--am-bar-ink);
   min-width: 0;
   overflow: hidden;
@@ -1198,4 +1344,16 @@
     left: 25%;
     right: 25%;
   }
+}
+
+/* ── Focus visible rings (4.24 §4.1) ────────────────────────────────── */
+.almanac-repair-toggle-btn:focus-visible,
+.journal-widget-block button:focus-visible,
+.journal-widget-block select:focus-visible,
+.journal-widget-block input:focus-visible,
+.almanac-editor-modal button:focus-visible,
+.almanac-editor-modal select:focus-visible,
+.almanac-editor-modal input:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
 }

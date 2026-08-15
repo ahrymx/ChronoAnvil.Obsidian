@@ -41,16 +41,36 @@ const DASHBOARD_GRAINS: DashboardGrain[] = [
 // the page head above it. Position was never what these tests were about — the
 // masthead is the fence carrying navigation, and saying so is both more honest
 // and immune to the next thing that arrives above it.
-const masthead = (text: string): string[] => {
+//
+// ── AND 4.19 SPLIT IT IN TWO ON A DASHBOARD, SO THERE ARE TWO HELPERS ──
+//
+// The banner is now the fence carrying the navigation row on BOTH surfaces —
+// which is this file's thesis arriving in the markup rather than a departure
+// from it. What a dashboard keeps in a second fence is the period summary and
+// its button, which is a different question and gets a different helper.
+//
+// An entry has one fence above the rule and both helpers find it, which is the
+// honest answer: on an entry the banner IS the masthead, and always was.
+const fenceHolding = (text: string, probe: (l: string) => boolean): string[] => {
   const lines = text.split("\n");
   let open = -1;
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].trim() === "```almanac") open = i;
-    if (open >= 0 && lines[i].startsWith("links:")) break;
+    if (open >= 0 && probe(lines[i])) break;
   }
   const close = lines.indexOf("```", open + 1);
   return lines.slice(open + 1, close);
 };
+
+// The fence carrying the navigation row — the banner, on every diary surface.
+const banner = (text: string): string[] =>
+  fenceHolding(text, (l) => l.startsWith("links:"));
+
+// The fence carrying the period summary. On an entry that is the banner itself
+// (its `entry-header` is what a summary is to a dashboard); on a dashboard it is
+// the second fence above the rule.
+const masthead = (text: string): string[] =>
+  fenceHolding(text, (l) => /-summary$/.test(l.trim()) || l.trim() === "entry-header");
 
 describe("above the rule, an entry and an overview are the same object", () => {
   it("both open their masthead with navigation", () => {
@@ -65,20 +85,29 @@ describe("above the rule, an entry and an overview are the same object", () => {
     // page's name twice — so its row keeps Home because nothing else there
     // offers it.
     //
-    // THE DIVERGENCE IS THE SEAM THE FOLLOW-UP CLOSES, and it is asserted
-    // rather than tolerated: the two rows differ by exactly `home`, and by
-    // nothing else. That is what makes this a scope boundary instead of a
-    // drift, and it is the assertion that will fail the day an entry gains a
-    // head — which is when this comment should be deleted.
+    // THE DIVERGENCE SURVIVED THE FOLLOW-UP, AND STOPPED BEING A SEAM (4.19).
+    //
+    // 4.19 merged each page's name and its navigation into one Banner section,
+    // and the sentence above predicted this assertion would fail "the day an
+    // entry gains a head". The entry did NOT gain one, for the reason given
+    // above and unchanged: `entry-header` already renames the note. So the two
+    // rows still differ by exactly `home`, and the difference is no longer a
+    // seam BETWEEN two sections — it is one section's internal shape, stated by
+    // each catalogue in one place.
+    //
+    // The rows are still asserted to differ by that one id and nothing else.
     for (const grain of TRACKER_CLASSES) {
-      expect(masthead(composeEntryTemplate(grain))[0], grain).toBe(
+      expect(banner(composeEntryTemplate(grain))[0], grain).toBe(
         "links:home,today,scopes#diary"
       );
     }
     for (const grain of DASHBOARD_GRAINS) {
-      expect(masthead(composeDiaryDashboard(grain))[0], grain).toBe(
-        "links:today,scopes#diary"
-      );
+      const body = banner(composeDiaryDashboard(grain));
+      // The dashboard's banner opens with the page's NAME and carries the
+      // navigation row beneath it — one block, two directives, which is the
+      // whole of what the merge changed here.
+      expect(body[0], grain).toBe("title:home,diary,journals");
+      expect(body[1], grain).toBe("links:today,scopes#diary");
     }
   });
 
@@ -89,7 +118,8 @@ describe("above the rule, an entry and an overview are the same object", () => {
     for (const grain of DASHBOARD_GRAINS) {
       const text = composeDiaryDashboard(grain);
       expect(text, grain).toContain("title:home,diary,journals");
-      expect(masthead(text)[0], grain).not.toContain("home");
+      // The links row — the second line of the banner now — still has no Home.
+      expect(banner(text)[1], grain).not.toContain("home");
     }
     // And an entry has no head, which is what keeps `home` in its row.
     for (const grain of TRACKER_CLASSES) {
@@ -102,11 +132,15 @@ describe("above the rule, an entry and an overview are the same object", () => {
     // and cannot be made into one — the limit 2.18.4 already hit one row lower
     // down, and the reason this release exists.
     for (const grain of TRACKER_CLASSES) {
-      expect(masthead(composeEntryTemplate(grain)), grain).toContain("entry-header");
+      expect(banner(composeEntryTemplate(grain)), grain).toContain("entry-header");
     }
     for (const grain of DASHBOARD_GRAINS) {
-      const head = masthead(composeDiaryDashboard(grain));
-      expect(head.some((l) => /-summary$/.test(l)), grain).toBe(true);
+      // AND ON A DASHBOARD IT SHARES IT WITH THE PAGE'S NAME (4.19), where
+      // before it shared it with the summary. The claim is unchanged — the
+      // navigation row never gets a fence of its own — and what it is welded to
+      // is now the thing that says which note this is.
+      const head = banner(composeDiaryDashboard(grain));
+      expect(head.some((l) => l.startsWith("title:")), grain).toBe(true);
     }
   });
 
@@ -122,8 +156,18 @@ describe("above the rule, an entry and an overview are the same object", () => {
 });
 
 describe("below the rule they diverge, and nothing forces them together", () => {
-  it("an entry's masthead carries trackers; an overview's never does", () => {
-    expect(masthead(composeEntryTemplate("daily"))).toContain("tracker:Mood");
+  it("an entry has trackers somewhere; an overview has none anywhere", () => {
+    // ── AND THEY LEFT THE BANNER IN 4.20 ──────────────────────────────
+    //
+    // This read `banner(...)` and asserted the grid was IN the entry's banner
+    // fence, which was true from 2.18.4 until 4.20 decided what a banner is: the
+    // file's name, its navigation and the control that edits it. The grid is
+    // content, so it has a block of its own now.
+    //
+    // The claim this test is for is unchanged and is about the two SURFACES —
+    // an entry records ratings and a dashboard reads them — so it is asked of
+    // the whole note rather than of one fence.
+    expect(composeEntryTemplate("daily")).toContain("tracker:Mood");
     for (const grain of DASHBOARD_GRAINS) {
       expect(
         masthead(composeDiaryDashboard(grain)).some((l) => l.startsWith("tracker:")),
@@ -138,7 +182,7 @@ describe("below the rule they diverge, and nothing forces them together", () => 
     // is a fact about its body and must not have leaked upward.
     const yearly = composeDiaryDashboard("yearly");
     expect(yearly).not.toContain("tasks-table");
-    expect(masthead(yearly)[0]).toBe("links:today,scopes#diary");
+    expect(banner(yearly)[1]).toBe("links:today,scopes#diary");
   });
 });
 
@@ -201,11 +245,21 @@ describe("the card belongs to the fence, not to a widget in it", () => {
   it("while the entry card keeps the one it has and grows a band", () => {
     const css = readCss();
     expect(css).toContain(".journal-entry-banner > .journal-links-card");
-    // The band takes the card's top edge; the strip below it stops being the
-    // top edge and drops the margin that pulled it there.
-    expect(css).toContain(
+    // ── AND THE BAND IS NOT THE TOP EDGE ANY MORE (4.21.1) ──────────
+    //
+    // It was, from 3.2 patch 5 until then, and the rule that put it there —
+    // `> .journal-links-card + .journal-entry-header` — is deliberately GONE
+    // rather than adjusted: the name leads on every banner now, so the links
+    // card is band 2 and nothing about where it sits is an entry's private
+    // arrangement. Asserted as an absence because the adjacency selector is
+    // what a re-flip would reach for first, and it would put the arrangement
+    // back on one surface only.
+    expect(css).not.toContain(
       ".journal-entry-banner > .journal-links-card + .journal-entry-header"
     );
+    // The inset, the rule and the bottom-edge handoff belong to the shared band
+    // class, which is what makes an entry's row and a leaf's one object.
+    expect(css).toContain(".journal-slim-banner .journal-banner-nav");
   });
 
   it("and the two links bands are styled the same, because they are the same", () => {
@@ -378,7 +432,12 @@ describe("3.5: the span above, the value as a control", () => {
     for (const grain of ["weekly", "monthly", "quarterly", "yearly"] as const) {
       const head = masthead(composeDiaryDashboard(grain));
       expect(head.some((l) => l.startsWith("period-nav:")), grain).toBe(false);
-      expect(head[1], grain).toMatch(/-summary$/);
+      // THE SUMMARY OPENS THE FENCE AS OF 4.19, where the navigation row used to
+      // and the summary was second. The claim is what the fence holds, and it
+      // holds one section's two lines now instead of two sections' three.
+      expect(head[0], grain).toMatch(/-summary$/);
+      expect(head[1], grain).toMatch(/^button:new-/);
+      expect(head, grain).toHaveLength(2);
     }
   });
 

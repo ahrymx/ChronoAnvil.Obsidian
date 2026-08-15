@@ -687,7 +687,11 @@ describe("the section catalogue", () => {
       // And the level above does the opposite, which is why order is per
       // template rather than one list for the catalogue.
       const top = defaultSectionIds(indexCtx(STUDY_JOURNAL, 0));
-      expect(top.indexOf("children")).toBe(1);
+      // SECOND UNTIL 4.20, THIRD NOW. The tracker grid became a section of its
+      // own and sits directly under the banner, so everything below it shifts
+      // by one. What this test is about — the note tables below the learning
+      // path — is a relative order and is unchanged.
+      expect(top.indexOf("children")).toBe(2);
     });
   });
 
@@ -786,6 +790,8 @@ describe("the section catalogue", () => {
       );
       expect(defaultSectionIds(c)).toEqual([
         "banner",
+        // 4.20: the ratings left the banner's fence to become a section.
+        "trackers",
         "children",
         "find",
         "review",
@@ -858,6 +864,7 @@ describe("the section catalogue", () => {
       const text = composeTemplate(lesson);
       expect(detectSections(text, lesson)).toEqual([
         "banner",
+        "trackers",
         "pages",
         "headings",
         "recall",

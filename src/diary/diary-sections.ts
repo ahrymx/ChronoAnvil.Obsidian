@@ -66,7 +66,7 @@ import {
   reconfigured,
   withAnswers,
 } from "../core/section-model";
-import { PAGE_TITLE_LINE, locateTitle } from "../core/note-sections";
+import { BANNER_ID, PAGE_TITLE_LINE, locateTitle } from "../core/note-sections";
 
 // What "the host note's own folder" is on this dashboard, for a plan line. A
 // dashboard sits in its grain's folder — `02 - Diary/Weekly` — which is exactly
@@ -271,59 +271,90 @@ const noun = (ctx: DiaryDashboardContext): string =>
 
 export const DIARY_SECTIONS: DiarySection[] = [
   {
-    id: "title",
-    label: "Page title",
+    id: BANNER_ID,
+    label: "Banner",
     blurb:
-      "The page's own name, where it can go, and the control that renames it and edits its sections.",
+      "The page's own name, where it can go in the vault and in time, and the control that renames it and edits its sections.",
     icon: "🏷️",
-    // NOT LOCKED, on the homepage's argument for the same object: a page
-    // without a title card is a coherent thing to want — the note's name is in
-    // the tab, the file explorer and the window.
-    locked: false,
-    // PINNED, and this is a stronger claim than `links`' (3.2 §4). Navigation
-    // being the top row is a convention; a page's own NAME being somewhere
-    // other than the top is a page with its title in the middle of it. A reader
-    // may still remove it — that is `locked` — but not file it under the
-    // charts.
-    pinned: true,
-    // ITS OWN BAND, WHICH IS ITS OWN FENCE. The argument is at `DiarySection.band`
-    // and is worth one line here: in the masthead the head would be welded into
-    // the navigation block, and `applyLayout` would then either duplicate that
-    // whole block on every dashboard that predates this release or never insert
-    // the head at all. A band of one is also immovable without a rule saying so.
-    band: "head",
-    applies: always,
-    render: () => ({ fence: "almanac", lines: [PAGE_TITLE_LINE] }),
-    locate: locateTitle,
-  },
-  {
-    id: "links",
-    label: "Navigation",
-    blurb: "Home, today, and the scope switcher.",
-    icon: "🧭",
-    // LOCKED, and the same argument the entry catalogue makes: a vault where
-    // some dashboards can get home and others cannot is worse than one with no
-    // links at all.
+    // LOCKED AS OF 4.19, WHERE THE HEAD WAS NOT. The head was removable — *a
+    // page without a title card is a coherent thing to want* — and `links` was
+    // not — *a vault where some dashboards can get home and others cannot is
+    // worse than one with no links at all*. Merging them makes one block that
+    // cannot hold both rules, and the navigation one is the stronger: a missing
+    // title costs a label the tab already shows, and a missing links row costs
+    // the way out of the page. `bannerSection` states the same trade for the
+    // flat notes and this is that decision, once, not twice.
     locked: true,
-    // PINNED, as of 3.2 §4: navigation is the top row of every diary surface.
+    // PINNED, unchanged and still the stronger of the two claims 3.2 §4 makes.
+    // Navigation being the top row is a convention; a page's own NAME being
+    // somewhere other than the top is a page with its title in the middle of it.
     pinned: true,
-    band: "masthead",
+    // ITS OWN BAND, WHICH IS ITS OWN FENCE — AND THAT IS NOW THE MERGE RATHER
+    // THAN AN OBSTACLE TO IT.
+    //
+    // 4.10 put the head in a band of its own and gave the reason: in the
+    // masthead it would be welded into the navigation block, and `applyLayout`
+    // step 3 — meeting a dashboard older than that release — would either insert
+    // the entire masthead a second time or never insert the head at all, because
+    // `assetUnits` marks only a block's FIRST directive insertable.
+    //
+    // THAT OBJECTION WAS ABOUT `applyLayout`, AND REPAIR STOPPED GOING THROUGH
+    // IT IN 4.18. `repair-plan.ts` reconciles composed notes through
+    // `SectionModel`, which matches on SECTION IDENTITY rather than on a
+    // keyword's position in a block — it was moved there precisely because the
+    // keyword reconciler could not see past the first directive of a welded
+    // fence. So the hazard that made the head a band of one is gone, and what
+    // the band does now is the opposite job: `ONE_FENCE` does not contain
+    // `head`, so a head band holding two sections' worth of lines composes as
+    // ONE fence, which is exactly the block this release wants. The mechanism
+    // did not change; the thing it was protecting against did.
+    band: "head",
     applies: always,
     render: () => ({
       fence: "almanac",
-      // `home` LEFT THIS LINE IN 4.10 — the head above carries it now, and two
-      // pills to the same page on one screen is the doubling this release is
-      // about. Repair applies it to notes that already exist without a
-      // migration: `links` is in `MANAGED_ARGS`, so step 2 rewrites the
-      // arguments wherever it finds them.
-      lines: ["links:today,scopes#diary"],
+      lines: [
+        PAGE_TITLE_LINE,
+        // `home` LEFT THIS LINE IN 4.10 — the title line above carries it, and
+        // two pills to the same page on one screen is the doubling that release
+        // began and this one finishes.
+        //
+        // AND THE CLAIM THAT USED TO BE HERE WAS FALSE, WHICH IS WORTH THE
+        // SENTENCE. It read: *"Repair applies it to notes that already exist
+        // without a migration: `links` is in `MANAGED_ARGS`, so step 2 rewrites
+        // the arguments wherever it finds them."* That was true when it was
+        // written and stopped being true in 4.18: `MANAGED_ARGS` is read only by
+        // `planLayout`/`applyLayout`, and `reconcileLayouts` now sends every note
+        // carrying a `surface` — all eight composed notes, these four among them
+        // — through `repairNote` instead. Step 2 of THAT pass is `planFlags`,
+        // which reads `MANAGED_FLAGS` and nothing else. So no dashboard written
+        // before 4.10 has ever had this argument rewritten, and 4.19 must carry
+        // its own migration rather than inherit one that was not running.
+        //
+        // AND THE ENTRY'S ROW STILL KEEPS `home`, which is not drift. An entry
+        // has no `title:` line — `entry-header` already renames the note, so a
+        // second name above it would be the page's name twice — so nothing else
+        // on an entry offers Home. `masthead.test.ts` asserts the difference is
+        // exactly that one id.
+        "links:today,scopes#diary",
+      ],
     }),
-    locate: (text) => probe(text, /^links:/m),
+    // EITHER LINE ANCHORS IT — `bannerSection` argues this in full. The short
+    // version: the head was removable until this release, so a dashboard with a
+    // navigation row and no title line is a state a reader was invited into, and
+    // a title-only anchor would compose them a second navigation row.
+    locate: (text) => {
+      const at = locateTitle(text);
+      return at >= 0 ? at : probe(text, /^links:/m);
+    },
   },
   {
     id: "summary",
     label: "Period summary",
-    blurb: "The banner: what this period holds, and its date navigator.",
+    // THE WORD "BANNER" LEFT THIS SENTENCE IN 4.19, and the reason is one row
+    // up: the section above is now called Banner, so a dashboard listed two
+    // sections that both claimed to be the banner. The label was always "Period
+    // summary" and stays it; only the blurb was overreaching.
+    blurb: "What this period holds, and its date navigator.",
     icon: "🗓",
     // LOCKED, and the one that most obviously has to be: without it the
     // dashboard has no date navigation and no way to say which period it is
@@ -463,7 +494,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
       },
     ],
     id: "open-tasks",
-    label: "Open Tasks",
+    label: "Open tasks",
     blurb: "Still-open Almanac tasks from entries inside this period.",
     icon: "⏳",
     // The tasks live in the entries this aggregates, not here. Removing the
@@ -475,13 +506,13 @@ export const DIARY_SECTIONS: DiarySection[] = [
     applies: (ctx) => ctx.grain !== "yearly",
     render: () => ({
       fence: "almanac",
-      lines: ["header:⏳ Open Tasks", "tasks-table:,period"],
+      lines: ["header:⏳ Open tasks", "tasks-table:,period"],
     }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },
   {
     id: "charts",
-    label: "Trends and Statistics",
+    label: "Trends and statistics",
     blurb: "The charts manager for this period.",
     icon: "📊",
     // NOT LOCKED, AND NOT FREELY REMOVABLE EITHER — the one section on a
@@ -829,9 +860,39 @@ export function parseDiarySections(
   text: string,
   ctx: DiaryDashboardContext
 ): DashboardRun[] {
+  // A SECTION IS ITS FIRST RUN, AND NOTHING AFTER IT — the guard
+  // `parseFlatSections` grew in 4.12 §A, arriving here in 4.19 because this is
+  // the release that makes it reachable by shipping rather than by hand.
+  //
+  // `locate` is one anchor per section, so two fences holding the same anchor
+  // BOTH come back owning that id. Downstream, `applyDiarySections`' reorder
+  // keys `byChunk` on a chunk's first id and a `Map` keeps the last write under
+  // a key: the two chunks collapse into one object which is then written into
+  // both slots. The first fence's content is replaced by the second's, on Save,
+  // with nothing in the plan saying so.
+  //
+  // WHAT MAKES IT REACHABLE NOW: the banner takes either a `title:` or a
+  // `links:` line as its anchor, so on a dashboard that still has its two
+  // fences unwelded, both match. Before this release it needed a reader to type
+  // a duplicate directive by hand.
+  //
+  // A SET RATHER THAN A SMARTER `ownersOf`, for the reason the flat note gives:
+  // the second fence then owns nothing, which every path downstream already
+  // knows how to treat — it becomes a run the catalogue does not manage,
+  // re-emitted byte-identically and reported as such. A silent content swap
+  // becomes a line in the Changes tab saying a block here was left alone.
+  //
+  // FILE ORDER DECIDES, because `segs` is in file order and this walks it once.
+  const claimed = new Set<string>();
   const segs = segment(text.split("\n"));
   return segs.map((seg, i) => {
-    const owners = seg.kind === "fence" ? ownersOf(seg.lines, ctx) : [];
+    const owners = (seg.kind === "fence" ? ownersOf(seg.lines, ctx) : []).filter(
+      (id) => {
+        if (claimed.has(id)) return false;
+        claimed.add(id);
+        return true;
+      }
+    );
     return {
       sectionIds: owners,
       from: i,
@@ -902,14 +963,14 @@ export function diaryRemovalRefusal(
 ): string | null {
   if (section.locked) {
     return isMovable(section)
-      ? `${section.label} is part of every dashboard and cannot be removed. You can move it, though.`
-      : `${section.label} is part of every dashboard and cannot be removed.`;
+      ? "Part of every dashboard, so it can't be removed. You can still move it."
+      : "Part of every dashboard, so it can't be removed or moved.";
   }
   const held = section.holds?.(text) ?? 0;
   if (held > 0) {
-    return `${section.label} has ${held} chart${
-      held === 1 ? "" : "s"
-    } in it. Remove ${held === 1 ? "it" : "them"} first, then remove the section.`;
+    return `Holds ${held} chart${held === 1 ? "" : "s"}. Remove ${
+      held === 1 ? "it" : "them"
+    } first, then remove the section.`;
   }
   return null;
 }
@@ -1217,9 +1278,22 @@ function insertionPoint(
 // masthead. The editor's reordering rule is unchanged and still has no surface
 // test in it ("two rows may swap when their groups match"); what changed is
 // that this surface now answers the question with something other than null.
+// ── AND TWO OF THE THREE WERE RENAMED IN 4.19 ─────────────────────────
+//
+// Each of the top two bands now holds exactly ONE section — the banner, and the
+// period summary that the navigation row left behind — so the old plural
+// readings were wrong in the same way: "the masthead" named a card of two rows
+// that is now one, and "the page head" named the half of the banner that existed
+// before it had the other half.
+//
+// AND THEY ARE STILL TWO BANDS, WHICH IS THE POINT. Collapsing them into one
+// would let the banner and the overview trade places, and a page whose name sits
+// below its date navigator is what `pinned` was added to prevent. Two bands of
+// one each is not redundancy; it is the arrangement stated in the only place
+// that can enforce it.
 const BANDS: Record<DiarySection["band"], string> = {
-  head: "The page head",
-  masthead: "The masthead",
+  head: "The banner",
+  masthead: "The overview",
   body: "The page below",
 };
 

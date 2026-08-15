@@ -98,7 +98,27 @@ export interface RepairOp {
 // shape of a fence written by an older release. Behind one tick they would be
 // two unlike things a reader cannot separate, which is the state this is
 // getting out of rather than a smaller version of it.
-export type RepairGroupId = "create" | "pages" | "journals" | "migrations";
+export type RepairGroupId =
+  | "create"
+  | "pages"
+  | "journals"
+  | "migrations"
+  | "templates"
+  // ONE ENTRY, REWRITTEN FROM A TEMPLATE (4.29). Not `templates`, which is the
+  // set of template FILES a refresh regenerates — this is the opposite
+  // direction, a template written over one note the reader is looking at. The
+  // window is borrowed because a diff and a confirmation are exactly what a
+  // whole-body replace owes, and reusing it costs one union member where a
+  // second confirmation dialog would cost a second idea of what a preview is.
+  | "entry"
+  // THE WHOLE VAULT, COPIED OUT (4.31). Added on exactly the argument the line
+  // above was: a preview and a confirmation are what a write of hundreds of
+  // files owes, and reusing this window costs one union member where a second
+  // confirmation dialog would cost a second idea of what a preview is.
+  //
+  // It is also the only group whose items are all in ONE folder, which is the
+  // property that makes the write recoverable — see `isUnderExportRoot`.
+  | "export";
 
 // One file a repair would touch.
 export interface RepairFileChange {

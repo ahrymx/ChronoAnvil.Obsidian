@@ -39,7 +39,12 @@ import { modelForSurface, resolveSectionHost } from "../src/ui/section-insert";
 import type { JournalHostRef } from "../src/ui/section-insert";
 import { STUDY_JOURNAL } from "../src/journals/journal";
 import { shippedNotes } from "../src/core/scaffold";
-import { DEFAULT_PATHS, RETIRED_WIDGETS } from "../src/core/constants";
+import {
+  DEFAULT_PATHS,
+  HEADER_PREFIX,
+  RETIRED_WIDGETS,
+  TRENDS_HEADING,
+} from "../src/core/constants";
 import { folderNotePath } from "../src/core/util";
 import { planLayout, segment } from "../src/core/layout";
 import type { FlatSection } from "../src/core/note-sections";
@@ -145,7 +150,9 @@ describe("both catalogues are data, which is the point", () => {
         // absolute position, so a reader who rearranged the page keeps their
         // arrangement.
         const ids = page.sections.filter((s) => !s.optIn).map((s) => s.id);
-        const droppable = ids.find((id) => id !== page.locked && id !== "charts");
+        const droppable = ids.find(
+          (id) => id !== page.locked && id !== "charts" && id !== "banner"
+        );
         expect(droppable, "a page needs one freely removable section").toBeTruthy();
         const without = page.model().apply(
           page.compose(),
@@ -162,20 +169,22 @@ describe("what each page refuses to lose", () => {
   it("locks the diary card on the diary dashboard and nothing else", () => {
     // A page about the diary with no way into the diary is worse than no page
     // at all — `home-sections` makes the same call about the same widget.
+    // AND THE BANNER, AS OF 4.19 — locked on every surface, which
+    // `bannerSection` argues and this records for this page.
     const locked = DIARY_DASHBOARD_SECTIONS.filter((s) => s.locked).map((s) => s.id);
-    expect(locked).toEqual(["today"]);
+    expect(locked).toEqual(["banner", "today"]);
   });
 
   it("locks the journals card on the journals dashboard and nothing else", () => {
     const locked = JOURNALS_DASHBOARD_SECTIONS.filter((s) => s.locked).map((s) => s.id);
-    expect(locked).toEqual(["journals"]);
+    expect(locked).toEqual(["banner", "journals"]);
   });
 
   it("says why, in a sentence about the reader's page", () => {
     for (const page of PAGES) {
       const why = page.model().refusal(page.locked, page.compose());
       expect(why, page.name).toContain(page.name);
-      expect(why, page.name).toContain("cannot be removed");
+      expect(why, page.name).toContain("can't be removed");
     }
   });
 
@@ -189,17 +198,21 @@ describe("what each page refuses to lose", () => {
     }
   });
 
-  it("fixes the page head in place on both, and still lets it go", () => {
-    // 4.11, and the two flags are asked separately on purpose: the head is the
-    // one section on either page that is immovable AND removable, so a single
-    // assertion could pass while the model had collapsed the two rules into one.
-    // That is exactly the collapse `diaryRemovalRefusal` had made on the period
-    // dashboards since 4.10.
+  it("fixes the banner in place on both, and no longer lets it go", () => {
+    // 4.11 asked the two flags separately because the head was the one section
+    // on either page that was immovable AND removable — a single assertion could
+    // have passed while the model collapsed the two rules into one, which is
+    // exactly the collapse `diaryRemovalRefusal` had made since 4.10.
+    //
+    // 4.19 REMOVED THAT COMBINATION FROM EVERY SURFACE, so the flags now agree.
+    // They are still asked separately: the collapse this guards against would be
+    // just as invisible now, and the day a removable-but-fixed section returns
+    // this is the test that has to still be looking.
     for (const page of PAGES) {
-      const view = page.model().sections().find((v) => v.id === "title");
+      const view = page.model().sections().find((v) => v.id === "banner");
       expect(view?.movable, page.name).toBe(false);
-      expect(view?.removable, page.name).toBe(true);
-      expect(page.model().refusal("title", page.compose()), page.name).toBeNull();
+      expect(view?.removable, page.name).toBe(false);
+      expect(page.model().refusal("banner", page.compose()), page.name).not.toBeNull();
     }
   });
 
@@ -228,12 +241,10 @@ describe("what each page refuses to lose", () => {
     // so; a reader with nine configured must not lose them to an untick.
     for (const page of PAGES) {
       expect(page.model().refusal("charts", page.compose()), page.name).toBeNull();
-      const withCharts = page
-        .compose()
-        .replace(
-          "header:📊 Trends and Statistics",
-          "header:📊 Trends and Statistics\nchart:mood"
-        );
+      // OFF THE CONSTANT, NOT A LITERAL — see home-sections.test.ts for what
+      // this cost when the heading was renamed in 4.26.
+      const bar = `${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`;
+      const withCharts = page.compose().replace(bar, `${bar}\nchart:mood`);
       const why = page.model().refusal("charts", withCharts);
       expect(why, page.name).toContain("1 chart");
     }
@@ -513,9 +524,14 @@ describe("no card sits under a header bar", () => {
   // followed: the page head draws `.jtc-card`, so a `header:` bar over it would
   // be the two-borders-arguing pairing described above — and, worse than
   // elsewhere, a title bar over the page's own title.
+  // `title` JOINS THE LIST IN 4.19, and it always belonged: the page-title
+  // widget draws its own card, and 4.19 is simply the release where the section
+  // holding it renders on a page this test walks. A header bar over it would be
+  // a title bar over the page's own title, which is the pairing this whole
+  // describe block exists to refuse.
   const CARD_DRAWING = ["diary", "month-summary", "journals", "week-summary",
     "quarter-summary", "year-summary", "entry-header", "journal-header",
-    "title"];
+    "banner", "title"];
 
   const keywordOf = (line: string): string =>
     line.split("|")[0].split(":")[0].trim();
@@ -569,7 +585,7 @@ describe("the homepage becomes a place to start", () => {
       .filter((x) => !x.optIn)
       .map((x) => x.id);
     expect(composed).toEqual([
-      "title",
+      "banner",
       "diary",
       "launcher",
       "tasks",

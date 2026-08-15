@@ -359,6 +359,26 @@ export function isTitleLine(line: string): boolean {
   return splitDirective(line).keyword === TITLE_KEYWORD;
 }
 
+// ── the banner's other half (4.19) ────────────────────────────────────
+//
+// `links:` HAS BEEN SPELLED AS A STRING LITERAL IN FOUR FILES. `MANAGED_ARGS`
+// holds one, `journal-sections.ts` and both diary catalogues each `locate` on a
+// regex of their own. That was fine while nothing but a reconciler asked the
+// question; 4.19 makes the banner a block that holds a `title:` line AND a
+// `links:` line, and the migration that welds an old note's two fences has to
+// find the second one inside a fence body — which is `isTitleLine`'s question
+// about the other keyword, and wants the same answer shape.
+//
+// EXACT, and `isTitleLine`'s note applies unchanged: `links-something` must not
+// be swallowed, and `splitDirective` is the grammar the dispatcher reads a body
+// line with, so a helper that used its own regex could disagree with it.
+export const LINKS_KEYWORD = "links";
+
+// Whether this fence body line is a navigation row's directive.
+export function isLinksLine(line: string): boolean {
+  return splitDirective(line).keyword === LINKS_KEYWORD;
+}
+
 // ── how wide the page is (4.11) ───────────────────────────────────────
 //
 // A THIRD MODIFIER, ON `frame:`'s AND `row`'s SLOT: one line, read before the
@@ -548,6 +568,102 @@ export function cellWeightOf(line: string): number | null {
   return n >= 1 ? n : null;
 }
 
+// ── the height of a widget ────────────────────────────────────────────
+//
+// HOW TALL ONE CARD IN A COLUMN IS. 4.22 §1.
+//
+// `cell` divided a row and then said how wide each part was. This says how tall
+// one part is, and it is the other half of the same sentence: a group's columns
+// have been resizable since 4.9 §3 and its rows have not, because there was no
+// grammar for a height and a seam with nothing to write is not a control.
+//
+//   row
+//   diary:3
+//   cell
+//   height: 240
+//   on-this-day:always
+//
+// POSITIONAL, LIKE `cell`, AND FOR A NARROWER REASON. `cell` means "the next
+// column starts here"; this means "the widget on the next line is this tall".
+// Not the cell, not the column, not the block — the ONE directive under it. That
+// is what makes it survivable: a height that named its widget would have to name
+// it again every time the reader retitled one, and a height located by counting
+// would size the wrong card the first time a directive drew nothing. The line
+// below it is the only address that cannot go stale while the file is not edited,
+// and `heightAbove` in `cell-height.ts` is where that rule is stated once.
+//
+// WHY `height` AND NOT `size`. A number in this fence already means a width —
+// `cell: 2` — and one keyword must not mean both. `height: 240` says what it sets
+// and cannot be read as anything else.
+export const HEIGHT_KEYWORD = "height";
+
+// Why a fence's `height` lines could not be honoured, or null when they can.
+//
+// NO FACT BESIDE THE ERROR, WHICH IS THIS PARSE'S SHAPE AND NOT AN OMISSION.
+// `parseCells` answers "does this block delimit its cells at all" because that is
+// one answer for the whole fence. A height is not one answer for the fence: there
+// are as many as there are cards, each belongs to the line under it, and the
+// render reads them one at a time through `heightAbove`. So the only thing this
+// can tell a caller that the caller cannot read for itself is whether to refuse.
+export interface HeightSpec {
+  error: string | null;
+}
+
+// Whether this line is the height modifier rather than a directive.
+export function isHeightLine(line: string): boolean {
+  return splitDirective(line).keyword === HEIGHT_KEYWORD;
+}
+
+// How many pixels tall this `height` line asks its widget to be, or null when
+// what it says is not a height.
+//
+// `cellWeightOf`'S RULES, INCLUDING ITS REFUSAL TO CAP. `/^\d+$/`, at least one,
+// and no upper bound: a height too large for the pane makes a card taller than
+// the window and the page scrolls, which is the layout answering correctly rather
+// than the grammar guessing at a monitor it cannot see. That is 4.3.1's lesson,
+// and it is the same one twice.
+//
+// AND THE ONE PLACE THE TWO DIVERGE: a `height:` with no value is not a height.
+// A delimiter with no value still delimits, which is why a bare `cell` means one
+// share and is the shortest way to say it. A height with no value says nothing at
+// all — there is no height a reader could mean by leaving it out — so it is
+// refused rather than defaulted to some number this file would have to pick.
+export function heightOf(line: string): number | null {
+  const raw = splitDirective(line).argument.trim();
+  if (!raw) return null;
+  if (!/^\d+$/.test(raw)) return null;
+  const n = Number(raw);
+  return n >= 1 ? n : null;
+}
+
+// `parseCells`' TWO REFUSALS, ASKED ABOUT A HEIGHT, and for its stated reason: a
+// line that does nothing is worse than a line that says why.
+export function parseHeights(lines: readonly string[]): HeightSpec {
+  const heightLines = lines.filter((l) => isHeightLine(l));
+  if (heightLines.length === 0) return { error: null };
+
+  // A HEIGHT WITH NOTHING TO SIZE. A height sizes a CARD, and `cardWidget` only
+  // builds cards inside a row — outside a group a directive is drawn bare, there
+  // is no box around it to be 240 pixels tall, and a reader who wrote one is
+  // describing a layout they have not asked for.
+  if (!lines.some((l) => isRowLine(l))) {
+    return {
+      error:
+        "height sets how tall one widget's card is, and a card is only drawn inside a row. Add row above the directives, or delete the height line.",
+    };
+  }
+
+  const bad = heightLines.find((l) => heightOf(l) === null);
+  if (bad) {
+    const raw = splitDirective(bad).argument.trim();
+    return {
+      error: `height: ${raw} isn't a height. A widget takes a whole number of pixels — height: 240 is a card 240 pixels tall, with its contents scrolling inside.`,
+    };
+  }
+
+  return { error: null };
+}
+
 export interface DirectiveParts {
   // Everything before the first `:` of the body.
   keyword: string;
@@ -702,4 +818,43 @@ export function spliceArg(
   out[span.line] =
     line.slice(0, span.from) + replacement + line.slice(span.to);
   return out;
+}
+
+// ── the header bar's own argument ─────────────────────────────────────
+//
+// MOVED HERE FROM `util.ts` IN 4.30, unchanged, and re-exported from there so
+// every existing caller is untouched. It was always directive grammar; it lived
+// in `util.ts` for the accident of having been needed by a caller that already
+// imported it. This file has no imports at all, which is what lets a pure
+// module read a header's title without pulling Obsidian in behind it.
+
+// Parse a `header:` directive body into its level + title. Grammar:
+//   `header:<title>`            → level 1 (a top-level section)
+//   `header:<1|2>:<title>`      → explicit level (2 = nested, e.g. a journal
+//                                 type inside the Journals container)
+// `rest` is everything after `header:` (already trimmed). Returns an empty
+// title for a bare `header:` (the legacy title-less anchor variant). Used by
+// both the widget renderer (to style/size the bar and drive collapse) and the
+// home-page section matchers in journal.ts / charts.ts (so a level prefix
+// doesn't stop them recognising "📚 Journals" / "📊 Trends and Statistics").
+export function parseHeaderDirective(rest: string): {
+  level: number;
+  title: string;
+} {
+  // Any leading `<digits>:` is a level, CLAMPED to the two that exist.
+  //
+  // The pattern was `/^([12]):/`, so `header:3:Sources` matched nothing and
+  // fell through to the default — rendering a level-1 bar literally titled
+  // "3:Sources". A number the grammar doesn't have should not become part of
+  // the text; clamping keeps the title clean and the bar somewhere sensible,
+  // and is what a reader reaching for a third level meant.
+  //
+  // Only digits, so a title that legitimately opens with a word and a colon
+  // ("Note: read this") is untouched.
+  const m = rest.match(/^(\d+):(.*)$/);
+  if (!m) return { level: 1, title: rest.trim() };
+  return {
+    level: Math.min(2, Math.max(1, Number(m[1]))),
+    title: m[2].trim(),
+  };
 }

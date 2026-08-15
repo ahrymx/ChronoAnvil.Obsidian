@@ -81,9 +81,7 @@ describe("what the footer counts", () => {
     // deleted the feature rather than restricting one row of it.
     const e = entry();
     const present = e.model.present(e.text);
-    const shared = present.filter(
-      (id) => id !== "links" && id !== "entry-header"
-    );
+    const shared = present.filter((id) => id !== "banner" && id !== "trackers");
     const want = [
       ...present.filter((id) => !shared.includes(id)),
       shared[1],
@@ -212,17 +210,22 @@ describe("a section cannot be dragged across the rule", () => {
     expect(body.match(/this\.bandOf\(id\)\.includes\(/g) ?? []).toHaveLength(2);
   });
 
-  it("and an entry really does report two bands", () => {
+  it("and an entry really does report three bands", () => {
     const e = entry();
     const bands = new Map<string | null, string[]>();
     for (const s of e.model.sections()) {
       bands.set(s.group, [...(bands.get(s.group) ?? []), s.id]);
     }
-    expect(bands.size).toBe(2);
-    expect(bands.get("Above the rule")).toEqual(["links", "entry-header"]);
+    // THREE AS OF 4.20. The banner and the tracker grid are each one row in a
+    // band of their own above the rule, and the reader's writing is below it.
+    // Two bands above rather than one is what stops the grid being dragged back
+    // into the card 4.20 took it out of.
+    expect(bands.size).toBe(3);
+    expect(bands.get("The banner")).toEqual(["banner"]);
+    expect(bands.get("The trackers")).toEqual(["trackers"]);
   });
 
-  it("and a dashboard reports three as of 4.10", () => {
+  it("and a dashboard reports three, one row each in the top two", () => {
     // It reported one until 3.2 §3 fused navigation and the period summary into
     // a masthead, which is a structural half in the same sense an entry's is: a
     // section cannot leave it without unmerging the card, and a body block
@@ -235,9 +238,12 @@ describe("a section cannot be dragged across the rule", () => {
     for (const s of dashboard().model.sections()) {
       bands.set(s.group, [...(bands.get(s.group) ?? []), s.id]);
     }
+    // 4.19 RENAMED THE TOP TWO AND LEFT THE COUNT ALONE. Each holds one section
+    // now — the banner, and the summary the navigation row left behind — and
+    // they stay two bands so the two cannot trade places.
     expect(bands.size).toBe(3);
-    expect(bands.get("The page head")).toEqual(["title"]);
-    expect(bands.get("The masthead")).toEqual(["links", "summary"]);
+    expect(bands.get("The banner")).toEqual(["banner"]);
+    expect(bands.get("The overview")).toEqual(["summary"]);
   });
 
   it("while a journal note still reports one, so nothing changes there", () => {
@@ -441,10 +447,10 @@ describe("what a fixed row offers", () => {
     // A row that vanished would take the explanation with it, and "navigation
     // is fixed" is exactly what a reader hunting for the setting needs told.
     const e = entry();
-    const links = e.model.sections().find((s) => s.id === "links")!;
-    expect(links.movable).toBe(false);
-    expect(e.model.present(e.text)).toContain("links");
-    expect(e.model.refusal("links", e.text)).toContain("removed or moved");
+    const banner = e.model.sections().find((s) => s.id === "banner")!;
+    expect(banner.movable).toBe(false);
+    expect(e.model.present(e.text)).toContain("banner");
+    expect(e.model.refusal("banner", e.text)).toContain("removed or moved");
   });
 
   it("says so on the row, for a fixed row with nothing else to report", () => {
@@ -468,16 +474,15 @@ describe("what a fixed row offers", () => {
 
   it("and the surfaces disagree about which rows are fixed", () => {
     // The flag has to be carrying real information rather than being true
-    // everywhere: a journal section is movable, a dashboard's banner is
-    // movable, and diary navigation is not.
+    // everywhere: a journal section is movable, and a diary banner is not.
     expect(
       journal().model.sections().every((s) => s.movable)
     ).toBe(true);
-    // On a dashboard the masthead's two rows are both fixed as of patch 3 —
-    // `links` by decision, `summary` by being the only unpinned member left in
-    // its band — and the body's are not.
+    // On a dashboard the top two rows are both fixed — the banner by decision,
+    // `summary` by being the only unpinned member left in its band — and the
+    // body's are not.
     const d = dashboard().model.sections();
-    expect(d.find((s) => s.id === "links")!.movable).toBe(false);
+    expect(d.find((s) => s.id === "banner")!.movable).toBe(false);
     expect(d.find((s) => s.id === "summary")!.movable).toBe(false);
     expect(d.find((s) => s.id === "charts")!.movable).toBe(true);
   });

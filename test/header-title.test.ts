@@ -72,9 +72,23 @@ describe("the defect that shipped", () => {
   it("the section editor reads answers through the refusing one", () => {
     // The one-line fix, asserted where it lives. `argSpanIn` over the whole file
     // is precisely what produced a Task Manager box reading "🔁 Review".
-    const src = readCode("section-editor");
-    expect(src).toContain("soleArgSpanIn(lines, q.directive)");
-    expect(src).not.toMatch(/argSpanIn\(lines, q\.directive\)/);
+    //
+    // RE-ANCHORED IN 4.29, because the read moved. It was a private method on
+    // the window; saving a page as a grain's default needs the same read, and
+    // two spellings of "what does this file already say" would be two chances
+    // to get this rule wrong. So the editor is now the caller and
+    // `section-model.ts` holds the rule — and the claim is unchanged: the
+    // editor must not reach past it to the ambiguous read, and the shared
+    // function must be the refusing one.
+    const editor = readCode("section-editor");
+    expect(editor).toContain("answerInText(this.spec.text, q)");
+    expect(editor).not.toMatch(/argSpanIn\(lines, q\.directive\)/);
+
+    const model = readCode("section-model");
+    expect(model).toContain("soleArgSpanIn(lines, q.directive)");
+    // Lowercase `a` — `soleArgSpanIn` carries a capital, so this catches a
+    // widening back to the whole-file read and nothing else.
+    expect(model).not.toMatch(/[^A-Za-z]argSpanIn\(lines, q\.directive\)/);
   });
 });
 

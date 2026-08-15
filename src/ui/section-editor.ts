@@ -60,11 +60,16 @@
 
 import { App, Notice, TFile, setIcon } from "obsidian";
 import { EditorModal } from "./editor-modal";
-import { createListRow } from "./list-row";
+import { createListRow, type ListRowOptions } from "./list-row";
 import { promptDetailedSuggester, promptLayoutSave } from "./modals";
 import type AlmanacPlugin from "../main";
 import { getFile } from "../core/util";
-import { fieldLabelOf, idsOf, questionIsRequired } from "../core/section-model";
+import {
+  answerInText,
+  fieldLabelOf,
+  idsOf,
+  questionIsRequired,
+} from "../core/section-model";
 import { isPageWidgetId } from "../core/widget-sections";
 import type {
   FolderQuestion,
@@ -75,7 +80,6 @@ import type {
   TitleQuestion,
   SectionWant,
 } from "../core/section-model";
-import { readArg, soleArgSpanIn } from "../core/directive-grammar";
 import { ArgSuggest } from "./arg-suggest";
 
 // The four panes, one at a time.
@@ -601,6 +605,27 @@ export class SectionEditorModal extends EditorModal {
     // discover on Save.
     const waiting = gone ? [] : this.unanswered(section.id);
 
+    const isSection = section.movable !== false && !this.column.has(section.id) && !this.joined.has(section.id);
+    const isWidget = !isSection && section.movable !== false;
+
+    const typePills: NonNullable<ListRowOptions["pills"]> = isSection
+      ? [{ text: "Section", tone: "accent" }]
+      : isWidget
+        ? [{ text: "Widget", tone: "muted" }]
+        : [];
+
+    const statusPills: NonNullable<ListRowOptions["pills"]> = gone
+      ? [{ text: "removing", tone: "off" }]
+      : waiting.length
+        ? waiting.map((q) => ({ text: `needs ${q.label}`, tone: "muted" }))
+        : isNew
+          ? [{ text: "adding", tone: "on" }]
+          : refusal
+            ? [{ text: "can't be removed", tone: "muted" }]
+            : section.movable === false
+              ? [{ text: "fixed", tone: "muted" }]
+              : [];
+
     const { row, lead, actions } = createListRow(host, {
       // THE ACTIONS GET A LINE OF THEIR OWN (4.15 §2). This is the caller the
       // flag was added for: a row here carries a dropdown or a text field
@@ -613,33 +638,14 @@ export class SectionEditorModal extends EditorModal {
       // the change is the failure 2.59.7 fixed on the plan side, and §3 exists
       // because a graphical editor is exactly where it would come back.
       subtitle: refusal ?? section.blurb,
-      // AND AN IMMOVABLE ROW SAYS SO, LAST (4.11). `bandOf` already gives such a
-      // row two disabled arrows and no drag, and until this release nothing on
-      // the row said why — because the only immovable rows were also locked, and
-      // the removal refusal in the subtitle happened to explain both. The page
-      // head is immovable and REMOVABLE, so it had a control that plainly did
-      // not work and no sentence anywhere about it.
-      //
-      // AFTER the refusal in this chain rather than before it: a row that cannot
-      // be removed either has the more surprising fact to report, and two pills
-      // saying two things about one row is the doubling `count` refuses one file
-      // over.
-      pills: gone
-        ? [{ text: "removing", tone: "off" }]
-        : waiting.length
-          ? waiting.map((q) => ({ text: `needs ${q.label}`, tone: "muted" as const }))
-          : isNew
-            ? [{ text: "adding", tone: "on" }]
-            : refusal
-              ? [{ text: "can't be removed", tone: "muted" }]
-              : section.movable === false
-                ? [{ text: "fixed", tone: "muted" }]
-                : [],
+      pills: [...typePills, ...statusPills],
       cls: [
         gone ? "almanac-tpl-row-removed" : "",
         isNew && !gone && !waiting.length ? "almanac-tpl-row-added" : "",
         refusal ? "almanac-tpl-row-locked" : "",
         waiting.length ? "almanac-tpl-row-waiting" : "",
+        isSection ? "almanac-tpl-row-section" : "",
+        isWidget ? "almanac-tpl-row-widget" : "",
       ],
     });
 
@@ -1064,11 +1070,14 @@ export class SectionEditorModal extends EditorModal {
   // answer it cannot tell apart from another section's is one it must not
   // claim to have read — and `readable()` therefore falls back to the honest
   // wording exactly where the ambiguity is real.
+  //
+  // THE READ ITSELF MOVED TO `section-model.ts` IN 4.29, and this is now the
+  // one-line caller. A second reader arrived — saving a page as a grain's
+  // default template has to carry the same answers — and two spellings of "what
+  // does this file already say" would be two chances to get the ambiguity rule
+  // wrong. The rule above is the one being shared.
   private answerIn(q: SectionQuestion): string | null {
-    if (!q.directive) return null;
-    const lines = this.spec.text.split("\n");
-    const span = soleArgSpanIn(lines, q.directive);
-    return span ? readArg(lines, span) : null;
+    return answerInText(this.spec.text, q);
   }
 
   // Two rows trade places in `this.rows`.

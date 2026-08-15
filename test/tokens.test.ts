@@ -57,6 +57,11 @@ const SET_FROM_TS = new Set([
   // by row.ts. Absent on an ordinary cell, which is why the stylesheet reads it
   // with a fallback.
   "--am-cell-weight",
+  // 4.22 §3.1: how tall the note says one widget's card is, set on the card by
+  // block-drag.ts. Absent on a card with no stated height, which is every card
+  // until somebody drags one — so `is-sized` is what guards the declaration
+  // rather than a fallback on the read.
+  "--am-card-h",
   "--am-row-cols",
   "--am-tracker-cell-h",
   "--am-chart-row-track",

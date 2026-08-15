@@ -7,7 +7,11 @@
 
 import { App, Notice, TFile } from "obsidian";
 import type AlmanacPlugin from "../main";
-import { HEADER_PREFIX, TRENDS_HEADING } from "../core/constants";
+import {
+  HEADER_PREFIX,
+  TRENDS_HEADING,
+  TRENDS_HEADINGS_PAST,
+} from "../core/constants";
 import type {
   ChartRange,
   ChartScope,
@@ -21,6 +25,7 @@ import { syncTrackersIntoVault } from "../trackers/trackers";
 import {
   getFile,
   locateSection,
+  parseHeaderDirective,
   moment,
   quarterMonths,
   quarterOfMonth,
@@ -1021,12 +1026,21 @@ function parseChartFlags(suffix: string): {
 // sub-headings each chart emits (deeper than level 2) are never mistaken for
 // the end. Section location (both the header-bar and legacy heading forms) is
 // shared with the Journals rebuild via util.ts::locateSection.
-const TRENDS_HEADER_TITLE = TRENDS_HEADING.replace(/^#+\s*/, "");
+const stripHash = (h: string): string => h.replace(/^#+\s*/, "");
+
+// WHAT WE WRITE (canonical) versus WHAT WE ACCEPT (canonical + history). The
+// two were one string until 4.26, which is what made the heading unrenameable:
+// every read and every write anchored on the same literal, so changing it moved
+// both at once and left old notes behind. Splitting them is the whole fix —
+// `TRENDS_HEADER_TITLE` is the only one a write may use.
+const TRENDS_HEADINGS = [TRENDS_HEADING, ...TRENDS_HEADINGS_PAST];
+const TRENDS_HEADER_TITLES = TRENDS_HEADINGS.map(stripHash);
+const TRENDS_HEADER_TITLE = TRENDS_HEADER_TITLES[0];
 
 function sectionBounds(
   lines: string[]
 ): { start: number; anchorEnd: number; end: number } | null {
-  const loc = locateSection(lines, TRENDS_HEADER_TITLE, TRENDS_HEADING);
+  const loc = locateSection(lines, TRENDS_HEADER_TITLES, TRENDS_HEADINGS);
   if (!loc) return null;
   // Charts keep the historical field names: `start` is the title's first line,
   // `anchorEnd` its last (the closing fence, or the heading line itself).
@@ -1270,6 +1284,74 @@ export function ensureTrendsHeader(lines: string[]): string[] | null {
   const out = [...lines];
   out.splice(fence.open + 1, 0, `${HEADER_PREFIX}${TRENDS_HEADER_TITLE}`);
   return out;
+}
+
+// ── the Trends title's old spelling (4.26) ──────────────────────────────────
+
+// Put a merged charts fence's title into the spelling this release writes.
+//
+// A THIRD MIGRATION, FOR THE SAME REASON THERE WAS A SECOND. `mergeTrendsSection`
+// folds a two-block section into one and `ensureTrendsHeader` titles a fence
+// that never had a title; neither can help a fence that HAS a title which is
+// simply the old words. That is every dashboard scaffolded between 2.1 and
+// 4.25 — the overwhelming majority of notes in the wild — and without this they
+// would read "Trends and Statistics" beside newly-created pages reading
+// "Trends and statistics", forever, since `reconcileLayouts` cannot see inside
+// an opaque charts fence (see `ensureTrendsHeader`'s note on why).
+//
+// NOTHING BREAKS IF IT IS NEVER RUN, and that is deliberate. `sectionBounds`
+// accepts every historical spelling, so an unmigrated note keeps working —
+// its charts draw, its region rewrites, its toolbar appears. This migration is
+// cosmetic, which is exactly why it must be offered rather than forced: it is
+// opt-in in the repair window like the other two, and a reader who never ticks
+// it loses nothing but the new capital letter.
+//
+// ONLY OUR OWN OLD WORDS. The rewrite fires when the title is one of
+// `TRENDS_HEADINGS_PAST` and never otherwise. A reader who retitled their own
+// Trends bar — which `header:` exists to let them do — has a title Almanac has
+// never written, so it is not on the list, so it is left exactly alone. This is
+// the reason the history is a list of exact strings rather than a
+// case-insensitive compare, which would have "corrected" a reader's
+// "Trends and STATISTICS" into ours.
+export function retitleTrends(lines: string[]): string[] | null {
+  const fence = findChartsFence(lines);
+  if (!fence) return null;
+  // A two-block note is `mergeTrendsSection`'s, and that function already
+  // writes the canonical title when it folds. Titling here as well would race
+  // it for the same line.
+  if (sectionBounds(lines)) return null;
+
+  const out = [...lines];
+  let changed = false;
+  for (let i = fence.open + 1; i < fence.close; i++) {
+    const raw = out[i].trim();
+    if (!raw.startsWith(HEADER_PREFIX)) continue;
+    // Through `parseHeaderDirective`, so a `header:2:…` keeps its level rather
+    // than having the digits swallowed into a new title.
+    const { level, title } = parseHeaderDirective(raw.slice(HEADER_PREFIX.length));
+    if (!TRENDS_HEADINGS_PAST.map(stripHash).includes(title)) continue;
+    const prefix = raw.slice(HEADER_PREFIX.length).match(/^\d+:/) ? `${level}:` : "";
+    out[i] = `${HEADER_PREFIX}${prefix}${TRENDS_HEADER_TITLE}`;
+    changed = true;
+  }
+  return changed ? out : null;
+}
+
+// Apply retitleTrends to one note in place. No-op (returns false) when the note
+// is missing, has no charts fence, or its title is already the current one.
+export async function migrateTrendsTitle(
+  app: App,
+  notePath: string
+): Promise<boolean> {
+  const file = getFile(app, notePath);
+  if (!(file instanceof TFile)) return false;
+  const original = await app.vault.read(file);
+  const retitled = retitleTrends(original.split("\n"));
+  if (!retitled) return false;
+  const updated = retitled.join("\n");
+  if (updated === original) return false;
+  await app.vault.modify(file, updated);
+  return true;
 }
 
 // Apply ensureTrendsHeader to one note in place. No-op (returns false) when the

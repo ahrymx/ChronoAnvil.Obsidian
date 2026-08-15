@@ -56,6 +56,7 @@ import { MarkdownPostProcessorContext, setIcon } from "obsidian";
 import type AlmanacPlugin from "../main";
 import { openCapture } from "./capture";
 import { buildBannerLinks } from "../core/links";
+import { getFile } from "../core/util";
 
 // A button in the strip. There is one, and it is a `.journal-btn` rather than a
 // `mod-cta`: 4.13.1 §1 flattened the primary tier out of the plugin.
@@ -113,7 +114,13 @@ export function buildDiaryActions(
   //
   // WHAT IS LEFT IS THE TWO THAT ARE NOT ON THE PAGE. Capture writes without
   // leaving the note, and Search reaches notes no calendar can point at.
-  addAction(root, "Capture", "pencil-line", () => openCapture(plugin));
+  // THE HOST NOTE, NOT THE ACTIVE ONE (4.27). This card is drawn into a note
+  // and that note is the context the reader is capturing from — which is not
+  // necessarily the focused leaf, since a diary card can be embedded or sit in
+  // an unfocused split. `ctx.sourcePath` is the answer this widget already has.
+  addAction(root, "Capture", "pencil-line", () =>
+    openCapture(plugin, getFile(plugin.app, ctx.sourcePath))
+  );
   root.appendChild(buildBannerLinks(plugin, ctx));
 
   return root;

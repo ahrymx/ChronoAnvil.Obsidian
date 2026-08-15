@@ -159,13 +159,26 @@ describe("what the head carries", () => {
 });
 
 describe("the homepage is unchanged, which is the scope holding", () => {
-  it("composes the bare form and gains no second row", () => {
-    // The homepage already has the launcher doing this job as CONTENT in a
-    // cell. A head carrying the same destinations as chrome would be the same
-    // places twice on one page.
+  it("carries the same destination row as every other page (4.20)", () => {
+    // ── THE ARGUMENT THIS REVERSES ────────────────────────────────────
+    //
+    // From 4.5 to 4.19 the homepage composed the BARE form, and the reason was
+    // real: the launcher is already on this page as CONTENT in a cell, shipping
+    // with Diary and Journals among its four tiles, so ids here draw two of the
+    // same destinations twice on one screen.
+    //
+    // 4.20 weighs that against what it cost — the banner meaning something
+    // different on this page than on the other eight. A reader learns the banner
+    // once, and the homepage was the one place its row was missing, which reads
+    // as unfinished rather than as considered. `home-sections.ts` carries the
+    // full argument, including why the two rows are not the same object: this is
+    // chrome you read to know where you are, and the launcher is content you
+    // click.
     const home = composeHomeNote(DEFAULT_PATHS.diaryRoot);
-    expect(home).toContain("\ntitle\n");
-    expect(home).not.toContain(PAGE_TITLE_LINE);
+    expect(home).toContain(PAGE_TITLE_LINE);
+    // And the bare form is gone from it: `title` on its own line would be a
+    // second head.
+    expect(home).not.toContain("\ntitle\n");
   });
 
   it("and a bare title draws no navigation at all", () => {

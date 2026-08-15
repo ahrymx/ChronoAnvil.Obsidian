@@ -216,6 +216,118 @@ describe("the note repaints when a name changes", () => {
   });
 });
 
+// The same staleness, one host further out. 4.18.2.
+//
+// WHAT WAS STILL WRONG. Everything above fixes a note open in a markdown tab,
+// because re-rendering the note was the only way the repaint knew to re-run a
+// block processor. A block drawn anywhere else keeps its old words: there is no
+// note to re-render, so a kind rename updated one pane and not the copy of the
+// same note embedded in another. `MarkdownRenderer.render` is public API and
+// dashboard plugins render notes through it, so "anywhere else" is a real place.
+describe("the repaint reaches blocks outside a markdown view", () => {
+  const live = (): string => readCode("livewidget");
+
+  it("repaints registered sites as well as markdown leaves", () => {
+    // The leaf loop is no longer the whole function.
+    const fn = live().slice(live().indexOf("export function repaintOpenNotes"));
+    expect(fn).toContain("repaintForeignSites(rerendered)");
+  });
+
+  it("collects the re-rendered containers before re-rendering them", () => {
+    // ORDERING IS LOAD-BEARING: `rerender` tears the preview down and rebuilds
+    // it, so a container read afterwards would no longer hold the elements the
+    // list exists to exclude.
+    const fn = live().slice(live().indexOf("export function repaintOpenNotes"));
+    expect(fn.indexOf("rerendered.push(view.containerEl)")).toBeGreaterThan(-1);
+    expect(fn.indexOf("rerendered.push(view.containerEl)")).toBeLessThan(
+      fn.indexOf("rerender(true)")
+    );
+  });
+
+  it("skips a site the note re-render already covered", () => {
+    // Redrawing it again would race Obsidian's teardown, and from a weaker
+    // source: the re-render re-reads the file, a repaint replays the source
+    // string captured at mount.
+    const fn = live().slice(live().indexOf("function repaintForeignSites"));
+    expect(fn).toContain("rerendered.some((root) => root.contains(el))");
+    expect(fn).toContain("continue");
+  });
+
+  it("drops a site whose element has left the document", () => {
+    // Pruned at repaint time rather than watched — a MutationObserver per block
+    // to save two fields and a closure is the wrong trade.
+    const fn = live().slice(live().indexOf("function repaintForeignSites"));
+    expect(fn).toContain("!el.isConnected");
+    expect(fn).toContain("sites.delete(site)");
+  });
+
+  it("iterates a copy, because a repaint can register a site", () => {
+    // `repaint` runs the block's own render path; a block that draws a nested
+    // block would mutate the set mid-iteration.
+    const fn = live().slice(live().indexOf("function repaintForeignSites"));
+    expect(fn).toContain("Array.from(sites)");
+  });
+
+  it("gives each drawing its own component and unloads the last", () => {
+    // WITHOUT THIS A REPAINT IS A LEAK. The widgets a block draws register
+    // watchers through `ctx.addChild`; re-running against the same context would
+    // add a second set beside the first, and the old ones keep listening and
+    // rebuilding into elements no longer on screen.
+    const s = live();
+    expect(s).toContain("function scopedContext");
+    expect(s).toContain("addChild: (child) => owner.addChild(child)");
+    const draw = s.slice(s.indexOf("private repaint(): void {"));
+    expect(draw.indexOf("this.discard()")).toBeLessThan(draw.indexOf("this.draw()"));
+  });
+
+  it("still asks Obsidian's own context where the block is", () => {
+    // `getSectionInfo` must reach the real renderer to answer truthfully about
+    // the file; a scoped context that answered for itself would be a lie the
+    // block-drag rewrite acts on.
+    expect(live()).toContain("getSectionInfo: (el) => ctx.getSectionInfo(el)");
+  });
+
+  it("anchors the inline site on the parent, not on the widget", () => {
+    // The inline path REPLACES its element on every repaint. Anchoring the child
+    // on the widget would arm `addChild`'s removal-driven unload against our own
+    // swap: the first repaint detaches it, Obsidian unloads the child, and the
+    // site stops repainting after exactly one try.
+    const s = live();
+    const mount = s.slice(s.indexOf("export function mountInline"));
+    expect(mount).toContain("const anchor = code.parentElement");
+    expect(mount).toContain("new InlineSite(anchor ?? first");
+  });
+
+  it("keeps what is on screen when a directive no longer builds", () => {
+    // `build` returns null for a retired widget or a deleted tracker, and a
+    // stale button serves a reader better than a control vanishing out of a
+    // table cell mid-session.
+    const s = live();
+    const fn = s.slice(s.indexOf("class InlineSite"));
+    expect(fn).toContain("if (!next) {");
+    expect(fn).toContain("generation.unload();");
+  });
+
+  it("routes every fenced language through the repaintable wrapper", () => {
+    // A fence registered straight on Obsidian would render once and never be
+    // heard from again, which is the whole defect.
+    const w = readCode("widgets");
+    expect(w).toContain('this.registerBlock("almanac", ');
+    expect(w).toContain('this.registerBlock(\n      "almanac-charts"');
+    expect(w).toContain('this.registerBlock(\n      "almanac-journal-charts"');
+    // And nothing bypasses it.
+    expect(w).not.toContain("this.plugin.registerMarkdownCodeBlockProcessor(\n");
+    expect(w).not.toContain('this.plugin.registerMarkdownCodeBlockProcessor("almanac"');
+  });
+
+  it("mounts the inline widget through the wrapper too", () => {
+    // These are the table-cell buttons a kind rename renames.
+    expect(readCode("widgets")).toContain(
+      "mountInline(code, ctx, (scoped) => this.build(text, scoped))"
+    );
+  });
+});
+
 describe("a stored plural survives an edit", () => {
   it("is carried through normaliseKinds rather than rebuilt", () => {
     // Study's Practice kind stores `plural: "Practice"` for exactly the reason

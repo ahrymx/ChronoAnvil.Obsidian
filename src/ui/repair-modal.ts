@@ -37,6 +37,7 @@
 
 import { App, Modal, setIcon } from "obsidian";
 import { createListRow } from "./list-row";
+import { emptyCallout } from "./empty";
 import { diffSummary } from "../core/line-diff";
 import type { DiffLine } from "../core/line-diff";
 import type {
@@ -64,18 +65,11 @@ export function openRepairWindow(
   });
 }
 
-// How many items are worth showing before the list becomes the window.
-//
-// A fresh vault creates forty-odd files and a vault with a long diary can have
-// hundreds of entries needing the banner migration. The full count is always
-// stated on the group; this caps the ROWS, because a window a reader has to
-// scroll for a minute to reach the button is one they will stop reading.
-const ROWS_SHOWN = 12;
-
 class RepairModal extends Modal {
   private chosen = new Set<RepairGroupId>();
   private confirmed = false;
   private go: HTMLButtonElement | null = null;
+  private groupControls: { id: RepairGroupId; box: HTMLInputElement; wrap: HTMLElement }[] = [];
 
   constructor(
     app: App,
@@ -97,18 +91,81 @@ class RepairModal extends Modal {
     return this.survey.groups.filter((g) => g.items.length > 0);
   }
 
+  private totalPendingItems(): number {
+    return this.pending().reduce((sum, g) => sum + g.items.length, 0);
+  }
+
   onOpen(): void {
     const { contentEl } = this;
     contentEl.addClass("almanac-repair");
-    contentEl.createEl("h3", { text: "Repair vault" });
-    contentEl.createEl("p", {
+
+    const header = contentEl.createDiv({ cls: "almanac-repair-header" });
+    const titleWrap = header.createDiv({ cls: "almanac-repair-title-wrap" });
+    const iconEl = titleWrap.createSpan({ cls: "almanac-repair-header-icon" });
+    setIcon(iconEl, "wrench");
+    titleWrap.createEl("h3", { text: "Set up / repair vault" });
+
+    const total = this.totalPendingItems();
+    if (total > 0) {
+      header.createSpan({
+        cls: "almanac-pill is-muted",
+        text: `${total} change${total === 1 ? "" : "s"} to review`,
+      });
+    }
+
+    // A CURRENT VAULT IS AN ANSWER, AND THIS IS WHERE IT BELONGS (4.18.2).
+    //
+    // `setupVault` used to report it as a notice and open nothing. The words
+    // were the same; the standing was not. A notice appears in the corner,
+    // leaves on its own, and lands in the one place a reader cannot ask it
+    // anything — and this command is run to ASK at least as often as it is run
+    // to fix, which makes "nothing is wrong" the answer rather than a reason to
+    // say nothing. Delivered where the answer was going to appear, it cannot be
+    // missed and cannot be mistaken for the command having failed to run.
+    if (!this.pending().length) {
+      this.renderNothingToDo();
+      return;
+    }
+
+    const toolbar = contentEl.createDiv({ cls: "almanac-repair-toolbar" });
+    toolbar.createEl("p", {
       cls: "almanac-repair-lead",
       text:
         "Everything this would change, grouped by what it touches. Untick anything you " +
         "would rather it left alone. Nothing is written until you press the button.",
     });
 
+    if (this.pending().length > 1) {
+      const toggleWrap = toolbar.createDiv({ cls: "almanac-repair-toggles" });
+      const selectAll = toggleWrap.createEl("button", {
+        cls: "almanac-repair-toggle-btn",
+        text: "Select all",
+      });
+      selectAll.addEventListener("click", () => {
+        for (const ctrl of this.groupControls) {
+          ctrl.box.checked = true;
+          this.chosen.add(ctrl.id);
+          ctrl.wrap.removeClass("is-off");
+        }
+        this.refreshButton();
+      });
+
+      const deselectAll = toggleWrap.createEl("button", {
+        cls: "almanac-repair-toggle-btn",
+        text: "Deselect all",
+      });
+      deselectAll.addEventListener("click", () => {
+        for (const ctrl of this.groupControls) {
+          ctrl.box.checked = false;
+          this.chosen.delete(ctrl.id);
+          ctrl.wrap.addClass("is-off");
+        }
+        this.refreshButton();
+      });
+    }
+
     const list = contentEl.createDiv({ cls: "almanac-repair-groups" });
+    this.groupControls = [];
     for (const group of this.pending()) this.renderGroup(list, group);
 
     const btnRow = contentEl.createDiv({ cls: "modal-button-container" });
@@ -122,6 +179,39 @@ class RepairModal extends Modal {
     cancel.addEventListener("click", () => this.close());
     this.refreshButton();
     cancel.focus();
+  }
+
+  // Nothing to do, said in the window rather than beside it.
+  //
+  // NO TICKS, NO CONFIRM, ONE WAY OUT. The window's other shape asks a question,
+  // so it draws a disabled button when the answer is momentarily unactionable —
+  // the narrow case the "nothing dead is drawn" rule allows, because there the
+  // button is the only route back to acting. Here there is no question and no
+  // route back: a greyed "Repair 0 things" beside a Cancel would be two dead
+  // controls dressed as a choice. One button, live, that closes.
+  //
+  // `confirmed` stays false, so this resolves null exactly as Cancel does and
+  // `setupVault` writes nothing.
+  private renderNothingToDo(): void {
+    const { contentEl } = this;
+    contentEl.createEl("p", {
+      cls: "almanac-repair-lead",
+      text: "Nothing here needs repairing.",
+    });
+    contentEl.createDiv({ cls: "almanac-repair-groups" }).appendChild(
+      emptyCallout(
+        "check",
+        "Your vault is up to date",
+        "This window lists anything Almanac would add, bring up to date, catch " +
+          "up or migrate from an older release. None of that is outstanding — " +
+          "every file it ships is present and current."
+      )
+    );
+
+    const btnRow = contentEl.createDiv({ cls: "modal-button-container" });
+    const close = btnRow.createEl("button", { cls: "mod-cta", text: "Close" });
+    close.addEventListener("click", () => this.close());
+    close.focus();
   }
 
   // The button says what it will do, counted from what is ticked.
@@ -143,7 +233,7 @@ class RepairModal extends Modal {
     go.setText(
       n === 0
         ? "Nothing selected"
-        : `Repair ${items} ${items === 1 ? "thing" : "things"}`
+        : `Apply repair (${items} ${items === 1 ? "item" : "items"})`
     );
   }
 
@@ -171,6 +261,8 @@ class RepairModal extends Modal {
     const box = lead.createEl("input", { type: "checkbox" });
     box.checked = this.chosen.has(group.id);
     box.setAttribute("aria-label", group.title);
+    this.groupControls.push({ id: group.id, box, wrap });
+
     const sync = (): void => {
       if (box.checked) this.chosen.add(group.id);
       else this.chosen.delete(group.id);
@@ -187,15 +279,8 @@ class RepairModal extends Modal {
     });
 
     const items = wrap.createDiv({ cls: "almanac-repair-items" });
-    for (const item of group.items.slice(0, ROWS_SHOWN)) {
+    for (const item of group.items) {
       this.renderItem(items, item);
-    }
-    const hidden = group.items.length - ROWS_SHOWN;
-    if (hidden > 0) {
-      items.createDiv({
-        cls: "almanac-repair-more",
-        text: `…and ${hidden} more`,
-      });
     }
   }
 

@@ -600,3 +600,33 @@ describe("every block on the two dashboards says something when empty", () => {
     }
   });
 });
+
+// ── an empty state that survives as hand-rolled is still written ONCE ──
+//
+// 4.25 §2. Two of the ad-hoc `*-empty` divs are deliberate survivors and the
+// ANSWERS table above says why. What was not deliberate is that the charts one
+// existed TWICE: `buildChartGrid` (chart-grid.ts) and the private
+// `buildJournalChartStack` (widgets/index.ts) are separate render paths for the
+// same fence, and each had spelled the sentence out for itself. Only the first
+// is pinned by the dashboard test, so an improvement to the sentence would have
+// been made in one file, passed, and left the other reading the old words.
+describe("the charts empty state is one sentence, not two", () => {
+  it("is a shared constant rather than a literal in each render path", () => {
+    const grid = readSrc("chart-grid");
+    expect(grid).toContain("export const CHART_GRID_EMPTY");
+    // The name is used where the div is built, in BOTH paths...
+    expect(readSrc("widgets")).toContain("CHART_GRID_EMPTY");
+  });
+
+  it("appears as a literal in exactly one place in the source", () => {
+    const sentence = "No charts yet";
+    const written = allSrcNames()
+      .map((n) => ({ n, hits: readSrc(n).split(sentence).length - 1 }))
+      .filter((r) => r.hits > 0);
+    const total = written.reduce((sum, r) => sum + r.hits, 0);
+    expect(
+      total,
+      `written ${total}× across ${written.map((r) => r.n).join(", ")}`
+    ).toBe(1);
+  });
+});

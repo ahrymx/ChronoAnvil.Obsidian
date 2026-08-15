@@ -476,45 +476,54 @@ describe("the divider and the box, as drawn", () => {
     );
   });
 
-  it("draws the same line between a cell's stacked widgets (4.13.1 §4)", () => {
-    // A group said where its COLUMNS divide and not where its WIDGETS do: the
-    // homepage's right-hand cell stacks three of them with the same gap between
-    // each pair that sits between the columns, and only one of those gaps had a
-    // mark in it.
+  it("has given the seam away, and drawn nothing twice (4.22 §4.2)", () => {
+    // 4.13.1 §4 drew a mark between two stacked widgets as a `::before` on the
+    // second card and left it inert, because there was no grammar for a widget's
+    // height. 4.22 added the grammar, so the mark became an element with a hit
+    // area and a drag on it — and the pseudo-element went, rather than the two
+    // being drawn side by side.
     //
-    // THE SAME LINE, TURNED, which is the whole specification — 2px, 28px, the
-    // divider's colour, its resting opacity and its transition. Two marks meaning
-    // "here is a boundary inside this box" drawn two ways is the fault 4.13 §1
-    // found in the title bars.
-    const SEAM =
-      ".journal-block-cell > .journal-widget-card + .journal-widget-card::before";
-    const seam = ruleFor(rules, SEAM);
+    // THE RULE'S ABSENCE IS THE ASSERTION. Two marks meaning "here is a boundary
+    // you can pull on" drawn two ways is the fault 4.13 §1 found in the title
+    // bars, and the way it comes back is a deletion that was made a comment.
+    expect(rules).not.toContain(
+      ".journal-block-cell > .journal-widget-card + .journal-widget-card::before"
+    );
+    // AND THE DRAWING SURVIVED THE MOVE, which is what makes it a move. The same
+    // rectangle laid down: the divider's mark is 2px wide and 28px tall, this one
+    // is 28 by 2, and the colour, resting opacity and transition are the column
+    // divider's own.
+    const seam = ruleFor(rules, ".journal-card-divider::after");
     const mark = ruleFor(rules, ".journal-group-divider::after");
     for (const decl of ["width: 28px", "height: 2px", "border-radius: 1px"]) {
-      // The divider's mark is 2px wide and 28px tall; this one is the same
-      // rectangle laid down, so the two numbers trade places.
       expect(seam, decl).toContain(decl);
     }
     expect(mark).toContain("height: 28px");
     expect(seam).toContain("background: var(--background-modifier-border)");
-    expect(seam).toContain("opacity: 0");
-    expect(seam).toContain("transition: opacity 120ms ease");
+    const strip = ruleFor(rules, ".journal-card-divider");
+    expect(strip).toContain("opacity: 0");
+    expect(strip).toContain("transition: opacity 120ms ease");
     // Revealed by a hover on the GROUP, exactly as the divider is: a boundary a
     // reader has to find before it appears is discoverable only by accident.
-    expect(rules).toContain(`.journal-group:hover ${SEAM} {`);
+    expect(rules).toContain(".journal-group:hover .journal-card-divider,");
   });
 
-  it("makes the seam inert, and gives it something to resolve against", () => {
-    // IT IS NOT A CONTROL. The vertical one sets a column's width through
-    // `cell: N`; there is no grammar for a widget's height, and inventing one to
-    // give a seam something to do would be a feature arriving inside a patch
-    // about how the page looks. So it takes no hit area and must not eat the
-    // click on the card's top edge — 4.8.3's fault in a new costume.
-    const SEAM =
-      ".journal-block-cell > .journal-widget-card + .journal-widget-card::before";
-    expect(ruleFor(rules, SEAM)).toContain("pointer-events: none");
-    // A pseudo-element positioned into the gap ABOVE its card needs the card
-    // positioned, or every seam in a column resolves against the cell and lands
+  it("makes it a control, and gives it something to resolve against", () => {
+    // THE GENEROSITY IN THE TARGET AND THE PRECISION IN THE DRAWING: a 12px hit
+    // area against a 2px mark, which is the column divider's proportions turned
+    // ninety degrees. The old seam took no hit area at all and said
+    // `pointer-events: none`, because it set nothing.
+    const strip = ruleFor(rules, ".journal-card-divider");
+    expect(strip).toContain("height: 12px");
+    expect(strip).toContain("cursor: row-resize");
+    expect(strip).not.toContain("pointer-events: none");
+    // Inert under a drag, which is the belt to the braces the two event families
+    // already give (see `attachCardResize`).
+    expect(rules).toContain(
+      ".journal-widget-block.is-slotting .journal-card-divider {"
+    );
+    // An element positioned into the gap BELOW its card needs the card
+    // positioned, or every mark in a column resolves against the cell and lands
     // at the same height.
     //
     // EVERY `.journal-widget-card {` RULE, NOT THE FIRST. The card is described

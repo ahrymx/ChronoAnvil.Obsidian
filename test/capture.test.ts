@@ -6,11 +6,24 @@
 // LICENSING.md.
 
 import { describe, it, expect } from "vitest";
-import { formatCapture } from "../src/diary/capture";
+import { readCode } from "./sources";
+import {
+  formatCapture,
+  grainsShowingCapture,
+  offersHostEntry,
+} from "../src/diary/capture";
+import { currentEntryKey, labelForGrain } from "../src/diary/nav";
+import { moment } from "../src/core/util";
+import { TRACKER_CLASSES } from "../src/trackers/trackers";
+import type AlmanacPlugin from "../src/main";
 import {
   appendToNoteRegion,
+  appendedSince,
   ensureNoteRegions,
+  hasNoteRegion,
+  joinRegionBlocks,
   readNoteRegion,
+  reconcileRegionWrite,
   writeNoteRegion,
 } from "../src/core/notestore";
 
@@ -56,9 +69,14 @@ describe("formatCapture", () => {
   });
 });
 
+// A note with a capture region holding `content`. Module-scoped since 4.27,
+// when the merge tests below needed the same fixture the append tests use —
+// two spellings of "a note with a region in it" is how the two describes end
+// up asserting against subtly different notes.
+const withRegion = (content: string): string =>
+  writeNoteRegion("# Note\n", "capture", content);
+
 describe("appendToNoteRegion", () => {
-  const withRegion = (content: string) =>
-    writeNoteRegion("# Note\n", "capture", content);
 
   it("appends to an empty region without a leading blank line", () => {
     const out = appendToNoteRegion(withRegion(""), "capture", "14:32 — first");
@@ -199,5 +217,269 @@ describe("capture region: append vs whole-region write", () => {
     text = appendToNoteRegion(text, "capture", "23:05 — [scale:Mood=5] good day.");
     const clobbered = writeNoteRegion(text, "capture", "23:05 — hmm");
     expect(readNoteRegion(clobbered, "capture")).toBe("23:05 — hmm");
+  });
+});
+
+// ── the merge that closes the clobber above (4.27 §1) ─────────────────
+//
+// The describe directly above this one asserts that a whole-region write DROPS
+// an appended capture, and its comment says the fix is not in `writeNoteRegion`
+// — which is right to do what it is told — but in "never letting the field
+// write a value older than what's on disk". These are that fix, as pure
+// functions, so the property is testable without a DOM the suite does not have.
+describe("appendedSince", () => {
+  it("recognises a block appended after the baseline", () => {
+    expect(appendedSince("A", "A\n\nB")).toBe("B");
+  });
+
+  it("treats everything as new when the baseline is empty", () => {
+    // A field that mounted on an empty region and then had a capture arrive.
+    expect(appendedSince("", "B")).toBe("B");
+    // ...but an empty region that is still empty is not an append.
+    expect(appendedSince("", "")).toBeNull();
+  });
+
+  it("matches a baseline whose trailing whitespace the region dropped", () => {
+    // A textarea invites a trailing return, and `joinRegionBlocks` trims before
+    // it joins — so without this the field's own buffer would never match its
+    // own region and every append would read as a conflict.
+    expect(appendedSince("A ", "A\n\nB")).toBe("B");
+    expect(appendedSince("A\n", "A\n\nB")).toBe("B");
+  });
+
+  it("refuses a divergence that is not an append", () => {
+    // Two writers rewrote the same prose. Not this function's to resolve.
+    expect(appendedSince("A", "C")).toBeNull();
+  });
+
+  it("refuses a shared prefix that is one word being typed", () => {
+    // "A" → "Ax" shares a prefix and is not a second block. Requiring the
+    // block separator is what tells them apart.
+    expect(appendedSince("A", "Ax")).toBeNull();
+    expect(appendedSince("A", "A\nx")).toBeNull();
+  });
+
+  it("is null when nothing changed", () => {
+    expect(appendedSince("A", "A")).toBeNull();
+  });
+});
+
+describe("reconcileRegionWrite", () => {
+  it("keeps a capture that landed under the field's edit", () => {
+    // THE PINNED BUG, NOT LOSING THE CAPTURE. The field mounted on "A", the
+    // reader typed "A x", a capture appended "B" underneath. The write says
+    // what the reader meant and carries the capture after it.
+    expect(reconcileRegionWrite("A\n\nB", "A", "A x")).toBe("A x\n\nB");
+  });
+
+  it("keeps the capture even when the reader cleared the field", () => {
+    // Emptying the box is an edit to the reader's own text, not consent to
+    // delete something they never saw arrive.
+    expect(reconcileRegionWrite("A\n\nB", "A", "")).toBe("B");
+  });
+
+  it("writes the value verbatim when nothing was appended", () => {
+    expect(reconcileRegionWrite("A", "A", "A x")).toBe("A x");
+  });
+
+  it("falls back to the value on an unrecognised divergence", () => {
+    // Deliberately today's behaviour: no merge is better than a guessed one.
+    expect(reconcileRegionWrite("C", "A", "A x")).toBe("A x");
+  });
+
+  it("closes the clobber the describe above records", () => {
+    // The same fixture as "capture region: append vs whole-region write",
+    // routed through the merge instead of straight at `writeNoteRegion`.
+    const base = "23:05 — hmm";
+    let text = withRegion(base);
+    text = appendToNoteRegion(text, "capture", "23:05 — [scale:Mood=5] good day.");
+    const onDisk = readNoteRegion(text, "capture");
+    const merged = writeNoteRegion(
+      text,
+      "capture",
+      reconcileRegionWrite(onDisk, base, base)
+    );
+    expect(readNoteRegion(merged, "capture")).toContain("[scale:Mood=5]");
+    expect(readNoteRegion(merged, "capture")).toContain("23:05 — hmm");
+  });
+});
+
+describe("joinRegionBlocks", () => {
+  // ASSERTED AS OUTPUT, NOT AS AGREEMENT WITH `appendToNoteRegion`. This was
+  // first written as a loop comparing the two, which is a test that cannot
+  // fail: `appendToNoteRegion` CALLS this function, so a mutation breaks both
+  // sides equally and they keep agreeing. Mutating the join to always prefix a
+  // blank line left it green while five real assertions went red — RESUME §6's
+  // "a test that has never failed has never been tested", caught in the act.
+  it("puts exactly one blank line between two blocks", () => {
+    expect(joinRegionBlocks("A", "B")).toBe("A\n\nB");
+  });
+
+  it("adds no leading blank line to an empty region", () => {
+    expect(joinRegionBlocks("", "B")).toBe("B");
+  });
+
+  it("trims both sides before joining", () => {
+    expect(joinRegionBlocks("A\n", "B")).toBe("A\n\nB");
+    expect(joinRegionBlocks("A", "B\n\n")).toBe("A\n\nB");
+  });
+
+  it("is a no-op for an empty addition", () => {
+    expect(joinRegionBlocks("A", "")).toBe("A");
+    expect(joinRegionBlocks("A", "   ")).toBe("A");
+  });
+});
+
+describe("hasNoteRegion", () => {
+  it("is true only when the region is actually there", () => {
+    // Quick capture's destination list turns on this: a note whose region is
+    // absent is one where a capture lands on disk and renders nowhere.
+    expect(hasNoteRegion(withRegion(""), "capture")).toBe(true);
+    expect(hasNoteRegion(withRegion("x"), "capture")).toBe(true);
+    expect(hasNoteRegion("# Just a note\n\nsome prose", "capture")).toBe(false);
+    expect(hasNoteRegion(withRegion("x"), "log")).toBe(false);
+  });
+});
+
+// ── the merge is actually wired to the field's write (4.27 §1) ────────
+//
+// The functions above are pure and provable; what they cannot show is that the
+// one write path a `note:` field uses goes through them. Scoped to the method
+// body rather than matched across the file, per RESUME §6 — a bare `indexOf`
+// over a module this size finds the word somewhere and proves nothing.
+describe("writeNoteRegionToFile merges rather than overwrites", () => {
+  const body = (): string => {
+    const src = readCode("widgets");
+    const at = src.indexOf("async writeNoteRegionToFile(");
+    expect(at, "writeNoteRegionToFile not found").toBeGreaterThan(0);
+    // To the start of the next method declaration at the same indent.
+    const end = src.indexOf("\n  async ", at + 1);
+    return src.slice(at, end === -1 ? src.length : end);
+  };
+
+  it("reconciles against what is on disk", () => {
+    expect(body()).toContain("reconcileRegionWrite(");
+    expect(body()).toContain("readNoteRegion(text, key)");
+  });
+
+  it("never writes the caller's value straight through when it has a baseline", () => {
+    // The pre-4.27 line. Its absence is the fix.
+    expect(body()).not.toContain("writeNoteRegion(text, key, value)");
+  });
+
+  it("still writes verbatim for a caller with no baseline", () => {
+    // The five list-shaped widgets serialise a structure they never read as
+    // text, so they have none to offer and must not have one invented — "" as a
+    // baseline would make every write look like the whole region was appended
+    // beneath it.
+    expect(body()).toContain("baseline == null");
+  });
+});
+
+// ── where a capture goes (4.27 §2) ────────────────────────────────────
+//
+// Until 4.27 the answer was "today's daily entry", always, and the box could
+// not say so. These pin the two decisions the picker makes, both split out of
+// their I/O so the suite can reach them: which grains are offered at all, and
+// whether the note the reader is on earns a row of its own.
+describe("grainsShowingCapture", () => {
+  // Only `settings.entrySections` is read, so a settings shape is a plugin
+  // enough. Cast rather than mocked: pretending to build an AlmanacPlugin here
+  // would be a fixture bigger than the thing it tests.
+  const withSections = (
+    entrySections: Record<string, { id: string }[]>
+  ): AlmanacPlugin =>
+    ({ settings: { entrySections } }) as unknown as AlmanacPlugin;
+
+  it("offers daily out of the box, because the daily template ships it", () => {
+    expect(grainsShowingCapture(withSections({}))).toEqual(["daily"]);
+  });
+
+  it("offers a grain the reader ticked Captured for", () => {
+    const grains = grainsShowingCapture(
+      withSections({ weekly: [{ id: "capture" }] })
+    );
+    expect(grains).toContain("weekly");
+    expect(grains).toContain("daily");
+  });
+
+  it("does not offer a grain whose extra sections are something else", () => {
+    // Ticking `bridge` for monthly must not put "This month" in the capture box.
+    expect(
+      grainsShowingCapture(withSections({ monthly: [{ id: "bridge" }] }))
+    ).toEqual(["daily"]);
+  });
+
+  it("keeps the catalogue's grain order rather than the settings' key order", () => {
+    const grains = grainsShowingCapture(
+      withSections({ yearly: [{ id: "capture" }], weekly: [{ id: "capture" }] })
+    );
+    expect(grains).toEqual(
+      TRACKER_CLASSES.filter((g) => grains.includes(g))
+    );
+  });
+});
+
+describe("offersHostEntry", () => {
+  const facts = (over: Partial<Parameters<typeof offersHostEntry>[0]> = {}) => ({
+    isManagedTemplate: false,
+    hasCaptureRegion: true,
+    hostKey: "2026-08-11",
+    currentKey: "2026-08-15",
+    grainAlreadyListed: true,
+    ...over,
+  });
+
+  it("offers a past entry that can show a capture", () => {
+    expect(offersHostEntry(facts())).toBe(true);
+  });
+
+  it("refuses a managed template", () => {
+    // Composed from the catalogue and rewritten by "Refresh entry templates",
+    // so anything captured into one is deleted without explanation.
+    expect(offersHostEntry(facts({ isManagedTemplate: true }))).toBe(false);
+  });
+
+  it("refuses an entry with no capture region", () => {
+    // The text would land on disk and draw nowhere.
+    expect(offersHostEntry(facts({ hasCaptureRegion: false }))).toBe(false);
+  });
+
+  it("refuses to name one file twice", () => {
+    // The reader is on this period's entry and its grain is already listed.
+    expect(
+      offersHostEntry(facts({ hostKey: "2026-08-15", grainAlreadyListed: true }))
+    ).toBe(false);
+  });
+
+  it("still offers the current entry when its grain is NOT listed", () => {
+    // A weekly entry with a Captured region the reader added by hand, on a
+    // vault where weekly's template does not write one — the grain row is
+    // absent, so this note is the only way to reach it.
+    expect(
+      offersHostEntry(facts({ hostKey: "2026-08-15", grainAlreadyListed: false }))
+    ).toBe(true);
+  });
+});
+
+describe("currentEntryKey", () => {
+  it("keys every grain at the start of its own period", () => {
+    // Derived from CLASS_DEFS.unit, so a sixth grain needs no edit here.
+    const at = moment("2026-08-15");
+    expect(currentEntryKey("daily", at)).toBe("2026-08-15");
+    expect(currentEntryKey("weekly", at)).toBe("2026-08-10"); // ISO Monday
+    expect(currentEntryKey("monthly", at)).toBe("2026-08");
+    expect(currentEntryKey("quarterly", at)).toBe("2026-07-01");
+    expect(currentEntryKey("yearly", at)).toBe("2026-01-01");
+  });
+
+  it("agrees with entryDateKey's shape for the same period", () => {
+    // The two are counterparts — one reads a key off a note, the other names
+    // the period a note would be for — so `labelForGrain` must render either.
+    const at = moment("2026-08-15");
+    for (const grain of TRACKER_CLASSES) {
+      const key = currentEntryKey(grain, at);
+      expect(labelForGrain(grain, key), grain).not.toBe(key);
+    }
   });
 });

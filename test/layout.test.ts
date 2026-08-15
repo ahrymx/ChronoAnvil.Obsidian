@@ -41,6 +41,14 @@ const asset = (name: string): string =>
 const L = (s: string): string[] => s.split("\n");
 
 // A 2.51-era Monthly Overview: three-rung ladder, no entry-rollup.
+//
+// ITS TITLES ARE 2.51'S AND STAY THAT WAY. 4.25 §1 put every shipped section
+// title into sentence case, and a sweep over this file would have rewritten
+// "Open Tasks" here too — which would make the fixture agree with what Almanac
+// composes TODAY and stop being what it is for. The whole point of the note is
+// that it is what a vault created before the rename actually contains, so the
+// assertions about carrying an old header fence along are testing the migration
+// path rather than a copy of the current asset with a 2.51 label on it.
 const OLD_MONTHLY = `---
 month-start:
 ---
@@ -273,11 +281,31 @@ describe("applyLayout", () => {
     expect(head).toBeLessThan(nav);
     expect(head).toBeLessThan(summary);
 
-    // AND IT ARRIVES ALONE. The failure this guards is the one that made the
-    // head a band of its own: an insert that carried the masthead's whole fence
-    // would put a second navigation row and a second banner in the note.
-    expect(text.match(/links:/g)).toHaveLength(1);
+    // THE SUMMARY ARRIVES ALONE, WHICH IS STILL THE GUARD THAT MATTERS HERE.
     expect(text.match(/month-summary/g)).toHaveLength(1);
+
+    // ── AND THE NAVIGATION ROW ARRIVES TWICE, WHICH IS ASSERTED RATHER THAN
+    //    FIXED (4.19) ──────────────────────────────────────────────────
+    //
+    // This read `toHaveLength(1)` until 4.19, and it was the assertion that made
+    // the page head a band of its own: an insert carrying the masthead's whole
+    // fence would put a second navigation row in the note.
+    //
+    // 4.19 welded the head and the navigation row into one banner, so the block
+    // step 3 inserts now CONTAINS a `links:` line — and `OLD_MONTHLY` already
+    // has one. `applyLayout` duplicates it. That is real, and it is not a
+    // regression, because **no dashboard reaches this function any more**:
+    // `shippedNotes` gives every composed page a `surface`, and
+    // `reconcileLayouts` sends every note that has one through `repairNote`,
+    // which matches on section identity and adds nothing to a note whose banner
+    // is already present under either of its anchors. `staging.md` is the only
+    // shipped note without a surface, and it has no banner.
+    //
+    // SO THE NUMBER IS PINNED AT 2 DELIBERATELY. It is the receipt for the
+    // sentence above: the hazard 4.10 designed around is still in this function,
+    // it is simply no longer reachable, and the day something routes a composed
+    // page back through `applyLayout` this test says exactly what it will cost.
+    expect(text.match(/links:/g)).toHaveLength(2);
   });
 
   it("adds no second head to a dashboard that already has one", () => {

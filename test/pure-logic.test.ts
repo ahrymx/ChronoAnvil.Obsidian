@@ -104,6 +104,7 @@ import {
   nextChartKey,
   mergeTrendsSection,
   ensureTrendsHeader,
+  retitleTrends,
   resolveChartWindow,
   hourAxisBounds,
   pointInWindow,
@@ -164,6 +165,7 @@ import {
   isEmptyValue,
   locateTrackerRegion,
   mergeEntryFences,
+  splitEntryFences,
   removeTrackerDirective,
   trackerOptions,
 } from "../src/trackers/entry-trackers";
@@ -230,7 +232,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { DEFAULT_PATHS, ROOT_CHILDREN, DEFAULT_TRACKERS } from "../src/core/constants";
 
-import { fnBody, readCss, readSrc, repoFile } from "./sources";
+import { fnBody, readCode, readCss, readSrc, repoFile } from "./sources";
 import { presetAsNewJournal } from "../src/journals/custom-journal";
 import { STUDY_PRESET } from "../src/journals/journal";
 // ── util.ts: fillTemplate ────────────────────────────────────────────────
@@ -328,6 +330,54 @@ describe("headerAtFence", () => {
 describe("locateSection", () => {
   const TITLE = "📚 Journals";
   const HEADING = "## 📚 Journals";
+
+  // ── a title may be spelled more than one way (4.26) ──────────────────
+  //
+  // The capability that made `TRENDS_HEADING` renameable. Before this the match
+  // was exact, so a section whose display name changed became unfindable in
+  // every note written before the change — and indistinguishable, to the
+  // caller, from a section that was never there: both are null.
+  describe("historical spellings", () => {
+    const NOW = "📚 Journals";
+    const WAS = "📚 JOURNALS";
+
+    it("finds a header bar written under an older spelling", () => {
+      const old = ["```almanac", `header:${WAS}`, "```", "body"];
+      // Exactly the pre-4.26 behaviour, restated so the fix has something to
+      // be a fix OF: the current name alone does not find the old note.
+      expect(locateSection(old, NOW, HEADING)).toBeNull();
+      const loc = locateSection(old, [NOW, WAS], HEADING);
+      expect(loc).not.toBeNull();
+      expect(loc!.viaHeaderBar).toBe(true);
+      expect(loc!.titleStart).toBe(0);
+    });
+
+    it("finds a legacy markdown heading under an older spelling too", () => {
+      const old = ["## 📚 JOURNALS", "body", "## Next"];
+      expect(locateSection(old, NOW, HEADING)).toBeNull();
+      const loc = locateSection(old, NOW, [HEADING, "## 📚 JOURNALS"]);
+      expect(loc).not.toBeNull();
+      expect(loc!.viaHeaderBar).toBe(false);
+      expect(loc!.end).toBe(2);
+    });
+
+    it("still refuses a spelling that is on neither list", () => {
+      // The list is a history, not a fuzzy match. A title Almanac never wrote
+      // is a reader's own and must stay unfound, or a migration would rewrite
+      // it.
+      const mine = ["```almanac", "header:📈 My numbers", "```"];
+      expect(locateSection(mine, [NOW, WAS], [HEADING])).toBeNull();
+    });
+
+    it("takes a bare string exactly as it always did", () => {
+      // The parameter widened; it did not change meaning. Every existing caller
+      // passes a string and must behave identically.
+      const lines = ["```almanac", `header:${NOW}`, "```"];
+      expect(locateSection(lines, NOW, HEADING)).toEqual(
+        locateSection(lines, [NOW], [HEADING])
+      );
+    });
+  });
 
   it("finds a header-bar section and its boundary", () => {
     const lines = [
@@ -1459,12 +1509,17 @@ describe("mergeTrendsSection", () => {
     ];
     const out = mergeTrendsSection(lines);
     expect(out).not.toBeNull();
+    // THE INPUT KEEPS 2.0'S SPELLING AND THE OUTPUT TAKES TODAY'S (4.26). The
+    // fixture is what a 2.0 note actually says, so it must not be swept into
+    // sentence case with the rest of the plugin; what the merge WRITES is the
+    // current title, which is the whole reason the heading could be renamed —
+    // `locateSection` finds the old words, and every write emits the new ones.
     expect(out!.join("\n")).toBe(
       [
         "# Home",
         "",
         "```almanac-charts",
-        "header:📊 Trends and Statistics",
+        "header:📊 Trends and statistics",
         "chart:c1:Mood:line:90",
         "```",
         "",
@@ -1494,7 +1549,7 @@ describe("mergeTrendsSection", () => {
     expect(out!.join("\n")).toBe(
       [
         "```almanac-charts",
-        "header:📊 Trends and Statistics",
+        "header:📊 Trends and statistics",
         "chart:c1:Mood:bar:365",
         "chart:c2:Sleep:line:30",
         "```",
@@ -1528,6 +1583,88 @@ describe("mergeTrendsSection", () => {
 // dashboard shipped in that state in 2.35 and stayed in it, because chart
 // fences are opaque to the reconciler — no keywords, therefore never a unit,
 // therefore never inserted or rewritten.
+// ── charts.ts: retitleTrends (the 4.25→4.26 spelling migration) ───────────
+//
+// The migration that made a display string renameable. Everything here is a
+// property of the pair `locateSection` + `retitleTrends`: the old words are
+// still FOUND, and are rewritten to the new words only where Almanac itself
+// wrote them.
+describe("retitleTrends", () => {
+  const merged = (title: string, ...body: string[]): string[] => [
+    "```almanac-charts",
+    `header:${title}`,
+    ...body,
+    "```",
+  ];
+
+  it("puts the old spelling into the new one, keeping the charts", () => {
+    const out = retitleTrends(
+      merged("📊 Trends and Statistics", "chart:c1:Mood:line:90")
+    );
+    expect(out).not.toBeNull();
+    expect(out!.join("\n")).toBe(
+      merged("📊 Trends and statistics", "chart:c1:Mood:line:90").join("\n")
+    );
+    // The reader's charts survive the retitle, which is the only thing in that
+    // fence that is theirs.
+    expect(parseChartRegion(out!)).toEqual([
+      { key: "c1", tracker: "Mood", type: "line", range: "90" },
+    ]);
+  });
+
+  it("is idempotent — a note already in the new spelling is null", () => {
+    expect(retitleTrends(merged("📊 Trends and statistics"))).toBeNull();
+    const once = retitleTrends(merged("📊 Trends and Statistics"))!;
+    expect(retitleTrends(once)).toBeNull();
+  });
+
+  it("leaves a title Almanac never wrote completely alone", () => {
+    // THE ASSERTION THE HISTORY LIST EXISTS FOR. A case-insensitive compare
+    // would have "corrected" both of these into the house spelling; an exact
+    // list of our own past words cannot, because neither is on it.
+    expect(retitleTrends(merged("📈 My numbers"))).toBeNull();
+    expect(retitleTrends(merged("📊 TRENDS AND STATISTICS"))).toBeNull();
+  });
+
+  it("keeps a header's level rather than eating the digits", () => {
+    const out = retitleTrends(merged("2:📊 Trends and Statistics"))!;
+    expect(out.join("\n")).toContain("header:2:📊 Trends and statistics");
+  });
+
+  it("defers to mergeTrendsSection on a two-block note", () => {
+    // Same standoff ensureTrendsHeader has with the merge, for the same reason:
+    // the merge writes the current title when it folds, so retitling here first
+    // would be two functions writing one line.
+    //
+    // THE FIXTURE CARRIES THE TITLE IN BOTH BLOCKS ON PURPOSE. Written the
+    // obvious way — a bare `chart:` fence under the header block — this passes
+    // whether or not the guard is there, because the loop finds no `header:`
+    // inside the fence and falls out returning null. Deleting the guard left it
+    // green, which is the "assertion that has never failed" RESUME §6 warns
+    // about; it is only a test of the guard when there IS something inside the
+    // fence for the guard to stop.
+    const legacy = [
+      "```almanac",
+      "header:📊 Trends and Statistics",
+      "```",
+      "",
+      "```almanac-charts",
+      "header:📊 Trends and Statistics",
+      "chart:c1:Mood:line:90",
+      "```",
+    ];
+    expect(retitleTrends(legacy)).toBeNull();
+    // And the merge does the job, emitting the NEW spelling from the OLD note.
+    expect(mergeTrendsSection(legacy)!.join("\n")).toContain(
+      "header:📊 Trends and statistics"
+    );
+  });
+
+  it("does nothing to a note with no charts fence", () => {
+    expect(retitleTrends(["# Home", "", "some prose"])).toBeNull();
+  });
+});
+
 describe("ensureTrendsHeader", () => {
   it("titles a bare charts fence", () => {
     // The Year dashboard, exactly as it shipped: an empty fence, no header
@@ -1546,7 +1683,7 @@ describe("ensureTrendsHeader", () => {
     const out = ensureTrendsHeader(lines);
     expect(out).not.toBeNull();
     expect(out!.join("\n")).toContain(
-      "```almanac-charts\nheader:📊 Trends and Statistics\n```"
+      "```almanac-charts\nheader:📊 Trends and statistics\n```"
     );
   });
 
@@ -1561,7 +1698,7 @@ describe("ensureTrendsHeader", () => {
     expect(out.join("\n")).toBe(
       [
         "```almanac-charts",
-        "header:📊 Trends and Statistics",
+        "header:📊 Trends and statistics",
         "chart:c1:Mood:line:90",
         "chart:c2:Sleep:bar:365",
         "```",
@@ -3469,34 +3606,53 @@ describe("shipped daily template", () => {
   // Composed since 2.60.1, not read from disk.
   const daily = composeEntryTemplate("daily");
 
-  it("ships the banner and the tracker region in one fence", () => {
-    // 2.18.4. Obsidian renders each fenced block as its own sibling element,
-    // so two fences can never be enclosed by one card no matter how they are
-    // styled — the limit journals-section.ts documents. One fence is one
-    // container, which is what makes the entry banner a real object rather
-    // than a resemblance. Split these again and the card silently comes apart.
-    // The quick-links now ride in their own leading fence (up under the
-    // spacer), so the banner fence is the one that carries `entry-header` —
-    // find that fence specifically, not just the first almanac fence.
+  it("ships the banner and the tracker region in TWO fences (4.20)", () => {
+    // ── THE INVARIANT THIS REPLACES, AND WHY IT WAS RIGHT UNTIL IT WASN'T ──
+    //
+    // 2.18.4 welded the tracker region into the banner's fence and this test
+    // pinned it, on a true limit: Obsidian renders each fenced block as its own
+    // sibling, so two fences can never be enclosed by one card and one fence is
+    // what made the entry banner a real object rather than a resemblance.
+    //
+    // 4.20 SPLITS THEM ON PURPOSE, because the argument settled what a banner IS
+    // — the file's name, its navigation and the control that edits it. The grid
+    // is the note's most-used CONTENT, and it was in that card for a reason that
+    // had nothing to do with what it is: the markers needed somewhere above the
+    // rule to live, and the banner's fence was the only fence there.
+    //
+    // The 2.18.4 limit is untouched and is now doing the opposite job: one fence
+    // is one card, so taking the grid out of the card means taking it out of the
+    // fence. `EntrySection.fence` carries the argument.
     const lines = daily.split("\n");
-    const open = lines.findIndex(
-      (l, i) =>
-        l.trim() === "```almanac" &&
-        lines[i + 1]?.trim() === "entry-header"
-    );
-    const close = lines.findIndex((l, i) => i > open && l.trim() === "```");
-    const body = lines.slice(open + 1, close).map((l) => l.trim());
-    expect(body).toContain("entry-header");
-    expect(body).toContain("# almanac:trackers:start");
-    expect(body).toContain("tracker:Mood");
-    expect(body).toContain("sleep");
-    expect(body).toContain("# almanac:trackers:end");
+    const fenceAfter = (probe: string): string[] => {
+      const open = lines.findIndex(
+        (l, i) => l.trim() === "```almanac" && lines[i + 1]?.trim() === probe
+      );
+      expect(open, probe).toBeGreaterThan(-1);
+      const close = lines.findIndex((l, i) => i > open && l.trim() === "```");
+      return lines.slice(open + 1, close).map((l) => l.trim());
+    };
+
+    // The banner: its navigation row and the strip that names the note, and
+    // nothing else.
+    const banner = fenceAfter("links:home,today,scopes#diary");
+    expect(banner).toContain("entry-header");
+    expect(banner).not.toContain("# almanac:trackers:start");
+    expect(banner).not.toContain("tracker:Mood");
+
+    // The grid, in a block of its own directly beneath it.
+    const trackers = fenceAfter("# almanac:trackers:start");
+    expect(trackers).toContain("tracker:Mood");
+    expect(trackers).toContain("sleep");
+    expect(trackers).toContain("# almanac:trackers:end");
+    expect(trackers).not.toContain("entry-header");
   });
 
-  it("still exposes the region to the per-note editor after merging", () => {
-    // The merge must not cost the note its editable tracker list: the markers
+  it("still exposes the region to the per-note editor after the split", () => {
+    // The split must not cost the note its editable tracker list: the markers
     // bound the writable span, so + Add tracker and the per-cell × keep working
-    // on a fence that also carries the entry-header directive.
+    // wherever that span now sits. `locateTrackerRegion` walks every fence, so
+    // this passed before the move and has to keep passing after it.
     const region = locateTrackerRegion(daily.split("\n"));
     expect(region).not.toBeNull();
     expect(region!.marked).toBe(true);
@@ -3593,14 +3749,17 @@ describe("shipped monthly template", () => {
     expect(noteTrackerDirectives(monthly.split("\n"))).toEqual([]);
   });
 
-  it("keeps the tracker region inside the entry banner's own fence", () => {
-    // Same rule as the daily template: the banner is one fence, so a region
-    // written outside it would put the monthly note's trackers outside the
-    // card built to hold them.
+  it("keeps the tracker region findable now that it has a fence of its own", () => {
+    // 4.20 moved it out of the banner — see the daily template's test for the
+    // argument. What has to survive the move is that `locateTrackerRegion` still
+    // finds it, because every "+ Add tracker" write goes through that function
+    // and it walks ALL almanac fences rather than assuming one.
     const lines = monthly.split("\n");
     const region = locateTrackerRegion(lines)!;
+    expect(region.marked).toBe(true);
     const fence = lines.slice(region.fenceOpen, region.fenceClose);
-    expect(fence).toContain("entry-header");
+    // Its own block, so the banner's directive is not in it.
+    expect(fence).not.toContain("entry-header");
   });
 
   it("picks up a goal written as an Almanac task", () => {
@@ -4487,12 +4646,35 @@ describe("self-labelled widget kinds", () => {
   // the dispatch switch rather than restating it is the point: a restated list
   // is the thing that went stale in 2.12.
   const dispatched = new Set<string>();
-  // `this.buildX(rest, ctx, label)` for a builder still on the class, or
-  // `buildX(this, rest, ctx, label)` for one extracted into a sibling module —
-  // both are the same dispatch, and both must be counted or the derived set
-  // silently shrinks as builders move out.
-  const caseRe = /case "([a-z-]+)":\s*(?:\/\/[^\n]*\n\s*)*(?:\/\/[^\n]*\n\s*)*widget = (?:this\.)?build[A-Za-z]+\(\s*(?:this,\s*)?rest,\s*ctx,\s*label\s*\)/g;
-  for (const m of widgets.matchAll(caseRe)) dispatched.add(m[1]);
+  // ASKED OF EACH CASE BLOCK, NOT MATCHED AS ONE CALL SHAPE (4.28).
+  //
+  // This was a single regex pinning `[this.]buildX(rest, ctx, label)`, and it
+  // had already been widened once — the comment it replaces records why: a
+  // builder extracted to a sibling module is called with `this` first, and
+  // matching only the original spelling would have made the derived set shrink
+  // silently. A third form then arrived (`note` picks between two builders on
+  // the region key) and it shrank silently exactly as predicted, in the one
+  // direction the guard below does not catch.
+  //
+  // RESUME §6: an assertion must not anchor on FORMATTING. So this asks each
+  // case block the question the describe is actually about — does this kind
+  // hand a builder the label? — and does not care how the call is written or
+  // how many of them there are. Over `readCode`, so a comment that happens to
+  // use the word cannot answer for the code.
+  // SCOPED TO THE `widget =` SWITCH, which the old regex did by accident of its
+  // shape and this has to do on purpose. There is a second dispatch further
+  // down that `return`s a region builder instead of assigning, and four of its
+  // cases take a label too — but they are not what `SELF_LABELLED_KINDS` is
+  // about, which is the kinds the generic wrapper must skip.
+  const code = readCode("widgets");
+  for (const m of code.matchAll(
+    /case "([a-z-]+)":([\s\S]*?)(?=\n\s*case "|\n\s*default:)/g
+  )) {
+    const body = m[2];
+    if (/widget =/.test(body) && /build[A-Za-z]+\([^;]*\blabel\b/.test(body)) {
+      dispatched.add(m[1]);
+    }
+  }
 
   const declared = new Set(
     (/const SELF_LABELLED_KINDS = new Set\(\[([^\]]*)\]/
@@ -5183,7 +5365,7 @@ describe("yearStripStats", () => {
 // enough to need a knownTitles set. No note carries that form, so what remains
 // is repair: a home note that has lost its Journals block gets one back.
 describe("ensureJournalsBlock", () => {
-  const NEW_BLOCK = "```almanac\njournals\n```";
+  const NEW_BLOCK = "```almanac\nframe: section\njournals\n```";
 
   it("leaves a note that already has the block alone", () => {
     const src = [
@@ -6032,6 +6214,52 @@ describe("per-entry trackers", () => {
       expect(lines.filter((l) => l.trim() === FENCE)).toHaveLength(1);
       expect(locateTrackerRegion(lines)!.marked).toBe(true);
       expect(noteTrackerDirectives(lines)).toEqual([]);
+    });
+  });
+
+  describe("splitEntryFences", () => {
+    const singleFenceMerged = [
+      "---",
+      "journal-date: 2026-07-23",
+      "---",
+      "`almanac:spacer`",
+      FENCE,
+      "links:home,today,scopes#diary",
+      "entry-header",
+      START,
+      "tracker:Mood",
+      "sleep",
+      END,
+      CLOSE,
+      "",
+      "---",
+      "body",
+    ].join("\n");
+
+    it("splits merged banner and trackers into two distinct fences", () => {
+      const out = splitEntryFences(singleFenceMerged)!;
+      const lines = out.split("\n");
+      expect(lines.filter((l) => l.trim() === FENCE)).toHaveLength(2);
+      expect(noteTrackerDirectives(lines)).toEqual(["tracker:Mood", "sleep"]);
+      const region = locateTrackerRegion(lines)!;
+      expect(region.marked).toBe(true);
+      expect(lines.slice(region.fenceOpen, region.fenceClose)).not.toContain("entry-header");
+      expect(lines.slice(region.fenceOpen, region.fenceClose)).not.toContain("links:home,today,scopes#diary");
+    });
+
+    it("is a no-op on a note whose banner and trackers are already separate (4.20+ format)", () => {
+      const alreadySplit = splitEntryFences(singleFenceMerged)!;
+      expect(splitEntryFences(alreadySplit)).toBeNull();
+    });
+
+    it("is a no-op when the note has no banner", () => {
+      const noBanner = [FENCE, START, "tracker:Mood", END, CLOSE].join("\n");
+      expect(splitEntryFences(noBanner)).toBeNull();
+    });
+
+    it("is a no-op when the banner fence has no trackers", () => {
+      const bareBanner = [FENCE, "links:home,today", "entry-header", CLOSE].join("\n");
+      expect(splitEntryFences(bareBanner)).toBeNull();
     });
   });
 
@@ -8030,7 +8258,7 @@ describe("renaming a layer moves its folder", () => {
     // disagreeing about which characters a name may have, and there is already
     // a second, wider spelling of that rule in attachments.ts for a different
     // job — which is the warning, not the precedent.
-    expect(readSrc("study-header")).toContain("attachNoteRename(app, titleRow, file,");
+    expect(readSrc("study-header")).toContain("attachNoteRename(app, titleWrap, file,");
     for (const gone of ["renameFile(folder, folderTarget)", "let settled = false;"]) {
       expect(readSrc("study-header"), gone).not.toContain(gone);
     }

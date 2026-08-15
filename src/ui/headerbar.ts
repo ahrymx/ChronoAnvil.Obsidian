@@ -722,11 +722,12 @@ export class HeaderBar extends MarkdownRenderChild {
       );
 
       if (inner.length === 0) {
+        const isBoundary = this.isSectionBoundary(block);
         els.push(block);
         nodes.push({
-          level: 0,
+          level: isBoundary ? 1 : 0,
           collapsed: false,
-          heading: this.isHeadingBlock(block),
+          heading: isBoundary,
         });
         continue;
       }
@@ -837,9 +838,9 @@ export class HeaderBar extends MarkdownRenderChild {
 
       const bar = block.querySelector<HTMLElement>(".journal-header-bar");
 
-      // A real markdown heading ends a section for the same reason it ends a
-      // fold: it is the note's own structure, which the plugin did not write.
-      if (!bar && this.isHeadingBlock(block)) {
+      // A real markdown heading or independent section/banner ends a section for the same reason it ends a
+      // fold: it is its own structure and must not be swallowed into this section's card.
+      if (!bar && (this.isHeadingBlock(block) || this.isSectionBoundary(block))) {
         return { opens: false, closes: true, hidden: false, renders: false };
       }
 
@@ -902,10 +903,18 @@ export class HeaderBar extends MarkdownRenderChild {
   //
   // Deliberately not a descendant search. Several widgets render their own
   // heading elements deep inside themselves — the calendar's year label, the
+  // Is this block a rendered markdown heading or an independent section/banner?
+  //
+  // Deliberately not a descendant search for headings. Several widgets render their own
+  // heading elements deep inside themselves — the calendar's year label, the
   // sleep card's title, an event section — and a descendant search would read
   // those as document structure and break the enclosing fold. A real markdown
   // heading is the block itself, its direct child, or (in reading view) a
   // wrapper Obsidian tags `el-h2`.
+  //
+  // AND BLOCKS WITH THEIR OWN SECTION FRAME OR BANNER ARE BOUNDARIES TOO. A block
+  // holding `frame: section` or a banner is a top-level section container and
+  // must not be swallowed into a preceding `header:` section's card run.
   private isHeadingBlock(block: HTMLElement): boolean {
     if (/^H[1-6]$/.test(block.tagName)) return true;
     if (READING_HEADING.test(block.className)) return true;
@@ -917,6 +926,13 @@ export class HeaderBar extends MarkdownRenderChild {
     if (EDITOR_HEADING.test(block.className)) return true;
     return !!block.querySelector(
       ":scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6"
+    );
+  }
+
+  private isSectionBoundary(block: HTMLElement): boolean {
+    if (this.isHeadingBlock(block)) return true;
+    return !!block.querySelector(
+      ":scope .journal-sec-fold, :scope .journal-section-bar, :scope .journal-overview-banner, :scope .journal-entry-banner, :scope .journal-study-banner, :scope .journals-card, :scope .journal-sec-l1"
     );
   }
 
@@ -949,7 +965,7 @@ export class HeaderBar extends MarkdownRenderChild {
         const b = sib.querySelector<HTMLElement>(".journal-header-bar");
         // Same boundary as recompute's: a heading ends the bar's body, so a
         // level-2 bar doesn't indent prose that isn't its.
-        if (!b && this.isHeadingBlock(sib)) break;
+        if (!b && this.isSectionBoundary(sib)) break;
         const lvl = b ? this.levelOf(b) : 0;
         if (lvl !== 0 && lvl <= level) break;
         sib.addClass("journal-section-l2-body");

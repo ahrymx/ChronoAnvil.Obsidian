@@ -114,6 +114,16 @@ export const DEFAULT_PATHS = {
   // templates means any export or sync of "my diary" either drags the system
   // folder along or leaves the images behind.
   attachments: `${ROOT_MATERIAL}/Attachments`,
+  // Where "export as plain markdown" writes (4.31). A ROOT of its own rather
+  // than a child of the infrastructure one, and deliberately: this holds copies
+  // of the reader's writing, which is content by the same argument
+  // `attachments` makes one line up — a folder of everything you wrote is the
+  // last thing that should be filed under machinery.
+  //
+  // A REAL PATH KEY RATHER THAN A CONSTANT, so PathWatch follows a rename of the
+  // folder in the file explorer for free (folders are carried automatically;
+  // only `FILE_PATH_KEYS` are special-cased). A reader who moves it keeps it.
+  exportRoot: "Almanac Export",
 };
 
 // Which root each of the remaining paths sits under.
@@ -149,6 +159,12 @@ export const ROOT_CHILDREN: Record<string, (keyof typeof DEFAULT_PATHS)[]> = {
   // root remaps them through `remapConfiguredPaths` over `customJournals`
   // rather than through here.
   journalsRoot: [],
+  // NO FIXED SUB-PATHS EITHER (4.31), and for a sharper reason than the journals
+  // root's: the export MIRRORS each note's vault path beneath this folder, so
+  // its children are whatever the vault happens to contain today. There is
+  // nothing to configure and nothing that could go stale, which is the whole
+  // argument for mirroring rather than inventing a naming scheme.
+  exportRoot: [],
 };
 
 // Defaults for the `attach:` widget's file handling. `subfolder` is a token
@@ -189,7 +205,34 @@ export const JOURNALS_DIRECTIVE = "journals";
 // boundary. This
 // keeps edit mode clean and means every dashboard carrying this heading gets a
 // managed chart area.
-export const TRENDS_HEADING = "## 📊 Trends and Statistics";
+//
+// SENTENCE CASE SINCE 4.26, AND IT WAS THE LAST TITLE TO GET THERE. 4.25 put
+// every other section title into sentence case and reverted this one, because
+// it is not only a display string: it is the ANCHOR `charts.ts::sectionBounds`
+// hands to `util.ts::locateSection`, and that match was exact. Renaming it then
+// would have unhooked the two pre-2.1 Trends migrations from the very notes
+// they exist to repair, with no error to show for it — `locateSection` returns
+// null for "not found" and for "found under its old name" alike.
+//
+// `locateSection` takes a list of historical spellings now, so the rename is
+// safe and the old notes are still found. See TRENDS_HEADINGS_PAST below.
+export const TRENDS_HEADING = "## 📊 Trends and statistics";
+
+// Every spelling this heading has shipped under, newest first, EXCLUDING the
+// current one.
+//
+// WHAT BELONGS HERE, AND WHAT MUST NOT. Only strings Almanac itself has written
+// into a note. A reader who retitles their own Trends bar has made it theirs —
+// `retitleTrends` rewrites a title only when it is on this list, so an unknown
+// title is left alone rather than "corrected" to the house spelling. That is
+// the whole reason this is a list of exact strings and not a case-insensitive
+// compare, which could not tell the two apart.
+//
+// APPEND, NEVER EDIT. A vault can be older than any one release, so a spelling
+// dropped from this list becomes a note nobody can find again.
+export const TRENDS_HEADINGS_PAST: readonly string[] = [
+  "## 📊 Trends and Statistics",
+];
 
 // The literal tokens of an ```almanac fenced block and the `header:` directive
 // inside it. Centralised so the section-locator (util.ts::locateSection), the

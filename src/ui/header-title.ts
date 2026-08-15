@@ -36,7 +36,7 @@
 //   • THE CODEBASE HAD ALREADY DECIDED HEADERS ARE THE READER'S.
 //     `journal-plan.ts::fenceKeywords` excludes `header:` from section
 //     identity, and says why: *"Headers are excluded because they are
-//     retitleable … a user who renames `header:⏳ Open Tasks` keeps it."*
+//     retitleable … a user who renames `header:⏳ Open tasks` keeps it."*
 //     So this hands a control to a rule that was already written down, rather
 //     than introducing a capability. It is also what makes it SAFE: no
 //     `locate`, no probe and no plan reads a header's text, so renaming one

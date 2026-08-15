@@ -47,10 +47,12 @@ import {
   CELL_KEYWORD,
   FRAME_KEYWORD,
   HEADER_KEYWORD,
+  HEIGHT_KEYWORD,
   ROW_KEYWORD,
   WIDE_KEYWORD,
   isCellLine,
   isFrameLine,
+  isHeightLine,
   isRowLine,
   isSectionFence,
   isTitleLine,
@@ -61,7 +63,7 @@ import {
 // BODY — the lines between the ``` pair, as the file has them.
 //
 // A RANGE RATHER THAN A LINE, because a block's own head is a cell source too:
-// a full-width block holding `header:⏳ Open Tasks` and `tasks-table:,period`
+// a full-width block holding `header:⏳ Open tasks` and `tasks-table:,period`
 // is one widget with its title, and the title travels with it. A card in a row
 // is the one-line case of the same thing.
 //
@@ -127,11 +129,21 @@ export type CellTarget =
 // also tests for by hand. Those three predate the set and the doubling is
 // harmless; a fourth copy would be a fourth place to keep in step for no gain,
 // since a keyword in this set is already not content.
+//
+// `height` IS ONE OF THEM (4.22 §5.3), and it earns it on the same question.
+// A height draws nothing: a fence holding `height: 240` and nothing else is an
+// empty block that has described a card which is not there. Registering it also
+// keeps the line BEHIND when a WHOLE BLOCK is dragged into a cell — `widgetRun`'s
+// content span stops at it — which is right for the reason that file already
+// gives about modifiers: a height describes a card, and the fence being emptied
+// has none. The height that must TRAVEL is the one above a widget inside a group,
+// and that one is carried by `runWithHeight` rather than by this set.
 const STRUCTURE = new Set<string>([
   ROW_KEYWORD,
   CELL_KEYWORD,
   FRAME_KEYWORD,
   WIDE_KEYWORD,
+  HEIGHT_KEYWORD,
 ]);
 
 // Whether this body line draws anything at all.
@@ -176,7 +188,7 @@ export function widgetCount(body: readonly string[]): number {
 // has none to offer. 4.8 §1.1.
 //
 // WHAT A BLOCK CAN GIVE A ROW is one widget and the bar over it — the shape of
-// every full-width section on the page, `header:⏳ Open Tasks` above
+// every full-width section on the page, `header:⏳ Open tasks` above
 // `tasks-table:,period`. Two widgets is not refused because it is hard; it is
 // refused because putting them in a row means deciding whether they are one
 // column or two, and the reader has not been asked. §2's card is where that
@@ -256,12 +268,37 @@ function tidyCells(body: readonly string[]): string[] {
   return body.filter((line, i) => !isCellLine(line) || opensSomething(body, i));
 }
 
+// The body with any `height:` line that sizes nothing taken out. 4.22 §5.4.
+//
+// `tidyCells`' MIRROR, AND THE SAME STANDARD. A height sizes the widget on the
+// NEXT line and nothing else — `heightAbove` states that rule once — so a height
+// whose next line is not a widget is a line describing a card that is not there,
+// which is exactly what a departure leaves behind.
+//
+// WHY THIS IS ARITHMETIC AND NOT A RULE TO REMEMBER. A height is positional, and
+// four different gestures can move the widget under one: a drag to another
+// column, a drag out to a block of its own, a whole block dragged into a cell,
+// and a section removed in the editor. Three of those already come through
+// `pruned`. Answering it here means the fourth path added after this release gets
+// the same answer without its author having to know the hazard exists.
+//
+// IT TOUCHES NOTHING ELSE. A height above a widget is the reader's, means what it
+// says, and stays — including one above a widget this function is not otherwise
+// interested in.
+export function tidyHeights(body: readonly string[]): string[] {
+  return body.filter(
+    (line, i) => !isHeightLine(line) || isWidget(body[i + 1] ?? "")
+  );
+}
+
 // What the block a run LEFT should look like, or null when it should go.
 //
-// THREE RULES, AND THEY ONLY EVER TOUCH LINES THE COMPOSER WROTE — `row`,
-// `cell`, and the fence itself. Nothing here can reach a directive or a word
-// the reader typed, which is the property that lets a reconciler rewrite
-// structure at all.
+// THREE RULES, AND THEY ONLY EVER TOUCH LINES THAT DESCRIBE A SHAPE — `row`,
+// `cell`, `height`, and the fence itself. Nothing here can reach a directive or a
+// word the reader typed, which is the property that lets a reconciler rewrite
+// structure at all. A `height:` is the one of the four a reader is likely to have
+// typed by hand, so it is only ever removed when what it described has gone: the
+// row that drew the cards, or the widget on the line under it.
 function pruned(body: readonly string[]): string[] | null {
   // AN EMPTIED FENCE GOES. An `almanac` fence with no directives left renders
   // as an empty card — `applyLayout` drops one for the same reason, in the same
@@ -271,10 +308,18 @@ function pruned(body: readonly string[]): string[] | null {
   // this is about what the file says: `row` over a single directive is a claim
   // about a shape that is no longer there, and the next reader to open the note
   // has to work out that it means nothing.
+  //
+  // AND THE HEIGHTS GO WITH THE ROW. A height sizes a CARD, `cardWidget` only
+  // builds cards inside a row, and `parseHeights` refuses a height outside one
+  // out loud. So leaving them here would hand the reader an error message on a
+  // block they did not touch — the widget that stayed behind, wearing a refusal
+  // about a line it never had a use for.
   if (widgetCount(body) < 2) {
-    return body.filter((l) => !isRowLine(l) && !isCellLine(l));
+    return body.filter(
+      (l) => !isRowLine(l) && !isCellLine(l) && !isHeightLine(l)
+    );
   }
-  return tidyCells(body);
+  return tidyHeights(tidyCells(body));
 }
 
 // The run as it arrives, with the delimiter its new cell needs.

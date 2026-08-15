@@ -439,6 +439,58 @@ export function mergeEntryFences(text: string): string | null {
   return out === text ? null : out;
 }
 
+// Split the tracker fence out of the entry banner across existing entries (4.20 / 4.23).
+//
+// In 4.20, the tracker grid became its own section and fence so that the banner
+// is only the note's name, navigation and cog, and the tracker grid is its own card.
+// Notes where the banner and trackers were merged into a single fence (from pre-4.20
+// or the old mergeEntryFences migration) are split back into two fences.
+//
+// Returns null when already separated or when no combined banner+trackers fence exists.
+export function splitEntryFences(text: string): string | null {
+  const lines = text.split("\n");
+  const fences = almanacFences(lines);
+
+  const banner = bannerFence(lines, fences);
+  if (!banner) return null;
+
+  // If there's no tracker marker or tracker directive in the banner fence, it's already split.
+  let trackerStartLine = -1;
+  for (let i = banner.open + 1; i < banner.close; i++) {
+    const l = lines[i].trim();
+    if (l === TRACKER_MARK_START || isTrackerDirective(lines[i])) {
+      trackerStartLine = i;
+      break;
+    }
+  }
+
+  if (trackerStartLine === -1) return null;
+
+  // Split into banner fence (open .. trackerStartLine-1) and tracker fence (trackerStartLine .. close)
+  const bannerBody = lines.slice(banner.open + 1, trackerStartLine);
+  while (bannerBody.length > 0 && bannerBody[bannerBody.length - 1].trim() === "") {
+    bannerBody.pop();
+  }
+
+  const trackerBody = lines.slice(trackerStartLine, banner.close);
+  while (trackerBody.length > 0 && trackerBody[0].trim() === "") {
+    trackerBody.shift();
+  }
+
+  const split = [
+    ...lines.slice(0, banner.open + 1),
+    ...bannerBody,
+    "```",
+    "",
+    "```almanac",
+    ...trackerBody,
+    ...lines.slice(banner.close),
+  ];
+
+  const out = split.join("\n");
+  return out === text ? null : out;
+}
+
 // Add a directive to a note's tracker region, after the last directive already
 // there so the new module lands at the end of the grid rather than the middle.
 // Returns null when the directive is already present (nothing to do) — the

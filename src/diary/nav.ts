@@ -17,8 +17,13 @@
 //
 // What survives is the part `entry-header` calls: `entryContext` answers
 // "what is before and after this entry", `labelForGrain` names a period key.
-// Both are read by entryheader.ts and by nothing else, which is why this file
-// still exists and why it no longer renders anything.
+// Those two were read by entryheader.ts and by nothing else, which is why this
+// file still exists and why it no longer renders anything.
+//
+// A THIRD READER SINCE 4.27: quick capture's destination list names a grain's
+// current entry, which needs `labelForGrain` and the `currentEntryKey` added
+// below it. The file is now what its name says — the vocabulary of where an
+// entry sits in time — rather than one widget's leftovers.
 
 import { TFile } from "obsidian";
 import type AlmanacPlugin from "../main";
@@ -27,6 +32,7 @@ import {
   noteKindOf,
 } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
+import type { MomentLike } from "../core/util";
 import {
   folderNotePath,
   filesUnder,
@@ -51,6 +57,36 @@ export interface EntryContext {
   dateTitle: string;
   prev: { file: TFile; label: string } | null;
   next: { file: TFile; label: string } | null;
+}
+
+// WHERE AN ENTRY KEEPS ITS DATE, ASKED ONCE (4.21.2).
+//
+// Each grain stores its own period key under its own property — `journal-date`,
+// `week-start`, `month`, `quarter-start`, `year-start` — with `journal-date` as
+// the fallback for entries written before 2.44, which have only that one and
+// still have to sort.
+//
+// THIS WAS WRITTEN THREE TIMES AND ONE OF THEM WAS WRONG, which is the reason
+// it is a function. `entryContext` below and `dateOptions` in entryheader.ts
+// spelled it identically; `subtitleFor` in the same file read `journal-date`
+// ALONE. That is right for a daily entry and wrong for the other four, so a
+// weekly entry's page-context strip printed the word "Weekly" where its dates
+// belonged — and a daily entry printed "Daily" for the moment before Obsidian's
+// metadata cache had indexed a note it had only just created.
+//
+// Returns "" for a note with no readable key, and the callers decide what that
+// means: `entryContext` has a label to fall back to for a NAV pill, and the
+// strip has nothing to say and says nothing.
+export function entryDateKey(
+  fm: Record<string, unknown>,
+  grain: TrackerClass
+): string {
+  const def = CLASS_DEFS[grain];
+  const raw = fm[def.dateProperty];
+  const primary = raw == null ? "" : String(raw);
+  const value =
+    (isoDate(primary) ?? primary) || (isoDate(fm["journal-date"]) ?? "");
+  return grain === "monthly" ? value.slice(0, 7) : value;
 }
 
 export function entryContext(
@@ -80,18 +116,8 @@ export function entryContext(
   const folder = paths[def.folderKey];
   const dashboard = folderNotePath(folder);
 
-  // The entry's own date, from wherever its grain keeps it. Monthly keeps a
-  // `month` key and falls back to `journal-date`; the fallback is preserved
-  // rather than tidied away, because entries written before 2.44 have only the
-  // latter and they still have to sort.
-  const keyOf = (fm: Record<string, unknown>): string => {
-    const raw = fm[def.dateProperty];
-    const primary = raw == null ? "" : String(raw);
-    const iso = isoDate(primary) ?? primary;
-    const fallback = isoDate(fm["journal-date"]) ?? "";
-    const value = iso || fallback;
-    return grain === "monthly" ? value.slice(0, 7) : value;
-  };
+  // The entry's own date, from wherever its grain keeps it — see `entryDateKey`.
+  const keyOf = (fm: Record<string, unknown>): string => entryDateKey(fm, grain);
 
   const entries = filesUnder(app, folder)
     .filter((f) => f.path !== dashboard)
@@ -113,6 +139,25 @@ export function entryContext(
         ? { file: entries[i + 1].file, label: nice(entries[i + 1].key) }
         : null,
   };
+}
+
+// The date key of the entry a grain is *currently* on — the counterpart of
+// `entryDateKey`, which reads one off a note that already exists.
+//
+// DERIVED FROM THE CLASS TABLE, not from five cases. `unit` is what makes
+// `startOf` right for each grain, and the only shape difference is monthly's
+// seven characters — exactly the slice `entryDateKey` takes, so the two produce
+// the same key for the same period and `labelForGrain` renders either.
+//
+// Needed by quick capture's destination list (4.27): it names a grain's current
+// entry before that entry necessarily exists, so it cannot read the key off a
+// file the way everything before it did.
+export function currentEntryKey(
+  grain: TrackerClass,
+  now: MomentLike = moment()
+): string {
+  const at = now.clone().startOf(CLASS_DEFS[grain].unit);
+  return grain === "monthly" ? at.format("YYYY-MM") : at.format("YYYY-MM-DD");
 }
 
 // How a grain's date reads in a title or a picker row.
