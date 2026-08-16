@@ -205,6 +205,46 @@ describe("a widget that drew its own header annotates rather than replaces", () 
   });
 });
 
+// ── the button it names is the button on the page (4.33.1) ───────────────
+//
+// The rule's second half is HOW TO MAKE IT HAPPEN, and a message that names the
+// wrong control fails it while looking like it passes: it is a whole sentence,
+// it clears every word count, and it sends the reader somewhere else.
+//
+// `folderRollup`'s said "Add one from the Journals card on the homepage". That
+// does make a container — but the section this callout is drawn inside opens
+// with `button:<type>:new-container`, so a Subject with no Topics yet was
+// pointing off the page at a control that was six pixels above the sentence.
+//
+// It was invisible while the branch that reaches it was broken: a Subject with
+// no Topics rendered the DEEPEST level's tables instead of this callout, so the
+// message only appeared once that was fixed.
+
+describe("an empty state names a control the reader can see", () => {
+  const rollup = (): string => {
+    const t = src("tables.ts");
+    const at = t.indexOf("export function folderRollup(");
+    expect(at, "the folder rollup").toBeGreaterThan(0);
+    return t.slice(at, t.indexOf("\n}\n", at));
+  };
+
+  it("points at the section's own button, not the homepage", () => {
+    const body = rollup();
+    expect(body).toContain("Press “+ ${noun}” above");
+    expect(body).not.toContain("Journals card on the homepage");
+  });
+
+  it("derives the button's words from the heading's words", () => {
+    // `kindTable` settled this one level down: both halves come from one value,
+    // so a relabelled level cannot leave the sentence naming the old button.
+    // The button is `journalSubActionSpec`'s `new-container` — a plus and the
+    // bare child noun — and `noun` is that same child noun.
+    const body = rollup();
+    expect(body).toContain("const noun = childNoun(type, folder.path);");
+    expect(body).toContain("`No ${plural(noun).toLowerCase()} yet`");
+  });
+});
+
 // ── the quarter rail (2.56.1) ────────────────────────────────────────────
 
 describe("the activity months fit a phone", () => {

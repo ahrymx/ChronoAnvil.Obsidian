@@ -425,24 +425,237 @@
   padding-top: 8px;
   border-top: var(--am-rule-hair) solid var(--background-modifier-border);
 }
-/* The label idiom `.journal-block-head-title` already uses, and for its reason:
-   a line of type that has to sit in a 14px strip says what the thing is without
-   competing with the titles inside it. */
-/* THE FOURTH COPY OF THE BAR'S VOICE, NOW READING IT (4.13 §1). This was written
-   out by hand — 0.7em / 600 / uppercase / 0.06em — with a comment saying it was
-   the idiom `.journal-block-head-title` uses, which was true and was not enforced
-   by anything. When §1 moved the two title rules onto tokens this one stayed
-   behind on `--text-faint`, a step of contrast away from the bars it was written
-   to match. */
-.journal-group-foot-count {
-  font-size: var(--am-bar-text);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: var(--am-bar-track);
-  color: var(--am-bar-ink);
-}
+/* `.journal-group-foot-count` WAS HERE AND IS GONE (4.34.2).
+   The foot said `2 COLUMNS` from 4.9 until the strip arrived, and the label
+   never earned its line: the columns are directly above it, so counting them
+   restated what the reader was already looking at. It existed because the foot
+   needed content to be a bar at all, and the foot now carries the grip, the `+`
+   and — where there are pages — the numbers. */
 /* The grip itself is dressed with the other grip rules below, after the
    `.jbd-handle` base it overrides. */
+
+/* ── The pages of a group (4.34) ────────────────────────────────────────
+ *
+ * `tab` divides a fence into pages the way `cell` divides a row into columns.
+ * One is on screen; the rest are built, laid out once, and then withheld.
+ *
+ * WHY THE ROWS GET A BOX OF THEIR OWN. A swap pins a height here so the group
+ * does not jump between a tall page and a short one — and it cannot be pinned on
+ * the group itself, whose height includes the foot: transitioning that would
+ * slide the strip out from under the pointer that is pressing it, which is the
+ * bug the pin exists to prevent. */
+.journal-group-pages {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+/* CLIPPED ONLY WHILE IT IS MOVING, and this rule was `overflow: hidden` at rest
+   for one draft — which put a clipping and containment context around EVERY
+   group in the plugin, pages or not, in a release whose whole compatibility
+   claim is that a group without a `tab` line is untouched. That is 4.8 §8.3's
+   hazard arriving through the wrapper rather than through a track, and it is the
+   reason the deferred carousel was deferred; introducing it at rest for the
+   groups that are not even paged would have been the same mistake with none of
+   the benefit.
+
+   During a swap it is exactly right: the outgoing page is still in the box while
+   the height is between two values, and clipping is what stops it spilling past
+   the foot. */
+.journal-group-pages.is-swapping,
+.journal-group-pages.is-measuring {
+  overflow: hidden;
+}
+.journal-group-pages.is-swapping {
+  transition: height 120ms ease;
+}
+
+/* A page that is not the open one.
+ *
+ * `display: none` IS WHAT THE FOLD ALREADY DOES — `.journal-sec-fold.is-collapsed
+ * > .journal-sec-fold-body`, shipped in every vault — and a closed page is the
+ * same statement about the same kind of content. It is also the point: a page
+ * that stayed laid out would keep every widget in it measured, which is the cost
+ * pages exist to remove. */
+.journal-block-row.is-closed {
+  display: none;
+}
+
+/* THE ONE FRAME BEFORE ANY OF THAT (4.34 §A).
+ *
+ * A canvas created inside `display: none` is created at 0x0, and nothing in this
+ * plugin can resize one afterwards — a chart hands its teardown to its caller and
+ * no registry holds the instance. So at first render every page is laid out, out
+ * of flow and invisible, for exactly one frame: real width, no flash, and every
+ * canvas gets a real box at the moment it is created.
+ *
+ * OUT OF FLOW rather than merely transparent, so the group's height for that
+ * frame is the OPEN page's and not the sum of all of them. */
+.journal-group-pages.is-measuring > .journal-block-row.is-closed {
+  display: flex;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* The page arriving. One frame at 8px and transparent, then released — so a
+   swap reads as a movement rather than a substitution. */
+.journal-block-row.is-entering {
+  opacity: 0;
+  transform: translateX(8px);
+}
+.journal-group-pages.is-swapping > .journal-block-row {
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+/* ── The strip (4.34 §3) ────────────────────────────────────────────────
+ *
+ * `[1] [2] [3]` at the right-hand end of the foot, where the column count sits
+ * on a group that has no pages. It REPLACES that count rather than joining it:
+ * the count said how many columns you can see, and with pages you can see one
+ * page's worth while the numbers already say how many there are. */
+.journal-group-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.journal-group-tab {
+  /* The foot's own voice, which every label in this strip shares — see
+     `.journal-group-foot-count`. A page number is a label that can be pressed,
+     not a button that happens to be small. */
+  font-size: var(--am-bar-text);
+  font-weight: 600;
+  letter-spacing: var(--am-bar-track);
+  color: var(--am-bar-ink);
+  line-height: 1;
+  padding: 3px 7px;
+  min-width: 0;
+  height: auto;
+  border: var(--am-rule-hair) solid transparent;
+  border-radius: var(--am-radius-sm);
+  background: none;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.journal-group-tab:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+/* THE OPEN ONE IS TINTED, NOT FILLED. The strip is chrome at the foot of a box
+   full of cards, and a solid accent pill down there reads louder than anything
+   it is a control for — the wash weight the captured cards took in 4.32, for the
+   same reason and out of the same token. */
+.journal-group-tab.is-open {
+  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 34%, transparent);
+  color: var(--interactive-accent);
+}
+.journal-group-tab:focus-visible {
+  outline: 2px solid var(--am-border-focus);
+  outline-offset: 1px;
+}
+
+/* ── Making a page (4.34.1) ─────────────────────────────────────────────
+ *
+ * `tab` shipped in 4.34 reachable only by typing it, which is exactly the state
+ * `cell: 2` sat in from 4.4 to 4.9 — a grammar nobody used because nothing on
+ * the page said it existed. This is the control, and it is on EVERY group,
+ * including one with no pages yet: that is the only place the first page can be
+ * made.
+ *
+ * ON HOVER, LIKE THE GRIP AND THE DIVIDER. A group at rest looks exactly as it
+ * did before this release, which is the compatibility claim the whole feature
+ * rests on — and the reader who is looking for something finds it in the strip
+ * where the group already talks about itself. */
+.journal-group-add {
+  font-size: var(--am-bar-text);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--am-bar-ink);
+  margin-left: 6px;
+  padding: 3px 7px;
+  border: var(--am-rule-hair) solid transparent;
+  border-radius: var(--am-radius-sm);
+  background: none;
+  box-shadow: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.journal-group:hover .journal-group-add,
+.journal-group-add:focus-visible {
+  opacity: 1;
+}
+.journal-group-add:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.journal-group-add:focus-visible {
+  outline: 2px solid var(--am-border-focus);
+  outline-offset: 1px;
+}
+/* The count sits at the right on a group with no pages, so the `+` needs the
+   strip's place rather than the count's — pushed to the end, where the numbers
+   are on a group that has them. */
+.journal-group-foot > .journal-group-add:last-child {
+  margin-left: 6px;
+}
+/* A HOVER-REVEALED CONTROL NEEDS A RESTING STATE ON TOUCH, which is the rule
+   `hover-reveal.test.ts` enforces across the whole stylesheet — and it caught
+   this one before it shipped. There is no hover on a phone, so an affordance
+   that only exists at `:hover` does not exist there at all: the divider and the
+   card seam both sit at 0.3 for exactly this reason, and the `+` is the same
+   kind of thing. */
+@media (hover: none) {
+  .journal-group-add {
+    opacity: 0.4;
+  }
+}
+
+/* WHICH GROUP THE KEY DRIVES (4.34 §B).
+ *
+ * The two page commands act on the group the reader last touched, and a keybind
+ * whose target is invisible is a keybind that changes the wrong thing. The FOOT
+ * says so rather than the box: it is the strip the key is about, and it is the
+ * one edge that belongs to the group rather than to anything in it.
+ *
+ * ONLY WHERE THERE IS A CHOICE TO MAKE. A page with one group needs no mark —
+ * the command falls back to it, nothing else can be meant, and a permanent
+ * outline on the only group on screen is noise. */
+.journal-group.is-focused .journal-group-foot {
+  border-top-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 45%,
+    var(--background-modifier-border)
+  );
+}
+
+/* ── The first reduced-motion block in this stylesheet (4.34 §D) ────────
+ *
+ * There has never been one, in twenty files. So it is written as a SHARED block
+ * rather than as a clause on the tab rules: a reader who turns this on because a
+ * group slid under them is a reader who will next look at everything else that
+ * moves, and a setting that only reached one feature would be a worse answer
+ * than none.
+ *
+ * THE SWAP IS STILL CORRECT WITH NO ANIMATION. The height is still pinned and
+ * still released — that is a layout mechanism, not an animation — and the
+ * release is on a timer rather than on `transitionend` precisely because there is
+ * no transition to end here. */
+@media (prefers-reduced-motion: reduce) {
+  .journal-group-pages.is-swapping,
+  .journal-group-pages.is-swapping > .journal-block-row,
+  .journal-block-row.is-entering {
+    transition: none;
+  }
+  .journal-block-row.is-entering {
+    opacity: 1;
+    transform: none;
+  }
+}
 
 /* ── The divider: setting a column's width (4.9 §3) ─────────────────────
  *
@@ -548,13 +761,29 @@
  *
  * NO `z-index` FIGHT, for the divider's reason (4.8 §8.3): this is drawn inside
  * the cell it belongs to, which is the safe side of a stacking context. */
+/* ── IT IS THE CARD'S BOTTOM EDGE NOW (4.34.3) ──────────────────────────
+ *
+ * The mark was a 28px pill floating in the gap between two cards, centred. Two
+ * of them in a column read as punctuation dropped between the widgets — a thing
+ * in the gap rather than a property of the card — and on a group of three the
+ * eye had to work out which card each one belonged to.
+ *
+ * The line now sits ON the card's own bottom edge and runs its full width, so
+ * what lights up is the EDGE OF THE THING BEING RESIZED. That is what the
+ * gesture actually does — it sets this card's height — and it is the same
+ * statement the column divider makes on the vertical, which is a full-height
+ * line on a boundary rather than a dash in the middle of one.
+ *
+ * THE HIT AREA IS UNCHANGED: 12px of strip straddling the edge, six either side,
+ * which is `snapHeight`'s generosity and the reason the drawing can afford to be
+ * a hairline. Only `bottom` moves — from the middle of the gap to the edge
+ * itself. */
 .journal-card-divider {
   position: absolute;
   left: 0;
   right: 0;
-  /* Centred in the gap the cell already lays between its children: down half the
-     gap, then half the strip's own thickness. */
-  bottom: calc(var(--am-widget-gap) / -2 - 6px);
+  /* STRADDLING THE CARD'S BOTTOM EDGE: half the strip above it, half below. */
+  bottom: -6px;
   height: 12px;
   z-index: 3;
   cursor: row-resize;
@@ -566,9 +795,9 @@
 }
 .journal-card-divider::after {
   content: "";
-  width: 28px;
-  height: 2px;
-  border-radius: 1px;
+  width: 100%;
+  height: var(--am-rule);
+  border-radius: 0;
   background: var(--background-modifier-border);
 }
 /* ON HOVER OF THE GROUP, not of the 12px strip — the divider's rule, and for its
@@ -828,41 +1057,110 @@
  * `order: -1` while being appended LAST: a gap would also open between the head
  * and anything else the card comes to hold, and the head is the only child whose
  * spacing is in question. */
+/* ── THE HEAD OVERLAYS, IT NO LONGER OPENS A GAP (4.34.3) ───────────────
+ *
+ * WHAT WAS WRONG WITH IT. The head animated `max-height` from 0 to 48px, which
+ * is height the card did not have a moment earlier — so hovering a widget in a
+ * group PUSHED ITS OWN CONTENT DOWN and, in a row, made its cell taller than
+ * the ones beside it. A label about a widget was rearranging the widget, and
+ * the taller the row the further everything moved.
+ *
+ * So it is laid OVER the card's top edge instead, which is the grip's own
+ * argument two rules down — "a strip absolutely positioned over the block's
+ * first 10px costs no height at all" — applied to the band the grip sits in.
+ * Nothing reflows, in the card or in the row.
+ *
+ * AND THE GRIP'S OWN BOX IS WHAT OPENS IT. A head revealed by hovering ANY part
+ * of a widget is a band appearing over the thing the reader is reaching for —
+ * fine while it pushed content clear of itself, and covering what they were
+ * pointing at the moment it stopped. A full-width strip along the top edge was
+ * better and still opened the band on the way past: the top edge of a card is
+ * something a pointer crosses to get anywhere else.
+ *
+ * So the trigger is the 44px the dots already occupy — one box, one meaning.
+ * The head names what the grip picks up, so the two appear together or not at
+ * all, and a pointer travelling over a dashboard opens nothing it was not aimed
+ * at. `.jbd-host:hover` still brings the DOTS back on a hover of the widget,
+ * which is the invitation; the band is what answers it.
+ *
+ * NO HIT AREA OF ITS OWN AT REST, which is the whole of the minimisation:
+ * `pointer-events: none` until it is open, so the only thing that can open it is
+ * the grip. Once open it takes them back, and its own `:hover` is what keeps it
+ * open as the pointer moves down off the dots and into the band.
+ *
+ * THE CARD'S OWN GROUND, because an overlay over content has to be opaque:
+ * `--background-primary-alt` is what `.journal-widget-card` paints, and reading
+ * a title through a table is worse than either. */
 .journal-widget-card > .journal-block-head {
-  margin-top: 0;
-  margin-left: 0;
-  margin-right: 0;
-  margin-bottom: 0;
-  max-height: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* UNDER THE GRIP, NOT OVER IT. The two share the top 10px and the grip is the
+     control; a label that swallowed the drag would be the label winning an
+     argument it should not be in. */
+  z-index: 1;
+  margin: 0;
+  height: 10px;
   padding: 0;
   border-bottom: 0 solid transparent;
+  border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
+  background: var(--background-primary-alt);
   opacity: 0;
   overflow: hidden;
+  /* INERT UNTIL IT IS OPEN. Nothing can be opened by pointing at the head, so
+     nothing opens by accident; and with no hit area at rest there is nothing
+     laid over the card's top edge for a click to land on either. */
   pointer-events: none;
-  transition: max-height 0.2s ease, margin 0.2s ease, padding 0.2s ease, opacity 0.18s ease;
+  transition: opacity 120ms ease;
 }
-.journal-widget-card:hover > .journal-block-head,
+.journal-widget-card > .journal-block-head:hover,
 .journal-widget-card:focus-within > .journal-block-head,
 .journal-widget-card.is-resizing > .journal-block-head,
 .journal-widget-card.is-dragging > .journal-block-head,
 .journal-widget-block.is-slotting .journal-widget-card > .journal-block-head {
-  max-height: 48px;
-  margin: -12px -14px 12px;
+  height: auto;
   padding: 6px 14px 5px;
   border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
   opacity: 1;
   overflow: visible;
+  /* Taken back only now, so the band keeps itself open under the pointer that
+     walked off the dots onto it. */
   pointer-events: auto;
 }
+/* THE GRIP CLAUSE IS ITS OWN RULE, and the repetition is deliberate. One
+   unsupported selector invalidates the whole group it is written in, so a
+   `:has()` sitting in the list above would take ordinary hover down with it on
+   any renderer that does not know the word — which is the rule
+   `pure-logic.test.ts` enforces across this stylesheet. */
+.journal-widget-card:has(> .jbd-handle:hover) > .journal-block-head {
+  height: auto;
+  padding: 6px 14px 5px;
+  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  opacity: 1;
+  overflow: visible;
+  /* Taken back only now, so the band keeps itself open under the pointer that
+     walked off the dots onto it. */
+  pointer-events: auto;
+}
+/* TOUCH KEEPS THE OLD SHAPE, IN FLOW, and that is the one place the two
+   behaviours differ on purpose. There is no hover to open a band with, and an
+   overlay that is permanently on would cover the top of every widget in the
+   vault. A phone has no drag to reach for either — the reader was never going
+   to move a widget by its head there — so the head is simply the card's top
+   band, which is what it has always been. */
 @media (hover: none) {
   .journal-widget-card > .journal-block-head {
-    max-height: 48px;
+    position: static;
+    height: auto;
+    z-index: auto;
+    background: none;
+    border-radius: 0;
     margin: -12px -14px 12px;
     padding: 6px 14px 5px;
     border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
     opacity: 1;
     overflow: visible;
-    pointer-events: auto;
   }
 }
 /* THE HEAD AS THE CARD'S TOP BAND. `order: -1` draws it first while it stays
@@ -890,36 +1188,77 @@
   border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
   gap: 8px;
 }
+/* THE SAME BAND ON A BLOCK THAT WEARS NO CARD, and the same three rules — it
+   is one head with two hosts, and 4.34.3's argument is about the head.
+
+   THE HOST IS POSITIONED HERE RATHER THAN LEFT TO `.jbd-host`. That class is
+   added by the script, and only to a block that has a GRIP — so a block with a
+   head and no grip would have resolved this overlay against whatever ancestor
+   happened to be positioned, which on a note is the whole pane. A card needs no
+   such line because `.journal-widget-card` has been `position: relative` since
+   its seam was drawn. */
+.journal-widget-block.has-head:not(.journal-widget-card) {
+  position: relative;
+}
 .journal-widget-block.has-head:not(.journal-widget-card) > .journal-block-head {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
   margin: 0;
-  max-height: 0;
+  height: 10px;
   padding: 0;
   border-bottom: 0 solid transparent;
+  border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
+  background: var(--background-primary-alt);
   opacity: 0;
   overflow: hidden;
+  /* INERT UNTIL IT IS OPEN, exactly as the card's is — and this line is the one
+     4.34.4 missed. The two rest rules are the same rule with two hosts, but only
+     the card's carried the comment the edit was anchored on, so a widget OUTSIDE
+     a group kept a full-width hit strip along its top edge and went on opening
+     its band to any pointer that crossed it. One host fixed and one not is worse
+     than neither: the same control behaved two ways on one page. */
   pointer-events: none;
-  transition: max-height 0.2s ease, margin 0.2s ease, padding 0.2s ease, opacity 0.18s ease;
+  transition: opacity 120ms ease;
 }
-.journal-widget-block.has-head:not(.journal-widget-card):hover > .journal-block-head,
+.journal-widget-block.has-head:not(.journal-widget-card) > .journal-block-head:hover,
 .journal-widget-block.has-head:not(.journal-widget-card):focus-within > .journal-block-head,
 .journal-widget-block.is-slotting .journal-block-head {
-  max-height: 48px;
-  margin: -12px -14px 0;
+  height: auto;
   padding: 6px 14px 5px;
   border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
   opacity: 1;
   overflow: visible;
+  /* Taken back only now, so the band keeps itself open under the pointer that
+     walked off the dots onto it. */
+  pointer-events: auto;
+}
+/* Its own rule, for the reason given at the card's. */
+.journal-widget-block.has-head:not(.journal-widget-card):has(> .jbd-handle:hover)
+  > .journal-block-head {
+  height: auto;
+  padding: 6px 14px 5px;
+  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  opacity: 1;
+  overflow: visible;
+  /* Taken back only now, so the band keeps itself open under the pointer that
+     walked off the dots onto it. */
   pointer-events: auto;
 }
 @media (hover: none) {
   .journal-widget-block.has-head:not(.journal-widget-card) > .journal-block-head {
-    max-height: 48px;
+    position: static;
+    height: auto;
+    z-index: auto;
+    background: none;
+    border-radius: 0;
     margin: -12px -14px 0;
     padding: 6px 14px 5px;
     border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
     opacity: 1;
     overflow: visible;
-    pointer-events: auto;
   }
 }
 /* The label idiom `.am-ev-section` already uses, and for the same reason: a

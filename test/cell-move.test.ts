@@ -604,7 +604,7 @@ describe("which line drew which widget", () => {
   it("stamps before either the cards or the row move anything", () => {
     const stamp = widgets.indexOf("stampLines(container, drawn");
     const card = widgets.indexOf("for (const { el, title } of named) cardWidget");
-    const row = widgets.indexOf("layOutRow(container, cellBounds)");
+    const row = widgets.indexOf("layOutRow(");
     expect(stamp).toBeGreaterThan(-1);
     expect(stamp).toBeLessThan(card);
     expect(stamp).toBeLessThan(row);

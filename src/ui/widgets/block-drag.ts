@@ -92,6 +92,8 @@ import {
   GROUP_FOOT_CLASS,
   ROW_CELL_CLASS,
   ROW_CLASS,
+  ROW_CLOSED_CLASS,
+  ROW_PAGE_ATTR,
 } from "./row";
 import { boundsOf } from "../header-title";
 import { getFile } from "../../core/util";
@@ -472,10 +474,14 @@ async function applyWidths(
   plugin: AlmanacPlugin,
   file: TFile,
   block: number,
-  weights: readonly number[]
+  weights: readonly number[],
+  // Which page of the group these columns are in (4.34 §6). The writer slices
+  // the fence to that page and leaves every other one as the exact lines it was
+  // read as.
+  page: number
 ): Promise<void> {
   const text = await plugin.app.vault.read(file);
-  const next = widenCells(text.split("\n"), block, weights);
+  const next = widenCells(text.split("\n"), block, weights, page);
   if (!next) return;
   await plugin.app.vault.modify(file, next.join("\n"));
 }
@@ -508,7 +514,8 @@ function attachResize(
   row: HTMLElement,
   cells: readonly HTMLElement[],
   n: number,
-  noteNow: () => { block: number; lines: string[] } | null
+  noteNow: () => { block: number; lines: string[] } | null,
+  page: number
 ): void {
   divider.addEventListener("pointerdown", (evt) => {
     if (evt.button !== 0) return;
@@ -526,7 +533,7 @@ function attachResize(
     if (left.offsetTop !== right.offsetTop) return;
     const where = noteNow();
     if (!where) return;
-    const start = cellWidthsIn(where.lines, where.block);
+    const start = cellWidthsIn(where.lines, where.block, page);
     // A COUNT THAT DISAGREES IS A STALE RENDER. The cells are what the last
     // render drew and the weights are what the file says now; if the two no
     // longer describe the same row, the honest answer is to do nothing rather
@@ -629,7 +636,7 @@ function attachResize(
       const next = [...start];
       next[n - 1] = live[0];
       next[n] = live[1];
-      void applyWidths(plugin, file, where.block, next);
+      void applyWidths(plugin, file, where.block, next, page);
     };
 
     // ESCAPE PUTS IT BACK, which is the undo a gesture with no dialog has. A
@@ -1070,11 +1077,32 @@ export function attachBlockHead(
   //
   //   EVERY OTHER BLOCK IS ALL PLACES. Its top half means "above this block" and
   //   its bottom half "below it".
-  const row = container.querySelector<HTMLElement>(`.${ROW_CLASS}`);
+  // THE OPEN PAGE, NOT THE FIRST ONE (4.34 §6). This was
+  // `querySelector(.${ROW_CLASS})`, which took the only row there was — and a
+  // group with pages has one row per page, all of them in the document at once.
+  // Unqualified, every gesture on a two-page group would have acted on page 1
+  // whatever the reader could see: the slots would open over cells that are not
+  // on screen, and a divider drag would resize a row nobody is looking at.
+  //
+  // `:not(.is-closed)` is exact for both shapes, because a group with one page
+  // never carries the class.
+  const row = container.querySelector<HTMLElement>(
+    `.${ROW_CLASS}:not(.${ROW_CLOSED_CLASS})`
+  );
   const cells = Array.from(row?.children ?? []).filter(
     (c): c is HTMLElement =>
       c instanceof HTMLElement && c.hasClass(ROW_CELL_CLASS)
   );
+  // WHICH PAGE THAT IS, for the writers that speak in body lines. `widenCells`
+  // and `cellWidthsIn` take a page ordinal and do their arithmetic inside that
+  // page's slice; handing them the default 0 would write tab 1's widths from
+  // tab 2's divider.
+  //
+  // READ OFF THE ROW RATHER THAN COUNTED. `TabbedPlan` has the argument: a page
+  // whose directives drew nothing has a row in the file and none on the screen,
+  // so the nth row on screen is not the nth page in the note. The stamp is the
+  // ordinal both sides agree on.
+  const openPage = Number(row?.getAttribute(ROW_PAGE_ATTR) ?? 0) || 0;
 
   // ABOVE AND BELOW: this block's place in the note, which is what a block drag
   // means and what a widget leaving a row is asking for. 4.8.5 restored it to
@@ -1387,7 +1415,7 @@ export function attachBlockHead(
     )) {
       const n = Number(divider.getAttribute(DIVIDER_INDEX_ATTR));
       if (!Number.isInteger(n) || n < 1 || n >= cells.length) continue;
-      attachResize(plugin, file, divider, row, cells, n, noteNow);
+      attachResize(plugin, file, divider, row, cells, n, noteNow, openPage);
     }
 
     // ── AND SETTING A WIDGET'S HEIGHT (4.22 §4.3) ───────────────────────

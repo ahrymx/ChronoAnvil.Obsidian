@@ -1438,6 +1438,93 @@ export function templateKeyFor(ctx: SectionContext): string {
   return `kind:${ctx.kind?.id ?? ""}${variant}`;
 }
 
+// ── Where a saved layout may be offered (4.33) ───────────────────────────
+//
+// A saved layout used to be offered on KINDS and nothing else, because a kind
+// was the only surface a note is created FROM A CHOICE of template: `newNote`
+// prompts with `kind.templates` and `promptNewNote` draws the dropdown. An
+// index note and a page have exactly one template each — `newTopLevel` and
+// `newContainer` always read `level.indexTemplate`, `newPage` always reads the
+// shared `page.md` — so a layout there could never have been picked at
+// creation.
+//
+// THAT IS STILL TRUE, AND IT IS WHY THESE TWO ARE NOT KINDS. A front-page or
+// page layout is a RECIPE: something to reload onto a note, or to press into
+// that surface's default. It mints no template file and appears in no dropdown,
+// and `templateKeyFor` above enforces it — the `index:` and `page:` arms carry
+// no variant slot, so two named front-page layouts would both fold to
+// `index:1` and the second would silently win. They are therefore resolved
+// straight off `cfg.variants` and never folded into `type.layout`.
+//
+// ONE TAG FOR EVERY FRONT PAGE, regardless of depth. A two-level journal has a
+// Subject Index and a Topic Index, and a `surface:index:<depth>` enumeration
+// would be a checkbox per level for a question the reader answers by choosing
+// which page to stand on: reload is per-note, and "save as the default" keys
+// off `templateKeyFor` of the note in front of them.
+export const LAYOUT_SURFACE_INDEX = "surface:index";
+export const LAYOUT_SURFACE_PAGE = "surface:page";
+
+// PREFIXED, SO A KIND CANNOT COLLIDE WITH A SURFACE. A journal's kind ids are
+// the reader's — `freshCustomJournal` alone ships `entry`, and nothing stops
+// someone naming one `index` or `page`. Bare ids would make the two
+// indistinguishable in a ticked-target list, which is the class of collision
+// the single filename allocator in `buildJournalType` exists to prevent one
+// layer down.
+export function targetIdFor(ctx: SectionContext): string {
+  if (ctx.noteKind === "index") return LAYOUT_SURFACE_INDEX;
+  if (ctx.noteKind === "page") return LAYOUT_SURFACE_PAGE;
+  return ctx.kind?.id ?? "";
+}
+
+// Everywhere an arrangement saved here may be offered: this journal's kinds,
+// then the two surfaces.
+//
+// KINDS FIRST because they are the common case and the origin in all but two
+// of them, and a reader scanning for the note type they are on should find it
+// before the two general ones.
+// AND `Page` IS NOT OFFERED WHERE THERE ARE NO PAGES. `templateTargets` emits a
+// `page` target only when some kind declares `pages`, so on a journal without
+// one the checkbox would tick a surface the journal does not have and produce a
+// layout nothing could ever reload. Every index has a front page, so that one
+// is unconditional.
+export function layoutTargetsFor(
+  type: JournalType
+): { id: string; label: string }[] {
+  return [
+    ...type.kinds.map((k) => ({ id: k.id, label: k.label })),
+    { id: LAYOUT_SURFACE_INDEX, label: "Front page" },
+    ...(type.kinds.some((k) => k.pages)
+      ? [{ id: LAYOUT_SURFACE_PAGE, label: "Page" }]
+      : []),
+  ];
+}
+
+// A window's flat list of ticked target ids, split into the two things storage
+// keeps them as.
+//
+// HERE RATHER THAN IN `saveVariant`, and the reason is a module cycle rather
+// than taste: `journal-sections.ts` already imports `kindAllowsTracker` from
+// `journal.ts` as a VALUE, so a value import back the other way would be a real
+// runtime cycle — and the thing being imported is a module-level const, which
+// is exactly what a cycle leaves in its temporal dead zone. Types cross that
+// edge; functions do not. Same rule `variantKinds`' own comment states one
+// module over.
+//
+// TWO CALLERS, ONE SPLIT: the banner's door (`section-insert.ts`) and the
+// settings rail's (`settings-editors.ts`). The window itself never learns that
+// a target can be anything but an opaque id, which is `ArrangementSink`'s
+// contract.
+export function splitLayoutTargets(
+  kindIds: readonly string[],
+  targets: readonly string[]
+): { kinds: string[]; surfaces: ("index" | "page")[] } {
+  const have = new Set(kindIds);
+  const surfaces: ("index" | "page")[] = [];
+  if (targets.includes(LAYOUT_SURFACE_INDEX)) surfaces.push("index");
+  if (targets.includes(LAYOUT_SURFACE_PAGE)) surfaces.push("page");
+  return { kinds: targets.filter((t) => have.has(t)), surfaces };
+}
+
 // The overrides a type declares for one section of one template, if any.
 export function sectionOverrides(
   ctx: SectionContext,

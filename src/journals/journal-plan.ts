@@ -957,9 +957,29 @@ function insertionPoint(
 // narrower and more useful: given these sections, is the file still the file
 // the plugin wrote?
 export function isHandEdited(text: string, ctx: SectionContext): boolean {
-  const present = sectionsPresent(text, ctx);
-  const composed = composeFrom(ctx, present);
-  return composed.trim() !== stripFrontmatter(text).trim();
+  return composedFromPresent(text, ctx).trim() !== stripFrontmatter(text).trim();
+}
+
+// What the catalogue would write for THE SECTIONS THIS FILE ALREADY HAS.
+//
+// EXTRACTED FROM `isHandEdited` IN 4.33 rather than spelled a second time. That
+// function reduces it to a boolean; the reload gate needs the text, because the
+// question it asks is "which lines in this note's fences did the catalogue not
+// put there" — a reader's added chart, a shelf they named — and a yes/no cannot
+// answer it.
+//
+// AGAINST THE FILE'S OWN SECTIONS, NOT AGAINST A LAYOUT'S. That is the whole
+// reason this is the right baseline: comparing a note against what a layout
+// would compose would report every section the layout DROPS as content lost,
+// and refuse every reload that changed anything — which is 4.29's rule that "a
+// catalogue directive the replacement drops is not a loss, it is the reload
+// doing what it was asked", carried onto a surface whose fences also hold
+// things the reader wrote.
+export function composedFromPresent(
+  text: string,
+  ctx: SectionContext
+): string {
+  return composeFrom(ctx, sectionsPresent(text, ctx));
 }
 
 // Composed in the order the sections appear IN THE FILE, not in catalogue

@@ -53,7 +53,7 @@ import {
 } from "./widget-sections";
 import type { VaultLists } from "./widget-registry";
 import { fencesOf } from "./block-move";
-import { moveCell, widgetRun } from "./cell-move";
+import { moveCell, setPageBreaks, widgetRun } from "./cell-move";
 import type { CellTarget } from "./cell-move";
 import {
   CELL_KEYWORD,
@@ -64,6 +64,7 @@ import {
   isHeightLine,
   isLinksLine,
   isRowLine,
+  isTabLine,
   isTitleLine,
   isWideLine,
   parseWide,
@@ -712,6 +713,47 @@ export function frontmatterEnd(lines: readonly string[]): number {
 
 const withoutFrontmatter = (lines: string[]): string[] =>
   lines.slice(frontmatterEnd(lines) + 1);
+
+// One page's frontmatter, another page's body.
+//
+// MOVED HERE FROM `entry-template.ts::reloadEntryBody` IN 4.33, because the
+// journals needed the same write and the function never had a diary thought in
+// it — it is `frontmatterEnd` twice and a join. Keeping a second copy in the
+// journals would have been two answers to "what does reloading a page keep",
+// and the two would eventually disagree about the malformed case below, which
+// is the one nobody looks at.
+//
+// It is also a net deletion: `withoutFrontmatter` directly above is the second
+// half of this, written a second time, and now shares the expression.
+//
+// FRONTMATTER IS KEPT BYTE-FOR-BYTE, and on both surfaces that is load-bearing
+// rather than polite. An entry's `journal-date` scopes it to its period, its
+// events stamp is written once at creation and never re-synced, and `title:` is
+// the reader's own words. A journal note's `type:` is what classifies it at all,
+// its level keys say where it belongs, its rating property holds a reading, and
+// a PAGE's `parent:` is the only thing tying it to the note it is a page of.
+//
+// Returns null when nothing would change, which is `applyEntrySections`' and
+// `applyLayout`'s convention and matters for the same reason: a rewrite that
+// changes nothing still bumps mtime, and on the diary side mtime is the source
+// of truth for what is stale.
+export function replaceBody(text: string, composed: string): string | null {
+  const lines = text.split("\n");
+  const end = frontmatterEnd(lines);
+  // No frontmatter to keep — the whole file is the body. Every page either
+  // composer writes has some, so this is the malformed case rather than a
+  // supported one, and replacing everything is what the reader asked for on a
+  // file with nothing to preserve.
+  //
+  // CALLERS ON THE JOURNAL SIDE REFUSE BEFORE REACHING IT. A page with no
+  // frontmatter has no `parent:`, and there is nothing in the body to recover
+  // it from — so `journal-template-manager.ts` declines rather than letting
+  // this arm do something defensible on an entry and destructive on a page.
+  const head = end === -1 ? [] : lines.slice(0, end + 1);
+  const body = withoutFrontmatter(composed.split("\n"));
+  const next = [...head, ...body].join("\n");
+  return next === text ? null : next;
+}
 
 // Which sections this fence holds, and which of its lines each one is on.
 //
@@ -1556,6 +1598,22 @@ export function flatBlocks(
             ? [...run.sectionIds]
             : run.sectionIds.filter((id) => hasKnownExtent(byId.get(id))),
         column: isColumn ? [...run.sectionIds] : [],
+        // WHICH OF THEM A `tab` LINE OPENS (4.34.2). Read from the fence rather
+        // than remembered, on `column`'s own argument: this is a question about
+        // the FILE, and the reader may have typed the line by hand.
+        //
+        // ANCHORED THE WAY `setPageBreaks` ANCHORS, walking back over a
+        // `height:` before looking for the delimiter — a height sizes the line
+        // under it, so it sits between the boundary and the widget. Two readings
+        // of where a boundary is would put the editor's ticks and the write's
+        // lines one row apart.
+        pages: run.sectionIds.filter((id) => {
+          const at = run.lineOf[id];
+          if (at == null) return false;
+          let above = at - 2;
+          while (above >= 0 && isHeightLine(body[above])) above--;
+          return above >= 0 && isTabLine(body[above]);
+        }),
       };
     });
 }
@@ -1606,7 +1664,8 @@ function whereIs(
 export function regroupFlatNote(
   text: string,
   sections: readonly FlatSection[],
-  blocks: readonly (readonly string[])[]
+  blocks: readonly (readonly string[])[],
+  pages?: readonly string[]
 ): string | null {
   const want = blocks.filter((b) => b.length > 0);
   // Which block each section is SUPPOSED to be in, by the id of the section
@@ -1747,8 +1806,75 @@ export function regroupFlatNote(
     if (!moved) break;
   }
 
+  // PHASE FOUR: pages, inside a block. 4.34.2.
+  //
+  // LAST, AND THE ORDER IS AS LOAD-BEARING AS THE FIRST THREE. A page boundary
+  // is a delimiter between two COLUMNS, so it can only be placed once the
+  // columns are settled and in the order the reader asked for — put it earlier
+  // and phase three's moves would carry widgets across a boundary that was
+  // already written, leaving the pages holding whatever happened to be beside
+  // them.
+  //
+  // AND IT MOVES NOTHING. Phases one to three are `moveCell` — lines leave
+  // fences and arrive in others. This one only rewrites delimiters inside a
+  // fence whose contents are already right, which is why it can be a single
+  // pass where the others are settle loops: there is nothing for it to
+  // invalidate.
+  //
+  // `undefined` MEANS LEAVE THEM ALONE. A surface with no pages, and every
+  // caller written before they existed, passes nothing and reaches none of this
+  // — which is not the same as passing an empty list, and the difference is a
+  // Save on one note silently flattening another's pages.
+  if (pages) {
+    const wanted = new Set(pages);
+    for (let pass = 0; pass < ceiling; pass++) {
+      const now = flatBlocks(lines.join("\n"), sections);
+      let written = false;
+      for (const block of now) {
+        if (block.ids.length < 2) continue;
+        const at = whereIs(lines, sections, block.ids[0]);
+        if (!at) continue;
+        // THE OPENER IS NEVER A BOUNDARY, which `setPageBreaks` also refuses —
+        // stated here as a `slice(1)` so the two agree by construction rather
+        // than by both remembering.
+        const openers: number[] = [];
+        for (const id of block.ids.slice(1)) {
+          if (!wanted.has(id)) continue;
+          const where = whereIs(lines, sections, id);
+          if (where?.line != null) openers.push(where.line);
+        }
+        const next = setPageBreaks(at.body, openers);
+        if (!next) continue;
+        const rebuilt = replaceBlockBody(lines, at.block, next);
+        if (!rebuilt) continue;
+        lines = rebuilt;
+        written = true;
+        break;
+      }
+      if (!written) break;
+    }
+  }
+
   const out = lines.join("\n");
   return out === text ? null : out;
+}
+
+// One fence's body, replaced. The counterpart of `whereIs`, which reads one.
+//
+// EVERY OTHER FENCE IS RE-EMITTED AS THE EXACT LINES IT WAS READ AS — the
+// promise `widenCells` and `splitPageIn` both make, and the property that lets
+// structure be rewritten in a file somebody else arranged.
+function replaceBlockBody(
+  lines: readonly string[],
+  block: number,
+  body: readonly string[]
+): string[] | null {
+  const { at, segs } = fencesOf(lines);
+  if (block < 0 || block >= at.length) return null;
+  const out = segs.map((seg, i) =>
+    i === at[block] ? [seg[0], ...body, "```"] : [...seg]
+  );
+  return out.flat();
 }
 
 export function flatNoteModel(spec: FlatNoteSpec): SectionModel {
@@ -1824,7 +1950,8 @@ export function flatNoteModel(spec: FlatNoteSpec): SectionModel {
     // got there first: a flat note is the only surface whose catalogue composes
     // a row. See `SectionModel.blocks`.
     blocks: (text) => flatBlocks(text, sectionsFor(text)),
-    regroup: (text, blocks) => regroupFlatNote(text, sectionsFor(text), blocks),
+    regroup: (text, blocks, pages) =>
+      regroupFlatNote(text, sectionsFor(text), blocks, pages),
   };
 }
 

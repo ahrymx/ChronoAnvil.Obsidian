@@ -216,6 +216,22 @@ export class SectionEditorModal extends EditorModal {
   // asks one question, disables one button and says one sentence.
   private column = new Set<string>();
 
+  // Which rows begin a PAGE of their group rather than a column of the page
+  // before it — 4.34.2, and the `tab` lines the fence already carries.
+  //
+  // `joined`'s SIBLING, AND THE SAME ONE BIT PER ROW. That one says "this is
+  // with the one above it"; this says "and it starts a new page there". Two
+  // independent bits describe every arrangement a group can have — a column of
+  // page two is joined and not paged, the first column of page two is both —
+  // and neither needs to know how many of anything there are, which is what
+  // lets both survive a reorder for free.
+  //
+  // A ROW THAT IS NOT `joined` CANNOT BE `paged`, because a page is a division
+  // INSIDE a group and a row that opens its own block has no group to divide.
+  // `pagesOf` is where that is enforced, once, rather than at each of the three
+  // places that set the bit.
+  private paged = new Set<string>();
+
   constructor(app: App, plugin: AlmanacPlugin, private spec: SectionEditorSpec) {
     super(
       app,
@@ -233,6 +249,10 @@ export class SectionEditorModal extends EditorModal {
       for (const id of block.ids.slice(1)) this.joined.add(id);
       for (const id of block.loose) this.loose.add(id);
       for (const id of block.column) this.column.add(id);
+      // WHAT THE FILE ALREADY SAYS ABOUT ITS PAGES. Without this the window
+      // would open on a paged group showing one undivided list, and the first
+      // Save would flatten every page the reader had made.
+      for (const id of block.pages ?? []) this.paged.add(id);
     }
   }
 
@@ -352,6 +372,42 @@ export class SectionEditorModal extends EditorModal {
     return out;
   }
 
+  // One group's rows, cut into its pages. 4.34.2.
+  //
+  // `groupsOf`'s TWIN, ONE LEVEL IN: that one cuts a list of rows into blocks
+  // wherever a row is not joined to the one above it, and this cuts ONE block
+  // into pages wherever a row is marked as opening one. Same walk, same one bit
+  // per row, and neither has to count anything.
+  //
+  // THE FIRST ROW OF A BLOCK IS NEVER A BREAK, however it is marked. The `row`
+  // line opens page one exactly as it opens the first column, so a group's
+  // opener cannot begin a page — enforced here, once, rather than at each place
+  // that sets the bit or reads it.
+  private pagesOf(group: readonly string[]): string[][] {
+    const out: string[][] = [];
+    group.forEach((id, i) => {
+      if (i > 0 && this.paged.has(id)) out.push([id]);
+      else if (out.length) out[out.length - 1].push(id);
+      else out.push([id]);
+    });
+    return out;
+  }
+
+  // Every row that begins a page, across the whole arrangement — what `regroup`
+  // is handed.
+  //
+  // FILTERED THROUGH `groupsOf`, so a row that stopped being part of a group
+  // stops being a page break with it. The bit survives a reorder for free (it
+  // is one bit on one row) and that is exactly why it has to be read back
+  // through the current grouping rather than trusted on its own: a row dragged
+  // out of a group would otherwise arrive at the write still claiming to open a
+  // page of a group it is no longer in.
+  private pageBreaks(ids: readonly string[]): string[] {
+    return this.groupsOf(ids).flatMap((group) =>
+      group.filter((id, i) => i > 0 && this.paged.has(id))
+    );
+  }
+
   // Whether this surface has rows at all.
   private get hasRows(): boolean {
     return Boolean(this.model.blocks && this.model.regroup);
@@ -371,7 +427,7 @@ export class SectionEditorModal extends EditorModal {
     if (!this.hasRows) return [];
     const base = this.model.apply(this.spec.text, this.want) ?? this.spec.text;
     const want = this.groupsOf(idsOf(this.want));
-    const next = this.model.regroup?.(base, want);
+    const next = this.model.regroup?.(base, want, this.pageBreaks(idsOf(this.want)));
     if (!next) return [];
     const openerIn = (text: string): Map<string, string> =>
       new Map(
@@ -533,10 +589,20 @@ export class SectionEditorModal extends EditorModal {
   // written, and the documentation says so in those words.
   private renderBlock(host: HTMLElement, group: readonly string[]): void {
     const card = host.createDiv({ cls: "almanac-tpl-block" });
+    const pages = this.pagesOf(group);
     const bar = card.createDiv({ cls: "almanac-tpl-block-bar" });
     bar.createSpan({
       cls: "almanac-tpl-block-title",
-      text: `Group — ${group.length} columns`,
+      // WHAT THE BAR SAYS, AND IT NO LONGER COUNTS COLUMNS (4.34.2). `Group — 4
+      // columns` was accurate until a group could hold pages and then was
+      // exactly wrong: a group of two pages with two columns each is not a group
+      // of four columns, and the number was the one thing on this card a reader
+      // would have taken as a description of their page.
+      //
+      // It says how many PAGES instead, and only where there is more than one —
+      // a plain `Group` for the common case, which is the same restraint the
+      // foot exercises by carrying no count at all.
+      text: pages.length > 1 ? `Group — ${pages.length} pages` : "Group",
     });
     const split = bar.createEl("button", {
       cls: "almanac-tpl-move",
@@ -560,10 +626,22 @@ export class SectionEditorModal extends EditorModal {
     });
 
     const body = card.createDiv({ cls: "almanac-tpl-block-body" });
-    for (const id of group) {
-      const section = this.view(id);
-      if (section) this.renderRow(body, section);
-    }
+    // ONE BAND PER PAGE, AND ONLY WHERE THERE IS MORE THAN ONE. A single page is
+    // the group itself, and a band saying `Page 1` over the whole card would be
+    // naming a division that is not there — the same label-for-nothing the foot's
+    // column count turned out to be.
+    pages.forEach((page, n) => {
+      if (pages.length > 1) {
+        body.createDiv({
+          cls: "almanac-tpl-page",
+          text: `Page ${n + 1}`,
+        });
+      }
+      for (const id of page) {
+        const section = this.view(id);
+        if (section) this.renderRow(body, section);
+      }
+    });
   }
 
   // Which rows this one may trade places with: the ones in its own band, in
@@ -724,6 +802,46 @@ export class SectionEditorModal extends EditorModal {
         }
         out.addEventListener("click", () => {
           this.joined.delete(section.id);
+          // A ROW THAT LEAVES ITS GROUP STOPS OPENING A PAGE OF IT. `pageBreaks`
+          // filters this out at the write anyway — it reads the bit back through
+          // the current grouping — but leaving it set would mean a row put back
+          // in the group later silently arrives as a page break the reader did
+          // not ask for the second time.
+          this.paged.delete(section.id);
+          this.refreshFrame();
+        });
+
+        // ── AND WHERE ITS PAGE BEGINS (4.34.2) ──────────────────────────
+        //
+        // The second bit a row in a group carries. `Take out of the group`
+        // decides WHETHER it is in one; this decides whether it starts a new
+        // page of it or sits beside what came before.
+        //
+        // OFFERED ON EVERY JOINED ROW, INCLUDING ONES THAT ALREADY BREAK — a
+        // toggle rather than a one-way control, because the reader who made a
+        // page in the wrong place has no other way to unmake it here.
+        const breaks = this.paged.has(section.id);
+        const page = actions.createEl("button", {
+          cls: "almanac-tpl-move",
+          text: breaks ? "Join the page before" : "Start a page here",
+          attr: {
+            title: breaks
+              ? "Put this section back beside the one before it, in the same page"
+              : "Begin a new page of this group at this section — the group draws a numbered strip to switch between its pages",
+          },
+        });
+        // THE SAME REFUSAL THE SPLIT MAKES, AND FOR THE SAME REASON. Placing a
+        // boundary means knowing which line this section starts on; a section
+        // whose lines cannot be told from its neighbours' would have the `tab`
+        // written above somebody else's widget.
+        page.disabled = !this.loose.has(section.id);
+        if (page.disabled) {
+          page.title =
+            "This section's lines can't be told apart from the others in its block, so a page can't be started at it.";
+        }
+        page.addEventListener("click", () => {
+          if (breaks) this.paged.delete(section.id);
+          else this.paged.add(section.id);
           this.refreshFrame();
         });
       } else if (sameBand) {
@@ -1420,7 +1538,11 @@ export class SectionEditorModal extends EditorModal {
     // ONE WRITE. The reader pressed Save once.
     const base = next ?? current;
     const regrouped = this.hasRows
-      ? this.model.regroup?.(base, this.groupsOf(idsOf(this.want))) ?? null
+      ? this.model.regroup?.(
+          base,
+          this.groupsOf(idsOf(this.want)),
+          this.pageBreaks(idsOf(this.want))
+        ) ?? null
       : null;
     const final = regrouped ?? next;
     if (final === null) {

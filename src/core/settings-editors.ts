@@ -38,7 +38,7 @@ import {
 } from "../journals/journal-plan";
 import type { KindChange } from "../journals/journal-plan";
 import { confirmAction, confirmPlan, promptText } from "../ui/modals";
-import { openTemplateEditor, variantEligible } from "../ui/template-editor";
+import { openTemplateEditor } from "../ui/template-editor";
 import type { JournalSection } from "../journals/journal-sections";
 import { sectionContext } from "../journals/journal-sections";
 import { resolveLayoutFor } from "../journals/layout-transfer";
@@ -85,6 +85,7 @@ import {
   defaultSectionIds,
   sectionsFor,
   templateTargets,
+  splitLayoutTargets,
 } from "../journals/journal-sections";
 import { notify } from "./notify";
 import { journalFoldersOnDisk, removeJournal } from "./journal-removal";
@@ -1519,18 +1520,24 @@ export class JournalEditModal extends SteppedEditorModal {
             path,
             target.ctx,
             () => this.refreshBody(),
-            // `variantEligible` since 3.18 §6 — the same rule the banner door
-            // uses, named once rather than spelled in both places.
-            variantEligible(target.ctx)
-              ? (label, sections, options, kinds) =>
-                  this.addVariant(
-                    target.ctx.kind!.id,
-                    label,
-                    sections,
-                    options,
-                    kinds
-                  )
-              : undefined
+            // PASSED UNCONDITIONALLY SINCE 4.33. It was gated on
+            // `variantEligible`, which refused an index and a page; all three
+            // note kinds can carry a layout now, so the gate became a tautology
+            // and was deleted. `splitLayoutTargets` is the shared half that
+            // replaced it — the same call the banner door makes.
+            (label, sections, options, targets) => {
+              const split = splitLayoutTargets(
+                this.draft.kinds.map((k) => k.id),
+                targets
+              );
+              return this.addVariant(
+                label,
+                sections,
+                options,
+                split.kinds,
+                split.surfaces
+              );
+            }
           );
         });
       })();
@@ -1551,14 +1558,24 @@ export class JournalEditModal extends SteppedEditorModal {
   // every kind row from the fields it knows about and did not know about
   // `variants`, so a layout saved here and a journal edited afterwards were a
   // saved layout and its deletion.
+  //
+  // TAKES SPLIT LISTS SINCE 4.33, the same shape and for the same reason as
+  // `JournalManager.saveVariant` — the `kindId` parameter's silent `return` on
+  // an id that was not a kind is a Save button that does nothing now that a
+  // front page and a page can be saved from.
   private async addVariant(
-    kindId: string,
     label: string,
     sections: string[],
     options: Record<string, SectionOverrides>,
-    kinds: string[] = [kindId]
+    kinds: string[],
+    surfaces: ("index" | "page")[] = []
   ): Promise<void> {
-    if (!this.draft.kinds.some((k) => k.id === kindId)) return;
+    if (!kinds.length && !surfaces.length) {
+      new Notice(
+        "Almanac: pick at least one note type or surface to offer this layout on."
+      );
+      return;
+    }
 
     // Ids unique within the JOURNAL now rather than within the kind, derived
     // from the label like every other id in this plugin, and suffixed rather
@@ -1577,7 +1594,11 @@ export class JournalEditModal extends SteppedEditorModal {
         label,
         sections: [...sections],
         ...(Object.keys(options).length ? { options } : {}),
+        // Always written, even empty — see the note on `kinds` in
+        // JournalVariantConfig: an absent list means "every kind" to
+        // `variantKinds`, which is the wrong answer for a surface layout.
         kinds: [...kinds],
+        ...(surfaces.length ? { surfaces } : {}),
       },
     ];
 

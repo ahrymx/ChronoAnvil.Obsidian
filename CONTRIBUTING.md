@@ -40,6 +40,33 @@ Other expectations:
   does.
 - `npm run package` should still produce a working `dist/almanac/`.
 
+### Keeping a copy of a version
+
+There is no git repository here, so the archives ARE the history: a version that
+is packaged and not archived is gone the moment the working tree moves on. Two
+of them per version, in the sibling directories `almanac-builds/` (the installable
+plugin folder) and `almanac-source/` (the whole tree, minus `node_modules/` and
+`dist/`).
+
+```
+npm run release      # package, then archive both
+npm run archive      # archive what is already in dist/
+```
+
+`tools/archive.mjs` does the work, and everything it refuses is worth knowing
+about before you reach for `zip` by hand:
+
+- it **anchors every path to the repository**, because the way these archives
+  went wrong three times in one session was a `tar` in a subshell that had
+  inherited a `cd`, writing a valid 410-byte archive of nothing;
+- it **opens each archive after writing it** and checks the files its name
+  claims, and **deletes** one that fails — a hollow archive left on disk looks
+  exactly like a good one until the day it is the only copy;
+- it **refuses a stale `dist/`**, which is the one error reading the archive back
+  cannot catch: bump the version, archive, forget to package, and the previous
+  build is filed under the new number;
+- it **will not overwrite** an existing version's archive without `--force`.
+
 ---
 
 ## Licensing your contribution

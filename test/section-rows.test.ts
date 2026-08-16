@@ -362,7 +362,11 @@ describe("the window over it", () => {
     const at = editor.indexOf("private layoutOps()");
     expect(at).toBeGreaterThan(-1);
     const body = editor.slice(at, at + 1400);
-    expect(body).toContain("this.model.regroup?.(base, want)");
+    expect(body).toContain("this.model.regroup?.(base, want,");
+    // AND THE PAGES GO WITH THE BLOCKS (4.34.2). The preview runs the SAME
+    // write Save runs, so a pane that passed the groupings and not the page
+    // breaks would promise a file that Save does not produce.
+    expect(body).toContain("this.pageBreaks(idsOf(this.want))");
     expect(body).toContain("const to = openerIn(next)");
   });
 
@@ -485,5 +489,85 @@ describe("two fences claiming one section", () => {
     expect(
       out!.split("\n").filter((l) => l === "events:upcoming:9")
     ).toHaveLength(1);
+  });
+});
+
+// ── pages, written from the editor's arrangement (4.34.2) ─────────────────
+//
+// Phases one to three put the right sections in the right blocks and the right
+// order. Phase four says where the PAGES of a block divide, and it runs last
+// for a reason it is worth restating here: a page boundary sits between two
+// columns, so placing one before the columns have settled would leave it
+// holding whatever happened to be beside it when phase three finished.
+
+describe("where a group's pages divide", () => {
+  it("writes a tab at the section the arrangement named", () => {
+    const out = regroupFlatNote(
+      PAGE,
+      CAT,
+      [["diary", "launcher", "journals"], ["tasks"]],
+      ["journals"]
+    );
+    expect(out).not.toBeNull();
+    const body = out!.split("\n");
+    // The delimiter that opened `journals` as a column is the one promoted —
+    // not a second line added beside it.
+    expect(body.filter((l) => l === "tab")).toHaveLength(1);
+    expect(body.filter((l) => l === "cell")).toHaveLength(1);
+    expect(body.indexOf("tab")).toBeLessThan(body.indexOf("journals"));
+  });
+
+  it("reads its own writing back as the page it wrote", () => {
+    // THE ROUND TRIP, WHICH IS THE ONLY THING THAT PROVES THE TWO SIDES AGREE.
+    // `regroup` writes the line; `flatBlocks` is what the editor opens with. If
+    // these disagreed, the window would reopen showing no pages and the next
+    // Save would flatten them.
+    const out = regroupFlatNote(
+      PAGE,
+      CAT,
+      [["diary", "launcher", "journals"], ["tasks"]],
+      ["journals"]
+    );
+    const block = flatBlocks(out!, CAT).find((b) => b.ids.includes("diary"));
+    expect(block?.ids).toEqual(["diary", "launcher", "journals"]);
+    expect(block?.pages).toEqual(["journals"]);
+  });
+
+  it("takes a page boundary away again, leaving the column", () => {
+    const paged = regroupFlatNote(
+      PAGE,
+      CAT,
+      [["diary", "launcher", "journals"], ["tasks"]],
+      ["journals"]
+    )!;
+    const flat = regroupFlatNote(paged, CAT, [
+      ["diary", "launcher", "journals"],
+      ["tasks"],
+    ], []);
+    expect(flat).not.toBeNull();
+    expect(flat!.split("\n").filter((l) => l === "tab")).toHaveLength(0);
+    // AND THE COLUMN SURVIVES IT. Removing a page must not stack the two
+    // widgets that were either side of it.
+    expect(flat!.split("\n").filter((l) => l === "cell")).toHaveLength(2);
+    expect(blocksOf(flat!)).toEqual([["diary", "launcher", "journals"], ["tasks"]]);
+  });
+
+  it("leaves the pages alone when it is not told about them", () => {
+    // `undefined` IS NOT AN EMPTY LIST. A surface with no pages, and every
+    // caller written before they existed, must not delete the pages of a note
+    // that has them.
+    const paged = regroupFlatNote(
+      PAGE,
+      CAT,
+      [["diary", "launcher", "journals"], ["tasks"]],
+      ["journals"]
+    )!;
+    const again = regroupFlatNote(paged, CAT, [
+      ["diary", "launcher", "journals"],
+      ["tasks"],
+    ]);
+    // Nothing to do at all — the blocks already match and no page was named.
+    expect(again).toBeNull();
+    expect(paged.split("\n").filter((l) => l === "tab")).toHaveLength(1);
   });
 });

@@ -4387,6 +4387,82 @@ describe("shipped stylesheet", () => {
   });
 });
 
+describe("the archive script", () => {
+  const read = (n: string): string =>
+    readFileSync(resolve(__dirname, "..", n), "utf8");
+  const src = (): string => read("tools/archive.mjs");
+
+  // ── WHAT THIS PINS, AND WHY IT IS WORTH A TEST ──────────────────────────
+  //
+  // The archives were made by hand until 4.34.4, and by hand is how they went
+  // wrong: three times in one session a `tar` ran in a subshell that had
+  // inherited a `cd` from earlier in the same command line, and wrote a valid,
+  // correctly named, 410-byte archive of nothing. Exit code 0. The only symptom
+  // was the file size.
+  //
+  // An archive is opened for the first time on the day it is the only copy of
+  // something, so the properties below are the ones that make it worth having at
+  // all — and each of them is a line somebody could delete as redundant.
+
+  it("anchors every path to the repository, never to the caller's cwd", () => {
+    // The bug, at its root: the script must not have a cwd it can be wrong
+    // about. `zip` is given an explicit `cwd` per call rather than the process
+    // being moved to it.
+    expect(src()).toContain(
+      'const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");'
+    );
+    expect(src()).toContain("{ cwd: from }");
+    expect(src()).not.toContain("process.chdir");
+  });
+
+  it("reads back what it wrote, and deletes an archive that lies", () => {
+    // THE WHOLE POINT. Writing the file proves nothing — a hollow zip is a valid
+    // zip. What proves it is opening the thing on disk and finding the files its
+    // name claims.
+    //
+    // AND THE DELETION IS THE HALF THAT IS EASY TO SOFTEN into a warning. A
+    // hollow archive left on disk is indistinguishable from a good one at a
+    // glance and will be believed later; a missing one fails loudly the moment
+    // it is needed.
+    expect(src()).toContain("async function verify(");
+    expect(src()).toContain('await run("unzip", ["-l", archive])');
+    const at = src().indexOf("async function verify(");
+    const body = src().slice(at, src().indexOf("\n}\n", at));
+    expect(body).toContain("await rm(archive, { force: true })");
+  });
+
+  it("refuses to file a stale build under a new number", () => {
+    // The one error verification cannot catch, because everything in the archive
+    // is real: bump the version, archive, forget to package, and the PREVIOUS
+    // build is filed as the new one.
+    expect(src()).toContain('readFile(path.join(folder, "manifest.json")');
+    expect(src()).toContain("if (built.version !== version)");
+  });
+
+  it("will not overwrite a version's archive without being told to", () => {
+    // An archived version is the record of what shipped under that number, and
+    // this repo has no git to recover one from — `RESUME.md` is in the source
+    // zips for exactly that reason.
+    expect(src()).toContain("--force");
+    expect(src()).toContain("already exists");
+  });
+
+  it("keeps the build output out of the source archive", () => {
+    // Two copies of one build, in two archives beside each other, that drift the
+    // first time either is rebuilt.
+    expect(src()).toMatch(/SOURCE_SKIP = new Set\(\[[^\]]*"node_modules"/);
+    expect(src()).toMatch(/SOURCE_SKIP = new Set\(\[[^\]]*"dist"/);
+  });
+
+  it("is reachable as a script rather than a command to remember", () => {
+    const pkg = JSON.parse(read("package.json"));
+    expect(pkg.scripts.archive).toBe("node tools/archive.mjs");
+    // And the pair that is always run together has one name.
+    expect(pkg.scripts.release).toContain("npm run package");
+    expect(pkg.scripts.release).toContain("tools/archive.mjs");
+  });
+});
+
 describe("package manifest", () => {
   const read = (n: string): string =>
     readFileSync(resolve(__dirname, "..", n), "utf8");

@@ -18,14 +18,23 @@
 // why a layout naming section ids cannot simply travel.
 
 import { describe, expect, it } from "vitest";
-import { buildJournalType, variantKinds } from "../src/journals/journal";
+import {
+  STUDY_CONFIG,
+  STUDY_JOURNAL,
+  buildJournalType,
+  variantKinds,
+} from "../src/journals/journal";
 import {
   freshCustomJournal,
   journalTemplateFiles,
   normalizeJournalConfigs,
 } from "../src/journals/custom-journal";
 import type { JournalConfig } from "../src/journals/custom-journal";
-import { templateTargets } from "../src/journals/journal-sections";
+import {
+  layoutTargetsFor,
+  splitLayoutTargets,
+  templateTargets,
+} from "../src/journals/journal-sections";
 import { readCode, readSrc } from "./sources";
 
 // Two kinds, so "shared across kinds" is a thing that can be observed at all.
@@ -252,7 +261,76 @@ describe("the door a reader actually uses", () => {
   it("offers every kind of the journal, and no other journal's", () => {
     // The whole point of the storage move, and the limit on it: cross-kind is
     // offered, cross-journal is not.
-    expect(tpl()).toContain("ctx.type.kinds.map((k) => ({ id: k.id, label: k.label }))");
+    //
+    // ASKED OF `layoutTargetsFor` RATHER THAN OF THE SOURCE TEXT (4.33). This
+    // used to pin the literal `ctx.type.kinds.map(...)` in template-editor.ts,
+    // which broke the moment the expression moved into a named function
+    // without one word of the CLAIM becoming false. A pin that fails on a
+    // rename is measuring the spelling; the claim is about what comes back.
+    const targets = layoutTargetsFor(STUDY_JOURNAL);
+    const ids = targets.map((t) => t.id);
+    for (const k of STUDY_JOURNAL.kinds) expect(ids).toContain(k.id);
+    // And nothing from a journal that is not this one.
+    expect(ids).not.toContain("recipe");
+    expect(targets.every((t) => t.label.length > 0)).toBe(true);
+    // Still resolved caller-side, so the window stays ignorant — the next test.
+    expect(tpl()).toContain("targets: layoutTargetsFor(ctx.type)");
+  });
+
+  // ── the two surfaces (4.33) ──────────────────────────────────────────
+  it("offers a front page, and a page only where the journal has any", () => {
+    // Study's Lesson declares `pages`, so both surfaces are on offer.
+    const study = layoutTargetsFor(STUDY_JOURNAL).map((t) => t.id);
+    expect(study).toContain("surface:index");
+    expect(study).toContain("surface:page");
+
+    // A journal with no paged kind is not offered `Page`: `templateTargets`
+    // emits no page template for it, so the checkbox would tick a surface the
+    // journal does not have and produce a layout nothing could ever reload.
+    const flat = buildJournalType({
+      ...structuredClone(STUDY_CONFIG),
+      id: "flat",
+      kinds: [{ id: "note", emoji: "📝", label: "Note" }],
+    });
+    const ids = layoutTargetsFor(flat).map((t) => t.id);
+    expect(ids).toContain("surface:index");
+    expect(ids).not.toContain("surface:page");
+  });
+
+  it("prefixes the surfaces so a kind cannot collide with one", () => {
+    // A reader may name a kind `index` or `page`; nothing stops them. Bare ids
+    // would make the two indistinguishable in a ticked-target list.
+    const clash = buildJournalType({
+      ...structuredClone(STUDY_CONFIG),
+      id: "clash",
+      kinds: [
+        { id: "index", emoji: "📇", label: "Index card" },
+        { id: "page", emoji: "📄", label: "Page note", pages: true },
+      ],
+    });
+    const ids = layoutTargetsFor(clash).map((t) => t.id);
+    expect(ids).toEqual(["index", "page", "surface:index", "surface:page"]);
+
+    // And the split reads them apart rather than by resemblance.
+    const split = splitLayoutTargets(
+      ["index", "page"],
+      ["index", "surface:page"]
+    );
+    expect(split.kinds).toEqual(["index"]);
+    expect(split.surfaces).toEqual(["page"]);
+  });
+
+  it("a surface layout is offered on no kind at all", () => {
+    // `variantKinds` reads an absent `kinds` as EVERY kind, which on a surface
+    // layout would put a row in every create dropdown and claim a template file
+    // per kind. Closed at both ends: the writers pass `kinds: []`, and the
+    // reader treats absent-plus-surfaces as none.
+    const cfg = { kinds: [{ id: "lesson", emoji: "📖", label: "Lesson" }] };
+    expect(
+      variantKinds(cfg, { id: "v", label: "V", surfaces: ["index"] })
+    ).toEqual([]);
+    // A layout that names no surface keeps the old meaning exactly.
+    expect(variantKinds(cfg, { id: "v", label: "V" })).toEqual(["lesson"]);
   });
 
   it("keeps the editor ignorant of what a kind is", () => {

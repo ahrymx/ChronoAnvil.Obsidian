@@ -49,6 +49,7 @@ import {
   TFile,
 } from "obsidian";
 import { settingsButton } from "../ui/section-frame";
+import { openJournalTemplateWindow } from "../ui/journal-template-modal";
 import { attachNoteRename } from "../ui/header-title";
 import type AlmanacPlugin from "../main";
 import {
@@ -329,6 +330,25 @@ function attachBannerMenu(
       );
       return;
     }
+
+    // BESIDE "Edit sections…", NOT INSTEAD OF IT (4.33). Both act on the page's
+    // structure and they are different gestures: that one changes THIS note and
+    // destroys nothing; this one is about what every note of this type is built
+    // from, and carries the only control in the plugin that can rewrite a note's
+    // whole body. The ellipsis is every window-opening item's convention on this
+    // menu.
+    //
+    // NOT ON A MANAGED TEMPLATE — the `isTemplate` branch above has already
+    // returned. "Save this template as the default" is a tautology, and the file
+    // is regenerated anyway.
+    menu.addItem((i: MenuItem) =>
+      i
+        .setTitle("Template…")
+        .setIcon("layout-template")
+        .onClick(() =>
+          openJournalTemplateWindow(plugin.app, plugin, notePath, ctx)
+        )
+    );
 
     menu.addSeparator();
     menu.addItem((i: MenuItem) =>

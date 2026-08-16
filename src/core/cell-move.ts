@@ -49,12 +49,14 @@ import {
   HEADER_KEYWORD,
   HEIGHT_KEYWORD,
   ROW_KEYWORD,
+  TAB_KEYWORD,
   WIDE_KEYWORD,
   isCellLine,
   isFrameLine,
   isHeightLine,
   isRowLine,
   isSectionFence,
+  isTabLine,
   isTitleLine,
   splitDirective,
 } from "./directive-grammar";
@@ -141,6 +143,11 @@ export type CellTarget =
 const STRUCTURE = new Set<string>([
   ROW_KEYWORD,
   CELL_KEYWORD,
+  // 4.34. A page boundary draws nothing, exactly as a column boundary draws
+  // nothing — and this one line is what keeps every count in this file right:
+  // `isWidget` reads `isContent`, `widgetCount` reads `isWidget`, and a `tab`
+  // counted as a widget would let a two-widget block believe it has three.
+  TAB_KEYWORD,
   FRAME_KEYWORD,
   WIDE_KEYWORD,
   HEIGHT_KEYWORD,
@@ -233,10 +240,242 @@ export function widgetRun(
   if (!at.length) return null;
   const from = at[0];
   const to = at[at.length - 1] + 1;
+  // AND A PAGE BOUNDARY IS CAUGHT LIKE THE REST (4.34 §6). A run spanning a
+  // `tab` line is two pages of a group being dragged into one cell — the
+  // arrival would land both, the boundary between them would be read as a
+  // column boundary by nothing at all, and what the reader would get is two
+  // widgets stacked with a dead line between them.
   const caught = body
     .slice(from, to)
-    .some((l) => isRowLine(l) || isCellLine(l) || isFrameLine(l));
+    .some((l) => isRowLine(l) || isCellLine(l) || isFrameLine(l) || isTabLine(l));
   return caught ? null : { from, to };
+}
+
+// ── the pages of one fence ────────────────────────────────────────────
+//
+// WHERE EACH PAGE OF A GROUP BEGINS AND ENDS, in the body's own line numbering.
+// 4.34 §1.3.
+//
+// THE ONE NEW PRIMITIVE THIS FEATURE ADDS, and everything else about tabs is a
+// caller of it. `cellPlan`, `columnsOf`, `setCellWidths` and `delimit` all keep
+// their exact contracts; they are handed a slice instead of the whole body. A
+// design that taught each of them about tabs would be four implementations of
+// one walk, and the first bug would be a `cell` in tab 2 counted as a column of
+// tab 1.
+//
+// ONE SLICE PER **DRAWN** PAGE, which is `cellPlan`'s own rule about empty runs
+// stated over lines rather than over children: a page with no widget in it is a
+// page nobody can see, so a trailing `tab`, two in a row and a `tab` above a
+// directive that drew nothing all produce nothing here.
+//
+// A BODY WITH NO `tab` LINE IS ONE SLICE SPANNING IT — so a caller that never
+// asks about pages gets today's answer, which is the property that makes every
+// existing gesture keep working on every existing note.
+//
+// THE SLICE INCLUDES THE BLOCK'S OWN MODIFIERS on the first page only, because
+// that is where they are written and they describe the whole fence. A caller
+// that needs to ask "is this a row?" must therefore ask it of the BODY and not
+// of a slice — `setCellWidths` does exactly this, and it is the reason that
+// function takes both.
+// ── `page` IS AN ORDINAL, NOT A POSITION IN THIS LIST ────────────────────
+//
+// It counts the `tab` delimiters above the slice, so the first page is 0
+// whether or not it drew anything and the third is 2 whether or not the second
+// did. That distinction is the one hazard in this feature that is invisible
+// from either side alone:
+//
+//   `tabPlan` drops a page whose directives APPENDED NO CHILDREN — `on-this-day`
+//   on a young vault, a `links:` row with nothing to link — because there is no
+//   row to draw. This walk drops a page with no WIDGET LINE, which is not the
+//   same set: a page can hold a directive that renders nothing.
+//
+// So a group whose page 2 drew nothing has DOM rows [1, 3] and line slices
+// [1, 2, 3]. Numbered by position, a divider dragged in the second visible row
+// would be told it is page 1 and would write page 2's widths — a resize
+// corrupting a row nobody is looking at, which is exactly 4.34 §6's rule about
+// gestures not crossing a page. Numbered by delimiter, both sides say 2, and
+// the missing ordinal is simply absent from one of them.
+export interface TabSlice {
+  from: number;
+  to: number;
+  page: number;
+}
+
+export function tabSlices(body: readonly string[]): TabSlice[] {
+  const holdsWidget = (from: number, to: number): boolean =>
+    body.slice(from, to).some(isWidget);
+
+  const out: TabSlice[] = [];
+  let from = 0;
+  let page = 0;
+  for (let i = 0; i < body.length; i++) {
+    if (!isTabLine(body[i])) continue;
+    if (holdsWidget(from, i)) out.push({ from, to: i, page });
+    // The delimiter itself belongs to neither page: it closes the one before it
+    // and opens the one after, which is `cell`'s rule and the reason a slice
+    // starts on the line AFTER the line that opened it.
+    from = i + 1;
+    page++;
+  }
+  if (holdsWidget(from, body.length)) {
+    out.push({ from, to: body.length, page });
+  }
+  return out;
+}
+
+// One page's lines, by its ordinal, or null when it has none.
+//
+// THE ONLY WAY THE WRITERS ADDRESS A PAGE, so the ordinal rule above is applied
+// in one place rather than by every caller doing its own `find`.
+export function pageSlice(
+  body: readonly string[],
+  page: number
+): { from: number; to: number } | null {
+  const slice = tabSlices(body).find((s) => s.page === page);
+  // WITHOUT THE ORDINAL, deliberately. A caller holding one of these is about to
+  // do arithmetic on lines; handing it the page number as well invites a second
+  // reading of which page it is in, and there is already exactly one.
+  return slice ? { from: slice.from, to: slice.to } : null;
+}
+
+// ── making a page (4.34.1) ────────────────────────────────────────────
+//
+// A GRAMMAR WITH NO WAY TO REACH IT IS A GRAMMAR NOBODY USES, and this project
+// has the receipt: `cell: 2` worked from 4.4 and shipped unused in every build
+// until 4.9 gave it a divider to drag, because the only way to ask for one was
+// to type it. `tab` shipped in exactly that state and this is the other half.
+//
+// WHY IT IS A SPLIT AND NOT AN "ADD". The obvious gesture is a `+` that appends
+// a `tab` line — and it would do nothing at all, visibly. A page with no widget
+// in it is not drawn, by design and by the rule `tabSlices` states, so appending
+// a delimiter at the end of a fence produces a line in the file and no change on
+// the screen. That is worse than no button.
+//
+// So the button takes the LAST COLUMN OF THE LAST PAGE and gives it a page of
+// its own. The reader presses `+` on a two-column group and gets `[1] [2]` with
+// a column each — which is the thing they were trying to find out about — and
+// the second press splits again from what is left.
+//
+// AND THE DELIMITER IS REPLACED WHERE THERE IS ONE. If the last column was
+// opened by a `cell`, that line BECOMES the `tab`: the column boundary is
+// exactly where the page boundary goes, so writing both would leave a delimiter
+// that opens nothing — the thing `tidyCells` exists to clean up, created on
+// purpose one line earlier.
+//
+// A HEIGHT TRAVELS WITH ITS WIDGET, which is `runWithHeight`'s rule applied
+// here: a `height:` sizes the line under it, so the cut goes above the height
+// rather than between it and the card it describes.
+export function splitPage(body: readonly string[]): string[] | null {
+  if (!body.some(isRowLine)) return null;
+  const pages = tabSlices(body);
+  const last = pages[pages.length - 1];
+  if (!last) return null;
+
+  // TWO WIDGETS OR IT IS NOT A SPLIT. Taking the only widget out of a page
+  // leaves that page empty, which draws nothing — the reader would press a
+  // button and watch a page disappear.
+  const widgets = [];
+  for (let i = last.from; i < last.to; i++) {
+    if (isWidget(body[i])) widgets.push(i);
+  }
+  if (widgets.length < 2) return null;
+
+  let cut = widgets[widgets.length - 1];
+  while (cut - 1 >= last.from && isHeightLine(body[cut - 1])) cut--;
+
+  const indent = /^\s*/.exec(body[cut])?.[0] ?? "";
+  const above = cut - 1;
+  if (above >= last.from && isCellLine(body[above])) {
+    const next = [...body];
+    next[above] = `${/^\s*/.exec(body[above])?.[0] ?? ""}${TAB_KEYWORD}`;
+    return next;
+  }
+  return [...body.slice(0, cut), `${indent}${TAB_KEYWORD}`, ...body.slice(cut)];
+}
+
+// The body with its page boundaries at exactly these widget lines. 4.34.2.
+//
+// WHAT THE SECTIONS EDITOR NEEDS, AND WHY IT IS NOT `splitPage`. That one is a
+// gesture — take the last column and make a page of it — and it is the right
+// shape for a `+` in a foot, where the reader is pointing at a thing and asking
+// for one more. The editor is the other kind of surface entirely: it holds the
+// WHOLE arrangement, the reader moves several rows at once, and Save writes the
+// difference. So it states the boundaries it wants and this makes them true.
+//
+// `openers` ARE BODY LINE NUMBERS OF WIDGETS, one per widget that should begin a
+// page. The first widget of the block is never one — the `row` line opens page
+// one, exactly as it opens the first column — and one named there is ignored
+// rather than refused, because the editor computing the same rule again is the
+// second copy of a rule this file already owns.
+//
+// IT WRITES BOTH DIRECTIONS. A boundary that should be there and is not becomes
+// a `tab`; one that is there and should not be becomes a `cell` — NOT nothing,
+// because the two widgets it separates are still separate columns, and deleting
+// the line would stack them. That is the asymmetry to get right: a page boundary
+// is a column boundary that has been promoted, so demoting it returns it to what
+// it was rather than removing it.
+//
+// A HEIGHT TRAVELS WITH ITS WIDGET, on `splitPage`'s rule and for its reason.
+export function setPageBreaks(
+  body: readonly string[],
+  openers: readonly number[]
+): string[] | null {
+  if (!body.some(isRowLine)) return null;
+  const widgets: number[] = [];
+  for (let i = 0; i < body.length; i++) if (isWidget(body[i])) widgets.push(i);
+  if (widgets.length < 2) return null;
+
+  const want = new Set(openers);
+  // BACK TO FRONT, so an insertion does not move the lines the earlier
+  // boundaries were located at — `setCellWidths`' own rule, one file over.
+  const out = [...body];
+  for (let n = widgets.length - 1; n >= 1; n--) {
+    let cut = widgets[n];
+    while (cut - 1 > widgets[n - 1] && isHeightLine(out[cut - 1])) cut--;
+    const above = cut - 1;
+    const isTab = above >= 0 && isTabLine(out[above]);
+    const isCell = above >= 0 && isCellLine(out[above]);
+    const indent = /^\s*/.exec(out[above] ?? out[cut])?.[0] ?? "";
+    if (want.has(widgets[n])) {
+      if (isTab) continue;
+      if (isCell) out[above] = `${indent}${TAB_KEYWORD}`;
+      else out.splice(cut, 0, `${/^\s*/.exec(out[cut])?.[0] ?? ""}${TAB_KEYWORD}`);
+      continue;
+    }
+    if (isTab) out[above] = `${indent}${CELL_KEYWORD}`;
+  }
+  return out.join("\n") === body.join("\n") ? null : out;
+}
+
+// The note with block `block`'s last column split off as a page of its own.
+//
+// `widenCells`' SHAPE, and for its reason: the gesture hands over a file and a
+// block number and gets a file back, and every other fence is re-emitted as the
+// exact lines it was read as.
+export function splitPageIn(
+  lines: readonly string[],
+  block: number
+): string[] | null {
+  const { at, segs } = fencesOf(lines);
+  if (block < 0 || block >= at.length) return null;
+  const next = splitPage(segs[at[block]].slice(1, -1));
+  if (!next) return null;
+  const out = segs.map((seg, i) =>
+    i === at[block] ? [seg[0], ...next, "```"] : [...seg]
+  );
+  return out.flat();
+}
+
+// Which page a body line is in, as an ordinal, or -1.
+//
+// FOR THE GESTURES, which are handed a line number by a stamp in the DOM and
+// have to know which page's arithmetic to do. -1 is a line in no drawn page —
+// a modifier above the first widget, or a `tab` delimiter itself — and every
+// caller reads it as "do not touch", which is the honest answer for a line that
+// describes no page.
+export function tabAt(body: readonly string[], line: number): number {
+  const slice = tabSlices(body).find((s) => line >= s.from && line < s.to);
+  return slice ? slice.page : -1;
 }
 
 const bodyOf = (fence: readonly string[]): string[] => fence.slice(1, -1);
@@ -257,6 +496,11 @@ const wrap = (open: string, body: readonly string[]): string[] => [
 function opensSomething(body: readonly string[], i: number): boolean {
   for (let j = i + 1; j < body.length; j++) {
     if (isCellLine(body[j])) return false;
+    // AND A PAGE BOUNDARY ENDS THE SEARCH (4.34). A `cell` at the foot of tab 1
+    // opens nothing: the next widget is on the next PAGE, and a column cannot
+    // reach across one. Without this line the last delimiter of every page but
+    // the last would be kept alive by the first widget of the page after it.
+    if (isTabLine(body[j])) return false;
     // A header is not cell content (row.ts, `NOT_A_CELL`), so a delimiter
     // followed by one is still looking for its cell.
     if (isWidget(body[j])) return true;
@@ -266,6 +510,33 @@ function opensSomething(body: readonly string[], i: number): boolean {
 
 function tidyCells(body: readonly string[]): string[] {
   return body.filter((line, i) => !isCellLine(line) || opensSomething(body, i));
+}
+
+// Whether the `tab` delimiter at `i` opens a page that has anything in it.
+//
+// `opensSomething`'s TWIN, one level up, and deliberately a separate function
+// rather than a parameterised one: the two stop on different things — a column
+// ends at the next `cell` OR the next `tab`, a page ends only at the next `tab`
+// — and folding that into one walk with a flag would hide the asymmetry that is
+// the whole difference between the two delimiters.
+function opensPage(body: readonly string[], i: number): boolean {
+  for (let j = i + 1; j < body.length; j++) {
+    if (isTabLine(body[j])) return false;
+    if (isWidget(body[j])) return true;
+  }
+  return false;
+}
+
+// The body with any `tab` line that pages nothing taken out. 4.34 §6.
+//
+// `tidyCells`' MIRROR, AND WHAT A DEPARTURE LEAVES BEHIND. Drag the only widget
+// out of tab 2 and the `tab` line that opened it is still there, saying there is
+// a page where there is none — the strip would draw `[1] [2]` and `[2]` would be
+// empty. `tabSlices` already declines to draw it, so this is not a correctness
+// fix; it is not leaving a line in the reader's file that describes a page that
+// is not there.
+function tidyTabs(body: readonly string[]): string[] {
+  return body.filter((line, i) => !isTabLine(line) || opensPage(body, i));
 }
 
 // The body with any `height:` line that sizes nothing taken out. 4.22 §5.4.
@@ -314,12 +585,22 @@ function pruned(body: readonly string[]): string[] | null {
   // out loud. So leaving them here would hand the reader an error message on a
   // block they did not touch — the widget that stayed behind, wearing a refusal
   // about a line it never had a use for.
+  //
+  // AND THE PAGES GO WITH IT TOO (4.34). A block of one widget is not a row, so
+  // it is not a group, so it has no pages — and a `tab` line left on it would be
+  // refused out loud by `parseTabs` for having no `row`, which is the same
+  // error-on-a-block-they-did-not-touch this branch already exists to prevent.
   if (widgetCount(body) < 2) {
     return body.filter(
-      (l) => !isRowLine(l) && !isCellLine(l) && !isHeightLine(l)
+      (l) =>
+        !isRowLine(l) && !isCellLine(l) && !isTabLine(l) && !isHeightLine(l)
     );
   }
-  return tidyHeights(tidyCells(body));
+  // TABS TIDIED BEFORE CELLS, and the order is load-bearing. `opensSomething`
+  // stops at a page boundary, so removing an emptied `tab` line first is what
+  // lets the `cell` above it see the widget that has become its own again. The
+  // other order leaves a delimiter that opens nothing.
+  return tidyHeights(tidyCells(tidyTabs(body)));
 }
 
 // The run as it arrives, with the delimiter its new cell needs.
@@ -340,13 +621,29 @@ function pruned(body: readonly string[]): string[] | null {
 // coincidence. `composeFlatNote` makes the same choice from the other end and
 // says so: a page that never asked for cells should not gain a delimiter
 // between every pair.
+//
+// AND "UNDIVIDED" IS ASKED OF THE PAGE, NOT OF THE FENCE (4.34 §6). A group can
+// have a divided tab 1 and an undivided tab 2, and the question this rule turns
+// on — *does this row already say where its columns are?* — is a question about
+// the row the run is landing in. Asked of the whole body, an arrival into an
+// undivided tab 2 would gain a delimiter because tab 1 has one, which divides a
+// row the reader never divided; asked the other way round, a landing in a
+// divided tab 1 would merge into its neighbour. Both are the bug this function's
+// header describes, reached through the delimiter added one level up.
+//
+// AND `at` AT THE END OF A PAGE IS THE END OF THE BODY'S CASE. A run landing at
+// the last line of tab 1 has nothing in that page to re-open, so the delimiter
+// goes before it, exactly as it does at the end of the fence.
 function arrival(
   body: readonly string[],
   run: readonly string[],
   at: number
 ): string[] {
-  if (!body.some(isRowLine) || !body.some(isCellLine)) return [...run];
-  return at >= body.length
+  if (!body.some(isRowLine)) return [...run];
+  const page = tabSlices(body).find((s) => at >= s.from && at <= s.to);
+  const span = page ?? { from: 0, to: body.length };
+  if (!body.slice(span.from, span.to).some(isCellLine)) return [...run];
+  return at >= span.to
     ? [CELL_KEYWORD, ...run]
     : [...run, CELL_KEYWORD];
 }
@@ -370,11 +667,18 @@ function arrival(
 // EXPORTED FOR `cell-width.ts` (4.9 §3.3), which needs it for the same reason a
 // stack does and states it in its own words: a weight has nowhere to be written
 // until the delimiters an undivided row implies are on the page.
+// AND THE COUNT RESTARTS AT EVERY PAGE (4.34 §6). A `tab` line opens its page's
+// first cell exactly as `row` opens the fence's first one, so the first widget
+// after a `tab` is already in a column and must not be given a delimiter of its
+// own. Without the reset, writing out an undivided two-page group puts a `cell`
+// immediately after every `tab` — which `cellPlan` drops as an empty run, so it
+// would render correctly and read as a file full of lines that do nothing.
 export function delimit(body: readonly string[]): { body: string[]; map: number[] } {
   const out: string[] = [];
   const map: number[] = [];
   let seen = 0;
   for (let i = 0; i < body.length; i++) {
+    if (isTabLine(body[i])) seen = 0;
     if (isWidget(body[i])) {
       if (seen > 0) out.push(CELL_KEYWORD);
       seen++;

@@ -350,6 +350,19 @@ describe("a stored plural survives an edit", () => {
     expect(kindPlural(practice as JournalKind)).toBe("Practice");
   });
 
+  it("is what the widgets print, rather than a second derivation", () => {
+    // AN OVERRIDE IS ONLY WORTH STORING IF EVERY SURFACE READS IT. Three in
+    // tables.ts did not, and each called `plural` on the kind's LABEL: the
+    // rollup's column heading, `level-index`'s per-kind heading, and the stats
+    // band's label. So a subject's table was headed "Practices" over a topic
+    // whose own section header, buttons and empty states — all of which go
+    // through `kindPlural` — said "Practice". One kind, two spellings, on two
+    // pages a click apart.
+    const tables = readCode("tables");
+    expect(tables).not.toMatch(/plural\(k(?:ind)?\.label\)/);
+    expect(tables).toContain("type.kinds.map((k) => kindPlural(k))");
+  });
+
   it("drops an override the new label already produces", () => {
     // A kind relabelled to "Seminar" whose stored plural is the one the
     // pluraliser would derive anyway keeps nothing — a journal should not

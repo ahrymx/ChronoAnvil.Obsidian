@@ -850,9 +850,50 @@ describe("one bar, at one scale (4.13 §1)", () => {
   it("reveals widget block heads on hover while keeping them discrete at rest", () => {
     const cardHead = body(".journal-widget-card > .journal-block-head {");
     expect(cardHead).toContain("opacity: 0");
-    expect(cardHead).toContain("max-height: 0");
+    // AND IT OVERLAYS RATHER THAN OPENING A GAP (4.34.3). It animated
+    // `max-height` from 0, which is height the card did not have a moment
+    // earlier — so hovering a widget in a group pushed its own content down and
+    // made its cell taller than the ones beside it. A label about a widget was
+    // rearranging the widget.
+    expect(cardHead).toContain("position: absolute");
+    expect(cardHead).not.toContain("max-height");
+    // AND NEITHER HOST HAS A HIT AREA OF ITS OWN AT REST (4.34.4, fixed in
+    // 4.34.5). The trigger is the grip's 44px box and nothing else — the head
+    // names what the grip picks up, so the two appear together. A full-width
+    // strip along the top edge still opened the band on the way past, because
+    // the top of a card is something a pointer crosses to get anywhere else.
+    //
+    // ASKED OF EVERY REST RULE, NOT OF THE CARD'S. 4.34.4 set this on the card
+    // and missed the block — the same head with a second host — so a widget
+    // outside a group went on opening its band to any pointer near its top edge,
+    // and the same control behaved two ways on one page. A test that named one
+    // host could not have caught that, which is why this one enumerates them.
+    const rests = rules()
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("}")
+      .map((r) => r.split("{"))
+      .filter(
+        ([sel, decls]) =>
+          sel !== undefined &&
+          decls !== undefined &&
+          / > \.journal-block-head\s*$/.test(sel) &&
+          decls.includes("opacity: 0")
+      );
+    expect(rests.length, "the head's rest rules").toBeGreaterThanOrEqual(2);
+    for (const [sel, decls] of rests) {
+      expect(decls, sel.trim()).toContain("pointer-events: none");
+      expect(decls, sel.trim()).toContain("position: absolute");
+    }
     const raw = rules();
-    expect(raw).toContain(".journal-widget-card:hover > .journal-block-head");
+    // NOT FROM ANYWHERE IN THE CARD, which is the reveal this replaced.
+    expect(raw).not.toContain(".journal-widget-card:hover > .journal-block-head");
+    expect(raw).toContain(
+      ".journal-widget-card:has(> .jbd-handle:hover) > .journal-block-head"
+    );
+    // AND THE BAND KEEPS ITSELF OPEN once it is, which is what lets the pointer
+    // walk off the dots and into it — the one thing its own `:hover` is for, and
+    // it only works because the open state takes `pointer-events` back.
+    expect(raw).toContain(".journal-widget-card > .journal-block-head:hover");
   });
 
   it("divides both of them with the same rule weight", () => {

@@ -127,6 +127,23 @@ export interface JournalVariantConfig {
   // that no longer exists, or a layout no kind names — is exactly the
   // two-sided drift `preserveIds` and the id-stability rule exist to prevent.
   kinds?: string[];
+  // Surfaces beyond this journal's kinds that this layout is offered on. 4.33.
+  //
+  // ABSENT MEANS NONE — deliberately the OPPOSITE of `kinds` above, and the
+  // asymmetry is the honest one rather than the tidy one. "Absent means all"
+  // works for kinds because every kind can compose every layout, so a layout
+  // that says nothing is offered wherever it fits. It cannot work here: these
+  // two surfaces are not kinds, a layout saved from a Lesson has no business
+  // being offered on a Subject Index by default, and every layout saved before
+  // this field existed was saved from a kind.
+  //
+  // A SEPARATE FIELD RATHER THAN TWO MORE ENTRIES IN `kinds`. `variantKinds`
+  // filters names against real kind ids and DROPS what it does not recognise,
+  // so `kinds: ["index"]` would be silently discarded; and a journal whose kind
+  // id is literally `index` or `page` would be indistinguishable from the
+  // surface. See `LAYOUT_SURFACE_INDEX` in journal-sections.ts for why these
+  // are recipes rather than template files.
+  surfaces?: ("index" | "page")[];
 }
 
 export interface JournalConfig {
@@ -242,14 +259,33 @@ export interface JournalPreset {
 // journal that declares them, so installing Study under a fresh id would leave
 // every Study note in the vault classified by nothing. This is the same hazard
 // `preserveIds` exists for, one level up.
+//
+// COPIED DEEPLY, AND THAT IS THE WHOLE OF IT (4.33). `preset.config` IS the
+// module-level literal — `STUDY_PRESET.config` is `STUDY_CONFIG` itself — so
+// anything this function shares by reference is shared with the shipped
+// default for the life of the process.
+//
+// It used to spread and then hand-copy two fields, which covered `kinds` and
+// `levels` and left `layout` and `variants` aliased. That was invisible while
+// nothing wrote them: `saveVariant` and `addVariant` both ASSIGN a new array
+// (`cfg.variants = [...]`) rather than mutating in place, so they were safe by
+// accident rather than by design. 4.33 gives a reader a way to write
+// `cfg.layout`, and a property write through an aliased object would edit the
+// shipped preset — so a second Study, or the wizard's "Start from Study",
+// would hand out the first reader's arrangement as the plugin's default.
+//
+// `structuredClone` rather than two more `.map` lines, because the hand-copy
+// was already one field behind the type when this was found and a third
+// nested field would put it behind again. It is the same call and the same
+// argument `startFrom` makes in settings.ts, where the comment reads "copied
+// deeply, so editing the new draft cannot reach back into the journal it was
+// started from" — this is that sentence, about the shipped literal.
 export function presetConfig(
   preset: JournalPreset,
   paths?: { root?: string; templatesFolder?: string }
 ): JournalConfig {
   return {
-    ...preset.config,
-    kinds: preset.config.kinds.map((k) => ({ ...k })),
-    levels: preset.config.levels.map((l) => ({ ...l })),
+    ...structuredClone(preset.config),
     ...(paths?.root ? { root: paths.root } : {}),
     ...(paths?.templatesFolder
       ? { templatesFolder: paths.templatesFolder }

@@ -1166,8 +1166,34 @@
 .almanac-tpl-row-added .almanac-list-title {
   color: var(--text-accent);
 }
+/* ── THE SPINE IS A HOVER, NOT A STATE (4.34.3) ─────────────────────────
+ *
+ * It was `3px solid var(--interactive-accent)`, permanently, on every row that
+ * is a section rather than a bare widget — so a list of twelve rows drew up to
+ * twelve accent bars down its left edge, all of them saying the same thing about
+ * a distinction the `Section` pill on the row already makes in words.
+ *
+ * An accent is emphasis, and emphasis that never varies is texture. What a
+ * reader wants from a list is to know WHICH ROW THEY ARE ON — which is the one
+ * thing the permanent version could not say — so the spine becomes the pointer's
+ * mark and the pill keeps the fact.
+ *
+ * RESERVED ON EVERY ROW, AND TRANSPARENT. The width is held whether or not the
+ * colour is, so nothing shifts by 3px as the pointer crosses it — and every row
+ * in the list gets the same slot, so a widget row and a section row light up
+ * identically. */
+.almanac-tpl-list .almanac-list-row {
+  border-left: 3px solid transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.almanac-tpl-list .almanac-list-row:hover {
+  border-left-color: var(--interactive-accent);
+}
 .almanac-tpl-row-section {
-  border-left: 3px solid var(--interactive-accent);
+  /* The width the shared rule already reserves; named here so the row keeps its
+     slot on any surface that lists sections outside the editor. */
+  border-left-width: 3px;
+  border-left-style: solid;
 }
 .almanac-tpl-row-section .almanac-list-title {
   font-weight: 600;
@@ -1510,11 +1536,16 @@
    Inset rather than raised: the rows inside are the same rows they were, and a
    heavier surface than the list they sit in would read as a different kind of
    item rather than as a container for the same kind. */
+/* A GROUP IS A CARD IN A LIST OF ROWS, AND IT NEEDS MORE AIR THAN A ROW DOES
+   (4.34.3). At 6px the card's own border sat almost against the loose rows above
+   and below it, so the boundary between "these three are one object" and "this
+   one is on its own" was carried by a 2px rule and nothing else. The gap is what
+   says a card is a different kind of thing from the rows around it. */
 .almanac-tpl-block {
   border: var(--am-rule) solid var(--background-modifier-border);
   border-radius: var(--am-radius-md);
   background: var(--background-primary-alt);
-  margin: 6px 0;
+  margin: 12px 0;
   overflow: hidden;
 }
 .almanac-tpl-block-bar {
@@ -1536,6 +1567,36 @@
   flex-direction: column;
   gap: 4px;
   padding: 6px;
+}
+/* ── Where a page of a group begins (4.34.2) ────────────────────────────
+ *
+ * A thin labelled rule between the rows of one group, drawn only where the
+ * group has more than one page — a single page is the group itself, and a band
+ * saying `Page 1` over the whole card would name a division that is not there.
+ *
+ * THE BAND IDIOM THE LIST ALREADY HAS, one level in: `.almanac-tpl-band`
+ * separates the bands of a diary entry in exactly this voice, and a page is the
+ * same kind of statement about a smaller thing. Sharing the look is what makes
+ * the card read as one list with divisions rather than as two lists. */
+.almanac-tpl-page {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: var(--am-text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.almanac-tpl-page::after {
+  content: "";
+  flex: 1 1 auto;
+  border-top: var(--am-rule-hair) solid var(--background-modifier-border);
+}
+/* The first band sits directly under the card's own bar, which already draws a
+   rule — so it gets no top margin and reads as that bar's second line. */
+.almanac-tpl-block-body > .almanac-tpl-page:first-child {
+  margin-top: 0;
 }
 /* A CLASS OF ITS OWN, NOT THE REMOVE BUTTON'S. These three act on where a
    section SITS; Remove acts on whether it is there at all. They also sit on
@@ -1889,12 +1950,19 @@
    should recognise this. What is new here is only what that window has no
    equivalent of — a sentence about the grain, a pair of full-width actions, and
    the block that stands in for the reload controls when the page is not empty. */
-.almanac-entry-tpl-note {
+/* RENAMED FROM `.almanac-entry-tpl-*` IN 4.33, when the journals grew the same
+   window. The rules never had a diary thought in them — a note, an actions row
+   and a refusal block — and a journal note carrying a class called `entry-tpl`
+   is one name for two things, which is the drift `RETIRED_WORDS` exists over
+   one layer up. They sit beside `.almanac-tpl-band` and `.almanac-tpl-toggle`,
+   which is where 4.29 borrowed them from and which already had the shorter
+   name. */
+.almanac-tpl-note {
   font-size: var(--am-text-sm);
   color: var(--text-muted);
   margin: 0 0 var(--am-space-2);
 }
-.almanac-entry-tpl-actions {
+.almanac-tpl-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--am-space-2);
@@ -1904,33 +1972,33 @@
    entry is for — this is the window declining to do something destructive, not
    the reader having made a mistake. Same reasoning as `.almanac-tpl-row-locked`
    one screen up, at the weight a whole block needs rather than a subtitle. */
-.almanac-entry-tpl-loss {
+.almanac-tpl-loss {
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--am-radius-md);
   background: var(--am-surface-inset);
   padding: var(--am-space-3);
   font-size: var(--am-text-sm);
 }
-.almanac-entry-tpl-loss-head {
+.almanac-tpl-loss-head {
   display: flex;
   align-items: flex-start;
   gap: var(--am-space-2);
   color: var(--text-normal);
 }
-.almanac-entry-tpl-loss-icon {
+.almanac-tpl-loss-icon {
   flex: 0 0 auto;
   display: flex;
   margin-top: 2px;
   color: var(--text-muted);
 }
-.almanac-entry-tpl-loss-list {
+.almanac-tpl-loss-list {
   margin: var(--am-space-2) 0 var(--am-space-2) var(--am-space-5);
   padding: 0;
   color: var(--text-muted);
 }
-.almanac-entry-tpl-loss-list li {
+.almanac-tpl-loss-list li {
   margin: 2px 0;
 }
-.almanac-entry-tpl-loss .almanac-entry-tpl-note {
+.almanac-tpl-loss .almanac-tpl-note {
   margin: 0;
 }

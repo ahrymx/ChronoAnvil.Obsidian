@@ -139,6 +139,20 @@ export interface AlmanacSettings {
   // remembers which sections the user has folded so they stay folded across
   // reloads. Absent key = expanded (the default).
   collapsedNoteSections: Record<string, boolean>;
+  // Which page of a tabbed widget group the reader last had open, keyed
+  // "<notePath>::<blockIndex>". Absent key = the first page. 4.34 §4.
+  //
+  // `collapsedNoteSections`' SHAPE AND ITS LOAD-TIME PRUNE, deliberately — the
+  // fold state is the same kind of fact (per-note, per-place, the reader's own,
+  // worthless to anyone else) and it already solved the two problems this has:
+  // where to put it so the markdown is not rewritten on every click, and how to
+  // stop a record that only ever grows.
+  //
+  // A NUMBER RATHER THAN A BOOLEAN IS THE ONE DIFFERENCE, AND IT IS THE ONE THAT
+  // CAN GO STALE. A fold cannot be wrong about a note that changed; a page index
+  // can, because the reader can delete a `tab` line. It is clamped where it is
+  // read and the clamp does not write — see `openTabFor` in main.ts.
+  openGroupTabs: Record<string, number>;
   // Unsaved quick-capture text, kept so closing the box doesn't lose it.
   // Lives here rather than in memory so it survives a restart.
   captureDraft: string;
@@ -234,6 +248,7 @@ export const DEFAULT_SETTINGS: AlmanacSettings = {
   customJournals: [],
   dismissedJournalFolders: [],
   collapsedNoteSections: {},
+  openGroupTabs: {},
   captureDraft: "",
   captureCollapsedByDefault: true,
   collapsedSettingsGroups: {},

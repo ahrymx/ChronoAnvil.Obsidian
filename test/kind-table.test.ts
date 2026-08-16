@@ -8,6 +8,8 @@
 import { describe, it, expect } from "vitest";
 import {
   COMPLETED_STATUS,
+  containerDepth,
+  hasLevelBelow,
   isCompletedStatus,
   kindTableProperties,
   sortKindRows,
@@ -322,7 +324,7 @@ describe("what is below this note decides which table to draw", () => {
     return src.slice(at, end);
   };
 
-  it("branches on whether there are child folders, at render time", () => {
+  it("branches on the level, at render time — not on today's contents", () => {
     // THE WHOLE POINT OF THE WIDGET. The journal catalogue used to choose
     // between a folder rollup and per-kind note tables when the note was
     // WRITTEN, by reading `hasSubContainers` at compose time — so a note that
@@ -331,15 +333,71 @@ describe("what is below this note decides which table to draw", () => {
     //
     // A SOURCE ASSERTION, and it says so: the branch reads a vault, which this
     // suite has no stub for — the same limit `kind-table`'s own header states
-    // about its DOM. What can be pinned is that the decision is made from the
-    // folder list rather than from anything handed in, and that it is made HERE.
+    // about its DOM. What can be pinned is WHICH QUESTION it asks, and that it
+    // is asked HERE. The question itself is pure and is pinned below.
     const body = fnBody(tables(), "export function buildLevelIndex(");
-    expect(body).toContain("journalChildFolders(plugin, type, folder)");
-    expect(body).toContain("if (children.length > 0)");
-    // Both branches, and the folder one first — an empty folder list is what
-    // means "the deepest level", not a special case flagged from outside.
+    expect(body).toContain("hasLevelBelow(type, folder.path)");
+    // AND NOT FROM THE FOLDER LISTING. Counting sub-folders is the bug: it read
+    // "no topics yet" as "this is the deepest level" and gave a fresh Subject
+    // the Lesson/Practice tables belonging to a level it does not have.
+    expect(body).not.toContain("journalChildFolders");
+    // Both branches, and the folder one first.
     expect(body).toContain("folderRollup(plugin, ctx, type, folder)");
     expect(body).toContain("kindTable(plugin, ctx, type, folder.path, kind.id)");
+  });
+
+  // ── the question the branch asks ────────────────────────────────────
+  //
+  // Pure, exported, and tested for its answers rather than its text — which is
+  // the whole reason it was worth extracting from the `if`.
+  describe("what is below a folder is a fact about its level", () => {
+    const STUDY_ROOT = STUDY_JOURNAL.root;
+
+    it("counts the root as one above the first level", () => {
+      // The root HOLDS Subjects, so its depth is the one whose children are
+      // `levels[0]`. It used to answer 0 — the same as a Subject — which named
+      // the root's own children "Topic".
+      expect(containerDepth(STUDY_JOURNAL, STUDY_ROOT)).toBe(-1);
+      expect(containerDepth(STUDY_JOURNAL, `${STUDY_ROOT}/Mathematics`)).toBe(0);
+      expect(
+        containerDepth(STUDY_JOURNAL, `${STUDY_ROOT}/Mathematics/Trigonometry`)
+      ).toBe(1);
+    });
+
+    it("says a subject has topics below it even when it has none yet", () => {
+      // THE REPORTED BUG. Mathematics on the day it is made: no Topic folders,
+      // and every other surface still calls what goes in it a Topic.
+      expect(hasLevelBelow(STUDY_JOURNAL, `${STUDY_ROOT}/Mathematics`)).toBe(
+        true
+      );
+      expect(hasLevelBelow(STUDY_JOURNAL, STUDY_ROOT)).toBe(true);
+    });
+
+    it("says a topic does not, however many folders are sitting in it", () => {
+      // A paged Lesson is a folder in a Topic and is not a container, so the
+      // old reading flipped a Topic to a rollup the first time a lesson was
+      // split. Depth cannot be talked into it.
+      expect(
+        hasLevelBelow(STUDY_JOURNAL, `${STUDY_ROOT}/Mathematics/Trigonometry`)
+      ).toBe(false);
+    });
+
+    it("agrees with the context that composed the note", () => {
+      // ONE RULE, TWO READERS. `sectionContext` decides from `depth` which
+      // shape the section is WRITTEN as; this decides which shape it RENDERS
+      // as. They disagreed, and the page is where that showed.
+      const path = (depth: number): string =>
+        [STUDY_ROOT, ...Array.from({ length: depth + 1 }, (_, i) => `L${i}`)]
+          .join("/");
+      for (const type of [STUDY_JOURNAL, COOKING]) {
+        for (let depth = 0; depth < type.levels.length; depth++) {
+          expect(
+            hasLevelBelow(type, path(depth).replace(STUDY_ROOT, type.root)),
+            `${type.name} depth ${depth}`
+          ).toBe(sectionContext(type, { depth }).hasSubContainers);
+        }
+      }
+    });
   });
 
   it("subscribes to the folder it reads, through the one resolver", () => {

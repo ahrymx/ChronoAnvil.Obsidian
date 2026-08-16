@@ -143,6 +143,7 @@ import { foldableSection, sectionFrame } from "../section-frame";
 import type { FoldStore } from "../section-frame";
 import {
   CELL_KEYWORD,
+  TAB_KEYWORD,
   TITLE_KEYWORD,
   cellWeightOf,
   isFrameLine,
@@ -155,11 +156,13 @@ import {
   parseFrame,
   parseHeights,
   parseRow,
+  parseTabs,
   parseWide,
 } from "../../core/directive-grammar";
 import type { FrameValue } from "../../core/directive-grammar";
 import { layOutRow } from "./row";
 import type { CellBound } from "./row";
+import { tabHandle } from "./group-tabs";
 import {
   applyCardHeights,
   attachBlockHead,
@@ -675,6 +678,13 @@ export class Widgets implements
       const cellSpec = parseCells(
         rawLines.filter((l) => l.length > 0 && !l.startsWith("#"))
       );
+      // AND WHERE ITS PAGES DIVIDE (4.34 §1). `parseCells`' twin one level up,
+      // read here for the same reason and dropped from `lines` for the same one
+      // — a `tab` means "here", so the loop meets it in sequence exactly as it
+      // meets a `cell`.
+      const tabSpec = parseTabs(
+        rawLines.filter((l) => l.length > 0 && !l.startsWith("#"))
+      );
       // AND HOW WIDE THE PAGE IS (4.11). Read with the other block modifiers,
       // dropped from `lines` like two of them, and the only one that says
       // something about the NOTE — which is why `parseWide` refuses it in a fence
@@ -781,6 +791,12 @@ export class Widgets implements
         container.createDiv({
           cls: "journal-frame-error",
           text: `Almanac: ${cellSpec.error}`,
+        });
+      }
+      if (tabSpec.error) {
+        container.createDiv({
+          cls: "journal-frame-error",
+          text: `Almanac: ${tabSpec.error}`,
         });
       }
       // And the height modifier's. This is the one a reader meets by ACCIDENT —
@@ -933,6 +949,12 @@ export class Widgets implements
       // so "the child before this line" is not always a child of this line.
       const cellBounds: CellBound[] = [];
 
+      // AND WHERE EACH PAGE OF THE GROUP ENDS (4.34 §2). `cellBounds`' shape
+      // exactly — a count of children rather than a node — because a `tab` above
+      // a directive that draws nothing has the identical problem a `cell` there
+      // has, and it has one answer.
+      const tabBounds: number[] = [];
+
       // The widgets a head can be put above, paired with the name to put in it.
       //
       // RECORDED AT THE APPEND, because that is the only place both halves are
@@ -970,6 +992,15 @@ export class Widgets implements
               weight: cellWeightOf(line) ?? 1,
             });
           }
+          continue;
+        }
+
+        // The page delimiter, on the same terms and taken in the same place: it
+        // draws nothing, dispatches nothing, records a position and steps aside.
+        // Before every other arm so it can never reach `buildFromSpec` as an
+        // unknown keyword.
+        if (kind === TAB_KEYWORD) {
+          if (tabSpec.tabs) tabBounds.push(container.childElementCount);
           continue;
         }
 
@@ -1378,7 +1409,23 @@ export class Widgets implements
       if (rowSpec.row) {
         for (const { el, title } of named) cardWidget(el, title);
         applyCardHeights(container, rawLines);
-        layOutRow(container, cellBounds);
+        // AND WHERE THE READER LEFT IT, on a group that has pages (4.34 §4).
+        //
+        // THE KEY IS ASKED FOR HERE AND NOWHERE ELSE. `blockIndexAt` needs the
+        // note's text and this block's place in it; both are on the render
+        // context, and a group with no `tab` line never asks — so a page of
+        // ordinary blocks does no segmenting it did not do before.
+        // A HANDLE ON EVERY GROUP, not only on one that already has pages —
+        // the `+` in the foot is how the first page gets made, so a group with
+        // no `tab` line is exactly where it has to be offered. Resolving the
+        // note position stays behind `count > 1` inside `tabHandle`, so an
+        // ordinary page of groups still segments nothing.
+        layOutRow(
+          container,
+          cellBounds,
+          tabBounds,
+          tabHandle(this.plugin, ctx, container, tabBounds.length + 1)
+        );
       }
 
       // ── THE ENTRY BANNER'S BANDS, IN BANNER ORDER (4.21.1) ──────────

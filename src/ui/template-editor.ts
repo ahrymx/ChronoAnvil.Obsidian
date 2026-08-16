@@ -44,26 +44,39 @@ import type {
   SectionContext,
   SectionOverrides,
 } from "../journals/journal-sections";
-import { sectionOverrides } from "../journals/journal-sections";
+import {
+  layoutTargetsFor,
+  sectionOverrides,
+  targetIdFor,
+} from "../journals/journal-sections";
 import { isHandEdited, journalSectionModel } from "../journals/journal-plan";
 import { getFile } from "../core/util";
 
-// Whether an arrangement of THIS file can be stored as one of a kind's saved
-// layouts. 3.18 §6.
+// `variantEligible` WAS HERE AND IS GONE (4.33). It read:
 //
-// ONE RULE, TWO CALLERS. The settings rail and the banner both offer "Save as
-// layout…", and the test used to be spelled inline in the settings rail alone:
+//   export function variantEligible(ctx: SectionContext): boolean {
+//     return !!ctx.kind && ctx.noteKind !== "page";
+//   }
+//
+// and 3.18 §6's argument for it was:
 //
 //   Only a kind's template can become a variant. An index template has nothing
 //   to vary FOR — there is one Subject Index per subject, not a choice made
 //   when creating one — so offering it there would be a button that could not
 //   mean anything.
 //
-// That reasoning is unchanged; giving it a name is what stops the two doors
-// disagreeing about which files it applies to.
-export function variantEligible(ctx: SectionContext): boolean {
-  return !!ctx.kind && ctx.noteKind !== "page";
-}
+// THE PREMISE WAS RIGHT AND THE CONCLUSION WAS TOO NARROW. "Nothing to vary
+// for" is true of CREATION — an index really is not picked from a dropdown, and
+// `LAYOUT_SURFACE_INDEX`'s comment keeps that fact and acts on it — but a saved
+// layout is also something you reload onto a page and something you press into
+// a surface's default, and both of those mean plenty on an index.
+//
+// So all three note kinds are eligible now, which makes the predicate a
+// tautology, and a function that always returns true is a decision that reads
+// like one and is not. It is deleted rather than widened: the callers pass the
+// sink unconditionally, and `layoutTargetsFor` is where "which surfaces exist
+// here" is now answered — including the one real refusal left, which is that a
+// journal with no paged kind is not offered `Page`.
 
 // Open the editor on a journal file, resolving its model first.
 //
@@ -105,19 +118,29 @@ export async function openTemplateEditor(
             buttonLabel: "Save as layout…",
             promptTitle: "Save as layout",
             promptPlaceholder: "e.g. Math Lesson",
-            // WHICH KINDS THIS LAYOUT MAY BE OFFERED ON (3.18 follow-ups §5).
-            // Resolved here for the same reason the overrides are: they are a
-            // journal concept and the modal holds no context to look one up
-            // with. It draws the labels and hands back the ids.
+            // WHERE THIS LAYOUT MAY BE OFFERED (3.18 follow-ups §5; the two
+            // surfaces added in 4.33). Resolved here for the same reason the
+            // overrides are: they are a journal concept and the modal holds no
+            // context to look one up with. It draws the labels and hands back
+            // the ids.
             //
             // EVERY KIND OF THIS JOURNAL, not just the current one — the whole
             // point of the storage move is that a layout is no longer the
-            // property of the kind it was saved from. Cross-JOURNAL is not
-            // offered, deliberately: a layout names section ids and an
-            // `options` entry keyed by kind id cannot survive a journey to a
-            // journal whose kind ids differ by construction.
-            targets: ctx.type.kinds.map((k) => ({ id: k.id, label: k.label })),
-            originTarget: ctx.kind?.id ?? "",
+            // property of the kind it was saved from — plus Front page, plus
+            // Page where the journal has any. Cross-JOURNAL is not offered,
+            // deliberately: a layout names section ids and an `options` entry
+            // keyed by kind id cannot survive a journey to a journal whose kind
+            // ids differ by construction.
+            targets: layoutTargetsFor(ctx.type),
+            // WAS `ctx.kind?.id ?? ""`, WHICH WAS EMPTY ON THE TWO SURFACES
+            // THAT COULD NOT REACH HERE. Now that they can, an empty origin
+            // would leave the box the reader is standing in unticked and
+            // un-disabled — so `promptLayoutSave`'s "the one you saved it from
+            // is always included" rule would quietly not apply on exactly the
+            // two new cases. Derived by `targetIdFor`, which is `templateKeyFor`
+            // asked about the same three-value question, so the origin and the
+            // key cannot drift.
+            originTarget: targetIdFor(ctx),
             // THE OVERRIDES ARE RESOLVED HERE, not in the modal.
             //
             // They are a journal concept — a kind's per-template label and

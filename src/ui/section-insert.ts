@@ -43,7 +43,8 @@ import { ArgSuggest } from "./arg-suggest";
 import { bridgeCatalogue } from "./widgets/bridge-widgets";
 import { otherSurface } from "../core/bridge";
 import { folderNotePath, getFile, openFile } from "../core/util";
-import { openTemplateEditor, variantEligible } from "./template-editor";
+import { openTemplateEditor } from "./template-editor";
+import { splitLayoutTargets } from "../journals/journal-sections";
 import { toPlainMarkdown } from "../core/plain-markdown";
 import { notify } from "../core/notify";
 
@@ -590,27 +591,31 @@ export class SectionInserter {
       // rail passed the callback that makes it appear, so a reader arranging a
       // note in front of them could not keep the arrangement.
       //
-      // The eligibility test is `variantEligible`, shared with the settings
-      // caller rather than spelled twice — an index template has nothing to
-      // vary FOR, since there is one Subject Index per subject rather than a
-      // choice made when creating one, and a page is not a kind.
+      // PASSED UNCONDITIONALLY SINCE 4.33. It used to be gated on
+      // `variantEligible`, which refused an index and a page; all three note
+      // kinds can carry a layout now, so the gate became a tautology and was
+      // deleted rather than left as a function that always says yes. See the
+      // note where it used to live in template-editor.ts.
       await openTemplateEditor(
         this.app,
         this.plugin,
         notePath,
         ctx,
         undefined,
-        variantEligible(ctx)
-          ? (label, sections, options, kinds) =>
-              this.plugin.journals.saveVariant(
-                ctx.type.id,
-                ctx.kind!.id,
-                label,
-                sections,
-                options,
-                kinds
-              )
-          : undefined
+        (label, sections, options, targets) => {
+          const split = splitLayoutTargets(
+            ctx.type.kinds.map((k) => k.id),
+            targets
+          );
+          return this.plugin.journals.saveVariant(
+            ctx.type.id,
+            label,
+            sections,
+            options,
+            split.kinds,
+            split.surfaces
+          );
+        }
       );
       return;
     }

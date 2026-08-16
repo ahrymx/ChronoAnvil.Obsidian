@@ -390,7 +390,7 @@ describe("the gesture around it", () => {
     // order and `cellPlan`'s recorded counts still point at the same
     // boundaries. This is the assertion that fails if the two are ever swapped.
     const wrap = widgets.indexOf("cardWidget(el, title)");
-    const row = widgets.indexOf("layOutRow(container, cellBounds)");
+    const row = widgets.indexOf("layOutRow(");
     expect(wrap, "widgets are never carded").toBeGreaterThan(-1);
     expect(wrap).toBeLessThan(row);
     expect(src).toContain("parent.insertBefore(card, widget)");
@@ -438,24 +438,33 @@ describe("the gesture around it", () => {
     expect(code).not.toContain("jc-diary-header");
   });
 
-  it("gives back the padding its bleed cancelled (4.13.6 §1)", () => {
-    // THE BLEED IS ONE-SIDED AND NOTHING PAID IT BACK. The head runs
-    // `margin: -12px -14px 0` so its rule reaches the card's edges — and the top
-    // `-12px` consumes the card's `padding-top` outright, leaving whatever the
-    // card holds sitting on the hairline. Measured on the Go-to launcher: card
-    // border at y=1, head rule at y=32, the first tile's own border at y=33. On
-    // the focused tile the accent ring and the hairline are adjacent pixel rows,
-    // which is what a reader sees as the tile overlapping the header.
+  it("no longer has a bleed to pay back, except where it still bleeds", () => {
+    // WHAT 4.13.6 §1 FIXED, AND WHY THE FIX IS NOW IN ONE PLACE. The head ran
+    // `margin: -12px -14px 0` so its rule reached the card's edges — and the top
+    // `-12px` consumed the card's `padding-top` outright, leaving whatever the
+    // card held sitting on the hairline. The answer was a 12px bottom margin:
+    // the bleed paid back exactly where it was taken.
     //
-    // SCOPED TO THE CARD, AND THAT IS THE ASSERTION AS MUCH AS THE VALUE IS.
-    // `.journal-widget-block.has-head` is the same head one level up, in a flex
-    // column with `gap: var(--am-widget-gap)` — it has always had air under its
-    // head, and an unscoped margin would serve it a second helping. The card is
-    // the one container with no gap, which is why it is the one that showed this.
+    // 4.34.3 TOOK THE BLEED OUT OF THE HOVER PATH ENTIRELY. The head is
+    // `position: absolute` over the card's top edge, so it consumes no padding
+    // and displaces nothing — there is no longer anything to pay back, and a
+    // margin here would be compensation for a debt that is not incurred.
+    //
+    // IT SURVIVES ON TOUCH, WHERE THE HEAD IS STILL IN FLOW, and so does its
+    // payback: that branch keeps the pair together, which is the whole of the
+    // rule. Asserted as a pair rather than as two values, because either one
+    // alone is the defect.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
     const at = rules.indexOf("\n.journal-widget-card > .journal-block-head {");
-    expect(at, "the head's bleed is still unpaid").toBeGreaterThan(-1);
-    expect(rules.slice(at, rules.indexOf("}", at))).toContain("margin-bottom");
+    expect(at, "the card head rule is gone").toBeGreaterThan(-1);
+    const desktop = rules.slice(at, rules.indexOf("}", at));
+    expect(desktop).toContain("position: absolute");
+    expect(desktop).not.toContain("-12px");
+    // The touch branch, where the head is a band in flow again.
+    const touch = rules.indexOf("  .journal-widget-card > .journal-block-head {");
+    expect(touch, "touch keeps the head in flow").toBeGreaterThan(-1);
+    const flowed = rules.slice(touch, rules.indexOf("}", touch));
+    expect(flowed).toContain("margin: -12px -14px 12px");
     // And it is NOT on the head itself, where it would reach the block too.
     const base = rules.indexOf("\n.journal-block-head {");
     expect(rules.slice(base, rules.indexOf("}", base))).not.toContain(
@@ -557,7 +566,7 @@ describe("the gesture around it", () => {
     // them first.
     const widgets = readCode("widgets");
     const drag = widgets.indexOf("attachBlockHead(this.plugin, container, ctx)");
-    const row = widgets.indexOf("layOutRow(container, cellBounds)");
+    const row = widgets.indexOf("layOutRow(");
     expect(drag, "the head is never attached").toBeGreaterThan(-1);
     expect(row, "the row is never laid out").toBeGreaterThan(-1);
     expect(drag).toBeGreaterThan(row);

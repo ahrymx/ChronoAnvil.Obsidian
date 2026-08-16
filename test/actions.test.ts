@@ -233,10 +233,14 @@ describe("the table holds what cannot be derived", () => {
     // any note the plugin recognises — and 24 until 4.31's
     // `maint-export-plain-markdown`, which is about the vault. Both belong here
     // by that same rule.
-    expect(ACTIONS).toHaveLength(25);
+    //
+    // 25 until 4.34's two page commands. They are the first entries here that
+    // exist to be BOUND rather than to be found — a group's pages are switched
+    // by a key, and the palette is where a reader discovers that they can be.
+    expect(ACTIONS).toHaveLength(27);
   });
 
-  it("splits them 13 / 0 / 5 / 7", () => {
+  it("splits them 13 / 0 / 7 / 7", () => {
     // `maint-find-journals` is the one that moved groups: it was with the
     // journals because of its subject, and everything else there MAKES a
     // journal note where this one reconciles the vault. It stays in the table
@@ -244,8 +248,10 @@ describe("the table holds what cannot be derived", () => {
     expect(groupOf("diary")).toHaveLength(13);
     // 4 until 4.30's `note-copy-plain-markdown`, which is note-scoped in the
     // strictest sense: it reads the note in front of the reader and writes
-    // nothing anywhere.
-    expect(groupOf("notes")).toHaveLength(5);
+    // nothing anywhere. 5 until 4.34's two, which are note-scoped in that same
+    // sense and narrower still: they act on one block of the note in front of
+    // the reader and touch no file at all.
+    expect(groupOf("notes")).toHaveLength(7);
     // 6 until 4.31's export, which surveys, shows and then writes — the shape
     // every other command in this group already has.
     expect(groupOf("maintenance")).toHaveLength(7);

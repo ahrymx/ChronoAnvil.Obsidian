@@ -361,10 +361,10 @@ describe("the block lays itself out afterwards, knowing nothing", () => {
     // `frame: section`'s shape: the loop needs no knowledge of the row, so a
     // widget written next year is a cell without being told. A call inside the
     // loop would rebuild the row on every line.
-    const calls = processor.match(/layOutRow\(container, cellBounds\)/g) ?? [];
+    const calls = processor.match(/layOutRow\(\s*container,/g) ?? [];
     expect(calls.length).toBe(1);
     const loopAt = processor.indexOf("for (const line of lines) {");
-    expect(processor.indexOf("layOutRow(container, cellBounds)")).toBeGreaterThan(loopAt);
+    expect(processor.indexOf("layOutRow(")).toBeGreaterThan(loopAt);
   });
 
   it("records the delimiter's position instead of dispatching it", () => {
@@ -397,7 +397,7 @@ describe("the block lays itself out afterwards, knowing nothing", () => {
     // outright left `indexOf` returning -1, which is less than any real
     // position, so the assertion passed on a feature that was not there. A
     // comparison between two positions is only a comparison when both exist.
-    const row = processor.indexOf("layOutRow(container, cellBounds)");
+    const row = processor.indexOf("layOutRow(");
     const frame = processor.indexOf("foldableSection(");
     expect(row, "the row is never laid out").toBeGreaterThan(-1);
     expect(frame, "the frame never wraps the block").toBeGreaterThan(-1);
@@ -571,13 +571,19 @@ describe("the box a group is drawn in — 4.9 §2", () => {
   it("wraps the row rather than replacing it", () => {
     // The row is the flex row and cannot also be the surface: a foot bar inside
     // it would be a third column. So the group is a level ABOVE, and the row is
-    // untouched — which is what lets `block-drag.ts` go on finding it with an
-    // unscoped `querySelector` and reading `row.children` for the cells.
+    // untouched — which is what lets `block-drag.ts` go on finding it and
+    // reading `row.children` for the cells.
+    //
+    // A THIRD LEVEL SINCE 4.34: the rows live in `.journal-group-pages`, which
+    // is what a page swap pins a height on. The group cannot be that box —
+    // its height includes the foot, and sliding the strip the reader is
+    // pressing is the whole bug the pin exists to prevent.
     const at = src.indexOf("const box = createDiv({ cls: GROUP_CLASS });");
     expect(at).toBeGreaterThan(-1);
-    expect(src.slice(at, at + 200)).toContain(
-      "const row = box.createDiv({ cls: ROW_CLASS });"
+    expect(src.slice(at, at + 700)).toContain(
+      "const pages = box.createDiv({ cls: GROUP_PAGES_CLASS });"
     );
+    expect(src).toContain("const row = pages.createDiv({");
   });
 
   it("goes in at the row's own place, so a bar stays above it", () => {
@@ -585,7 +591,12 @@ describe("the box a group is drawn in — 4.9 §2", () => {
     // not a cell (`NOT_A_CELL`) and stays a direct child of the block; inserting
     // the box anywhere else would put the group above the bar that titles it, or
     // below whatever the processor drew last.
-    expect(src).toContain("container.insertBefore(box, children[groups[0][0]]);");
+    //
+    // THE FIRST CELL OF THE FIRST PAGE, as of 4.34, which is the same place: a
+    // group's pages all begin where its first row began.
+    expect(src).toContain(
+      "container.insertBefore(box, children[plans[0].cells[0][0]]);"
+    );
   });
 
   it("names its parts for the noun the reader is given", () => {
@@ -599,11 +610,22 @@ describe("the box a group is drawn in — 4.9 §2", () => {
     expect(ROW_KEYWORD).toBe("row");
   });
 
-  it("counts columns, not widgets, in the foot", () => {
-    // A cell has held more than one widget since 4.4 §1 — the homepage's aside
-    // is three of them in one column — so a foot counting children would say
-    // "4 columns" about a group with two.
-    expect(src).toContain("${groups.length}");
+  it("says nothing in the foot that the reader can already see", () => {
+    // `N columns` was the foot's whole content from 4.9 until 4.34.2 took it
+    // out. It was there because the foot needed something in it to be a bar,
+    // and what it said was a count of the columns directly above it — a label
+    // restating the thing it sits under, which is the empty state's "no data"
+    // fault wearing a number.
+    //
+    // WHAT THE FOOT CARRIES NOW: the grip (block-drag.ts's), the `+`, and the
+    // page numbers where there are pages. All three are controls.
+    expect(src).not.toContain("GROUP_FOOT_CLASS}-count");
+    expect(src).not.toContain("? \"column\" : \"columns\"");
     expect(src).not.toContain("${children.length}");
+    // Comments stripped: the rule that replaced it names it, which is the
+    // record of what went and why (journal-cards.test.ts does the same).
+    expect(readCss().replace(/\/\*[\s\S]*?\*\//g, "")).not.toContain(
+      ".journal-group-foot-count"
+    );
   });
 });

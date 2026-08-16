@@ -712,3 +712,45 @@ describe("the editor carries the defence the add command left it (3.13 §9.1)", 
     expect(src).toContain('isPageWidgetId(s.id) ? "Widgets" : "Sections"');
   });
 });
+
+// ── how the list reads, 4.34.3 ────────────────────────────────────────────
+
+describe("the list marks where the pointer is, not what a row is", () => {
+  const css = (): string => readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("colours a spine on hover rather than on being a section", () => {
+    // THE SPINE WAS A PERMANENT ACCENT on every section row, so a list of twelve
+    // drew up to twelve accent bars down its left edge — all of them stating a
+    // distinction the `Section` pill on the row already makes in words. Emphasis
+    // that never varies is texture, and the one thing it could not say was which
+    // row the reader is on.
+    expect(css()).toContain(".almanac-tpl-list .almanac-list-row:hover");
+    expect(css()).toMatch(
+      /\.almanac-tpl-list \.almanac-list-row \{[^}]*border-left: 3px solid transparent/
+    );
+    // The section row keeps the SLOT and loses the colour.
+    expect(css()).not.toMatch(
+      /\.almanac-tpl-row-section \{[^}]*border-left: 3px solid var\(--interactive-accent\)/
+    );
+  });
+
+  it("reserves the spine's width on every row, so nothing shifts", () => {
+    // A border that appears on hover moves the row it appears on by its own
+    // width. Held transparent, the pointer crossing a row changes one colour and
+    // nothing else.
+    const rule = css().slice(
+      css().indexOf(".almanac-tpl-list .almanac-list-row {")
+    );
+    expect(rule.slice(0, rule.indexOf("}"))).toContain("transparent");
+  });
+
+  it("gives a group more air than a row", () => {
+    // A group is a CARD in a list of rows, and at 6px its border sat almost
+    // against the loose rows either side — so "these three are one object" was
+    // carried by a 2px rule and nothing else.
+    const at = css().indexOf(".almanac-tpl-block {");
+    expect(at).toBeGreaterThan(-1);
+    const block = css().slice(at, css().indexOf("}", at));
+    expect(block).toContain("margin: 12px 0");
+  });
+});

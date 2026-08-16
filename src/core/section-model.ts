@@ -588,7 +588,18 @@ export interface SectionModel {
   // The text with its sections grouped into these blocks, or null if nothing
   // would change. `blocks` is a partition of the note's sections in the order
   // they should end up in, which is exactly what `blocks()` returns.
-  regroup?(text: string, blocks: readonly (readonly string[])[]): string | null;
+  // `pages` names the sections that begin a page of their block — the `tab`
+  // lines, in the same terms `blocks` uses for the fences. Optional so a model
+  // that has no pages, and every caller written before they existed, keeps its
+  // behaviour exactly: absent means "leave the page boundaries alone", which is
+  // not the same as an empty list ("this note has none"), and conflating the two
+  // would make a Save on a surface that cannot page delete the pages of one that
+  // can.
+  regroup?(
+    text: string,
+    blocks: readonly (readonly string[])[],
+    pages?: readonly string[]
+  ): string | null;
 }
 
 // One block of a note, as the editor needs it.
@@ -621,6 +632,18 @@ export interface BlockView {
   // render below the group it titles). The editor asks one question and gets one
   // answer, and none of the three reasons is spelled there.
   column: string[];
+  // Which of them begin a PAGE of this block rather than a column of the page
+  // before it — 4.34.2, and the `tab` lines the fence already carries.
+  //
+  // THE EDITOR HAS TO SEE WHAT THE FILE SAYS BEFORE IT CAN CHANGE IT. Without
+  // this, opening the window on a note that already has pages would show one
+  // undivided group, and the first Save would flatten every page the reader had
+  // made — a window that silently discards what it could not display, which is
+  // the failure the stored `plural` and `variants` each cost a release.
+  //
+  // NEVER THE FIRST ID: the `row` line opens page one, exactly as it opens the
+  // first column, so a block's opener cannot also be a page break.
+  pages: string[];
 }
 
 // ── answers, in the note ──────────────────────────────────────────────

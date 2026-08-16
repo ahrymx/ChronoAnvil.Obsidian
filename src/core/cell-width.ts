@@ -47,7 +47,7 @@
 
 import { CELL_KEYWORD, isCellLine, isRowLine, splitDirective } from "./directive-grammar";
 import { fencesOf } from "./block-move";
-import { delimit, isWidget } from "./cell-move";
+import { delimit, isWidget, pageSlice } from "./cell-move";
 
 // The largest a group's shares may add up to.
 //
@@ -200,24 +200,52 @@ function columnsOf(
 // the first of two in a row, is not this gesture's business — a resize that
 // tidied lines the reader did not point at would be a reconciler rewriting
 // structure it was not asked about, which is what 3.15 §2.3 forbids.
+// ── AND IT IS ASKED OF ONE PAGE (4.34 §6) ────────────────────────────────
+//
+// `page` is an index into `tabSlices`. A group's pages each have their own
+// columns and their own widths, and the divider a reader drags is inside one of
+// them — so every question below is asked of that page's lines and every write
+// is offset back into the body.
+//
+// DEFAULTS TO 0, which on a body with no `tab` line is the whole body: the
+// signature every existing caller already uses, answering exactly what it
+// answered before. That is not a convenience, it is the compatibility claim, and
+// `test/tabs.test.ts` asserts it rather than trusting it.
+//
+// THE ROW LINE IS STILL ASKED OF THE WHOLE BODY. `row` is a block modifier
+// written once at the top, so only the first page's slice contains it — asking a
+// slice would refuse every gesture on every page but the first.
 export function setCellWidths(
   body: readonly string[],
-  weights: readonly number[]
+  weights: readonly number[],
+  page = 0
 ): string[] | null {
   if (!body.some(isRowLine)) return null;
   if (!weights.length) return null;
   if (!weights.every((w) => Number.isInteger(w) && w >= 1)) return null;
 
+  // A PAGE THAT IS NOT THERE IS A STALE GESTURE, and the answer is the one this
+  // function already gives for a count that disagrees: write nothing. The
+  // reader has edited the fence since the drag began.
+  const span = pageSlice(body, page);
+  if (!span) return null;
+
+  const seg = body.slice(span.from, span.to);
+
   // AN EVEN ROW THAT IS ALREADY UNDIVIDED IS THE ROW BEING ASKED FOR, and this
   // is the ONLY thing standing between it and a delimiter between every pair.
   // The line below would otherwise write it out to hang weights of one on it,
   // and the reader who never asked for cells would get a fence full of them.
-  if (weights.every((w) => w === 1) && !body.some(isCellLine)) return null;
+  if (weights.every((w) => w === 1) && !seg.some(isCellLine)) return null;
 
   // AND `delimit` IS FOR AN UNDIVIDED ROW ONLY. Run on a body that already has
   // delimiters it would add a second one before every widget, which is why this
   // asks about the body rather than about the weights.
-  const next = body.some(isCellLine) ? [...body] : delimit(body).body;
+  //
+  // ASKED OF THE PAGE, because a group whose tab 1 is divided and whose tab 2 is
+  // not is an ordinary group: the global reading would see tab 1's delimiters
+  // and leave tab 2 with nowhere to hang a weight.
+  const next = seg.some(isCellLine) ? [...seg] : delimit(seg).body;
   const columns = columnsOf(next);
   // A COUNT THAT DISAGREES IS A STALE GESTURE. The weights were worked out from
   // the cells on screen, and the note is re-read at the moment of the write —
@@ -240,7 +268,16 @@ export function setCellWidths(
     }
   }
 
-  return next.join("\n") === body.join("\n") ? null : next;
+  // BACK INTO THE BODY THE PAGE CAME OUT OF. Every other page is re-emitted as
+  // the exact lines it was read as — `widenCells`' own promise, one level down,
+  // and the property that lets a width be written into a fence somebody else
+  // arranged.
+  const out = [
+    ...body.slice(0, span.from),
+    ...next,
+    ...body.slice(span.to),
+  ];
+  return out.join("\n") === body.join("\n") ? null : out;
 }
 
 // What the columns of this body currently weigh, one per drawn column.
@@ -250,10 +287,13 @@ export function setCellWidths(
 // with: a weight the DOM shows and the body does not is a weight this function
 // is about to overwrite. It is also what makes an Escape mid-drag a restore
 // rather than a second write.
-export function cellWidthsOf(body: readonly string[]): number[] {
-  return columnsOf(body).map(({ opener }) => {
+export function cellWidthsOf(body: readonly string[], page = 0): number[] {
+  const span = pageSlice(body, page);
+  if (!span) return [];
+  const seg = body.slice(span.from, span.to);
+  return columnsOf(seg).map(({ opener }) => {
     if (opener < 0) return 1;
-    const raw = splitDirective(body[opener]).argument.trim();
+    const raw = splitDirective(seg[opener]).argument.trim();
     if (!raw || !/^\d+$/.test(raw)) return 1;
     const n = Number(raw);
     return n >= 1 ? n : 1;
@@ -278,12 +318,13 @@ export function cellWidthsOf(body: readonly string[]): number[] {
 export function widenCells(
   lines: readonly string[],
   block: number,
-  weights: readonly number[]
+  weights: readonly number[],
+  page = 0
 ): string[] | null {
   const { at, segs } = fencesOf(lines);
   if (block < 0 || block >= at.length) return null;
   const fence = segs[at[block]];
-  const next = setCellWidths(fence.slice(1, -1), weights);
+  const next = setCellWidths(fence.slice(1, -1), weights, page);
   if (!next) return null;
   const out = segs.map((seg, i) =>
     i === at[block] ? [seg[0], ...next, "```"] : [...seg]
@@ -299,10 +340,11 @@ export function widenCells(
 // has since moved.
 export function cellWidthsIn(
   lines: readonly string[],
-  block: number
+  block: number,
+  page = 0
 ): number[] | null {
   const { at, segs } = fencesOf(lines);
   if (block < 0 || block >= at.length) return null;
   const body = segs[at[block]].slice(1, -1);
-  return body.some(isRowLine) ? cellWidthsOf(body) : null;
+  return body.some(isRowLine) ? cellWidthsOf(body, page) : null;
 }

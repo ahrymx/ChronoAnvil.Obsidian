@@ -91,6 +91,7 @@ import { ensureEventsNote } from "../events/eventstore";
 import { syncTrackerConfig } from "../charts/charts";
 import { registeredJournalTypes } from "../journals/journal";
 import { journalTypeOfPath } from "../trackers/trackers";
+import { hasTabbedGroup, stepFocusedGroup } from "../ui/widgets/group-tabs";
 import { notify } from "./notify";
 import { openFile } from "./util";
 import { runVaultExport } from "./vault-export-manager";
@@ -350,6 +351,36 @@ export const ACTIONS: Action[] = [
     group: "notes",
     when: inJournal,
     run: (p) => void p.journals.newPageHere(),
+  },
+  // ── the pages of a widget group (4.34 §5) ───────────────────────────
+  //
+  // TWO COMMANDS AND NO SUGGESTED HOTKEY. Obsidian's own hotkey pane is where a
+  // reader expects to bind a key, and a default chosen here would collide with
+  // something in somebody's vault — these are the first two actions in the table
+  // that exist to BE bound rather than to be found.
+  //
+  // `when` KEEPS THEM OUT OF THE PALETTE on a note with no tabbed group, which
+  // is §6's rule for every note-scoped action. It is also cheap in the way that
+  // rule demands: `hasTabbedGroup` reads a register of what is on screen right
+  // now — no vault read, no metadata walk.
+  //
+  // AND THEY WRAP. `[3]` → next → `[1]`: a reader who binds one key is cycling,
+  // and a switcher that stopped at the end would need the other key to get home.
+  {
+    id: "note-group-next-page",
+    name: "Note: next page in this widget group",
+    icon: "chevron-right",
+    group: "notes",
+    when: hasTabbedGroup,
+    run: (p) => void stepFocusedGroup(p, 1),
+  },
+  {
+    id: "note-group-prev-page",
+    name: "Note: previous page in this widget group",
+    icon: "chevron-left",
+    group: "notes",
+    when: hasTabbedGroup,
+    run: (p) => void stepFocusedGroup(p, -1),
   },
   {
     id: "note-convert-to-dashboard",

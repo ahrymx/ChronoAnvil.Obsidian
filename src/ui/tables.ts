@@ -312,10 +312,33 @@ function hostType(
 // `type` frontmatter because these widgets run on folder dashboards, and a
 // dashboard whose frontmatter is missing or hand-edited should still count
 // what is under it correctly.
-function containerDepth(type: JournalType, folderPath: string): number {
-  const root = type.root;
-  if (!root || !folderPath.startsWith(`${root}/`)) return 0;
-  return folderPath.slice(root.length + 1).split("/").length - 1;
+//
+// THE ROOT IS -1, BECAUSE THE ROOT IS NOT A CONTAINER. It is the box the first
+// level sits in: `03 - Journals/Study` holds Subjects, and a Subject is
+// `levels[0]`. This returned 0 for it — the same answer it gives for a Subject
+// — so a rollup drawn at the root headed its first column "Topic" over rows
+// that were Subjects, and (once the branch below started reading this) would
+// have called the level below the root the wrong thing too. -1 is the depth of
+// the thing whose children are `levels[0]`, which is exactly what the root is.
+export function containerDepth(type: JournalType, folderPath: string): number {
+  const root = normalizePath(type.root ?? "");
+  const path = normalizePath(folderPath);
+  if (!type.root) return 0;
+  if (path === root) return -1;
+  if (!path.startsWith(`${root}/`)) return 0;
+  return path.slice(root.length + 1).split("/").length - 1;
+}
+
+// Whether the journal declares a level beneath this folder — i.e. whether what
+// is below it is more FOLDERS or the notes themselves.
+//
+// THE STRUCTURE ANSWERS THIS, NOT THE FOLDER'S CURRENT CONTENTS, and that is
+// the whole point of extracting it. It is the same rule `sectionContext` states
+// as `hasSubContainers` (`depth < type.levels.length - 1`), which is what
+// composes the note in the first place; the renderer asking a different
+// question is how a page came to disagree with the section that wrote it.
+export function hasLevelBelow(type: JournalType, folderPath: string): boolean {
+  return containerDepth(type, folderPath) + 1 < type.levels.length;
 }
 
 // What the folders one level under this one are called, e.g. "Topic" on a
@@ -517,7 +540,17 @@ export function folderRollup(
       emptyCallout(
         "folder-plus",
         `No ${plural(noun).toLowerCase()} yet`,
-        `Add one from the Journals card on the homepage — it'll appear here with live counts and activity.`
+        // THE BUTTON THAT IS ON THIS PAGE, not the one two clicks away. This
+        // sent the reader to the homepage's Journals card, which does make a
+        // container — but the section this callout is drawn inside opens with
+        // `button:<type>:new-container`, labelled with a plus and the bare
+        // child noun (journalSubActionSpec). So the control was six pixels
+        // above the sentence pointing somewhere else.
+        //
+        // Derived from the same `noun` the heading uses, on `kindTable`'s rule
+        // one screen down: both halves come from one value, so they cannot come
+        // to name different buttons.
+        `Press “+ ${noun}” above to add one — it'll appear here with its counts and activity.`
       )
     );
     return root;
@@ -526,9 +559,16 @@ export function folderRollup(
   // One column per note kind, named after the kind. Study still reads
   // "Lessons | Practice" because those are its kinds; a Cooking journal reads
   // "Recipes" because that is what is in its folders.
+  //
+  // `kindPlural`, NOT `plural(k.label)`. A kind carries a `plural` override for
+  // exactly the words the pluraliser gets wrong, and Study's Practice is the
+  // one shipped example of it — so the column read "Practices" while the
+  // section header, the buttons and the empty states one level down all read
+  // "Practice", every one of them derived from the kind. This was the only
+  // place that re-derived it and it was the only place that disagreed.
   const { row: addRow } = recordList(root, [
     noun,
-    ...type.kinds.map((k) => plural(k.label)),
+    ...type.kinds.map((k) => kindPlural(k)),
     "Activity",
     "Open",
   ]);
@@ -597,11 +637,30 @@ export function buildLevelIndex(
   }
   const { type, folder } = scope;
 
-  // WHICH BRANCH IS A QUESTION ABOUT THE FOLDER, asked here and nowhere else.
-  // `journalChildFolders` is the same reading the rollup itself makes, so the
-  // two cannot disagree about whether there is anything to roll up.
-  const children = journalChildFolders(plugin, type, folder);
-  if (children.length > 0) {
+  // WHICH BRANCH IS A QUESTION ABOUT THE LEVEL, NOT ABOUT TODAY'S CONTENTS.
+  //
+  // THE BUG THIS FIXES. It asked `journalChildFolders(...).length > 0` — "does
+  // this folder have sub-folders right now" — and read an empty answer as "this
+  // is the deepest level". So a Subject with no Topics yet, which is every
+  // Subject on the day it is made, got the DEEPEST level's rendering: a "🗂️
+  // Lessons" table and a "🗂️ Practice" table, each with an empty state telling
+  // the reader to press a "New Lesson" button that is not on a Subject page at
+  // all. The one thing the section is for — "what's below this note" — was
+  // answered with the level below the level below.
+  //
+  // Emptiness is not depth. A Subject with no Topics is a Subject WITH NO
+  // TOPICS, and the honest answer is the rollup's own empty state, which names
+  // the thing that will appear here and the button that makes one.
+  //
+  // AND THE SAME MISREADING WENT THE OTHER WAY. A paged Lesson is a folder but
+  // not a container (see `isContainerFolder` below), so the first Lesson split
+  // across pages gave a Topic index a non-empty folder list and turned its two
+  // kind tables into a folder rollup listing that one lesson.
+  //
+  // `hasLevelBelow` is the structure's own answer, and it is the same rule
+  // `sectionContext` used to COMPOSE this note. The renderer and the composer
+  // now agree by construction rather than by coincidence.
+  if (hasLevelBelow(type, folder.path)) {
     root.appendChild(folderRollup(plugin, ctx, type, folder));
     return root;
   }
@@ -616,10 +675,17 @@ export function buildLevelIndex(
   //
   // A HEADING PER TABLE, because two tables with no names between them read as
   // one table that changed its columns halfway down.
+  //
+  // THE KIND'S OWN EMOJI AND THE KIND'S OWN PLURAL, which is what
+  // `childrenParts` writes into the composed fence — "📖 Lessons", "🛠️
+  // Practice". This drew "🗂️ Lessons" and "🗂️ Practices": the folder glyph over
+  // tables of notes, and a pluralisation the kind explicitly overrides. Two
+  // spellings of one heading is one too many when the composer's is on the next
+  // note down.
   for (const kind of type.kinds) {
     root.createDiv({
       cls: "journal-level-index-head",
-      text: `🗂️ ${plural(kind.label)}`,
+      text: `${kind.emoji} ${kindPlural(kind)}`,
     });
     root.appendChild(kindTable(plugin, ctx, type, folder.path, kind.id));
   }
@@ -766,10 +832,14 @@ export function buildTopicStats(
 
   // One cell per note kind, named after the kind — the same derivation
   // topics-table uses one level up, so a subject's numbers about a topic and
-  // the topic's numbers about itself keep coming from one place.
+  // the topic's numbers about itself keep coming from one place. That claim was
+  // true of the count and false of the WORD until the rollup and this band both
+  // went through `kindPlural`: a topic's band read "0 practices" under a
+  // subject's column headed "Practices", and every other surface said
+  // "Practice".
   for (const kind of type.kinds) {
     const n = pages.filter((p) => p.fm["type"] === kind.id).length;
-    cell(String(n), n === 1 ? kind.label.toLowerCase() : plural(kind.label).toLowerCase());
+    cell(String(n), (n === 1 ? kind.label : kindPlural(kind)).toLowerCase());
   }
   // An em dash rather than 0.0 when nothing is graded: an average of no
   // readings is absent, not zero, and showing 0.0/5 on a fresh topic reads

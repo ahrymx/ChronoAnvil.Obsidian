@@ -52,11 +52,11 @@ import {
   parseEntry,
 } from "./entry-sections";
 import type { EntrySection, EntrySectionContext } from "./entry-sections";
-import { allNoteRegions } from "../core/notestore";
 import { answerInText } from "../core/section-model";
 import type { SectionChoice } from "../core/section-model";
-import { frontmatterEnd } from "../core/note-sections";
-import { TRACKER_MARK_END, TRACKER_MARK_START } from "../core/constants";
+import { replaceBody } from "../core/note-sections";
+import { reloadLoss } from "../core/reload-loss";
+import type { ReloadLoss } from "../core/reload-loss";
 import type { TrackerClass } from "../trackers/trackers";
 
 // A named arrangement of an entry's shared band, offered on the grains the
@@ -88,76 +88,12 @@ export interface EntryLayoutConfig {
 
 // One thing a recompose over this page would destroy.
 //
-// A LIST, NOT A BOOLEAN. The window has to say what is in the way — a refusal
-// that only says no sends someone looking for a control that does not exist,
-// which is the shape every refusal in this plugin was rewritten out of in 4.21.
-// And a boolean derived from four unrelated facts is untestable in the way that
-// matters: it cannot say WHICH of the four broke.
-export interface EntryLoss {
-  kind: "region" | "tracker" | "foreign" | "prose";
-  // The reader's name for the thing — a section's label, or the line itself.
-  label: string;
-  detail: string;
-}
-
-// The body, as lines: everything after the frontmatter closes.
-function bodyLines(text: string): string[] {
-  const lines = text.split("\n");
-  return lines.slice(frontmatterEnd(lines) + 1);
-}
-
-// The `# almanac:trackers` block's contents, wherever in the body it sits.
-//
-// LOCATED BY ITS MARKERS rather than by fence position, for the reason
-// `parseEntry` locates regions by theirs: the block is inside the tracker fence
-// on a modern entry and was inside the banner fence before 4.20, and an entry
-// written under either is still the reader's.
-function trackerBlockLines(text: string): string[] {
-  const lines = bodyLines(text);
-  const start = lines.findIndex((l) => l.trim() === TRACKER_MARK_START);
-  if (start === -1) return [];
-  const end = lines.findIndex((l, i) => i > start && l.trim() === TRACKER_MARK_END);
-  if (end === -1) return [];
-  return lines
-    .slice(start + 1, end)
-    .map((l) => l.trim())
-    .filter((l) => l !== "");
-}
-
-// Body lines that sit outside every fence and every region, trimmed, blanks
-// dropped — the composer's own structural furniture on a composed template, and
-// the reader's prose on a page they have written in.
-//
-// ONE WALK, TWO READERS, and that is deliberate rather than tidy: the loss test
-// compares a page's loose lines against a template's, so the two lists have to
-// be gathered by the same rule or the comparison is between two different
-// questions. A region opener is matched by the same shape `parseEntry` uses.
-function looseLines(text: string): string[] {
-  const out: string[] = [];
-  let fence = false;
-  let region = false;
-  for (const raw of bodyLines(text)) {
-    const line = raw.trim();
-    if (fence) {
-      if (line === "```") fence = false;
-      continue;
-    }
-    if (region) {
-      if (line === "-->") region = false;
-      continue;
-    }
-    if (line === "```almanac") {
-      fence = true;
-      continue;
-    }
-    if (/^<!--almanac:[A-Za-z0-9_-]+$/.test(line)) {
-      region = true;
-      continue;
-    }
-    if (line !== "") out.push(line);
-  }
-  return out;
-}
+// THE SHARED SHAPE UNDER THE DIARY'S NAME (4.33). `ReloadLoss` carries the
+// argument this comment used to — a list rather than a boolean, because the
+// window has to say what is in the way and because a boolean derived from four
+// unrelated facts cannot say WHICH of them broke. The alias stays because
+// `EntryLoss` is the right word on this surface and two callers import it.
+export type EntryLoss = ReloadLoss;
 
 // What a recompose of this page as `composed` would destroy. Empty means the
 // reload is safe to offer.
@@ -167,75 +103,41 @@ function looseLines(text: string): string[] {
 // cannot drift from the write. It is also what makes the round trip statable:
 // the losses of composing a page over itself are none, and if that is ever
 // false a freshly created entry can never be reloaded.
+//
+// THREE OF ITS FOUR CHECKS LIVE IN `core/reload-loss.ts` SINCE 4.33, unchanged
+// and in the same order, because none of them ever looked at a diary. What is
+// left here is check 3, which is the only one that has to know whose catalogue
+// is asking — and the labels, which are this catalogue's words.
 export function entryReloadLoss(
   text: string,
   composed: string,
   ctx: EntrySectionContext
 ): EntryLoss[] {
-  const out: EntryLoss[] = [];
   const labels = new Map(ENTRY_SECTIONS.map((s) => [s.id, s.label]));
-
-  // 1. REGIONS WITH WRITING IN THEM. Discovered rather than looked up by
-  // catalogue id — `allNoteRegions` finds the keys — so a region a reader added
-  // by hand counts too. Every region a recompose writes is empty, so any
-  // content at all is a loss.
-  for (const { key, content } of allNoteRegions(text)) {
-    if (content.trim() === "") continue;
-    out.push({
-      kind: "region",
-      label: labels.get(key) ?? key,
-      detail: "holds your writing",
-    });
-  }
-
-  // 2. TRACKERS THIS ENTRY GAINED ON ITS OWN. The loss nobody predicts: "+ Add
-  // tracker" writes a directive into the body between the tracker markers while
-  // its PROPERTY sits in the frontmatter, so a recompose reseeds the block from
-  // the grain's defaults and leaves an orphaned property above a grid that no
-  // longer reads it. A regions-are-empty test misses this completely.
-  const seeded = new Set(trackerBlockLines(composed));
-  for (const line of trackerBlockLines(text)) {
-    if (seeded.has(line)) continue;
-    out.push({
-      kind: "tracker",
-      label: line,
-      detail: "added to this entry only",
-    });
-  }
-
-  // 3. DIRECTIVES IN THE WIDGET FENCE THAT ARE NOT THE CATALOGUE'S. The same
-  // set `planEntrySections` reports as `foreign` and leaves alone — it can
-  // leave them alone because it splices, and this cannot because it replaces.
-  //
-  // ONLY THE UNRECOGNISED ONES. A catalogue directive the replacement drops is
-  // not a loss, it is the reload doing what it was asked: a layout that takes
-  // out an empty section is the whole gesture, and reporting that as damage
-  // would refuse every reload that changed anything.
-  const shared = parseEntry(text, ctx).shared;
-  for (const b of shared?.body ?? []) {
-    if (b.id !== null || b.line.trim() === "") continue;
-    out.push({
-      kind: "foreign",
-      label: b.line.trim(),
-      detail: "not a line this catalogue writes",
-    });
-  }
-
-  // 4. PROSE. Anything in the body outside a fence and outside a region that is
-  // not a piece of structure the composer itself emits.
-  //
-  // THE STRUCTURE IS GATHERED FROM `composed`, NOT LISTED HERE. It is `---` and
-  // `` `almanac:spacer` `` today. A list written into this file would be a
-  // second copy of a decision `composeEntryTemplate` makes, and it would go
-  // wrong silently — reporting the reader's own page as full of prose — the
-  // first time that function emitted anything new.
-  const structure = new Set(looseLines(composed));
-  for (const line of looseLines(text)) {
-    if (structure.has(line)) continue;
-    out.push({ kind: "prose", label: line, detail: "written outside any section" });
-  }
-
-  return out;
+  return reloadLoss(text, composed, {
+    label: (key) => labels.get(key) ?? key,
+    // 3. DIRECTIVES IN THE WIDGET FENCE THAT ARE NOT THE CATALOGUE'S. The same
+    // set `planEntrySections` reports as `foreign` and leaves alone — it can
+    // leave them alone because it splices, and this cannot because it replaces.
+    //
+    // ONLY THE UNRECOGNISED ONES. A catalogue directive the replacement drops
+    // is not a loss, it is the reload doing what it was asked: a layout that
+    // takes out an empty section is the whole gesture, and reporting that as
+    // damage would refuse every reload that changed anything.
+    extra: (t) => {
+      const out: EntryLoss[] = [];
+      const shared = parseEntry(t, ctx).shared;
+      for (const b of shared?.body ?? []) {
+        if (b.id !== null || b.line.trim() === "") continue;
+        out.push({
+          kind: "foreign",
+          label: b.line.trim(),
+          detail: "not a line this catalogue writes",
+        });
+      }
+      return out;
+    },
+  });
 }
 
 // This page's shared band, in the order the page has it, with each section's
@@ -319,20 +221,11 @@ export function bandWithSection(
 
 // The page with `composed`'s body and its own frontmatter.
 //
-// Returns null when nothing would change, which is `applyEntrySections`' and
-// `applyLayout`'s convention and matters for the same reason: a rewrite that
-// changes nothing still bumps mtime, and on the diary side mtime is the source
-// of truth for what is stale.
+// THE BODY OF THIS MOVED TO `core/note-sections.ts::replaceBody` IN 4.33, when
+// the journals needed the same write. The name stays here because it is the
+// diary's word for the gesture and two callers already use it; what is gone is
+// the second copy of the rule.
 export function reloadEntryBody(text: string, composed: string): string | null {
-  const lines = text.split("\n");
-  const end = frontmatterEnd(lines);
-  // No frontmatter to keep — the whole file is the body. An entry always has
-  // some, so this is the malformed case rather than a supported one, and
-  // replacing everything is what the reader asked for on a file with nothing
-  // to preserve.
-  const head = end === -1 ? [] : lines.slice(0, end + 1);
-  const body = composed.split("\n").slice(frontmatterEnd(composed.split("\n")) + 1);
-  const next = [...head, ...body].join("\n");
-  return next === text ? null : next;
+  return replaceBody(text, composed);
 }
 

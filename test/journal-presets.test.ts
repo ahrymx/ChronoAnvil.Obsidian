@@ -24,7 +24,10 @@ import {
   presetAsNewJournal,
   presetConfig,
 } from "../src/journals/custom-journal";
-import type { JournalConfig } from "../src/journals/custom-journal";
+import type {
+  JournalConfig,
+  JournalPreset,
+} from "../src/journals/custom-journal";
 import {
   JOURNAL_PRESETS,
   STUDY_CONFIG,
@@ -91,6 +94,116 @@ describe("a preset is an ordinary journal", () => {
       settings: { customJournals: [] },
     } as unknown as Parameters<typeof registeredJournalTypes>[0];
     expect(registeredJournalTypes(plugin)).toEqual([]);
+  });
+});
+
+// INSTALLING A PRESET COPIES IT, ALL OF IT (4.33).
+//
+// `STUDY_PRESET.config` IS `STUDY_CONFIG` — the module-level literal, not a
+// copy of it — so any field `presetConfig` shares by reference is shared with
+// the shipped default for the life of the process.
+//
+// This was invisible until 4.33, and the reason is worth keeping: the two
+// writers that existed both ASSIGN a fresh array (`cfg.variants = [...]`)
+// rather than mutating in place, so they were safe by accident. 4.33 gives a
+// reader a way to write `cfg.layout`, and the obvious spelling of that is a
+// property write — which through an aliased object edits the plugin's own
+// default.
+//
+// Asserted on `layout` and `variants` specifically because those are the two
+// the old hand-copy missed, and on a SECOND INSTALL because that is the state a
+// reader reaches without doing anything unusual: install Study, edit it, then
+// use Presets or "Start from Study" again.
+describe("installing a preset copies it, all of it", () => {
+  const installed = (): JournalConfig =>
+    presetConfig(STUDY_PRESET, { root: "J/S", templatesFolder: "T/S" });
+
+  it("does not share `layout` with the shipped literal", () => {
+    const key = Object.keys(STUDY_CONFIG.layout ?? {})[0];
+    expect(key, "Study ships a layout to alias").toBeTruthy();
+    const before = JSON.stringify(STUDY_CONFIG.layout);
+
+    const mine = installed();
+    // The property write 4.33's "save this page as the default" would make.
+    mine.layout![key] = { sections: ["banner"] };
+    mine.layout![key].options = { banner: { label: "Mine" } };
+
+    expect(JSON.stringify(STUDY_CONFIG.layout)).toBe(before);
+  });
+
+  it("does not share `layout` between two installs", () => {
+    const first = installed();
+    const second = installed();
+    const key = Object.keys(first.layout ?? {})[0];
+
+    first.layout![key] = { sections: ["banner"] };
+
+    expect(second.layout![key]).not.toEqual({ sections: ["banner"] });
+  });
+
+  it("does not share a nested `options` object either", () => {
+    // The half a one-level-deeper hand-copy would still have missed: `layout`
+    // holds `TemplateLayout`, which holds `options`, which holds
+    // `SectionOverrides`. This is why the fix is a structured clone rather
+    // than a third `.map`.
+    const key = Object.keys(STUDY_CONFIG.layout ?? {}).find(
+      (k) => STUDY_CONFIG.layout?.[k]?.options
+    );
+    expect(key, "Study ships nested options to alias").toBeTruthy();
+    const before = JSON.stringify(STUDY_CONFIG.layout![key!].options);
+
+    const mine = installed();
+    const opts = mine.layout![key!].options!;
+    opts[Object.keys(opts)[0]] = { label: "Mine" };
+
+    expect(JSON.stringify(STUDY_CONFIG.layout![key!].options)).toBe(before);
+  });
+
+  it("does not share `variants` with the shipped literal", () => {
+    // ON A PRESET THAT HAS SOME, and that is not padding: Study ships none, so
+    // asserting this against Study would be an assertion that cannot fail —
+    // `other.variants ?? []` mints a fresh array when the field is absent, and
+    // the test would pass against the aliasing version it exists to catch.
+    // (It did. That is how this came to be written this way.)
+    const shipped: JournalPreset = {
+      id: "withlayouts",
+      name: "With layouts",
+      emoji: "📐",
+      blurb: "A preset that ships a saved layout.",
+      config: {
+        ...structuredClone(STUDY_CONFIG),
+        id: "withlayouts",
+        variants: [
+          { id: "two-column", label: "Two column", sections: ["banner"] },
+        ],
+      },
+    };
+
+    const mine = presetConfig(shipped);
+    mine.variants![0].label = "Mine";
+    mine.variants!.push({ id: "x", label: "X" });
+
+    expect(shipped.config.variants).toHaveLength(1);
+    expect(shipped.config.variants![0].label).toBe("Two column");
+  });
+
+  it("still composes Study's own templates after all of that", () => {
+    // The clone must not change WHAT is installed, only who owns it. Same
+    // assertion as the equivalence test above, run last so it also catches a
+    // preceding case having damaged the literal.
+    const from = journalTemplateFiles(
+      buildJournalType(
+        presetConfig(STUDY_PRESET, {
+          root: STUDY_CONFIG.root,
+          templatesFolder: STUDY_CONFIG.templatesFolder,
+        })
+      )
+    );
+    for (const name of ["topic-index.md", "subject-index.md", "lesson.md"]) {
+      expect(from.find((f) => f.name === name)!.content, name).toBe(
+        studyTemplate(name)
+      );
+    }
   });
 });
 

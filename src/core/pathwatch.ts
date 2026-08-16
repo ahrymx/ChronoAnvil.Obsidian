@@ -198,8 +198,15 @@ export const SECTION_KEY_SEP = "::";
 // so a vault that had churned through notes carried their folds in data.json
 // forever, unbounded. Run once at load against the paths the vault actually
 // has. Pure so it can be tested without a vault.
+//
+// TAKES ANY VALUE TYPE, AS OF 4.34. The rule it applies is about the KEY — a
+// note path before the first `::` — and it never looks at what is stored under
+// one, so narrowing it to `boolean` was describing the one caller rather than
+// the function. `openGroupTabs` holds numbers on identical keys and needs
+// identical pruning, and two copies of this walk is how the two records come to
+// disagree about what a dead note is.
 export function pruneCollapsedSections(
-  folds: Record<string, boolean>,
+  folds: Record<string, unknown>,
   livePaths: Set<string>
 ): number {
   let dropped = 0;

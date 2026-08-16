@@ -568,6 +568,102 @@ export function cellWeightOf(line: string): number | null {
   return n >= 1 ? n : null;
 }
 
+// ── the tab delimiter ─────────────────────────────────────────────────
+//
+// WHERE ONE PAGE OF A GROUP ENDS AND THE NEXT BEGINS. 4.34 §1.
+//
+// `cell` divides a row into columns; this divides a fence into PAGES, of which
+// one is on screen at a time and the group's foot carries a numbered strip to
+// switch between them. It is the same delimiter one level up:
+//
+//   row
+//   diary:3
+//   cell
+//   tasks-table          ← tab [1], two columns
+//   tab
+//   chart:confidence     ← tab [2], one column
+//
+// THE SAME WALK, WHICH IS THE WHOLE DESIGN. Every reading in this plugin that
+// turns a fence into a layout is "runs between delimiters, empty runs dropped" —
+// `cellPlan` over rendered children, `columnsOf` over body lines. A tab does not
+// get a second implementation of any of it: `tabSlices` (cell-move.ts) cuts the
+// body into one slice per page, and every existing function keeps its exact
+// contract INSIDE one slice. A design that taught `cellPlan` about tabs would
+// put two levels of delimiter in one loop, and the first bug would be a `cell`
+// in tab 2 counted as a column of tab 1.
+//
+// WHAT THE TWO DELIMITERS MEAN TOGETHER. The `row` line opens tab 1 and its
+// first cell, exactly as it opens the first cell today. A `tab` line closes the
+// page before it and opens the next one, AND opens that page's first cell — so a
+// `cell` immediately after a `tab` opens nothing and is dropped, which is the
+// leading-`cell` rule `cellPlan` has honoured since 4.4 §2.
+//
+// AN EMPTY RUN DRAWS NO TAB, so a trailing `tab`, two in a row, and a `tab`
+// above a directive that drew nothing all mean what they already mean for
+// `cell`.
+//
+// AND A BLOCK WITH NO `tab` LINE IS EXACTLY WHAT IT WAS. One page, no strip, the
+// column count in the foot. That is what makes this a minor rather than a
+// breaking change, and it is the first thing 4.34's verification checks.
+export const TAB_KEYWORD = "tab";
+
+// What a fence's `tab` lines said, or why they could not be honoured.
+//
+// `CellSpec`'s SHAPE, for `CellSpec`'s reason: one function answers one question
+// completely, so no caller has to remember to ask the other first.
+export interface TabSpec {
+  // Whether this block divides itself into pages at all.
+  tabs: boolean;
+  error: string | null;
+}
+
+// Whether this line is the tab delimiter rather than a directive.
+//
+// EXACT, for `isFrameLine`'s and `isRowLine`'s reason: a future `tab-something`
+// directive must not be eaten by the delimiter that shares its first three
+// letters.
+export function isTabLine(line: string): boolean {
+  return splitDirective(line).keyword === TAB_KEYWORD;
+}
+
+export function parseTabs(lines: readonly string[]): TabSpec {
+  const tabLines = lines.filter((l) => isTabLine(l));
+  if (tabLines.length === 0) return { tabs: false, error: null };
+
+  // A DELIMITER WITH NOTHING TO DIVIDE, which is `parseCells`' first refusal one
+  // level up. `tab` pages a group; a block that is not a row is a column of
+  // widgets and has no group to page, so a reader who wrote one is describing a
+  // layout they have not asked for.
+  if (!lines.some((l) => isRowLine(l))) {
+    return {
+      tabs: false,
+      error:
+        "tab divides a group into pages, and this block has no row line. Add row above the directives, or delete the tab line.",
+    };
+  }
+
+  // A VALUE IS REFUSED, AND THAT IS A DOOR HELD OPEN RATHER THAN A FEATURE
+  // DECLINED. The strip is numbered — `[1] [2] [3]` — so there is nothing for a
+  // value to say yet, and `tab: Charts` is the obvious next spelling. A refusal
+  // can become an acceptance later without breaking a single file on disk; a
+  // value accepted and ignored cannot, because by then files will carry one.
+  //
+  // This is `row`'s own argument (4.2 refused `row: 3` and says why) applied to
+  // the same slot, and it is deliberately NOT `cell`'s — a width on a cell
+  // cannot go stale because it is written where the cell is, and a page has
+  // nothing of that kind to carry.
+  const valued = tabLines.find((l) => splitDirective(l).argument.trim() !== "");
+  if (valued) {
+    const raw = splitDirective(valued).argument.trim();
+    return {
+      tabs: false,
+      error: `tab takes no value, so \`tab: ${raw}\` is refused. A tab holds every widget between it and the next one, which means the number of pages is the number of tab lines you wrote.`,
+    };
+  }
+
+  return { tabs: true, error: null };
+}
+
 // ── the height of a widget ────────────────────────────────────────────
 //
 // HOW TALL ONE CARD IN A COLUMN IS. 4.22 §1.

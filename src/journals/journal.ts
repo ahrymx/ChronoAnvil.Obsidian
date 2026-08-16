@@ -519,11 +519,20 @@ export const PAGE_TEMPLATE = "page.md";
 // here into custom-journal.ts is exactly the runtime cycle the note above
 // `import type { JournalConfig }` describes and test/type-integrity.test.ts
 // guards. Types cross that edge; functions do not.
+// AND ABSENT MEANS *NONE* ONCE A LAYOUT NAMES A SURFACE (4.33). A front-page or
+// page layout is written with `kinds: []`, which this already handles — but
+// leaving `kinds` off such a layout would offer it on every kind, put a row in
+// every create dropdown and `claim()` a template file per kind, which is a
+// silent multiplication rather than a visible mistake. Making the trap
+// unrepresentable here is one line and costs nothing: a layout that names a
+// surface and says nothing about kinds is a surface layout.
 export function variantKinds(
   cfg: { kinds: JournalKindConfig[] },
   variant: JournalVariantConfig
 ): string[] {
-  if (!variant.kinds) return cfg.kinds.map((k) => k.id);
+  if (!variant.kinds) {
+    return variant.surfaces?.length ? [] : cfg.kinds.map((k) => k.id);
+  }
   // A named kind that no longer exists is dropped rather than carried: a kind
   // id is what `preserveIds` protects precisely because it is the handle
   // everything else hangs off, and a layout naming a deleted one would compose
@@ -1621,25 +1630,36 @@ export class JournalManager {
   // so a reader who saved a layout and then edited that journal in Settings had
   // it silently discarded. Nothing guarded the old address; the new one is not
   // in that routine's path at all.
+  // TAKES THE SPLIT LISTS SINCE 4.33, AND NO LONGER A `kindId`. That parameter
+  // did two jobs — the default membership, and a guard that returned SILENTLY
+  // when the id was not a real kind — and the second is a Save button that does
+  // nothing on two of the three surfaces the window can now be opened from.
+  // `splitLayoutTargets` does the splitting, in one place, for both doors; the
+  // origin is not a parameter at all because `promptLayoutSave` already
+  // guarantees the surface it was saved from is ticked.
   async saveVariant(
     typeId: string,
-    kindId: string,
     label: string,
     sections: string[],
     options: Record<string, SectionOverrides>,
-    // Which kinds the layout is offered on. Defaults to the one it was saved
-    // from, which is exactly the behaviour it had when it could not be anything
-    // else — so this is additive and no caller had to change.
-    kinds: string[] = [kindId]
+    kinds: string[],
+    surfaces: ("index" | "page")[] = []
   ): Promise<void> {
     const cfg = this.plugin.settings.customJournals.find((j) => j.id === typeId);
     if (!cfg) {
       new Notice(
-        "Saved layouts are stored on a journal you defined, and this note belongs to the built-in Study journal."
+        "Saved layouts are stored on a journal you defined, and this journal is not one of them."
       );
       return;
     }
-    if (!cfg.kinds.some((k) => k.id === kindId)) return;
+    if (!kinds.length && !surfaces.length) {
+      // SAID, NOT SWALLOWED. The old spelling was a bare `return` on an
+      // unrecognised kind, which a reader cannot tell from a save that worked.
+      new Notice(
+        "Almanac: pick at least one note type or surface to offer this layout on."
+      );
+      return;
+    }
 
     // Ids unique within the JOURNAL now rather than within the kind, which is
     // the one consequence of the move that is not invisible: two kinds could
@@ -1659,7 +1679,14 @@ export class JournalManager {
         label,
         sections: [...sections],
         ...(Object.keys(options).length ? { options } : {}),
+        // ALWAYS WRITTEN, EVEN EMPTY. `variantKinds` reads an absent `kinds` as
+        // "every kind", so a surface-only layout that left it off would appear
+        // in every create dropdown and claim a template file per kind. That
+        // trap is closed in `variantKinds` too; writing it explicitly means the
+        // stored shape says what it means without needing the reader of it to
+        // know the rule.
         kinds: [...kinds],
+        ...(surfaces.length ? { surfaces } : {}),
       },
     ];
 

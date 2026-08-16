@@ -489,15 +489,20 @@ describe("the divider and the box, as drawn", () => {
     expect(rules).not.toContain(
       ".journal-block-cell > .journal-widget-card + .journal-widget-card::before"
     );
-    // AND THE DRAWING SURVIVED THE MOVE, which is what makes it a move. The same
-    // rectangle laid down: the divider's mark is 2px wide and 28px tall, this one
-    // is 28 by 2, and the colour, resting opacity and transition are the column
-    // divider's own.
+    // AND THE DRAWING IS THE CARD'S OWN EDGE, AS OF 4.34.3. It was a 28px pill
+    // centred in the gap between two cards — punctuation dropped between the
+    // widgets, which on a group of three left the eye working out which card
+    // each mark belonged to. It runs the full width of the card's bottom edge
+    // now, so what lights up is the edge of the thing the drag resizes.
+    //
+    // THE COLUMN DIVIDER IS UNCHANGED and is still the pill: it divides two
+    // cells that are side by side, and there is no single edge for it to be.
     const seam = ruleFor(rules, ".journal-card-divider::after");
     const mark = ruleFor(rules, ".journal-group-divider::after");
-    for (const decl of ["width: 28px", "height: 2px", "border-radius: 1px"]) {
+    for (const decl of ["width: 100%", "height: var(--am-rule)"]) {
       expect(seam, decl).toContain(decl);
     }
+    expect(seam).not.toContain("width: 28px");
     expect(mark).toContain("height: 28px");
     expect(seam).toContain("background: var(--background-modifier-border)");
     const strip = ruleFor(rules, ".journal-card-divider");
@@ -510,8 +515,8 @@ describe("the divider and the box, as drawn", () => {
 
   it("makes it a control, and gives it something to resolve against", () => {
     // THE GENEROSITY IN THE TARGET AND THE PRECISION IN THE DRAWING: a 12px hit
-    // area against a 2px mark, which is the column divider's proportions turned
-    // ninety degrees. The old seam took no hit area at all and said
+    // area against a 2px line, which is what lets the drawing be a hairline on
+    // an edge. The old seam took no hit area at all and said
     // `pointer-events: none`, because it set nothing.
     const strip = ruleFor(rules, ".journal-card-divider");
     expect(strip).toContain("height: 12px");
@@ -562,10 +567,19 @@ describe("the divider and the box, as drawn", () => {
     expect(rule).toContain("padding: 0");
   });
 
-  it("says how many columns it has, in the foot", () => {
+  it("says nothing in the foot that the reader can already see", () => {
+    // 4.9 put `N columns` here because the foot needed content to be a bar at
+    // all. 4.34.2 took it out: the columns are directly above it, so the label
+    // restated what the reader was looking at — and the foot now carries three
+    // controls instead (the grip, the `+`, and the page numbers where a group
+    // has pages).
     const src = readSrc("row");
-    expect(src).toContain('`${groups.length} ${groups.length === 1 ? "column" : "columns"}`');
-    expect(ruleAt(rules, ".journal-group-foot")).toBeGreaterThan(-1);
+    expect(src).not.toContain('? "column" : "columns"');
+    // Comments stripped: the rule that replaced it names it, which is the
+    // record of what went and why (journal-cards.test.ts does the same).
+    expect(readCss().replace(/\/\*[\s\S]*?\*\//g, "")).not.toContain(
+      ".journal-group-foot-count"
+    );
   });
 
   it("draws no divider on the first column", () => {

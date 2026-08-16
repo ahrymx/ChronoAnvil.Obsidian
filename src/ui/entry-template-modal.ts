@@ -106,7 +106,7 @@ class EntryTemplateModal extends Modal {
     const composed = this.manager.composedFor(this.grain);
 
     host.createDiv({
-      cls: "almanac-entry-tpl-note",
+      cls: "almanac-tpl-note",
       // Named sections rather than a count: "6 sections" tells a reader
       // nothing they can check against the page they are looking at.
       text: `Every new ${CLASS_DEFS[
@@ -114,7 +114,7 @@ class EntryTemplateModal extends Modal {
       ].label.toLowerCase()} entry starts with ${listOf(bandOf(composed))}.`,
     });
 
-    const row = host.createDiv({ cls: "almanac-entry-tpl-actions" });
+    const row = host.createDiv({ cls: "almanac-tpl-actions" });
     const save = row.createEl("button", {
       text: "Save this page as the default",
       cls: "mod-cta",
@@ -166,7 +166,7 @@ class EntryTemplateModal extends Modal {
     }
 
     host.createDiv({
-      cls: "almanac-entry-tpl-note",
+      cls: "almanac-tpl-note",
       text: "This entry holds nothing yet, so it can be rebuilt from a template. Your properties — the date, the title, any events on this entry — are kept.",
     });
 
@@ -259,18 +259,18 @@ class EntryTemplateModal extends Modal {
 
   // What is standing in the way, in the reader's own terms, and what clears it.
   private drawLoss(host: HTMLElement, loss: EntryLoss[]): void {
-    const box = host.createDiv({ cls: "almanac-entry-tpl-loss" });
-    const head = box.createDiv({ cls: "almanac-entry-tpl-loss-head" });
-    setIcon(head.createDiv({ cls: "almanac-entry-tpl-loss-icon" }), "pencil-line");
+    const box = host.createDiv({ cls: "almanac-tpl-loss" });
+    const head = box.createDiv({ cls: "almanac-tpl-loss-head" });
+    setIcon(head.createDiv({ cls: "almanac-tpl-loss-icon" }), "pencil-line");
     head.createDiv({
       text: "You've written in this entry, so it can't be rebuilt from a template — a rebuild replaces everything below the properties.",
     });
-    const list = box.createEl("ul", { cls: "almanac-entry-tpl-loss-list" });
+    const list = box.createEl("ul", { cls: "almanac-tpl-loss-list" });
     for (const l of loss) {
       list.createEl("li", { text: `${l.label} — ${l.detail}` });
     }
     box.createDiv({
-      cls: "almanac-entry-tpl-note",
+      cls: "almanac-tpl-note",
       // NAMES THE OTHER DOOR. A refusal that only says no sends a reader
       // looking for a control that does not exist; "Edit sections…" is the
       // non-destructive path and it is one item up the same menu.

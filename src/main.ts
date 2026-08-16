@@ -28,6 +28,7 @@ import { danglingTypeIds } from "./trackers/trackers";
 import { Charts } from "./charts/charts-manager";
 import { EntryTrackers } from "./trackers/entry-tracker-manager";
 import { EntryTemplates } from "./diary/entry-template-manager";
+import { JournalTemplates } from "./journals/journal-template-manager";
 import { normalizeTrackers } from "./trackers/trackers";
 import { JournalCharts } from "./charts/journal-charts-manager";
 import { JournalImporter } from "./journals/journal-import";
@@ -55,6 +56,13 @@ export default class AlmanacPlugin extends Plugin {
   // sections a new entry starts with; `entryTrackers` decides what THIS entry
   // carries; this decides what the template itself is.
   entryTemplates!: EntryTemplates;
+  // The same three gestures on a JOURNAL note (4.33): this page as its note
+  // type's default, as a named layout, or a template written back over it.
+  // A separate manager because the stores are separate — a grain's default is
+  // a settings key and a journal's is `cfg.layout`, keyed per template target
+  // — and merging them would put a diary layout on a journal, which is the
+  // cross-catalogue carry `layout-transfer.ts` exists to refuse.
+  journalTemplates!: JournalTemplates;
   widgets!: Widgets;
   scaffold!: Scaffold;
   sections!: SectionInserter;
@@ -110,6 +118,7 @@ export default class AlmanacPlugin extends Plugin {
     this.journalCharts = new JournalCharts(this.app, this);
     this.entryTrackers = new EntryTrackers(this.app, this);
     this.entryTemplates = new EntryTemplates(this.app, this);
+    this.journalTemplates = new JournalTemplates(this.app, this);
     this.widgets = new Widgets(this.app, this);
     this.scaffold = new Scaffold(this.app, this);
     this.sections = new SectionInserter(this.app, this);
@@ -145,7 +154,7 @@ export default class AlmanacPlugin extends Plugin {
         this.registry.announceRestore(this.restoredFrom);
         this.restoredFrom = null;
       }
-      void this.pruneFoldState();
+      void this.pruneNoteState();
       // Adopt any journal folder the settings don't account for, THEN report
       // dangling tracker scopes. Order matters: a journal recovered here
       // re-registers the very type those trackers name, so reporting first
@@ -304,11 +313,26 @@ export default class AlmanacPlugin extends Plugin {
     );
   }
 
-  private async pruneFoldState(): Promise<void> {
+  // Drop per-note UI state for notes that no longer exist.
+  //
+  // WAS `pruneFoldState`, AND THE RENAME IS THE POINT (4.34). It now prunes two
+  // records that are the same kind of fact — what the reader folded, and which
+  // page of a group they had open — keyed identically and worthless once the
+  // note is gone. A second copy of this walk is how two records that share a key
+  // format come to disagree about what a dead note is.
+  private async pruneNoteState(): Promise<void> {
     const folds = this.settings.collapsedNoteSections;
-    if (!folds || Object.keys(folds).length === 0) return;
+    const tabs = this.settings.openGroupTabs;
+    const any =
+      Object.keys(folds ?? {}).length > 0 || Object.keys(tabs ?? {}).length > 0;
+    if (!any) return;
     const live = new Set(this.app.vault.getMarkdownFiles().map((f) => f.path));
-    let dropped = pruneCollapsedSections(folds, live);
+    let dropped = tabs ? pruneCollapsedSections(tabs, live) : 0;
+    if (!folds || Object.keys(folds).length === 0) {
+      if (dropped > 0) await this.saveSettings();
+      return;
+    }
+    dropped += pruneCollapsedSections(folds, live);
     // 2.51 removed the Journals hero's fold-everything chevron, and with it the
     // only writer and only reader of `<note>::journal:list`. pruneCollapsedSections
     // can't catch these — the note they name still exists, so by its rule the key

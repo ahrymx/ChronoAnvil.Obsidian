@@ -7,6 +7,278 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.34.5] - 2026-08-16
+
+**A widget outside a group opened its header to any pointer near its top edge.**
+4.34.4 made the drag dots the only thing that reveals a widget's header, and set
+that on one of the two places a header can live — so widgets in a group behaved
+as intended while widgets on their own kept the full-width strip along their top
+edge and went on opening unasked. One control, two behaviours, on the same page.
+The strip is gone from both now.
+
+**And the archives are a script.** They were made by hand until this release, and
+by hand is how they went wrong: three times in one session a `tar` inherited a
+directory change from earlier on the same command line and wrote a valid,
+correctly named, 410-byte archive of nothing — exit code 0, the only symptom
+being the file size. `npm run release` packages and files both archives, and it
+does three things a command line does not: it has no working directory to be
+wrong about, it opens each archive after writing it and deletes any that does not
+contain what its name claims, and it refuses to file a stale build under a new
+number — the one error reading the archive back cannot catch, because everything
+inside it is real. An existing version's archive is never replaced without
+`--force`.
+
+## [4.34.4] - 2026-08-16
+
+**The widget header opens from the drag dots now, and from nothing else.** 4.34.3
+made it an overlay triggered by a strip along the card's top edge, which was
+still too easy to ask for by accident: the top of a card is something a pointer
+crosses on its way somewhere else, so the band went on appearing unbidden.
+
+The header names what the grip picks up, so the two are one control — hover a
+widget and the dots appear, move onto them and the band opens under them. It has
+no hit area of its own until it is open, which is what makes the minimisation
+real rather than a matter of degree; once open it takes one back, so the band
+stays up as you move down off the dots and into it.
+
+## [4.34.3] - 2026-08-16
+
+**A widget's header no longer pushes the widget down.** Hovering one opened a
+band that was not there a moment before, so the widget's own contents moved — and
+inside a group it made that cell taller than the ones beside it, which moved the
+whole row. A label about a widget was rearranging the widget. It is laid **over**
+the top edge now, the way the drag dots already are, so nothing reflows.
+
+**And it only appears where it will be.** A band that opens over the thing you
+are pointing at is worse than one that opens over the padding above it — so the
+trigger is the top edge itself, a 10px strip over the card's own top padding. On
+a phone it is unchanged: a static band, because there is no hover to open one
+with and nothing there to drag.
+
+**The mark you pull to set a widget's height is the widget's bottom edge now.**
+It was a short pill centred in the gap between two cards — punctuation dropped
+between the widgets rather than a property of either, and on a group of three the
+eye had to work out which card each one belonged to. It runs the full width of
+the card's own bottom edge instead, so what lights up is the edge of the thing
+the drag resizes. The 12px target is unchanged; only the drawing moved.
+
+**In *Edit sections…*, the accent spine follows the pointer.** It was painted
+permanently on every section row, so a list of twelve drew a dozen accent bars
+down its left edge — all saying the same thing about a distinction the *Section*
+pill on the row already states in words. Emphasis that never varies is texture,
+and the one thing it could not tell you was which row you were on. Now it marks
+that, and its width is held on every row so nothing shifts as you move down the
+list.
+
+**A group in that list has more room around it.** At six pixels its card sat
+almost against the loose sections above and below, leaving a 2px rule to carry
+the whole difference between *these three are one object* and *this one is on its
+own*.
+
+## [4.34.2] - 2026-08-16
+
+**Pages are in *Edit sections…* now.** The `+` in a group's foot is the gesture
+for when you are pointing at one thing; the sections window is where you arrange
+the whole note, and until now it could not see pages at all — it would have shown
+a paged group as one undivided list and flattened it on the next Save.
+
+Every section inside a group carries **Start a page here**, and the group's card
+shows where its pages divide. Press it again — it reads **Join the page before** —
+to take the division away. **The column stays either way:** removing a page
+boundary puts the two sections back beside each other rather than stacking them,
+because a page break is a column break that was promoted, and unmaking it returns
+it to what it was.
+
+**The card stopped counting columns, and so did the group's foot.** *Group — 4
+columns* became exactly wrong the moment a group could hold pages: two pages of
+two columns each is not a group of four columns, and that number was the one
+thing on the card you would have read as a description of your page. It says how
+many **pages** now, and only where there is more than one.
+
+**And the `2 COLUMNS` in the foot is gone entirely.** It was there because 4.9's
+foot needed something in it to be a bar at all, and what it said was a count of
+the columns directly above it — a label restating the thing it sat under. The
+foot carries three controls instead: the grip, the `+`, and the page numbers.
+
+## [4.34.1] - 2026-08-16
+
+**A group now says that pages exist.** 4.34 shipped `tab` reachable only by
+typing it, and the first thing a reader saw was a footer still reading *2
+columns* with nothing anywhere suggesting a page was a thing a group could have.
+That is precisely the state `cell: 2` sat in from 4.4 until 4.9 gave it a divider
+to drag — a grammar nobody used, because nothing on the page said it was there.
+
+**Point at a group and a `+` appears in its foot.** Press it and the last column
+becomes a page of its own; press it again and the next one follows. It is offered
+on any group with two columns left to divide, **including one that has no pages
+yet**, which is exactly where you would go looking for it.
+
+**It splits rather than adds, and that is not a shortcut.** A page with nothing
+in it is not drawn — that rule is what stops a stray `tab` line putting an empty
+number in the strip — so a button that only appended a `tab` would have written
+to your note and changed nothing on the screen. Splitting the last column is the
+gesture that has something to show for itself.
+
+**One fix you would only have seen in a group that was never paged.** The
+wrapper 4.34 put around a group's rows clipped its contents at rest, in a release
+whose whole claim is that a group without a `tab` line is untouched. It now clips
+only while a page is actually moving.
+
+## [4.34.0] - 2026-08-16
+
+**A widget group can have pages now.** A `row` line has put widgets side by side
+since 4.2 and a `cell` line has divided that row into columns since 4.4. A **`tab`**
+line divides the block itself — into pages, one on screen at a time, with a
+numbered strip in the group's foot to switch between them:
+
+````
+```almanac
+row
+diary:3
+cell
+tasks-table
+tab
+journal-chart:confidence
+```
+````
+
+That is one group with two pages. The first is two columns, the second is a
+single wide chart, and the foot reads **[1] [2]** with the open one tinted. Until
+now the only answer to a crowded dashboard was to make it longer; this is the
+answer for the widgets that are *alternatives* to each other — the confidence
+chart and the accuracy chart, this month and last month, the table and the chart
+of the same thing.
+
+**Each page is a whole row of its own,** so every page has its own columns and its
+own widths. A `cell` divides the page it is in and nothing else.
+
+**Two commands, and they are the reason to open Settings → Hotkeys.** *Note: next
+page in this widget group* and *Note: previous page in this widget group* switch
+the group you last clicked in, and they wrap — pressing *next* on the last page
+goes back to the first. Nothing ships bound to a key, because any default we
+chose would collide with something you already use. With one group on the note
+the keys simply find it; with several, the one they are listening to shows a
+tinted line above its foot, so you are never pressing a key at a group you cannot
+identify.
+
+**Where you left it is remembered per note, and your markdown is untouched.**
+Close the note, come back a week later, and the group is on the page you were
+reading. Switching pages never writes to the file — the page you have open is the
+plugin's business, not your note's.
+
+**The strip does not jump under your pointer.** A tall page followed by a short
+one would otherwise move the foot between two presses of the same key, which is
+the kind of thing that is never broken and always feels broken. The group's
+height moves with the page instead. If you have **reduced motion** turned on, the
+swap is instant — and that setting is now respected across the plugin, which it
+never has been before.
+
+**`tab` takes no value,** the way `row` doesn't. The pages are numbered, and the
+count is the number of `tab` lines you wrote, so `tab: Charts` is refused rather
+than quietly ignored. Named pages are a reasonable thing to want later, and a
+value accepted and dropped today would be sitting in your files by then.
+
+**A page you cannot see is not drawn** — a `tab` at the end of a block, two in a
+row, or one above a widget that has nothing to show. The strip never offers a
+number that opens onto nothing.
+
+**And a group with no `tab` line is exactly what it was:** one row, its columns,
+and the column count in the foot. Every dashboard Almanac ships is one of those
+and none of them has changed.
+
+## [4.33.1] - 2026-08-16
+
+**A subject with no topics yet now says so.** *What's below this note* asked the
+wrong question. It looked at whether a folder had any sub-folders in it *right
+now* and treated an empty answer as "this is the bottom of the journal" — so a
+brand-new Subject, which has no Topics by definition, was given the tables that
+belong on a Topic: a **Lessons** table and a **Practice** table, each telling you
+to press a *New Lesson* button that is not on a Subject page. Every subject you
+made looked broken for as long as it was new, and looked correct the moment you
+added a topic to it. What decides now is the shape of the journal itself: a
+Subject has Topics below it whether or not any exist yet, so an empty one shows
+**No topics yet** and points at the **+ Topic** button in that section's own bar.
+
+**And a topic stopped turning into a subject.** The same question got the same
+answer backwards: a lesson split across pages is a folder, so the first time you
+split one, the Topic holding it decided it must have containers below it and
+replaced its **Lessons** and **Practice** tables with a folder rollup listing
+that one lesson.
+
+**The empty state points at the button that is actually on the page.** It used
+to send you to the Journals card on the homepage while the control that does the
+job sat directly above the sentence.
+
+**"Practice" is "Practice" everywhere.** Study spells out that this one does not
+gain an "s", and three places ignored it and pluralised the label themselves: a
+subject's table column, the four-number band at the top of a topic, and the
+per-type headings *What's below this note* draws when it is pointed at a folder
+by hand. So a subject's page said **Practices** over a topic that called itself
+**Practice** on every one of its own headings and buttons. The same fix covers
+any journal of yours whose spelling you have corrected by hand.
+
+**A journal's front page named the wrong level.** A rollup drawn at the root of a
+journal — the folder that holds your Subjects — headed its first column **Topic**
+and offered to make one, because it counted the root as though it were a Subject.
+
+## [4.33.0] - 2026-08-16
+
+**Your journal notes can decide what a journal note looks like.** 4.29 gave every
+diary entry a **Template…** item on its cog. Journal notes had nothing like it:
+the only way to change what a new Lesson started with was Settings → Journals →
+*Templates and sections*, which edits the template file from a screen nowhere
+near the note. There is now a **Template…** item on every journal note's banner
+cog, next to *Edit sections…*, and it does the same three things.
+
+**Save this page as the default.** Arrange a note however you like — drag its
+sections into the order you want, take out the ones you never use — then save
+that page as the default for its note type. Every new note of that type is built
+from it. Notes you already have keep what they have.
+
+**Every kind of journal page, not just the note types.** Front pages — the
+dashboard note in each folder — and pages both have their own default now, and
+you save one the same way: stand on the page and press the button. Saving
+finishes by opening the usual template window, so you see exactly what your
+templates gain and lose before saying yes.
+
+**Named layouts, now offered on front pages and pages too.** Saving a layout asks
+where it should be available, and the list has two new entries beside your note
+types: **Front page** and **Page**. A layout tagged that way is an arrangement
+you can reload onto any front page or page — it does not add a new choice when
+you create one, because front pages and pages are not created from a choice.
+
+**Reload a template onto a note you have not written in.** Pick the type's
+default or any saved layout and the note is rebuilt from it. **This is only
+offered when the note is genuinely empty**, and "empty" is strict: a word in any
+section, a paragraph under one of your headings, a tracker you added to that one
+note, a chart you added to that page, a resource shelf you named, or a line of
+your own in a widget block all count. When something is in the way the window
+says exactly what, and points you at *Edit sections…*, which changes a note's
+sections without losing anything.
+
+**Charts you added are now protected, and previously they were not reported at
+all.** A journal note's charts live in a block Almanac treats as opaque, so the
+existing "preview changes" window would tell you a page's charts were unchanged
+while a rebuild was about to replace every one of them. A rebuild now refuses.
+
+**Saving keeps what you wrote in the markdown, which it used to quietly drop.**
+If you renamed a heading — `## Notes` to `## Working` — or retitled a section's
+header bar, saving the page as a default or a layout now keeps your name for it.
+It used to fall back to the name the journal had stored, at exactly the moment
+you asked it to keep something. The prose *under* a heading is never carried into
+a template: that is what you wrote in that note, not the shape of the next one.
+
+Nothing about a reload touches your properties. What the note is, the folders it
+belongs to, when it was made and any readings on it are kept exactly as they
+are — only the body is rebuilt — and you see the full difference and confirm
+before anything is written.
+
+**One fix that has nothing to do with the window.** Installing a journal from a
+preset shared part of its arrangement with the preset itself, so a second Study —
+or *Start from Study* in the journal wizard — could have handed you the first
+one's edits as though they were the plugin's defaults. Installing now copies
+everything.
+
 ## [4.32.0] - 2026-08-15
 
 **A refined surface hierarchy for diary pages and subsystems.**
