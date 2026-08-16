@@ -81,8 +81,9 @@ import {
   slugify,
 } from "../journals/custom-journal";
 import {
+  TemplateLayout,
   TemplateTarget,
-  defaultSectionIds,
+  chosenSectionIds,
   sectionsFor,
   templateTargets,
   splitLayoutTargets,
@@ -1296,7 +1297,13 @@ export class JournalEditModal extends SteppedEditorModal {
     private onSave: (cfg: JournalConfig) => Promise<void>,
     // What had to be guessed to fill this form in. Import only; shown above
     // the fields so the reader knows which values to look at before saving.
-    private guesses: string[] = []
+    private guesses: string[] = [],
+    // Trackers a preset is about to install, which the registry does not hold
+    // yet. OFFERED TO THE "Rated on" DROPDOWN AND WRITTEN NOWHERE — see
+    // paintKinds for why a select with no matching option silently discards
+    // the value it was given. The seed itself happens in settings.ts, from the
+    // config the reader commits.
+    private pendingTrackers: TrackerDef[] = []
   ) {
     super(app, plugin, ...MODE_STRINGS[mode]);
     // Deep-ish copy: levels and kinds are the arrays a cancelled edit must not
@@ -2080,7 +2087,26 @@ export class JournalEditModal extends SteppedEditorModal {
     if (!host) return;
     host.empty();
 
-    const rateable = ratingChoices(this.plugin, this.draft.id);
+    // THE DROPDOWN THAT WOULD OTHERWISE LIE. 4.35 §1.4.
+    //
+    // A `<select>` handed a value with no matching `<option>` reads back as
+    // `""` — so a preset whose Workout is rated on Intensity would show
+    // **"Nothing"** on the Structure step, because the tracker it names is not
+    // in the registry yet and `ratingChoices` reads the registry. One touch of
+    // the dropdown would then make that true, silently discarding the rating
+    // the preset shipped.
+    //
+    // Offered here, WRITTEN NOWHERE: the seed happens in settings.ts at save
+    // time, from the config the reader committed. This list only has to make
+    // the option exist so the value binds and the label draws.
+    const rateable = [
+      ...ratingChoices(this.plugin, this.draft.id),
+      ...(this.pendingTrackers ?? []).filter(
+        (t) => t.type === "number" || t.type === "scale"
+      ),
+    ].filter(
+      (t, i, all) => all.findIndex((o) => o.id === t.id) === i
+    );
 
     this.draft.kinds.forEach((kind, i) => {
       const row = host.createDiv({ cls: "almanac-kind" });
@@ -2243,10 +2269,16 @@ export class JournalEditModal extends SteppedEditorModal {
         // it goes, and the catalogue's answer is the one every other surface
         // gives.
         const now = [...(this.chosen.get(active.key) ?? [])];
+        // ORDER CANNOT MATTER HERE: this Map is only read for `.required`.
         const byId = new Map(sectionsFor(active.ctx).map((sc) => [sc.id, sc]));
         const at = now.indexOf(section.id);
         if (box.checked && at === -1) {
-          const order = sectionsFor(active.ctx).map((s) => s.id);
+          // With the layout, so re-ticking a section returns it to its DESIGNED
+          // slot rather than to its catalogue rank — the same answer
+          // `displayOrder` drew it in while it was unticked.
+          const order = sectionsFor(active.ctx, this.layoutFor(active)).map(
+            (s) => s.id
+          );
           const rank = (id: string): number => order.indexOf(id);
           const before = now.findIndex((id) => rank(id) > rank(section.id));
           now.splice(before === -1 ? now.length : before, 0, section.id);
@@ -2275,7 +2307,10 @@ export class JournalEditModal extends SteppedEditorModal {
   // the output — it is not in the file — so it cannot be moved and is placed
   // where it WOULD go if ticked, which is what makes ticking one predictable.
   private displayOrder(target: TemplateTarget): JournalSection[] {
-    const all = sectionsFor(target.ctx);
+    // With the layout, so an UNTICKED row sits where the design would put it
+    // rather than at catalogue rank — the position it would take if ticked,
+    // which is the whole promise this function's comment makes.
+    const all = sectionsFor(target.ctx, this.layoutFor(target));
     const byId = new Map(all.map((s) => [s.id, s]));
     const chosen = (this.chosen.get(target.key) ?? []).filter((id) =>
       byId.has(id)
@@ -2309,6 +2344,7 @@ export class JournalEditModal extends SteppedEditorModal {
   ): void {
     const ids = [...(this.chosen.get(target.key) ?? [])];
     const at = ids.indexOf(id);
+    // ORDER CANNOT MATTER HERE EITHER: only `.required` is read off this Map.
     const byId = new Map(sectionsFor(target.ctx).map((sc) => [sc.id, sc]));
     // NOTHING MOVES ABOVE THE BANNER, and this is a correctness rule rather
     // than a convention about where a title looks best.
@@ -2396,9 +2432,24 @@ export class JournalEditModal extends SteppedEditorModal {
     }
     for (const t of targets) {
       if (!this.chosen.has(t.key)) {
-        this.chosen.set(t.key, defaultSectionIds(t.ctx));
+        // THE SEED, AND THE ONE THAT MATTERS (4.35 §0.2).
+        //
+        // This was `defaultSectionIds(t.ctx)` with no layout, so a preset's
+        // arrangement was discarded at the single moment it is used: install
+        // Study through Presets and its Topic Index came out in CATALOGUE
+        // order, not in the order journal.ts argues for at length. `chosen`
+        // is then what `commit` writes and what the templates are composed
+        // from, so the loss was total rather than cosmetic.
+        this.chosen.set(t.key, chosenSectionIds(t.ctx, this.layoutFor(t)));
       }
     }
+  }
+
+  // The draft's saved layout for a template, if it has one. `TemplateTarget.key`
+  // IS the layout key — both come from `templateKeyFor` — so this cannot drift
+  // from what `commit` writes back or what `composeTemplate` reads.
+  private layoutFor(target: TemplateTarget): TemplateLayout | undefined {
+    return this.draft.layout?.[target.key];
   }
 
   private section(host: HTMLElement, title: string): HTMLElement {
@@ -2760,10 +2811,25 @@ export class JournalEditModal extends SteppedEditorModal {
     // also freeze which, or a journal created today would never gain a section
     // the catalogue adds tomorrow. `sections` is the saved-variant field and
     // means the stronger thing.
+    //
+    // EXCEPT WHERE THE LAYOUT ALREADY SAYS `sections` (4.35 §0.3). A layout
+    // that ships one is authoritative for every later reader — it is how a
+    // preset turns on a section the catalogue defaults to off, which is the
+    // only way it can, since `defaultSectionIds` filters on `default(ctx)`
+    // regardless of layout. Writing only `order` beside a preset's untouched
+    // `sections` would leave the stronger field saying what the reader just
+    // changed, and `refreshJournalTemplates` would offer back the section they
+    // had unticked. So where `sections` exists it is REWRITTEN, and where it
+    // does not it is never created.
     for (const [key, ids] of this.chosen) {
+      const prev = this.draft.layout?.[key];
       this.draft.layout = {
         ...(this.draft.layout ?? {}),
-        [key]: { ...(this.draft.layout?.[key] ?? {}), order: [...ids] },
+        [key]: {
+          ...(prev ?? {}),
+          order: [...ids],
+          ...(prev?.sections ? { sections: [...ids] } : {}),
+        },
       };
     }
     await this.onSave(this.draft);
@@ -2786,6 +2852,10 @@ export function openJournalEditor(
     // which was four clicks away. Clamped by goTo, so an out-of-range value
     // opens the last step rather than a blank window.
     step?: number;
+    // Trackers a preset is about to install. Offered to the "Rated on"
+    // dropdown so a preset's rating draws its own label rather than
+    // "Nothing"; never written from here. 4.35 §1.4.
+    pendingTrackers?: TrackerDef[];
   },
   onSave: (cfg: JournalConfig) => Promise<void>
 ): void {
@@ -2796,7 +2866,8 @@ export function openJournalEditor(
     opts.mode,
     opts.index,
     onSave,
-    opts.guesses ?? []
+    opts.guesses ?? [],
+    opts.pendingTrackers ?? []
   );
   if (opts.step !== undefined) modal.startAt(opts.step);
   modal.open();

@@ -624,13 +624,23 @@
   margin-top: 1px;
 }
 
+/* THE ONE RULE 4.27's SWEEP MISSED (4.35.1). The note a few hundred lines down
+   says "Every colour in this block was a literal — #e2e8f0, #ddd6fe, #1e293b
+   and nine more" and that it converted them; this badge sat in the same file
+   with the same three and was not reached. It is the section count in Settings,
+   so what it drew was a light-mode chip on whatever the reader's theme was
+   doing — legible in dark mode by luck, which is the tell 4.27 names.
+
+   It takes the sibling pill's vocabulary rather than a fourth opinion, so the
+   badge and the pills beside it read as one family. `--am-rule` for the border
+   width, like every other rule since 4.11. */
 .almanac-settings-badge {
   flex: 0 0 auto;
   padding: 2px 9px;
   border-radius: var(--am-radius-pill);
-  background: #e2e8f0;
-  border: 1px solid #cbd5e1;
-  color: #1e293b;
+  background: var(--background-secondary);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  color: var(--text-normal);
   font-size: var(--am-text-2xs);
   font-weight: 600;
   white-space: nowrap;
@@ -952,7 +962,22 @@ details[open] > summary .almanac-section-chevron {
 .almanac-section-fold:not([open]) + .almanac-section-fold > .almanac-section-head {
   margin-top: 10px;
 }
+/* THE TITLE TAKES THE SLACK, SO THE ACTIONS GROUP ON THE RIGHT (4.35.1).
+   `.almanac-section-head` is `space-between`, which is the right answer for the
+   two children it had — a title and one button. 3.20.1 gave a section a SECOND
+   action ("Presets" beside "Add journal") and nothing here was revisited, so
+   three children got equal gaps and the first button floated into the middle of
+   the row, equidistant from the title and from the button it belongs beside.
+
+   That also made settings.ts's own claim false: it puts the primary action last
+   "so it sits rightmost, nearest the reader's expectation of where a section's
+   main button lives" — true only if the buttons are adjacent.
+
+   The fold variant already solved this, with `.almanac-section-count` growing
+   to absorb the slack; this is the plain head's equivalent. The fold's own
+   `flex: 0 0 auto` override is more specific, so it is unaffected. */
 .almanac-section-title {
+  flex: 1 1 auto;
   font-size: var(--am-text-2xs);
   font-weight: 700;
   letter-spacing: 0.09em;
@@ -974,7 +999,15 @@ details[open] > summary .almanac-section-chevron {
   box-shadow: none;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
-.almanac-section-action:hover {
+/* A BUTTON HOLDING AN OPEN MENU LOOKS PRESSED (4.35.3). The accent here is a
+   HOVER, so the moment the pointer left the button — to travel into the menu it
+   had just opened — every trace of which control owned that menu went with it.
+   `.is-open` is set while the menu is up and cleared on its `onHide`, so the
+   two states are the same treatment for the same reason: this button is the
+   live one. Listed beside `:hover` rather than duplicating the declarations, so
+   the two can never drift apart. */
+.almanac-section-action:hover,
+.almanac-section-action.is-open {
   background: var(--interactive-accent);
   border-color: var(--interactive-accent);
   color: var(--text-on-accent);

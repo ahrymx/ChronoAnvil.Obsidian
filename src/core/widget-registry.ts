@@ -410,6 +410,16 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "📈",
     blurb: "The stats band for the topics under this folder.",
   },
+  // OFFERABLE FROM THE SECTION WINDOW, unlike `journal-chart` beside it,
+  // because it names nothing the vault has to list. It reads the registry for
+  // whatever this journal's summable quantities are, so the directive is bare
+  // and the answer is computed at render time — which is exactly the property
+  // `needs-vault-answer` exists to mark the absence of.
+  "journal-totals": {
+    label: "Totals",
+    glyph: "🧮",
+    blurb: "What the notes under this folder add up to, for every quantity this journal totals.",
+  },
   "pages-table": {
     label: "Pages table",
     glyph: "📄",
@@ -567,6 +577,10 @@ export const NOT_PAGE_WIDGETS: Record<string, WidgetExclusion> = {
     note: "must name a tracker, and the section window has no list of this vault's trackers",
   },
   "journal-breakdown": {
+    reason: "needs-vault-answer",
+    note: "must name a tracker, and the section window has no list of this vault's trackers",
+  },
+  "journal-tally": {
     reason: "needs-vault-answer",
     note: "must name a tracker, and the section window has no list of this vault's trackers",
   },

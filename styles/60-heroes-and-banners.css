@@ -462,8 +462,11 @@
   flex-direction: column;
   background: var(--background-primary-alt);
   /* 1px, matching `.journals-card` and `.jjc-card`. `--am-rule` is 2px and is
-     for a RULE — a divider between bands — which is a different job. */
-  border: 1px solid var(--background-modifier-border);
+     for a RULE — a divider between bands — which is a different job.
+     `--am-border-inner` RATHER THAN THE PLAIN BORDER (4.35.2): this card sits
+     inside the section card, whose edge is the same ink, so the two drew one
+     boundary twice at 12px apart. See the token for the whole argument. */
+  border: 1px solid var(--am-border-inner);
   border-radius: var(--am-radius-md);
   overflow: hidden;
 }

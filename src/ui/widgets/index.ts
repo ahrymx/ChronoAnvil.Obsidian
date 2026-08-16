@@ -82,6 +82,8 @@ import {
   buildCalendarRegion,
   buildEventsRegion,
   buildJournalBreakdownRegion,
+  buildJournalTallyRegion,
+  buildJournalTotalsRegion,
   buildJournalChartRegion,
   buildJournalSearchRegion,
   buildJournalsHeaderRegion,
@@ -451,6 +453,11 @@ const SECTION_TITLES: Record<string, string> = {
   "journal-search": "🔎 Find",
   "diary-search": "🔎 Search",
   "topics-table": "🗂 Topics",
+  // The totals band gets a head; the tally does not, because it draws its own
+  // title from the tracker it names — exactly as `journal-breakdown` beside it
+  // does, and for the same reason: a page can hold two tallies and one head
+  // saying "Tally" over both would name neither.
+  "journal-totals": "🧮 Totals",
   "pages-table": "📄 Pages",
   "kind-table": "🗂 Notes",
   "activity-chart": "📈 Activity",
@@ -2153,6 +2160,10 @@ export class Widgets implements
         return buildJournalChartRegion(this.plugin, kind, rest, label, ctx);
       case "journal-breakdown":
         return buildJournalBreakdownRegion(this.plugin, rest, label, ctx);
+      case "journal-tally":
+        return buildJournalTallyRegion(this.plugin, rest, label, ctx);
+      case "journal-totals":
+        return buildJournalTotalsRegion(this.plugin, label, ctx);
       case "review-queue":
         return buildReviewQueueRegion(this.plugin, rest, ctx);
       case "journal-search":

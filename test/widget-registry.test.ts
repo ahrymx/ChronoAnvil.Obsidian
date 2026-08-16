@@ -196,14 +196,21 @@ describe("the exclusions say why, and the reasons are the ones claimed", () => {
     }
   });
 
-  it("defers the five that need a list only the vault has", () => {
+  it("defers the six that need a list only the vault has", () => {
     expect(of("needs-vault-answer")).toEqual([
       "bridge-notes",
       "bridge-readings",
       "journal-breakdown",
       "journal-chart",
+      "journal-tally",
       "kind-table",
     ]);
+    // A SIXTH IN 4.35, AND ITS SIBLING IS DELIBERATELY NOT HERE.
+    // `journal-tally` must name a tracker, so it defers like the two above it.
+    // `journal-totals` takes NO argument — it reads the registry for whatever
+    // this journal totals — so it is offerable from the section window and
+    // sits in WIDGETS instead. Two widgets shipped together, on opposite sides
+    // of this exact line, which is the clearest statement of what it means.
     // AND THE DEFERRAL IS WHAT THE SPEC CANNOT CARRY, not a taste. If
     // `FlatNoteSpec` ever grows a field naming this vault's trackers or
     // journals, this test is the one that should fail.

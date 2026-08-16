@@ -38,6 +38,23 @@
   --am-border-subtle: var(--background-modifier-border);
   --am-border-hover: var(--background-modifier-border-hover);
   --am-border-focus: var(--interactive-accent);
+  /* AN EDGE FOR A CARD THAT IS ALREADY INSIDE ONE (4.35.2).
+     `--am-border-subtle` is an alias for `--background-modifier-border` and is
+     therefore the same ink as the section card's own edge — so a card nested in
+     a section drew two identical 1px lines a dozen pixels apart, which is the
+     shape 4.13.5 §23 spent a release removing elsewhere. It is milder here,
+     because the grounds between them differ and the inner one is the quieter,
+     which is what `.jjs-card`'s own note argues makes the nesting deliberate.
+     Milder is not the same as right: the OUTER edge is the boundary and the
+     inner one is a seam, and they were saying it at the same volume.
+     Mixed toward the surface the card sits ON, so the seam is a fraction of the
+     step rather than a repeat of it. One definition serves both themes: every
+     term is a variable, so it resolves per theme with no override below. */
+  --am-border-inner: color-mix(
+    in srgb,
+    var(--background-modifier-border) 55%,
+    var(--am-surface-inset)
+  );
   --am-edge-highlight: rgba(255, 255, 255, 0.04);
 
   /* Card shadow elevation */

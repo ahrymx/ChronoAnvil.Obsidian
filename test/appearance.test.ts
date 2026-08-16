@@ -7,7 +7,14 @@
 
 import { describe, expect, it } from "vitest";
 
-import { allSrcNames, readCss, readSrc } from "./sources";
+import {
+  allSrcNames,
+  cssRule,
+  readCss,
+  readSrc,
+  repoFile,
+  styleSheets,
+} from "./sources";
 // ── one row, one notice marker ────────────────────────────────────────────
 //
 // Both halves of this patch are about a decision that had been made repeatedly
@@ -1234,5 +1241,173 @@ describe("the banner is one material, and the minimal one is quiet", () => {
     for (const sel of [".journal-entry-banner", ".journal-study-banner"]) {
       expect(css, sel).not.toContain(`${sel}::before {`);
     }
+  });
+});
+
+describe("nothing picks a colour outside the theme (4.35.1)", () => {
+  // THE SWEEP 4.27 DID BY HAND, MADE INTO AN ASSERTION.
+  //
+  // 4.27 converted the Trackers and Journals pills from literals to theme
+  // tokens and wrote up why: "the Journals table drew a light-mode chip on top
+  // of whatever the reader's theme was doing. Legible in dark mode by luck,
+  // which is the tell — nothing else in this stylesheet picks a colour without
+  // going through a variable."
+  //
+  // It missed `.almanac-settings-badge`, in the same file, carrying the same
+  // three literals it named. Nothing caught that for eight releases, because
+  // the sweep was a person reading rules rather than a rule about rules. The
+  // Settings section count rendered as a light chip on a dark theme until
+  // 4.35.1, and it was found by decoding a screenshot.
+  //
+  // So this is the rule about rules. It is what makes 4.27's claim true going
+  // forward instead of true on the day it was written.
+
+  // `00-tokens.css` is where the literals BELONG: a token file's whole job is
+  // to be the one place a raw colour is written down, so it is skipped below.
+
+  // Text drawn on a ground that is itself fixed, so it cannot follow the theme
+  // either. Each one is paired with a colour this stylesheet pins:
+  //   the two chart values sit on `--am-act-*`, a fixed four-stop ramp;
+  //   the `#fff` sits on `rgba(255,255,255,0.12)`.
+  // A pairing like that is the one honest reason to write a literal.
+  const ALLOWED = new Set(["#173404", "#f2fbf4", "#fff"]);
+
+  it("writes raw colours only in the token file and only as var() fallbacks", () => {
+    const offenders: string[] = [];
+    for (const { name, css } of styleSheets()) {
+      if (name === "00-tokens.css") continue;
+      const code = css.replace(/\/\*[\s\S]*?\*\//g, "");
+      for (const m of code.matchAll(/[a-z-]+\s*:[^;{}]*?(#[0-9a-fA-F]{3,8})\b[^;{}]*/g)) {
+        // `var(--token, #fallback)` is the supported shape: the theme wins and
+        // the literal is only reached when the token is absent.
+        if (/var\(--[^)]*,\s*#/.test(m[0])) continue;
+        if (ALLOWED.has(m[1].toLowerCase())) continue;
+        offenders.push(`${name}: ${m[0].trim()}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("has the settings badge on tokens, which is the rule that was missed", () => {
+    const rule = cssRule(".almanac-settings-badge");
+    expect(rule).toContain("var(--background-secondary)");
+    expect(rule).toContain("var(--background-modifier-border)");
+    expect(rule).toContain("var(--text-normal)");
+    expect(rule).not.toContain("#");
+  });
+});
+
+describe("a section head with two buttons groups them (4.35.1)", () => {
+  it("lets the title absorb the slack, so the actions sit together", () => {
+    // `space-between` is right for two children and wrong for three: with a
+    // title and two buttons it gave equal gaps, floating "Presets" into the
+    // middle of the row rather than beside the button it belongs with.
+    expect(cssRule(".almanac-section-head")).toContain("space-between");
+    // `cssRule` is anchored, so this reads the bare rule and not the
+    // `.almanac-section-head-fold .almanac-section-title` override that
+    // contains it as a substring and states the opposite.
+    expect(cssRule(".almanac-section-title")).toContain("flex: 1 1 auto");
+  });
+
+  it("leaves the fold variant alone, which already solved it its own way", () => {
+    // `.almanac-section-count` grows there instead; the fold's own override is
+    // more specific, so the rule above cannot reach it.
+    expect(
+      cssRule(".almanac-section-head-fold .almanac-section-title")
+    ).toContain("flex: 0 0 auto");
+  });
+
+  it("keeps the primary action last in the DOM, which is what puts it rightmost", () => {
+    // settings.ts states this as its reason for the array order; grouping the
+    // buttons is what finally makes the sentence true.
+    const src = readSrc("settings");
+    const types = src.slice(src.indexOf('sectionHeader(containerEl, "Types"'));
+    expect(types.indexOf('label: "Presets"')).toBeLessThan(
+      types.indexOf('label: "Add journal"')
+    );
+  });
+});
+
+describe("a card nested in a card does not repeat its edge (4.35.2)", () => {
+  it("gives the inner card a seam, not a second boundary", () => {
+    // `.jjs-card` sits inside the section card, whose border is
+    // `--background-modifier-border`. Using the same ink drew one boundary
+    // twice, 12px apart — the shape 4.13.5 §23 removed elsewhere. Milder here,
+    // because the grounds differ and the inner is the quieter, which is what
+    // `.jjs-card`'s own note says makes the nesting deliberate; but the two
+    // edges were still the same weight.
+    const rule = cssRule(".jjs-card");
+    expect(rule).toContain("var(--am-border-inner)");
+    expect(rule).not.toContain("var(--background-modifier-border)");
+  });
+
+  it("defines that edge as a mix toward the surface it sits on", () => {
+    // A fraction of the step rather than a repeat of it — and every term is a
+    // variable, which is what lets one definition serve both themes.
+    const css = readCss();
+    const at = css.indexOf("--am-border-inner:");
+    expect(at).toBeGreaterThan(0);
+    const decl = css.slice(at, css.indexOf(";", at));
+    expect(decl).toContain("color-mix");
+    expect(decl).toContain("var(--background-modifier-border)");
+    expect(decl).toContain("var(--am-surface-inset)");
+  });
+
+  it("needs no light-theme override, because it is defined in variables", () => {
+    // The token file's own rule: anything theme-specific goes below the line,
+    // and this deliberately is not.
+    // BOUNDED BY `cssRule`. An open-ended slice runs to the end of the
+    // concatenation and picks up `var(--am-border-inner)` where the card USES
+    // it, several files later — a use, not an override, which would fail this
+    // for the opposite of the reason it exists.
+    expect(cssRule("body.theme-light")).not.toContain("--am-border-inner");
+  });
+});
+
+describe("a button holding an open menu says so (4.35.3)", () => {
+  const settings = () => repoFile("src/core/settings.ts");
+
+  it("shares one treatment with hover, so the two cannot drift", () => {
+    // The accent was a `:hover` and nothing else, so moving the pointer off the
+    // button — into the menu it had just opened — left nothing saying which
+    // control owned it.
+    //
+    // ASSERTS THE PROPERTY, NOT THE SELECTOR. Splitting these into two rules
+    // with the same declarations passes, and should: that is not drift. What
+    // fails is the two saying different things, which is the thing worth
+    // preventing. Mutation-checked both ways.
+    const rule = cssRule(".almanac-section-action.is-open");
+    expect(rule).toContain("var(--interactive-accent)");
+    expect(cssRule(".almanac-section-action:hover")).toBe(rule);
+  });
+
+  it("sets the class and the aria state together", () => {
+    const src = settings();
+    expect(src).toContain('btn.addClass("is-open")');
+    expect(src).toContain('btn.setAttr("aria-expanded", "true")');
+  });
+
+  it("clears both on onHide, which covers every way a menu closes", () => {
+    // A pick, Escape, or a click elsewhere. Clearing in each item's handler
+    // would have missed the last two.
+    const src = settings();
+    const hide = src.slice(src.indexOf("menu.onHide(()"), src.indexOf("});", src.indexOf("menu.onHide(()")));
+    expect(hide).toContain('btn.removeClass("is-open")');
+    expect(hide).toContain('"aria-expanded", "false"');
+  });
+
+  it("leaves a button that opens no menu untouched", () => {
+    // The guard that stops a plain action growing a state it can never leave.
+    expect(settings()).toContain("if (!menu) return;");
+  });
+
+  it("has every menu action hand its menu back", () => {
+    // The wiring only reaches an action that returns one, so a menu action that
+    // forgot would silently opt out of the state.
+    const src = settings();
+    const opens = src.split("menu.showAtMouseEvent(evt);").length - 1;
+    const returns = src.split("return menu;").length - 1;
+    expect(opens).toBeGreaterThan(0);
+    expect(returns).toBe(opens);
   });
 });

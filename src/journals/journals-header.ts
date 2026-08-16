@@ -48,6 +48,8 @@ import { setIcon, TFile } from "obsidian";
 import type AlmanacPlugin from "../main";
 import { countBodyTasks } from "../ui/tables";
 import { registeredJournalTypes } from "./journal";
+import type { JournalType } from "./journal";
+import { kindPlural } from "./journal-sections";
 import {
   activityBucket,
   activityWeight,
@@ -252,6 +254,37 @@ function drawStrip(
   }
 }
 
+// WHAT THIS BAND IS WAITING FOR, IN THE READER'S OWN WORDS. 4.35.1.
+//
+// This sentence said "as you add lessons and entries" on EVERY journal, so a
+// Projects journal — whose notes are Updates and Decisions — was told to add
+// lessons. It is the same leak 2.27 and 3.19.1 closed everywhere else, and
+// `tables.ts` names the most visible one in its own comment: "Telling a Cooking
+// journal to 'add a lesson'". This band is the copy those sweeps did not reach,
+// and it survived for the usual reason — nobody had rendered a non-Study
+// journal on this page until 4.35 shipped three.
+//
+// CAPPED AT THREE, then the generic word. The strip aggregates across every
+// registered journal, so a vault with four of them has seven or more note types
+// and naming them all would be a list where a sentence was wanted. Three is
+// enough to be recognisably about THIS vault; past that, what the reader needs
+// to know is that dated notes are the thing, not which seven kinds count.
+//
+// `kindPlural` rather than `plural(label)`, so a type that declares an
+// irregular plural ("Practice") gets its own word here exactly as it does on
+// the buttons and in the rollups.
+const EMPTY_KIND_CAP = 3;
+
+export function kindWords(types: JournalType[]): string {
+  const words = types.flatMap((t) => t.kinds.map((k) => kindPlural(k).toLowerCase()));
+  // De-duped: two journals that both call their notes "entries" should not make
+  // the sentence say it twice.
+  const unique = [...new Set(words)];
+  if (unique.length === 0 || unique.length > EMPTY_KIND_CAP) return "notes";
+  if (unique.length === 1) return unique[0];
+  return `${unique.slice(0, -1).join(", ")} and ${unique[unique.length - 1]}`;
+}
+
 export function buildJournalsHeader(
   plugin: AlmanacPlugin,
   opts: JournalsHeaderOptions = {}
@@ -394,7 +427,7 @@ export function buildJournalsHeader(
     // is how it came apart the first time.
     if (collected.length === 0) {
       status.setText(
-        "No dated notes yet — activity appears here as you add lessons and entries."
+        `No dated notes yet — activity appears here as you add ${kindWords(types)}.`
       );
     } else {
       const last = [...cells]

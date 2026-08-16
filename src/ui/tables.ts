@@ -43,9 +43,15 @@ import {
   registeredJournalTypes,
 } from "../journals/journal";
 import { kindPlural, plural, typeRating } from "../journals/journal-sections";
-import { journalChartRefusal } from "../charts/charts";
+import { journalChartRefusal, journalTallyRefusal, summarize } from "../charts/charts";
 import { partsOf } from "../core/section-model";
-import { describeSurface, getTracker, parseSelectOptions } from "../trackers/trackers";
+import {
+  describeSurface,
+  getTracker,
+  isJournalSurface,
+  parseSelectOptions,
+  surfaceAcceptsType,
+} from "../trackers/trackers";
 import { journalTypeNamer } from "../trackers/entry-trackers";
 import {
   AlmanacTask,
@@ -859,6 +865,235 @@ export function buildTopicStats(
     openVal.setText(open ? String(open) : "—");
   });
 
+  return root;
+}
+
+// ── journal-totals ───────────────────────────────────────────────────
+//
+// `journal-totals` — what the notes below this one ADD UP TO.
+//
+// NO ARGUMENT, AND THAT IS THE DESIGN. A directive naming one tracker would
+// force the summable quantity to be a kind's `rating`, because the catalogue
+// can only name a tracker through `typeRating` — and a kind has exactly one,
+// so an Exercise journal would have to choose between Intensity and Distance
+// and could never band both.
+//
+// So it reads the REGISTRY instead, which it can do and `journal-chart`
+// cannot, for one reason: the widget holds the plugin. `TrackerDef.reduce` is
+// already the field that says a quantity adds up — its only effect until now
+// was on diary charts, so on a journal tracker the control that sets it was
+// visibly present and did nothing. This gives it its meaning on this surface.
+//
+// Reuses `pagesUnder` and `confidenceKinds` — so a total and an average can
+// never disagree about what is in scope — and `summarize`, which has returned
+// `total` all along.
+//
+// A QUANTITY WITH NO READINGS DRAWS NO CELL. That is what makes one directive
+// serve Books and Film out of one journal: the Books shelf bands *Pages read*,
+// the Film shelf bands *Minutes*, because neither has any reading of the
+// other. A zero would be a claim that nobody read any pages; absence is the
+// honest answer and the useful one.
+export function buildJournalTotals(
+  plugin: AlmanacPlugin,
+  ctx: MarkdownPostProcessorContext,
+  label: string | null
+): HTMLElement {
+  const app = plugin.app;
+  const root = createDiv({ cls: "journal-totals" });
+
+  const file = hostFile(app, ctx);
+  if (!file?.parent) return root;
+
+  const type = hostType(plugin, file.path);
+  if (!type) return root;
+
+  const pages = pagesUnder(app, file.parent.path);
+  const cells: { label: string; value: string }[] = [];
+
+  for (const def of summableTrackers(plugin, type)) {
+    // The kinds that carry this tracker, exactly as an average would ask —
+    // `kindAllowsTracker`'s read-side counterpart. A Meal's Calories are not
+    // added into a band of Workout distances.
+    const counts = new Set(confidenceKinds(plugin, file.path, def.id));
+    const values: number[] = [];
+    for (const p of pages) {
+      const t = p.fm["type"];
+      if (typeof t !== "string" || !counts.has(t)) continue;
+      const raw = p.fm[def.id];
+      if (raw == null || raw === "") continue;
+      const n = Number(raw);
+      if (Number.isFinite(n)) values.push(n);
+    }
+    const stats = summarize(values);
+    if (!stats) continue;
+    // Trailing zeroes off a whole number: 45 minutes reads as "45", and 8.5 km
+    // keeps the half it was logged with.
+    const total = Number(stats.total.toFixed(2));
+    cells.push({
+      label: ratingNoun(def, def.id).toLowerCase(),
+      value: def.unit ? `${total} ${def.unit}` : String(total),
+    });
+  }
+
+  if (cells.length === 0) {
+    // Silent rather than an empty state on a fresh journal: this band sits on
+    // an index note that has just been made, and a callout saying "nothing
+    // logged" under a heading that already says Totals is a box inside a box —
+    // the same rule `journal-breakdown` records one widget up.
+    return root;
+  }
+
+  if (label) root.createDiv({ cls: "jtot-title", text: label });
+  // THE STAT STRIP, REUSED RATHER THAN COPIED. `.am-stats` is the row of
+  // divided cells the year dashboard's body and three mastheads already draw,
+  // and it brings the one thing a hand-rolled band would have got wrong: it
+  // collapses on a `@container` query rather than a `@media` one, so it folds
+  // in a narrow PANE and not only in a phone-width window. That distinction
+  // was a real bug in this stylesheet once (see 96-stat-strip.css).
+  const strip = root.createDiv({ cls: "am-stats" });
+  // Capped at the four the collapse rules are written for; a fifth quantity
+  // wraps onto a second row, which the gap-as-divider design handles with no
+  // per-cell arithmetic.
+  strip.setAttribute("data-cols", String(Math.min(cells.length, 4)));
+  for (const c of cells) {
+    const cell = strip.createDiv({ cls: "am-stat" });
+    cell.createDiv({ cls: "am-stat-value", text: c.value });
+    cell.createDiv({ cls: "am-stat-label", text: c.label });
+  }
+  return root;
+}
+
+// THE PREDICATE, AND IT IS DELIBERATELY NARROW. A quantity is in this band
+// when it is a NUMBER on THIS journal that declares `reduce: "sum"`.
+//
+// `scale` is excluded even though it is numeric: a total of Intensity readings
+// is a number with no meaning — five workouts at 4/5 do not make 20 of
+// anything — which is exactly why `reduce` defaults to mean and why the
+// default is the silent one. `confidence` and every other mean-reduced tracker
+// stay out for the same reason.
+export function summableTrackers(
+  plugin: AlmanacPlugin,
+  type: JournalType
+): TrackerDef[] {
+  return plugin.settings.trackers.filter(
+    (t) =>
+      t.type === "number" &&
+      t.reduce === "sum" &&
+      isJournalSurface(t.surface) &&
+      surfaceAcceptsType(t.surface, type.id)
+  );
+}
+
+// ── journal-tally ────────────────────────────────────────────────────
+//
+// `journal-tally:<tracker>` — how many of the things below sit at each value.
+//
+// `journal-breakdown`'s grammar exactly, and the counterpart question: that
+// widget ranks containers by an average, this one counts them into the buckets
+// of a vocabulary. Two Areas with four Projects and two Completed is a
+// sentence a project journal is kept to be able to say, and nothing in the
+// plugin could say it — `journalChartRefusal` refuses `select` by design, so
+// no chart can count "how many finished".
+//
+// COUNTS THE CHILD CONTAINERS' INDEX NOTES where the level has one below it,
+// and the NOTES where it does not — branching on `hasLevelBelow`, which is the
+// structure's own answer and the one that composed the note. An Area tallies
+// its Projects; a Project tallies its Updates. Asking the folder what it
+// currently contains instead is how a page comes to disagree with the section
+// that wrote it.
+export function buildJournalTally(
+  plugin: AlmanacPlugin,
+  ctx: MarkdownPostProcessorContext,
+  trackerId: string,
+  label: string | null
+): HTMLElement {
+  const app = plugin.app;
+  const root = createDiv({ cls: "journal-table journal-tally" });
+
+  const file = hostFile(app, ctx);
+  if (!file?.parent) return root;
+
+  const type = journalTypeOfNote(plugin, file.path);
+  const namer = journalTypeNamer(plugin);
+  const def = getTracker(plugin, trackerId);
+  const refusal = journalTallyRefusal(
+    def,
+    trackerId,
+    type?.id ?? null,
+    (surface) => describeSurface(surface, namer),
+    type?.name
+  );
+  if (refusal != null || !def) {
+    root.createDiv({ cls: "journal-widget-error", text: refusal ?? "" });
+    return root;
+  }
+
+  const title = label ?? `${def.label ?? trackerId} tally`;
+  root.createDiv({ cls: "jtly-title", text: title });
+
+  // IN THE TRACKER'S DECLARED ORDER, NOT BY COUNT. A status vocabulary is a
+  // pipeline — Planned, Active, Blocked, Done — and sorting it by size would
+  // reorder the row every time a project moved, which is the one thing a
+  // reader is scanning it to notice. `parseSelectOptions` already supplies
+  // both the values and their labels.
+  const options = parseSelectOptions(def.options);
+  const counts = new Map<string, number>(options.map((o) => [o.value, 0]));
+
+  const values: string[] = [];
+  if (type && hasLevelBelow(type, file.parent.path)) {
+    for (const folder of journalChildFolders(plugin, type, file.parent).filter(
+      (f) => isContainerFolder(app, plugin, f)
+    )) {
+      const index = getFile(app, `${folder.path}/${folder.name}.md`);
+      if (!index) continue;
+      const v = frontmatterOf(app, index)?.[def.id];
+      if (typeof v === "string" && v) values.push(v);
+    }
+  } else {
+    const kinds = new Set(confidenceKinds(plugin, file.path, trackerId));
+    for (const p of pagesUnder(app, file.parent.path)) {
+      if (p.file.path === file.path) continue;
+      const t = p.fm["type"];
+      if (typeof t !== "string" || !kinds.has(t)) continue;
+      const v = p.fm[def.id];
+      if (typeof v === "string" && v) values.push(v);
+    }
+  }
+  for (const v of values) {
+    // A value the vocabulary no longer lists is counted rather than dropped:
+    // a reader who renamed an option still has notes carrying the old word,
+    // and silently omitting them would make the tally disagree with the
+    // folder.
+    counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+
+  if (values.length === 0) {
+    emptyLine(
+      root,
+      `Nothing here carries a ${ratingNoun(def, trackerId).toLowerCase()} yet — set one on the notes below and they'll be counted here.`
+    );
+    return root;
+  }
+
+  const known = new Set(options.map((o) => o.value));
+  const rows = [
+    ...options.map((o) => ({ label: o.label, n: counts.get(o.value) ?? 0 })),
+    // Anything off the vocabulary, after the declared run and in the order it
+    // was met, so the pipeline still reads left to right.
+    ...[...counts.keys()]
+      .filter((v) => !known.has(v))
+      .map((v) => ({ label: v, n: counts.get(v) ?? 0 })),
+  ];
+
+  const strip = root.createDiv({ cls: "jtly-strip" });
+  for (const r of rows) {
+    const pill = strip.createDiv({ cls: "jtly-pill" });
+    // A zero-count option is drawn and dimmed rather than omitted: the row is
+    // a pipeline, and a missing stage reads as a stage that does not exist.
+    if (r.n === 0) pill.addClass("jtly-empty");
+    pill.createSpan({ cls: "jtly-count", text: String(r.n) });
+    pill.createSpan({ cls: "jtly-label", text: r.label });
+  }
   return root;
 }
 

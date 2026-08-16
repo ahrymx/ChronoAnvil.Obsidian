@@ -655,6 +655,15 @@ export type ChartScope = TrackerClass | "daily-by-month";
 // trackers — kilometres run, pages read — which a user adds themselves. A
 // wrong mean reads as a plausible number; a wrong sum reads as a wildly
 // inflated one, so the safer of the two is the one that applies silently.
+//
+// TWO READERS SINCE 4.35, and the second is what gives this field a meaning on
+// a journal at all. It was written for `daily-by-month` bucketing, which is a
+// DIARY path — so on a journal tracker the control that sets it (*"chart by
+// month: average / total"*) was visibly present and did nothing whatever.
+// `journal-totals` reads it as the answer to "does this quantity add up",
+// which is the same question the diary asks and the only one this field has
+// ever encoded. Duration and Distance say `sum` and land in the totals band;
+// Intensity and `confidence` say nothing and stay out of it.
 export type ChartReduce = "mean" | "sum";
 
 // How much of the chart grid one chart occupies (2.46).
@@ -749,6 +758,41 @@ function withSurface(t: TrackerDef): TrackerDef {
 //     the coupled control, Sleep as the derived column); off → all three
 //     hidden and the derived Sleep dropped entirely,
 //   • order the built-ins canonically first, custom trackers after (in order).
+// WHICH OF A SET OF INCOMING TRACKERS THE REGISTRY SHOULD GAIN. 4.35 §1.2.
+//
+// ONE RULE, TWO CALLERS, AND THAT IS THE POINT OF EXTRACTING IT. Adoption
+// (`JournalImporter.register`) has applied a manifest's trackers since 3.18
+// under exactly this rule; installing a preset needs the same one. Two paths
+// that seed the registry from outside it must not hold the rule twice, or the
+// day one of them is corrected the other keeps the bug — so the adoption
+// path's existing tests now also pin the preset path, which is the proof the
+// two really are shared rather than merely alike.
+//
+// NEVER OVERWRITES AN ID THE VAULT ALREADY DEFINES. An import must not be able
+// to redefine `status`, and a preset must not clobber a tracker the reader has
+// tuned: a vault that has made `Distance` a date keeps its own, and the widget
+// that wanted a number simply omits it. Silence is correct here — the reader
+// did not ask to install a tracker, they asked to install a journal.
+//
+// De-dupes within `incoming` too, so a caller assembling seeds from several
+// presets cannot push one id twice; and preserves the order it was given,
+// because that is the order the editor will list them in.
+//
+// Pure: it returns what to ADD and pushes nothing itself.
+export function trackersToSeed(
+  existing: TrackerDef[],
+  incoming: TrackerDef[]
+): TrackerDef[] {
+  const known = new Set(existing.map((t) => t.id));
+  const out: TrackerDef[] = [];
+  for (const t of incoming) {
+    if (known.has(t.id)) continue;
+    known.add(t.id);
+    out.push(t);
+  }
+  return out;
+}
+
 export function normalizeTrackers(
   input: TrackerDef[],
   sleepEnabled: boolean

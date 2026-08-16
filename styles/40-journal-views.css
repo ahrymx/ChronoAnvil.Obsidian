@@ -570,6 +570,89 @@
   }
 }
 
+/* ── The tally (4.35) ────────────────────────────────────────────────────
+   How many of the things below sit at each value of a select — one pill per
+   option, in the tracker's DECLARED order rather than by count, so the row
+   reads as a pipeline (Planned → Active → Done) instead of reshuffling itself
+   every time a note moves. That ordering is a decision in the widget; what the
+   stylesheet owes it is a row that keeps reading as a sequence.
+
+   PILLS RATHER THAN THE BREAKDOWN'S BARS, and the two sit on the same page.
+   `journal-breakdown` ranks containers by a magnitude, so a bar's LENGTH is
+   the value and the rows must stack to be comparable. A tally has no magnitude
+   to draw — four projects and two projects are two counts, not a short bar and
+   a long one — so making it a second bar chart would be a picture that invites
+   a comparison the numbers do not support. A count printed at readable size,
+   with its option beside it, is the whole content.
+
+   WRAPS RATHER THAN SCROLLS. Six options at a phone width is two rows of
+   three, which is legible; a horizontal scroller would hide the end of a
+   pipeline, and the end of a pipeline is the half a reader is looking for. */
+.journal-tally {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.jtly-title {
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.jtly-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.jtly-pill {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  background: var(--background-secondary);
+  min-width: 0;
+}
+.jtly-count {
+  font-size: 1.05em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+.jtly-label {
+  font-size: var(--am-text-sm);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* An option nothing carries is DIMMED, NOT DROPPED. A pipeline with its empty
+   stage removed reads as a stage that does not exist — "no Blocked column"
+   rather than "nothing blocked" — which is the opposite of what a tally is
+   read for. Faint rather than hidden says the stage is there and empty. */
+.jtly-pill.jtly-empty {
+  background: transparent;
+  border-style: dashed;
+}
+.jtly-pill.jtly-empty .jtly-count,
+.jtly-pill.jtly-empty .jtly-label {
+  color: var(--text-faint);
+}
+
+/* The totals band's optional title. The strip itself is `.am-stats` — the
+   shared stat strip, not a copy of it — so there is nothing else to declare
+   here; see 96-stat-strip.css. */
+.journal-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.jtot-title {
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 /* Related-lessons: a Practice banner's own property cell — removable pill
    chips over a body-backed list (see widgets.ts::buildRelatedLessons), plus
    a dashed circular add button matching the tracker grid's add-tile

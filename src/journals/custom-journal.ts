@@ -18,13 +18,15 @@ export { slugify } from "../core/util";
 import {
   SectionContext,
   TemplateLayout,
-  defaultSectionIds,
+  chosenSectionIds,
   kindPlural,
   renderSection,
   sectionsFor,
   templateTargets,
 } from "./journal-sections";
 import type { SectionOverrides } from "./journal-sections";
+import { journalSurface } from "../trackers/trackers";
+import type { TrackerDef } from "../trackers/trackers";
 
 // ── Custom Journals: user-defined journal types stored in settings ────────
 //
@@ -243,6 +245,33 @@ export function normaliseLevels(
 // should not have to turn one off, and one who wants Study is two clicks from
 // it. Presets are offered where journals are added, which is the only place a
 // reader is already thinking about the question.
+// A TRACKER A PRESET SHIPS, MINUS THE THREE FIELDS IT MAY NOT CHOOSE. 4.35 §1.1.
+//
+// A preset could not ship a measurement at all before this. `JournalKindConfig.
+// rating` is an id into the global registry and nothing more, so naming an id
+// the vault does not define renders *"Unknown tracker: X"* on every note —
+// Study is safe only because `confidence` and `accuracy` are built-ins scoped
+// to every journal. A fitness journal that cannot ship Distance is a folder
+// tree.
+//
+// `surface` IS OMITTED BECAUSE IT IS NOT A PRESET'S TO KNOW. `applyNameChange`
+// re-slugs a new journal's id from its name, so a preset declaring
+// `surface: journalSurface("media")` that the reader renames to "Watchlist" on
+// the Identity step would seed trackers scoped to a journal that never exists,
+// and every chart on it would refuse with *"Stars is a media tracker; this note
+// is in Watchlist."* It is attached at SEED time from the config the reader
+// actually saved, because the id they saved is the id their notes are
+// classified through. This makes the wrong thing unrepresentable rather than
+// documenting it.
+//
+// `showInTemplate` and `showInBase` are omitted because both are diary-only and
+// `normalizeTrackers` forces them false on a journal surface — asking for them
+// would be two fields whose only legal answer is the one the loader overwrites.
+export type PresetTracker = Omit<
+  TrackerDef,
+  "surface" | "showInTemplate" | "showInBase"
+>;
+
 export interface JournalPreset {
   id: string;
   name: string;
@@ -250,6 +279,13 @@ export interface JournalPreset {
   // What it is, in the words the catalogue would use. One line.
   blurb: string;
   config: JournalConfig;
+  // The measurements this journal is kept for. Seeded into the registry when
+  // the preset is installed, never overwriting an id the vault already has.
+  //
+  // ON THE PRESET, NOT ON `JournalConfig`. A config is stored in `data.json`
+  // per journal; the registry has one home, and a tracker written into both
+  // would be two records of one definition with nothing keeping them equal.
+  trackers?: PresetTracker[];
 }
 
 // Installed as an ORDINARY config, at the paths the reader has configured.
@@ -320,6 +356,36 @@ export function presetAsNewJournal(
 ): JournalConfig {
   const base = presetConfig(preset);
   return { ...base, ...deriveJournalFolders(base.name, paths) };
+}
+
+// A preset's trackers as registry entries, scoped to the journal as SAVED.
+// 4.35 §1.1.
+//
+// `cfg` is the config the reader actually committed, not `preset.config` — so
+// a Media preset renamed to "Watchlist" on the Identity step seeds trackers
+// scoped to `watchlist`, which is the id its notes are classified through.
+// Taking the id from the preset would scope them to a journal that never
+// exists, and every chart would refuse with a message naming a journal the
+// reader has never seen.
+//
+// COPIED DEEPLY, for the reason 4.33 paid for once already: `preset.trackers`
+// IS the module-level literal, so anything shared by reference here is shared
+// with the shipped default for the life of the process — and a reader editing
+// a seeded tracker's faces or options would be editing the preset.
+//
+// The two forced fields are written rather than asked for: `normalizeTrackers`
+// sets both false on a journal surface anyway, so this is stating the answer
+// the loader would give instead of leaving a gap the type has to allow.
+export function presetTrackerDefs(
+  preset: JournalPreset,
+  cfg: JournalConfig
+): TrackerDef[] {
+  return (preset.trackers ?? []).map((t) => ({
+    ...structuredClone(t),
+    surface: journalSurface(cfg.id),
+    showInTemplate: false,
+    showInBase: false,
+  }));
 }
 
 // THE STUDY MIGRATION HAS BEEN REMOVED (3.21).
@@ -455,9 +521,7 @@ export function composeTemplate(
   // catalogue's defaults. The middle one is what makes a variant a variant:
   // journalTemplateFiles passes no ids for a non-wizard caller, so without it
   // every variant of a kind would compose identically.
-  const ids = new Set(
-    sectionIds ?? layout?.sections ?? defaultSectionIds(ctx, layout)
-  );
+  const ids = new Set(sectionIds ?? chosenSectionIds(ctx, layout));
   const body = sectionsFor(ctx, layout)
     // `required` is enforced here rather than trusted from the caller. The
     // wizard cannot untick the banner, but this function is also the one item

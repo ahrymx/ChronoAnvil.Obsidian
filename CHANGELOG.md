@@ -7,6 +7,140 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.35.3] - 2026-08-16
+
+**A button holding an open menu looks pressed.** "Presets" and the Events
+menu wore the accent on `:hover` and nothing else — so the moment the pointer
+left the button to travel into the menu it had just opened, nothing said which
+control that menu belonged to. They hold the same treatment while the menu is
+up, cleared on the menu's own `onHide` so a pick, an Escape and a click
+elsewhere all end it. They report `aria-expanded` too, which was absent in both
+directions before.
+
+**Deliberately unchanged:** the empty-journal activity band still draws its
+zeros and its empty year, because the grid staying in one place is what stops
+the page moving when the first note lands. The "+ Add tracker" tile still takes
+a full grid cell, for the rhythm reason its own comment gives. And the tracker
+card's "Tracking:" keeps its colon — the grid below it is what the colon
+introduces.
+
+### Internal
+
+**A CSS assertion can no longer pass by finding nothing.** Thirty-odd tests
+reach for a rule as `slice(indexOf(sel), indexOf("}", …))`, which fails two ways
+that both end in a green suite: an unanchored match reads a DIFFERENT rule when
+one selector ends with another (`.almanac-section-title` inside
+`.almanac-head-fold .almanac-section-title`), and a renamed selector returns an
+empty string on which every negative assertion succeeds while asserting
+nothing. `cssRule` walks the stylesheet by brace depth, compares whole
+selectors, reaches inside `@container` blocks, and **throws** when there is no
+match. It has its own test file, because everything downstream of a test helper
+inherits its bugs as passes.
+
+## [4.35.2] - 2026-08-16
+
+**A journal card no longer draws its section's edge a second time.** The card
+sits inside the section card, and both used the same border ink — so one
+boundary was stated twice, twelve pixels apart. It takes a new
+`--am-border-inner` now: the same colour mixed toward the surface the card sits
+on, so the outer edge reads as the boundary and the inner one as a seam. The
+grounds already differed, which is what the stylesheet's own note says makes a
+card inside a card deliberate; what changed is that the two edges are no longer
+the same weight.
+
+**The two columns on a card row say what they are.** A row reads
+"Almanac — —" on a journal you have just made: the columns explain themselves
+once there is data ("3d ago", "2 ◻") and say nothing at all before then. Both
+carry a name now, so hovering explains them and a screen reader reads them —
+it heard "dash dash" in either state before, since neither cell had ever
+carried a label. No header row, because the card body's height is stated in
+rows and a header would cost one of the four notes a card can show.
+
+**Deliberately unchanged:** the card body stays four rows tall whatever is in
+it. A card holding one note is mostly empty, and that is the stated price of a
+grid whose cards are all one height — 4.13.4 chose it, and the vault check that
+would test it (one, four and nine notes side by side) has still never been
+walked. It should be, before that decision is revisited.
+
+## [4.35.1] - 2026-08-16
+
+**A journal that is not Study stopped being told to add lessons.** The activity
+band's empty state read *"activity appears here as you add lessons and
+entries"* on every journal, so a Projects journal — whose notes are Updates and
+Decisions — was given Study's vocabulary. It names the journal's own note types
+now, up to three of them, and falls back to the plain word past that. This is
+the same leak 2.27 and 3.19.1 closed everywhere else; it is the copy those
+sweeps did not reach, and nothing found it until there was a journal that is
+not Study to render.
+
+**The Settings section count is a themed chip.** It was drawing three
+hard-coded colours — a light chip on a dark theme, legible by luck. 4.27
+converted exactly these literals on the pills beside it and recorded that it
+had; this rule sat in the same file and was missed. **A test now sweeps every
+stylesheet for a colour written outside the theme**, so the claim holds going
+forward rather than on the day it was made.
+
+**Two buttons on a section header sit together.** "Presets" was laid out
+equidistant from the section title and from "Add journal" — a header built for
+one button, given a second in 3.20.1 and never revisited — so the first action
+floated into the middle of the row. Presets now sits directly left of "Add
+journal", which is also what the code always claimed it did.
+
+**And a preset names itself once.** Every row in the Presets menu carried the
+same sparkles icon beside the emoji that actually identifies it, so one of the
+two glyphs was the same on all four rows.
+
+## [4.35.0] - 2026-08-16
+
+**Three more journals to start from.** *Settings → Journals → Presets* has
+offered exactly one entry since Study stopped being built in, so the machinery
+underneath it — recipe, wizard, scaffold, manifest — had never had a second
+instance to prove it generalises. It has three now, and each is a different
+shape rather than three journals that differ only in their nouns.
+
+**🚀 Projects** — Area → Project, with dated Updates and the Decisions you go
+back to. It scores nothing, deliberately: the only thing a project tracks is
+Status, and a second vocabulary for it is the split Status was unified to end.
+It is the preset that proves a journal need not be graded.
+
+**🏋️ Exercise & Diet** — one folder per training block, so a day's food and its
+training are read together rather than split across two journals. Ships
+Intensity, Duration, Distance, Calories and Protein.
+
+**🍿 Media** — one shelf per medium: books, film, TV, games, sport. One note
+type and one Stars rating across all of them, because a book, a film, a season
+and a match are all *a thing I got through and rated*; what differs per shelf
+is the quantities, and the Books shelf bands *Pages read* where Film bands
+*Minutes* out of the same directive.
+
+**A preset can bring its own measurements now.** It could not before: a note
+type's rating is an id into the tracker registry and nothing more, so a preset
+naming one the vault does not define rendered *"Unknown tracker"* on every
+note — Study was safe only because Confidence and Accuracy are built-ins. A
+preset's trackers are seeded when you save, they **never overwrite an id your
+vault already defines** (if you have your own Distance, yours is kept), and
+they are written into the journal's own manifest, so they survive a settings
+wipe and come back with the folder. Adoption has applied exactly that rule
+since 3.18; both paths share one function now rather than holding it twice.
+
+**Two widgets, because two of the three would be hollow without them.**
+`journal-totals` bands what the notes below add up to — one cell per quantity,
+with no argument, because it reads the registry for whatever declares *chart by
+month: total*. That control existed on journal trackers and did nothing at all
+until now. `journal-tally` counts how many of the things below sit at each
+value of a dropdown — the question a chart cannot ask, since charts refuse
+`select` by design, so nothing in the plugin could count *how many finished*.
+An Area tallies its Projects; a Project tallies its Updates.
+
+**And the wizard stopped throwing away the arrangement a preset ships.** The
+section rail seeded itself from the catalogue's defaults **without the
+preset's layout**, and the Create step then wrote that back over it — so
+installing Study through the Presets button produced a Topic Index in
+catalogue order rather than in Study's own, at the one moment that arrangement
+is used. Both functions involved had accepted a layout all along; the wizard
+had never passed one. Nothing else in this release would have survived the
+trip in.
+
 ## [4.34.5] - 2026-08-16
 
 **A widget outside a group opened its header to any pointer near its top edge.**

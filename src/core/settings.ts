@@ -36,6 +36,7 @@ import {
   surfaceKey,
   TRACKER_CLASSES,
   trackersScopedToType,
+  trackersToSeed,
 } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
 import type { SectionChoice } from "./section-model";
@@ -71,7 +72,9 @@ import {
   deriveJournalFolders,
   freshCustomJournal,
   presetAsNewJournal,
+  presetTrackerDefs,
 } from "../journals/custom-journal";
+import type { JournalPreset } from "../journals/custom-journal";
 import {
   TRACKER_TYPE_LABELS,
   createListRow,
@@ -287,7 +290,19 @@ const DERIVED_PATH_LABELS: Record<string, string> = {
 interface SectionAction {
   label: string;
   icon: string;
-  onClick: (evt: MouseEvent) => void;
+  // RETURNING THE MENU IS HOW A BUTTON GETS AN OPEN STATE (4.35.3).
+  //
+  // These buttons open a `Menu` and then looked exactly like buttons that had
+  // not been pressed: the accent they wear is `:hover`, so moving the pointer
+  // off the button — onto the menu it just opened — left nothing at all saying
+  // which control the menu belonged to. And `aria-expanded` was never set, so
+  // the state was absent for assistive tech in BOTH directions.
+  //
+  // The alternative was each action toggling a class on a button it does not
+  // have a reference to. Handing the menu back instead means `sectionHeader`
+  // wires this once for every action it draws, and an action that opens no menu
+  // returns nothing and is untouched.
+  onClick: (evt: MouseEvent) => Menu | void;
 }
 
 const actionList = (
@@ -500,7 +515,21 @@ export class AlmanacSettingTab extends PluginSettingTab {
       const btn = head.createEl("button", { cls: "almanac-section-action" });
       setIcon(btn.createSpan({ cls: "almanac-section-action-icon" }), a.icon);
       btn.createSpan({ text: a.label });
-      btn.addEventListener("click", (evt) => a.onClick(evt));
+      btn.addEventListener("click", (evt) => {
+        const menu = a.onClick(evt);
+        // An action that opens no menu returns nothing, and nothing here runs —
+        // so a plain button never grows a state it cannot leave.
+        if (!menu) return;
+        btn.addClass("is-open");
+        btn.setAttr("aria-expanded", "true");
+        // `onHide` covers every way a menu closes — a pick, Escape, or a click
+        // anywhere else — which is why the class is cleared there rather than in
+        // each item's own handler.
+        menu.onHide(() => {
+          btn.removeClass("is-open");
+          btn.setAttr("aria-expanded", "false");
+        });
+      });
     }
   }
 
@@ -1343,14 +1372,47 @@ export class AlmanacSettingTab extends PluginSettingTab {
     // Open the create wizard on a draft. Every route below produces a draft and
     // hands it here; none of them writes anything until the reader saves, which
     // is what makes "start from" a starting point rather than a copy operation.
-    const start = (cfg: JournalConfig): void => {
+    const start = (cfg: JournalConfig, preset?: JournalPreset): void => {
       openJournalEditor(
         this.app,
         this.plugin,
         cfg,
-        { mode: "create", index: -1 },
+        {
+          mode: "create",
+          index: -1,
+          // Offered to the Structure step's "Rated on" dropdown so a preset
+          // whose Workout is rated on Intensity does not read "Nothing".
+          // Written nowhere — see §1.4. The scoping is irrelevant here, since
+          // only the id and the label are drawn.
+          pendingTrackers: preset ? presetTrackerDefs(preset, cfg) : undefined,
+        },
         async (saved) => {
           journals.push(saved);
+          // THE PRESET'S OWN MEASUREMENTS, SEEDED HERE AND NOWHERE ELSE.
+          // 4.35 §1.3.
+          //
+          // Scoped to `saved`, not to `cfg`: the reader may have renamed the
+          // journal on the Identity step, and `applyNameChange` re-slugs the
+          // id — so the surface has to come from the config they committed or
+          // every chart would refuse with a message naming a journal that
+          // does not exist.
+          //
+          // BEFORE `saveSettings`, AND THEREFORE BEFORE
+          // `scaffold.createJournalType` WRITES THE MANIFEST — which filters
+          // `settings.trackers` through `manifestCarriesTracker(t, cfg.id)`.
+          // So the preset's trackers land in the journal's own
+          // `.almanac-journal.json` for free, and survive a `data.json` wipe,
+          // a folder copy and re-adoption. That is not a side effect to be
+          // discovered later; it is the argument for this hook point over any
+          // other.
+          if (preset) {
+            this.plugin.settings.trackers.push(
+              ...trackersToSeed(
+                this.plugin.settings.trackers,
+                presetTrackerDefs(preset, saved)
+              )
+            );
+          }
           await this.plugin.saveSettings();
           await this.plugin.journals.rebuildJournalHome();
           this.display();
@@ -1407,8 +1469,15 @@ export class AlmanacSettingTab extends PluginSettingTab {
           for (const preset of offered) {
             menu.addItem((i) =>
               i
+                // NO `setIcon` HERE, AND THAT IS THE POINT (4.35.1). Every row
+                // carried the same `sparkles` beside the emoji that actually
+                // identifies it, so one of the two glyphs was identical on all
+                // four rows and told the reader nothing. The emoji IS the
+                // preset's identity — it is what the journal wears on its
+                // banner, its section bar and its cards — so it is the one that
+                // stays. Dropping the icon also gives the rows Obsidian's icon
+                // gutter back.
                 .setTitle(`${preset.emoji}  ${preset.name}`)
-                .setIcon("sparkles")
                 // OPENED IN THE EDITOR RATHER THAN INSTALLED OUTRIGHT, so a
                 // preset is a starting point a reader can rename, re-level and
                 // re-kind before it exists — the whole claim being made by
@@ -1420,14 +1489,20 @@ export class AlmanacSettingTab extends PluginSettingTab {
                 // gets `Templates/Study` rather than the `Templates/Studies`
                 // the built-in carried since before journals had derived
                 // folders at all.
+                // THE PRESET ITSELF GOES THROUGH TOO, not just its config: its
+                // trackers are on the preset rather than on the config, because
+                // a config is stored per journal in `data.json` and the
+                // registry has one home.
                 .onClick(() =>
                   start(
-                    presetAsNewJournal(preset, this.plugin.settings.paths)
+                    presetAsNewJournal(preset, this.plugin.settings.paths),
+                    preset
                   )
                 )
             );
           }
           menu.showAtMouseEvent(evt);
+          return menu;
         },
       },
       {
@@ -1462,6 +1537,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
             );
           }
           menu.showAtMouseEvent(evt);
+          return menu;
         },
       },
     ]);

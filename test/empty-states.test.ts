@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { allSrcNames, readCss, readSrc } from "./sources";
 import { composeDiaryDashboardNote } from "../src/diary/diary-dashboard-sections";
+import { kindWords } from "../src/journals/journals-header";
 import { composeJournalsDashboardNote } from "../src/journals/journals-dashboard-sections";
 // ── empty states ──────────────────────────────────────────────────────────
 //
@@ -668,5 +669,73 @@ describe("the charts empty state is one sentence, not two", () => {
       total,
       `written ${total}× across ${written.map((r) => r.n).join(", ")}`
     ).toBe(1);
+  });
+});
+
+describe("an empty journal is told to add ITS OWN notes (4.35.1)", () => {
+  // THE LEAK, AND IT WAS VISIBLE ON A RENDERED PAGE. The activity band said
+  // "activity appears here as you add lessons and entries" on EVERY journal, so
+  // a Projects journal — whose notes are Updates and Decisions — was told to
+  // add lessons. Same class as the leaks 2.27 and 3.19.1 closed; this was the
+  // copy those sweeps did not reach, and nothing found it until 4.35 shipped a
+  // journal that is not Study.
+  const type = (kinds: { id: string; label: string; plural?: string }[]) =>
+    ({
+      kinds: kinds.map((k) => ({ emoji: "📝", ...k })),
+    }) as unknown as Parameters<typeof kindWords>[0][number];
+
+  it("names one journal's own note types", () => {
+    expect(kindWords([type([{ id: "update", label: "Update" }, { id: "decision", label: "Decision" }])]))
+      .toBe("updates and decisions");
+  });
+
+  it("honours a declared irregular plural", () => {
+    // `kindPlural`, not `plural(label)` — Study's Practice says its own word on
+    // the buttons and in the rollups, so it says it here too.
+    expect(kindWords([type([{ id: "practice", label: "Practice", plural: "Practice" }])]))
+      .toBe("practice");
+  });
+
+  it("joins across journals, because the strip aggregates across them", () => {
+    expect(
+      kindWords([
+        type([{ id: "lesson", label: "Lesson" }]),
+        type([{ id: "update", label: "Update" }]),
+      ])
+    ).toBe("lessons and updates");
+  });
+
+  it("falls back to the generic word past three, rather than listing seven", () => {
+    // A vault with four journals has seven or more note types, and naming them
+    // all is a list where a sentence was wanted.
+    const many = type([
+      { id: "a", label: "Alpha" },
+      { id: "b", label: "Beta" },
+      { id: "c", label: "Gamma" },
+      { id: "d", label: "Delta" },
+    ]);
+    expect(kindWords([many])).toBe("notes");
+  });
+
+  it("de-dupes a word two journals share", () => {
+    expect(
+      kindWords([
+        type([{ id: "entry", label: "Entry" }]),
+        type([{ id: "entry", label: "Entry" }]),
+      ])
+    ).toBe("entries");
+  });
+
+  it("says nothing Study-specific in the source any more", () => {
+    // CODE ONLY, COMMENTS STRIPPED — the same guard `preset-validation.test.ts`
+    // spells out: the fix explains what it stopped doing, so a naive substring
+    // check trips on its own explanation. This asserts the string is not
+    // EMITTED, which is the property; the comment quoting it is the record.
+    const code = readSrc("journals-header")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//"))
+      .join("\n");
+    expect(code).not.toContain("lessons and entries");
   });
 });

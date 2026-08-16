@@ -157,6 +157,22 @@ export interface SectionOverrides {
   // no plugin, so it cannot read the tracker registry to ask what a vault
   // actually defines — and a type that knows better says so here.
   tracker?: string;
+  // WHICH TRACKERS A NOTE OF THIS TEMPLATE STARTS WITH. 4.35 §1.5.
+  //
+  // Ids into the registry, exactly as `rating` is. `trackerSeeds` seeds only
+  // the kind's `rating` and `status`, and `showInTemplate` — the diary's
+  // answer to this question — is forced false on a journal surface. So a
+  // preset that ships five quantities would start a Workout with Intensity
+  // and nothing else, and Duration would be added by hand from the cog on
+  // every note ever written. Nobody keeps that journal.
+  //
+  // The same shape of decision as `headings` and `tracker` above, and for the
+  // same stated reason: the catalogue supplies a generic default because it
+  // holds a `JournalType` and no plugin, and a type that knows better says so
+  // here.
+  //
+  // NO FRONTMATTER IS SEEDED FOR THESE — see `trackerSeeds`.
+  trackers?: string[];
 }
 
 // How one template departs from the catalogue's own arrangement.
@@ -505,6 +521,15 @@ export const DEFAULT_BRIDGE_TRACKER = "Mood";
 const always = (): boolean => true;
 const never = (): boolean => false;
 
+// The tracker the `tally` section counts when a type does not say otherwise.
+//
+// `status` and not a guess: it is the one id every journal is guaranteed to
+// define — unified across every journal and every kind in `constants.ts`, and
+// the only select the catalogue can name without reading a registry it cannot
+// see. A type that measures something better overrides it through
+// `options.tally.tracker`.
+export const DEFAULT_TALLY_TRACKER = "status";
+
 // What the section editor says about a title it cannot read back, and where it
 // sends the reader instead. 3.18 follow-ups §2.
 //
@@ -535,7 +560,7 @@ const TITLE_SETTLED = {
 // a section that applied when it had nothing to compose would write an empty
 // marked region, and one that composed what it had not applied for could not
 // happen at all.
-function trackerSeeds(ctx: SectionContext): string[] {
+function trackerSeeds(ctx: SectionContext, opts?: SectionOverrides): string[] {
   // A page carries no tracker grid: its ratings belong to the note it is a page
   // of, and a per-page Confidence would mean the note's own average silently
   // counted its parts as peers.
@@ -550,6 +575,24 @@ function trackerSeeds(ctx: SectionContext): string[] {
     kindAllowsTracker(ctx.type, ctx.kind?.id ?? null, "status")
   ) {
     out.push("tracker:status");
+  }
+  // THE QUANTITIES A TYPE SAYS ITS NOTES ARE KEPT FOR. 4.35 §1.5.
+  //
+  // Appended rather than inserted, so the rating and Status keep the positions
+  // every shipped template already has them in. Filtered through
+  // `kindAllowsTracker` like Status is — a Meal must not start with Intensity
+  // just because the journal defines it — and de-duped against what is already
+  // seeded, so naming the rating here is a no-op rather than a second copy.
+  //
+  // NO FRONTMATTER IS SEEDED FOR THEM, and that asymmetry with `rating` is
+  // deliberate. A rating is written as `1` because that is what a Recall
+  // sitting grades and what the review queue reads; `Distance: 1` would be a
+  // kilometre nobody ran. The widget is there to be filled in; the property
+  // arrives when it has a value.
+  for (const id of opts?.trackers ?? []) {
+    if (out.includes(`tracker:${id}`)) continue;
+    if (!kindAllowsTracker(ctx.type, ctx.kind?.id ?? null, id)) continue;
+    out.push(`tracker:${id}`);
   }
   return out;
 }
@@ -614,12 +657,18 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // than an empty marked region — the region exists so "+ Add tracker" has
     // somewhere to write, and `spliceMarkedRegion` inserts one when it finds
     // none, so an empty pair of markers buys nothing and renders as a gap.
+    // `applies` DELIBERATELY DOES NOT SEE `opts`. A section's applicability is
+    // asked of the catalogue before any layout is resolved, and a note whose
+    // only grid contents came from an override would be a template that
+    // appears or vanishes depending on a field the editor can clear. What a
+    // type adds through `options.trackers` is extra rows in a grid it already
+    // has, not a reason for the grid to exist.
     applies: (ctx) => trackerSeeds(ctx).length > 0,
     default: always,
     claims: ["tracker"],
     locate: (t) => probe(t, new RegExp(`^${TRACKER_MARK_START}\\s*$`, "m")),
-    render: (ctx) => [
-      fence([TRACKER_MARK_START, ...trackerSeeds(ctx), TRACKER_MARK_END]),
+    render: (ctx, opts) => [
+      fence([TRACKER_MARK_START, ...trackerSeeds(ctx, opts), TRACKER_MARK_END]),
     ],
   },
 
@@ -889,6 +938,55 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
         ),
       ];
     },
+  },
+
+  // ── The two 4.35 bands ────────────────────────────────────────────
+  //
+  // BOTH `default: never`, AND THAT IS FORCED RATHER THAN CHOSEN. The
+  // catalogue holds a `JournalType` and no plugin, so it cannot see whether a
+  // vault has a tracker worth summing or a vocabulary worth counting — which
+  // is `bridge`'s own argument, verbatim, a few sections down. A section that
+  // defaulted on would write a band into every journal in every vault and draw
+  // nothing in almost all of them.
+  //
+  // So the presets that want them turn them on through `layout.sections`,
+  // which is the field that can: `defaultSectionIds` filters on
+  // `required || default(ctx)` regardless of layout, so `order` alone could
+  // only rearrange what was already on. That is what §0 makes possible, and it
+  // is the whole reason §0 ships first.
+  //
+  // NOTHING PLACES EITHER ON A JOURNAL THAT ALREADY EXISTS. A reader adds them
+  // from *Edit sections…*, which is the silence 4.29 and 4.33 both chose.
+  {
+    id: "totals",
+    icon: "🧮",
+    label: "Totals",
+    blurb: "What the notes beneath this one add up to, for every quantity this journal totals.",
+    surface: "index",
+    default: never,
+    claims: ["journal-totals"],
+    locate: (t) => probe(t, /^journal-totals\s*$/m),
+    render: () => [fence(["journal-totals"])],
+  },
+
+  {
+    id: "tally",
+    icon: "🔢",
+    label: "Tally",
+    blurb: "How many of the things beneath this one sit at each value of a tracker.",
+    surface: "index",
+    default: never,
+    claims: ["journal-tally"],
+    locate: (t) => probe(t, /^journal-tally:/m),
+    // THE TRACKER IS AN OVERRIDE WITH A DEFAULT, not a required question. The
+    // catalogue cannot read the registry, so it names the one id every journal
+    // is guaranteed to define — `status` is unified across every journal and
+    // every kind — and a type that measures something better says so through
+    // `options.tally.tracker`. Exactly the shape `bridge` uses for the same
+    // reason, and the field is the one `SectionOverrides.tracker` already is.
+    render: (_ctx, opts) => [
+      fence([`journal-tally:${opts?.tracker ?? DEFAULT_TALLY_TRACKER}`]),
+    ],
   },
 
   {
@@ -1399,6 +1497,25 @@ export function defaultSectionIds(
   return sectionsFor(ctx, layout)
     .filter((s) => s.required || s.default(ctx))
     .map((s) => s.id);
+}
+
+// WHAT A LAYOUT ACTUALLY ASKS FOR — one precedence, in one place.
+//
+// `defaultSectionIds` filters on `required || default(ctx)` REGARDLESS of the
+// layout, so a layout can reorder what the catalogue already turns on and
+// cannot turn anything on itself. A `sections` list is the field that can:
+// it is a complete answer, not a preference, and it wins outright.
+//
+// This exists so the composer and the wizard read ONE derivation rather than
+// two that happen to agree. `composeTemplate` had this precedence inline and
+// the wizard had none of it at all — it seeded from `defaultSectionIds(ctx)`
+// with no layout, so installing a preset through the Presets button replaced
+// the arrangement the preset exists to ship with catalogue order.
+export function chosenSectionIds(
+  ctx: SectionContext,
+  layout?: TemplateLayout
+): string[] {
+  return layout?.sections ? [...layout.sections] : defaultSectionIds(ctx, layout);
 }
 
 // Every template a type owns, paired with the surface context that template is

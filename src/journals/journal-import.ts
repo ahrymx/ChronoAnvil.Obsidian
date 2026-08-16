@@ -9,7 +9,11 @@ import { App, Notice, TFile, TFolder, normalizePath } from "obsidian";
 import type AlmanacPlugin from "../main";
 import { JournalConfig, deriveJournalFolders } from "./custom-journal";
 import { registeredJournalTypes } from "./journal";
-import { TrackerDef, journalSurface } from "../trackers/trackers";
+import {
+  TrackerDef,
+  journalSurface,
+  trackersToSeed,
+} from "../trackers/trackers";
 import { childFolders } from "../core/util";
 import {
   JournalManifest,
@@ -455,16 +459,17 @@ export class JournalImporter {
   // not be able to redefine `status` or clobber a tracker the user has tuned.
   async register(found: AdoptedJournal[]): Promise<void> {
     if (found.length === 0) return;
-    const knownTrackerIds = new Set(
-      this.plugin.settings.trackers.map((t) => t.id)
-    );
     for (const item of found) {
       this.plugin.settings.customJournals.push(item.config);
-      for (const tracker of item.trackers) {
-        if (knownTrackerIds.has(tracker.id)) continue;
-        this.plugin.settings.trackers.push(tracker);
-        knownTrackerIds.add(tracker.id);
-      }
+      // THE RULE LIVES IN `trackersToSeed` NOW (4.35 §1.2), and this loop is
+      // where it came from. Installing a preset seeds the registry from
+      // outside it too, and two callers holding one rule twice is how the two
+      // drift — so the rule moved and this became a call. Still inside the
+      // loop, so the ids seeded by an earlier journal in the same batch are
+      // visible to a later one.
+      this.plugin.settings.trackers.push(
+        ...trackersToSeed(this.plugin.settings.trackers, item.trackers)
+      );
       // Give an inferred journal the manifest it was missing, so the next
       // reload reads it back exactly rather than inferring again — and so a
       // correction made in Settings sticks instead of being re-guessed.

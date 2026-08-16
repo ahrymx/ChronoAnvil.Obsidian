@@ -197,6 +197,115 @@ export function readCss(): string {
   return readFileSync(join(ROOT, "styles.css"), "utf8");
 }
 
+/**
+ * The stylesheet modules, each with its filename — for assertions that are
+ * ABOUT a module rather than about the concatenation. `readCss` joins them, so
+ * a failure there can only say "somewhere in 634KB"; this lets a rule sweep
+ * name the file it found a problem in, which is the difference between a
+ * report you can act on and one you have to go looking through.
+ *
+ * Falls back to the built `styles.css` as one entry, exactly as readCss does.
+ */
+export function styleSheets(): { name: string; css: string }[] {
+  const dir = join(ROOT, "styles");
+  if (isDir(dir)) {
+    return readdirSync(dir)
+      .sort()
+      .filter((f) => f.endsWith(".css"))
+      .map((f) => ({ name: f, css: readFileSync(join(dir, f), "utf8") }));
+  }
+  return [
+    { name: "styles.css", css: readFileSync(join(ROOT, "styles.css"), "utf8") },
+  ];
+}
+
+/**
+ * ONE RULE'S DECLARATIONS, ANCHORED AND BOUNDED. 4.35.3.
+ *
+ * WHY THIS EXISTS. Thirty-odd assertions in this suite reach for a CSS rule as
+ * `css.slice(css.indexOf(SEL), css.indexOf("}", css.indexOf(SEL)))`, and that
+ * shape has two failure modes that both END IN A PASSING TEST:
+ *
+ *   NOT ANCHORED — `indexOf(".almanac-section-title {")` also matches inside
+ *   `.almanac-head-fold .almanac-section-title {`, so the assertion reads a
+ *   DIFFERENT rule, usually the override that states the opposite. Cost one
+ *   debugging round in 4.35.1.
+ *
+ *   NOT FOUND — a renamed selector makes `indexOf` return -1, `slice(-1, …)`
+ *   returns "" or a stray tail, and every `toContain` on it fails loudly while
+ *   every `not.toContain` passes while asserting nothing. That is the shape
+ *   `RESUME.md` records for the 4.16 test that "quietly stopped testing", and
+ *   it happened twice more while writing 4.35.1 and 4.35.2.
+ *
+ * So this walks the stylesheet with brace depth rather than searching text,
+ * compares whole selectors in a list rather than substrings, and THROWS when
+ * there is no match — because the one thing a helper like this must never do is
+ * hand back an empty string that quietly satisfies a negative assertion.
+ */
+function eachRule(css: string): { selector: string; body: string }[] {
+  const out: { selector: string; body: string }[] = [];
+  // COMMENTS COME OUT FIRST, and both halves of that matter. A selector is read
+  // as "everything since the last block closed", so a rule preceded by one of
+  // this project's long explanatory comments would carry the whole comment in
+  // its name and match nothing. And a comment containing a brace — several here
+  // quote selectors — would corrupt the depth count for the rest of the file.
+  css = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < css.length; i++) {
+    const c = css[i];
+    if (c === "{") {
+      // The selector list runs from the end of the previous block to here.
+      if (depth === 0) {
+        out.push({ selector: css.slice(start, i).trim(), body: "" });
+        start = i + 1;
+      }
+      depth++;
+    } else if (c === "}") {
+      depth--;
+      // Only the outermost close ends a rule; an at-rule's inner braces are
+      // stepped over here and its contents are walked separately by `cssRules`.
+      if (depth === 0) {
+        out[out.length - 1].body = css.slice(start, i);
+        start = i + 1;
+      }
+    }
+  }
+  return out;
+}
+
+/** Every rule whose selector list names `selector` exactly. At-rules included. */
+export function cssRules(selector: string): string[] {
+  const found: string[] = [];
+  const walk = (css: string): void => {
+    for (const rule of eachRule(css)) {
+      if (rule.selector.startsWith("@")) {
+        walk(rule.body);
+        continue;
+      }
+      const names = rule.selector.split(",").map((x) => x.trim());
+      if (names.includes(selector)) found.push(rule.body);
+    }
+  };
+  walk(readCss());
+  return found;
+}
+
+/**
+ * The declarations of the one rule named `selector`, anchored and bounded.
+ * Throws when there is no such rule, so a rename fails loudly instead of
+ * turning every negative assertion into a no-op.
+ */
+export function cssRule(selector: string): string {
+  const found = cssRules(selector);
+  if (found.length === 0) {
+    throw new Error(
+      `No CSS rule for "${selector}" — it was renamed, or the selector is part of a longer list.`
+    );
+  }
+  return found.join("\n");
+}
+
 /** A file from assets/, by filename. */
 export function readAsset(name: string): string {
   return readFileSync(join(ROOT, "assets", name), "utf8");

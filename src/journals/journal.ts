@@ -10,9 +10,11 @@ import type AlmanacPlugin from "../main";
 import type { TemplateLayout , SectionOverrides } from "./journal-sections";
 import { only, promptText, promptSuggester, promptNewNote } from "../ui/modals";
 import {
+  DEFAULT_ENERGY_FACES,
   DEFAULT_SUBJECT_EMOJI,
   DEFAULT_TOPIC_EMOJI,
   JOURNALS_DIRECTIVE,
+  ROOT_JOURNALS,
   ROOT_STUDY,
   TEMPLATES_ROOT,
   FENCE_OPEN,
@@ -693,7 +695,243 @@ export const STUDY_PRESET: JournalPreset = {
   config: STUDY_CONFIG,
 };
 
-export const JOURNAL_PRESETS: JournalPreset[] = [STUDY_PRESET];
+// ── Three more to start from (4.35 §2) ──────────────────────────────────
+//
+// ONE PRESET IS NOT A PRESET SYSTEM. 3.20 stopped Study being built in and made
+// it a recipe, and `JOURNAL_PRESETS` has had exactly one entry ever since — so
+// the machinery (recipe, wizard, scaffold, manifest) has never had a second
+// instance to prove it generalises. These three are that proof, and each is a
+// different SHAPE, which is what actually tests it rather than three journals
+// that differ only in their nouns.
+//
+// EVERY KIND ID IS `slugify(label)` AND EVERY LEVEL ID IS `slugify(noun)`, and
+// that is a correctness rule rather than a convention. `commit` calls
+// `normaliseKinds(..., { preserveIds: this.isEstablished })` and `isEstablished`
+// is `mode !== "create"` — so on an INSTALL the id becomes `slugify(label)`.
+// A preset naming a kind `log` and labelling it "Update" would have its id
+// change at commit, and every `layout["kind:<id>"]` key would silently address
+// a template that no longer exists. Study satisfies this by accident; these
+// satisfy it deliberately, and a test over every preset pins it.
+
+// ── Projects 🚀 ─────────────────────────────────────────────────────────
+//
+// THE ONE THAT PROVES A JOURNAL NEED NOT BE SCORED. `typeRating` is null, no
+// rating line is written, the notes base grows no rating column, and the charts
+// region ships as the bare managed region the catalogue already documents for a
+// type that measures nothing. If anything in the plugin still assumes a rating,
+// this is what finds it.
+export const PROJECTS_CONFIG: JournalConfig = {
+  id: "projects",
+  name: "Projects",
+  emoji: "🚀",
+  root: `${ROOT_JOURNALS}/Projects`,
+  templatesFolder: `${TEMPLATES_ROOT}/Projects`,
+  // TWO LEVELS because a Project needs a page of its own — its plan, its tally,
+  // its files — and the notes inside it need somewhere that is not the whole
+  // journal.
+  levels: [
+    { id: "area", noun: "Area", fallbackEmoji: "🗂️" },
+    { id: "project", noun: "Project", fallbackEmoji: "🚀" },
+  ],
+  kinds: [
+    // An Update is the dated *what happened*; a Decision is the undated record
+    // you go back to. Different searches, different lifetimes — which is the
+    // whole argument for two kinds rather than one with a tag on it.
+    { id: "update", emoji: "📝", label: "Update" },
+    { id: "decision", emoji: "⚖️", label: "Decision", plural: "Decisions" },
+  ],
+  // IT SHIPS NO TRACKERS AND DECLARES NO RATING. The only thing a project
+  // tracks is `status`, which every journal already has, and a second
+  // vocabulary for it is the split `status` was unified to end.
+  layout: {
+    // The Area index counts the PROJECTS beneath it, which is the sentence this
+    // journal is kept to be able to say. `sections` rather than `order`,
+    // because that is the only field that can turn a `default: never` section
+    // on — see the `tally` section for why it must default off.
+    "index:0": {
+      sections: [
+        "banner",
+        "trackers",
+        "children",
+        "tally",
+        "find",
+        "charts",
+        "tasks",
+      ],
+    },
+    // AND `index:1` SHIPS `order` DELIBERATELY, TO SHOW THE DIFFERENCE. A
+    // Project index wants its updates first and its tasks high, which is an
+    // arrangement — so it says only that, and gains a section the day the
+    // catalogue adds one. A layout that shipped `sections` here would be frozen
+    // for every later reader, which is what `sections` means and is a price
+    // worth paying only where a widget has to be turned on.
+    "index:1": {
+      order: ["banner", "trackers", "tasks", "children", "charts", "find"],
+    },
+  },
+};
+
+export const PROJECTS_PRESET: JournalPreset = {
+  id: "projects",
+  name: "Projects",
+  emoji: "🚀",
+  blurb: "Area → Project, with dated updates and the decisions behind them.",
+  config: PROJECTS_CONFIG,
+};
+
+// ── Exercise & Diet 🏋️ ──────────────────────────────────────────────────
+//
+// ONE LEVEL, because the whole point is that a day's food and its training sit
+// in one folder. A second level is the split the reader asked not to have.
+//
+// TWO KINDS, because a Workout and a Meal carry different numbers.
+// `kindAllowsTracker` already keeps a Meal out of an average of Intensity.
+export const EXERCISE_CONFIG: JournalConfig = {
+  id: "exercise-diet",
+  name: "Exercise & Diet",
+  emoji: "🏋️",
+  root: `${ROOT_JOURNALS}/Exercise & Diet`,
+  templatesFolder: `${TEMPLATES_ROOT}/Exercise & Diet`,
+  // A Block is a month, a training block — the stretch you plan as one.
+  levels: [{ id: "block", noun: "Block", fallbackEmoji: "🗓️" }],
+  kinds: [
+    { id: "workout", emoji: "🏋️", label: "Workout", rating: "intensity" },
+    { id: "meal", emoji: "🍽️", label: "Meal" },
+  ],
+  layout: {
+    // The Block index bands what its workouts and meals add up to. Turned on
+    // through `sections` for the reason the catalogue entry gives.
+    "index:0": {
+      sections: [
+        "banner",
+        "trackers",
+        "totals",
+        "children",
+        "charts",
+        "find",
+        "tasks",
+      ],
+    },
+    // THE QUANTITIES EACH NOTE STARTS WITH. Without this a Workout would open
+    // with Intensity and nothing else, and Duration would be added by hand from
+    // the cog on every note ever written — see `SectionOverrides.trackers`.
+    "kind:workout": {
+      options: { trackers: { trackers: ["duration", "distance"] } },
+    },
+    "kind:meal": {
+      options: { trackers: { trackers: ["calories", "protein"] } },
+    },
+  },
+};
+
+export const EXERCISE_PRESET: JournalPreset = {
+  id: "exercise-diet",
+  name: "Exercise & Diet",
+  emoji: "🏋️",
+  blurb: "One folder per training block, with workouts and meals read together.",
+  config: EXERCISE_CONFIG,
+  // THE FOUR QUANTITIES EACH DECLARE `reduce: "sum"`, WHICH IS WHAT PUTS THEM
+  // IN THE TOTALS BAND. Drop any one and the band has a cell missing from it.
+  // Intensity does NOT: five workouts at 4/5 do not make 20 of anything, which
+  // is exactly why `reduce` defaults to mean.
+  trackers: [
+    {
+      id: "intensity",
+      label: "🔥 Intensity",
+      type: "scale",
+      min: 1,
+      max: 5,
+      step: 1,
+      faces: [...DEFAULT_ENERGY_FACES],
+    },
+    { id: "duration", label: "⏱️ Duration", type: "number", min: 0, step: 5, unit: "min", reduce: "sum" },
+    { id: "distance", label: "📏 Distance", type: "number", min: 0, step: 0.5, unit: "km", reduce: "sum" },
+    { id: "calories", label: "🔥 Calories", type: "number", min: 0, step: 10, unit: "kcal", reduce: "sum" },
+    { id: "protein", label: "🥩 Protein", type: "number", min: 0, step: 1, unit: "g", reduce: "sum" },
+  ],
+};
+
+// ── Media 🍿 ────────────────────────────────────────────────────────────
+//
+// ONE KIND, NOT FIVE. Kinds are journal-wide, so a Book kind and a Film kind
+// would put five create buttons on every shelf. A book, a film, a season and a
+// match are all *a thing I got through and rated*, which is why the ratings are
+// shared: one Stars, one status, one table.
+//
+// Books, Film, TV, Games and Sport are folders the reader makes with + Medium.
+export const MEDIA_CONFIG: JournalConfig = {
+  id: "media",
+  name: "Media",
+  emoji: "🍿",
+  root: `${ROOT_JOURNALS}/Media`,
+  templatesFolder: `${TEMPLATES_ROOT}/Media`,
+  levels: [{ id: "medium", noun: "Medium", fallbackEmoji: "🍿" }],
+  kinds: [
+    // THE KIND IS `Title`, NOT `Review`. `journalSubActionSpec` builds
+    // `New ${kind.label}`, and *"new review"* is a retired phrase that the
+    // source-literal scan cannot see, because the string is composed at
+    // runtime rather than written down.
+    //
+    // `pages: true` is the shape no other preset has — a long read splits into
+    // chapters, a season into episodes — and the shared page template and the
+    // 📄 Pages section already do it.
+    {
+      id: "title",
+      emoji: "🎬",
+      label: "Title",
+      pages: true,
+      rating: "stars",
+    },
+  ],
+  layout: {
+    // Books shows *Pages read* and Film shows *Minutes* out of THIS ONE
+    // DIRECTIVE, because the totals band omits a quantity with no readings in
+    // scope. That is the concrete answer to "shared ratings, per-medium
+    // quantities".
+    "index:0": {
+      sections: [
+        "banner",
+        "trackers",
+        "stats",
+        "totals",
+        "children",
+        "charts",
+        "find",
+      ],
+    },
+    "kind:title": {
+      options: { trackers: { trackers: ["pagesRead", "minutes"] } },
+    },
+  },
+};
+
+export const MEDIA_PRESET: JournalPreset = {
+  id: "media",
+  name: "Media",
+  emoji: "🍿",
+  blurb: "One shelf per medium — books, film, TV, games — rated the same way.",
+  config: MEDIA_CONFIG,
+  trackers: [
+    {
+      id: "stars",
+      label: "⭐ Stars",
+      type: "scale",
+      min: 1,
+      max: 5,
+      step: 1,
+      faces: ["★", "★★", "★★★", "★★★★", "★★★★★"],
+    },
+    { id: "pagesRead", label: "📖 Pages read", type: "number", min: 0, step: 10, unit: "pages", reduce: "sum" },
+    { id: "minutes", label: "⏱️ Minutes", type: "number", min: 0, step: 5, unit: "min", reduce: "sum" },
+  ],
+};
+
+export const JOURNAL_PRESETS: JournalPreset[] = [
+  STUDY_PRESET,
+  PROJECTS_PRESET,
+  EXERCISE_PRESET,
+  MEDIA_PRESET,
+];
 
 // EVERY JOURNAL IS A CONFIGURED ONE SINCE 3.20. This used to prepend Study when
 // a settings toggle said so, which is why Study was the one journal that could

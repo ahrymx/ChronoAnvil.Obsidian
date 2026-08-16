@@ -44,6 +44,8 @@ import { LiveWidget } from "../livewidget";
 import type { VaultArea } from "../../core/links";
 import {
   buildJournalBreakdown,
+  buildJournalTally,
+  buildJournalTotals,
   buildKindTable,
   buildPagesTable,
   buildTagIndex,
@@ -442,6 +444,40 @@ export function buildJournalBreakdownRegion(
   if (!file?.parent) return null;
   return liveScopedWidget(plugin, ctx, file.parent.path, () =>
     buildJournalBreakdown(plugin, ctx, rest.trim(), label)
+  );
+}
+
+export function buildJournalTallyRegion(
+  plugin: AlmanacPlugin,
+  rest: string,
+  label: string | null,
+  ctx: MarkdownPostProcessorContext
+): HTMLElement | null {
+  // `journal-tally:<tracker>[|Label]` — `journal-breakdown`'s grammar, and
+  // the same folder rule: scope is the host note's own folder, so an Area
+  // index counts its Projects and a Project index counts its Updates without
+  // being told which. Live-scoped, so moving a note between folders re-counts
+  // both ends.
+  const file = fileOfCtx(plugin, ctx);
+  if (!file?.parent) return null;
+  return liveScopedWidget(plugin, ctx, file.parent.path, () =>
+    buildJournalTally(plugin, ctx, rest.trim(), label)
+  );
+}
+
+export function buildJournalTotalsRegion(
+  plugin: AlmanacPlugin,
+  label: string | null,
+  ctx: MarkdownPostProcessorContext
+): HTMLElement | null {
+  // `journal-totals` — NO ARGUMENT. See buildJournalTotals for why naming one
+  // tracker would have forced the summable quantity to be a kind's rating.
+  // Live-scoped over the host's folder, so logging a second workout repaints
+  // the band rather than waiting for the note to be reopened.
+  const file = fileOfCtx(plugin, ctx);
+  if (!file?.parent) return null;
+  return liveScopedWidget(plugin, ctx, file.parent.path, () =>
+    buildJournalTotals(plugin, ctx, label)
   );
 }
 

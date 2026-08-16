@@ -301,12 +301,33 @@ function topicRow(
   const { pages, lastActive } = folderActivity(plugin.app, sub.path);
   const row = body.createDiv({ cls: "jjs-card-row" });
   folderLink(plugin, row, sub, ctx.sourcePath, "jjs-row-link");
-  row.createSpan({ cls: "jjs-card-when", text: relativeActivity(lastActive) });
+  // NAMED, BECAUSE THE GLYPHS ONLY EXPLAIN THEMSELVES ONCE THERE IS DATA
+  // (4.35.2). Populated, these two read "3d ago" and "2 ◻" and need no header.
+  // Empty — which is every row on a journal a reader has just made — they are
+  // two bare em dashes with nothing to say which is which, and a screen reader
+  // heard "dash dash" in either state, since neither cell carried a name.
+  //
+  // A `title` rather than a header row: the body's height is stated in ROWS
+  // (see `.jjs-card-body`), so a header would cost one of the four notes a card
+  // can show. This costs nothing and is also the accessible fix.
+  const when = row.createSpan({
+    cls: "jjs-card-when",
+    text: relativeActivity(lastActive),
+  });
+  when.setAttr("title", "Last activity");
+  when.setAttr(
+    "aria-label",
+    lastActive
+      ? `Last activity: ${relativeActivity(lastActive)}`
+      : "Last activity: none yet"
+  );
   // An Almanac `- ( )` line lives in a note's BODY and is invisible to the
   // metadata cache, so this cell cannot be filled synchronously. It ships a
   // placeholder and fills on resolve — the idiom the banner's four numbers and
   // `topics-table`'s own Open column both use.
   const openCell = row.createSpan({ cls: "jjs-card-open", text: "…" });
+  openCell.setAttr("title", "Open tasks");
+  openCell.setAttr("aria-label", "Open tasks: counting…");
   void sumBodyTasks(
     plugin.app,
     pages.map((p) => p.file)
@@ -316,6 +337,14 @@ function topicRow(
     // way and for the same reason.
     if (!openCell.isConnected) return;
     openCell.setText(open ? `${open} ◻` : "—");
+    // The label is rewritten with the text, so it never describes the
+    // placeholder the cell shipped with.
+    openCell.setAttr(
+      "aria-label",
+      open === 0
+        ? "No open tasks"
+        : `${open} open ${open === 1 ? "task" : "tasks"}`
+    );
     openCell.toggleClass("is-zero", open === 0);
   });
 }

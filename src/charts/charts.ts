@@ -72,24 +72,49 @@ export function chartableType(t: TrackerDef): boolean {
 // A null `hostTypeId` is unclassified and passes, the same permissiveness
 // directiveAllowedOn applies for the same reason: a dashboard outside every
 // journal root is a place we don't know enough about to refuse.
-export function journalChartRefusal(
+// ── The refusal, in three parts (4.35 §3.3) ──────────────────────────────
+//
+// `journal-tally` asks the same question about a tracker's IDENTITY and its
+// SURFACE and the opposite question about its type: it counts how many notes
+// sit at each value of a `select`, which is exactly what `chartableType`
+// refuses and refuses correctly — a select's arbitrary strings are not a
+// magnitude and there is no axis to put them on.
+//
+// So the two shared checks are split out ABOVE the chart's refusal and it is
+// recomposed from them with its `chartableType` arm between: same checks, same
+// order, same strings. THE DIRECTION MATTERS. Teaching `journalChartRefusal` a
+// second mode would have meant editing the function every existing assertion
+// runs through; splitting underneath it means `test/journal-chart.test.ts`
+// passes UNEDITED, which is the whole argument for doing it this way round.
+
+// Is there a tracker here at all? `directive` names the widget in the message,
+// because "needs a tracker id" with no subject is advice a reader cannot act
+// on when three widgets take one.
+export function trackerMissingRefusal(
   def: TrackerDef | undefined,
   id: string,
+  directive: string,
+  example: string
+): string | null {
+  if (!id) {
+    return `${directive} needs a tracker id — e.g. \`${directive}:${example}\`.`;
+  }
+  if (!def) return `No tracker called "${id}" is defined.`;
+  return null;
+}
+
+// Does this tracker belong on the notes in this folder?
+//
+// A null `hostTypeId` is unclassified and passes, the same permissiveness
+// `directiveAllowedOn` applies for the same reason: a dashboard outside every
+// journal root is a place we don't know enough about to refuse.
+export function journalSurfaceRefusal(
+  def: TrackerDef,
   hostTypeId: string | null,
   surfaceName: (s: TrackerSurface) => string,
   hostTypeName?: string
 ): string | null {
-  if (!id) {
-    return "journal-chart needs a tracker id — e.g. `journal-chart:confidence`.";
-  }
-  if (!def) return `No tracker called "${id}" is defined.`;
   const name = def.label || def.id;
-  if (!chartableType(def)) {
-    // A select's arbitrary strings and a bare date aren't a magnitude, so
-    // there is no axis to put them on. Same rule the chart system applies;
-    // only the scope half differs.
-    return `${name} isn't a numeric tracker, so there's nothing to plot.`;
-  }
   if (!isJournalSurface(def.surface)) {
     // A diary tracker's readings are in the diary folders. Folder-scoping one
     // to a journal note would draw an empty chart that looks broken rather
@@ -100,6 +125,53 @@ export function journalChartRefusal(
     return `${name} is a ${surfaceName(def.surface)} tracker; this note is in ${hostTypeName ?? hostTypeId}.`;
   }
   return null;
+}
+
+export function journalChartRefusal(
+  def: TrackerDef | undefined,
+  id: string,
+  hostTypeId: string | null,
+  surfaceName: (s: TrackerSurface) => string,
+  hostTypeName?: string
+): string | null {
+  const missing = trackerMissingRefusal(def, id, "journal-chart", "confidence");
+  // `|| !def` narrows for the compiler and is unreachable: the check above
+  // returns a message for every absent `def`. It is here rather than a `!`
+  // because the assertion operator would read as a claim nothing verifies.
+  if (missing || !def) return missing;
+  const name = def.label || def.id;
+  if (!chartableType(def)) {
+    // A select's arbitrary strings and a bare date aren't a magnitude, so
+    // there is no axis to put them on. Same rule the chart system applies;
+    // only the scope half differs.
+    return `${name} isn't a numeric tracker, so there's nothing to plot.`;
+  }
+  return journalSurfaceRefusal(def, hostTypeId, surfaceName, hostTypeName);
+}
+
+// THE TALLY'S REFUSAL: the two shared arms, with `select` REQUIRED between
+// them rather than refused.
+//
+// A tally counts notes at each option of a vocabulary, so a select is the only
+// thing it can read — the exact inverse of the chart's arm, which is why
+// `journalChartRefusal` could not be reused with a flag and why the split runs
+// in this direction.
+export function journalTallyRefusal(
+  def: TrackerDef | undefined,
+  id: string,
+  hostTypeId: string | null,
+  surfaceName: (s: TrackerSurface) => string,
+  hostTypeName?: string
+): string | null {
+  const missing = trackerMissingRefusal(def, id, "journal-tally", "status");
+  if (missing || !def) return missing;
+  const name = def.label || def.id;
+  if (def.type !== "select") {
+    // A number has no vocabulary to group by — asking for one back would be a
+    // bar per distinct reading, which is a histogram and a different widget.
+    return `${name} isn't a select tracker, so there are no options to count.`;
+  }
+  return journalSurfaceRefusal(def, hostTypeId, surfaceName, hostTypeName);
 }
 
 // A tracker whose value axis can pair with another's on a scatter plot. Same

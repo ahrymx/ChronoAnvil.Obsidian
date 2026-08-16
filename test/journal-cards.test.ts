@@ -502,3 +502,34 @@ describe("the activity strip is sized by its container", () => {
     expect(readSrc("journals-header")).toContain('cls: "jjh-cell is-empty"');
   });
 });
+
+describe("a card row names its columns (4.35.2)", () => {
+  const src = () => readSrc("journals");
+
+  it("labels the activity cell in both states", () => {
+    // Populated it reads "3d ago" and explains itself; empty it is a bare em
+    // dash beside another bare em dash, which is every row on a journal the
+    // reader has just made.
+    expect(src()).toContain('when.setAttr("title", "Last activity")');
+    expect(src()).toContain('"Last activity: none yet"');
+  });
+
+  it("labels the open-tasks cell, and rewrites it when the count lands", () => {
+    // The cell ships a placeholder because Almanac tasks live in note bodies
+    // and are invisible to the metadata cache. A label written once would
+    // describe the placeholder forever.
+    expect(src()).toContain('openCell.setAttr("title", "Open tasks")');
+    expect(src()).toContain('"Open tasks: counting…"');
+    expect(src()).toContain('"No open tasks"');
+  });
+
+  it("says task or tasks, like every other count in this file", () => {
+    expect(src()).toContain('open === 1 ? "task" : "tasks"');
+  });
+
+  it("adds no header row, because the body's height is stated in rows", () => {
+    // A header would cost one of the four notes a card can show. The labels are
+    // the version of this that is free.
+    expect(src()).not.toContain("jjs-card-head-row");
+  });
+});
