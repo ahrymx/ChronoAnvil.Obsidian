@@ -100,6 +100,7 @@ import {
   tasksScopeFor,
   buildTimelineRegion,
   buildTopicStatsRegion,
+  buildLevelCardsRegion,
   buildLevelIndexRegion,
 } from "./directive-regions";
 import {
@@ -256,6 +257,11 @@ const OVERVIEW_KINDS = new Set([
   "month-summary",
   "quarter-summary",
   "year-summary",
+  // `level-cards` DRAWS CARDS, so it takes the card modifier for the reason
+  // this set exists (4.36). Without it a `frame: section` fence would keep the
+  // block's own card AND add a section bar, which is 4.1 §3.1's two borders
+  // arguing — and the journal dashboard composes exactly that fence.
+  "level-cards",
 ]);
 
 // What a directive calls itself when it has to title its own section.
@@ -488,6 +494,11 @@ const SECTION_TITLES: Record<string, string> = {
   // questions either is for.
   "journal-card": "📓 Journal card",
   "level-index": "🗂️ What's below",
+  // THE SECTION'S OWN NAME ON THE PAGE THAT COMPOSES IT (4.36). Not "What's
+  // below" a second time: `level-index` and `level-cards` answer one question,
+  // and two blocks on one page headed identically would read as a duplicate
+  // rather than as two arrangements a reader chose between.
+  "level-cards": "🗂️ Contents",
   events: "🎉 Events",
   "sleep-summary": "😴 Sleep",
   "period-nav": "⏮️ Go to period",
@@ -2149,6 +2160,13 @@ export class Widgets implements
       case "topics-table":
       case "level-index":
         return buildLevelIndexRegion(this.plugin, ctx, rest);
+      // THE SAME QUESTION IN CARDS (4.36 §2). A keyword rather than an argument
+      // on the line above, because that directive spends both pieces of its one
+      // argument on a journal and a folder and the folder may hold slashes —
+      // see the registry entry, which makes the case at length. The two share
+      // `levelScope`, so an unresolvable argument reads the same either way.
+      case "level-cards":
+        return buildLevelCardsRegion(this.plugin, ctx, rest);
       case "topic-stats":
         return buildTopicStatsRegion(this.plugin, ctx);
       case "kind-table":
@@ -2237,7 +2255,11 @@ export class Widgets implements
         // line that draws a card.
         return buildJournalCardRegion(this.plugin, ctx, rest);
       case "journals-header":
-        return buildJournalsHeaderRegion(this.plugin, ctx);
+        // BARE IS EVERY JOURNAL, AND STAYS SO (4.36 §3). The argument narrows
+        // the band to one; without it the numbers and the strip cover every
+        // registered journal exactly as they always have, so no note in any
+        // vault renders differently for having been written before this.
+        return buildJournalsHeaderRegion(this.plugin, ctx, rest);
       // The join, both ways (2.57.0). Two cases rather than one with a mode
       // argument: `bridge-notes` reads the index and `bridge-readings` reads
       // the tracker series, which are different stores with different caching,

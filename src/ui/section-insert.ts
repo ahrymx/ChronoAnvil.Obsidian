@@ -15,6 +15,7 @@ import { entrySectionModel } from "../diary/entry-sections";
 import { homeSectionModel } from "../diary/home-sections";
 import { diaryDashboardSectionModel } from "../diary/diary-dashboard-sections";
 import { journalsDashboardSectionModel } from "../journals/journals-dashboard-sections";
+import { journalDashboardSectionModel } from "../journals/journal-dashboard-sections";
 import { searchSectionModel } from "../diary/search-sections";
 import type { EntrySectionContext } from "../diary/entry-sections";
 import { isManagedTemplate } from "../trackers/entry-trackers";
@@ -209,6 +210,16 @@ export type ResolvedSurface =
   // deriving their paths, showing up a second time.
   | { kind: "diary-dashboard" }
   | { kind: "journals-dashboard" }
+  // ONE JOURNAL'S OWN FOLDER NOTE, AS OF 4.36 §0.4 — and it carries a `ctx`
+  // where the two above carry nothing.
+  //
+  // THE RESEMBLANCE IS THE MISLEADING PART, which is why this says so rather
+  // than sitting quietly beside them. Those two are ONE note each: there is one
+  // diary and one journals root, and nothing about either page varies. There are
+  // N of these, and the catalogue is a function of the journal — its name is the
+  // window's noun, and two of its sections name the journal in their directives.
+  // So the shape here is `dashboard`'s, not `search`'s.
+  | { kind: "journal-dashboard"; ctx: { type: JournalType } }
   | { kind: "managed" };
 
 // The surface, as the one interface sees it — and what to call it to a reader.
@@ -275,6 +286,17 @@ export function modelForSurface(
     return {
       model: journalsDashboardSectionModel(hostFolder, vault),
       noun: "journals dashboard",
+    };
+  }
+  if (surface.kind === "journal-dashboard") {
+    // THE NOUN IS THE JOURNAL'S OWN NAME — "this Study dashboard", not "this
+    // journal dashboard". Every message these commands write names the thing
+    // being edited, and a vault with four journals has four of these pages: a
+    // generic noun here would be the one surface whose sentence cannot tell a
+    // reader which page they are on.
+    return {
+      model: journalDashboardSectionModel(surface.ctx.type, hostFolder, vault),
+      noun: `${surface.ctx.type.name} dashboard`,
     };
   }
   return {
@@ -542,6 +564,30 @@ export class SectionInserter {
     }
     if (notePath === folderNotePath(paths.journalsRoot)) {
       return { kind: "journals-dashboard" };
+    }
+
+    // AND ONE PER REGISTERED JOURNAL (4.36 §0.4), beside the two above and
+    // derived the same way — `folderNotePath(type.root)`, so a renamed journal
+    // folder brings its page along and there is no fifth path key.
+    //
+    // AFTER THOSE TWO, WHICH IS THE TIE-BREAK. A journal rooted exactly AT the
+    // journals root would otherwise take that page's identity away from it. The
+    // paragraph above describes the same collision from the other side and
+    // settles it the same way: the arrangement is reachable only by editing a
+    // root by hand, and the honest note is that the two pages would then
+    // disagree about what that file is. The established page keeps its path.
+    //
+    // IT ALSO SITS AFTER `resolveSectionHost`, WHICH CANNOT MATCH IT. That
+    // resolver needs a `type:` frontmatter value naming a level or a kind, and
+    // this page is composed by `composeFlatNote`, which writes no frontmatter at
+    // all. The ordering is therefore belt rather than braces — but the property
+    // it depends on is asserted, because a page that grew a `type:` line would
+    // silently start being offered the journal NOTE catalogue instead of its
+    // own.
+    for (const type of registeredJournalTypes(this.plugin)) {
+      if (notePath === folderNotePath(type.root)) {
+        return { kind: "journal-dashboard", ctx: { type } };
+      }
     }
 
     const dash = this.diaryContextFor(notePath);

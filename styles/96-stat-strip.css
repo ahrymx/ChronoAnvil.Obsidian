@@ -91,7 +91,14 @@
 
    `.journal-widget-block` has carried `container-type: inline-size` since
    2.51, and twelve rules in this sheet already query it. This one was written
-   before that was true and never revisited. */
+   before that was true and never revisited.
+
+   AND THE BLOCK IS NOT ALWAYS WHAT IT MEASURES. `@container` resolves against
+   the NEAREST container, so a caller that puts a strip inside a smaller one
+   gets the collapse against that instead — which is what `.jld-card` does since
+   4.36.3, for exactly the reason above one level down: a 330px card in a
+   700px section had four cells at 80px in it. That is the query working rather
+   than a special case, and it is the reason this rule names no ancestor. */
 @container (max-width: 480px) {
   /* Same specificity as the rules above and later in the file, which is what
      makes it win — and why the selectors are spelled out rather than left as

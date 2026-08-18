@@ -1512,6 +1512,27 @@
   color: var(--text-faint);
   font-style: italic;
 }
+/* ── The reorganise-journals window (4.40) ──────────────────────────────
+   A SHORT LIST AND NOTHING ELSE, so it borrows the template editor's row rather
+   than growing a second one — the arrows are `.almanac-tpl-arrow`, already
+   styled above, because "move this up" should look the same in every window
+   that offers it. What is added here is only the list's own breathing room. */
+.almanac-reorder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 12px 0 4px;
+}
+/* THE POSITION NUMBER IS THE SUBJECT OF THIS LIST, so its column is not the
+   near-invisible slot a glyph gets elsewhere: tabular figures, so 9 and 10 line
+   up under each other, and the faint ink a label wears rather than the normal
+   ink a value does — it is a count of rows, not a fact about the journal. */
+.almanac-reorder-list .almanac-list-token {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  font-size: var(--am-text-sm);
+}
+
 /* Drag reorders the list; nothing is written until Save. The cursor says the
    row is draggable, and only rows inside the same band ever light up as a
    drop target — a row in the other band is not a target at all, so the

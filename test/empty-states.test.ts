@@ -256,17 +256,25 @@ describe("the activity months fit a phone", () => {
     const css = readCss();
     const at = css.indexOf("@media (max-width: 500px) {\n  .journal-act-months");
     expect(at).toBeGreaterThan(0);
-    const block = css.slice(at, at + 700);
-    expect(block).toContain("flex-wrap: nowrap");
+    const block = css.slice(at, at + 1400);
+    // ONE ROW OF NATURAL-WIDTH PANELS. `flex-wrap: nowrap` said this until 4.38.4
+    // made the rail a grid so its three panels could share a wide section; the
+    // phone case is unchanged in what it does and changed in how it says it.
+    expect(block).toContain("grid-auto-flow: column");
+    expect(block).toContain("grid-auto-columns: max-content");
     expect(block).toContain("overflow-x: auto");
     expect(block).toContain("scroll-snap-align: start");
   });
 
-  it("keeps wrapping above the breakpoint, where three panels fit", () => {
+  it("gives each panel a third of the width above the breakpoint", () => {
+    // Was `flex-wrap: wrap`, which fitted three panels and left the rest of the
+    // section empty. Three tracks fill it; the phone rail above is what handles
+    // the width where three do not fit.
     const css = readCss();
     const at = css.indexOf(".journal-act-months {");
     const block = css.slice(at, css.indexOf("}", at));
-    expect(block).toContain("flex-wrap: wrap");
+    expect(block).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
+    expect(block).not.toContain("flex-wrap");
   });
 });
 

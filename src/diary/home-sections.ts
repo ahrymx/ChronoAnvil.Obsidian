@@ -36,7 +36,12 @@
 // page already shows once. All three stay documented directives for a reader
 // building a page of their own — see 3.11 §8.
 
-import { HEADER_PREFIX, TRENDS_HEADING } from "../core/constants";
+import {
+  HEADER_PREFIX,
+  JOURNALS_DIRECTIVE_LINE,
+  TRENDS_HEADING,
+  isJournalsDirective,
+} from "../core/constants";
 import {
   composeFlatNote,
   flatNoteModel,
@@ -354,7 +359,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
   {
     id: "journals",
     label: "Journals",
-    blurb: "Every journal, subject and topic, as one card.",
+    blurb: "One card per journal, with its numbers.",
     icon: "📚",
     // The counterpart of `diary`, and unlocked where that one is locked: a
     // vault can reasonably have no journals at all — Study is a preset that
@@ -362,8 +367,29 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // homepage without this section is a coherent thing to want. The widget
     // already agrees: it renders nothing when no journals are enabled.
     locked: false,
-    render: () => ({ fence: "almanac", lines: ["frame: section", "journals"] }),
-    locate: (text) => probe(text, /^journals\s*$/m),
+    // ── `journals:cards` RATHER THAN `journals` (4.37) ───────────────────
+    //
+    // THE ARGUMENT THAT REFUSED THIS PAGE HAS INVERTED. `journals` draws every
+    // journal, every top-level container and every child of each — three levels
+    // on the homepage — and until 4.36 that was the only place any of it could be
+    // seen. 4.1 §2.2 refused a per-journal dashboard on exactly those grounds.
+    // The dashboard exists now, and enumerating a journal's contents on the
+    // HOMEPAGE is the duplication that release was written to remove: the reader
+    // wants to know which journal to open, not what is inside all of them at
+    // once.
+    //
+    // So the homepage asks the arrangement whose card IS a journal — a name that
+    // opens its dashboard, over four figures about it. `journals` is untouched and
+    // still the right answer on a page about journals; the journals dashboard
+    // composes it for that reason.
+    render: () => ({ fence: "almanac", lines: ["frame: section", "journals:cards"] }),
+    // MATCHES BOTH SPELLINGS, which is the same shape of locator 4.36 wrote for
+    // `level-(index|cards)` and for the same reason: this page is RECONCILED, so
+    // a homepage written before this release must be recognised as already having
+    // this section rather than having a second one added beside it. `\S*` rather
+    // than `(:cards)?` so a reader who wrote a third arrangement by hand is also
+    // found — the section is "the journals block", whichever way it is drawn.
+    locate: (text) => probe(text, JOURNALS_DIRECTIVE_LINE),
   },
   {
     id: "charts",
@@ -496,4 +522,119 @@ export function homeSectionModel(
   vault?: VaultLists
 ): SectionModel {
   return flatNoteModel({ ...specFor(diaryRoot, hostFolder), vault });
+}
+
+// ── The journals block, collapsed to one and spelled for its page ─────────
+//
+// ── WHAT THIS REPLACES, AND THE BUG IT IS THE FIX FOR (4.38.2) ────────────
+//
+// 4.37 shipped `retargetJournalsCards`, which rewrote a bare `journals` line to
+// `journals:cards` inside any `almanac` fence. Its comment claimed *"it only
+// ever matches one page in the vault, which is why it can sit in this loop
+// rather than needing a walk of its own."*
+//
+// **That was false, and it was the whole bug.** The journals DASHBOARD composes
+// a bare `journals` too — it is that page's main section — and the migration
+// walked every shipped note, so it rewrote the dashboard's block as well. The
+// dashboard's `locate` probe is `/^journals\s*$/m`, strict, so on the next
+// repair it could no longer find its own section and `reconcileLayouts` did the
+// correct thing with the wrong input: it ADDED one. Then the migration rewrote
+// that one too. A reader running repair twice got two Journals sections on the
+// dashboard; three times, three — and the window alternated between offering
+// "adds journals" and "draw the Journals section as one card per journal"
+// forever, which is exactly what was reported.
+//
+// So the fix is three things and this function is two of them:
+//
+//   1. THE TARGET IS THE CALLER'S. The homepage wants `journals:cards`; the
+//      dashboard wants `journals`. One function cannot know which page it is
+//      looking at and must not guess — the parameter is that refusal made
+//      explicit. `scaffold.ts` passes the spelling per path.
+//   2. DUPLICATES COLLAPSE. A vault that already ran the broken migration has
+//      two or more journals fences on a page, and no amount of correct
+//      behaviour from here on removes them. The first survives, the rest go.
+//   3. And the dashboard's `locate` is widened (see
+//      `journals-dashboard-sections.ts`) so a page that is momentarily on the
+//      other spelling is recognised rather than duplicated. That is the belt to
+//      this function's braces: with it, the growth stops even before this runs.
+//
+// THE FIRST BLOCK IS THE SURVIVOR, not the last and not the composed position: a
+// reader who moved their journals section up the page moved it deliberately, and
+// a migration that relocates a section is doing more than it was asked.
+//
+// WHY A MIGRATION AND NOT RECONCILIATION. `reconcileLayouts` is additive — it
+// adds a section this release ships and the note lacks — and these sections are
+// already there, twice over. `reconfigure` is not the answer either:
+// `note-sections.ts` emits it only for a section the reader asked to rewrite in
+// the sections editor, which is a deliberate act and not a release upgrade.
+//
+// PURE, TEXT-IN AND TEXT-OR-NULL-OUT, which is the property that makes the repair
+// window's dry run *be* the migration with the write taken off rather than a
+// summary of one — stated for `mergeBannerFences` and inherited here.
+//
+// ONLY INSIDE AN `almanac` FENCE, because "journals" is an ordinary English word
+// and a reader's own prose or heading must not be rewritten. The fence state is
+// tracked rather than assumed from position: a page may hold several fences and
+// the reader may have moved this one.
+//
+// AND `journals-header:study` MUST NOT MATCH. It is a different widget that
+// happens to start with the same seven letters, and it lives on every journal
+// dashboard — so the directive is matched whole, with an optional `:argument`,
+// rather than by prefix.
+export function collapseJournalsBlocks(
+  text: string,
+  keep: "journals" | "journals:cards"
+): string | null {
+  const lines = text.split("\n");
+
+  // Every `almanac` fence that holds a journals directive, as [start, end] line
+  // indices of the fence including its two ``` lines, plus where the directive
+  // sits inside it.
+  const found: { start: number; end: number; at: number }[] = [];
+  let start = -1;
+  let at = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // The opening fence carries the language; the closing one is bare. Matching
+    // ``` at a line's start is how every other reader in this project walks
+    // fences, and the `almanac` check is what keeps a code sample out of scope.
+    if (/^```/.test(line)) {
+      if (start === -1) {
+        if (/^```almanac\s*$/.test(line.trim())) {
+          start = i;
+          at = -1;
+        }
+        continue;
+      }
+      if (at !== -1) found.push({ start, end: i, at });
+      start = -1;
+      continue;
+    }
+    // `journals` or `journals:<argument>` and nothing else on the line. A fence
+    // holding `journals-header:study` is a DIFFERENT widget and must not match,
+    // which is what the `:` alternative pins down rather than a loose prefix.
+    if (start !== -1 && isJournalsDirective(line)) at = i;
+  }
+  if (found.length === 0) return null;
+
+  const out = [...lines];
+  // The survivor is the FIRST, so a reader who moved their journals section up
+  // the page keeps it where they put it.
+  const first = found[0];
+  out[first.at] = out[first.at].replace(/journals(:[a-z-]+)?\s*$/, keep);
+
+  // And every later one goes, with the blank line that separated it — walked
+  // backwards so the earlier indices stay valid.
+  const drop = new Set<number>();
+  for (const block of found.slice(1)) {
+    for (let i = block.start; i <= block.end; i++) drop.add(i);
+    // One trailing blank, if the fence had one. Not a greedy run: two blank
+    // lines in a reader's note are a paragraph break they chose.
+    if (lines[block.end + 1] !== undefined && lines[block.end + 1].trim() === "") {
+      drop.add(block.end + 1);
+    }
+  }
+  const kept = out.filter((_, i) => !drop.has(i));
+  const next = kept.join("\n");
+  return next === text ? null : next;
 }

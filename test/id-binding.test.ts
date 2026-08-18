@@ -341,6 +341,42 @@ describe("pluralising a noun the reader chose", () => {
   it("leaves a noun ending in a vowel + y alone", () => {
     expect(plural("Day")).toBe("Days");
   });
+
+  it("knows the few the rules get wrong (4.39.1)", () => {
+    // "Mediums appear here automatically" on the Media preset's empty state —
+    // "Medium" matches no ending rule and the `+ "s"` fallback is not crude, it is
+    // wrong. Crude was always the deal; wrong was not.
+    //
+    // A SHORT LIST AND NOT A DICTIONARY, which is `singularGuess`' own defence
+    // fifteen lines below `plural` and is made for exactly this: those words are
+    // listed because the rules mangle them outright, these because the rules
+    // produce a word that is not English.
+    expect(plural("Medium")).toBe("Media");
+    expect(plural("Index")).toBe("Indices");
+    expect(plural("Appendix")).toBe("Appendices");
+    expect(plural("Criterion")).toBe("Criteria");
+  });
+
+  it("carries the caller's case rather than a stored capital", () => {
+    // Level nouns are title case and the callers lowercase for prose, so a stored
+    // "Media" would come out wrong in half the call sites — `${plural(noun)
+    // .toLowerCase()} appear here` is the shape the empty states use.
+    expect(plural("medium")).toBe("media");
+    expect(plural("Medium")).toBe("Media");
+    expect(plural("Medium").toLowerCase()).toBe("media");
+  });
+
+  it("does not swallow a word the rules already handle", () => {
+    // The list is consulted FIRST, so an entry added carelessly would silently
+    // override a working rule. These are the wizard's own worked examples and the
+    // ending rules must still own them.
+    expect(plural("Dish")).toBe("Dishes");
+    expect(plural("Entry")).toBe("Entries");
+    // AND THE ENTRY CONDITION HOLDS: a word earns a line only when it is a noun
+    // someone would name a folder LEVEL after. Not every English irregular.
+    expect(plural("Child")).toBe("Childs");
+    expect(plural("Person")).toBe("Persons");
+  });
 });
 
 describe("what a note says it is", () => {

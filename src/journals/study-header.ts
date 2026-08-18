@@ -109,6 +109,32 @@ export function rootCrumbPath(
   return notePath === home ? null : home;
 }
 
+// Which note the trail's JOURNAL crumb points at, or null for no journal crumb.
+//
+// THE SAME RULE, ONE LEVEL IN (4.36 §4). `03 - Journals/Study/Study.md` is the
+// folder note of the folder every Study note lives under, so by this function's
+// sibling's own argument it IS an ancestor — and when it is the open note it is
+// the page you are on, so it goes by the rule rather than becoming a step to
+// nowhere.
+//
+// IT HAS BEEN MISSING FROM EVERY TRAIL IN THE PLUGIN, and the reason was the
+// absent file rather than the rule. `journalAncestors` slices the path BELOW the
+// root (`journal.ts`), so a Study lesson's trail has always read
+// `Journals › Maths › Algebra` — the journals root, then a Subject, with the
+// journal itself skipped. Until 4.36 there was nothing at that path to link to.
+//
+// A SEPARATE FUNCTION RATHER THAN A WIDER `journalAncestors`, because that one
+// answers "which CONTAINER folders is this note inside" — a question the folder
+// rollups, `metaFor` and the level index all ask — and a journal is not a
+// container. Widening it would change four readers to give one a crumb.
+export function journalCrumbPath(
+  journalRoot: string,
+  notePath: string
+): string | null {
+  const home = folderNotePath(journalRoot);
+  return notePath === home ? null : home;
+}
+
 // The crumb trail: Home, then this note's ancestor containers within its
 // journal type.
 //
@@ -171,6 +197,20 @@ function journalCrumbs(
 
   const type = journalTypeOfNote(plugin, file.path);
   if (type) {
+    // THE JOURNAL ITSELF, BETWEEN THE ROOT AND THE CONTAINERS (4.36 §4). See
+    // `journalCrumbPath` for why this has been absent and why it belongs.
+    //
+    // A CRUMB WITH NO FILE IS NOT DRAWN, which is the condition that makes this
+    // safe on a vault that predates 4.36: the page is written by repair, by the
+    // wizard and by adoption, and until one of those has run there is nothing to
+    // point at. `Crumb.file` is already nullable and the renderer already draws
+    // an unlinked crumb — but an unlinked crumb naming a page that does not
+    // exist is a step to nowhere, which is the thing this trail's own rule is
+    // about. So the crumb is withheld rather than drawn dead.
+    const journalPath = journalCrumbPath(type.root, file.path);
+    const journalFile = journalPath ? getFile(app, journalPath) : null;
+    if (journalFile) out.push({ label: type.name, file: journalFile });
+
     const ancestors = journalAncestors(type, file.path);
     // A folder note's last ancestor is itself.
     const trail = isIndex ? ancestors.slice(0, -1) : ancestors;

@@ -31,12 +31,16 @@ import { TrackerDef, getBuiltinTracker } from "../trackers/trackers";
 // to a patch that is about the copy rather than the plumbing.
 import { emptyCallout, emptyLine } from "./empty";
 import { createListRow } from "./list-row";
-import { splitGlyph } from "./section-frame";
+import { sectionFrame, splitGlyph } from "./section-frame";
+import { statStrip } from "./stat-strip";
+import type { StatCard } from "./stat-strip";
 export { emptyCallout, emptyLine };
 import {
   JournalKind,
   JournalType,
+  folderEmoji,
   getJournalType,
+  hueOf,
   journalChildFolders,
   journalTypeOfNote,
   kindsCarrying,
@@ -93,6 +97,130 @@ function internalLink(
     });
   });
   return a;
+}
+
+// A link to a container folder's index note ("Maths/Maths.md").
+//
+// MOVED HERE FROM `journals-section.ts` IN 4.36, unchanged in what it draws.
+// Two widgets now put a container's name on a card — the `journals` card and
+// `level-cards` — and `journals-section.ts` already imports from this file, so
+// this is the only home the two can share without a cycle.
+//
+// Falls back to plain text when the index note is missing, which happens if
+// someone made the folder by hand — better a visible, unclickable name than a
+// dead link.
+//
+// ON `internalLink`, WHICH WAS ALREADY HERE. The original was a second copy of
+// that function's hover-preview wiring with a different `source` string; the
+// only thing genuinely its own is the orphan branch and the class it puts on the
+// anchor. What is left is the difference rather than a restatement.
+export function folderLink(
+  plugin: AlmanacPlugin,
+  parent: HTMLElement,
+  folder: TFolder,
+  sourcePath: string,
+  cls: string,
+  // What the link SAYS, when that is not the folder's own name (4.42).
+  //
+  // A container is named by its folder and there is nothing else it could be
+  // called; a JOURNAL has a display name in settings — "Exercise & Diet" — over
+  // a folder that may be called something else entirely, and the head has always
+  // shown the display name. Without this the journal's title would rename itself
+  // the moment it became a link, which is a worse bug than the one being fixed.
+  //
+  // AN OVERRIDE AND NOT A SECOND FUNCTION: what makes this worth sharing is the
+  // `stopPropagation` below, and a copy written for the journal head is a copy
+  // that will be missing it the first time somebody moves the fold.
+  text?: string
+): void {
+  const label = text ?? folder.name;
+  const file = getFile(plugin.app, `${folder.path}/${folder.name}.md`);
+  if (!file) {
+    parent.createSpan({ cls: `${cls} is-orphan`, text: label });
+    return;
+  }
+  const a = internalLink(parent, plugin.app, file, label, sourcePath);
+  a.addClass(cls);
+  // STOPPED HERE AS WELL AS DEFAULTED. A card's head is a fold target in the
+  // `journals` card, so a click that opened the subject and ALSO folded its
+  // journal would do two things for one press. `internalLink` only prevents the
+  // default.
+  a.addEventListener("click", (evt) => evt.stopPropagation());
+}
+
+// One child inside a container's card: its name, when it was last worked, and
+// what is open beneath it.
+//
+// MOVED HERE FROM `journals-section.ts` IN 4.36, where it was `topicRow` and
+// private. Two widgets draw this row now, and 4.13.3's own sentence is the
+// argument for sharing exactly this much and no more: the `journals` card fuses
+// the head and this list into ONE card and `level-cards` splits them into a
+// pair, so what the two share is not the card — it is *"the thing that actually
+// mattered: the NUMBERS"*.
+//
+// RENAMED FROM `topicRow`, because "topic" is Study's word for its second level
+// and this draws whatever the journal calls that thing — a Project, a Dish, a
+// Title. The old name was the last of the Study literals in this row.
+//
+// A FUNCTION FOR TWO CALLERS, and it was worth naming when it had one: what it
+// is is the SHAPE of a line in a card — a link, a relative date, and a count
+// that arrives late — and the async fill at the end is the part a second copy
+// would get wrong.
+export function childRow(
+  plugin: AlmanacPlugin,
+  ctx: MarkdownPostProcessorContext,
+  body: HTMLElement,
+  sub: TFolder
+): void {
+  const { pages, lastActive } = folderActivity(plugin.app, sub.path);
+  const row = body.createDiv({ cls: "jjs-card-row" });
+  folderLink(plugin, row, sub, ctx.sourcePath, "jjs-row-link");
+  // NAMED, BECAUSE THE GLYPHS ONLY EXPLAIN THEMSELVES ONCE THERE IS DATA
+  // (4.35.2). Populated, these two read "3d ago" and "2 ◻" and need no header.
+  // Empty — which is every row on a journal a reader has just made — they are
+  // two bare em dashes with nothing to say which is which, and a screen reader
+  // heard "dash dash" in either state, since neither cell carried a name.
+  //
+  // A `title` rather than a header row: the body's height is stated in ROWS
+  // (see `.jjs-card-body`), so a header would cost one of the four notes a card
+  // can show. This costs nothing and is also the accessible fix.
+  const when = row.createSpan({
+    cls: "jjs-card-when",
+    text: relativeActivity(lastActive),
+  });
+  when.setAttr("title", "Last activity");
+  when.setAttr(
+    "aria-label",
+    lastActive
+      ? `Last activity: ${relativeActivity(lastActive)}`
+      : "Last activity: none yet"
+  );
+  // An Almanac `- ( )` line lives in a note's BODY and is invisible to the
+  // metadata cache, so this cell cannot be filled synchronously. It ships a
+  // placeholder and fills on resolve — the idiom the banner's four numbers and
+  // the level index's Open column both use.
+  const openCell = row.createSpan({ cls: "jjs-card-open", text: "…" });
+  openCell.setAttr("title", "Open tasks");
+  openCell.setAttr("aria-label", "Open tasks: counting…");
+  void sumBodyTasks(
+    plugin.app,
+    pages.map((p) => p.file)
+  ).then(({ open }) => {
+    // The host may have been torn down, or the LiveWidget rebuilt, while the
+    // reads were in flight — `buildJournalsHeader` guards its own fills the same
+    // way and for the same reason.
+    if (!openCell.isConnected) return;
+    openCell.setText(open ? `${open} ◻` : "—");
+    // The label is rewritten with the text, so it never describes the
+    // placeholder the cell shipped with.
+    openCell.setAttr(
+      "aria-label",
+      open === 0
+        ? "No open tasks"
+        : `${open} open ${open === 1 ? "task" : "tasks"}`
+    );
+    openCell.toggleClass("is-zero", open === 0);
+  });
 }
 
 function hostFile(app: App, ctx: MarkdownPostProcessorContext): TFile | null {
@@ -359,7 +487,15 @@ function childNoun(type: JournalType, folderPath: string): string {
 // The tracker an average over this type's notes should read, and its
 // definition — so a Cooking journal rated on Difficulty averages `difficulty`
 // out of its own maximum rather than `confidence` out of 5.
-function ratingDefOf(
+//
+// EXPORTED IN 4.37 for the journals card, which grew a stat strip and needs the
+// same fourth cell this file's own cards draw. It is the NUMBERS being shared
+// rather than the layout, which is 4.13.3's rule for these two families: *"what
+// is still shared is the thing that actually mattered"*. The two strips are built
+// separately because they differ in the fourth slot — a container card has three
+// cells or four, and a journal card always has four because it can fall back to a
+// count of what is in the journal.
+export function ratingDefOf(
   plugin: AlmanacPlugin,
   type: JournalType
 ): TrackerDef | null {
@@ -385,7 +521,10 @@ function ratingNoun(def: TrackerDef | null, fallback: string): string {
 // "avg confidence" from "🎯 Confidence". The registry label carries an emoji
 // and title case for use as a widget heading; under a number in a stats band
 // it wants neither.
-function ratingWord(def: TrackerDef | null): string {
+// Exported in 4.37 with `ratingDefOf`, and for the same reason — the two are one
+// answer, and a caller that has the definition without the word would have to
+// spell the label-stripping itself.
+export function ratingWord(def: TrackerDef | null): string {
   return ratingNoun(def, "rating").toLowerCase();
 }
 
@@ -790,6 +929,559 @@ export function levelScope(
     return { type, folder: at };
   }
   return `No folder "${relative}" in ${type.name}. Give a path inside ${root}, or the full path from the vault root.`;
+}
+
+// ── level-cards ──────────────────────────────────────────────────────
+//
+// THE SAME QUESTION AS `level-index`, IN CARDS. 4.36 §2.
+//
+// ── WHY A SECOND KEYWORD, WHEN `journals:cards` IS AN ARGUMENT ──────────
+//
+// 4.2 put the card arrangement of `journals` in the argument slot and said why:
+// *"the grammar already has a slot for that: `keyword[:argument]`, and
+// `journals` had never used its argument."* This keyword's slot is not free.
+// `level-index` takes a journal AND a folder, joined by `/`, and both pieces
+// carry meaning. The three ways out each lose to a rule already written down:
+//
+//   • A THIRD PIECE (`level-index:study/Maths/cards`) is unparseable — the
+//     second piece is a folder path and may contain slashes.
+//   • A `#` SUB-GRAMMAR is what `directive-grammar.ts` explicitly declines to
+//     generalise: *"a parser that guessed at it would be inventing a rule
+//     nothing in the vault follows."*
+//   • A FENCE MODIFIER would put an arrangement in the same namespace as
+//     `frame:` and `wide`, which are about the block's chrome rather than about
+//     what the widget draws.
+//
+// ── AND IT SHARES THE RESOLVER RATHER THAN RESEMBLING IT ────────────────
+//
+// `levelScope` is exported for exactly this, and says at its own definition what
+// the alternative costs: *"A duplicate is only narrow while the thing it
+// duplicates is small."* The two widgets take the same four refusal sentences
+// from one function, so a reader who mistypes a journal id is told the same
+// thing whichever arrangement they asked for — pinned by a test that compares
+// the two outputs rather than by care.
+//
+// ── WHAT A PAIR IS, AND WHEN THERE IS ONE ───────────────────────────────
+//
+// One card per container, and a SECOND card beside it listing what is below
+// that container — exactly when `hasLevelBelow` says the journal declares a
+// level there. That is the structure's own answer rather than "does this folder
+// have sub-folders today", which is the misreading 4.16 §1 rewrote
+// `buildLevelIndex` around: a Subject with no Topics yet is a Subject WITH NO
+// TOPICS, not a deepest level.
+//
+// So a two-level journal draws pairs and a flat one draws singles, and neither
+// depends on what anybody has created yet.
+//
+// ── WHAT IS SHARED WITH THE `journals` CARD, AND WHAT IS NOT ────────────
+//
+// The ROW and the NUMBERS, not the card. 4.13.4 decided a flat card is its head
+// and 4.13.3 gave a subject's card up its fold to become one; re-litigating
+// either would be this release changing a page it is not about. What that
+// release said it kept is the right amount to share here too — *"what is still
+// shared is the thing that actually mattered: the NUMBERS"* — so `childRow` and
+// `folderActivity` have one implementation and the two cards do not.
+
+// One card per container under `folder`, paired with what is below each.
+export function buildLevelCards(
+  plugin: AlmanacPlugin,
+  ctx: MarkdownPostProcessorContext,
+  argument: string
+): HTMLElement {
+  const root = createDiv({ cls: "jld-grid" });
+  const scope = levelScope(plugin, ctx, argument);
+  if (typeof scope === "string") {
+    root.createDiv({ cls: "journal-widget-error", text: scope });
+    return root;
+  }
+  const { type, folder } = scope;
+
+  // THE JOURNAL'S OWN HUE, SET ONCE ON THE GRID (4.37). `hueOf` is a stable
+  // function of the journal's id — derived rather than assigned, so two journals
+  // cannot swap colours when a third is added — and it is the only per-journal
+  // identity colour the plugin has. Set here rather than per card because every
+  // card in this grid belongs to one journal; a card reading it from an ancestor
+  // cannot disagree with its siblings.
+  //
+  // ON THE GRID, NOT IN THE STYLESHEET, for the reason `statStrip` states about
+  // `data-cols`: what the script knows is which journal this is, and what the
+  // stylesheet knows is how to paint one. An inline custom property is the one
+  // inline declaration a stylesheet CAN still act on, which is why this is safe
+  // where `style.setProperty("grid-template-columns", …)` was not.
+  root.style.setProperty("--jjc-hue", String(hueOf(type.id)));
+
+  // CARDS ARE FOR CONTAINERS, AND SAYING SO BEATS DRAWING NOTES. At the deepest
+  // level what is below a folder is NOTES — no children to list, no activity to
+  // roll up, nothing a two-card pair could hold — and quietly drawing something
+  // else is the near-miss `journals:card` is refused for: it reads as the
+  // feature not working rather than as the wrong widget having been asked for.
+  //
+  // The refusal names the widget that DOES answer here, which is the half a bare
+  // "not supported" would leave the reader to guess.
+  if (!hasLevelBelow(type, folder.path)) {
+    root.addClass("is-empty");
+    root.appendChild(
+      emptyCallout(
+        "layout-grid",
+        `Nothing to draw as cards here`,
+        `${folder.name} holds notes rather than folders, and a card is a container. Use \`level-index\` to list them.`
+      )
+    );
+    return root;
+  }
+
+  const tops = journalChildFolders(plugin, type, folder);
+  const level = type.levels[containerDepth(type, folder.path) + 1];
+
+  if (tops.length === 0) {
+    // A JOURNAL ON THE DAY IT IS MADE, which is the state this page is most
+    // often first seen in — and the one state where the tile below is the only
+    // thing on the surface, so the callout points AT it rather than sending the
+    // reader to the Journals section for a control that is now under their
+    // cursor. `is-empty` drops the grid to one column so the two stack.
+    root.addClass("is-empty");
+    root.appendChild(
+      emptyCallout(
+        "folder-plus",
+        `No ${plural(level.noun).toLowerCase()} yet`,
+        `Add the first one below. ${plural(level.noun)} appear here automatically.`
+      )
+    );
+    root.appendChild(addTile(plugin, type, folder, level.noun));
+    return root;
+  }
+
+  for (const child of tops) {
+    // THE PAIR IS A WRAPPER, NOT TWO LOOSE CARDS. It spans two tracks of the
+    // grid, so a container and the list belonging to it cannot be split across
+    // a wrap — and at a width where two cards will not fit side by side the
+    // wrapper stacks them and stays one cell. Two siblings in the grid could do
+    // neither.
+    // ── AND ONE HEAD ACROSS IT (4.38) ─────────────────────────────────
+    //
+    // The two panes had a head each, and they were different KINDS of thing
+    // pitched identically: the left said "Linear Algebra" — a container's name,
+    // and a link — and the right said "Topics", a level noun that goes nowhere.
+    // Same size, same weight, same band, one of them clickable. The reader had no
+    // way to tell which from looking, and the hue band had a seam in the middle of
+    // it where the two heads met.
+    //
+    // So the pair has ONE head, and it is the container's: the name, the glyph,
+    // and the ＋ that adds to it. What each pane holds is said inside the pane by
+    // a caps label, which is the treatment for a thing that names a region rather
+    // than being a title — see `paneLabel`. A single head cannot disagree with
+    // itself, and it is what makes the band one strip.
+    const paired = hasLevelBelow(type, child.path);
+    if (!paired) {
+      root.appendChild(containerCard(plugin, ctx, type, child, true));
+      continue;
+    }
+    const pair = root.createDiv({ cls: "jld-pair" });
+    const below = type.levels[containerDepth(type, child.path) + 1];
+    containerHead(plugin, ctx, pair, type, child, below?.noun ?? null);
+    pair.appendChild(containerCard(plugin, ctx, type, child, false));
+    pair.appendChild(childrenCard(plugin, ctx, type, child));
+  }
+
+  // THE CREATE CONTROL CLOSES THE SURFACE IT CREATES INTO. The grid lists
+  // containers at one level, so the thing at its end makes one of those — and
+  // it is a CARD-SHAPED cell rather than a button above or beside the grid, for
+  // `journal-tracker-add`'s reason said one widget over: an add that sits in
+  // the grid inherits the grid's rhythm instead of orphaning itself on a row of
+  // its own, and "the empty slot at the end" is a shape readers already parse
+  // without a label telling them it is a control.
+  //
+  // ── AND IT IS THE SIZE OF THE SLOT IT OPENS (4.37) ──────────────────
+  //
+  // A tile that always took one track left half a row of nothing whenever the
+  // grid drew pairs, because a pair spends both tracks and the tile wrapped
+  // alone onto the next row. The fix is not a width; it is the observation that
+  // **the tile is an empty slot for the thing it creates**, so it should be that
+  // thing's footprint — two tracks where this grid draws pairs, one where it
+  // draws singles.
+  //
+  // DECIDED FROM THE JOURNAL'S SHAPE, NOT FROM A MEASUREMENT. Which of the two
+  // it is answers to `hasLevelBelow` at the child level — the same predicate the
+  // pairing itself uses — so the tile cannot disagree with the cards beside it,
+  // and no query is needed. In a two-track grid `span 2` IS the full row and one
+  // track is half of it, which is where the two arrangements come from; at four
+  // tracks a pair-sized tile still lands beside a pair rather than stranding a
+  // gap. The browser clamps a span to the tracks that exist, which is what makes
+  // it safe in a one-column grid — `.jld-pair` relies on the same thing.
+  if (tops.some((child) => hasLevelBelow(type, child.path))) {
+    root.addClass("is-paired");
+  }
+  root.appendChild(addTile(plugin, type, folder, level.noun));
+  return root;
+}
+
+// ── The create controls ────────────────────────────────────────────────
+//
+// ONE PER LIST SURFACE, AND NONE PER CARD. Until 4.36.3 every container card
+// carried an action row — an *Open* button beside a bare ＋ opening a menu —
+// and both halves were answering questions the card had already answered. The
+// card's TITLE is the link that opens it, which is 4.13.3's rule and the reason
+// `titleRender` exists; and a ＋ on a card is ambiguous about what it adds,
+// which is why it had to be a menu at all.
+//
+// Putting the control in the SURFACE removes the ambiguity rather than
+// explaining it: the grid lists subjects and its tile makes a subject, a
+// children card lists topics and its row makes a topic. Nothing needs a menu,
+// because a surface that lists one kind of thing can only be adding that kind
+// of thing.
+//
+// A card's body is not a list surface, so a card in a FLAT journal gets no
+// control here — notes are made from the container's own page, from the
+// palette, or from the Journals section, all of which name the note type they
+// are making. That is the affordance the old ＋ menu's second branch was, and
+// it was the branch nobody could have guessed was there.
+//
+// ── AND THE LIST'S CONTROL IS IN ITS HEAD, NOT ITS BODY (4.37) ──────────
+//
+// 4.36.3 put the children card's control at the end of its list, as a dashed
+// row. Two things were wrong with that once it was rendered. A row inside a
+// four-row scrolling body SPENDS ONE OF THE FOUR — a card showing two topics
+// showed two topics and a control — and the body is a list of TOPICS, so a row
+// that is not a topic is the one row in it that does not mean what its
+// neighbours mean.
+//
+// The head is where a section's own controls already live: `sectionFrame`
+// returns an `actions` slot for exactly this, and at level 2 that slot sits
+// inline on the title line pushed right (`30-header-bars.css:147`). So the
+// control costs no geometry, no row, and nothing new to learn — it is where the
+// chart edit button, the scope cycle and the journals section's own `+ Subject`
+// already are.
+//
+// THE TILE STAYS A TILE, because the grid has no head of its own to put a
+// control in — its head belongs to the Contents SECTION, which is a different
+// scope: it covers the whole widget rather than one list. An empty slot at the
+// end of a grid of cards is the affordance that reads correctly there, and it
+// is `journal-tracker-add`'s.
+
+// Create one container inside `parent`. Depth 0 is the journal's top level and
+// has its own entry point, because `newContainer` REFUSES `depth <= 0` — it
+// exists to nest under a parent and it says so.
+function addContainer(
+  plugin: AlmanacPlugin,
+  type: JournalType,
+  parent: TFolder
+): void {
+  const depth = containerDepth(type, parent.path) + 1;
+  if (depth <= 0) void plugin.journals.newTopLevel(type);
+  else void plugin.journals.newContainer(type, depth, parent.name);
+}
+
+// The click, shared by both shapes — the one thing they genuinely have in
+// common, and the reason they are not two functions with two handlers.
+function onAdd(
+  btn: HTMLElement,
+  plugin: AlmanacPlugin,
+  type: JournalType,
+  parent: TFolder
+): void {
+  btn.addEventListener("click", (evt) => {
+    evt.preventDefault();
+    // The children card's rows open notes on click, and the grid's cards sit
+    // inside a section whose head folds it. Neither should fire because
+    // something was created.
+    evt.stopPropagation();
+    addContainer(plugin, type, parent);
+  });
+}
+
+// The tile: an empty slot at the end of the grid, in `journal-tracker-add`'s
+// vocabulary — dashed edge, no ground, muted ink lifting to the accent.
+// EXPORTED IN 4.38 for the journals section's empty states, which replaced two
+// sentences that pointed at controls with the control itself. It is exported rather
+// than reimplemented there for the reason `childRow` and `folderActivity` already
+// are: an empty slot that opens a create dialog is one object, and a second copy
+// would be a second answer to "what does an empty surface look like" the first time
+// either was tuned.
+export function addTile(
+  plugin: AlmanacPlugin,
+  type: JournalType,
+  parent: TFolder,
+  noun: string
+): HTMLElement {
+  const label = `New ${noun.toLowerCase()}`;
+    // ── NO `title`, BECAUSE THE BUTTON ALREADY SAYS IT (4.42) ───────────
+    //
+    // MEASURED: on `20260818_20h59m08s_grim.png` a tooltip reading "New project"
+    // is open under a tile whose visible label reads "New project". A `title`
+    // that repeats the words on the control tells a pointer user nothing and
+    // makes a screen reader announce the name twice.
+    //
+    // `aria-label` STAYS. It is the same string, which is redundant rather than
+    // wrong, and it is what keeps the accessible name stable if the visible label
+    // is ever shortened.
+    //
+    // AND `addHeadButton` KEEPS ITS `title`, forty lines down, because there the
+    // two strings DIFFER — the button shows "Topic" and the tooltip says "New
+    // topic" — and that button collapses to icon-only under 460px, where the
+    // tooltip is the only text there is.
+  const btn = createEl("button", {
+    cls: "jld-add jld-add-tile",
+    attr: { type: "button", "aria-label": label },
+  });
+  setIcon(btn.createSpan({ cls: "jld-add-icon" }), "plus");
+  btn.createSpan({ cls: "jld-add-label", text: label });
+  onAdd(btn, plugin, type, parent);
+  return btn;
+}
+
+// The same tile, wearing a card (4.38.4).
+//
+// WHY A WRAPPER AND NOT A STYLED BUTTON. A naked dashed tile beside a run of
+// bordered cards reads as a control that wandered into the grid; the maintainer's
+// note was that it should look like the thing it makes. So it takes `.jjs-card`'s
+// chrome — the same ground, border and radius its neighbours have — with the
+// dashed affordance inside, which is exactly what an EMPTY subject card already
+// looks like one column over (`buildGroup` puts the same tile in its body).
+//
+// AND THE WRAPPER IS WHAT MAKES IT MATCH IN HEIGHT, which the tile alone could
+// not do. `.jjs-grid` is `align-items: stretch`, but a `<button>` does not
+// stretch: Obsidian gives form controls a definite height, and `align-self:
+// stretch` is ignored on any item whose height is not `auto`, so the tile sat at
+// its 92px minimum beside 160px cards. A `div` has no such height and stretches,
+// and the tile then fills it through the flex chain below.
+//
+// NO HEAD, because there is no name yet. That is the one way it differs from its
+// neighbours, and it is the honest difference: a head would have nothing to say.
+export function addCardTile(
+  plugin: AlmanacPlugin,
+  type: JournalType,
+  parent: TFolder,
+  noun: string
+): HTMLElement {
+  const card = createDiv({ cls: "jjs-card jjs-card-add" });
+  const body = card.createDiv({ cls: "jjs-card-body" });
+  body.appendChild(addTile(plugin, type, parent, noun));
+  return card;
+}
+
+// The head control: a ＋ that says what it adds when you point at it.
+//
+// A GHOST BUTTON, NOT A DASHED ONE. The dashed treatment means "an empty slot
+// where a thing would go", which is true of a cell in a grid of cards and false
+// of a control on a bar — there is no slot in a head. On a bar the house form is
+// `journal-btn-ghost`, which is what every other icon control in the plugin
+// wears (`85-tracker-controls.css:475`: *"shared by every directional/utility
+// icon button"*).
+//
+// THE LABEL IS DRAWN AND HIDDEN RATHER THAN OMITTED, which is the whole point of
+// this shape. A bare ＋ in a card head has the ambiguity the old ＋ menu had —
+// add WHAT — and a permanently labelled button costs the title its width on a
+// 330px card. Rendering the label and revealing it on hover keeps the width at
+// rest and answers the question on demand.
+//
+// AND THE TOOLTIP IS NOT THE FALLBACK, IT IS THE ANSWER FOR EVERYONE ELSE.
+// `aria-label` and `title` carry the same sentence, so a screen reader, a
+// keyboard and a touch device — none of which have a hover — all get the noun
+// without depending on the reveal. That is the condition `50-entry-header.css`
+// attaches to its own icon-only collapse (*"safe only BECAUSE `buildButton` sets
+// `aria-label` and `title` independently of the label span"*), met here for the
+// same reason: this control also hides a label it has drawn.
+function addHeadButton(
+  plugin: AlmanacPlugin,
+  type: JournalType,
+  parent: TFolder,
+  noun: string
+): HTMLElement {
+  const label = `New ${noun.toLowerCase()}`;
+  const btn = createEl("button", {
+    cls: "journal-btn-ghost jld-head-add",
+    attr: { type: "button", "aria-label": label, title: label },
+  });
+  setIcon(btn.createSpan({ cls: "journal-btn-icon" }), "plus");
+  btn.createSpan({ cls: "journal-btn-label", text: noun });
+  onAdd(btn, plugin, type, parent);
+  return btn;
+}
+
+// The container's head, drawn on whichever box IS the container — the pair when
+// there are two panes, the card itself when there is one. One function so the two
+// arrangements cannot drift into two different heads for one object.
+//
+// `noun` is the level BELOW, and it is optional because it is only the ＋'s: a
+// container at the deepest container level has nothing to create, so it gets a
+// head with a name and no control rather than a disabled one.
+function containerHead(
+  plugin: AlmanacPlugin,
+  ctx: MarkdownPostProcessorContext,
+  host: HTMLElement,
+  type: JournalType,
+  folder: TFolder,
+  below: string | null
+): void {
+  const level = type.levels[containerDepth(type, folder.path)];
+  // THE HEAD IS `sectionFrame`, WHICH IS WHY THIS IS CHEAP — 4.13.3's argument,
+  // reused rather than restated: the slim recessed band with a glyph in a fixed
+  // slot and a name in small caps IS a level-2 section bar, so nothing about the
+  // title, its truncation, its glyph slot or its link is decided here.
+  const frame = sectionFrame(host, {
+    title: folder.name,
+    glyph: folderEmoji(plugin, folder.name, level?.fallbackEmoji ?? "📁"),
+    level: 2,
+    owns: "children",
+    titleRender: (slot) =>
+      folderLink(plugin, slot, folder, ctx.sourcePath, "jjs-group-name"),
+  });
+  if (below) {
+    frame.actions.appendChild(addHeadButton(plugin, type, folder, below));
+  }
+}
+
+// A pane's own caption. `paneLabel` and not a second head: what these say —
+// "SUBJECT", "TOPICS" — names the REGION rather than titling a document, and the
+// plugin's caps treatment is exactly that distinction said in type. Both panes
+// take one, which is also what gives them a shared first line to start on; a
+// label on the list alone would put the two halves a line out of step.
+function paneLabel(host: HTMLElement, text: string): void {
+  host.createDiv({ cls: "jld-pane-label", text: text.toUpperCase() });
+}
+
+// The left card: one container, summarised. `head` is false inside a pair, where
+// the head belongs to the pair and saying it twice is the thing 4.38 removed.
+function containerCard(
+  plugin: AlmanacPlugin,
+  ctx: MarkdownPostProcessorContext,
+  type: JournalType,
+  folder: TFolder,
+  head: boolean
+): HTMLElement {
+  const card = createDiv({ cls: "jld-card jld-container" });
+  const level = type.levels[containerDepth(type, folder.path)];
+
+  if (head) {
+    const below = type.levels[containerDepth(type, folder.path) + 1];
+    containerHead(plugin, ctx, card, type, folder, below?.noun ?? null);
+  }
+
+  // NAMED FOR WHAT IT IS, which is information the page stopped carrying when the
+  // head became the container's name alone: "Linear Algebra" does not say that a
+  // Linear Algebra is a SUBJECT. Only inside a pair, because a single card's head
+  // is right there and would then say the level noun twice.
+  //
+  // ON THE CARD, LEVEL WITH THE LIST'S LABEL, which is the half of this that is
+  // about the pair rather than about this pane: the two labels are siblings of
+  // their bodies in both panes, so they sit on one line and the two halves start
+  // together. Finding 15 — *"the panes of a pair keep different vertical
+  // rhythms"* — is this, and a label in one pane only would have deepened it.
+  if (!head && level) paneLabel(card, level.noun);
+  const body = card.createDiv({ cls: "jld-card-body" });
+
+  // ── The numbers ────────────────────────────────────────────────────────
+  //
+  // `statStrip` LITERALLY, NOT A BAND THAT LOOKS LIKE ONE — 4.35's outcome note
+  // is the argument in full. The shared strip collapses on an `@container` query
+  // rather than an `@media` one, which is the difference between a card that
+  // reads correctly in a 400px pane and one that does not, and rediscovering
+  // that correctly on the first try is what `RESUME.md` §2.5 is about.
+  const { pages, lastActive } = folderActivity(plugin.app, folder.path);
+  const ratingDef = ratingDefOf(plugin, type);
+  const ratingId = ratingDef?.id ?? confidenceProperty(plugin);
+  const conf = ratingDef
+    ? confidenceStats(
+        pagesUnder(plugin.app, folder.path),
+        ratingId,
+        confidenceKinds(plugin, folder.path, ratingId)
+      )
+    : null;
+
+  const cards: StatCard[] = [
+    { label: "notes", value: String(pages.length) },
+    { label: "last", value: relativeActivity(lastActive) || "—" },
+    { label: "open", value: "…" },
+  ];
+  // A FOURTH CELL ONLY WHERE THE JOURNAL RATES SOMETHING. Projects declares no
+  // rating at all, and an "avg rating —" cell on every card would be a column of
+  // em dashes explaining nothing. `data-cols` is what the collapse rules read,
+  // and `statStrip` sets it from the count it is handed.
+  if (ratingDef) {
+    cards.push({
+      // An em dash rather than 0.0 when nothing is graded: an average of no
+      // readings is absent, not zero — `buildTopicStats`' own rule, and the
+      // reason it is stated there is that 0.0/5 reads as "you understand none of
+      // this" rather than "nothing logged yet".
+      //
+      // THE BARE NOUN, WITHOUT "avg" (4.38). Measured on the render: this was
+      // the only label on either card grid long enough to wrap in a 240px track,
+      // and a wrapped label made the card 15px taller than the one beside it.
+      // `align-items: stretch` stops that from raggedding the row, but the label
+      // is also the wrong length for what it says: the three cells beside it are
+      // "notes", "last", "open" — one word each, and none of them says how it is
+      // computed either. `buildTopicStats` keeps its "avg confidence" because it
+      // is a wide hero strip that also prints the /5 denominator; a 54px cell in
+      // a card is not that.
+      label: ratingWord(ratingDef),
+      value: conf ? conf.avg : "—",
+    });
+  }
+  const { cells } = statStrip(body, cards);
+
+  // Open tasks are `- ( )` lines in note BODIES, invisible to the metadata
+  // cache, so this cell ships a placeholder and fills on resolve — the same
+  // idiom `childRow` and `buildTopicStats` use.
+  const openCell = cells[2].value;
+  void sumBodyTasks(
+    plugin.app,
+    pages.map((p) => p.file)
+  ).then(({ open }) => {
+    if (!openCell.isConnected) return;
+    openCell.setText(open ? String(open) : "—");
+  });
+
+  return card;
+}
+
+// The right card: what is below this container, one row each.
+function childrenCard(
+  plugin: AlmanacPlugin,
+  ctx: MarkdownPostProcessorContext,
+  type: JournalType,
+  folder: TFolder
+): HTMLElement {
+  const card = createDiv({ cls: "jld-card jld-children" });
+  const below = type.levels[containerDepth(type, folder.path) + 1];
+  const subs = journalChildFolders(plugin, type, folder);
+
+  // NO HEAD OF ITS OWN (4.38). It had one — "🗂️ Topics" in a level-2 bar, with
+  // the ＋ on it as of 4.37 — and the trouble was never what it said but that it
+  // was a TITLE saying it. A pane's head, beside a pane head carrying a link to a
+  // place, made two things that look the same and behave differently, and put a
+  // seam in the middle of the hue band.
+  //
+  // What it says survives as the pane's caps label, and the ＋ moved up to the
+  // pair's one head — which is the same folder and the same action, because the
+  // ＋ was always adding a child of the CONTAINER, not of this list.
+  // ABOVE THE BODY AND NOT IN IT, because the body is a stated four rows that
+  // SCROLLS — a label inside it would ride away on the first scroll and would
+  // spend one of the four rows the card is built to show.
+  paneLabel(card, plural(below.noun));
+  const body = card.createDiv({ cls: "jjs-card-body" });
+
+  // EVERY CHILD IS DRAWN AND THE BODY SCROLLS, which is 4.13.4's answer and its
+  // number: a card is its bar plus four rows whatever is in it, so the grid is
+  // rows rather than a ragged edge and a long list is a scroll away rather than
+  // a page away. `.jjs-card-body` is where the four is stated, and this card
+  // takes that class rather than restating it.
+  if (subs.length === 0) {
+    // STATES THE FACT AND NOTHING ELSE. This sentence has now outlived two
+    // create controls — it once ended *"add one with the ＋ beside this card"*,
+    // then *"add one below"* was avoided on the same grounds — which is the
+    // argument for it naming no control at all: prose that quotes a button
+    // breaks silently every time the button moves, and it has moved twice.
+    body.createDiv({
+      cls: "jjs-empty-row",
+      text: `No ${plural(below.noun).toLowerCase()} yet.`,
+    });
+  }
+  // AND NOTHING FOLLOWS THEM. 4.36.3 closed this body with a dashed row, and it
+  // cost one of the four rows a card gets — a card showing two topics showed two
+  // topics and a control — on a body whose every other row is a topic. The
+  // control is in the head now; see `addHeadButton`.
+  for (const sub of subs) childRow(plugin, ctx, body, sub);
+  return card;
 }
 
 // ── topic-stats ──────────────────────────────────────────────────────

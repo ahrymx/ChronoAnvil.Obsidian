@@ -6,6 +6,10 @@
 // LICENSING.md.
 
 import { describe, it, expect } from "vitest";
+import {
+  JOURNALS_DASHBOARD_SECTIONS,
+  composeJournalsDashboardNote,
+} from "../src/journals/journals-dashboard-sections";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -13,6 +17,7 @@ import {
   composeHomeNote,
   homeSectionModel,
   HOME_CSS_CLASS,
+  collapseJournalsBlocks,
 } from "../src/diary/home-sections";
 import { DEFAULT_PATHS, HEADER_PREFIX, TRENDS_HEADING } from "../src/core/constants";
 import { planLayout, segment } from "../src/core/layout";
@@ -410,7 +415,7 @@ const TOP_ROW = "```almanac\nrow\ndiary:3\ncell\nlauncher\ntasks-table\non-this-
 // is exactly why the refusal it triggers still needs a test.
 const MULTILINE_ROW = (): string =>
   home().replace(
-    "```almanac\nframe: section\njournals\n```",
+    "```almanac\nframe: section\njournals:cards\n```",
     `\`\`\`almanac\nrow\njournals\nheader:🏷️ Tags\ntag-index:${ROOT}\n\`\`\``
   );
 
@@ -435,7 +440,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     expect(out).toContain("```almanac\nrow\ndiary:3\ncell\ntasks-table\n```");
     expect(out).not.toContain("on-this-day");
     // The rest of the page is untouched.
-    expect(out).toContain("```almanac\nframe: section\njournals\n```");
+    expect(out).toContain("```almanac\nframe: section\njournals:cards\n```");
   });
 
   it("says it is removing it, and then removes it", () => {
@@ -527,7 +532,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
         `\`\`\`almanac\n${WIDE_KEYWORD}\n${PAGE_TITLE_LINE}\n\`\`\``,
         `\`\`\`almanac\n${WIDE_KEYWORD}\n${PAGE_TITLE_LINE}\njournals\n\`\`\``
       )
-      .replace("\n```almanac\nframe: section\njournals\n```\n", "");
+      .replace("\n```almanac\nframe: section\njournals:cards\n```\n", "");
     const ops = model.plan(shared, [
       "banner",
       "diary",
@@ -775,8 +780,8 @@ describe("the home model", () => {
     // A reader removing one widget from a group and watching a DIFFERENT one
     // change shape is the failure, and it is invisible until it happens.
     const lines = home().split("\n");
-    const at = lines.indexOf("journals");
-    expect(at, "no bare journals directive on the homepage").toBeGreaterThan(-1);
+    const at = lines.indexOf("journals:cards");
+    expect(at, "no journals:cards directive on the homepage").toBeGreaterThan(-1);
     const sized = [...lines.slice(0, at), "height: 240", ...lines.slice(at)];
     const next = model.apply(
       sized.join("\n"),
@@ -1019,5 +1024,231 @@ describe("on this day ships again, as a cell (4.2 §2)", () => {
     for (const line of reads.slice(1)) {
       expect(body, `optIn is read outside the composer: ${line.trim()}`).toContain(line);
     }
+  });
+});
+
+// ── 4.37: the journals block becomes one card per journal ─────────────────
+
+describe("the journals block, and the migration that upgrades it", () => {
+  it("composes the card arrangement", () => {
+    // THE ARGUMENT THAT REFUSED THIS HAS INVERTED. `journals` draws every journal,
+    // every top-level container and every child of each — three levels on the
+    // homepage — and until 4.36 that was the only place any of it could be seen.
+    // 4.1 §2.2 refused a per-journal dashboard on those grounds. The dashboard
+    // exists now, so enumerating a journal's contents HERE is the duplication that
+    // release was written to remove.
+    expect(home()).toContain("```almanac\nframe: section\njournals:cards\n```");
+    expect(home()).not.toMatch(/^journals$/m);
+  });
+
+  it("still composes the bare form on the page that is about journals", () => {
+    // `journals` is untouched and is still right where the reader has come to see
+    // what is inside their journals. This is a change of arrangement on ONE page,
+    // not a retirement.
+    expect(readSrc("journals-dashboard-sections")).toContain('"journals"');
+  });
+
+  it("recognises both spellings, so repair adds no second block", () => {
+    // THE LOCATOR IS THE HALF THAT PREVENTS A DUPLICATE, and it is the same shape
+    // 4.36 wrote for `level-(index|cards)` for the same reason: this page is
+    // RECONCILED, so a homepage written before this release must be seen as
+    // already having this section rather than having a second one added beside it.
+    const journals = homeSections(ROOT).find((s) => s.id === "journals");
+    expect(journals, "no journals section").toBeTruthy();
+    const locate = journals!.locate;
+    const fence = (line: string): string => `\`\`\`almanac\nframe: section\n${line}\n\`\`\``;
+    expect(locate(fence("journals")), "pre-4.37 spelling not found").toBeGreaterThan(-1);
+    expect(locate(fence("journals:cards")), "current spelling not found").toBeGreaterThan(-1);
+    // And a page with no journals block at all is still a miss, or repair would
+    // never add the section to a homepage that genuinely lacks it.
+    expect(locate("```almanac\ndiary:3\n```")).toBe(-1);
+  });
+
+  it("upgrades an existing homepage exactly, and only once", () => {
+    // WHY A MIGRATION AT ALL. Repair is additive and the section is already
+    // there, so `reconcileLayouts` correctly does nothing — verified by hand
+    // against `repairNote`, which returned zero ops. Doing nothing leaves every
+    // existing homepage on the three-level list forever, which is why this is the
+    // fourth one-off migration rather than a reconciliation.
+    const fresh = composeHomeNote(ROOT);
+    const old = fresh.replace("journals:cards", "journals");
+    expect(old).not.toBe(fresh);
+    // EXACTLY the composed page: a migration that landed somewhere between the two
+    // would leave a page neither version writes.
+    expect(collapseJournalsBlocks(old, "journals:cards")).toBe(fresh);
+    // IDEMPOTENT, which is what lets a reader run repair twice — the property
+    // `ROADMAP-4.19` checks by running its migration twice against a vault.
+    expect(collapseJournalsBlocks(fresh, "journals:cards")).toBeNull();
+  });
+
+  it("touches nothing outside an almanac fence, or that the reader chose", () => {
+    // "journals" IS AN ORDINARY ENGLISH WORD. A reader's heading or prose must not
+    // be rewritten, so the fence state is tracked rather than inferred from
+    // position — a homepage may hold several fences and the reader may have moved
+    // this one.
+    const cards = (t: string): string | null => collapseJournalsBlocks(t, "journals:cards");
+    expect(cards("journals\n")).toBeNull();
+    expect(cards("# journals\n\njournals\n")).toBeNull();
+    expect(cards("```js\njournals\n```")).toBeNull();
+    // ALREADY RIGHT IS A NO-OP — the property that lets a reader run repair twice.
+    expect(cards("```almanac\njournals:cards\n```")).toBeNull();
+    // AND `journals-header:study` IS A DIFFERENT WIDGET that happens to share
+    // seven letters, and it sits on every journal dashboard. Matching by prefix
+    // would have rewritten it into oblivion; the directive is matched whole.
+    expect(cards("```almanac\njournals-header:study\n```")).toBeNull();
+    expect(collapseJournalsBlocks("```almanac\njournals-header:study\n```", "journals")).toBeNull();
+    // And it does fire on the real shape, so the negatives above are not vacuous.
+    expect(cards("```almanac\njournals\n```")).toBe("```almanac\njournals:cards\n```");
+    // BOTH DIRECTIONS, which is new in 4.38.2 and is the half the dashboard needs:
+    // that page wants the bare form back.
+    expect(collapseJournalsBlocks("```almanac\njournals:cards\n```", "journals")).toBe(
+      "```almanac\njournals\n```"
+    );
+  });
+
+  // ── The duplication loop, closed (4.38.2) ──────────────────────────────
+  //
+  // A reader ran repair and the window alternated: "adds journals" one time,
+  // "draw the Journals section as one card per journal" the next, and the
+  // journals dashboard grew a second identical Journals section on every cycle.
+  //
+  // 4.37's migration claimed it *"only ever matches one page in the vault"*. The
+  // journals dashboard composes a bare `journals` as its MAIN section, so the
+  // migration rewrote that too, to a spelling that page's strict `locate` could
+  // not find — and `reconcileLayouts` then did the correct thing with the wrong
+  // input and added one.
+  describe("the journals block cannot multiply", () => {
+    const home = (): string => composeHomeNote(ROOT);
+    const dash = (): string => composeJournalsDashboardNote();
+
+    it("leaves the journals dashboard's own spelling alone", () => {
+      // THE PAGE DECIDES, AND THE DECISION IS THE CALLER'S. The dashboard's
+      // section is not a summary of somewhere else — it IS the page — so it keeps
+      // the full index rather than a grid of cards.
+      expect(dash()).toContain("\njournals\n");
+      expect(collapseJournalsBlocks(dash(), "journals")).toBeNull();
+      // And `scaffold` picks the argument from the path rather than guessing.
+      const scaffold = readSrc("scaffold");
+      expect(scaffold).toContain("const journalsArgumentFor = (");
+      expect(scaffold).toContain(
+        'normalizePath(dest) === normalizePath(paths.home) ? "journals:cards" : "journals"'
+      );
+    });
+
+    it("collapses the duplicates an earlier repair already wrote", () => {
+      // A vault that ran the broken migration has two or more journals fences on a
+      // page, and no amount of correct behaviour from here on removes them.
+      const twice = dash().replace(
+        "```almanac\nframe: section\njournals\n```",
+        "```almanac\nframe: section\njournals:cards\n```\n\n```almanac\nframe: section\njournals:cards\n```"
+      );
+      expect(twice.match(/^journals(:cards)?$/gm)).toHaveLength(2);
+      const fixed = collapseJournalsBlocks(twice, "journals");
+      expect(fixed, "the duplicate was not collapsed").not.toBeNull();
+      // EXACTLY the composed page again — one block, the right spelling, and the
+      // blank line that separated the duplicate gone with it.
+      expect(fixed).toBe(dash());
+    });
+
+    it("keeps the FIRST block, so a moved section stays where it was put", () => {
+      // A reader who moved their journals section up the page moved it
+      // deliberately, and a migration that relocates a section is doing more than
+      // it was asked.
+      const moved =
+        "```almanac\njournals:cards\n```\n\n# Notes\n\n```almanac\njournals\n```\n";
+      expect(collapseJournalsBlocks(moved, "journals")).toBe(
+        "```almanac\njournals\n```\n\n# Notes\n"
+      );
+    });
+
+    it("is a fixed point after one pass, on both pages", () => {
+      // THE PROPERTY THE BUG VIOLATED, stated directly: repair run twice must not
+      // differ from repair run once. Both pages, both spellings, and the second
+      // call must return null rather than merely the same text.
+      for (const [text, keep] of [
+        [home(), "journals:cards"],
+        [dash(), "journals"],
+      ] as const) {
+        const once = collapseJournalsBlocks(text, keep) ?? text;
+        expect(collapseJournalsBlocks(once, keep), keep).toBeNull();
+      }
+    });
+
+    it("asks the question in exactly one place (4.38.3)", () => {
+      // THE ROOT CAUSE OF THREE PATCHES IN A ROW. "Does this note already carry
+      // the Journals section?" was answered in FOUR places with four spellings,
+      // and 4.37's `journals:cards` broke three of them:
+      //
+      //   • `ensureJournalsBlock` compared the line exactly → appended a second
+      //     block when a journal was created, on a CLEAN vault (4.38.3).
+      //   • the dashboard's `locate` did the same → repair grew a section every
+      //     run (4.38.2).
+      //   • the homepage's `locate` was widened by hand in 4.37 to `journals\S*`,
+      //     a fourth spelling that happened to be right — and which would also
+      //     have matched `journals-header:study`.
+      //
+      // Each patch corrected one caller and left the others for a reader to find.
+      // This asserts the shape that stops that: one definition, and no caller
+      // carrying its own copy of the pattern.
+      const constants = readSrc("constants");
+      expect(constants).toContain("const JOURNALS_DIRECTIVE_BODY =");
+      expect(constants).toContain("export const isJournalsDirective");
+      expect(constants).toContain("export const JOURNALS_DIRECTIVE_LINE");
+      for (const [mod, use] of [
+        ["journal", "isJournalsDirective(l)"],
+        ["home-sections", "isJournalsDirective(line)"],
+        ["home-sections", "probe(text, JOURNALS_DIRECTIVE_LINE)"],
+        ["journals-dashboard-sections", "probe(text, JOURNALS_DIRECTIVE_LINE)"],
+      ] as const) {
+        expect(readSrc(mod), `${mod} stopped sharing the predicate`).toContain(use);
+      }
+      // AND NOBODY KEEPS A PRIVATE COPY. A second literal is how the four came to
+      // disagree in the first place, so the pattern must appear in one file only.
+      //
+      // COMMENTS STRIPPED FIRST, and the first version of this did not and FAILED:
+      // `home-sections.ts` explains the bug by QUOTING the probe it replaced. That
+      // is 4.37's recorded trap — an absence assertion on prose is defeated by the
+      // prose explaining the absence — and a file that documents a reversal will
+      // always name what it reversed.
+      const code = (mod: string): string =>
+        readSrc(mod)
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/^\s*\/\/.*$/gm, "");
+      for (const mod of ["journal", "home-sections", "journals-dashboard-sections"]) {
+        expect(code(mod), mod).not.toMatch(/\^journals[(\\]/);
+      }
+    });
+
+    it("lets the dashboard find a block on either spelling", () => {
+      // THE BELT TO THE FIX'S BRACES. With this probe the growth stops even before
+      // the migration runs: a page momentarily on the other spelling is recognised
+      // as having its journals section rather than judged to be missing one.
+      const journals = JOURNALS_DASHBOARD_SECTIONS.find((sec) => sec.id === "journals");
+      expect(journals, "no journals section on the dashboard").toBeTruthy();
+      const at = journals!.locate;
+      const fence = (line: string): string =>
+        `\`\`\`almanac\nframe: section\n${line}\n\`\`\``;
+      expect(at(fence("journals")), "composed spelling not found").toBeGreaterThan(-1);
+      expect(at(fence("journals:cards")), "migrated spelling not found").toBeGreaterThan(-1);
+      // A page that genuinely lacks the section is still a miss, or repair could
+      // never add it to a dashboard that needs one.
+      expect(at("```almanac\ndiary:3\n```")).toBe(-1);
+      // AND A DIFFERENT WIDGET IS NOT IT.
+      expect(at(fence("journals-header:study"))).toBe(-1);
+    });
+  });
+
+  it("is offered in the repair window with the other four", () => {
+    // OPT-IN, which matters more than usual: the `migrations` group is ticked
+    // separately, so a reader who wants their three-level list keeps it by not
+    // ticking it. Both halves have to be wired or the window offers a change it
+    // will not make, or makes one it did not offer.
+    const scaffold = readSrc("scaffold");
+    expect(scaffold).toContain("collapseJournalsBlocks(welded, journalsArgumentFor(dash, p))");
+    expect(scaffold).toContain("await this.cardJournalsBlock(dash)");
+    expect(scaffold).toContain("draw the Journals section as one card per journal");
+    // The dry run diffs against the LAST link in the chain, or the preview would
+    // be computed against a text the migration had not been applied to.
+    expect(scaffold).toContain("diff: diffText(original, carded)");
   });
 });

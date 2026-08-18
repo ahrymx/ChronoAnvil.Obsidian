@@ -550,14 +550,42 @@
 
    Above the breakpoint nothing changes — three panels fit, and a rail that
    never scrolls is just a flex row with extra rules. */
+/* ── AND THE THREE MONTHS SHARE THE SECTION (4.38.4) ────────────────────
+ *
+ * This was a wrapping flex row of three fixed 172px panels, so on a 700px section
+ * the quarter ended around x=650 and left ~130px of ground at the right — the
+ * rail sat in the left two-thirds of a box it was the only occupant of. Measured
+ * on `dev-screenshots/20260818_16h03m37s_grim.png`.
+ *
+ * THREE EQUAL TRACKS, WHICH IS THE HEATMAP'S ANSWER one widget over: `drawStrip`
+ * asks for `minmax(cell, 1fr)` and lets the container decide how much each track
+ * gets. The same shape here, one level up — the PANELS take a third each — and
+ * the grid inside each panel does the same for its seven columns.
+ *
+ * `minmax(0, 1fr)` AND NOT `1fr`: a grid track's default minimum is `auto`, which
+ * is the panel's content, so three 172px panels in a 400px pane would overflow
+ * rather than shrink. The zero minimum is what lets the track be smaller than
+ * what is in it, and the mobile rail below is what handles that case properly. */
 .journal-act-months {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px 22px;
+  /* The panel is capped by its own grid's track maximum, so on a wide section it
+     is narrower than its third. Centred, the three months distribute across the
+     section instead of bunching at the left with the slack on the right — which
+     is the thing being fixed. */
+  justify-items: center;
 }
 @media (max-width: 500px) {
   .journal-act-months {
-    flex-wrap: nowrap;
+    /* ONE ROW OF NATURAL-WIDTH PANELS, which is what `flex-wrap: nowrap` used to
+       buy and what `grid-auto-flow: column` buys now. `max-content` keeps a panel
+       at its legible width rather than squeezing three into 360px, so the rail is
+       self-evidently scrollable. */
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    justify-items: start;
     overflow-x: auto;
     scroll-snap-type: x proximity;
     /* Room for the panel's focus ring, which a clipped overflow would shave. */
@@ -576,7 +604,9 @@
 .journal-act-panel {
   display: flex;
   flex-direction: column;
-  flex: 0 0 auto;
+  /* `flex: 0 0 auto` STOOD HERE and is inert now that the rail is a grid — a grid
+     item is sized by its track and by its own max. Removed rather than left as a
+     no-op that reads like it is doing something. */
 }
 /* Names the panel's month. The quarter label in the nav says which three these
    are, but not which is which — and with three grids side by side, reading the
@@ -597,15 +627,34 @@
   opacity: 0.55;
 }
 
-/* Fixed 22px columns, NOT 1fr with a max-width. The first version capped the
-   grid at 320px but left the columns flexible, so aspect-ratio:1 inflated each
-   cell to ~46px and one month towered over the rest of the section to show a
-   handful of squares. A calendar wants a legible cell, not a proportional one. */
+/* ── THE COLUMNS GROW, THE CELLS DO NOT (4.38.4) ────────────────────────
+ *
+ * This was `repeat(7, 22px)`, and the comment that stood here recorded a real
+ * regression: an earlier version used `1fr` columns with a max-width on the grid,
+ * and `aspect-ratio: 1` on the cell inflated each square to ~46px so one month
+ * towered over the section to show a handful of days. *"A calendar wants a
+ * legible cell, not a proportional one"* — that is still true and is still the
+ * rule.
+ *
+ * WHAT MAKES FLEXIBLE COLUMNS SAFE NOW is that the CELL states its own size
+ * (`width: 22px; height: 22px`, no `aspect-ratio`), so a wider track is wider
+ * SPACING and not a bigger square. That is exactly how the journals heatmap
+ * fills: `.jjh-cell` is a fixed `var(--jjh-cell)` inside a `minmax(cell, 1fr)`
+ * track. The cell is pinned by a test for that reason.
+ *
+ * AND THE TRACK HAS A CEILING. `1fr` alone would give each column 46px on a
+ * 1050px dashboard and the month would read as a scatter of loose squares rather
+ * than as a calendar. 34px is where a 22px cell still reads as gridded — a third
+ * of the cell in air, no more. */
 .journal-act-weekdays,
 .journal-act-grid {
   display: grid;
-  grid-template-columns: repeat(7, 22px);
+  grid-template-columns: repeat(7, minmax(22px, 34px));
   gap: 3px;
+  /* The cell is narrower than its track once the track grows, so it is centred
+     in it — otherwise the days drift left and the columns stop lining up with
+     the weekday letters above them. */
+  justify-items: center;
   /* Six-row months are one row taller than five-row ones; without this the
      legend and any panel beside them would sit at different heights. */
   align-content: start;

@@ -33,6 +33,11 @@ import {
   composeJournalsDashboardNote,
   journalsDashboardSectionModel,
 } from "../src/journals/journals-dashboard-sections";
+import {
+  journalDashboardSections,
+  composeJournalDashboardNote,
+  journalDashboardSectionModel,
+} from "../src/journals/journal-dashboard-sections";
 import { homeSections, composeHomeNote } from "../src/diary/home-sections";
 import { ROOT_CRUMB_LABEL, rootCrumbPath } from "../src/journals/study-header";
 import { modelForSurface, resolveSectionHost } from "../src/ui/section-insert";
@@ -62,6 +67,15 @@ const PAGES: {
   model: () => ReturnType<typeof diaryDashboardSectionModel>;
   dest: string;
   locked: string;
+  // Whether this page COMPOSES its charts region, as opposed to offering it.
+  //
+  // A FIELD RATHER THAN A THIRD COPY OF THE TABLE (4.36). The two folder-note
+  // dashboards ship the region seeded with nothing, which is a working Add
+  // button; a journal dashboard offers it instead, because that page is
+  // RECONCILED and a composed section is one repair writes into every journal in
+  // every vault at the next release. Every other property in this block is true
+  // of all three, so the one that is not gets a flag rather than a fork.
+  chartsComposed: boolean;
 }[] = [
   {
     name: "the diary dashboard",
@@ -70,6 +84,7 @@ const PAGES: {
     model: () => diaryDashboardSectionModel(DEFAULT_PATHS.diaryRoot),
     dest: DIARY_HOME,
     locked: "today",
+    chartsComposed: true,
   },
   {
     name: "the journals dashboard",
@@ -78,6 +93,27 @@ const PAGES: {
     model: () => journalsDashboardSectionModel(DEFAULT_PATHS.journalsRoot),
     dest: JOURNALS_HOME,
     locked: "journals",
+    chartsComposed: true,
+  },
+  // THE THIRD PAGE, 4.36. Added to this table rather than given a block of its
+  // own precisely because everything above is structural: a catalogue that
+  // locates what it composes, plans no foreign runs, keeps its banner pinned and
+  // restores a file exactly on remove-then-re-add. Those are properties of a
+  // flat note, and a third page that met them only by having been written by the
+  // same author on the same day is the drift this table exists to catch.
+  //
+  // STUDY IS THE FIXTURE, and any registered journal would do — what varies with
+  // the type is two directives' arguments and three blurbs, none of which any
+  // assertion here reads. `test/journal-dashboard.test.ts` covers what IS
+  // per-journal.
+  {
+    name: `the ${STUDY_JOURNAL.name} dashboard`,
+    sections: journalDashboardSections(STUDY_JOURNAL),
+    compose: () => composeJournalDashboardNote(STUDY_JOURNAL),
+    model: () => journalDashboardSectionModel(STUDY_JOURNAL, STUDY_JOURNAL.root),
+    dest: folderNotePath(STUDY_JOURNAL.root),
+    locked: "contents",
+    chartsComposed: false,
   },
 ];
 
@@ -239,7 +275,7 @@ describe("what each page refuses to lose", () => {
     // The one section on each page where "not locked" and "freely removable"
     // are different answers. A reader who wants no charts should be able to say
     // so; a reader with nine configured must not lose them to an untick.
-    for (const page of PAGES) {
+    for (const page of PAGES.filter((p) => p.chartsComposed)) {
       expect(page.model().refusal("charts", page.compose()), page.name).toBeNull();
       // OFF THE CONSTANT, NOT A LITERAL — see home-sections.test.ts for what
       // this cost when the heading was renamed in 4.26.
@@ -262,7 +298,13 @@ describe("where the pages live, and who agrees about it", () => {
     // `surfaceOfNote` recognises another, repair composes a page the section
     // editor will not open — which is the failure 3.11 §1 fixed for the
     // homepage, and the one worth pinning before it can recur twice.
-    const dests = shippedNotes(DEFAULT_PATHS).map((n) => n.dest);
+    //
+    // `[]` FOR THE JOURNALS, throughout this block. These four cases are about
+    // the TWO FIXED folder notes and nothing else; the per-journal dashboards
+    // 4.36 adds are a separate population with their own file, and mixing them
+    // in here would make an assertion about "those two paths" depend on how many
+    // journals the fixture happens to carry.
+    const dests = shippedNotes(DEFAULT_PATHS, []).map((n) => n.dest);
     expect(dests).toContain(DIARY_HOME);
     expect(dests).toContain(JOURNALS_HOME);
   });
@@ -272,7 +314,7 @@ describe("where the pages live, and who agrees about it", () => {
     // not excluded from `reconcileLayouts`. Both halves matter — a template
     // flag here would buy permanent drift the moment a directive is renamed.
     for (const dest of [DIARY_HOME, JOURNALS_HOME]) {
-      const note = shippedNotes(DEFAULT_PATHS).find((n) => n.dest === dest);
+      const note = shippedNotes(DEFAULT_PATHS, []).find((n) => n.dest === dest);
       expect(note?.content, dest).toBeTruthy();
       expect(note?.asset, dest).toBeUndefined();
       expect(note?.template, dest).toBeFalsy();
@@ -281,7 +323,7 @@ describe("where the pages live, and who agrees about it", () => {
 
   it("writes each catalogue into its own page", () => {
     const byDest = new Map(
-      shippedNotes(DEFAULT_PATHS).map((n) => [n.dest, n.content])
+      shippedNotes(DEFAULT_PATHS, []).map((n) => [n.dest, n.content])
     );
     expect(byDest.get(DIARY_HOME)).toBe(composeDiaryDashboardNote());
     expect(byDest.get(JOURNALS_HOME)).toBe(composeJournalsDashboardNote());
@@ -356,7 +398,7 @@ describe("where the pages live, and who agrees about it", () => {
     expect(folderNotePath(moved.journalsRoot)).toBe(
       "09 - Notebooks/09 - Notebooks.md"
     );
-    expect(shippedNotes(moved).map((n) => n.dest)).toContain(
+    expect(shippedNotes(moved, []).map((n) => n.dest)).toContain(
       "09 - Notebooks/09 - Notebooks.md"
     );
   });
@@ -529,9 +571,17 @@ describe("no card sits under a header bar", () => {
   // holding it renders on a page this test walks. A header bar over it would be
   // a title bar over the page's own title, which is the pairing this whole
   // describe block exists to refuse.
+  // `journals-header` JOINS THE LIST IN 4.36, and it has always belonged —
+  // 60-heroes-and-banners.css says so at `.jjs-hero .jjh-root`, which cancels
+  // the band's shell inside the journals card and states the rule in the same
+  // breath: *"The `journals-header` directive still renders the bordered card
+  // version wherever it's used on its own."* A `header:` bar over a bordered box
+  // is 4.1 §3.1's doubling exactly, and the journal dashboard is the first
+  // catalogue to compose the band standalone — so this is the release where the
+  // pairing became reachable rather than the release where it became wrong.
   const CARD_DRAWING = ["diary", "month-summary", "journals", "week-summary",
     "quarter-summary", "year-summary", "entry-header", "journal-header",
-    "banner", "title"];
+    "banner", "title", "journals-header"];
 
   const keywordOf = (line: string): string =>
     line.split("|")[0].split(":")[0].trim();
@@ -550,20 +600,45 @@ describe("no card sits under a header bar", () => {
     });
   }
 
-  it("gives the list widgets a bar, so they are not loose content", () => {
-    // The other half: a non-card widget with no bar would be untitled content
-    // in the note's flow, inconsistent with every section around it. That is
-    // the case `frame: section` exists for, and until it lands a `header:` is
-    // how a section titles itself.
+  it("titles every non-card widget, so none is loose content", () => {
+    // The other half: a widget with no bar is untitled content in the note's
+    // flow, inconsistent with every section around it.
+    //
+    // TWO WAYS TO BE TITLED, NOT ONE. This asserted `header:` alone, and its own
+    // comment said why — *"that is the case `frame: section` exists for, and
+    // until it lands a `header:` is how a section titles itself"*. It has
+    // landed. The two are alternatives rather than a preference: `header:` puts
+    // a bar above a widget that has no chrome of its own, `frame: section` takes
+    // the chrome away from one that does, and the grammar REFUSES a fence
+    // carrying both (see the frame block in `ui/widgets/index.ts`) precisely
+    // because they are two answers to one question.
+    //
+    // So the property is that a section is titled, and asserting the mechanism
+    // instead is the trap `RESUME.md` §2.2 names as 4.18's own lesson.
+    //
+    // COMPOSED SECTIONS ONLY, WHICH IS WHAT "LOOSE CONTENT" MEANS. An `optIn`
+    // section is not on the page, and the two ways of titling one that is are
+    // not the only two that exist: a fence holding exactly one keyword
+    // `SECTION_TITLES` can name gets a head with no modifier at all
+    // (`journal-totals`), and `journal-tally` titles itself at render time from
+    // the tracker it names — which is why it is deliberately absent from that
+    // table. Widening the rule to cover sections that are not composed would
+    // mean restating both of those here, and a second copy of `SECTION_TITLES`
+    // in a test is the drift `blockTitle` exists to prevent.
+    //
+    // Nothing changes for the two folder-note dashboards: neither has an `optIn`
+    // section, so this walks exactly what it walked before.
     for (const page of PAGES) {
-      for (const s of page.sections) {
+      for (const s of page.sections.filter((x) => !x.optIn)) {
         const { fence, lines } = s.render();
         // The chart fence carries its header INSIDE itself — the charts
         // processor reads it and makes the whole section self-titled.
         if (fence !== "almanac") continue;
         const keywords = lines.map(keywordOf);
         if (keywords.some((k) => CARD_DRAWING.includes(k))) continue;
-        expect(keywords, `${page.name}: ${s.id}`).toContain("header");
+        const titled =
+          keywords.includes("header") || lines.some((l) => /^frame:/.test(l));
+        expect(titled, `${page.name}: ${s.id} is untitled`).toBe(true);
       }
     }
   });

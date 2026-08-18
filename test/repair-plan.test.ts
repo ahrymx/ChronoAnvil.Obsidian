@@ -16,6 +16,8 @@
 // that a test asserts behaviour rather than that a string is in a file.
 
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { repairNote } from "../src/core/repair-plan";
 import {
   MANAGED_FLAGS,
@@ -225,7 +227,7 @@ describe("repairNote — what it must not do", () => {
     const shipped = home();
     const text = withoutLine(shipped, "tasks-table");
     const { next } = repairNote(homeModel(), text, shipped);
-    const before = L(text).filter((l) => l.trim() === "journals");
+    const before = L(text).filter((l) => l.trim() === "journals:cards");
     expect(before).toHaveLength(1);
     // Everything the note already had is still in the order it had it.
     const kept = (t: string): string[] =>
@@ -331,5 +333,88 @@ describe("managed flags", () => {
     // directive has to have others the reader owns. A directive whose whole
     // argument is the plugin's belongs in `MANAGED_ARGS` instead.
     expect(Object.keys(MANAGED_FLAGS)).toEqual(["on-this-day"]);
+  });
+});
+
+// ── The dotfile that stopped repair dead (4.38.1) ────────────────────────
+//
+// A reader reported that the repair window listed two notes under "Run format
+// migrations" and applying it did nothing at all — no writes, no toast. The
+// migration was innocent. What happened is in the group ABOVE it:
+//
+// A journal manifest is `.almanac-journal.json`, a DOTFILE, and Obsidian keeps
+// dotfiles out of the vault index. `planCreate` asked the vault whether one
+// existed, was told no whatever the truth, and listed all four of them as
+// missing on every run — the window in the report shows four identical rows.
+// Applying then called `vault.create` on a path already on disk, which throws
+// "File already exists"; the create loop had no `try`, so the throw escaped
+// `applyRepair`, took the migrations group with it, and skipped the closing
+// notice that would have said so.
+//
+// `journal-manifest.ts` had stated the rule the whole time — *"the adapter
+// while the rest of the plugin talks to the vault"* — and `writeManifest`
+// obeyed it. This is the one caller that did not.
+//
+// ASSERTED AGAINST THE SOURCE, because the failure is which API is called and
+// there is no vault here to call one on.
+describe("a manifest is a dotfile, and the vault cannot see it", () => {
+  const scaffold = (): string =>
+    readFileSync(join(__dirname, "..", "src", "core", "scaffold.ts"), "utf8");
+
+  it("plans manifests through the adapter, not through the vault index", () => {
+    const src = scaffold();
+    const at = src.indexOf("const dest = manifestPathFor(cfg.root);");
+    expect(at, "the manifest planner moved").toBeGreaterThan(0);
+    const block = src.slice(at, at + 2400);
+    // The existence check and the drift read both go to the adapter. Either one
+    // left on the vault reintroduces "listed as missing on every run".
+    expect(block).toContain("await adapter.exists(dest)");
+    expect(block).toContain("await adapter.read(dest)");
+    expect(block).not.toContain("const existing = getFile(this.app, dest);");
+    // And the plan carries the fact forward, so the write does not have to
+    // re-derive "is this a dotfile" from the path.
+    expect(block).toContain("files.push({ dest, content, hidden: true })");
+  });
+
+  it("writes a hidden file through the adapter too", () => {
+    const src = scaffold();
+    const at = src.indexOf('if (chosen.has("create")) {');
+    expect(at, "the create group moved").toBeGreaterThan(0);
+    const block = src.slice(at, src.indexOf('if (chosen.has("pages"))', at));
+    expect(block).toContain("await this.app.vault.adapter.write(dest, content)");
+    // A FOLDER IS INDEXED EVEN WHEN A FILE IN IT IS NOT, so the parent still
+    // comes from the vault — the adapter write would otherwise fail on a journal
+    // whose root has not been made yet.
+    expect(block).toContain("await ensureFolder(this.app, parent)");
+    // The vault path survives for everything that is not hidden.
+    expect(block).toContain("createFileEnsuringFolders(this.app, dest, content)");
+  });
+
+  it("does not let one file's failure end the repair", () => {
+    // THE SHAPE OF THE FAILURE IS THE PART WORTH DEFENDING. Create is the FIRST
+    // group, so anything it throws takes every later group and the closing
+    // notice with it — which is why the reader saw no toast rather than an
+    // error. Every other group in this method already had a `try`.
+    const src = scaffold();
+    const at = src.indexOf('if (chosen.has("create")) {');
+    const block = src.slice(at, src.indexOf('if (chosen.has("pages"))', at));
+    expect(block).toContain("try {");
+    expect(block).toContain("catch (e) {");
+    // Counted and REPORTED, not swallowed: a silent skip is the same defect one
+    // level quieter.
+    expect(block).toContain("failed++");
+    expect(block).toContain("check the console");
+  });
+
+  it("still reaches the migrations group, which is what the report was about", () => {
+    // The ordering that made a create failure fatal to the migration. Pinned so
+    // the two stay in one method and the later group is genuinely later.
+    const src = scaffold();
+    expect(src.indexOf('if (chosen.has("create")) {')).toBeLessThan(
+      src.indexOf('if (chosen.has("migrations")) {')
+    );
+    // And the notice at the end is unconditional — it is the only thing that
+    // tells a reader the command finished at all.
+    expect(src).toContain('notify.ok("Almanac: nothing to do")');
   });
 });

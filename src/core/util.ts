@@ -1053,7 +1053,44 @@ export function slugify(name: string): string {
 // reason slugify moved in 2.43: it knows nothing about the catalogue, and a UI
 // module reaching into the catalogue to pluralise a word is how a second copy
 // of this gets written instead.
+//
+// ── AND A SHORT IRREGULAR LIST (4.39.1) ──────────────────────────────────
+//
+// "Mediums appear here automatically" — the Media preset's level noun is
+// "Medium", no ending rule matches it, and the fallback `+ "s"` is not crude, it
+// is wrong. Crude was always the deal; wrong was not.
+//
+// A SHORT LIST AND NOT A DICTIONARY, which is `singularGuess`' own defence
+// fifteen lines below, made for exactly this shape of problem: those words are
+// there because the rules "mangle them outright", and these are here because the
+// rules produce a word that is not English. Everything not on either list still
+// degrades to a plausible wrong answer a reader can overrule, which is the
+// accepted cost this function was written around.
+//
+// THE ENTRY CONDITION, so the list does not grow into the dependency the comment
+// above refuses: a word earns a line here when it is a NOUN SOMEONE WOULD NAME A
+// FOLDER LEVEL AFTER and the rules get it wrong. Not every English irregular —
+// "Child" and "Person" are not level nouns and are deliberately absent.
+//
+// CASE IS THE CALLER'S. Level nouns are title-case ("Medium") and the callers
+// lowercase for prose, so the replacement carries the input's leading case rather
+// than a stored capital that would come out wrong in half the call sites.
+const IRREGULAR_PLURALS: Record<string, string> = {
+  medium: "media",
+  index: "indices",
+  appendix: "appendices",
+  criterion: "criteria",
+};
+
 export function plural(noun: string): string {
+  const irregular = IRREGULAR_PLURALS[noun.trim().toLowerCase()];
+  if (irregular) {
+    // "Medium" → "Media", "medium" → "media". Only the first letter, because a
+    // level noun is one word and title case is the only case that varies.
+    return /^[A-Z]/.test(noun.trim())
+      ? irregular.charAt(0).toUpperCase() + irregular.slice(1)
+      : irregular;
+  }
   if (/(s|x|z|ch|sh)$/i.test(noun)) return `${noun}es`;
   if (/[^aeiou]y$/i.test(noun)) return `${noun.slice(0, -1)}ies`;
   return `${noun}s`;

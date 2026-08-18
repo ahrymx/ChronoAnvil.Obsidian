@@ -14,6 +14,7 @@ import {
   DEFAULT_SUBJECT_EMOJI,
   DEFAULT_TOPIC_EMOJI,
   JOURNALS_DIRECTIVE,
+  isJournalsDirective,
   ROOT_JOURNALS,
   ROOT_STUDY,
   TEMPLATES_ROOT,
@@ -292,6 +293,74 @@ export interface JournalType {
 }
 
 // ── Built-in: Study ──────────────────────────────────────────────────────
+
+// ── A journal's hue ──────────────────────────────────────────────────────
+//
+// A stable colour for a journal, worn by `journals:cards`' banner since 4.15 and
+// by the level-cards head since 4.37.
+//
+// DERIVED FROM THE ID, NOT ASSIGNED. Two journals must not swap colours when a
+// third is added or one is renamed, and an assigned palette index would do
+// exactly that — it is the same argument `foldKey` makes for keying a fold on
+// the type's id rather than on its position. The arithmetic is a sum of code
+// points because it has to agree with itself across sessions and nothing here
+// is worth a hash function.
+//
+// IT LIVES HERE RATHER THAN IN `journals-cards.ts`, WHERE IT WAS WRITTEN, because
+// two surfaces read it now and that file cannot be imported by the other one — it
+// depends on `journals-section.ts`, which depends on `tables.ts`. See the note it
+// left behind. A stable hue for a journal id is a fact about the journal model
+// either way, which is what makes this the right home and not merely the
+// reachable one.
+//
+// ── AND THE SUM IS AN INDEX, NOT THE ANGLE (4.42) ──────────────────────
+//
+// MEASURED ON THE SHIPPED PRESETS: study summed to 359 and media to 32 — **33°
+// apart** — so on `20260818_20h59m08s_grim.png` two of the four journal bands
+// were near-identical warm reds. Nothing in a sum of code points spreads its
+// outputs; ids that differ by one character differ by ~31, which on a 360° wheel
+// is the same colour twice.
+//
+// **THE STEP TURNS NEARNESS INTO DISTANCE.** Multiplying the index by a stride
+// coprime to 360 maps consecutive sums far apart, so two ids differing by one
+// character no longer land on one colour.
+//
+// 59 AND NOT 137, AND THE CORRECTION IS THE INTERESTING PART (4.42.1). 4.42 used
+// 137 — the golden angle, the sunflower's own stride — and checked it against
+// `"exercise"`. **The preset's id is `exercise-diet`.** On the ids that actually
+// exist, 137 puts Projects at 278° and Exercise & Diet at 261°: **17° apart,
+// where the un-stepped sums had been 26°.** The change made the shipped vault
+// worse and its test passed, because the test measured an id no vault has.
+//
+// SO THE STRIDE IS FITTED, AND THAT IS SAID OUT LOUD RATHER THAN DRESSED UP. 59
+// is coprime to 360, like 137, and puts the four presets at 88°, 146°, 207° and
+// 301° — 58° minimum. It was chosen by trying every coprime stride against the
+// four real ids and taking the best. **A hash cannot promise separation**: this
+// is four ids arranged well, not a guarantee, and a fifth preset or a custom
+// journal can still land on top of one. The alternative that WOULD guarantee it
+// — fixed hues for the shipped presets — was offered and declined, so a reader
+// who finds two custom journals clashing should rename one rather than expect
+// this to have prevented it.
+//
+// COPRIME IS THE PART THAT IS NOT FITTED. Any stride sharing a factor with 360
+// visits only 360/gcd hues and collides in cycles — 138 would reach sixty. 59 is
+// prime, so the map is a BIJECTION over 0…359: every hue stays reachable and no
+// two sums are pushed onto one that were not already equal. Integer arithmetic
+// throughout, because the number has to agree with itself across sessions and a
+// float stride invites a rounding difference nobody would look for.
+//
+// ANAGRAMS STILL COLLIDE EXACTLY, since the index is a sum. That is inherent and
+// left alone: "Recipes" and "Precise" are not a case worth a hash function, and
+// the reader can rename one.
+//
+// EVERY EXISTING VAULT'S COLOURS CHANGE ONCE. That is the cost and it was
+// accepted: the hue is decoration derived from an id, nothing is stored, and the
+// alternative is keeping a spread that was never there.
+export function hueOf(id: string): number {
+  let sum = 0;
+  for (let i = 0; i < id.length; i++) sum = (sum + id.charCodeAt(i) * 31) % 360;
+  return (sum * 59) % 360;
+}
 
 // ── Folder emoji ─────────────────────────────────────────────────────────
 //
@@ -1329,10 +1398,25 @@ export function journalAncestors(
 // `journals` line inside a longer block still counts: the widget renders
 // wherever it appears, and adding a second copy above it would be worse than
 // leaving the note alone.
+//
+// ── AND IT COMPARED THE LINE EXACTLY, WHICH BROKE A CLEAN VAULT (4.38.3) ──
+//
+// This read `l.trim() === JOURNALS_DIRECTIVE`, and the sentence above states
+// precisely why that was wrong the moment 4.37 shipped `journals:cards`: the
+// homepage composes the ARGUMENT form, this saw no line equal to `journals`,
+// concluded the section was missing, and appended a second copy — *"worse than
+// leaving the note alone"*, by its own rule.
+//
+// It is reached from `rebuildJournalHome`, which runs when a journal is created.
+// So the reported sequence was: fresh vault, add Study, and the homepage already
+// had two Journals sections before repair had been opened once. Every later
+// symptom — the duplicate render, the migration offering to delete five lines —
+// was downstream of this line.
+//
+// `isJournalsDirective` is the one place that question is answered now; see
+// `constants.ts` for why there were four.
 export function ensureJournalsBlock(source: string): string {
-  const has = source
-    .split("\n")
-    .some((l) => l.trim() === JOURNALS_DIRECTIVE);
+  const has = source.split("\n").some((l) => isJournalsDirective(l));
   if (has) return source;
   const block = [FENCE_OPEN, "frame: section", JOURNALS_DIRECTIVE, FENCE_CLOSE].join("\n");
   return `${source.trimEnd()}\n\n${block}\n`;

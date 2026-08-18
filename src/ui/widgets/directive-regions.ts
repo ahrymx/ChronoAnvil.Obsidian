@@ -52,6 +52,7 @@ import {
   buildTasksTable,
   TasksScope,
   buildTopicStats,
+  buildLevelCards,
   buildLevelIndex,
   levelScope,
   confidenceKinds,
@@ -62,7 +63,10 @@ import { buildLinks } from "../../core/links";
 import { buildOnThisDay, buildTimeline } from "../../diary/diary-retrieval";
 import { buildJournalSearch } from "../../journals/journal-search";
 import { journalFolderScope } from "../../journals/journal";
-import { buildJournalsHeader } from "../../journals/journals-header";
+import {
+  buildJournalsHeader,
+  journalsHeaderScope,
+} from "../../journals/journals-header";
 import { buildReviewQueue } from "../../review/review-queue";
 import { pagesUnder } from "../../core/query";
 import { CalendarState, buildCalendar } from "../../diary/calendar";
@@ -283,6 +287,26 @@ export function buildLevelIndexRegion(
   if (watched === null) return buildLevelIndex(plugin, ctx, argument);
   return liveScopedWidget(plugin, ctx, watched, () =>
     buildLevelIndex(plugin, ctx, argument)
+  );
+}
+
+// The card arrangement, watching the same tree (4.36 §2).
+//
+// ONE SCOPE FUNCTION FOR BOTH, which is the whole reason `levelIndexScope`
+// answers only WHERE: the two widgets ask the same question of the same folder
+// and differ in how they draw the answer, so a second resolution here would be
+// the duplicate `levelScope`'s own comment describes going wrong — it drifted
+// once already, and the test that pinned the two spellings held exactly until
+// the rule grew past one line.
+export function buildLevelCardsRegion(
+  plugin: AlmanacPlugin,
+  ctx: MarkdownPostProcessorContext,
+  argument: string
+): HTMLElement | null {
+  const watched = levelIndexScope(plugin, ctx, argument);
+  if (watched === null) return buildLevelCards(plugin, ctx, argument);
+  return liveScopedWidget(plugin, ctx, watched, () =>
+    buildLevelCards(plugin, ctx, argument)
   );
 }
 
@@ -931,20 +955,32 @@ export function buildJournalCardRegion(
 
 export function buildJournalsHeaderRegion(
   plugin: AlmanacPlugin,
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext,
+  // Which journal the band covers. Empty — or `all` — is every registered one,
+  // which is what the keyword has always meant (4.36 §3).
+  argument = ""
 ): HTMLElement | null {
   // The Journals section's hero band: at-a-glance numbers plus a
-  // 53-week activity strip across every registered journal. Scoped
-  // live to all of those roots at once, so adding a lesson under any of
-  // them repaints the strip without a manual refresh.
+  // 53-week activity strip across the journals it is pointed at. Scoped
+  // live to their roots, so adding a lesson under any of them repaints the
+  // strip without a manual refresh.
   //
-  // The roots are read per build rather than captured: enabling Study or
+  // The scope is read per build rather than captured: enabling Study or
   // adding a custom journal in Settings changes the set, and the home
   // page is re-rendered on that change.
-  const roots = registeredJournalTypes(plugin).map((t) =>
-    t.root
-  );
+  const scope = journalsHeaderScope(plugin, argument);
+  if (typeof scope === "string") {
+    // NAMED OUT LOUD RATHER THAN DRAWN EMPTY. The band renders nothing when it
+    // has no journals — right for a vault that has none, and indistinguishable
+    // from a typo on a vault that has four. See `journalsHeaderScope`.
+    return createDiv({ cls: "journal-widget-error", text: scope });
+  }
+  const roots = scope.map((t) => t.root);
+  // THE ROOTS ARE THE WATCH AND THE TYPES ARE THE DRAW, and both come off the
+  // one resolution — so a band scoped to Study cannot end up repainting on a
+  // note written in Cooking, which is what two separate reads would eventually
+  // allow.
   return liveScopedWidget(plugin, ctx, roots, () =>
-    buildJournalsHeader(plugin)
+    buildJournalsHeader(plugin, { types: scope })
   );
 }

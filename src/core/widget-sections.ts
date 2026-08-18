@@ -294,12 +294,26 @@ const argQuestion = (
   // null `hostFolder` already takes on the same surface.
   if (arg.kind === "vault") {
     const source = VAULT_SOURCES[arg.source];
+    // KEYWORDS FIRST, AND THEY ARE NOT PART OF THE VAULT'S LIST (4.36). A
+    // `vault` choice is required, so a widget whose EMPTY argument means
+    // something — `journals-header` covers every journal — would otherwise be
+    // unaddable without narrowing it. The keyword is an answer the plugin
+    // defines rather than one the vault does, which is exactly the split
+    // `WidgetArg`'s `choice` and `vault` variants already draw; offering it
+    // ahead of the vault's own rows makes the widget's default the first pick.
+    const have = source.of(vault ?? {});
+    // AND A VAULT WITH NOTHING IN IT GETS NO KEYWORDS EITHER. The editor draws
+    // the `empty` sentence when `values` is empty, so a lone "Every journal" row
+    // would replace *"No journals yet — turn on Study or add one…"* with a
+    // dropdown offering to cover every one of none. The keyword is a way of
+    // naming the vault's whole list, and there is no list.
+    const keywords = have.length ? (arg.keywords ?? []) : [];
     return {
       kind: "choice",
       key: "arg",
       label: arg.label,
       directive: keyword,
-      values: source.of(vault ?? {}),
+      values: [...keywords, ...have],
       empty: source.empty,
     };
   }

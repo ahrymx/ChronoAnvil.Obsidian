@@ -118,6 +118,26 @@
   border-radius: 0;
 }
 
+/* AND THE ACTIVITY BAND SHEDS ITS OWN SHELL (4.36).
+   `journals-header` standing alone draws a bordered, padded card — the rule at
+   `.jjs-hero .jjh-root` in 60-heroes-and-banners.css cancels exactly that when
+   the band sits inside the journals card, and says in the same breath that the
+   directive "still renders the bordered card version wherever it's used on its
+   own". A journal dashboard composes it standalone under `frame: section`, so
+   without this the page draws a section bar around a bordered box: 4.1 §3.1's
+   two borders arguing, arrived at from the other direction.
+   THE SAME FOUR LINES AS `.jjs-hero .jjh-root`, and deliberately not a shared
+   class between them. The two cancellations are triggered by different things —
+   one by being inside the card, one by the fence's own modifier — and a class
+   both had to carry would have to be applied by the JS in one case and by the
+   markdown in the other. */
+.journal-widget-block.is-unframed .jjh-root {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+}
+
 /* ── The unframed empty state (§4) ─────────────────────────────────────
  *
  * §12 calls this "the part most likely to be skipped, and the first thing a

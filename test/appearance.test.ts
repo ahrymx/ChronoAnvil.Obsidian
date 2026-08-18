@@ -1341,26 +1341,40 @@ describe("a card nested in a card does not repeat its edge (4.35.2)", () => {
     expect(rule).not.toContain("var(--background-modifier-border)");
   });
 
-  it("defines that edge as a mix toward the surface it sits on", () => {
-    // A fraction of the step rather than a repeat of it — and every term is a
-    // variable, which is what lets one definition serve both themes.
+  it("draws that edge as a step off the surface, not as a mix (4.42)", () => {
+    // ── WHAT THIS TEST USED TO REQUIRE, AND WHY IT IS REVERSED ───────────
+    //
+    // It required `color-mix(in srgb, var(--background-modifier-border) 55%,
+    // var(--am-surface-inset))` — a fraction of the step rather than a repeat of
+    // it, every term a variable so one definition served both themes. That was
+    // the better idea and it **never once drew**: from 4.35.2 to 4.41.0 every
+    // card reading it came back `#dadada`, which is `currentColor`.
+    //
+    // The cause is in `tokens.test.ts`: a custom property's `var()`s resolve on
+    // the element that declares it, and Obsidian's colours are on `body`. Moving
+    // the mix to `body` in 4.40.1 was right and not enough, because it was
+    // reading `--am-surface-inset` — a `:root` alias, broken the same way. With
+    // the mix now possible in principle, it is still not used, and that is a
+    // deliberate retreat: an adaptive value that has rendered as `currentColor`
+    // in every build of its life is not adaptive.
+    //
+    // WHAT THE TOKEN STILL MEANS IS UNCHANGED. A seam quieter than the boundary
+    // outside it: 0.06 white over the card's #232323 is #303030, against the
+    // #333333 edge of the section card it sits in.
     const css = readCss();
+    expect(css).not.toMatch(/--am-border-inner:\s*color-mix/);
     const at = css.indexOf("--am-border-inner:");
     expect(at).toBeGreaterThan(0);
-    const decl = css.slice(at, css.indexOf(";", at));
-    expect(decl).toContain("color-mix");
-    expect(decl).toContain("var(--background-modifier-border)");
-    expect(decl).toContain("var(--am-surface-inset)");
+    expect(css.slice(at, css.indexOf(";", at))).toMatch(/rgba\(255, 255, 255/);
   });
 
-  it("needs no light-theme override, because it is defined in variables", () => {
-    // The token file's own rule: anything theme-specific goes below the line,
-    // and this deliberately is not.
-    // BOUNDED BY `cssRule`. An open-ended slice runs to the end of the
-    // concatenation and picks up `var(--am-border-inner)` where the card USES
-    // it, several files later — a use, not an override, which would fail this
-    // for the opposite of the reason it exists.
-    expect(cssRule("body.theme-light")).not.toContain("--am-border-inner");
+  it("needs a light-theme twin now, being a literal rather than variables", () => {
+    // The mix resolved per theme for free; a literal cannot, and the file's own
+    // rule is that anything theme-specific goes below the line. TWO NUMBERS AND
+    // NOT ONE SIGN FLIP: a 6% white hair on a near-black card is a visible step,
+    // 6% black on a near-white one is not.
+    const light = cssRule("body.theme-light");
+    expect(light).toMatch(/--am-border-inner: rgba\(0, 0, 0, [\d.]+\)/);
   });
 });
 

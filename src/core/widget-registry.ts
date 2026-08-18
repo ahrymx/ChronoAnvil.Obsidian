@@ -87,7 +87,24 @@ export type WidgetArg =
   // ONE SOURCE SO FAR. `journals` is what this release needs. Trackers and note
   // kinds are the same shape and are deliberately not added speculatively —
   // each has its own question about what an id means when the thing is renamed.
-  | { kind: "vault"; label: string; source: "journals" };
+  //
+  // `keywords` IS THE FOLDER VARIANT'S FIELD, HERE FOR THE SAME REASON (4.36).
+  // A vault argument becomes a `choice`, and a choice is REQUIRED — so a widget
+  // whose empty argument means something useful has no way to say so, and the
+  // add list would force a reader to name one journal where the widget's own
+  // default is all of them. `journals-header` is that widget. A keyword is not
+  // a member of the vault's list and cannot collide with one: the ids come from
+  // `customJournals` and `all` is `SCOPE_ALL`, which `review-queue` and
+  // `journal-search` already take with the same meaning.
+  //
+  // OFFERED BEFORE THE VAULT'S OWN ANSWERS, so "Every journal" is the first row
+  // rather than the last of five — the default should be the easy pick.
+  | {
+      kind: "vault";
+      label: string;
+      source: "journals";
+      keywords?: readonly WidgetChoice[];
+    };
 
 // Which of this vault's lists a `vault` argument draws its answers from.
 export type WidgetArgVaultSource = Extract<
@@ -366,7 +383,28 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     label: "Journals activity",
     glyph: "🔥",
     blurb:
-      "At-a-glance numbers over a 53-week activity strip covering every enabled journal at once.",
+      "At-a-glance numbers over a 53-week activity strip — every enabled journal at once, or one you name.",
+    // POINTABLE AS OF 4.36 §3, because a page about ONE journal was composing
+    // this band and getting the whole vault's figures under its name. The band's
+    // own note states the scope it has always had — "every registered journal's
+    // root folder, unioned" — and on a per-journal dashboard every one of those
+    // numbers is a plausible figure about something else, which is the worst
+    // shape a statistic can take.
+    //
+    // THE KEYWORD IS WHAT KEEPS THE OLD ANSWER REACHABLE. A `vault` argument
+    // becomes a required choice, so without `all` the add list would force a
+    // reader onto one journal where the widget's own default is all of them.
+    // Bare still means every journal, so nothing already written changes.
+    // THE LITERAL `"all"`, as `review-queue` and `journal-search` write it two
+    // entries down — this file is "a table with no functions in it" and has no
+    // imports, so `SCOPE_ALL` is spelled rather than referenced. A test pins
+    // that the three agree.
+    arg: {
+      kind: "vault",
+      label: "the journal to cover",
+      source: "journals",
+      keywords: [{ value: "all", label: "Every journal" }],
+    },
   },
   "level-index": {
     label: "Journal level index",
@@ -403,6 +441,35 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     argJoin: "/",
     // MORE THAN ONE IS THE POINT once it can be pointed: a page can carry
     // Study's subjects beside Cooking's recipes.
+    repeats: true,
+  },
+  // THE CARD ARRANGEMENT OF `level-index`'s QUESTION, 4.36 §2.
+  //
+  // A SECOND KEYWORD RATHER THAN AN ARGUMENT, and the entry above is why it
+  // could not be one: `level-index` already spends both pieces of its single
+  // argument on a journal and a folder, and the folder may contain slashes, so
+  // there is no third piece to spend. `journals` / `journals:cards` rode the
+  // argument slot because that keyword had one free.
+  //
+  // THE SAME TWO ARGUMENTS, VERBATIM, because they are the same question — and
+  // the two widgets resolve them through one exported `levelScope`, so a
+  // mistyped journal id gets the same sentence from either.
+  "level-cards": {
+    label: "Journal level cards",
+    glyph: "🗂️",
+    blurb:
+      "What is below this note, as cards — one per folder, paired with what is inside it where there is a level below.",
+    arg: { kind: "vault", label: "the journal to show", source: "journals" },
+    arg2: {
+      kind: "folder",
+      label: "the folder inside it",
+      // EMPTY IS THE JOURNAL'S ROOT, as on `level-index` and for its reason:
+      // this is the sibling answer rather than the page.
+      emptyLabel: "the whole journal",
+    },
+    argJoin: "/",
+    // MORE THAN ONE IS THE POINT, exactly as it is one entry up: a page can
+    // carry Study's subjects beside Cooking's recipes.
     repeats: true,
   },
   "topic-stats": {

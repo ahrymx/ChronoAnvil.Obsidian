@@ -658,14 +658,31 @@ describe("a widget a page may hold more than one of", () => {
       "the whole journal"
     );
 
-    // AND IT IS THE ONLY ONE. A second widget quietly acquiring an override
+    // AND THE SET IS NAMED RATHER THAN COUNTED (4.36). This asserted a length of
+    // ONE, on the argument that "a second widget quietly acquiring an override
     // would mean the ordinary wording had stopped being true somewhere else
-    // too, and nobody had noticed which.
+    // too, and nobody had noticed which." The argument is right and the
+    // instrument was a tally: `level-cards` is `level-index`'s card arrangement,
+    // takes its two arguments verbatim, and has the same sibling fallback for
+    // the same reason — so it is the one case the count was never going to be
+    // able to tell apart from the failure it was watching for.
+    //
+    // Naming them keeps the guard: a THIRD widget, or either of these two
+    // drifting to different words, still fails.
     const overridden = m
       .sections("")
       .flatMap((s) => s.questions ?? [])
       .filter((q) => q.kind === "folder" && "emptyLabel" in q && q.emptyLabel);
-    expect(overridden).toHaveLength(1);
+    expect(overridden.map((q) => q.directive).sort()).toEqual([
+      "level-cards",
+      "level-index",
+    ]);
+    for (const q of overridden) {
+      expect(
+        "emptyLabel" in q ? q.emptyLabel : undefined,
+        q.directive
+      ).toBe("the whole journal");
+    }
   });
 
   it("reads each piece back into its own box, remainder and all", () => {

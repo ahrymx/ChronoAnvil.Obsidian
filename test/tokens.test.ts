@@ -35,9 +35,12 @@ function definedAnywhere(css: string): Set<string> {
 function unconditional(): Set<string> {
   return new Set(
     [
-      ...repoFile("styles/00-tokens.css").matchAll(
-        /^\s*(--am-[a-z0-9-]+)\s*:/gm
-      ),
+      // COMMENTS OUT FIRST, for the reason the guard below records: prose in this
+      // file names tokens, and a sentence beginning `--am-border-inner: …` at the
+      // start of a comment line is not a definition.
+      ...repoFile("styles/00-tokens.css")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .matchAll(/^\s*(--am-[a-z0-9-]+)\s*:/gm),
     ].map((m) => m[1])
   );
 }
@@ -85,6 +88,85 @@ describe("a token reference resolves to a token", () => {
   });
 });
 
+describe("a token that names a theme colour is declared on `body` (4.42)", () => {
+  it("reads nothing on :root that :root does not itself define", () => {
+    // ── THREE RELEASES OF WHITE CARD BORDERS, AND THIS IS THE RULE ───────
+    //
+    // `--am-border-inner` was a `color-mix` over two theme variables on `:root`,
+    // and every card that read it drew a **`#dadada`** edge — `currentColor`,
+    // the initial `border-color`, which is what an element gets when the colour
+    // it asked for is invalid.
+    //
+    // **OBSIDIAN DECLARES ITS COLOURS ON `body`.** `.theme-dark` and
+    // `.theme-light` are classes on `body`; `:root` is the `html` element and has
+    // none of them.
+    //
+    // **AND A CUSTOM PROPERTY'S `var()` REFERENCES ARE SUBSTITUTED ON THE ELEMENT
+    // THAT DECLARES IT**, not on the element that uses it. So a theme colour
+    // aliased on `:root` resolves against an element that has never had one, and
+    // the token is invalid for everything that inherits it.
+    //
+    // 4.40.1 WROTE THIS GUARD FOR `color-mix` ONLY, on the theory that a lone
+    // `var()` was somehow lazier. It is not — `--am-surface-inset:
+    // var(--background-primary-alt)` on `:root` was broken by exactly the same
+    // mechanism, and it was still broken after the mix moved to `body`, because
+    // the mix was reading IT. Nine tokens were affected; the guard that would
+    // have caught all nine is this one, and it is barely longer.
+    const css = repoFile("styles/00-tokens.css").replace(/\/\*[\s\S]*?\*\//g, "");
+    const at = css.indexOf(":root {");
+    expect(at).toBeGreaterThan(-1);
+    const root = css.slice(at, css.indexOf("\n}", at));
+    // What :root defines for itself is fair game: the spacing scale is seven
+    // `calc()`s over a unit declared four lines above them, and the type scale
+    // reads its own steps. That is the case this must not forbid.
+    const own = new Set(
+      [...root.matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)].map((m) => m[1])
+    );
+    const offenders: string[] = [];
+    for (const d of root.matchAll(/(--[a-z0-9-]+):\s*([^;]*)/g)) {
+      for (const r of d[2].matchAll(/var\(\s*(--[a-z0-9-]+)/g)) {
+        if (!own.has(r[1])) offenders.push(`${d[1]} reads ${r[1]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("declares each of the nine on `body` instead", () => {
+    // Named individually rather than counted, so deleting one to make the guard
+    // above pass is not a way through.
+    const css = repoFile("styles/00-tokens.css");
+    const body = css.slice(css.indexOf("\nbody {"), css.indexOf("body.theme-light"));
+    for (const t of [
+      "--am-surface-card",
+      "--am-surface-raised",
+      "--am-surface-inset",
+      "--am-border-subtle",
+      "--am-border-hover",
+      "--am-border-focus",
+      "--am-bar-ink",
+      "--am-sec-title-ink",
+    ]) {
+      expect(body, t).toContain(`${t}: var(--`);
+    }
+  });
+
+  it("gives the seam a value that cannot fail, and a twin for light", () => {
+    // WHAT IS GIVEN UP: the mix adapted to whatever border colour a theme
+    // declared. It also never once drew. An adaptive value that renders as
+    // `currentColor` is not adaptive, and `--am-slot-edge` is the proof a plain
+    // one works — measured at #333333 over #232323 on the same screenshot that
+    // showed this token still white.
+    const css = repoFile("styles/00-tokens.css").replace(/\/\*[\s\S]*?\*\//g, "");
+    const root = css.slice(css.indexOf(":root {"), css.indexOf("\n}"));
+    expect(root).toMatch(/--am-border-inner: rgba\(255, 255, 255, [\d.]+\);/);
+    expect(css).toMatch(
+      /body\.theme-light \{[\s\S]*?--am-border-inner: rgba\(0, 0, 0, [\d.]+\);/
+    );
+    // AND NOWHERE IS IT A MIX AGAIN.
+    expect(css).not.toMatch(/--am-border-inner:\s*color-mix/);
+  });
+});
+
 describe("a fallback means the token can be missing", () => {
   it("carries no fallback on a token 00-tokens.css defines", () => {
     // §4.2 recorded this as two harmless spellings of one thing:
@@ -102,7 +184,18 @@ describe("a fallback means the token can be missing", () => {
     // looks like a considered default. The rule that replaces them — a fallback
     // is a claim that this property may be absent, and for anything in
     // 00-tokens.css that claim is false.
-    const css = readCss();
+    //
+    // ── COMMENTS STRIPPED FIRST, AND 4.40 IS WHY ─────────────────────────
+    //
+    // This scraped the raw bundle, so a COMMENT explaining why a fallback would
+    // not have helped — *"`var(--am-border-inner, fallback)` does not help
+    // either; the fallback is for a property that is NOT SET"* — reported itself
+    // as the offence it was warning about. A file documenting a rule quotes the
+    // thing the rule forbids; that is what documenting it means. The house rule
+    // is on record for TypeScript (`home-sections.ts` tripped it the same way in
+    // 4.38.3) and it is the same rule here: **an absence assertion must be told
+    // what it is allowed to read.**
+    const css = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
     const always = unconditional();
     const offenders = [
       ...new Set(
@@ -321,26 +414,42 @@ describe("the bar scale (4.13 §1)", () => {
     }
   });
 
-  it("keeps them in :root, because none of them reads a theme variable", () => {
-    // 3.6 patch 1's scar, applied forwards rather than after the fact: a token
-    // whose value reads `--interactive-accent` or its siblings MUST be declared
-    // on `body`, because a custom property is substituted where it is DECLARED
-    // and `:root` is one level above where Obsidian puts those. These four read
-    // `--am-text-*` and `--text-muted`, which are ours and the theme's ordinary
-    // inherited ink — so `:root` is right, and this says why rather than leaving
-    // the next reader to work out whether it was checked.
+  it("puts the three that read our own tokens in :root, and the ink on body", () => {
+    // ── THIS TEST ALREADY KNEW THE RULE, AND THEN EXEMPTED THE ONE TOKEN IT
+    //    APPLIED TO (4.42) ────────────────────────────────────────────────
+    //
+    // It read: *"a token whose value reads `--interactive-accent` or its
+    // siblings MUST be declared on `body`, because a custom property is
+    // substituted where it is DECLARED and `:root` is one level above where
+    // Obsidian puts those"* — which is exactly right, and is the fault behind
+    // three releases of white card borders.
+    //
+    // It then said these four *"read `--am-text-*` and `--text-muted`, which are
+    // ours and the theme's ordinary inherited ink — so `:root` is right"*.
+    // **`--text-muted` is not ordinary inherited ink; it is a theme variable
+    // declared on `body`, the same as `--interactive-accent`.** The rule was
+    // written down, and then an exemption was invented for the single token it
+    // caught. `--am-bar-ink` has been invalid since it was written.
+    //
+    // WHAT THE FAILURE OF THIS ONE TEST IS WORTH RECORDING FOR: a guard that
+    // names the offenders it knows about will be talked out of the ones it does
+    // not. The replacement in `a token that names a theme colour…` asks the
+    // structural question instead — does `:root` define what this token reads —
+    // and has no room for a judgement call about which theme variables are
+    // really theme variables.
     const file = repoFile("styles/00-tokens.css");
     const bodyAt = file.indexOf("\nbody {");
     expect(bodyAt, "the body block moved").toBeGreaterThan(0);
-    const bar = file
-      .split("\n")
-      .filter((l) => /^\s*--am-bar-/.test(l));
-    expect(bar.length).toBe(4);
-    for (const line of bar) {
-      expect(line, line).not.toContain("--interactive-accent");
-      // And declared ABOVE the `body {` block, i.e. in `:root`.
-      expect(file.indexOf(line), line).toBeLessThan(bodyAt);
+    const line = (t: string): string =>
+      file.split("\n").find((l) => l.trim().startsWith(`${t}:`)) ?? "";
+    // Three read `--am-*`, which `:root` defines for itself.
+    for (const t of ["--am-bar-text", "--am-bar-track", "--am-bar-glyph"]) {
+      expect(line(t), t).toBeTruthy();
+      expect(file.indexOf(line(t)), t).toBeLessThan(bodyAt);
     }
+    // The fourth reads the theme's, so it lives where the theme's are.
+    expect(line("--am-bar-ink")).toContain("var(--text-muted)");
+    expect(file.indexOf(line("--am-bar-ink"))).toBeGreaterThan(bodyAt);
   });
 
   it("gives none of them a fallback", () => {

@@ -11,6 +11,7 @@ import { studyFile, studyTemplate } from "./study-template";
 import { composeDiaryDashboard } from "../src/diary/diary-sections";
 import { TFile, TFolder } from "./obsidian-stub";
 import { ensureJournalsBlock } from "../src/journals/journal";
+import { composeHomeNote } from "../src/diary/home-sections";
 import {
   pruneCollapsedSections,
   remapConfiguredPaths,
@@ -4320,14 +4321,49 @@ describe("shipped stylesheet", () => {
     }
   });
 
-  it("sizes heatmap cells in fixed px, not flexible columns", () => {
-    // The regression this pins produced a month grid taller than the rest of
-    // the section: `repeat(7, 1fr)` with a max-width leaves the columns
-    // flexible, so cells inflate to fill whatever width is going. A calendar
-    // cell should be a legible fixed size.
-    expect(css).toMatch(/\.journal-act-grid\s*\{[^}]*grid-template-columns:\s*repeat\(7,\s*\d+px\)/);
-    expect(css).not.toMatch(/\.journal-act-grid\s*\{[^}]*repeat\(7,\s*1fr\)/);
+  it("sizes heatmap cells in fixed px, whatever the column does", () => {
+    // THE REGRESSION THIS PINS, AND THE ASSERTION MOVED IN 4.38.4 WITHOUT THE
+    // RULE MOVING. An early version used `1fr` columns with a max-width on the
+    // grid, and `aspect-ratio: 1` on the cell inflated each square to ~46px so one
+    // month towered over the section to show a handful of days. A calendar wants a
+    // legible cell, not a proportional one.
+    //
+    // The columns are flexible again — the rail has to fill its section, which is
+    // what the heatmap one widget over already does — so pinning
+    // `repeat(7, <n>px)` would now pin the wrong half. **The cell's own stated
+    // size is the mechanism**, exactly as `.jjh-cell` is inside its
+    // `minmax(cell, 1fr)` tracks: a wider track is wider SPACING, not a bigger
+    // square.
+    expect(css).toMatch(/\.journal-act-cell\s*\{[^}]*width:\s*\d+px/);
+    expect(css).toMatch(/\.journal-act-cell\s*\{[^}]*height:\s*\d+px/);
     expect(css).not.toMatch(/\.journal-act-cell\s*\{[^}]*aspect-ratio/);
+    // AND THE TRACK HAS A CEILING, or a 1050px dashboard gives each column 46px
+    // and the month reads as a scatter of loose squares. A bare `1fr` is the shape
+    // that fails, so it is the shape that is refused.
+    expect(css).toMatch(
+      /\.journal-act-grid\s*\{[^}]*grid-template-columns:\s*repeat\(7,\s*minmax\(\d+px,\s*\d+px\)\)/
+    );
+    expect(css).not.toMatch(/\.journal-act-grid\s*\{[^}]*repeat\(7,\s*1fr\)/);
+    // The cell is centred in a track it no longer fills, or the days drift left
+    // and stop lining up with the weekday letters above them.
+    expect(css).toMatch(/\.journal-act-grid\s*\{[^}]*justify-items:\s*center/);
+  });
+
+  it("gives the three months the whole section (4.38.4)", () => {
+    // MEASURED: a wrapping flex row of three fixed 172px panels ended at x=650 in
+    // a section running to x=780, so the rail sat in the left two-thirds of a box
+    // it was the only occupant of. Three equal tracks is the heatmap's answer one
+    // level up — the panels take a third each.
+    const at = css.indexOf(".journal-act-months {");
+    const block = css.slice(at, css.indexOf("}", at));
+    expect(block).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
+    // `minmax(0, 1fr)` AND NOT `1fr`: a track's default minimum is `auto`, which
+    // is the panel's content, so three 172px panels in a 400px pane would overflow
+    // rather than shrink.
+    expect(block).not.toMatch(/grid-template-columns:\s*repeat\(3,\s*1fr\)/);
+    // Centred, so on a wide section the months distribute rather than bunching at
+    // the left with the slack on the right — which is the thing being fixed.
+    expect(block).toContain("justify-items: center");
   });
 
   it("styles the Learning Path widget", () => {
@@ -5472,6 +5508,37 @@ describe("ensureJournalsBlock", () => {
     expect(out).toContain("diary:3");
     expect(out.indexOf("diary:3")).toBeLessThan(out.indexOf("journals"));
     expect(out.endsWith("\n")).toBe(true);
+  });
+
+  it("counts the composed homepage's own spelling (4.38.3)", () => {
+    // THE BUG A READER HIT ON A CLEAN VAULT. This compared each line to
+    // `JOURNALS_DIRECTIVE` exactly, so `journals:cards` — what the homepage has
+    // composed since 4.37 — read as ABSENT and a second block was appended.
+    //
+    // The path is short and had nothing to do with repair: install, add the Study
+    // journal, and `rebuildJournalHome` calls this. The homepage had two Journals
+    // sections before the repair window had been opened once, and every later
+    // symptom was downstream of it.
+    const home = composeHomeNote(DEFAULT_PATHS.diaryRoot);
+    expect(home, "the homepage stopped composing the argument form").toContain(
+      "journals:cards"
+    );
+    expect(ensureJournalsBlock(home)).toBe(home);
+    // The bare fence form too, whatever the argument, because an ARGUMENT is an
+    // arrangement of this section rather than a different section.
+    for (const line of ["journals", "journals:cards"]) {
+      const src = ["```almanac", "frame: section", line, "```"].join("\n");
+      expect(ensureJournalsBlock(src), line).toBe(src);
+    }
+  });
+
+  it("still adds one when a DIFFERENT widget shares the prefix", () => {
+    // `journals-header:study` is on every journal dashboard and is not this
+    // section. The old check would not have matched it either, but the fix must
+    // not reach for a loose prefix on the way past — that is the trap the shared
+    // predicate in `constants.ts` is written to close.
+    const src = ["```almanac", "journals-header:study", "```"].join("\n");
+    expect(ensureJournalsBlock(src)).toContain(NEW_BLOCK);
   });
 
   it("does not touch the sections around it", () => {

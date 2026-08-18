@@ -61,7 +61,18 @@ const DIST = path.join(ROOT, "dist", "ahrymx.almanac");
 // archive of its own beside this one — two copies of it in two files that drift
 // the first time either is rebuilt. `node_modules` is the obvious one and would
 // take the zip from four megabytes to two hundred.
-const SOURCE_SKIP = new Set(["node_modules", "dist"]);
+//
+// `.git` WAS MISSING AND WENT UNNOTICED UNTIL 4.36, because the working tree
+// had none — every archive before this one was taken from a directory with no
+// repository in it, so the omission cost nothing and looked like a decision.
+// The first archive taken beside a `.git` swept 849 files in and took the zip
+// from 3.5MB to 9.7MB, most of it object history.
+//
+// AND SIZE IS THE SMALLER HALF. A source archive is a snapshot of the TREE at
+// one version; a repository inside it carries every other version as well, plus
+// remotes, credentials in a config, and whatever is on branches nobody meant to
+// hand over. A snapshot that contains its own history is not a snapshot.
+const SOURCE_SKIP = new Set(["node_modules", "dist", ".git"]);
 
 // What each archive must contain to be worth keeping. Read back OUT of the file
 // on disk, not asserted about the directory that went in.

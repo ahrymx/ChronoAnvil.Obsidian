@@ -22,6 +22,7 @@ import {
 } from "../src/core/layout";
 import { DEFAULT_PATHS, RETIRED_WIDGETS } from "../src/core/constants";
 import { isReconcilable, shippedNotes } from "../src/core/scaffold";
+import { STUDY_JOURNAL } from "../src/journals/journal";
 import { readSrc } from "./sources";
 
 const ASSETS = resolve(__dirname, "..", "assets");
@@ -611,7 +612,12 @@ describe("only markdown is reconciled", () => {
     // on rather than adding one for a file that does not exist yet — which is
     // the opposite of what §6.1 assumed, and the reason to assert the whole
     // population instead of the one entry the change was written for.
-    const shipped = shippedNotes(DEFAULT_PATHS);
+    // WITH A JOURNAL IN IT, so the population includes the per-journal
+    // dashboards 4.36 adds. Passing `[]` here would make the whole assertion
+    // vacuous about the newest entries in the list — which is exactly the shape
+    // of hole `shippedNotes`' required parameter exists to close, so this test
+    // must not reintroduce it on the test side.
+    const shipped = shippedNotes(DEFAULT_PATHS, [STUDY_JOURNAL]);
     for (const note of shipped) {
       const want =
         note.dest.endsWith(".md") &&

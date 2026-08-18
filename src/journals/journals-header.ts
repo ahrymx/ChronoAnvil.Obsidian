@@ -47,8 +47,9 @@
 import { setIcon, TFile } from "obsidian";
 import type AlmanacPlugin from "../main";
 import { countBodyTasks } from "../ui/tables";
-import { registeredJournalTypes } from "./journal";
+import { getJournalType, registeredJournalTypes } from "./journal";
 import type { JournalType } from "./journal";
+import { SCOPE_ALL } from "../core/directive-grammar";
 import { kindPlural } from "./journal-sections";
 import {
   activityBucket,
@@ -81,6 +82,47 @@ export interface JournalsHeaderAction {
 export interface JournalsHeaderOptions {
   // Section-level controls, anchored right of the title.
   actions?: JournalsHeaderAction[];
+  // Which journals the band covers, when the caller has already resolved them.
+  //
+  // ABSENT IS EVERY REGISTERED JOURNAL, which is what this band has always
+  // meant and what every bare `journals-header` in every vault still means. The
+  // field exists so the band can be pointed, not so its default can change.
+  types?: readonly JournalType[];
+}
+
+// Which journals a `journals-header` argument names, or the sentence to draw
+// instead.
+//
+// A REFUSAL IS A STRING, on `levelScope`'s shape one module over and for its
+// reason: there is more than one way to name nothing, and returning an empty
+// list would let the caller draw the band's own no-journals state — which is
+// SILENCE. `buildJournalsHeader` renders an empty root when it has no types,
+// correctly, because a vault with no journals has a callout under it saying so.
+// A vault with four journals and a mistyped id would get that same nothing, and
+// a widget that renders nothing is indistinguishable from a widget that is not
+// there.
+//
+// EMPTY IS EVERY JOURNAL, and `all` is the same answer said out loud. The
+// keyword is `SCOPE_ALL`, which `review-queue` and `journal-search` already take
+// and which already means "every registered journal type's root" — so this
+// spells an existing idea rather than inventing a second word for it. The
+// section window writes `all` because a required choice must have something to
+// choose; a reader typing the bare keyword gets the identical band.
+export function journalsHeaderScope(
+  plugin: AlmanacPlugin,
+  argument: string
+): JournalType[] | string {
+  const id = argument.trim();
+  const all = registeredJournalTypes(plugin);
+  if (!id || id === SCOPE_ALL) return all;
+
+  const type = getJournalType(plugin, id);
+  if (type) return [type];
+
+  const have = all.map((t) => t.id);
+  return have.length
+    ? `No journal called "${id}". This vault has: ${have.join(", ")}.`
+    : `journals-header names the journal "${id}", and this vault has no journals — turn on Study or add one in Settings → Almanac → Journals.`;
 }
 
 // A stat cell: value over caption. Returns the value element so an async
@@ -275,7 +317,7 @@ function drawStrip(
 // the buttons and in the rollups.
 const EMPTY_KIND_CAP = 3;
 
-export function kindWords(types: JournalType[]): string {
+export function kindWords(types: readonly JournalType[]): string {
   const words = types.flatMap((t) => t.kinds.map((k) => kindPlural(k).toLowerCase()));
   // De-duped: two journals that both call their notes "entries" should not make
   // the sentence say it twice.
@@ -289,7 +331,11 @@ export function buildJournalsHeader(
   plugin: AlmanacPlugin,
   opts: JournalsHeaderOptions = {}
 ): HTMLElement {
-  const types = registeredJournalTypes(plugin);
+  // WHAT THE CALLER RESOLVED, OR EVERY JOURNAL. The default is the scope this
+  // band has always had, so nothing that renders it today changes; a caller
+  // that has an argument to honour resolves it through `journalsHeaderScope`
+  // and hands the answer in, which keeps the refusal out of the drawing.
+  const types = opts.types ?? registeredJournalTypes(plugin);
   const root = createDiv({ cls: "jjh-root" });
 
   // No journal types enabled: render nothing. journal.ts already writes an
@@ -324,11 +370,22 @@ export function buildJournalsHeader(
   const head = root.createDiv({ cls: "jjh-head" });
   const left = head.createDiv({ cls: "jjh-left" });
 
-  const typeNames = types.map((t) => t.name);
-  left.createDiv({
-    cls: "jjh-eyebrow",
-    text: `Last 12 months · ${typeNames.join(" · ")}`,
-  });
+  // ── AND IT NAMES THE PERIOD, NOT THE ROSTER (4.38.4) ──────────────────
+  //
+  // It read `Last 12 months · Study · Projects · Exercise & Diet · Media`, which
+  // is a line that gets LONGER the more journals a reader has — the case it is
+  // most likely to be read in — and wraps on a sidebar. The list was also the
+  // half a reader did not need: this band is the whole section's, the section is
+  // titled Journals, and every journal in the vault is in it by definition. So
+  // the roster restated the scope rather than narrowing it.
+  //
+  // The period does narrow it, and nothing else on the page says it. That is what
+  // an eyebrow is for.
+  //
+  // `types` IS STILL THE ARGUMENT it always was — the band's numbers are scoped
+  // to it, and a `journals-header:study` on a reader's own note covers one
+  // journal. What changed is only what the label says out loud.
+  left.createDiv({ cls: "jjh-eyebrow", text: "Last 12 months" });
 
   const status = left.createDiv({ cls: "jjh-status", text: "Reading activity…" });
 
@@ -471,7 +528,23 @@ export function buildJournalsHeader(
 
     // Legend, under the grid. One legend for the whole strip: the shade scale
     // is a single window-wide max, so a second scale would be a lie.
-    const legend = stripWrap.createDiv({ cls: "jjh-legend" });
+    //
+    // ── AND IT IS NOT INSIDE THE SCROLLER (4.38) ────────────────────────
+    //
+    // It was `stripWrap.createDiv`, appended four lines after the scroll above,
+    // which meant the KEY to the colours rode the year: on any pane where the
+    // strip overflows — the case where a reader is most likely to need it — the
+    // scroll-to-recent dragged the legend off to the left and "Less" rendered as
+    // "ss" against the wrap's edge. Measured on
+    // `dev-screenshots/20260817_13h45m10s_grim.png`, where the homepage's strip
+    // scrolls and the dashboard's does not.
+    //
+    // The scroll itself is right and stays — 3.12 §14.5's argument is that a year
+    // read from the wrong end is worse than a year that scrolls. What was wrong is
+    // that a legend is not part of the year. It is a caption ABOUT the strip, so it
+    // belongs beside the scroller rather than in it, and then no scroll position can
+    // take it away.
+    const legend = root.createDiv({ cls: "jjh-legend" });
     legend.createSpan({ cls: "jjh-legend-text", text: "Less" });
     legend.createDiv({ cls: "jjh-cell is-empty" });
     for (let b = 1; b <= 4; b++) {

@@ -7,6 +7,1005 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.42.1] - 2026-08-18
+
+**Two corrections to 4.42, both of which its own tests had passed.**
+
+### The add tile was placed in the last track, not across the row
+
+4.42 wrote `grid-column: auto / -1` and described it as "auto-placed as early as
+it fits, ending at the last line". It does not do that. **An item with an `auto`
+start and a definite end is given a span of 1** (Grid §8.1.1), so `auto / -1`
+means *one track, ending at the last line* — which is always the last track.
+
+Measured on `20260818_21h25m06s_grim.png`: four empty journals, every one
+drawing its slot in track 2 with **track 1 bare** — a gap in front of the tile
+rather than behind it. Study and Projects had looked right by luck, because with
+two tracks and one card the last track is also the next free one.
+
+**CSS cannot say "from where I land to the end of the row"** — there is no value
+for it, and the track count comes from `auto-fill` and the container's width, so
+no rule can name it either. What is left is two honest cases: alone in the grid,
+`1 / -1`; beside cards, nothing at all, because **ordinary auto-placement already
+fills the next free track** and was doing so before 4.42 touched it. The case
+that remains unsolved is stated in the stylesheet rather than left to be
+rediscovered: a grid whose last row is exactly full puts the tile alone on a new
+row in one track.
+
+**And the test could not have caught it**, because it asserted the declaration
+(`grid-column: auto / -1`) rather than what the declaration had to achieve — it
+could only ever confirm the wrong value was still there. It asserts the two cases
+by selector now.
+
+### The hue spread was checked against an id no vault has
+
+4.42 changed `hueOf` to step its sum by the golden angle and reported the four
+presets moving from 33° minimum separation to 55°. Both numbers were wrong: the
+test measured `"exercise"`, and **the preset's id is `exercise-diet`**. On the ids
+that actually exist the un-stepped sums were **26°** apart at their closest, and
+the stride 4.42 introduced put Projects at 278° and Exercise & Diet at 261° —
+**17°**. The change made the shipped vault worse and its test said it was fine.
+
+The stride is **59** now: coprime to 360 like 137, and putting the four presets at
+88°, 146°, 207° and 301° — 58° minimum. **It was fitted**, by trying every coprime
+stride against the four real ids and taking the best, and the source says so: a
+hash cannot promise separation, so a green suite means these four are arranged
+well and not that collisions are prevented. The alternative that would have
+guaranteed it — fixed hues for the shipped presets — was offered and declined.
+
+Coprimality is the part that is *not* fitted, and it is what the second test
+holds: any stride sharing a factor with 360 visits only 360/gcd hues and collides
+in cycles. That test now asks the property through the public function rather than
+naming the constant — the stride has already changed once, and a test naming the
+number would have had to change with it while proving nothing.
+
+**The preset ids come from `JOURNAL_PRESETS` itself now**, not from a literal
+beside the assertion. A fixture that restates a value the source already holds
+can only ever be checked against the fixture.
+
+## [4.42.0] - 2026-08-18
+
+**The white card border is finally fixed, at its actual cause; journal titles
+open their dashboards; and three smaller things off the same screenshot.**
+
+### The `:root` fault, third diagnosis and the one that holds
+
+**`--am-border-inner` had never drawn since 4.35.2 introduced it.** Every card
+reading it came back `#dadada` — `currentColor`, the initial `border-color`,
+which is what an element gets when the colour it asked for is invalid. 4.40
+blamed the border shorthand (real, fixed, not the cause). 4.40.1 blamed `:root`
+and moved the `color-mix` to `body` — right about the placement, and the next
+screenshot still measured `#dadada`.
+
+**The rule is broader than 4.40.1 wrote it.** Obsidian declares its colours on
+`body` (`.theme-dark` / `.theme-light` are classes on `body`); `:root` is the
+`html` element and has none of them. And a custom property's `var()` references
+are substituted **on the element that declares it** — which has nothing to do
+with `color-mix`. 4.40.1 asserted that a lone `var()` was somehow lazier; it is
+not. `--am-surface-inset: var(--background-primary-alt)` on `:root` was broken by
+exactly the same mechanism, and the mix on `body` was reading *it*.
+
+**Nine tokens were affected**, and all nine are on `body` now:
+`--am-surface-card`, `--am-surface-raised`, `--am-surface-inset`,
+`--am-border-subtle`, `--am-border-hover`, `--am-border-focus`, `--am-bar-ink`,
+`--am-sec-title-ink`, and the seam itself. **`--am-border-inner` is a plain
+`rgba` rather than a mix** — the mix was the better idea and has never once
+drawn, and an adaptive value that renders as `currentColor` is not adaptive.
+
+**A visible consequence beyond the borders.** `.jjs-group-name` asks for
+`--am-bar-ink`, so with that token invalid the subject titles fell through to
+Obsidian's `.internal-link` — chem and Maths measured `#a68af9` on the
+screenshot. They read as the bar's own voice now, which is what 4.13 designed
+and what has never rendered.
+
+**And a test from 4.13 already knew the rule, then exempted the one token it
+caught.** It said, correctly, that *"a token whose value reads
+`--interactive-accent` or its siblings MUST be declared on `body`"* — and then
+argued these four read `--text-muted`, *"the theme's ordinary inherited ink"*, so
+`:root` was fine. `--text-muted` is a theme variable on `body`, the same as
+`--interactive-accent`. The replacement guard asks the structural question
+instead — does `:root` define what this token reads — which has no room for a
+judgement call about which theme variables are really theme variables.
+
+### A journal's name is the way into it
+
+The head named the journal and went nowhere, while every card below it has linked
+to its own folder note since 4.13.3 — so the page's shallowest object was the
+only one you could not enter. The title is a link now, through `folderLink`,
+which stops propagation as well as preventing the default: **a card's head is a
+fold target**, and a click that opened the journal and also folded it would do
+two things for one press. The title navigates and the rest of the band still
+folds, matching the rank below rather than inverting between them.
+
+`folderLink` gained a display-name override, because a journal has a name in
+settings — "Exercise & Diet" — over a folder that may be called something else,
+and without it the title would have renamed itself the moment it became a link.
+A journal whose folder note is missing stays plain text.
+
+### The add slot fills the rest of its row
+
+Study had two subjects in a three-track grid, so the slot took track 1 of row 2
+and left two tracks bare; Exercise & Diet and Media had none, so one 260px slot
+sat in a row two-thirds empty. Same fault — the slot was sized like a card when
+what it marks is *the space a card goes into*. `grid-column: auto / -1` says
+exactly that: auto-placed as early as it fits, ending at the last line, so it
+completes a partial row and spans a whole empty one. No track count appears in
+the rule, which matters because `auto-fill` decides that from the container's
+width. Its height floor drops to 64px, following `.jld-grid.is-paired`'s own
+reasoning that a full-row tile as tall as a card is a large empty box.
+
+### Two smaller things
+
+**The add tile no longer repeats itself in a tooltip.** A bubble reading "New
+project" was open under a tile whose visible label reads "New project" — nothing
+for a pointer user, and a name announced twice by a screen reader. The head ＋
+keeps its `title`, because there the two strings differ ("Topic" / "New topic")
+and that button collapses to icon-only under 460px.
+
+**Journal hues are spread across the wheel.** `hueOf` summed code points, and a
+sum spreads nothing: study landed on 359° and media on 32° — **33° apart**, so
+two of the four bands were near-identical warm reds. The sum is an index now,
+stepped by the golden angle, so consecutive indices land 137° apart. **137 and
+not the closer 138**: 138 shares a factor of six with 360 and would visit only
+sixty hues, while 137 is prime and coprime to it, so the map is a bijection and
+no two ids are pushed onto one colour that were not already equal. Minimum
+separation across the four presets goes from 33° to 55°. Every existing vault's
+journal colours change once, which is the cost and was accepted.
+
+## [4.41.0] - 2026-08-18
+
+**Each journal on the Journals page is now a card that holds its own subject
+cards, and its head carries the journal's colour — as its cards already did.**
+
+**What this replaces was a rule between two bars.** A journal's name was a bare
+title band on the section's ground with its subject cards loose underneath, and
+the only thing binding a journal to its cards was the gap before the next title
+— **the same gap that separates two cards inside one journal**. Four journals
+read as four lines ruled across one surface rather than as four objects. They are
+boxes now, and the line between them is gone: a list of bars needs a rule to be
+read as separate sections, a list of cards is separated by the gap, and both at
+once is the boundary drawn twice.
+
+**The hue was already there and was only ever drawn by the children.**
+`hueOf(type.id)` is set on the journal by `buildType` and tints every subject
+card's head one level down — which is why **chem and maths wear the same red**:
+the colour is the *journal's*, said once per card and never by the journal
+itself. It is on the journal's own band now.
+
+**And the cards keep theirs**, on the maintainer's call. Saying it once at the
+top would be tidier, and it was declined for a reason worth recording: a subject
+card read on its own — at the bottom of a scroll, or lifted into a narrow pane —
+still has to say which journal it belongs to.
+
+**Which makes the two strengths the whole decision, and the number is derived
+rather than picked.** The bands mix into different grounds — `#282828` out here,
+`#232323` in there — and that five-unit difference is diluted by the tint to
+nothing: at 30% both ways they compute to `#4b2e2e` and `#472a2b`, four units of
+red apart, which is not a hierarchy but a smudge. `hsl(359 45% 42%)` is
+`rgb(155, 59, 61)`; at **40%** over `#282828` the journal's band lands on
+`#563030` against the card's `#472a2b` — fifteen units, a step you can see
+without it becoming a second colour. Both numbers are fixed and only the hue
+varies, so every journal keeps the same parent-to-child relationship.
+
+**A folded journal drops its head's under-edge.** The body is `display: none`
+when collapsed, so that border would otherwise land one pixel inside the card's
+own — the doubled boundary again, in the one state where it is guaranteed rather
+than possible.
+
+Drawn as four variants first (`dev-mockups/journals-superset-cards.html`, palette
+sampled from the screenshots) so the arrangement could be judged before it cost a
+release; the file now records which one was chosen and why the other three were
+not.
+
+## [4.40.1] - 2026-08-18
+
+**The white outline on every card is gone, and 4.40's explanation for it was
+wrong.**
+
+**What the new screenshots showed.** 4.40 split the border shorthands into
+longhands, which stopped the 3px rope — and the edge came back as **1px
+`#dadada`** instead. Still `currentColor`, still the initial value an element
+gets when the colour it asked for is invalid. The longhands were right and did
+not touch the cause.
+
+**And the `@supports` guard proved the theory wrong rather than fixing it.** If
+`color-mix` had been unsupported, the guard would not have applied and the token
+would have fallen back to a real grey. The guard applied and the border was still
+white — so `color-mix` works fine here, and the mix was failing for another
+reason. It is deleted rather than left standing as a wrong explanation with a
+passing test on top of it.
+
+**The actual cause: `--am-border-inner` was declared on `:root`.** Obsidian's
+colour variables live on **`body`** — `--background-modifier-border` comes from
+`.theme-dark` / `.theme-light`, which are classes on `body`, and the `html`
+element has none of them. And a `color-mix()` inside a custom property is
+resolved **at the element the property is declared on**, eagerly, because a mix
+must produce a colour. So this one asked `:root` for a variable `:root` has never
+had, got nothing, and was invalid for every element that inherited it. It had
+been doing that since 4.35.2 introduced it — every `.jjs-card`, every
+`.jld-pair`, every `.jld-card`.
+
+**A lone `var()` does not behave that way, and that asymmetry is what hid it.** A
+custom property whose value is just `var(--x)` is a *pending-substitution value*:
+it is substituted where it is **used**, so `--am-surface-inset:
+var(--background-primary-alt)` on the same `:root` works perfectly. Wrap the
+identical reference in `color-mix()` and it resolves at the declaration instead.
+
+The proof was in the same file the whole time: `--am-surface-accent-subtle` is
+the same construct — a `color-mix` over two theme variables — declared on `body`,
+and it has always worked.
+
+**The fix, and the guard that would have caught it.** The mix moves to `body`,
+beside the token that proves the mechanism; `:root` keeps a real grey as the
+floor, so anything rendering above `body` gets an edge rather than
+`currentColor`. A new test refuses any `:root` declaration that **computes** with
+a variable `:root` does not itself define — which passes the spacing scale, seven
+`calc()`s over a unit declared four lines above them, and would have failed this
+token on the day it was written.
+
+**Three tests changed to record the reversal** rather than being quietly
+repointed, and one of them tripped the same trap for the third time this session:
+an absence assertion reading the comment that documents the thing it forbids.
+The rule is now stated flatly beside it — strip comments before asserting a
+string is absent, every time, without first checking whether this particular file
+happens to mention it.
+
+## [4.40.0] - 2026-08-18
+
+**Journals can be put in the order you want them, and a rope that had been
+around the add tile since the token was introduced is gone.**
+
+### Reorganising journals
+
+**Two surfaces, one write.** The homepage draws each journal as a card and the
+Journals page draws it as a full-width section with its contents inside, and
+4.40 gives each the affordance its shape can carry rather than the same one
+twice. **Drag a card onto another** on the homepage and it takes that card's
+place; on the Journals page a **Reorganise** button sits on the header bar
+beside Refresh and opens a short window with ↑/↓ on each row and a Save.
+
+Both end in `journal-order.ts`, which is the point of it: two gestures that
+became two implementations would drift, in the way `journal-actions.ts` is on
+record as having drifted.
+
+**There is no order field, and that is the good news.** `registeredJournalTypes`
+has always been `settings.customJournals.map(buildJournalType)` — the array *is*
+the order, and every surface that lists journals already draws them in it. So
+this is a permutation of a list the plugin owns: no new setting, no migration,
+nothing that a folder renamed outside Almanac could fall out of. Study is not a
+special case; it is the first entry.
+
+**Nothing moves on disk, and the window says so before you touch anything.**
+Reordering a list that also names folders invites "does this move my notes?",
+and that answer belongs on the window rather than in a changelog.
+
+**4.8.1's argument had to be answered rather than ignored.** That release
+*removed* whole-block dragging, because a drag and a dialog doing one job meant
+"every block on every page carrying a permanent invitation to the weaker one".
+That is an argument about two controls on **one** surface — which is why the
+button is not also on the card grid and the drag is not also on the sections. A
+reader on either page is offered exactly one way to reorder journals. The drag
+writes on drop with no confirmation, which is that file's other rule: the gesture
+is the consent.
+
+The window is the opposite and deliberately so — nothing is written until Save,
+so four nudges are one plan and not four repaints. **Arrows rather than drag
+there**, on the maintainer's call ("drag is for cards only"); the section editor
+pairs both and argues each is right, so what is dropped is the half the other
+surface already has, not the half a keyboard can reach.
+
+### The dashed edge, and the fault underneath it
+
+**Toned down, as asked.** The add tile and the empty add card now draw their
+edge in `--am-slot-edge` — a hair above the surface rather than against it. A
+dashed border is already the loudest edge in the vocabulary (it is broken, so it
+flickers as the eye travels it) and it does not also need contrast: it marks
+*where* a card would go, and the label inside says what pressing it does. A plain
+`rgba`, not a mix, with a light-theme twin — for the reason the rest of this
+section is about.
+
+**And the rope was not a styling choice; it was a fault.** Measured on the
+reader's screenshot, the add card's edge came back **3px wide in `#dadada`** —
+neither number written in any rule. Both are CSS *initial values*:
+`border-width: medium` computes to 3px, and the initial `border-color` is
+`currentColor`, which under a journals widget is `--text-normal`. Two initial
+values at once is a signature, not a coincidence.
+
+**A `var()` that does not resolve invalidates the whole shorthand.** Not just
+the colour — `border-width`, `border-style` and `border-color` all revert,
+because a shorthand containing an unresolvable `var()` is invalid at
+computed-value time as one declaration. `.jjs-card` read
+`border: 1px solid var(--am-border-inner)`, so wherever that token failed the
+card lost its border *entirely* (`border-style: none`), and the one place a
+style was stated separately — `.jjs-card-add`'s `dashed` — inherited the 3px
+`currentColor` rope as the only survivor of the three.
+
+Two independent fixes, because only one of them survives being wrong about the
+cause:
+
+- **Longhands.** Every use of `--am-border-inner` is now `border-*-width` /
+  `-style` / `-color`. A colour that cannot be computed costs the colour and
+  nothing else.
+- **An `@supports` guard on the token.** A custom property *cannot* fall back by
+  being re-declared — it accepts any token stream at parse time, so a `color-mix`
+  written second always wins and fails later, at the point of use. `var(--x,
+  fallback)` does not help either: the fallback is for a property that is **not
+  set**, and this one is set, to something unusable. `@supports` is the only
+  guard that works.
+
+**Three tests had pinned the shorthand** and reported this fix as a regression.
+They were asserting the *shape* of a rule rather than what it guarantees — the
+trap 4.39.0 already recorded as *a test that pins the workaround blocks the fix*
+— and now ask for a 1px solid edge in that ink on that side, however it is
+spelled.
+
+**And one absence assertion read its own documentation.** The token guard scraped
+the raw stylesheet, so a comment explaining *why a fallback would not have
+helped* reported itself as the offence it was warning about. Comments are
+stripped before the scrape now, which is the rule `home-sections.ts` learned in
+4.38.3 arriving in the stylesheet suite.
+
+## [4.39.1] - 2026-08-18
+
+**The add tile actually looks like a tile, three words become the right words,
+and an empty section stops saying one thing three times.**
+
+**The tile was rendering as a grey button.** 4.39.0 wrapped the dashed "＋ New
+subject" slot in `.jjs-card` chrome so it would read as an empty card offering to
+be filled; on the render it came back as a solid grey rectangle. Sampling the
+screenshot settled it rather than guessing: the tile measured `#333333` border on
+`#3c3c3c` fill — *pixel-identical to the Refresh button two rows up*. It was not
+a spacing problem or a wrapper problem. The theme paints a bare `button` element
+at specificity (0,1,1), `.jld-add` asked at (0,1,0), and the dashed border and
+transparent ground had never landed in any build.
+
+The fix names the three properties that carry "this is a slot, not a control" —
+border, background, box-shadow — and forces them, with the hover state that a
+forced background otherwise kills. `.jjs-card-add` is the dashed edge now and the
+inner tile is stripped of chrome entirely, so there is one dashed rectangle
+instead of two nested ones. **A second defect surfaced underneath it**: an add
+card alone in its grid collapsed to a 29px pill, because `min-height: 0` on the
+tile is correct when the card body has a stated height from its neighbours and
+meaningless when there are no neighbours. A `:only-child` floor covers that case
+without touching the populated one.
+
+**`plural()` learned the few words the rules get wrong.** The Media preset's
+empty state read *"Mediums appear here automatically."* Crude was always the deal
+for this helper — it is four ending rules — but "Mediums" is not crude, it is
+wrong. It now consults a short irregular list first: medium, index, appendix,
+criterion. Not a dictionary, and the entry condition is written down beside it —
+**a noun someone would plausibly name a folder level after, that the rules
+mangle**. "Child" and "Person" are deliberately absent and tested as absent, so
+the list cannot quietly grow into a general English pluraliser. The lookup
+carries the caller's case rather than a stored capital, because half the call
+sites lowercase for prose.
+
+**An empty journal section is now the tile alone.** It drew three things that
+said one thing: a title *"No subjects yet"*, a sentence *"Subjects appear here
+automatically."*, and then a card-shaped dashed tile reading *"＋ New subject"*.
+An empty card in an otherwise empty grid already says the level is empty — that
+is the whole reason 4.38.4 gave the tile card chrome — so the two lines restating
+it are gone.
+
+The sentence's fact survives being unsaid, and it is worth saying why rather than
+treating the deletion as pure tidying: it told the reader that a folder made in
+the file explorer gets picked up here. The only reader that reaches is one who
+has already made such a folder, and that reader is not looking at an empty
+section. **Both lines do survive on the far side of one return**, in the branch
+where the journal is registered but its root folder does not exist yet — there
+the tile cannot be drawn at all, and words are the only thing on offer. The test
+asserts that as an ordering rather than an absence, because both strings are
+still in the function and a `not.toContain` would have asserted the opposite of
+the truth.
+
+**Declined, and recorded as declined.** A ＋ on each subject card's own head was
+offered and turned down: the homepage is read-only for topics. It lists what is
+in a journal; making things belongs to that journal's dashboard and to the
+command palette. Pinned in both the source and the test so the obvious "fix" is
+known to have been considered rather than missed.
+
+## [4.39.0] - 2026-08-18
+
+**Four visual asks off the 4.38.3 render, and one wording defect found on the
+way.**
+
+**The Progress rail fills its section.** Three fixed 172px month panels in a
+wrapping flex row ended at x=650 in a section running to x=780 — the rail sat in
+the left two-thirds of a box it was the only occupant of. It is three equal grid
+tracks now, which is the journals heatmap's answer one level up: that widget asks
+for `minmax(cell, 1fr)` and lets the container decide how much each track gets.
+The day columns do the same, capped at 34px so a 1050px dashboard does not turn a
+month into a scatter of loose squares.
+
+What makes flexible columns safe here is worth recording, because the comment
+they replaced warned against exactly this: an early version used `1fr` columns
+and `aspect-ratio: 1` on the cell, which inflated each square to ~46px so one
+month towered over the section. **The cell states its own size now**, so a wider
+track is wider *spacing* and not a bigger square — the same arrangement
+`.jjh-cell` has inside its `minmax()` tracks. The test moved from pinning the
+column to pinning the cell, which is where the mechanism actually lives.
+
+**The activity eyebrow says "Last 12 months".** It read `Last 12 months · Study ·
+Projects · Exercise & Diet · Media` — a line that gets *longer* the more journals
+a reader has, which is the case it is most likely to be read in. The roster was
+also the half a reader did not need: the band is the whole section's, the section
+is titled Journals, and every journal in the vault is in it by definition. The
+period is what narrows it, and nothing else on the page says it.
+
+**The add tile is an empty card.** It was a naked 135×90px dashed button on the
+section's ground, standing where a card would go and looking nothing like one. It
+wears `.jjs-card`'s chrome now with the dashed affordance inside — which is what
+an empty subject card already looks like one column over.
+
+The wrapper also fixed a height bug 4.38.1 thought it had closed. `.jjs-grid` has
+been `align-items: stretch` since then and the tile *still* sat at 96px beside
+160px cards, because **Obsidian gives form controls a definite height and
+`align-self: stretch` is ignored on any item whose height is not `auto`** — a
+`<button>` cannot stretch. A `div` can.
+
+**The journal title bars lost their remaining ＋.** `＋ Topic` / `＋ Project` were
+kept in 4.38.1 on the argument that nothing else offered a second child; the
+maintainer's call is that a second control on every journal's title bar is noise
+the page does not earn. Recorded beside the code and here, because it is a real
+gap rather than a tidy-up with no downside: **a subject that already has topics
+now has no ＋ on the homepage.** An empty one shows the tile, and the journal's
+own dashboard carries a ＋ on every card head, but from the homepage a second
+topic is the command palette or the dashboard. Closing it properly means a ＋ on
+the subject card's own head — the level cards already work that way — which is a
+separate change.
+
+### And one the screenshots gave away
+
+> **"No study journals yet"** sat above **"Subjects appear here automatically."**
+> The two disagreed about what was absent and the title was the wrong one: the
+> journal is not missing, it is right there and titled two lines up. What is
+> missing is a *subject*. It reads "No subjects yet" now, and `splitGlyph` — which
+> existed only to keep the emoji out of "No 🎓 study journals yet" — went with it.
+
+## [4.38.3] - 2026-08-18
+
+**The duplicate Journals section, at its actual source — and it was never repair.**
+
+A reader installed on a clean vault, added the Study journal, and opened the
+repair window: it offered to delete five lines from the homepage. There should
+have been nothing to delete on a vault minutes old.
+
+Adding a journal calls `rebuildJournalHome`, which calls `ensureJournalsBlock`,
+which asked whether the homepage already carried a Journals section like this:
+
+```ts
+source.split("\n").some((l) => l.trim() === JOURNALS_DIRECTIVE)
+```
+
+An exact comparison against `"journals"` — and the homepage has composed
+`journals:cards` since 4.37. So it saw no Journals section, and appended a
+second one. Its own comment states the rule it was breaking: *"adding a second
+copy above it would be worse than leaving the note alone."* **Every symptom
+reported over the last two patches was downstream of this line**, including the
+duplicate render and the migration offering to remove a block; the repair loop
+fixed in 4.38.2 was a second instance of the same mistake, not the cause.
+
+### The root cause: one question, four answers
+
+*"Does this note already carry the Journals section?"* was asked in four places,
+each with its own spelling, and 4.37's `journals:cards` broke three of them:
+
+| Where | Asked | Result |
+|---|---|---|
+| `ensureJournalsBlock` | `l.trim() === "journals"` | appended a duplicate when a journal was created — **this release** |
+| the dashboard's `locate` | `/^journals\s*$/m` | repair grew a section on every run — 4.38.2 |
+| the homepage's `locate` | `/^journals\S*\s*$/m` | correct by luck; would also have matched `journals-header:study` |
+| the migration | its own inline literal | correct, and the fourth copy |
+
+Each of the last two patches corrected one caller and left the others to be found
+by a reader running into them. **There is one definition now** — 
+`isJournalsDirective` and `JOURNALS_DIRECTIVE_LINE` in `constants.ts` — and a test
+asserts that no caller keeps a private copy of the pattern, because a second
+literal is exactly how the four came to disagree.
+
+The shared predicate matches the directive **whole**, with an optional
+`:argument`, and never by prefix: `journals-header:study` is a different widget
+that shares seven letters and sits on every journal dashboard.
+
+An argument is an *arrangement* of a section, not a different section. Every
+"is it here?" answers yes to both spellings now.
+
+## [4.38.2] - 2026-08-18
+
+**The repair loop that grew a Journals section every time it ran, and the card
+list that clipped a fifth row.**
+
+### Repair alternated between two answers and duplicated a section on each pass
+
+With 4.38.1's fix in place repair applied — and then did this: one run offered
+*"draw the Journals section as one card per journal"*, the next offered *"adds
+journals"*, and the journals dashboard gained a second identical Journals
+section. Run it three times, get three.
+
+The cause is a false claim in a comment I shipped in 4.37. The migration that
+rewrites a bare `journals` directive to `journals:cards` said of itself: *"it
+only ever matches one page in the vault, which is why it can sit in this loop
+rather than needing a walk of its own."* **The journals dashboard composes a bare
+`journals` too** — it is that page's main section — and the migration walked
+every shipped note, so it rewrote the dashboard's block as well. That page's
+`locate` probe is `/^journals\s*$/m`, strict, so on the next repair it could no
+longer find its own section, and `reconcileLayouts` did the correct thing with
+the wrong input: it added one. Which the migration then rewrote in turn.
+
+Fixed in three places, because one alone would have left the vaults that already
+ran it broken:
+
+- **The target is the caller's.** The homepage wants `journals:cards`; the
+  dashboard wants `journals`. `scaffold` now picks the spelling from the path
+  instead of a text function guessing at a page it cannot see.
+- **Duplicates collapse.** `collapseJournalsBlocks` keeps the first journals
+  fence on a page and removes the rest, with the blank line that separated them.
+  The first, not the composed position — a reader who moved their section up the
+  page moved it deliberately.
+- **The dashboard's probe matches both spellings**, as the homepage's has since
+  4.37. This is the belt to the other two's braces: with it the growth stops even
+  before the migration runs. An argument is an *arrangement* of a section, not a
+  different section, so a probe asking "is it here" should say yes to either.
+
+Also fixed while there: `journals-header:study` is a different widget that shares
+seven letters with `journals`, and it sits on every journal dashboard. The
+directive is matched whole now, with an optional `:argument`, rather than by
+prefix.
+
+### The subject card no longer clips a fifth row
+
+A card showed enough of row five under row four to read as a clipped letter
+rather than as a scroll. The arithmetic was right and the box model was not:
+**`overflow` clips at the padding box, not the content box.** Four rows are
+exactly 115px and the content box was exactly 115px — but the body's 10px of
+bottom padding sits *inside* the scroller, so it was a 10px window onto whatever
+came next. A scroll container whose height is stated in rows cannot carry bottom
+padding, because the padding is a partial row. The height counts the top padding
+only now, and the breathing room moved out to the card — which is where it always
+meant to be: space between the last row and the card's edge, not part of the
+list.
+
+## [4.38.1] - 2026-08-18
+
+**A repair that reported changes and applied none, and the visual tidy-up 4.38.0
+still owed.**
+
+### Repair silently did nothing, and the cause was a dotfile
+
+A reader ticked two groups in the repair window, pressed *Apply repair (7
+items)*, and got no writes and no notice — not even an error. The migration the
+window named was innocent; the group **above** it was the problem, and the chain
+is worth writing down because every link was individually reasonable.
+
+A journal's manifest is `.almanac-journal.json`, and **Obsidian keeps dotfiles
+out of the vault index**. `journal-manifest.ts` has said so since manifests
+existed — *"the adapter while the rest of the plugin talks to the vault"* — and
+`writeManifest` obeys it. The repair planner did not:
+
+1. It asked `getFile()` whether the manifest existed. The vault always answers
+   *no* for a dotfile, whatever is on disk — so **every manifest was listed as
+   "create this file" on every repair, forever.** The reported window shows four
+   identical `.almanac-journal.json` rows on a vault that already had all four.
+2. Applying then called `vault.create()` on a path that was already there, which
+   throws *"File already exists"*.
+3. The create loop was the one group in `applyRepair` with **no `try`**, so the
+   throw escaped, took every later group with it — including the migrations the
+   reader had actually ticked — and skipped the closing notice, which is the only
+   thing that tells a reader the command finished.
+
+Fixed at all three points: the planner reads hidden files through the adapter (so
+a manifest that matches is no longer offered, and one that has drifted is offered
+once), the write path writes them through the adapter, and a file that cannot be
+written is now counted, logged and named in the notice instead of ending the run.
+
+### One create is not two buttons
+
+Every journal on the homepage drew `＋ Subject` on its section head **and** a
+"New subject" tile at the end of its grid, about 40px apart — four journals, four
+duplicated buttons. 4.38 added the tile without noticing the button it made
+redundant. The tile is what survives, and on its own merits rather than because
+it is newer: it sits where the thing it makes will appear, at the end of the list
+of them, which is the argument `journal-tracker-add` made and 4.37 applied to the
+level cards. The child button (`＋ Topic`, `＋ Project`) stays, because only an
+*empty* subject card carries a tile and nothing else offers it. The top-level
+button comes back where the tile cannot be drawn — a registered journal whose
+folder has never been made — so no journal is left with no create path.
+
+### Two 4.38 changes that did not actually land
+
+Both were caught by measuring the render, and both had passing tests.
+
+> **The subject grid's row was still ragged.** `.jjc-grid` was corrected to
+> `align-items: stretch` in 4.38 and `.jjs-grid` was missed, so a row showed a
+> 163px card, a 163px card and a 90px tile — the tile falling back to its
+> `min-height` and reading as a small button rather than as an empty slot. The
+> tile's own `align-self: stretch` did not carry it, so the container states it
+> now. `.jld-grid` deliberately keeps `start`: its tile spans the full row and
+> sits alone on it.
+
+> **The tile's ＋ never became 20px.** 4.38 added `.jld-add-icon { --jld-add-glyph:
+> 20px; … }` and the glyph did not change, because `.jld-add .svg-icon` was
+> already sizing the SVG to a flat 15px — two classes against one class and one
+> element, so the older rule outranked the newer one. The 4.38 test asked whether
+> the new rule said 20px; it did not ask whether anything outranked it. Both rules
+> read the same custom property now.
+
+## [4.38.0] - 2026-08-17
+
+**Sixteen visual-fidelity findings off the 4.37.0 render, closed in four
+batches.** The whole release is measured rather than reasoned: the palette, the
+band heights and the two overflow bugs were all read out of the PNGs in
+`dev-screenshots/`, and two of the sixteen findings turned out to be *wrong* when
+checked that way — see the corrections at the end, which are the most useful part
+of this entry.
+
+**A pair of cards has one head, not one per pane.** The left head was a
+container's name and a link; the right was a level noun that goes nowhere. Same
+size, same weight, same band, one of them clickable, and nothing about them said
+which. The pair now carries a single head — the container's name, its glyph, and
+the ＋ that adds to it — and what each pane holds is said inside the pane as a
+caps caption, "SUBJECT" over the numbers and "TOPICS" over the list. That is a
+change of *type*, not just of position: a caption names a region and cannot be
+mistaken for a destination. Both panes take one, which is also what gives the two
+halves a shared first line — the mismatched vertical rhythms were a separate
+finding and this closes it.
+
+**A card head states its own height.** Measured: 37px on the left pane and 42px
+on the right, so a hue band whose whole argument is that it reads as one strip had
+a 5px step in it. The cause was the ＋ — a 13.6px icon with 6px of vertical
+padding is taller than the title's 24.84px line box, and a flex item taller than
+its siblings grows the container, so a control was deciding how tall a head was.
+The band now takes a floor derived from the title's own line box, the button is
+constrained not to exceed it, and on a phone the band takes the 40px tap floor
+instead — on every head, which is the part that matters. The step inside a pair is
+now impossible, but the floor stays: a grid row can hold a pair beside a single
+card, and only one of those heads has a ＋.
+
+**Every card in a row ends on one line.** `.jjc-grid` was `align-items: start`, so
+Study's card was 15px taller than Media's beside it — Study declares a rating, its
+fourth cell's label wrapped, and the card ended where its content did. One
+label's length was deciding a row's alignment. And the label was the wrong length
+for what it says: the rating cell now reads the tracker's bare noun, because the
+three cells beside it are "notes", "last" and "open" and none of them explains how
+it was computed either.
+
+**The journal hue reaches all three card families.** The journals-section subject
+cards still had a `#282828` head — the same value as the section card around
+them, the exact defect 4.37.0 fixed one family over. They take the same mix into
+the same base, set once per journal so a card cannot disagree with its siblings.
+
+**Both empty states became the control they were describing.** *"add one from this
+journal's row above"* and *"Create one from the buttons on the row above"* both
+named a row that 4.36–4.37 deleted, and one of them had already gone stale once
+before. The empty body is a dashed add tile now — the same one the level grid ends
+with — so there is no sentence about chrome left to rot. What survives as prose is
+the half that was never about chrome: new containers appear on their own.
+
+**Both card grids end in the slot for the next card**, and neither had its tracks
+narrowed. The obvious reading of "half the section is bare" is that the columns
+are too wide, and it is wrong: `auto-fill` had already made more tracks than there
+were cards, so a smaller minimum would have made *more* empty tracks. The gap is a
+count, and the honest thing at the end of a list is what adds to it. The journal
+grid's tile is not the shared one — a journal is a declared type, not a folder, so
+its tile opens Settings, where journals are actually made.
+
+**A journal's create controls sit on its title line.** They were a full-width
+second row with a hairline over it, on a band whose right half was empty — ~34px
+per journal, and the same arrangement the level cards left behind in 4.37. Scoped
+to this section rather than fixed in the level-1 rule every section reads.
+
+**A card carried three controls for two actions.** The homepage journal card had a
+⋯ menu on its banner *and* a footer row holding *Open* and ＋ — where *Open* is
+what the title link does and ＋ is the menu's own second entry. The row is gone,
+which is 4.36.3's deletion applied to the other card family; it survived this long
+only because the two are built by two widgets.
+
+**Both ＋ glyphs state their size.** The head's was 12.24px and nothing said so —
+`--am-text-sm` at 0.85em, then 0.9em of that — which is why it was the smallest
+mark on the card while being the tallest thing in its band. It is 15px now, the
+title's cap height beside it; the tile's is 20px, because on an empty surface the
+＋ *is* the content. Two named values, so nobody later "fixes" them into
+agreement.
+
+**The activity legend no longer rides the year.** The strip scrolls to its recent
+end on load, which is right and stays — a year read from the wrong end is worse
+than a year that scrolls. But the legend was built *inside* the scroller four
+lines after that scroll, so the key to the colours was dragged off to the left and
+"Less" rendered as "ss" on exactly the panes narrow enough to need it. A legend is
+not part of the year.
+
+### Two findings that were wrong, and how
+
+Both were mine, both were stated confidently in a list of sixteen, and both
+dissolved on contact with the actual pixels and the actual source. They are
+recorded because the *method* that caught them is the transferable part.
+
+> **"The activity strip overflows its section and clips its cell labels."** The
+> stat band fits and clips nothing. What clips is the legend, for the unrelated
+> reason above. The fix that had been agreed for the stated problem — collapse a
+> tier earlier — would have reversed two documented decisions (3.12 §14.5 and
+> 4.13.3) on the strength of a misreading.
+
+> **"Narrowing the grid tracks will fix the empty space."** It would have made it
+> worse: both grids already create more tracks than they have cards, so a smaller
+> minimum adds empty tracks. Checked by arithmetic on the measured section widths
+> before implementing, not after.
+
+> A third correction is smaller but the same shape: `.jjs-group-name` was recorded
+> as already using `--text-accent`, which is why the card title was moved to it
+> "for consistency". It does not — it is `--am-bar-ink`, and `.jjs-row-link` is
+> `--text-normal`. The move stands on Obsidian's own link colour and on
+> `.jsh-crumbs a.jn-pill`, the plugin's other link to a container's folder note.
+> The wrong justification was in a code comment and a test; both now say what is
+> actually true, and record that three link treatments across two card families is
+> still open.
+
+## [4.37.0] - 2026-08-17
+
+**The journal cards get their colour, their create control moves into the head,
+and the homepage stops enumerating every journal's contents.** Four decisions,
+all four chosen from mockups rather than from a build — `dev-mockups/journal-
+dashboard-cards.html` drew six card heads and `dev-mockups/homepage-journal-
+cards.html` drew four homepage cards, and both are kept as the record of what the
+others were and what each traded.
+
+**A card head wears its journal's own hue.** It was `--background-secondary` on a
+`--background-primary-alt` body, which measured, in a real vault, as `#282828` on
+`#232323` — a 5/255 step, *and the same colour as the section card around it*. A
+head the colour of the thing surrounding it does not read as a lid; it reads as
+the section showing through a hole. It now takes 30% of `hueOf(journal.id)` mixed
+into the card's ground: the plugin's only per-journal identity colour, the same
+material the homepage card's banner already wears, so a reader arriving from that
+card meets the same colour. Mixed into a theme surface rather than stated as a
+literal, so one definition serves both themes with no override.
+
+**"New topic" moved from a row in the table to a ＋ in the card head.** The
+dashed row at the end of a contents card spent one of the four rows a card gets —
+a card holding two topics showed two topics and a control — on a body whose every
+other row is a topic. `sectionFrame` has always returned a slot for a section's
+own controls, and at level 2 it sits inline on the title line; both cards had been
+discarding that return value, which is the whole reason the control had nowhere to
+go. The ＋ **draws its label and hides it**, opening on hover of the card, so the
+button costs a glyph's width at rest and still answers *add what?* — with
+`aria-label` and `title` carrying the same word for keyboards, screen readers and
+touch, where the label is simply shown.
+
+**The add tile is the size of the slot it opens.** It always took one track, so on
+a grid drawing pairs it wrapped alone onto the next row and left half a row of
+nothing. It now spans a pair's footprint where the cards are pairs and one track
+where they are singles — decided from `hasLevelBelow`, the same predicate the
+pairing itself uses, so the tile cannot disagree with the cards beside it.
+
+**The homepage draws one card per journal, with its numbers.** `journals` drew
+every journal, every top-level container and every child of each — three levels on
+the homepage. **4.1 §2.2 refused a per-journal dashboard on exactly those
+grounds**, and 4.36 built the dashboard, so the argument now runs the other way:
+enumerating a journal's contents on the homepage is the duplication that release
+existed to remove. The homepage composes `journals:cards`, whose card is a name
+that opens that journal's dashboard over four figures about it — notes, last
+worked, open tasks, and either an average rating or a count of what is inside.
+`journals` is untouched and is still what the journals dashboard composes.
+
+None of those figures is new arithmetic: each comes from the function the
+dashboard's own cards already read, scoped to the journal's root, so a card and
+the page it opens cannot disagree. The card also became a query container, so its
+strip collapses against the card rather than the pane — 4.36.3's fix applied to
+the family that had the same defect.
+
+### Migrated
+
+**An existing homepage is upgraded, and it is opt-in.** Repair is additive and the
+journals section is already on the page, so reconciliation correctly does nothing
+— and the section's locator was widened to match both spellings precisely so
+repair would not add a *second* journals block beside yours. Correct, and it would
+have left every existing homepage on the old arrangement forever. So this is a
+one-off migration beside the Trends pair and the banner weld: one word on one
+line, ticked separately in **Set up / repair vault**, and it touches only a bare
+`journals` inside an `almanac` fence — never your prose, and never an argument you
+chose yourself.
+
+### Internal
+
+`hueOf` moved from `journals-cards.ts` to `journal.ts`. Two surfaces read it now
+and the first cannot be imported by the second — it imports `tables.ts` for the
+strip's numbers, so the edge would close a cycle in one hop. Same wall 4.36 hit
+sharing `childRow`, same answer: the shared thing moves to the module both already
+depend on. `ratingDefOf` and `ratingWord` are exported for the same reason.
+
+`countLabel` is deleted with its last caller. It survived 4.13.2 on the one
+distinction that mattered — a card saying "4 subjects" about a list it does not
+show is a reading, not a tally of visible rows — and that reading is still drawn,
+as the strip's fourth cell. A stat cell splits the number from the noun, so there
+is nothing left for a function returning the formatted phrase to fill.
+
+**A test that could not fail, and the correction above it.** See the 4.36.3 entry:
+the assertion holding "the rule under the head is gone" asked whether one rule
+mentioned a property rather than whether a border landed. It now pins which rule
+is in charge. One new assertion in this release survived its own mutation check
+first time round — hiding the ＋'s label with `display: none` satisfied a
+`max-width` assertion while removing the label from layout entirely — and pins the
+laid-out box instead.
+
+## [4.36.3] - 2026-08-17
+
+**The dashboard's cards get their cleanup, and the create controls move into the
+surfaces they create into.**
+
+**A pair is now one box, not two.** 4.36.1 drew a container and its contents as
+two separately bordered cards with the grid's gap between them — two unrelated
+objects that happen to be adjacent, on a section whose whole claim is that they
+belong together. The border, the radius and the clipping belong to the **pair**;
+the cards inside give theirs up and a single divider separates them. Under 560px
+the pair stacks and the divider turns with it, because a vertical rule between
+two stacked boxes is a line down the side of the lower one.
+
+**Fewer edges.** The section card's border, the card's border, a rule under the
+card's head and the stat strip's own hairlines were four lines of the same ink
+within about 20px of each other. The strip stops drawing hairlines inside a card,
+dividing its cells with a gap instead, and its reserved sub-line — which no card
+uses — no longer holds space under every number.
+
+> **Correction, added in 4.37.** This entry originally said *"the rule under the
+> head is gone"*. **It was not.** The `border-bottom` declaration was removed from
+> `.jld-card > .journal-sec`, and `.journal-sec`'s base rule went on painting one
+> on every card head in the plugin; nothing cancelled it. So this release removed
+> three of the four lines it described, not four. The line is still there in 4.37
+> and now stays deliberately, under a coloured head where it marks where the
+> colour stops. The test that was supposed to hold this asked whether one rule
+> *mentioned* the property rather than whether a border landed, and passed
+> throughout — it is rewritten in 4.37.
+
+**Create where you are looking.** Every card carried an action row — an *Open*
+button beside a bare **＋** opening a menu — and both halves answered questions
+the card had already answered: the card's **name is the link that opens it**, and
+a ＋ on a card is ambiguous about what it adds, which is the only reason it had
+to be a menu. The row is gone. In its place, **each surface that lists things
+ends with a dashed control that adds one of them**: a card-shaped tile closes the
+grid, and a row closes each contents card, in the same empty-slot vocabulary the
+tracker bar's *Add tracker* already uses. A brand-new journal's empty state now
+points at the tile under it instead of sending you to the Journals section.
+
+### Fixed
+
+**The stat strip was collapsing against the wrong thing.** It drops from four
+cells to two below 480px, measured against the nearest query container — which
+was the whole section, and never that narrow on a desktop. A card is around
+330px inside it, so four cells sat at roughly 80px each and `AVG CONFIDENCE`
+rendered as *"AVG CONFIDEN / CE"* with its value pushed onto a third line. The
+card is a query container now, so the existing rule measures the box the cells
+actually have to fit in. This is 4.3.1's lesson one level down: `@media` was
+wrong because it measured the window rather than the pane, and the block was
+wrong here because it measures the pane rather than the card.
+
+### Internal
+
+`enclosingQuery` in the widget's suite took the nearest `@container` *before* a
+selector without checking that its block was still open, and read a commented-out
+query in `05-inline-widgets.css` as structure. It counts braces over
+comment-stripped CSS now. The suite's source scrapes were bounded by the name of
+the *next* function, which silently became "the rest of the file" the moment that
+function was deleted — they find the end structurally instead, and one assertion
+counts occurrences rather than testing for presence, because the grid has two
+exits and both have to close with the tile.
+
+## [4.36.2] - 2026-08-16
+
+**A journal note's trail names its journal.** It reads
+`Journals › Study › Maths › Algebra` where it used to read
+`Journals › Maths › Algebra` — the journal was skipped because the trail is
+derived from the path *below* the journal's root and there was nothing at that
+root to link to. That was a missing file rather than a decision, and the rule the
+trail states about itself has always included it: *a trail names a note's
+ancestors, never the note itself*, and a journal is an ancestor of every note in
+it.
+
+A crumb whose page does not exist yet is **withheld rather than drawn dead**, so
+a vault gains the crumb when **Set up / repair vault** writes the page. And both
+dashboards drop their own crumb when they are the page you are on, which is the
+same rule one level up.
+
+**The documentation catches up** with the pages, the widget and the argument:
+`docs/reference.md`'s composed-pages table (whose opening count was already wrong
+— it said six notes over a table of eight pages), its `level-cards` and
+`journals-header` rows, and the Folder notes section of the in-vault README.
+
+### Internal
+
+`journalCrumbPath` is a pure sibling of `rootCrumbPath` rather than a widening of
+`journalAncestors`, which answers a different question — which CONTAINER folders
+a note is inside, read by the folder rollups, the banner's date line and the
+level index. A journal is not a container, and widening it would have changed
+four readers to give one a crumb.
+
+## [4.36.1] - 2026-08-16
+
+**A journal's dashboard draws its contents as cards.** Each folder in the
+journal gets a card carrying its numbers — notes, when it was last worked, open
+tasks, and the average rating where the journal rates anything — over **Open**
+and a **＋**. Where the journal has a second level, that card is joined by one
+beside it listing what is inside, so a two-level journal reads as pairs and a
+flat one as singles.
+
+**The ＋ is a menu rather than a named button**, and that is what makes one card
+work for both shapes: it offers *New topic* on a journal that has a level below,
+and one item per note type on a journal that does not. A named button would have
+had to become one button per note type on a flat journal — which is exactly what
+4.13.4 deleted from the journals card, for putting the same control on every
+card in the grid.
+
+**`level-cards:<journal>[/<folder>]`** is the widget, and it can go on any page.
+It takes `level-index`'s two arguments verbatim and resolves them through the
+same function, so the two are one question in two arrangements and an unknown
+journal gets the same sentence from either. At the deepest level it declines and
+names `level-index`, because a card is a container and what is below a deepest
+folder is notes.
+
+**Whether a container is paired is a question about the journal's shape, not
+about what is in the folder today.** A subject with no topics yet draws its pair
+with an empty list rather than being mistaken for a deepest level — the same
+correction 4.16 made to `level-index`, inherited by using the same predicate
+rather than by remembering.
+
+**A dashboard written by 4.36.0 keeps its table.** The Contents section
+recognises both spellings and repair is additive, so nothing is rewritten under
+a reader who preferred the table — or who has a journal with forty subjects, on
+which a table is the better page. Swapping is a one-word edit.
+
+### Internal
+
+**The card row has one implementation.** `topicRow` and `folderLink` move from
+`journals-section.ts` to `tables.ts` as `childRow` and `folderLink`, because two
+widgets draw that line now and `journals-section.ts` already imports from
+`tables.ts` — the only home the two can share without a cycle. What is shared is
+the row and the numbers, not the card: 4.13.4 decided a flat card is its head and
+4.13.3 traded a subject's fold for its card, and neither is reopened here.
+
+**The pairing test pins the call site, and says why.** The assertions that
+`hasLevelBelow` answers correctly went on passing when the builder was mutated to
+read the folder's current contents instead — the exact misreading 4.16 was
+written to correct. With no DOM in the suite, the honest instrument is the call
+site, labelled as the mechanism assertion it is.
+
+## [4.36.0] - 2026-08-16
+
+**Every journal now has a page about it.** Clicking a journal's folder — Study,
+Media, whatever you have made — opens a dashboard composed for it: the journal's
+name, a twelve-month activity band scoped to that journal alone, everything
+inside it, and its open tasks. A **Review** queue, a **Totals** band, a **Tally**,
+a **Tags** cloud and a **charts** region are offered in *Edit this note's
+sections…* rather than written for you, because each of them draws nothing on a
+journal that has not got the thing it counts.
+
+**Three controls that never did anything now work.** `journals:cards` and
+`journal-card:<journal>` have given each journal a title link, an *Open ✕* menu
+item and an *Open ✕* button since 4.2, and all three open the journal's folder
+note — which nothing in the plugin had ever created. The same note is where a
+`banner:` property is read from, so a journal card can finally wear an image.
+
+**The activity band can be pointed at one journal.** `journals-header:study`
+covers Study; bare — which is what every note carrying it today has — still
+covers every enabled journal, and `journals-header:all` is that said out loud.
+An id this vault does not have draws the list of the ones it does, rather than
+an empty band that looks like the widget not being there.
+
+Run **Set up / repair vault** to get the pages. They are written only where they
+are missing; a journal you make afterwards gets one as it is created, and a
+journal adopted from a folder gets one when its manifest is read.
+
+### Internal
+
+**`shippedNotes` takes the registered journals, and takes them as a required
+argument.** Four walks read that list — the one that creates missing pages, the
+one that converges existing ones, and the migration's dry run and write — and a
+defaulted parameter would have compiled at all four while silently omitting the
+new pages from two. The compiler enumerates the callers instead.
+
+**The journal dashboard is a third row in the flat-dashboard test table**, not a
+fourth copy of it: locating what it composes, planning no foreign runs, pinning
+its banner and restoring a file exactly on remove-then-re-add are properties of a
+flat note, and a page that met them only by having been written on the same day
+as the assertions is the drift that table exists to catch.
+
 ## [4.35.3] - 2026-08-16
 
 **A button holding an open menu looks pressed.** "Presets" and the Events

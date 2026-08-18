@@ -29,33 +29,73 @@
   --am-radius-md: 10px;  /* cards: callouts, calendar, tracker rows, tag groups */
   --am-radius-pill: 999px; /* every pill-shaped button, link and badge */
 
-  /* ── Surface depth hierarchy & Frames (4.24 §1) ── */
-  --am-surface-card: var(--background-secondary);
-  --am-surface-raised: var(--background-secondary-alt);
-  --am-surface-inset: var(--background-primary-alt);
+  /* THE SURFACE AND BORDER ALIASES MOVED TO `body` IN 4.42 — see the block at
+     the foot of this file. Every one of them names an OBSIDIAN variable, and
+     Obsidian declares its colours on `body` (`.theme-dark` / `.theme-light` are
+     classes on `body`); `:root` is the `html` element and has none of them. A
+     custom property's `var()` references are substituted **on the element that
+     declares it**, so a theme colour aliased here resolved against an element
+     that has never had it. Nothing about that is specific to `color-mix`, which
+     is what 4.40.1 got wrong. */
 
   /* Subtle border & edge highlight */
-  --am-border-subtle: var(--background-modifier-border);
-  --am-border-hover: var(--background-modifier-border-hover);
-  --am-border-focus: var(--interactive-accent);
-  /* AN EDGE FOR A CARD THAT IS ALREADY INSIDE ONE (4.35.2).
-     `--am-border-subtle` is an alias for `--background-modifier-border` and is
-     therefore the same ink as the section card's own edge — so a card nested in
-     a section drew two identical 1px lines a dozen pixels apart, which is the
-     shape 4.13.5 §23 spent a release removing elsewhere. It is milder here,
-     because the grounds between them differ and the inner one is the quieter,
-     which is what `.jjs-card`'s own note argues makes the nesting deliberate.
-     Milder is not the same as right: the OUTER edge is the boundary and the
-     inner one is a seam, and they were saying it at the same volume.
-     Mixed toward the surface the card sits ON, so the seam is a fraction of the
-     step rather than a repeat of it. One definition serves both themes: every
-     term is a variable, so it resolves per theme with no override below. */
-  --am-border-inner: color-mix(
-    in srgb,
-    var(--background-modifier-border) 55%,
-    var(--am-surface-inset)
-  );
+  /* ── AN EDGE FOR A CARD THAT IS ALREADY INSIDE ONE (4.35.2) ──────────
+     The card sits inside the section card, whose edge is `--background-
+     modifier-border`, so an inner card wearing the same ink drew one boundary
+     twice a dozen pixels apart — the shape 4.13.5 §23 spent a release removing.
+     The outer edge is the boundary and the inner one is a SEAM, and they were
+     saying it at the same volume. This is the seam: a step off the surface the
+     card sits on, quieter than the boundary outside it.
+
+     ── A PLAIN VALUE, AFTER THREE RELEASES OF IT NOT DRAWING AT ALL (4.42) ─
+     It was `color-mix(in srgb, var(--background-modifier-border) 55%,
+     var(--am-surface-inset))`, and on every screenshot from 4.35.2 to 4.41.0 the
+     cards that read it came back with a **`#dadada`** edge — `currentColor`, the
+     initial `border-color`, which is what an element gets when the colour it
+     asked for is invalid.
+
+     4.40 blamed the shorthand (real, fixed, not the cause). 4.40.1 blamed
+     `:root` and moved the mix to `body` (right about the placement, still white
+     on the next render). At that point the remaining unresolved term was
+     `var(--am-surface-inset)` — itself a `:root` alias of a theme variable — and
+     the mix could ALSO be failing simply because a `color-mix` over `var()`s
+     inside a custom property does not compute here. **A screenshot cannot
+     separate those two, and it does not have to: a plain value is immune to
+     both.**
+
+     WHAT IS GIVEN UP, STATED HONESTLY. The mix adapted to whatever border
+     colour a theme declared; a white-alpha hair does not. That was the better
+     idea and it has never once drawn — an adaptive value that renders as
+     `currentColor` is not adaptive, it is broken. `--am-edge-highlight` and
+     `--am-slot-edge` are the same decision, and `--am-slot-edge` is the reason
+     to trust this one: measured at `#333333` over `#232323` on
+     `20260818_20h59m08s_grim.png`, exactly what the arithmetic says.
+
+     0.06 over the card's `#232323` is `#303030` — a step off the surface,
+     quieter than the `#333333` boundary outside it, which is the whole point of
+     the token. */
+  --am-border-inner: rgba(255, 255, 255, 0.06);
   --am-edge-highlight: rgba(255, 255, 255, 0.04);
+  /* ── THE EDGE OF AN EMPTY SLOT, AND IT MUST NOT MARCH (4.40) ──────────
+     MEASURED COMPLAINT: *"the tiles have ant-pattern lines around them now, and
+     it is too jarring"*, on `20260818_20h01m16s_grim.png`. The add card's dash
+     came back **3px wide in `#dadada`** — a near-white rope around a box whose
+     ground is `#232323`. See the fault note at `.jjs-card` for why it was white
+     and 3px, which is a different bug from this one.
+
+     THIS TOKEN IS THE OTHER HALF: what the edge should say. A dashed border is
+     already the loudest edge in the vocabulary — it is broken, so it flickers as
+     the eye travels it — and it does not also need contrast. It marks WHERE a
+     card would go; the tile's label says what pressing it does. So it sits a
+     hair above the surface and no more.
+
+     A PLAIN VALUE, NOT A MIX, AND IT STAYS ONE (4.40.1). `--am-border-inner`'s
+     mix is the fault that opened this file, and although the cause turned out to
+     be WHERE it was declared rather than the mix itself, the conclusion holds:
+     the one edge on the page that is drawn ONLY as an edge should not depend on
+     a computation at all. `--am-edge-highlight` two lines up is the same decision
+     for the same reason, and both resolve per theme by having a twin below. */
+  --am-slot-edge: rgba(255, 255, 255, 0.07);
 
   /* Card shadow elevation */
   --am-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
@@ -236,14 +276,16 @@
      to align a column of titles, and it can only do that if what sits in it is
      legible. 0.85em is the smallest size at which the shipped glyphs still read.
 
-     NO THEME VARIABLE IS READ HERE, which is why these may live in `:root` — see
-     the `body` block at the end of this file for the one that cannot. */
+     THIS SAID "NO THEME VARIABLE IS READ HERE, WHICH IS WHY THESE MAY LIVE IN
+     `:root`" AND IT WAS FALSE (4.42) — two lines below it, `--am-bar-ink` read
+     `--text-muted` and `--am-sec-title-ink` read `--text-normal`. The rule the
+     sentence states is right; the claim that these obeyed it was not. Both have
+     moved to `body`, and the guard in `tokens.test.ts` now checks the rule
+     rather than trusting a comment to have been kept true. */
   --am-bar-text: var(--am-text-2xs);
   --am-bar-track: 0.06em;
-  --am-bar-ink: var(--text-muted);
   --am-bar-glyph: var(--am-text-sm);
   --am-sec-title-size: var(--am-text-lg);
-  --am-sec-title-ink: var(--text-normal);
   /* Added in 2.53 for the week table's date, the first place in the sheet that
      wanted type *above* body size. Named rather than written as a literal so
      the next one that does agrees with it. It is now the size a NOTE'S NAME is
@@ -589,6 +631,33 @@ body.is-mobile .jrc-grade button {
    second hardcoded hue that silently wins whenever the real lookup breaks,
    which is the same failure with the evidence removed. */
 body {
+  /* ── EVERY TOKEN THAT NAMES A THEME COLOUR LIVES HERE (4.42) ───────────
+     NOT A STYLE CHOICE. Obsidian declares its colours on `body` — `.theme-dark`
+     and `.theme-light` are classes on `body` — and a custom property's `var()`
+     references are substituted on the element that DECLARES it, not on the
+     element that uses it. A theme colour aliased on `:root` therefore resolves
+     against the `html` element, which has never had one, and the token is
+     invalid for everything that inherits it.
+
+     That is the fault behind three releases of white card borders, and it is not
+     specific to `color-mix`: a lone `var(--background-secondary)` on `:root` is
+     wrong for exactly the same reason. `tokens.test.ts` refuses any `:root`
+     token that reads a variable `:root` does not itself define, so this cannot
+     drift back one alias at a time. */
+
+  /* Surface depth hierarchy & Frames (4.24 §1) */
+  --am-surface-card: var(--background-secondary);
+  --am-surface-raised: var(--background-secondary-alt);
+  --am-surface-inset: var(--background-primary-alt);
+
+  /* Subtle border & edge */
+  --am-border-subtle: var(--background-modifier-border);
+  --am-border-hover: var(--background-modifier-border-hover);
+  --am-border-focus: var(--interactive-accent);
+
+  /* Header-bar and section-title ink */
+  --am-bar-ink: var(--text-muted);
+  --am-sec-title-ink: var(--text-normal);
   --am-area-diary: var(--interactive-accent);
   --am-area-diary-rgb: var(--interactive-accent-rgb, 138, 92, 245);
   --am-area-journals: var(--am-ev-blue);
@@ -613,6 +682,15 @@ body {
    theme-specific token goes here. */
 body.theme-light {
   --am-edge-highlight: rgba(0, 0, 0, 0.03);
+  /* DARKER, AND STRONGER THAN THE DARK TWIN. A 6% white hair over a near-black
+     card is a visible step; 6% black over a near-white one is not — the eye's
+     response to a light increment on a dark ground is not the response to a dark
+     increment on a light one, which is why every pair in this file is two numbers
+     rather than one sign flip. */
+  --am-border-inner: rgba(0, 0, 0, 0.09);
+  /* Darker rather than lighter, and slightly stronger: an 0.07 white hair over a
+     near-white card is invisible, and the slot has to be findable to be pressed. */
+  --am-slot-edge: rgba(0, 0, 0, 0.1);
   --am-surface-accent-subtle: color-mix(
     in srgb,
     var(--interactive-accent) 5%,

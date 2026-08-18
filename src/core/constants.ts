@@ -199,6 +199,46 @@ export const JOURNALS_TITLE = "📚 Journals";
 // migration can find and replace an older, markdown-generated container.
 export const JOURNALS_DIRECTIVE = "journals";
 
+// ── AND THE ONE QUESTION EVERYTHING ELSE ASKS ABOUT IT (4.38.3) ──────────
+//
+// "Does this note already carry the Journals section?" was asked in FOUR places,
+// each with its own spelling of the answer, and three of them were wrong the
+// moment 4.37 introduced `journals:cards`:
+//
+//   • `ensureJournalsBlock` compared a line to `JOURNALS_DIRECTIVE` exactly, so
+//     it saw `journals:cards` as *absent* and appended a SECOND block. That is
+//     the one a reader hit on a clean vault: install, add Study — which calls
+//     `rebuildJournalHome` — and the homepage silently gained a duplicate
+//     Journals section before repair had ever run.
+//   • `journals-dashboard-sections.ts`'s `locate` did the same, which turned
+//     4.37's migration into a page that grew a section on every repair (4.38.2).
+//   • `home-sections.ts`'s `locate` was widened by hand in 4.37 to `journals\S*`,
+//     which is why the homepage never duplicated *through repair* — a fourth
+//     spelling that happened to be right.
+//
+// AN ARGUMENT IS AN ARRANGEMENT, NOT A DIFFERENT SECTION. `journals` and
+// `journals:cards` are one section drawn two ways, so every "is it here?" must
+// answer yes to both. Having said that once, here, is the fix; the three patches
+// that preceded it each corrected one caller and left the others to be found by a
+// reader.
+//
+// `journals-header:study` MUST NOT MATCH. It is a different widget sharing seven
+// letters, and it sits on every journal dashboard — so the directive is matched
+// whole, with an optional `:argument`, never by prefix. `journals\S*` did match it
+// and got away with it only because no page composes both.
+const JOURNALS_DIRECTIVE_BODY = "journals(?::[a-z-]+)?";
+
+// For a probe over a whole note — what `locate` uses.
+export const JOURNALS_DIRECTIVE_LINE = new RegExp(
+  `^${JOURNALS_DIRECTIVE_BODY}\\s*$`,
+  "m"
+);
+
+// For a single line already in hand — what the fence walkers use.
+const JOURNALS_DIRECTIVE_EXACT = new RegExp(`^${JOURNALS_DIRECTIVE_BODY}$`);
+export const isJournalsDirective = (line: string): boolean =>
+  JOURNALS_DIRECTIVE_EXACT.test(line.trim());
+
 // Per-note chart region. The chart manager owns the body of this section:
 // everything between this heading and the next heading of the same or higher
 // level (or end of file). No invisible marker text — the heading itself is the

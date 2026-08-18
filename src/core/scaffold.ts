@@ -8,6 +8,7 @@
 import { App, Notice, TFile, normalizePath } from "obsidian";
 import type AlmanacPlugin from "../main";
 import {
+  basename,
   createFileEnsuringFolders,
   ensureFolder,
   filesUnder,
@@ -38,6 +39,7 @@ import {
 } from "../journals/custom-journal";
 import { STUDY_JOURNAL, registeredJournalTypes } from "../journals/journal";
 import type { JournalType } from "../journals/journal";
+import { composeJournalDashboardNote } from "../journals/journal-dashboard-sections";
 import {
   findSection,
   templateTargets,
@@ -77,7 +79,7 @@ import {
   findDashboardCatchups,
 } from "../journals/dashboard-catchup";
 import type { DashboardCatchup } from "../journals/dashboard-catchup";
-import { composeHomeNote } from "../diary/home-sections";
+import { composeHomeNote, collapseJournalsBlocks } from "../diary/home-sections";
 import { composeDiaryDashboardNote } from "../diary/diary-dashboard-sections";
 import { composeJournalsDashboardNote } from "../journals/journals-dashboard-sections";
 import { composeSearchNote } from "../diary/search-sections";
@@ -219,8 +221,25 @@ export function isReconcilable(note: ShippedNote): boolean {
 // other would compose a template that differs from the one on disk by a
 // reorder, and `surveyDiaryTemplatesDrift` would then offer to undo every save
 // the reader had made.
+// `types` IS REQUIRED, AND THAT IS THE DECISION (4.36 §0.2).
+//
+// Four walks read this list — `planCreate` writes what is missing,
+// `reconcileLayouts` converges what exists, and the migration dry run and write
+// chase the Trends section and the banner weld through both. A per-journal
+// dashboard has to be in all four, and a DEFAULTED parameter would compile at
+// every call site while silently omitting them from the two that pass only
+// `p`.
+//
+// That is the shape of hole `isReconcilable` above describes in its own comment
+// — "correct for every composed note that has ever existed … a hole rather than
+// a decision" — and the cheapest guard against it is the compiler: required
+// means every caller has to answer, and a new caller cannot forget.
+//
+// SECOND, NOT LAST, because it is the parameter every caller has and the two
+// after it are a configured vault's own additions to the entry templates.
 export function shippedNotes(
   p: typeof DEFAULT_PATHS,
+  types: readonly JournalType[],
   extras: Partial<Record<TrackerClass, readonly SectionWant[]>> = {},
   bands: Partial<Record<TrackerClass, readonly string[]>> = {}
 ): ShippedNote[] {
@@ -291,6 +310,30 @@ export function shippedNotes(
     })),
     { asset: "diary.base", dest: `${p.infrastructureRoot}/Diary.base` },
     { asset: "documentation.md", dest: `${p.documentation}/README.md` },
+    // ONE FOLDER-NOTE DASHBOARD PER REGISTERED JOURNAL, 4.36 §0.2.
+    //
+    // The gap 4.1 §2 closed at `02 - Diary/` and `03 - Journals/` exists again
+    // one level in: a journal's root is the folder a reader clicks and it had no
+    // note in it. `journals-cards.ts` has opened this exact path since 4.2 —
+    // from the card's title, its overflow item and its action button — and
+    // nothing has ever written it, so all three did nothing.
+    //
+    // DERIVED, NOT CONFIGURED, on §2.5's argument applied one level in: a folder
+    // note moves with its folder for free, so there is no path key to add to
+    // `PATH_LABELS`, `ROOT_CHILDREN`, `remapConfiguredPaths` or the registry
+    // mirror. A settings entry would exist only to point "Study's dashboard" at
+    // a note outside Study, which is the thing the convention prevents.
+    //
+    // LAST IN THE LIST, so a vault set up from nothing writes the homepage and
+    // the two folder notes these link up into before it writes them. Nothing
+    // depends on the order — every entry is independent and `planCreate` writes
+    // whatever is missing — but the list is read by people and this is the
+    // vault's own shape.
+    ...types.map((type) => ({
+      content: composeJournalDashboardNote(type),
+      dest: folderNotePath(type.root),
+      surface: { kind: "journal-dashboard" as const, ctx: { type } },
+    })),
   ];
 }
 
@@ -319,6 +362,27 @@ export interface LayoutChange {
 // that would describe the wrong scope if it were ever asked.
 const hostFolderOf = (dest: string): string =>
   dest.split("/").slice(0, -1).join("/");
+
+// Which spelling of the journals directive a given shipped page wants (4.38.2).
+//
+// TWO PAGES COMPOSE A JOURNALS SECTION AND THEY DISAGREE ON PURPOSE. The homepage
+// draws `journals:cards` — one card per journal, linking to its dashboard, which
+// is what 4.37 chose. The journals DASHBOARD draws the bare `journals` — the full
+// index, hero and per-journal groups — because on that page the section is not a
+// summary of somewhere else, it IS the page.
+//
+// 4.37's migration did not know that and rewrote both, which is the whole of the
+// duplicate-sections bug. Deciding it HERE, from the path, is what stops a text
+// function guessing at something only the caller can know.
+//
+// ANY OTHER PAGE GETS THE DASHBOARD'S ANSWER, and it costs nothing: no other
+// shipped note composes a journals block at all, so `collapseJournalsBlocks`
+// finds none and returns null before the argument is ever used.
+const journalsArgumentFor = (
+  dest: string,
+  paths: { home: string }
+): "journals" | "journals:cards" =>
+  normalizePath(dest) === normalizePath(paths.home) ? "journals:cards" : "journals";
 
 export class Scaffold {
   constructor(private app: App, private plugin: AlmanacPlugin) {}
@@ -403,6 +467,27 @@ export class Scaffold {
     const original = await this.app.vault.read(file);
     const welded = mergeBannerFences(original);
     if (welded != null) await this.app.vault.modify(file, welded);
+  }
+
+  // The homepage's journals block, retargeted from the three-level list to one
+  // card per journal. 4.37.
+  //
+  // `weldBanner`'s SHAPE EXACTLY, which is `mergeEntryBanners`' shape before it:
+  // read, call a pure function, write only on a non-null answer. Fourth surface,
+  // third migration written this way, and the repetition is the point — a
+  // migration that looks like the last one is a migration a reader can check.
+  //
+  // TAKES A PATH AND NOT A FOLDER for the same reason: the caller already holds
+  // the list of pages this plugin composes, and only one of them can match.
+  //
+  // ERRORS ARE THE CALLER'S, inside the same `try` as the other four, so one
+  // page's failure leaves that page exactly as it was.
+  private async cardJournalsBlock(path: string): Promise<void> {
+    const file = getFile(this.app, path);
+    if (!(file instanceof TFile)) return;
+    const original = await this.app.vault.read(file);
+    const carded = collapseJournalsBlocks(original, journalsArgumentFor(path, this.paths));
+    if (carded != null) await this.app.vault.modify(file, carded);
   }
 
   // Overwrite the shipped diary assets with the current bundled versions,
@@ -643,6 +728,27 @@ export class Scaffold {
     const written: string[] = [];
     const type = buildJournalType(cfg);
 
+    // THE JOURNAL'S OWN DASHBOARD, WRITTEN HERE BECAUSE THIS IS THE DOOR EVERY
+    // OTHER PATH GOES THROUGH (4.36 §0.3). `createJournalType` covers the
+    // wizard; a kind added, a journal edited, a preset installed and an ADOPTED
+    // journal all arrive here instead, and a journal that came back from a
+    // manifest with no page about it would be the same gap this release closes.
+    //
+    // NEVER OVERWRITES, unlike the `.base` below it, and the difference is who
+    // owns the file. A `.base` is generated YAML with nothing of the reader's in
+    // it; this page holds their charts, their prose and whatever sections they
+    // have added. Converging it is `reconcileLayouts`' job, which is additive by
+    // construction and shows a diff first.
+    const dashPath = folderNotePath(cfg.root);
+    if (!getFile(this.app, dashPath)) {
+      await createFileEnsuringFolders(
+        this.app,
+        dashPath,
+        composeJournalDashboardNote(type)
+      );
+      written.push(basename(dashPath));
+    }
+
     for (const tpl of customTemplateFiles(cfg)) {
       const dest = `${cfg.templatesFolder}/${tpl.name}`;
       if (getFile(this.app, dest)) continue;
@@ -691,6 +797,23 @@ export class Scaffold {
       const file = await createFileEnsuringFolders(this.app, dest, tpl.content);
       first ??= file;
       written++;
+    }
+
+    // The page about this journal, at its folder's own note (4.36 §0.3). Written
+    // here as well as in `ensureJournalTemplates` — which the wizard does not
+    // call — so a journal has a page from the moment it exists rather than from
+    // the next repair.
+    //
+    // NEVER OVERWRITES, the rule this whole routine follows and for the reason
+    // stated above it: a folder reused for a second journal of the same name
+    // would otherwise lose the first one's page along with its edited templates.
+    const dashPath = folderNotePath(cfg.root);
+    if (!getFile(this.app, dashPath)) {
+      await createFileEnsuringFolders(
+        this.app,
+        dashPath,
+        composeJournalDashboardNote(type)
+      );
     }
 
     // The definition, written beside the notes it describes. This is what
@@ -878,6 +1001,7 @@ export class Scaffold {
     const out: LayoutChange[] = [];
     for (const note of shippedNotes(
       this.paths,
+      registeredJournalTypes(this.plugin),
       this.plugin.settings.entrySections,
       this.plugin.settings.entrySectionBand
     )) {
@@ -990,7 +1114,11 @@ export class Scaffold {
   // same memory that forgot the first".
   private async planCreate(): Promise<{
     folders: string[];
-    files: { dest: string; content: string }[];
+    // `hidden` — see the declaration in the body. It travels on the plan rather
+    // than being re-derived from the path at write time, because "is this a
+    // dotfile" is a fact the planner already had to know to check whether the
+    // file was there.
+    files: { dest: string; content: string; hidden?: boolean }[];
     missingAssets: number;
   }> {
     const p = this.paths;
@@ -1016,7 +1144,14 @@ export class Scaffold {
       folders.push(cfg.root, cfg.templatesFolder);
     }
 
-    const files: { dest: string; content: string }[] = [];
+    // `hidden` MARKS A FILE OBSIDIAN'S VAULT CANNOT SEE (4.38.1). A dotfile is
+    // excluded from the vault index, so `getFile` returns null for one that is
+    // sitting right there on disk and `vault.create` throws "File already
+    // exists" when asked to make it again. `journal-manifest.ts` states the rule
+    // this flag carries — *"the adapter while the rest of the plugin talks to
+    // the vault"* — and `writeManifest` has always obeyed it. This planner did
+    // not, which is the bug below.
+    const files: { dest: string; content: string; hidden?: boolean }[] = [];
     let missingAssets = 0;
 
     // Every registered journal type gets an all-notes .base, generated from the
@@ -1031,6 +1166,7 @@ export class Scaffold {
 
     for (const note of shippedNotes(
       p,
+      registeredJournalTypes(this.plugin),
       this.plugin.settings.entrySections,
       this.plugin.settings.entrySectionBand
     )) {
@@ -1073,9 +1209,37 @@ export class Scaffold {
           manifestCarriesTracker(t, cfg.id)
         )
       );
-      const existing = getFile(this.app, dest);
-      if (existing && (await this.app.vault.read(existing)) === content) continue;
-      files.push({ dest, content });
+      // ── THROUGH THE ADAPTER, NOT THE VAULT (4.38.1) ──────────────────────
+      //
+      // This read `getFile(this.app, dest)` and then `vault.read(existing)`, and
+      // BOTH ANSWER null FOR A DOTFILE WHETHER OR NOT IT EXISTS — Obsidian keeps
+      // dotfiles out of the vault index entirely. Two consequences, and the
+      // second is what a reader actually reported:
+      //
+      //   • Every manifest was listed as "create this file" on every repair,
+      //     forever, because the drift check below could never run. A vault with
+      //     four journals showed four identical `.almanac-journal.json` rows in
+      //     the window each time it was opened.
+      //   • And applying it THREW. `createFileEnsuringFolders` also asks the
+      //     vault, also gets null, and calls `vault.create` on a path that is
+      //     already on disk — which raises "File already exists". That escaped
+      //     the create loop, aborted `applyRepair` before the migrations group
+      //     ran, and skipped the closing notice: repair reported changes, wrote
+      //     nothing, and said nothing. The migration it stranded was innocent.
+      //
+      // `writeManifest` has used the adapter since manifests existed and
+      // `manifestPathFor`'s own comment states the rule. This is that rule
+      // applied to the one caller that had missed it.
+      const adapter = this.app.vault.adapter;
+      if (await adapter.exists(dest)) {
+        try {
+          if ((await adapter.read(dest)) === content) continue;
+        } catch (e) {
+          // Unreadable is not "unchanged": fall through and offer to rewrite it.
+          console.error(`[Almanac] could not read the manifest at ${dest}`, e);
+        }
+      }
+      files.push({ dest, content, hidden: true });
     }
 
     // The special-events note, through the store's own definition of what a
@@ -1116,7 +1280,12 @@ export class Scaffold {
       }
     }
 
-    for (const dash of shippedNotes(p).filter(isReconcilable).map((f) => f.dest)) {
+    // THE JOURNAL DASHBOARDS ARE IN THIS WALK TOO (4.36 §0.2), which is what the
+    // required parameter buys: this call read `shippedNotes(p)` and would have
+    // gone on compiling with the new pages silently absent from the migration.
+    for (const dash of shippedNotes(p, registeredJournalTypes(this.plugin))
+      .filter(isReconcilable)
+      .map((f) => f.dest)) {
       const file = getFile(this.app, dash);
       if (!file) continue;
       try {
@@ -1143,7 +1312,20 @@ export class Scaffold {
         // same note, and the second diff would be computed against a text the
         // first had not been applied to — a preview that could not happen.
         const welded = mergeBannerFences(respelled) ?? respelled;
-        if (welded === original) continue;
+        // AND THE JOURNALS BLOCK, FIFTH (4.37, CORRECTED IN 4.38.2).
+        //
+        // THE CLAIM THAT STOOD HERE WAS FALSE AND IT WAS THE BUG: *"it only ever
+        // matches one page in the vault, which is why it can sit in this loop
+        // rather than needing a walk of its own."* The journals DASHBOARD composes
+        // a bare `journals` too, so this loop rewrote that page's main section to a
+        // spelling its own `locate` could not find — and `reconcileLayouts` then
+        // added a second one, every single time repair ran. See
+        // `collapseJournalsBlocks` for the full account.
+        //
+        // The spelling is the PAGE's, so it is chosen here where the path is known
+        // rather than guessed inside a text function that cannot see one.
+        const carded = collapseJournalsBlocks(welded, journalsArgumentFor(dash, p)) ?? welded;
+        if (carded === original) continue;
         // ONE OP PER MIGRATION THAT ACTUALLY FIRED. `ops` is a list precisely so
         // a file can report more than one, and a page that only needs the weld
         // must not be labelled with the Trends sentence — the window's rows are
@@ -1167,11 +1349,17 @@ export class Scaffold {
             detail: "weld the page's name and its navigation row into one banner",
           });
         }
+        if (carded !== welded) {
+          ops.push({
+            kind: "migrate",
+            detail: "draw the Journals section as one card per journal",
+          });
+        }
         out.push({
           path: dash,
           label: dash.split("/").pop() ?? dash,
           ops,
-          diff: diffText(original, welded),
+          diff: diffText(original, carded),
         });
       } catch (e) {
         console.error(`[Almanac] Trends scan failed for ${dash}`, e);
@@ -1341,17 +1529,47 @@ export class Scaffold {
 
     if (chosen.has("create")) {
       for (const folder of create.folders) await ensureFolder(this.app, folder);
-      for (const { dest, content } of create.files) {
-        const existing = getFile(this.app, dest);
-        // A MANIFEST IS THE ONE ENTRY THAT MAY ALREADY EXIST — `planCreate`
-        // lists it when it has drifted, and every other entry is listed only
-        // when absent. So this writes rather than skips, and the never-overwrite
-        // rule is kept where it belongs: in what gets LISTED.
-        if (existing) await this.app.vault.modify(existing, content);
-        else await createFileEnsuringFolders(this.app, dest, content);
-        created++;
+      // ── ONE FILE'S FAILURE IS ONE FILE'S FAILURE (4.38.1) ──────────────────
+      //
+      // This loop had no `try`, and every other group in this method does. A
+      // single throw here escaped `applyRepair` entirely: the groups below never
+      // ran, and the closing notice — which is unconditional, and is the only
+      // thing that tells a reader the command finished — never fired either. So
+      // the window listed changes, the button did nothing, and nothing said why.
+      //
+      // The cause was the dotfile bug `planCreate` now fixes, but the shape of
+      // the failure is the part worth defending against: a create loop is the
+      // FIRST group, so anything it throws takes the whole repair with it. Now a
+      // file that cannot be written is counted, named in the console and named
+      // in the notice, and the migrations still run.
+      let failed = 0;
+      for (const { dest, content, hidden } of create.files) {
+        try {
+          if (hidden) {
+            // A dotfile: invisible to the vault index, so it is written the same
+            // way `writeManifest` writes it. The folder still comes from the
+            // vault, because a FOLDER is indexed even when a file in it is not.
+            const parent = dest.split("/").slice(0, -1).join("/");
+            if (parent) await ensureFolder(this.app, parent);
+            await this.app.vault.adapter.write(dest, content);
+            created++;
+            continue;
+          }
+          const existing = getFile(this.app, dest);
+          // A MANIFEST IS THE ONE ENTRY THAT MAY ALREADY EXIST — `planCreate`
+          // lists it when it has drifted, and every other entry is listed only
+          // when absent. So this writes rather than skips, and the never-overwrite
+          // rule is kept where it belongs: in what gets LISTED.
+          if (existing) await this.app.vault.modify(existing, content);
+          else await createFileEnsuringFolders(this.app, dest, content);
+          created++;
+        } catch (e) {
+          failed++;
+          console.error(`[Almanac] could not write ${dest}`, e);
+        }
       }
       if (created > 0) parts.push(`created ${created} file(s)`);
+      if (failed > 0) parts.push(`${failed} file(s) failed — check the console`);
     }
 
     if (chosen.has("pages")) {
@@ -1427,7 +1645,7 @@ export class Scaffold {
       // §6.1). This walk used to restate the guards inline and had the identical
       // hole for the identical reason: its filter tested the ASSET's extension,
       // and a composed entry has no asset to test.
-      for (const dash of shippedNotes(this.paths)
+      for (const dash of shippedNotes(this.paths, registeredJournalTypes(this.plugin))
         .filter(isReconcilable)
         .map((f) => f.dest)) {
         try {
@@ -1462,6 +1680,20 @@ export class Scaffold {
           // wants their two blocks left alone simply does not tick it — and
           // nothing else in this release writes to their notes.
           await this.weldBanner(dash);
+          // AND THE HOMEPAGE'S JOURNALS BLOCK (4.37), fifth and last, in the
+          // order the dry run chains them.
+          //
+          // WHY IT IS A MIGRATION AND NOT REPAIR, stated where a reader looking
+          // for it will be: the section is already on the page, so
+          // `reconcileLayouts` has nothing to add — and its `locate` probe was
+          // widened to match both spellings precisely so repair would NOT add a
+          // second journals block beside the reader's. Correct, and it leaves the
+          // page on the old arrangement, which is what this fixes.
+          //
+          // OPT-IN with the other four: the `migrations` group is ticked
+          // separately in the repair window, so a reader who wants their
+          // three-level list keeps it by not ticking it.
+          await this.cardJournalsBlock(dash);
         } catch (e) {
           console.error(`[Almanac] Trends migration failed for ${dash}`, e);
         }

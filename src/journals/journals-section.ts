@@ -44,17 +44,18 @@
 import { MarkdownPostProcessorContext, setIcon, TFolder } from "obsidian";
 import type AlmanacPlugin from "../main";
 import { buildJournalsHeader } from "./journals-header";
+import { openReorganiseJournals } from "./reorganise-journals";
 import {
   JournalLevel,
   JournalType,
   journalChildFolders,
   registeredJournalTypes,
   folderEmoji,
+  hueOf,
 } from "./journal";
-import { getFile, getFolder, noExt, openFile, plural } from "../core/util";
-import { relativeActivity } from "../core/query";
-import { folderActivity, sumBodyTasks } from "../ui/tables";
-import { sectionFrame, splitGlyph } from "../ui/section-frame";
+import { getFolder, plural } from "../core/util";
+import { addCardTile, addTile, childRow, folderLink } from "../ui/tables";
+import { sectionFrame } from "../ui/section-frame";
 
 // ── Collapse state ───────────────────────────────────────────────────────
 // Shares settings.collapsedNoteSections with headerbar.ts, whose own keys are
@@ -156,46 +157,6 @@ function addButtons(parent: HTMLElement, specs: BtnSpec[]): HTMLElement {
   return group;
 }
 
-// A link to a container folder's index note ("Maths/Maths.md"), with the hover
-// preview wiring Obsidian's own internal links get. Falls back to plain text
-// when the index note is missing, which happens if someone made the folder by
-// hand — better a visible, unclickable name than a dead link.
-function folderLink(
-  plugin: AlmanacPlugin,
-  parent: HTMLElement,
-  folder: TFolder,
-  sourcePath: string,
-  cls: string
-): void {
-  const file = getFile(plugin.app, `${folder.path}/${folder.name}.md`);
-  if (!file) {
-    parent.createSpan({ cls: `${cls} is-orphan`, text: folder.name });
-    return;
-  }
-  const href = noExt(file.path);
-  const a = parent.createEl("a", {
-    cls: `${cls} internal-link`,
-    text: folder.name,
-    href,
-    attr: { "data-href": href },
-  });
-  a.addEventListener("click", (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    void openFile(plugin.app, file);
-  });
-  a.addEventListener("mouseover", (evt) => {
-    plugin.app.workspace.trigger("hover-link", {
-      event: evt,
-      source: "almanac-journals",
-      hoverParent: parent,
-      targetEl: a,
-      linktext: href,
-      sourcePath,
-    });
-  });
-}
-
 // ── `primaryKindButton` IS DELETED (4.13.4) ─────────────────────────────
 //
 // It built one `+ {kind}` — "New Entry", "New Recipe" — onto the head of every
@@ -257,24 +218,25 @@ function levelEmojiFor(
   return folderEmoji(plugin, name, level.fallbackEmoji);
 }
 
-// "3 topics" / "1 topic" / "" at zero.
+// `countLabel` STOOD HERE AND IS DELETED (4.37).
 //
-// NO LONGER USED BY THIS FILE (4.13.2 §2), which took the count off both of its
-// bars. It stays exported and stays here: `journals-cards.ts` renders it as a
-// card's subtitle, where the thing being counted is NOT on the screen — a card
-// says "4 subjects" about a list it does not show, which is a reading rather
-// than a tally of visible rows. That is the distinction the removal was about,
-// so the function survives it.
+// It formatted "3 topics" / "1 topic" / "" at zero. 4.13.2 §2 took the count off
+// both of this file's bars and the function survived on ONE caller, with the
+// distinction written down: `journals-cards.ts` used it as a card's subtitle,
+// where *"the thing being counted is NOT on the screen — a card says '4 subjects'
+// about a list it does not show, which is a reading rather than a tally of
+// visible rows."*
 //
-// Through plural(), not `+ "s"`. This was a second and cruder pluraliser
-// sitting a couple of imports away from the real one, and both of the wizard's
-// own worked examples broke under it: a Cooking journal's sub-level noun
-// "Dish" read "3 dishs", and the default kind "Entry" read "3 entrys". The
-// noun is lowercased *after* pluralising, since the rules key off the ending.
-export function countLabel(n: number, noun: string): string {
-  if (n <= 0) return "";
-  return `${n} ${(n === 1 ? noun : plural(noun)).toLowerCase()}`;
-}
+// THAT DISTINCTION IS STILL TRUE AND STILL DRAWN; what is gone is the string.
+// The journals card has a stat strip now, and a strip splits the number from the
+// noun — a cell is a `--am-text-2xs` small-caps LABEL over a `1.15em` value, so
+// there is nothing for a function returning "4 subjects" to be put into. The
+// reading survives as the strip's fourth cell.
+//
+// Its pluralisation lesson goes with it and is worth carrying: it was once a
+// second, cruder pluraliser two imports from the real one, and both of the
+// wizard's own worked examples broke under it — "3 dishs", "3 entrys". The cell
+// label goes through `plural()` for that reason.
 
 // `TOPICS_SHOWN = 8` STOOD HERE AND IS DELETED (4.13.4). It capped a card's list
 // and sent the remainder to the subject's own note, because 4.13.3 had taken the
@@ -285,69 +247,16 @@ export function countLabel(n: number, noun: string): string {
 // than a page away. The number four now lives in `.jjs-card-body`, which is the
 // only place that can honestly hold it — it is a height, not a count.
 //
-// One child inside a subject's card: its name, when it was last worked, and what
-// is open beneath it.
+// `topicRow` MOVED TO `tables.ts` AS `childRow` (4.36), and is imported above.
 //
-// A FUNCTION FOR ONE CALLER, deliberately. It had two until the cap went; what
-// it is now is the SHAPE of a line in this card — a link, a relative date, and a
-// count that arrives late — and that is worth naming even once, because the
-// async fill at the end of it is the part a second copy would get wrong.
-function topicRow(
-  plugin: AlmanacPlugin,
-  ctx: MarkdownPostProcessorContext,
-  body: HTMLElement,
-  sub: TFolder
-): void {
-  const { pages, lastActive } = folderActivity(plugin.app, sub.path);
-  const row = body.createDiv({ cls: "jjs-card-row" });
-  folderLink(plugin, row, sub, ctx.sourcePath, "jjs-row-link");
-  // NAMED, BECAUSE THE GLYPHS ONLY EXPLAIN THEMSELVES ONCE THERE IS DATA
-  // (4.35.2). Populated, these two read "3d ago" and "2 ◻" and need no header.
-  // Empty — which is every row on a journal a reader has just made — they are
-  // two bare em dashes with nothing to say which is which, and a screen reader
-  // heard "dash dash" in either state, since neither cell carried a name.
-  //
-  // A `title` rather than a header row: the body's height is stated in ROWS
-  // (see `.jjs-card-body`), so a header would cost one of the four notes a card
-  // can show. This costs nothing and is also the accessible fix.
-  const when = row.createSpan({
-    cls: "jjs-card-when",
-    text: relativeActivity(lastActive),
-  });
-  when.setAttr("title", "Last activity");
-  when.setAttr(
-    "aria-label",
-    lastActive
-      ? `Last activity: ${relativeActivity(lastActive)}`
-      : "Last activity: none yet"
-  );
-  // An Almanac `- ( )` line lives in a note's BODY and is invisible to the
-  // metadata cache, so this cell cannot be filled synchronously. It ships a
-  // placeholder and fills on resolve — the idiom the banner's four numbers and
-  // `topics-table`'s own Open column both use.
-  const openCell = row.createSpan({ cls: "jjs-card-open", text: "…" });
-  openCell.setAttr("title", "Open tasks");
-  openCell.setAttr("aria-label", "Open tasks: counting…");
-  void sumBodyTasks(
-    plugin.app,
-    pages.map((p) => p.file)
-  ).then(({ open }) => {
-    // The host may have been torn down, or the LiveWidget rebuilt, while the
-    // reads were in flight — `buildJournalsHeader` guards its own fills the same
-    // way and for the same reason.
-    if (!openCell.isConnected) return;
-    openCell.setText(open ? `${open} ◻` : "—");
-    // The label is rewritten with the text, so it never describes the
-    // placeholder the cell shipped with.
-    openCell.setAttr(
-      "aria-label",
-      open === 0
-        ? "No open tasks"
-        : `${open} open ${open === 1 ? "task" : "tasks"}`
-    );
-    openCell.toggleClass("is-zero", open === 0);
-  });
-}
+// It had one caller until `level-cards` drew the same line in the right-hand
+// card of a pair. What the two widgets share is the ROW and the NUMBERS rather
+// than the card — 4.13.3's own sentence, and the reason the pair is not this
+// card at a different size.
+//
+// RENAMED WITH THE MOVE. "Topic" is Study's word for its second level and this
+// draws whatever the journal calls that thing, which was the last Study literal
+// left in the row.
 
 // ── One subject group (a top-level container folder) ─────────────────────
 
@@ -419,13 +328,21 @@ function buildGroup(
   const body = card.createDiv({ cls: "jjs-card-body" });
 
   if (subs.length === 0) {
-    body.createDiv({
-      cls: "jjs-empty-row",
-      // Names the place, not the label. Prose that quotes a button breaks
-      // silently every time the button is reworded — which it now has been
-      // twice — and the card this sits in has the control two rows above it.
-      text: `No ${plural(childLevel.noun).toLowerCase()} yet — add one from this journal's row above.`,
-    });
+    // ── THE EMPTY STATE IS THE CONTROL (4.38) ──────────────────────────
+    //
+    // This sentence read *"add one from this journal's row above"*, and the row it
+    // named was deleted in 4.36–4.37 — the second time this exact string went stale
+    // by describing chrome that moved. The comment it replaces had already spotted
+    // the pattern and drawn the wrong conclusion from it: it named the PLACE rather
+    // than the label, on the theory that a place is more stable than a word. A
+    // place is not more stable, and prose about a control is the wrong shape of
+    // answer either way.
+    //
+    // So the empty body IS the affordance — `addTile`, the same dashed slot the
+    // level grid ends with, filling the space the rows would have used. Nothing to
+    // keep in step, because there is no longer a sentence describing where anything
+    // is.
+    body.appendChild(addTile(plugin, type, folder, childLevel.noun));
     return card;
   }
 
@@ -462,7 +379,7 @@ function buildGroup(
   // page away. The cap, the `+ N more` link and the branch for a folder with no
   // index note all go with it — see `.jjs-card-body` in
   // 60-heroes-and-banners.css, which is where the four is stated.
-  for (const sub of subs) topicRow(plugin, ctx, body, sub);
+  for (const sub of subs) childRow(plugin, ctx, body, sub);
 
   return card;
 }
@@ -477,9 +394,17 @@ function buildType(
   const root = getFolder(plugin.app, type.root);
   const tops = journalChildFolders(plugin, type, root);
   const topLevel = type.levels[0];
-  const childLevel = type.levels[1];
+  // `childLevel` STOOD HERE and went with the `＋ Topic` button in 4.38.4. The
+  // level itself is not gone — `buildGroup` reads it to name a subject's rows and
+  // its empty tile — only this function's use of it.
 
   const section = createDiv({ cls: "jjs-type" });
+  // THE HUE, ON THE TYPE (4.38). Every card in this group belongs to this
+  // journal, so the tint on their heads is set once here and read from an ancestor
+  // — a card that resolved its own could not be made to disagree with its
+  // siblings, which is the same reason `buildLevelCards` sets it on the grid.
+  // `.jjs-card > .journal-sec` is what reads it.
+  section.style.setProperty("--jjc-hue", String(hueOf(type.id)));
   // `owns: "children"` — the type's body is the `jjs-type-body` div below,
   // inside this widget's own DOM. It folds by toggling a class on itself
   // (makeFoldable), not by walking the note's blocks, so it must not carry the
@@ -492,6 +417,33 @@ function buildType(
     glyph: type.emoji,
     level: 1,
     owns: "children",
+    // ── THE TITLE OPENS THE JOURNAL (4.42) ──────────────────────────────
+    //
+    // The head named the journal and went nowhere, while every card BELOW it has
+    // been a link to its own folder note since 4.13.3. So the page's shallowest
+    // object was the only one you could not enter, and the way in was the file
+    // explorer.
+    //
+    // `folderLink` RATHER THAN AN ANCHOR WRITTEN HERE, and the reason is one
+    // line in it: a card's head is a fold target, so the link stops propagation
+    // as well as preventing the default — *"a click that opened the subject and
+    // ALSO folded its journal would do two things for one press"*. That is
+    // exactly this bar's situation one rank up, and a second implementation is
+    // one that will be missing that line.
+    //
+    // THE TITLE ONLY. The glyph, the empty span past the name and the chevron all
+    // still fold, which is the same division the subject cards already use — so
+    // the gesture means the same thing at both ranks rather than inverting
+    // between them.
+    //
+    // A JOURNAL WHOSE FOLDER NOTE IS NOT THERE stays plain text: `folderLink`
+    // draws `is-orphan` instead of a dead link, which is the rule a container row
+    // has followed since it was written — *"a folder with no index note of its
+    // own is still a row; it just has nothing to open"*.
+    titleRender: root
+      ? (slot) =>
+          folderLink(plugin, slot, root, ctx.sourcePath, "jjs-type-name", type.name)
+      : undefined,
   });
   const head = frame.root;
 
@@ -503,43 +455,113 @@ function buildType(
   // (this one makes a folder, that one makes a folder) that is true of both and
   // interesting about neither, while making the pair look like two unrelated
   // controls rather than one level and the level below it.
-  const specs: BtnSpec[] = [
-    {
+  // ── THE HEAD KEEPS ONLY WHAT THE GRID DOES NOT OFFER (4.38.1) ──────────
+  //
+  // `＋ Subject` stood first in this list, and 4.38 put a "New subject" tile at
+  // the end of the grid below — the SAME action, twice, about 40px apart, on
+  // every journal on the page. Four journals meant four duplicated buttons.
+  //
+  // THE TILE IS THE ONE THAT SURVIVES, and it is the better of the two on its
+  // own terms rather than merely the newer: it sits in the place the thing it
+  // makes will appear, at the end of the list of them, which is the shape
+  // `journal-tracker-add` argued for and 4.37 already applied to the level cards.
+  // A button on a section head is chrome about the section; a slot at the end of
+  // a grid is the grid saying what comes next.
+  //
+  // THE CHILD BUTTON STAYS, because nothing else offers it. A topic belongs to a
+  // subject, and only an EMPTY subject card carries a "New topic" tile — a
+  // subject that already has topics has no tile, so this is the only path to a
+  // second one from this page.
+  //
+  // AND THE TOP-LEVEL BUTTON COMES BACK WHERE THERE IS NO TILE. `buildType` draws
+  // the tile only when the journal's root folder exists; a registered journal
+  // whose folder has never been made has no tile in either branch, and removing
+  // this button unconditionally would leave that journal with no create path at
+  // all. `newTopLevel` does not need the folder, so the button is the fallback
+  // exactly where the tile cannot be.
+  const specs: BtnSpec[] = [];
+  if (!root) {
+    specs.push({
       label: topLevel.noun,
       icon: "plus",
       primary: true,
       onClick: () => void plugin.journals.newTopLevel(type),
-    },
-  ];
-  if (childLevel) {
-    specs.push({
-      label: childLevel.noun,
-      icon: "plus",
-      onClick: () => void plugin.journals.newContainer(type, 1),
     });
   }
-  addButtons(frame.actions, specs);
+  // ── AND THE CHILD-LEVEL BUTTON IS GONE TOO (4.38.4) ───────────────────
+  //
+  // `＋ Topic` / `＋ Project` stood here, kept in 4.38.1 on the argument that
+  // nothing else offered a second child. The maintainer's call is that a second
+  // control on every journal's title bar is noise the page does not earn — four
+  // journals is four of them, on bars whose job is to say which journal you are
+  // looking at.
+  //
+  // WHAT THIS COSTS, STATED PLAINLY because it is a real gap rather than a
+  // tidy-up with no downside: a subject that ALREADY has topics has no ＋ on this
+  // page. An empty one shows the add tile in its body, and the journal's own
+  // dashboard carries the ＋ on every card head — but from the homepage, adding a
+  // second topic to Chemistry is now the command palette or the dashboard.
+  // AND THE GAP IS THE DECISION, NOT A LOOSE END (4.39.1). A ＋ on the subject
+  // card's own head was offered — it is what the level cards do and it would have
+  // closed this exactly — and was declined. **The homepage is read-only for
+  // topics.** It lists what is in a journal; making things in it is the journal's
+  // own dashboard's job, and the command palette's. Anyone reading this comment
+  // and reaching for the obvious fix should know it was considered and refused,
+  // rather than that nobody had got to it.
+  //
+  // NOTHING DRAWN WHERE THERE IS NOTHING TO DRAW. Most journals now have no head
+  // control at all, and `addButtons` would otherwise leave an empty `.jjs-actions`
+  // div inside the widgets bar, which defeats the `:empty` rule in
+  // 30-header-bars.css that hides an unused slot.
+  if (specs.length > 0) addButtons(frame.actions, specs);
 
   makeFoldable(plugin, section, head, foldKey(ctx.sourcePath, type.id));
 
   const body = section.createDiv({ cls: "jjs-type-body" });
 
   if (tops.length === 0) {
+    // ── THE TILE IS THE EMPTY STATE (4.39.1) ────────────────────────────
+    //
+    // This branch drew three things that said one thing: a title `No subjects
+    // yet`, a sentence `Subjects appear here automatically.`, and then a
+    // card-shaped dashed tile reading `＋ New subject`. Since 4.38.4 the tile is
+    // an empty card in the same grid the populated branch draws, and an empty
+    // card in an otherwise empty grid ALREADY says the level is empty — that is
+    // the whole reason it was given card chrome. The title restated it in words
+    // and the sentence restated the title. Two of the three go.
+    //
+    // WHAT WENT WITH THEM, AND WHY IT IS NOT A LOSS OF INFORMATION. The sentence
+    // carried a real fact — a folder made in the file explorer is picked up here
+    // without being registered — and the fact survives being unsaid, because the
+    // only reader it can reach is one who has already made such a folder, and
+    // that reader is by definition not looking at this branch. The empty state is
+    // read by someone with nothing, and the one thing worth telling them is where
+    // to start.
+    if (root) {
+      body
+        .createDiv({ cls: "jjs-grid" })
+        .appendChild(addCardTile(plugin, type, root, topLevel.noun));
+      return section;
+    }
+    // NO FOLDER, NO TILE, SO THE WORDS STAY. `getFolder` returns null for a
+    // registered journal whose root has not been created yet — a preset enabled
+    // and never used — and the tile's action needs the parent to work out which
+    // level it is creating. This is the one state where nothing is drawn unless
+    // the callout draws it, and where the sentence is the true answer rather than
+    // a restatement: the folder, and with it the tile, appears when the journal is
+    // first used.
     const empty = body.createDiv({ cls: "jjs-empty" });
     empty.createDiv({
       cls: "jjs-empty-title",
-      // `splitGlyph`: a type's name is "🎓 Study", and lowercasing it whole
-      // renders "No 🎓 study journals yet". Third instance of one
-      // construction — tables.ts, journal.ts, here — which is why the guard in
-      // empty-states.test.ts is a pattern match over every source file rather
-      // than three corrected strings.
-      text: `No ${splitGlyph(type.name).text.toLowerCase()} journals yet`,
+      // IT NAMES WHAT IS MISSING, NOT WHAT IT IS INSIDE (4.38.4). This read
+      // `No ${splitGlyph(type.name).text.toLowerCase()} journals yet` and
+      // disagreed with the line under it about what was absent. The journal is
+      // not missing; it is titled two lines up. What is missing is a SUBJECT.
+      text: `No ${plural(topLevel.noun).toLowerCase()} yet`,
     });
     empty.createDiv({
       cls: "jjs-empty-body",
-      text:
-        `Create one from the buttons on the row above, or from the command ` +
-        `palette. ${plural(topLevel.noun)} appear here automatically.`,
+      text: `${plural(topLevel.noun)} appear here automatically.`,
     });
     return section;
   }
@@ -558,6 +580,16 @@ function buildType(
   for (const folder of tops) {
     grid.appendChild(buildGroup(plugin, ctx, type, folder));
   }
+  // AND THE GRID ENDS IN THE SLOT FOR THE NEXT ONE (4.38), which is the level
+  // grid's argument at `addTile` and the fix for a measured complaint: in
+  // `dev-screenshots/20260817_13h45m10s_grim.png` this grid drew two 334px tracks
+  // and had one subject, so half the section was bare.
+  //
+  // THE TRACK WIDTH IS NOT THE PROBLEM AND WAS NOT NARROWED. `auto-fill` had
+  // already made more tracks than there were cards, so a smaller minimum would have
+  // made MORE empty tracks, not fewer — the gap is a card count, and the only thing
+  // that fills a trailing gap honestly is the control that adds the next card.
+  if (root) grid.appendChild(addCardTile(plugin, type, root, topLevel.noun));
   return section;
 }
 
@@ -600,7 +632,28 @@ export function buildJournalsSection(
   const band = root.createDiv({ cls: "jjs-hero" });
   band.appendChild(
     buildJournalsHeader(plugin, {
-      actions: [{ label: "Refresh", icon: "refresh-cw", onClick: refresh }],
+      // ── REORGANISE, BESIDE REFRESH (4.40) ──────────────────────────
+      //
+      // THE READER'S ASK — *"a feature to reorganize journal, via a button on the
+      // header bar"* — and this bar is the only one the section has. It is also
+      // the right one: the button acts on the LIST below it, and this band is
+      // what heads that list.
+      //
+      // FIRST, AND NOT BY HABIT. Refresh re-reads what is already there; this
+      // changes it. The band's actions run left to right, and the one that
+      // alters the page should not sit past the one that merely repaints it.
+      //
+      // NO EQUIVALENT ON THE HOMEPAGE, deliberately: that page draws journals as
+      // cards and the cards are dragged. Both write through `journal-order.ts`.
+      // See `attachCardDrag` for the 4.8.1 argument that keeps them apart.
+      actions: [
+        {
+          label: "Reorganise",
+          icon: "arrow-up-down",
+          onClick: () => openReorganiseJournals(plugin),
+        },
+        { label: "Refresh", icon: "refresh-cw", onClick: refresh },
+      ],
     })
   );
 
