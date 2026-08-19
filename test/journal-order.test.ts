@@ -18,7 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   applyJournalOrder,
   journalOrder,
-  moveJournalBefore,
+  moveJournalOnto,
 } from "../src/journals/journal-order";
 import { cssRule, readCode, readSrc } from "./sources";
 import type AlmanacPlugin from "../src/main";
@@ -49,7 +49,7 @@ describe("the order journals are drawn in", () => {
     // first and STUDY third, which is a move the reader did not ask for and
     // cannot see themselves having made.
     const { plugin } = stub(["study", "projects", "exercise", "media"]);
-    expect(await moveJournalBefore(plugin, "media", "study")).toBe(true);
+    expect(await moveJournalOnto(plugin, "media", "study")).toBe(true);
     expect(journalOrder(plugin)).toEqual([
       "media",
       "study",
@@ -58,18 +58,30 @@ describe("the order journals are drawn in", () => {
     ]);
   });
 
-  it("reads both indices after the removal, so a move downward lands where it was dropped", async () => {
-    // THE OFF-BY-ONE THIS PREVENTS: dropping Study onto Media means "Study goes
-    // where Media is". Computing the target index BEFORE lifting Study out would
-    // insert at 3 in a list Study is still in — one place short.
+  it("lands a downward move where it was dropped, on the far side of the target", async () => {
+    // WHAT THIS TEST ASSERTED UNTIL 4.45.1, AND WHAT ITS OWN COMMENT SAID, WERE
+    // DIFFERENT THINGS. The comment: "dropping Study onto Media means Study goes
+    // where Media is". The assertion underneath it put Study at index 2 and left
+    // Media at 3 — one place short, every time, in that direction. A comment is
+    // not a test, which is this suite's own rule read back to it.
     const { plugin } = stub(["study", "projects", "exercise", "media"]);
-    await moveJournalBefore(plugin, "study", "media");
+    await moveJournalOnto(plugin, "study", "media");
     expect(journalOrder(plugin)).toEqual([
       "projects",
       "exercise",
-      "study",
       "media",
+      "study",
     ]);
+  });
+
+  it("swaps a card with its neighbour, the drop that used to do nothing at all", async () => {
+    // Lift Study out, put it back before the card that has just moved up into
+    // its place, and the list is exactly the list you started with. So the
+    // commonest drag on the grid wrote nothing and looked broken.
+    const { plugin, saveSettings } = stub(["study", "projects", "media"]);
+    expect(await moveJournalOnto(plugin, "study", "projects")).toBe(true);
+    expect(journalOrder(plugin)).toEqual(["projects", "study", "media"]);
+    expect(saveSettings).toHaveBeenCalled();
   });
 
   it("treats a drop on itself as a reader changing their mind", async () => {
@@ -77,15 +89,15 @@ describe("the order journals are drawn in", () => {
       "study",
       "projects",
     ]);
-    expect(await moveJournalBefore(plugin, "study", "study")).toBe(false);
+    expect(await moveJournalOnto(plugin, "study", "study")).toBe(false);
     expect(saveSettings).not.toHaveBeenCalled();
     expect(notifyJournalTypesChanged).not.toHaveBeenCalled();
   });
 
   it("declines a move naming a journal that is not there", async () => {
     const { plugin, saveSettings } = stub(["study", "projects"]);
-    expect(await moveJournalBefore(plugin, "study", "ghost")).toBe(false);
-    expect(await moveJournalBefore(plugin, "ghost", "study")).toBe(false);
+    expect(await moveJournalOnto(plugin, "study", "ghost")).toBe(false);
+    expect(await moveJournalOnto(plugin, "ghost", "study")).toBe(false);
     expect(journalOrder(plugin)).toEqual(["study", "projects"]);
     expect(saveSettings).not.toHaveBeenCalled();
   });
@@ -152,10 +164,10 @@ describe("saving a whole order", () => {
 describe("the two surfaces reach that one write", () => {
   it("drags on the homepage's cards", () => {
     const src = readCode("journals-cards");
-    expect(src).toContain('import { moveJournalBefore } from "./journal-order"');
+    expect(src).toContain('import { moveJournalOnto } from "./journal-order"');
     expect(src).toContain("attachCardDrag(plugin, card, type.id)");
     expect(src).toContain("card.draggable = true");
-    expect(src).toContain("void moveJournalBefore(plugin, from, id)");
+    expect(src).toContain("void moveJournalOnto(plugin, from, id)");
   });
 
   it("carries the dragged id in the payload rather than in a module variable", () => {

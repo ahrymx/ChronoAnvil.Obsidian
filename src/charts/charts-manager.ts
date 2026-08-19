@@ -10,9 +10,11 @@ import type AlmanacPlugin from "../main";
 import { promptChoice } from "../ui/modals";
 import {
   ChartSpec,
+  chartTitle,
   nextChartKey,
   parseChartRegion,
   periodUnitOf,
+  reorderCharts,
   writeChartRegion,
 } from "./charts";
 import type { PeriodBounds } from "./charts";
@@ -119,6 +121,29 @@ export class Charts {
     await writeChartRegion(this.app, notePath, specs);
   }
 
+  // Move one chart in front of another. 4.45, and the write behind the drag.
+  //
+  // `setRange`'s SHAPE EXACTLY, including the re-read and the reason for it: the
+  // tiles were drawn from block source that may be stale by the time a gesture
+  // finishes, and writing back an array built from an old read is how a drag
+  // silently reverts an edit made thirty seconds earlier.
+  //
+  // NO NOTICE. The tiles visibly move, which is the whole feedback a direct
+  // manipulation needs — a toast saying what the reader just watched happen is
+  // the plugin talking over its own result. `false` is returned for a no-op so
+  // the caller can tell "nothing moved" from "moved", and nothing is written.
+  async moveChart(
+    notePath: string,
+    fromKey: string,
+    beforeKey: string
+  ): Promise<boolean> {
+    const specs = await this.readSpecs(notePath);
+    const moved = reorderCharts(specs, fromKey, beforeKey);
+    if (!moved) return false;
+    await writeChartRegion(this.app, notePath, moved);
+    return true;
+  }
+
   async removeChart(notePath: string, key?: string): Promise<void> {
     const all = await this.readSpecs(notePath);
     const target = key ?? (await this.pickChart(all, "🗑️ Remove which chart?"));
@@ -149,7 +174,18 @@ export class Charts {
       specs,
       (s) => {
         const def = getTracker(this.plugin, s.tracker);
-        const name = def ? def.label : `⚠️ ${s.tracker}`;
+        // THE NAME THE TILE CARRIES, so the row a reader picks reads as the
+        // tile they were looking at. Through `chartTitle` for that reason: a
+        // picker naming a chart by its tracker while the tile names it
+        // something else is two names for one thing in one window.
+        //
+        // A missing tracker keeps its warning rather than borrowing the title —
+        // "⚠️ mood" is what is wrong with the chart, and a reader who titled it
+        // "How I felt" would otherwise be shown a row with nothing wrong in it.
+        const def2 = s.tracker2 ? getTracker(this.plugin, s.tracker2) : undefined;
+        const name = def
+          ? chartTitle(s, def.label, def2?.label)
+          : `⚠️ ${s.tracker}`;
         const from = s.scope === "monthly" ? "  ·  monthly" : "";
         // Size only when it was set explicitly. An automatically-sized chart
         // has no size of its own to name, and printing the derived one would

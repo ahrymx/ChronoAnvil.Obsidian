@@ -1189,7 +1189,17 @@ export function journalFolderScope(
     );
   }
   if (a) return [a];
-  return hostFolder ? [hostFolder] : [];
+  // `!= null`, NOT TRUTHY (4.44.0). The vault ROOT is a folder, and it is the
+  // one folder whose path can be the empty string — `hostFolderOf` derives a
+  // path by cutting at the last slash, and a note at the top of the vault has
+  // no slash to cut at. Read as falsy, that answer became "this note is
+  // nowhere", and a bare folder-scoped directive on a top-level note resolved
+  // to no folder at all rather than to the vault.
+  //
+  // ABSENT IS STILL ABSENT. `null` is the one value that means the caller has
+  // no host to offer — a journal TEMPLATE, which is composed once and used in
+  // every folder of its level — and it still resolves to nothing here.
+  return hostFolder != null ? [hostFolder] : [];
 }
 
 // Every `type` value that means "this note is a page", across all registered

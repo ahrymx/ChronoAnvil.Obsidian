@@ -26,13 +26,14 @@
 // the header bar. Those are two gestures and they must not be two rules. Both
 // end here.
 //
-// `applyJournalOrder` IS THE PRIMITIVE AND `moveJournalBefore` IS SUGAR, rather
+// `applyJournalOrder` IS THE PRIMITIVE AND `moveJournalOnto` IS SUGAR, rather
 // than the other way round, because the window works on a whole list — a reader
 // nudges four rows and presses Save once — and a drag works on a pair. A whole
 // list expressed as a sequence of pairwise moves would write four times and fire
 // four repaints; a pair expressed as a whole list costs one array copy.
 
 import type AlmanacPlugin from "../main";
+import { dropOnto } from "../core/drop-onto";
 
 // The journal ids, in the order every surface draws them.
 export function journalOrder(plugin: AlmanacPlugin): string[] {
@@ -83,26 +84,27 @@ export async function applyJournalOrder(
   return true;
 }
 
-// Lift `fromId` out and drop it in `beforeId`'s slot. The drag's semantics.
+// Lift `fromId` out and drop it in `ontoId`'s slot. The drag's semantics.
 //
-// LIFT-AND-INSERT, NOT SWAP, which is `SectionEditor.attachDrag`'s rule said
-// again for the same reason: dragging a card three places up should move it
-// three places, not trade it with whatever happened to be there. Both indices
-// are read AFTER the removal, from the same list, so the arithmetic cannot be
-// off by one at the ends.
+// RENAMED FROM `moveJournalBefore` IN 4.45.1, AND THE OLD NAME WAS THE BUG
+// SAID OUT LOUD. It inserted before the target in both directions, so dragging
+// a card onto the one directly below it did nothing whatever — lift it out,
+// put it back before the card that has just moved up into its place, and the
+// list is unchanged. Every downward drop landed one place short.
 //
-// Dropping a journal on itself, or naming one that is not there, is a no-op
-// rather than an error: a drag that ends where it started is a reader changing
-// their mind, and that is not a failure to report.
-export async function moveJournalBefore(
+// This function's own test described the right rule — *"dropping Study onto
+// Media means Study goes where Media is"* — and then asserted the wrong
+// arrangement underneath it. A comment is not a test.
+//
+// The rule, the direction and the no-op contract are all `dropOnto`'s now; see
+// `core/drop-onto.ts`, which the chart grid and the section editor call too.
+// What is left here is the settings read and write around it.
+export async function moveJournalOnto(
   plugin: AlmanacPlugin,
   fromId: string,
-  beforeId: string
+  ontoId: string
 ): Promise<boolean> {
-  if (fromId === beforeId) return false;
-  const ids = journalOrder(plugin);
-  if (!ids.includes(fromId) || !ids.includes(beforeId)) return false;
-  const rest = ids.filter((id) => id !== fromId);
-  rest.splice(rest.indexOf(beforeId), 0, fromId);
-  return applyJournalOrder(plugin, rest);
+  const next = dropOnto(journalOrder(plugin), fromId, ontoId);
+  if (!next) return false;
+  return applyJournalOrder(plugin, next);
 }

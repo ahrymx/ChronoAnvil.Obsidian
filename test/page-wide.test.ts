@@ -40,6 +40,7 @@ import {
 import { composeSearchNote } from "../src/diary/search-sections";
 import { DEFAULT_PATHS } from "../src/core/constants";
 import { readCode, readCss } from "./sources";
+import { WIDE_PAGE_CLASS } from "../src/ui/page-width";
 
 const ROOT = DEFAULT_PATHS.diaryRoot;
 const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
@@ -265,29 +266,65 @@ describe("the toggle that writes it", () => {
 describe("the width itself, which only the stylesheet can give", () => {
   it("is one rule, one declaration, four selectors", () => {
     // TWO MECHANISMS AND ONE WIDTH. The frontmatter class keeps homepages
-    // composed before 4.11 wide; the marker gives every page the same width from
-    // its own head. Two rules with the same `max-width` would be two places to
-    // retune one number.
+    // composed before 4.11 wide; the view class gives every page the same width
+    // from its own head. Two rules with the same `max-width` would be two places
+    // to retune one number.
     const at = rules.indexOf(".markdown-preview-view.almanac-wide");
     expect(at, "no width rule").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain(".markdown-source-view.almanac-wide .cm-sizer");
-    expect(rule).toContain(
-      ".markdown-preview-view:has(.jtc-wide) .markdown-preview-sizer"
-    );
-    expect(rule).toContain(".markdown-source-view:has(.jtc-wide) .cm-sizer");
+    expect(rule).toContain(`.${WIDE_PAGE_CLASS} .markdown-preview-view .markdown-preview-sizer`);
+    expect(rule).toContain(`.${WIDE_PAGE_CLASS} .markdown-source-view .cm-sizer`);
     expect(rule).toContain("max-width: var(--am-page-width)");
     expect(rule).not.toContain("--file-line-width");
   });
 
-  it("puts ONE class inside `:has()`, which is what keeps a theme able to win", () => {
-    // `:has()` takes the specificity of its most specific argument, so
-    // `:has(.jtc-card.jtc-wide)` would weigh (0,4,0) and quietly outrank the theme
-    // this rule promises not to overrule — the promise is in the comment above it
-    // and the reason there is no `!important` here.
-    expect(rules).toContain(":has(.jtc-wide)");
-    expect(rules).not.toContain(":has(.jtc-card.");
+  it("no longer asks `:has()` for a card a reading view is allowed to unload", () => {
+    // THE 4.45.1 BUG, PINNED. `:has(.jtc-wide)` reached from the view down to
+    // the title card — the FIRST block on the page — and Obsidian drops a
+    // section from the DOM once it is far enough from the viewport. Scrolling a
+    // dashboard to the bottom therefore cancelled its own width. Nothing may
+    // reach for that class from the stylesheet again.
+    expect(rules).not.toContain(":has(.jtc-wide)");
+    // Over the comment-stripped stylesheet: the rule's own comment names the
+    // class it stopped using, and it should — that is the record of why.
+    expect(rules).not.toContain(".jtc-wide");
+  });
+
+  it("weighs exactly what Obsidian's own width rule weighs, so a theme can win", () => {
+    // Three classes a side — `.am-wide-page .markdown-preview-view
+    // .markdown-preview-sizer` against
+    // `.markdown-preview-view.is-readable-line-width .markdown-preview-sizer` —
+    // which is the promise the comment above the rule makes and the reason there
+    // is no `!important` in it.
+    const at = rules.indexOf(".markdown-preview-view.almanac-wide");
+    const rule = rules.slice(at, rules.indexOf("}", at));
+    for (const sel of rule.split(",").map((x) => x.trim()).filter(Boolean)) {
+      expect(sel.split(".").length - 1, `${sel} is not three classes`).toBe(3);
+    }
     expect(rules).not.toMatch(/max-width: var\(--am-page-width\) !important/);
+  });
+
+  it("marks the view from the FILE, on every event that can change the answer", () => {
+    // A CLASS ON THE VIEW IS THE THING `HOME_CSS_CLASS` REFUSES — when it is put
+    // there at render time, because Obsidian reuses a leaf across file switches
+    // and the width outlives the note. What makes this the other thing is that
+    // it is re-derived from the file for every open note on every event that
+    // could change the answer, so a leaf showing a narrow note has the class
+    // taken off on the same pass that puts it on elsewhere.
+    const src = readCode("page-width");
+    expect(src).toContain("pageIsWide(text)");
+    expect(src).toContain('this.app.workspace.on("file-open", sweep)');
+    expect(src).toContain('this.app.workspace.on("layout-change", sweep)');
+    expect(src).toContain('this.app.workspace.on("active-leaf-change", sweep)');
+    expect(src).toContain('this.app.metadataCache.on("changed"');
+    expect(src).toContain("onLayoutReady");
+    // The read that cannot disagree with what is on screen, and the guard that
+    // stops a slow one writing about a note the leaf has already left.
+    expect(src).toContain("cachedRead(file)");
+    expect(src).toContain("if (view.file?.path !== file.path) return;");
+    // And it is registered, or none of the above ever runs.
+    expect(readCode("main")).toContain("this.pageWidth.register()");
   });
 
   it("is applied to the head's card by the dispatcher, from the modifier", () => {

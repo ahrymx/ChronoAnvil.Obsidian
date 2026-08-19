@@ -41,7 +41,7 @@ import { SteppedEditorModal } from "../ui/editor-modal";
 import type { WizardStep } from "../ui/editor-modal";
 import type AlmanacPlugin from "../main";
 import type { ChartSpec, PeriodBounds } from "./charts";
-import { defaultSpan, isChartable, rangeDays, scopesFor } from "./charts";
+import { chartTitle, defaultSpan, isChartable, rangeDays, scopesFor } from "./charts";
 export { scopesFor };
 import type {
   ChartRange,
@@ -192,10 +192,18 @@ export class ChartEditModal extends SteppedEditorModal {
     const first = this.chartable[0];
     // Field by field rather than a spread, so the draft can't carry `key` — but
     // that means every field on ChartSpec has to be named here or it is silently
-    // dropped on save. `size` is the newest: leave it out and a reader who sets
-    // a chart to Large, then later changes its range, loses the size with no
-    // error and no obvious cause. There is no test that can catch this shape of
-    // omission, so it is called out rather than trusted to review.
+    // dropped on save. `size` was the case that taught this: leave it out and a
+    // reader who sets a chart to Large, then later changes its range, loses the
+    // size with no error and no obvious cause.
+    //
+    // THERE IS A TEST NOW (4.45). This comment used to end "there is no test
+    // that can catch this shape of omission, so it is called out rather than
+    // trusted to review", and that was true of a test that runs the modal —
+    // there is no DOM in the suite. It is not true of one that reads the
+    // SOURCE: `test/chart-series.test.ts` takes the field names out of
+    // `ChartSpec` and asserts each appears in this object, which fails the next
+    // time a field is added and not copied. `title` is the field that was added
+    // the day the test was written.
     this.draft = opts.spec
       ? {
           tracker: opts.spec.tracker,
@@ -205,6 +213,7 @@ export class ChartEditModal extends SteppedEditorModal {
           tracker2: opts.spec.tracker2,
           avg: opts.spec.avg,
           size: opts.spec.size,
+          title: opts.spec.title,
         }
       : { tracker: first?.id ?? "", type: "line", range: "period" };
     // Whatever the controls will display, the draft has to already agree with
@@ -256,20 +265,34 @@ export class ChartEditModal extends SteppedEditorModal {
     // tracker2 and avg only mean something for one chart type each; drop them
     // otherwise so a directive never carries a token its type ignores, and so
     // switching type→scatter→line→scatter doesn't resurrect a stale partner.
+    const others = this.chartable.filter((t) => t.id !== this.draft.tracker);
+    const partnerValid =
+      this.draft.tracker2 != null &&
+      this.draft.tracker2 !== this.draft.tracker &&
+      others.some((t) => t.id === this.draft.tracker2);
     if (type === "scatter") {
       // Default the Y-axis to a different tracker than X where one exists, so a
       // fresh scatter isn't X-against-itself (a diagonal line, never the
       // intent). Keep an explicit prior choice if it's still valid.
-      const others = this.chartable.filter((t) => t.id !== this.draft.tracker);
-      const valid =
-        this.draft.tracker2 != null &&
-        this.draft.tracker2 !== this.draft.tracker &&
-        others.some((t) => t.id === this.draft.tracker2);
-      this.draft.tracker2 = valid ? this.draft.tracker2 : others[0]?.id;
+      this.draft.tracker2 = partnerValid ? this.draft.tracker2 : others[0]?.id;
+    } else if (type === "line") {
+      // A LINE KEEPS A PARTNER AND IS NEVER GIVEN ONE (4.45), and the asymmetry
+      // with the branch above is the whole difference between the two charts. A
+      // scatter without a second tracker is not a chart — one coordinate is not
+      // a point — so it defaults. A line without one is the ordinary case, and
+      // defaulting would draw a second trend nobody asked for on a tile that
+      // was about one thing.
+      //
+      // Kept when it is still valid, so scatter → line → scatter does not lose
+      // the reader's choice on the way through.
+      if (!partnerValid) delete this.draft.tracker2;
     } else {
       delete this.draft.tracker2;
     }
-    if (type !== "line") delete this.draft.avg;
+    // The rolling average is a line's, and a single line's — see ChartSpec.avg.
+    // Enforced here rather than only withheld in the form, so a `+avg+y=`
+    // directive somebody typed by hand is resolved the moment it is opened.
+    if (type !== "line" || this.draft.tracker2) delete this.draft.avg;
   }
 
   // An existing chart can be saved from any step — see SteppedEditorModal. A
@@ -426,8 +449,9 @@ export class ChartEditModal extends SteppedEditorModal {
         });
       });
 
-    // Scatter's second axis. Its own dropdown rather than a positional token,
-    // and only shown for scatter — every other chart reads one series.
+    // The second tracker. Its own dropdown rather than a positional token, and
+    // shown for the two types that read two series — a scatter, which REQUIRES
+    // one, and since 4.45 a line, which OFFERS one.
     //
     // ON THIS STEP RATHER THAN THE ONE CALLED "WHAT TO PLOT", which is the one
     // placement in this window that had to be argued. It does name a second
@@ -435,43 +459,108 @@ export class ChartEditModal extends SteppedEditorModal {
     // exist until a chart type asks for it: put it on step one and it is a
     // blank dropdown with no reason to be there, whose reason arrives a page
     // later. A field summoned by a control belongs beside that control.
-    if (this.draft.type === "scatter") {
+    //
+    // TWO CHARTS, TWO SENTENCES, ONE CONTROL. A scatter plots X against Y and
+    // keeps whichever entries logged both; a line draws two trends over one
+    // date axis and keeps every day either of them logged. Describing both with
+    // one string would be describing neither.
+    const wantsPartner = this.draft.type === "scatter" || this.draft.type === "line";
+    if (wantsPartner) {
       const others = this.chartable.filter((t) => t.id !== this.draft.tracker);
+      const isScatter = this.draft.type === "scatter";
       if (others.length === 0) {
-        new Setting(host)
-          .setName("Against")
-          .setDesc(
-            "A scatter needs a second tracker to plot against, and there's only one chartable tracker so far. Add another in Settings → Trackers."
-          );
+        // Only a scatter is BLOCKED by this — a line with nothing to pair is
+        // simply a line — so the sentence is only worth showing there.
+        if (isScatter) {
+          new Setting(host)
+            .setName("Against")
+            .setDesc(
+              "A scatter needs a second tracker to plot against, and there's only one chartable tracker so far. Add another in Settings → Trackers."
+            );
+        }
       } else {
         new Setting(host)
-          .setName("Against (Y axis)")
+          .setName(isScatter ? "Against (Y axis)" : "Second tracker")
           .setDesc(
-            `${def?.label ?? "This tracker"} is the X axis; pick the tracker for the Y axis. Only entries that logged both appear as points, and days that logged the same pair twice merge into one larger dot.`
+            isScatter
+              ? `${def?.label ?? "This tracker"} is the X axis; pick the tracker for the Y axis. Only entries that logged both appear as points, and days that logged the same pair twice merge into one larger dot.`
+              : `Optional. Draws a second line on its own axis at the right, scaled to its own values and coloured to match. The two axes are independent, so where the lines cross means nothing — read each line against its own side.`
           )
           .addDropdown((d) => {
+            // NONE IS AN ANSWER ON A LINE AND NOT ON A SCATTER, which is the
+            // same asymmetry `reconcile()` states from the other end: one chart
+            // is incomplete without a partner and the other is complete with
+            // one series. The empty value DELETES the field rather than storing
+            // a sentinel — the rule Size already follows with its "auto".
+            if (!isScatter) d.addOption("", "— none —");
             for (const t of others) d.addOption(t.id, `${t.label}  ·  ${t.id}`);
-            if (this.draft.tracker2) d.setValue(this.draft.tracker2);
+            d.setValue(this.draft.tracker2 ?? "");
             d.onChange((v) => {
-              this.draft.tracker2 = v;
+              if (!v) delete this.draft.tracker2;
+              else this.draft.tracker2 = v;
+              // The rolling average is withheld the moment a partner is
+              // chosen, so the form has to redraw to take it away — and to put
+              // it back when the partner is cleared.
+              if (!isScatter) {
+                this.reconcile();
+                this.refreshBody();
+              }
             });
           });
       }
     }
 
     // Rolling-average overlay: a display option on the line chart only.
+    //
+    // AND ON A SINGLE LINE ONLY, SINCE 4.45. Withheld rather than disabled,
+    // with the reason in its place: a control that is present and refusing
+    // teaches nothing here, because the thing to change is a field two rows up
+    // rather than the toggle itself.
     if (this.draft.type === "line") {
-      new Setting(host)
-        .setName("Rolling average")
-        .setDesc(
-          "Overlay a trailing mean to show the trend through the day-to-day noise. The window adapts to the range (about a week for daily data)."
-        )
-        .addToggle((c) =>
-          c.setValue(this.draft.avg ?? false).onChange((v) => {
-            this.draft.avg = v || undefined;
-          })
-        );
+      if (this.draft.tracker2) {
+        new Setting(host)
+          .setName("Rolling average")
+          .setDesc(
+            "Not available with a second tracker. A trailing mean is a guide through the noise of one trend; drawn through two, on two axes, it is a third dashed line belonging visibly to neither. Clear the second tracker to bring it back."
+          );
+      } else {
+        new Setting(host)
+          .setName("Rolling average")
+          .setDesc(
+            "Overlay a trailing mean to show the trend through the day-to-day noise. The window adapts to the range (about a week for daily data)."
+          )
+          .addToggle((c) =>
+            c.setValue(this.draft.avg ?? false).onChange((v) => {
+              this.draft.avg = v || undefined;
+            })
+          );
+      }
     }
+
+    // What the tile calls itself. 4.45.
+    //
+    // PLACEHOLDER, NEVER PRE-FILLED, which is `TitleQuestion`'s rule in the
+    // section editor and holds for the same reason: seeding the box with the
+    // derived name would write it into the directive as though the reader had
+    // chosen it, and a later change of default — a renamed tracker, a second
+    // series added — could never reach that chart again.
+    //
+    // ON THIS STEP because a title decides no numbers, and step one is the
+    // three fields that decide which numbers exist.
+    new Setting(host)
+      .setName("Title")
+      .setDesc(
+        "Optional. Left empty, the tile names itself after the tracker it reads — or after both, for a chart with two."
+      )
+      .addText((t) => {
+        t.setPlaceholder(this.derivedTitle());
+        t.setValue(this.draft.title ?? "");
+        t.onChange((v) => {
+          const next = v.trim();
+          if (next) this.draft.title = next;
+          else delete this.draft.title;
+        });
+      });
 
     // Size, last because it depends on everything above it — and, now, on the
     // range chosen on the step before, which is why the Auto label is resolved
@@ -517,18 +606,39 @@ export class ChartEditModal extends SteppedEditorModal {
   }
 
   private validateDrawing(): string | null {
-    if (this.draft.type === "scatter") {
-      if (!this.draft.tracker2) {
-        return "A scatter needs a second tracker for the Y axis.";
-      }
+    // ONLY A SCATTER REQUIRES A PARTNER. A line with none is an ordinary line,
+    // which is why this refusal stayed where it was while the two below moved
+    // out to cover both charts.
+    if (this.draft.type === "scatter" && !this.draft.tracker2) {
+      return "A scatter needs a second tracker for the Y axis.";
+    }
+    if (this.draft.tracker2) {
       if (this.draft.tracker2 === this.draft.tracker) {
-        return "Pick two different trackers for a scatter.";
+        return "A chart can't plot a tracker against itself — pick a different second tracker.";
       }
       if (!this.chartable.some((t) => t.id === this.draft.tracker2)) {
-        return "The Y-axis tracker no longer exists — pick another.";
+        return "The second tracker no longer exists — pick another, or clear it.";
       }
     }
     return null;
+  }
+
+  // What the tile would call itself if the reader gave it no title — the
+  // placeholder, and the thing the schematic below draws.
+  //
+  // THROUGH `chartTitle`, so this window and the tile cannot disagree. A
+  // placeholder promising one name over a tile that draws another is a reader
+  // typing a title to fix a name that was never wrong.
+  private derivedTitle(): string {
+    const def = this.trackerDef();
+    const other = this.draft.tracker2
+      ? this.chartable.find((t) => t.id === this.draft.tracker2)
+      : undefined;
+    return chartTitle(
+      { type: this.draft.type, title: undefined },
+      def?.label ?? "This chart",
+      other?.label
+    );
   }
 
   // How much of the dashboard the tile takes, drawn.
@@ -555,7 +665,9 @@ export class ChartEditModal extends SteppedEditorModal {
     const tile = grid.createDiv({
       cls: `almanac-wizard-tile${wide ? " is-w2" : ""}${tall ? " is-h2" : ""}`,
     });
-    tile.setText(this.trackerDef()?.label ?? "This chart");
+    // The name the tile will actually carry, not the tracker's — a reader who
+    // has just typed a title should see it in the picture of their tile.
+    tile.setText(this.draft.title ?? this.derivedTitle());
     // The cells the tile does not take, so the proportion has something to be
     // a proportion OF. Four cells is the widest a dashboard row gets before it
     // wraps, which is why "large" fills the drawing exactly.
@@ -643,6 +755,13 @@ export class ChartEditModal extends SteppedEditorModal {
     const used = this.draft.tracker;
     const next = this.chartable.find((t) => t.id !== used) ?? this.chartable[0];
     this.draft = { ...this.draft, tracker: next.id };
+    // BUT NOT THE TITLE (4.45). Everything else here is carried forward because
+    // the next chart in a Trends section is usually the same shape over a
+    // different tracker — and a title is the one field that described the chart
+    // just saved. Carried over, it would name the new chart after the old one,
+    // silently, on a page where both are visible. `journal-chart-ui.ts` states
+    // the same rule for the same field.
+    delete this.draft.title;
     this.reconcile();
     this.clearError();
     // Back to the top of the flow rather than a repaint in place. The subject

@@ -31,6 +31,7 @@ import {
   PeriodBounds,
   ScatterPoint,
   isChartable,
+  alignSeries,
   hourAxisBounds,
   journalTrendShowsAverage,
   clusterPairs,
@@ -347,9 +348,26 @@ function dateLabel(date: string): string {
 }
 
 // ── line / bar (Chart.js) ────────────────────────────────────────────────
-function renderLineOrBar(args: RenderArgs, points: ChartPoint[]): ChartTeardown {
+//
+// ONE SERIES, OR TWO SINCE 4.45. The second is optional and absent for every
+// caller that had one before — `renderJournalTrend` and the bridge trend both
+// pass one series and get, line for line, the configuration they got in 4.44:
+// the labels come from their own points, there is one `y`, no `spanGaps` key is
+// written, and the legend stays off unless the rolling average turned it on.
+// That is deliberate and is the reason the second series is a parameter rather
+// than a field on `RenderArgs`: a widget that is not about two trackers should
+// not have to say so.
+function renderLineOrBar(
+  args: RenderArgs,
+  points: ChartPoint[],
+  second?: { def: TrackerDef; points: ChartPoint[] }
+): ChartTeardown {
   const { body, def } = args;
-  if (points.length === 0) {
+  // A SECOND TRACKER WITH NOTHING IN THE WINDOW IS NOT A SECOND SERIES. Drawing
+  // it would put an empty right-hand axis on the tile, scaled to nothing, next
+  // to a legend entry for a line that is not there. What there is, is drawn.
+  const other = second && second.points.length > 0 ? second : undefined;
+  if (points.length === 0 && !other) {
     body.setText("No data in this range yet.");
     return null;
   }
@@ -360,65 +378,106 @@ function renderLineOrBar(args: RenderArgs, points: ChartPoint[]): ChartTeardown 
   const canvas = wrap.createEl("canvas");
 
   const accent = cssVar(body, "--interactive-accent", "#6c8cff");
+  // The second series' colour. A token rather than a hard-coded hue, defined in
+  // 00-tokens.css beside the mood and activity palettes, so a theme can move it
+  // and so the guard in test/tokens.test.ts can see it is defined at all.
+  const accent2 = cssVar(body, "--am-chart-series-2", "#d99b3f");
   const gridColor = cssVar(body, "--background-modifier-border", "rgba(140,140,160,0.25)");
   const textColor = cssVar(body, "--text-muted", "#9aa0aa");
-  const isTime = def.type === "time";
   const isBar = args.type === "bar";
-  const unit = def.unit ? ` ${def.unit}` : "";
 
-  const yScale: NonNullable<ChartConfiguration["options"]>["scales"] = {
-    y: {
+  // ONE AXIS BUILDER, TWO AXES. The clock ticks, the true-zero baseline and the
+  // declared maximum are properties of the TRACKER, so asking them twice of one
+  // function is what stops the right-hand axis from slowly acquiring different
+  // rules to the left-hand one. It was inline for a single `y` until 4.45.
+  const valueAxis = (
+    d: TrackerDef,
+    values: number[],
+    opts: { right?: boolean; tint?: string } = {}
+  ): Record<string, unknown> => {
+    const clock = d.type === "time";
+    const axis: Record<string, unknown> = {
       ticks: {
-        color: textColor,
+        color: opts.tint ?? textColor,
         // A clock axis can top out at exactly 1440 (a span covering the whole
         // day); formatClock wraps that to "00:00", which would label both ends
         // of the axis identically. Show the end of the day as 24:00 instead.
-        callback: isTime
-          ? (v) => {
+        callback: clock
+          ? (v: unknown) => {
               const n = typeof v === "number" ? v : Number(v);
               return n === 1440 ? "24:00" : formatClock(n);
             }
           : undefined,
       },
-      grid: { color: gridColor },
-    },
+      // THE RIGHT-HAND AXIS DRAWS NO GRID. Two grids at two scales cross each
+      // other at nothing in particular, and the result reads as graph paper
+      // rather than as two readings. The left one keeps its lines.
+      grid: opts.right ? { drawOnChartArea: false } : { color: gridColor },
+      ...(opts.right ? { position: "right" } : {}),
+    };
+    // Number charts start at 0 so bar lengths and line heights read against a
+    // true zero baseline — pinning to a tracker's declared min (e.g. Mood's 1)
+    // both hides a minimum-valued bar and exaggerates a line's swings. def.max
+    // still caps the top (Mood stays 0–5).
+    if (d.type === "number") {
+      axis.beginAtZero = true;
+      if (d.max != null) axis.max = d.max;
+    } else if (clock) {
+      // Clock axis: snap to whole hours so ticks read 07:00, 08:00, 09:00
+      // rather than Chart.js's automatic 40-minute spacing. The range still
+      // hugs the data (a wake-time band reads better than a forced 00:00–24:00
+      // axis) — it's just widened to the enclosing hours.
+      const bounds = hourAxisBounds(values);
+      if (bounds) {
+        axis.min = bounds.min;
+        axis.max = bounds.max;
+        axis.ticks = {
+          ...(axis.ticks as Record<string, unknown>),
+          stepSize: bounds.stepSize,
+        };
+      }
+    }
+    return axis;
+  };
+
+  // THE DATE AXIS IS THE UNION OF BOTH SERIES, and for one series that union is
+  // its own dates — so this one expression is both the old behaviour and the
+  // new one. `alignSeries` is the OUTER join and `pairPoints` is the inner one;
+  // reusing the scatter's pairing here would have silently plotted only the
+  // days on which both trackers were logged.
+  const aligned = other ? alignSeries(points, other.points) : null;
+  const dates = aligned ? aligned.dates : points.map((p) => p.date);
+  const values = aligned ? aligned.a : points.map((p) => p.value);
+
+  const yScale: NonNullable<ChartConfiguration["options"]>["scales"] = {
+    y: valueAxis(def, points.map((p) => p.value), other ? { tint: accent } : {}),
     x: {
       ticks: { color: textColor, maxRotation: 0, autoSkipPadding: 16 },
       grid: { display: false },
     },
+    ...(other
+      ? {
+          y1: valueAxis(
+            other.def,
+            other.points.map((p) => p.value),
+            { right: true, tint: accent2 }
+          ),
+        }
+      : {}),
   };
-  // Number charts start at 0 so bar lengths and line heights read against a
-  // true zero baseline — pinning to a tracker's declared min (e.g. Mood's 1)
-  // both hides a minimum-valued bar and exaggerates a line's swings. def.max
-  // still caps the top (Mood stays 0–5).
-  if (def.type === "number") {
-    const y = yScale.y as { min?: number; max?: number; beginAtZero?: boolean };
-    y.beginAtZero = true;
-    if (def.max != null) y.max = def.max;
-  } else if (isTime) {
-    // Clock axis: snap to whole hours so ticks read 07:00, 08:00, 09:00 rather
-    // than Chart.js's automatic 40-minute spacing. The range still hugs the
-    // data (a wake-time band reads better than a forced 00:00–24:00 axis) —
-    // it's just widened to the enclosing hours.
-    const bounds = hourAxisBounds(points.map((p) => p.value));
-    if (bounds) {
-      const y = yScale.y as {
-        min?: number;
-        max?: number;
-        ticks?: { stepSize?: number };
-      };
-      y.min = bounds.min;
-      y.max = bounds.max;
-      y.ticks = { ...(y.ticks ?? {}), stepSize: bounds.stepSize };
-    }
-  }
 
   // Rolling-average overlay: a second, smoother line through the same points.
   // Line charts only (a bar's per-day totals aren't a series you smooth), and
   // only when asked. Muted colour and no points so it reads as a guide behind
   // the raw data rather than a competing series.
+  //
+  // AND ONE SERIES ONLY (4.45). A mean drawn through a chart that already has
+  // two lines and two axes is a third dashed line belonging visibly to neither.
+  // The editor withholds the toggle when a second tracker is set; this ignores
+  // the flag as well, so a hand-written directive carrying both gets the same
+  // chart the editor would have produced.
   const overlay =
-    !isBar && args.avg && points.length >= 2
+    !isBar && args.avg && !other && points.length >= 2
       ? [
           {
             label: "Rolling avg",
@@ -438,16 +497,22 @@ function renderLineOrBar(args: RenderArgs, points: ChartPoint[]): ChartTeardown 
         ]
       : [];
 
+  // Which tracker each dataset reads, index-aligned with `datasets` below, so
+  // the tooltip can format a value in ITS OWN units rather than in the first
+  // series'. `null` is the rolling average, which is a mean of the first
+  // series and takes its units.
+  const seriesDefs: (TrackerDef | null)[] = [def, ...(other ? [other.def] : []), ...overlay.map(() => null)];
+
   const config: ChartConfiguration = {
     type: isBar ? "bar" : "line",
     data: {
-      labels: points.map((p) =>
-        isMonthResolution(args.scope) ? monthLabel(p.date) : dateLabel(p.date)
+      labels: dates.map((d) =>
+        isMonthResolution(args.scope) ? monthLabel(d) : dateLabel(d)
       ),
       datasets: [
         {
           label: def.label,
-          data: points.map((p) => p.value),
+          data: values,
           borderColor: accent,
           backgroundColor: isBar ? withAlpha(accent, 0.65) : withAlpha(accent, 0.12),
           borderWidth: 2,
@@ -456,7 +521,36 @@ function renderLineOrBar(args: RenderArgs, points: ChartPoint[]): ChartTeardown 
           pointRadius: isBar ? 0 : 3,
           pointHoverRadius: isBar ? 0 : 5,
           pointBackgroundColor: accent,
+          // A HOLE IN THE UNION IS NOT A HOLE IN THE DATA. Two trackers logged
+          // on different days produce gaps in each series that neither had on
+          // its own — a weekly weight beside a daily mood would draw as
+          // unconnected dots. Bridged only where the union created the gap;
+          // a single series has none by construction and says nothing here, so
+          // its configuration is unchanged.
+          ...(other ? { spanGaps: true } : {}),
         },
+        ...(other
+          ? [
+              {
+                label: other.def.label,
+                data: aligned!.b,
+                yAxisID: "y1",
+                borderColor: accent2,
+                // NO AREA FILL ON THE SECOND LINE. Two translucent fills at two
+                // scales overprint into a third colour that means nothing, and
+                // the lower series would be washed out by whichever was drawn
+                // last. The first keeps its fill; the second is a line.
+                backgroundColor: "transparent",
+                borderWidth: 2,
+                fill: false,
+                tension: 0.25,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                pointBackgroundColor: accent2,
+                spanGaps: true,
+              },
+            ]
+          : []),
         ...overlay,
       ],
     },
@@ -469,16 +563,22 @@ function renderLineOrBar(args: RenderArgs, points: ChartPoint[]): ChartTeardown 
       plugins: {
         legend: {
           // Off for a single series (the tile's caption already names it), on
-          // when the overlay adds a second so the dashed line is identified.
-          display: overlay.length > 0,
+          // as soon as there is anything to tell apart — the rolling average,
+          // or a second tracker.
+          display: overlay.length > 0 || other != null,
           labels: { color: textColor, boxWidth: 12, boxHeight: 2 },
         },
         tooltip: {
           callbacks: {
-            title: (items) => (items.length ? points[items[0].dataIndex].date : ""),
+            title: (items) => (items.length ? dates[items[0].dataIndex] ?? "" : ""),
             label: (item) => {
               const y = item.parsed.y as number;
-              return isTime ? formatClock(y) : `${round(y)}${unit}`;
+              // ITS OWN UNITS, NOT THE FIRST SERIES'. A weight in kg beside a
+              // mood out of 5 formatted with one unit is a tooltip that is
+              // wrong half the time.
+              const d: TrackerDef = seriesDefs[item.datasetIndex] ?? def;
+              const u = d.unit ? ` ${d.unit}` : "";
+              return d.type === "time" ? formatClock(y) : `${round(y)}${u}`;
             },
           },
         },
@@ -1001,7 +1101,25 @@ export function renderTrackerChart(args: RenderChartOptions): ChartTeardown {
     def2: args.def2,
   };
   switch (type) {
-    case "line":
+    case "line": {
+      // A SECOND TRACKER IF THIS CHART NAMES ONE (4.45), read exactly as the
+      // scatter below reads its own: the same scope, the same window, the same
+      // collector. What differs is the join — `renderLineOrBar` aligns the two
+      // over the union of their dates, where a scatter pairs them and drops
+      // whatever is unmatched.
+      //
+      // A NAMED TRACKER THAT NO LONGER EXISTS IS NOT FATAL HERE, unlike on a
+      // scatter, where it is the whole Y axis. A line without its partner is
+      // still the chart it was — one trend — so it draws, and the tile's own
+      // caption is what says two trackers were meant.
+      const partner = args.def2
+        ? {
+            def: args.def2,
+            points: pointsInWindow(collectPoints(app, plugin, args.def2, scope), win),
+          }
+        : undefined;
+      return renderLineOrBar(inner, points, partner);
+    }
     case "bar":
       return renderLineOrBar(inner, points);
     case "summary":

@@ -53,6 +53,20 @@ export function daysSinceWeekStart(dayOfWeek: number, weekStart: number): number
   return ((dayOfWeek - weekStart) % 7 + 7) % 7;
 }
 
+// A title a reader typed, made safe to write into a directive line.
+//
+// A title is one line of a fenced block, and titles arrive pasted from
+// somewhere else more often than they are typed. A newline in one would end the
+// directive; a backtick run would end the fence.
+//
+// MOVED HERE IN 4.45, from `journal-charts.ts`, when the diary's charts gained
+// titles of their own. The rule is about a directive line rather than about a
+// journal chart, and two copies of it is how one of them ends up not stripping
+// backticks — which is a title that breaks the fence it is written into.
+export function cleanLabel(raw: string): string {
+  return raw.replace(/[\r\n]+/g, " ").replace(/`/g, "").trim();
+}
+
 // Ensure a folder (and all parents) exists. No-op if already present.
 export async function ensureFolder(app: App, path: string): Promise<void> {
   const clean = normalizePath(path);
@@ -273,10 +287,53 @@ export function childFiles(folder: TFolder | null): TFile[] {
 // rather than going through Dataview, so the built-in navigator/calendar
 // widgets have no dependency on the Dataview plugin.
 
+// ── The vault root, which is a folder and is spelled four ways ─────────
+//
+// 4.44.0, AND EVERY LINE BELOW IS A BUG REPORT. A folder-scoped widget on a
+// note at the TOP of the vault resolved its scope to the root and then read
+// nothing at all, because the whole plugin asks "is this path under that
+// folder?" by string prefix and the root has no prefix to test with.
+//
+// `folderPath + "/"` is the right question for `02 - Diary` and the wrong one
+// for the root: Obsidian's own `normalizePath` returns `"/"` for the empty
+// string and strips a trailing slash from everything else, so a root scope
+// became the prefix `"//"` — which no path in any vault begins with. The
+// homepage's `tasks-table`, whose catalogue entry says in full that bare means
+// THE WHOLE VAULT, therefore drew "No notes here yet" on a vault holding 135
+// open tasks. It was not scoping wrongly; it was scoping to a prefix that
+// cannot match.
+//
+// FOUR SPELLINGS, BECAUSE FOUR THINGS PRODUCE THEM. `""` is what a path with no
+// slash in it leaves behind (`section-insert.ts::hostFolderOf`) and what this
+// codebase's own comments call "a KNOWN folder rather than an absent one";
+// `"/"` is what Obsidian's root `TFolder` carries in `path` and so what
+// `file.parent.path` hands every widget on a top-level note; `"."` and `"./"`
+// are what a reader types into the folder box when they mean "from here down",
+// and the box has no other way to say the root — `vaultFolders` deliberately
+// omits it, since `""` already meant the host's folder in that grammar.
+//
+// All four are the same folder. Testing them in one place is what stops the
+// next widget from picking two of them and calling it done.
+export function isVaultRoot(folderPath: string): boolean {
+  const clean = folderPath.trim();
+  return clean === "" || clean === "/" || clean === "." || clean === "./";
+}
+
+// The string every path under `folderPath` starts with — and it is `""` at the
+// root, which is the whole point: every path in the vault starts with nothing.
+//
+// THE ONE PLACE THE `+ "/"` LIVES. It was written out at six call sites, each
+// of which had the root bug independently and none of which could be fixed by
+// fixing another. A caller that wants to know whether a path is in scope asks
+// `path.startsWith(folderPrefix(folder))` and gets the root right for free.
+export function folderPrefix(folderPath: string): string {
+  return isVaultRoot(folderPath) ? "" : normalizePath(folderPath) + "/";
+}
+
 // All markdown files whose path sits under `folderPath` (recursive, like
-// Dataview's `dv.pages('"folder"')`).
+// Dataview's `dv.pages('"folder"')`). The vault root means the whole vault.
 export function filesUnder(app: App, folderPath: string): TFile[] {
-  const prefix = normalizePath(folderPath) + "/";
+  const prefix = folderPrefix(folderPath);
   return app.vault.getMarkdownFiles().filter((f) => f.path.startsWith(prefix));
 }
 

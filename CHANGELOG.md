@@ -7,6 +7,483 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.45.1] - 2026-08-19
+
+**Two things a reader found within minutes of 4.45: dragging a chart onto the
+chart below it did nothing, and a wide dashboard went narrow when you scrolled
+to the bottom of it.**
+
+### A drop landed one place short, on three surfaces
+
+Dragging a chart onto the one directly below it changed nothing at all. Dragging
+it two down worked, and looked like a swap. Both are the same defect seen from
+two distances.
+
+Three surfaces let you drag one thing onto another to reorder a list — the chart
+grid (4.45), the journal cards (4.40) and the section editor's rows (4.8) — and
+all three had written the same four lines: lift the dragged item out, then insert
+it **before** the target. Each carried a comment explaining that the arithmetic
+was safe because both indices are read *after* the lift. That is true, and it
+answers a different question. Reading the destination after the removal stops the
+index drifting; it does not decide which **side** of the destination the arrival
+belongs on.
+
+Insert-before is right for a drag going up and wrong for a drag going down, and
+for the adjacent case it is not merely wrong but invisible: lift a chart out, put
+it back before the chart that has just moved up into its place, and the list you
+get is the list you started with. **So the commonest drag on the grid wrote
+nothing.**
+
+The rule now: **the thing you dropped on moves aside towards where you dragged
+from.** Down onto it, you land after it; up onto it, you land before it. Dropping
+on your neighbour swaps the two, which is what anyone trying it expects to see.
+It is still lift-and-insert rather than swap — dragging a card three places up
+moves it three places — and only the adjacent case looks like a trade, because
+with one place between them the two descriptions agree.
+
+One function, `core/drop-onto.ts`, called by all three. Three copies of a
+four-line splice were three chances to get the side wrong, and it was wrong in
+all three.
+
+**Two of those three had tests, and both tests asserted the defect underneath a
+comment describing the rule they meant.** The journal cards' read *"dropping
+Study onto Media means Study goes where Media is"* — and then asserted an
+arrangement in which Study stops one place short of Media. A comment is not a
+test.
+
+*This changes how the journal cards and the section editor's rows respond to a
+drag, not only the charts.* Both now do what their own comments always said.
+
+### A wide page went narrow when you scrolled
+
+A dashboard set to **Wide page** rendered wide, and then collapsed to Obsidian's
+own width — every widget in it dropping to its narrow layout — when you scrolled
+to the bottom, or when the page grew long enough to scroll after charts were
+added.
+
+The width lives on Obsidian's sizer, which is an ancestor of everything a
+post-processor can reach, so 4.11 marked the page's title card and reached up
+for it from the stylesheet with `:has(.jtc-wide)`. **A reading view does not keep
+the whole note in the DOM.** It renders sections as they approach the viewport
+and drops them again when they leave — and the title card is the *first* block on
+the page. Scroll far enough and the marker the width depended on is unloaded, so
+the rule stops matching. Nothing was wrong with the note; the evidence had
+scrolled away.
+
+The width is derived from the **file** now — the same `pageIsWide` the cog writes
+with — and marked on the view, re-derived for every open note whenever a file is
+opened, the layout changes, the active leaf changes, or that note itself changes.
+
+This is not the thing `HOME_CSS_CLASS` refuses. That refusal is of a class put on
+the view *at render time*, which outlived the note that caused it because Obsidian
+reuses a leaf across file switches. This one is re-read from whichever file the
+leaf is showing, so a leaf showing a narrow note has the class removed on the same
+pass that adds it elsewhere. Nothing about the declaration changed: it is still
+one `wide` line in the block you are looking at, deleting it still narrows the
+page, and no part of Almanac writes it back.
+
+The `:has()` rules are gone rather than kept alongside — two carriers of one
+decision would disagree for exactly as long as it takes a card to be unloaded,
+which is the whole of this bug. `cssclasses: almanac-wide` still works, because
+that is Obsidian's own class applied by Obsidian from the file, and it is what
+keeps a homepage composed before 4.11 wide.
+
+### Tests
+
+`test/drop-onto.test.ts` — 13 cases over the shared rule, including the adjacent
+drop in both directions and a tripwire that fails if any surface writes the old
+splice again. The three existing tests that pinned the old behaviour were
+corrected rather than deleted, and the correction is named in each. Six
+single-token mutations were confirmed to turn the set red; the "changed nothing"
+guard was found to be unreachable once the direction is right, and removed rather
+than left as a passing line no test could reach.
+
+## [4.45.0] - 2026-08-19
+
+**A line chart can plot two trackers, the grid can be put in the order you
+dragged it into, and a chart can be called what you want to call it.**
+
+### Two trackers on a line
+
+A scatter has been able to hold two trackers since 2.19, and it answers one
+question: do these two move *together*? The question people actually had was the
+other one — sleep dipped in March, **what did mood do?** — and it needs both
+series against **time**, which the scatter cannot draw.
+
+So the line chart now takes a second tracker, picked in the same control the
+scatter uses, and set back to **— none —** to drop it again. They are aligned by
+**date, not by pairing**: a day that logged mood and not sleep is a mood reading
+with a gap beside it, not a day that did not happen. Reusing the scatter's own
+pairing here would have quietly truncated both lines to the days they share — a
+chart plotting a subset of what it says it plots, which looks entirely plausible
+on screen — so the join is a named function with its own tests.
+
+**Each tracker gets its own Y axis**, the first on the left and the second on
+the right. Minutes of sleep and a 1–5 mood share no scale, and one axis would
+flatten the smaller series into a line along the floor. The consequence is
+stated in the editor rather than left to be discovered: *the two axes are
+independent, so where the lines cross means nothing — read each line against its
+own side.* The legend appears by itself once there are two series to tell apart,
+and each series reads back in its own unit in the tooltip.
+
+### The rolling average is withheld while a second tracker is set
+
+Not disabled — **withheld, with the reason in its place**. A trailing mean is a
+guide through the noise of *one* trend; drawn through two, on two axes, it is a
+third dashed line belonging visibly to neither. A greyed toggle would teach
+nothing here, because the thing to change is a field two rows up rather than the
+toggle itself, so the row says so and names the way back: clear the second
+tracker and the control returns, with the setting you had.
+
+The model enforces it as well as the form, so a directive hand-written with both
+flags renders as the chart it says it is rather than a fourth line nobody asked
+for.
+
+### Drag a chart to reorder the grid
+
+Pick up a tile anywhere on its face and drop it on another, and it lands
+**before** that chart — the same promise dragging a journal card makes, and the
+same rule: **the gesture is the consent**, so it writes on drop with no
+confirmation to click. The charts visibly move, which is the confirmation. A
+chart cannot be dragged into another note's grid; the drop refuses rather than
+moving something invisible.
+
+**The grid stopped backfilling to make this true.** It was laid out with
+`grid-auto-flow: dense`, which lets a small chart hop *upwards* past a wide one
+to fill a hole — helpful when nothing owns the order, and directly opposed to an
+order you just dragged. Two charts of unequal size could swap themselves back
+the moment you let go. Dense packing is gone; sizes still work exactly as they
+did, a wide tile just no longer has anything backfilled above it.
+
+### A chart can be called what you want
+
+The editor's **Title** field starts empty with the name the chart would take
+anyway as its placeholder — the tracker's name, *Sleep vs Mood* for a scatter,
+*Sleep and Mood* for a two-tracker line. Leaving it alone is therefore not a
+blank tile, and the placeholder is never pre-filled into the box: seeding it
+would write the derived name into your note as though you had chosen it, and a
+later rename of the tracker could never reach that chart again.
+
+It is stored after a `|` at the end of the chart's line. **A bar rather than
+another `+flag`**, because a title is free text and the tracker field is greedy:
+`+title=` would have let `chart:c1:Mood:line:30+title=mood:line:all` parse as a
+tracker called `Mood:line:30+title=mood` — a different chart, silently, with
+nothing on screen to say so. The bar cannot appear before the fields are read.
+An untitled chart writes no bar at all, so every chart already on disk
+round-trips byte for byte.
+
+The bar is also **the spelling this plugin already had**: a journal note's
+`jchart:` line has carried `|Label` since 2.35, and `journal-chart:<tracker>|Label`
+longer than that. One name per idea, so a reader who has titled one kind of chart
+knows how to title the other.
+
+### Tests
+
+`test/chart-series.test.ts` — 41 cases over the alignment, the titles, the
+reorder and the drag payload, plus the byte-identity clauses. Seven single-token
+mutations were confirmed to turn them red, including the one that matters most:
+inner-joining the two series instead of outer-joining them.
+
+## [4.44.1] - 2026-08-19
+
+**Two controls in the section editor wrote their change, re-drew the list to
+show it, and left Save disabled over "No changes": reordering a row inside a
+group, and Start a page here.**
+
+`regroup` does four things to a note, and the pane that reports it could see
+one of them. Everything below is one silence with two victims.
+
+### Start a page here wrote a bit nobody counted
+
+The same seam, one question further along, and the reason it survived 4.44.1's
+first pass: a `tab` line moves nothing between blocks **and nothing between
+columns**, so a page break was invisible to the opener diff and to the cell-order
+diff alike. The button wrote its bit, the card re-drew with `Page 1` and `Page 2`
+bands and its bar said *Group — 2 pages*, and the footer said there was nothing
+to save. `regroupFlatNote`'s phase four had been placing the boundary correctly
+since 4.34.2; as with the reorder, nothing at the bottom was missing.
+
+`pageBreakOps` is `cellMoveOps`' sibling and reports both directions —
+*"Open tasks starts a new page of its group"*, *"Open tasks joins the page before
+it"* — because **Join the page before** is the only way to unmake a page from
+this window, and a change that can be made and not unmade is half a control.
+Blocks are matched by members here too, and a block whose membership changed is
+left to the regroup ops that already name it.
+
+**Every phase of `regroup` is now named by the dry run**, which is the property
+that was missing rather than any one of these calls.
+
+*Unmaking a page still leaves a column*, exactly as 4.34.2 states — "a page break
+is a column break that was promoted, and unmaking it returns it to what it was".
+Where the reader started a page inside a *stack*, the boundary it returns to is a
+column that was not there before. That is unchanged behaviour and is now
+reachable for the first time, so it is stated rather than left to be found.
+
+### The refusal was speaking for a write that was never asked
+
+Every reorder in the section editor goes through the same list of rows, and a
+grouped row is an ordinary member of it: it has arrows, it is a drag source and
+it is a drop target. Dragging one re-drew the list in the new order — and the
+footer read **No changes**, with Save disabled, because the plan had answered:
+
+> Go to is in one block with Diary, Open tasks and On this day and moves with it.
+> Split the block to move them apart.
+
+That sentence is right about **leaving** a block. It was being asked about two
+cells of one row trading places, which leaves nothing: no fence is created,
+emptied or crossed, and every `row`, `cell`, `tab` and `frame` line stays where
+it is. On the homepage four of the seven rows are in one group, so the commonest
+reorder on the commonest page was the refused one — and the refusal is in the
+Changes tab, which nobody opens when the button says there is nothing to save.
+
+**And the write had been able to do it since 4.8.** `regroupFlatNote`'s *phase
+three — order, inside a block* settles exactly this. Nothing was missing at the
+bottom; what was missing is that no pass **named** the change, and the pass that
+refused it was speaking on behalf of a write that was never going to be asked.
+
+So the plan now says nothing about a move that stays inside its block
+(`cellOrderIn` is the test: every member staying, placeable, unpinned, and
+contiguous in the requested order), and the dry run names it. Three ops for one
+drag was the other way to get this wrong.
+
+### `layoutOps` asked which block, and never which column
+
+The Changes pane is a **dry run**: it applies the write to a copy and reports
+what came back, which is the only way it can promise exactly what Save does. It
+was comparing each section's *opener* — which block it is in — so a reorder
+inside one block came back identical and was reported as nothing.
+
+`cellMoveOps` asks the same question one level in, through the same `moveOps`
+the plan uses, so a reorder gets the wording every other move gets ("moves above
+Open tasks") and is minimal in the same way: dragging one cell past three names
+one move, not four. **Blocks are matched by their members, not by their opener** —
+the opener is one of the rows that can move — and a block whose membership
+changed is left to the regroup ops, which already name it.
+
+### Phase three turned a stack into a column
+
+Found by running it rather than reading it. The move used a `cell` target, which
+**opens a column**: right for a section arriving from another block, wrong for
+two that are already there. The homepage's aside stacks three widgets in one
+cell, and reordering them came back as
+
+```
+row / diary:3 / cell / tasks-table / cell / launcher / on-this-day:always
+```
+
+— a two-column row silently becoming three. It uses `swap`, the target built for
+this and documented for it: *nothing is inserted and nothing is removed, so the
+row keeps exactly the columns it had and each one keeps its count.*
+
+### The one bit a reorder could not survive
+
+`joined` is one bit per row — *this row is with the one above it* — and the
+editor argues, correctly, that a block is a run of consecutive rows so one bit
+says the whole of it. It also claimed the bit "survives a reorder for free". It
+does, for every row except the one that **opens** a block: that row is described
+by the *absence* of a bit, and absence does not travel.
+
+Move the homepage's Diary card below Go to and the list handed to the write said:
+Go to is joined, so it joins the block above it — **the banner** — and Diary,
+unjoined, opens a block of its own. One drag, two wrong blocks, on the one block
+that holds the page title and that nothing may join.
+
+`keptBlocks` restores boundaries **by position**: a block whose members are still
+consecutive keeps its first row as its opener and the rest joined to it, whichever
+rows those now are. A block the move genuinely broke up — a row dragged out of it,
+or another dropped through it — is left exactly as the bits describe, because
+that reader is regrouping and the bits are how they say so. One rule, asked by
+both reorder paths, because a fix in one of them is a window where the arrows are
+safe and the drag is not.
+
+### Tests
+
+`test/section-reorder.test.ts` — 26 cases, and they run the model: what these
+controls produce is a file, and the file is what was wrong. Reverting each of the
+four fixes independently was confirmed to turn them red (4, 2, 1 and 1 case). The
+byte-identical clauses are asserted rather than described: every block outside
+the group unchanged, one `cell` line before and after, and the note restored
+exactly when the reorder is undone.
+
+## [4.44.0] - 2026-08-19
+
+**The homepage's Open tasks widget scoped itself to the vault root, and the
+vault root is the one folder no scope test in this plugin could match.**
+
+### `//` is a prefix nothing starts with
+
+Every folder-scoped widget here answers "is this note in scope?" the same way:
+`path.startsWith(folder + "/")`. Obsidian's root folder carries the path `/`, so
+`file.parent.path` on a top-level note is `/`, so the test became
+`path.startsWith("//")` — **false for every path in every vault, forever.**
+
+The homepage's `tasks-table` is the widget whose entire scope is the root. Its
+catalogue entry has said since 4.2 that bare means the whole vault; the composer
+wrote the bare line; the reader saw **"No notes here yet — open tasks from notes
+under `/` collect here"** on a vault holding 135 open tasks across 98 notes. The
+empty state was even printing the defect, in the one place a reader would read it
+as a folder name.
+
+`core/util.ts` now owns the question. `isVaultRoot` knows the **four spellings**
+the root arrives in, because four different things produce them: `""` from a path
+cut at its last slash, `/` from Obsidian's own root `TFolder`, and `.` / `./`
+from a reader typing "from here down". `folderPrefix` returns the prefix a scope
+implies — and at the root that is `""`, which every path in the vault starts
+with. `filesUnder` is one line over it, so **every folder-scoped widget in the
+plugin can be pointed at the root**, not only the one that reported this.
+
+Three more call sites asked the same question in their own words and each had the
+bug independently:
+
+- **`liveScopedWidget` watched `//`**, so a root-scoped widget refreshed for its
+  own host note and nothing else. This is the silent half: had the read worked,
+  the table would have painted correct rows once and then sat there while tasks
+  were ticked underneath it.
+- **`readOpenTasks`' cache sweep** never matched a root-scoped path, so a
+  since-deleted note's entry was kept rather than dropped.
+- **`readFolders`' sweep** in `diary-index.ts`, which the journal search and
+  the journal index read through, for the same reason.
+
+And one that failed by being *falsy* rather than by not matching:
+`journalFolderScope` ended `return hostFolder ? [hostFolder] : []`, so a host
+folder spelled `""` — a real, known folder — read as "this note is nowhere" and
+the widget drew **nothing at all** rather than an empty state. It is `!= null`
+now, which keeps the one case that genuinely means absent: a journal **template**,
+composed once and used in every folder of its level, still resolves to nothing.
+
+### The homepage was the only `tasks-table` in the plugin with no folder box
+
+The diary dashboard, the journals dashboard and every journal index have declared
+the folder question over this directive since 3.15. The homepage's copy did not —
+so *Edit sections* drew a row with a Remove button and nothing to answer, and
+"the whole vault" was a scope the reader could neither confirm nor change. It is
+declared now, and needed no new machinery: `withAnswers` splices into the
+directive's own span, so the answer lands on the `tasks-table` line and the diary
+card, the launcher and On this day it shares a fence with come out byte-identical.
+
+**The box says "the whole vault", not "This note's folder".** The ordinary
+placeholder is *true* on this page — the homepage's own folder is the root — and
+tells the reader nothing, leaving them unable to tell a vault-wide widget from
+one pointed at a folder that happens to be empty. `emptyLabel` is 4.16.1's field,
+already built for `level-index`'s sibling fallback, and this is the same failure
+from the other side: a box describing a rule it does not follow.
+
+### A spelling for "the whole vault", from anywhere
+
+`""` means the **host's** folder, and `ArgSuggest` deliberately omits the root
+from its folder list because `""` already spells something else there — so a
+reader on a note *inside* a folder had no way to say "the vault" at all. The
+`tasks-table` argument now offers **`./` — The whole vault** as a named
+suggestion, drawn by its name rather than as a path. It is nothing like the `all`
+keyword this argument still refuses: `all` names several journal roots and
+`buildTasksTableRegion` takes `folders[0]`, so it would promise a scope the widget
+truncates. `./` names one folder.
+
+The scope cycle in the table's corner carries it like any other written scope,
+under the name **Vault** rather than *Path* — and the *Below* hint on a top-level
+note now reads "Tasks in every note in the vault" instead of naming the path `/`.
+Both empty states do the same: **"Open tasks from every note in the vault collect
+here"**, and **"No open tasks anywhere in the vault"**.
+
+### The tests run the resolvers rather than reading them
+
+`test/vault-root-scope.test.ts` builds a five-note vault and asserts **which
+files come back** from each of the four spellings, because a test that pinned
+`normalizePath(folderPath) + "/"` would have been green for three releases while
+the homepage rendered nothing — it would have been pinning the defect. Sixteen
+tests; reverting `folderPrefix`, the homepage's question and
+`journalFolderScope`'s `!= null` each turns them red, which was checked rather
+than assumed.
+
+Two assertions are on source text, and both name behaviour no unit test in this
+suite can reach: the callout built inside an async `.then`, and the predicate a
+`LiveWidget` is constructed with.
+
+`test/widget-sections.test.ts`'s `emptyLabel` tripwire — "a THIRD widget, or
+either of these two drifting, still fails" — fired exactly as designed. It now
+names three members with their words rather than looping over one string, and a
+fourth still fails it.
+
+## [4.43.0] - 2026-08-18
+
+**An engine that fills a scaffolded vault with example content, so the vault a
+stranger downloads shows the plugin instead of showing its empty states.**
+
+### `npm run seed -- <vault>`
+
+`tools/seed-vault.mjs` writes a year of diary entries and a populated journal
+tree into an already-scaffolded vault. Every widget in Almanac renders somebody's
+notes, and on an empty vault every one of them renders its empty state — an
+honest picture of nothing and a useless picture of the plugin.
+
+**It derives; it does not restate.** Nothing about the vault's shape is written
+into the tool. Paths come from the vault's own
+`.obsidian/plugins/ahrymx.almanac/data.json`; each journal's levels, kinds and
+template filenames come from that same file; note bodies come from the vault's
+templates, edited in place rather than reproduced. A preset that gains a level, a
+template that gains a section, or a reader who renamed `02 - Diary` are all
+handled by reading rather than by editing the tool. The one thing written down is
+the prose, in `tools/seed-corpus.mjs`, and that is the whole point of it.
+
+**Deterministic, with one honest exception.** A seeded PRNG drives every choice,
+so the same seed and vault give the same 323 files; nothing consults the clock
+except the end of the date window, and `--today` pins that too. Left off, the
+history ends today so the example looks current rather than abandoned.
+
+**It refuses to overwrite.** A vault is somebody's notes. Every write declines a
+path that already exists unless `--force` is given, and the run reports what it
+skipped — so re-running it after a release is a no-op rather than a silent
+double-write. `--dry-run` reports the plan and writes nothing.
+
+The history is shaped rather than uniform: runs of consecutive days with short
+breaks between them, and one deliberate two-to-three-week lapse in the middle
+third, because the thing a year of activity is supposed to make visible is
+precisely that you can look back and see where you fell off. A default run over
+13 months writes 273 active days with a longest streak of 12.
+
+### Four format bugs the first real seed found, and one it did not
+
+Four different things live in `<!--almanac:… -->` regions and they look alike
+from a distance. **The region's name does not say which format it holds, and
+nothing warns when the wrong one goes in** — the write succeeds, the file looks
+plausible, and the widget renders rubbish.
+
+- **Recall cards were written in the task format.** `- ( ) question` into
+  `<!--almanac:recall-->`: it parsed, it produced a card, and the card's prompt
+  read `- ( ) What makes an atom a stereocentre?` with nothing behind the reveal.
+  Fifty notes, zero warnings. Recall is `question :: answer`, and the corpus now
+  carries answers rather than questions alone — a card with a blank reveal
+  demonstrates the widget without demonstrating the feature.
+- **The daily's prose was appended under the note instead of put in it.** The
+  daily template declares `note:focus`, `list:highlights`, `list:challenges`,
+  `note:log` and `tasks:todo`, each backed by a region. The first version wrote
+  `## Title` and a line at the end of the file, so every seeded day rendered a
+  column of empty prompts with a stray heading below them — which teaches a
+  reader opening the example vault that Almanac's daily note does not work.
+- **Not every day gets every field**, now that they are filled. A year where all
+  five regions are full every single day is a year nobody lived, and it hides the
+  thing an example should show: a half-filled entry is a normal entry.
+- **Bulleted sections lost their bullets**, because a template's `- **Definition:** `
+  lines were replaced with bare text. Fixed by marking unmarked lines — and then
+  fixed again, because `**Definition:**` starts with `*` and the first marker test
+  read it as a list item, so the corpus's most heavily used shape was the one that
+  came out unbulleted.
+
+### The tests run the tool rather than reading it
+
+The other tool tests in this suite assert on source text, because what they pin
+is a build contract with no return value to look at. This one is a pile of pure
+string and date transforms, and the transforms are where every defect above
+lived — so `test/seed-vault.test.ts` imports and runs them.
+
+**The region tests do not check a string shape.** They feed the seeder's output
+to the plugin's own `parseTaskLine`, `parseRecall` and `parseEntries` and check
+what comes back out, because a test that knew the format would have agreed with
+the recall bug. Twenty-four tests; ten single-token mutations of the tool were
+confirmed to turn them red, and the one that stays green — a global regex on a
+string already sliced to the frontmatter — is recorded in the test as genuinely
+equivalent rather than quietly dropped.
+
 ## [4.42.1] - 2026-08-18
 
 **Two corrections to 4.42, both of which its own tests had passed.**

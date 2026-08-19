@@ -363,6 +363,18 @@
   --am-mood-4: #8bbf5d;
   --am-mood-5: #4caf7d;
 
+  /* The second chart series (4.45). A line chart may draw two trackers, and the
+     first keeps the theme's own accent — a chart that changed colour the moment
+     you added a second tracker would be worse than one that did not. This is
+     the other hue.
+
+     ORANGE AGAINST THE ACCENT'S USUAL BLUE, which is the standard first pair of
+     a categorical order and stays separable for the common forms of colour
+     blindness, where a second blue or a green would not. Named here rather than
+     written into chart-render.ts so a theme whose accent IS orange can move it —
+     the one case this default cannot answer for itself. */
+  --am-chart-series-2: #eb6834;
+
   /* Activity ramp — the study heatmap's four shades, light to dark. Separate
      from the mood palette on purpose: mood runs red→green because low mood is
      bad, whereas a low task count is simply less work, so it wants a single

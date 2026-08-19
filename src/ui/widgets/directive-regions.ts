@@ -685,8 +685,13 @@ export function buildTasksTableRegion(
   // every root) resolve to the first or to nothing rather than being flattened
   // into a fake parent.
   const folders = journalFolderScope(plugin, arg, hostFolder);
+  // `== null`, NOT FALSY (4.44.0). The vault root is a folder whose path is the
+  // EMPTY STRING wherever a path is derived by cutting at the last slash — and
+  // a falsy test threw that answer away and drew nothing at all, which is the
+  // silent half of this release's bug: the widget vanished rather than
+  // rendering empty. Nothing resolvable is `[]`, and `[]` still gives up here.
   const folder = folders[0];
-  if (!folder) return null;
+  if (folder == null) return null;
 
   // Whether "This whole journal" is reachable from here. Asked by resolving the
   // keyword rather than by testing the path a second way — the button must not
@@ -745,7 +750,9 @@ export function tasksScopeFor(
   const arg = rest.replace(PERIOD_FLAG_RE, "").trim();
   const file = fileOfCtx(plugin, ctx);
   const hostFolder = file?.parent?.path ?? null;
-  if (!journalFolderScope(plugin, arg, hostFolder)[0]) return null;
+  // `== null` for the reason the region states: the vault root can be spelled
+  // with the empty string, and a falsy test reads that as "unresolvable".
+  if (journalFolderScope(plugin, arg, hostFolder)[0] == null) return null;
   return {
     arg,
     hostFolder,

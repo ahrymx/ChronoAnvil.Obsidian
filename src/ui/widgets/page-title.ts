@@ -161,8 +161,15 @@ function sectionsMenuFor(
   };
 }
 
-// The class the stylesheet reaches for with `:has()`. Spelled once, here and in
-// the dispatcher that puts it on, so the two cannot drift.
+// The mark the cog reads its own checkbox from. Spelled once, here and in the
+// dispatcher that puts it on, so the two cannot drift.
+//
+// IT IS NO LONGER WHAT MAKES THE PAGE WIDE (4.45.1). The stylesheet used to
+// reach up for this class with `:has()`, and stopped when the card scrolled out
+// of the DOM; the width is derived from the file now, by `ui/page-width.ts`.
+// What this still does is answer the menu, which is a question about the card
+// in front of the reader and not about the page — see `menu` above, which
+// argues for reading it here rather than reading the file a second time.
 export const WIDE_CLASS = "jtc-wide";
 
 // Write the page's width into the note that asked for it.

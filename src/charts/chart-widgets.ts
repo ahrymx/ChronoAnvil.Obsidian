@@ -44,7 +44,11 @@ import { renderTrackerChart } from "./chart-render";
 import type { ChartTeardown } from "./chart-render";
 import { RANGE_LABELS, RANGE_SHORT_LABELS } from "./chart-ui";
 import {
+  CHART_DRAG_TYPE,
   ChartSpec,
+  chartTitle,
+  decodeChartDrag,
+  encodeChartDrag,
   periodBoundsFor,
   periodPropertyFor,
   periodUnitOf,
@@ -97,6 +101,68 @@ export function buildRangeCycle(
 }
 
 
+// Drag a tile to reorder the charts. 4.45.
+//
+// `journals-cards.ts::attachCardDrag` LINE FOR LINE, and deliberately so — the
+// two gestures are the same gesture over a different list, and the rules that
+// file argues for are not about journals:
+//
+//   THE KEY TRAVELS IN THE PAYLOAD, not in a variable in this closure. The grid
+//   is a LiveWidget and rebuilds on any change to the host note — including the
+//   one this drag causes — so a module-level "currently dragging" would be read
+//   by handlers belonging to tiles that no longer exist. `dataTransfer` is owned
+//   by the gesture and dies with it.
+//
+//   THE TYPE GATE IS WHAT MAKES A DROP TARGET. A file dragged in from the
+//   explorer fires `dragover` on whatever is under the pointer, and a grid that
+//   lit up for it would be promising a move it cannot make.
+//
+//   IT WRITES ON DROP WITH NO CONFIRMATION: the gesture is the consent, and the
+//   tiles visibly move.
+//
+// AND ONE RULE THAT IS THIS FILE'S OWN: the payload carries the NOTE PATH as
+// well as the key. A journal id is unique in a vault; a chart key is unique
+// only within its note, and every note's first chart is `c1`. Two dashboards
+// open in a split are drop targets for each other's drags, so the path is what
+// lets this refuse one — without it, a drag between panes would reorder the
+// wrong note using a key that happens to exist there too.
+function attachChartDrag(
+  plugin: AlmanacPlugin,
+  cell: HTMLElement,
+  key: string,
+  notePath: string
+): void {
+  cell.draggable = true;
+  cell.dataset.chartKey = key;
+  cell.addEventListener("dragstart", (e) => {
+    const payload = encodeChartDrag(notePath, key);
+    e.dataTransfer?.setData(CHART_DRAG_TYPE, payload);
+    e.dataTransfer?.setData("text/plain", payload);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+    cell.addClass("is-dragging");
+  });
+  cell.addEventListener("dragend", () => cell.removeClass("is-dragging"));
+  cell.addEventListener("dragover", (e) => {
+    if (!e.dataTransfer?.types.includes(CHART_DRAG_TYPE)) return;
+    if (cell.hasClass("is-dragging")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    cell.addClass("is-drop-target");
+  });
+  cell.addEventListener("dragleave", () => cell.removeClass("is-drop-target"));
+  cell.addEventListener("drop", (e) => {
+    cell.removeClass("is-drop-target");
+    const from = decodeChartDrag(e.dataTransfer?.getData(CHART_DRAG_TYPE) ?? "");
+    if (!from) return;
+    // A TILE FROM ANOTHER NOTE IS NOT A MOVE THIS GRID CAN MAKE. Refused
+    // quietly: the reader dragged between two panes, which is a reasonable
+    // thing to try and an unreasonable thing to be told off for.
+    if (from.path !== notePath) return;
+    e.preventDefault();
+    void plugin.charts.moveChart(notePath, from.key, key);
+  });
+}
+
 export function buildChartCell(
   plugin: AlmanacPlugin,
   grid: HTMLElement,
@@ -107,6 +173,10 @@ export function buildChartCell(
   const cell = grid.createDiv({ cls: "journal-chart-cell" });
   const span = spanOf(spec, period?.unit ?? null);
   if (span !== "small") cell.addClass(`is-${span}`);
+  // BEFORE THE BROKEN-TRACKER RETURN BELOW, so a tile whose tracker is gone can
+  // still be moved out of the way. A chart a reader cannot draw is one they are
+  // especially likely to want at the bottom of the grid.
+  attachChartDrag(plugin, cell, spec.key, ctx.sourcePath);
   const def = getTracker(plugin, spec.tracker);
 
   if (!isChartable(def)) {
@@ -119,13 +189,17 @@ export function buildChartCell(
     return null;
   }
 
-  // A scatter names a second tracker; resolve it so the eyebrow can read
-  // "X vs Y" and the renderer gets both axes. A missing/unchartable partner
-  // isn't fatal here — renderTrackerChart shows an in-tile notice — but the
-  // label should still make sense.
+  // A scatter names a second tracker, and since 4.45 a line may too; resolve it
+  // so the caption can name both and the renderer gets both axes. A
+  // missing/unchartable partner isn't fatal here — renderTrackerChart shows an
+  // in-tile notice for a scatter and draws the one series it has for a line —
+  // but the label should still make sense.
   const def2 = spec.tracker2 ? getTracker(plugin, spec.tracker2) : undefined;
-  const eyebrow =
-    spec.type === "scatter" && def2 ? `${def.label} vs ${def2.label}` : def.label;
+  // THE READER'S OWN WORDS IF THEY GAVE ANY, else the trackers'. Derived in
+  // `chartTitle` rather than here, because the editor's placeholder and the
+  // picker's description have to agree with this tile about what the chart is
+  // called — three surfaces, one answer.
+  const eyebrow = chartTitle(spec, def.label, isChartable(def2) ? def2.label : undefined);
   const head = cell.createDiv({ cls: "journal-chart-head" });
   head.createDiv({ cls: "journal-chart-label", text: eyebrow });
   buildRangeCycle(plugin, head, spec, period, ctx);

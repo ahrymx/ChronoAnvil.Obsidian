@@ -1055,6 +1055,67 @@ function cellLineIn(
   return run.lineOf[section.id] ?? null;
 }
 
+// ── reordering INSIDE one block (4.44.1) ──────────────────────────────
+//
+// THE RULE ABOVE IS ABOUT LEAVING A BLOCK, AND IT WAS READ AS BEING ABOUT
+// MOVING AT ALL. "A section in a shared block travels with the block, because
+// the chunk the reorder permutes IS the block" — true of the chunk permutation,
+// and it made every move naming a grouped section a refusal, including the one
+// move that never leaves the fence: two cells of one row trading places.
+//
+// The editor OFFERS that move. A grouped row is in a band, so it has arrows,
+// it is a drag source and it is a drop target — and on the homepage four of the
+// seven rows are in one group, so the commonest reorder on the commonest page
+// was the refused one. The reader dragged, the list re-drew in the new order,
+// the footer said "No changes", and Save was disabled. Nothing told them why:
+// the sentence naming the block is in the Changes tab, behind a tab nobody
+// opens when the button says there is nothing to save.
+//
+// AND THE WRITE COULD ALWAYS DO IT. Nothing crosses a fence, no fence is
+// created or emptied, no delimiter changes meaning: the anchors trade lines
+// inside one body and every `row`, `cell`, `tab` and `frame` line stays exactly
+// where it was. That is why this is a permutation here rather than a call into
+// `moveCell` — the cell machinery exists for a widget CHANGING blocks, and
+// borrowing it would be re-deriving a structure that is not moving.
+//
+// WHAT IT REFUSES, AND EACH IS THE SAME REFUSAL AS BEFORE:
+//
+//   • A member whose extent is a guess (`hasKnownExtent`) — the same predicate
+//     the partial removal asks, for the same reason: a section rendering a bar
+//     and a directive has an end nothing can bound, so its lines cannot be
+//     lifted without guessing.
+//   • A member being removed in the same save. The cut below is computed from
+//     `run.lineOf`, so the two edits share one set of indices and would have to
+//     agree about the order they happen in. They do not have to be able to.
+//   • A member that is pinned — the page head, which `holdPinned` has already
+//     put back where the file has it.
+//   • An arrangement that INTERLEAVES the block with anything else. That is a
+//     section moving INTO or THROUGH the group, which is the move the refusal
+//     was always about and which this does not touch: the members have to come
+//     out contiguous, in some order, or the answer is no.
+//
+// Null for "nothing to do" as well as for "cannot" — the two are the same
+// answer to the caller, which is `applyFlatSections`' own null-means-no-change
+// contract one level down.
+function cellOrderIn(
+  run: FlatRun,
+  target: readonly string[],
+  byId: Map<string, FlatSection>
+): string[] | null {
+  const ids = run.sectionIds;
+  if (ids.length < 2) return null;
+  for (const id of ids) {
+    if (!target.includes(id)) return null;
+    if (!hasKnownExtent(byId.get(id))) return null;
+    if (byId.get(id)?.pinned === true) return null;
+    if (run.lineOf[id] == null) return null;
+  }
+  const at = ids.map((id) => target.indexOf(id)).sort((a, b) => a - b);
+  if (at[at.length - 1] - at[0] !== at.length - 1) return null;
+  const next = at.map((i) => target[i]);
+  return next.every((id, i) => id === ids[i]) ? null : next;
+}
+
 // "Diary" / "Diary and Journals" / "Diary, Journals and Tags" — the co-tenants,
 // named so the sentence reads as one about the reader's page.
 const andList = (labels: string[]): string =>
@@ -1209,12 +1270,28 @@ export function planFlatSections(
   // unaffected: a section in its own block still moves past a shared one
   // freely, and the shared block goes with whichever of its own sections the
   // reorder carries.
+  const runOf = new Map(
+    runs.flatMap((r) => r.sectionIds.map((id) => [id, r] as [string, FlatRun]))
+  );
   for (const op of moveOps(surviving, target, (id) => byId.get(id)?.label)) {
     const with_ = op.sectionId ? sharers.get(op.sectionId) : undefined;
     if (!with_?.length) {
       ops.push(op);
       continue;
     }
+    // UNLESS THE MOVE STAYS INSIDE THE BLOCK (4.44.1), which is the one shape of
+    // "moves with it" that does not move the block at all — two cells of one row
+    // trading places. `regroupFlatNote`'s phase three settles the order inside a
+    // block and always has; what this refusal did was tell the reader it could
+    // not be done, in the one window that then went on to do it.
+    //
+    // SILENT HERE RATHER THAN A `move` OP, because the op belongs to the pass
+    // that performs it. `section-editor.ts::layoutOps` runs `regroup` as a dry
+    // run and reports what it ACTUALLY did — the rule that pane was built on —
+    // and a `move` from this function beside a `move` from that one would count
+    // one reorder twice on the button the reader is looking at.
+    const inside = op.sectionId ? runOf.get(op.sectionId) : undefined;
+    if (inside && cellOrderIn(inside, target, byId)) continue;
     // AND A BLOCK HOLDING A PINNED SECTION DOES NOT TRAVEL AT ALL (4.11). This is
     // the one route to moving the page head that `holdPinned` cannot see: it
     // permutes ids, and a chunk is a BLOCK — so a reader who typed the head and
@@ -1315,6 +1392,9 @@ export function applyFlatSections(
     ids: string[];
     lines: string[];
   }
+  // The order the reorder pass is measured against, computed exactly as the plan
+  // computes it — this is the second half of the note above about recomputing
+  // `want` rather than being handed it, one question further in.
   const chunks: Chunk[] = [];
   for (let ri = 0; ri < runs.length; ri++) {
     const run = runs[ri];
@@ -1779,9 +1859,28 @@ export function regroupFlatNote(
   // rather than what is inside one.
   //
   // ONE STEP PER PASS, AND EACH STEP FIXES THE LEFTMOST DISAGREEMENT. The
-  // section that should be in column `i` is moved in front of whatever is
-  // there — so every pass settles one more column from the left and the walk
-  // cannot undo its own work.
+  // section that should be in column `i` trades places with whatever is there —
+  // so every pass settles one more column from the left and the walk cannot
+  // undo its own work.
+  //
+  // A SWAP RATHER THAN AN INSERT, SINCE 4.44.1, AND THE DIFFERENCE IS A COLUMN
+  // THE READER DID NOT ASK FOR. This used `{ kind: "cell" }`, which OPENS a
+  // column at the target — right for a section arriving from another block, and
+  // wrong for two that are already here: a homepage whose aside stacks three
+  // widgets in one cell came back with the reordered one in a `cell` of its own,
+  // so a reorder silently became a three-column row.
+  //
+  // `swap` is the target built for exactly this and says so: "nothing is
+  // inserted and nothing is removed, so none of the delimiter rules apply — the
+  // row keeps exactly the columns it had and each one keeps its count." The
+  // stacking, the widths and the pages are all somebody else's answers, and a
+  // reorder has no business changing any of them.
+  //
+  // A HEIGHT STAYS WITH THE SLOT, which is what the one other `swap` caller
+  // already does (`block-drag.ts` carries the dragged widget's height and leaves
+  // the target's where it is). Two widgets trading columns keep the sizes their
+  // columns had; that is a statement worth making rather than a gap, and making
+  // it differently here would be two answers to one question.
   for (let pass = 0; pass < ceiling; pass++) {
     const now = flatBlocks(lines.join("\n"), sections);
     let moved = false;
@@ -1796,7 +1895,7 @@ export function regroupFlatNote(
       const next = moveCell(
         lines,
         { block: from.block, from: from.line, to: from.line + 1 },
-        { kind: "cell", block: onto.block, at: onto.line }
+        { kind: "swap", block: onto.block, at: onto.line }
       );
       if (!next) break;
       lines = next;

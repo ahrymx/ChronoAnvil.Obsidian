@@ -1,6 +1,6 @@
 {
   "name": "obsidian-almanac-plugin",
-  "version": "4.42.1",
+  "version": "4.45.1",
   "description": "Keep a daily diary and your own journal types with one shared tracker registry, and render calendars, charts, tables and period dashboards natively. Includes quick capture, full-text search, an entry navigator and vault scaffolding.",
   "main": "main.js",
   "type": "module",
@@ -14,6 +14,7 @@
     "lint": "eslint src test",
     "check:versions": "node tools/check-version-agreement.mjs",
     "measure:css": "node tools/measure-css.mjs",
+    "seed": "node tools/seed-vault.mjs",
     "pretest": "node tools/build-css.mjs",
     "test": "vitest run",
     "test:watch": "vitest"

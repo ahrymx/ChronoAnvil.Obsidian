@@ -43,7 +43,7 @@ import { allNoteRegions } from "../core/notestore";
 import { parseTasks } from "../ui/tasks";
 import { mapWithLimit } from "../ui/tables";
 import { tagsOf } from "../core/query";
-import { filesUnder, frontmatterOf, isoDate, moment } from "../core/util";
+import { filesUnder, folderPrefix, frontmatterOf, isoDate, moment } from "../core/util";
 import { journalAncestors, journalTypeOfNote } from "../journals/journal";
 import { TITLE_PROP } from "./entryheader";
 import { ENTRY_EVENTS_PROPERTY, JOURNAL_DATE_PROPERTY } from "../core/constants";
@@ -820,7 +820,11 @@ async function readFolders(
     const surface = key.slice(0, nul) as IndexSurface;
     const path = key.slice(nul + 1);
     if (!surfaces.has(surface)) continue;
-    const inScope = folders.some((folder) => path.startsWith(folder + "/"));
+    // `folderPrefix`, so the sweep asks the same question the read above asked
+    // (4.44.0). `folder + "/"` is `"//"` at the vault root — a scope the reader
+    // can now name — and a cache entry the read no longer covers would have
+    // been kept forever rather than dropped.
+    const inScope = folders.some((folder) => path.startsWith(folderPrefix(folder)));
     if (inScope && !seen.has(path)) indexCache.delete(key);
   }
 

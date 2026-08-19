@@ -15,6 +15,7 @@ import { Scaffold } from "./core/scaffold";
 import { SectionInserter } from "./ui/section-insert";
 import { wantsReadingMode } from "./core/viewmode";
 import { PathWatch, pruneCollapsedSections } from "./core/pathwatch";
+import { PageWidth } from "./ui/page-width";
 import {
   getFile,
   moment,
@@ -67,6 +68,7 @@ export default class AlmanacPlugin extends Plugin {
   scaffold!: Scaffold;
   sections!: SectionInserter;
   pathWatch!: PathWatch;
+  pageWidth!: PageWidth;
   // Reads and writes the per-journal manifest, and adopts a journal folder
   // that arrived without one. See journal-import.ts.
   journalImport!: JournalImporter;
@@ -123,10 +125,12 @@ export default class AlmanacPlugin extends Plugin {
     this.scaffold = new Scaffold(this.app, this);
     this.sections = new SectionInserter(this.app, this);
     this.pathWatch = new PathWatch(this.app, this);
+    this.pageWidth = new PageWidth(this.app, this);
     this.journalImport = new JournalImporter(this.app, this);
 
     this.widgets.register();
     this.pathWatch.register();
+    this.pageWidth.register();
 
     this.addSettingTab(new AlmanacSettingTab(this.app, this));
     this.registerCommands();

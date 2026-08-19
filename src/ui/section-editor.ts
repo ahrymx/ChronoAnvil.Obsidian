@@ -64,10 +64,14 @@ import { createListRow, type ListRowOptions } from "./list-row";
 import { promptDetailedSuggester, promptLayoutSave } from "./modals";
 import type AlmanacPlugin from "../main";
 import { getFile } from "../core/util";
+import { dropOnto } from "../core/drop-onto";
 import {
   answerInText,
   fieldLabelOf,
+  cellMoveOps,
   idsOf,
+  keptBlocks,
+  pageBreakOps,
   questionIsRequired,
 } from "../core/section-model";
 import { isPageWidgetId } from "../core/widget-sections";
@@ -451,6 +455,35 @@ export class SectionEditorModal extends EditorModal {
             : `${label} joins one block with ${this.view(opener)?.label ?? opener}`,
       });
     }
+    // AND THE ORDER INSIDE A BLOCK, WHICH IS THE SAME DRY RUN ASKED ONE
+    // QUESTION FURTHER IN (4.44.1). The map above answers "which block is this
+    // section in", so two cells of one row trading places is invisible to it —
+    // and `regroup`'s phase three had been settling exactly that since 4.8,
+    // unnamed and therefore uncounted. The footer disables Save at zero, so the
+    // reader dragged, watched the list re-draw, and was told "No changes".
+    //
+    // WHAT IT SKIPS AND HOW IT MATCHES ARE `cellMoveOps`' TO SAY, beside the
+    // `moveOps` it is built out of — so the sentence a reorder gets here is the
+    // one the plan writes for every other move, and a block whose MEMBERSHIP
+    // changed is left to the regroup ops above rather than being named twice.
+    const label = (id: string): string | undefined => this.view(id)?.label;
+    const was = this.model.blocks?.(base) ?? [];
+    const now = this.model.blocks?.(next) ?? [];
+    ops.push(
+      ...cellMoveOps(
+        was.map((b) => b.ids),
+        now.map((b) => b.ids),
+        label
+      )
+    );
+    // AND WHERE ITS PAGES BEGIN, WHICH IS THE FOURTH THING `regroup` DOES AND
+    // THE LAST ONE THIS PANE COULD NOT SEE (4.44.1). A `tab` line changes
+    // neither which block a section is in nor which column of it, so **Start a
+    // page here** wrote its bit, the write placed the boundary, and this
+    // returned nothing — leaving the footer to say "No changes" over a button
+    // the reader had just pressed. `BlockView.pages` has carried the answer
+    // since 4.34.2; nothing was asking it.
+    ops.push(...pageBreakOps(was, now, label));
     return ops;
   }
 
@@ -1210,7 +1243,14 @@ export class SectionEditorModal extends EditorModal {
     const i = this.rows.indexOf(a);
     const j = this.rows.indexOf(b);
     if (i === -1 || j === -1) return;
+    const before = this.groupsOf(this.rows);
     [this.rows[i], this.rows[j]] = [this.rows[j], this.rows[i]];
+    // AND THE BLOCK KEEPS ITS BOUNDARIES (4.44.1). Two rows of one group trading
+    // places must not hand the write a different arrangement of groups — which
+    // is what happens when the row that moves is the one that OPENS the block,
+    // because its bit is the absence of a bit and absence does not travel with
+    // it. `keptBlocks` states the whole of that.
+    this.joined = keptBlocks(before, this.rows, this.joined);
   }
 
   // Drag to reorder — direct manipulation, and STILL PLANNED MANIPULATION.
@@ -1255,11 +1295,21 @@ export class SectionEditorModal extends EditorModal {
       if (!from || from === id || !this.bandOf(id).includes(from)) return;
       // Lifted out and re-inserted at the target's slot, so dragging a row
       // three places up moves it three places rather than swapping it with
-      // whatever happened to be there. Restricted to one band throughout: both
-      // indices are read after the removal, from the same list.
-      const rest = this.rows.filter((x) => x !== from);
-      rest.splice(rest.indexOf(id), 0, from);
+      // whatever happened to be there. Restricted to one band throughout, which
+      // `bandOf` above has already checked.
+      //
+      // `dropOnto` SINCE 4.45.1, and the four lines it replaced inserted before
+      // the target in both directions — so dropping a row on the one directly
+      // below it did nothing at all. See `core/drop-onto.ts`; the chart grid and
+      // the journal cards had the same defect and now ask the same function.
+      const before = this.groupsOf(this.rows);
+      const rest = dropOnto(this.rows, from, id);
+      if (!rest) return;
       this.rows = rest;
+      // The arrows' rule, and for the arrows' reason — see `swap`. A drag that
+      // reorders inside one group keeps that group; a drag that takes a row out
+      // of one is a regroup, and `keptBlocks` leaves that reader's bits alone.
+      this.joined = keptBlocks(before, this.rows, this.joined);
       this.refreshFrame();
     });
   }

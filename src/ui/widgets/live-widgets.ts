@@ -25,6 +25,7 @@
 
 import { MarkdownPostProcessorContext, normalizePath } from "obsidian";
 import type AlmanacPlugin from "../../main";
+import { folderPrefix } from "../../core/util";
 import { LiveWidget } from "../livewidget";
 
 export function liveScopedWidget(
@@ -36,7 +37,13 @@ export function liveScopedWidget(
 ): HTMLElement {
   const host = createDiv({ cls: "journal-live-widget" });
   const folders = Array.isArray(scopeFolder) ? scopeFolder : [scopeFolder];
-  const prefixes = folders.map((f) => normalizePath(f) + "/");
+  // `folderPrefix`, NOT `normalizePath(f) + "/"` (4.44.0). A widget scoped to
+  // the vault root watched the prefix `"//"` and so never refreshed for any
+  // file but its own host note — the table would draw the right rows on first
+  // paint and then sit there while tasks were ticked underneath it. The root's
+  // prefix is `""`, which matches every path, which is what "watch the whole
+  // vault" has to mean.
+  const prefixes = folders.map(folderPrefix);
   ctx.addChild(
     new LiveWidget(plugin.app, host, {
       build,

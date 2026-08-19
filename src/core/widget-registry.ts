@@ -526,6 +526,16 @@ export const WIDGETS: Record<string, WidgetSpec> = {
       // `folders[0]`, so a keyword naming several roots resolves to the first
       // one rather than to all of them. Offering it would promise a scope the
       // widget silently truncates.
+      //
+      // `./` IS THE OTHER ANSWER AND IS OFFERED, 4.44.0. It names ONE folder —
+      // the vault root — so it is nothing like `all` and the objection above
+      // does not reach it. It is here because the grammar had no way to say
+      // "the whole vault" from a note that is not at the top of it: empty means
+      // the HOST's folder, and `ArgSuggest` deliberately omits the root from
+      // its folder list because `""` already spells something else there. A
+      // scope the plugin resolves and no control can express is a scope only a
+      // reader who reads source can use.
+      keywords: [{ value: "./", label: "The whole vault" }],
     },
   },
   "tag-index": {

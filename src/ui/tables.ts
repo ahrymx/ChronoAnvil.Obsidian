@@ -19,7 +19,7 @@
 import { SCOPE_JOURNAL } from "../core/directive-grammar";
 import { App, MarkdownPostProcessorContext, normalizePath, setIcon, TFile, TFolder } from "obsidian";
 import type AlmanacPlugin from "../main";
-import { childFiles, filesUnder, frontmatterOf, getFile, isoDate, moment, noExt, openFile, openGlobalSearch } from "../core/util";
+import { childFiles, filesUnder, folderPrefix, frontmatterOf, getFile, isVaultRoot, isoDate, moment, noExt, openFile, openGlobalSearch } from "../core/util";
 import { pagesUnder, recencyMs, relativeActivity, tagsOf } from "../core/query";
 import type { PageInfo } from "../core/query";
 import { formatPeriodLabel } from "../charts/charts";
@@ -2793,7 +2793,11 @@ async function readOpenTasks(
   liveFiles: TFile[] = files
 ): Promise<OpenTaskRow[][]> {
   const perFile = await mapWithLimit(files, 12, (f) => openTasksInFile(app, f));
-  const prefix = normalizePath(folder) + "/";
+  // `folderPrefix` since 4.44.0: at the vault root the prefix is `""`, so the
+  // sweep covers every cached note rather than none of them. With `"//"` a
+  // root-scoped table never dropped a since-deleted note's entry — harmless,
+  // but it is the same wrong question the read itself was asking.
+  const prefix = folderPrefix(folder);
   const live = new Set(liveFiles.map((f) => f.path));
   for (const path of taskCache.keys()) {
     if (path.startsWith(prefix) && !live.has(path)) taskCache.delete(path);
@@ -2921,13 +2925,28 @@ export function buildScopeCycle(root: HTMLElement, scope: TasksScope): void {
   const isKeyword = scope.arg === SCOPE_JOURNAL;
   const hasPath = !!scope.arg && !isKeyword;
   const current = isKeyword ? "journal" : hasPath ? "path" : "below";
+  // THE ROOT IS A WRITTEN SCOPE LIKE ANY OTHER, AND IS NOT A PATH (4.44.0). A
+  // directive may name it — `tasks-table:./` is how a note inside a folder says
+  // "the whole vault", which empty cannot say anywhere but the top — so it is
+  // CARRIED by the cycle exactly as a folder is, under a name that describes
+  // it. Calling that state "Path" would be the same wrong word as the "/" the
+  // hint used to print.
+  const hostAtRoot = scope.hostFolder != null && isVaultRoot(scope.hostFolder);
+  const argAtRoot = hasPath && isVaultRoot(scope.arg);
 
   const states: { id: string; value: string; label: string; hint: string }[] = [
     {
       id: "below",
       value: "",
       label: "Below",
-      hint: `Tasks in notes under ${scope.hostFolder ?? "this note's folder"}`,
+      // AND AT THE ROOT IT SAYS SO IN WORDS (4.44.0). `hostFolder` is `"/"` on
+      // every top-level note, so this hint read "Tasks in notes under /" — a
+      // path no reader could type, describing the one scope that is not a path.
+      // "Below" is still the right LABEL there: what is below the homepage is
+      // the vault.
+      hint: hostAtRoot
+        ? "Tasks in every note in the vault"
+        : `Tasks in notes under ${scope.hostFolder ?? "this note's folder"}`,
     },
     ...(scope.inJournal
       ? [
@@ -2944,8 +2963,10 @@ export function buildScopeCycle(root: HTMLElement, scope: TasksScope): void {
           {
             id: "path",
             value: scope.arg,
-            label: "Path",
-            hint: `Tasks in notes under ${scope.arg}`,
+            label: argAtRoot ? "Vault" : "Path",
+            hint: argAtRoot
+              ? "Tasks in every note in the vault"
+              : `Tasks in notes under ${scope.arg}`,
           },
         ]
       : []),
@@ -3011,6 +3032,11 @@ export function buildTasksTable(
   // table labelled itself "week of 1 Jul 2026". See formatPeriodLabel.
   const periodLabel = period ? formatPeriodLabel(period.unit, period.start) : "";
 
+  // WHAT EMPTY SAYS DEPENDS ON WHETHER THE SCOPE IS A PATH (4.44.0). At the
+  // vault root it is not one — `/` is what Obsidian calls the root folder and
+  // is not something a reader recognises as a place, so the two callouts below
+  // name the vault instead of printing it.
+  const atRoot = isVaultRoot(folder);
   const allFiles = filesUnder(app, folder);
   // Filter before reading: a scoped table on a folder with years of notes
   // should not pay to read the notes it's about to discard.
@@ -3031,7 +3057,9 @@ export function buildTasksTable(
         : emptyCallout(
             "list-checks",
             "No notes here yet",
-            `Open tasks from notes under ${folder} collect here — add a task in any note's Tasks field and it'll show up, grouped by note.`
+            atRoot
+              ? "Open tasks from every note in the vault collect here — add a task in any note's Tasks field and it'll show up, grouped by note."
+              : `Open tasks from notes under ${folder} collect here — add a task in any note's Tasks field and it'll show up, grouped by note.`
           )
     );
     return root;
@@ -3062,7 +3090,9 @@ export function buildTasksTable(
           "All clear",
           period
             ? `No open tasks for ${periodLabel} — everything's done, or nothing's been added yet.`
-            : `No open tasks under ${folder} — everything's done, or nothing's been added yet.`
+            : atRoot
+              ? "No open tasks anywhere in the vault — everything's done, or nothing's been added yet."
+              : `No open tasks under ${folder} — everything's done, or nothing's been added yet.`
         )
       );
       return;

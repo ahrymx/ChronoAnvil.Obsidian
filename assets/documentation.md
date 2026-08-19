@@ -112,7 +112,7 @@ Directives:
 - `journals-header[:<journal>]` — the hero band on its own, for putting the numbers on another dashboard: at-a-glance numbers (active days, current and longest streak, open tasks) over a 53-week activity strip. Bare it covers *every* enabled journal at once, which is what it has always meant; name a journal and it covers that one (4.36), which is what each journal's own dashboard does — a band of the whole vault's figures under one journal's name is a plausible number about something else. `journals-header:all` is bare said out loud, and is what the sections editor writes when you pick **Every journal**. Unlike `activity-chart` it is a fixed window with no navigation and no day numbers — it answers "have I kept this up?" at a glance rather than being browsed — but it shares the same four-shade scale, so a colour means the same amount of work in both. A day with a note behind it opens that note, and the strip repaints as notes are added under any journal root. Renders nothing at all when no journals are enabled.
 - `tag-index[:<folder>]` — a table of tags, most-used first, counted under `<folder>`. The folder is optional and defaults to **the host note's own folder**, the same rule `tasks-table`, `review-queue` and `journal-search` follow — so a bare `tag-index` on a Subject Index covers every topic beneath it. (Before 3.11 it defaulted to the Diary root instead; the homepage now writes its folder out, so nothing there changed.) Where the scope spans more than one folder, each row also names its **sources** — the first folder beneath the scope its notes live in, so a table over your journals root says which journal each tag came from. With one source, or none, that column isn't drawn. Available as the **Tags** section on the homepage, on journal index notes, and — new in 3.14 — on the weekly, monthly, quarterly and yearly dashboards, where it is offered rather than added for you and writes the diary root out as its folder (the dashboards' own folders hold period notes, not tagged ones). Click a tag to search the **whole vault** for it; expand a row to see the notes counted in scope.
 - `entry-rollup[:day|:month]` — **What the entries said**: each entry inside the host dashboard's period that wrote something, oldest first, with its focus (and highlights and challenges, where the entry logged them). Bare gathers **days**; `entry-rollup:month` gathers **monthly entries**, which is what a Quarterly dashboard wants. Scoped by the host note's `week-start` / `month-start` / `quarter-start` property — put it on a note without one and it says so rather than guessing a window. Ships on the Weekly and Monthly dashboards and is offered on the Quarterly one, where it overlaps the Recap.
-- `tasks-table[:<folder>]` — the "Open Tasks" rollup: every still-open Almanac task from notes under `<folder>` (optional, defaults to the host note's own folder), grouped by source note with the note title linked. Tick a checkbox to complete a task in place; edit its text/priority/due in the source note's own Tasks field. Used on the Weekly, Monthly, Staging and Subject dashboards. Replaces the old Tasks-plugin `` ```tasks `` query blocks.
+- `tasks-table[:<folder>]` — the "Open Tasks" rollup: every still-open Almanac task from notes under `<folder>` (optional, defaults to the host note's own folder), grouped by source note with the note title linked. Tick a checkbox to complete a task in place; edit its text/priority/due in the source note's own Tasks field. Used on the Weekly, Monthly, Staging and Subject dashboards. It also accepts **`./` — the whole vault**, which is the only way to say that from a note that isn't at the top of one, since empty means the *host's* folder; the section editor offers it by name. On the **homepage** the two are the same thing, because the homepage's own folder is the vault root — bare `tasks-table` there means every note you have. (Before 4.44.0 it meant that in the catalogue and nowhere else: the root's path is `/`, every scope test asks whether a path starts with `folder + "/"`, and nothing starts with `//` — so the homepage's list read an empty vault and said so.) Replaces the old Tasks-plugin `` ```tasks `` query blocks.
 
 All of the above read note metadata directly through Obsidian's own cache, so none of them need Dataview.
 
@@ -456,6 +456,11 @@ index plots that topic's own lessons; on a Subject index, every topic beneath
 it. A breakdown on a Subject index gives one bar per topic; on a Topic index —
 which holds notes rather than folders — one bar per rated note.
 
+A journal note's charts are a **list, not a grid**: they draw one under
+another, in the order the region names them, so there is nothing to reorder by
+dragging and no second tracker to add — both of those belong to the dashboard
+chart system described above, which a journal chart deliberately is not.
+
 A note written before 2.35, or one you have added a chart to by hand, keeps
 working exactly as it did: `journal-chart:`, `journal-breakdown:` and
 `confidence-trend` are still ordinary directives. The section is somewhere to
@@ -709,7 +714,20 @@ Any number, time, scale, or boolean tracker can get a chart: Line (trend, with
 an optional rolling-average overlay), Bar (per-day totals), Summary
 (avg/min/max/total as text), Calendar heatmap, Scatter (two trackers against
 each other), or — for a habit — Streak (current run, longest run, completion
-rate). On a scatter, days that logged the *same* pair of values merge into one
+rate). **A line can plot two trackers at once**, picked in the same *Second
+tracker* control the scatter uses: a scatter asks whether sleep and mood move
+*together*, a two-tracker line asks how each of them moved over the same weeks,
+which is the question you have when sleep dipped in March and you want to see
+what mood did. They are drawn against time, so a day that logged one and not
+the other is a reading with a gap beside it rather than a day that did not
+happen, and each tracker gets **its own Y axis** — the first on the left, the
+second on the right — because minutes of sleep and a 1–5 mood share no scale.
+The rolling average is **not** offered while a second tracker is set, and the
+editor says why rather than leaving a tick box that does nothing: two lines
+plus two dashed means is four lines on two scales, and smoothing exists to make
+*one* noisy series legible. Set the second tracker back to *— none —* and the
+overlay comes back with the setting you had. On a scatter, days that logged the
+*same* pair of values merge into one
 dot sized by how many they were — two self-reported daily numbers repeat
 constantly, and stacked identical dots made one reading look the same as
 twenty. Hover a dot for the count and the dates behind it. A boolean's raw 0/1 isn't offered as a line or bar (it reads better as a
@@ -755,6 +773,24 @@ dashboard, without you editing anything. On a narrow pane — a sidebar, or a
 split view — every chart drops to full width regardless, so a wide tile never
 becomes two cramped half-charts.
 
+**Give a chart a title of your own.** The editor's **Title** field starts empty
+with the name the chart would take anyway as its placeholder — the tracker's
+name, or "Sleep vs Mood" for a scatter and "Sleep and Mood" for a two-tracker
+line — so leaving it alone is not a blank tile. Type over it when the derived
+name isn't the point you were making: *Weekend sleep debt* says something the
+tracker's name cannot.
+
+**Drag a tile to put the grid in the order you want.** Pick up a chart anywhere
+on its tile and drop it on another one, and the chart you dropped on moves aside
+towards where you dragged from — so dropping a chart on the one below it swaps
+the two, and dragging it further down lands it exactly where you let go. Journal
+cards and the rows in the section editor follow the same rule. The note is
+written on the drop, with no confirmation to click: the charts visibly move,
+which is the confirmation. Charts only move within the note they are on. Until
+4.45 the grid **backfilled** — a small chart could hop up past a wide one to
+fill a hole — and it no longer does, because a grid that rearranges itself
+cannot keep an order you dragged.
+
 The **Add chart** and **Edit…** controls sit in the section's own header bar;
 Edit… prompts you to pick which chart when a section has more than one, and the
 editor that opens holds **Delete** as well as the fields — so one button covers
@@ -783,6 +819,8 @@ You can rearrange any of it from **Edit this note's sections…**. Unticking one
 ## How wide the homepage is
 
 A new homepage is written with `cssclasses: almanac-wide` in its properties, and Almanac gives that class a width of its own — wider than Obsidian's **readable line length**, and capped where that setting imposes no cap at all. It exists because of `row`: a row splits the page into equal cells, so with readable line length on (700px by default) a two-cell row leaves each widget about 345px and every one of them renders in its narrow layout. Whether your dashboard is wide or collapsed should not depend on a setting meant for how many characters read comfortably in a line of prose. It is a line in your note rather than a setting of the plugin's: delete it and the page follows your own preference again, and nothing will write it back. You can add the same line to any dashboard you build yourself. A homepage you already have is not touched.
+
+**If a wide page used to go narrow when you scrolled to the bottom of it, that is fixed in 4.45.1.** The width was being read from the page's title card, and Obsidian removes a section from the page while it is far off screen — so on a dashboard long enough to scroll, the evidence for the width scrolled away with it and every widget dropped to its narrow layout. Almanac reads the width from the note itself now, so it holds wherever you are on the page and however long the page gets.
 
 ## Moving a widget by dragging it
 

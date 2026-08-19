@@ -73,7 +73,7 @@ import { folderNotePath } from "../core/util";
 import { emptyCallout } from "../ui/empty";
 import { overflowButton } from "../ui/section-frame";
 import { hueOf, journalChildFolders, registeredJournalTypes } from "./journal";
-import { moveJournalBefore } from "./journal-order";
+import { moveJournalOnto } from "./journal-order";
 // The NUMBERS, shared with the container cards rather than recomputed — 4.13.3's
 // rule for these two families, and what stops a journal's card and the dashboard
 // it opens disagreeing about how many notes are in it.
@@ -361,7 +361,7 @@ function attachCardDrag(
     const from = e.dataTransfer?.getData(JOURNAL_DRAG_TYPE);
     if (!from) return;
     e.preventDefault();
-    void moveJournalBefore(plugin, from, id);
+    void moveJournalOnto(plugin, from, id);
   });
 }
 

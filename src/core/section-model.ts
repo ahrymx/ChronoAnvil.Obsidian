@@ -921,9 +921,134 @@ export function holdPinned(
   return out;
 }
 
+// The moves an arrangement makes INSIDE blocks whose membership it left alone.
+// 4.44.1.
+//
+// `moveOps`' COMPANION, ONE LEVEL IN. That one is handed two flat lists and
+// names the minimal set of sections that moved; this asks the same question of
+// each block in turn, so two cells of one row trading places is reported as one
+// move rather than as nothing at all.
+//
+// MATCHED BY MEMBERS, NOT BY OPENER. The opener is one of the rows that can
+// move — a reader dragging the first cell of a group down is the case this
+// exists for — so a block looked up under its own first id would not find
+// itself. A block whose membership DID change is somebody joining or leaving,
+// which is a regroup and is named as one; it is skipped here rather than
+// reported twice under two different words.
+export function cellMoveOps(
+  before: readonly (readonly string[])[],
+  after: readonly (readonly string[])[],
+  label: (id: string) => string | undefined
+): SectionOp[] {
+  const key = (ids: readonly string[]): string => [...ids].sort().join("\u0000");
+  const was = new Map(before.map((ids) => [key(ids), ids]));
+  const out: SectionOp[] = [];
+  for (const block of after) {
+    const prior = was.get(key(block));
+    if (!prior || prior.length < 2) continue;
+    if (prior.every((id, i) => id === block[i])) continue;
+    out.push(...moveOps([...prior], [...block], label));
+  }
+  return out;
+}
+
+// The page boundaries an arrangement moves inside blocks it left alone. 4.44.1.
+//
+// `cellMoveOps`' THIRD SIBLING, AND THE LAST PHASE OF `regroup` TO GET A NAME.
+// The dry run reports what the write did, and it could see two of the four
+// things it does: which block a section is in, and — since this release — which
+// column of it. A `tab` line changes neither. So **Start a page here** wrote its
+// bit, the write placed the boundary, and the pane that runs the write and reads
+// the result came back with nothing to report — which the footer turns into "No
+// changes" over a button the reader had just pressed.
+//
+// MATCHED BY MEMBERS, exactly as `cellMoveOps` matches, and for its reason: the
+// row that opens a block can move. A block whose membership changed is a
+// regroup and is named as one.
+//
+// TWO DIRECTIONS, BECAUSE THE CONTROL IS A TOGGLE. "Join the page before" is the
+// only way to unmake a page from this window, and a change that can be made and
+// not unmade is half a control.
+export function pageBreakOps(
+  before: readonly { ids: readonly string[]; pages: readonly string[] }[],
+  after: readonly { ids: readonly string[]; pages: readonly string[] }[],
+  label: (id: string) => string | undefined
+): SectionOp[] {
+  const key = (ids: readonly string[]): string => [...ids].sort().join("\u0000");
+  const was = new Map(before.map((b) => [key(b.ids), new Set(b.pages)]));
+  const out: SectionOp[] = [];
+  for (const block of after) {
+    const prior = was.get(key(block.ids));
+    if (!prior) continue;
+    const now = new Set(block.pages);
+    // IN THE BLOCK'S OWN ORDER, so a plan naming two of them reads down the
+    // group rather than in whichever order a Set happened to hold.
+    for (const id of block.ids) {
+      if (prior.has(id) === now.has(id)) continue;
+      const name = label(id);
+      if (name === undefined) continue;
+      out.push({
+        kind: "regroup",
+        sectionId: id,
+        label: name,
+        detail: now.has(id)
+          ? `${name} starts a new page of its group`
+          : `${name} joins the page before it`,
+      });
+    }
+  }
+  return out;
+}
+
 export function desiredOrder(occupants: string[], want: string[]): string[] {
   return [
     ...want.filter((id) => occupants.includes(id)),
     ...occupants.filter((id) => !want.includes(id)),
   ];
+}
+
+// The `joined` bits a reordered list should carry. 4.44.1.
+//
+// ── THE ONE BIT, AND THE ONE ARRANGEMENT IT CANNOT DESCRIBE ──────────────
+//
+// `section-editor.ts` records a block as one bit per row — *this row is with the
+// one above it* — and argues, correctly, that a run of consecutive rows is what a
+// block IS, so one bit says the whole of it. It then says the bit "survives a
+// reorder for free": drag a row out of the middle of a block and it takes its
+// flag with it, and the row that followed keeps a flag now pointing at whatever
+// is above it.
+//
+// That is true of every row of a block EXCEPT THE ONE THAT OPENS IT, and the
+// exception is not a corner: the opener is the row a reader drags when they want
+// their group to start with something else. Its bit is the ABSENCE of a bit, and
+// absence does not travel. Move the homepage's Diary card below Go to and the
+// list says: Go to is joined, so it joins the block above it — the BANNER — and
+// Diary, unjoined, opens a block of its own. One drag, and the arrangement handed
+// to the write is a group the reader never asked for.
+//
+// ── SO THE BOUNDARIES ARE RESTORED BY POSITION, NOT BY ROW ───────────────
+//
+// A block whose members are still together after the move keeps its boundaries:
+// its first row opens it and the rest are joined to it, whichever rows those now
+// are. A block that was BROKEN UP by the move — a row dragged out of it, or
+// another row dropped into the middle of it — is left exactly as the bits
+// describe it, because that reader is regrouping and the bits are how they say
+// so. The two cases are told apart by one question, asked of the new order: are
+// this block's rows still consecutive?
+export function keptBlocks(
+  before: readonly (readonly string[])[],
+  rows: readonly string[],
+  joined: ReadonlySet<string>
+): Set<string> {
+  const out = new Set(joined);
+  for (const block of before) {
+    if (block.length < 2) continue;
+    const at = block.map((id) => rows.indexOf(id)).sort((a, b) => a - b);
+    if (at[0] === -1) continue;
+    if (at.some((n, i) => i > 0 && n !== at[i - 1] + 1)) continue;
+    const ids = at.map((i) => rows[i]);
+    out.delete(ids[0]);
+    for (const id of ids.slice(1)) out.add(id);
+  }
+  return out;
 }

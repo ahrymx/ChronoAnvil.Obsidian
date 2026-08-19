@@ -92,20 +92,24 @@
   grid-auto-rows: var(--am-chart-row-track, var(--am-chart-row-h));
   align-items: stretch;
   gap: var(--am-chart-gap);
-  /* Dense packing. A mix of sizes in a two-column grid leaves holes — a
-     `small` followed by a `wide` pushes the wide one to the next row and
-     leaves the first half empty — and on a ten-chart dashboard that happens
-     constantly and reads as a bug. Dense pulls a later small tile forward into
-     the gap.
+  /* Plain row flow, and until 4.45 this said `row dense`.
 
-     The cost is that rendered order can differ from directive order, which is
-     worth pausing on in a codebase this insistent that the note is the source
-     of truth. It is affordable because position is not something the system
-     ever means: charts are addressed by `key`, the picker describes each by
-     tracker/type/range, and nothing anywhere reads "the third chart".
-     Directive order has never been more than the order they were added in, and
-     there is no UI to reorder them. One line, and reversible. */
-  grid-auto-flow: row dense;
+     THE LICENCE THE OLD LINE WROTE FOR ITSELF HAS EXPIRED, and it is worth
+     keeping what it said: dense packing pulls a later small tile forward into
+     the hole a `wide` one leaves, which stops a mixed-size dashboard reading as
+     a bug — and the cost, that rendered order can differ from directive order,
+     was "affordable because position is not something the system ever means …
+     and there is no UI to reorder them."
+
+     4.45 is that UI. With dense packing a reader could drag a tile in front of
+     another, watch the write succeed, and watch the packer put it back where it
+     was — a gesture that produces no visible change, which reads as a broken
+     feature rather than as a layout rule.
+
+     So the holes come back, and they are now the reader's to close by moving a
+     tile, which is a thing they can do and could not before. One line, and
+     still reversible — but not while the grid can be dragged. */
+  grid-auto-flow: row;
 }
 /* A tile's footprint. Custom properties rather than literal `grid-column`
    values, specifically so the narrow-pane clamp further down can override the
@@ -137,6 +141,34 @@
 .journal-chart-grid .journal-chart-cell.is-large {
   --am-span-c: 2;
   --am-span-r: 2;
+}
+
+/* ── Dragging a tile (4.45) ───────────────────────────────────────────────
+   `.jjc-card`'s three rules in shape, because the tile has the two properties
+   that decided them: `overflow: hidden` and a 1px border of its own.
+
+   THE CARD BEING CARRIED FADES; the one that would receive it takes an edge.
+   Two signals for two roles, which is what stops a grid mid-drag reading as two
+   selected tiles.
+
+   AN INSET SHADOW, NOT A BORDER. A second border inside a clipping cell moves
+   the canvas by a pixel as it appears — and a canvas that resizes mid-drag is
+   Chart.js redrawing under the pointer. Recolouring the existing border would
+   shift nothing, but a 1px edge is not visible enough to say "here".
+
+   AFTER the span rules and prefixed with the grid, for the cascade reason the
+   narrow-pane clamp below documents at length. */
+.journal-chart-grid .journal-chart-cell[draggable="true"] {
+  cursor: grab;
+}
+.journal-chart-grid .journal-chart-cell[draggable="true"]:active {
+  cursor: grabbing;
+}
+.journal-chart-grid .journal-chart-cell.is-dragging {
+  opacity: 0.45;
+}
+.journal-chart-grid .journal-chart-cell.is-drop-target {
+  box-shadow: inset 0 0 0 2px var(--interactive-accent);
 }
 
 /* ── Narrow panes ─────────────────────────────────────────────────────────

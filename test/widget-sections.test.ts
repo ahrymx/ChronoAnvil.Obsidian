@@ -669,20 +669,34 @@ describe("a widget a page may hold more than one of", () => {
     //
     // Naming them keeps the guard: a THIRD widget, or either of these two
     // drifting to different words, still fails.
+    //
+    // AND THE WORDS ARE ASSERTED PER MEMBER AS OF 4.44.0, because the set has a
+    // second reason to be in it now and a loop over one string could not hold
+    // both. The homepage's `tasks-table` falls back to the vault ROOT — which is
+    // this note's own folder, so the ordinary wording is TRUE there and says
+    // nothing: "This note's folder" on the homepage describes the whole vault
+    // without ever using the word. That is the same failure `level-index` had
+    // (a box describing a rule it does not follow) arriving from the opposite
+    // side, and the same field answers it.
+    //
+    // The guard the count was standing in for is intact: a FOURTH override, or
+    // any of these three drifting, still fails here.
     const overridden = m
       .sections("")
       .flatMap((s) => s.questions ?? [])
       .filter((q) => q.kind === "folder" && "emptyLabel" in q && q.emptyLabel);
-    expect(overridden.map((q) => q.directive).sort()).toEqual([
-      "level-cards",
-      "level-index",
-    ]);
-    for (const q of overridden) {
-      expect(
-        "emptyLabel" in q ? q.emptyLabel : undefined,
-        q.directive
-      ).toBe("the whole journal");
-    }
+    expect(
+      Object.fromEntries(
+        overridden.map((q) => [
+          q.directive,
+          "emptyLabel" in q ? q.emptyLabel : undefined,
+        ])
+      )
+    ).toEqual({
+      "level-cards": "the whole journal",
+      "level-index": "the whole journal",
+      "tasks-table": "the whole vault",
+    });
   });
 
   it("reads each piece back into its own box, remainder and all", () => {

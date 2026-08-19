@@ -23,6 +23,7 @@ import type {
 import { diaryClassOf, isJournalSurface, surfaceAcceptsType } from "../trackers/trackers";
 import { syncTrackersIntoVault } from "../trackers/trackers";
 import {
+  cleanLabel,
   getFile,
   locateSection,
   parseHeaderDirective,
@@ -31,6 +32,7 @@ import {
   quarterOfMonth,
   today as todayIso,
 } from "../core/util";
+import { dropOnto } from "../core/drop-onto";
 import type { ChartReduce } from "../trackers/trackers";
 import type { MomentLike } from "../core/util";
 
@@ -661,6 +663,52 @@ export function pairPoints(
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// ── Two series over one date axis (4.45) ──────────────────────────────────
+//
+// `pairPoints`' OPPOSITE, AND THE TWO ARE A PAIR WORTH READING TOGETHER. That
+// one is an INNER join: a scatter point needs both coordinates, so a day that
+// logged only one contributes nothing and there is no honest value to invent.
+// This is the OUTER join, and a dual-line chart needs exactly that — the two
+// trackers are drawn against TIME rather than against each other, so a day that
+// logged mood and not sleep is a mood reading with a gap beside it, not a day
+// that did not happen.
+//
+// Getting this wrong is not a crash, which is why it is a named function with
+// its own tests rather than three lines inside the renderer. Reusing
+// `pairPoints` here would have silently truncated both series to the days they
+// share — a line chart quietly plotting a subset of the data it says it plots,
+// which looks entirely plausible on screen.
+//
+// `null` RATHER THAN A SKIPPED INDEX, because Chart.js reads a `null` in a
+// `data` array as "no value here" and leaves the gap. Two arrays and one label
+// list, index-aligned, is the shape a category axis wants — and it is the same
+// shape the rolling-average overlay already relies on.
+export interface AlignedSeries {
+  dates: string[];
+  a: (number | null)[];
+  b: (number | null)[];
+}
+
+export function alignSeries(
+  a: ChartPoint[],
+  b: ChartPoint[]
+): AlignedSeries {
+  const aByDate = new Map(a.map((p) => [p.date, p.value]));
+  const bByDate = new Map(b.map((p) => [p.date, p.value]));
+  // Sorted, because a line drawn in read order is a line drawn in whatever
+  // order the vault handed the files back. `pointsInWindow` already sorts each
+  // series; the union of two sorted lists is not sorted, so this does it again
+  // rather than assuming.
+  const dates = [...new Set([...aByDate.keys(), ...bByDate.keys()])].sort((x, y) =>
+    x.localeCompare(y)
+  );
+  return {
+    dates,
+    a: dates.map((d) => aByDate.get(d) ?? null),
+    b: dates.map((d) => bByDate.get(d) ?? null),
+  };
+}
+
 // ── Scatter clustering ────────────────────────────────────────────────────
 //
 // A scatter of two self-reported daily trackers is mostly COINCIDENT POINTS,
@@ -889,19 +937,68 @@ export interface ChartSpec {
   // Which notes the values come from. Optional, and absent means "daily" —
   // that is what keeps every chart written before 2.18.6 parsing unchanged.
   scope?: ChartScope;
-  // scatter-only: the id of the tracker on the other axis. `tracker` is X,
-  // `tracker2` is Y. Absent on every non-scatter chart, so its token only
-  // appears where it means something.
+  // The id of the second tracker this chart reads. `tracker` is X, `tracker2`
+  // is Y. Absent unless the chart has one, so its token only appears where it
+  // means something.
+  //
+  // SCATTER-ONLY UNTIL 4.45, and the field is unchanged — what changed is which
+  // types are allowed to carry it. A scatter REQUIRES one (a cloud with one
+  // coordinate is not a chart); a line OFFERS one (a second trend on its own
+  // axis) and is an ordinary single-series line without it. The grammar already
+  // accepted `+y=` on any type; only the editor and the renderer said otherwise.
   tracker2?: string;
   // line-only: overlay a rolling mean on the raw series. A display option, not
   // a different dataset — the same points, plus a smoothed line through them —
   // so it rides on the spec rather than being its own chart type.
+  //
+  // AND ONE SERIES ONLY, AS OF 4.45. A rolling mean is a guide THROUGH the
+  // noise of a single trend; drawn through two it is a third dashed line in a
+  // tile that now has two axes to read, and it is not obvious which series it
+  // belongs to. The editor withholds the toggle when a second tracker is set
+  // and the renderer ignores the flag if a hand-written directive carries both.
   avg?: boolean;
   // How many grid cells this chart occupies. Absent means "derive it from the
   // chart type and the length of the window it draws" (see defaultSpan) — the
   // same absence-is-a-derivation rule `scope` follows, and the reason adding
   // this field rewrites no directive that is already on disk.
   size?: ChartSpan;
+  // What the tile calls itself, written after a bar at the end of the directive.
+  // Absent means "derive it from the trackers this chart reads", which is what
+  // every chart written before 4.45 does and what most charts should keep doing
+  // — see `chartTitle`.
+  //
+  // 4.45, AND THE GAP IT CLOSES IS ONE A JOURNAL CHART NEVER HAD: `jchart:` has
+  // taken an optional label since 2.35, and a dashboard chart could not be
+  // named at all. Two charts of one tracker over two ranges were two tiles with
+  // one name, in a grid whose whole job is to be scanned.
+  title?: string;
+}
+
+// What a tile calls itself, and what the editor offers as its placeholder.
+//
+// ONE FUNCTION FOR THREE SURFACES (4.45). The eyebrow, the editor's placeholder
+// and the picker's description all have to agree about a chart's name, and the
+// first of them was deriving it inline. A placeholder that says one thing and a
+// tile that says another is a reader typing a title to fix a name that was
+// never wrong.
+//
+// `vs` MEANS SCATTER AND KEEPS MEANING IT. Two trackers plotted AGAINST each
+// other read "Sleep vs Mood"; two trackers drawn over the same dates read
+// "Sleep and Mood". The distinction is the whole difference between the two
+// charts, and it is the only place on the tile where that difference is
+// visible — the shapes look nothing alike, but the words are what a reader
+// scans first.
+//
+// Takes labels rather than defs, so a caller that has already resolved them
+// does not resolve them twice and this stays a question about strings.
+export function chartTitle(
+  spec: Pick<ChartSpec, "type" | "title">,
+  label: string,
+  label2?: string
+): string {
+  if (spec.title) return spec.title;
+  if (!label2) return label;
+  return spec.type === "scatter" ? `${label} vs ${label2}` : `${label} and ${label2}`;
 }
 
 // ── Chart tile spans ──────────────────────────────────────────────────────
@@ -1054,8 +1151,27 @@ export function spanOf(
 // The scatter token allows a colon-containing id after `+y=` because it runs to
 // the next `+` or end; ids with a literal `+` in them aren't supported here,
 // which is consistent with the flag grammar and vanishingly rare.
+// And a title after a bar, since 4.45:
+//   `|<title>`  what the tile calls itself, in the reader's own words. LAST,
+//              and delimited rather than prefixed, which is the one place this
+//              grammar could not copy the flag family.
+//
+// WHY NOT `+title=`. A flag segment runs to the next `+` and may contain
+// colons, and the tracker group is GREEDY WITH BACKTRACKING — so free text
+// inside a flag can supply a second, entirely valid parse of the same line.
+// `chart:c1:Mood:line:30+title=mood:line:all` matches with
+// `tracker="Mood:line:30+title=mood"`, `type="line"`, `range="all"`: every
+// field wrong, no error, a different chart drawn. An id could never contain
+// `:line:30`; a title a reader typed can.
+//
+// The bar kills it structurally and matches `jchart:`'s own `[|Label]`, which
+// is the same question already answered one file over. Three groups narrow to
+// pay for it — the key and the tracker exclude `|`, and so does a flag segment
+// — which is what makes the FIRST bar on the line unambiguously the delimiter
+// and lets the title itself hold bars, colons, plusses and equals signs. No id
+// on disk can contain a bar: there has never been a way to write one here.
 const CHART_TAG =
-  /^chart:([^:]+):(.+):(line|bar|summary|month|scatter|streak):(period|30|90|365|all)(?::(daily|monthly))?((?:\+[^+]+)*)$/;
+  /^chart:([^:|]+):([^|]+):(line|bar|summary|month|scatter|streak):(period|30|90|365|all)(?::(daily|monthly))?((?:\+[^|+]+)*)(?:\|(.*))?$/;
 
 // The suffix group (m[6]) holds zero or more `+token` segments in any order.
 // Parsed here rather than in the master regex so their order doesn't matter and
@@ -1161,6 +1277,7 @@ export function parseChartDirectives(lines: string[]): ChartSpec[] {
     const m = line.trim().match(CHART_TAG);
     if (!m) continue;
     const flags = parseChartFlags(m[6] ?? "");
+    const title = cleanLabel(m[7] ?? "");
     specs.push({
       key: m[1],
       tracker: m[2],
@@ -1170,9 +1287,92 @@ export function parseChartDirectives(lines: string[]): ChartSpec[] {
       ...(flags.tracker2 ? { tracker2: flags.tracker2 } : {}),
       ...(flags.avg ? { avg: true } : {}),
       ...(flags.size ? { size: flags.size } : {}),
+      // ABSENT AND EMPTY ARE DIFFERENT ANSWERS, which is `serializeJournalChartSpec`'s
+      // rule for the same delimiter: a trailing bar with nothing after it yields
+      // `""` and no title, where no bar at all yields no title either — but only
+      // one of the two can be written back byte-identically, and it is the one
+      // without the bar.
+      ...(title ? { title } : {}),
     });
   }
   return specs;
+}
+
+// ── The order the charts are in (4.45) ────────────────────────────────────
+//
+// `writeChartRegion` has always serialised its array in order, and nothing
+// anywhere permuted that array: a chart's position was the order it was added
+// in, and the only way to change it was to edit the fence by hand. This is the
+// arithmetic behind the drag that changes it, and it is here rather than in the
+// manager for the reason `journal-order.ts` gives about its own split — the
+// move is a pure question about a list, and a test should be able to ask it
+// without a vault.
+//
+// WHAT A DROP MEANS IS `dropOnto`'S, NOT THIS FUNCTION'S (4.45.1). 4.45 wrote
+// the splice here, inserted before the target in both directions, and so did
+// nothing at all when a tile was dropped on the one below it. The rule and the
+// reasoning now live in `core/drop-onto.ts` with the two other surfaces that
+// had the same four lines and the same defect; this maps keys to specs around
+// it and adds nothing of its own.
+//
+// NULL MEANS NOTHING WOULD CHANGE — a chart dropped on itself, or named by a
+// key the note does not have. It is `moveCell`'s contract and
+// `applyFlatSections`', and it covers the case a reader makes every time they
+// think better of a drag. Writing the file to say nothing happened would put an
+// entry in every sync log in the vault.
+//
+// `ontoKey` NAMES A NEIGHBOUR RATHER THAN AN INDEX, because the grid is
+// rebuilt by a LiveWidget and an index captured when the drag started may
+// describe a different tile by the time it is dropped. A key is the one thing
+// about a chart that does not move.
+// The drag's payload, and why it carries a path.
+//
+// A JOURNAL ID IS GLOBAL AND A CHART KEY IS NOT. `journals-cards.ts` puts a
+// bare id in the payload and is right to: there is one journal called `study`
+// in a vault. Every note's first chart, by contrast, is `c1` — so two
+// dashboards open side by side in a split are drop targets for each other's
+// drags, and a bare key would reorder the wrong note using a key that happens
+// to exist there too. The path is what makes the drop refusable.
+//
+// LOWERCASE, because a MIME type is compared case-sensitively by
+// `DataTransfer.types` in practice and the one bug this cost elsewhere in the
+// plugin was exactly that.
+export const CHART_DRAG_TYPE = "application/x-almanac-chart";
+
+export function encodeChartDrag(notePath: string, key: string): string {
+  return JSON.stringify({ path: notePath, key });
+}
+
+// `null` for anything that is not one of ours: another plugin's drag, a file
+// from the explorer, a truncated payload. A drop handler that trusts this
+// blindly is one malformed string away from reordering nothing and reporting
+// success.
+export function decodeChartDrag(raw: string): { path: string; key: string } | null {
+  if (!raw) return null;
+  try {
+    const v: unknown = JSON.parse(raw);
+    if (!v || typeof v !== "object") return null;
+    const { path, key } = v as { path?: unknown; key?: unknown };
+    if (typeof path !== "string" || typeof key !== "string") return null;
+    if (!path || !key) return null;
+    return { path, key };
+  } catch {
+    return null;
+  }
+}
+
+export function reorderCharts(
+  specs: readonly ChartSpec[],
+  fromKey: string,
+  ontoKey: string
+): ChartSpec[] | null {
+  const order = dropOnto(specs.map((s) => s.key), fromKey, ontoKey);
+  if (!order) return null;
+  const byKey = new Map(specs.map((s) => [s.key, s]));
+  // The SAME OBJECTS, permuted — never rebuilt — so a caller can still compare
+  // by identity and `writeChartRegion` re-serialises each spec from exactly
+  // what it parsed.
+  return order.map((k) => byKey.get(k) as ChartSpec);
 }
 
 // Smallest unused `c<N>` key.
@@ -1202,7 +1402,15 @@ export function serializeChartSpec(s: ChartSpec): string {
   // still serialises byte-identically — the same discipline the omitted `daily`
   // scope token follows, and pinned by a test for the same reason.
   const size = s.size ? `+size=${s.size}` : "";
-  return `chart:${s.key}:${s.tracker}:${s.type}:${s.range}${scope}${y}${avg}${size}`;
+  // And the reader's own words last, after a bar, absent when they have not
+  // given any — the same rule every token above follows, and the reason 4.45
+  // rewrites nothing that is already on disk. Sanitised on the way out as well
+  // as on the way in, because this is the write path and a newline here would
+  // end the directive it is part of.
+  const title = cleanLabel(s.title ?? "");
+  return `chart:${s.key}:${s.tracker}:${s.type}:${s.range}${scope}${y}${avg}${size}${
+    title ? `|${title}` : ""
+  }`;
 }
 
 function buildChartRegionBody(specs: ChartSpec[]): string[] {

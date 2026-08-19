@@ -34,7 +34,7 @@
 // is no second implementation to drift.
 
 import { App, Notice } from "obsidian";
-import { getFile } from "../core/util";
+import { cleanLabel, getFile } from "../core/util";
 
 export type JournalChartShape = "trend" | "breakdown";
 
@@ -68,12 +68,11 @@ export function journalChartDirective(spec: JournalChartSpec): string {
   return `${kind}:${spec.tracker}${label ? `|${label}` : ""}`;
 }
 
-// A title is one line of a fenced block, and titles arrive pasted from
-// somewhere else more often than they are typed. A newline in one would end
-// the directive; a backtick run would end the fence.
-export function cleanLabel(raw: string): string {
-  return raw.replace(/[\r\n]+/g, " ").replace(/`/g, "").trim();
-}
+// The sanitiser, which lives in `core/util.ts` since 4.45 because the diary's
+// charts need the same rule and a directive line is not a journal idea. Named
+// here so this module's own callers — and the tests that pin its behaviour —
+// still read it where the specs are.
+export { cleanLabel };
 
 // NO TRAILING BAR when there is no title, and that is correctness rather than
 // tidiness — both in the stored `jchart:` line and in the directive it

@@ -897,27 +897,37 @@
  * is the only thing that writes `cssclasses:` and a post-processor cannot write
  * frontmatter at all. So the width was a property of one composed page rather
  * than a setting. The second pair of selectors is that setting: a `wide` line in
- * the block that draws the page's title, marked on the card as `.jtc-wide`, read
- * from here with `:has()`.
+ * the block that draws the page's title.
  *
- * DERIVED FROM THE CARD RATHER THAN DECLARED ON THE PAGE, which is the same route
- * `:has(.jtc-card) .inline-title` already takes and the same reason: the width
- * follows the head, so removing the section narrows the page and there is no
- * stale declaration left saying otherwise.
+ * ── AND IT IS NO LONGER READ WITH `:has()` (4.45.1) ───────────────────
  *
- * ONE CLASS INSIDE `:has()`, AND THAT IS LOAD-BEARING. `:has()` takes the
- * specificity of its most specific argument, so `:has(.jtc-card.jtc-wide)` would
- * weigh (0,4,0) and quietly outrank the theme this rule promises not to overrule
- * three paragraphs up. `:has(.jtc-wide)` weighs (0,3,0) — exactly what
+ * It was: the render marked the title card `.jtc-wide` and this rule reached up
+ * for it with `.markdown-preview-view:has(.jtc-wide)`. THE CARD IS NOT ALWAYS
+ * IN THE DOM. A reading view renders sections as they approach the viewport and
+ * drops them again when they leave, and the title card is the first block on the
+ * page — so scrolling a dashboard to the bottom unloaded the very element this
+ * selector was looking for, and the page snapped back to Obsidian's width with
+ * every widget in it collapsing. A note whose charts made it long enough to
+ * scroll could not stay wide.
+ *
+ * So the class is on the VIEW now, put there by `ui/page-width.ts` from the file
+ * itself rather than from anything rendered — see that file for why this is not
+ * the "class on the view at render time" that `HOME_CSS_CLASS` refuses. The
+ * width still follows the head: delete the line, or the whole title section, and
+ * the next pass over that note takes the class away.
+ *
+ * THE SPECIFICITY IS STILL EXACTLY MATCHED. `.am-wide-page .markdown-preview-view
+ * .markdown-preview-sizer` weighs (0,3,0) — what
  * `.markdown-preview-view.is-readable-line-width .markdown-preview-sizer` weighs,
- * and exactly what the `almanac-wide` half beside it weighs. Do not add a second
- * class in there.
+ * and what the `almanac-wide` half beside it weighs. That is the whole of the
+ * promise made three paragraphs up, that a theme deliberately setting a width
+ * still gets the last word. Do not add a fourth class to either selector.
  *
  * ONE DECLARATION FOR BOTH, because it is one width. Two rules with the same
  * `max-width` would be two places to retune it. */
 .markdown-preview-view.almanac-wide .markdown-preview-sizer,
 .markdown-source-view.almanac-wide .cm-sizer,
-.markdown-preview-view:has(.jtc-wide) .markdown-preview-sizer,
-.markdown-source-view:has(.jtc-wide) .cm-sizer {
+.am-wide-page .markdown-preview-view .markdown-preview-sizer,
+.am-wide-page .markdown-source-view .cm-sizer {
   max-width: var(--am-page-width);
 }

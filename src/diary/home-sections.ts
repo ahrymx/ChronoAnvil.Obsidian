@@ -281,9 +281,38 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // vault root, so the bare form already means what the page wants — and, per
     // "Caveat on paths", a directive with no argument is the one that never
     // needs updating when a folder is renamed.
+    //
+    // IT DID NOT MEAN THAT UNTIL 4.44.0, AND THE SENTENCE ABOVE IS WHY THE BUG
+    // SURVIVED THREE RELEASES. The catalogue said the right thing, the composer
+    // wrote the right line, and the reader saw "No notes here yet" on a vault
+    // with 135 open tasks in it — because the root resolves to the path `/` and
+    // every scope test in the plugin asked `path.startsWith(folder + "/")`.
+    // Nothing starts with `//`. See `core/util.ts::isVaultRoot`.
     locked: false,
     row: HOME_TOP_ROW,
     cell: HOME_ASIDE,
+    // AND THE WINDOW CAN NOW REPOINT IT, which every other `tasks-table` in the
+    // plugin has allowed since 3.15 and this one alone did not. The diary
+    // dashboard, the journals dashboard and every journal index all declare this
+    // question over the same directive; the homepage's copy was the odd one out,
+    // so the section editor drew a row with a Remove button and no field, and
+    // "the whole vault" was a scope the reader could neither confirm nor change.
+    //
+    // `emptyLabel` BECAUSE "This note's folder" IS TRUE HERE AND SAYS NOTHING.
+    // The homepage's own folder IS the vault root — the placeholder would be
+    // technically correct and would leave the reader unable to tell this widget
+    // from one scoped to a folder that happens to be empty. The catalogue
+    // supplies the words, exactly as `level-index`'s second piece does.
+    questions: (spec) => [
+      {
+        kind: "folder",
+        key: "folder",
+        label: "the folder to collect tasks from",
+        directive: "tasks-table",
+        hostFolder: spec.hostFolder ?? null,
+        emptyLabel: "the whole vault",
+      },
+    ],
     render: () => ({ fence: "almanac", lines: ["tasks-table"] }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },

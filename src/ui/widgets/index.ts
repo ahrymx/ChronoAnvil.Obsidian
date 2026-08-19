@@ -1509,22 +1509,18 @@ export class Widgets implements
 
       // ── AND HOW WIDE THE PAGE IS, MARKED ON THE HEAD (4.11) ─────────
       //
-      // A CLASS ON THE CARD, NOT ON THE PAGE, because a post-processor cannot
-      // reach the page: the width lives on Obsidian's sizer, which is an ancestor
-      // of everything this plugin renders. The stylesheet reaches up with `:has()`
-      // — the route `.jtc-card` already uses to hide Obsidian's own inline title,
-      // and the reason that rule is *derived* rather than declared.
+      // THIS MARK NO LONGER SETS THE WIDTH (4.45.1). It used to: the stylesheet
+      // reached up from the card with `:has()`, because a post-processor cannot
+      // touch the sizer the width lives on. What that missed is that a reading
+      // view UNLOADS a section once it is far enough from the viewport, and this
+      // card is the first block on the page — so a dashboard long enough to
+      // scroll lost its width at the bottom of the scroll. `ui/page-width.ts`
+      // derives it from the file now and marks the view.
       //
-      // ON THE HEAD'S OWN CARD rather than on the block, so the width follows the
-      // head: remove the section and the page narrows, with no stale frontmatter
-      // left saying otherwise. That is the same property `:has(.jtc-card)` buys
-      // for the title.
-      //
-      // `jtc-wide` IS A CLASS THAT STANDS ALONE INSIDE `:has()`, and it is spelled
-      // as its own name rather than as `.jtc-card.is-wide` for a reason written in
-      // the stylesheet: `:has()` takes the specificity of its most specific
-      // argument, and the width rule promises to weigh exactly what Obsidian's own
-      // does so a theme can still win.
+      // THE MARK STAYS, because the cog's *Wide page* item reads it for its
+      // checked state — see `WIDE_CLASS` in page-title.ts. It is a fact about
+      // the card that was drawn, which is the question the menu is asking, and
+      // it is one read rather than a second trip to the file.
       if (wideSpec.wide) {
         container.querySelector<HTMLElement>(".jtc-card")?.addClass("jtc-wide");
       }
