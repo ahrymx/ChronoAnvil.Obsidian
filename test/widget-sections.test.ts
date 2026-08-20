@@ -131,13 +131,36 @@ describe("what the generator makes", () => {
     expect(tasks.render({ arg: "   " }).lines).toEqual(["tasks-table"]);
   });
 
-  it("asks one question, only where the registry says there is one", () => {
+  it("asks one question per piece the registry declares", () => {
+    // ONE PER PIECE, NOT ONE PER WIDGET (4.47). This read `spec.arg` and
+    // asserted a length of 1, which was right while a compound was spelled
+    // `arg` + `arg2` and `argQuestions` was the only thing that knew — and
+    // wrong the moment a widget declared `args`. `stats-band` declares four,
+    // because a band is four cells and a reader chooses each.
+    //
+    // THE NORMALISATION IS THE SOURCE'S OWN (`argsOf`), restated here as the
+    // shape rather than imported, because what this test is for is noticing
+    // that the two spellings have stopped meaning the same thing.
     const spec = { hostFolder: "02 - Diary" };
     for (const s of tail) {
-      const arg = WIDGETS[s.id.slice(WIDGET_ID_PREFIX.length)].arg;
+      const w = WIDGETS[s.id.slice(WIDGET_ID_PREFIX.length)];
+      const args = w.args ?? (w.arg ? (w.arg2 ? [w.arg, w.arg2] : [w.arg]) : []);
       const qs = s.questions?.(spec as never) ?? [];
-      expect(qs, s.id).toHaveLength(arg ? 1 : 0);
+      expect(qs, s.id).toHaveLength(args.length);
+      const arg = args[0];
       if (!arg) continue;
+      // EVERY PIECE NAMES THE SAME DIRECTIVE AND ITS OWN SLOT IN IT, which is
+      // what stops several splices of one span overwriting each other.
+      for (const [i, q] of qs.entries()) {
+        expect(q.directive, s.id).toBe(s.id.slice(WIDGET_ID_PREFIX.length));
+        if (args.length > 1) {
+          expect(q.part, `${s.id} ${i}`).toEqual({
+            at: i,
+            of: args.length,
+            join: w.argJoin ?? "/",
+          });
+        }
+      }
       // NAMES ITS OWN DIRECTIVE, which is what lets `withAnswers` splice the
       // answer in and `answerIn` read it back out of the reader's line.
       expect(qs[0].directive, s.id).toBe(s.id.slice(WIDGET_ID_PREFIX.length));

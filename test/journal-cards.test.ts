@@ -14,7 +14,15 @@
 // banner source — are exercised directly.
 
 import { describe, expect, it } from "vitest";
-import { hueOf, JOURNAL_PRESETS } from "../src/journals/journal";
+import {
+  buildJournalType,
+  hueOf,
+  JOURNAL_PRESETS,
+  JournalManager,
+} from "../src/journals/journal";
+import { cardStatChoices } from "../src/journals/journals-cards";
+import { kindPlural } from "../src/journals/journal-sections";
+import { scopesForMeasure } from "../src/journals/stats-band";
 import { cssRule, cssRules, readCode, readCss, readSrc } from "./sources";
 
 describe("the grid is an arrangement, not a second widget", () => {
@@ -1264,7 +1272,18 @@ describe("a journal's card carries its numbers", () => {
     const src = readSrc("journals-cards").replace(/\/\/.*$/gm, "");
     const at = src.indexOf("export function buildCard(");
     if (at < 0) throw new Error("no buildCard");
-    return src.slice(at, src.indexOf("\nasync function openIndex(", at));
+    return src.slice(at, src.indexOf("\nfunction cardFourth(", at));
+  };
+
+  // THE FOURTH CELL LEFT `buildCard` IN 4.47, because it stopped being a
+  // derivation and became a reader's choice WITH that derivation as its
+  // fallback. It is read separately so the assertions below cannot pass on the
+  // strength of something that merely happens to sit in the same file.
+  const fourth = (): string => {
+    const src = readSrc("journals-cards").replace(/\/\/.*$/gm, "");
+    const at = src.indexOf("function cardFourth(");
+    if (at < 0) throw new Error("no cardFourth");
+    return src.slice(at, src.indexOf("\nexport function cardStatChoices(", at));
   };
 
   it("reads the numbers the dashboard reads, rather than computing its own", () => {
@@ -1298,11 +1317,41 @@ describe("a journal's card carries its numbers", () => {
     // fourth to say, because a journal that rates nothing still has a count of
     // what is in it. The container card can drop to three because its neighbour
     // in a pair is a list, not another strip.
-    const body = card();
+    //
+    // 4.47 MADE THAT CELL A READER'S CHOICE AND THE GUARANTEE HAD TO SURVIVE IT.
+    // It survives structurally rather than by argument: the cell is pushed
+    // unconditionally, and the function that fills it returns a card rather than
+    // a card-or-nothing, so neither a choice nor an absent one can shorten the
+    // row.
+    expect(card()).toContain(
+      "cards.push(cardFourth(plugin, type, tops.length, ratingDef));"
+    );
+    const body = fourth();
+    expect(body).toMatch(/\): StatCard \{/);
+    expect(body).not.toMatch(/\): StatCard \| null/);
+    // The two alternatives the derivation chooses between are both still there,
+    // and the count is what the function falls out to when nothing else applies.
     expect(body).toContain("label: ratingWord(ratingDef)");
     expect(body).toContain("plural(type.levels[0].noun).toLowerCase()");
-    // The two are the alternatives of ONE branch, which is what guarantees four.
-    expect(body).toMatch(/if \(ratingDef\) \{[\s\S]*?\} else \{[\s\S]*?tops\.length/);
+    expect(body.trimEnd().endsWith("return count();\n}")).toBe(true);
+  });
+
+  it("keeps the derivation as what an untouched journal gets", () => {
+    // 4.47 §5: `cardStat` absent means TODAY'S RULE — the rating where the
+    // journal declares one, the count of what is below otherwise — so every
+    // journal that already exists draws the cell it drew yesterday and nobody
+    // has to be told about a field to keep what they had.
+    const body = fourth();
+    expect(body).toContain("const chosen = type.cardStat ?? null;");
+    // The absent choice takes the SAME branch the rating always took, rather
+    // than a branch of its own that would have to be kept in step with it.
+    expect(body).toContain('chosen === "rating" || chosen === null');
+    // And it is still conditional on the journal declaring a rating: a journal
+    // that grades nothing falls to the count, chosen or not.
+    expect(body).toMatch(/chosen === "rating" \|\| chosen === null\) && ratingDef/);
+    // `below` HAS NO ARM, because it is what everything else falls through to.
+    // It had one, and a mutation could break it with the suite still green.
+    expect(body).not.toContain('chosen === "below"');
   });
 
   it("is allowed the rating cell, and the 2.44 objections are answered", () => {
@@ -1312,9 +1361,9 @@ describe("a journal's card carries its numbers", () => {
     // band spans every registered journal at once."* A CARD IS ONE JOURNAL, and
     // that note's own conclusion is the permission: *"an average rating is a fact
     // about one journal."*
-    const body = card();
+    const body = fourth();
     // The kind filter is the fix for the first objection and is what this reads.
-    expect(body).toContain("confidenceKinds(plugin, type.root, ratingId)");
+    expect(body).toContain("confidenceKinds(plugin, type.root, ratingDef.id)");
     // No denominator anywhere, which is the second.
     expect(body).not.toContain("/5");
     expect(body).not.toMatch(/\$\{[^}]*\}\s*\/\s*\$\{/);
@@ -1324,6 +1373,154 @@ describe("a journal's card carries its numbers", () => {
     // And the band it was removed from still has no rating cell; this is not a
     // reversal of that decision, which was about a multi-journal scope.
     expect(readSrc("journals-header")).toContain("NO AVERAGE RATING HERE");
+  });
+
+  it("offers only the numbers one card can answer", () => {
+    // 4.47 §5. THE FIRST THREE CELLS ARE FIXED, so offering `notes`, `last` or
+    // `open` would be a card saying one thing twice; `kinds` and `totals` fill
+    // an unknown number of cells and there is exactly one slot. What is left is
+    // the rating, the count of what is below, and the per-kind counts.
+    const study = buildJournalType(JOURNAL_PRESETS[0].config);
+    const rated = cardStatChoices(study, {
+      id: "confidence",
+      label: "Confidence",
+      type: "number",
+    });
+    const values = rated.map((r) => r.value);
+    expect(values).toContain("rating");
+    expect(values).toContain("below");
+    for (const kind of study.kinds) expect(values).toContain(`kind:${kind.id}`);
+    // The band's vocabulary, not a second one — one set of words for "a number
+    // about a journal", which is what lets a reader move between the two.
+    for (const value of values) expect(scopesForMeasure(value)).toContain("journal");
+    // Nothing that the other three cells already say, and nothing that expands.
+    expect(values).not.toContain("notes");
+    expect(values).not.toContain("last");
+    expect(values).not.toContain("open");
+    expect(values).not.toContain("kinds");
+    expect(values).not.toContain("totals");
+  });
+
+  it("does not offer a rating to a journal that grades nothing", () => {
+    // BUILT FROM THE TYPE. A menu row that draws an em dash whatever is under it
+    // is the "nothing dead is drawn" rule with an extra step, and the derivation
+    // it would set is the one such a journal already falls to.
+    const study = buildJournalType(JOURNAL_PRESETS[0].config);
+    const values = cardStatChoices(study, null).map((r) => r.value);
+    expect(values).not.toContain("rating");
+    expect(values[0]).toBe("below");
+    // And the rating goes FIRST where there is one, because it is the cell the
+    // card drew before anyone could choose.
+    const rated = cardStatChoices(study, {
+      id: "confidence",
+      label: "Confidence",
+      type: "number",
+    });
+    expect(rated[0].value).toBe("rating");
+  });
+
+  it("names the journal's own note types rather than numbering them", () => {
+    // A row reading "kind:lesson" is the id leaking into the menu. `kindPlural`
+    // is what the rest of this plugin titles a kind with, so the menu and the
+    // cell it fills agree on the word.
+    const study = buildJournalType(JOURNAL_PRESETS[0].config);
+    const rows = cardStatChoices(study, null);
+    for (const row of rows) {
+      expect(row.label).not.toContain(":");
+      expect(row.label.length).toBeGreaterThan(0);
+    }
+    const kind = study.kinds[0];
+    expect(rows.find((r) => r.value === `kind:${kind.id}`)?.label).toBe(
+      kindPlural(kind)
+    );
+  });
+
+  it("is chosen from the card's own menu, ticked on what is drawn", () => {
+    // 4.47 §5: THE CONTROL BESIDE THE THING IT CHANGES. Settings → Journals is
+    // where a journal is DEFINED and a card's fourth cell is not a definition,
+    // and the ⋯ is built on click so it already describes the journal as it is.
+    const src = readSrc("journals-cards");
+    expect(src).toContain("cardStatChoices(type, ratingDef)");
+    // The tick has to name the DERIVATION where nothing is chosen, or a reader
+    // opening the menu on an untouched journal sees four rows and no answer.
+    expect(src).toContain(
+      'row.value === (type.cardStat ?? (ratingDef ? "rating" : "below"))'
+    );
+    expect(src).toContain("plugin.journals.setCardStat(type, row.value)");
+    // `setSubmenu` IS NOT ON OBSIDIAN'S PUBLIC TYPES, so it is probed — and a
+    // probe that fails has to leave the setting REACHABLE. The first cut
+    // returned, which drew the word "Fourth number" over nothing at all.
+    expect(src).toContain("const target: Menu = sub ?? menu;");
+    expect(src).not.toContain("if (!sub) return;");
+  });
+
+  it("stores the choice on the journal, and picking it again undoes it", async () => {
+    // STORED ON THE JOURNAL so every surface that draws its card agrees. Deleted
+    // rather than written empty on the way back: absent is the state every
+    // journal starts in, and a key present with no value would be a third state
+    // that `cardFourth`'s `?? null` cannot tell from the first.
+    const cfg = { ...JOURNAL_PRESETS[0].config, id: "study" };
+    let saves = 0;
+    let repaints = 0;
+    const plugin = {
+      settings: { customJournals: [cfg] },
+      saveSettings: async (): Promise<void> => {
+        saves += 1;
+      },
+      // `repaintOpenNotes` asks the workspace for its markdown leaves, which is
+      // the only observable this fake needs to prove the repaint happened.
+      app: {
+        workspace: {
+          getLeavesOfType: (): unknown[] => {
+            repaints += 1;
+            return [];
+          },
+        },
+      },
+    };
+    const manager = new JournalManager({} as never, plugin as never);
+    const type = buildJournalType(cfg);
+
+    await manager.setCardStat(type, "below");
+    expect(cfg.cardStat).toBe("below");
+    expect(saves).toBe(1);
+    // 4.48, AND THIS IS THE BUG 4.47 SHIPPED. The save alone left the card
+    // showing the old number until the note was reopened — `saveSettings`
+    // writes `data.json` and re-renders nothing, which is 3.20.1's finding
+    // arriving on a third surface.
+    expect(repaints).toBe(1);
+
+    await manager.setCardStat(type, "kind:lesson");
+    expect(cfg.cardStat).toBe("kind:lesson");
+
+    await manager.setCardStat(type, "kind:lesson");
+    expect("cardStat" in cfg).toBe(false);
+    expect(saves).toBe(3);
+  });
+
+  it("tells a journal it cannot store this on, rather than swallowing it", async () => {
+    // `saveVariant`'s rule one screen up, in its own words: a bare return on an
+    // unrecognised journal is indistinguishable from a save that worked. A
+    // built-in that is not in `customJournals` has nowhere to keep the answer.
+    let saves = 0;
+    const plugin = {
+      settings: { customJournals: [] },
+      saveSettings: async (): Promise<void> => {
+        saves += 1;
+      },
+      app: { workspace: { getLeavesOfType: (): unknown[] => [] } },
+    };
+    const manager = new JournalManager({} as never, plugin as never);
+    const type = buildJournalType(JOURNAL_PRESETS[0].config);
+    await manager.setCardStat(type, "below");
+    expect(saves).toBe(0);
+    // The saying is the point — a bare return here would pass the line above
+    // and leave a reader watching a menu tick that never appears.
+    const src = readSrc("journal").replace(/\/\/.*$/gm, "");
+    const at = src.indexOf("async setCardStat(");
+    expect(src.slice(at, src.indexOf("async newTopLevel(", at))).toContain(
+      "new Notice("
+    );
   });
 
   it("collapses its strip against the card, not the pane", () => {

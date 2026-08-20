@@ -39,7 +39,13 @@
 // interface would give the editor a method whose only correct use is to destroy
 // the thing it is editing.
 
-import { argSpanIn, readArg, soleArgSpanIn, spliceArg } from "./directive-grammar";
+import {
+  argSpanIn,
+  readArg,
+  renameSoleKeyword,
+  soleArgSpanIn,
+  spliceArg,
+} from "./directive-grammar";
 
 // ── operations ────────────────────────────────────────────────────────
 //
@@ -244,6 +250,48 @@ interface SectionQuestionCommon {
   // from. Absent means nothing can read this answer back and the editor says so
   // rather than drawing a control over it, which is 3.0 patch 1's rule.
   directive?: string;
+  // OLDER KEYWORDS THAT CARRY THIS SAME ANSWER, each mapped to what that
+  // spelling MEANS. 4.46.1.
+  //
+  // WHY A QUESTION NEEDS THIS AND A LOCATOR ALREADY HAD IT. A catalogue that
+  // merges two widgets says so three times: `claims` lists the words, `locate`
+  // probes for any of them, and — until this field — the QUESTION named exactly
+  // one. So a section was correctly found on a note written before the merge,
+  // its row appeared, and its control did not: `answerInText` looks for the
+  // named keyword's span, finds none, and the editor draws the inert *"set when
+  // added"* wording over a question it could perfectly well have answered.
+  //
+  // AND THE WRITE WAS WORSE THAN THE READ. `withAnswers` finds the span the same
+  // way, so an answer given on such a note was dropped without a word. 4.46.0
+  // shipped both halves of that.
+  //
+  // A MAP RATHER THAN A LIST, because a superseded spelling is not merely
+  // another name for the line — it is another name that already MEANS something.
+  // A bare `topic-stats` draws the Progress arrangement and a bare
+  // `journal-totals` draws Totals; reading either as "no answer" would show a
+  // reader the wrong preset over a band that is drawing a different one.
+  //
+  // ANSWERING MIGRATES THE LINE. The write renames the keyword to `directive`
+  // and then splices — see `renameSoleKeyword`, which states why that is the
+  // only honest option and why it never runs unasked.
+  supersedes?: Readonly<Record<string, string>>;
+  // ARGUMENT WORDS THAT STAND FOR A LONGER ARGUMENT. 4.47.
+  //
+  // `supersedes` maps a KEYWORD to what that spelling means; this maps an
+  // ARGUMENT to what it means, and the two compose — `topic-stats` means the
+  // argument `progress`, and `progress` means `kinds,rating,open`.
+  //
+  // WHY A QUESTION NEEDS IT. A compound argument is divided between several
+  // questions, and a SHORTHAND is not divisible: four boxes over `summary` would
+  // put the whole word in the first box and leave three empty, over a band
+  // drawing four cells. Expanding first is what lets a reader see what their
+  // note is actually doing — and what they change is then written out in full,
+  // so the shorthand is a thing the plugin composes and reads rather than a
+  // thing a control has to represent.
+  //
+  // BOTH DIRECTIONS ARE DATA, and neither is a parser: a word is looked up or it
+  // is left exactly as it was written.
+  shorthand?: Readonly<Record<string, string>>;
   // Which PIECE of that directive's argument this answers, where more than one
   // question shares one directive. 4.16.
   //
@@ -303,6 +351,26 @@ export interface ChoiceQuestion extends SectionQuestionCommon {
   values: readonly { value: string; label: string }[];
   // What to say in place of the control when `values` is empty.
   empty: string;
+  // WHAT EMPTY RESOLVES TO, WHERE EMPTY RESOLVES TO SOMETHING. 4.46.
+  //
+  // `FolderQuestion.emptyLabel` is the same field with the same meaning, and it
+  // is spelled the same on purpose: absent is the ordinary case, and present
+  // means the catalogue is naming a working default in the reader's words.
+  //
+  // AND IT IS WHAT `questionIsRequired` READS. That function used to answer from
+  // the KIND — every choice required, every folder not — and the sentence under
+  // it says why: *"a choice is required because an unanswered one composes a
+  // block that looks broken, a folder never is because its empty state is a
+  // working directive"*. Read that carefully and the kind was never the reason;
+  // it was a proxy for the reason, and it held for exactly as long as no choice
+  // had a working empty state.
+  //
+  // `stats-band` is the one that does. A bare directive resolves to the scope's
+  // own preset — `Progress` inside a container, `Activity` above it — so
+  // withholding the section until a reader picks one would be the window
+  // demanding an answer the plugin already has. The field is how a catalogue
+  // says so, and the derivation now reads the fact instead of the proxy.
+  emptyLabel?: string;
 }
 
 // A question answered with a folder path, drawn as a text field with
@@ -430,14 +498,67 @@ export function answerInText(text: string, q: SectionQuestion): string | null {
   if (!q.directive) return null;
   const lines = text.split("\n");
   const span = soleArgSpanIn(lines, q.directive);
-  return span ? readArg(lines, span) : null;
+  if (span) return expandShorthand(q, readArg(lines, span));
+  // A SUPERSEDED SPELLING ANSWERS ITSELF (4.46.1). The reader's line says
+  // `topic-stats`, the question names `stats-band`, and the answer is neither
+  // absent nor whatever that line's argument happens to be: it is what the old
+  // word MEANS. See `SectionQuestionCommon.supersedes`.
+  //
+  // STILL SOLE. `soleArgSpanIn` is asked for each older word in turn, so a note
+  // carrying two of one spelling reads as unanswered exactly as it would on the
+  // current one — the ambiguity rule this function already follows, applied to
+  // the words it has just learned.
+  for (const [word, means] of Object.entries(q.supersedes ?? {})) {
+    if (soleArgSpanIn(lines, word)) return expandShorthand(q, means);
+  }
+  return null;
+}
+
+// A shorthand word replaced by what it stands for, or the text untouched.
+//
+// TRIMMED FOR THE LOOKUP AND RETURNED WHOLE, because a reader may have typed a
+// space after the colon and a shorthand that missed on `" progress"` would show
+// them an empty control over a working band.
+function expandShorthand(q: SectionQuestion, argument: string): string {
+  return q.shorthand?.[argument.trim()] ?? argument;
+}
+
+// What a file already says for each of these questions, per question key.
+//
+// ONE READER FOR BOTH SHAPES. `answerInText` answers for a question that owns a
+// whole argument; a question that owns a PIECE needs the same read and then
+// `partsOf`, which is the only thing that knows where one piece ends. Written
+// once here because three models want it and `note-sections.ts::answersOn`
+// already had a private copy for the flat surfaces — that copy answers a
+// different question (which LINE, for a widget that repeats) and keeps its own
+// body; this is the one the journal catalogue needed and did not have.
+export function answersInText(
+  text: string,
+  questions: readonly SectionQuestion[]
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const q of questions) {
+    const whole = answerInText(text, q);
+    if (whole === null) continue;
+    out[q.key] = q.part
+      ? (partsOf(whole, q.part.of, q.part.join)[q.part.at] ?? "").trim()
+      : whole;
+  }
+  return out;
 }
 
 export function questionIsRequired(q: SectionQuestion): boolean {
+  // THE RULE IS "HAS THIS QUESTION A WORKING EMPTY STATE", and until 4.46 it was
+  // spelled as "is this a choice", which is a proxy that held while no choice
+  // had one.
+  //
   // A title is never required: unanswered means the catalogue's own heading,
-  // which is a working directive and the one every shipped template carries —
-  // the same reason a folder question is not required.
-  return q.kind === "choice";
+  // which is a working directive and the one every shipped template carries. A
+  // folder is never required: empty is the host note's own folder, the spelling
+  // every journal index ships. A choice is required unless it NAMES what empty
+  // means — see `ChoiceQuestion.emptyLabel`, which is the catalogue asserting
+  // that a bare directive works, in the reader's words, in the control.
+  return q.kind === "choice" && q.emptyLabel === undefined;
 }
 
 // ── what a caller asks for ────────────────────────────────────────────
@@ -738,6 +859,35 @@ export function withAnswers(
     byDirective.set(q.directive, [...(byDirective.get(q.directive) ?? []), q]);
   }
   for (const [directive, group] of byDirective) {
+    // THE LINE MOVES ONTO THE CURRENT SPELLING BEFORE IT IS WRITTEN (4.46.1).
+    // Only when the current word is absent, exactly one older one is present,
+    // AND this group actually has an answer to write — `renameSoleKeyword` makes
+    // the case for the rename existing at all. Without it the span below is null
+    // and the answer is dropped in silence, which is what 4.46.0 did on every
+    // note written before it.
+    //
+    // THE "HAS AN ANSWER" GUARD IS NOT BELT AND BRACES, and a test found it
+    // missing. The rename is a write to the reader's line; running it on a group
+    // whose answers turn out to be absent would migrate a keyword for nothing —
+    // the file changes and the reader is told nothing changed, which is the
+    // silence `reconfigure` exists to end, arriving from the other direction.
+    const answering = group.some((q) => typeof options[q.key] === "string");
+    // WHAT THE OLD SPELLING MEANT, KEPT ACROSS THE RENAME (4.47). An alias
+    // carries no argument — a bare `topic-stats` — so renaming it and then
+    // seeding from the empty line would throw away the arrangement the reader
+    // was looking at, and a reader who changed the SECOND cell would find the
+    // first three gone.
+    let meant: string | null = null;
+    if (answering && !argSpanIn(out, directive)) {
+      for (const [word, means] of Object.entries(group[0].supersedes ?? {})) {
+        const renamed = renameSoleKeyword(out, word, directive);
+        if (renamed) {
+          out = renamed;
+          meant = means;
+          break;
+        }
+      }
+    }
     const span = argSpanIn(out, directive);
     if (!span) continue;
     const compound = group.find((q) => q.part);
@@ -753,7 +903,13 @@ export function withAnswers(
     // as the reader left it — the same promise a single-question splice makes
     // about the rest of the line, one level in.
     const { of, join } = compound.part;
-    const parts = partsOf(readArg(out, span), of, join);
+    // SEEDED FROM WHAT THE LINE MEANS, NOT FROM WHAT IT SAYS. A shorthand is not
+    // divisible — four pieces over `summary` would put the whole word in the
+    // first and leave three empty — so it is expanded before the split, exactly
+    // as the read side expands it before showing the boxes. See
+    // `SectionQuestionCommon.shorthand`.
+    const seed = expandShorthand(compound, meant ?? readArg(out, span));
+    const parts = partsOf(seed, of, join);
     let touched = false;
     for (const q of group) {
       if (!q.part) continue;

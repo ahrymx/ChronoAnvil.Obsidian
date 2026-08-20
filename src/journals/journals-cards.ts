@@ -65,7 +65,7 @@
 // rather than unfinished.
 
 import { setIcon } from "obsidian";
-import type { MarkdownPostProcessorContext } from "obsidian";
+import type { MarkdownPostProcessorContext, Menu } from "obsidian";
 
 import type AlmanacPlugin from "../main";
 import { getFile, getFolder, openFile } from "../core/util";
@@ -88,7 +88,11 @@ import {
 import { pagesUnder, relativeActivity } from "../core/query";
 import { statStrip } from "../ui/stat-strip";
 import type { StatCard } from "../ui/stat-strip";
-import { plural } from "./journal-sections";
+import { kindPlural, plural } from "./journal-sections";
+// The band's own vocabulary for "a number about a journal", so the card's fourth
+// cell and the band's cells cannot come to name one figure two ways.
+import { kindMeasure, kindOfMeasure } from "./stats-band";
+import type { TrackerDef } from "../trackers/trackers";
 import type { JournalType } from "./journal";
 
 // The image a journal's card wears, or null for the wash.
@@ -171,6 +175,50 @@ export function buildCard(
         .setIcon("plus")
         .onClick(() => void plugin.journals.newTopLevel(type))
     );
+
+    // ── THE FOURTH CELL, CHOSEN HERE (4.47) ──────────────────────────
+    //
+    // THE CONTROL BESIDE THE THING IT CHANGES. Settings → Journals is where a
+    // journal is DEFINED — its levels, its note types, its templates — and a
+    // card's fourth cell is not a definition; it is a view preference about the
+    // card in front of the reader. This menu is already built on click, so it
+    // describes the journal as it is rather than as it was when the grid
+    // rendered, which is what lets the ticked row be right.
+    //
+    // A SUBMENU RATHER THAN FOUR TOP-LEVEL ROWS, because the two items above are
+    // ACTIONS and these are a setting: a menu that mixes "New subject" with
+    // "Average confidence" as siblings reads as six things you can do.
+    const ratingDef = ratingDefOf(plugin, type);
+    const rows = cardStatChoices(type, ratingDef);
+    // `setSubmenu` IS OBSIDIAN'S AND IS NOT ON ITS PUBLIC TYPES, so it is
+    // probed rather than cast blindly. WHERE IT IS MISSING THE ROWS GO ON THE
+    // MENU ITSELF, under the same word turned into a heading — the first cut
+    // returned instead, which drew a "Fourth number" row with nothing behind
+    // it and no way to reach the setting at all. A fallback that keeps the
+    // control working is worth four characters; one that draws a dead row is
+    // the thing this project's rule is against.
+    let sub: Menu | null = null;
+    menu.addItem((i) => {
+      i.setTitle("Fourth number").setIcon("hash");
+      sub = (i as unknown as { setSubmenu?: () => Menu }).setSubmenu?.() ?? null;
+      if (!sub) i.setDisabled(true);
+    });
+    {
+      const target: Menu = sub ?? menu;
+      for (const row of rows) {
+        target.addItem((s) =>
+          s
+            .setTitle(row.label)
+            // TICKED ON WHAT IS DRAWN, NOT ON WHAT IS STORED. A journal with no
+            // `cardStat` draws the derivation, so the tick has to fall on
+            // whichever row that derivation lands on — otherwise a reader opens
+            // the menu, sees nothing ticked, and cannot tell what they are
+            // changing FROM.
+            .setChecked(row.value === (type.cardStat ?? (ratingDef ? "rating" : "below")))
+            .onClick(() => void plugin.journals.setCardStat(type, row.value))
+        );
+      }
+    }
   });
 
   // ── The body ───────────────────────────────────────────────────────────
@@ -231,27 +279,18 @@ export function buildCard(
   // say, because a journal that rates nothing still has a count of what is in it.
   // What it costs is the count on a journal that DOES rate: `.jjc-menu` still
   // names the level and the dashboard states it in full.
-  if (ratingDef) {
-    const ratingId = ratingDef.id;
-    const conf = confidenceStats(
-      pagesUnder(plugin.app, type.root),
-      ratingId,
-      confidenceKinds(plugin, type.root, ratingId)
-    );
-    // An em dash rather than 0.0 when nothing is graded — `buildTopicStats`' rule:
-    // an average of no readings is absent, not zero.
-    //
-    // THE BARE NOUN, WITHOUT "avg" (4.38) — the same change and the same reason
-    // as `containerCard`'s fourth cell: it was the one label on this grid long
-    // enough to wrap in a 240px track, and it is the only one of the four that
-    // tried to say how it was computed. See `tables.ts` for the full note.
-    cards.push({ label: ratingWord(ratingDef), value: conf ? conf.avg : "—" });
-  } else {
-    cards.push({
-      label: plural(type.levels[0].noun).toLowerCase(),
-      value: String(tops.length),
-    });
-  }
+  // AND THE READER MAY CHOOSE IT (4.47). `cardStat` names a measure out of the
+  // stats band's own vocabulary — one list of things a number about a journal can
+  // be, so the card and the band cannot come to name the same figure two ways —
+  // and it is set from the ⋯ menu on this card.
+  //
+  // ABSENT IS THE DERIVATION ABOVE, unchanged, which is what every journal in
+  // every vault keeps until somebody chooses.
+  //
+  // AN UNANSWERABLE CHOICE FALLS BACK RATHER THAN DRAWING A DASH. A reader who
+  // picks the rating on a journal that later stops declaring one would otherwise
+  // get a permanent em dash in the fourth cell of every card in the row.
+  cards.push(cardFourth(plugin, type, tops.length, ratingDef));
 
   const strip = body.createDiv({ cls: "jjc-stats" });
   const { cells } = statStrip(strip, cards);
@@ -286,6 +325,86 @@ export function buildCard(
   // something else. What the card loses is ~36px per card and a footer edge.
   void ctx;
   return card;
+}
+
+// The card's fourth cell: the reader's choice, or the card's own derivation.
+//
+// THE THREE MEASURES A CARD CAN ANSWER, and no more. A journal card is one
+// journal at its root, so `notes`, `last` and `open` are already the first three
+// cells and offering them again would be a card saying one thing twice; `kinds`
+// and `totals` fill an unknown number of cells and there is exactly one slot.
+// What is left is the rating, the count of what is below, and the per-kind
+// counts — which is what `cardStatChoices` offers.
+function cardFourth(
+  plugin: AlmanacPlugin,
+  type: JournalType,
+  below: number,
+  ratingDef: TrackerDef | null
+): StatCard {
+  const chosen = type.cardStat ?? null;
+
+  const kindId = chosen ? kindOfMeasure(chosen) : null;
+  if (kindId) {
+    const kind = type.kinds.find((k) => k.id === kindId);
+    if (kind) {
+      const n = pagesUnder(plugin.app, type.root).filter(
+        (p) => p.fm["type"] === kind.id
+      ).length;
+      return {
+        label: (n === 1 ? kind.label : kindPlural(kind)).toLowerCase(),
+        value: String(n),
+      };
+    }
+  }
+
+  const count = (): StatCard => ({
+    label: plural(type.levels[0].noun).toLowerCase(),
+    value: String(below),
+  });
+
+  // `below` NEEDS NO ARM OF ITS OWN and had one until a mutation run showed it
+  // could be broken without a test noticing. It is the fall-through: a choice
+  // that is not a kind and not the rating lands on the count either way, and a
+  // line that can be deleted with no change in behaviour is a line that says
+  // something untrue about how the function decides.
+
+  // THE RATING, WHERE THE JOURNAL DECLARES ONE — chosen, or derived by the rule
+  // this card has always followed.
+  //
+  // An em dash rather than 0.0 when nothing is graded — `buildStatsBand`'s rule:
+  // an average of no readings is absent, not zero.
+  //
+  // THE BARE NOUN, WITHOUT "avg" (4.38): it was the one label on this grid long
+  // enough to wrap in a 240px track, and it is the only one of the four that
+  // tried to say how it was computed. See `tables.ts` for the full note.
+  if ((chosen === "rating" || chosen === null) && ratingDef) {
+    const conf = confidenceStats(
+      pagesUnder(plugin.app, type.root),
+      ratingDef.id,
+      confidenceKinds(plugin, type.root, ratingDef.id)
+    );
+    return { label: ratingWord(ratingDef), value: conf ? conf.avg : "—" };
+  }
+  return count();
+}
+
+// What a reader may put in that cell, on this journal.
+//
+// BUILT FROM THE TYPE, so a journal that rates nothing is not offered a rating
+// and a journal's own note types are named rather than numbered. The ids are the
+// band's, which is the point: one vocabulary for "a number about a journal".
+export function cardStatChoices(
+  type: JournalType,
+  ratingDef: TrackerDef | null
+): { value: string; label: string }[] {
+  const rows = [
+    { value: "below", label: plural(type.levels[0].noun) },
+    ...type.kinds.map((k) => ({ value: kindMeasure(k.id), label: kindPlural(k) })),
+  ];
+  if (ratingDef) {
+    rows.unshift({ value: "rating", label: `Average ${ratingWord(ratingDef)}` });
+  }
+  return rows;
 }
 
 async function openIndex(plugin: AlmanacPlugin, type: JournalType): Promise<void> {

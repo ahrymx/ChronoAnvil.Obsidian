@@ -1957,8 +1957,9 @@ body.is-mobile .jld-pair > .journal-sec {
  * the old one was a title, which is what made it indistinguishable from the
  * container's name beside it even though one is a link to a place and the other is
  * a word for a kind of thing. Caps at `--am-text-2xs` is the plugin's treatment
- * for a thing that names a region — `.jc-qlabel`, `.jts-label`, the stat strip's
- * own labels — and it cannot be mistaken for a destination.
+ * for a thing that names a region — `.jc-qlabel` and the stat strip's own
+ * labels — and it cannot be mistaken for a destination. (`.jts-label` was the
+ * third name here until 4.46 merged that band into the strip.)
  *
  * A SIBLING OF THE BODY IN BOTH PANES, which is what makes the two halves start on
  * one line. In the list pane it also has to be outside `.jjs-card-body`, because

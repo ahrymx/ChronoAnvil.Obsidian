@@ -187,9 +187,32 @@ describe("the exclusions say why, and the reasons are the ones claimed", () => {
     // must go on rendering — and `RETIRED_WIDGETS` is the wrong shelf for that,
     // because `planLayout` REMOVES what it names from a reader's note on repair.
     // Retired means gone and cleaned up; an alias means superseded and honoured.
-    expect(of("alias")).toEqual(["confidence-trend", "topics-table"]);
+    // FOUR AS OF 4.46, and the two new ones route DIFFERENTLY from the two
+    // above — which is worth stating rather than hiding behind a longer list.
+    //
+    // `confidence-trend` and `topics-table` fall THROUGH to their target's arm,
+    // because each is a bare second spelling of one directive. `topic-stats` and
+    // `journal-totals` cannot: they merged into `stats-band`, whose behaviour is
+    // chosen by a preset argument, and neither old word carried one. So each has
+    // an arm of its own that supplies the preset it always drew — which is the
+    // only place that knows which of the two spellings was written.
+    expect(of("alias")).toEqual([
+      "confidence-trend",
+      "journal-totals",
+      "topic-stats",
+      "topics-table",
+    ]);
     expect(dispatchBody()).toContain('case "confidence-trend":\n      case "journal-chart":');
     expect(dispatchBody()).toContain('case "topics-table":\n      case "level-index":');
+    // THE TWO BAND SPELLINGS SHARE AN ARM AS OF 4.46.1, which is the fallthrough
+    // shape after all — but not for the reason the other two have it. They still
+    // resolve to DIFFERENT presets; what changed is that the preset is looked up
+    // in `STATS_BAND_ALIASES` rather than written here as a literal. 4.46.0 had
+    // it in two literals, which made this the second of three places that knew
+    // what an old word means, and the third — the section editor's question —
+    // had no way to know at all.
+    expect(dispatchBody()).toContain('case "topic-stats":\n      case "journal-totals":');
+    expect(dispatchBody()).toContain("STATS_BAND_ALIASES[kind]");
     // And neither is retired, which is the half that would delete work.
     for (const alias of of("alias")) {
       expect(Object.keys(RETIRED_WIDGETS), alias).not.toContain(alias);

@@ -45,13 +45,12 @@ import type { VaultArea } from "../../core/links";
 import {
   buildJournalBreakdown,
   buildJournalTally,
-  buildJournalTotals,
   buildKindTable,
   buildPagesTable,
   buildTagIndex,
   buildTasksTable,
   TasksScope,
-  buildTopicStats,
+  buildStatsBand,
   buildLevelCards,
   buildLevelIndex,
   levelScope,
@@ -310,17 +309,24 @@ export function buildLevelCardsRegion(
   );
 }
 
-export function buildTopicStatsRegion(
+export function buildStatsBandRegion(
   plugin: AlmanacPlugin,
+  rest: string,
+  label: string | null,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
-  // Scope = host note's own folder, matching confidence-summary — a
-  // topic index note reads the topic it sits in without being told
-  // which one it is. Live, so adding a lesson repaints the band.
+  // `stats-band[:<preset>]` — the one band in the journal subsystem as of 4.46,
+  // and the two regions this replaced are why it takes an argument at all.
+  //
+  // SCOPE IS THE HOST NOTE'S OWN FOLDER AND IS NOT IN THE DIRECTIVE. That was
+  // already true of both widgets this merges — a Topic index read the topic it
+  // sat in, a Block index read the block — and it is what `statScopeOf` turns
+  // into the three scopes. Live-scoped, so logging a lesson or a second workout
+  // repaints the band rather than waiting for the note to be reopened.
   const file = fileOfCtx(plugin, ctx);
   if (!file?.parent) return null;
   return liveScopedWidget(plugin, ctx, file.parent.path, () =>
-    buildTopicStats(plugin, ctx)
+    buildStatsBand(plugin, ctx, rest.trim(), label)
   );
 }
 
@@ -486,22 +492,6 @@ export function buildJournalTallyRegion(
   if (!file?.parent) return null;
   return liveScopedWidget(plugin, ctx, file.parent.path, () =>
     buildJournalTally(plugin, ctx, rest.trim(), label)
-  );
-}
-
-export function buildJournalTotalsRegion(
-  plugin: AlmanacPlugin,
-  label: string | null,
-  ctx: MarkdownPostProcessorContext
-): HTMLElement | null {
-  // `journal-totals` — NO ARGUMENT. See buildJournalTotals for why naming one
-  // tracker would have forced the summable quantity to be a kind's rating.
-  // Live-scoped over the host's folder, so logging a second workout repaints
-  // the band rather than waiting for the note to be reopened.
-  const file = fileOfCtx(plugin, ctx);
-  if (!file?.parent) return null;
-  return liveScopedWidget(plugin, ctx, file.parent.path, () =>
-    buildJournalTotals(plugin, ctx, label)
   );
 }
 

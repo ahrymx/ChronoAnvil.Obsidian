@@ -509,66 +509,25 @@
   font-style: italic;
 }
 
-/* ── Topic stats band ─────────────────────────────────────────────────────
-   The four numbers under a Topic dashboard's banner. Its own bordered strip
-   rather than more cells welded into the banner above it, because the banner's
-   grid is where a reader *changes* things (Status) and this is only ever read
-   — mixing the two would make the card a place where some cells respond to a
-   click and the rest don't. Sits tight under the banner so the pair still
-   reads as one header block. */
-.journal-topic-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
-  overflow: hidden;
-  margin-top: -4px;
-}
-.jts-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 9px 13px;
-  min-width: 0;
-}
-.jts-cell + .jts-cell {
-  border-left: 1px solid var(--background-modifier-border);
-}
-.jts-value {
-  font-size: 1.15em;
-  font-weight: 600;
-  color: var(--text-normal);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.jts-sub {
-  font-size: var(--am-text-xs);
-  font-weight: 400;
-  color: var(--text-muted);
-}
-.jts-label {
-  font-size: var(--am-text-2xs);
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* Narrow panes: four numbers in a row get crushed long before the rest of
-   the page does, so fold to two rows of two rather than let them wrap
-   raggedly. */
-@container (max-width: 520px) {
-  .journal-topic-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .jts-cell:nth-child(3) {
-    border-left: none;
-  }
-  .jts-cell:nth-child(n + 3) {
-    border-top: 1px solid var(--background-modifier-border);
-  }
-}
+/* ── The topic stats band STOOD HERE AND IS GONE (4.46) ───────────────────
+   Fifty-five declarations drawing `.journal-topic-stats` and four `.jts-*`
+   children: a grid of four, a border, a radius, an overflow clip, per-cell
+   left borders, and a `@container (max-width: 520px)` fold with two more rules
+   to unpick those borders on the second row.
+
+   EVERY ONE OF THEM WAS `.am-stats` SPELLED AGAIN. The shared stat strip four
+   sheets down does the same job with the dividers as the GAP over a coloured
+   ground, so it needs no per-cell border arithmetic and no rules to undo it
+   when the grid folds — which is the argument `96-stat-strip.css` opens with,
+   made against the rules that used to be here.
+
+   AND THE TWO FOLDED AT DIFFERENT WIDTHS. This band folded at 520px and the
+   strip at 480px, so a Media shelf drawing both — which every Media shelf did
+   until 4.46 — had two bands of four cells that became two-by-two forty pixels
+   apart. Nothing was wrong with either number; there were two of them.
+
+   `stats-band` draws `.am-stats`, so there is nothing left to declare here but
+   the wrapper below. */
 
 /* ── The tally (4.35) ────────────────────────────────────────────────────
    How many of the things below sit at each value of a select — one pill per
@@ -639,18 +598,105 @@
   color: var(--text-faint);
 }
 
-/* The totals band's optional title. The strip itself is `.am-stats` — the
-   shared stat strip, not a copy of it — so there is nothing else to declare
-   here; see 96-stat-strip.css. */
-.journal-totals {
+/* The stats band's wrapper and its optional title. The band itself is
+   `.am-stats` — the shared stat strip, not a copy of it — so there is nothing
+   else to declare here; see 96-stat-strip.css.
+
+   `.stats-band`, WHERE `.journal-totals` AND `.journal-topic-stats` BOTH WERE
+   (4.46). One widget draws one band now, so there is one wrapper; the class is
+   named for the widget rather than for one of the four arrangements it can be
+   set to, which is what `.journal-totals` was named for and why it read as a
+   different object from the band above it. */
+.stats-band {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.jtot-title {
+.sb-title {
   font-size: var(--am-text-sm);
   font-weight: 600;
   color: var(--text-muted);
+}
+
+/* ── The control a CELL carries (4.48) ──────────────────────────────────
+   Each cell of a band is chosen from its own `⋯`, which is why these rules are
+   scoped to `.stats-band .am-stat` and never to `.am-stat` alone: that strip is
+   also the year dashboard's body and three period mastheads, and a control that
+   edits a directive must not appear on a surface that has no directive to edit.
+
+   HIDDEN UNTIL HOVER, because a row of four numbers with four `⋯` on it reads
+   as a toolbar. The reveal is on the CELL rather than on the button, so the
+   whole cell is the target — the same shape `.jsh-title` uses for its pencil.
+
+   `:focus-within` IS NOT DECORATION HERE. It is the only way the button can be
+   reached by keyboard: a control at `opacity: 0` is still focusable, and one
+   that stays invisible while focused is a control nobody can see they are on.
+   The touch resting state is at the foot of this file's family — see the
+   `(hover: none)` branch — and `hover-reveal.test.ts` fails the build without
+   it. */
+.stats-band .am-stat {
+  position: relative;
+}
+.sb-cell-menu {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.sb-cell-menu svg {
+  width: 0.8em;
+  height: 0.8em;
+}
+.stats-band .am-stat:hover .sb-cell-menu,
+.stats-band .am-stat:focus-within .sb-cell-menu {
+  opacity: 1;
+}
+.sb-cell-menu:hover {
+  opacity: 1;
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+/* A touchscreen has no hover to reveal it with, so it rests visible and faint
+   — 3.9 §3.3's rule, which is checked mechanically rather than remembered. */
+@media (hover: none) {
+  .sb-cell-menu {
+    opacity: 0.55;
+  }
+}
+
+/* ── Two cells trading places (4.49) ────────────────────────────────────
+   The journal cards' gesture on a smaller surface, so it wears the journal
+   cards' two classes. THE CURSOR IS ON `[draggable="true"]` RATHER THAN ON THE
+   CELL, which is the derivation this stylesheet prefers to a second rule: the
+   attribute is set only where there is somewhere to drop, so a one-cell band
+   never offers a grip for a gesture that cannot start.
+
+   SCOPED TO `.stats-band` for the reason the `⋯` above it is: `.am-stat` is
+   also the year dashboard's body and three period mastheads, and none of those
+   cells came from a directive anybody can rewrite. */
+.stats-band .am-stat[draggable="true"] {
+  cursor: grab;
+}
+.stats-band .am-stat.is-dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+/* The target says where the thing in the air would land, in the accent the rest
+   of this plugin uses for the same promise. An inset shadow rather than an
+   outline: the cells are divided by borders and an outline over one of them
+   reads as the divider moving. */
+.stats-band .am-stat.is-drop-target {
+  background: var(--background-modifier-hover);
+  box-shadow: inset 0 0 0 2px var(--interactive-accent);
 }
 
 /* Related-lessons: a Practice banner's own property cell — removable pill

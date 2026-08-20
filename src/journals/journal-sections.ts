@@ -16,6 +16,11 @@ import { JOURNAL_CHARTS_FENCE } from "../charts/journal-charts";
 import { plural } from "../core/util";
 import type { SectionQuestion } from "../core/section-model";
 import { SCOPE_ALL, SCOPE_JOURNAL } from "../core/directive-grammar";
+import {
+  STATS_BAND_WORDS,
+  STAT_PRESET_SHORTHAND,
+  statsBandProbe,
+} from "./stats-band";
 
 // ── The section catalogue ─────────────────────────────────────────────────
 //
@@ -173,6 +178,20 @@ export interface SectionOverrides {
   //
   // NO FRONTMATTER IS SEEDED FOR THESE — see `trackerSeeds`.
   trackers?: string[];
+  // WHICH ARRANGEMENT OF NUMBERS THE `stats` SECTION BANDS. 4.46.
+  //
+  // The same shape of decision as `tracker` above and for the same stated
+  // reason: the catalogue supplies a generic default because it holds a
+  // `JournalType` and no plugin, and a type that knows better says so here.
+  // Exercise & Diet wants its four sums; Media wants a count, a rating, its open
+  // tasks and its pages read in one band, which is what replaced the two it drew
+  // before this release.
+  //
+  // A PRESET ID, VALIDATED NOWHERE AND SAFE FOR IT. `resolveStatPreset` falls
+  // back to the scope's default for a word it does not know, so a layout naming
+  // a preset a later release removes degrades to the ordinary band rather than
+  // to a refusal in the reader's note.
+  preset?: string;
 }
 
 // How one template departs from the catalogue's own arrangement.
@@ -530,6 +549,24 @@ const never = (): boolean => false;
 // `options.tally.tracker`.
 export const DEFAULT_TALLY_TRACKER = "status";
 
+// The preset a `stats` section on a CONTAINER index resolves to when nothing
+// says otherwise, and the reason it is spelled here as well as in
+// `stats-band.ts` is that this file has to be able to compare against it.
+//
+// A BARE DIRECTIVE IS THE ANSWER, NOT A WRITTEN WORD. `resolveStatPreset` gives
+// a bare `stats-band` this preset inside a container, so composing
+// `stats-band:progress` would be the note restating a rule the plugin already
+// applies — and it would make a Topic index composed by 4.46 differ, byte for
+// byte, from one composed by 4.45 that says exactly the same thing. `render`
+// compares against this to decide whether the argument is worth writing.
+//
+// A SECOND COPY OF A VALUE, WHICH THIS PROJECT HAS BEEN BITTEN BY (4.21.1: "two
+// copies of a value cannot see a third"). It is here rather than imported
+// because it is a fact about what this CATALOGUE composes, and a test pins the
+// two together — the same treatment `DEFAULT_BRIDGE_TRACKER` gets against
+// `DEFAULT_SETTINGS.moodTrackerId` four lines up, and for the same reason.
+export const DEFAULT_CONTAINER_PRESET = "progress";
+
 // What the section editor says about a title it cannot read back, and where it
 // sends the reader instead. 3.18 follow-ups §2.
 //
@@ -720,14 +757,76 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     id: "stats",
     icon: "🔢",
     label: "Stats band",
-    blurb: "A row of counts and the average rating for everything below.",
+    blurb: "A row of numbers about everything below — you pick each one.",
     surface: "index",
-    // The deepest index only: it is a band about the NOTES here, and one level
+    // ── IT ABSORBED `totals` IN 4.46 ──────────────────────────────────
+    //
+    // There were two sections here — this one, emitting `topic-stats`, and
+    // `totals`, emitting `journal-totals` — and a Media shelf named BOTH,
+    // because that was the only way the catalogue had to state both facts. What
+    // it drew was two bands of divided numbered cells, stacked, in two markup
+    // families with two collapse rules, answering one question and differing
+    // only in which quantities they picked.
+    //
+    // So the second section is gone and this one takes a preset. `progress` is
+    // what `topic-stats` drew, cell for cell; `totals` is what `journal-totals`
+    // drew; and `summary` is the two of them at once, inside the four cells a
+    // band gets. See `stats-band.ts`.
+    //
+    // THE DEFAULT STAYS THE DEEPEST INDEX and stays `progress`, which is the
+    // half of this that must not change: every Study Topic index in every vault
+    // has drawn that band since 3.11, and a merge that quietly re-picked its
+    // numbers would be the release editing notes it did not compose. One level
     // up the same numbers are already a column each in the children table.
     default: (ctx) => !ctx.hasSubContainers,
-    claims: ["topic-stats"],
-    locate: (t) => probe(t, /^topic-stats\b/m),
-    render: () => [fence(["topic-stats"])],
+    // ── AND IT ASKS NOTHING HERE, AS OF 4.48 ──────────────────────────
+    //
+    // 4.46 asked ONE question naming a whole arrangement; 4.47 corrected that to
+    // FOUR, one per cell, and drew four `<select>` boxes wrapped across the
+    // section's row. Reported from a vault as clutter, and the reader was right:
+    // the row of boxes was a MODEL OF THE BAND, drawn beside the band, in a
+    // window whose job is which sections a note has rather than what is inside
+    // one.
+    //
+    // **THE CONTROL IS ON THE CELL NOW** — a `⋯` per cell, revealed on hover,
+    // with the same rows this offered plus *Add cell* and *Remove cell*. See
+    // `ui/widgets/stats-band-menu.ts`, which writes through `withAnswers` and
+    // `slotQuestions` exactly as this row did, so nothing about the file format
+    // or the migration of an older keyword changed with the control.
+    //
+    // The questions did not go anywhere; they stopped being the CATALOGUE's.
+
+    // ALL THREE SPELLINGS, AND THE OTHER TWO ARE NOT SPECULATIVE. A locator that
+    // knew only `stats-band` would report this section ABSENT on every index
+    // note composed before 4.46 and offer to add a second copy of what is
+    // already there — 4.16 §1's finding, arriving through a merged directive
+    // instead of a renamed one. Both old words still render.
+    claims: [...STATS_BAND_WORDS],
+    locate: (t) => probe(t, statsBandProbe()),
+    // BARE WHERE THE PRESET IS THE SCOPE'S OWN DEFAULT, which is how a Topic
+    // index composed by this release and one composed by 4.45 come out reading
+    // the same. `resolveStatPreset` gives a bare band `progress` inside a
+    // container, so writing the word would be the note stating a rule the plugin
+    // already applies — and a directive with nothing in its argument is one
+    // fewer thing to go stale.
+    // BARE WHERE THE ARRANGEMENT IS THE SCOPE'S OWN, which is how a Topic index
+    // composed by this release and one composed by 4.45 come out reading the
+    // same: `bandMeasures` gives a bare band `progress` inside a container, so
+    // writing anything would be the note stating a rule the plugin applies.
+    //
+    // A PRESET NAMED IN A LAYOUT IS WRITTEN AS ITS CELLS (4.47), not as its
+    // word. The word still resolves — every note in every vault carries one —
+    // but a note composed today should say what it draws, so that the four boxes
+    // in *Edit sections…* are showing the reader their own line rather than a
+    // shorthand the plugin expanded on their behalf.
+    render: (_ctx, opts) => {
+      const preset = opts?.preset;
+      if (!preset || preset === DEFAULT_CONTAINER_PRESET) {
+        return [fence(["stats-band"])];
+      }
+      const cells = STAT_PRESET_SHORTHAND[preset] ?? preset;
+      return [fence([`stats-band:${cells}`])];
+    },
   },
 
   {
@@ -940,35 +1039,27 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     },
   },
 
-  // ── The two 4.35 bands ────────────────────────────────────────────
+  // ── The 4.35 band that is left ────────────────────────────────────
   //
-  // BOTH `default: never`, AND THAT IS FORCED RATHER THAN CHOSEN. The
+  // WAS TWO, AND `totals` IS NOW A PRESET OF `stats` ABOVE (4.46). What that
+  // section's own note argues is the whole of it: two bands of divided numbered
+  // cells, stacked on one Media shelf, were one idea drawn twice.
+  //
+  // `default: never`, AND THAT IS FORCED RATHER THAN CHOSEN. The
   // catalogue holds a `JournalType` and no plugin, so it cannot see whether a
-  // vault has a tracker worth summing or a vocabulary worth counting — which
-  // is `bridge`'s own argument, verbatim, a few sections down. A section that
-  // defaulted on would write a band into every journal in every vault and draw
-  // nothing in almost all of them.
+  // vault has a vocabulary worth counting — which is `bridge`'s own argument,
+  // verbatim, a few sections down. A section that defaulted on would write a
+  // band into every journal in every vault and draw nothing in almost all of
+  // them.
   //
-  // So the presets that want them turn them on through `layout.sections`,
+  // So the presets that want it turn it on through `layout.sections`,
   // which is the field that can: `defaultSectionIds` filters on
   // `required || default(ctx)` regardless of layout, so `order` alone could
   // only rearrange what was already on. That is what §0 makes possible, and it
   // is the whole reason §0 ships first.
   //
-  // NOTHING PLACES EITHER ON A JOURNAL THAT ALREADY EXISTS. A reader adds them
-  // from *Edit sections…*, which is the silence 4.29 and 4.33 both chose.
-  {
-    id: "totals",
-    icon: "🧮",
-    label: "Totals",
-    blurb: "What the notes beneath this one add up to, for every quantity this journal totals.",
-    surface: "index",
-    default: never,
-    claims: ["journal-totals"],
-    locate: (t) => probe(t, /^journal-totals\s*$/m),
-    render: () => [fence(["journal-totals"])],
-  },
-
+  // NOTHING PLACES IT ON A JOURNAL THAT ALREADY EXISTS. A reader adds it from
+  // *Edit sections…*, which is the silence 4.29 and 4.33 both chose.
   {
     id: "tally",
     icon: "🔢",

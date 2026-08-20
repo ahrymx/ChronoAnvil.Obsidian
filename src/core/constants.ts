@@ -670,7 +670,7 @@ export const RETIRED_WIDGETS: Record<string, { since: string; note: string }> = 
   // widget no template writes and no catalogue offers.
   "confidence-summary": {
     since: "3.11",
-    note: "replaced by topic-stats, which states the same numbers as a band",
+    note: "replaced by the stats band, which states the same numbers as a band",
   },
   nav: {
     since: "3.11",

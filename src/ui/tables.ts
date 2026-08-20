@@ -19,7 +19,7 @@
 import { SCOPE_JOURNAL } from "../core/directive-grammar";
 import { App, MarkdownPostProcessorContext, normalizePath, setIcon, TFile, TFolder } from "obsidian";
 import type AlmanacPlugin from "../main";
-import { childFiles, filesUnder, folderPrefix, frontmatterOf, getFile, isVaultRoot, isoDate, moment, noExt, openFile, openGlobalSearch } from "../core/util";
+import { childFiles, filesUnder, folderPrefix, frontmatterOf, getFile, getFolder, isVaultRoot, isoDate, moment, noExt, openFile, openGlobalSearch } from "../core/util";
 import { pagesUnder, recencyMs, relativeActivity, tagsOf } from "../core/query";
 import type { PageInfo } from "../core/query";
 import { formatPeriodLabel } from "../charts/charts";
@@ -47,6 +47,17 @@ import {
   registeredJournalTypes,
 } from "../journals/journal";
 import { kindPlural, plural, typeRating } from "../journals/journal-sections";
+// The band's own table: which measures a preset names, which of them a scope
+// can answer, and how many cells a band may have. Pure — see `stats-band.ts`
+// for why the arithmetic that reads a vault is here and the decisions are not.
+import {
+  STAT_CELL_CAP,
+  bandMeasures,
+  kindOfMeasure,
+  soleKindOf,
+  statScopeOf,
+} from "../journals/stats-band";
+import { attachCellMenus } from "./widgets/stats-band-menu";
 import { journalChartRefusal, journalTallyRefusal, summarize } from "../charts/charts";
 import { partsOf } from "../core/section-model";
 import {
@@ -1484,129 +1495,338 @@ function childrenCard(
   return card;
 }
 
-// ── topic-stats ──────────────────────────────────────────────────────
-// The four-number band under a Topic dashboard's banner: lessons, practice,
-// average confidence, open tasks. Scope = the host note's own folder, the
-// same rule confidence-summary uses, so it reads a topic index note without
-// being told which topic it is on.
+// ── stats-band ───────────────────────────────────────────────────────
 //
-// Nothing here is new arithmetic: it is the row buildTopicsTable already
-// computes for *each* topic on a subject page, scoped to one topic and laid
-// out as a band rather than a table row. Presenting it at the top of the
-// topic's own page means the numbers a subject shows about a topic and the
-// numbers the topic shows about itself come from one place and cannot drift.
+// `stats-band[:<preset>]` — a row of divided cells about what is below this
+// note. 4.46.
 //
-// A band rather than the sentence `confidence-summary` renders, because the
-// subject dashboard one level up already states its totals as a band — the
-// two levels now read the same way instead of each inventing a header.
-export function buildTopicStats(
+// ── IT IS TWO WIDGETS, AND THEY WERE ONE IDEA ────────────────────────────
+//
+// `topic-stats` drew *3 titles · 4.7/5 avg stars · 1 open tasks* and
+// `journal-totals` drew *753 pages read* DIRECTLY UNDERNEATH IT on the same
+// Media shelf, because `MEDIA_CONFIG` named both sections — the only way the
+// catalogue had to state both facts. Two widgets, two catalogue sections, two
+// markup families and two collapse rules, answering one question and differing
+// only in which quantities they picked.
+//
+// AND THE TWO BANDS WERE NOT THE SAME OBJECT, WHICH IS THE HALF THAT MATTERED.
+// `journal-totals` drew `.am-stats` — the shared strip, whose collapse is an
+// `@container` query, so it folds in a narrow PANE. `topic-stats` drew `.jts-*`,
+// a hand-rolled band with its own 520px query, its own borders and its own
+// padding. Two objects that look alike, maintained apart, which is precisely
+// the defect `96-stat-strip.css` exists to record.
+//
+// ── WHAT DECIDES THE CELLS ───────────────────────────────────────────────
+//
+// The preset names MEASURES; `stats-band.ts` holds the table and every decision
+// that does not need a vault. This function does the reading and the drawing and
+// nothing else, which is what lets the release's central claim — one preset,
+// three scopes, three honest bands — be asserted against a pure table.
+//
+// SCOPE IS DERIVED FROM THE HOST, never from the argument. `containerDepth`
+// gives −1 for a journal's own folder note and 0-up for a container, and a note
+// in no journal at all is the vault. See `statScopeOf`.
+export function buildStatsBand(
   plugin: AlmanacPlugin,
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext,
+  arg: string,
+  label: string | null
 ): HTMLElement {
   const app = plugin.app;
-  const root = createDiv({ cls: "journal-topic-stats" });
+  const root = createDiv({ cls: "stats-band" });
 
   const file = hostFile(app, ctx);
   if (!file?.parent) return root;
 
   const type = hostType(plugin, file.path);
-  if (!type) return root;
-  const pages = pagesUnder(app, file.parent.path);
-  const ratingDef = ratingDefOf(plugin, type);
-  const ratingId = ratingDef?.id ?? confidenceProperty(plugin);
-  const conf = confidenceStats(
-    pages,
-    ratingId,
-    confidenceKinds(plugin, file.path, ratingId)
-  );
+  const scope = statScopeOf(type ? containerDepth(type, file.parent.path) : null);
+  // THE ARGUMENT IS A SLOT LIST OR A PRESET WORD, and `bandMeasures` is the one
+  // place that decides which — see its note for why the two cannot collide and
+  // why an unknown word falls back rather than refusing.
+  const measures = bandMeasures(arg, scope);
 
-  const cell = (value: string, label: string, sub?: string): HTMLElement => {
-    const c = root.createDiv({ cls: "jts-cell" });
-    const v = c.createDiv({ cls: "jts-value", text: value });
-    if (sub) v.createSpan({ cls: "jts-sub", text: sub });
-    c.createDiv({ cls: "jts-label", text: label });
-    return c;
+  // THE FOLDERS THE NUMBERS ARE TAKEN OVER, and there is exactly one rule per
+  // scope. A journal's folder note and a container index both read their own
+  // parent — which is what `topic-stats` and `journal-totals` both already did,
+  // so nothing about an existing band's scope changes. The vault reads every
+  // registered journal's root, unioned, which is `journals-header`'s documented
+  // scope reached the same way.
+  const roots =
+    scope === "vault"
+      ? registeredJournalTypes(plugin).map((t) => t.root)
+      : [file.parent.path];
+
+  const pages = pagesOver(app, roots);
+  const typed = pages.filter((p) => p.fm["type"]);
+
+  const cells: StatCard[] = [];
+  // WHICH SLOT DREW EACH CELL (4.48). `kinds` and `totals` expand, so the cells
+  // are not one-to-one with the measures and a cell's own menu has to know which
+  // choice it came from. Recorded as the cells are pushed, because this loop is
+  // the only place that knows — reconstructing it afterwards would mean counting
+  // kinds a second time and getting a different answer the day one is renamed.
+  const origin: number[] = [];
+  let slot = 0;
+  const add = (c: StatCard): void => {
+    cells.push(c);
+    origin.push(slot);
   };
 
-  // One cell per note kind, named after the kind — the same derivation
-  // topics-table uses one level up, so a subject's numbers about a topic and
-  // the topic's numbers about itself keep coming from one place. That claim was
-  // true of the count and false of the WORD until the rollup and this band both
-  // went through `kindPlural`: a topic's band read "0 practices" under a
-  // subject's column headed "Practices", and every other surface said
-  // "Practice".
-  for (const kind of type.kinds) {
-    const n = pages.filter((p) => p.fm["type"] === kind.id).length;
-    cell(String(n), (n === 1 ? kind.label : kindPlural(kind)).toLowerCase());
-  }
-  // An em dash rather than 0.0 when nothing is graded: an average of no
-  // readings is absent, not zero, and showing 0.0/5 on a fresh topic reads
-  // as "you understand none of this" rather than "nothing logged yet".
-  const word = `avg ${ratingWord(ratingDef)}`;
-  const outOf = ratingDef?.max != null ? `/${ratingDef.max}` : undefined;
-  if (conf) cell(conf.avg, word, outOf);
-  else cell("—", word);
+  // Filled in on resolve, because open tasks are `- ( )` lines in note BODIES
+  // and invisible to the metadata cache — the idiom `childRow`, `containerCard`
+  // and the band this replaces all use. Recorded by INDEX rather than by a
+  // reference, because the cells do not exist until `statStrip` has been called
+  // and the caller cannot know in advance which slot it lands in.
+  let openAt = -1;
 
-  // Open tasks are Almanac `- ( )` lines in note bodies, invisible to the
-  // metadata cache — so this cell ships a placeholder and fills once the
-  // bodies are read, exactly as the topics-table's Open column does.
-  const openCell = root.createDiv({ cls: "jts-cell" });
-  const openVal = openCell.createDiv({ cls: "jts-value", text: "…" });
-  openCell.createDiv({ cls: "jts-label", text: "open tasks" });
-  void sumBodyTasks(app, pages.map((p) => p.file)).then(({ open }) => {
-    openVal.setText(open ? String(open) : "—");
-  });
+  // INDEXED RATHER THAN `for…of`, because the index IS the slot and
+  // `measures.indexOf(measure)` would give both cells of `notes,notes` the
+  // first one — a menu on the second that edits the first.
+  for (slot = 0; slot < measures.length; slot += 1) {
+    const measure = measures[slot];
+    // ONE NOTE TYPE, NAMED (4.47). Handled before the switch because it is a
+    // FAMILY rather than a word — `kind:lesson`, `kind:practice` — and a switch
+    // arm cannot match a family. Drawn exactly as `kinds` draws one of its
+    // cells, because it is one of its cells: a reader who wants two of the three
+    // picks two slots instead of the one that fills them all.
+    const onlyKind = kindOfMeasure(measure);
+    if (onlyKind) {
+      const kind = type?.kinds.find((k) => k.id === onlyKind);
+      // A kind the journal no longer declares draws nothing. It is a renamed or
+      // deleted note type, and a cell headed with an id nobody recognises is
+      // worse than a band one cell short.
+      if (!kind) continue;
+      const n = typed.filter((p) => p.fm["type"] === kind.id).length;
+      add({
+        value: String(n),
+        label: (n === 1 ? kind.label : kindPlural(kind)).toLowerCase(),
+      });
+      continue;
+    }
+    switch (measure) {
+      case "notes": {
+        // Named after the journal's single kind where it has one — see
+        // `soleKindOf` for why that is a derivation rather than a special case.
+        const sole = soleKindOf(type);
+        const n = typed.length;
+        add({
+          label: sole
+            ? (n === 1 ? sole.label : kindPlural(sole)).toLowerCase()
+            : n === 1
+              ? "note"
+              : "notes",
+          value: String(n),
+        });
+        break;
+      }
+      case "kinds": {
+        // One cell per kind the journal declares, named after the kind — the
+        // derivation `level-index` uses one level up, so a subject's numbers
+        // about a topic and the topic's numbers about itself keep coming from
+        // one place. A kind with no notes still draws its cell: a Study Topic
+        // with no Practice yet is a fact about the topic, not an absent
+        // quantity, and unlike a tracker it is declared rather than logged.
+        for (const kind of type?.kinds ?? []) {
+          const n = typed.filter((p) => p.fm["type"] === kind.id).length;
+          add({
+            value: String(n),
+            label: (n === 1 ? kind.label : kindPlural(kind)).toLowerCase(),
+          });
+        }
+        break;
+      }
+      case "below": {
+        // WHAT IS ONE LEVEL DOWN, named by the level's own noun. On the vault
+        // that is the journals themselves; inside one it is the child folders,
+        // through `journalChildFolders`, which already excludes another
+        // journal's root sitting inside this one's.
+        //
+        // NOTHING BELOW DRAWS NO CELL. On the deepest container the children are
+        // notes, which the `notes` and `kinds` measures already count — a
+        // "0 topics" cell there would be answering a question the level does not
+        // have.
+        const below = belowOf(plugin, type, file.parent.path);
+        if (!below) break;
+        add({
+          value: String(below.count),
+          label: (below.count === 1
+            ? below.noun
+            : plural(below.noun)
+          ).toLowerCase(),
+        });
+        break;
+      }
+      case "rating": {
+        const def = type ? ratingDefOf(plugin, type) : null;
+        // NO RATING DECLARED IS NO CELL, not a column of em dashes. Projects
+        // rates nothing at all, and `containerCard` already makes exactly this
+        // call for its fourth cell.
+        if (!type || !def) break;
+        const conf = confidenceStats(
+          pages,
+          def.id,
+          confidenceKinds(plugin, file.path, def.id)
+        );
+        // An em dash rather than 0.0 when nothing is graded: an average of no
+        // readings is absent, not zero — 0.0/5 reads as "you understand none of
+        // this" rather than "nothing logged yet". `buildTopicStats`' rule, and
+        // this band is the wide one that keeps the denominator with it.
+        add({
+          label: `avg ${ratingWord(def)}`,
+          value: conf ? conf.avg : "—",
+          sub: def.max != null ? `/${def.max}` : null,
+        });
+        break;
+      }
+      case "open": {
+        openAt = cells.length;
+        add({ label: "open tasks", value: "…" });
+        break;
+      }
+      case "last": {
+        let latest: string | null = null;
+        for (const p of typed) {
+          const d = isoDate(p.fm["date"]);
+          if (d && (!latest || d > latest)) latest = d;
+        }
+        add({ label: "last", value: relativeActivity(latest) || "—" });
+        break;
+      }
+      case "totals": {
+        if (!type) break;
+        for (const c of totalCells(plugin, type, file.path, pages)) add(c);
+        break;
+      }
+    }
+  }
+
+  // A BAND WITH NOTHING TO SAY DRAWS NOTHING, which is `journal-totals`' own
+  // silence and its reason: this sits on an index note that has just been made,
+  // and a callout saying "nothing logged" under a heading that already says
+  // Stats is a box inside a box.
+  if (cells.length === 0) return root;
+
+  // THE CAP, APPLIED HERE AND ARGUED IN `stats-band.ts`. Four is what the strip
+  // has always claimed and what nothing shipped exceeds; past it the cells are
+  // too narrow to read a label in. What is left out is named in the title
+  // attribute, which is the one place that costs no layout.
+  const shown = cells.slice(0, STAT_CELL_CAP);
+  const dropped = cells.slice(STAT_CELL_CAP);
+
+  if (label) root.createDiv({ cls: "sb-title", text: label });
+  // THE SHARED STRIP, REUSED RATHER THAN COPIED — and as of this release it is
+  // the only band in the journal subsystem, which is the half `journal-totals`
+  // got right and `topic-stats` did not. It brings the thing a hand-rolled band
+  // gets wrong: it collapses on a `@container` query rather than a `@media` one,
+  // so it folds in a narrow PANE and not only in a phone-width window. That
+  // distinction was a real bug in this stylesheet once (see 96-stat-strip.css).
+  const { cells: drawn, grid } = statStrip(root, shown);
+
+  // THE CONTROL GOES ON THE CELL (4.48), and the slot list it edits is the one
+  // the band DREW — filtered to this scope — so a menu never offers to move a
+  // cell nobody can see. What it does to the note is `stats-band-menu.ts`'s; all
+  // that is handed over is the provenance this loop recorded.
+  attachCellMenus(
+    { plugin, ctx, file, scope, type, measures },
+    drawn,
+    origin.slice(0, STAT_CELL_CAP)
+  );
+
+  if (dropped.length) {
+    grid.setAttr(
+      "title",
+      `Also totalled here: ${dropped.map((c) => c.label).join(", ")}`
+    );
+  }
+
+  if (openAt >= 0 && openAt < drawn.length) {
+    const openCell = drawn[openAt].value;
+    void sumBodyTasks(
+      app,
+      pages.map((p) => p.file)
+    ).then(({ open }) => {
+      if (!openCell.isConnected) return;
+      openCell.setText(open ? String(open) : "—");
+    });
+  }
 
   return root;
 }
 
-// ── journal-totals ───────────────────────────────────────────────────
+// Every page under one or several roots, de-duplicated by path.
 //
-// `journal-totals` — what the notes below this one ADD UP TO.
+// THE DEDUPE IS NOT DEFENSIVE PADDING. Two registered journals cannot nest
+// today — each root is a folder directly inside the journals root — but nothing
+// in the settings schema FORBIDS a reader pointing one at a folder inside
+// another's, and the failure mode of not deduping is a count that is silently
+// too high on the one surface that reads several roots at once. A `Set` over
+// paths costs one pass.
+function pagesOver(app: App, roots: readonly string[]): PageInfo[] {
+  if (roots.length === 1) return pagesUnder(app, roots[0]);
+  const seen = new Set<string>();
+  const out: PageInfo[] = [];
+  for (const root of roots) {
+    for (const p of pagesUnder(app, root)) {
+      if (seen.has(p.file.path)) continue;
+      seen.add(p.file.path);
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+// WHAT IS ONE LEVEL BELOW THIS SCOPE, and what it is called there.
 //
-// NO ARGUMENT, AND THAT IS THE DESIGN. A directive naming one tracker would
-// force the summable quantity to be a kind's `rating`, because the catalogue
-// can only name a tracker through `typeRating` — and a kind has exactly one,
-// so an Exercise journal would have to choose between Intensity and Distance
-// and could never band both.
-//
-// So it reads the REGISTRY instead, which it can do and `journal-chart`
-// cannot, for one reason: the widget holds the plugin. `TrackerDef.reduce` is
-// already the field that says a quantity adds up — its only effect until now
-// was on diary charts, so on a journal tracker the control that sets it was
-// visibly present and did nothing. This gives it its meaning on this surface.
-//
-// Reuses `pagesUnder` and `confidenceKinds` — so a total and an average can
-// never disagree about what is in scope — and `summarize`, which has returned
-// `total` all along.
-//
-// A QUANTITY WITH NO READINGS DRAWS NO CELL. That is what makes one directive
-// serve Books and Film out of one journal: the Books shelf bands *Pages read*,
-// the Film shelf bands *Minutes*, because neither has any reading of the
-// other. A zero would be a claim that nobody read any pages; absence is the
-// honest answer and the useful one.
-export function buildJournalTotals(
+// Three answers out of one function, because "below" is one question the three
+// scopes answer with three different nouns — journals, then the level's noun,
+// then nothing. Separated from the drawing for `folderActivity`'s reason: two
+// copies of "what is under here" is how a page and the card that links to it
+// come to disagree.
+function belowOf(
   plugin: AlmanacPlugin,
-  ctx: MarkdownPostProcessorContext,
-  label: string | null
-): HTMLElement {
-  const app = plugin.app;
-  const root = createDiv({ cls: "journal-totals" });
+  type: JournalType | null,
+  folderPath: string
+): { count: number; noun: string } | null {
+  if (!type) {
+    const n = registeredJournalTypes(plugin).length;
+    return n ? { count: n, noun: "Journal" } : null;
+  }
+  if (!hasLevelBelow(type, folderPath)) return null;
+  const folder = getFolder(plugin.app, folderPath);
+  if (!folder) return null;
+  const noun = type.levels[containerDepth(type, folderPath) + 1]?.noun;
+  if (!noun) return null;
+  return { count: journalChildFolders(plugin, type, folder).length, noun };
+}
 
-  const file = hostFile(app, ctx);
-  if (!file?.parent) return root;
-
-  const type = hostType(plugin, file.path);
-  if (!type) return root;
-
-  const pages = pagesUnder(app, file.parent.path);
-  const cells: { label: string; value: string }[] = [];
-
+// ── The totals measure ────────────────────────────────────────────────
+//
+// `journal-totals`' arithmetic, unchanged, as one measure of the band that
+// replaced it.
+//
+// IT READS THE REGISTRY, WHICH IS WHY IT NEEDS NO ARGUMENT. A directive naming
+// one tracker would force the summable quantity to be a kind's `rating`, and a
+// kind has exactly one — so an Exercise journal would have to choose between
+// Intensity and Distance and could never band both. `TrackerDef.reduce` is
+// already the field that says a quantity adds up.
+//
+// A QUANTITY WITH NO READINGS DRAWS NO CELL. That is what makes one preset serve
+// Books and Film out of one journal: the Books shelf bands *Pages read*, the
+// Film shelf bands *Minutes*, because neither has any reading of the other. A
+// zero would be a claim that nobody read any pages; absence is the honest answer
+// and the useful one.
+function totalCells(
+  plugin: AlmanacPlugin,
+  type: JournalType,
+  notePath: string,
+  pages: PageInfo[]
+): StatCard[] {
+  const out: StatCard[] = [];
   for (const def of summableTrackers(plugin, type)) {
     // The kinds that carry this tracker, exactly as an average would ask —
     // `kindAllowsTracker`'s read-side counterpart. A Meal's Calories are not
     // added into a band of Workout distances.
-    const counts = new Set(confidenceKinds(plugin, file.path, def.id));
+    const counts = new Set(confidenceKinds(plugin, notePath, def.id));
     const values: number[] = [];
     for (const p of pages) {
       const t = p.fm["type"];
@@ -1621,38 +1841,12 @@ export function buildJournalTotals(
     // Trailing zeroes off a whole number: 45 minutes reads as "45", and 8.5 km
     // keeps the half it was logged with.
     const total = Number(stats.total.toFixed(2));
-    cells.push({
+    out.push({
       label: ratingNoun(def, def.id).toLowerCase(),
       value: def.unit ? `${total} ${def.unit}` : String(total),
     });
   }
-
-  if (cells.length === 0) {
-    // Silent rather than an empty state on a fresh journal: this band sits on
-    // an index note that has just been made, and a callout saying "nothing
-    // logged" under a heading that already says Totals is a box inside a box —
-    // the same rule `journal-breakdown` records one widget up.
-    return root;
-  }
-
-  if (label) root.createDiv({ cls: "jtot-title", text: label });
-  // THE STAT STRIP, REUSED RATHER THAN COPIED. `.am-stats` is the row of
-  // divided cells the year dashboard's body and three mastheads already draw,
-  // and it brings the one thing a hand-rolled band would have got wrong: it
-  // collapses on a `@container` query rather than a `@media` one, so it folds
-  // in a narrow PANE and not only in a phone-width window. That distinction
-  // was a real bug in this stylesheet once (see 96-stat-strip.css).
-  const strip = root.createDiv({ cls: "am-stats" });
-  // Capped at the four the collapse rules are written for; a fifth quantity
-  // wraps onto a second row, which the gap-as-divider design handles with no
-  // per-cell arithmetic.
-  strip.setAttribute("data-cols", String(Math.min(cells.length, 4)));
-  for (const c of cells) {
-    const cell = strip.createDiv({ cls: "am-stat" });
-    cell.createDiv({ cls: "am-stat-value", text: c.value });
-    cell.createDiv({ cls: "am-stat-label", text: c.label });
-  }
-  return root;
+  return out;
 }
 
 // THE PREDICATE, AND IT IS DELIBERATELY NARROW. A quantity is in this band

@@ -1031,12 +1031,19 @@ export class SectionEditorModal extends EditorModal {
       // That was true of the slot it had. The control now sits on a line of its
       // own under a field label, so the phrase can be measured rather than only
       // read — which is what the note about `aria-label` was standing in for.
+      // THE FIRST ROW IS A PROMPT OR AN ANSWER, AND `emptyLabel` DECIDES WHICH
+      // (4.46). A choice with no working empty state must not be left unpicked,
+      // so its first row is a disabled prompt and `questionIsRequired` holds the
+      // section back until the reader answers. A choice that NAMES its empty
+      // state has an answer already — a bare `stats-band` draws the scope's own
+      // preset — so the row is selectable and says what it does, which is the
+      // same treatment `renderFolderQuestion` gives a placeholder.
       const none = select.createEl("option", {
-        text: `Choose ${q.label}…`,
+        text: q.emptyLabel ? `${q.emptyLabel} (default)` : `Choose ${q.label}…`,
         value: "",
       });
       select.title = `Choose ${q.label}`;
-      none.disabled = true;
+      none.disabled = q.emptyLabel === undefined;
       // SEEDED FROM THE FILE ON A SETTLED SECTION, which is the whole of patch
       // 5 on this control: the answer is in their note, this window can now
       // read it, so it shows what they chose rather than "Choose…" over an

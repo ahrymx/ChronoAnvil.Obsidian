@@ -105,6 +105,7 @@ import {
   moveOps,
   optionsFor,
   reconfigured,
+  answersInText,
   withAnswers,
 } from "../core/section-model";
 
@@ -1169,9 +1170,14 @@ export function declassificationCost(typeName: string, count: number): string[] 
 // kind or the surface, and that is the point: if the editor can ask, the
 // interface is wrong.
 
+// `text` IS OPTIONAL AND ITS ABSENCE IS A CALLER WITH NO NOTE (4.47). The
+// template editor and `addable` build views to LIST sections; the section window
+// builds them over a file. Only the second can say what a question is currently
+// answered with.
 const viewOf = (
   section: JournalSection,
-  ctx: SectionContext
+  ctx: SectionContext,
+  text?: string
 ): SectionView => ({
   id: section.id,
   label: section.label,
@@ -1186,6 +1192,23 @@ const viewOf = (
   // rather than with the one that fixes a required row.
   movable: true,
   ...(section.questions ? { questions: section.questions(ctx) } : {}),
+  // WHAT THE FILE ALREADY SAYS, PER QUESTION (4.47), and this catalogue was the
+  // one that never supplied it.
+  //
+  // `note-sections.ts` has set `answered` on flat sections since 4.16, and a
+  // journal note's model did not — which cost nothing while every question here
+  // owned a WHOLE argument, because the editor falls back to reading the file
+  // itself. It stops being free the moment a question owns a PIECE: the fallback
+  // hands every one of four boxes the entire argument, so a band configured
+  // `notes,rating,open` would show that string in all four.
+  //
+  // THROUGH `answersInText`, WHICH ALSO EXPANDS. A superseded keyword and a
+  // shorthand argument both have to be resolved before the pieces are split, and
+  // doing that here rather than in the editor is what keeps the window from
+  // learning what a stats band is.
+  ...(text !== undefined && section.questions
+    ? { answered: answersInText(text, section.questions(ctx)) }
+    : {}),
   // ONE BAND. A journal note is a stack of sections with no structural rule
   // through it, so every section may be reordered against every other. A diary
   // entry is the one surface where that is not true.
@@ -1233,7 +1256,7 @@ export function journalSectionModel(ctx: SectionContext): SectionModel {
   const find = (id: string): JournalSection | undefined =>
     sectionsFor(ctx).find((s) => s.id === id);
   return {
-    sections: () => sectionsFor(ctx).map((s) => viewOf(s, ctx)),
+    sections: (text) => sectionsFor(ctx).map((s) => viewOf(s, ctx, text)),
     present: (text) => sectionsPresent(text, ctx),
     addable: (text) => {
       const present = new Set(sectionsPresent(text, ctx));

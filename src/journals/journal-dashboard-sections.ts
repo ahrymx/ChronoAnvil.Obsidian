@@ -84,12 +84,17 @@
 // journal, and what is still open — and five are `optIn`: offered in *Edit this
 // note's sections…*, absent from a fresh page.
 //
-// TOTALS AND TALLY ARE `optIn` FOR 4.35'S OWN REASON, UNCHANGED. The catalogue
-// holds a `JournalType` and no plugin, so it cannot see whether this vault has a
-// tracker worth summing or a vocabulary worth counting. 4.35 spelled that
-// `default: never` in the journal catalogue; a flat catalogue spells it
-// `optIn`, and it means the same thing. Projects ships no trackers at all, so a
-// composed totals band would draw nothing on a quarter of the presets.
+// THE STATS BAND AND TALLY ARE `optIn`, AND AS OF 4.46 FOR TWO DIFFERENT
+// REASONS. Tally keeps 4.35's: the catalogue holds a `JournalType` and no
+// plugin, so it cannot see whether this vault has a vocabulary worth counting.
+// 4.35 spelled that `default: never` in the journal catalogue; a flat catalogue
+// spells it `optIn`, and it means the same thing.
+//
+// THE BAND'S REASON EXPIRED AND IT STAYED OFF ANYWAY. It was `totals`, and it
+// was offered because the catalogue cannot know whether a journal sums anything
+// — Projects ships no trackers at all. The merged band's `activity` preset needs
+// no registry and would draw honestly on every journal. What keeps it off is the
+// paragraph below rather than that one.
 //
 // AND `optIn` MATTERS MORE HERE THAN IT DOES ON A TEMPLATE, because this page is
 // RECONCILED. `reconcileLayouts` converges every shipped note on the
@@ -109,7 +114,7 @@
 //
 // `diary-dashboard-sections.ts` makes this argument at length and it transfers
 // one level in with no word changed: `tasks-table`, `review-queue`, `tag-index`,
-// `journal-totals` and `journal-tally` all default to THE HOST NOTE'S OWN
+// `stats-band` and `journal-tally` all default to THE HOST NOTE'S OWN
 // FOLDER, and this note's own folder is the journal root. Bare composes to
 // exactly the scope this page wants, and a bare directive has no path in it to
 // go stale when the folder is renamed.
@@ -143,6 +148,7 @@ import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
 import type { SectionModel } from "../core/section-model";
 import { DEFAULT_TALLY_TRACKER } from "./journal-sections";
+import { statsBandProbe } from "./stats-band";
 import { plural } from "../core/util";
 import type { JournalType } from "./journal";
 
@@ -161,7 +167,7 @@ const journalChartLinesIn = (text: string): number =>
 // ORDER IS COMPOSITION ORDER FOR THE FOUR THAT COMPOSE, and insertion rank for
 // the five that do not: `planFlatSections` puts an added section at its
 // catalogue position, so where an `optIn` row sits here is where it lands in the
-// note when a reader ticks it. Totals and Tally therefore sit directly under
+// note when a reader ticks it. The stats band and Tally therefore sit directly under
 // Contents — a band of numbers about the journal belongs above its task list
 // rather than under it — even though neither is composed.
 export function journalDashboardSections(type: JournalType): FlatSection[] {
@@ -236,17 +242,51 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
     },
 
     {
-      id: "totals",
-      label: "Totals",
-      blurb: "What every note in this journal adds up to, for each quantity it totals.",
-      icon: "🧮",
+      id: "stats",
+      label: "Stats band",
+      blurb: `A row of numbers about ${type.name} — you pick each one.`,
+      icon: "🔢",
       locked: false,
-      // OFFERED, NOT COMPOSED — see the header. The catalogue cannot see the
-      // registry, so it cannot know whether this journal has a single tracker
-      // declaring `reduce: "sum"`. Projects ships none at all.
+      // ── IT WAS `totals`, AND IT IS THE SAME SECTION (4.46) ────────────
+      //
+      // The id changed with the widget under it: `journal-totals` and
+      // `topic-stats` merged into `stats-band`, because they were one idea drawn
+      // twice — see `stats-band.ts`. What this page offers is the band, and
+      // Totals is one of the four presets it can be set to.
+      //
+      // RENAMING AN ID IS A REAL COST AND IT IS PAID DELIBERATELY. A reader's
+      // saved layout naming `totals` no longer resolves, so this page falls back
+      // to the composed set for them — which is the same four sections it has
+      // always composed, because `totals` was never one of them. Nothing is lost
+      // that was on the page.
+      //
+      // OFFERED, NOT COMPOSED, AND FOR A DIFFERENT REASON THAN BEFORE. The old
+      // entry was optIn because the catalogue cannot see the registry and so
+      // cannot know whether this journal sums anything — Projects ships no
+      // trackers at all. The band's `activity` preset needs no registry and
+      // would draw honestly on every journal, so that reason has expired. It
+      // stays optIn on the OTHER one this file's header states: this page is
+      // RECONCILED, so a section that composes is a section repair writes into
+      // every journal in every vault at the next release. Making that move is a
+      // decision worth its own release rather than a side effect of a merge.
       optIn: true,
-      render: () => ({ fence: "almanac", lines: ["journal-totals"] }),
-      locate: (text) => probe(text, /^journal-totals\s*$/m),
+      // NO QUESTIONS HERE EITHER, AS OF 4.48. The four boxes moved onto the
+      // cells — one `⋯` per cell, revealed on hover — for the reason
+      // `journal-sections.ts` gives at its own copy of this section: a row of
+      // controls modelling a row of cells, drawn beside it. The scope this page
+      // is (`journal`, because the note is a journal's own folder note) is
+      // derived by the band at render time, as it always was, so nothing was
+      // lost by the catalogue no longer naming it.
+
+      // BARE, LIKE EVERY OTHER SCOPED DIRECTIVE ON THIS PAGE. `resolveStatPreset`
+      // gives a bare band the scope's default — `activity` here — which is the
+      // preset a page about a whole journal wants, and an argument the plugin
+      // would have supplied anyway is one more thing to go stale.
+      render: () => ({ fence: "almanac", lines: ["stats-band"] }),
+      // ALL THREE SPELLINGS. A page composed before 4.46 that a reader had ticked
+      // Totals onto carries `journal-totals`, and a locator that knew only the
+      // new word would call the section missing and offer to add a second band.
+      locate: (text) => probe(text, statsBandProbe()),
     },
 
     {

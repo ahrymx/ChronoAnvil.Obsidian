@@ -172,6 +172,16 @@ export const countKeyword = (keyword: string, text: string): number =>
     .split("\n")
     .filter((line) => splitDirective(line.trim()).keyword === keyword).length;
 
+// THE PIECES OF THIS WIDGET'S ONE ARGUMENT, however the table spelled them.
+//
+// `arg`/`arg2` is the shorthand for the common case and `args` is the general
+// form (4.47). Normalising in ONE function is what makes the first a shorthand
+// rather than a second mechanism — three call sites read this, and each of them
+// used to test `spec.arg` directly, which is how a widget declaring `args` came
+// to be offered with no questions at all and composed with no argument.
+const argsOf = (spec: WidgetSpec): readonly WidgetArg[] =>
+  spec.args ?? (spec.arg ? (spec.arg2 ? [spec.arg, spec.arg2] : [spec.arg]) : []);
+
 // The line this section writes, with the reader's answer in it where there is one.
 //
 // AN ANSWER IS ONLY READ WHERE THE REGISTRY ASKED FOR ONE, which is `withAnswers`'
@@ -184,17 +194,24 @@ const renderLine = (
   spec: WidgetSpec,
   options?: Record<string, unknown>
 ): string => {
-  if (!spec.arg) return keyword;
+  const args = argsOf(spec);
+  if (args.length === 0) return keyword;
   const piece = (key: string): string =>
     typeof options?.[key] === "string" ? (options[key] as string).trim() : "";
-  // TWO PIECES COMPOSE THE ONE ARGUMENT (4.16), through the same joiner
+  // THE PIECES COMPOSE THE ONE ARGUMENT (4.16), through the same joiner
   // `withAnswers` uses to write one and `partsOf` uses to read one — so a
-  // section ADDED with both answers and a section RE-POINTED afterwards spell
-  // the line identically. Three spellings of one compound is how a control comes
-  // to disagree with the file it wrote.
-  const answer = spec.arg2
-    ? joinParts([piece("arg"), piece("arg2")], spec.argJoin ?? "/")
-    : piece("arg");
+  // section ADDED with its answers and a section RE-POINTED afterwards spell the
+  // line identically. Three spellings of one compound is how a control comes to
+  // disagree with the file it wrote.
+  //
+  // THE KEYS ARE `arg`, `arg2`, `arg3`, … which is what `argQuestions` writes.
+  const answer =
+    args.length === 1
+      ? piece("arg")
+      : joinParts(
+          args.map((_, i) => piece(i === 0 ? "arg" : `arg${i + 1}`)),
+          spec.argJoin ?? "/"
+        );
   return answer ? `${keyword}:${answer}` : keyword;
 };
 
@@ -249,19 +266,24 @@ const argQuestions = (
   hostFolder: string | null,
   vault?: VaultLists
 ): SectionQuestion[] => {
-  if (!spec.arg) return [];
-  if (!spec.arg2) {
-    return [argQuestion(keyword, spec.arg, hostFolder, vault)];
+  // TWO SPELLINGS, ONE LIST, AND NOTHING BELOW HERE CAN TELL THEM APART (4.47).
+  // `arg`/`arg2` is the shorthand for the common case and `args` is the general
+  // form; normalising here is what makes the first a shorthand rather than a
+  // second mechanism.
+  const list = argsOf(spec);
+  if (list.length === 0) return [];
+  if (list.length === 1) {
+    return [argQuestion(keyword, list[0], hostFolder, vault)];
   }
   const join = spec.argJoin ?? "/";
-  return [spec.arg, spec.arg2].map((a, i) => ({
+  return list.map((a, i) => ({
     ...argQuestion(keyword, a, hostFolder, vault),
     // A KEY PER PIECE, because two answers cannot share one. `arg` stays the
     // first piece's key so a widget that grows a second question does not
     // rename the one it had — nothing reads these keys but the catalogue that
     // wrote them, and a rename is a saved layout that stops applying.
-    key: i === 0 ? "arg" : "arg2",
-    part: { at: i, of: 2, join },
+    key: i === 0 ? "arg" : `arg${i + 1}`,
+    part: { at: i, of: list.length, join },
   }));
 };
 
@@ -323,6 +345,10 @@ const argQuestion = (
     label: arg.label,
     directive: keyword,
     values: arg.values,
+    // CARRIED WHERE THE REGISTRY DECLARED ONE (4.46), and omitted rather than
+    // passed as undefined for the reason the folder branch above spells: the two
+    // are the same field, and `questionIsRequired` reads its ABSENCE.
+    ...(arg.emptyLabel ? { emptyLabel: arg.emptyLabel } : {}),
     // Unreachable as written — every fixed `choice` in the registry ships its
     // own answers and a test pins that each has at least two — but the field is
     // not optional and a sentence beats an empty string if one ever is. A
@@ -351,7 +377,7 @@ const widgetSection = (
     lines: [renderLine(keyword, spec, options)],
   }),
   ...(spec.repeats ? { repeatable: true as const } : {}),
-  ...(spec.arg
+  ...(argsOf(spec).length
     ? {
         questions: (noteSpec: {
           hostFolder?: string | null;

@@ -312,21 +312,44 @@ describe("a template only seeds trackers its own note type may carry", () => {
   });
 });
 
-describe("the two new sections are off by default", () => {
+describe("the 4.35 band that is left is off by default", () => {
   // The catalogue holds a JournalType and no plugin, so it cannot see whether a
-  // vault has a tracker worth summing — which is `bridge`'s own argument. A
+  // vault has a vocabulary worth counting — which is `bridge`'s own argument. A
   // section that defaulted on would write a band into every journal in every
   // vault and draw nothing in almost all of them.
+  //
+  // `totals` IS NOT ASSERTED HERE ANY MORE, AND ITS ABSENCE IS THE 4.46 CHANGE
+  // rather than a dropped check. It stopped being a section: `topic-stats` and
+  // `journal-totals` merged into one band, so Totals is a PRESET of `stats` and
+  // the question "is it on by default" is now the question below about `stats`.
   for (const preset of JOURNAL_PRESETS) {
-    it(`${preset.name}: no surface defaults to totals or tally`, () => {
+    it(`${preset.name}: no surface defaults to tally`, () => {
       const type = buildJournalType(preset.config);
       for (const target of templateTargets(type)) {
         const ids = defaultSectionIds(target.ctx);
-        expect(ids, `${preset.id} ${target.key}`).not.toContain("totals");
         expect(ids, `${preset.id} ${target.key}`).not.toContain("tally");
+        // AND `totals` IS GONE AS AN ID, which is worth pinning rather than
+        // leaving to the absence above: a layout still naming it would resolve
+        // to nothing, and this is what would catch a half-finished merge.
+        expect(ids, `${preset.id} ${target.key}`).not.toContain("totals");
       }
     });
   }
+
+  it("but the band itself is, on the deepest index and nowhere else", () => {
+    // THE HALF THE MERGE MUST NOT HAVE CHANGED. `stats` defaulted on for the
+    // deepest index before 4.46 and does after it, because that is where every
+    // Study Topic index in every vault already carries the band — and a bare
+    // directive there resolves to `progress`, which is what `topic-stats` drew.
+    for (const preset of JOURNAL_PRESETS) {
+      const type = buildJournalType(preset.config);
+      const deepest = `index:${type.levels.length - 1}`;
+      for (const target of templateTargets(type)) {
+        const on = defaultSectionIds(target.ctx).includes("stats");
+        expect(on, `${preset.id} ${target.key}`).toBe(target.key === deepest);
+      }
+    }
+  });
 
   it("and they are offered on index surfaces, so a reader can add them", () => {
     // Off by default is not the same as absent: *Edit sections…* must list
@@ -334,8 +357,11 @@ describe("the two new sections are off by default", () => {
     const type = buildJournalType(EXERCISE_PRESET.config);
     const index = templateTargets(type).find((t) => t.key === "index:0")!;
     const offered = sectionsFor(index.ctx).map((s) => s.id);
-    expect(offered).toContain("totals");
+    expect(offered).toContain("stats");
     expect(offered).toContain("tally");
+    // ONE BAND ROW, NOT TWO. The editor listed "Stats band" and "Totals" as
+    // separate rows on this surface, and a Media shelf ticked both.
+    expect(offered).not.toContain("totals");
   });
 });
 

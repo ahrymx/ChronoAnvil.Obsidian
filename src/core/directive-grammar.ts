@@ -901,6 +901,47 @@ export function readArg(lines: readonly string[], span: ArgSpan): string {
   return (span.keepColon ? raw : raw.replace(/^:/, "")).trim();
 }
 
+// The same lines with one directive's KEYWORD replaced by another. 4.46.1.
+//
+// WHY A RENAME EXISTS AT ALL, when this file's whole posture is that a
+// superseded spelling is honoured rather than rewritten. It is not repair, and
+// it never runs on its own: it is what happens when a reader ANSWERS a question
+// on a section whose line still carries an older word for the same widget.
+//
+// Without it the answer has nowhere to go. `withAnswers` finds the span to
+// write into by keyword, so a question naming `stats-band` on a line that says
+// `topic-stats` finds nothing and drops the write silently — which is exactly
+// what 4.46.0 shipped. The choice is between refusing to let the reader
+// configure the block at all and moving their line onto the current spelling at
+// the moment they configure it. The second is the one that does what they
+// asked.
+//
+// SOLE, ON `soleArgSpanIn`'s RULE AND FOR ITS REASON: a keyword that appears
+// twice cannot be told apart, and renaming the first would move an answer onto
+// a block the reader was not looking at.
+//
+// THE ARGUMENT AND ANY `|Label` SURVIVE, because only the word is replaced —
+// which is what makes this safe to run before `spliceArg` rather than instead
+// of it.
+export function renameSoleKeyword(
+  lines: readonly string[],
+  from: string,
+  to: string
+): string[] | null {
+  let found = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (splitDirective(lines[i]).keyword !== from) continue;
+    if (found !== -1) return null;
+    found = i;
+  }
+  if (found === -1) return null;
+  const line = lines[found];
+  const at = line.indexOf(from);
+  const out = [...lines];
+  out[found] = line.slice(0, at) + to + line.slice(at + from.length);
+  return out;
+}
+
 // The same lines with `value` in that span and nothing else touched.
 export function spliceArg(
   lines: readonly string[],

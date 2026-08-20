@@ -48,7 +48,10 @@ import { readSrc } from "./sources";
 const TYPES: JournalType[] = JOURNAL_PRESETS.map((p) => buildJournalType(p.config));
 
 const COMPOSED = ["banner", "activity", "contents", "open-tasks"];
-const OFFERED = ["totals", "tally", "review", "tags", "charts"];
+// `totals` BECAME `stats` IN 4.46. The section is the same one — it offers the
+// band — and the widget under it merged with `topic-stats`, so Totals is now one
+// of the four presets rather than a section of its own.
+const OFFERED = ["stats", "tally", "review", "tags", "charts"];
 
 describe("the catalogue, for every journal a reader can start from", () => {
   for (const type of TYPES) {

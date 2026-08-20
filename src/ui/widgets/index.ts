@@ -20,6 +20,9 @@ import {
   buildDiarySearch,
 } from "../../diary/diary-retrieval";
 import { buildStudyHeader, buildJournalContext } from "../../journals/study-header";
+// The one copy of what each superseded band spelling means. See the two arms
+// in `buildFromSpec` that read it.
+import { STATS_BAND_ALIASES } from "../../journals/stats-band";
 import {
   buildMonthSummary,
   buildWeekSummary,
@@ -83,7 +86,6 @@ import {
   buildEventsRegion,
   buildJournalBreakdownRegion,
   buildJournalTallyRegion,
-  buildJournalTotalsRegion,
   buildJournalChartRegion,
   buildJournalSearchRegion,
   buildJournalsHeaderRegion,
@@ -99,7 +101,7 @@ import {
   buildTasksTableRegion,
   tasksScopeFor,
   buildTimelineRegion,
-  buildTopicStatsRegion,
+  buildStatsBandRegion,
   buildLevelCardsRegion,
   buildLevelIndexRegion,
 } from "./directive-regions";
@@ -459,10 +461,19 @@ const SECTION_TITLES: Record<string, string> = {
   "journal-search": "🔎 Find",
   "diary-search": "🔎 Search",
   "topics-table": "🗂 Topics",
-  // The totals band gets a head; the tally does not, because it draws its own
-  // title from the tracker it names — exactly as `journal-breakdown` beside it
-  // does, and for the same reason: a page can hold two tallies and one head
-  // saying "Tally" over both would name neither.
+  // The band gets a head; the tally does not, because it draws its own title
+  // from the tracker it names — exactly as `journal-breakdown` beside it does,
+  // and for the same reason: a page can hold two tallies and one head saying
+  // "Tally" over both would name neither.
+  //
+  // THREE WORDS, ONE BAND, AND THE HEADS DIFFER ON PURPOSE (4.46). A
+  // `frame: section` fence is titled from the KEYWORD on its first line, so the
+  // two aliases must keep entries or a note composed before this release loses
+  // its head and draws onto the page's own background — the exact defect 4.15
+  // §1 found on six widgets, one of which was `topic-stats`. Each alias keeps
+  // the name it has always drawn, because the note on disk did not change; the
+  // aliases' entries are further down this table where they have always been.
+  "stats-band": "🔢 Stats",
   "journal-totals": "🧮 Totals",
   "pages-table": "📄 Pages",
   "kind-table": "🗂 Notes",
@@ -2163,8 +2174,28 @@ export class Widgets implements
       // `levelScope`, so an unresolvable argument reads the same either way.
       case "level-cards":
         return buildLevelCardsRegion(this.plugin, ctx, rest);
+      // THE ONE BAND, AND THE TWO WORDS THAT STILL REACH IT (4.46 §5).
+      //
+      // `topic-stats` sits in every Study Topic index in every vault and
+      // `journal-totals` in every Exercise Block index, so both go on
+      // dispatching as aliases rather than being retired: an entry in
+      // `RETIRED_WIDGETS` is an instruction to `planLayout` to REMOVE the word
+      // from a reader's note, which would delete a working band. That is 4.16
+      // §3's rule, and this is its third application.
+      //
+      // EACH ALIAS RESOLVES TO THE PRESET IT ALWAYS WAS. Neither old word took
+      // an argument, so `rest` is empty for every line that exists on disk and
+      // the preset comes from here — which is the only place that knows which
+      // of the two spellings was written.
       case "topic-stats":
-        return buildTopicStatsRegion(this.plugin, ctx);
+      case "journal-totals":
+        // THE PRESET COMES FROM THE TABLE, NOT FROM HERE (4.46.1). It was two
+        // string literals, which made this the second of three places that knew
+        // what an old word means — and the third, the section editor's question,
+        // had no way to know at all. `STATS_BAND_ALIASES` is the one copy.
+        return buildStatsBandRegion(this.plugin, STATS_BAND_ALIASES[kind], label, ctx);
+      case "stats-band":
+        return buildStatsBandRegion(this.plugin, rest, label, ctx);
       case "kind-table":
         return buildKindTableRegion(this.plugin, rest, ctx);
       case "pages-table":
@@ -2176,8 +2207,6 @@ export class Widgets implements
         return buildJournalBreakdownRegion(this.plugin, rest, label, ctx);
       case "journal-tally":
         return buildJournalTallyRegion(this.plugin, rest, label, ctx);
-      case "journal-totals":
-        return buildJournalTotalsRegion(this.plugin, label, ctx);
       case "review-queue":
         return buildReviewQueueRegion(this.plugin, rest, ctx);
       case "journal-search":

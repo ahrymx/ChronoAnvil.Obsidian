@@ -76,8 +76,48 @@ describe("no widget borrows Study's identity any more", () => {
         .split("\n")
         .map((l) => l.trim())
         .filter((l) => l && !l.startsWith("//"))[0];
-      expect(next, `unguarded hostType at ${site.index}`).toMatch(/^if \(!type\)/);
+      // TWO SHAPES OF THE ONE RULE AS OF 4.46, AND THE RULE IS UNCHANGED: no
+      // reader of `hostType` uses its answer without checking it.
+      //
+      // The first shape returns: a widget that can only describe a journal draws
+      // nothing on a note in none. The second CARRIES the null — `stats-band`
+      // renders at three scopes and "no journal here" is one of them, so it hands
+      // the nullable straight to `statScopeOf` and every later read is guarded
+      // individually. That second shape is checked by the test below, which is
+      // stronger than this one: it asserts the band never dereferences `type` at
+      // all.
+      expect(next, `unguarded hostType at ${site.index}`).toMatch(
+        /^if \(!type\)|^const scope = statScopeOf\(/
+      );
     }
+  });
+
+  it("lets the band carry a null type rather than dereference it", () => {
+    // THE HALF THE GUARD TEST ABOVE CANNOT SEE. `buildStatsBand` is the one
+    // reader of `hostType` that does not return early, because a note in no
+    // journal is a scope it draws — the vault, every registered journal's root
+    // unioned. So what has to hold there is not "it returned" but "it never
+    // reads a member off the thing that may be null".
+    //
+    // ASSERTED OVER THE FUNCTION BODY, not the file: `belowOf` and `totalCells`
+    // beside it take a `JournalType` that has already been checked and read its
+    // members freely, which is correct and would fail a file-wide match.
+    const src = tables();
+    const start = src.indexOf("export function buildStatsBand(");
+    expect(start, "buildStatsBand").toBeGreaterThan(-1);
+    const body = src.slice(start, src.indexOf("\n}\n", start));
+    // Comments in this project describe old code, so they are stripped before a
+    // negative match — the house rule from RESUME §6.
+    const code = body
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//"))
+      .join("\n");
+    expect(code).not.toMatch(/\btype\.[a-zA-Z]/);
+    // And it does reach the type's contents, through the optional chain and
+    // through helpers that take it — so the assertion above is not passing
+    // because nothing uses it.
+    expect(code).toContain("type?.kinds");
+    expect(code).toContain("soleKindOf(type)");
   });
 
   it("stops counting Study-shaped notes on a note in no journal", () => {

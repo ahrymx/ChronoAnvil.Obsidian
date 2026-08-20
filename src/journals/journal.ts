@@ -58,6 +58,7 @@ import { splitGlyph } from "../ui/section-frame";
 import { journalTypeOfPath } from "../trackers/trackers";
 import { SCOPE_JOURNAL } from "../core/directive-grammar";
 import { notify } from "../core/notify";
+import { repaintOpenNotes } from "../ui/livewidget";
 
 // ── Who owns a template ──────────────────────────────────────────────────
 //
@@ -290,6 +291,13 @@ export interface JournalType {
   // Compose-time only — nothing here is written beside a note. Absent means
   // "the catalogue's arrangement, unmodified", which is every custom type.
   layout?: Record<string, TemplateLayout>;
+  // What this journal's CARD shows in its fourth cell. 4.47.
+  //
+  // Carried onto the built type rather than looked up from settings at draw
+  // time, on this interface's own rule — every field here is resolved when the
+  // type is BUILT, so a widget holds a journal rather than a way of finding one.
+  // See `JournalConfig.cardStat` for what absent means.
+  cardStat?: string;
 }
 
 // ── Built-in: Study ──────────────────────────────────────────────────────
@@ -702,6 +710,10 @@ export function buildJournalType(cfg: JournalConfig): JournalType {
     templatesFolder: cfg.templatesFolder,
     levels,
     kinds,
+    // OMITTED RATHER THAN COPIED AS `undefined` (4.47), on the idiom the layout
+    // fold below uses: an absent field is the card's own derivation, and a key
+    // present with no value is a third state nothing wants to reason about.
+    ...(cfg.cardStat ? { cardStat: cfg.cardStat } : {}),
     // A variant's saved layout is folded into the type's layout map under the
     // variant's own template key, rather than being read from the variant at
     // compose time. That is what makes the whole feature nearly free:
@@ -870,16 +882,22 @@ export const EXERCISE_CONFIG: JournalConfig = {
   layout: {
     // The Block index bands what its workouts and meals add up to. Turned on
     // through `sections` for the reason the catalogue entry gives.
+    //
+    // ONE SECTION AND A PRESET AS OF 4.46. This named `totals`, which was its own
+    // section emitting `journal-totals`; that widget is now the `totals` preset
+    // of the merged stats band, and the layout says so here rather than by
+    // naming a second section.
     "index:0": {
       sections: [
         "banner",
         "trackers",
-        "totals",
+        "stats",
         "children",
         "charts",
         "find",
         "tasks",
       ],
+      options: { stats: { preset: "totals" } },
     },
     // THE QUANTITIES EACH NOTE STARTS WITH. Without this a Workout would open
     // with Intensity and nothing else, and Duration would be added by hand from
@@ -900,7 +918,8 @@ export const EXERCISE_PRESET: JournalPreset = {
   blurb: "One folder per training block, with workouts and meals read together.",
   config: EXERCISE_CONFIG,
   // THE FOUR QUANTITIES EACH DECLARE `reduce: "sum"`, WHICH IS WHAT PUTS THEM
-  // IN THE TOTALS BAND. Drop any one and the band has a cell missing from it.
+  // IN THE BAND'S `totals` PRESET. Drop any one and the band has a cell missing
+  // from it.
   // Intensity does NOT: five workouts at 4/5 do not make 20 of anything, which
   // is exactly why `reduce` defaults to mean.
   trackers: [
@@ -954,19 +973,26 @@ export const MEDIA_CONFIG: JournalConfig = {
   ],
   layout: {
     // Books shows *Pages read* and Film shows *Minutes* out of THIS ONE
-    // DIRECTIVE, because the totals band omits a quantity with no readings in
-    // scope. That is the concrete answer to "shared ratings, per-medium
-    // quantities".
+    // DIRECTIVE, because the band omits a quantity with no readings in scope.
+    // That is the concrete answer to "shared ratings, per-medium quantities".
+    //
+    // ── THIS LAYOUT IS WHAT 4.46 WAS WRITTEN FROM ─────────────────────
+    //
+    // It named `stats` AND `totals`, and a Media shelf drew both: *3 titles ·
+    // 4.7/5 avg stars · 1 open tasks* in one band, and *753 pages read* in a
+    // second band directly beneath it. Two objects, two markup families, two
+    // collapse rules, one question. The `summary` preset is those four cells in
+    // one band — see `stats-band.ts`, which cites this shelf.
     "index:0": {
       sections: [
         "banner",
         "trackers",
         "stats",
-        "totals",
         "children",
         "charts",
         "find",
       ],
+      options: { stats: { preset: "summary" } },
     },
     "kind:title": {
       options: { trackers: { trackers: ["pagesRead", "minutes"] } },
@@ -1434,6 +1460,52 @@ export function ensureJournalsBlock(source: string): string {
 
 export class JournalManager {
   constructor(private app: App, private plugin: AlmanacPlugin) {}
+
+  // ── What this journal's card shows in its fourth cell (4.47) ───────────
+  //
+  // STORED ON THE JOURNAL, so every surface that draws its card agrees — the
+  // homepage grid, a `journal-card:<id>` on any page, and any future one. A per-
+  // note answer would make the same journal say different things on two pages,
+  // which is what a card is for NOT doing.
+  //
+  // A STUDY THAT IS NOT IN `customJournals` IS TOLD, NOT SWALLOWED — the rule
+  // `saveVariant` above states in its own words: a bare return on an
+  // unrecognised journal is indistinguishable from a save that worked.
+  //
+  // NO SCAFFOLD PASS AND NO TEMPLATE WRITE. Nothing about this reaches a note,
+  // and that is exactly why the last line is here.
+  //
+  // ── THE REPAINT, AND 4.47 SHIPPED WITHOUT IT (4.48) ────────────────────
+  //
+  // This comment used to end *"the cards are re-rendered from settings, which is
+  // what `saveSettings` already triggers"*, and that sentence was false.
+  // `saveSettings` writes `data.json`, schedules the registry mirror and
+  // re-registers commands; it re-renders nothing. So the menu ticked the new
+  // row, the file on disk changed, and the card under it went on showing the
+  // old number until the note was reopened — **a silent no-op**, reported from
+  // a vault.
+  //
+  // `settings-editors.ts` had already written the finding down: *"A LABEL CHANGE
+  // IS INVISIBLE TO EVERY FILE WATCHER (3.20.1). Renaming a note type here
+  // rewrites no note, so nothing in an open dashboard was told."* A journal's
+  // `cardStat` is the same species of change and takes the same line.
+  async setCardStat(type: JournalType, measure: string): Promise<void> {
+    const cfg = this.plugin.settings.customJournals.find((j) => j.id === type.id);
+    if (!cfg) {
+      new Notice(
+        "A card's fourth number is stored on a journal you defined, and this journal is not one of them."
+      );
+      return;
+    }
+    // TOGGLED OFF BY PICKING WHAT IS ALREADY THERE, which costs nothing and is
+    // the only way back to the card's own derivation once a reader has chosen.
+    // Deleted rather than written empty: absent is the state every journal
+    // starts in, and a key present with no value is a third state.
+    if (cfg.cardStat === measure) delete cfg.cardStat;
+    else cfg.cardStat = measure;
+    await this.plugin.saveSettings();
+    repaintOpenNotes(this.plugin.app);
+  }
 
   // ── Create a top-level container (Study: a subject) ─────────────────────
   async newTopLevel(type: JournalType): Promise<void> {

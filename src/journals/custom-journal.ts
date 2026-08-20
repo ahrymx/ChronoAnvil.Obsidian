@@ -100,6 +100,23 @@ export interface JournalKindConfig {
   // both problems go away at once, and the second is why the migration is not
   // optional.
   variants?: JournalVariantConfig[];
+  // WHAT THIS JOURNAL'S CARD SHOWS IN ITS FOURTH CELL. 4.47.
+  //
+  // A measure id, on the stats band's own vocabulary — one list of things a
+  // number about a journal can be, so the card and the band cannot come to name
+  // the same figure two ways.
+  //
+  // ABSENT IS THE DERIVATION THE CARD HAS ALWAYS MADE: the rating where the
+  // journal declares one, the count of what is below otherwise. That is what
+  // every journal in every vault gets until somebody chooses, which is the only
+  // acceptable default for a field added to a card that already exists.
+  //
+  // ONLY THE FOURTH. A grid of cards is read ACROSS — `journals-cards.ts` makes
+  // that argument for why every card has four cells rather than three-or-four —
+  // and four freely chosen cells per journal would break the row it is read in.
+  // The first three are how many notes, when it was last worked, and what is
+  // still open, on every card.
+  cardStat?: string;
 }
 
 // A saved layout: which sections a variant's template starts with, in order,
@@ -193,6 +210,23 @@ export interface JournalConfig {
   // construction. That half stays a copy rather than a reference, and is not
   // this change.
   variants?: JournalVariantConfig[];
+  // WHAT THIS JOURNAL'S CARD SHOWS IN ITS FOURTH CELL. 4.47.
+  //
+  // A measure id, on the stats band's own vocabulary — one list of things a
+  // number about a journal can be, so the card and the band cannot come to name
+  // the same figure two ways.
+  //
+  // ABSENT IS THE DERIVATION THE CARD HAS ALWAYS MADE: the rating where the
+  // journal declares one, the count of what is below otherwise. That is what
+  // every journal in every vault gets until somebody chooses, which is the only
+  // acceptable default for a field added to a card that already exists.
+  //
+  // ONLY THE FOURTH. A grid of cards is read ACROSS — `journals-cards.ts` makes
+  // that argument for why every card has four cells rather than three-or-four —
+  // and four freely chosen cells per journal would break the row it is read in.
+  // The first three are how many notes, when it was last worked, and what is
+  // still open, on every card.
+  cardStat?: string;
 }
 
 // ── Normalising stored config ─────────────────────────────────────────────

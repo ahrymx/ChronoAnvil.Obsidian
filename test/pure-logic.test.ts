@@ -3882,10 +3882,18 @@ describe("subject and topic dashboard banner", () => {
 
   it("states the topic's totals as a band, not a sentence", () => {
     const t = studyTemplate("Topic Index.md");
-    // topic-stats replaces the one-line confidence-summary under its own
+    // The band replaces the one-line confidence-summary under its own
     // collapsible Progress header, matching how the subject page one level
     // up already states its totals.
-    expect(t).toContain("topic-stats");
+    //
+    // `stats-band` SINCE 4.46, AND BARE. The word changed when `topic-stats` and
+    // `journal-totals` merged; what it DRAWS did not, because a bare band at
+    // container scope resolves to the `progress` preset, which is `topic-stats`
+    // cell for cell. Asserted as the composed line rather than as the old word,
+    // and asserted BARE — writing `stats-band:progress` would be the note
+    // restating a rule the plugin already applies.
+    expect(t).toContain("stats-band");
+    expect(t).not.toContain("stats-band:");
     expect(t).not.toContain("confidence-summary");
     expect(t).not.toMatch(/^header:.*Progress/m);
   });

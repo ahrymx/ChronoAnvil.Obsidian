@@ -336,6 +336,14 @@ describe("the editor cannot learn which surface it is on", () => {
     // this test builds is the deepest one, where the section emits a header per
     // note kind and "the title" is not a thing it has; those are named per kind
     // through `fields` instead (§3.2).
+    // A FOURTH KIND ARRIVED IN 4.46 AND LEFT AGAIN IN 4.48, and the round trip
+    // is worth the four lines. `stats` asked which numbers to band — the first
+    // optional `choice` in the plugin, four of them by 4.47 — and the row drew
+    // four `<select>` boxes over a section whose body is a row of four cells.
+    // **The control is on the cell now**, so this list is one shorter than it
+    // was and the questions live in `stats-band.ts` for the band's own menu to
+    // write through. `emptyLabel` and the corrected `questionIsRequired` stay:
+    // they are the shared model's, and `folder` and `title` questions use them.
     expect(asking).toEqual([
       "journal index/find",
       "journal index/review",

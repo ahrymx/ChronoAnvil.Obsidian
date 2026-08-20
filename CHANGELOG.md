@@ -7,6 +7,248 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.49.0] - 2026-08-20
+
+**Drag one number in a stats band onto another and the two swap places.**
+
+Pick up any cell of a band and drop it on another cell of the same band. The two
+trade positions and nothing else moves — the numbers you did not touch stay
+exactly where they were, which is what makes it a swap rather than a reshuffle.
+
+The line in your note is rewritten in the new order, keeping any title you typed
+after a `|`, and an older `topic-stats` or `journal-totals` block moves onto the
+current spelling the same way the ⋯ menu moves it.
+
+A few things it deliberately will not do:
+
+- **A band with one cell cannot be dragged**, so you never get a grab cursor for
+  a gesture that has nowhere to go.
+- **Two cells that came from one choice cannot trade.** *One per note type* and
+  *Every quantity this journal totals* each fill several cells, drawn in the
+  plugin's own order — dropping one on another of the same group says so rather
+  than doing nothing.
+- **A cell from a different band on the same page is refused**, rather than
+  rewriting the band you dropped it on.
+
+Dragging needs a mouse. On a touchscreen the ⋯ still does everything else —
+change a cell, add one, remove one.
+
+## [4.48.0] - 2026-08-20
+
+**The stats band is edited on the band. Hover a cell, click its ⋯, and pick what
+that number is.**
+
+### The four boxes left the section editor
+
+4.47 put *First*, *Second*, *Third* and *Fourth* dropdowns on the band's row in
+*Edit this note's sections…* — four controls modelling a row of four cells, in a
+window whose job is which sections a note has rather than what is inside one.
+
+Now each cell of a rendered band carries its own **⋯**, faint and only while you
+are hovering the cell (always visible on a touchscreen). It holds:
+
+- every number that page can honestly answer, ticked on the one you are looking
+  at — including your own note types by name, *how many Lessons*;
+- **Add cell**, which adds one right after the cell you opened, showing
+  something the band is not already showing;
+- **Remove cell**.
+
+The band's row in the section editor is now just its name and a Remove button,
+like every other section.
+
+**Nothing about your notes changed.** The menu writes the same directive the
+dropdowns wrote, including moving an old `topic-stats` or `journal-totals` block
+onto the current spelling the first time you pick something, and keeping any
+title you typed after a `|`.
+
+**The last cell has no Remove.** A band with no cells written on it falls back to
+the page's own arrangement, so removing the last one would silently bring back
+the four cells you had just replaced. Remove the section itself if that is what
+you want.
+
+### Fixed: the card's fourth number did nothing
+
+Choosing a **Fourth number** from a journal card's ⋯ ticked the new row, saved
+it, and left the card showing the old number until you reopened the note. The
+setting was being stored correctly the whole time — nothing on screen was told
+about it. Cards now update as soon as you choose.
+
+## [4.47.0] - 2026-08-19
+
+**Every cell of a stats band is now yours to pick, and so is the fourth number
+on a journal card.**
+
+### Four boxes instead of one dropdown
+
+4.46 let you choose the band's *arrangement* from a list of four. That was the
+wrong shape for the question — a band is a row of cells, and what you actually
+want to say is what goes in each one.
+
+*Edit this note's sections…* now shows **First**, **Second**, **Third** and
+**Fourth** beside the stats band. Each one is a list of the numbers that page
+can honestly answer, and each one can be left empty:
+
+- **Notes** — how many are here
+- **What is below** — one level down
+- **Open tasks**
+- **Last worked**
+- **Average rating** — where the journal grades something
+- **How many Lessons** (or Practices, or Books — your own note types, by name)
+- **One per note type**
+- **Every quantity this journal totals**
+
+Clearing a box removes that cell; the ones after it close up.
+
+**The presets did not go away — they became shorthand.** A block that says
+`stats-band:progress`, or the older `topic-stats`, opens with **Kinds**,
+**Rating** and **Open** already in the first three boxes. Change any one of them
+and the block is written out in full. Nothing you have is rewritten until you
+choose something.
+
+**Your own note types are new here.** "One per note type" fills as many cells as
+you have kinds, which is right when you want all of them and wrong when you
+wanted to say *how many Lessons*. Now you can say that.
+
+### The fourth number on a journal card
+
+A journal card shows four numbers, and the fourth was chosen for you: the
+average rating where the journal had one, and the count of what is inside it
+otherwise.
+
+Open the **⋯** on any card and there is now a **Fourth number** submenu — the
+rating, the count of what is below, or how many notes of one of your own kinds.
+The row you are currently seeing is ticked, whether you picked it or not.
+
+The choice is stored on the journal, so every page that draws that card agrees.
+Picking the row that is already ticked puts the card back to choosing for
+itself. **A journal you have not touched is exactly as it was.**
+
+The first three cells stay fixed, because a grid of cards is read across and
+cards with different numbers in different places stop being a grid.
+
+## [4.46.1] - 2026-08-19
+
+**4.46 added a way to choose what your stats band shows, and on every page you
+already had, there was no way to get at it. Reported within the hour.**
+
+### The dropdown was missing on every existing page
+
+4.46 merged two bands into one and gave it four presets, picked from a dropdown
+in *Edit this note's sections…*. On a page **written by 4.46** that worked. On
+every page written before it — which is every page anyone actually has — the
+row for the band showed the words *"set when added"* where the dropdown belongs,
+and the tooltip suggested removing the block and adding it back.
+
+Two separate faults, both from the same cause:
+
+- **The control was not drawn.** The window looks for the answer in your note by
+  the block's name. Your note says `topic-stats` or `journal-totals`; the
+  question was asking about `stats-band`, found nothing, and concluded the
+  answer was unreadable.
+- **And if it had been drawn, picking a preset would have saved nothing.** The
+  save path finds the line to rewrite the same way, so the answer went nowhere.
+  Silently.
+
+Now the question knows the two older names and what each of them draws — a
+`topic-stats` block shows **Progress** in the dropdown, a `journal-totals` block
+shows **Totals**, because that is what each is drawing. Change it, and the line
+is updated to the current spelling with your choice on it. Any title you typed
+after a `|` is kept.
+
+**Nothing is rewritten unless you change the preset.** Opening the window and
+closing it again touches nothing, exactly as before.
+
+### The box was labelled "Which"
+
+The field beside the dropdown read **Which**, because the question behind it was
+worded as a question rather than as a noun. It reads **Numbers** now, like
+*Folder* and *Journal* on the rows near it. Small, and it is half of why the
+control was hard to spot even on the pages that had it.
+
+### Under the hood
+
+What each old name draws was written down in two places and needed by a third,
+which is why the third one could not be built. It is one table now, and the
+block renderer, both catalogues' locators and the section editor's question all
+read it.
+
+## [4.46.0] - 2026-08-19
+
+**Your journal pages drew two bands of numbers where they meant one, and you
+could not change what either of them said. Now there is one band, and you pick
+what it shows.**
+
+### Two bands became one
+
+A Media shelf looked like this, top to bottom:
+
+> **3** titles · **4.7/5** avg stars · **1** open tasks
+> **753 pages** — PAGES READ
+
+Two strips of numbers, stacked, about the same shelf. They came from two
+separate blocks — a **Stats band** and a **Totals** band — which the *Edit
+sections…* window listed as two separate things to add, and which folded to two
+rows at slightly different pane widths so they never quite lined up.
+
+They were answering the same question. One picked counts and an average, the
+other picked sums, and neither could be told to pick anything else.
+
+**There is now one Stats band**, and the two facts above are one strip:
+*titles · avg stars · open tasks · pages read*.
+
+### And you choose what it shows
+
+The band takes a **preset** — pick one from the dropdown in *Edit sections…*:
+
+- **Activity** — how many notes, when you last worked here, what is still open,
+  and what is below.
+- **Progress** — one count per note type, the average rating, what is open.
+  *This is exactly what the old Stats band showed.*
+- **Totals** — every quantity this journal adds up. *This is exactly what the
+  old Totals band showed.*
+- **Summary** — how many, how well, what is open, and what it all adds up to.
+
+You can leave it alone: an unpicked band shows the one the page would have
+picked for you.
+
+### It knows where it is
+
+The same preset says different things in different places, because it reads the
+page it is on rather than being told:
+
+- On a **journal's own page**, *Activity* counts the subjects (or areas, or
+  blocks) inside it.
+- On a **subject page**, it counts the topics.
+- On the **deepest page**, where there are no folders left, it drops that cell
+  rather than printing a nought.
+- On a page **outside every journal** — your homepage — it counts your journals.
+
+A number a page cannot honestly answer is left out, not shown as a dash or a
+zero. That is why one Media directive still shows *Pages read* on a Books shelf
+and *Minutes* on a Film shelf.
+
+### Nothing to run, and nothing changes on pages you already have
+
+Pages written before this release keep working exactly as they did — the old
+`topic-stats` and `journal-totals` blocks still draw, and each draws the preset
+it always drew. Repair will not rewrite them and will not offer you a second
+band beside them. If you want the merged version on an existing page, swap the
+block yourself from *Edit sections…*.
+
+**Two new journals compose differently.** A new *Media* journal now gets one
+band showing all four numbers instead of two bands showing three and one, and a
+new *Exercise & Diet* journal gets its Totals through the same one section.
+Journals you already have are untouched.
+
+### Under the hood
+
+The two bands were not only two blocks, they were two sets of styling rules —
+one hand-written, one shared — that looked alike and folded at different widths.
+The hand-written set is gone; there is one strip, one fold, and one place to fix
+it. A band is capped at four cells, which is what makes it readable in a narrow
+pane; a journal with more quantities than that names the rest in the strip's
+tooltip.
+
 ## [4.45.1] - 2026-08-19
 
 **Two things a reader found within minutes of 4.45: dragging a chart onto the

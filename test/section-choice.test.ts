@@ -555,7 +555,13 @@ describe("patch 7 follow-up: the control is sized for the answer", () => {
     // WHAT DID NOT CHANGE is that the phrase must still reach a screen reader,
     // which is what the `aria-label` half was really defending.
     const src = readCode("section-editor");
-    expect(src).toContain("text: `Choose ${q.label}…`");
+    // THE PHRASE MOVED INTO A CONDITIONAL IN 4.46 AND IS OTHERWISE UNCHANGED.
+    // A choice that names a working empty state draws that name in the first
+    // row instead of a prompt — `stats-band` is the one, because a bare band is
+    // already the scope's own preset — so the prompt is now the branch taken
+    // when `emptyLabel` is absent, which is every other choice in the plugin.
+    expect(src).toContain("`Choose ${q.label}…`");
+    expect(src).toContain("q.emptyLabel ? `${q.emptyLabel} (default)`");
     expect(src).toContain('select.setAttribute("aria-label", `Choose ${q.label}`)');
     expect(src).toContain("select.title = `Choose ${q.label}`");
   });

@@ -67,7 +67,19 @@ export type WidgetArg =
     }
   // One of a fixed set the plugin itself defines. NOT a set the vault defines —
   // see `vault` below, which is the kind that is.
-  | { kind: "choice"; label: string; values: readonly WidgetChoice[] }
+  //
+  // `emptyLabel` IS WHAT MAKES ONE OPTIONAL (4.46), on the folder variant's
+  // field and with its meaning: present names a working empty state in the
+  // reader's words, absent means there isn't one and `questionIsRequired` holds
+  // the section back until the question is answered. `stats-band` is the first
+  // choice in this table with a default worth stating — a bare band draws the
+  // scope's own preset — and the rest deliberately have none.
+  | {
+      kind: "choice";
+      label: string;
+      values: readonly WidgetChoice[];
+      emptyLabel?: string;
+    }
   // One of a set THIS VAULT defines, named rather than listed. 4.15 §4.
   //
   // THE DEFERRAL UNDER `needs-vault-answer` IS WHAT THIS LIFTS, and it is worth
@@ -161,6 +173,26 @@ export interface WidgetSpec {
   // see `argQuestions`. The last piece takes the remainder, so a folder with
   // slashes in it survives.
   arg2?: WidgetArg;
+  // THE SAME COMPOUND, WITH MORE THAN TWO PIECES. 4.47.
+  //
+  // `arg` and `arg2` say "this argument has two pieces" and were written when
+  // two was all anything wanted — the entry above makes that case at length and
+  // every word of it still holds: a directive has ONE argument, and several
+  // questions DIVIDE it rather than adding slots to the line.
+  //
+  // `stats-band` wants four, because a band is four cells and a reader chooses
+  // each. That is the same compound one piece longer, not a new grammar, so it
+  // is the same field generalised rather than an `arg3` and an `arg4`.
+  //
+  // `arg`/`arg2` STAY, and are not rewritten into this. They are the shorthand
+  // for the common case, they are what two entries in this table already use,
+  // and `argQuestions` normalises the two spellings into one list — so nothing
+  // downstream can tell them apart, which is the test of whether a shorthand is
+  // one.
+  //
+  // NAMED PIECES ARE STILL KEYED `arg`, `arg2`, `arg3`, … so a widget that grows
+  // a piece does not rename the ones it had. A saved layout names those keys.
+  args?: readonly WidgetArg[];
   argJoin?: string;
   // Whether a page may hold more than one of these. 4.15 §4.
   //
@@ -249,6 +281,13 @@ export interface WidgetExclusion {
   // category and this is the sentence a reader needs.
   note: string;
 }
+
+// `STAT_SLOT_ROWS` STOOD HERE AND IS DELETED (4.48). It was the vault scope's
+// stat-band rows, spelled out because this table may hold no functions and
+// `slotChoicesFor` is one — a copy kept in step with the real list by a test.
+// The four `choice` rows it fed are gone with the band's argument questions (see
+// the `stats-band` entry), and a second copy of a list that nothing reads is the
+// staleness this file's own rule is against.
 
 // ── the widgets a page can be given ───────────────────────────────────
 
@@ -472,20 +511,35 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     // carry Study's subjects beside Cooking's recipes.
     repeats: true,
   },
-  "topic-stats": {
-    label: "Topic statistics",
-    glyph: "📈",
-    blurb: "The stats band for the topics under this folder.",
-  },
-  // OFFERABLE FROM THE SECTION WINDOW, unlike `journal-chart` beside it,
-  // because it names nothing the vault has to list. It reads the registry for
-  // whatever this journal's summable quantities are, so the directive is bare
-  // and the answer is computed at render time — which is exactly the property
-  // `needs-vault-answer` exists to mark the absence of.
-  "journal-totals": {
-    label: "Totals",
-    glyph: "🧮",
-    blurb: "What the notes under this folder add up to, for every quantity this journal totals.",
+  // ONE BAND, WHERE THERE WERE TWO (4.46). `topic-stats` and `journal-totals`
+  // stood here as separate entries and answered one question — what do the notes
+  // below this note come to? — differing only in which quantities they picked.
+  // A Media shelf named both sections and drew them stacked. Both words still
+  // dispatch; see `NOT_PAGE_WIDGETS`, where they now sit as aliases.
+  //
+  // ── AND IT DECLARES NO ARGUMENT ROWS, AS OF 4.48 ──────────────────────
+  //
+  // It declared four — one `choice` per cell, added in 4.47 — and every surface
+  // that reaches this table drew them as four `<select>` boxes on the section's
+  // row. **The control is on the cell now**: each cell of a rendered band
+  // carries a `⋯`, revealed on hover, offering the same rows plus *Add cell* and
+  // *Remove cell*. See `ui/widgets/stats-band-menu.ts`.
+  //
+  // WHAT THAT COSTS IS NOTHING A READER CAN REACH, and it is worth saying why: a
+  // widget added from this table is composed BARE, and a bare `stats-band`
+  // resolves to the scope's own default — `Progress` inside a container,
+  // `Activity` above it. So the section arrives drawing something, and what it
+  // draws is then chosen on the page rather than in a window over it.
+  //
+  // `STAT_SLOT_ROWS` WENT WITH THEM. The vault scope's rows are
+  // `slotChoicesFor("vault", null)`, which is a function and belongs in
+  // `stats-band.ts`; this table's opening paragraph is the rule that keeps
+  // functions out of it, and a copy of that list here existed only to feed the
+  // four rows above.
+  "stats-band": {
+    label: "Stats band",
+    glyph: "🔢",
+    blurb: "A row of numbers about what is below this note — you pick each one.",
   },
   "pages-table": {
     label: "Pages table",
@@ -646,6 +700,24 @@ export const NOT_PAGE_WIDGETS: Record<string, WidgetExclusion> = {
   "topics-table": {
     reason: "alias",
     note: "the older spelling of level-index, kept because it sits in every shipped Subject index note",
+  },
+  // THE TWO BANDS 4.46 MERGED, ON THE SHELF `topics-table` IS ON AND FOR ITS
+  // REASON. Both still dispatch — `topic-stats` resolves to `stats-band`'s
+  // `progress` preset and `journal-totals` to its `totals` preset, which is cell
+  // for cell what each of them drew — and neither is offered, because offering
+  // three names for one band is exactly what this reason means.
+  //
+  // NOT IN `RETIRED_WIDGETS`, third time of stating it: `topic-stats` sits in
+  // every Study Topic index in every vault and `journal-totals` in every
+  // Exercise Block index, and an entry there would have repair delete a working
+  // band out of a reader's note.
+  "topic-stats": {
+    reason: "alias",
+    note: "the older spelling of stats-band's Progress preset, kept because it sits in every shipped Topic index note",
+  },
+  "journal-totals": {
+    reason: "alias",
+    note: "the older spelling of stats-band's Totals preset, kept because it sits in shipped Block index notes",
   },
 
   // Needs a list only the vault can supply.
