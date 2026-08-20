@@ -59,6 +59,14 @@ import { journalTypeOfPath } from "../trackers/trackers";
 import { SCOPE_JOURNAL } from "../core/directive-grammar";
 import { notify } from "../core/notify";
 import { repaintOpenNotes } from "../ui/livewidget";
+import {
+  PAGE_LAYOUT_DEFAULT,
+  PAGE_LAYOUT_KEY,
+  configOfJournal,
+  pageLayoutChoices,
+  pageLayoutOf,
+  pageLayoutShown,
+} from "./page-default";
 
 // ── Who owns a template ──────────────────────────────────────────────────
 //
@@ -1490,7 +1498,7 @@ export class JournalManager {
   // rewrites no note, so nothing in an open dashboard was told."* A journal's
   // `cardStat` is the same species of change and takes the same line.
   async setCardStat(type: JournalType, measure: string): Promise<void> {
-    const cfg = this.plugin.settings.customJournals.find((j) => j.id === type.id);
+    const cfg = configOfJournal(this.plugin.settings.customJournals, type.id);
     if (!cfg) {
       new Notice(
         "A card's fourth number is stored on a journal you defined, and this journal is not one of them."
@@ -1678,12 +1686,28 @@ export class JournalManager {
     }
     if (!folderPath) return;
 
-    const details = await promptNewNote(
-      this.app,
-      `${kind.emoji} New ${kind.label.toLowerCase()}`,
-      `${kind.label} title`,
-      kind.templates.map((t) => ({ id: t.id, label: t.label }))
-    );
+    // BOTH FIELDS, ALWAYS (4.50 §1). `kind.templates` always holds at least the
+    // default variant, and `pageLayoutChoices` always holds at least the page
+    // default — so neither list is ever empty and neither field is ever hidden.
+    // The pages half is absent, not empty, for a kind that cannot hold pages.
+    const pageRows = kind.pages
+      ? pageLayoutChoices(this.configOf(type), kind.pages.label)
+      : null;
+    const details = await promptNewNote(this.app, {
+      heading: `${kind.emoji} New ${kind.label.toLowerCase()}`,
+      titlePlaceholder: `${kind.label} title`,
+      layoutLabel: "Layout",
+      templates: kind.templates.map((t) => ({ id: t.id, label: t.label })),
+      ...(pageRows && kind.pages
+        ? {
+            pages: {
+              label: `${kind.pages.label} layout`,
+              templates: pageRows,
+              templateId: PAGE_LAYOUT_DEFAULT,
+            },
+          }
+        : {}),
+    });
     if (!details?.title.trim()) return;
     const safeTitle = details.title.trim().replace(/[\\/:"*?<>|]/g, "-");
     const variant =
@@ -1728,8 +1752,35 @@ export class JournalManager {
       created: nowTimestamp(),
     });
     const file = await createFileEnsuringFolders(this.app, notePath, content);
+    await this.setPageLayout(file, details.pageTemplateId);
     await openFile(this.app, file);
     notify.ok(`${kind.label} created!`);
+  }
+
+  // The stored config a built type came from, or null.
+  //
+  // BY ID, on `JournalTemplates.configFor`'s rule: `JournalType` is rebuilt on
+  // every read and the thing that persists is the `JournalConfig` in settings,
+  // which is where saved layouts live.
+  configOf(type: JournalType): JournalConfig | null {
+    return configOfJournal(this.plugin.settings.customJournals, type.id);
+  }
+
+  // What a title's pages are built from, written onto the title itself.
+  //
+  // THE DEFAULT CLEARS THE PROPERTY RATHER THAN STORING A WORD FOR IT. Absent
+  // means the journal's page default — that is `page-default.ts`'s whole
+  // contract and `cardStat`'s shape before it — so writing an id meaning "no
+  // id" would give one state two spellings and leave every note in every vault
+  // in the other one.
+  async setPageLayout(file: TFile, layoutId: string): Promise<void> {
+    const id = layoutId.trim();
+    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+    if (!id && !(PAGE_LAYOUT_KEY in fm)) return;
+    await this.app.fileManager.processFrontMatter(file, (front) => {
+      if (id) front[PAGE_LAYOUT_KEY] = id;
+      else delete front[PAGE_LAYOUT_KEY];
+    });
   }
 
   // ── Pages: splitting one note across several ────────────────────────────
@@ -1834,9 +1885,30 @@ export class JournalManager {
     if (!host?.parent) return;
 
     const pages = kind.pages;
-    const title = await promptText(this.app, `${pages.label} title`);
-    if (!title?.trim()) return;
-    const safeTitle = title.trim().replace(/[\\/:"*?<>|]/g, "-");
+
+    // THE PAGE DIALOGUE IS THE TITLE DIALOGUE (4.50 §4). It was a bare
+    // `promptText` — a title and nothing else — which is the other half of what
+    // the reader called *"the new title/page dialogue"*. One window, both
+    // fields, the same modal.
+    //
+    // AND IT OPENS ON WHAT THE TITLE STORES. A page default nothing ever shows
+    // is a setting the reader has to remember making; this is where it becomes
+    // visible, and a reader who wants this one page built differently overrides
+    // it here without disturbing the next one.
+    //
+    // A PAGE HAS NO PAGES, so no third field — §1's argument for drawing a
+    // one-option field is an argument about a pair.
+    const cfg = this.configOf(type);
+    const rows = pageLayoutChoices(cfg, pages.label);
+    const details = await promptNewNote(this.app, {
+      heading: `${pages.label} in ${host.basename}`,
+      titlePlaceholder: `${pages.label} title`,
+      layoutLabel: "Layout",
+      templates: rows,
+      templateId: pageLayoutShown(cfg, pageLayoutOf(fm)),
+    });
+    if (!details?.title.trim()) return;
+    const safeTitle = details.title.trim().replace(/[\\/:"*?<>|]/g, "-");
 
     const notePathNew = `${host.parent.path}/${safeTitle}.md`;
     if (getFile(this.app, notePathNew)) {
@@ -1844,10 +1916,20 @@ export class JournalManager {
       return;
     }
 
-    const tpl = await readTemplate(
-      this.app,
-      `${type.templatesFolder}/${pages.template}`
-    );
+    // A saved layout is COMPOSED; the default is the file on disk. Both are
+    // templates carrying `{{tokens}}`, so `fillTemplate` below cannot tell them
+    // apart — see `JournalTemplates.pageLayoutText`, which is the only thing
+    // that knows a layout exists.
+    const tpl =
+      this.plugin.journalTemplates.pageLayoutText(
+        type,
+        kind,
+        details.templateId
+      ) ??
+      (await readTemplate(
+        this.app,
+        `${type.templatesFolder}/${pages.template}`
+      ));
     if (tpl == null) {
       new Notice(`${pages.template} missing — run 'Set up / repair vault'.`);
       return;
@@ -2049,7 +2131,7 @@ export class JournalManager {
     kinds: string[],
     surfaces: ("index" | "page")[] = []
   ): Promise<void> {
-    const cfg = this.plugin.settings.customJournals.find((j) => j.id === typeId);
+    const cfg = configOfJournal(this.plugin.settings.customJournals, typeId);
     if (!cfg) {
       new Notice(
         "Saved layouts are stored on a journal you defined, and this journal is not one of them."

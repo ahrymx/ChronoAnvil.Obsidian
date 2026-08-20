@@ -28,7 +28,7 @@
 // ASK. The row asks with a confirm and two pickers; the refusal asks with a
 // button, because in its case there is nothing on disk to ask about.
 
-import { App, normalizePath, TFolder } from "obsidian";
+import { App, normalizePath, TAbstractFile, TFile, TFolder } from "obsidian";
 import type AlmanacPlugin from "../main";
 import type { JournalConfig } from "../journals/custom-journal";
 import { ROOT_INFRASTRUCTURE } from "./constants";
@@ -60,16 +60,22 @@ export const BIN_FOLDER = `${ROOT_INFRASTRUCTURE}/Bin`;
 // PURE, TAKING `taken` RATHER THAN AN APP, so the numbering rule is testable
 // without a vault. Everything else in this module needs one; this does not, and
 // it is the part with an off-by-one in it.
+//
+// `ext` IS FOR BINNING A FILE (4.50.1). A journal is folders and needed none;
+// a title that was never promoted is a single `.md`, and a binned note that has
+// lost its extension is a note Obsidian will not open. **The suffix goes before
+// the extension**, or the collision rule produces `Quadratics-2026-08-20.md-2`.
 export function binPathFor(
   folderName: string,
   date: string,
-  taken: (path: string) => boolean
+  taken: (path: string) => boolean,
+  ext = ""
 ): string {
-  const base = `${BIN_FOLDER}/${folderName}-${date}`;
-  if (!taken(base)) return base;
+  const stem = `${BIN_FOLDER}/${folderName}-${date}`;
+  if (!taken(`${stem}${ext}`)) return `${stem}${ext}`;
   // From 2, because the unsuffixed path IS the first one.
   for (let n = 2; ; n++) {
-    const candidate = `${base}-${n}`;
+    const candidate = `${stem}-${n}${ext}`;
     if (!taken(candidate)) return candidate;
   }
 }
@@ -113,6 +119,95 @@ export async function binJournalFolders(
     moved.push(target);
   }
   return moved;
+}
+
+// Bin one thing the reader is finished with: a note, or a folder note and
+// everything in it. 4.50.1.
+//
+// ── WHY THIS EXISTS, AND WHAT IT REPLACES ────────────────────────────────
+//
+// 4.50 gave a title's row a *Move to bin*, and it went to OBSIDIAN's trash
+// through `fileManager.trashFile`. That is a second bin behind the same word,
+// and the module it should have read is this one — which had already decided
+// where a bin goes, why it goes there, and that **a move is not a delete**:
+//
+//   *A MOVE, NEVER A DELETE, and the wording everywhere this surfaces says so.
+//   Almanac has never removed a reader's note and this is not where that
+//   starts.*
+//
+// A `trashFile` on a reader's journal note is exactly where that starts. It was
+// reported from a vault as *"vault's trash doesn't seem to exist"*, which is the
+// symptom; the fault is that the plugin had an answer and the new surface did
+// not use it.
+//
+// ── A FOLDER NOTE BINS AS ITS FOLDER ─────────────────────────────────────
+//
+// A promoted title is `Quadratics/Quadratics.md` with its pages beside it, so
+// binning it is ONE rename of the folder — the pages come with it by
+// construction rather than by a list that could be wrong. That is also what
+// makes the bin honest: what comes back out is the note and its pages arranged
+// the way they were.
+//
+// `fileManager.renameFile`, NEVER `vault.rename`, for `binJournalFolders`'
+// reason one screen up: the former updates every link that pointed at what
+// moved, which is the difference between a binned note that still resolves from
+// the rest of the vault and a page of broken links.
+export async function binAway(
+  app: App,
+  item: TAbstractFile,
+  date: string
+): Promise<string | null> {
+  const isFile = item instanceof TFile;
+  const name = isFile ? item.basename : item.name;
+  const ext = isFile ? `.${item.extension}` : "";
+  const target = binPathFor(
+    name,
+    date,
+    (p) => app.vault.getAbstractFileByPath(p) !== null,
+    ext
+  );
+  try {
+    await ensureFolder(app, BIN_FOLDER);
+    await app.fileManager.renameFile(item, target);
+    return target;
+  } catch (e) {
+    console.error("[Almanac] could not bin", item.path, e);
+    return null;
+  }
+}
+
+// Bin several files together, into one folder of their own.
+//
+// ONE FOLDER RATHER THAN N LOOSE FILES, and this is the whole reason it is not
+// `binAway` in a loop. A note's pages are *Roots*, *Graphs*, *Examples* — names
+// that mean something under their parent and nothing at the top of a bin, where
+// next week they sit beside another note's *Examples*. The folder is what says
+// which note they came out of.
+//
+// RETURNS THE FOLDER AND HOW MANY LANDED IN IT, because `renameFile` can fail
+// per file and a report of what was ASKED FOR is the kind that costs an hour.
+export async function binTogether(
+  app: App,
+  items: readonly TAbstractFile[],
+  folderName: string,
+  date: string
+): Promise<{ target: string; moved: number }> {
+  const target = binPathFor(
+    folderName,
+    date,
+    (p) => app.vault.getAbstractFileByPath(p) !== null
+  );
+  let moved = 0;
+  await ensureFolder(app, target);
+  for (const item of items) {
+    try {
+      await app.fileManager.renameFile(item, `${target}/${item.name}`);
+      moved += 1;
+    } catch (e) {
+      console.error("[Almanac] could not bin", item.path, e);
+    }
+  }
+  return { target, moved };
 }
 
 // Which of a journal's folders are actually on disk.

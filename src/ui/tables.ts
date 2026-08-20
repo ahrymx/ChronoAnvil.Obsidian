@@ -58,6 +58,7 @@ import {
   statScopeOf,
 } from "../journals/stats-band";
 import { attachCellMenus } from "./widgets/stats-band-menu";
+import { attachKindRowMenu } from "./widgets/kind-row-menu";
 import { journalChartRefusal, journalTallyRefusal, summarize } from "../charts/charts";
 import { partsOf } from "../core/section-model";
 import {
@@ -562,6 +563,19 @@ interface RecordRow {
   cls?: string[];
 }
 
+// What a row hands back: the value cells go in `main`, and anything that ACTS
+// on the row goes in `actions`.
+//
+// TWO SLOTS RATHER THAN ONE (4.50). `main` is the grid the columns line up in,
+// so a control put there would be a column — it would want a heading, it would
+// shrink the title, and at the collapse width it would stack with the values as
+// though it were one. `createListRow` has had the slot beside it since it was
+// written; this only stops throwing it away.
+interface RecordSlots {
+  main: HTMLElement;
+  actions: HTMLElement;
+}
+
 // PRIVATE AGAIN AS OF 4.13.3, AND THE ROUND TRIP IS WORTH RECORDING. 4.13.2
 // exported this for a fourth caller — the Journals card's per-subject topic
 // table — and 4.13.3 replaced that table with cards, which have no heading strip
@@ -574,14 +588,23 @@ interface RecordRow {
 // different objects, and only the numbers had to agree.
 function recordList(
   host: HTMLElement,
-  headings: string[]
-): { list: HTMLElement; row: (opts: RecordRow) => HTMLElement } {
+  headings: string[],
+  // Whether rows will put anything in their actions slot.
+  //
+  // THE HEADING STRIP HAS TO KNOW. `actions` is `flex: 0 0 auto` beside the
+  // grid, so every row is that much narrower than the strip above it and every
+  // value column sits a button's width to the LEFT of its own heading. The
+  // strip pays the same reserve, or the table is subtly out of true in exactly
+  // the way nobody can name from looking at it.
+  hasActions = false
+): { list: HTMLElement; row: (opts: RecordRow) => RecordSlots } {
   // The name column gives way; the value columns are sized to their content,
   // because a date that wraps is unreadable and a count is one character.
   const tracks = `minmax(0, 1fr)${" auto".repeat(Math.max(0, headings.length - 1))}`;
 
   const list = host.createDiv({ cls: "almanac-list" });
   list.setAttr("role", "table");
+  if (hasActions) list.addClass("has-row-actions");
 
   // Hidden by the container query rather than removed: it is the accessible
   // name for each column at any width, and at narrow widths the row's own
@@ -597,7 +620,7 @@ function recordList(
   return {
     list,
     row: (opts) => {
-      const { row } = createListRow(list, {
+      const { row, actions } = createListRow(list, {
         token: "",
         title: opts.title,
         titleRender: opts.titleRender,
@@ -609,7 +632,10 @@ function recordList(
       // The main region is where the value cells go, beside the title, so the
       // grid tracks line up across the whole row rather than only across the
       // part after the title.
-      return row.querySelector<HTMLElement>(".almanac-list-main") ?? row;
+      return {
+        main: row.querySelector<HTMLElement>(".almanac-list-main") ?? row,
+        actions,
+      };
     },
   };
 }
@@ -733,7 +759,7 @@ export function folderRollup(
     const { pages, typed, lastActive } = folderActivity(app, tf.path);
 
     const noteFile = getFile(app, `${tf.path}/${tf.name}.md`);
-    const main = addRow({
+    const { main } = addRow({
       title: tf.name,
       // A folder with no index note of its own is still a row; it just has
       // nothing to open, so the name stays text.
@@ -2195,18 +2221,22 @@ export function kindTable(
   // lists stopped being one. This was the first of the three converted, in
   // 2.56.5, and it carried the heading strip and the ARIA roles inline until
   // the second and third arrived to make the repetition obvious.
-  const { row: addRow } = recordList(root, [
-    kind.label,
-    ...columns.map(heading),
-  ]);
+  // THE THIRD ARGUMENT IS "EVERY ROW CARRIES A `⋯`" (4.50), so the heading strip
+  // reserves the same width the rows spend. A slot that appeared only on hover
+  // would shift the whole row's columns under the pointer.
+  const { row: addRow } = recordList(root, [kind.label, ...columns.map(heading)], true);
 
   for (const { note, date, done } of sorted) {
-    const main = addRow({
+    const { main, actions } = addRow({
       title: note.file.basename,
       titleRender: (slot) =>
         internalLink(slot, app, note.file, note.file.basename, ctx.sourcePath),
       cls: ["is-done-able", done ? "is-done" : ""],
     });
+    // WHAT THIS NOTE'S PAGES ARE MADE FROM, AND WHETHER IT SHOULD STILL EXIST —
+    // both facts about the one note the row is, so the control goes on the row.
+    // See `kind-row-menu.ts`, which owns all of it; this file draws tables.
+    attachKindRowMenu({ plugin, type, kind }, actions, note.file);
     for (const property of columns) {
       if (property === "date") {
         recordCell(main, date ?? "—");

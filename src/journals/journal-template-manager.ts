@@ -30,12 +30,15 @@ import type {
 } from "./custom-journal";
 import {
   layoutTargetsFor,
+  sectionContext,
   sectionsFor,
   splitLayoutTargets,
   targetIdFor,
   templateKeyFor,
 } from "./journal-sections";
 import type { SectionContext, TemplateLayout } from "./journal-sections";
+import type { JournalKind, JournalType } from "./journal";
+import { configOfJournal, pageLayoutById } from "./page-default";
 import {
   journalReloadLoss,
   wantFromJournalNote,
@@ -57,10 +60,40 @@ export class JournalTemplates {
   // every read; the thing that persists is the `JournalConfig` in settings, and
   // it is what a write has to reach.
   configFor(ctx: SectionContext): JournalConfig | null {
-    return (
-      this.plugin.settings.customJournals.find((j) => j.id === ctx.type.id) ??
-      null
-    );
+    // ONE IMPLEMENTATION, IN `page-default.ts` (4.50). `JournalManager` had the
+    // same three lines, and a second copy is how "which config is this
+    // journal?" comes to have two answers the day one of them learns about a
+    // migration. A shared FUNCTION rather than one manager calling the other:
+    // the dependency would be real, would be circular in spirit, and would put
+    // a lookup out of reach of a test with no plugin.
+    return this.configForType(ctx.type);
+  }
+
+  private configForType(type: JournalType): JournalConfig | null {
+    return configOfJournal(this.plugin.settings.customJournals, type.id);
+  }
+
+  // The markdown a NEW PAGE of this kind is built from, when the reader picked a
+  // saved layout rather than the journal's own page template. 4.50.
+  //
+  // NULL IS "READ THE FILE", which is what `newPage` has always done and what
+  // the default still means. `page-default.ts` states why a page layout is not
+  // a file: `templateTargets` emits exactly one page template per journal and a
+  // saved layout claims nothing on disk — so the only two answers are the file
+  // and a composition, and this returns the second or says so.
+  //
+  // TOKENS AND ALL. `composeTemplate` writes `{{title}}`, `{{parent}}`,
+  // `{{order}}` — it is a TEMPLATE, not a note — so its output goes through the
+  // same `fillTemplate` the file's does and the caller cannot tell them apart.
+  pageLayoutText(
+    type: JournalType,
+    kind: JournalKind,
+    layoutId: string
+  ): string | null {
+    if (!kind.pages) return null;
+    const layout = pageLayoutById(this.configForType(type), layoutId);
+    if (!layout) return null;
+    return this.composedFrom(sectionContext(type, { page: kind }), layout).text;
   }
 
   // What a new note of this target is composed from today.

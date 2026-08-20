@@ -434,6 +434,24 @@ export async function deleteAttachmentFile(
     );
     if (!ok) return false;
   }
+  // ── PRIVATE AGAIN AS OF 4.50.1, AND THE ROUND TRIP IS WORTH RECORDING ──
+  //
+  // 4.50 lifted this probe into `util.ts` because a title row's *Move to bin*
+  // had become a second caller. It should never have been one: a journal note
+  // goes to `00 - Infrastructure/Bin/` by a rename, which is Almanac's own bin
+  // and the thing `journal-removal.ts` had already decided. With that caller
+  // gone this is a shared helper with one user, which is `recordList`'s round
+  // trip in 4.13.3 for the same reason — **a component is worth sharing when two
+  // surfaces do the same thing, and these two never did.**
+  //
+  // AN ATTACHMENT IS THE CASE WHERE OBSIDIAN'S TRASH IS RIGHT. It is a binary
+  // the reader added to a note rather than a note they wrote, the vault's
+  // *Deleted files* setting is the answer they already gave for files like it,
+  // and the confirmation above says "moved to the trash" in those words.
+  //
+  // `fileManager.trashFile` IS THE ONE THAT ASKS THAT SETTING — system trash,
+  // `.trash/`, or permanent — and it is only on newer API versions, so it is
+  // probed with `vault.trash(file, true)` behind it.
   try {
     const fm = deps.app.fileManager as unknown as {
       trashFile?: (f: TFile) => Promise<void>;

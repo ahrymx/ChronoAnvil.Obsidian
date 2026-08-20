@@ -133,27 +133,81 @@ export interface TemplateChoice {
 export interface NewNoteDetails {
   title: string;
   templateId: string;
+  // Which layout this note's own PAGES are built from, when it can hold any.
+  // Empty is the journal's page default — see `page-default.ts`, which owns
+  // what that means and never learns there is a window.
+  pageTemplateId: string;
 }
 
-// Title + template type, both visible in one window. Used whenever a journal
-// leaf note is created (Study's Lesson/Practice, and every custom journal
-// kind) — folded into one modal rather than a title prompt followed by a
-// separate template picker, the same "one window, every field visible" move
-// the chart and event editors already make.
+// Everything the window asks. 4.50.
+//
+// AN OBJECT RATHER THAN SIX POSITIONAL ARGUMENTS. It took four and grew two,
+// and `promptNewNote(app, heading, placeholder, templates, pageLabel, pages)`
+// is a call nobody can read at the call site. The two callers are `newNote` and
+// `newPage`, which is the other half of *"the new title/page dialogue"* — until
+// this release that one was a bare `promptText` with no template field at all.
+export interface NewNotePrompt {
+  heading: string;
+  titlePlaceholder: string;
+  // What this note is built from. `label` names the surface — "Layout" on a
+  // title, "Layout" on a page — and the rows are the surface's own list.
+  layoutLabel: string;
+  templates: TemplateChoice[];
+  // Which row opens selected. Absent is the first, which is every default.
+  templateId?: string;
+  // What this note's PAGES are built from, for a kind that can hold them.
+  //
+  // ABSENT RATHER THAN EMPTY for a surface with no pages — a page has no pages,
+  // and §1's argument for drawing a one-option field is an argument about a
+  // PAIR, not about a field with nothing behind it at all.
+  pages?: {
+    label: string;
+    templates: TemplateChoice[];
+    templateId: string;
+  };
+}
+
+// Title + what it is built from + what its pages are built from, all visible in
+// one window. Used whenever a journal leaf note or page is created — folded
+// into one modal rather than a title prompt followed by a separate template
+// picker, the same "one window, every field visible" move the chart and event
+// editors already make.
+//
+// ── EVERY FIELD IS DRAWN, INCLUDING AT ONE OPTION (4.50 §1) ──────────────
+//
+// The Layout field was gated on `templates.length > 1`, and the reason given was
+// a real one: *"a required dropdown with one option labelled Generic on every
+// new-note popup in the plugin — a control that looks like a decision and is
+// not."*
+//
+// THAT ARGUMENT IS ABOUT A LONE DROPDOWN AND THIS IS A PAIR. Two fields side by
+// side are not two decisions with one option each; they are the STATEMENT of
+// what this note and its pages will be built from, and the second is a reader's
+// only introduction to the idea that a title HAS a page default — which is the
+// thing the `⋯` on its row then changes.
+//
+// AND HALF A PAIR IS WORSE THAN NEITHER HALF. Under the old gate, a journal with
+// one title layout and two page layouts drew *Page layout* alone, and a reader
+// could not tell whether *Layout* was missing because there was nothing to
+// choose or because the plugin had chosen for them.
+//
+// What survives of 2.54.7 is the half about the WORD: the default row is named
+// after the thing it makes ("Title", "⭐ Page default"), never "Generic", which
+// read as a category nobody picked.
 class NewNoteModal extends Modal {
   private resolve!: (value: NewNoteDetails | null) => void;
   private submitted = false;
   private title = "";
   private templateId: string;
+  private pageTemplateId: string;
 
-  constructor(
-    app: App,
-    private heading: string,
-    private titlePlaceholder: string,
-    private templates: TemplateChoice[]
-  ) {
+  constructor(app: App, private prompt: NewNotePrompt) {
     super(app);
-    this.templateId = templates[0]?.id ?? "";
+    // The asked-for row where there is one, else the first — which is the
+    // default on every list this window is given, because `pageLayoutChoices`
+    // and `kind.templates` both put it there.
+    this.templateId = prompt.templateId ?? prompt.templates[0]?.id ?? "";
+    this.pageTemplateId = prompt.pages?.templateId ?? "";
   }
 
   openAndGetValue(resolve: (value: NewNoteDetails | null) => void): void {
@@ -162,11 +216,11 @@ class NewNoteModal extends Modal {
   }
 
   onOpen(): void {
-    const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.heading });
+    const { contentEl, prompt } = this;
+    contentEl.createEl("h3", { text: prompt.heading });
 
     new Setting(contentEl).setName("Title").addText((t) => {
-      t.setPlaceholder(this.titlePlaceholder).onChange((v) => {
+      t.setPlaceholder(prompt.titlePlaceholder).onChange((v) => {
         this.title = v;
       });
       t.inputEl.addEventListener("keydown", (e) => {
@@ -178,22 +232,21 @@ class NewNoteModal extends Modal {
       window.setTimeout(() => t.inputEl.focus(), 0);
     });
 
-    // Hidden when there is nothing to choose.
-    //
-    // Every kind shipped exactly one template until 2.54.7, so this was a
-    // required dropdown with one option labelled "Generic" on every new-note
-    // popup in the plugin — a control that looks like a decision and is not,
-    // which is the same complaint the journal folder fields earned before they
-    // became derived. A kind with saved layouts gets a real choice here; a kind
-    // with one gets a title prompt, which is all it ever needed.
-    if (this.templates.length > 1) {
-      new Setting(contentEl).setName("Layout").addDropdown((d) => {
-        for (const choice of this.templates)
-          d.addOption(choice.id, choice.label);
-        d.setValue(this.templateId).onChange((v) => {
-          this.templateId = v;
-        });
-      });
+    // Both fields, at every count — see the block above this class for why the
+    // `length > 1` gate that used to be here is gone.
+    this.dropdown(contentEl, prompt.layoutLabel, prompt.templates, this.templateId, (v) => {
+      this.templateId = v;
+    });
+    if (prompt.pages) {
+      this.dropdown(
+        contentEl,
+        prompt.pages.label,
+        prompt.pages.templates,
+        this.pageTemplateId,
+        (v) => {
+          this.pageTemplateId = v;
+        }
+      );
     }
 
     const btnRow = contentEl.createDiv({ cls: "modal-button-container" });
@@ -201,6 +254,19 @@ class NewNoteModal extends Modal {
     ok.addEventListener("click", () => this.submit());
     const cancel = btnRow.createEl("button", { text: "Cancel" });
     cancel.addEventListener("click", () => this.close());
+  }
+
+  private dropdown(
+    host: HTMLElement,
+    name: string,
+    rows: TemplateChoice[],
+    value: string,
+    onChange: (v: string) => void
+  ): void {
+    new Setting(host).setName(name).addDropdown((d) => {
+      for (const choice of rows) d.addOption(choice.id, choice.label);
+      d.setValue(value).onChange(onChange);
+    });
   }
 
   private submit(): void {
@@ -211,7 +277,17 @@ class NewNoteModal extends Modal {
   onClose(): void {
     this.contentEl.empty();
     this.resolve(
-      this.submitted ? { title: this.title, templateId: this.templateId } : null
+      this.submitted
+        ? {
+            title: this.title,
+            templateId: this.templateId,
+            // EMPTY WHERE THE SURFACE HAS NO PAGES, never the stale value of a
+            // field that was not drawn. A caller reading this back writes it
+            // into a note, and a page id on a kind that cannot hold pages is a
+            // property nothing would ever read.
+            pageTemplateId: this.prompt.pages ? this.pageTemplateId : "",
+          }
+        : null
     );
   }
 }
@@ -486,14 +562,10 @@ export function promptKindRename(
 
 export function promptNewNote(
   app: App,
-  heading: string,
-  titlePlaceholder: string,
-  templates: TemplateChoice[]
+  prompt: NewNotePrompt
 ): Promise<NewNoteDetails | null> {
   return new Promise((resolve) => {
-    new NewNoteModal(app, heading, titlePlaceholder, templates).openAndGetValue(
-      resolve
-    );
+    new NewNoteModal(app, prompt).openAndGetValue(resolve);
   });
 }
 
@@ -537,6 +609,90 @@ class ConfirmModal extends Modal {
     this.contentEl.empty();
     this.resolve(this.confirmed);
   }
+}
+
+// A confirmation with more than one way to say yes. 4.50.2.
+//
+// ── WHY `confirmAction` COULD NOT ANSWER THIS ────────────────────────────
+//
+// *Move to bin* on a title with pages is not one question with a yes and a no.
+// It is *"the note and its pages, or just the pages?"* — two affirmative
+// answers, and a reader who has to pick between them BEFORE opening the dialogue
+// is picking without having read what either one takes.
+//
+// 4.50 shipped it as two menu rows and it was reported as clutter: two entries
+// whose difference is a scope, sitting under a menu whose other rows are a
+// single list. **The choice belongs where the consequence is described**, which
+// is the same move 4.48 made putting a control on the thing it changes.
+//
+// ── A SECOND MODAL, NOT A FLAG ON THE FIRST ──────────────────────────────
+//
+// `ConfirmModal` resolves a BOOLEAN, and every one of its two dozen callers
+// reads that boolean. Widening it to return a string would make each of them
+// answer a question it does not have. This one resolves the value of the button
+// pressed, and dismissal — Esc, clicking away, Cancel — is `null`, so a caller
+// can still treat "anything but an explicit choice" as a no.
+export interface ActionChoice {
+  // What the caller gets back. Its own vocabulary, not this file's.
+  value: string;
+  label: string;
+  // Paints it `mod-cta`. At most one, and it is the answer a reader who is not
+  // reading wants — never the wider-reaching of two.
+  cta?: boolean;
+}
+
+class ActionModal extends Modal {
+  private picked: string | null = null;
+
+  constructor(
+    app: App,
+    private title: string,
+    private message: string,
+    private choices: ActionChoice[],
+    private resolve: (value: string | null) => void
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: this.title });
+    contentEl.createEl("p", { text: this.message });
+
+    const btnRow = contentEl.createDiv({ cls: "modal-button-container" });
+    // CANCEL FIRST AND FOCUSED, which is `ConfirmModal`'s arrangement and its
+    // reason: a reader who presses Enter on a window they have not read has not
+    // agreed to anything.
+    const cancel = btnRow.createEl("button", { text: "Cancel" });
+    cancel.addEventListener("click", () => this.close());
+    for (const choice of this.choices) {
+      const b = btnRow.createEl("button", {
+        text: choice.label,
+        ...(choice.cta ? { cls: "mod-cta" } : {}),
+      });
+      b.addEventListener("click", () => {
+        this.picked = choice.value;
+        this.close();
+      });
+    }
+    cancel.focus();
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+    this.resolve(this.picked);
+  }
+}
+
+export function promptAction(
+  app: App,
+  title: string,
+  message: string,
+  choices: ActionChoice[]
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    new ActionModal(app, title, message, choices, resolve).open();
+  });
 }
 
 export function confirmAction(
@@ -728,8 +884,16 @@ export function promptDetailedSuggester(
 // The rule was already known and applied three separate ways with three
 // separate inline arguments: charts-manager short-circuits its picker at one
 // spec, chart-ui.ts guards its scope dropdown with "Only a question when there
-// are two answers", and modals.ts hides the layout field at one layout. Naming
+// are two answers", and modals.ts hid the layout field at one layout. Naming
 // it once is most of the value here; the rest is the places that missed it.
+//
+// AND ONE OF THE THREE WAS RIGHT ABOUT A LONE CONTROL AND WRONG ABOUT A PAIR
+// (4.50). `NewNoteModal` draws its layout field at one option now, because the
+// field is no longer only a choice — beside *Page layout* it is the STATEMENT
+// of what this note and its pages are built from, and the reader's only
+// introduction to the fact that a title has a page default at all. A dropdown
+// that says something true when it cannot be changed is not the control this
+// rule is about. The block above that class makes the case at length.
 //
 // BUT NOT EVERYWHERE, and this is the part a blanket rule gets wrong.
 // Auto-selecting the only option is right when the option is INCIDENTAL to what

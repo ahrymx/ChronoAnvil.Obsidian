@@ -550,3 +550,59 @@
     opacity: 1;
   }
 }
+
+/* ── The `⋯` on a title's row (4.50) ─────────────────────────────────────
+   4.48's move one surface over: the control goes on the thing it changes, and
+   what it changes here is one note — what its pages are built from, and whether
+   it should still exist. The band's cell menu is the model, so it wears the same
+   size, the same faint rest and the same reveal.
+
+   NAMED FOR THE COMPONENT, NOT FOR THE KIND TABLE. It went in as `.jkt-row-menu`
+   and `test/appearance.test.ts` caught it within the hour — `.jkt-*` is the
+   private family 2.56.9 retired, and a `⋯` in a row's actions slot is what ANY
+   list of records wants. It is `.almanac-list-menu` for the same reason the
+   heading strip and the value cell are `.almanac-list-*`.
+
+   THE HEADING STRIP PAYS THE SAME RESERVE AS THE ROWS. The actions slot is
+   `flex: 0 0 auto` beside the grid, so without this every value column sits a
+   button's width to the left of its own heading — out of true in exactly the way
+   nobody can name from looking at it. One custom property, read by both, so the
+   two cannot drift when the button is resized. */
+.almanac-list.has-row-actions {
+  --am-row-action-w: 22px;
+}
+.almanac-list.has-row-actions .almanac-list-heads {
+  padding-right: calc(6px + var(--am-row-action-w));
+}
+.almanac-list-menu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--am-row-action-w, 22px);
+  height: 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.almanac-list-menu svg {
+  width: 0.85em;
+  height: 0.85em;
+}
+.almanac-list-row:hover .almanac-list-menu,
+.almanac-list-row:focus-within .almanac-list-menu {
+  opacity: 1;
+}
+.almanac-list-menu:hover {
+  opacity: 1;
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+/* A touchscreen has no hover to reveal it with, so it rests visible and faint —
+   3.9 §3.3's rule, checked mechanically rather than remembered. */
+@media (hover: none) {
+  .almanac-list-menu {
+    opacity: 0.55;
+  }
+}

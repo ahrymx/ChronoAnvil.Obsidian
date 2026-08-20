@@ -44,11 +44,40 @@ export function liveScopedWidget(
   // prefix is `""`, which matches every path, which is what "watch the whole
   // vault" has to mean.
   const prefixes = folders.map(folderPrefix);
+  // ONE PREDICATE, ASKED OF BOTH KINDS OF EVENT (4.50.2). `shouldRefresh` is
+  // handed a `TFile` and `shouldRefreshPath` a bare path, and they are the same
+  // question — is this in my scope — so the string form is the one that
+  // actually decides and the file form defers to it. Two spellings of one scope
+  // is how a widget comes to watch two slightly different folders.
+  const inScope = (path: string): boolean =>
+    path === ctx.sourcePath || prefixes.some((p) => path.startsWith(p));
   ctx.addChild(
     new LiveWidget(plugin.app, host, {
       build,
-      shouldRefresh: (f) =>
-        f.path === ctx.sourcePath || prefixes.some((p) => f.path.startsWith(p)),
+      shouldRefresh: (f) => inScope(f.path),
+      // ── A FILE THAT MOVES OUT OF SCOPE NEVER FIRED ANYTHING (4.50.2) ────
+      //
+      // `metadataCache.on("changed")` is a CONTENT event. It fires when a file
+      // is parsed, and a rename parses nothing — so every folder-scoped widget
+      // in this plugin drew its rows on first paint and then sat there while
+      // notes were moved, renamed and deleted underneath it.
+      //
+      // IT WENT UNNOTICED FOR AS LONG AS NOTHING MOVED A FILE. Creating a note
+      // fires `changed` once its body is written, which is why *New title*
+      // always appeared to work; a reader dragging a note between folders in the
+      // explorer was the only way to see it, and then the stale table looks like
+      // Obsidian being slow rather than like a bug.
+      //
+      // 4.50's bin is what made it a REPORT: *Move to bin* left the row on
+      // screen, so the reader pressed it again — and Obsidian mutates a `TFile`
+      // in place on rename, so the second press binned the file at its NEW path.
+      // `The Avengers-2026-08-20-2026-08-20.md`, from one row that should have
+      // been gone.
+      //
+      // `LiveWidget` has handled both sides of a rename since it was written —
+      // *"either side moving in or out of scope is a reason to repaint"* — and
+      // this is the option that was never passed to reach it.
+      shouldRefreshPath: inScope,
       onCleanup,
     })
   );

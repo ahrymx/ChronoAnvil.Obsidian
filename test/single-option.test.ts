@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { only } from "../src/ui/modals";
 
-import { readSrc } from "./sources";
+import { readCode, readSrc } from "./sources";
 // ── controls that aren't decisions ────────────────────────────────────────
 //
 // A control whose value cannot change spends a reader's attention and returns
@@ -96,7 +96,32 @@ describe("pickers that were already right", () => {
     expect(src("chart-ui.ts")).toContain("scopes.length > 1");
   });
 
-  it("keeps the layout field hidden at one layout", () => {
-    expect(src("modals.ts")).toContain("this.templates.length > 1");
+  // ── AND ONE OF THEM STOPPED BEING RIGHT (4.50) ────────────────────────
+  //
+  // The layout field was hidden at one option and now is not, which looks like
+  // this rule being broken and is the rule being read properly. 2.54.7 found a
+  // LONE dropdown with one option; 4.50 puts a second field beside it — what
+  // this note's pages are built from — and two fields side by side are not two
+  // decisions with one option each. They are the statement of what will be
+  // built, and the second is a reader's only introduction to the idea that a
+  // title HAS a page default, which is the thing the `⋯` on its row changes.
+  //
+  // HALF A PAIR IS THE OUTCOME THE OLD GATE ACTUALLY PRODUCED: a journal with
+  // one title layout and two page layouts drew *Page layout* alone, and a
+  // reader could not tell whether *Layout* was missing because there was
+  // nothing to choose or because the plugin had chosen for them.
+  it("draws the layout field at one layout, because it is half a pair", () => {
+    const text = readCode("modals.ts");
+    expect(text).not.toContain("templates.length > 1");
+    // What gates the SECOND field is whether the surface has pages at all — a
+    // page has no pages — and never a count, or the pair comes apart again.
+    expect(text).toContain("if (prompt.pages)");
+  });
+
+  it("still names the rule where the pair is the exception to it", () => {
+    // The exception is argued where the rule is stated, not only at the site,
+    // because a reader arriving at `only()` next release must not read the
+    // drawn field as an oversight.
+    expect(src("modals.ts")).toContain("RIGHT ABOUT A LONE CONTROL AND WRONG ABOUT A PAIR");
   });
 });

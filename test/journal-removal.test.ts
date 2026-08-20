@@ -57,6 +57,81 @@ describe("where a binned journal's folders go", () => {
     );
   });
 
+  // ── binning a FILE, added in 4.50.1 ─────────────────────────────────────
+  //
+  // A journal is folders and needed no extension. A title that was never
+  // promoted is a single `.md`, and this function is now what names its
+  // destination too.
+
+  it("keeps a binned note's extension, or Obsidian will not open it", () => {
+    expect(binPathFor("Quadratics", "2026-08-20", () => false, ".md")).toBe(
+      `${BIN_FOLDER}/Quadratics-2026-08-20.md`
+    );
+  });
+
+  it("puts the collision suffix BEFORE the extension", () => {
+    // `Quadratics-2026-08-20.md-2` is not a markdown file. The suffix rule and
+    // the extension rule have to compose, and this is the one way they do.
+    const taken = new Set([`${BIN_FOLDER}/Quadratics-2026-08-20.md`]);
+    expect(
+      binPathFor("Quadratics", "2026-08-20", (p) => taken.has(p), ".md")
+    ).toBe(`${BIN_FOLDER}/Quadratics-2026-08-20-2.md`);
+  });
+
+  it("tests the path it will actually return, extension and all", () => {
+    // The `taken` probe must be asked about the full name. Asking about the
+    // stem would report a folder called `Quadratics-2026-08-20` as a collision
+    // with a FILE of that name plus `.md`, and — worse — would miss a real one.
+    const taken = new Set([`${BIN_FOLDER}/Quadratics-2026-08-20`]);
+    expect(
+      binPathFor("Quadratics", "2026-08-20", (p) => taken.has(p), ".md")
+    ).toBe(`${BIN_FOLDER}/Quadratics-2026-08-20.md`);
+  });
+
+  it("is unchanged for every caller that bins a folder", () => {
+    // `ext` defaults to empty, so 4.17's two callers get byte-for-byte what
+    // they got before — which is what makes this a widening rather than a
+    // change.
+    expect(binPathFor("Cooking", "2026-08-10", () => false)).toBe(
+      `${BIN_FOLDER}/Cooking-2026-08-10`
+    );
+  });
+
+  it("hands a file's own extension to the namer", () => {
+    // `binPathFor` is told the extension; the caller is what decides there is
+    // one. A mutation dropping this left the suite green because every
+    // assertion about extensions was aimed at the namer.
+    const src = readCode("journal-removal");
+    expect(src).toContain("const ext = isFile ? `.${item.extension}` : \"\";");
+    // AND A FOLDER GETS NONE. `item.name` on a folder is already the whole
+    // name; appending anything would rename the folder on the way in.
+    expect(src).toContain("const name = isFile ? item.basename : item.name;");
+  });
+
+  it("moves a single item through the same mover, never a delete", () => {
+    // 4.50 shipped a *Move to bin* on a title's row that called
+    // `fileManager.trashFile`, which is Obsidian's trash — a second bin behind
+    // the same word, and a DELETE where this module's own header says Almanac
+    // has never removed a reader's note.
+    const src = readCode("journal-removal");
+    expect(src).toContain("app.fileManager.renameFile(item, target)");
+    expect(src).not.toContain("trashFile");
+  });
+
+  it("bins several files into one folder rather than loose at the top", () => {
+    // A note's pages are *Roots*, *Graphs*, *Examples* — names that mean
+    // something under their parent and nothing beside another note's *Examples*
+    // next week. The folder is what says which note they came out of.
+    const src = readCode("journal-removal");
+    expect(src).toContain("export async function binTogether(");
+    expect(src).toContain("await ensureFolder(app, target)");
+    expect(src).toContain("`${target}/${item.name}`");
+  });
+
+  it("counts what actually moved, because renameFile can fail per file", () => {
+    expect(readCode("journal-removal")).toContain("return { target, moved };");
+  });
+
   it("moves rather than deletes, through the mover that fixes links", () => {
     // `fileManager.renameFile`, NOT `vault.rename` — the former updates every
     // link that pointed into the folder, which is the difference between a

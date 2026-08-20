@@ -7,6 +7,99 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.50.2] - 2026-08-20
+
+**Fix: a binned note stayed in the list, and pressing it again binned it twice.**
+
+Reported with a screenshot showing the giveaway —
+`Moved to 00 - Infrastructure/Bin/The Avengers-2026-08-20-2026-08-20.md`. Two
+dates is one note binned twice, because the row was still on screen after the
+first move.
+
+**The table was not listening for a note MOVING.** Almanac's live tables rebuild
+when a note's *contents* change, and a move changes no contents — so every
+folder-scoped table in the plugin (what's below this note, the page index, the
+note-type tables) drew its rows once and then sat there while notes were moved,
+renamed or deleted underneath it. That has been true since those tables were
+written; the bin is simply the first control that moves a file.
+
+They now repaint the moment anything in their folder is created, renamed, moved
+or deleted — so dragging a note between folders in the file explorer updates
+them too.
+
+**And a row now acts on the note it was drawn for, or on nothing.** If the note
+has moved since the list was drawn, the ⋯ says so instead of acting on whatever
+is at the end of a stale handle.
+
+**The two bin entries are one.** *Move to bin* and *Move pages to bin* were one
+action at two scopes sitting as two rows; there is a single **Move to bin** now,
+and the window it opens is where you choose:
+
+- **Note and pages** — the whole thing.
+- **Pages only** — keeps the note, moves its pages.
+
+The second button appears only when the note has pages. Cancel is focused, so
+pressing Enter on a window you haven't read agrees to nothing.
+
+## [4.50.1] - 2026-08-20
+
+**Fix: *Move to bin* went to Obsidian's trash, which you may not have one of.**
+
+Reported from a vault the same day 4.50.0 shipped. Obsidian's *Deleted files*
+setting can be set to delete permanently, or to a `.trash` folder the file
+explorer does not show you — so "moved to your vault's trash" was, depending on
+your settings, either a place you could not find or not a place at all.
+
+**Almanac already had a bin and this now uses it.** A binned title goes to
+`00 - Infrastructure/Bin/`, the same folder a deleted journal's folders have gone
+to since 4.17 — an ordinary folder you can open, look inside, drag a note back
+out of, and empty when you mean to. Nothing is deleted, and links from your other
+notes are updated to follow what moved.
+
+Two things that got better on the way:
+
+- **A note with pages moves as one folder**, so its pages come with it arranged
+  the way they were, rather than being collected up file by file.
+- **Loose pages bin together**, into a folder named after the note they came out
+  of. *Roots* and *Graphs* mean something under their parent and nothing sitting
+  beside another note's *Graphs* next week.
+
+The confirmation now names the folder it is moving things to, and its button is
+no longer red — it was overstating what it does. *(4.50.2 merges the two bin
+entries into one — see above.)*
+
+Deleting an **attachment** is unchanged and still uses your Obsidian trash
+setting: that is a file you attached rather than a note you wrote.
+
+## [4.50.0] - 2026-08-20
+
+**A new title asks what it is built from *and* what its pages are built from —
+and every title in the list below a note now has a ⋯.**
+
+The *New title* window used to show one field. It shows both templates now, and
+it shows them whether or not you have saved any layouts, because the second one
+is how you find out a title has a page default at all:
+
+- **Layout** — what this note starts with.
+- **Page layout** — what pages added to it later start with. Saved as a property
+  on the note, so it travels with it.
+
+**Adding a page is the same window now.** It was a bare "what shall I call it?"
+box; it asks for a layout too, and opens on whatever the title chose. Change it
+there and only that page is different — the title's own default is untouched.
+
+**Every row of *what's below this note* carries a ⋯,** faint until you hover it,
+always visible on a touchscreen. It holds:
+
+- **The page layout for that title**, ticked on the one actually in use.
+- **Move to bin** — the note *and* its pages, so a folder of pages is never left
+  behind pointing at a note that has gone.
+- **Move pages to bin** — the pages only, keeping the note. Shown only when
+  there are some.
+
+Both bins ask first and name what they are about to take. *(4.50.0 sent them to
+your Obsidian trash; 4.50.1 corrects that to Almanac's own bin — see above.)*
+
 ## [4.49.0] - 2026-08-20
 
 **Drag one number in a stats band onto another and the two swap places.**
