@@ -145,6 +145,7 @@ import {
 } from "../../diary/entryheader";
 import { buildPeriodNav } from "../../diary/periodnav";
 import { foldableSection, sectionFrame } from "../section-frame";
+import { bannerSuppressed } from "../vault-banner";
 import type { FoldStore } from "../section-frame";
 import {
   CELL_KEYWORD,
@@ -175,6 +176,7 @@ import {
   stampLines,
 } from "./block-drag";
 import { buildPageTitle } from "./page-title";
+import { livePageHead, pageHeadNames } from "./page-head";
 import { buildLauncher, LAUNCHER_DEFAULT } from "./launcher";
 import {
   JournalChartSpec,
@@ -220,6 +222,26 @@ export const BANNER_KINDS = new Set([
   "entry-header",
   ...JOURNAL_BANNER_KINDS,
 ]);
+
+// Every directive the VAULT BANNER stands in for. 4.51.5, narrowed in 4.51.6.
+//
+// ONE WORD, AND IT IS NOT A BANNER. `links:` is a row of `resolveTarget`
+// destinations, which is precisely what the bar's own nav is — so with the bar
+// on it is the same four buttons drawn again in a card, which is what the vault
+// render showed. It is dropped.
+//
+// THE THREE BANNER DIRECTIVES ARE NO LONGER IN THIS SET (4.51.6). They were,
+// for five patches, and drew nothing — a `required: true` section rendering
+// nothing is a section waiting to be deleted. They draw the PAGE HEAD now: the
+// note's own name in a page's face, over what kind of note it is. See
+// `page-head.ts`, which holds the argument for why that is not the bar's job
+// done twice.
+//
+// KEPT SEPARATE FROM `BANNER_KINDS` rather than widening it, because widening
+// it would make a lone `links:` fence report itself as a banner to `blockTitle`,
+// to `chromeClasses` and to the section editor — three answers changed to avoid
+// declaring one set.
+export const SUPPRESSED_KINDS = new Set(["links"]);
 
 // The widget kinds that sit INLINE in a widget-bar row — sliders, selects,
 // steppers, buttons, tracker cells. Everything else renders as its own
@@ -426,7 +448,15 @@ function buildTrackerHead(
   // GRAIN'S NAME — "Daily" where "Fri 14 Aug 2026" belongs. See
   // `entryDateLabel`: an absent caption is honest and this row is live, so it
   // fills itself in the moment the note is indexed.
-  if (period) row.createSpan({ cls: "jth-period", text: period });
+  //
+  // AND NOT WHERE THE HEAD IS ALREADY CALLING THE NOTE THAT (4.51.7). An entry
+  // with no title of its own IS its date, so the head above prints exactly this
+  // string as the note's name — reported from the vault as the same words a
+  // hundred pixels apart. `pageHeadNames` is asked rather than re-derived: the
+  // head owns what it says, and this row owns whether to say it too.
+  if (period && !(file instanceof TFile && pageHeadNames(plugin, file, period))) {
+    row.createSpan({ cls: "jth-period", text: period });
+  }
   row.createSpan({ cls: "jth-label", text: TRACKING_LABEL });
   return row;
 }
@@ -758,8 +788,55 @@ export class Widgets implements
             !isWideLine(l) &&
             !isHeightLine(l)
         );
-      const lines = kept.map((k) => k.l);
-      const lineAt = kept.map((k) => k.at);
+      // ── AND THE BANNER'S OWN LINES, WHEN THE VAULT BAR IS DRAWING ──────
+      //
+      // 4.51.1, and it is the second attempt. 4.51 suppressed a banner by
+      // returning `null` from the widget's case, and `null` from a case is how
+      // this loop is told a directive is UNKNOWN — so every suppressed banner
+      // rendered a red *"Unknown Almanac widget: journal-header"* where the
+      // banner had been. Trading one wrong block for a worse one.
+      //
+      // A SUPPRESSED BANNER IS NOT A DIRECTIVE THAT FAILED. It is a line with
+      // nothing to draw, which is a fact about the FENCE rather than about the
+      // widget — so it is answered here, where the fence's lines are chosen,
+      // and the loop below never learns the bar exists.
+      //
+      // `BANNER_KINDS` IS THE LIST, not a second one written from memory of it.
+      // That is exactly the mistake 4.51 made: it guarded the two directives
+      // called "header" and missed `title`, which is what a DASHBOARD's banner
+      // is — and the set has said so since 4.21, in as many words. One list,
+      // read here.
+      //
+      // `links:` IS THE WHOLE OF IT (4.51.5), WHICH 4.51.1 GOT WRONG. That release
+      // kept the row on the argument that it carries *where you are in time*.
+      // It does not: the three `links:` lines this plugin composes are
+      // `home,today,scopes#diary`, `today,scopes#diary` and `home[,up]` — every
+      // one of them a VAULT destination out of `resolveTarget`, which is the
+      // table the bar's own row reads. A period dashboard's prev/next is
+      // `period-nav`, a separate directive, and an entry's day navigator lives
+      // on the tracker strip. Neither is touched.
+      //
+      // So the row was the bar's four destinations drawn a second time, in a
+      // card, six lines below them — reported as exactly that. What it had that
+      // the bar did not is `scopes` and `up`, and both are answered rather than
+      // dropped: the bar carries an Overviews control on the diary surface (see
+      // `vault-banner.ts`), and `up` is what the trail has always been.
+      //
+      // `at` IS PRESERVED BY THE FILTER, so a drag still names the file's own
+      // line number. Filtering `kept` rather than `rawLines` is what keeps that
+      // true.
+      const quiet = bannerSuppressed(this.plugin, ctx.sourcePath);
+      const drawable = quiet
+        ? kept.filter(({ l }) => !SUPPRESSED_KINDS.has(keywordOf(l)))
+        : kept;
+
+      // A FENCE THAT WAS ONLY A BANNER DRAWS NOTHING AT ALL — no block, no
+      // border, no head. The homepage's banner is a bare `title` and nothing
+      // else, so an empty framed card is exactly what the reader would see.
+      if (drawable.length === 0 && kept.length > 0) return;
+
+      const lines = drawable.map((k) => k.l);
+      const lineAt = drawable.map((k) => k.at);
 
       // WHICH OF THIS FENCE'S LINES NOTHING MAY MOVE (4.11).
       //
@@ -775,7 +852,7 @@ export class Widgets implements
       // text inside block-drag would have to recount past the comments, the
       // `frame:` line and the `row` line to say the same thing — which is the
       // off-by-a-modifier bug `lineAt` exists to have fixed once.
-      const fixed = kept.filter(({ l }) => isTitleLine(l)).map(({ at }) => at);
+      const fixed = drawable.filter(({ l }) => isTitleLine(l)).map(({ at }) => at);
 
       // WHETHER THIS FENCE TITLES ITSELF (4.12 §A), for the same reason and in
       // the same place. A block that draws its own section bar cannot be a
@@ -934,6 +1011,10 @@ export class Widgets implements
       // makes that fence one card rather than two — `BlockComposites.pageBanner`
       // has the argument.
       let isPageBanner = false;
+      // The page head this fence drew, if the bar is on and it drew one. Not a
+      // flag: what the code below needs is the ELEMENT, so that a strip which
+      // prepends to the block lands under the note's name rather than over it.
+      let pageHead: HTMLElement | null = null;
       // How many TITLED header bars this fence has already drawn. It is the
       // handle a rename uses to find its own line back in the file, so it counts
       // exactly what the file counts: an untitled `header:` renders no title,
@@ -1214,9 +1295,32 @@ export class Widgets implements
         if (!INLINE_KINDS.has(kind)) {
           bar = null;
           headerGroup = null;
-          if (kind === "entry-header") isEntryBanner = true;
-          if (JOURNAL_BANNER_KINDS.has(kind)) isStudyBanner = true;
-          if (kind === TITLE_KEYWORD) isPageBanner = true;
+          // ── A HEAD IS NOT A BANNER, AND TAKES NONE OF ITS CHROME (4.51.6) ──
+          //
+          // These three flags choose the block's CARD — the accent wash of
+          // `.journal-page-banner`, the slim band of the other two. While the
+          // bar is on, the same three directives draw the page head instead,
+          // and a head in a banner's card is the furniture this release was
+          // asked to remove: *"the old Banner Sections need to be completely
+          // remade into stylistic property/page titles."*
+          //
+          // WITH THEM OFF THE BLOCK IS AN ORDINARY ONE — `.journal-widget-block`
+          // paints nothing on its own — so the head sits on the page's ground
+          // the way a heading does. **And it is exactly the block 4.51.5 built**,
+          // where these directives were filtered out before the loop ever saw
+          // them: a legacy fence whose markers live inside the banner still
+          // becomes the tracker section, with its card, its caption and its
+          // page-context strip. The head is one more child of it.
+          if (!quiet) {
+            if (kind === "entry-header") isEntryBanner = true;
+            if (JOURNAL_BANNER_KINDS.has(kind)) isStudyBanner = true;
+            if (kind === TITLE_KEYWORD) isPageBanner = true;
+          } else if (BANNER_KINDS.has(kind)) {
+            // KEPT SO THE STRIP CAN GO UNDER IT. Everything that prepends to
+            // this block does so because it is the tracker section's head; the
+            // note's own name is above all of it.
+            pageHead = widget;
+          }
           // The three flags above and `BANNER_KINDS` are one fact told twice —
           // which of them a block drew, and whether it drew any. They are kept
           // apart because the flags choose CHROME (three classes, three looks)
@@ -1379,7 +1483,7 @@ export class Widgets implements
         this.plugin.sections.entryContextFor(ctx.sourcePath) &&
         !isManagedTemplate(this.plugin, ctx.sourcePath)
       ) {
-        const strip = buildEntryContext(this.plugin, ctx);
+        const strip = buildEntryContext(this.plugin, ctx, quiet);
         // PREPENDED ON THE NEW SHAPE, APPENDED ON THE OLD ONE, and the two are
         // the same decision rather than a special case. On a note composed by
         // 4.20 or later this block is the tracker section and the strip is its
@@ -1388,7 +1492,12 @@ export class Widgets implements
         // FOOTER it has been since 3.7 — under the grid, where that release put
         // it. Neither reader sees anything move.
         if (strip) {
+          // AND UNDER THE HEAD WHERE THERE IS ONE (4.51.6). "Prepend" means
+          // *the head of this section*, and on a legacy fence the note's own
+          // name is now the first child of it — a strip above that would put
+          // the date over the title it belongs to.
           if (isEntryBanner) container.appendChild(strip);
+          else if (pageHead) pageHead.insertAdjacentElement("afterend", strip);
           else container.prepend(strip);
         }
       }
@@ -1400,7 +1509,11 @@ export class Widgets implements
       // entry's, were never composed anywhere else.
       if (hasTrackerRegion && !isEntryBanner && !isStudyBanner && !isPageBanner) {
         const facts = buildJournalContext(this.plugin, ctx);
-        if (facts) container.prepend(facts);
+        // Under the head, for the reason one block up.
+        if (facts) {
+          if (pageHead) pageHead.insertAdjacentElement("afterend", facts);
+          else container.prepend(facts);
+        }
       }
 
       // ── THE ROW, LAID OUT AFTER THE LOOP ────────────────────────────
@@ -1944,10 +2057,20 @@ export class Widgets implements
         // first ```almanac fence — which would render that fence as raw source
         // ("expand" it). Inline (not a fenced block) so the cursor resting on
         // its own line only ever reveals a short code span, never a wall of
-        // directives. Renders as a thin empty strip; carries no function today
-        // but is a named widget so it can gain one later without moving it.
-        widget = buildSpacer();
+        // directives.
+        //
+        // QUIETENED, NOT REMOVED, WHERE THE VAULT BAR DRAWS (4.51.1). The
+        // wordmark on a hairline is a top boundary, and with the bar above it
+        // that is a second one — the first vault render shows both, stacked.
+        //
+        // BUT THE ELEMENT STAYS, because its primary job is not decoration: it
+        // is *"where the cursor lands on open, so the first real ```almanac
+        // block below it isn't rendered raw"*. Deleting it would trade a
+        // duplicate rule for a fence that expands into source the moment a note
+        // is opened, which is the failure it was written to prevent.
+        widget = buildSpacer(bannerSuppressed(this.plugin, ctx.sourcePath));
         break;
+
       case "time":
         widget = buildTimeOrDate(this, rest, ctx, "time");
         break;
@@ -2046,21 +2169,54 @@ export class Widgets implements
       case "button":
         widget = buildButton(this, rest, ctx);
         break;
+      // ── THE IN-NOTE BANNERS (4.51) ──────────────────────────────────
+      //
+      // NOTHING IS REWRITTEN AND NOTHING IS RETIRED. Both directives stay in
+      // every note; while the vault bar is on, the FENCE drops their lines
+      // before this switch is reached — see `drawable`, which reads
+      // `BANNER_KINDS`. Turning the bar off restores every note exactly as it
+      // was, which is what makes the release reversible, and it is why neither
+      // word is in `RETIRED_WIDGETS`: an entry there is an instruction to
+      // `planLayout` to REMOVE the word from a reader's note, which would
+      // delete the fallback.
+      //
+      // A LATER RELEASE MAKES THESE A SMALLER SECONDARY BANNER rather than
+      // deleting them, which is the other reason to leave the words alone.
+      //
+      // THE SUPPRESSION IS NOT HERE, AND 4.51.1 IS WHY. Returning `null` from a
+      // case is how this switch says *unknown directive*, so the first cut drew
+      // a red "Unknown Almanac widget: journal-header" where each banner had
+      // been. A line with nothing to draw is a fact about the fence.
       case "entry-header":
-        // Live so the title updates the moment it's renamed. The header now
-        // carries only what's about *this* entry — its title and date
-        // navigator. The page's quick-links moved out to a standalone `links:`
-        // block (up under the spacer), so `entry-header` takes no arguments.
-        return liveFrontmatterWidget(this.plugin, ctx, () =>
-          buildEntryHeader(this.plugin, ctx)
-        );
       case "journal-header":
-        // Live for the same reason entry-header is: the breadcrumb pills
-        // and date read the note's own frontmatter, so a subject/topic/date
-        // edit repaints them immediately rather than on next file open.
-        return liveFrontmatterWidget(this.plugin, ctx, () =>
-          buildStudyHeader(this.plugin, ctx)
-        );
+        // THE HEAD, WHERE THE BAR IS DRAWING (4.51.6). Not `null` — see the
+        // note at the `drawable` filter for what `null` from a case means, and
+        // not nothing, because a required section that renders nothing is a
+        // section waiting to be deleted.
+        //
+        // ASKED HERE RATHER THAN PASSED IN, because this switch is a method of
+        // its own and the fence's `quiet` is a local two hundred lines up. The
+        // question is pure — settings and a path — so asking it twice per note
+        // costs nothing and passing it would thread a parameter through every
+        // case in the file.
+        //
+        // AND LIVE, LIKE THE BANNER IT STANDS IN FOR (4.51.7). The two lines
+        // below say why, and every word of it is true of the head — see
+        // `livePageHead`, which is where 4.51.6 dropped the wrapper.
+        if (bannerSuppressed(this.plugin, ctx.sourcePath)) {
+          return livePageHead(this.plugin, ctx);
+        }
+        // BOTH LIVE ON FRONTMATTER, AND FOR ONE REASON: an entry's title and a
+        // journal note's crumbs and date are all properties, so an edit
+        // repaints the band rather than waiting for the next file open. The two
+        // arms were separate until 4.51 and said this twice.
+        return kind === "entry-header"
+          ? liveFrontmatterWidget(this.plugin, ctx, () =>
+              buildEntryHeader(this.plugin, ctx)
+            )
+          : liveFrontmatterWidget(this.plugin, ctx, () =>
+              buildStudyHeader(this.plugin, ctx)
+            );
       case "links":
         return buildLinksRegion(this.plugin, rest, ctx);
       case "period-nav": {
@@ -2221,6 +2377,14 @@ export class Widgets implements
         return buildActivityChartRegion(this.plugin, ctx);
       case "title":
         // The page's own name, with the control that acts on the page. 4.5 §4.
+        //
+        // A DASHBOARD'S BANNER IS THIS DIRECTIVE, which is what makes it a
+        // member of `BANNER_KINDS` — and therefore one of the three that draw
+        // the PAGE HEAD instead of themselves while the bar is on (4.51.6).
+        // 4.51 guarded the two directives *called* headers and missed this one.
+        if (bannerSuppressed(this.plugin, ctx.sourcePath)) {
+          return livePageHead(this.plugin, ctx);
+        }
         //
         // THE ARGUMENT IS THE HEAD'S DESTINATIONS, NOT ITS NAME (4.10). The name
         // is still the file's, which is the whole of that decision — see

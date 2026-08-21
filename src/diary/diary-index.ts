@@ -418,6 +418,92 @@ export function searchEntries(
   return hits.slice(0, limit);
 }
 
+// ── ordering the hits (4.51) ──────────────────────────────────────────
+//
+// THE BANNER'S SEARCH IS THE FOURTH VIEW OVER THIS INDEX and the first that does
+// not filter by surface. It offers the reader a choice of what ranks the
+// results, which is the only genuinely new thing here — and it is a choice
+// between fields that already exist on `IndexedEntry` rather than a new
+// retrieval mode.
+//
+// EVERY UNIVERSAL FIELD, AND ONLY THOSE. A diary entry and a journal page differ
+// in almost everything; these four are on both, so a list mixing surfaces can be
+// ordered by any of them without half the rows having nothing to sort on. Mood
+// is diary-only and a journal rating is per-kind — see `queryNarrowsTo`, which
+// is how those become offerable.
+export type SortField = "relevance" | "date" | "title" | "tasks";
+
+export const SORT_FIELDS: { id: SortField; label: string }[] = [
+  { id: "relevance", label: "Relevance" },
+  { id: "date", label: "Date" },
+  { id: "title", label: "Title" },
+  { id: "tasks", label: "Open tasks" },
+];
+
+// The hits, ordered.
+//
+// RELEVANCE IS `searchEntries`' OWN ORDER, restated rather than re-derived: a
+// score descending, ties broken by recency. That is what every existing search
+// in the plugin shows, and the chip that names it must not quietly mean
+// something else.
+//
+// EVERY OTHER FIELD FALLS BACK TO RELEVANCE ON A TIE, so two notes with the same
+// date come out in the order the search would have given them anyway. A sort
+// that discards the score entirely would make an exact title match sink beneath
+// forty body matches from the same afternoon.
+//
+// DATELESS SORTS LAST, NEVER FIRST — `byDateDesc`'s rule, and 2.33's: *"a note
+// with no date has no position in the sequence, which is not the same as being
+// the oldest."*
+export function sortHits(
+  hits: readonly SearchHit[],
+  field: SortField
+): SearchHit[] {
+  const byScore = (a: SearchHit, b: SearchHit): number =>
+    b.score - a.score || byDateDesc(a.entry.iso, b.entry.iso);
+  const out = [...hits];
+  if (field === "relevance") return out.sort(byScore);
+  if (field === "date") {
+    return out.sort((a, b) => byDateDesc(a.entry.iso, b.entry.iso) || byScore(a, b));
+  }
+  if (field === "title") {
+    return out.sort(
+      (a, b) =>
+        a.entry.title.localeCompare(b.entry.title, undefined, {
+          sensitivity: "base",
+        }) || byScore(a, b)
+    );
+  }
+  // Most open work first, which is the only reading that makes this worth
+  // offering: a search sorted by tasks is a reader looking for what is unfinished.
+  return out.sort((a, b) => b.entry.openTasks - a.entry.openTasks || byScore(a, b));
+}
+
+// The one surface a query can only be about, or null when it spans both.
+//
+// WHAT IT IS FOR (4.51, Q12). A tracker sort — Mood, Confidence, Stars — is
+// meaningful over one surface and meaningless over two: Mood is the diary's,
+// and a journal rating is declared per KIND, so a Cooking journal's Difficulty
+// and a Study lesson's Confidence are not one column. Offering those chips over
+// a mixed list would be sorting by a field most rows have not got.
+//
+// SO THE CHIP APPEARS WHEN IT BECOMES MEANINGFUL rather than greying out, which
+// is `launcher.ts`'s rule reaching one surface further: **nothing dead is
+// drawn**. A reader who types `is:daily` has narrowed to the diary and the mood
+// chip arrives; a reader who has not, has not.
+//
+// `kind` IS THE ONLY NARROWING FILTER, and that is worth stating because three
+// others look like they should be. `from:`/`to:` narrow a RANGE and both
+// surfaces have dates; `tag:` and `has:` are on both. Only `is:` names a kind,
+// and a kind belongs to exactly one surface.
+export function queryNarrowsTo(
+  q: DiaryQuery,
+  diaryKinds: readonly string[]
+): IndexSurface | null {
+  if (!q.kind) return null;
+  return diaryKinds.includes(q.kind) ? "diary" : "journal";
+}
+
 // True when a query would do nothing — used to show the idle state rather than
 // listing the entire vault as "results".
 export function isEmptyQuery(q: DiaryQuery): boolean {

@@ -61,6 +61,7 @@ import { readEvents } from "../events/eventstore";
 import { draftEvent, openEventEditor } from "../events/event-ui";
 import { confirmAction, promptSuggester } from "../ui/modals";
 import { today } from "./util";
+import { initialsOf } from "../ui/vault-banner";
 import {
   BIN_FOLDER,
   binJournalFolders,
@@ -106,6 +107,36 @@ export interface AttachmentOptions {
   confirmDelete: boolean;
 }
 
+// What the vault banner is allowed to vary. 4.51.
+//
+// TWO FIELDS, AND THE SECOND IS THE ONLY THING THE READER PICKS. The nav slots
+// are fixed for this release — see `vault-banner.ts` — because configurable nav
+// is a settings surface, an ordering question and a migration, and none of it is
+// needed to find out whether the banner is right.
+export interface BannerOptions {
+  enabled: boolean;
+  // What the tile shows. Empty falls back to two initials from the vault's name,
+  // so a fresh vault has something in it rather than a blank square.
+  //
+  // A STRING RATHER THAN AN EMOJI TYPE: an emoji, one letter, three letters, a
+  // symbol — the tile is 38px and the CSS scales to fit whatever is put there.
+  glyph: string;
+  // Whether Almanac's own head and Properties window stand in for Obsidian's
+  // inline title and property panel, on the notes the bar reaches. 4.51.6.
+  //
+  // ON BY DEFAULT, WHICH `hideInlineTitle` WAS NOT (4.51.5, one release old).
+  // That flag hid a title and put nothing in its place, so it was a subtraction
+  // and had to be opted into. This is a REPLACEMENT: the page head names the
+  // note, in a face that says what kind of note it is and with the name
+  // editable, and the bar's Properties button holds every field the panel held.
+  // Turning it off is how a reader gets Obsidian's own two back — and turning
+  // the bar off does it too, which is what keeps the whole release reversible.
+  //
+  // SCOPED TO THE NOTES THE BAR DRAWS ON, always. A note Almanac has nothing to
+  // say about keeps Obsidian's chrome whatever this says.
+  absorb: boolean;
+}
+
 export interface AlmanacSettings {
   paths: typeof DEFAULT_PATHS;
   attachments: AttachmentOptions;
@@ -118,6 +149,13 @@ export interface AlmanacSettings {
   // render as one control that derives a `Sleep` (hours) property, which is
   // added as a chartable column. Off removes the derived tracker and shows the
   // two times as independent pickers.
+  // The vault banner: the strip of chrome above every Almanac note. 4.51.
+  //
+  // OFF IS THE OLD BEHAVIOUR EXACTLY. `journal-header` and `entry-header` draw
+  // their in-note banners again and nothing in any file has changed — which is
+  // the whole reason this is a toggle rather than a migration. See
+  // `ui/vault-banner.ts`.
+  banner: BannerOptions;
   sleepEnabled: boolean;
   // Whether special events are read and drawn. Off hides every decoration and
   // the upcoming list without touching the events note itself, so turning it
@@ -242,6 +280,11 @@ export const DEFAULT_SETTINGS: AlmanacSettings = {
     ...t,
     faces: t.faces ? [...t.faces] : undefined,
   })),
+  // ON BY DEFAULT, and that is a real choice rather than an oversight. The
+  // banner is what 4.51 is; shipping it off would make the release a setting
+  // nobody finds. Turning it off restores the in-note banners exactly, and
+  // nothing in any note has to change either way.
+  banner: { enabled: true, glyph: "", absorb: true },
   sleepEnabled: true,
   eventsEnabled: true,
   moodTrackerId: "Mood",
@@ -696,6 +739,18 @@ export class AlmanacSettingTab extends PluginSettingTab {
       )
     );
 
+    this.renderBanner(
+      this.group(
+        containerEl,
+        "banner",
+        "🏷️",
+        "Vault banner",
+        "The strip above every Almanac note",
+        false,
+        s.banner.enabled ? "On" : "Off"
+      )
+    );
+
     this.renderPaths(
       this.group(
         containerEl,
@@ -706,6 +761,71 @@ export class AlmanacSettingTab extends PluginSettingTab {
         false
       )
     );
+  }
+
+  // ── The vault banner ────────────────────────────────────────────────────
+  //
+  // TWO ROWS, AND NOT ONE MORE (4.51). The nav's four destinations are fixed
+  // for this release (Q9) and the search's sort is session state that
+  // deliberately never reaches `data.json` (Q13), so what is left is the only
+  // two things that are genuinely the reader's: whether the strip is there, and
+  // what its tile says.
+  //
+  // BOTH CALL `refresh()`, because every open note is already showing the old
+  // answer. A setting that takes effect on the next file-open is a setting the
+  // reader presses twice.
+  private renderBanner(containerEl: HTMLElement): void {
+    const s = this.plugin.settings;
+    this.note(
+      containerEl,
+      "A bar at the top of every note in your diary, your journals and your home page: search, the four places you go most, where this note sits, and its title.",
+      "While it is on, the header block inside those notes draws nothing — nothing is rewritten, so turning it off puts every note back exactly as it was."
+    );
+
+    new Setting(containerEl)
+      .setName("Show the banner")
+      .setDesc("Off restores the in-note headers.")
+      .addToggle((c) =>
+        c.setValue(s.banner.enabled).onChange(async (v) => {
+          s.banner.enabled = v;
+          await this.plugin.saveSettings();
+          this.plugin.vaultBanner.refresh();
+          // REDRAWN, because the group's own badge reads On or Off.
+          this.display();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Use Almanac's title and properties")
+      .setDesc(
+        "On the notes this bar appears on, replace Obsidian's note title with Almanac's page head, and its property panel with the bar's Properties button. The note's path, which Obsidian repeats in the tab's own header, is hidden with them. Off puts all three back."
+      )
+      .addToggle((c) =>
+        c.setValue(s.banner.absorb).onChange(async (v) => {
+          s.banner.absorb = v;
+          await this.plugin.saveSettings();
+          this.plugin.vaultBanner.refresh();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Tile")
+      .setDesc(
+        `What the square in the corner shows — a letter or two, or an emoji. Empty uses your vault's initials (${initialsOf(this.app.vault.getName())}).`
+      )
+      .addText((c) =>
+        c
+          .setPlaceholder(initialsOf(this.app.vault.getName()))
+          .setValue(s.banner.glyph)
+          .onChange(async (v) => {
+            // TRIMMED AND CAPPED HERE rather than in the banner, because a
+            // twelve-character tile is a broken row and the reader should see
+            // it refuse in the field they typed it into.
+            s.banner.glyph = v.trim().slice(0, 4);
+            await this.plugin.saveSettings();
+            this.plugin.vaultBanner.refresh();
+          })
+      );
   }
 
   // ── Special events ──────────────────────────────────────────────────────

@@ -261,7 +261,7 @@ describe("the footer is welded by the block that owns the card", () => {
     // which is to say, every time the reader edits the title the footer is
     // there to sit beneath.
     const w = readCode("widgets");
-    expect(w).toContain("buildEntryContext(this.plugin, ctx)");
+    expect(w).toContain("buildEntryContext(this.plugin, ctx, quiet)");
     expect(w).toContain("container.appendChild(strip)");
   });
 
@@ -272,7 +272,7 @@ describe("the footer is welded by the block that owns the card", () => {
     // is the footer it has been since 3.7 — under the grid, where that release
     // put it. Neither reader sees anything move, and nothing is migrated.
     const w = readCode("widgets");
-    const at = w.indexOf("buildEntryContext(this.plugin, ctx)");
+    const at = w.indexOf("buildEntryContext(this.plugin, ctx, quiet)");
     const after = w.slice(at, at + 260);
     expect(after).toContain("if (isEntryBanner) container.appendChild(strip)");
     expect(after).toContain("else container.prepend(strip)");
@@ -283,7 +283,7 @@ describe("the footer is welded by the block that owns the card", () => {
     // a tracker section as well — and an entry's strip would tell it which day
     // it was.
     const w = readCode("widgets");
-    const at = w.indexOf("buildEntryContext(this.plugin, ctx)");
+    const at = w.indexOf("buildEntryContext(this.plugin, ctx, quiet)");
     const guard = w.slice(at - 400, at);
     expect(guard).toContain("hasTrackerRegion");
     expect(guard).toContain("entryContextFor(ctx.sourcePath)");

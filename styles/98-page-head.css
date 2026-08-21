@@ -1,0 +1,113 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+   Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+
+   Licensed under the GNU Affero General Public License v3.0 or later, with
+   attribution and naming terms under its section 7. See LICENSE and
+   LICENSING.md. */
+
+/* THE PAGE HEAD — 4.51.6.
+
+   Its own file rather than the bar's, because it is not the bar: the bar is
+   chrome on the leaf, and this is the first thing IN the note. What ties them
+   together is only that the head exists because the bar absorbed Obsidian's
+   title — see `page-head.ts` for that argument, and `97-vault-banner.css` for
+   the rule that hides what it stands in for. */
+
+/* ── The page head ───────────────────────────────────────────────────────
+   The remade Banner section: what a page calls itself, over what kind of page
+   it is. See `page-head.ts` for why it carries no properties.
+
+   NO CARD, WHICH IS THE WHOLE OF ITS LOOK. Every other block on an Almanac
+   note is a bordered surface, and a note that opens with one more of them
+   opens with furniture. This is the note's own head — it takes the page's
+   ground, the way a heading does, and the only rule on it is the one under it
+   that separates it from the first block. */
+.journal-page-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--am-space-4);
+  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+}
+.journal-page-head .jph-eyebrow {
+  color: var(--text-accent);
+  font-size: var(--am-text-2xs);
+  font-weight: var(--am-caps-weight);
+  letter-spacing: var(--am-caps-tracking);
+  text-transform: uppercase;
+}
+.journal-page-head .jph-titlerow {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+/* THE FACE OBSIDIAN'S INLINE TITLE HAD, because this stands in its place and a
+   reader should not be able to tell that anything moved — except that this one
+   knows what the note is and can be clicked. */
+.journal-page-head .jph-title {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--am-space-3);
+  font-size: var(--am-text-xl);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-normal);
+  cursor: text;
+}
+/* A NAME THE READER DID NOT TYPE TAKES NO TEXT CURSOR (4.51.7). A period
+   dashboard's head prints *August 2026* — a fact about which window the page is
+   on, not a name anyone owns — so the row is text: no pencil is attached, and
+   the caret that says "click me" must not be either. */
+.journal-page-head .jph-title.is-fixed {
+  cursor: default;
+}
+.journal-page-head .jph-title-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Hover-revealed, at rest on touch — `94-native-tables.css`'s rule and the
+   same exception. */
+.journal-page-head .jph-title-edit {
+  display: flex;
+  align-self: center;
+  opacity: 0;
+  color: var(--text-faint);
+  transition: opacity 120ms ease;
+}
+.journal-page-head .jph-title-edit .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.journal-page-head .jph-title:hover .jph-title-edit {
+  opacity: 1;
+}
+@media (hover: none) {
+  .journal-page-head .jph-title-edit {
+    opacity: 0.55;
+  }
+}
+/* In place, on the title's own metrics, so the row does not jump when clicked. */
+.journal-page-head .jph-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: none;
+  border-bottom: var(--am-rule) solid var(--interactive-accent);
+  border-radius: 0;
+  background: transparent;
+  font-size: var(--am-text-xl);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-normal);
+}
+.journal-page-head .jph-title-input:focus {
+  box-shadow: none;
+}
+.journal-page-head .jph-sub {
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  font-variant-numeric: tabular-nums;
+}

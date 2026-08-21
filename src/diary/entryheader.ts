@@ -57,6 +57,7 @@ import { CLASS_DEFS } from "../trackers/trackers";
 import { labelForGrain, entryDateKey } from "./nav";
 import type { TrackerClass } from "../trackers/trackers";
 import { entryContext } from "./nav";
+import type { EntryContext } from "./nav";
 import {
   filesUnder,
   frontmatterOf,
@@ -466,7 +467,18 @@ export function buildEntryHeader(
 // would strand the stepper in the middle on a note with no alias offered.
 export function buildEntryContext(
   plugin: AlmanacPlugin,
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext,
+  // Whether the vault banner is drawing this note's title (4.51.5). When it is,
+  // the alias editor below is that same control a second time — same property,
+  // same note, forty pixels apart — so the strip keeps only what the bar has
+  // not got: the date, and the navigator between entries.
+  //
+  // A PARAMETER RATHER THAN A CALL, so this module keeps knowing nothing about
+  // the bar. The dispatcher already computes the answer once per note for its
+  // own filter, and passing it costs one argument where importing it would cost
+  // a cycle: `vault-banner.ts` imports `TITLE_PROP` and `entryDateLabel` from
+  // here.
+  titleElsewhere = false
 ): HTMLElement | null {
   const app = plugin.app;
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
@@ -481,6 +493,19 @@ export function buildEntryContext(
   // as a subtitle, which made this row a title, a date and a navigator — three
   // things that fit a desktop pane and wrap onto two lines on a phone. The date
   // is on the caption row over the grid now, where it has a row to itself.
+  if (titleElsewhere) {
+    // AND NOTHING TAKES THE ALIAS'S PLACE. The date already has a slot — the
+    // caption row over the grid, where 4.21.2 put it precisely so this row
+    // would not be a title, a date and a navigator at once — so moving it up
+    // here would be that release undone in the name of filling a gap.
+    //
+    // The row is the navigator alone, and says so: `jec-nav-only` tightens it,
+    // because a control on its own does not need a row's worth of height.
+    bar.addClass("jec-nav-only");
+    buildEntryNav(plugin, bar, file, c);
+    return bar;
+  }
+
   const fm = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
   // ── MUTABLE, AND THAT IS THE FIX (4.21.3) ───────────────────────────
   //
@@ -601,14 +626,28 @@ export function buildEntryContext(
   renderTitle();
   titleEl.addEventListener("click", beginEdit);
 
-  // ── the navigator, on the right ─────────────────────────────────────
-  //
-  // Three connected segments — prev chevron, "Jump to day/month" trigger, next
-  // chevron — that read as one control.
+  buildEntryNav(plugin, bar, file, c);
+  return bar;
+}
+
+// The navigator, on the right.
+//
+// Three connected segments — prev chevron, "Jump to day/month" trigger, next
+// chevron — that read as one control.
+//
+// LIFTED OUT IN 4.51.5 so the two shapes of the strip cannot drift. It is the
+// half the vault banner does NOT replace — the bar says which note this is and
+// this says which one is next — so it is drawn on both paths, and drawing it
+// twice by hand is how one of them loses a chevron.
+function buildEntryNav(
+  plugin: AlmanacPlugin,
+  bar: HTMLElement,
+  file: TFile,
+  c: EntryContext
+): void {
+  const app = plugin.app;
   const navGroup = bar.createDiv({ cls: "jeh-nav jeh-seg" });
   navPill(navGroup, app, c.prev, "chevron-left", `Earliest ${CLASS_DEFS[c.grain].periodNoun}`, "left");
   buildDatePicker(plugin, navGroup, file, c.grain);
   navPill(navGroup, app, c.next, "chevron-right", `Latest ${CLASS_DEFS[c.grain].periodNoun}`, "right");
-
-  return bar;
 }

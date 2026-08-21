@@ -16,6 +16,8 @@ import { SectionInserter } from "./ui/section-insert";
 import { wantsReadingMode } from "./core/viewmode";
 import { PathWatch, pruneCollapsedSections } from "./core/pathwatch";
 import { PageWidth } from "./ui/page-width";
+import { VaultBanner } from "./ui/vault-banner";
+import { openVaultSearch } from "./ui/search-all";
 import {
   getFile,
   moment,
@@ -69,6 +71,7 @@ export default class AlmanacPlugin extends Plugin {
   sections!: SectionInserter;
   pathWatch!: PathWatch;
   pageWidth!: PageWidth;
+  vaultBanner!: VaultBanner;
   // Reads and writes the per-journal manifest, and adopts a journal folder
   // that arrived without one. See journal-import.ts.
   journalImport!: JournalImporter;
@@ -126,11 +129,13 @@ export default class AlmanacPlugin extends Plugin {
     this.sections = new SectionInserter(this.app, this);
     this.pathWatch = new PathWatch(this.app, this);
     this.pageWidth = new PageWidth(this.app, this);
+    this.vaultBanner = new VaultBanner(this.app, this);
     this.journalImport = new JournalImporter(this.app, this);
 
     this.widgets.register();
     this.pathWatch.register();
     this.pageWidth.register();
+    this.vaultBanner.register();
 
     this.addSettingTab(new AlmanacSettingTab(this.app, this));
     this.registerCommands();
@@ -408,6 +413,24 @@ export default class AlmanacPlugin extends Plugin {
   }
 
   private registerCommands(): void {
+    // THE SEARCH, AND ITS SHORTCUT (4.51). A command rather than a hotkey bound
+    // here: Obsidian's own settings are where a reader rebinds it, and a plugin
+    // that claims `Ctrl K` outright takes it from whatever they had on it. The
+    // banner's field shows that default rather than reading the reader's
+    // binding, which is not on the public API — see `search-all.ts`.
+    //
+    // IT COLLIDES WITH CORE'S *Insert Markdown link*, KNOWINGLY. `Mod K` is a
+    // requested default (4.51, Q10) and Obsidian flags the clash in its own
+    // Hotkeys pane, where either side can be rebound. Declaring it as a
+    // `hotkeys` DEFAULT rather than registering a keymap is what keeps that
+    // true: a reader who wants the link shortcut back clears one row.
+    this.addCommand({
+      id: "almanac-search-everything",
+      name: "Search everything",
+      hotkeys: [{ modifiers: ["Mod"], key: "k" }],
+      callback: () => openVaultSearch(this),
+    });
+
     // ONE TABLE, TWO DOORS (3.13 §7). This used to be thirty-one hand-written
     // `addCommand` calls, with `openMenu` separately hand-writing thirteen menu
     // items and duplicating each callback inline. The two lists had diverged in
@@ -663,6 +686,17 @@ export default class AlmanacPlugin extends Plugin {
       {},
       DEFAULT_SETTINGS.attachments,
       this.settings.attachments ?? {}
+    );
+
+    // And the banner options, on the same rule (4.51). A data.json written
+    // before this release has no `banner` key at all, and a shallow assign would
+    // be fine for that — but a hand-edited one with `{"enabled": false}` and no
+    // glyph would arrive with `glyph: undefined`, which the tile would then try
+    // to render.
+    this.settings.banner = Object.assign(
+      {},
+      DEFAULT_SETTINGS.banner,
+      this.settings.banner ?? {}
     );
 
     // Give every journal level the stable id 2.43 introduced. Done once, here,

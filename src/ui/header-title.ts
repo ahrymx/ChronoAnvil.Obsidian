@@ -477,6 +477,85 @@ export function attachHeaderRename(
 // banner already used.
 const ILLEGAL_NAME = /[\\/:*?"<>|]/;
 
+// The same control, writing a PROPERTY instead of the filename. 4.51.6.
+//
+// WHY IT LIVES BESIDE `attachNoteRename` RATHER THAN AT ITS CALLER. They are one
+// affordance with two targets — `titleTargetFor` picks between them and says
+// why — and a reader who learns the pencil on a journal note meets the same
+// pencil on a diary entry. Two implementations in two files is how one of them
+// grows a placeholder or an Escape key the other has not got.
+//
+// THE PLACEHOLDER IS THE VALUE'S FALLBACK, WHICH IS THE WHOLE OF THE DIFFERENCE
+// FROM A RENAME. An entry with no title is not untitled — it is called by its
+// date — so clearing the field deletes the property and the date comes back.
+// There is no way to end up with a nameless entry, which is why this one may
+// commit an empty value where a rename may not.
+export function attachPropertyRename(
+  app: App,
+  row: HTMLElement,
+  file: TFile,
+  prefix: string,
+  prop: string,
+  fallback: string
+): void {
+  const el = row.createDiv({ cls: prefix });
+  const read = (): string => {
+    const fm = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+    const v = fm[prop];
+    return typeof v === "string" ? v.trim() : "";
+  };
+
+  const render = (): void => {
+    el.empty();
+    el.createSpan({ cls: `${prefix}-text`, text: read() || fallback });
+    setIcon(el.createSpan({ cls: `${prefix}-edit` }), "pencil");
+  };
+
+  const edit = (): void => {
+    el.empty();
+    const input = el.createEl("input", {
+      type: "text",
+      cls: `${prefix}-input`,
+      attr: { placeholder: fallback },
+    });
+    input.value = read();
+    // ONE COMMIT PER EDIT, for `attachNoteRename`'s reason two screens down:
+    // Enter commits, the commit re-renders, re-rendering detaches the focused
+    // input, and detaching fires `blur` — which would commit a second time.
+    let settled = false;
+    const commit = (save: boolean): void => {
+      if (settled) return;
+      settled = true;
+      const next = input.value.trim();
+      // NOTHING IS WRITTEN WHEN NOTHING WOULD CHANGE. A `processFrontMatter`
+      // that leaves a file identical still moves its modified time, which is a
+      // lie about the reader's vault that sync then propagates.
+      if (save && next !== read()) {
+        void app.fileManager.processFrontMatter(file, (fm) => {
+          if (next) fm[prop] = next;
+          else delete fm[prop];
+        });
+      }
+      render();
+    };
+    input.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter") {
+        evt.preventDefault();
+        commit(true);
+      } else if (evt.key === "Escape") {
+        evt.preventDefault();
+        commit(false);
+      }
+    });
+    input.addEventListener("blur", () => commit(true));
+    input.focus();
+    input.select();
+  };
+
+  el.addEventListener("click", edit);
+  render();
+}
+
 export function attachNoteRename(
   app: App,
   row: HTMLElement,

@@ -105,10 +105,24 @@ import { settingsButton } from "../section-frame";
 //
 // SEPARATED FROM THE DRAWING so the "draw no control" decision is made once and
 // before the button exists, rather than by a menu that opens empty.
-function sectionsMenuFor(
+// EXPORTED SINCE 4.51.1, SO THE VAULT BANNER'S COG OPENS THIS MENU AND NOT A
+// SECOND ONE. That banner drew its own two items — *Edit sections…* and *Add a
+// section…* — and silently dropped *Wide page*, which is the setting a
+// dashboard's reader is most likely to want and the one with no other door. The
+// same argument `journalBannerMenu` was split out for, on the other surface: the
+// cog moves, what it offers must not fork.
+//
+// `isWide` IS A CALLBACK, NOT THE CARD. It was the card only to read one class
+// off it, and the vault banner has no card — it has the view, which
+// `page-width.ts` marks with `WIDE_PAGE_CLASS`. Both are the same argument this
+// function already made about reading the RENDER rather than the file: *the
+// menu is built on click, so by the time this runs the marker is the note's
+// answer.* A callback is what lets each caller name its own marker without this
+// function learning about either.
+export function sectionsMenuFor(
   plugin: AlmanacPlugin,
   notePath: string,
-  card: HTMLElement
+  isWide: () => boolean
 ): ((menu: Menu) => void) | null {
   // `editSectionsHere` and `addSectionHere` both resolve the surface themselves
   // and both report when they cannot. What is asked here is the narrower
@@ -150,7 +164,7 @@ function sectionsMenuFor(
     // second source of truth for one fact. `links.ts` marks a checked item the
     // same way.
     menu.addSeparator();
-    const wide = card.hasClass(WIDE_CLASS);
+    const wide = isWide();
     menu.addItem((i) =>
       i
         .setTitle("Wide page")
@@ -286,7 +300,9 @@ export function buildPageTitle(
   const titleRow = row.createDiv({ cls: "jtc-titlerow" });
   attachNoteRename(plugin.app, titleRow, file, "jtc-title");
 
-  const build = sectionsMenuFor(plugin, ctx.sourcePath, root);
+  const build = sectionsMenuFor(plugin, ctx.sourcePath, () =>
+    root.hasClass(WIDE_CLASS)
+  );
   if (build) {
     // `settingsButton` builds its menu ON CLICK, which is what keeps this cheap
     // on a note that renders it on every open and correct when the note has

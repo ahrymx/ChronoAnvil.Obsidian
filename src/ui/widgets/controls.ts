@@ -74,9 +74,14 @@ export interface EntryControlHost extends WidgetHost {
  * Carries no behaviour and no host dependency — see the dispatch comment in
  * index.ts for why a note wants one at line 0.
  */
-export function buildSpacer(): HTMLElement {
-  const wrap = createDiv({ cls: "journal-spacer" });
-  wrap.createSpan({ cls: "journal-spacer-mark", text: "Almanac" });
+// `quiet` DROPS THE MARK AND KEEPS THE ELEMENT (4.51.1). The wordmark on a
+// hairline is a top boundary for the note, and the vault banner is a louder one
+// six pixels above it — two rules stacked, which is what the first vault render
+// of that bar showed. The element itself stays either way: its primary job is
+// being where the cursor lands on open, and nothing about that changes.
+export function buildSpacer(quiet = false): HTMLElement {
+  const wrap = createDiv({ cls: "journal-spacer" + (quiet ? " is-quiet" : "") });
+  if (!quiet) wrap.createSpan({ cls: "journal-spacer-mark", text: "Almanac" });
   return wrap;
 }
 

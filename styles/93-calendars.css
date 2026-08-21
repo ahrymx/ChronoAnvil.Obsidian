@@ -2271,6 +2271,19 @@
      which segment read it, which is the exact failure it exists to end. */
   --jpn-headline: 1.36em;
 }
+/* AND A CONTROL'S SIZE WHERE THE PAGE HEAD IS DRAWING (4.51.7). The head above
+   prints this exact period as the note's name, so a trigger still wearing the
+   title's size is the page's headline said twice — once as a name and once as a
+   button. Demoted through the ONE token, which is why that token exists: the
+   label, the caret and the chevrons outside the trigger all follow it without
+   a rule of their own.
+
+   `job-head-elsewhere` is put on by `buildOverviewBanner` and only while the
+   bar is on — with it off there is no head, and this control is the only thing
+   on the page that names the period. */
+.journal-overview-banner.job-head-elsewhere .journal-period-nav.jeh-seg {
+  --jpn-headline: 1em;
+}
 /* No height of their own: the row's height belongs to the headline now. The
    width stays fixed because it IS the optical air either side of the title,
    and it has to equal the trigger's padding. */

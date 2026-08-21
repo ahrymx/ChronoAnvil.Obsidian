@@ -1170,6 +1170,36 @@ export function journalTypeOfNote(
   return typeRecognised(type, raw) ? type : undefined;
 }
 
+// The journal a note SITS IN, whatever the note says about itself. 4.51.7.
+//
+// ── TWO QUESTIONS, AND THEY ARE NOT THE SAME ONE ────────────────────────
+//
+// `journalTypeOfNote` above answers *"is this one of this journal's notes"* —
+// path AND a recognised `type:` — because the callers that ask it REFUSE things:
+// a misplaced `tracker:`, a chart on the wrong surface. A stray note under a
+// journal's root must not be adopted by those.
+//
+// This answers *"which journal's folders is this note under"*, and nothing it
+// feeds refuses anything. It exists because a journal's own DASHBOARD carries no
+// `type:` at all — so the strict answer is "no journal", and the first vault
+// render of 4.51.6 duly showed `Study/Study.md` labelled *Journal* in the bar
+// and drawing no eyebrow at all, on the one page in that folder whose whole
+// subject is the journal.
+//
+// LABELS ASK THIS ONE; REFUSALS ASK THE OTHER. Written down here because the
+// two names are one word apart.
+export function journalTypeAtPath(
+  plugin: AlmanacPlugin,
+  notePath: string
+): JournalType | undefined {
+  const types = registeredJournalTypes(plugin);
+  const id = journalTypeOfPath(
+    types.map((t) => ({ typeId: t.id, root: t.root })),
+    notePath
+  );
+  return id == null ? undefined : types.find((t) => t.id === id);
+}
+
 // Shared by the resolver above and by classifyNote, so the surface layer and
 // the type layer cannot disagree about what counts as one of a journal's notes.
 export function typeRecognised(type: JournalType, raw: unknown): boolean {

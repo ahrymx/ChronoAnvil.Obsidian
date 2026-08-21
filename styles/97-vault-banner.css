@@ -1,0 +1,832 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+   Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+
+   Licensed under the GNU Affero General Public License v3.0 or later, with
+   attribution and naming terms under its section 7. See LICENSE and
+   LICENSING.md. */
+
+/* ── The vault banner ────────────────────────────────────────────────────
+   4.51. The strip above every Almanac note, injected into the note's scroll
+   container by `vault-banner.ts` rather than rendered from a directive.
+
+   ── IT IS ON THE LEAF, NOT IN THE NOTE (4.51.3) ────────────────────────
+
+   It is the first child of `.workspace-leaf-content`, above Obsidian's own view
+   header, so it spans the whole leaf and stays put while the note scrolls under
+   it. `flex: 0 0 auto` because that container is a column flexbox and the view
+   below is the part that grows.
+
+   THE ROUNDING AND THE MARGINS WENT WITH THE MOVE. A card floating at the top
+   of a text column is one thing; a strip welded between two toolbars is
+   another, and it takes a bottom border and square corners for the same reason
+   the toolbars either side of it do.
+
+   ── IT IS A TOOLBAR, AND IT HAD TO LOOK LIKE ONE (4.51.2) ──────────────
+
+   The first cut was a transparent strip with a hairline under it, on the
+   argument that chrome should be quiet. The vault render disagreed and the
+   reference the reader asked it to follow disagrees too: with no ground of its
+   own the bar reads as the first paragraph of the note rather than as furniture
+   above it, and its controls read as content.
+
+   So it has a ground, a border and a radius — the shape of a toolbar. What it
+   still does NOT have is `.journal-page-banner`'s 45° hatch and accent wash.
+   Those are for the opening of a page, which is meant to be looked at. This is
+   the same on every note, and a reader who notices it twice a day is a reader
+   it has failed.
+
+   THE ACCENT IS SPENT ON THE TILE. One saturated square in the corner says
+   which plugin this belongs to; a second accented thing would make the strip
+   compete with the note under it.
+
+   AND IT NOW SPANS THE WHOLE LEAF FOR FREE, which 4.51.2 could not do: reaching
+   a pane edge from inside the sizer meant measuring in JavaScript on every
+   resize, or a fixed negative margin that overflows the moment a reader turns
+   *readable line length* off. Outside the note there is nothing to bleed past.
+
+   ── IT IS ITS OWN QUERY CONTAINER ──────────────────────────────────────
+   `container-type: inline-size` here, and NOT borrowed from
+   `.journal-widget-block`. That block is what every other `@container` rule
+   in styles/ measures against, and this banner is not inside one. Declaring
+   its own is what makes the 330px collapse measure THE BANNER, which is what
+   was asked for (4.51, Q5), rather than the window. A sidebar leaf and a
+   narrow split get the collapsed strip; a wide window with a narrow note does
+   too. */
+.am-vault-banner {
+  container-type: inline-size;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-space-3);
+  padding: var(--am-space-3) var(--am-space-5);
+  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  /* THE READER'S CURSOR IS NOT IN HERE. The banner sits inside the editor's
+     own sizer in Live Preview, so a click that lands on padding rather than
+     on a control would otherwise put a caret in the note behind it. */
+  user-select: none;
+}
+
+/* OBSIDIAN'S TITLE AND PROPERTY PANEL, STOOD IN FOR (4.51.6). Scoped to the
+   leaf the bar drew on — see `HIDE_TITLE_CLASS`, put on and taken off in the
+   same two lines as the bar itself — and only with `banner.absorb`, which is on
+   by default because Almanac puts something in each one's place: the page head
+   names the note, and the bar's Properties button holds the fields.
+
+   `visibility` RATHER THAN `display`, and it is not a preference: in Live
+   Preview both of these are editable regions CodeMirror measures, and removing
+   one from layout mid-session is a class of bug — a stranded cursor, a
+   mis-measured scroll — that this feature is nowhere near worth. Hidden, with
+   the height collapsed, and still there for anything that reaches for it. */
+.am-absorb-host-chrome .inline-title,
+.am-absorb-host-chrome .metadata-container {
+  visibility: hidden;
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  overflow: hidden;
+}
+/* AND THE THIRD NAMING (4.51.7). Obsidian centres the note's whole PATH in its
+   view header — `02 - Diary / Daily / Day-2026-08-20` — directly under a trail
+   reading `Diary › Thu 20 Aug 2026` and directly over a head reading the same
+   date. Three names in two centimetres, which is the count this release has
+   spent five patches bringing down.
+
+   THE TITLE TEXT ONLY, AND NOT THE HEADER. The back and forward arrows, the
+   reading/editing toggle and Obsidian's own ⋯ live in the same bar and none of
+   them is replaced by anything Almanac draws — hiding the bar would take four
+   controls to remove one label. `display: none` is safe here where it is not
+   safe on the other two: this is a static label, not an editable region
+   CodeMirror measures. */
+.am-absorb-host-chrome .view-header-title-container {
+  display: none;
+}
+
+/* ── Row one: who you are, what you are looking for, where you can go ──── */
+
+.am-vault-banner .avb-global {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-4);
+}
+
+/* THE LOCKUP: the mark, the vault's name, and which part of it you are in.
+   One button — pressing any of the three opens Almanac's settings, which is
+   where the mark itself is set. */
+.am-vault-banner .avb-id {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-3);
+  padding: var(--am-space-1) var(--am-space-2);
+  margin: calc(-1 * var(--am-space-1)) calc(-1 * var(--am-space-2));
+  border-radius: var(--am-radius-sm);
+  cursor: pointer;
+}
+.am-vault-banner .avb-id:hover {
+  background: var(--background-modifier-hover);
+}
+/* A FIXED SQUARE WITH CENTRED CONTENT, because the glyph is the reader's
+   (4.51, Q7) and may be an emoji, one letter, or three — and the row must not
+   change height for any of them. */
+.am-vault-banner .avb-tile {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--am-radius-sm);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: var(--am-text-sm);
+  font-weight: var(--am-caps-weight);
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+.am-vault-banner .avb-id-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.am-vault-banner .avb-id-name {
+  color: var(--text-normal);
+  font-size: var(--am-text-sm);
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.am-vault-banner .avb-id-sub {
+  color: var(--text-faint);
+  font-size: var(--am-text-2xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A BUTTON DRESSED AS A FIELD. It opens the search window; it is not one.
+   The affordance still has to read as "type here", which is what the icon and
+   the placeholder-coloured text do — and the shortcut is spelled on it so the
+   second time the reader wants it they do not need the mouse. */
+/* IT TAKES THE ROOM (4.51.9), AND THE CAP IS GONE.
+   4.51.5 capped it at 460px on the argument that an uncapped field left the bar
+   as *"a mark, a half-kilometre of empty input, and four buttons pinned to the
+   far edge — three groups that never settle into one object."* Two renders
+   answered that: at 460 the reader asked whether it had shrunk, at 620 a
+   1786px pane still showed 700px of nothing between the field and the tiles,
+   and the instruction was to make it *"scale to fit the full width."*
+
+   THE ARGUMENT WAS RIGHT ABOUT THE FAULT AND WRONG ABOUT THE CAUSE. What makes
+   three groups is the GAP, not the field's length — an empty middle is what
+   stops a row reading as one object, and a cap is what creates the empty
+   middle. Filled, the bar is a mark, a field and a nav: three parts touching,
+   which is a toolbar. `margin-right: auto` goes with the cap; with nothing left
+   to push, a rule that only fires when the field is short is a rule waiting to
+   be wrong. */
+.am-vault-banner .avb-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-2);
+  height: 34px;
+  padding: 0 var(--am-space-4);
+  border: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  cursor: text;
+}
+.am-vault-banner .avb-search:hover {
+  border-color: var(--background-modifier-border-hover);
+  background: var(--background-modifier-hover);
+}
+.am-vault-banner .avb-search-icon {
+  display: flex;
+  color: var(--text-faint);
+}
+.am-vault-banner .avb-search-icon .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.am-vault-banner .avb-search-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.am-vault-banner .avb-kbd,
+.am-search-modal .ams-kbd {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-secondary);
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-size: var(--am-text-2xs);
+  line-height: 1.5;
+}
+
+/* THE DESTINATIONS ARE TILES, NOT LINKS (4.51.2). Four of them, read as a set
+   and pressed without aiming — the icon carries the meaning and the word
+   confirms it, stacked so both fit in a target the width of the word. Drawn as
+   a row of small buttons they were the least prominent thing on a bar whose
+   whole job is going somewhere.
+
+   AND IT IS THE GROUND THAT MADE THEM CARDS, NOT THE EDGE (4.51.8, corrected in
+   4.51.9). 4.51.2 gave each tile a border AND a filled ground, and the vault
+   render read them as *"punchout cards"* — four filled boxes on a bar that is
+   itself a filled box, which is one nesting more than a toolbar can carry.
+   Taking both away left the row with nothing to say where one target ends and
+   the next begins, reported in the same words one render later: *"the buttons
+   don't have any border lines."*
+
+   SO THE FILL GOES AND THE EDGE STAYS. A hairline on the bar's own ground is a
+   button's outline; a hairline around a second ground is a card sitting on a
+   card. The target keeps its size, the icon and the word still sit one over the
+   other, and what says "pressed" is the ground that appears UNDER THE POINTER
+   rather than one painted in advance — `94-native-tables.css`'s rule reaching
+   the bar, and the reason the trail's cog has always been hover-revealed. */
+.am-vault-banner .avb-nav {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  gap: var(--am-space-2);
+}
+.am-vault-banner .avb-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 56px;
+  padding: var(--am-space-2) var(--am-space-3);
+  border: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.am-vault-banner .avb-btn:hover {
+  border-color: var(--background-modifier-border-hover);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.am-vault-banner .avb-btn:focus-visible {
+  outline: var(--am-rule) solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+/* WHERE YOU ALREADY ARE IS NOT A DESTINATION, and saying so is cheaper than a
+   reader pressing Today on today's note and wondering why nothing happened.
+   Marked rather than disabled: it still opens the note, which is the harmless
+   thing to do, and a disabled control on a nav bar is a control that teaches
+   the reader this plugin's buttons are sometimes decoration. */
+/* AND "YOU ARE HERE" IS THE INK FIRST (4.51.8), WITH THE EDGE AGREEING (4.51.9).
+   While the tiles were edgeless an accent BORDER would have been the only box on
+   the row — which reads as the one tile that is still a card rather than as the
+   one you are on. Now that every tile is outlined that reading is gone, so the
+   accent takes both: the glyph and the word, where the reader is already
+   looking, and the outline, which is what carries across the row.
+
+   The label thickens too, so the mark survives a theme whose accent sits close
+   to its text colour. */
+.am-vault-banner .avb-btn.is-on {
+  border-color: var(--interactive-accent);
+  color: var(--text-accent);
+}
+.am-vault-banner .avb-btn.is-on .avb-btn-label {
+  font-weight: 700;
+}
+.am-vault-banner .avb-btn.is-on:hover {
+  color: var(--text-accent-hover);
+}
+.am-vault-banner .avb-btn-icon {
+  display: flex;
+}
+.am-vault-banner .avb-btn-icon .svg-icon {
+  width: 17px;
+  height: 17px;
+}
+/* The menu tile's caret. Smaller than the icon and faint, because it is the
+   only part of this row that is not a destination — it says "there is a list
+   behind this one" and should not read as a fifth glyph. */
+.am-vault-banner .avb-btn-caret {
+  display: flex;
+  color: var(--text-faint);
+}
+.am-vault-banner .avb-btn-caret .svg-icon {
+  width: 11px;
+  height: 11px;
+}
+/* A MENU TILE IS WIDER THAN A DESTINATION, because its label is a scope's name
+   — "Quarterly Overview" — rather than one word, and eliding it would lose the
+   position reading the label is there to give. */
+.am-vault-banner .avb-btn-menu {
+  flex-direction: row;
+  gap: var(--am-space-2);
+  min-width: 0;
+}
+.am-vault-banner .avb-btn-menu .avb-btn-label {
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.am-vault-banner .avb-btn-label {
+  font-size: var(--am-text-2xs);
+  font-weight: var(--am-caps-weight);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── Row two: where this note sits, ending in what it is called ────────── */
+
+.am-vault-banner .avb-trail {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-2);
+  min-width: 0;
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+}
+.am-vault-banner .avb-sep {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+/* The crumbs themselves are styled with the study header's, in
+   `30-header-bars.css`, because they are the same trail drawn by the same
+   `renderCrumb` — see the note there. */
+/* THE LAST CRUMB IS THIS NOTE, and it is the only one that is not a link —
+   `study-header`'s trail settled that: *a trail names a note's ancestors, never
+   the note itself.* Drawing it anyway is what tells the reader the trail is
+   finished rather than truncated.
+
+   TEXT, NOT AN EDITOR, SINCE 4.51.6. It was the bar's title for four patches,
+   because Obsidian's inline title made three names for one note and this was
+   the one worth keeping. The head below is the fourth answer and the right one:
+   a page names itself in a page's face, and a breadcrumb goes back to saying
+   where you are. `98-page-head.css` has the pencil now. */
+.am-vault-banner .avb-here {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  color: var(--text-normal);
+  font-weight: 650;
+}
+.am-vault-banner .avb-here-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.am-vault-banner .avb-meta {
+  flex: 0 0 auto;
+  margin-left: var(--am-space-2);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+/* THE COG IS PUSHED TO THE FAR CORNER, and that is not a layout preference.
+   `study-header.ts` states it: *"a control next to it would be a control one
+   slip away from renaming the note."* The title is click-to-edit; the gap is
+   the safety. */
+.am-vault-banner .avb-cog {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  padding: 3px;
+  border-radius: var(--am-radius-sm);
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 120ms ease;
+  cursor: pointer;
+}
+.am-vault-banner .avb-cog .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.am-vault-banner:hover .avb-cog,
+.am-vault-banner .avb-cog:focus-visible {
+  opacity: 1;
+}
+.am-vault-banner .avb-cog:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+@media (hover: none) {
+  .am-vault-banner .avb-cog {
+    opacity: 0.55;
+  }
+}
+
+/* ── The collapse, at 330px of BANNER ──────────────────────────────────
+   4.51, Q5: the nav loses its words and the strip wraps rather than shrinking
+   every control at once.
+
+   THE LABELS GO AND THE ICONS STAY, which is the order of what a nav bar can
+   afford to lose. A row of four glyphs is still four destinations in a fixed
+   order; four half-elided words are four things the reader has to read.
+   `aria-label` carries the name either way, so nothing is lost to a screen
+   reader — the labels were always the redundant half.
+
+   THE VAULT'S NAME GOES WITH THEM, and the mark stays. At this width the
+   lockup is the widest fixed thing on the row, and the two lines it carries
+   are the two the reader can most afford to lose: they know which vault they
+   opened, and the trail below already says which part of it they are in. */
+@container (max-width: 330px) {
+  .am-vault-banner .avb-global {
+    flex-wrap: wrap;
+  }
+  .am-vault-banner .avb-id-text {
+    display: none;
+  }
+  .am-vault-banner .avb-btn-label {
+    display: none;
+  }
+  .am-vault-banner .avb-btn {
+    min-width: 0;
+    padding: var(--am-space-2);
+  }
+  /* The search takes the second row whole rather than sharing it: a field is
+     the one control here that is worse for being narrow, and at this width the
+     mark and the four tiles have the first row to themselves. There is no cap
+     to lift any more — 4.51.9 removed it everywhere. */
+  .am-vault-banner .avb-search {
+    order: 3;
+    flex: 1 0 100%;
+  }
+  /* The scope tile keeps its caret and loses its word with the rest. */
+  .am-vault-banner .avb-btn-menu {
+    gap: 0;
+  }
+  .am-vault-banner .avb-nav {
+    margin-left: auto;
+  }
+}
+
+/* ── The search window ──────────────────────────────────────────────────
+   `search-all.ts`. One list over the diary and every journal, which is the
+   only place in the plugin where a result may come from either.
+
+   IT IS A PALETTE, NOT A DIALOGUE. Fixed height, so the list does not resize
+   under the reader's cursor as they type — a window that grows on every
+   keystroke is one where the third result is never in the same place twice. */
+.am-search-modal {
+  --ams-height: 60vh;
+  padding: 0;
+  width: min(720px, 90vw);
+}
+.am-search-modal .modal-close-button {
+  display: none;
+}
+.am-search-modal .ams-query {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-2);
+  padding: var(--am-space-4) var(--am-space-5);
+  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+}
+.am-search-modal .ams-query-icon {
+  display: flex;
+  color: var(--text-faint);
+}
+.am-search-modal .ams-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: var(--am-text-lg);
+  color: var(--text-normal);
+}
+.am-search-modal .ams-input:focus {
+  box-shadow: none;
+}
+
+.am-search-modal .ams-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--am-space-2);
+  padding: var(--am-space-2) var(--am-space-5);
+  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+.am-search-modal .ams-sort-label {
+  color: var(--text-faint);
+  font-size: var(--am-text-2xs);
+  font-weight: var(--am-caps-weight);
+  letter-spacing: var(--am-caps-tracking);
+  text-transform: uppercase;
+}
+.am-search-modal .ams-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-1);
+}
+.am-search-modal .ams-chip {
+  padding: 2px var(--am-space-3);
+  border-radius: var(--am-radius-pill);
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  cursor: pointer;
+}
+.am-search-modal .ams-chip:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.am-search-modal .ams-chip.is-on {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+/* WHAT THE QUERY HAS ALREADY DECIDED, said rather than left to be noticed
+   (4.51, Q12). A `kind:` filter that can only match the diary makes this one
+   search over one half, and a reader who does not know that reads the missing
+   journals as a bug in the search. */
+.am-search-modal .ams-narrowed {
+  margin-left: var(--am-space-2);
+  color: var(--text-faint);
+  font-size: var(--am-text-xs);
+}
+
+.am-search-modal .ams-results {
+  height: var(--ams-height);
+  overflow-y: auto;
+  padding: var(--am-space-2) 0;
+}
+.am-search-modal .ams-note {
+  padding: var(--am-space-6) var(--am-space-5);
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  text-align: center;
+}
+.am-search-modal .ams-row {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-3);
+  padding: var(--am-space-2) var(--am-space-5);
+  cursor: pointer;
+}
+.am-search-modal .ams-row:hover,
+.am-search-modal .ams-row.is-sel {
+  background: var(--background-modifier-hover);
+}
+/* WHICH HALF IT CAME FROM, IN THE LEFT MARGIN. This is the first list in the
+   plugin where the rows above and below each other may be a diary entry and a
+   journal page, and the reader is entitled to know which without reading the
+   path. A GLYPH RATHER THAN A WORD, because it repeats on every row and a
+   repeated word is noise by the fourth one — and the two glyphs are the nav
+   bar's own for the same two places, so the mark is already learnt. */
+.am-search-modal .ams-mark {
+  flex: 0 0 auto;
+  display: flex;
+  align-self: center;
+  color: var(--am-chart-series-2);
+}
+.am-search-modal .ams-mark.is-journal {
+  color: var(--interactive-accent);
+}
+.am-search-modal .ams-mark .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.am-search-modal .ams-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.am-search-modal .ams-title {
+  color: var(--text-normal);
+  font-size: var(--am-text-base);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.am-search-modal .ams-field {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: var(--am-text-2xs);
+  font-weight: var(--am-caps-weight);
+  letter-spacing: var(--am-caps-tracking);
+  text-transform: uppercase;
+}
+.am-search-modal .ams-where {
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* The snippet is one line and is allowed to be cut off. It is EVIDENCE that the
+   note matched, not the note — a reader who wants the rest presses the row. */
+.am-search-modal .ams-snip {
+  display: flex;
+  align-items: baseline;
+  gap: var(--am-space-2);
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.am-search-modal .ams-snip > span:last-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.am-search-modal .ams-date {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: var(--am-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.am-search-modal .ams-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-4);
+  padding: var(--am-space-2) var(--am-space-5);
+  border-top: var(--am-rule-hair) solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-faint);
+  font-size: var(--am-text-xs);
+}
+.am-search-modal .ams-foot-item {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-2);
+}
+.am-search-modal .ams-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Narrow windows: the palette is a phone-width sheet and the fixed list
+   height stops being right when the window is shorter than the list. */
+@media (max-width: 480px) {
+  .am-search-modal {
+    --ams-height: 50vh;
+  }
+  .am-search-modal .ams-query,
+  .am-search-modal .ams-bar,
+  .am-search-modal .ams-row,
+  .am-search-modal .ams-foot {
+    padding-left: var(--am-space-3);
+    padding-right: var(--am-space-3);
+  }
+}
+
+
+/* ── The Properties button, and the window behind it ─────────────────────
+   4.51.6. A count and a glyph on the trail row, left of the cog — the same
+   corner every control that acts on the whole page has used since 4.20.
+
+   IT SHOWS ITS COUNT ALWAYS, where the cog is hover-revealed. The cog is a
+   menu of things a reader may never need; this is the only place a note's
+   property count exists once Obsidian's panel is stood in for, and a control
+   that is the sole route to something must not hide. */
+.am-vault-banner .avb-props {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--am-space-2);
+  border-radius: var(--am-radius-sm);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.am-vault-banner .avb-props:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.am-vault-banner .avb-props-icon {
+  display: flex;
+}
+.am-vault-banner .avb-props-icon .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+/* THE COG GIVES UP ITS `margin-left: auto` TO THE BUTTON BESIDE IT. Two
+   elements both claiming the slack would put a gap between them. */
+.am-vault-banner .avb-props ~ .avb-cog {
+  margin-left: 0;
+}
+
+.am-props-modal {
+  width: min(560px, 92vw);
+}
+/* THE HEAD IS A HEAD, NOT THE FIRST ROW (4.51.7, and again in 4.51.8). Reported
+   from the vault twice: the rule under "Properties" landed on `journal-date`,
+   and the first fix — space on the body — was undone by the line that came with
+   it, which took the first row's own padding away. A `Setting`'s control is
+   taller than its label, so a row with no top padding puts an INPUT against the
+   rule; the words looked spaced and the boxes did not.
+
+   So: air under the head, air above the first control, and the row keeps its
+   padding. The only thing the first row gives up is its hairline, because the
+   head's is directly above it.
+
+   AND ROOM FOR THE CLOSE BUTTON. Obsidian draws its × in the modal's top-right
+   corner, over whatever is there — which was the note's name. */
+.am-props-modal .amp-head {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-2);
+  padding-right: var(--am-space-6);
+  padding-bottom: var(--am-space-4);
+  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+}
+.am-props-modal .amp-head-icon {
+  display: flex;
+  color: var(--text-faint);
+}
+.am-props-modal .amp-head-text {
+  font-size: var(--am-text-lg);
+  font-weight: 650;
+  color: var(--text-normal);
+}
+/* The note's name, so a window opened from the wrong leaf says so. */
+.am-props-modal .amp-head-note {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-faint);
+  font-size: var(--am-text-xs);
+}
+.am-props-modal .amp-body {
+  margin-top: var(--am-space-3);
+  max-height: 55vh;
+  overflow-y: auto;
+  /* The scrollbar's own gutter, so a long list does not put its thumb through
+     the trash buttons. */
+  padding-right: var(--am-space-2);
+}
+/* The first row brings no rule of its own — the head's is directly above it and
+   two hairlines a few pixels apart read as a mistake. It keeps its PADDING,
+   which is the half 4.51.7 got wrong. */
+.am-props-modal .amp-body > .setting-item:first-child {
+  border-top: none;
+}
+.am-props-modal .amp-empty {
+  padding: var(--am-space-6) 0;
+  color: var(--text-muted);
+  font-size: var(--am-text-sm);
+  text-align: center;
+}
+/* A PROPERTY NAME IS DATA, so it is set in the monospace face the rest of the
+   plugin gives to keys — and it does not take a whole row's weight the way a
+   settings label does. */
+.am-props-modal .amp-row .setting-item-name {
+  font-family: var(--font-monospace);
+  font-size: var(--am-text-sm);
+  font-weight: 500;
+}
+.am-props-modal .amp-row {
+  padding: var(--am-space-4) 0;
+}
+/* A NAME AND ITS VALUE, NOT A SETTING AND ITS DESCRIPTION. Obsidian's own row
+   gives the label two thirds of the width because it usually carries a sentence
+   under it; a property name is one word and the value is the part being read,
+   so the control gets room and the field fills it. */
+.am-props-modal .amp-row .setting-item-control {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  gap: var(--am-space-2);
+}
+.am-props-modal .amp-row .setting-item-control input[type="text"],
+.am-props-modal .amp-row .setting-item-control input[type="number"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 320px;
+}
+.am-props-modal .amp-row-opaque {
+  opacity: 0.65;
+}
+/* THE FOOTER IS BELOW THE LIST, NOT ON IT. The body scrolls; without a rule and
+   a margin the last row runs straight into the buttons, which on a six-property
+   note put *Add a property…* across `Wake-Up`'s field. */
+.am-props-modal .amp-foot {
+  margin-top: var(--am-space-3);
+  padding-top: var(--am-space-3);
+  border-top: var(--am-rule-hair) solid var(--background-modifier-border);
+}
+.am-props-modal .amp-foot .setting-item {
+  border-top: none;
+  padding: 0;
+}
+.am-props-modal .amp-name-input {
+  width: 100%;
+}

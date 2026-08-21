@@ -22,6 +22,10 @@ import {
   IndexedEntry,
   searchHintLine,
   HAS_VALUES,
+  SORT_FIELDS,
+  SearchHit,
+  sortHits,
+  queryNarrowsTo,
 } from "../src/diary/diary-index";
 
 // A minimal indexed entry, overridable per case.
@@ -524,5 +528,155 @@ describe("searchHintLine", () => {
     // monthly. A hint promising a filter the page rejects is worse than none.
     expect(parseQuery("is:monthly").kind).toBe("monthly");
     expect(parseQuery("is:lesson", ["lesson", "practice"]).kind).toBe("lesson");
+  });
+});
+
+
+// ── the sort, and what a query has already decided (4.51) ─────────────────
+//
+// Both of these exist for the unified search window, and both are pure
+// precisely so the window's behaviour is checkable without a vault.
+
+function hit(over: Partial<SearchHit> & { entry?: Partial<IndexedEntry> } = {}): SearchHit {
+  return {
+    entry: entry(over.entry),
+    score: over.score ?? 0,
+    snippet: over.snippet ?? "",
+    snippetKey: over.snippetKey ?? null,
+  };
+}
+
+describe("sortHits", () => {
+  it("offers exactly the fields every indexed entry has", () => {
+    // THE LIST IS THE CONTRACT. A fifth chip for a tracker would be sorting a
+    // mixed list by a field most rows have not got — which is the argument
+    // `queryNarrowsTo` exists to make, one function down.
+    expect(SORT_FIELDS.map((f) => f.id)).toEqual([
+      "relevance",
+      "date",
+      "title",
+      "tasks",
+    ]);
+  });
+
+  it("does not mutate what it was given", () => {
+    // The window re-sorts the SAME hits array on every chip press. A sort in
+    // place would make the second press sort an already-reordered list, which
+    // is only visibly wrong on the tie-breaks — the worst kind of wrong.
+    const hits = [hit({ score: 1 }), hit({ score: 9 })];
+    const before = [...hits];
+    sortHits(hits, "relevance");
+    expect(hits).toEqual(before);
+  });
+
+  it("orders by relevance, breaking ties on the newer entry", () => {
+    const out = sortHits(
+      [
+        hit({ score: 5, entry: { iso: "2026-01-01", title: "old" } }),
+        hit({ score: 9, entry: { iso: "2020-01-01", title: "best" } }),
+        hit({ score: 5, entry: { iso: "2026-06-01", title: "new" } }),
+      ],
+      "relevance"
+    );
+    expect(out.map((h) => h.entry.title)).toEqual(["best", "new", "old"]);
+  });
+
+  it("orders by date newest first", () => {
+    const out = sortHits(
+      [
+        hit({ entry: { iso: "2024-01-01", title: "a" } }),
+        hit({ entry: { iso: "2026-01-01", title: "b" } }),
+      ],
+      "date"
+    );
+    expect(out.map((h) => h.entry.title)).toEqual(["b", "a"]);
+  });
+
+  it("puts a dateless note last when sorting by date", () => {
+    // A JOURNAL INDEX HAS NO DATE, and this is the sort where that shows. The
+    // rule is `byDateDesc`'s and is inherited rather than restated — a Subject
+    // page ahead of every entry in a date-sorted list would read as the newest
+    // thing in the vault.
+    const out = sortHits(
+      [
+        hit({ entry: { iso: null, title: "Subject" } }),
+        hit({ entry: { iso: "2020-01-01", title: "old entry" } }),
+      ],
+      "date"
+    );
+    expect(out.map((h) => h.entry.title)).toEqual(["old entry", "Subject"]);
+  });
+
+  it("orders by title without regard to case", () => {
+    const out = sortHits(
+      [
+        hit({ entry: { title: "banana" } }),
+        hit({ entry: { title: "Apple" } }),
+      ],
+      "title"
+    );
+    expect(out.map((h) => h.entry.title)).toEqual(["Apple", "banana"]);
+  });
+
+  it("orders by open tasks, most unfinished first", () => {
+    const out = sortHits(
+      [
+        hit({ entry: { title: "quiet", openTasks: 0 } }),
+        hit({ entry: { title: "busy", openTasks: 7 } }),
+      ],
+      "tasks"
+    );
+    expect(out.map((h) => h.entry.title)).toEqual(["busy", "quiet"]);
+  });
+
+  it("falls back to relevance on a tie in every field", () => {
+    // THE FALLBACK IS WHAT MAKES THE OTHER THREE USABLE. Fifty notes with no
+    // open tasks sorted by tasks is otherwise fifty rows in index order, and
+    // the reader's actual best match is somewhere in the middle of it.
+    for (const field of ["date", "title", "tasks"] as const) {
+      const out = sortHits(
+        [
+          hit({ score: 1, entry: { iso: "2026-03-04", title: "same" } }),
+          hit({ score: 8, entry: { iso: "2026-03-04", title: "same" } }),
+        ],
+        field
+      );
+      expect(out[0].score).toBe(8);
+    }
+  });
+});
+
+describe("queryNarrowsTo", () => {
+  const diaryKinds = ["daily", "weekly", "monthly"];
+
+  it("spans both surfaces when nothing names a kind", () => {
+    expect(queryNarrowsTo(parseQuery("holiday", diaryKinds), diaryKinds)).toBeNull();
+  });
+
+  it("narrows to the diary on a diary kind", () => {
+    expect(queryNarrowsTo(parseQuery("is:daily", diaryKinds), diaryKinds)).toBe(
+      "diary"
+    );
+  });
+
+  it("narrows to the journals on any other kind", () => {
+    // THE TWO ARGUMENTS ARE DIFFERENT LISTS AND THAT IS THE TRAP. `parseQuery`
+    // is given every kind EITHER surface knows, so `is:lesson` is a filter
+    // rather than a search term; this is given the DIARY's kinds alone, because
+    // its whole question is "is that kind one of the diary's". Handing it the
+    // combined list makes every query narrow to the diary, silently.
+    const kinds = [...diaryKinds, "lesson"];
+    expect(queryNarrowsTo(parseQuery("is:lesson", kinds), diaryKinds)).toBe(
+      "journal"
+    );
+  });
+
+  it("is not narrowed by a range, a tag or a has-filter", () => {
+    // WORTH PINNING BECAUSE THREE FILTERS LOOK LIKE THEY SHOULD. `from:`/`to:`
+    // narrow a range and both surfaces have dates; `tag:` and `has:` are on
+    // both. Only `is:` names a kind, and a kind belongs to one surface.
+    for (const q of ["from:2026-01-01", "to:2026-01-01", "tag:home", "has:tasks"]) {
+      expect(queryNarrowsTo(parseQuery(q, diaryKinds), diaryKinds)).toBeNull();
+    }
   });
 });

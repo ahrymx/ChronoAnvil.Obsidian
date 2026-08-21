@@ -31,7 +31,7 @@
 //   period-nav:quarter   (on the Quarterly Overview — drives `quarter-start`)
 //   ```
 
-import { MarkdownPostProcessorContext, setIcon, TFile } from "obsidian";
+import { App, MarkdownPostProcessorContext, setIcon, TFile } from "obsidian";
 import type AlmanacPlugin from "../main";
 import {
   filesUnder,
@@ -352,6 +352,29 @@ export function buildNowButton(
   return btn;
 }
 
+// The period a dashboard is currently showing.
+//
+// ITS OWN `<unit>-start` PROPERTY, FALLING BACK TO NOW — and the fallback is the
+// half worth stating: a period dashboard that has never been navigated has no
+// such property at all, and it shows the current period. A reader of `month:`
+// would get nothing on exactly the note that draws August (4.51.7 found this on
+// the Monthly overview, where the head printed the FILENAME because
+// `entryDateKey` reads `CLASS_DEFS.monthly.dateProperty` — which is `month`,
+// the ENTRY's property, not this one).
+//
+// EXPORTED SO THE HEAD CAN NAME THE PAGE. The band and the head must agree
+// about which August this is, and one function is how.
+export function periodAnchor(
+  app: App,
+  file: TFile,
+  unit: Unit
+): ReturnType<typeof moment> {
+  const { momentUnit } = metaFor(unit);
+  const fm = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+  const seed = moment(isoDate(fm[metaFor(unit).prop]) ?? undefined);
+  return (seed.isValid() ? seed : moment()).startOf(momentUnit);
+}
+
 export function buildPeriodNav(
   plugin: AlmanacPlugin,
   ctx: MarkdownPostProcessorContext,
@@ -373,9 +396,7 @@ export function buildPeriodNav(
   // cache after each write — `processFrontMatter` resolves before the cache's
   // "changed" event lands, so a re-read could show the pre-write value. Seed it
   // from the note once; every shift/pick advances it in lock-step with the file.
-  const fm0 = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-  const seed = moment(isoDate(fm0[prop]) ?? undefined);
-  let cur = (seed.isValid() ? seed : moment()).startOf(momentUnit);
+  let cur = periodAnchor(app, file, unit);
 
   const jumpTo = async (next: ReturnType<typeof moment>): Promise<void> => {
     cur = next.startOf(momentUnit);

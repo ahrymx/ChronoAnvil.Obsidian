@@ -563,6 +563,19 @@
   cursor: pointer;
 }
 
+/* THE STRIP WITH ITS TITLE ELSEWHERE (4.51.5). The vault banner draws the
+   entry's title, so this row keeps only the navigator between entries — and a
+   lone control does not need a row's worth of height or a row's worth of
+   emptiness beside it. Pushed right, where the navigator has always sat, and
+   tightened so it reads as a control on the grid's edge rather than as a band
+   that lost its contents. */
+.journal-entry-context.jec-nav-only {
+  justify-content: flex-end;
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 /* spacer: a full-width branded line (almanac:spacer, inline on line 0). Its
    primary job is to be where the cursor lands on open, so the first real
    ```almanac block below it isn't rendered raw/expanded — but it doubles as a
@@ -582,6 +595,17 @@
   flex: 1;
   height: 1px;
   background: var(--background-modifier-border);
+}
+/* QUIET: the vault banner is drawing, and it is already a top boundary. The
+   element keeps its line — it is what the cursor lands on when a note opens —
+   and gives up the rule and the wordmark that would be a second one. */
+.journal-spacer.is-quiet {
+  margin: 0;
+  height: 0;
+}
+.journal-spacer.is-quiet::before,
+.journal-spacer.is-quiet::after {
+  background: transparent;
 }
 .journal-spacer-mark {
   font-size: var(--am-text-2xs);

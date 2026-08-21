@@ -242,12 +242,20 @@ describe("the toggle that writes it", () => {
     );
   });
 
-  it("reads its checkmark off the card, not off the file", () => {
+  it("reads its checkmark off the render, not off the file", () => {
     // The class was put there by the render, FROM the note, and the menu is built
     // on click — so the marker is the note's answer by construction, and a second
     // read would be a second source of truth for one fact.
+    //
+    // WHICH MARKER IS THE CALLER'S SINCE 4.51.1, and the rule is unchanged. The
+    // vault banner opens this same menu and has no card to read — it has the
+    // view, which `page-width.ts` marks. So the marker arrives as a callback,
+    // and both callers name their own; what is asserted is that neither reaches
+    // for the file.
     const code = readCode("page-title");
-    expect(code).toContain("card.hasClass(WIDE_CLASS)");
+    expect(code).toContain("const wide = isWide();");
+    expect(code).toContain("root.hasClass(WIDE_CLASS)");
+    expect(readCode("vault-banner")).toContain("host.hasClass(WIDE_PAGE_CLASS)");
     expect(code).toContain(".setChecked(");
     // AND IT STILL READS NO FRONTMATTER, which page-widgets.test.ts asserts for
     // the whole widget and which this item must not be the exception to.

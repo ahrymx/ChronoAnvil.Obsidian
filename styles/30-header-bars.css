@@ -647,7 +647,12 @@
    place it goes, and the boxes were doing the work the separators already do.
    They are links now, muted for the trail and accented for the one you can
    press, with the hit area kept by padding rather than by a border. */
-.jsh-crumbs a.jn-pill {
+/* TWO HOSTS, ONE TRAIL (4.51.2). The vault banner draws the same crumbs
+   through the same `renderCrumb`, so it gets the same treatment here rather
+   than a near-copy in its own file. Restating these eight declarations one
+   stylesheet later is how the two trails come to disagree about a hover. */
+.jsh-crumbs a.jn-pill,
+.am-vault-banner .avb-trail a.jn-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -660,14 +665,16 @@
   white-space: nowrap;
   transition: background 0.15s, color 0.15s;
 }
-.jsh-crumbs a.jn-pill:hover {
+.jsh-crumbs a.jn-pill:hover,
+.am-vault-banner .avb-trail a.jn-pill:hover {
   background: var(--background-modifier-hover);
   color: var(--text-accent) !important;
 }
 /* The crumb for a level this note has not got — dashed, because it is a gap in
    the trail rather than a place. Kept as an outline for exactly that reason;
    without it a missing level would read as absent rather than as empty. */
-.jsh-crumbs .jn-flat.jn-muted {
+.jsh-crumbs .jn-flat.jn-muted,
+.am-vault-banner .avb-trail .jn-flat.jn-muted {
   display: inline-flex;
   align-items: center;
   padding: var(--am-space-1) var(--am-space-4);
@@ -689,12 +696,20 @@
    than leading with a word every note in the vault repeats. Squared padding
    keeps it circular instead of stretching into a stadium. */
 .jsh-crumbs a.jn-pill.jsh-crumb-icon,
-.jsh-crumbs .jn-flat.jn-muted.jsh-crumb-icon {
+.jsh-crumbs .jn-flat.jn-muted.jsh-crumb-icon,
+.am-vault-banner .avb-trail .jsh-crumb-icon {
   padding: var(--am-space-2) var(--am-space-4);
 }
 .jsh-crumb-icon .svg-icon {
   width: 14px;
   height: 14px;
+}
+/* The banner's trail is one line of small type, so its crumbs take the row's
+   size rather than the study header's. Everything else about them is shared. */
+.am-vault-banner .avb-trail a.jn-pill,
+.am-vault-banner .avb-trail .jn-flat.jn-muted {
+  font-size: inherit;
+  flex: 0 0 auto;
 }
 
 /* Row 2: the note's title, click-to-edit. Same affordance as a diary

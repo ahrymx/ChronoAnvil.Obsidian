@@ -232,6 +232,64 @@ describe("section bodies are marked for the surface", () => {
     );
   });
 
+  it("counts every block that is its own structure as a boundary", () => {
+    // ONE LIST, AND THE LOGGING GRID WAS MISSING FROM IT (4.51.4). Reported as
+    // *"the resources section in Journals merging with the trackers"*: a note
+    // whose grid sits after a `header:` section drew the grid INSIDE that
+    // section's surface, and collapsing the section took the grid with it.
+    //
+    // The grid has had its own card and its own caption since 4.21.1 — *"the
+    // only section in the plugin with a card and no name"* — which is precisely
+    // what every other entry in this list is here for.
+    //
+    // WHY IT SURVIVED SO LONG. On a note composed by 4.20 or later the grid is
+    // section two, above every bar, so no section was ever open for it to fall
+    // into. On older notes the markers sit inside the BANNER's fence, so the
+    // block wore `.journal-study-banner` — which is in the list — and was a
+    // boundary by inheritance. 4.51 suppressing the banner's directives dropped
+    // that class and left the same block carrying only the tracker one.
+    //
+    // `.journal-page-head` JOINS IT IN 4.51.6 and before it can be reported:
+    // the head is what the three banner directives became, so it stands in the
+    // same place the banner classes above did — and on an older note it is
+    // drawn from the same fence, which is where a section is open.
+    const body = method("isSectionBoundary");
+    for (const cls of [
+      "journal-sec-fold",
+      "journal-section-bar",
+      "journal-overview-banner",
+      "journal-entry-banner",
+      "journal-study-banner",
+      "journal-tracker-section",
+      "journal-page-head",
+      "journals-card",
+      "journal-sec-l1",
+    ]) {
+      expect(body, cls).toContain(`:scope .${cls}`);
+    }
+  });
+
+  it("asks that question in both walks rather than twice over", () => {
+    // The fold and the shade must agree about what "this section" means — a
+    // section that folds one set of blocks and shades another is two claims,
+    // and a reader meets the disagreement the first time they collapse
+    // something. Both call the one predicate.
+    expect(method("markSectionBodies")).toContain("this.isSectionBoundary(block)");
+    expect(method("markL2Body")).toContain("this.isSectionBoundary(sib)");
+    expect(method("recompute")).toContain("this.isSectionBoundary(block)");
+  });
+
+  it("gives the logging grid a class no banner shares", () => {
+    // The flag is computed as "has markers AND is not a banner", so a block can
+    // never be both — which is what lets the list above name them separately
+    // without a tie to break.
+    const widgets = readSrc("widgets");
+    expect(widgets).toContain('if (drew.trackerSection) out.push("journal-tracker-section");');
+    expect(widgets).toContain(
+      "hasTrackerRegion && !isEntryBanner && !isStudyBanner && !isPageBanner,"
+    );
+  });
+
   it("does not treat the diary entry banner as a section", () => {
     // The banner is the note's head. It is built as a header bar so it inherits
     // the frame's layout, which is right — and is exactly why the section walk

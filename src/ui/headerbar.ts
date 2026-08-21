@@ -929,10 +929,38 @@ export class HeaderBar extends MarkdownRenderChild {
     );
   }
 
+  // ── THE LOGGING GRID IS ONE OF THESE, AND WAS NOT LISTED (4.51.4) ──────
+  //
+  // `.journal-tracker-section` is a block with its own card and its own caption
+  // — 4.21.1 gave it both, on the argument that *"it is the only section in the
+  // plugin with a card and no name"*. Everything in the list beside it is here
+  // for the reason stated at `markSectionBodies`: *it is its own structure and
+  // must not be swallowed into this section's card.* The grid is exactly that
+  // and was the one such block missing, so a note whose logging grid sat after
+  // a `header:` section drew the grid INSIDE that section's surface — reported
+  // as *"the resources section in Journals merging with the trackers"* — and
+  // collapsing that section took the grid with it.
+  //
+  // WHY 4.51 IS WHAT EXPOSED IT. On a note composed by 4.20 or later the grid
+  // is section two, above every `header:` bar, so there was never an open
+  // section for it to fall into. On every note composed BEFORE that the markers
+  // are inside the banner's own fence — `createTrackerRegion` still writes them
+  // there — and that fence wore `.journal-study-banner`, which IS in this list.
+  // Suppressing the banner's directives dropped that class and left the same
+  // block carrying only `.journal-tracker-section`: a boundary that had been
+  // one by inheritance stopped being one.
+  //
+  // So this is a gap in the list rather than a consequence of the bar, and it
+  // is fixed as one: the grid is a boundary because of what it is, on every
+  // note, whether or not the vault banner is on.
+  //
+  // `.journal-page-head` JOINS IT IN 4.51.6 for the same reason and before it
+  // can bite: the remade Banner section is a page's own head, which is the most
+  // obviously self-standing block in the plugin.
   private isSectionBoundary(block: HTMLElement): boolean {
     if (this.isHeadingBlock(block)) return true;
     return !!block.querySelector(
-      ":scope .journal-sec-fold, :scope .journal-section-bar, :scope .journal-overview-banner, :scope .journal-entry-banner, :scope .journal-study-banner, :scope .journals-card, :scope .journal-sec-l1"
+      ":scope .journal-sec-fold, :scope .journal-section-bar, :scope .journal-overview-banner, :scope .journal-entry-banner, :scope .journal-study-banner, :scope .journal-page-head, :scope .journal-tracker-section, :scope .journals-card, :scope .journal-sec-l1"
     );
   }
 

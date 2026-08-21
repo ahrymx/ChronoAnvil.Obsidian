@@ -51,6 +51,7 @@ import {
 import { settingsButton } from "../ui/section-frame";
 import { openJournalTemplateWindow } from "../ui/journal-template-modal";
 import { attachNoteRename } from "../ui/header-title";
+import { pageHeadSays } from "../ui/widgets/page-head";
 import type AlmanacPlugin from "../main";
 import {
   folderNotePath,
@@ -66,7 +67,7 @@ import { journalAncestors, journalTypeOfNote } from "./journal";
 // The characters Obsidian refuses in a file name. Checked up front so a bad
 // rename reports what is wrong instead of surfacing a raw vault exception.
 
-interface Crumb {
+export interface Crumb {
   label: string;
   file: TFile | null;
   // Lucide id for a crumb that draws as an icon rather than as text.
@@ -157,7 +158,7 @@ export function journalCrumbPath(
 // its folder, so its own name is dropped: the title two lines down already
 // says it, and a trail ending in the name of the page you are on is a step to
 // nowhere.
-function journalCrumbs(
+export function journalCrumbs(
   app: App,
   plugin: AlmanacPlugin,
   file: TFile,
@@ -239,7 +240,7 @@ function journalCrumbs(
 // index note has none, so it states when anything under it last happened —
 // the same relative phrasing (and the same source) as the Activity column of
 // the subject page's topics table.
-function metaFor(
+export function metaFor(
   app: App,
   file: TFile,
   isIndex: boolean,
@@ -271,7 +272,7 @@ function metaFor(
 // One crumb: a real pill when its destination exists, muted flat text
 // otherwise (mirrors links.ts::renderTarget's "destination doesn't exist yet"
 // treatment) — never a dead link.
-function renderCrumb(
+export function renderCrumb(
   parent: HTMLElement,
   app: App,
   crumb: Crumb,
@@ -347,11 +348,32 @@ function attachBannerMenu(
   notePath: string,
   isIndex: boolean
 ): void {
+  const build = journalBannerMenu(plugin, notePath, isIndex);
+  if (build) settingsButton(host, "jsh-more", build);
+}
+
+// What the banner's cog offers on a JOURNAL note, as a builder rather than as a
+// button. 4.51.
+//
+// SPLIT OUT SO THE VAULT BANNER OFFERS THE SAME MENU. That banner draws the cog
+// itself, in its own corner, on its own surface — but what the cog DOES must not
+// fork: a reader who learns "Template…" on a note before turning the banner on
+// has to find it in the same place after. `attachBannerMenu` above is now three
+// lines and this is all of the behaviour, so there is one list.
+//
+// NULL WHERE THERE IS NOTHING TO OFFER, which is `sectionsMenuFor`'s rule and
+// `discoverability.test.ts`'s: *a menu that opens and then explains it cannot
+// help is worse than no menu.*
+export function journalBannerMenu(
+  plugin: AlmanacPlugin,
+  notePath: string,
+  isIndex: boolean
+): ((menu: Menu) => void) | null {
   const ctx = plugin.sections.contextFor(notePath);
-  if (!ctx) return;
+  if (!ctx) return null;
 
   const isTemplate = plugin.sections.isTemplate(notePath);
-  settingsButton(host, "jsh-more", (menu: Menu) => {
+  return (menu: Menu) => {
     menu.addItem((i: MenuItem) =>
       i
         .setTitle("Edit sections…")
@@ -418,7 +440,7 @@ function attachBannerMenu(
       );
     }
 
-  });
+  };
 }
 
 export function buildStudyHeader(
@@ -553,8 +575,27 @@ export function buildJournalContext(
   const kind = sctx.kind ?? null;
   // A page is a part of the note above it rather than a note of its own, so it
   // has no level of its own to report.
-  const levelNoun = sctx.noteKind === "page" ? null : (level?.noun ?? null);
-  if (!levelNoun && !kind) return null;
+  let levelNoun = sctx.noteKind === "page" ? null : (level?.noun ?? null);
+  let kindLabel = kind?.label ?? null;
+
+  // ── AND NOT WHAT THE HEAD'S EYEBROW ALREADY SAYS (4.51.7) ─────────────
+  //
+  // The page head above this card reads `STUDY · SUBJECT`, and the first vault
+  // render of 4.51.6 showed this strip printing `SUBJECT` again inside the card
+  // under it. Both facts are still true; only one of them needs saying, and the
+  // head is the one a reader meets first.
+  //
+  // ASKED, NOT DERIVED. `pageHeadSays` is the head's own answer — including
+  // whether there IS a head, which is what keeps the strip whole on a note with
+  // the bar turned off.
+  const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
+  if (file instanceof TFile) {
+    if (levelNoun && pageHeadSays(plugin, file, levelNoun)) levelNoun = null;
+    if (kindLabel && pageHeadSays(plugin, file, kindLabel)) kindLabel = null;
+  }
+  // A strip with nothing left to report draws nothing, which it has always
+  // done — the empty case is not new, only newly reachable.
+  if (!levelNoun && !kindLabel) return null;
 
   const bar = createDiv({ cls: "journal-widget-bar journal-note-context" });
   const facts = bar.createDiv({ cls: "jnc-facts" });
@@ -564,10 +605,10 @@ export function buildJournalContext(
     setIcon(el.createSpan({ cls: "jnc-fact-icon" }), "layers");
     el.createSpan({ cls: "jnc-fact-text", text: levelNoun });
   }
-  if (kind) {
+  if (kindLabel) {
     const el = facts.createSpan({ cls: "jnc-fact jnc-fact-kind" });
     setIcon(el.createSpan({ cls: "jnc-fact-icon" }), "file-text");
-    el.createSpan({ cls: "jnc-fact-text", text: kind.label });
+    el.createSpan({ cls: "jnc-fact-text", text: kindLabel });
   }
 
   return bar;

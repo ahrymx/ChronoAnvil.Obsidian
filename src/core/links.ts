@@ -277,6 +277,24 @@ function renderTarget(
 // on a note that is none of the scopes, where there is no position to show.
 const SCOPES = ["week", "month", "quarter", "year", "all"] as const;
 
+// The scopes that exist in this vault, and which of them this note IS.
+//
+// EXPORTED IN 4.51.5 so the vault banner offers the same five in the same order
+// with the same "you are here" reading, rather than listing them again. The row
+// this control used to sit on is gone from a diary entry — the bar draws its
+// four destinations — and the scope menu is the one thing that row had which
+// the bar had not. Moving a control is not a reason to re-derive what it holds.
+export function reviewScopes(
+  plugin: AlmanacPlugin,
+  file: TFile,
+  sourcePath: string
+): { targets: LinkTarget[]; here: LinkTarget | undefined } {
+  const targets = SCOPES.map((id) => resolveTarget(plugin, file, id)).filter(
+    (t): t is LinkTarget => t != null
+  );
+  return { targets, here: targets.find((t) => t.file?.path === sourcePath) };
+}
+
 // The scope menu, anchored to the row's right edge.
 //
 // Right rather than left because the two pills beside it are fixed
@@ -289,11 +307,7 @@ function renderScopes(
   file: TFile,
   sourcePath: string
 ): void {
-  const resolved = SCOPES.map((id) => resolveTarget(plugin, file, id)).filter(
-    (t): t is LinkTarget => t != null
-  );
-
-  const here = resolved.find((t) => t.file?.path === sourcePath);
+  const { targets: resolved, here } = reviewScopes(plugin, file, sourcePath);
 
   const btn = wrap.createEl("a", {
     cls: "jn-pill jn-scopes" + (here ? " is-here" : ""),

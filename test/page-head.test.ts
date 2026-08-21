@@ -319,7 +319,13 @@ describe("nothing on the page can pick the head up", () => {
     // cannot shift it. A predicate over the raw text inside block-drag.ts would
     // have to recount past both.
     const w = code("widgets");
-    expect(w).toContain("kept.filter(({ l }) => isTitleLine(l)).map(({ at }) => at)");
+    // READ FROM WHAT WILL BE DRAWN, not from every line the fence holds
+    // (4.51.1). A suppressed banner's `title` line is no longer in the block, so
+    // pinning a position it does not occupy would fix the widget that took its
+    // place.
+    expect(w).toContain(
+      "drawable.filter(({ l }) => isTitleLine(l)).map(({ at }) => at)"
+    );
     // `fixed` is still the last thing computed from `kept` and is still passed
     // straight through; 4.12 added `sectionFence` after it, computed in the same
     // place for the same reason — the dispatcher is holding the fence's lines and

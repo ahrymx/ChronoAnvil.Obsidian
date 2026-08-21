@@ -31,9 +31,30 @@ describe("where the control appears", () => {
     // The important row. A menu that opens and then explains it cannot help is
     // worse than no menu, and resolveSectionHost already returns null for an
     // unrecognised note — the same answer "Add a section" gives it.
+    //
+    // RESTATED IN 4.51, WHERE THE MENU BECAME A BUILDER. `journalBannerMenu`
+    // returns null instead of returning early, because the vault banner now
+    // draws the same menu behind its own cog and had to be able to ask whether
+    // there IS one before drawing a control for it. The refusal is the same
+    // refusal; what changed is that it is now answered to two callers.
     const t = header();
     expect(t).toContain("contextFor(notePath)");
-    expect(t).toMatch(/if \(!ctx\) return;/);
+    expect(t).toMatch(/if \(!ctx\) return null;/);
+  });
+
+  it("makes both banners' cogs conditional on that same answer", () => {
+    // ASSERTED AT THE CALL SITES, because a builder that correctly returns null
+    // is worth nothing if either caller draws its button anyway — which is the
+    // whole failure the row above exists to prevent, now available in two
+    // places instead of one.
+    expect(header()).toContain(
+      "if (build) settingsButton(host, \"jsh-more\", build);"
+    );
+    const banner = readSrc("vault-banner");
+    expect(banner).toContain(
+      "const build = this.menuFor(file, surface, isIndex, view);"
+    );
+    expect(banner).toMatch(/if \(build\) \{\n\s+const cog = trail\.createDiv/);
   });
 
   it("resolves the surface through the existing resolver", () => {

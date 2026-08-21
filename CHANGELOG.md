@@ -7,6 +7,220 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.51.9] - 2026-08-21
+
+- **The destination tiles are outlined again.** 4.51.8 read *"punchout cards"* as
+  being about the border and the ground together and took both, which left
+  nothing to say where one target ends and the next begins. It was the fill: a
+  hairline on the bar's own ground is a button's outline; a hairline around a
+  second ground is a card on a card. The page you are on takes the accent on its
+  outline as well as its label.
+- **The search field fills the bar.** The cap is gone — on a wide pane it was
+  leaving several hundred pixels of nothing between the field and the tiles.
+
+## [4.51.8] - 2026-08-21
+
+**The bar's row of destinations, and the Properties window's spacing.**
+
+- **Home · Capture · Diary · Journals.** *Today* is off the bar and *Diary* has
+  taken a slot: the bar goes to places, and the two halves of the vault should
+  be one press each. Today's entry is still on the command palette and one press
+  away on any diary calendar.
+- **The destination tiles are not cards.** They had a border and a ground each,
+  which read as four punched-out boxes on a bar that is already a box. The
+  target is the same size; what says "pressable" now appears under the pointer,
+  and the page you are on is marked in the accent rather than boxed.
+- **The search field is longer** — it now runs to 620px before it stops growing.
+- **The Properties window has room again**: air under its head *and* on the
+  first field (4.51.7 gave it one and took the other), the note's name clear of
+  Obsidian's close button, the buttons below the list rather than on its last
+  row, and wider value fields.
+
+## [4.51.7] - 2026-08-21
+
+**The first vault render of the page head, across six surfaces.** Almost
+everything it found is one of two shapes: two places saying one thing, or a fact
+that never arrived.
+
+- **The head repaints itself again.** It carries the note's title, its kind and
+  its date — all properties — and 4.51.6 dropped the live wrapper the banner it
+  replaced had. On a note Obsidian had not finished indexing, the head drew no
+  kind at all and never filled it in. Editing a property in the Properties
+  window now repaints the head under it too.
+- **The date is no longer printed twice on an entry.** The head names an
+  untitled entry by its date; the caption over the tracker grid was saying it
+  again a centimetre below. Same for a journal note's level: the head reads
+  *Study · Subject* and the card below no longer repeats *Subject*.
+- **Every page the bar draws on has an eyebrow now.** *Journals*, *Study ·
+  Journal*, *Diary*, *Diary · Monthly Overview* — the four dashboards had none,
+  because they carry no `type` property of their own. The homepage and Search
+  still have none, on purpose: their titles already say what they are.
+- **A period overview names its period.** The head reads *August 2026* rather
+  than *Monthly*, the folder note's filename — and the big month name in the
+  card below is a navigator again, at a control's size.
+- **The bar names the journal on its own dashboard.** It read *Journal* on
+  `Study/Study.md` and *Study* on every note inside it.
+- **Obsidian's centred note path is hidden** with its title and property panel,
+  under the same setting — it was a third naming of the note, between the bar's
+  trail and the page head. The arrows, the mode toggle and Obsidian's own ⋯ stay.
+- **In the Properties window**, the head no longer sits on the first field, and
+  *Add a property…* has its words back — it was rendering as a bare `+`.
+- **No `0` on the Properties button** where a note has no properties.
+
+## [4.51.6] - 2026-08-20
+
+**The note's title and its properties are Almanac's now.** Obsidian draws a
+filename in a large face and six rows of properties above everything you opened
+the note to write in; on the notes the bar appears on, both are replaced.
+
+- **Every note opens with its own head.** What used to be the Banner section is
+  now the page's name — in a page's face, click-to-edit — over a small line
+  saying what kind of note it is: *Daily entry*, *Study · Lesson*, *Maths ·
+  Topic*. On a dated entry the pencil writes the `title` property, not the
+  filename, so renaming an entry does not move it out of its folder.
+- **Properties live behind a button on the bar**, with a count on it. It opens a
+  window with one field per property: a switch for a checkbox, a number field
+  for a number, commas for a list. Add a property, empty one, or remove it.
+  Nested values are shown and left alone — edit those in the note itself.
+- **Obsidian's inline title and property panel are hidden** where Almanac draws
+  its own. The setting is now *Use Almanac's title and properties* (Settings →
+  Almanac → Vault banner) and it is **on** by default — it was *Hide Obsidian's
+  note title*, off by default, when it took something away without replacing it.
+- **The bar's trail ends in plain text.** It is a breadcrumb again — where you
+  are — now that the head below carries the name and the pencil.
+- **The `links:` card is the only block the bar still silences.** The three
+  banner directives draw the head instead of nothing.
+
+## [4.51.5] - 2026-08-20
+
+**The navigation row is gone from diary entries, and a few things stopped being
+said twice.**
+
+- **The links card is gone** from diary entries and from the diary dashboard. It
+  was Home and Today — both on the bar, six lines above — drawn again in a card
+  of their own.
+- **Overviews moved onto the bar.** On diary notes the destinations now end with
+  a scope control: Week, Month, Quarter, Year, All entries, labelled with the
+  one you are on. Nothing the old row offered was dropped.
+- **One title on an entry, not two.** The strip over the tracker grid used to
+  carry its own *Add a title…* — the same property the bar edits. It keeps the
+  navigator between entries, which is the part the bar does not have.
+- **The date is no longer printed twice** on an entry with no title of its own.
+- **The search field is capped** rather than growing with the window, so the bar
+  reads as one object instead of three groups pinned to opposite edges.
+- **New setting: *Hide Obsidian's note title*** (Settings → Almanac → Vault
+  banner). Off by default. On the notes the bar appears on, it hides the large
+  heading Obsidian draws under it — which the bar already names at the end of
+  its trail.
+
+## [4.51.4] - 2026-08-20
+
+**Fix: a journal note's tracker grid was being drawn inside the section above
+it.** Reported on a Study topic, where the grid landed inside *Resources* —
+sharing its surface, and disappearing when *Resources* was collapsed.
+
+The grid has had a card and a caption of its own since 4.21, but it was the one
+block of that kind the section walk did not recognise as its own structure, so
+any section still open above it swallowed it. On notes written before 4.20 the
+grid lives inside the banner's own fence and inherited the banner's answer —
+which is why turning the vault banner on is what made it visible.
+
+It is a section boundary in its own right now, on every note, whether or not the
+vault banner is on.
+
+## [4.51.3] - 2026-08-20
+
+**Fix: the bar sometimes didn't appear — and now it lives between the toolbars.**
+
+- **It sits above the note's toolbar**, between the tab strip and the note,
+  spanning the whole pane — where the reference design puts it. It no longer
+  scrolls away with the note.
+- **It always draws.** It used to be mounted inside the note's own scroll area,
+  which does not exist yet when Obsidian restores a workspace at startup — so on
+  some opens you got no bar *and* no in-note header, which looked like nothing
+  rather than like a fault.
+- **The diary's and the journals' own pages have it now.** `02 - Diary`,
+  `03 - Journals` and the Search note were outside the bar entirely — and the
+  journals one affected every vault with no journal set up yet, which is every
+  new vault.
+- **A dashboard's name is edited as its filename.** Only a dated diary *entry*
+  writes to its title property; the diary's own pages and the four period
+  overviews do not.
+- The diary dashboard no longer shows itself in its own trail.
+
+## [4.51.2] - 2026-08-20
+
+**The bar, drawn the way it was meant to look.** A second vault render beside
+the reference design it was asked to follow.
+
+- **The note is named once.** The bar drew a trail *and* a large title under it,
+  and Obsidian draws the note's name itself just below — three copies of
+  *Homepage* in four centimetres. The title is still on the bar and still
+  click-to-edit; it is now the last step of the trail, where you were already
+  looking for it.
+- **The mark has the vault's name beside it**, with a second line saying which
+  part of the vault you are in — *Diary*, *Home*, or the journal's own name.
+  Pressing any of it opens Almanac's settings, as before.
+- **The four destinations are proper buttons** — the icon above the word, in a
+  row you can hit without aiming, instead of four small links.
+- **The bar looks like a toolbar.** It has a ground, a border and its own edge,
+  so it reads as furniture above the note rather than as the note's first
+  paragraph.
+- Below 330px the vault's name drops with the destinations' words; the mark and
+  the four icons stay.
+
+## [4.51.1] - 2026-08-20
+
+**Fix: the first vault render of the bar, reported with a screenshot.** Four
+faults, all in how 4.51 met notes that already existed.
+
+- **The old banner was still there.** The homepage drew its own name twice — once
+  on the bar, once on the card six lines below it. A dashboard's banner is a
+  different directive from a journal note's, and only two of the three were
+  being silenced. All three are now, from the one list the plugin already kept.
+- **Two of the four destinations were missing.** *Today* and *Capture* do not go
+  to a note — they open the day's entry and the capture window — and the bar was
+  only drawing destinations that were notes. All four again, and *Today* creates
+  the entry if it is not there yet.
+- **A doubled rule under the bar.** The thin "Almanac" line at the top of each
+  note was a top boundary, and the bar is a louder one right above it. It keeps
+  its line — that is where your cursor lands when a note opens — and gives up the
+  rule and the wordmark.
+- **The dashboard cog lost *Wide page*.** The bar's cog now opens the same menu
+  the old card's cog opened, on dashboards as well as on journal notes.
+
+## [4.51.0] - 2026-08-20
+
+**Every Almanac note now opens with one bar.**
+
+Search, the four places you go most, where this note sits, and its title —
+above the note's content, scrolling with it. It replaces the header block that
+used to be built into each note.
+
+**What is on it**
+
+- **The tile.** Your vault's initials, or a letter or emoji of your own. Press
+  it to open Almanac's settings.
+- **Search everything.** One list over your diary *and* every journal —
+  `Ctrl K`, or press the field. Sort by relevance, date, title or open tasks;
+  `Tab` cycles, arrows move, `Enter` opens.
+- **Home, Today, Capture, Journals.** A destination that does not exist in your
+  vault is not drawn, rather than drawn and dead.
+- **Where this note sits**, and **its title**, which you can click to edit. On a
+  journal note that renames the file; on a diary entry it sets the entry's
+  title property, because the filename is the date your diary finds it by.
+- **A cog**, offering what the old banner's cog offered on the same notes.
+
+**It appears on Almanac's notes only** — your diary, your journals, your home
+page. A note outside all three gets nothing.
+
+**Nothing is rewritten.** The header block is still in every note; while the bar
+is on it draws nothing. Turn the bar off in *Settings → Vault banner* and every
+note is exactly as it was.
+
+**Narrow leaves.** Below 330px of bar, the destinations drop their words and
+keep their icons, and the search takes a row of its own.
+
 ## [4.50.2] - 2026-08-20
 
 **Fix: a binned note stayed in the list, and pressing it again binned it twice.**

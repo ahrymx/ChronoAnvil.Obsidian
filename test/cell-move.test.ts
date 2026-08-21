@@ -597,7 +597,13 @@ describe("which line drew which widget", () => {
     // The filter drops comments, blanks and the modifiers, so the loop's index
     // is a different number on any fence that has one of those in it — and
     // writing the wrong one moves the wrong widget.
-    expect(widgets).toContain("const lineAt = kept.map((k) => k.at)");
+    //
+    // ONE MORE FILTER IN 4.51.1 and the property is unchanged, which is the
+    // point of asserting `.at` rather than the list's name: a suppressed banner
+    // drops MORE lines, and each survivor still carries the number it had in
+    // the file. A filter that rebuilt the index instead of carrying it is the
+    // failure this row is for.
+    expect(widgets).toContain("const lineAt = drawable.map((k) => k.at)");
     expect(widgets).toContain("drawn.push({ at: container.childElementCount");
   });
 

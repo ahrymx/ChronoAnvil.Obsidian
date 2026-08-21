@@ -34,6 +34,7 @@ import {
 import { getEventsFile, readEvents } from "../events/eventstore";
 import { buildDiaryActions } from "./diary-header";
 import { buildPeriodNav, periodSpan } from "./periodnav";
+import { bannerSuppressed } from "../ui/vault-banner";
 import { statStrip } from "../ui/stat-strip";
 import { lineOf, readRollup } from "../trackers/fields";
 import { allNoteRegions } from "../core/notestore";
@@ -1187,6 +1188,30 @@ export function buildOverviewBanner(
   title: string
 ): { band: HTMLElement; textCol: HTMLElement } {
   const band = createDiv({ cls: `journal-overview-banner job-${unit}` });
+
+  // ── THE HEADLINE IS UPSTAIRS NOW (4.51.7) ─────────────────────────────
+  //
+  // The band's biggest type is the navigator's own trigger — *"the period's
+  // VALUE… wearing the title's size"* — and since 4.51.6 the page head above
+  // prints that same value as the note's name. Two headlines on one page, one
+  // of them a control.
+  //
+  // So where the head is drawing, the trigger goes back to being a control:
+  // ONE TOKEN, `--jpn-headline`, which the label, the caret and the chevrons
+  // outside the trigger all measure themselves against — see
+  // `93-calendars.css`, where that token exists precisely so this size is
+  // stated once.
+  //
+  // GATED ON THE BAR, because with it off there is no head and this trigger is
+  // the only thing on the page naming the period. A demotion that ran
+  // unconditionally would leave that page with no headline at all, which is the
+  // failure this release keeps finding: a fact moved to a surface that is not
+  // being drawn.
+  const noteFile = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
+  if (noteFile instanceof TFile && bannerSuppressed(plugin, ctx.sourcePath)) {
+    band.addClass("job-head-elsewhere");
+  }
+
   const head = band.createDiv({ cls: "job-head" });
 
   // NO EYEBROW AND NO NAVIGATOR AS OF 3.4. Both moved out of the band, and the
