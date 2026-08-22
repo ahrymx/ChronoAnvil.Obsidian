@@ -1184,52 +1184,30 @@ describe("the banner is one material, and the minimal one is quiet", () => {
     expect(readCss()).not.toContain("\n.jec-title-input {");
   });
 
-  it("captions the tracker grid in the strip's register, not a section bar's", () => {
-    // The grid is the only section in the plugin with a card and no name — it
-    // is a MARKED REGION rather than a directive, so there is no line in the
-    // fence for a `header:` title to be an argument to. The block says it
-    // instead, as a caption.
-    //
-    // SMALL CAPS AND FAINT, which is the register the page-context strip above
-    // it uses for its own facts. Anything louder would compete with the alias
-    // two lines up, which is the one piece of type on the card meant to be read.
-    const label = body(".jth-label");
-    expect(label).toContain("font-size: var(--am-text-2xs)");
-    expect(label).toContain("text-transform: uppercase");
-    expect(label).toContain("color: var(--text-faint)");
+  it("spans the period navigator across the full top row with centered date selector", () => {
+    // The period navigator spans the full width of the tracker card's top row,
+    // with navigation chevrons on both sides and an enlarged centered date trigger.
+    const nav = body(".journal-entry-context.jec-nav-only .jeh-nav.jeh-seg");
+    expect(nav).toContain("width: 100%");
+    expect(nav).toContain("justify-content: space-between");
 
-    // ── AND IT IS PUSHED, NOT SPLIT (4.21.2) ────────────────────────
-    //
-    // The row's other half is the entry's date, and a journal note has no date
-    // to put there — so on that surface the row holds the label alone.
-    // `space-between` would strand it on the LEFT, where it reads as a heading
-    // over the whole card rather than as a caption on the grid beneath it.
-    expect(label).toContain("margin-left: auto");
-    expect(body(".journal-tracker-head")).not.toContain("space-between");
+    const dateTrigger = body(".journal-entry-context.jec-nav-only .jeh-datenav-trigger");
+    expect(dateTrigger).toContain("font-size: var(--am-text-base)");
+    expect(dateTrigger).toContain("border-radius: var(--am-radius-pill)");
+
+    // The redundant "Tracking:" header is removed
+    expect(readCss()).not.toContain(".jth-label");
+    expect(readCss()).not.toContain(".journal-tracker-head");
   });
 
-  it("rules under the caption, not between it and the strip above it", () => {
-    // ── WHICH SIDE OF THE HAIRLINE THE CAPTION IS ON (4.21.3) ───────
-    //
-    // The card's head is the alias line and the caption line; the rule separates
-    // what the page knows about itself from the grid you fill in. It ran between
-    // the two halves of the head, which left "Fri 14 Aug 2026 / TRACKING:" on the
-    // grid's side of a rule it is the label for.
-    //
-    // THE CLAIM IS "THE LAST BAND ABOVE THE GRID OWNS THE DIVIDER", and the
-    // caption is always that band — a strip is optional on both page kinds, and
-    // the caption is not. So the rule moved rather than being duplicated.
-    expect(body(".journal-tracker-head")).toContain("border-bottom: var(--am-rule)");
-    // AND THE TWO STRIPS ARE ONE RULE, which is why this reads one body rather
-    // than two. They were two copies of five declarations, and a divider that
-    // moved in one copy would have left a journal note with a rule under its
-    // level line AND one under its caption.
+  it("rules under the top strip, dividing it from the tracker cells", () => {
+    // The top strip carries the bottom rule separating navigation from the grid
     const css = readCss();
     const at = css.indexOf(".journal-tracker-section > .journal-entry-context,");
-    expect(at, "the two page-context strips are not one rule").toBeGreaterThan(0);
+    expect(at, "the two page-context strips are one rule").toBeGreaterThan(0);
     const strips = css.slice(at, css.indexOf("}", at));
     expect(strips).toContain(".journal-tracker-section > .journal-note-context");
-    expect(strips).toContain("border-bottom: none");
+    expect(strips).toContain("border-bottom: var(--am-rule)");
   });
 
   it("applies subtle banner tinting and engraved texture to the slim banner", () => {

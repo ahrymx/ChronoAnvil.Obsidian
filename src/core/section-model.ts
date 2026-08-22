@@ -42,7 +42,9 @@
 import {
   argSpanIn,
   hasSectionBar,
+  isFrameLine,
   isHeaderLine,
+  parseFrame,
   readArg,
   renameSoleKeyword,
   soleArgSpanIn,
@@ -501,7 +503,9 @@ export const WIDGET_FORM = "widget";
 // own title back over the reader's. The question is whether there is a bar at
 // all, and `hasSectionBar` is the plugin's one answer to it.
 export function formOf(lines: readonly string[]): string {
-  return hasSectionBar(lines) ? SECTION_FORM : WIDGET_FORM;
+  return hasSectionBar(lines) || parseFrame(lines).frame === "section"
+    ? SECTION_FORM
+    : WIDGET_FORM;
 }
 
 // The form of the fence holding the directive at `line`.
@@ -959,7 +963,11 @@ export function withAnswers(
   if (form && typeof options[form.key] === "string") {
     const want = options[form.key] as string;
     if (want === WIDGET_FORM) {
-      out = out.filter((l) => !isHeaderLine(l));
+      out = out.filter(
+        (l) =>
+          !isHeaderLine(l) &&
+          !(isFrameLine(l) && parseFrame([l]).frame === "section")
+      );
     } else if (want === SECTION_FORM && formOf(out) === WIDGET_FORM) {
       // DIRECTLY UNDER THE FENCE, which is where every catalogue composes a bar
       // and where the dispatcher needs it: the bar anchors the widgets that

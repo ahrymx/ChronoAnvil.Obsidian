@@ -153,38 +153,16 @@ describe("the two slim banners are one banner (4.21.1)", () => {
     expect(w).not.toContain("order: 2");
   });
 
-  it("and the caption goes on the section, never on a banner", () => {
-    // Every entry composed before 4.20 keeps its markers in the banner's fence,
-    // where the grid is welded to the name band — captioning it there would be
-    // labelling part of a banner. The guard is `chromeClasses`', spelled the
-    // same way, so the caption and the card cannot disagree about which blocks
-    // are the section.
-    const w = readCode("widgets");
-    const at = w.indexOf("buildTrackerHead(this.plugin, ctx, grain)");
-    expect(at).toBeGreaterThan(0);
-    const guard = w.slice(w.lastIndexOf("if (", at), at);
-    for (const flag of ["isEntryBanner", "isStudyBanner", "isPageBanner"]) {
-      expect(guard, flag).toContain(`!${flag}`);
-    }
-    expect(guard).toContain("hasTrackerRegion");
+  it("and the date navigator is built with the formatted date label", () => {
+    const entry = readCode("entryheader");
+    expect(entry).toContain("const dateLabel = entryDateLabel(app, file, grain);");
+    expect(entry).toContain('trigger.createSpan({ cls: "jeh-datenav-label", text: dateLabel });');
   });
 
-  it("and the caption row is live, because the strip above it cannot be", () => {
-    // ── WHY ONE OF THEM REPAINTS AND THE OTHER MUST NOT ─────────────
-    //
-    // The caption row reads the note's own frontmatter for the date, and
-    // Obsidian has not always indexed a note it has just created by the time the
-    // postprocessor runs — which is how a fresh daily entry drew its caption
-    // with no date. A LiveWidget repaints on the next metadata change.
-    //
-    // The page-context strip cannot take the same treatment, and this is the
-    // distinction the whole file is about: the alias editor WRITES frontmatter,
-    // so a live host would rebuild the input the reader is typing in.
+  it("and the redundant tracking caption header is removed from the block", () => {
     const w = readCode("widgets");
-    const at = w.indexOf("buildTrackerHead(this.plugin, ctx, grain)");
-    expect(w.slice(at - 200, at)).toContain("liveFrontmatterWidget");
-    const strip = w.indexOf("buildEntryContext(this.plugin, ctx)");
-    expect(w.slice(strip - 200, strip)).not.toContain("liveFrontmatterWidget");
+    expect(w).not.toContain("buildTrackerHead");
+    expect(w).not.toContain("TRACKING_LABEL");
   });
 
   it("and saving puts the band back, because nothing else will (4.21.3)", () => {

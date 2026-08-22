@@ -220,6 +220,10 @@ function buildDatePicker(
     },
   });
   setIcon(trigger.createSpan({ cls: "jeh-datenav-cal" }), "calendar-search");
+  const dateLabel = entryDateLabel(app, file, grain);
+  if (dateLabel) {
+    trigger.createSpan({ cls: "jeh-datenav-label", text: dateLabel });
+  }
   setIcon(trigger.createSpan({ cls: "jeh-datenav-caret" }), "chevrons-up-down");
 
   let menu: HTMLElement | null = null;

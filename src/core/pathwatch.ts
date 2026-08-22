@@ -90,6 +90,7 @@ const PATH_LABELS: Record<string, string> = {
   templates: "templates",
   templatesDiary: "diary templates",
   documentation: "documentation",
+  art: "art folder",
   attachments: "attachments",
   logbooks: "logbooks folder",
 };

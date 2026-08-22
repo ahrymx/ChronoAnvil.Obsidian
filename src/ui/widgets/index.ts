@@ -127,7 +127,6 @@ import {
   getBuiltinTracker,
   recomputeSleepInFrontmatter,
 } from "../../trackers/trackers";
-import type { TrackerClass } from "../../trackers/trackers";
 import { buildSleepSummary } from "../../trackers/sleep";
 import {
   describeSurfaceMismatch,
@@ -143,7 +142,6 @@ import {
 import {
   buildEntryHeader,
   buildEntryContext,
-  entryDateLabel,
 } from "../../diary/entryheader";
 import { buildPeriodNav } from "../../diary/periodnav";
 import { foldableSection, sectionFrame } from "../section-frame";
@@ -154,6 +152,7 @@ import {
   TAB_KEYWORD,
   TITLE_KEYWORD,
   cellWeightOf,
+  hasTitledBar,
   isFrameLine,
   isHeightLine,
   isRowLine,
@@ -178,7 +177,7 @@ import {
   stampLines,
 } from "./block-drag";
 import { buildPageTitle } from "./page-title";
-import { livePageHead, pageHeadNames } from "./page-head";
+import { livePageHead } from "./page-head";
 import { buildLauncher, LAUNCHER_DEFAULT } from "./launcher";
 import {
   JournalChartSpec,
@@ -412,56 +411,7 @@ export function chromeClasses(
   return out;
 }
 
-// ── THE CAPTION ROW OVER THE LOGGING GRID (4.21.1, a row in 4.21.2) ──────
-//
-// WHY THE GRID NEEDS A CAPTION AT ALL. It is the only section in the plugin with
-// a card and no name, and it cannot have a `header:` line: the section is a
-// MARKED REGION rather than a directive, so there is nothing in the fence for a
-// title to be an argument to, and adding one would put a second thing inside the
-// markers `addTracker` writes between. The block says it instead.
-//
-// TWO HALVES, AND THE ROW IS THE POINT. Left is which PERIOD this note is —
-// "Fri 14 Aug 2026" — and right is what the block under it HOLDS. The date was
-// beside the alias until 4.21.2, which put a title, a date and a navigator on
-// one line: fine in a desktop pane, two wrapped lines on a phone.
-//
-// THE COLON IS DELIBERATE. The label sits at the far right of a row whose
-// content is directly beneath it, so it reads as an introduction to the grid
-// rather than as a heading floating over nothing.
-//
-// NOTHING TO SAY ON A JOURNAL NOTE, which has no period of its own — its level
-// and its kind are on the strip above. The row is then the label alone, pushed
-// right by its own margin rather than by a `space-between` that would have
-// stranded it on the left.
-export const TRACKING_LABEL = "Tracking:";
 
-function buildTrackerHead(
-  plugin: AlmanacPlugin,
-  ctx: MarkdownPostProcessorContext,
-  grain: TrackerClass | undefined
-): HTMLElement {
-  const row = createDiv({ cls: "journal-tracker-head" });
-  const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
-  const period =
-    grain && file instanceof TFile
-      ? entryDateLabel(plugin.app, file, grain)
-      : null;
-  // A DATE THAT IS NOT THERE IS NOT DRAWN, and it used to be drawn as the
-  // GRAIN'S NAME — "Daily" where "Fri 14 Aug 2026" belongs. See
-  // `entryDateLabel`: an absent caption is honest and this row is live, so it
-  // fills itself in the moment the note is indexed.
-  //
-  // AND NOT WHERE THE HEAD IS ALREADY CALLING THE NOTE THAT (4.51.7). An entry
-  // with no title of its own IS its date, so the head above prints exactly this
-  // string as the note's name — reported from the vault as the same words a
-  // hundred pixels apart. `pageHeadNames` is asked rather than re-derived: the
-  // head owns what it says, and this row owns whether to say it too.
-  if (period && !(file instanceof TFile && pageHeadNames(plugin, file, period))) {
-    row.createSpan({ cls: "jth-period", text: period });
-  }
-  row.createSpan({ cls: "jth-label", text: TRACKING_LABEL });
-  return row;
-}
 
 const SECTION_TITLES: Record<string, string> = {
   diary: "📆 Today",
@@ -1397,59 +1347,7 @@ export class Widgets implements
         trackerBar.appendChild(buildTrackerAddCell(this, ctx));
       }
 
-      // ── THE GRID SAYS WHAT IT IS (4.21.1) ───────────────────────────
-      //
-      // 4.20 made the logging grid a section of its own and 4.21 gave it a card,
-      // and it is the only section in the plugin with a card and no name. Every
-      // other one opens with a `header:` line — "📆 Today", "✨ Highlights" — and
-      // this one could not, because the section is a MARKED REGION rather than a
-      // directive: there is no line in the fence for a title to be an argument
-      // to, and adding one would put a second thing inside the markers that
-      // `addTracker` writes between.
-      //
-      // SO THE BLOCK SAYS IT RATHER THAN THE FILE. The word is not stored, not
-      // editable and not a `header:` — it is a caption on a grid, in the same
-      // register the page-context strip above it uses for its facts, and a
-      // reader who deletes it has nothing to delete.
-      //
-      // ONLY ON THE SECTION, NEVER IN A BANNER. Every entry composed before 4.20
-      // keeps its markers in the banner's fence, where the grid is welded to the
-      // name band and captioning it would be labelling part of a banner. The test
-      // is `chromeClasses`', spelled the same way as the class it chooses, so the
-      // caption and the card cannot disagree about which blocks are the section.
-      //
-      // ── AND IT IS A ROW, NOT A WORD (4.21.2) ────────────────────────
-      //
-      // The caption shares its line with the entry's DATE, which sat beside the
-      // alias until this release and made that line a title, a date and a
-      // navigator — three things a desktop pane fits and a phone wraps onto two.
-      // The date has a row to itself here and the caption has the far end of it,
-      // so both halves of the row say what the block under them is: which period
-      // it belongs to, and what it holds.
-      //
-      // LIVE, WHICH THE STRIP ABOVE IT CANNOT BE. `entryDateLabel` reads the
-      // note's own frontmatter, and Obsidian has not always indexed a note it has
-      // only just created by the time the postprocessor runs — which is how a
-      // fresh daily entry rendered its caption with no date at all. A LiveWidget
-      // repaints on the note's next metadata change, so the row fills itself in.
-      // The page-context strip cannot take the same treatment: the alias editor
-      // WRITES frontmatter, so a live host would rebuild the input mid-edit.
-      if (
-        trackerBar &&
-        trackerBar.parentElement === container &&
-        hasTrackerRegion &&
-        !isEntryBanner &&
-        !isStudyBanner &&
-        !isPageBanner
-      ) {
-        const grain = this.plugin.sections.entryContextFor(ctx.sourcePath)?.grain;
-        container.insertBefore(
-          liveFrontmatterWidget(this.plugin, ctx, () =>
-            buildTrackerHead(this.plugin, ctx, grain)
-          ),
-          trackerBar
-        );
-      }
+
 
       // The entry card's footer — the date stepper and the entry's `⋯`, 3.7.
       //
@@ -1638,7 +1536,9 @@ export class Widgets implements
         trackerSection:
           hasTrackerRegion && !isEntryBanner && !isStudyBanner && !isPageBanner,
       })) {
-        container.addClass(cls);
+        if (!rowSpec.row || cls === "is-unframed") {
+          container.addClass(cls);
+        }
       }
 
       // ── AND HOW WIDE THE PAGE IS, MARKED ON THE HEAD (4.11) ─────────
@@ -1660,37 +1560,39 @@ export class Widgets implements
       }
 
       if (frameSpec.frame === "section") {
-        // THE WIDGET TITLES ITSELF, because `sectionFrame` requires a title and
-        // a bare `month-summary` fence has none. The title comes from the
-        // directive rather than from the modifier: `frame: section: 🗓 Today`
-        // would strain a one-line grammar and put a colon inside a value, and
-        // the string is the same one a catalogue would have written into a
-        // `header:` anyway.
-        //
-        // WRAPPED AFTER THE FACT rather than built into, so the loop above
-        // needs no knowledge of the frame at all. Moving rendered nodes is safe
-        // — a `MarkdownRenderChild` is bound to its element, not to its parent,
-        // and a LiveWidget rebuilds its own subtree wherever that subtree sits.
-        const kind = lines.map((l) => l.split("|")[0].split(":")[0].trim())
-          .find((k) => SECTION_TITLES[k]);
-        if (kind) {
-          const drawn = Array.from(container.children);
-          const { body } = foldableSection(
-            container,
-            { title: SECTION_TITLES[kind], level: 1 },
-            this.foldStore(),
-            `${ctx.sourcePath}::frame:${kind}`
-          );
-          for (const node of drawn) body.appendChild(node);
-        } else {
-          // REFUSED OUT LOUD RATHER THAN DOWNGRADED. Falling back to `none`
-          // here would render the block unframed and leave the reader looking
-          // at a `frame: section` line that did nothing, with no way to tell
-          // whether the modifier or the widget was at fault.
-          container.createDiv({
-            cls: "journal-frame-error",
-            text: "Almanac: nothing in this block can title its own section, so frame: section has no title to use. Add a header: bar instead, or use frame: none.",
-          });
+        if (!hasTitledBar(lines)) {
+          // THE WIDGET TITLES ITSELF, because `sectionFrame` requires a title and
+          // a bare `month-summary` fence has none. The title comes from the
+          // directive rather than from the modifier: `frame: section: 🗓 Today`
+          // would strain a one-line grammar and put a colon inside a value, and
+          // the string is the same one a catalogue would have written into a
+          // `header:` anyway.
+          //
+          // WRAPPED AFTER THE FACT rather than built into, so the loop above
+          // needs no knowledge of the frame at all. Moving rendered nodes is safe
+          // — a `MarkdownRenderChild` is bound to its element, not to its parent,
+          // and a LiveWidget rebuilds its own subtree wherever that subtree sits.
+          const kind = lines.map((l) => l.split("|")[0].split(":")[0].trim())
+            .find((k) => SECTION_TITLES[k]);
+          if (kind) {
+            const drawn = Array.from(container.children);
+            const { body } = foldableSection(
+              container,
+              { title: SECTION_TITLES[kind], level: 1 },
+              this.foldStore(),
+              `${ctx.sourcePath}::frame:${kind}`
+            );
+            for (const node of drawn) body.appendChild(node);
+          } else {
+            // REFUSED OUT LOUD RATHER THAN DOWNGRADED. Falling back to `none`
+            // here would render the block unframed and leave the reader looking
+            // at a `frame: section` line that did nothing, with no way to tell
+            // whether the modifier or the widget was at fault.
+            container.createDiv({
+              cls: "journal-frame-error",
+              text: "Almanac: nothing in this block can title its own section, so frame: section has no title to use. Add a header: bar instead, or use frame: none.",
+            });
+          }
         }
       }
 

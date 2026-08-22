@@ -1121,4 +1121,27 @@ describe("the period summary is a section and wears a section's bar", () => {
     expect(view?.removable).toBe(false);
     expect(view?.movable).toBe(true);
   });
+
+  it("allows Period Summary in widget mode to be grouped into a row", () => {
+    const ctx = { grain: "weekly" } as const;
+    const model = diarySectionModel(ctx);
+    const shipped = composeDiaryDashboard("weekly");
+    // In section mode, summary has header: so blocks() reports empty column
+    const blocksSection = model.blocks!(shipped);
+    const summaryBlock = blocksSection.find((b) => b.ids.includes("summary"));
+    expect(summaryBlock?.column).toEqual([]);
+
+    // In widget mode (no header), summary has week-summary + button
+    const widgetMode =
+      shipped.replace(`${HEADER_PREFIX}📅 This week\n`, "") +
+      "\n```almanac\nevents\n```\n";
+    const blocksWidget = model.blocks!(widgetMode);
+    const summaryWidgetBlock = blocksWidget.find((b) => b.ids.includes("summary"));
+    expect(summaryWidgetBlock?.column).toEqual(["summary"]);
+
+    // Regrouping summary in widget mode with events succeeds
+    const regrouped = model.regroup!(widgetMode, [["summary", "w:events#1"]]);
+    expect(regrouped).not.toBeNull();
+    expect(regrouped).toContain("row\nweek-summary\nbutton:new-week\ncell\nevents");
+  });
 });

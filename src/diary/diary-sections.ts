@@ -78,7 +78,9 @@ import {
   BANNER_ID,
   PAGE_TITLE_LINE,
   answersOn,
+  flatBlocks,
   locateTitle,
+  regroupFlatNote,
 } from "../core/note-sections";
 import {
   instanceIdOf,
@@ -1884,5 +1886,17 @@ export function diarySectionModel(ctx: DiaryDashboardContext): SectionModel {
     // A dashboard holds more than one of a widget as of 4.58.0, so it owes the
     // editor the id to stage for the next copy. See `SectionModel.instanceOf`.
     instanceOf: (id, text, taken) => nextInstanceId(id, text, taken),
+    blocks: (text) =>
+      flatBlocks(
+        text,
+        sectionsForDashboard(ctx, text).map((s) => asFlat(s, ctx))
+      ),
+    regroup: (text, blocks, pages) =>
+      regroupFlatNote(
+        text,
+        sectionsForDashboard(ctx, text).map((s) => asFlat(s, ctx)),
+        blocks,
+        pages
+      ),
   };
 }

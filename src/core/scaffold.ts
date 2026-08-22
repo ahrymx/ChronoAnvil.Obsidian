@@ -323,6 +323,12 @@ export function shippedNotes(
     })),
     { asset: "diary.base", dest: `${p.infrastructureRoot}/Diary.base` },
     { asset: "documentation.md", dest: `${p.documentation}/README.md` },
+    { asset: "art/topography-minimal.svg", dest: `${p.art}/topography-minimal.svg` },
+    { asset: "art/dot-grid.svg", dest: `${p.art}/dot-grid.svg` },
+    { asset: "art/constellations.svg", dest: `${p.art}/constellations.svg` },
+    { asset: "art/aurora-mesh.svg", dest: `${p.art}/aurora-mesh.svg` },
+    { asset: "art/isometric-grid.svg", dest: `${p.art}/isometric-grid.svg` },
+    { asset: "art/subtle-waves.svg", dest: `${p.art}/subtle-waves.svg` },
     // ONE FOLDER-NOTE DASHBOARD PER REGISTERED JOURNAL, 4.36 §0.2.
     //
     // The gap 4.1 §2 closed at `02 - Diary/` and `03 - Journals/` exists again

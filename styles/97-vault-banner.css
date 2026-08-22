@@ -61,10 +61,42 @@
   padding: var(--am-space-3) var(--am-space-5);
   border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
   background: var(--background-secondary);
+  position: relative;
+  overflow: hidden;
   /* THE READER'S CURSOR IS NOT IN HERE. The banner sits inside the editor's
      own sizer in Live Preview, so a click that lands on padding rather than
      on a control would otherwise put a caret in the note behind it. */
   user-select: none;
+}
+
+/* Ambient gradient glow layer */
+.am-vault-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--am-header-bg-gradient);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Textured art pattern layer */
+.am-vault-banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--am-header-art-pattern);
+  background-size: var(--am-header-art-size);
+  background-repeat: var(--am-header-art-repeat);
+  background-position: var(--am-header-art-position);
+  opacity: var(--am-header-art-opacity);
+  mix-blend-mode: var(--am-header-art-blend);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.am-vault-banner > * {
+  position: relative;
+  z-index: 3;
 }
 
 /* OBSIDIAN'S TITLE AND PROPERTY PANEL, STOOD IN FOR (4.51.6). Scoped to the
@@ -403,9 +435,9 @@
   display: flex;
   padding: 3px;
   border-radius: var(--am-radius-sm);
-  color: var(--text-faint);
-  opacity: 0;
-  transition: opacity 120ms ease;
+  color: var(--text-muted);
+  opacity: var(--am-cog-opacity);
+  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
   cursor: pointer;
 }
 .am-vault-banner .avb-cog .svg-icon {
@@ -413,7 +445,8 @@
   height: 15px;
 }
 .am-vault-banner:hover .avb-cog,
-.am-vault-banner .avb-cog:focus-visible {
+.am-vault-banner .avb-cog:focus-visible,
+.am-vault-banner .avb-cog:hover {
   opacity: 1;
 }
 .am-vault-banner .avb-cog:hover {
@@ -422,7 +455,7 @@
 }
 @media (hover: none) {
   .am-vault-banner .avb-cog {
-    opacity: 0.55;
+    opacity: 0.65;
   }
 }
 

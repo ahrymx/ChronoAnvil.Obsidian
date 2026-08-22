@@ -70,7 +70,8 @@ import {
   bannerSurfaceOf,
   titleTargetFor,
 } from "../core/banner-scope";
-import { openFile } from "../core/util";
+import { openFile, getFile } from "../core/util";
+import { ART_PRESETS } from "../core/constants";
 import { resolveTarget, reviewScopes } from "../core/links";
 import {
   Crumb,
@@ -243,9 +244,46 @@ export class VaultBanner {
   ): HTMLElement {
     const root = createDiv({ cls: BANNER_CLASS });
     root.setAttr("data-surface", surface);
+    this.applyArt(root);
     this.buildGlobal(root, file, surface);
     this.buildContext(root, file, surface, view);
     return root;
+  }
+
+  private applyArt(root: HTMLElement): void {
+    const banner = this.plugin.settings.banner;
+    const art = banner.art;
+    if (art && art !== "none") {
+      const artPath = `${this.plugin.settings.paths.art}/${art}`;
+      const file = getFile(this.app, artPath);
+      if (file) {
+        const url = this.app.vault.getResourcePath(file);
+        root.style.setProperty("--am-header-art-pattern", `url("${url}")`);
+      }
+
+      // Check if this art file matches a built-in preset spec
+      const preset = ART_PRESETS[art];
+      if (preset) {
+        root.style.setProperty("--am-header-art-size", preset.size);
+        root.style.setProperty("--am-header-art-repeat", preset.repeat);
+        root.style.setProperty("--am-header-art-position", preset.position);
+        root.style.setProperty("--am-header-art-blend", preset.blend);
+      }
+
+      const opacity = banner.artOpacity ?? preset?.defaultOpacity ?? 18;
+      root.style.setProperty("--am-header-art-opacity", String(opacity / 100));
+    } else if (art === "none") {
+      root.style.setProperty("--am-header-art-pattern", "none");
+    }
+
+    if (banner.glowEnabled === false) {
+      root.style.setProperty("--am-header-bg-gradient", "none");
+    } else if (banner.glowEnabled === true) {
+      root.style.setProperty(
+        "--am-header-bg-gradient",
+        "radial-gradient(circle at 85% 20%, rgba(var(--interactive-accent-rgb), 0.15) 0%, transparent 60%)"
+      );
+    }
   }
 
   // Row one: the tile, the search, the four destinations. Identical on every
@@ -632,26 +670,23 @@ export class VaultBanner {
     isIndex: boolean,
     host: HTMLElement
   ): ((menu: Menu) => void) | null {
-    // THE JOURNAL MENU IS THE ONE THE OLD BANNER'S COG OPENED, shared rather
-    // than re-listed — Template…, the tracker pair, Convert to a dashboard. A
-    // reader who learns those before turning the banner on finds them in the
-    // same place after.
-    if (surface === "journal") {
-      const build = journalBannerMenu(this.plugin, file.path, isIndex);
-      if (build) return build;
-    }
-    // AND THE DASHBOARD MENU IS THE ONE THE `title` CARD'S COG OPENED — Edit
-    // sections…, Add a section…, and **Wide page**, which 4.51 dropped by
-    // writing its own two items (4.51.1). That setting has no other door, and a
-    // page of widgets is exactly where it matters: at Obsidian's 700px default
-    // a two-cell row renders collapsed.
-    //
-    // WIDE IS READ OFF THE VIEW, which is where `page-width.ts` marks it, and
-    // read AT THE CLICK — so it is the note's current answer rather than what
-    // was true when the bar was drawn.
-    return sectionsMenuFor(this.plugin, file.path, () =>
-      host.hasClass(WIDE_PAGE_CLASS)
-    );
+    const build =
+      surface === "journal"
+        ? journalBannerMenu(this.plugin, file.path, isIndex)
+        : sectionsMenuFor(this.plugin, file.path, () =>
+            host.hasClass(WIDE_PAGE_CLASS)
+          );
+
+    return (menu: Menu) => {
+      if (build) build(menu);
+      if (build) menu.addSeparator();
+      menu.addItem((i) =>
+        i
+          .setTitle("Banner art & settings…")
+          .setIcon("palette")
+          .onClick(() => this.openSettings())
+      );
+    };
   }
 
   // ── the tile ───────────────────────────────────────────────────────────

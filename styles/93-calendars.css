@@ -3,6 +3,25 @@
   padding: 12px 14px 10px;
   margin: 0.5em 0 1.5em;
 }
+
+/* UNBOXED INSIDE A CARD: The card (such as .journal-widget-card or
+   .journal-block-cell on the Homepage) already provides the container frame,
+   border, and background. Inside any card, the calendar gives up its own
+   outer box and margins so it uses the card's border directly. */
+.journal-widget-card .journal-calendar,
+.journal-block-cell .journal-calendar,
+.journal-widget-block .journal-calendar,
+.journal-sec-block .journal-calendar,
+.journal-sec-fold-body .journal-calendar,
+.has-head .journal-calendar,
+.journal-overview-card .journal-calendar {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+  padding: 0;
+}
 /* ── The actions strip (4.13.1 §3) ──────────────────────────────────────
  *
  * What the card opens with when it is a diary SECTION rather than a bare grid:
@@ -611,7 +630,7 @@
 .journal-calendar .jc-mcell.is-selected,
 .journal-calendar .jc-mcell.is-selected:hover {
   background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
-  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent), 0 0 8px rgba(138, 92, 245, 0.12);
   color: var(--interactive-accent);
   font-weight: 600;
 }
@@ -946,14 +965,17 @@
   cursor: pointer;
   font-size: var(--am-text-sm);
   color: var(--text-normal);
-  transition: background 0.12s;
+  transition: background 0.12s, transform 0.12s, box-shadow 0.12s;
 }
 .cal-cell:hover {
   background: var(--background-modifier-hover);
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 var(--am-rule) color-mix(in srgb, var(--text-normal) 20%, transparent), 0 2px 6px rgba(0, 0, 0, 0.12);
+  z-index: 2;
 }
 .cal-cell-outside {
   color: var(--text-faint);
-  opacity: 0.55;
+  opacity: 0.4;
 }
 /* TODAY, AT THREE SIGNALS INSTEAD OF ONE (4.14 §2). It was a 1.5px accent ring
    and a bold numeral on a cell otherwise identical to its thirty neighbours,
@@ -1962,8 +1984,8 @@
    square corner inside a rounded one is visible whether or not there is a fill
    to see it against. */
 .jc-agenda {
-  margin: 10px -14px 0;
-  padding: 2px 14px 10px;
+  margin: 10px -14px -12px;
+  padding: 2px 14px 12px;
   border-top: 1px solid var(--background-modifier-border);
   border-radius: 0 0 var(--am-radius-md) var(--am-radius-md);
 }

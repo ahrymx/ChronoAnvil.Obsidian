@@ -230,22 +230,6 @@ export function parseFrame(lines: readonly string[]): FrameSpec {
     };
   }
 
-  // The contradiction, refused. Only `section` collides: a `header:` above a
-  // `frame: none` widget is the composed-dashboard case (§3.3) and is exactly
-  // right — one bar over its own widgets, no card underneath.
-  //
-  // `hasTitledBar` IS THIS TEST, LIFTED (4.12 §A). It was a local until the drag
-  // needed to ask a neighbouring question — whether the fence titles itself at
-  // all — and two spellings of "is there a bar here" is how the refusal above
-  // and the refusal in `widgetRun` would come to disagree about one fence.
-  if (raw === "section" && hasTitledBar(lines)) {
-    return {
-      frame: DEFAULT_FRAME,
-      error:
-        "This block has both a header: bar and frame: section, which both title it. Keep the header: line, or change the frame to none.",
-    };
-  }
-
   return { frame: raw, error: null };
 }
 

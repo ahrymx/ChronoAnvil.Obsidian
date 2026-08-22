@@ -165,7 +165,7 @@
 .jeh-datenav-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   height: 2em;
   padding: 0 10px;
   border: none;
@@ -178,6 +178,12 @@
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.12s, color 0.12s;
+}
+.jeh-datenav-label {
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
 }
 .jeh-datenav-trigger .jeh-datenav-cal svg {
   width: 1.05em;
@@ -563,17 +569,52 @@
   cursor: pointer;
 }
 
-/* THE STRIP WITH ITS TITLE ELSEWHERE (4.51.5). The vault banner draws the
-   entry's title, so this row keeps only the navigator between entries — and a
-   lone control does not need a row's worth of height or a row's worth of
-   emptiness beside it. Pushed right, where the navigator has always sat, and
-   tightened so it reads as a control on the grid's edge rather than as a band
-   that lost its contents. */
+/* THE STRIP WITH ITS TITLE ELSEWHERE. The vault banner draws the
+   entry's title, so this row keeps only the navigator between entries.
+   It spans the full width of the tracker card top row with arrows on both
+   sides and the date selector centered and enlarged. */
 .journal-entry-context.jec-nav-only {
-  justify-content: flex-end;
+  width: 100%;
   min-height: 0;
   padding-top: 0;
   padding-bottom: 0;
+}
+.journal-entry-context.jec-nav-only .jeh-nav.jeh-seg {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: none;
+  border-radius: 0;
+}
+.journal-entry-context.jec-nav-only .jeh-navpill {
+  width: 2.2em;
+  height: 2.2em;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+}
+.journal-entry-context.jec-nav-only .jeh-datenav {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+.journal-entry-context.jec-nav-only .jeh-datenav-trigger {
+  height: 2.2em;
+  padding: 0 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-primary);
+  font-size: var(--am-text-base);
+  font-weight: 600;
+  gap: 8px;
+}
+.journal-entry-context.jec-nav-only .jeh-datenav-trigger .jeh-datenav-label {
+  font-size: var(--am-text-base);
+}
+.journal-entry-context.jec-nav-only .jeh-datenav-trigger:hover,
+.journal-entry-context.jec-nav-only .jeh-datenav-trigger.is-open {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
 }
 
 /* spacer: a full-width branded line (almanac:spacer, inline on line 0). Its
@@ -647,110 +688,26 @@
   border-radius: var(--am-radius-md);
   box-shadow: inset 0 1px 0 var(--am-edge-highlight);
 }
-/* ── THE HEAD IS TWO ROWS ABOVE ONE RULE (4.21.3) ─────────────────────────
+/* ── THE TRACKER SECTION TOP STRIP ──────────────────────────────────────
  *
- * The card's head holds the alias line and the caption line, and the hairline
- * goes UNDER BOTH OF THEM — it separates what the page knows about itself from
- * the grid you fill in, and until 4.21.3 it ran between the two halves of the
- * first thing, leaving "Fri 14 Aug 2026 / TRACKING:" stranded on the grid's side
- * of a rule it is the label for.
- *
- * SO THE RULE BELONGS TO THE LAST BAND ABOVE THE GRID, WHICH IS ALWAYS THE
- * CAPTION. That is a stronger claim than "the strip has a border", and it is why
- * the divider moved rather than being duplicated: a strip is optional on both
- * page kinds — a journal note outside a registered root has no level to report,
- * an entry template draws no alias — and the caption is not.
- *
- * The strip keeps the bleed and loses the rule. Its horizontal numbers are
- * `.journal-banner-name`'s, one card up; the vertical ones are its own, because
- * this band holds the biggest type on the page and 7px/8px was sized for a
- * label. */
+ * The page-context strip is the card's top band, carrying the navigator across
+ * the full width above the logging grid. The bottom rule is this band's,
+ * separating the navigation and metadata from the tracker cells below it.
+ */
 .journal-tracker-section > .journal-entry-context,
 .journal-tracker-section > .journal-note-context {
   display: flex;
   align-items: center;
   gap: 8px 16px;
   flex-wrap: wrap;
-  margin: -12px -14px 0;
-  padding: 11px 14px 2px;
-  border-bottom: none;
-}
-/* ── The caption row over the grid (4.21.1; a ROW as of 4.21.2) ───────────
-   The section's name, said by the block rather than by the file — see the note
-   in `index.ts` for why this is a caption and not a `header:` line.
-
-   TWO HALVES: which period this note is, on the left, and what the block under
-   it holds, on the right. The date used to sit beside the alias one band up,
-   which put a title, a date and a navigator on one line — comfortable in a
-   desktop pane and two wrapped lines on a phone. Giving it this row is what
-   makes the alias line a title and a control, and nothing else.
-
-   PUSHED, NOT SPLIT. A journal note has no period of its own, so the row is the
-   label alone; `space-between` would strand it on the left, where it would read
-   as a heading for the whole card rather than as a caption on the grid.
-
-   NOT A `.journal-header-bar`. That carries a fold toggle, a rename and an
-   actions strip, none of which this has — a section bar that folds nothing and
-   renames nothing is three affordances promised and none delivered.
-
-   AND IT CARRIES THE CARD'S DIVIDER as of 4.21.3 — see the strip above for why
-   the rule is this band's rather than that one's. It bleeds the card's padding
-   to draw it full width, out through the `.journal-live-widget` host that makes
-   the row repaint; that host carries no layout, which is what lets the margin
-   through. */
-.journal-tracker-head {
-  display: flex;
-  align-items: baseline;
-  gap: 4px 12px;
-  flex-wrap: wrap;
-  margin: 0 -14px 12px;
-  padding: 2px 14px 8px;
+  margin: -12px -14px 12px;
+  padding: 8px 14px;
   border-bottom: var(--am-rule) solid var(--background-modifier-border);
 }
-/* The live host is a passenger; the row inside it does the bleeding. Spelled for
-   the reason `.journal-overview-card > .journal-live-widget` is spelled: a host
-   with layout of its own would stop the negative margin at its own edge. */
-.journal-tracker-section > .journal-live-widget {
-  margin: 0;
-  padding: 0;
-}
-/* NO STRIP ABOVE IT means the caption is the card's top band as well as its
-   last, so it takes the top bleed the strip would have taken. A journal note
-   outside a registered journal root has no level and no kind to report, and an
-   entry template draws no alias — `:has()` asks which case this is rather than
-   depending on how many children happen to precede the row. */
-.journal-tracker-section:not(:has(> .journal-entry-context)):not(
-    :has(> .journal-note-context)
-  )
-  .journal-tracker-head {
-  margin-top: -12px;
-  padding-top: 11px;
-}
-/* AND NO HEAD AT ALL means no divider to place. A managed entry template draws
-   neither the caption nor the strip — `isManagedTemplate` withholds both — so
-   the grid is the whole card and has nothing above it to be separated from. */
+/* A managed entry template draws no strip — `isManagedTemplate` withholds it —
+   so the grid is the whole card and has nothing above it to be separated from. */
 .journal-tracker-section > .journal-tracker-bar:first-child {
   margin-top: 0;
-}
-/* The period, at the size the alias's subtitle was — this is the same fact in
-   the same words, one band lower. */
-.jth-period {
-  font-size: var(--am-text-xs);
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-/* THE SMALL-CAPS REGISTER, WHICH IS THE STRIP'S. A journal note's level and kind
-   sit directly above it in exactly this face, and the two are the same kind of
-   thing: a word that labels what is under it, read once and then ignored. Set
-   any louder it would compete with the alias two lines up, which is the one
-   piece of type on this card that is meant to be read. */
-.jth-label {
-  margin-left: auto;
-  font-size: var(--am-text-2xs);
-  font-weight: var(--am-caps-weight);
-  letter-spacing: var(--am-caps-tracking);
-  text-transform: uppercase;
-  color: var(--text-faint);
 }
 /* The alias, on the left, pushing the navigator to the far edge. */
 .jec-title-wrap {

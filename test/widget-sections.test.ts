@@ -428,10 +428,6 @@ describe("a widget fence somebody wrote by hand", () => {
   });
 
   it("and a titled one is listed, removable, and not offered a group", () => {
-    // A hand-written `header:` over a widget IS a widget row — named by the
-    // directive under the bar — and it is not a column, because its bar would
-    // render below the group it titles. Listed, removable, not grouped: the
-    // complaint answered from the other side.
     const titled = home() + "\n```almanac\nheader:🎉 Events\nevents\n```\n";
     expect(model.present(titled)).toContain("w:events#1");
     const block = flatBlocks(titled, WITH_WIDGETS).find((b) =>

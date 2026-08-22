@@ -7,6 +7,31 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.61.0] - 2026-08-23
+
+**Groups on Diary overviews and folder note, widget-mode grouping, and layout refinements.**
+
+### Added
+
+- **Row and tab groups on Diary Overviews and Diary Dashboard.** The Section Editor now supports creating row and tab groups on all period overview notes (Weekly, Monthly, Quarterly, Yearly) as well as the Diary folder note (`02 - Diary`).
+- **Groupable Period Summary and Today/This Month in Widget Mode.** When switched to widget form ("As a widget, so it can sit in a row"), the Period Summary (with inline creation button), Today, and This Month can now join rows, columns, and tabbed pages alongside other widgets.
+
+### Fixed
+
+- **Eliminated nested outer borders in groups containing period summaries.** Single-block composite chrome (`.journal-overview-card`) is now withheld from the outer container whenever a block is rendered as a row/group, eliminating multi-layered borders.
+- **Trackers section and homepage calendar layout improvements.** Streamlined full-width period navigators, cleaner card borders, and collapsible headers on period sections.
+
+## [4.60.0] - 2026-08-22
+
+**The vault banner grows customizable background art and an always-visible cog wheel.**
+
+### Added
+
+- **Always-visible cog wheel on the vault banner.** Previously hover-revealed, the cog wheel now stays discoverable at a resting opacity (`0.65`) with smooth elevation to `1.0` on hover, keyboard focus, and touch devices.
+- **Header background art and texture subsystem (`00 - Infrastructure/Art/`).** A new customizable art directory seeded with 6 starter vector patterns (Topography, Dot Matrix, Constellations, Aurora Mesh, Isometric Grid, and Minimal Waves).
+- **Built-in preset map.** Each bundled pattern automatically applies its optimized background size, repetition, and blend mode (`soft-light`, `screen`, `overlay`).
+- **Banner customization settings.** Choose active background art, fine-tune pattern opacity with a slider (0–60%), and toggle subtle ambient theme accent glow directly from **Settings → Almanac → Vault banner** or from the cog menu's new **"Banner art & settings…"** shortcut.
+
 ## [4.59.0] - 2026-08-22
 
 **The period summary is a section, and now wears one — or drops the bar and joins a row.**

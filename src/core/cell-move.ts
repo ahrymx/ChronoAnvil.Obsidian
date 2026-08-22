@@ -176,10 +176,9 @@ function isContent(line: string): boolean {
 // EXPORTED FOR `cell-width.ts` (4.9 §3.3), which walks the same body to find
 // where each COLUMN starts. Two copies of "is this line a widget" is exactly the
 // second meaning hiding in the first that the one-name-per-idea rule exists to
-// stop: this one already knows that a `header:` bar is content and not a cell,
-// and a resize has to make the same call for the same reason.
 export function isWidget(line: string): boolean {
-  return isContent(line) && splitDirective(line.trim()).keyword !== HEADER_KEYWORD;
+  const kw = splitDirective(line.trim()).keyword;
+  return isContent(line) && kw !== HEADER_KEYWORD && kw !== "button";
 }
 
 // How many widgets this block holds, counting from its body.
@@ -211,30 +210,6 @@ export function widgetCount(body: readonly string[]): number {
 export function widgetRun(
   body: readonly string[]
 ): { from: number; to: number } | null {
-  // AND A BLOCK THAT TITLES ITSELF GIVES NOTHING (4.12 §A). One line, and it is
-  // the whole of "only widgets can be grouped" on the source side, because
-  // everything downstream reads this function rather than repeating its rule:
-  //
-  //   • `block-drag.ts` sets `CELL_TYPE` and the payload's `cell` range only
-  //     where there is a run, and the side quarters gate on both — so no
-  //     quarter LIGHTS UP during `dragover`. The gesture is declined before the
-  //     reader commits to it, which is 4.8.7's rule and the reason there is no
-  //     notice anywhere in this release.
-  //   • `regroupFlatNote` phase two lifts a joining section through this, so the
-  //     editor's **Make a group** cannot write the same page from the other end.
-  //   • `moveCell`'s `group` branch loses its source.
-  //
-  // WHAT IT DELIBERATELY KEEPS. The block's own grip and its above/below slots:
-  // a titled section still REORDERS, and always could. And the per-widget grips
-  // inside a `frame: section` row are untouched, because a widget in a cell
-  // never consults this — the run is what a WHOLE BLOCK offers.
-  //
-  // THIS WAS THE ADVERTISED BEHAVIOUR UNTIL NOW, which is why it is a refusal
-  // rather than a fix: `widgetRun` accepted `header:` + one widget, so the drop
-  // wrote the bar into the cell, `NOT_A_CELL` evicted it at render, and
-  // `layOutRow` inserted the group at the first CELL child's index — leaving the
-  // second column's bar below the group and the first appearing to title the
-  // whole thing. It worked in the file and was wrong on the page.
   if (isSectionFence(body)) return null;
   if (widgetCount(body) !== 1) return null;
   const at = body.flatMap((l, i) => (isContent(l) ? [i] : []));
@@ -690,7 +665,7 @@ function pruned(body: readonly string[]): string[] | null {
   // AN EMPTIED FENCE GOES. An `almanac` fence with no directives left renders
   // as an empty card — `applyLayout` drops one for the same reason, in the same
   // words.
-  if (!body.some(isContent)) return null;
+  if (!body.some(isWidget)) return null;
   // A ROW OF ONE IS NOT A ROW. The block renders identically either way, so
   // this is about what the file says: `row` over a single directive is a claim
   // about a shape that is no longer there, and the next reader to open the note
@@ -985,22 +960,9 @@ export function moveCell(
     // this is the smaller statement that a target with a `row` line is somebody
     // else's case.
     if (dstBody.some(isRowLine)) return null;
-    // AND A GROUP IS NOT MADE OUT OF A SECTION (4.12 §A). The refusal in
-    // `widgetRun` closes the gesture from the SOURCE end — a titled block offers
-    // no run, so it cannot be dragged into a column. This is the same page
-    // reached from the other end: a plain widget dropped ONTO a titled block's
-    // quarter would turn that block into a row, and its bar would then render
-    // below the group it titles for exactly the reasons `widgetRun` lists.
-    //
-    // TWO EDITS, GEOMETRY AND ARITHMETIC, which is this project's standing
-    // pattern: `block-drag.ts` withholds the quarters so nothing lights up, and
-    // this says the same thing to callers not yet written.
     if (isSectionFence(dstBody)) return null;
+    if (widgetCount(dstBody) !== 1) return null;
     if (!dstBody.some(isContent)) return null;
-    // MODIFIERS STAY AT THE TOP, where the reader wrote them and where
-    // `docs/reference.md` shows them. `row` goes under them and above the
-    // content, which is `composeFlatNote`'s own spelling for a fence with no
-    // modifiers in it.
     let cut = 0;
     while (
       cut < dstBody.length &&

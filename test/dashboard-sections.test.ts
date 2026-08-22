@@ -835,4 +835,29 @@ describe("no block on either dashboard is loose content", () => {
       }
     }
   });
+
+  it("allows Today and This month in widget mode to be grouped on diary dashboard", () => {
+    const model = diaryDashboardSectionModel();
+    const shipped = composeDiaryDashboardNote();
+
+    // In section mode (frame: section), Today cannot be grouped
+    const blocksSection = model.blocks!(shipped);
+    const todayBlock = blocksSection.find((b) => b.ids.includes("today"));
+    expect(todayBlock?.column).toEqual([]);
+
+    // In widget mode (no frame: section), Today and This month can be grouped
+    const widgetMode = shipped
+      .replace("frame: section\n", "")
+      .replace("frame: section\n", "");
+    const blocksWidget = model.blocks!(widgetMode);
+    const todayWidgetBlock = blocksWidget.find((b) => b.ids.includes("today"));
+    expect(todayWidgetBlock?.column).toEqual(["today"]);
+    const monthWidgetBlock = blocksWidget.find((b) => b.ids.includes("this-month"));
+    expect(monthWidgetBlock?.column).toEqual(["this-month"]);
+
+    // Regrouping Today with This month in widget mode succeeds
+    const regrouped = model.regroup!(widgetMode, [["today", "this-month"]]);
+    expect(regrouped).not.toBeNull();
+    expect(regrouped).toContain("row\ndiary:3\ncell\nmonth-summary");
+  });
 });

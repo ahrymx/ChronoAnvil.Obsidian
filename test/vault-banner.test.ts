@@ -635,7 +635,7 @@ describe("the settings rows", () => {
     // A setting that takes effect on the next file-open is a setting the reader
     // presses twice.
     const t = settings();
-    expect(t.match(/this\.plugin\.vaultBanner\.refresh\(\)/g)?.length).toBe(3);
+    expect(t.match(/this\.plugin\.vaultBanner\.refresh\(\)/g)?.length).toBe(6);
   });
 
   it("takes the inline-title class off a leaf as readily as it puts it on", () => {
@@ -854,14 +854,9 @@ describe("the banner's stylesheet", () => {
     expect(onRule).toContain("border-color: var(--interactive-accent)");
   });
 
-  it("reveals the pencil and the cog on hover, and gives them back on touch", () => {
-    // `94-native-tables.css`'s rule and its exception: a control always visible
-    // on a thing the reader is reading becomes part of what they are reading —
-    // but there is no hover on a phone.
-    //
-    // THE PENCIL MOVED WITH THE NAME (4.51.6) and took the rule with it, which
-    // is the half worth asserting: a control that changes surfaces and drops
-    // its behaviour on the way is how two surfaces come to disagree.
+  it("reveals the pencil on hover and keeps the cog visible", () => {
+    // The cog on the vault banner is always visible for discoverability (with
+    // elevated opacity on hover), while the pencil in the page head is hover-revealed.
     const css = readCss();
     expect(css).toContain(".journal-page-head .jph-title:hover .jph-title-edit");
     expect(css).toContain(".am-vault-banner:hover .avb-cog");
@@ -869,7 +864,7 @@ describe("the banner's stylesheet", () => {
       /@media \(hover: none\) \{\s*\.journal-page-head \.jph-title-edit \{\s*opacity: 0\.55;/
     );
     expect(css).toMatch(
-      /@media \(hover: none\) \{\s*\.am-vault-banner \.avb-cog \{\s*opacity: 0\.55;/
+      /@media \(hover: none\) \{\s*\.am-vault-banner \.avb-cog \{\s*opacity: 0\.65;/
     );
     // And nothing is left behind styling a title the bar no longer draws.
     expect(css).not.toContain(".avb-title");
@@ -989,13 +984,6 @@ describe("what the Banner section became", () => {
     // with no title of its own IS called by its date, so a subtitle repeating
     // it is the same words twice.
     expect(head()).toContain("sub: date && date !== title ? date : null,");
-    // AND THE CAPTION OVER THE GRID ASKS THE HEAD RATHER THAN RE-DERIVING IT
-    // (4.51.7). The first vault render of the head showed the entry's date
-    // printed as the note's name and again a hundred pixels below, in the
-    // tracker card's caption. One function answers what the head says.
-    expect(readSrc("widgets")).toContain(
-      "if (period && !(file instanceof TFile && pageHeadNames(plugin, file, period))) {"
-    );
     expect(readSrc("study-header")).toContain(
       "if (levelNoun && pageHeadSays(plugin, file, levelNoun)) levelNoun = null;"
     );

@@ -109,11 +109,6 @@ describe("what the editor is shown", () => {
   });
 
   it("says which members could be a column of a group at all", () => {
-    // `column` IS NOT `loose`, AND THE TWO DISAGREE IN BOTH DIRECTIONS — which
-    // is why 4.12 §A made it a second field rather than a second reading of the
-    // first. Here the three members of the row are each a column; the titled
-    // section below is loose (the whole fence is its) and is NOT a column,
-    // because the bar it carries would render below the group it titles.
     const blocks = flatBlocks(PAGE, CAT);
     expect(blocks[0].column).toEqual(["diary", "launcher", "journals"]);
     expect(blocks[1].loose).toEqual(["tasks"]);
@@ -121,10 +116,6 @@ describe("what the editor is shown", () => {
   });
 
   it("refuses a frame: section fence as a column, and a bare header: too", () => {
-    // The three refusals arrive as one field. `frame: section` loses its
-    // modifier on the way into a cell; a bare `header:` is looser than the
-    // grammar's own contradiction test and still renders a bar that cannot be
-    // cell content.
     const framed = PAGE.replace(
       "```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```",
       "```almanac\nframe: section\ntasks-table:,period\n```"
@@ -231,10 +222,6 @@ describe("putting a widget into a group", () => {
 });
 
 describe("a section that titles itself is not a column", () => {
-  // THE CASE THE DESCRIBE ABOVE USED TO ASSERT THE OTHER WAY. `widgetRun`
-  // refuses a fence carrying its own bar, and phase two of the regroup lifts a
-  // joining section through exactly that — so the join does not happen and the
-  // note comes back unchanged rather than half-made.
   it("declines to join it, and changes nothing", () => {
     expect(
       regroupFlatNote(PAGE, CAT, [["diary", "launcher", "journals", "tasks"]])
@@ -242,9 +229,6 @@ describe("a section that titles itself is not a column", () => {
   });
 
   it("declines a frame: section fence for the same reason", () => {
-    // Worse than the bar case in the file: `frame:` is not content, so the
-    // modifier would stay behind with the fence being emptied and the section
-    // would lose its bar, its title and its fold in one move.
     const framed = PAGE.replace(
       "```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```",
       "```almanac\nframe: section\ntasks-table:,period\n```"
@@ -255,9 +239,6 @@ describe("a section that titles itself is not a column", () => {
   });
 
   it("still lets it move as a block of its own", () => {
-    // THE HALF THAT IS DELIBERATELY KEPT. A titled section cannot be a COLUMN;
-    // it has always been able to change places, and this release does not touch
-    // that. Reordering goes through `applyFlatSections`, not through `widgetRun`.
     const out = regroupFlatNote(PAGE, CAT, [["diary", "launcher"], ["journals"], ["tasks"]]);
     expect(out).not.toBeNull();
     expect(out).toContain("header:⏳ Open tasks");

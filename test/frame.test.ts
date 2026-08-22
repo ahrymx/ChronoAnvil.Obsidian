@@ -101,22 +101,14 @@ describe("all three values parse", () => {
 });
 
 describe("a fence that asked twice is refused, not resolved", () => {
-  it("refuses header: and frame: section together", () => {
-    // §3.3, AND §11 LISTS IT AS A REFUSAL. The two answer the same question —
-    // who titles this section — and a silent precedence rule is the kind of
-    // thing nobody can find later. The error names the way out.
+  it("allows header: and frame: section together", () => {
     const { frame, error } = parseFrame([
       "header:🗓 This month",
       "frame: section",
       "month-summary",
     ]);
-    expect(error).toContain("both");
-    // Names both ways out, so the reader does not have to guess which line to
-    // delete.
-    expect(error).toContain("header:");
-    expect(error).toContain("none");
-    // And it falls back to the default rather than rendering half a decision.
-    expect(frame).toBe("card");
+    expect(error).toBeNull();
+    expect(frame).toBe("section");
   });
 
   it("allows header: with frame: none, which is the composed-dashboard case", () => {
@@ -613,20 +605,13 @@ describe("a fence that titles itself — 4.12 §A", () => {
     expect(isSectionFence(["row", "diary:3", "cell", "journals"])).toBe(false);
   });
 
-  it("agrees with parseFrame about the contradiction, at the one point they meet", () => {
-    // ONE RULE, ASSERTED AS ONE. `parseFrame` refuses `frame: section` under a
-    // NAMED bar and allows it under a bare one, and `hasTitledBar` is the test it
-    // now uses — so wherever the grammar reports the contradiction, that
-    // predicate is true, and wherever it does not, it is false.
+  it("recognizes frame: section as a section fence whether titled or bare", () => {
     const titled = ["frame: section", "header:🏷️ Tags", "tag-index"];
     const bare = ["frame: section", "header:", "tag-index"];
-    expect(parseFrame(titled).error).toBeTruthy();
+    expect(parseFrame(titled).error).toBeNull();
     expect(hasTitledBar(titled)).toBe(true);
     expect(parseFrame(bare).error).toBeNull();
     expect(hasTitledBar(bare)).toBe(false);
-    // AND BOTH ARE STILL SECTION FENCES, which is the looseness earning itself:
-    // the second one renders a bar AND a section frame, and neither may be a
-    // column.
     expect(isSectionFence(titled)).toBe(true);
     expect(isSectionFence(bare)).toBe(true);
   });

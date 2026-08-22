@@ -410,37 +410,19 @@ describe("swapping two widgets", () => {
 
 describe("what a whole block offers a row", () => {
   it("refuses a block that titles itself", () => {
-    // THIS INVERTS A CASE THAT PASSED FOR FOUR RELEASES, and the case was not
-    // wrong about the arithmetic — it was wrong about the page. `widgetRun`
-    // accepted `header:` + one widget and handed back the bar with its widget,
-    // so the drop wrote both into a cell. Then `NOT_A_CELL` refused the bar as
-    // cell content at render, `layOutRow` inserted the group at the first CELL
-    // child's index, and the bar came out BELOW the group it was meant to title
-    // — with the other column's bar appearing to title the whole thing and
-    // `HeaderBar`'s sibling walk folding all of it. The file was fine and the
-    // page was wrong, which is why nothing here caught it.
-    //
-    // 4.12 §A: a section is not a widget. What a block gives a row is a widget
-    // and nothing that draws a title over it.
     expect(widgetRun(["header:⏳ Open tasks", "tasks-table:,period"])).toBeNull();
   });
 
-  it("refuses a bare header: too, which is looser than the grammar's own test", () => {
-    // `parseFrame`'s contradiction needs a NAMED bar — an untitled `header:`
-    // does not compete with `frame: section` for the title. This refusal is not
-    // about naming: an untitled bar still renders `.journal-sec`, is still
-    // evicted by `NOT_A_CELL`, and still lands below the group. So
-    // `hasSectionBar` is deliberately looser than `hasTitledBar`, and this is
-    // the case that says so.
+  it("refuses a bare header: too", () => {
     expect(widgetRun(["header:", "tasks-table"])).toBeNull();
   });
 
-  it("refuses a frame: section block, whose modifier would stay behind", () => {
-    // Worse than the header case rather than the same: the run is the CONTENT
-    // span, and `frame:` is not content — so a `frame: section` block hands over
-    // its widget bare and keeps the modifier with the fence it is emptying. The
-    // section loses its bar, its title and its fold in one move.
+  it("refuses a frame: section block", () => {
     expect(widgetRun(["frame: section", "tasks-table"])).toBeNull();
+  });
+
+  it("extracts a widget in widget mode with inline button", () => {
+    expect(widgetRun(["month-summary", "button:new-month"])).toEqual({ from: 0, to: 2 });
   });
 
   it("leaves the modifier behind with the fence it describes", () => {
@@ -1078,11 +1060,6 @@ describe("making a group out of two blocks", () => {
   });
 
   it("refuses a destination that titles itself, which is the other end of §A", () => {
-    // THE REFUSAL THE SOURCE ONE DOES NOT COVER. `widgetRun` stops a titled
-    // block being dragged INTO a column; this stops a plain widget being dropped
-    // ONTO a titled block's quarter, which reaches the same corrupt page from
-    // the other end. Both are needed, and `block-drag.ts` withholds the quarters
-    // so a reader never gets far enough to meet either.
     const titled = [
       "```almanac",
       "header:🏷️ Tags",
@@ -1097,8 +1074,6 @@ describe("making a group out of two blocks", () => {
     expect(
       moveCell(titled, { block: 1, from: 0, to: 1 }, { kind: "group", block: 0, side: "right" })
     ).toBeNull();
-    // And a `frame: section` destination, whose modifier the arrival would sit
-    // under while the bar it names is drawn for the whole group.
     const framed = [
       "```almanac",
       "frame: section",

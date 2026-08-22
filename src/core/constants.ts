@@ -45,6 +45,81 @@ export const ROOT_JOURNALS = "03 - Journals";
 export const ROOT_STUDY = `${ROOT_JOURNALS}/Study`;
 
 export const TEMPLATES_ROOT = `${ROOT_INFRASTRUCTURE}/Templates`;
+export const ART_ROOT = `${ROOT_INFRASTRUCTURE}/Art`;
+
+export interface ArtPresetSpec {
+  id: string;
+  name: string;
+  file: string;
+  size: string;
+  repeat: string;
+  position: string;
+  blend: string;
+  defaultOpacity: number;
+}
+
+export const ART_PRESETS: Record<string, ArtPresetSpec> = {
+  "topography-minimal.svg": {
+    id: "topography",
+    name: "Topography (Contour lines)",
+    file: "topography-minimal.svg",
+    size: "400px 200px",
+    repeat: "repeat",
+    position: "center",
+    blend: "soft-light",
+    defaultOpacity: 18,
+  },
+  "dot-grid.svg": {
+    id: "dot-grid",
+    name: "Dot Matrix (Technical grid)",
+    file: "dot-grid.svg",
+    size: "24px 24px",
+    repeat: "repeat",
+    position: "center",
+    blend: "soft-light",
+    defaultOpacity: 25,
+  },
+  "constellations.svg": {
+    id: "constellations",
+    name: "Constellations (Geometric nodes)",
+    file: "constellations.svg",
+    size: "160px 160px",
+    repeat: "repeat",
+    position: "center",
+    blend: "soft-light",
+    defaultOpacity: 22,
+  },
+  "aurora-mesh.svg": {
+    id: "aurora-mesh",
+    name: "Aurora Mesh (Luminous gradient)",
+    file: "aurora-mesh.svg",
+    size: "cover",
+    repeat: "no-repeat",
+    position: "center",
+    blend: "screen",
+    defaultOpacity: 35,
+  },
+  "isometric-grid.svg": {
+    id: "isometric-grid",
+    name: "Isometric Grid (3D cube lattice)",
+    file: "isometric-grid.svg",
+    size: "40px 69.3px",
+    repeat: "repeat",
+    position: "center",
+    blend: "overlay",
+    defaultOpacity: 16,
+  },
+  "subtle-waves.svg": {
+    id: "subtle-waves",
+    name: "Minimal Waves (Ripples)",
+    file: "subtle-waves.svg",
+    size: "100px 20px",
+    repeat: "repeat",
+    position: "center",
+    blend: "soft-light",
+    defaultOpacity: 20,
+  },
+};
 
 export const DEFAULT_PATHS = {
   // The page both banners live on. Named "Journal Home.md" until 2.51, which
@@ -127,6 +202,7 @@ export const DEFAULT_PATHS = {
   templates: TEMPLATES_ROOT,
   templatesDiary: `${TEMPLATES_ROOT}/Diary`,
   documentation: `${ROOT_INFRASTRUCTURE}/Documentation`,
+  art: ART_ROOT,
   // Deliberately *not* under the infrastructure root: a photo taken on a
   // Wednesday in July is content, not vault machinery, and filing it beside the
   // templates means any export or sync of "my diary" either drags the system
@@ -158,6 +234,7 @@ export const ROOT_CHILDREN: Record<string, (keyof typeof DEFAULT_PATHS)[]> = {
     "templates",
     "templatesDiary",
     "documentation",
+    "art",
   ],
   materialRoot: ["staging", "attachments"],
   diaryRoot: [

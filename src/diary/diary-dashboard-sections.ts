@@ -85,7 +85,9 @@ import { HEADER_PREFIX, TRENDS_HEADING } from "../core/constants";
 import { composeFlatNote, flatNoteModel, bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
+import { WIDGET_FORM } from "../core/section-model";
 import type { SectionModel } from "../core/section-model";
+import { FRAME_KEYWORD } from "../core/directive-grammar";
 
 const probe = (text: string, re: RegExp): number => text.search(re);
 
@@ -135,10 +137,24 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // collapsible bar every other section on this page has. See the header
     // note: standing bare, it was the one block here that could not be folded
     // and did not look like its siblings.
-    render: () => ({
+    render: (opts) => ({
       fence: "almanac",
-      lines: ["frame: section", `diary:${DASHBOARD_AGENDA}`],
+      lines: [
+        ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
+        `diary:${DASHBOARD_AGENDA}`,
+      ],
     }),
+    questions: () => [
+      {
+        kind: "form",
+        key: "form",
+        label: "how this is drawn",
+        directive: FRAME_KEYWORD,
+        bar: "frame: section",
+        section: "A section of its own, with a foldable bar",
+        widget: "As a widget, so it can sit in a row",
+      },
+    ],
     locate: (text) => probe(text, /^diary\b/m),
   },
   {
@@ -164,10 +180,24 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // not meant to, so the section is always "this month", which is what the
     // label promises.
     locked: false,
-    render: () => ({
+    render: (opts) => ({
       fence: "almanac",
-      lines: ["frame: section", "month-summary"],
+      lines: [
+        ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
+        "month-summary",
+      ],
     }),
+    questions: () => [
+      {
+        kind: "form",
+        key: "form",
+        label: "how this is drawn",
+        directive: FRAME_KEYWORD,
+        bar: "frame: section",
+        section: "A section of its own, with a foldable bar",
+        widget: "As a widget, so it can sit in a row",
+      },
+    ],
     locate: (text) => probe(text, /^month-summary\b/m),
   },
   {

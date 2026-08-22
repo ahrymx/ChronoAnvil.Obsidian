@@ -11,6 +11,8 @@ import {
   Notice,
   PluginSettingTab,
   Setting,
+  TFile,
+  TFolder,
   setIcon,
 } from "obsidian";
 import type AlmanacPlugin from "../main";
@@ -21,6 +23,7 @@ import {
   DEFAULT_ATTACHMENT_OPTIONS,
   DEFAULT_LOGBOOKS,
   ROOT_CHILDREN,
+  ART_PRESETS,
 } from "./constants";
 import type { LogbookDef } from "./constants";
 import { remapConfiguredPaths } from "./pathwatch";
@@ -145,6 +148,12 @@ export interface BannerOptions {
   // SCOPED TO THE NOTES THE BAR DRAWS ON, always. A note Almanac has nothing to
   // say about keeps Obsidian's chrome whatever this says.
   absorb: boolean;
+  // Background art pattern file inside `00 - Infrastructure/Art/` (or "none").
+  art?: string;
+  // Art pattern opacity percentage (0-100).
+  artOpacity?: number;
+  // Whether ambient radial accent glow is enabled.
+  glowEnabled?: boolean;
 }
 
 export interface AlmanacSettings {
@@ -299,7 +308,14 @@ export const DEFAULT_SETTINGS: AlmanacSettings = {
   // banner is what 4.51 is; shipping it off would make the release a setting
   // nobody finds. Turning it off restores the in-note banners exactly, and
   // nothing in any note has to change either way.
-  banner: { enabled: true, glyph: "", absorb: true },
+  banner: {
+    enabled: true,
+    glyph: "",
+    absorb: true,
+    art: "topography-minimal.svg",
+    artOpacity: 18,
+    glowEnabled: true,
+  },
   sleepEnabled: true,
   eventsEnabled: true,
   moodTrackerId: "Mood",
@@ -332,6 +348,7 @@ const DERIVED_PATH_LABELS: Record<string, string> = {
   templates: "Templates",
   templatesDiary: "Diary templates",
   documentation: "Documentation",
+  art: "Art & Textures",
   staging: "Staging",
   attachments: "Attachments",
   diaryDaily: "Daily entries",
@@ -854,6 +871,77 @@ export class AlmanacSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
             this.plugin.vaultBanner.refresh();
           })
+      );
+
+    // ── Background Art & Texture ──────────────────────────────────────
+    const artFolder = this.app.vault.getAbstractFileByPath(s.paths.art);
+    const artFiles: string[] = [];
+    if (artFolder instanceof TFolder) {
+      for (const child of artFolder.children) {
+        if (
+          child instanceof TFile &&
+          (child.extension === "svg" ||
+            child.extension === "png" ||
+            child.extension === "jpg")
+        ) {
+          artFiles.push(child.name);
+        }
+      }
+    }
+
+    const artOptions = new Set([
+      "none",
+      ...Object.keys(ART_PRESETS),
+      ...artFiles,
+    ]);
+
+    const artLabels: Record<string, string> = {
+      none: "None (Clean / Flat)",
+      ...Object.fromEntries(
+        Object.entries(ART_PRESETS).map(([k, v]) => [k, v.name])
+      ),
+    };
+
+    new Setting(containerEl)
+      .setName("Background art pattern")
+      .setDesc(
+        `Vector pattern or texture from ${s.paths.art}/ to layer over the banner.`
+      )
+      .addDropdown((d) => {
+        for (const opt of artOptions) {
+          d.addOption(opt, artLabels[opt] ?? opt);
+        }
+        d.setValue(s.banner.art || "none").onChange(async (v) => {
+          s.banner.art = v;
+          await this.plugin.saveSettings();
+          this.plugin.vaultBanner.refresh();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Art pattern opacity")
+      .setDesc("Opacity of the background pattern overlay (default 18%).")
+      .addSlider((sl) =>
+        sl
+          .setLimits(0, 60, 1)
+          .setValue(s.banner.artOpacity ?? 18)
+          .setDynamicTooltip()
+          .onChange(async (v) => {
+            s.banner.artOpacity = v;
+            await this.plugin.saveSettings();
+            this.plugin.vaultBanner.refresh();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Ambient accent glow")
+      .setDesc("A subtle soft radial gradient in your theme's accent color.")
+      .addToggle((t) =>
+        t.setValue(s.banner.glowEnabled ?? true).onChange(async (v) => {
+          s.banner.glowEnabled = v;
+          await this.plugin.saveSettings();
+          this.plugin.vaultBanner.refresh();
+        })
       );
   }
 
