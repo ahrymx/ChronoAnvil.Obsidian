@@ -617,7 +617,7 @@ describe("only markdown is reconciled", () => {
     // vacuous about the newest entries in the list — which is exactly the shape
     // of hole `shippedNotes`' required parameter exists to close, so this test
     // must not reintroduce it on the test side.
-    const shipped = shippedNotes(DEFAULT_PATHS, [STUDY_JOURNAL]);
+    const shipped = shippedNotes(DEFAULT_PATHS, [STUDY_JOURNAL], []);
     for (const note of shipped) {
       const want =
         note.dest.endsWith(".md") &&

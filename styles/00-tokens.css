@@ -108,6 +108,25 @@
      silently breaks the day someone retunes the spacing here. */
   --am-widget-gap: 10px;
 
+  /* How far a row block's drop bands reach BEYOND the block, into the margin
+     between it and its neighbour (4.54 §1).
+
+     THE BANDS LOST THE INSIDE OF THE BLOCK and had to be given something back.
+     They used to lie over the columns — a quarter of the block, up to 72px —
+     which is what made the top of the first widget in a column mean "above this
+     whole group" instead of "above this widget". The columns now win everything
+     they cover, so what is left of a band is the strip that is genuinely
+     outside the row: the group's own padding, and this.
+
+     16px BECAUSE IT IS THE BLOCK'S OWN BOTTOM MARGIN. `.journal-widget-block`
+     sits in `margin: 0.5em 0 1em`, so a band reaching this far stops on the
+     neighbouring block's edge rather than over anything the neighbour drew. Two
+     adjacent blocks therefore TILE the space between them — the lower one's
+     "above" band and the upper one's "below" band both name the same insertion
+     point, so the overlap in the middle is one place with two names rather than
+     an ambiguity. */
+  --am-slot-reach: 16px;
+
   /* How wide a page of widgets is allowed to get (4.2 §2). Read by the
      homepage's `almanac-wide` class and by nothing else yet.
 
@@ -399,6 +418,28 @@
   --am-ev-purple: #8b6fd1;
   --am-ev-pink: #cc6699;
   --am-ev-grey: #8a8f98;
+
+  /* ── the same eight, as a GROUND (4.55) ──────────────────────────────
+     The time grid fills a block with a swatch and puts white type on it, and
+     the eight above are tuned for the opposite job: a 3px bar and an 11px
+     icon, drawn as a foreground on the page's own ground. White on
+     `--am-ev-amber` is about 2.4:1, which is unreadable at the smallest size
+     in the plugin.
+
+     So each fill is the same hue taken down until white clears 4.5:1 on it.
+     Nine tokens rather than eight because the ink is one of them: it is white
+     in BOTH themes, since the fills stay dark in both, and a rule that read
+     `--text-on-accent` would follow the theme away from the only colour that
+     works here. */
+  --am-tg-ink: #ffffff;
+  --am-tg-red: #c2403c;
+  --am-tg-amber: #a2661d;
+  --am-tg-green: #3f7f43;
+  --am-tg-teal: #2c7676;
+  --am-tg-blue: #376fa8;
+  --am-tg-purple: #6b53ac;
+  --am-tg-pink: #a84e79;
+  --am-tg-grey: #626973;
 
   /* ── The spacing scale (3.9 §4) ────────────────────────────────────────
      DEFINED HERE AND READ BY NOTHING IN THE PATCH THAT ADDS IT. That is the

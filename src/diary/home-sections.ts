@@ -49,7 +49,9 @@ import {
   PAGE_TITLE_IDS,
 } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
+import { WIDGETS } from "../core/widget-registry";
 import type { VaultLists } from "../core/widget-registry";
+import { widgetLine, widgetQuestions } from "../core/widget-sections";
 import type { SectionModel } from "../core/section-model";
 
 const probe = (text: string, re: RegExp): number => text.search(re);
@@ -202,10 +204,11 @@ const HOME_SECTION_DEFS: FlatSection[] = [
   // tiles. `page-title.ts` makes exactly this distinction between its row and
   // the `links:` row, and it holds one step further out.
   //
-  // NO `links:` ROW EITHER, for the reason `diary` is the locked section here:
-  // the diary card's destination pills ARE this page's time navigation, and
-  // always were. So the homepage banner is a title and nothing else, which is
-  // the honest answer for a page whose navigation is two widgets a reader chose.
+  // NO `links:` ROW EITHER: the diary card's destination pills ARE this page's
+  // time navigation, and always were. So the homepage banner is a title and
+  // nothing else, which is the honest answer for a page whose navigation is two
+  // widgets a reader chose. That was also the argument that locked `diary`
+  // until 4.53 — see there for why the lock went and this paragraph stayed.
   //
   // AND IT NOW CANNOT BE REMOVED, which is 4.19's one loss and is felt hardest
   // here. The old `title` section was unlocked on the argument that a homepage
@@ -222,14 +225,25 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     label: "Diary",
     blurb: "The greeting, today's numbers, the month grid and what's coming up.",
     icon: "📆",
-    // LOCKED, for `links`' reason one catalogue over: a vault whose homepage
-    // has no way into the diary is worse than one with no homepage at all.
+    // UNLOCKED AS OF 4.53, and it was locked from 4.2 until then. The old
+    // argument was `links`' one catalogue over: this note has no `links:` row,
+    // the diary card's destination pills ARE its time navigation, and a vault
+    // whose homepage has no way into the diary is worse than one with no
+    // homepage at all.
     //
-    // It is also the only section here carrying navigation of any kind — there
-    // is no `links:` row on this note, because the diary card's destination
-    // pills ARE it. That is why the lock is on this section and not on a
-    // navigation section that does not exist.
-    locked: true,
+    // What that argument missed is that the homepage is not the only way in.
+    // The ribbon, the command palette and the diary dashboard all open the
+    // diary, and none of them can be turned off from here — so the lock was
+    // not protecting the only door, it was protecting a preferred one. A
+    // reader who wants a homepage of journals and charts was told no by a rule
+    // that bought them nothing.
+    //
+    // The card is still what the section catalogue OFFERS first and what a
+    // fresh homepage composes with; unlocking changes what a reader may take
+    // away, not what they are given. Compare `banner`, which stays locked
+    // because ONE rule across nine surfaces beats a rule learnt per page —
+    // that argument survives, and this one did not.
+    locked: false,
     // The first cell of the top row. 4.2 §2.
     row: HOME_TOP_ROW,
     render: () => ({ fence: "almanac", lines: [`diary:${HOME_AGENDA}`] }),
@@ -386,11 +400,50 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     locate: (text) => probe(text, /^on-this-day\b/m),
   },
   {
+    id: "time-grid",
+    label: "Time grid",
+    // THE REGISTRY'S OWN SENTENCE AND GLYPH. The same widget through a second
+    // door, so a reader meeting it here reads what a reader meeting it in the
+    // widget list reads — one description, in `widget-registry.ts`.
+    blurb: WIDGETS["time-grid"].blurb,
+    icon: WIDGETS["time-grid"].glyph,
+    // Nothing of the reader's is stored here — the meetings, the log items and
+    // the tasks live in their own notes, and this is a view onto them.
+    locked: false,
+    // ── A BLOCK OF ITS OWN, NOT A CELL ───────────────────────────────────
+    //
+    // No `row`/`cell`, unlike the four blocks above it: the grid is seven
+    // columns of hours and half a page is not enough width for it. The same
+    // call `charts` and `tags` make below, and for the same reason.
+    //
+    // AND THIS IS THE PAGE WHERE IT IS HONEST, alongside the weekly dashboard.
+    // `weekStartOf` reads `week-start` off the host note and falls back to the
+    // CURRENT week — which is wrong on a month page and exactly right here,
+    // because a homepage is a page about now. It is the only surface where the
+    // fallback is the intent rather than a miss.
+    //
+    // A HOMEPAGE IS RECONCILED, so `optIn` below is what keeps it off the
+    // homepages that already exist — see there.
+    optIn: true,
+    render: (options) => ({
+      fence: "almanac",
+      lines: ["header:⏱️ The week by the hour", widgetLine("time-grid", options)],
+    }),
+    // THE REGISTRY'S QUESTION, ASKED FROM HERE — `time-grid`'s three sources are
+    // declared once and this composes the same directive, so it asks through
+    // `widgetQuestions` rather than re-typing them.
+    questions: () => widgetQuestions("time-grid"),
+    // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who narrows the grid to
+    // `time-grid:events` still has a section the editor can find rather than a
+    // second one it offers to add.
+    locate: (text) => probe(text, /^time-grid\b/m),
+  },
+  {
     id: "journals",
     label: "Journals",
     blurb: "One card per journal, with its numbers.",
     icon: "📚",
-    // The counterpart of `diary`, and unlocked where that one is locked: a
+    // The counterpart of `diary`, and unlocked as that one now is too: a
     // vault can reasonably have no journals at all — Study is a preset that
     // ships enabled and can be turned off, and custom types are opt-in — so a
     // homepage without this section is a coherent thing to want. The widget

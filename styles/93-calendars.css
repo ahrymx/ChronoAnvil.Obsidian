@@ -2105,6 +2105,41 @@
 .journal-overview-card > .journal-links-card > .journal-links-bar {
   padding: 7px 8px;
 }
+/* ── THE SECTION'S OWN BAR, AS THE CARD'S TOP BAND (4.59.0) ───────────
+ *
+ * THE PERIOD SUMMARY IS A SECTION AND NOW SAYS SO. Every other section on a
+ * dashboard is a `header:` line welded to its directive — Open tasks, What the
+ * days said, Tags, Trends — and this one was the directive alone, so the one
+ * section a reader cannot remove was the one they could not fold either.
+ *
+ * A BAND, NOT A SECOND BORDER, which is the whole of what this rule is for.
+ * `.journal-sec-block` gives its bar a full bleed by cancelling a padding
+ * VARIABLE; this card's inset is literal (`12px 14px`), so the bleed is written
+ * out. The result is `.journal-slim-banner .journal-banner-name` one card over,
+ * and that rule's own comment says why it is the manoeuvre every band in this
+ * plugin makes: a rule that stops short of the card's edges reads as an
+ * underline on the title, one that meets them reads as the edge of a header.
+ *
+ * NO GROUND OF ITS OWN, on the section surface's rule: two fills of the same
+ * colour with different radii is how a card grows a visible corner. And no
+ * radius — the card owns its corners, and a band inside one that rounded its own
+ * would show the card's through the gap. */
+.journal-overview-card > .journal-sec-l1.journal-header-bar {
+  background: none;
+  margin: -12px -14px 11px;
+  padding: 9px 14px 8px;
+  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: 0;
+}
+/* A COLLAPSED SECTION IS ITS BAR ALONE, and a rule along the bottom of a closed
+   card is an edge promising content that isn't there — 70-section-surface.css's
+   sentence, and the same two properties answer it here. The negative bottom
+   margin pulls the card's own lower inset back up, so a folded summary is the
+   height of its bar rather than a bar over 12px of nothing. */
+.journal-overview-card > .journal-sec-l1.journal-header-bar.is-collapsed {
+  margin-bottom: -12px;
+  border-bottom: none;
+}
 /* The summary widget gives up the frame it drew for itself. */
 .journal-overview-card .journal-overview-summary {
   margin: 0;

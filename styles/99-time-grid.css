@@ -1,0 +1,291 @@
+/* ── The time grid (4.55) ──────────────────────────────────────────────
+   `time-grid` — a week laid against the hours. The only calendar in the
+   plugin that positions anything by clock time, which is why it is a file
+   of its own rather than more of 93-calendars.css: that file is 2,300 lines
+   of month-and-day-cell grammar and shares no selector with this.
+
+   THE GEOMETRY IS ALL PERCENTAGES, AND IT IS SET FROM TypeScript. A block's
+   `top`, `height`, `left` and `width` come from `placeInWindow` and
+   `packDay`; nothing here knows how many hours are on screen except through
+   `--am-tg-hours`, which the view sets on each column. Two places holding
+   the same number is how a grid comes to draw its lines an hour out from its
+   blocks. */
+
+.am-tg {
+  container-type: inline-size;
+  margin: var(--am-space-3) 0;
+}
+
+.am-tg-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 0 0 8px;
+}
+
+.am-tg-span {
+  font-weight: 600;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+.am-tg-sources {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  margin-left: auto;
+}
+
+.am-tg-status,
+.am-tg-empty {
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  padding: 10px 2px;
+}
+
+/* WIDE CONTENT SCROLLS INSIDE ITSELF. Seven columns with a floor of 74px
+   each plus the rail is 576px, which is wider than a phone and wider than a
+   split pane — and a grid that widened the note would push every other
+   widget on the page sideways. */
+.am-tg-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-primary);
+}
+
+.am-tg-grid {
+  min-width: 576px;
+}
+
+.am-tg-head,
+.am-tg-lane,
+.am-tg-body {
+  display: grid;
+  grid-template-columns: 52px repeat(7, minmax(74px, 1fr));
+}
+
+.am-tg-head {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.am-tg-corner {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 6px 5px 0;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+.am-tg-day {
+  text-align: center;
+  padding: 8px 4px 6px;
+  border-left: 1px solid var(--background-modifier-border-hover);
+}
+
+.am-tg-dow {
+  font-size: var(--font-ui-smaller);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.am-tg-dnum {
+  font-size: 1.3em;
+  line-height: 1.3;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+
+.am-tg-day.is-today .am-tg-dow {
+  color: var(--text-accent);
+}
+
+.am-tg-day.is-today .am-tg-dnum {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  border-radius: var(--radius-l);
+  display: inline-block;
+  min-width: 1.9em;
+  padding: 0 0.2em;
+}
+
+/* ── the all-day lane ────────────────────────────────────────────────
+   Tasks due with no hour on them. Kept above the rail rather than at the
+   top of the first column, because a thing true of a whole day has no
+   position among the hours and putting it at 00:00 would be a claim. */
+
+.am-tg-lane {
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  min-height: 30px;
+}
+
+.am-tg-lane-label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 6px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.am-tg-lane-cell {
+  border-left: 1px solid var(--background-modifier-border-hover);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.am-tg-chip {
+  font-size: var(--font-ui-smaller);
+  color: var(--am-tg-ink);
+  border-radius: var(--radius-s);
+  padding: 1px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── the rail and the columns ──────────────────────────────────────── */
+
+.am-tg-rail {
+  position: relative;
+  min-height: 320px;
+}
+
+.am-tg-hour {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.am-tg-col {
+  position: relative;
+  border-left: 1px solid var(--background-modifier-border-hover);
+  /* One line per hour, from the hour count the view puts on this element.
+     `calc(100% / var(--am-tg-hours))` rather than a pixel step, so the lines
+     stay welded to the blocks when the grid is any height at all. */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--background-modifier-border-hover) 0 1px,
+    transparent 1px calc(100% / var(--am-tg-hours))
+  );
+}
+
+.am-tg-col.is-today {
+  background-color: var(--background-modifier-hover);
+}
+
+/* ── a block ─────────────────────────────────────────────────────────
+   `min-height` IS LOAD-BEARING AND COSTS A LITTLE ACCURACY. A quarter-hour
+   in a ten-hour window is 1.5% of a 320px column — five pixels, which is
+   less than one line of text. A block that cannot show its own title is not
+   a smaller block, it is a bug, so the floor wins and the foot of a very
+   short block sits a few minutes late. */
+
+.am-tg-blk {
+  position: absolute;
+  min-height: 17px;
+  border-radius: var(--radius-s);
+  padding: 1px 4px;
+  overflow: hidden;
+  color: var(--am-tg-ink);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.25;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+}
+
+.am-tg-blk-title {
+  display: block;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.am-tg-blk-when {
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A MOMENT IS NOT A SHORT SPAN. An item with no duration claims one minute,
+   not seventeen pixels of it, so it is drawn with a flat foot and a rule
+   where a span's fill would keep going. */
+.am-tg-blk.is-moment {
+  border-radius: var(--radius-s) var(--radius-s) 0 0;
+  border-bottom: 2px solid var(--am-tg-ink);
+}
+
+.am-tg-blk-open {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  opacity: 0;
+  display: flex;
+}
+
+.am-tg-blk-open svg {
+  width: 11px;
+  height: 11px;
+}
+
+.am-tg-blk:hover .am-tg-blk-open,
+.am-tg-blk:focus-visible .am-tg-blk-open {
+  opacity: 0.8;
+}
+
+/* NOTHING HOVERS ON A TOUCHSCREEN, so an affordance revealed only on hover is
+   an affordance that does not exist there. Shown at rest instead — the rule
+   every hover-revealed control in this plugin follows, and the one a test
+   checks for by name. */
+@media (hover: none) {
+  .am-tg-blk-open {
+    opacity: 0.55;
+  }
+}
+
+.am-tg-blk.is-clickable,
+.am-tg-chip.is-clickable {
+  cursor: pointer;
+}
+
+.am-tg-blk.is-clickable:hover {
+  filter: brightness(1.08);
+}
+
+/* ── the fills ───────────────────────────────────────────────────────
+   THE STORED VALUE IS A NAME AND THIS IS WHERE IT BECOMES A COLOUR, which
+   is `am-ev-chip-*`'s arrangement one file over and exists for the same
+   reason: nothing user-controlled reaches a style attribute.
+
+   THE NINE `--am-tg-*` TOKENS ARE IN `00-tokens.css`, beside the eight they
+   are darkened from — a raw colour belongs in the token file and nowhere
+   else, which is the rule `appearance.test.ts` enforces about rules. */
+
+.am-tg-fill-red { background: var(--am-tg-red); }
+.am-tg-fill-amber { background: var(--am-tg-amber); }
+.am-tg-fill-green { background: var(--am-tg-green); }
+.am-tg-fill-teal { background: var(--am-tg-teal); }
+.am-tg-fill-blue { background: var(--am-tg-blue); }
+.am-tg-fill-purple { background: var(--am-tg-purple); }
+.am-tg-fill-pink { background: var(--am-tg-pink); }
+.am-tg-fill-grey { background: var(--am-tg-grey); }
+
+/* One column per line below a phone's width would be seven screens of
+   scrolling, so the grid keeps its shape and the container scrolls. What
+   changes is the rail, which has no room for "12 PM" at this width. */
+@container (max-width: 400px) {
+  .am-tg-head,
+  .am-tg-lane,
+  .am-tg-body {
+    grid-template-columns: 40px repeat(7, minmax(74px, 1fr));
+  }
+}

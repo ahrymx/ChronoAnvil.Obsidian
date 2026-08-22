@@ -19,9 +19,12 @@ import {
   DEFAULT_FOLDER_EMOJIS,
   DEFAULT_TRACKERS,
   DEFAULT_ATTACHMENT_OPTIONS,
+  DEFAULT_LOGBOOKS,
   ROOT_CHILDREN,
 } from "./constants";
+import type { LogbookDef } from "./constants";
 import { remapConfiguredPaths } from "./pathwatch";
+import { logbookNotePath } from "../diary/logbooks";
 import { JOURNAL_PRESETS } from "../journals/journal";
 import {
   CLASS_DEFS,
@@ -56,7 +59,14 @@ import {
   surfacePathConfig,
 } from "../trackers/entry-trackers";
 import { syncTrackerConfig } from "../charts/charts";
-import { EventDef, describeEventDate, eventColor, eventIcon } from "../events/events";
+import {
+  DEFAULT_EVENT_COLOR,
+  EVENT_COLORS,
+  EventDef,
+  describeEventDate,
+  eventColor,
+  eventIcon,
+} from "../events/events";
 import { readEvents } from "../events/eventstore";
 import { draftEvent, openEventEditor } from "../events/event-ui";
 import { confirmAction, promptSuggester } from "../ui/modals";
@@ -175,6 +185,11 @@ export interface AlmanacSettings {
   // User-defined journal types (Custom Journals). The built-in Study type is
   // not stored here — it's hand-written in journal.ts. See custom-journal.ts.
   customJournals: JournalConfig[];
+  // The logbooks this vault keeps — the diary's undated layer (4.52). Ships as
+  // `DEFAULT_LOGBOOKS`, which is four, and is a list rather than a fixed set
+  // for the reason `customJournals` is one: a reader who keeps a fifth kind of
+  // standing list should not need a release.
+  logbooks: LogbookDef[];
   // Per-section collapse state for header bars, keyed "<notePath>::<title>".
   // A header bar collapses everything after it up to the next header bar; this
   // remembers which sections the user has folded so they stay folded across
@@ -292,6 +307,7 @@ export const DEFAULT_SETTINGS: AlmanacSettings = {
     (t) => t.id
   ),
   customJournals: [],
+  logbooks: DEFAULT_LOGBOOKS.map((book) => ({ ...book })),
   dismissedJournalFolders: [],
   collapsedNoteSections: {},
   openGroupTabs: {},
@@ -312,6 +328,7 @@ function freshId(): string {
 
 // Display names for the paths shown read-only under their root.
 const DERIVED_PATH_LABELS: Record<string, string> = {
+  logbooks: "Logbooks",
   templates: "Templates",
   templatesDiary: "Diary templates",
   documentation: "Documentation",
@@ -698,6 +715,18 @@ export class AlmanacSettingTab extends PluginSettingTab {
       )
     );
 
+    this.renderLogbooks(
+      this.group(
+        containerEl,
+        "logbooks",
+        "🗒️",
+        "Logbooks",
+        "What you keep track of that isn't a day",
+        false,
+        s.logbooks.length === 1 ? "1 logbook" : `${s.logbooks.length} logbooks`
+      )
+    );
+
     this.renderEntrySections(
       this.group(
         containerEl,
@@ -834,6 +863,123 @@ export class AlmanacSettingTab extends PluginSettingTab {
   // vault (see events.ts), so this reads it fresh rather than from data.json,
   // and re-renders the whole tab after an edit — the list is short and the
   // alternative is a second copy of the row-rendering code.
+  // ── Logbooks (4.52) ─────────────────────────────────────────────────
+  //
+  // BESIDE SPECIAL EVENTS, because the two are the diary's other two layers and
+  // a reader deciding where something goes is choosing between them: an event is
+  // a fact about a DATE, a logbook item is a fact about no date in particular.
+  private renderLogbooks(containerEl: HTMLElement): void {
+    const s = this.plugin.settings;
+
+    containerEl.createEl("p", {
+      text:
+        "A logbook is a standing note for what belongs to the diary but not to one day — what you worked on, what you are focused on, links to come back to, what is scheduled. Each one is a note in the Logbooks folder, and the logbook: widget draws it on any page.",
+      cls: "setting-item-description",
+    });
+
+    this.sectionHeader(containerEl, "Logbooks", {
+      label: "New logbook",
+      icon: "plus",
+      onClick: () => {
+        const taken = new Set(s.logbooks.map((b) => b.id));
+        let id = "logbook";
+        let n = 2;
+        while (taken.has(id)) id = `logbook-${n++}`;
+        const name = id === "logbook" ? "New logbook" : `New logbook ${n - 1}`;
+        s.logbooks.push({
+          id,
+          name,
+          icon: "🗒️",
+          source: "region",
+          path: logbookNotePath(s.paths.logbooks, name),
+          color: DEFAULT_EVENT_COLOR,
+        });
+        void this.plugin.saveSettings().then(() => this.display());
+      },
+    });
+
+    if (!s.logbooks.length) {
+      this.emptyState(
+        containerEl,
+        "notebook-pen",
+        "No logbooks. Add one and its note is written the next time you run Set up / repair vault."
+      );
+      return;
+    }
+
+    for (const book of s.logbooks) {
+      const setting = new Setting(containerEl)
+        .setName(book.name)
+        .setDesc(
+          book.source === "events"
+            ? `${book.path} · everything scheduled ahead, read from the events note`
+            : book.path
+        );
+
+      setting.addText((t) =>
+        t
+          .setPlaceholder("🗒️")
+          .setValue(book.icon)
+          .onChange(async (v) => {
+            book.icon = v.trim() || "🗒️";
+            await this.plugin.saveSettings();
+          })
+      );
+
+      setting.addText((t) =>
+        t
+          .setPlaceholder("Name")
+          .setValue(book.name)
+          .onChange(async (v) => {
+            const next = v.trim();
+            if (!next) return;
+            // THE NOTE DOES NOT FOLLOW THE NAME, and that is the contract
+            // `LogbookDef.path` is stored to keep: a label is retyped, and a
+            // note full of items must not be orphaned by a retype. Rename the
+            // file in the explorer to move it — PathWatch carries the setting.
+            book.name = next;
+            await this.plugin.saveSettings();
+          })
+      );
+
+      // The swatch its items wear on the time grid (4.55).
+      //
+      // A DROPDOWN OF NAMES, NOT A COLOUR PICKER, which is `EVENT_COLORS`' own
+      // rule said again: the stored value is a name the stylesheet resolves per
+      // theme, and a free picker would let a reader choose something that
+      // vanishes in one of the two.
+      //
+      // ON EVERY BOOK, INCLUDING MEETINGS — whose items are events and take
+      // their own colours, so this one is inert. It is drawn anyway rather than
+      // hidden on a `source` test: a row missing a control its neighbours have
+      // reads as a bug, and the honest place for the exception is here.
+      setting.addDropdown((d) => {
+        for (const name of EVENT_COLORS) {
+          d.addOption(name, name.charAt(0).toUpperCase() + name.slice(1));
+        }
+        d.setValue(book.color).onChange(async (v) => {
+          book.color = v;
+          await this.plugin.saveSettings();
+        });
+      });
+
+      setting.addExtraButton((b) =>
+        b
+          .setIcon("trash")
+          .setTooltip("Remove this logbook")
+          .onClick(async () => {
+            // THE NOTE IS LEFT ON DISK, deliberately and without asking. This
+            // list says which logbooks Almanac draws; it is not a filing
+            // cabinet, and a settings row that deleted a reader's writing when
+            // they tidied it away would be the worst kind of surprise.
+            s.logbooks = s.logbooks.filter((other) => other.id !== book.id);
+            await this.plugin.saveSettings();
+            this.display();
+          })
+      );
+    }
+  }
+
   private renderEvents(containerEl: HTMLElement): void {
     const s = this.plugin.settings;
 

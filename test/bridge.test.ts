@@ -910,13 +910,31 @@ describe("section shading never reaches Obsidian's own chrome", () => {
     // whatever order anything appears in.
     const at = src().indexOf("block.hasClass(OBSIDIAN_DOM.viewFooter)");
     expect(at).toBeGreaterThan(0);
-    expect(src().slice(at, at + 200)).toContain(
-      "{ opens: false, closes: true, hidden: false, renders: false }"
-    );
+    const block = src().slice(at, at + 240);
+    for (const field of [
+      "opens: false",
+      "closes: true",
+      "hidden: false",
+      "renders: false",
+    ]) {
+      expect(block, field).toContain(field);
+    }
     expect(
       computeSectionRuns([
-        { opens: true, closes: false, hidden: false, renders: true },
-        { opens: false, closes: true, hidden: false, renders: false },
+        {
+          opens: true,
+          closes: false,
+          hidden: false,
+          renders: true,
+          ends: false,
+        },
+        {
+          opens: false,
+          closes: true,
+          hidden: false,
+          renders: false,
+          ends: false,
+        },
       ])[1].member
     ).toBe(false);
   });

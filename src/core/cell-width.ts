@@ -45,9 +45,9 @@
 // the ratios their window can actually hold. A weight too large for the pane
 // still wraps; it is simply no longer something a drag can produce by accident.
 
-import { CELL_KEYWORD, isCellLine, isRowLine, splitDirective } from "./directive-grammar";
+import { CELL_KEYWORD, isCellLine, isRowLine, MAX_COLUMNS, splitDirective } from "./directive-grammar";
 import { fencesOf } from "./block-move";
-import { delimit, isWidget, pageSlice } from "./cell-move";
+import { delimit, pageSlice, runsOf } from "./cell-move";
 
 // The largest a group's shares may add up to.
 //
@@ -141,27 +141,15 @@ const spell = (indent: string, weight: number): string =>
 function columnsOf(
   body: readonly string[]
 ): { opener: number; firstWidget: number }[] {
-  if (!body.some(isCellLine)) {
-    return body.flatMap((line, i) =>
-      isWidget(line) ? [{ opener: -1, firstWidget: i }] : []
-    );
-  }
-  const out: { opener: number; firstWidget: number }[] = [];
-  let opener = -1;
-  let firstWidget = -1;
-  for (let i = 0; i < body.length; i++) {
-    if (isCellLine(body[i])) {
-      if (firstWidget >= 0) {
-        out.push({ opener, firstWidget });
-        firstWidget = -1;
-      }
-      opener = i;
-      continue;
-    }
-    if (firstWidget < 0 && isWidget(body[i])) firstWidget = i;
-  }
-  if (firstWidget >= 0) out.push({ opener, firstWidget });
-  return out;
+  // STOPPING AT THE CAP IS THE WHOLE OF THE CHANGE (4.52.1). A fence asking for
+  // four columns draws two, so a gesture that measured four would write widths
+  // onto delimiters that open nothing — and `setCellWidths`' own count check
+  // would then refuse every drag on the row instead. The drawn columns are the
+  // first `MAX_COLUMNS` runs; the rest are dealt into them and bring no share of
+  // their own, which `capColumns` states from the render's side.
+  return runsOf(body)
+    .slice(0, MAX_COLUMNS)
+    .map(({ opener, widgets }) => ({ opener, firstWidget: widgets[0] }));
 }
 
 // The fence body with these per-column weights, or null when nothing would

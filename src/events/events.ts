@@ -54,6 +54,48 @@ export interface EventDef {
   start?: string; // YYYY-MM-DD
   end?: string; // YYYY-MM-DD, inclusive. Absent or equal to start = one day.
 
+  // ── the hour, where there is one ────────────────────────────────────
+  // `"HH:mm"`, and absent on almost every event.
+  //
+  // WHAT IT MAKES REPRESENTABLE (4.52). A birthday, a holiday and a trip are
+  // facts about a DAY — they start when the day starts. A meeting is not: it is
+  // at 14:00, and until now the diary had nowhere to say so. The reader asked
+  // for scheduled meetings among the logbooks, and a second store of dated
+  // things the calendar knew nothing about was the thing worth avoiding, so a
+  // meeting is an event with an hour on it.
+  //
+  // AN OPTIONAL FIELD RATHER THAN A `kind`, and that is the decision. `kind`
+  // answers "how does this repeat", which a meeting does not change; the hour
+  // is a detail of the occurrence. It also means every `Events.md` already in a
+  // vault is a file of events with no times, which is exactly what it is.
+  //
+  // SINGLE EVENTS IN PRACTICE, THOUGH NOTHING REFUSES IT ON A RECURRING ONE:
+  // this recurrence is annual by construction ("deliberately not a rule
+  // engine"), so a weekly stand-up is not expressible here and an annual one at
+  // 09:00 is perfectly sensible.
+  time?: string;
+
+  // How long it runs, in MINUTES from `time`. Absent on almost every event, and
+  // meaningless without one. 4.55.
+  //
+  // WHAT IT MAKES REPRESENTABLE. `time` gave the diary somewhere to say a
+  // meeting is at 14:00; it still had nowhere to say the meeting is an hour.
+  // The time grid draws a block from a start and a length, so an event with a
+  // time and no duration is a MOMENT on it — a mark at 14:00, not a claim about
+  // how long it lasted.
+  //
+  // MINUTES RATHER THAN AN END TIME, and the same choice is made one file over
+  // for `LogItem.mins`. A stamp holds one clock field; a second `HH:mm` beside
+  // it reads as a range and has to be told apart from the bare-time alternative
+  // the log grammar already allows. Minutes also cross midnight without
+  // arithmetic, which `22:00`–`01:00` does not.
+  //
+  // NOT VALIDATED AGAINST THE DAY. A 600-minute event starting at 20:00 runs
+  // past midnight, and the grid clips it at the foot of the column rather than
+  // refusing it — the tolerance `parseLogItems` extends to a region somebody
+  // typed into by hand, applied to a number somebody typed into a box.
+  duration?: number;
+
   // ── decoration ──────────────────────────────────────────────────────
   // A Lucide icon name from EVENT_ICONS and a colour name from EVENT_COLORS.
   // Both are validated on read (see eventIcon/eventColor) so a hand-edited
@@ -157,6 +199,24 @@ export function eventColor(def: EventDef): string {
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// A duration somebody may have typed, in minutes: whole and positive, or
+// nothing at all. `soon`, `-5` and `0` are all "no duration", because a grid
+// can draw a moment and cannot draw any of those.
+//
+// IT LIVES HERE, AND `log-items.ts` IMPORTS IT, which is worth a sentence
+// because the direction looks backwards — the log grammar is older than events
+// carrying a length. This file imports NOTHING (see the header: "everything in
+// this file is a pure function over plain data"), so it cannot borrow the
+// reader from a module that imports the note store, and two spellings of "what
+// a duration is" would drift the first time one of them learned to accept
+// `90m`. One definition, in the only module that can hold it.
+export function readMinutes(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(String(value).trim());
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n);
+}
+
 export function isValidIso(value: unknown): value is string {
   if (typeof value !== "string" || !ISO_RE.test(value)) return false;
   const [y, m, d] = value.split("-").map(Number);
@@ -204,6 +264,24 @@ function asString(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+// An hour of the day, or null.
+//
+// PADDED ON READ, so `9:00` typed by hand and `09:00` written by the editor are
+// one value — a list sorted as strings has to be, or 09:00 sorts after 10:00.
+// Out-of-range numbers are dropped rather than clamped: a clamp would turn a
+// typo into a plausible time and file the meeting at midnight without saying
+// so, and an event with no time is a fact about the day, which is a safe thing
+// for a mistyped one to become.
+function normalizeTime(v: unknown): string | null {
+  const raw = asString(v);
+  const m = /^(\d{1,2}):(\d{2})$/.exec(raw);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return `${String(h).padStart(2, "0")}:${m[2]}`;
+}
+
 function asInt(v: unknown): number | null {
   const n = typeof v === "number" ? v : Number(asString(v));
   return Number.isInteger(n) ? n : null;
@@ -216,6 +294,10 @@ export function normalizeEvent(raw: unknown): EventDef | null {
   const title = asString(r.title);
   if (!title) return null;
 
+  const time = normalizeTime(r.time);
+  // A duration with no start is a length of nothing, so it is dropped rather
+  // than carried for a `time` that may never arrive.
+  const duration = time ? readMinutes(r.duration) : null;
   const icon = asString(r.icon);
   const color = asString(r.color);
   const note = asString(r.note);
@@ -227,6 +309,8 @@ export function normalizeEvent(raw: unknown): EventDef | null {
     title,
     icon: ICON_SET.has(icon) ? icon : DEFAULT_EVENT_ICON,
     color: COLOR_SET.has(color) ? color : DEFAULT_EVENT_COLOR,
+    ...(time ? { time } : {}),
+    ...(duration ? { duration } : {}),
     ...(note ? { note } : {}),
     ...(enabled ? {} : { enabled: false }),
   };
@@ -296,6 +380,8 @@ export function serializeEvents(defs: EventDef[]): Record<string, unknown>[] {
       out.start = d.start;
       if (d.end && d.end !== d.start) out.end = d.end;
     }
+    if (d.time) out.time = d.time;
+    if (d.time && d.duration) out.duration = d.duration;
     out.icon = eventIcon(d);
     out.color = eventColor(d);
     if (d.note) out.note = d.note;
@@ -505,9 +591,18 @@ export function upcomingEvents(
     });
   }
 
-  out.sort((a, b) =>
-    a.iso === b.iso ? a.def.title.localeCompare(b.def.title) : a.iso < b.iso ? -1 : 1
-  );
+  // DATE, THEN HOUR, THEN TITLE (4.52). The hour is new and it is a fix rather
+  // than a refinement: two events on one day sorted alphabetically, so a 17:00
+  // review came before a 09:00 stand-up in every agenda that drew them. An
+  // event with no time is a fact about the whole day and sorts first, which is
+  // where a day's own facts belong.
+  out.sort((a, b) => {
+    if (a.iso !== b.iso) return a.iso < b.iso ? -1 : 1;
+    const at = a.def.time ?? "";
+    const bt = b.def.time ?? "";
+    if (at !== bt) return at < bt ? -1 : 1;
+    return a.def.title.localeCompare(b.def.title);
+  });
   return out.slice(0, count);
 }
 
@@ -538,6 +633,20 @@ export function describeEventDate(def: EventDef): string {
         ? `${sd} ${MONTHS[sm - 1]} – ${ed} ${MONTHS[em - 1]} ${sy}`
         : `${sd} ${MONTHS[sm - 1]} ${sy} – ${ed} ${MONTHS[em - 1]} ${ey}`;
   return `${range} (${days} days)`;
+}
+
+// "12 April" / "9 March 2026, 14:00" — the date with its hour where it has one.
+//
+// A SECOND FUNCTION RATHER THAN A FLAG ON `describeEventDate` (4.52), because
+// that one is read by the calendar, the manager and the settings row, and every
+// one of them is describing a DAY. This describes an appointment. Splitting
+// them is also what keeps the existing string pinned: `describeEventDate` is
+// asserted byte for byte in the suite, and a time appended inside it would have
+// changed what those rows were about.
+export function describeEventWhen(def: EventDef): string {
+  const date = describeEventDate(def);
+  if (!def.time) return date;
+  return date ? `${date}, ${def.time}` : def.time;
 }
 
 // "in 3 days" / "today" / "day 2 of 5" — the relative phrasing the upcoming

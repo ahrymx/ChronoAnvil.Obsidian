@@ -978,22 +978,61 @@ describe("one bar, at one scale (4.13 §1)", () => {
     expect(t).not.toContain(".journal-header-bar.is-collapsed .journal-header-toggle");
   });
 
+  it("stands the surface down for a block that is already a card (4.59.0)", () => {
+    // ONE CARD, NOT TWO. `claimOwnBlock` marks any block holding a level-1 bar
+    // as a section surface, and a surface is a card — so a fence whose widget
+    // block ALREADY draws one ends up inside another. It showed up the day the
+    // period summary gained a bar: `.journal-overview-card` has been a card since
+    // 3.2 and had never held a `header:` line, so the two had never met.
+    const rule = body(".journal-sec-block:has(.journal-overview-card),");
+    for (const off of ["background: none", "border: none", "padding: 0"]) {
+      expect(rule).toContain(off);
+    }
+    // THE RUN'S EDGES CARRY THE SAME CLASSES AT THE SAME SPECIFICITY, so a single
+    // selector would lose to `.is-first` and `.is-last` on exactly the blocks a
+    // welded section is both of. Listing them is the assertion, not the tidiness.
+    for (const at of [".is-first", ".is-last", ".is-first.is-last"]) {
+      expect(rule).toContain(`.journal-sec-block${at}:has(.journal-overview-card)`);
+    }
+    // A DESCENDANT, NOT A CHILD, for the reason the collapsed rule below states:
+    // the surface is claimed on `siblingAnchor()`, which is not always the
+    // postprocessor's own element, so the card can sit a level further in.
+    expect(rule).not.toContain(":has(> .journal-overview-card");
+    // AND THE INNER CARD IS THE ONE THAT SURVIVES, which is the half a selector
+    // cannot state. 4.1 §3.1 cancels the WIDGET's card inside a framed block;
+    // here it is the outer that gives way, because the overview card's bands are
+    // measured against its inset and the surface has nothing measured against
+    // its own. A rule cancelling the inner one would strand all three.
+    expect(rules()).not.toContain(
+      ".journal-sec-block .journal-overview-card {\n  background: none"
+    );
+  });
+
   it("takes the bottom padding off a collapsed section (4.13 §4)", () => {
     // A closed section reserved 10px under a body it was not drawing — the
     // `.is-last` gap, standing under a bar whose rule had already been cancelled
     // two rules above it. The `frame: section` twin had fixed this at the foot of
     // the same file; the block variant had no rule at all, which is how a defect
     // survives in a stylesheet that argues with itself in comments.
-    const rule = body(".journal-sec-block.is-last:has(");
+    // ASKED FOR BY ITS WHOLE SELECTOR AS OF 4.59.0. `.journal-sec-block.is-last:has(`
+    // stopped being unique that release: the surface also stands down for a block
+    // that already draws its own card, which is a second `:has()` on the same two
+    // classes. A prefix that matches two rules silently reads whichever comes
+    // first in the file, which is a test that passes for the wrong reason the
+    // moment anything is inserted above it.
+    const rule = body(
+      ".journal-sec-block.is-last:has(.journal-sec-l1.journal-header-bar.is-collapsed)"
+    );
     expect(rule).toContain("padding-bottom: 0");
     // A DESCENDANT, NOT A CHILD, and this is the assertion rather than a comment
     // because the first cut of the rule used `:has(> …)` — which matches nothing,
     // since `claimOwnBlock` marks the note's block element and the bar is built
     // inside the widget block within it. A rule that cannot fire looks exactly
     // like a decision that was made.
+    const head = "\n.journal-sec-block.is-last:has(.journal-sec-l1.journal-header-bar.is-collapsed)";
     const selector = rules().slice(
-      rules().indexOf("\n.journal-sec-block.is-last:has("),
-      rules().indexOf("{", rules().indexOf("\n.journal-sec-block.is-last:has("))
+      rules().indexOf(head),
+      rules().indexOf("{", rules().indexOf(head))
     );
     expect(selector).not.toContain(":has(>");
     expect(selector).toContain(".journal-sec-l1.journal-header-bar.is-collapsed");

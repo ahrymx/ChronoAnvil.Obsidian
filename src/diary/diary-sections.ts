@@ -52,6 +52,12 @@ import { CLASS_DEFS } from "../trackers/trackers";
 import { DEFAULT_PATHS, HEADER_PREFIX, TRENDS_HEADING } from "../core/constants";
 import { segment } from "../core/layout";
 import {
+  HEADER_KEYWORD,
+  hasSectionBar,
+  isCellLine,
+  isRowLine,
+} from "../core/directive-grammar";
+import {
   SectionModel,
   SectionWant,
   idsOf,
@@ -65,8 +71,28 @@ import {
   moveOps,
   reconfigured,
   withAnswers,
+  WIDGET_FORM,
 } from "../core/section-model";
-import { BANNER_ID, PAGE_TITLE_LINE, locateTitle } from "../core/note-sections";
+import type { FlatNoteSpec, FlatSection } from "../core/note-sections";
+import {
+  BANNER_ID,
+  PAGE_TITLE_LINE,
+  answersOn,
+  locateTitle,
+} from "../core/note-sections";
+import {
+  instanceIdOf,
+  instanceId,
+  instanceSectionFor,
+  locateNth,
+  nextInstanceId,
+  pageWidgetKeywords,
+  widgetInstances,
+  widgetLine,
+  widgetQuestions,
+} from "../core/widget-sections";
+import { WIDGETS } from "../core/widget-registry";
+import type { VaultLists } from "../core/widget-registry";
 
 // What "the host note's own folder" is on this dashboard, for a plan line. A
 // dashboard sits in its grain's folder — `02 - Diary/Weekly` — which is exactly
@@ -110,6 +136,19 @@ export interface DiaryDashboardContext {
   // context from a grain and never draws a control, and
   // `section-insert.ts::diaryContextFor` holds the note.
   hostFolder?: string | null;
+  // What THIS VAULT can answer a widget's argument with — `FlatNoteSpec.vault`'s
+  // field, arriving on the surface that grew widgets in 4.58.0.
+  //
+  // SUPPLIED BY THE CALLER THAT OPENED THE WINDOW, for `hostFolder`'s reason one
+  // line up: only that caller knows which vault it is in. `modelForSurface`
+  // already held the lists and already threaded them into the four flat
+  // surfaces; the dashboard branch is the one that dropped them on the floor,
+  // because until this release it had nothing to ask.
+  //
+  // ABSENT IS A VAULT THAT COULD NOT BE ASKED, not an empty one, and both come
+  // out as the same empty list with the same sentence over it — exactly the
+  // posture a null `hostFolder` already takes.
+  vault?: VaultLists;
 }
 
 export interface DiarySection {
@@ -161,28 +200,30 @@ export interface DiarySection {
   // makes it unreachable there — by there being nowhere to drop it, not by a
   // check that says no.
   //
-  // ── AND THERE ARE THREE OF THEM AS OF 4.10 ─────────────────────────
+  // ── AND THERE ARE TWO OF THEM AS OF 4.58.0 ─────────────────────────
   //
-  // `head` is the page's own name and the places it can go. It is a band rather
-  // than the first member of the masthead, and the reason is not taste:
+  // THERE WERE THREE, AND THE THIRD WAS A RESTRICTION NOBODY ARGUED FOR.
+  // `masthead` was added in 3.2 patch 3 to hold navigation and the period
+  // summary as one card; 4.19 moved navigation into the banner and left the
+  // summary alone in a band. A band of one movable section is a section that
+  // cannot move — that is all `isMovable` does — so the overview was immobile as
+  // a side effect of a card that no longer existed. It is `body` now, and the
+  // band is gone rather than emptied, because an empty band is a rule waiting to
+  // be re-broken.
   //
-  //   A BAND IS A FENCE. `masthead` is in `ONE_FENCE`, so everything in it is
-  //   welded into a single block — and `assetUnits` marks only the FIRST
-  //   directive of a block insertable, with `fences` being the whole block. Put
-  //   the head first in the masthead and `applyLayout` step 3, meeting a
-  //   dashboard that predates this release, inserts the entire masthead a
-  //   second time: two navigation rows, two banners, two buttons. Put it second
-  //   and it is never insertable at all, so no existing dashboard would ever
-  //   get one.
+  // `head` is the page's own name and the places it can go. It stays its own
+  // band, and the reason is not taste:
   //
-  //   BANDS ARE CONTIGUOUS. A `body` section composed above the masthead would
+  //   BANDS ARE CONTIGUOUS. A `body` section composed above the banner would
   //   split the body in two, and the partition below — which reorders each band
-  //   against its own part of `want` — assumes each band is one run.
+  //   against its own part of `want` — assumes each band is one run. So a band
+  //   is what makes "the page's name is the top of the page" unreachable, rather
+  //   than a check somewhere that says no.
   //
   // So the head is its own fence, its own group in the editor, and alone in its
-  // band: immovable by the arithmetic `isMovable` already does, rather than by
-  // a rule that had to be written.
-  band: "head" | "masthead" | "body";
+  // band: immovable by the arithmetic `isMovable` already does, on top of the
+  // `pinned` flag that says the same thing by declaration.
+  band: "head" | "body";
   // How many lines of the READER'S OWN content this section is holding in this
   // note, for a section whose body is theirs rather than the catalogue's.
   //
@@ -225,6 +266,15 @@ export interface DiarySection {
   // a month's overlap nothing. A bare `true` is still the common case and
   // still reads as "offered everywhere it applies, shipped nowhere".
   optIn?: boolean | ((ctx: DiaryDashboardContext) => boolean);
+  // Whether a dashboard may hold more than one of these. `FlatSection.repeatable`
+  // exactly, and for the same reader: the ADD LIST reads it to know that a
+  // section already present is still worth offering.
+  //
+  // ABSENT MEANS ONE, which every section in this catalogue means. Only the
+  // widget instances `widgetDiarySections` adapts in ever set it — a catalogue
+  // section is located by one anchor and owns one run, and a second copy of Open
+  // Tasks would be two ids fighting over one fence.
+  repeatable?: boolean;
   // The lines inside this section's fence, and which fence.
   // `opts` is what the reader chose for this instance — see the same parameter
   // on `EntrySection.directive`, which it mirrors deliberately. A dashboard
@@ -268,6 +318,25 @@ const chartLinesIn = (text: string): number =>
 // for in 2.58.0.
 const noun = (ctx: DiaryDashboardContext): string =>
   CLASS_DEFS[ctx.grain].periodNoun;
+
+// What the period summary's own bar is called, per grain.
+//
+// THE SAME FOUR STRINGS `SECTION_TITLES` HOLDS, and written out here rather than
+// imported from there for the reason every catalogue in this plugin writes its
+// `header:` text literally: that table lives in `ui/widgets/index.ts`, which
+// imports half the plugin, and a catalogue is data. `tags` writes "🏷️ Tags"
+// beside a `SECTION_TITLES["tag-index"]` that says the same thing, and the two
+// answer different questions — this is the title a fence CARRIES, that is the
+// one a fence with no bar is given.
+const SUMMARY_TITLES: Record<string, string> = {
+  week: "📅 This week",
+  month: "📅 This month",
+  quarter: "📅 This quarter",
+  year: "📅 This year",
+};
+
+const summaryBar = (ctx: DiaryDashboardContext): string =>
+  `${HEADER_PREFIX}${SUMMARY_TITLES[noun(ctx)] ?? "📅 This period"}`;
 
 export const DIARY_SECTIONS: DiarySection[] = [
   {
@@ -355,19 +424,69 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // sections that both claimed to be the banner. The label was always "Period
     // summary" and stays it; only the blurb was overreaching.
     blurb: "What this period holds, and its date navigator.",
-    icon: "🗓",
+    // 📅 SINCE 4.59.0, BECAUSE THE SECTION NOW HAS A BAR TO AGREE WITH. The row's
+    // token is its bar's own emoji wherever a section renders one — the rule
+    // `diary-move.test.ts` pins across this whole catalogue — and the four bars
+    // are "📅 This week/month/quarter/year", the strings `SECTION_TITLES` has
+    // carried for these directives since they were nameable. 🗓 was a token for a
+    // row that titled nothing, and there was nothing for it to disagree with.
+    icon: "📅",
     // LOCKED, and the one that most obviously has to be: without it the
     // dashboard has no date navigation and no way to say which period it is
     // scoped to. It stops being a dashboard rather than losing a feature —
     // `entry-header`'s argument exactly.
     locked: true,
-    // The other half of the masthead. Locked as before, and immovable as of
-    // patch 3 — see `isMovable`, which derives that rather than declaring it.
-    band: "masthead",
+    // ── THE BODY, NOT A BAND OF ITS OWN (4.58.0) ─────────────────────
+    //
+    // It was `masthead` from 3.2 patch 3 until this release, and that band held
+    // exactly one movable section: this one. `isMovable` is arithmetic over a
+    // band — alone among your band's movable members means nowhere to go — so
+    // the band was the whole of why the overview could not be moved. The lock
+    // on REMOVAL is unchanged and argued three lines up; what went is a
+    // restriction on ORDER that no comment in this file ever claimed to want,
+    // and that the refusal string had to apologise for.
+    //
+    // THE RULE IT LEAVES BEHIND IS THE ONE WORTH KEEPING: the banner is `head`,
+    // alone, pinned, and every other section on the page is `body`. A page whose
+    // name sits in the middle of it is still unreachable, because that is what
+    // `head` and `pinned` were for; a reader who wants their charts above the
+    // period summary is expressing a preference about their own note, which is
+    // the sentence `DiarySection.locked` has used about position since 2.60.2.
+    //
+    // AND THE COMPOSED NOTE IS BYTE-IDENTICAL, which is what made this a band
+    // change rather than a release. `composeDiaryDashboard` welded a band's
+    // sections into one fence only for `masthead`, and a band of one has nothing
+    // to weld — so this section was already its own block and still is. The
+    // weld went with the band; see `composeDiaryDashboard`.
+    band: "body",
     applies: always,
-    render: (ctx) => ({
+    // ── A SECTION, SO IT WEARS A SECTION'S BAR (4.59.0) ──────────────
+    //
+    // IT HAD NONE, AND NOTHING HAD DECIDED THAT. Every other section on a
+    // dashboard is a `header:` line welded to its directive — Open tasks, What
+    // the days said, Tags, Trends — and this one was the directive alone, so the
+    // one section a dashboard cannot remove was also the one a reader could not
+    // fold. The card is what made it look deliberate: a period summary already
+    // draws chrome, so the missing bar read as a design rather than an omission.
+    //
+    // THE BAR GOES INSIDE THE CARD, which is the part that needed CSS rather
+    // than a line. `.journal-overview-card` is a real card — background, border,
+    // inset — and a bar dropped into it would be a second border arguing with
+    // the first. It becomes the card's TOP BAND instead, bleeding the padding
+    // and carrying the rule beneath it, which is the manoeuvre
+    // `.journal-slim-banner .journal-banner-name` makes one card over and the
+    // reason that rule's comment says every band in this plugin makes it.
+    //
+    // THE QUESTION BELOW IS WHAT KEEPS THE OTHER FORM AVAILABLE. See it.
+    render: (ctx, opts) => ({
       fence: "almanac",
       lines: [
+        // THE ANSWER READ HERE IS THE ADD PATH'S ONLY. A section already in the
+        // file is re-formed by `withAnswers`, which writes the bar line in or
+        // out of the fence the reader has; this is what a section composed
+        // FRESH is written as, and unanswered means the bar — which is what
+        // every dashboard shipped before this release holds.
+        ...(opts?.form === WIDGET_FORM ? [] : [summaryBar(ctx)]),
         `${noun(ctx)}-summary`,
         // All four now. Monthly was the exception until 3.3 — not by argument
         // but by age: `new-monthly` was written when the monthly note was a
@@ -377,6 +496,42 @@ export const DIARY_SECTIONS: DiarySection[] = [
         `button:new-${noun(ctx)}`,
       ],
     }),
+    // ── AND THE WIDGET FORM, FOR A READER WHO WANTS IT IN A ROW ──────
+    //
+    // A SECTION CANNOT BE A COLUMN OF A GROUP, and that is a fact about the
+    // renderer rather than a policy: `isSectionFence` refuses a fence that
+    // titles itself, because `layOutRow` inserts the group at the first cell
+    // child and a bar is not cell content — so the bar would render below the
+    // group it was meant to title and `HeaderBar`'s walk would fold all of it.
+    // Giving this section a bar therefore takes something away, and the toggle
+    // is how it is given back.
+    //
+    // ONE ROW IN THE PICKER, NOT TWO. The alternative was a `week-summary`
+    // widget offered beside the section — but the section is locked, so a
+    // dashboard would then hold two summaries, and on a page where it were not
+    // the two rows would draw the same directive and differ by a line the reader
+    // cannot see. One directive, one row, two forms is the honest shape, and it
+    // is why `FormQuestion` is a question rather than a second catalogue entry.
+    questions: (ctx) => [
+      {
+        kind: "form",
+        key: "form",
+        label: "how this is drawn",
+        // NAMES `header` SO THE ANSWER IS KNOWN TO BE WRITABLE — see
+        // `SectionEditorModal.readable`, which declines to draw a control over a
+        // question that names no line. The answer itself is read off the FENCE
+        // rather than off that line's argument, which is what `formAt` is for
+        // and why a widget form (no header line at all) still reads back.
+        directive: HEADER_KEYWORD,
+        bar: summaryBar(ctx),
+        section: "A section of its own, with a foldable bar",
+        widget: "As a widget, so it can sit in a row",
+      },
+    ],
+    // STILL MATCHES ANY GRAIN'S SUMMARY, deliberately, and the bar changes
+    // nothing about that: a reader who retitled the bar, or turned the section
+    // into a widget, or changed which period this note is about, still has a
+    // dashboard whose summary the editor can find.
     locate: (text) => probe(text, /^(day|week|month|quarter|year)-summary\b/m),
   },
   {
@@ -482,6 +637,58 @@ export const DIARY_SECTIONS: DiarySection[] = [
             lines: ["header:📖 What the days said", "entry-rollup"],
           },
     locate: (text) => probe(text, /^entry-rollup\b/m),
+  },
+  {
+    // THE REGISTRY'S OWN QUESTION, ASKED FROM HERE. `time-grid`'s three sources
+    // are declared once, in `widget-registry.ts`, and this composes the same
+    // directive — so it asks through `widgetQuestions` rather than re-typing the
+    // list. See that function for why it is exported.
+    questions: () => widgetQuestions("time-grid"),
+    id: "time-grid",
+    label: "Time grid",
+    // THE REGISTRY'S SENTENCE TOO, because this is the same widget offered
+    // through a second door and a reader meeting it on a dashboard should read
+    // what a reader meeting it on a year page reads.
+    blurb: WIDGETS["time-grid"].blurb,
+    icon: WIDGETS["time-grid"].glyph,
+    // Nothing of the reader's lives here: the meetings, the log items and the
+    // tasks are in their own notes, and removing the grid removes a view of them.
+    locked: false,
+    band: "body",
+    // ── WEEKLY ALONE, AND IT IS THE DIRECTIVE THAT DECIDES ───────────────
+    //
+    // `time-grid` draws THE HOST NOTE'S WEEK: `weekStartOf` reads `week-start`
+    // from the note's frontmatter and falls back to the current week when there
+    // is none. A weekly dashboard declares `week-start`, so the grid is scoped to
+    // the period the page is about and `period-nav:week` re-scopes both together
+    // — which is the whole argument for it being a section of that page.
+    //
+    // THE OTHER THREE GRAINS DECLARE `month-start`, `quarter-start` AND
+    // `year-start`. None of those is a week, so on a monthly dashboard scoped to
+    // March the grid would draw whatever week today is in — a block about now on
+    // a page about then. A section of a period dashboard is about that period;
+    // this one could not be.
+    //
+    // AND IT IS STILL ADDABLE THERE, AS A WIDGET, which is the point of the two
+    // doors. `pageWidgetKeywords` withholds a keyword the grain's catalogue
+    // writes, so weekly offers the section and the other three offer the card —
+    // exactly the split `tasks-table` has had since 2.58.6, where a year is the
+    // grain with no Open Tasks section and a reader who wants one anyway may add
+    // it. What a reader loses on a month page is the claim that the grid is part
+    // of what a month dashboard IS, which is a claim that would not be true.
+    applies: (ctx) => ctx.grain === "weekly",
+    // OFFERED, NEVER SHIPPED. 3.9 §2. Every weekly dashboard in every vault
+    // predates this section, and a release that silently grew a seven-column
+    // grid on all of them would be deciding something for people who did not ask.
+    optIn: true,
+    render: (_ctx, opts) => ({
+      fence: "almanac",
+      lines: ["header:⏱️ The week by the hour", widgetLine("time-grid", opts)],
+    }),
+    // MATCHES THE KEYWORD, NOT THE ARGUMENT — the rule every catalogue follows,
+    // so a reader who narrows the grid to `time-grid:events` still has a section
+    // the editor can find rather than a second one it offers to add.
+    locate: (text) => probe(text, /^time-grid\b/m),
   },
   {
     questions: (ctx) => [
@@ -625,11 +832,16 @@ export const DIARY_SECTIONS: DiarySection[] = [
 
 // Which of this dashboard's sections the note already has, in the order they
 // appear. The diary half of `detectSections`.
+//
+// WIDGETS INCLUDED AS OF 4.58.0, AND WITHOUT A SPECIAL CASE. An instance's
+// `locate` is the nth occurrence in the whole text, which is what this function
+// hands it — so the instances a note holds come back at their own offsets and
+// the spare behind each returns -1, which is already spelled "not present".
 export function detectDiarySections(
   text: string,
   ctx: DiaryDashboardContext
 ): string[] {
-  return sectionsForDashboard(ctx)
+  return sectionsForDashboard(ctx, text)
     .map((s) => ({ id: s.id, at: s.locate(text) }))
     .filter((s) => s.at >= 0)
     .sort((a, b) => a.at - b.at)
@@ -639,12 +851,20 @@ export function detectDiarySections(
 // What could still be added here: applies to this grain, and is not already in
 // the note. The diary half of `addableSections`, and the call 3.0's editor
 // makes.
+//
+// AND A WIDGET NEVER LEAVES THE PICKER, which falls out of the rule rather than
+// being an exception to it. `widgetInstances` offers every instance the text
+// holds plus the one that would come next; the held ones are present and the
+// spare is not, so exactly one row per keyword survives this filter however many
+// cards the page already has. A catalogue section behaves the other way and
+// should — it is withheld once the page has it, because a second copy would be
+// two ids claiming one fence.
 export function addableDiarySections(
   ctx: DiaryDashboardContext,
   text: string
 ): DiarySection[] {
   const present = new Set(detectDiarySections(text, ctx));
-  return sectionsForDashboard(ctx).filter((s) => !present.has(s.id));
+  return sectionsForDashboard(ctx, text).filter((s) => !present.has(s.id));
 }
 
 // One section's markdown, for adding it to a note that lacks it.
@@ -667,11 +887,183 @@ export function isOptIn(
     : section.optIn === true;
 }
 
-export function sectionsForDashboard(
-  ctx: DiaryDashboardContext
+// ── the widget door, on the surface that did not have one (4.58.0) ────
+//
+// WHAT WAS WRONG. `flatNoteModel` appends every page widget this vault's
+// registry offers to whatever catalogue it was handed, and it is the ONLY place
+// in the tree that does — so the homepage, Search, both folder notes and both
+// vault dashboards list a SECTIONS group and a WIDGETS group, and a period
+// dashboard listed six rows and offered one. Nothing decided that. The four
+// grains got their own model in 3.0 because a dashboard's fences are not a flat
+// note's, and the widget tail arrived in 4.12 on the other side of that seam.
+//
+// A READER CANNOT SEE THE SEAM, WHICH IS WHY IT HAD TO GO. The two windows are
+// one window, opened from the same cog, over notes that sit two clicks apart. A
+// picker that offers thirty cards on the Home note and one on the Weekly note is
+// describing the plugin's file layout to somebody who has never seen it.
+//
+// ── AND IT IS THE SAME DOOR, NOT A SECOND ONE ─────────────────────────
+//
+// Everything below adapts rather than reimplements: `pageWidgetKeywords` decides
+// which keywords are free, `widgetInstances` builds the sections, and the two
+// functions here only change their shape. A dashboard section renders from a
+// GRAIN and a flat one does not, which is the whole of the difference and the
+// whole of what these two conversions carry.
+//
+// THE COMPOSER NEVER SEES THEM. `composeDiaryDashboard` calls
+// `sectionsForDashboard` with no text, which is the arity that answers with the
+// catalogue alone — so a fresh dashboard is composed exactly as it was, and
+// `reconcileLayouts`, which diffs a live note against that text, has no unit for
+// a widget and will neither insert one nor take one back out. That is the same
+// guarantee `flatNoteModel` gives by adding its tail in the model rather than in
+// the catalogue, made the same way.
+
+// A dashboard section as the widget machinery needs to see it: no grain.
+//
+// FOR THE PROBE ONLY. `pageWidgetKeywords` asks two questions of a catalogue —
+// what does it compose, and what does its `locate` claim — and both are
+// answerable once the grain is bound. Nothing downstream of it reads this shape.
+const asFlat = (s: DiarySection, ctx: DiaryDashboardContext): FlatSection => ({
+  id: s.id,
+  label: s.label,
+  blurb: s.blurb,
+  icon: s.icon,
+  locked: s.locked,
+  render: () => s.render(ctx),
+  locate: s.locate,
+});
+
+// A widget instance as a dashboard section.
+//
+// `body`, ALWAYS, and that is the only placement decision here. A widget is
+// content the reader added, and the one band that is not content is the banner —
+// which is `head` for exactly that reason. So a card lands on the page below,
+// where it can be dragged among the sections it was added beside.
+//
+// NEVER LOCKED, NEVER PINNED, ALWAYS OPT-IN. `widgetSection` states the first
+// two — *"it is there because a reader added it, so it is theirs to move and
+// theirs to remove"* — and the third is what keeps it out of `composeDiaryDashboard`
+// even on the paths that DO pass a text.
+//
+// `applies` IS `always`, WHICH IS NOT A SHRUG. A widget's own registry decides
+// where it makes sense, and it has already decided: `pageWidgetKeywords` withheld
+// every keyword this grain's catalogue writes or claims, and `NOT_PAGE_WIDGETS`
+// withheld everything that is not a page widget at all. A grain test on top of
+// those would be this file inventing an opinion about a registry it does not own.
+const asDiary = (s: FlatSection): DiarySection => ({
+  id: s.id,
+  label: s.label,
+  blurb: s.blurb,
+  icon: s.icon,
+  locked: false,
+  band: "body",
+  optIn: true,
+  ...(s.repeatable ? { repeatable: true as const } : {}),
+  applies: always,
+  render: (_ctx, opts) => s.render(opts),
+  ...(s.questions
+    ? {
+        // THE TWO FIELDS A WIDGET'S QUESTION ACTUALLY READS, and the other three
+        // are shaped rather than meant. `FlatNoteSpec` is the type
+        // `FlatSection.questions` takes; `argQuestions` reads `hostFolder` and
+        // `vault` from it and nothing else, so the catalogue, the noun and the
+        // held unit are filled with what a dashboard would say if asked. Passing
+        // a partial cast instead would be the same lie with less of it visible.
+        questions: (ctx: DiaryDashboardContext) =>
+          s.questions!({
+            sections: [],
+            hostFolder: ctx.hostFolder,
+            vault: ctx.vault,
+            noun: "dashboard",
+            heldUnit: "chart",
+          } satisfies FlatNoteSpec),
+      }
+    : {}),
+  locate: s.locate,
+});
+
+// Which page widgets this grain's catalogue leaves free, probed once per grain.
+//
+// CACHED, WHERE `flatNoteModel` REFUSED TO CACHE, and the difference is what the
+// key can be. That function is handed an ARRAY which `homeSections(diaryRoot)`
+// deliberately rebuilds on every call, so a cache would have had to key on an
+// identity that is new each time. This one is keyed on the grain, of which there
+// are four, and the input is `DIARY_SECTIONS` — a module constant. The answer
+// cannot go stale between two calls with the same key unless the catalogue is
+// edited, which is a source change.
+//
+// AND `diaryRoot` IS NOT PART OF THE KEY, deliberately. It changes what the Tags
+// section renders INSIDE its directive; it cannot change which KEYWORDS the
+// catalogue writes, which is the only thing the probe reads.
+const KEYWORDS = new Map<DashboardGrain, string[]>();
+const widgetKeywords = (ctx: DiaryDashboardContext): string[] => {
+  const hit = KEYWORDS.get(ctx.grain);
+  if (hit) return hit;
+  const out = pageWidgetKeywords(
+    DIARY_SECTIONS.filter((s) => s.applies(ctx)).map((s) => asFlat(s, ctx))
+  );
+  KEYWORDS.set(ctx.grain, out);
+  return out;
+};
+
+// Every widget instance this text holds, plus the one that would come next.
+export function widgetDiarySections(
+  ctx: DiaryDashboardContext,
+  text: string
 ): DiarySection[] {
-  return DIARY_SECTIONS.filter((s) => s.applies(ctx));
+  return widgetInstances(widgetKeywords(ctx), text).map(asDiary);
 }
+
+// The section for a widget instance id, built from the id alone.
+//
+// SO THAT AN ID NEED NOT HAVE BEEN LISTED, which is `flatNoteModel`'s reason
+// stated once more: the lists above offer what a text holds plus one spare, and
+// a reader staging three new cards in one session reaches past that. The id says
+// what it is, so the lookup can be exact rather than deeper.
+export function diaryWidgetSectionFor(id: string): DiarySection | null {
+  const flat = instanceSectionFor(id);
+  return flat ? asDiary(flat) : null;
+}
+
+// What this dashboard offers.
+//
+// WITH A TEXT: the catalogue for this grain, plus every widget instance the note
+// holds and the spare behind each. WITHOUT ONE: the catalogue, which is what
+// this function has always answered and what `composeDiaryDashboard` needs.
+//
+// NO TEXT MEANS NO WIDGETS, WHERE IT COULD HAVE MEANT THE UNREPEATABLE ONES.
+// `flatNoteModel` argues this and the argument is the same here: a widget
+// section is an OCCURRENCE, and an occurrence is a fact about a note, so with
+// nothing to count there is nothing honest to list.
+export function sectionsForDashboard(
+  ctx: DiaryDashboardContext,
+  text?: string
+): DiarySection[] {
+  const catalogue = DIARY_SECTIONS.filter((s) => s.applies(ctx));
+  return text === undefined
+    ? catalogue
+    : [...catalogue, ...widgetDiarySections(ctx, text)];
+}
+
+// The list above, plus a section for every instance id the caller is asking
+// about. `note-sections.ts::specWithWanted`, one surface over and for its
+// reason: `planDiarySections` and `applyDiarySections` look each wanted id up
+// and silently skip one they cannot find, and the text's instances plus one
+// spare do not cover the second and third card a reader stages in one session.
+const sectionsWanting = (
+  ctx: DiaryDashboardContext,
+  text: string,
+  want: readonly SectionWant[]
+): DiarySection[] => {
+  const sections = sectionsForDashboard(ctx, text);
+  const have = new Set(sections.map((s) => s.id));
+  return [
+    ...sections,
+    ...idsOf(want)
+      .filter((id) => !have.has(id))
+      .flatMap((id) => diaryWidgetSectionFor(id) ?? []),
+  ];
+};
 
 // The frontmatter a dashboard declares: its period property, blank.
 //
@@ -745,7 +1137,19 @@ export function composeDiaryDashboard(grain: DashboardGrain): string {
   // The `fence` agreement is still required on top: `charts` renders into an
   // `almanac-charts` fence, so a rule keyed on the band alone would fuse chart
   // specs into a directive block the day a chart section joined the masthead.
-  const ONE_FENCE: ReadonlySet<DiarySection["band"]> = new Set(["masthead"]);
+  //
+  // ── AND IT IS EMPTY AS OF 4.58.0, WHICH IS NOT THE SAME AS GONE ──────
+  //
+  // `masthead` was its only member and `masthead` no longer exists: the period
+  // summary is a `body` section, so the composed dashboard is one fence per
+  // section from top to bottom. It was ALREADY that — a band of one has nothing
+  // to weld — which is why moving the summary changed no byte of any composed
+  // note, and `diary-assets.test.ts` pins that rather than trusting it.
+  //
+  // The set stays because the band is still the only thing that could make two
+  // sections one card, and the next release that wants one should re-open this
+  // line rather than rediscover the argument above it.
+  const ONE_FENCE: ReadonlySet<DiarySection["band"]> = new Set();
   const blocks: string[] = [];
   let run: { fence: string; band: string; lines: string[] } | null = null;
   const flush = (): void => {
@@ -843,13 +1247,50 @@ const isBlank = (lines: string[]): boolean =>
 // Restricted to the sections that APPLY to this grain, so a `tasks-table`
 // someone hand-added to a yearly dashboard stays foreign and is left alone
 // rather than being adopted and then offered for removal.
-function ownersOf(lines: string[], ctx: DiaryDashboardContext): string[] {
+//
+// ── AND A WIDGET IS COUNTED ACROSS SEGMENTS, NOT INSIDE ONE (4.58.0) ──
+//
+// A widget instance's `locate` is `locateNth(keyword, n)` — the nth line in the
+// TEXT IT IS SHOWN. This function shows it one fence, so asking `w:events#2` to
+// find itself in the fence that holds the second Events card would fail (there
+// is one occurrence in there, not two) and `w:events#1` would match it instead.
+// Every card after the first would answer to the wrong id, and the reorder keys
+// its chunks on ids.
+//
+// So the repeating keywords are counted with a walking tally rather than probed:
+// `seen` carries how many of each keyword the fences ABOVE this one held, and
+// each occurrence in this one takes the next number. `parseFlatSections` has
+// done exactly this since 4.15 and this is that function's loop, transposed.
+//
+// EVERY OCCURRENCE IN THIS FENCE, not just the first: a reader may group two
+// cards into one block, and each is its own section with its own line.
+function ownersOf(
+  lines: string[],
+  sections: readonly DiarySection[],
+  seen: Map<string, number>
+): string[] {
   const text = lines.join("\n");
-  return sectionsForDashboard(ctx)
-    .map((s) => ({ id: s.id, at: s.locate(text) }))
-    .filter((s) => s.at >= 0)
-    .sort((a, b) => a.at - b.at)
-    .map((s) => s.id);
+  const found: { id: string; at: number }[] = [];
+  const repeating = new Set<string>();
+  for (const s of sections) {
+    const inst = instanceIdOf(s.id);
+    if (inst) {
+      repeating.add(inst.keyword);
+      continue;
+    }
+    const at = s.locate(text);
+    if (at >= 0) found.push({ id: s.id, at });
+  }
+  for (const keyword of repeating) {
+    let n = seen.get(keyword) ?? 0;
+    for (let k = 1; ; k++) {
+      const at = locateNth(keyword, k)(text);
+      if (at < 0) break;
+      found.push({ id: instanceId(keyword, ++n), at });
+    }
+    seen.set(keyword, n);
+  }
+  return found.sort((a, b) => a.at - b.at).map((f) => f.id);
 }
 
 // A dashboard as the sections it contains, in file order.
@@ -884,15 +1325,21 @@ export function parseDiarySections(
   //
   // FILE ORDER DECIDES, because `segs` is in file order and this walks it once.
   const claimed = new Set<string>();
+  // Hoisted, so the probe that produced the keyword list runs once for the whole
+  // file rather than once per fence.
+  const sections = sectionsForDashboard(ctx, text);
+  // How many of each repeating keyword the fences above this one held. One map
+  // for the walk, which is what makes the tally continuous — see `ownersOf`.
+  const seen = new Map<string, number>();
   const segs = segment(text.split("\n"));
   return segs.map((seg, i) => {
-    const owners = (seg.kind === "fence" ? ownersOf(seg.lines, ctx) : []).filter(
-      (id) => {
-        if (claimed.has(id)) return false;
-        claimed.add(id);
-        return true;
-      }
-    );
+    const owners = (
+      seg.kind === "fence" ? ownersOf(seg.lines, sections, seen) : []
+    ).filter((id) => {
+      if (claimed.has(id)) return false;
+      claimed.add(id);
+      return true;
+    });
     return {
       sectionIds: owners,
       from: i,
@@ -918,18 +1365,23 @@ export function parseDiarySections(
 // states: pinned is fixed by decision, and alone among its band's movable
 // members is fixed by arithmetic.
 //
-// PATCH 3 IS WHERE THIS STOPS BEING FREE. Before the masthead existed, every
-// dashboard section could trade places with every other, so `summary` carried
-// "You can move it, though." and it was true. Fusing it into one card with
-// navigation makes it the only unpinned member of a two-section band, so it
-// loses its move — not to a new rule, but to the same arithmetic that stranded
-// `entry-header`. That is a real cost of §3 and is priced in the roadmap rather
-// than discovered in a message that quietly stopped being accurate.
+// AND 4.58.0 IS WHERE IT STOPS COSTING ANYTHING. 3.2 patch 3 fused the period
+// summary into a masthead card with navigation, which made it the only unpinned
+// member of a two-section band and took its move away — not to a new rule, but
+// to this arithmetic. 4.19 dissolved the card and left the band, so the cost
+// outlived the thing it was paid for: a heading over one row, and a section
+// immobile for a reason that had stopped being true four releases earlier.
+// `summary` is a `body` section now, so "You can move it, though." is once again
+// what this function answers about it.
 //
-// GRAIN-BLIND ON PURPOSE. `applies` narrows the body per grain — a yearly
-// dashboard has one body section — but the two masthead sections are on every
-// grain, and they are the only ones a refusal ever reaches. The editor asks
-// through `viewOf`, which does know the grain.
+// WHICH LEAVES EXACTLY ONE IMMOVABLE ROW ON A DASHBOARD, and it is the banner —
+// pinned by declaration, and alone in `head` besides. That is the rule the whole
+// surface is meant to have: the page's name is the top of the page, and
+// everything below it is the reader's to arrange.
+//
+// GRAIN-BLIND ON PURPOSE. `applies` narrows the body per grain, but the two
+// sections a refusal ever reaches — the banner and the period summary — are on
+// every grain. The editor asks through `viewFor`, which does know the grain.
 export function isMovable(
   section: DiarySection,
   ctx?: DiaryDashboardContext
@@ -975,6 +1427,62 @@ export function diaryRemovalRefusal(
   return null;
 }
 
+// ── THE BAR ON A DASHBOARD THAT PREDATES IT (4.59.0) ─────────────────────
+//
+// `ensureTrendsHeader`'s SHAPE EXACTLY, and for its reason. Repair is ADDITIVE:
+// it adds a section this release ships and the note lacks, and `repairNote`
+// throws on anything else. The summary is already on every dashboard — what
+// changed is the line above it — so there is nothing for repair to add and the
+// page would keep the untitled fence forever. `charts.ts` names this escape
+// where it took it, and this is the same escape for the same shape of change.
+//
+// PURE, TEXT IN AND TEXT-OR-NULL OUT, which is what lets the repair window show
+// the diff before anything is written. `scaffold.ts` chains it with the other
+// five on one text so a reader reads one diff per page.
+//
+// TWO FENCES IT LEAVES ALONE, and both are a reader having decided something:
+//
+//   • ONE THAT ALREADY HAS A BAR. Titled by this migration on an earlier run, or
+//     composed with one, or renamed since — `attachHeaderRename` rewrites the
+//     title in place, so a second pass must not put ours back above theirs.
+//
+//   • ONE IN A ROW GROUP. A `row`/`cell` fence is the widget form, which exists
+//     precisely so the summary can be a column of a group — `isSectionFence`
+//     refuses a self-titling fence as cell content, so titling it here would
+//     break the layout the reader built and drop the bar below the group it
+//     appeared to title. The toggle in the section editor is the same decision
+//     said in the window; this walk must not overrule it.
+//
+// A READER WHO TOGGLED THE WIDGET FORM WITHOUT GROUPING IT does get the bar back
+// if they tick `migrations` in the repair window. That is the trade the other
+// five make too — the group is ticked separately precisely so a reader who wants
+// their pages left alone leaves it unticked — and it costs one toggle to undo.
+export function titleSummaryFence(text: string): string | null {
+  const lines = text.split("\n");
+  const segs = segment(lines);
+  let at = 0;
+  for (const seg of segs) {
+    const open = at;
+    at += seg.lines.length;
+    if (seg.kind !== "fence") continue;
+    const body = seg.lines.slice(1, -1);
+    if (!body.some((l) => /^(day|week|month|quarter|year)-summary\b/.test(l.trim()))) {
+      continue;
+    }
+    if (hasSectionBar(body)) return null;
+    if (body.some((l) => isRowLine(l) || isCellLine(l))) return null;
+    const keyword = body
+      .map((l) => l.trim().split(":")[0])
+      .find((k) => /^(day|week|month|quarter|year)-summary$/.test(k));
+    const title = SUMMARY_TITLES[(keyword ?? "").replace(/-summary$/, "")];
+    if (!title) return null;
+    const out = [...lines];
+    out.splice(open + 1, 0, `${HEADER_PREFIX}${title}`);
+    return out.join("\n");
+  }
+  return null;
+}
+
 // What changing this dashboard's sections to `want` would do.
 export function planDiarySections(
   text: string,
@@ -984,7 +1492,14 @@ export function planDiarySections(
   const runs = parseDiarySections(text, ctx);
   const order = runs.flatMap((r) => r.sectionIds);
   const present = new Set(order);
-  const byId = new Map(sectionsForDashboard(ctx).map((s) => [s.id, s]));
+  // THE TEXT AND THE WANT BOTH, because either can name a section this grain's
+  // catalogue does not hold: the text names the widget cards it already carries,
+  // and the want names the ones the reader staged this session. A section
+  // neither list resolves is one this function silently skips, which is how a
+  // staged third card used to vanish between the preview and the write.
+  const byId = new Map(
+    sectionsWanting(ctx, text, requested).map((s) => [s.id, s])
+  );
 
   // 3.2 §4: a pinned section keeps the index the file gives it, whatever the
   // reader dragged. Normalised HERE rather than checked at each use, so the
@@ -1068,7 +1583,7 @@ export function planDiarySections(
   // permutation is always the identity — but writing the partition generally is
   // the same code, and it is the code that stops a body section climbing above
   // navigation.
-  for (const band of ["head", "masthead", "body"] as const) {
+  for (const band of ["head", "body"] as const) {
     const inBand = (id: string): boolean => byId.get(id)?.band === band;
     const surviving = order.filter((id) => inBand(id) && want.includes(id));
     const target = want.filter(
@@ -1113,7 +1628,9 @@ export function applyDiarySections(
   requested: readonly SectionWant[]
 ): string | null {
   const ops = planDiarySections(text, ctx, requested);
-  const byPin = new Map(sectionsForDashboard(ctx).map((s) => [s.id, s]));
+  const byPin = new Map(
+    sectionsWanting(ctx, text, requested).map((s) => [s.id, s])
+  );
   // The same normalisation the plan performed, from the same helper and the
   // same file order. Recomputed rather than returned by `planDiarySections`,
   // which answers in ops and would have to grow a second return value to carry
@@ -1147,7 +1664,9 @@ export function applyDiarySections(
 
   const segs = segment(text.split("\n"));
   const runs = parseDiarySections(text, ctx);
-  const byId = new Map(sectionsForDashboard(ctx).map((s) => [s.id, s]));
+  const byId = new Map(
+    sectionsWanting(ctx, text, requested).map((s) => [s.id, s])
+  );
 
   // A chunk is a run's lines plus every section that run holds. The masthead is
   // the one chunk with two, and it is never removed — both its sections are
@@ -1190,7 +1709,13 @@ export function applyDiarySections(
   // preceding section the file actually has, else before the earliest
   // following one, else at the end. A reader who reordered their dashboard
   // keeps their order and gets the new block somewhere sensible.
-  const order = sectionsForDashboard(ctx).map((s) => s.id);
+  // WIDGETS RANK BELOW EVERY CATALOGUE SECTION, which is what putting them at
+  // the tail of `sectionsForDashboard` already says. `insertionPoint` walks this
+  // list to find the first section that outranks the new one, so a card added to
+  // a dashboard nobody has rearranged lands at the bottom of the page — which is
+  // where a reader who has not thought about position is least surprised to find
+  // it, and one drag from anywhere else.
+  const order = sectionsForDashboard(ctx, text).map((s) => s.id);
   for (const id of adding) {
     const section = byId.get(id);
     if (!section) continue;
@@ -1218,7 +1743,7 @@ export function applyDiarySections(
   // slots and never trade — which is what keeps a body block from landing above
   // navigation, without a check anywhere saying so.
   if (moving) {
-    for (const band of ["head", "masthead", "body"] as const) {
+    for (const band of ["head", "body"] as const) {
       const slots: number[] = [];
       for (let i = 0; i < chunks.length; i++) {
         const first = chunks[i].ids[0];
@@ -1278,35 +1803,46 @@ function insertionPoint(
 // masthead. The editor's reordering rule is unchanged and still has no surface
 // test in it ("two rows may swap when their groups match"); what changed is
 // that this surface now answers the question with something other than null.
-// ── AND TWO OF THE THREE WERE RENAMED IN 4.19 ─────────────────────────
+// ── AND THE OVERVIEW'S BAND WENT IN 4.58.0 ────────────────────────────
 //
-// Each of the top two bands now holds exactly ONE section — the banner, and the
-// period summary that the navigation row left behind — so the old plural
-// readings were wrong in the same way: "the masthead" named a card of two rows
-// that is now one, and "the page head" named the half of the banner that existed
-// before it had the other half.
+// "The overview" named a band holding exactly one section, and a band of one is
+// a section that cannot be moved. The card it was named for stopped existing in
+// 4.19, when navigation went into the banner; what survived it was a heading
+// over a single row and an arithmetic lock nothing in this file wanted.
 //
-// AND THEY ARE STILL TWO BANDS, WHICH IS THE POINT. Collapsing them into one
-// would let the banner and the overview trade places, and a page whose name sits
-// below its date navigator is what `pinned` was added to prevent. Two bands of
-// one each is not redundancy; it is the arrangement stated in the only place
-// that can enforce it.
+// TWO BANDS, AND THE REMAINING ONE IS THE WHOLE RULE. `head` holds the banner
+// and nothing else, so the page's own name cannot be dragged into the middle of
+// the page — which is what `pinned` was added to prevent and what a band is the
+// only thing able to enforce. Everything else is "The page below", and where it
+// sits in there is the reader's.
 const BANDS: Record<DiarySection["band"], string> = {
   head: "The banner",
-  masthead: "The overview",
   body: "The page below",
 };
 
 const viewFor =
-  (ctx: DiaryDashboardContext) =>
-  (s: DiarySection): SectionView => ({
-    ...viewOf(s),
-    ...(s.questions ? { questions: s.questions(ctx) } : {}),
-    // Grain-aware, unlike the refusal: a yearly dashboard has one body section,
-    // so there is nothing for it to trade places with and its arrows should say
-    // so. `isMovable` works that out from `applies` rather than from a table.
-    movable: isMovable(s, ctx),
-  });
+  (ctx: DiaryDashboardContext, text?: string) =>
+  (s: DiarySection): SectionView => {
+    const questions = s.questions?.(ctx);
+    return {
+      ...viewOf(s),
+      ...(questions ? { questions } : {}),
+      // WHAT THIS SECTION'S OWN LINE ALREADY SAYS (4.58.0), and it is the
+      // repeating widgets that need it. The window reads an answer back by
+      // finding the directive in the whole file and REFUSES when it appears more
+      // than once — a refusal that is right for a window holding a file and no
+      // extents, and that would blank the selector on every Events card the
+      // moment a dashboard held two. The model located the section, so it knows
+      // which line is that section's and reads the answer off that line alone.
+      ...(questions && text !== undefined
+        ? { answered: answersOn(s.locate(text), questions, text) }
+        : {}),
+      // Grain-aware, unlike the refusal: a yearly dashboard has fewer body
+      // sections, so `isMovable` works out from `applies` rather than from a
+      // table whether a row has anywhere to go.
+      movable: isMovable(s, ctx),
+    };
+  };
 
 const viewOf = (s: DiarySection): SectionView => ({
   id: s.id,
@@ -1315,28 +1851,38 @@ const viewOf = (s: DiarySection): SectionView => ({
   blurb: s.blurb,
   icon: s.icon,
   removable: !s.locked,
-  // TWO BANDS AS OF 3.2 PATCH 3. This said "ONE BAND. A dashboard is a stack of
-  // fences with nothing separating a structural half from a personal one" —
-  // true until the masthead fused navigation and the period summary into one
-  // card, which is exactly such a separation. The editor's rule is unchanged
-  // and still has no surface test in it; this surface simply stopped answering
-  // null.
+  // TWO BANDS AS OF 3.2 PATCH 3, AND STILL TWO AFTER 4.58.0 TOOK ONE AWAY AND
+  // 4.10 HAD ADDED ONE. This said "ONE BAND. A dashboard is a stack of fences
+  // with nothing separating a structural half from a personal one" — true until
+  // the masthead, and true again of everything below the banner. The editor's
+  // rule is unchanged through all of it and still has no surface test in it.
   group: BANDS[s.band],
+  ...(s.repeatable ? { repeatable: true } : {}),
 });
 
 // This dashboard, as the editor sees it.
 export function diarySectionModel(ctx: DiaryDashboardContext): SectionModel {
-  const find = (id: string): DiarySection | undefined =>
-    sectionsForDashboard(ctx).find((s) => s.id === id);
+  // AN ID RESOLVES EVEN WHEN NOTHING LISTED IT — `flatNoteModel`'s rule, and
+  // its reason: the lists offer what the text holds plus one spare, and a reader
+  // staging three new cards in one session reaches past that. Those ids are
+  // built from their own spelling instead.
+  const find = (id: string, text?: string): DiarySection | undefined =>
+    sectionsForDashboard(ctx, text).find((s) => s.id === id) ??
+    diaryWidgetSectionFor(id) ??
+    undefined;
   return {
-    sections: () => sectionsForDashboard(ctx).map(viewFor(ctx)),
+    sections: (text) => sectionsForDashboard(ctx, text).map(viewFor(ctx, text)),
     present: (text) => detectDiarySections(text, ctx),
-    addable: (text) => addableDiarySections(ctx, text).map(viewFor(ctx)),
+    addable: (text) =>
+      addableDiarySections(ctx, text).map(viewFor(ctx, text)),
     refusal: (id, text) => {
-      const s = find(id);
+      const s = find(id, text);
       return s ? diaryRemovalRefusal(s, text) : null;
     },
     plan: (text, want) => planDiarySections(text, ctx, want),
     apply: (text, want) => applyDiarySections(text, ctx, want),
+    // A dashboard holds more than one of a widget as of 4.58.0, so it owes the
+    // editor the id to stage for the next copy. See `SectionModel.instanceOf`.
+    instanceOf: (id, text, taken) => nextInstanceId(id, text, taken),
   };
 }

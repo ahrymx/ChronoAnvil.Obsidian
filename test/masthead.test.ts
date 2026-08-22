@@ -434,10 +434,16 @@ describe("3.5: the span above, the value as a control", () => {
       expect(head.some((l) => l.startsWith("period-nav:")), grain).toBe(false);
       // THE SUMMARY OPENS THE FENCE AS OF 4.19, where the navigation row used to
       // and the summary was second. The claim is what the fence holds, and it
-      // holds one section's two lines now instead of two sections' three.
-      expect(head[0], grain).toMatch(/-summary$/);
-      expect(head[1], grain).toMatch(/^button:new-/);
-      expect(head, grain).toHaveLength(2);
+      // holds one section's lines now instead of two sections' three.
+      //
+      // THREE OF THEM SINCE 4.59.0, and the new one is the section's own bar
+      // rather than another section: a `header:` line, first, because a bar
+      // anchors what follows it. The claim this case makes is unchanged — the
+      // fence is one section's — and `period-nav:` is still not in it.
+      expect(head[0], grain).toMatch(/^header:📅 This /);
+      expect(head[1], grain).toMatch(/-summary$/);
+      expect(head[2], grain).toMatch(/^button:new-/);
+      expect(head, grain).toHaveLength(3);
     }
   });
 

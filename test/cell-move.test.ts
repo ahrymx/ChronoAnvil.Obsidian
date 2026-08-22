@@ -550,6 +550,39 @@ describe("the gesture that reaches this", () => {
     expect(src).toContain("cell: widgetRun(body) ?? undefined");
   });
 
+  it("draws no slot that would open a third column (4.52.1)", () => {
+    // A ROW DRAWS TWO COLUMNS, so the two slots that OPEN one have nothing to
+    // offer once there are two — `empty.ts`'s rule applied to a landing place,
+    // which is the same reading 4.8.7 made of the block slots. The other three
+    // on every card are untouched: above, below and the swap in the middle do
+    // not open a column, and they are how a third widget joins a full row.
+    expect(src).toContain("cells.length < MAX_COLUMNS");
+    expect(src).toContain('slot(child, "jbd-slot-before", CELL_TYPE, (p) => p.cell, () => {');
+    expect(src).toContain("}, hasRoom);");
+    expect(src).toContain('slot(child, "jbd-slot-after", CELL_TYPE, (p) => p.cell, after, hasRoom);');
+    // AND NOT ON THE THREE THAT STACK OR SWAP, which is the half that would be
+    // silent if it were wrong: the reader would find a full group refusing every
+    // drop rather than refusing the two it must.
+    for (const cls of ["jbd-slot-over", "jbd-slot-under", "jbd-slot-swap"]) {
+      const at = src.indexOf(`slot(child, "${cls}"`);
+      expect(at, cls).toBeGreaterThan(-1);
+      expect(src.slice(at, src.indexOf("});", at))).not.toContain("hasRoom");
+    }
+  });
+
+  it("still lets a widget already in the row change columns", () => {
+    // THE ESCAPE, AND WITHOUT IT THE CAP WOULD TAKE AWAY A GESTURE. A widget
+    // alone in a column of THIS row frees that column as the new one opens, so
+    // the count is unchanged — moving the right-hand widget to the left of the
+    // left-hand one is still a drag. Measured at `dragstart`, because a slot is
+    // asked during `dragover` where a drag's data is unreadable by design.
+    expect(src).toContain("inFlight !== null && inFlight.frees && inFlight.block === indexNow()");
+    expect(src).toContain("inFlight = { block, whole, frees: onlyInItsCell(host) }");
+    // The stamped children are the widgets: a divider is a child of the cell too
+    // and carries no line stamp, which is what makes the count exact.
+    expect(src).toContain("cell.querySelectorAll(`[${LINE_ATTR}]`).length === 1");
+  });
+
   it("will not carry a card across a split into another note", () => {
     // A block index means nothing outside the file it was counted in. Two notes
     // open side by side would otherwise let a card name whichever block of the
@@ -704,12 +737,108 @@ describe("the landing places, as drawn", () => {
     // the block's padding, which is the strip visibly outside the row — and the
     // cells tile everything between them.
     expect(src).toContain('const edge = row ? " jbd-slot-edge" : ""');
-    // A share of the block with a floor and a ceiling — it was a flat 16px,
-    // which is the block's own padding and about a fingertip.
+    // A share of the block with a floor — it was a flat 16px, which is the
+    // block's own padding and about a fingertip.
     expect(ruleFor(".jbd-slot-edge {")).toContain("clamp(");
-    expect(ruleFor(".jbd-slot-edge {")).toContain("z-index: 5");
     expect(ruleFor(".jbd-slot-before,")).toContain("top: 0");
     expect(ruleFor(".jbd-slot-before,")).toContain("bottom: 0");
+  });
+
+  it("puts the columns OVER the block's own bands, not under them (4.54 §1)", () => {
+    // THE BUG A VAULT FOUND: *"a cell can not be dragged above a cell that is at
+    // the top, because the wrong box highlights."* Screenshotted mid-drag with
+    // the pointer on the first card of a column and the whole group lit as
+    // "above this block".
+    //
+    // The band was `clamp(24px, 25%, 72px)` at `z-index: 5`, so up to 72px of
+    // "outside the row" lay over the top of every column — and the test above
+    // says why no number on a cell slot could rise through it. So the GROUND is
+    // swapped: the cell outranks the band while a drag is in the air, and the
+    // band keeps only what no column covers.
+    //
+    // BOTH HALVES ASSERTED, because either one alone is the bug back. A band
+    // left above the cells hides the five places; a cell lifted over a band that
+    // still owns the whole top of the block leaves nothing to drop OUT of the
+    // group with.
+    const band = Number(/z-index: (\d+)/.exec(ruleFor(".jbd-slot-edge {"))?.[1]);
+    const cell = Number(
+      /z-index: (\d+)/.exec(
+        ruleFor(
+          ".journal-widget-block.is-slotting .journal-block-row > .journal-block-cell {"
+        )
+      )?.[1]
+    );
+    expect(band).toBeGreaterThan(0);
+    expect(cell).toBeGreaterThan(band);
+    // AND THE CEILING WENT WITH THE OVERLAP IT WAS RATIONING. What is left of a
+    // band is the group's padding and the reach outside the block, so the space
+    // it lost is paid back from the margin rather than from the columns.
+    expect(ruleFor(".jbd-slot-edge {")).toContain("var(--am-slot-reach)");
+    expect(ruleFor(".jbd-slot-above.jbd-slot-edge {")).toContain(
+      "calc(-1 * var(--am-slot-reach))"
+    );
+    expect(ruleFor(".jbd-slot-below.jbd-slot-edge {")).toContain(
+      "calc(-1 * var(--am-slot-reach))"
+    );
+    // The mark is put back on the block's own edge, or it floats in the margin
+    // and says the arrival lands in the gap between two blocks.
+    expect(ruleFor(".jbd-slot-above.jbd-slot-edge::after {")).toContain(
+      "var(--am-slot-reach)"
+    );
+    expect(ruleFor(".jbd-slot-below.jbd-slot-edge::after {")).toContain(
+      "var(--am-slot-reach)"
+    );
+  });
+
+  it("leaves no dead strip between two cards in a column (4.54 §1)", () => {
+    // The gap between two stacked cards was covered by whichever block band
+    // reached it. With the bands under the columns nothing does, so it would be
+    // the one place inside a group that means nothing. It goes to the card
+    // ABOVE — "below this one" and "above the next" are the same insertion point
+    // — because reaching upwards instead would take the strip the top band is
+    // now living on.
+    //
+    // MATCHED WHOLE, not through `ruleFor`. `.jbd-slot-under` shares a rule with
+    // `.jbd-slot-over` above it, so `indexOf` on the bare selector finds the
+    // pair rather than the override — the reason the older assertions here
+    // anchor on a preceding brace. An exact rule is the anchor that cannot pick
+    // the wrong one.
+    expect(rules).toContain(
+      ".jbd-slot-under {\n  bottom: calc(-1 * var(--am-widget-gap));\n" +
+        "  height: calc(20% + var(--am-widget-gap));\n}"
+    );
+    // And the bar stays on the card's own bottom edge rather than being carried
+    // down against the top of the next card.
+    expect(rules).toContain(
+      ".jbd-slot-under::after {\n  bottom: var(--am-widget-gap);\n}"
+    );
+  });
+
+  it("draws the new-column bar in the gutter it names (4.54 §2)", () => {
+    // ARITHMETIC LEFT BEHIND BY A HIT AREA. The bar was placed half a gutter out
+    // from the CARD's edge, which was right while the slot's box started there.
+    // 4.8.3 moved the box out by `gap/2 + 9px` to widen the target and the bar,
+    // an `::after` inside the box, went with it — so the two slots naming ONE
+    // boundary drew their bars 20px apart, one on each card, neither on the seam.
+    //
+    // THE OVERHANG IS ADDED BACK AS A SUM rather than as the 8px it comes to, so
+    // the mark and the box that carries it cannot drift apart again.
+    const back = "var(--am-widget-gap) / 2 + 9px - var(--am-widget-gap) / 2 - 1px";
+    expect(rules).toContain(
+      `.jbd-slot-before::after {\n  left: calc(${back});\n}`
+    );
+    expect(rules).toContain(
+      `.jbd-slot-after::after {\n  right: calc(${back});\n}`
+    );
+    // The box's own inset, which is the half the sum above is compensating for.
+    // If this ever changes, the two `9px` stop agreeing and the bar drifts off
+    // the seam again — which is the whole of the defect.
+    expect(rules).toContain(
+      ".jbd-slot-before {\n  left: calc(var(--am-widget-gap) / -2 - 9px);\n}"
+    );
+    expect(rules).toContain(
+      ".jbd-slot-after {\n  right: calc(var(--am-widget-gap) / -2 - 9px);\n}"
+    );
   });
 
   it("keeps the grip out of anything that can be hidden", () => {

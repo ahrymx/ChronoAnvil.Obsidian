@@ -94,6 +94,28 @@ export const LAYOUT_TITLE = "Layout";
 export const PAGE = "page";
 export const PAGES = "pages";
 
+// A standing note that collects items belonging to the diary but not to one
+// date — a work log, what you are focused on, links to come back to, the
+// meetings in the week ahead. `LogbookDef` in code, and the argument of the
+// `logbook:` directive.
+//
+// THE NOUN IS `logbook` BECAUSE `log` IS ALREADY THE VERB (4.52), and this is
+// the collision this file exists to catch rather than one it missed.
+// `button:log:<trackerId>:<delta>` has logged a tracker VALUE since 2.56 and is
+// written into shipped notes; a `log:` directive beside it would put one word in
+// the grammar twice, meaning an action in one place and a container in the
+// other. That is `type` meaning two things, exactly, and the fix here was free
+// where `type`'s was not: nothing had shipped yet, so the new thing took the
+// word that was still available.
+//
+// A logbook's ITEMS are entries in the ordinary English sense and are never
+// called entries in a reader-facing string: an ENTRY is a dated diary note, and
+// that word is spoken for. They are items.
+export const LOGBOOK = "logbook";
+export const LOGBOOKS = "logbooks";
+export const LOGBOOK_TITLE = "Logbook";
+export const LOGBOOKS_TITLE = "Logbooks";
+
 // ── retired ───────────────────────────────────────────────────────────
 
 // The words that must not appear in a reader-facing string again, and what to

@@ -96,10 +96,10 @@ import { frontmatterEnd } from "./note-sections";
 import { isHeaderLine, parseHeaderDirective, splitDirective } from "./directive-grammar";
 import { NOT_PAGE_WIDGETS } from "./widget-registry";
 import { isValidNoteKey, noteKeyOf, readNoteRegion } from "./notestore";
-import { CAPTURE_NOTE_KEY } from "./constants";
+import { CAPTURE_NOTE_KEY, LOGBOOK_KEYWORD, LOGBOOK_NOTE_KEY } from "./constants";
 import type { SectionModel } from "./section-model";
 import { parseEntries } from "../diary/entries";
-import { parseCaptures } from "../diary/capture-log";
+import { parseLogItems } from "../diary/log-items";
 import { parseTaskLine, serializeTaskLine } from "../ui/tasks";
 import { parseRecall } from "../review/recall";
 
@@ -132,7 +132,29 @@ export interface PlainSection {
 // with `WIDGETS` is already pinned against the dispatch switch, so this borrows
 // a completeness proof instead of starting a second list that can go stale.
 function isRegionBacked(keyword: string): boolean {
+  // A LOGBOOK IS THE ONE PAGE WIDGET THAT IS ALSO A REGION (4.52), so it cannot
+  // come from the registry's `region` reason — that list is the widgets a page
+  // is NOT offered, and a logbook is offered.
+  //
+  // WHICH NOTE'S REGION, THOUGH, IS ANSWERED BY THE TEXT IN HAND rather than by
+  // this predicate, and that is what makes it safe. `logbook:work` on the
+  // homepage draws the work log's items from another file; exported, it finds no
+  // `logbook` region in the HOMEPAGE's text and contributes nothing, which is
+  // right — an export of the homepage is not an export of the work log. On
+  // `Work log.md` the same directive finds its own region and carries the items.
+  if (keyword === LOGBOOK_KEYWORD) return true;
   return NOT_PAGE_WIDGETS[keyword]?.reason === "region";
+}
+
+// Which region a region-backed directive reads.
+//
+// EVERY OTHER ONE NAMES ITS REGION IN ITS ARGUMENT — `note:capture` reads
+// `capture` — and a logbook's argument names a NOTE instead, so it is the one
+// keyword whose key is a constant. Asked in one place because the two walks
+// below must agree: they count the same lines in the same order, and a key rule
+// spelled twice is how the count and the content come to disagree.
+function regionKeyFor(keyword: string, argument: string): string {
+  return keyword === LOGBOOK_KEYWORD ? LOGBOOK_NOTE_KEY : noteKeyOf(argument);
 }
 
 // GFM, out of Almanac's own checkbox.
@@ -142,7 +164,7 @@ function isRegionBacked(keyword: string): boolean {
 // are explicitly total over non-blank lines — `parseEntries` keeps every one,
 // `parseRecall` treats an unseparated line as a question with no answer yet,
 // `parseAttachmentLine` yields "free text at worst, which is what makes the
-// round-trip lossless", `parseCaptures` keeps what someone typed by hand so it
+// round-trip lossless", `parseLogItems` keeps what someone typed by hand so it
 // "survives a round trip instead of being silently swallowed", and `note` is
 // not parsed at all.
 //
@@ -173,15 +195,21 @@ function tasksToMarkdown(region: string): string {
     .trim();
 }
 
-// A capture log as a list, with the time it was caught and whether it is done.
-function capturesToMarkdown(region: string): string {
-  return parseCaptures(region)
+// A stamped region as a list, with when it was written and whether it is done.
+//
+// ONE FUNCTION FOR BOTH REGIONS THAT USE THE GRAMMAR (4.52) — the capture log
+// and a logbook — because they ARE one grammar, and the only difference between
+// them is whether the stamp carries a date. That is a property of the item, so
+// it is read off the item rather than passed in by the caller.
+function logItemsToMarkdown(region: string): string {
+  return parseLogItems(region)
     .map((c) => {
       const box = c.done ? "- [x] " : "- ";
-      const stamp = c.time ? `${c.time} — ` : "";
+      const when = [c.date, c.time].filter((part) => !!part).join(" ");
+      const stamp = when ? `${when} — ` : "";
       const [first, ...rest] = c.text.split("\n");
       // Continuation lines are indented under their own item so a multi-line
-      // capture stays one list entry rather than becoming several.
+      // item stays one list entry rather than becoming several.
       const tail = rest.map((l) => (l ? `  ${l}` : "")).join("\n");
       const head = `${box}${stamp}${first}`;
       return tail ? `${head}\n${tail}` : head;
@@ -210,7 +238,12 @@ function bodyFor(keyword: string, key: string, region: string): string {
   // same test `index.ts` makes before it picks a builder, and `constants.ts`
   // gives capture its own region precisely so it is not confused with prose
   // written on purpose.
-  if (keyword === "note" && key === CAPTURE_NOTE_KEY) return capturesToMarkdown(region);
+  if (keyword === "note" && key === CAPTURE_NOTE_KEY) return logItemsToMarkdown(region);
+  // A LOGBOOK, WHOSE REGION IS THE SAME GRAMMAR ONE STAMP WIDER (4.52). Keyed
+  // on the KEYWORD and not on the key, unlike capture above, because a logbook
+  // note holds exactly one region and `LOGBOOK_NOTE_KEY` is what it is called —
+  // the directive's argument names the note, never the region.
+  if (keyword === LOGBOOK_KEYWORD) return logItemsToMarkdown(region);
   return region.trim();
 }
 
@@ -237,7 +270,7 @@ export function plainSections(text: string, model: SectionModel): PlainSection[]
     for (const line of inner) {
       const parts = splitDirective(line);
       if (!isRegionBacked(parts.keyword)) continue;
-      const key = noteKeyOf(parts.argument);
+      const key = regionKeyFor(parts.keyword, parts.argument);
       // A key the store would refuse on write is a key nothing was written
       // under, so there is no region to find and nothing honest to label.
       if (!isValidNoteKey(key)) continue;
@@ -342,7 +375,10 @@ export function toPlainMarkdown(
       const inner = seg.lines.slice(1, -1);
       const mine = inner.filter((l) => {
         const p = splitDirective(l);
-        return isRegionBacked(p.keyword) && isValidNoteKey(noteKeyOf(p.argument));
+        return (
+          isRegionBacked(p.keyword) &&
+          isValidNoteKey(regionKeyFor(p.keyword, p.argument))
+        );
       }).length;
       const here = sections.slice(taken, taken + mine);
       taken += mine;

@@ -57,6 +57,52 @@
 .journal-sec-block.is-first.is-last {
   border-radius: var(--am-radius-md);
 }
+/* ── A BLOCK THAT ALREADY IS A CARD DOES NOT GET A SECOND ONE (4.59.0) ──
+ *
+ * THE SURFACE STANDS DOWN, AND THIS IS 4.1 §3.1's RULE ONE LEVEL OUT. That one
+ * says a widget drawing its own card inside a framed block is two borders
+ * arguing, and cancels the WIDGET's — see the list in 05-inline-widgets.css,
+ * which names the three widgets that draw one. This is the same argument
+ * arriving from above: `claimOwnBlock` marks any block holding a level-1 bar as
+ * a section surface, and a surface is a card, so a fence whose widget block is
+ * ALREADY a card ends up inside one.
+ *
+ * IT SHOWED UP THE DAY THE PERIOD SUMMARY GAINED A BAR. `.journal-overview-card`
+ * has been a card since 3.2 and never held a `header:` line, so the two had
+ * never met: the render was the summary's card inset 13px inside a section
+ * surface, one card in another, with the bar bled to the inner one's edges.
+ *
+ * WHY THE INNER CARD IS THE ONE THAT SURVIVES, where §3.1 keeps the outer. The
+ * overview card's own bands are measured against it — `.journal-overview-banner`
+ * and the actions row both bleed `-14px`, and `.journal-overview-card
+ * .journal-overview-summary` is what stops the summary drawing a third box
+ * inside that. Cancelling the inner card would strand all three against a
+ * surface with a different inset. The outer has nothing measured against it: it
+ * is a background, an edge and a padding, and this gives up all three.
+ *
+ * `:has()` RATHER THAN A CLASS ON THE BLOCK, because the fact is already in the
+ * DOM. `chromeClasses` decides `journal-overview-card` from the directives in
+ * the fence and `claimOwnBlock` decides `journal-sec-block` from a bar in the
+ * same fence; a third mark saying "these two met" would be a fact stated twice
+ * by two passes that run at different times, and the later one would be the one
+ * that is wrong. The descendant form rather than `>` because the surface is
+ * claimed on `siblingAnchor()`, which is the highest ancestor under the note's
+ * section container and is not always the postprocessor's own element.
+ *
+ * LISTED FOR `is-first` AND `is-last` TOO, which is not repetition: those carry
+ * the run's edges and rounding at the same specificity as the base rule, so a
+ * single selector would lose to them on the first and last block of a run — and
+ * a welded section is both. */
+.journal-sec-block:has(.journal-overview-card),
+.journal-sec-block.is-first:has(.journal-overview-card),
+.journal-sec-block.is-last:has(.journal-overview-card),
+.journal-sec-block.is-first.is-last:has(.journal-overview-card) {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
 /* The spacing at the edges of the surface is the surface's to decide, so the
    content gives its own up. */
 .journal-sec-block > :first-child {

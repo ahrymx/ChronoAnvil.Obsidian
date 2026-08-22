@@ -97,14 +97,28 @@ describe("the three surfaces ask it rather than writing it again", () => {
   it("is called by the chart grid, the journal cards and the section editor", () => {
     expect(readCode("charts")).toContain("dropOnto(specs.map((s) => s.key), fromKey, ontoKey)");
     expect(readCode("journal-order")).toContain("dropOnto(journalOrder(plugin), fromId, ontoId)");
-    expect(readCode("section-editor")).toContain("dropOnto(this.rows, from, id)");
+    // THE SECTION EDITOR ASKS IT THROUGH `row-order` AS OF 4.53.0, and twice —
+    // once over the cells of a group and once over the blocks of a band. The
+    // editor's own drop used to splice the flat list of rows, which is how a
+    // drop could land in the middle of somebody's group; the module that owns
+    // the arrangement makes the same call, on the list the drag was picked up
+    // from.
+    expect(readCode("row-order")).toContain("dropOnto(blocks[at], from, onto)");
+    expect(readCode("row-order")).toContain("dropOnto(");
+    expect(readCode("section-editor")).not.toContain("dropOnto(");
   });
 
   it("leaves no copy of the splice behind in any of them", () => {
     // THE TRIPWIRE. If a fourth surface — or a revert of one of these three —
     // writes `rest.splice(rest.indexOf(x), 0, y)` again, it is reintroducing
     // exactly this bug, and it should turn this red rather than ship.
-    for (const mod of ["charts", "journal-order", "section-editor", "journals-cards"]) {
+    for (const mod of [
+      "charts",
+      "journal-order",
+      "section-editor",
+      "row-order",
+      "journals-cards",
+    ]) {
       expect(readCode(mod), mod).not.toMatch(/splice\(\s*rest\.(indexOf|findIndex)/);
     }
   });

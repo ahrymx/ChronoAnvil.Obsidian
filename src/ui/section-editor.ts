@@ -61,22 +61,50 @@
 import { App, Notice, TFile, setIcon } from "obsidian";
 import { EditorModal } from "./editor-modal";
 import { createListRow, type ListRowOptions } from "./list-row";
-import { promptDetailedSuggester, promptLayoutSave } from "./modals";
+import {
+  only,
+  promptChoice,
+  promptDetailedSuggester,
+  promptLayoutSave,
+} from "./modals";
 import type AlmanacPlugin from "../main";
 import { getFile } from "../core/util";
-import { dropOnto } from "../core/drop-onto";
 import {
   answerInText,
   fieldLabelOf,
   cellMoveOps,
   idsOf,
-  keptBlocks,
   pageBreakOps,
   questionIsRequired,
 } from "../core/section-model";
+// THE ARRANGEMENT IS NOT THIS WINDOW'S TO IMPROVISE (4.53.0). Every reorder
+// here used to be a hand-written swap or splice over `rows`, with the block
+// bits patched up afterwards — four of them, each having to remember what a
+// group is. They are now one module of plain functions that cannot produce an
+// arrangement whose groups are not runs, and this file draws buttons over it.
+import {
+  blocksOf,
+  blockOf,
+  breakUp,
+  canMoveBlock,
+  canMoveRow,
+  dropBlock,
+  dropCell,
+  joinables,
+  joinInto,
+  moveBlock,
+  moveRow,
+  pagesOf,
+  setPage,
+  takeOut,
+  unitOf,
+} from "../core/row-order";
+import type { Arrangement, MoveUnit, NextArrangement } from "../core/row-order";
 import { isPageWidgetId } from "../core/widget-sections";
+import { panDuringDrag } from "./drag-scroll";
 import type {
   FolderQuestion,
+  FormQuestion,
   SectionModel,
   SectionOp,
   SectionQuestion,
@@ -84,6 +112,7 @@ import type {
   TitleQuestion,
   SectionWant,
 } from "../core/section-model";
+import { SECTION_FORM, WIDGET_FORM } from "../core/section-model";
 import { ArgSuggest } from "./arg-suggest";
 
 // The four panes, one at a time.
@@ -188,7 +217,15 @@ export class SectionEditorModal extends EditorModal {
   // it was the half you could not see. Now it is a pane like the others and the
   // reader came here to arrange, so that is what the window opens on.
   private pane: Pane = "sections";
-  private dragging: string | null = null;
+  // What a drag is carrying, and which list it is moving inside.
+  //
+  // THE SCOPE TRAVELS WITH THE DRAG (4.53.0). A cell of a group and a block of
+  // the list are two different things to move, so they are two different drags:
+  // a cell may land only on another cell of its own group, and a block only on
+  // another block. Recording it at `dragstart` is what lets `accepts` answer
+  // both of dragover's and drop's questions with one predicate, rather than
+  // each one re-deriving what was picked up.
+  private dragging: { id: string; scope: MoveUnit } | null = null;
   // Which rows share a block with the row above them. 4.8 §2.
   //
   // A FLAG PER ROW RATHER THAN A LIST OF BLOCKS, and the reason is `rows`
@@ -204,10 +241,17 @@ export class SectionEditorModal extends EditorModal {
   // that now points at whatever is above it, which is the same answer the file
   // would give.
   private joined = new Set<string>();
-  // Which rows the WRITE could cut out of a shared block, from the file as it
-  // was opened. See `BlockView.loose` — a section whose extent is a guess is
-  // not offered a split rather than being offered one that quietly does
-  // nothing.
+  // Which rows the WRITE could cut out of a shared block. See `BlockView.loose`
+  // — a section whose extent is a guess is not offered a split rather than
+  // being offered one that quietly does nothing.
+  //
+  // RE-READ ON EVERY DRAW, AND NOT FROM THE FILE AS IT WAS OPENED (4.53.0).
+  // These two sets were filled in the constructor, which meant they had an
+  // answer for every row the reader FOUND and none for a row they ADDED — so a
+  // widget staged in this session was in neither set, **Make a group** came up
+  // disabled, and the sentence it wore said the widget draws its own title bar,
+  // which was not true of it and was not why. See `readCaps`: they are facts
+  // about a file, so they are asked of the file this arrangement would write.
   private loose = new Set<string>();
 
   // Which rows may be a COLUMN of a group at all — 4.12 §A.
@@ -232,8 +276,8 @@ export class SectionEditorModal extends EditorModal {
   //
   // A ROW THAT IS NOT `joined` CANNOT BE `paged`, because a page is a division
   // INSIDE a group and a row that opens its own block has no group to divide.
-  // `pagesOf` is where that is enforced, once, rather than at each of the three
-  // places that set the bit.
+  // `normalise` (row-order.ts) is where that is enforced, once, rather than at
+  // each of the places that set the bit.
   private paged = new Set<string>();
 
   constructor(app: App, plugin: AlmanacPlugin, private spec: SectionEditorSpec) {
@@ -249,10 +293,14 @@ export class SectionEditorModal extends EditorModal {
     // The blocks the file already has, where the surface has any. A model that
     // does not implement `blocks` leaves both sets empty, every group is one
     // row long, and this window draws the list it always drew.
+    //
+    // THE TWO BITS ONLY, AS OF 4.53.0. `loose` and `column` used to be read here
+    // too and they are not the same kind of thing: these two are the READER'S
+    // arrangement, which this window then owns and changes, and those two are
+    // facts about a file, which change under it every time it stages a section.
+    // See `readCaps` for what reading them once cost.
     for (const block of spec.model.blocks?.(spec.text) ?? []) {
       for (const id of block.ids.slice(1)) this.joined.add(id);
-      for (const id of block.loose) this.loose.add(id);
-      for (const id of block.column) this.column.add(id);
       // WHAT THE FILE ALREADY SAYS ABOUT ITS PAGES. Without this the window
       // would open on a paged group showing one undivided list, and the first
       // Save would flatten every page the reader had made.
@@ -358,6 +406,27 @@ export class SectionEditorModal extends EditorModal {
 
   // ── rows (4.8 §2) ─────────────────────────────────────────────────────
 
+  // The three pieces of state that describe the arrangement, handed to the one
+  // module that is allowed to change it. 4.53.0.
+  private get arrangement(): Arrangement {
+    return { rows: this.rows, joined: this.joined, paged: this.paged };
+  }
+
+  // And what comes back, taken in one go.
+  //
+  // NULL IS A MOVE THAT CHANGES NOTHING and is not a repaint: pressing a
+  // disabled-looking arrow, dropping a row on itself, joining a block that is
+  // already where it would go. `row-order.ts` answers that way for the same
+  // reason `applyFlatSections` does, and the window's part of the bargain is not
+  // to redraw a list to leave it identical.
+  private settle(next: NextArrangement | null): void {
+    if (!next) return;
+    this.rows = next.rows;
+    this.joined = next.joined;
+    this.paged = next.paged;
+    this.refreshFrame();
+  }
+
   // These ids cut into blocks: a run starts wherever a row is not joined to the
   // one before it.
   //
@@ -368,32 +437,61 @@ export class SectionEditorModal extends EditorModal {
   // block whose first member is being removed is opened by the next one, which
   // falls out of the same walk rather than needing a case.
   private groupsOf(ids: readonly string[]): string[][] {
-    const out: string[][] = [];
-    for (const id of ids) {
-      if (out.length && this.joined.has(id)) out[out.length - 1].push(id);
-      else out.push([id]);
-    }
-    return out;
+    return blocksOf(ids, this.joined);
   }
 
   // One group's rows, cut into its pages. 4.34.2.
   //
-  // `groupsOf`'s TWIN, ONE LEVEL IN: that one cuts a list of rows into blocks
-  // wherever a row is not joined to the one above it, and this cuts ONE block
-  // into pages wherever a row is marked as opening one. Same walk, same one bit
-  // per row, and neither has to count anything.
+  // A ROW ON ITS WAY OUT DOES NOT DIVIDE ANYTHING (4.53.0). `pageBreaks` reads
+  // the bits back through `want` at the write, where a removed row is already
+  // gone — so a card whose struck-through member carried a page bit was drawing
+  // a division the Save would not make, and counting it in the bar's `Group — n
+  // pages`. The bit is the reader's and is kept; it just stops being asked.
+  private pagesIn(group: readonly string[]): string[][] {
+    const breaks = new Set(
+      [...this.paged].filter((id) => !this.removed.has(id))
+    );
+    return pagesOf(group, breaks);
+  }
+
+  // The blocks the LIST draws: the ones the write will make, with the rows on
+  // their way out put back where they sit. 4.53.0.
   //
-  // THE FIRST ROW OF A BLOCK IS NEVER A BREAK, however it is marked. The `row`
-  // line opens page one exactly as it opens the first column, so a group's
-  // opener cannot begin a page — enforced here, once, rather than at each place
-  // that sets the bit or reads it.
-  private pagesOf(group: readonly string[]): string[][] {
+  // TWO QUESTIONS THE OLD ONE ANSWERED WITH ONE WALK. `groupsOf(this.rows)`
+  // cuts the rows on screen, struck-through ones included, which is right for
+  // "show me the group I am taking something out of" and wrong for everything
+  // else: a removed row between two members made them look like two blocks when
+  // the Save would write one, and **Add to group** — which reads the block above
+  // out of `want` — then named a card the reader could not see.
+  //
+  // So membership is decided over the rows that will be there, and a removed row
+  // is drawn inside whatever run it is sitting in. A group whose kept members
+  // come down to one stops being drawn as a card, because it stops being a
+  // group; the two rows are still next to each other and one of them is still
+  // struck through, which says the same thing without promising a group that
+  // will not exist.
+  private displayBlocks(ids: readonly string[]): string[][] {
+    const blocks = blocksOf(
+      ids.filter((id) => !this.removed.has(id)),
+      this.joined
+    );
+    const owner = new Map<string, number>();
+    blocks.forEach((b, i) => b.forEach((id) => owner.set(id, i)));
     const out: string[][] = [];
-    group.forEach((id, i) => {
-      if (i > 0 && this.paged.has(id)) out.push([id]);
-      else if (out.length) out[out.length - 1].push(id);
-      else out.push([id]);
-    });
+    let run = -1;
+    for (const id of ids) {
+      const at = owner.get(id);
+      if (at === undefined) {
+        if (out.length) out[out.length - 1].push(id);
+        else out.push([id]);
+        continue;
+      }
+      if (at === run && out.length) out[out.length - 1].push(id);
+      else {
+        out.push([id]);
+        run = at;
+      }
+    }
     return out;
   }
 
@@ -410,6 +508,37 @@ export class SectionEditorModal extends EditorModal {
     return this.groupsOf(ids).flatMap((group) =>
       group.filter((id, i) => i > 0 && this.paged.has(id))
     );
+  }
+
+  // What the file this arrangement would write can be asked to do — read fresh,
+  // once per draw. 4.53.0.
+  //
+  // `loose` AND `column` ARE FACTS ABOUT A FILE, NOT ABOUT A ROW. Whether a
+  // section can be cut out of the fence it shares, and whether it is the kind of
+  // thing a column is, are answered by reading the lines it actually has — which
+  // is why `BlockView` carries them and this window does not compute them. The
+  // constructor read them ONCE, from the file as it was opened, and that answer
+  // is missing for exactly the rows a reader is most likely to want to group: the
+  // ones they have just added, which are not in that file at all.
+  //
+  // SO IT ASKS ABOUT `apply`'s OUTPUT, which is the same dry run `layoutOps`
+  // makes and for the same reason — the honest answer to "what could I do with
+  // this" is read off the file the Save would produce, not off the one that is
+  // there. A staged section is alone in a fence of its own there, so it is loose
+  // and it is a column exactly when its own lines make it one.
+  //
+  // ONCE PER DRAW, at the top of `renderList`, because `apply` walks the file and
+  // the twenty-odd `loose.has` and `column.has` calls a list of rows makes are
+  // all asking about the same one.
+  private readCaps(): void {
+    this.loose = new Set();
+    this.column = new Set();
+    if (!this.model.blocks) return;
+    const base = this.model.apply(this.spec.text, this.want) ?? this.spec.text;
+    for (const block of this.model.blocks(base)) {
+      for (const id of block.loose) this.loose.add(id);
+      for (const id of block.column) this.column.add(id);
+    }
   }
 
   // Whether this surface has rows at all.
@@ -574,6 +703,11 @@ export class SectionEditorModal extends EditorModal {
   // list it always did; a diary entry has two and gets two headings. The
   // difference is in the data, and this is the only place it shows.
   private renderList(pane: HTMLElement): void {
+    // WHAT THE ROWS MAY BE ASKED TO DO, read once for the whole draw. See
+    // `readCaps` — every group button below consults it, and a section staged in
+    // this session has an answer only because this runs here rather than in the
+    // constructor.
+    this.readCaps();
     // No heading of its own: the tab it sits behind is already called "In this
     // file", and a pane that repeats its own tab as a title is a line of
     // chrome that pushes the first row down for nothing.
@@ -594,10 +728,16 @@ export class SectionEditorModal extends EditorModal {
       const inBand = this.rows.filter(
         (id) => (this.view(id)?.group ?? null) === band && this.view(id)
       );
-      for (const group of this.groupsOf(inBand)) {
-        if (group.length < 2) {
-          const section = this.view(group[0]);
-          if (section) this.renderRow(host, section);
+      for (const group of this.displayBlocks(inBand)) {
+        // A CARD IS DRAWN FOR THE GROUP THE SAVE WILL WRITE. Counting every row
+        // on screen would put one round a member and the struck-through row it
+        // is replacing, which is two rows and no group.
+        const kept = group.filter((id) => !this.removed.has(id));
+        if (kept.length < 2) {
+          for (const id of group) {
+            const section = this.view(id);
+            if (section) this.renderRow(host, section);
+          }
           continue;
         }
         this.renderBlock(host, group);
@@ -622,8 +762,43 @@ export class SectionEditorModal extends EditorModal {
   // written, and the documentation says so in those words.
   private renderBlock(host: HTMLElement, group: readonly string[]): void {
     const card = host.createDiv({ cls: "almanac-tpl-block" });
-    const pages = this.pagesOf(group);
+    const pages = this.pagesIn(group);
     const bar = card.createDiv({ cls: "almanac-tpl-block-bar" });
+
+    // ── THE GROUP MOVES AS ONE THING, FROM THE CARD (4.53.0) ──────────────
+    //
+    // The card has drawn a group since 4.8 and there was no way to move one. A
+    // reader who wanted their group further down the page had to press Move down
+    // on each of its cells in turn and watch the group come apart doing it —
+    // which is the report this release is about, from the other end.
+    //
+    // ON THE BAR, WHICH IS WHERE THE OBJECT IS. The arrows inside the card move
+    // a CELL within the group; these move the group among the blocks of the
+    // list. Two levels, two places, and the one you press is the one that
+    // belongs to the thing you are pointing at.
+    const band = this.bandOf(group[0]);
+    const shift = (delta: number, label: string, icon: string): void => {
+      const b = bar.createEl("button", {
+        cls: "almanac-tpl-arrow",
+        attr: { "aria-label": label, title: label },
+      });
+      setIcon(b, icon);
+      b.disabled = !canMoveBlock(band, this.joined, group[0], delta);
+      b.addEventListener("click", () => {
+        this.settle(moveBlock(this.arrangement, band, group[0], delta));
+      });
+    };
+    shift(-1, "Move the group up", "chevron-up");
+    shift(1, "Move the group down", "chevron-down");
+    // PICKED UP BY THE BAR, DROPPED ON THE CARD. The bar is the handle because
+    // the rows inside the card are drag sources of their own and a handle has to
+    // be somewhere that is not one; the target is the whole card because a thin
+    // strip is a bad thing to have to hit, and because what lands beside a group
+    // lands beside all of it. A cell drop inside the card is refused here by
+    // scope and handled by the row it was let go on.
+    this.attachDrag(bar, group[0], "block", card);
+    this.attachDrop(card, group[0], "block");
+
     bar.createSpan({
       cls: "almanac-tpl-block-title",
       // WHAT THE BAR SAYS, AND IT NO LONGER COUNTS COLUMNS (4.34.2). `Group — 4
@@ -644,7 +819,14 @@ export class SectionEditorModal extends EditorModal {
     // EVERY MEMBER LEAVES AT ONCE, which is the one operation on a block that
     // needs no per-row judgement: they each get the block they would have had
     // if nobody had put them together.
-    split.disabled = !group.slice(1).every((id) => this.loose.has(id));
+    //
+    // ASKED OF THE MEMBERS THAT WILL STILL BE THERE (4.53.0). A struck-through
+    // row is not in the file the Save writes, so it has no lines to be cut out
+    // of anything — and `loose`, which is read off that file, has nothing to say
+    // about it. Counting it disabled the button over a group the write would
+    // have broken up perfectly well.
+    const kept = group.filter((id) => !this.removed.has(id));
+    split.disabled = !kept.slice(1).every((id) => this.loose.has(id));
     // AND IT SAYS WHY, AS OF 4.12 §A. This button has been drawn disabled with
     // no explanation since 4.8, which is the same defect the join button is
     // getting fixed for in this release — a control that is visibly there and
@@ -654,8 +836,7 @@ export class SectionEditorModal extends EditorModal {
         "One of these sections' lines can't be told apart from the others in its block, so the group can't be broken up. Move it out of the block by hand first.";
     }
     split.addEventListener("click", () => {
-      for (const id of group) this.joined.delete(id);
-      this.refreshFrame();
+      this.settle(breakUp(this.arrangement, band, group[0]));
     });
 
     const body = card.createDiv({ cls: "almanac-tpl-block-body" });
@@ -696,11 +877,29 @@ export class SectionEditorModal extends EditorModal {
   // It still RENDERS, with its refusal in the subtitle. A row that vanished
   // would take the explanation with it, and "navigation is fixed" is exactly
   // the thing a reader hunting for the setting needs to be told.
+  //
+  // AND IT IS THE LIST THE BLOCKS ARE CUT FROM (4.53.0), not the list a row is
+  // swapped inside. `row-order.ts` takes a band and answers in blocks, so the
+  // one rule this method states — which rows may be rearranged together — is
+  // still the only rule about crossing, and everything about groups is read off
+  // it rather than checked beside it.
+  //
+  // WHICH IS WHY A ROW ON ITS WAY OUT IS NOT IN ONE EITHER, the same omission
+  // doing a fourth job. A struck-through row is not in the file the Save writes,
+  // so it is not in the blocks the Save writes — and a band that still held it
+  // would have every control asking about an arrangement one row wider than the
+  // one being planned. It keeps its slot on screen exactly as an immovable row
+  // does (see `restack`), so the reader finds it where they left it and gets its
+  // arrows back the moment they press Keep.
   private bandOf(id: string): string[] {
     if (this.view(id)?.movable === false) return [];
     const band = this.view(id)?.group ?? null;
     return this.rows.filter(
-      (x) => (this.view(x)?.group ?? null) === band && this.view(x)?.movable !== false
+      (x) =>
+        this.view(x) !== undefined &&
+        !this.removed.has(x) &&
+        (this.view(x)?.group ?? null) === band &&
+        this.view(x)?.movable !== false
     );
   }
 
@@ -760,7 +959,15 @@ export class SectionEditorModal extends EditorModal {
       ],
     });
 
-    this.attachDrag(row, section.id);
+    const band = this.bandOf(section.id);
+    // WHICH LIST THIS ROW MOVES INSIDE, and the whole of 4.53.0 in one word. A
+    // cell of a group moves among its group's cells; anything else moves among
+    // the blocks of its band, and a group is one block. Read from the
+    // arrangement rather than from where this row happens to be being drawn, so
+    // the card and the mover cannot disagree about what a group is.
+    const unit = unitOf(band, this.joined, section.id);
+    this.attachDrag(row, section.id, unit);
+    this.attachDrop(row, section.id, unit);
 
     // ARROWS AS WELL AS DRAG, not instead of it.
     //
@@ -773,22 +980,28 @@ export class SectionEditorModal extends EditorModal {
     //
     // In `lead` rather than beside the toggle: "move this up" next to "remove
     // this" is a pairing one slip away from being expensive.
-    const band = this.bandOf(section.id);
-    const at = band.indexOf(section.id);
-    const nudge = (delta: number, label: string, icon: string): void => {
+    //
+    // WHAT THEY SAY DEPENDS ON WHAT THEY MOVE (4.53.0), because a reader
+    // pressing an arrow on a row below a group needs to know before they press
+    // it that the row is going OVER the group rather than into it. "Move up
+    // past the group" is the sentence the old control could not say,
+    // because it did not know: it swapped with whatever row was above,
+    // discovered the group afterwards, and left the file describing an
+    // arrangement nobody had asked for.
+    const nudge = (delta: number, icon: string): void => {
+      const label = this.moveLabel(band, section.id, unit, delta);
       const b = lead.createEl("button", {
         cls: "almanac-tpl-arrow",
         attr: { "aria-label": label, title: label },
       });
       setIcon(b, icon);
-      b.disabled = at + delta < 0 || at + delta >= band.length;
+      b.disabled = !canMoveRow(band, this.joined, section.id, delta);
       b.addEventListener("click", () => {
-        this.swap(section.id, band[at + delta]);
-        this.refreshFrame();
+        this.settle(moveRow(this.arrangement, band, section.id, delta));
       });
     };
-    nudge(-1, "Move up", "chevron-up");
-    nudge(1, "Move down", "chevron-down");
+    nudge(-1, "chevron-up");
+    nudge(1, "chevron-down");
 
     this.renderQuestions(actions, section);
 
@@ -808,23 +1021,39 @@ export class SectionEditorModal extends EditorModal {
     // is the one case where "nothing dead is drawn" is the wrong rule: the
     // reader is looking for the control and its absence explains nothing.
     if (this.hasRows && !gone) {
-      const at = this.rows.indexOf(section.id);
-      const above = this.rows[at - 1];
-      // AND THE ROW ABOVE HAS TO BE A COLUMN TOO. A group is made out of two
-      // blocks, so a destination that cannot be one is a join `moveCell` will
-      // decline at Save — and offering a button that plans a move the write
-      // refuses is the failure `loose` exists to have stopped one control over.
-      const sameBand =
-        above !== undefined &&
-        (this.view(above)?.group ?? null) === (section.group ?? null) &&
-        this.view(above)?.movable !== false &&
-        this.column.has(above);
-      if (this.joined.has(section.id)) {
-        const out = actions.createEl("button", {
-          cls: "almanac-tpl-move",
-          text: "Take out of the group",
-          attr: { title: "Give this section a block of its own" },
+      // WHICH OF THE TWO SETS OF CONTROLS THIS ROW GETS, asked once. A cell of a
+      // group can leave it and can open a page of it; a block can join the block
+      // above. Reading `unit` rather than `joined` is what finally gives the
+      // row that OPENS a group the right controls — it is as much a cell of that
+      // group as the ones below it, and its bit is the absence of a bit, so
+      // asking `joined` put it in the other branch and offered it a join with
+      // whatever was outside the card. That is where the two-groups-become-one
+      // surprise came from.
+      if (unit === "cell") {
+        // AN ICON UNDER THE ARROWS, NOT A PILL IN THE ACTIONS ROW (4.53.1).
+        //
+        // It is the same question the arrows ask. Up, down and out are three
+        // answers to "where does this row sit"; the actions row answers "what
+        // is this row for" — a dropdown, a text field, Remove. Sorting the
+        // controls by the question they answer is also what keeps Remove away
+        // from the movers, which is the pairing `lead` exists to avoid.
+        //
+        // It stopped being the widest thing on the line, too: "Take out of the
+        // group" is the longest label in the editor, and it was setting the
+        // wrap of every actions row that carried it.
+        //
+        // LABELLED, NOT JUST DRAWN. An icon button with no text is a button
+        // with no name to a screen reader and a guess to everyone else, so the
+        // name goes in `aria-label` and the sentence in `title` — the same
+        // pairing the arrows use one block up.
+        const out = lead.createEl("button", {
+          cls: "almanac-tpl-arrow almanac-tpl-leave",
+          attr: {
+            "aria-label": "Take out of the group",
+            title: "Take out of the group — give this section a block of its own",
+          },
         });
+        setIcon(out, "unlink");
         // A SECTION WHOSE EXTENT IS A GUESS IS NOT OFFERED THE SPLIT. See
         // `BlockView.loose`: the alternative is a button that plans a move the
         // write then declines to make.
@@ -833,15 +1062,13 @@ export class SectionEditorModal extends EditorModal {
           out.title =
             "This section's lines can't be told apart from the others in its block, so it can't be split out.";
         }
+        // IT LEAVES THROUGH THE NEAREST EDGE, and `takeOut` is where that is
+        // decided. The old handler was `joined.delete(id)`, which does not take
+        // a row OUT of a run — it cuts the run in two at that row, so taking the
+        // middle cell out of a group of three carried the third one with it into
+        // a group the reader had not asked for.
         out.addEventListener("click", () => {
-          this.joined.delete(section.id);
-          // A ROW THAT LEAVES ITS GROUP STOPS OPENING A PAGE OF IT. `pageBreaks`
-          // filters this out at the write anyway — it reads the bit back through
-          // the current grouping — but leaving it set would mean a row put back
-          // in the group later silently arrives as a page break the reader did
-          // not ask for the second time.
-          this.paged.delete(section.id);
-          this.refreshFrame();
+          this.settle(takeOut(this.arrangement, band, section.id));
         });
 
         // ── AND WHERE ITS PAGE BEGINS (4.34.2) ──────────────────────────
@@ -853,64 +1080,138 @@ export class SectionEditorModal extends EditorModal {
         // OFFERED ON EVERY JOINED ROW, INCLUDING ONES THAT ALREADY BREAK — a
         // toggle rather than a one-way control, because the reader who made a
         // page in the wrong place has no other way to unmake it here.
-        const breaks = this.paged.has(section.id);
-        const page = actions.createEl("button", {
-          cls: "almanac-tpl-move",
-          text: breaks ? "Join the page before" : "Start a page here",
-          attr: {
-            title: breaks
-              ? "Put this section back beside the one before it, in the same page"
-              : "Begin a new page of this group at this section — the group draws a numbered strip to switch between its pages",
-          },
-        });
-        // THE SAME REFUSAL THE SPLIT MAKES, AND FOR THE SAME REASON. Placing a
-        // boundary means knowing which line this section starts on; a section
-        // whose lines cannot be told from its neighbours' would have the `tab`
-        // written above somebody else's widget.
-        page.disabled = !this.loose.has(section.id);
-        if (page.disabled) {
-          page.title =
-            "This section's lines can't be told apart from the others in its block, so a page can't be started at it.";
+        //
+        // AND NOT ON THE ROW THAT OPENS THE GROUP, which is the one cell that
+        // cannot begin a page of it: the `row` line opens page one exactly as it
+        // opens the first column. `normalise` enforces that on the bits; this is
+        // the same fact, drawn.
+        if (this.joined.has(section.id)) {
+          const breaks = this.paged.has(section.id);
+          const page = actions.createEl("button", {
+            cls: "almanac-tpl-move",
+            text: breaks ? "Join the page before" : "Start a page here",
+            attr: {
+              title: breaks
+                ? "Put this section back beside the one before it, in the same page"
+                : "Begin a new page of this group at this section — the group draws a numbered strip to switch between its pages",
+            },
+          });
+          // THE SAME REFUSAL THE SPLIT MAKES, AND FOR THE SAME REASON. Placing a
+          // boundary means knowing which line this section starts on; a section
+          // whose lines cannot be told from its neighbours' would have the `tab`
+          // written above somebody else's widget.
+          page.disabled = !this.loose.has(section.id);
+          if (page.disabled) {
+            page.title =
+              "This section's lines can't be told apart from the others in its block, so a page can't be started at it.";
+          }
+          page.addEventListener("click", () => {
+            this.settle(setPage(this.arrangement, band, section.id, !breaks));
+          });
         }
-        page.addEventListener("click", () => {
-          if (breaks) this.paged.delete(section.id);
-          else this.paged.add(section.id);
-          this.refreshFrame();
-        });
-      } else if (sameBand) {
-        // TWO LABELS FOR ONE BUTTON (4.9 §1), because the click does two things
-        // and the old name described neither: "Join above" is about a LIST, and
-        // what a reader gets is a group on their page. Whether this makes one or
-        // adds to one is exactly what `joined.has(above)` already knows — the
-        // row above is in a block with ITS predecessor, or it is not — so the
-        // distinction costs a lookup that is already being done and saves the
-        // reader working out which happened after the fact.
-        const already = this.joined.has(above);
-        const join = actions.createEl("button", {
-          cls: "almanac-tpl-move",
-          text: already ? "Add to group" : "Make a group",
-          attr: {
-            title: already
-              ? "Put this section in the group above it, as another column"
-              : "Put this section and the one above it in one group, side by side",
-          },
-        });
-        // A SECTION THAT DRAWS ITS OWN TITLE BAR IS NOT A COLUMN (4.12 §A), and
-        // it is DISABLED WITH THE SENTENCE rather than omitted — which is the
-        // one place this window departs from "nothing dead is drawn", on the
-        // precedent three lines up. The page draws nothing at all for this rule:
-        // no quarter lights, no notice appears, and a reader who wants to know
-        // why has to be told somewhere. This is that somewhere, and it is the
-        // whole discoverability cost of the release.
-        join.disabled = !this.column.has(section.id);
-        if (join.disabled) {
-          join.title =
-            "This section draws its own title bar, so it can't be a column of a group — a group's columns each carry their own head. Add the widget on its own instead.";
+      } else {
+        // THE BLOCK ABOVE, NOT THE ROW ABOVE (4.53.0). These are the same thing
+        // only when the row above is on its own: where it is the last cell of a
+        // group, "the row above" is a member of something, and a join is into
+        // the WHOLE of that something. Reading the block is also what stops the
+        // control appearing on a row whose neighbour is being removed, and what
+        // lets it say which of the two things it is about to do.
+        //
+        // AND THE GROUPS FURTHER OFF (4.53.2). `joinables` adds every group on
+        // the page to the block above, because "put this beside that" was only
+        // ever offered for a destination that happened to be touching — a widget
+        // three rows under the group it belongs in had to be walked there one
+        // arrow at a time. Where there is more than one answer the reader is
+        // asked which; see `askJoin` for why the question is not always put.
+        const near = joinables(band, this.joined, section.id);
+        if (near.length > 0) {
+          // WHICH OF THEM WOULD ACTUALLY TAKE IT. The column rule is a fact
+          // about the destination as much as about this row, so it decides how
+          // many answers there are and therefore whether there is a question.
+          const open = near.filter((b) => b.every((x) => this.column.has(x)));
+          const target = only(open);
+          const name = (b: readonly string[]): string =>
+            this.view(b[0])?.label ?? b[0];
+          // TWO LABELS FOR ONE BUTTON (4.9 §1), because the click does two
+          // things and the old name described neither: "Join above" is about a
+          // LIST, and what a reader gets is a group on their page. Three now,
+          // and the third is the honest one for a button that opens a dialog:
+          // it does not yet know which group, because that is the question.
+          let label = "Make a group";
+          let title = "Put this section and the one above it in one group, side by side";
+          if (open.length > 1) {
+            label = "Add to a group";
+            title =
+              "Put this section in one of this page's groups, as another column — you'll be asked which";
+          } else if (target && target.length > 1) {
+            label = "Add to group";
+            title = `Put this section in the group with “${name(target)}”, as another column`;
+          } else if (target) {
+            title = `Put this section and “${name(target)}” in one group, side by side`;
+          } else if (near[0].length > 1) {
+            // Nothing will take it; the refusal below replaces this title. The
+            // NAME still has to be right, because that is what a screen reader
+            // reads out of a disabled control.
+            label = "Add to group";
+          }
+          // BESIDE ITS OPPOSITE, NOT ACROSS THE ROW FROM IT (4.53.2). Take out
+          // of the group went into `lead` one patch ago on the argument that up,
+          // down and out are three answers to "where does this row sit". In is
+          // the fourth, and it is the same control on the other side of one
+          // fact — a row is in a group or it is not, and exactly one of the two
+          // icons is ever drawn. Putting them anywhere but the same place would
+          // make a reader hunt for the mirror of a button they just used.
+          const make = lead.createEl("button", {
+            cls: "almanac-tpl-arrow almanac-tpl-join",
+            attr: { "aria-label": label, title },
+          });
+          setIcon(make, "link");
+          // A SECTION THAT DRAWS ITS OWN TITLE BAR IS NOT A COLUMN (4.12 §A),
+          // and it is DISABLED WITH THE SENTENCE rather than omitted — which is
+          // the one place this window departs from "nothing dead is drawn". The
+          // page draws nothing at all for this rule: no quarter lights, no
+          // notice appears, and a reader who wants to know why has to be told
+          // somewhere.
+          //
+          // AND THE DESTINATION REFUSES IN THE SAME VOICE (4.53.0). A group is
+          // made out of two blocks, so a destination that cannot be a column is
+          // a join the write declines — and until this release that case drew NO
+          // BUTTON AT ALL. The reader saw the control on some rows and not
+          // others, with nothing anywhere saying what the difference was, which
+          // is the same defect one step along from the one the sentence above
+          // was written for.
+          make.disabled =
+            waiting.length > 0 ||
+            !this.column.has(section.id) ||
+            open.length === 0;
+          // A SECTION THAT IS NOT BEING ADDED YET CANNOT BE PUT ANYWHERE, and
+          // says so in its own words rather than in the column rule's. A row
+          // with an open question contributes no `add` op, so it is not in the
+          // file `readCaps` reads — which used to leave it wearing the sentence
+          // about title bars, a true statement about some other section.
+          if (waiting.length > 0) {
+            make.title = `Choose ${waiting[0].label} first — this section isn't being added yet, so there is nothing to group.`;
+          } else if (!this.column.has(section.id)) {
+            make.title =
+              "This section draws its own title bar, so it can't be a column of a group — a group's columns each carry their own head. Add the widget on its own instead.";
+          } else if (open.length === 0) {
+            // NAMED, AND THE NAME COMES FROM THE NEAREST ONE. With several
+            // destinations all refusing, one example plus "every" is the
+            // shortest true sentence; with one, the old wording stands, because
+            // "every block" reads as evasive when there is only the one.
+            const stuck = near.flatMap((b) =>
+              b.filter((x) => !this.column.has(x))
+            );
+            const who = this.view(stuck[0])?.label ?? stuck[0];
+            make.title =
+              near.length > 1
+                ? `Every group here has a section that draws its own title bar — “${who}” is one — so none of them can hold a column beside it.`
+                : `“${who}” draws its own title bar, so it can't hold a column beside it. Move this section under a plain widget instead.`;
+          }
+          make.addEventListener("click", () => {
+            void this.askJoin(band, section.id, open);
+          });
         }
-        join.addEventListener("click", () => {
-          this.joined.add(section.id);
-          this.refreshFrame();
-        });
       }
     }
 
@@ -925,6 +1226,57 @@ export class SectionEditorModal extends EditorModal {
       else this.removed.add(section.id);
       this.refreshFrame();
     });
+  }
+
+  // Which group this row is joining, asked only when there is more than one.
+  //
+  // `only` FIRST, AND IT IS THE RULE IN `modals.ts` AND NOT A SHORTCUT. That
+  // block draws the line at whether the choice IS the request or is bookkeeping
+  // for it: "add which section" must always ask, because the section is the
+  // substance; "which folder" with one folder must not, because it is a
+  // keystroke charged for nothing. This is the second kind. The reader pressed
+  // a button on a specific row that means "put this in a group", and with one
+  // destination the page has already answered — a dialog there would be a
+  // question whose answer was on screen before it opened. It is also what keeps
+  // the ordinary page, where the only destination is the block above, at the
+  // one press it has always been.
+  //
+  // NOTHING IS WRITTEN BY THIS. It settles an arrangement like every other
+  // control here; Save is still the only thing that touches the file, so a
+  // reader who picks the wrong group has the same undo they had before — Cancel.
+  private async askJoin(
+    band: string[],
+    id: string,
+    targets: string[][]
+  ): Promise<void> {
+    const pick =
+      only(targets) ??
+      (await promptChoice(
+        this.app,
+        targets,
+        (b) => this.joinLabel(b),
+        "Add this section to which group?"
+      ));
+    if (!pick) return;
+    // THE ARRANGEMENT IS READ AFTER THE AWAIT, not captured before it. The
+    // window stays live while the dialog is open, and a `band` computed a
+    // moment ago is a list, not a promise about the arrangement it came from.
+    // `joinInto` re-derives the blocks and returns null if the row is no longer
+    // a block of one — so a stale answer settles nothing rather than something
+    // wrong.
+    this.settle(joinInto(this.arrangement, band, id, pick[0]));
+  }
+
+  // How a destination reads in that dialog: what it is made of, and what
+  // joining it does. "Diary + Go to" is a group the reader can find on the
+  // page by looking at it, where "the group above Tasks" is a description they
+  // would have to resolve — and the two verbs are kept apart because arriving
+  // in a group of three and inventing a group of two are different outcomes.
+  private joinLabel(block: readonly string[]): string {
+    const names = block.map((id) => this.view(id)?.label ?? id).join(" + ");
+    return block.length > 1
+      ? `Add to the group: ${names}`
+      : `Make a new group with: ${names}`;
   }
 
   // The control a section that asks something gets, beside its row.
@@ -1008,6 +1360,10 @@ export class SectionEditorModal extends EditorModal {
       }
       if (q.kind === "title") {
         this.renderTitleQuestion(field(q), section, q);
+        continue;
+      }
+      if (q.kind === "form") {
+        this.renderFormQuestion(field(q), section, q);
         continue;
       }
       // NOTHING TO CHOOSE FROM IS A SENTENCE, NOT AN EMPTY MENU. A dropdown
@@ -1103,6 +1459,51 @@ export class SectionEditorModal extends EditorModal {
     input.value = this.shownAnswer(section, q) ?? "";
     input.addEventListener("change", () => {
       this.answer(section.id, q.key, input.value.trim() || undefined);
+      this.refreshFrame();
+    });
+  }
+
+  // The section/widget toggle. 4.59.0.
+  //
+  // A CHECKBOX RATHER THAN A `<select>`, which is the one place this question
+  // departs from the three beside it. Those pick a value out of a list the vault
+  // supplies and have a meaningful unanswered state; this has two answers, one
+  // of which is what every catalogue composes, so it is a thing that is either
+  // on or off. The label says what ticking it DOES rather than naming both
+  // sides, for the reason the folder box's placeholder states its default: a
+  // control that describes its own effect needs no legend.
+  //
+  // THE SENTENCE UNDER IT IS THE POINT, not decoration. "So it can sit in a row
+  // beside another block" is the only reason a reader would want this, and it is
+  // not guessable from a bar disappearing — `isSectionFence` refuses a fence
+  // that titles itself as a column of a group, and nothing in this window would
+  // otherwise say so.
+  private renderFormQuestion(
+    host: HTMLElement,
+    section: SectionView,
+    q: FormQuestion
+  ): void {
+    const wrap = host.createDiv({ cls: "almanac-tpl-form" });
+    const box = wrap.createEl("input", {
+      type: "checkbox",
+      cls: "almanac-tpl-form-box",
+    });
+    const id = `almanac-form-${section.id.replace(/[^a-z0-9]+/gi, "-")}`;
+    box.id = id;
+    const label = wrap.createEl("label", {
+      cls: "almanac-tpl-form-label",
+      text: q.widget,
+    });
+    label.htmlFor = id;
+    // UNANSWERED READS AS A SECTION, which is what the catalogue composes and
+    // what every note written before this release holds. `shownAnswer` returns
+    // the empty string for a section the window has not read, and the empty
+    // string is not `WIDGET_FORM`.
+    box.checked = this.shownAnswer(section, q) === WIDGET_FORM;
+    box.title = box.checked ? q.section : q.widget;
+    box.setAttribute("aria-label", q.widget);
+    box.addEventListener("change", () => {
+      this.answer(section.id, q.key, box.checked ? WIDGET_FORM : SECTION_FORM);
       this.refreshFrame();
     });
   }
@@ -1238,26 +1639,40 @@ export class SectionEditorModal extends EditorModal {
     return answerInText(this.spec.text, q);
   }
 
-  // Two rows trade places in `this.rows`.
+  // What an arrow is about to do, in the reader's words.
   //
-  // A SWAP OF SLOTS, not a splice-and-insert, and the difference matters on a
-  // banded surface: swapping two members of one band cannot disturb the
-  // positions of another band's rows, where re-inserting into a flat list
-  // could. The rule "a section cannot cross the rule" is therefore a property
-  // of the operation rather than something checked after it.
-  private swap(a: string, b: string): void {
-    if (!b || a === b) return;
-    const i = this.rows.indexOf(a);
-    const j = this.rows.indexOf(b);
-    if (i === -1 || j === -1) return;
-    const before = this.groupsOf(this.rows);
-    [this.rows[i], this.rows[j]] = [this.rows[j], this.rows[i]];
-    // AND THE BLOCK KEEPS ITS BOUNDARIES (4.44.1). Two rows of one group trading
-    // places must not hand the write a different arrangement of groups — which
-    // is what happens when the row that moves is the one that OPENS the block,
-    // because its bit is the absence of a bit and absence does not travel with
-    // it. `keptBlocks` states the whole of that.
-    this.joined = keptBlocks(before, this.rows, this.joined);
+  // WRITTEN BEFORE THE PRESS, NOT DISCOVERED AFTER IT. This is the whole reason
+  // the release is not just a bug fix: a row below a group and a row below a row
+  // wore the same two chevrons and the same "Move up", and did two very
+  // different things. Saying which is what lets a reader predict a list that has
+  // groups in it — and the sentence is available only because `unit` is decided
+  // before the button is drawn rather than inside the handler.
+  private moveLabel(
+    band: readonly string[],
+    id: string,
+    unit: MoveUnit,
+    delta: number
+  ): string {
+    const where = delta < 0 ? "up" : "down";
+    // A row in no band — fixed, or on its way out — gets the plain words. It has
+    // no neighbours to name and no rule to explain; the reason it cannot move is
+    // in its own subtitle or in the strike through its title.
+    if (!band.includes(id)) return delta < 0 ? "Move up" : "Move down";
+    if (!canMoveRow(band, this.joined, id, delta)) {
+      return unit === "cell"
+        ? `This is the ${delta < 0 ? "first" : "last"} column of its group`
+        : `Nothing to move ${where} past`;
+    }
+    if (unit === "cell") return `Move ${where} inside the group`;
+    // WHAT IT IS ABOUT TO STEP OVER. A group is one block, so a row below one
+    // moves past the whole of it in a single press — which is the behaviour the
+    // report asked for and the one a reader will not expect unless told.
+    const blocks = blocksOf(band, this.joined);
+    const at = blocks.findIndex((b) => b.includes(id));
+    const past = blocks[at + delta];
+    if (past && past.length > 1) return `Move ${where} past the group`;
+    const label = past ? this.view(past[0])?.label : undefined;
+    return label ? `Move ${where} past ${label}` : `Move ${where}`;
   }
 
   // Drag to reorder — direct manipulation, and STILL PLANNED MANIPULATION.
@@ -1267,66 +1682,117 @@ export class SectionEditorModal extends EditorModal {
   // removes the preview. Nothing here writes. A drag reorders a list in the
   // modal, the summary re-reads, and the reader can drag six times and change
   // their mind before pressing Save.
-  private attachDrag(row: HTMLElement, id: string): void {
+  //
+  // AND IT CARRIES ITS SCOPE (4.53.0). A cell of a group and a block of the list
+  // are two different things to pick up, so they are two different drags: the
+  // group's bar lifts the group, a cell lifts itself, and a cell may land only
+  // among its own group's cells. Until this release every drag was over the flat
+  // list of rows, so dropping anything anywhere could land it in the middle of
+  // somebody's group — and the arrangement that came back was whatever the
+  // leftover bits happened to describe.
+  private attachDrag(
+    el: HTMLElement,
+    id: string,
+    scope: MoveUnit,
+    // WHAT LIGHTS UP, where that is not what you grabbed. A group is picked up
+    // by its bar and it is the CARD that should fade — the object being moved is
+    // the whole block, and a bar that dimmed on its own would say the reader was
+    // dragging a title.
+    mark: HTMLElement = el
+  ): void {
     // `bandOf` already makes a fixed row an impossible drop, so the drag would
     // fail on release rather than be accepted. That is one failure too late:
     // `draggable = true` is a promise the cursor makes before the reader has
     // committed to anything, and letting them lift a row that cannot land is
     // the same class of lie as a refusal that offers a move (3.2 §4).
-    if (this.view(id)?.movable === false) return;
-    row.draggable = true;
-    row.addEventListener("dragstart", (e) => {
-      this.dragging = id;
-      row.addClass("is-dragging");
+    //
+    // ASKED AS "IS IT IN ITS OWN BAND" (4.53.0), which is one question covering
+    // both rows that are not: the immovable one and the one being removed. A
+    // second test beside this one would be a second place to forget.
+    if (!this.bandOf(id).includes(id)) return;
+    el.draggable = true;
+    // AND THE LIST SCROLLS WHILE A ROW IS IN THE AIR (4.57). A page with a
+    // dozen sections and four groups is taller than the window this draws in,
+    // and a native drag stops the scroller dead — so the rows a reader could
+    // reach were the ones already on screen. `drag-scroll.ts` reads the same
+    // `dragover` the drop targets read and pans the modal's own scroller.
+    let stopPan: (() => void) | null = null;
+    el.addEventListener("dragstart", (e) => {
+      this.dragging = { id, scope };
+      mark.addClass("is-dragging");
       e.dataTransfer?.setData("text/plain", id);
+      stopPan = panDuringDrag(el);
     });
-    row.addEventListener("dragend", () => {
+    el.addEventListener("dragend", () => {
+      stopPan?.();
+      stopPan = null;
       this.dragging = null;
-      row.removeClass("is-dragging");
-    });
-    row.addEventListener("dragover", (e) => {
-      // Only inside the band. A row in another band is not a drop target at
-      // all, so the gesture reports "no" the way every other drag does rather
-      // than accepting the drop and then explaining itself.
-      if (!this.dragging || this.dragging === id) return;
-      if (!this.bandOf(id).includes(this.dragging)) return;
-      e.preventDefault();
-      row.addClass("is-drop-target");
-    });
-    row.addEventListener("dragleave", () => row.removeClass("is-drop-target"));
-    row.addEventListener("drop", (e) => {
-      e.preventDefault();
-      row.removeClass("is-drop-target");
-      const from = this.dragging;
-      this.dragging = null;
-      if (!from || from === id || !this.bandOf(id).includes(from)) return;
-      // Lifted out and re-inserted at the target's slot, so dragging a row
-      // three places up moves it three places rather than swapping it with
-      // whatever happened to be there. Restricted to one band throughout, which
-      // `bandOf` above has already checked.
-      //
-      // `dropOnto` SINCE 4.45.1, and the four lines it replaced inserted before
-      // the target in both directions — so dropping a row on the one directly
-      // below it did nothing at all. See `core/drop-onto.ts`; the chart grid and
-      // the journal cards had the same defect and now ask the same function.
-      const before = this.groupsOf(this.rows);
-      const rest = dropOnto(this.rows, from, id);
-      if (!rest) return;
-      this.rows = rest;
-      // The arrows' rule, and for the arrows' reason — see `swap`. A drag that
-      // reorders inside one group keeps that group; a drag that takes a row out
-      // of one is a regroup, and `keptBlocks` leaves that reader's bits alone.
-      this.joined = keptBlocks(before, this.rows, this.joined);
-      this.refreshFrame();
+      mark.removeClass("is-dragging");
     });
   }
 
+  // And where it may land.
+  //
+  // ONE PREDICATE, ASKED TWICE. `dragover` decides whether this is a drop target
+  // at all — no `preventDefault`, no drop, so the gesture reports "no" the way
+  // every other drag does rather than accepting the drop and then explaining
+  // itself — and `drop` asks again rather than trusting that dragover ran. A
+  // rule enforced in one of two paths is a rule with a way round it.
+  private attachDrop(
+    el: HTMLElement,
+    id: string,
+    scope: MoveUnit,
+    mark: HTMLElement = el
+  ): void {
+    if (!this.bandOf(id).includes(id)) return;
+    el.addEventListener("dragover", (e) => {
+      if (!this.accepts(id, scope)) return;
+      e.preventDefault();
+      mark.addClass("is-drop-target");
+    });
+    el.addEventListener("dragleave", () => mark.removeClass("is-drop-target"));
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      mark.removeClass("is-drop-target");
+      const drag = this.dragging;
+      this.dragging = null;
+      if (!drag || !this.accepts(id, scope)) return;
+      const band = this.bandOf(id);
+      // Lifted out and re-inserted at the target's slot, so dragging three
+      // places up moves it three places rather than swapping it with whatever
+      // happened to be there — `dropOnto`'s rule, over cells or over blocks
+      // depending on what was picked up.
+      this.settle(
+        scope === "cell"
+          ? dropCell(this.arrangement, band, drag.id, id)
+          : dropBlock(this.arrangement, band, drag.id, id)
+      );
+    });
+  }
+
+  // Whether what is being dragged may land here.
+  //
+  // THREE QUESTIONS, AND THE BAND IS STILL THE FIRST OF THEM. A row in another
+  // band is not a target, which is the rule 3.2 §4 states and the one an
+  // immovable row is excluded by. What 4.53.0 adds is the other two: a drag
+  // knows what it picked up, and a cell drop must stay inside the group it
+  // started in.
+  private accepts(onto: string, scope: MoveUnit): boolean {
+    const drag = this.dragging;
+    if (!drag || drag.id === onto || drag.scope !== scope) return false;
+    if (!this.bandOf(onto).includes(drag.id)) return false;
+    if (scope !== "cell") return true;
+    return blockOf(this.bandOf(onto), this.joined, onto).includes(drag.id);
+  }
+
   private renderAdd(host: HTMLElement): void {
-    // A REPEATABLE WIDGET STAYS OFFERED (4.15 §4). Everything else drops out of
-    // this list the moment it is staged, because there is one of it and the
-    // reader has it. A widget a page may hold several of is the one case where
-    // "you already added this" is not a reason to stop offering it — and the
-    // flag is the model's, so this window still does not know what makes one.
+    // A WIDGET STAYS OFFERED, A SECTION DOES NOT (4.15 §4, every widget as of
+    // 4.56). A section drops out of this list the moment it is staged, because
+    // there is one of it and the reader has it — a second copy would claim the
+    // first one's region and overwrite it. A widget renders and remembers
+    // nothing, so "you already added this" is not a reason to stop offering
+    // another. The flag is the model's, so this window still does not know what
+    // makes one.
     const absent = this.model
       .addable(this.spec.text)
       .filter((s) => s.repeatable || !this.rows.includes(s.id));

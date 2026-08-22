@@ -52,7 +52,8 @@ import { journalTypeAtPath } from "../../journals/journal";
 import { CLASS_DEFS, noteKindOf, TrackerClass } from "../../trackers/trackers";
 import { OVERVIEW_LABELS, OverviewUnit } from "../../diary/calendar";
 import { periodAnchor, valueLabel } from "../../diary/periodnav";
-import { folderNotePath } from "../../core/util";
+import { folderNotePath, folderPrefix } from "../../core/util";
+import { LOGBOOK_TITLE } from "../../core/vocabulary";
 
 /** The class the head carries. Named once — `headerbar.ts` reads it too. */
 export const PAGE_HEAD_CLASS = "journal-page-head";
@@ -132,10 +133,18 @@ export interface PageHeadText {
 // masthead said *August 2026*. Nothing here is new information: the folder note
 // path is `folderNotePath`, the grain is `entryContext`'s, and both were
 // already being read one line apart.
+//
+// A FOURTH SHAPE ARRIVED IN 4.52 and it is the one that was WRONG rather than
+// merely unnamed. A logbook is a note under `paths.logbooks` — inside the diary
+// root, so the bar draws — and `noteKindOf` returns null for it, because it is
+// in no grain folder. `grainOf` falls back to `daily`, so a work log's head read
+// **DAILY ENTRY** over its filename: not a missing answer but a confident wrong
+// one, which is the kind this table exists to make impossible.
 type DiaryRole =
   | { role: "entry" }
   | { role: "overview"; unit: OverviewUnit }
-  | { role: "dashboard" };
+  | { role: "dashboard" }
+  | { role: "logbook" };
 
 // The four grains that HAVE a period dashboard. Daily has none — there is no
 // "Daily Overview" widget — so a `Daily/Daily.md` is a dashboard rather than an
@@ -171,6 +180,17 @@ function grainOf(plugin: AlmanacPlugin, file: TFile): TrackerClass {
 
 function diaryRoleOf(plugin: AlmanacPlugin, file: TFile): DiaryRole {
   const paths = plugin.settings.paths;
+  // FIRST, BEFORE THE GRAIN IS ASKED FOR, because the grain has no answer here
+  // and gives one anyway. A logbook is neither an entry nor a period; the
+  // folder it is in IS the fact.
+  //
+  // The folder note is a logbook page too — it is the page about all of them —
+  // and it takes the same eyebrow rather than a fifth role: what a reader needs
+  // told there is that they are looking at logbooks, which the title beneath it
+  // then narrows to which.
+  if (paths.logbooks && file.path.startsWith(folderPrefix(paths.logbooks))) {
+    return { role: "logbook" };
+  }
   const grain = grainOf(plugin, file);
   const unit = OVERVIEW_UNIT[grain];
   if (file.path === folderNotePath(paths[CLASS_DEFS[grain].folderKey])) {
@@ -322,6 +342,7 @@ function eyebrowFor(
     // one of them was already there."* The head is where it belongs.
     if (role.role === "overview") return `Diary · ${OVERVIEW_LABELS[role.unit]}`;
     if (role.role === "dashboard") return "Diary";
+    if (role.role === "logbook") return `Diary · ${LOGBOOK_TITLE}`;
     return `${CLASS_DEFS[grainOf(plugin, file)].label} entry`;
   }
   if (surface === "journal") {

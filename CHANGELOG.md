@@ -7,6 +7,479 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.59.0] - 2026-08-22
+
+**The period summary is a section, and now wears one — or drops the bar and joins a row.**
+
+### Added
+
+- **The period summary has a collapsible header bar.** Every other section on a
+  Weekly, Monthly, Quarterly or Yearly overview is a titled bar you can fold —
+  Open tasks, What the days said, Tags, Trends — and the one section you cannot
+  remove was the one you could not fold either. It now opens with **📅 This
+  week** / **month** / **quarter** / **year**, drawn as the summary card's top
+  band rather than as a second border inside it, with the chevron in the corner
+  and its folded state remembered per note like every other section's.
+- **A toggle that turns the section into a widget.** *Edit sections* → the
+  summary's row now carries **"As a widget, so it can sit in a row"**. Tick it
+  and the bar comes off; the summary is then an ordinary block, which is what
+  lets it be a column of a row group — a fence that titles itself cannot be one,
+  because the bar would end up below the group it was supposed to title. Untick
+  it and the bar comes back. One row in the picker, one directive in the note,
+  two ways of drawing it.
+- **The bar is yours to rename.** Click the title, as on any other section bar.
+  Turning the section off and on again keeps the name you gave it.
+
+### Fixed
+
+- **The summary is one card, not a card inside a card.** Giving the fence a bar
+  also makes it a *section surface* — which is itself a card — so the summary's
+  own card ended up inset inside it, with the bar bled to the inner one's edges.
+  The surface stands down for a block that already draws a card, so the summary
+  reads as one object again with the bar as its top band, exactly like every
+  other section on the page.
+- **Overviews written before this release can get the bar too.** The section is
+  already on the page, so ordinary repair has nothing to add. **Set up / repair
+  vault → Run format migrations** puts the bar on it, and shows you the diff
+  before it does — the same route that welds an older banner. It leaves alone any
+  summary already sitting in a row group, because that is the widget form on
+  purpose, and any bar you have renamed.
+
+## [4.58.1] - 2026-08-22
+
+**The time grid becomes a section of the week, with the header bar every section has.**
+
+### Fixed
+
+- **The time grid has its collapsible header bar.** Adding it to a page gave you
+  a grid under a plain title strip that would not fold, where every section on
+  the page above it folded — and the reason was that it had never been a section.
+  It was a page widget, and 4.58.0 offering widgets everywhere is what made the
+  difference visible on a dashboard. It is now a catalogue section on the two
+  pages where it belongs, with the ⏱️ **The week by the hour** bar you can
+  collapse like any other.
+
+### Added
+
+- **Time grid, on the weekly overview and the homepage.** It moves out of the
+  **Widgets** half of *Edit sections* and into **Sections** on those two pages,
+  which means one per page, offered until you have it and withheld once you do —
+  and movable and removable like everything else there.
+- **Still a widget everywhere else.** A monthly, quarterly or yearly overview
+  keeps it in the **Widgets** list, as many as you like. The grid draws the host
+  note's week and falls back to the current one, so a week page and the homepage
+  can honestly call it theirs — a March page would have shown you this week — but
+  a reader who wants one on a year page is not stopped from adding it.
+- **It is offered, never composed.** No existing homepage or weekly overview
+  grows a grid on upgrade, and repair neither adds one nor takes away one you
+  added.
+
+## [4.58.0] - 2026-08-22
+
+**Every page offers the same widgets, and only the banner is fixed in place.**
+
+### Added
+
+- **Period dashboards can hold page widgets.** Opening *Edit sections* on a
+  Weekly, Monthly, Quarterly or Yearly overview offered one thing to add; the
+  homepage, two clicks away, offered thirty. Nothing had decided that — the four
+  overviews got their own section model when dashboards and flat pages turned out
+  to compose different markdown, and the widget list arrived later on the other
+  side of that seam. The picker on an overview now has the same **Sections** and
+  **Widgets** halves the homepage has: events, a time grid, a search box, journal
+  cards, a logbook, an activity strip, and the rest.
+- **As many copies as you want, here too.** A widget stays in the list however
+  many the page already holds, each with its own dropdown and its own Remove —
+  the behaviour flat pages got in 4.56, now on all of them.
+- **A widget is offered only where nothing already draws it.** A weekly overview
+  is not offered a week summary or a tag index, because the page composes both
+  already; a yearly overview *is* offered an open-tasks table, because a year
+  deliberately ships without one and asking for it back is a reasonable thing to
+  want.
+
+### Changed
+
+- **The period summary can be moved.** It was the one row besides the banner that
+  could not be, and the reason had expired: 3.2 fused it into a masthead card
+  with the date navigator, and 4.19 dissolved that card and moved navigation into
+  the banner — leaving the summary alone in a band, and a section alone in a band
+  has nowhere to go. It is part of the page below now, so your charts, your
+  rollup and the overview itself can sit in whatever order you want them.
+- **The banner is the only fixed row on any page.** It stays first because that
+  is where a page's own name belongs; everything below it is yours to arrange.
+  Nothing became removable that was not removable before — a section the page
+  needs still says so, and now says "You can still move it" when that is true.
+
+## [4.57.1] - 2026-08-22
+
+**Fix: the last section on a page was swallowing the widgets added below it.**
+Reported on a homepage, where two logbooks added under *Trends and statistics*
+came back inside its card after a reload — and would have folded away with it.
+
+A `header:` bar has always owned the blocks that follow it, because a section
+used to be written as two fences: a title fence, then a body fence. Obsidian
+renders every block separately, so that was the only way a section could have a
+body at all. Every page Almanac composes now welds the two — the bar and its
+widgets are one fence — which makes "the blocks after it" not the section's body
+but whatever you put next. The page's last section therefore took everything
+added below it, and the homepage's last section is *Trends and statistics*.
+
+A fence that drew its own body now ends its section where the block ends. A bar
+alone in its fence still owns what follows, so every note written the older way
+folds and shades exactly as it did.
+
+## [4.57.0] - 2026-08-22
+
+**The page keeps scrolling while you are holding something.**
+
+### Added
+
+- **Carry a widget to the edge and the pane follows.** Dragging locked the page
+  where it stood, so the only landing places were the ones already on screen and
+  a note taller than its pane could not be rearranged past the fold at all. Now
+  the top and bottom of the pane are live: gently at the inside edge of the
+  band, quickly right at the edge, so the speed is controlled by the movement
+  you are already making. Every drag in the plugin gets it — widgets on the
+  page, rows in the section editor, journal cards, charts, the cells of a stats
+  band, an entry's attachments.
+- **And the wheel scrolls too, where your platform sends it.** A browser running
+  a drag keeps the wheel to itself; some engines pass it on and some do not,
+  which is why the edges are the mechanism rather than the fallback. Where the
+  wheel does arrive it moves the same pane.
+
+## [4.56.0] - 2026-08-22
+
+**A page can hold as many copies of a widget as you want.**
+
+### Changed
+
+- **Every widget can be added more than once.** It stays in the *Add a section…*
+  list however many copies the page already holds, so a homepage can carry the
+  work log beside Current focus beside what is scheduled — three logbooks, each
+  with its own dropdown, each removable on its own. Three widgets could do this
+  before and the other thirty could not, for no reason anyone had decided: the
+  limit was a field's default rather than a judgement about any particular
+  widget. Reported against the logbook, which is exactly where a page wanting
+  several was most obviously right.
+- **A section of the page's own still drops out of the list once the page has
+  it**, which is the other half of the same rule and is unchanged. The
+  difference is what the two do with what you type: a section keeps content in a
+  region named after it, and a second copy would claim the first one's region and
+  overwrite it on Save. A widget draws something and remembers nothing.
+
+### Fixed
+
+- **A second copy written by hand is a row in the editor, not an untouchable
+  block.** Two `events` fences used to be one section and one *block nobody
+  owns* — reported, unmovable and impossible to remove from the window, because
+  Almanac managed only the first fence holding a given widget. Each occurrence
+  has its own row now, and removing one leaves the other exactly as it was.
+
+## [4.55.0] - 2026-08-22
+
+**The week, laid against the hours — and a way to say when something happened.**
+
+Almanac has drawn three calendars and every one of them was a day grid: a cell
+per day, with what happened listed inside it. Two of its stores have carried an
+hour since 4.52 and nothing could show it. This is the view that can, and the
+controls that let a reader set the hour in the first place.
+
+### Added
+
+- **`time-grid` — seven day columns and an hour rail.** Timed events, logbook
+  items and tasks that are due, each drawn where it sits in the day. Write
+  `time-grid` for all three or `time-grid:events,tasks` for the ones you want; an
+  unknown source word is refused by name rather than quietly dropped. On a note
+  with `week-start` in its frontmatter it draws that week, so `period-nav:week`
+  already moves it; anywhere else it draws this one, starting on the day your
+  settings say a week starts on.
+  - **The hours it draws are the hours the week uses.** A day is 1,440 minutes
+    and nobody uses them all; drawn whole, a week is a wall of empty night with a
+    thin band of content in it. The rail covers the earliest start to the latest
+    end, padded to whole hours and never tighter than eight, and it grows
+    downward first so a 9am meeting stays near the top rather than sinking under
+    six hours of empty morning.
+  - **Two things at the same time sit side by side.** Everything whose times
+    touch is treated as one cluster and shares one width, so three meetings in a
+    row do not draw at three different widths — a width means *these clash*, and
+    it should mean that consistently.
+  - **A moment is drawn as a moment.** An item with no length is a fact about a
+    minute, and it gets a flat foot and a floor height instead of a block
+    pretending to a duration nobody recorded. Nothing invents a length for it.
+  - **An all-day lane above the rail** for tasks due with no hour on them.
+  - **Click a block to open what it came from** — the event editor, the logbook,
+    the note the task lives in.
+- **A length on a timed event.** The event editor shows a minutes field beside
+  the time, and only when there is a time: a length with no start is not a span.
+- **A length on a logbook item or a capture**, written as `[mins:: 45]` on the
+  stamp line.
+- **An hour on a task that is due.** Beside the date, and hidden until there is a
+  date to hang it on: an hour on no day is not a time.
+- **A colour per logbook,** chosen in Settings → Almanac → Logbooks from the same
+  eight the events use — because the grid draws both, and two palettes in one
+  view would be two designs in one view. Work, Current focus, Review and Meetings
+  ship with four different ones.
+
+### Changed
+
+- **A logbook's add box can say when.** The clock button beside it opens a day, an
+  hour and a length; the defaults are still *now* with no duration, so type,
+  Enter, done is unchanged. On a capture the same control offers the hour and the
+  length but never the day — a capture lives in a dated entry, and the day is the
+  note's.
+- **The timestamp on a logged item is a button now.** It was dead text, which
+  meant an item logged at 17:00 about something that happened at 14:00 said 17:00
+  forever. Click it to correct the day, the hour, or how long it took.
+
+## [4.54.0] - 2026-08-22
+
+**A widget can be dropped above the top one in a column.**
+
+The first of a run of patches on the drag gestures themselves, and both of these
+are geometry: what a slot covers, and where its bar is drawn.
+
+### Fixed
+
+- **The top of a card in a group means the top of that card again.** Reported
+  from a screenshot mid-drag: the pointer is on the head of the first widget in
+  the right-hand column and the whole group lights up as *above this block*, so
+  the one place a widget could not be put was above the widget at the top. Two
+  things had to be true at once for it, and both were.
+  - **The band was four fingertips deep.** *Above this block* and *below it* are
+    bands along a group's top and bottom edges, and they grew from a flat 16px
+    to a quarter of the block — up to 72px — so a hand could find them. A
+    quarter of a tall group is the whole head of every column in it, and the
+    five places a card offers are inside that.
+  - **And nothing inside a column could reach through it.** A column is a query
+    container, which makes it a stacking context, so no number written on a
+    card's own slot can rise above a number written on the group's. The band did
+    not win the argument; there was never an argument to have.
+  - **So the columns are lifted over the bands instead of the other way round.**
+    While something is in the air a column outranks the group's own bands, and a
+    band keeps exactly what no column covers. The five places on a card work
+    everywhere a card is, including the first and last in a column.
+  - **And a band is paid back from outside the block rather than from the
+    columns.** It now reaches 16px past the block's edge, into the margin
+    between it and its neighbour — which is the space between two groups, where
+    *out of this group* is what a reader means. Two neighbouring blocks tile
+    that space between them, and the bar still draws on the block's own edge.
+  - **The gap between two stacked cards is no longer dead.** It used to be
+    covered by whichever band reached it. It belongs to the card above it now:
+    *below this one* and *above the next* are the same place, and reaching down
+    rather than up keeps the top of a column clear for the band above it.
+- **The new-column bar is drawn on the seam it names.** A widget dragged to the
+  left or right edge of a card opens a column there, and the bar marking it was
+  drawn 14px too far out — clear of the gutter and onto the neighbouring card.
+  The two edges naming one boundary put their bars 20px apart, one on each side,
+  neither on the line between them. The bar was placed correctly against the
+  card and then the hit area around it was widened without the bar being told;
+  it is written as the sum of the two now, so they cannot come apart again.
+
+## [4.53.2] - 2026-08-21
+
+**A section can be put into a group it is not next to.**
+
+### Added
+
+- **Make a group is a link icon, under the row's arrows.** The opposite of
+  **Take out of the group**, in the slot **Take out of the group** moved to one
+  patch ago — and it is one slot, not two, because a row is in a group or it is
+  not and exactly one of the two icons is ever drawn on it. Up, down, in and out
+  are four answers to *where does this row sit*; the actions line keeps the
+  controls that answer something else.
+- **It reaches any group on the page, not only the block above it.** That was
+  the real limit and it was easy to miss, because the control looked complete:
+  a widget three rows under the group it belonged beside had no way in except
+  pressing an arrow at it until the two were touching — walking it past
+  everything in between, one press at a time. It can now name the group and go.
+  - **You are asked which, when there is more than one.** With a single
+    destination it just does it: the page has already answered, and a dialog
+    there is a keystroke charged for nothing. So the ordinary case — a page with
+    one group, or none — is the one press it always was.
+  - **It arrives at the near edge.** Joining from above makes it the group's
+    first column and joining from below its last, which is **Take out of the
+    group** read backwards: take a member out to look at it, put it back, and
+    the group is as you left it rather than reordered behind you.
+  - **A lone section is still not offered another lone section further off.**
+    Those two are not a group yet, so joining them is not *put this in that* —
+    move one under the other and the block-above rule has it. Offering it would
+    have made a page of eight ungrouped widgets ask a question with seven
+    answers before it could make its first group.
+
+### Fixed
+
+- **A section at the very top of a page can be put in a group.** There is no
+  block above it, so the old control was not drawn there at all, whatever sat
+  underneath. This is the row the homepage's diary card becomes the moment it is
+  taken out of the top row, so 4.53.1 and this patch met on it.
+
+## [4.53.1] - 2026-08-21
+
+**The homepage's diary card is yours to remove, and the split control moved
+under the arrows.**
+
+Both reported from the same screenshot of 4.53.0's rebuilt editor.
+
+### Changed
+
+- **The homepage's diary card can be unticked.** It was a required section from
+  4.2 until now, and the row said so: a *can't be removed* pill, a subtitle
+  where its blurb should be, and no Remove toggle. The lock was argued on the
+  homepage having no `links:` row of its own — the card's destination pills ARE
+  that page's time navigation — which is true of the page and was never true of
+  the vault. The ribbon, the command palette and the diary dashboard are all
+  still doors into the diary, so the lock was not holding the only one open; it
+  was refusing a reader a homepage of journals and charts for nothing. The card
+  is still what a fresh homepage composes with, and it now moves, groups and
+  goes like every other row.
+  - **The diary dashboard's own copy stays locked.** *A page about the diary
+    with no way into the diary* is the stronger claim, and it is the one that
+    survives. So is the banner, on every surface, for its own reason.
+- **Take out of the group is an icon under that row's arrows.** Up, down and out
+  are three answers to *where does this row sit*; the actions line answers *what
+  is this row for* — a dropdown, a field, Remove. Sorting the controls by the
+  question they answer also keeps every mover away from the remove toggle, which
+  is what the arrows' column was for in the first place, and stops the longest
+  label in the window from setting the wrap of every actions line carrying it.
+  The refusal it shows on a member whose lines cannot be told apart from its
+  neighbours' is now on hover, and the button is named for a screen reader
+  rather than being an unlabelled glyph.
+
+## [4.53.0] - 2026-08-21
+
+**The group controls in the section editor, rebuilt.**
+
+Reported from a vault: *"the group editing controls in the section editor is a
+buggy mess"*, with one case named — a section below a group, moved upward.
+
+One sentence explains nearly all of it. The editor held its arrangement as a flat
+list of rows plus one bit each — *this row is with the one above it* — and every
+control moved a row by **swapping it with its neighbour in that flat list**. A
+group is a RUN of rows, a swap is blind to where a run ends, and the bit that
+opens a group is the *absence* of a bit. So the neighbour of the row below a
+group is that group's last column, and trading places with it left the group's
+members no longer next to each other with a bit now pointing at the arrival: one
+press, and the group you had was gone and one you had never asked for was in its
+place.
+
+### Fixed
+
+- **A section below a group moves over it, not into it.** The list has two levels
+  now and the arrows follow them: a section on its own is a block and moves past
+  the block above or below it, whole group or single row; a section inside a
+  group moves among that group's columns and cannot leave through an arrow. Each
+  arrow says which it is about to do before you press it.
+- **A group can be moved.** The card carries its own up and down arrows and is
+  the handle for dragging the whole group somewhere else. There was no way to
+  move one before: you pressed an arrow on each member in turn and watched it
+  come apart doing it.
+- **Moving a group's first column no longer swallows what is above it.** Same
+  cause, other end — that row's membership was recorded as the absence of a bit,
+  and absence does not travel with a swap.
+- **Take out of the group** no longer takes the columns after it as well. It used
+  to cut the group in two at that row rather than removing the row from it, so
+  taking the middle one of three out left a group of the two you did not name.
+  The section now leaves through the nearest edge — below the group, or above it
+  where it is the one the group starts with — and the rest of the group closes up.
+- **Break up the group** takes the group's page divisions with it. Leaving them
+  behind meant rebuilding the group brought back boundaries you had asked for
+  once, a while ago, on a different arrangement.
+- **A section you have just added can be grouped.** Whether a section may be a
+  column was read once, from the file as it was opened, so a widget staged in the
+  same session had no answer — **Make a group** came up disabled wearing a
+  sentence about title bars that was not true of it and was not why. It is now
+  asked of the file the Save would write.
+- **Add to group names the block above, not the row above.** Where the row above
+  is the last column of a group, a join is into the whole group; where it is
+  being removed, it is not there at Save. Both used to read the screen and mean
+  something else.
+- **A drag can no longer land in the middle of a group.** Dragging is scoped the
+  way the arrows are: a column may be dropped only on another column of its own
+  group, and a section dropped anywhere on a card lands beside the group.
+- **A struck-through row stops pretending to be in a group.** It is not in the
+  file the Save writes, so it is not in the blocks it writes: a card whose kept
+  members come down to one is no longer drawn as a group, and a removed member no
+  longer disables **Break up the group** or divides the card into pages.
+- **Every refusal says why.** **Make a group** was simply absent where the
+  destination could not hold a column, and where the section was still waiting on
+  its own question. Both now draw the button disabled with the reason, which is
+  what the rule about a section's own title bar has done since 4.12.
+
+### Internal
+
+- **`src/core/row-order.ts`** owns the arrangement — the two bits, the blocks they
+  cut, and every operation over them. `keptBlocks` moved there from
+  `section-model.ts` beside its new sibling `keptPages`, which keeps a group's
+  page boundaries where they are when two of its columns trade places. The window
+  is now a drawing of it: nothing there reorders a list or writes a bit.
+
+## [4.52.1] - 2026-08-21
+
+**A group holds two columns.**
+
+Reported from a vault: *"the groups can be easily broken and don't reflect what
+is shown in the editor."* Four widgets in one `row` fence. Three fitted across
+the note and the fourth wrapped onto a line of its own, where it stretched to the
+full width of the group — so a column stopped reading as a column, and the file,
+the section editor and the page all said something different. The row had been
+able to ask for more columns than a pane can hold since 4.2; a three-column row
+does the same thing in a half-width pane.
+
+### Fixed
+
+- **A row draws at most two columns.** A column asks for 320px, so two plus the
+  gap need 650px and three need 980px — which a sidebar, a split pane and a good
+  many windows have not got. Past that, whatever the wrap did, the shape of a
+  group depended on how wide the reader's sidebar happened to be.
+- **A fence that asks for more is dealt, not truncated.** Nothing is dropped and
+  nothing is hidden: the third widget goes under the first and the fourth under
+  the second, so four are a 2×2 read across and then down. Notes written before
+  this release draw two columns straight away, and the next time the section
+  editor saves one the file says what the page has been drawing.
+- **Nothing offers you a third column any more.** The left and right edges of a
+  card in a full group are no longer landing places — its top, bottom and middle
+  are how a widget joins one — and **Add to group** stacks the arrival at the
+  foot of whichever column is holding fewer.
+- **A page added and removed leaves the group it found.** Starting a page inside
+  a group and then joining it back used to leave a column boundary behind where
+  there had never been one, because taking a page away turns its line back into
+  a `cell`. That is right where the page began at a widget with a column of its
+  own, and wrong where it began at one stacked under another — the homepage came
+  back with three columns after two clicks that should have cancelled out.
+
+## [4.52.0] - 2026-08-21
+
+**Logbooks — the diary's undated layer.**
+
+The diary has had two layers and both are dated: an entry says what a day was
+like, an event says what a day *is*. Everything else you keep — what you worked
+on, what you are focused on now, links to come back to, the meetings ahead — had
+nowhere to go, because it belongs to the diary and to no single day.
+
+- **A logbook is a standing note.** Four ship — **Work log**, **Current focus**,
+  **Review links** and **Meetings** — each a note under `02 - Diary/Logbooks/`,
+  listed together on that folder's own note, and written by *Set up / repair
+  vault* alongside everything else it writes.
+- **Add your own** in Settings → Almanac → **Logbooks**. Removing one there
+  leaves its note where it is: the list says which logbooks Almanac draws, not
+  which files you keep.
+- **`logbook:<id>` draws one anywhere.** It shows the logbook's own note rather
+  than the note it sits on, so `logbook:work` on the homepage shows — and takes
+  — items in `Work log.md`. Type into the box to add one, tick to cross it off,
+  edit or delete on the card.
+- **Items are stamped with the day and the minute.** A capture is the same kind
+  of item stamped only with the minute, because its note already knows which day
+  it is; both are one grammar now, so nothing about an existing capture region
+  changed.
+- **A meeting is an event with a time on it.** Events gained an optional hour,
+  which is what the Meetings logbook lists — so a meeting added there lands on
+  the month grid and in *coming up* as well, instead of living in a second
+  calendar that the first one knows nothing about. Two events on one day now
+  order by the hour rather than alphabetically.
+- **The head knows what a logbook is.** A work log used to read *DAILY ENTRY*
+  over its filename, because a note under the diary root that is in no grain
+  folder was assumed to be a day.
+
 ## [4.51.9] - 2026-08-21
 
 - **The destination tiles are outlined again.** 4.51.8 read *"punchout cards"* as

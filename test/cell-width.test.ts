@@ -154,7 +154,16 @@ describe("where the pointer snaps to", () => {
     // this wrong and a resize refuses every row nobody divided by hand, because
     // the column count would never match the cells on screen.
     expect(cellWidthsOf(["row", "diary:3", "tasks-table"])).toEqual([1, 1]);
-    expect(cellWidthsOf(["row", "header:Hi", "a", "b", "c"])).toEqual([1, 1, 1]);
+  });
+
+  it("stops at the cap, because that is what the row draws (4.52.1)", () => {
+    // THE SAME AGREEMENT, ON A FENCE THAT ASKS FOR TOO MANY. This read three
+    // columns until 4.52.1 and the row now draws two — so the count `capColumns`
+    // arrives at on the render and the count this arrives at in the file are the
+    // one number `setCellWidths` compares against. Left at three, every divider
+    // on a legacy fence would refuse to drag: the gesture bails when the weights
+    // and the cells on screen no longer describe the same row.
+    expect(cellWidthsOf(["row", "header:Hi", "a", "b", "c"])).toEqual([1, 1]);
   });
 });
 

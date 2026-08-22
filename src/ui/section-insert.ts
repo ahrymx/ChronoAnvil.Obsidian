@@ -23,6 +23,12 @@ import { openSectionEditor } from "./section-editor";
 import { journalSectionModel } from "../journals/journal-plan";
 import type { SectionModel, SectionWant } from "../core/section-model";
 import type { VaultLists } from "../core/widget-registry";
+import { logbookChoices } from "../diary/logbooks";
+import {
+  logbookSectionModel,
+  logbooksFolderSectionModel,
+} from "../diary/logbook-sections";
+import type { LogbookDef } from "../core/constants";
 import type {
   DiaryDashboardContext,
   DiarySection,
@@ -220,6 +226,18 @@ export type ResolvedSurface =
   // window's noun, and two of its sections name the journal in their directives.
   // So the shape here is `dashboard`'s, not `search`'s.
   | { kind: "journal-dashboard"; ctx: { type: JournalType } }
+  // ONE LOGBOOK'S NOTE, AND THE NOTE ABOUT ALL OF THEM (4.52). The same pair of
+  // shapes the journals half of the vault already has, one level down: N notes
+  // whose catalogue is a function of which one, and one index page whose
+  // catalogue is a function of the whole list.
+  //
+  // THE INDEX CARRIES THE LIST RATHER THAN NOTHING, which is where it differs
+  // from `journals-dashboard` above. That page draws its journals through the
+  // `journals` widget, which asks the plugin at render time; this one composes
+  // one `logbook:` line per registered logbook, so the catalogue has to know
+  // which ones exist.
+  | { kind: "logbook"; ctx: { def: LogbookDef } }
+  | { kind: "logbooks"; ctx: { books: readonly LogbookDef[] } }
   | { kind: "managed" };
 
 // The surface, as the one interface sees it — and what to call it to a reader.
@@ -263,7 +281,10 @@ export function modelForSurface(
   }
   if (surface.kind === "dashboard") {
     return {
-      model: diarySectionModel({ ...surface.ctx, hostFolder }),
+      // THE VAULT LISTS REACH THIS BRANCH AS OF 4.58.0. They were threaded to
+      // the four flat surfaces in 4.15 and dropped here, because a period
+      // dashboard had no widget to ask a question of. It has thirty now.
+      model: diarySectionModel({ ...surface.ctx, hostFolder, vault }),
       noun: `${CLASS_DEFS[surface.ctx.grain].periodNoun} dashboard`,
     };
   }
@@ -275,6 +296,18 @@ export function modelForSurface(
   }
   if (surface.kind === "search") {
     return { model: searchSectionModel(vault), noun: "Search note" };
+  }
+  if (surface.kind === "logbook") {
+    return {
+      model: logbookSectionModel(surface.ctx.def, vault),
+      noun: `${surface.ctx.def.name} logbook`,
+    };
+  }
+  if (surface.kind === "logbooks") {
+    return {
+      model: logbooksFolderSectionModel(surface.ctx.books, vault),
+      noun: "Logbooks note",
+    };
   }
   if (surface.kind === "diary-dashboard") {
     return {
@@ -334,6 +367,7 @@ export class SectionInserter {
         value: t.id,
         label: `${t.emoji} ${t.name}`.trim(),
       })),
+      logbooks: logbookChoices(this.plugin.settings.logbooks),
     };
   }
 
@@ -540,6 +574,27 @@ export class SectionInserter {
       return { kind: "home", diaryRoot: this.plugin.settings.paths.diaryRoot };
     }
     if (notePath === this.plugin.settings.paths.search) return { kind: "search" };
+
+    // THE LOGBOOKS (4.52), BY THE PATH ON THE DEF — the one identity in this
+    // resolver that is neither a settings key nor derived from a folder.
+    // `LogbookDef.path` is stored so that retitling a logbook does not orphan a
+    // note full of items, and the consequence shows up here: the note is found
+    // by the string the registry holds rather than by anything about the file.
+    //
+    // BEFORE THE DIARY RESOLVERS BELOW, and it matters. A logbook lives under
+    // the diary root, so `entryContextFor` is the next thing that would be asked
+    // about it — and `page-head.ts` records what that costs: a note in no grain
+    // folder falls back to `daily`, which is a confident wrong answer rather
+    // than a missing one. Here it would offer the DAILY ENTRY catalogue on a
+    // work log.
+    const books = this.plugin.settings.logbooks;
+    const book = books.find((b) => b.path === notePath);
+    if (book) return { kind: "logbook", ctx: { def: book } };
+    // And the page about all of them — derived from the folder, like the two
+    // dashboards below, so it moves with a rename and needs no path key.
+    if (books.length > 0 && notePath === folderNotePath(this.plugin.settings.paths.logbooks)) {
+      return { kind: "logbooks", ctx: { books } };
+    }
 
     // THE TWO FOLDER-NOTE DASHBOARDS (4.1 §2), beside the other two notes
     // identified by path rather than by classification.
@@ -943,6 +998,14 @@ export class SectionInserter {
       // re-runnable half"), and a title is the change least worth spending it
       // on, being the one that costs nothing to make later.
       if (q.kind === "title") continue;
+      // A form is skipped at ADD time on the title's argument exactly (4.59.0),
+      // and one step stronger. The section is about to be written in the form
+      // the catalogue composes — with its bar — which is the answer an
+      // unanswered form means; and the reason to change it is a LAYOUT the
+      // reader has not built yet, since a widget form exists to join a group and
+      // there is nothing to join it to at the moment it is added. The toggle is
+      // in the editor, beside the arrows that would move it there.
+      if (q.kind === "form") continue;
       if (!q.values.length) {
         new Notice(`Almanac: ${q.empty}`);
         return;

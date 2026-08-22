@@ -30,7 +30,11 @@
 import { describe, expect, it } from "vitest";
 
 import { composeHomeNote, homeSectionModel } from "../src/diary/home-sections";
-import { cellMoveOps, keptBlocks, pageBreakOps } from "../src/core/section-model";
+import { cellMoveOps, pageBreakOps } from "../src/core/section-model";
+// `keptBlocks` MOVED TO `core/row-order.ts` IN 4.53.0, beside the operations
+// that call it and beside `keptPages`, which is the same rule about the other
+// bit. The behaviour asserted below is unchanged; only its address is.
+import { keptBlocks } from "../src/core/row-order";
 import { DEFAULT_PATHS } from "../src/core/constants";
 import { readSrc } from "./sources";
 
@@ -273,26 +277,37 @@ describe("starting a page inside a group", () => {
     expect(pageBreakOps(before, after, (id) => id)).toEqual([]);
   });
 
-  it("takes the page back out as a column, which is 4.34.2's rule", () => {
-    // *"The column stays either way: removing a page boundary puts the two
-    // sections back beside each other rather than stacking them, because a page
-    // break is a column break that was promoted."* So the boundary becomes
-    // `cell` and does not vanish — asserted here because this is the first
-    // release in which a reader can actually reach it: until now the button
-    // wrote a bit the footer would not let them save.
+  it("takes the page back out, leaving the group it found (4.52.1)", () => {
+    // 4.34.2's RULE, WITH THE ONE CASE IT COULD NOT SEE. *"The column stays
+    // either way: removing a page boundary puts the two sections back beside
+    // each other rather than stacking them, because a page break is a column
+    // break that was promoted."* True whenever there WAS one to promote — and
+    // the boundary above `tasks-table` was not: the homepage stacks those three
+    // in one column, so the `tab` was inserted rather than promoted.
+    //
+    // THIS ASSERTED THE DEMOTION UNTIL 4.52.1 and the demotion was inventing a
+    // column. The fence came back with three where the reader had two, and with
+    // the cap in place those three are then dealt into two that are not the two
+    // they started with — a page added and removed rearranging the homepage.
+    //
+    // SO THE STRONGEST FORM OF IT IS THE ONE TO ASSERT: byte-for-byte the note
+    // that was composed. A boundary a reader can add and remove has to leave
+    // nothing behind, and anything weaker than this would pass while a
+    // delimiter, an indent or a blank line survived the round trip.
     const paged = blocked(["tasks"]) as string;
     const back = model.regroup?.(paged, blocks(GROUP), []) as string;
+    expect(back).toBe(home());
     expect(fenceOf(back)).toEqual([
       "row",
       "diary:3",
       "cell",
       "launcher",
-      "cell",
       "tasks-table",
       "on-this-day:always",
     ]);
     expect(model.blocks?.(back)?.[1].pages).toEqual([]);
   });
+
 });
 
 describe("the one bit a reorder could not survive", () => {
@@ -355,7 +370,29 @@ describe("the window asks both of them", () => {
   it("restores the boundaries after an arrow and after a drop", () => {
     // Two reorder paths, one rule. A fix in one of them is a window where the
     // arrows are safe and the drag is not.
-    expect(src.split("keptBlocks(before, this.rows, this.joined)")).toHaveLength(3);
+    //
+    // ASSERTED OF THE MODULE THAT OWNS THE RULE, AS OF 4.53.0. The window used
+    // to carry two hand-written reorders with a `keptBlocks` call bolted to the
+    // end of each, which is exactly the shape that lets a third one be written
+    // without it — and the third one was the group card's, which had no reorder
+    // at all. Every move now goes through `settle`, so there is one place the
+    // boundaries can be restored and no way to add a mover that skips it.
+    const order = readSrc("row-order");
+    expect(order).toContain("keptBlocks(before, rows, arr.joined)");
+    expect(order).toContain("keptPages(before, rows, arr.paged)");
+    expect(src).not.toContain("keptBlocks(");
+    for (const mover of [
+      "moveCell(",
+      "moveBlock(",
+      "dropCell(",
+      "dropBlock(",
+    ]) {
+      const at = order.indexOf(`export function ${mover}`);
+      expect(at, mover).toBeGreaterThan(-1);
+      expect(order.slice(at, order.indexOf("\n}", at)), mover).toContain(
+        "return settle("
+      );
+    }
   });
 
   it("counts what the dry run found, because Save is disabled at zero", () => {

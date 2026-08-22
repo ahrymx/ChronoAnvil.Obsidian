@@ -40,6 +40,7 @@ import {
 import type { MomentLike } from "../core/util";
 import type AlmanacPlugin from "../main";
 import { getTracker } from "../trackers/trackers";
+import { panDuringDrag } from "../ui/drag-scroll";
 import { renderTrackerChart } from "./chart-render";
 import type { ChartTeardown } from "./chart-render";
 import { RANGE_LABELS, RANGE_SHORT_LABELS } from "./chart-ui";
@@ -134,14 +135,23 @@ function attachChartDrag(
 ): void {
   cell.draggable = true;
   cell.dataset.chartKey = key;
+  // The pane goes on scrolling while a chart is in the air (4.57), which a grid
+  // of six on a period dashboard needs more than most: the chart being aimed at
+  // is usually the one off the bottom of the pane. See `drag-scroll.ts`.
+  let stopPan: (() => void) | null = null;
   cell.addEventListener("dragstart", (e) => {
     const payload = encodeChartDrag(notePath, key);
     e.dataTransfer?.setData(CHART_DRAG_TYPE, payload);
     e.dataTransfer?.setData("text/plain", payload);
     if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
     cell.addClass("is-dragging");
+    stopPan = panDuringDrag(cell);
   });
-  cell.addEventListener("dragend", () => cell.removeClass("is-dragging"));
+  cell.addEventListener("dragend", () => {
+    stopPan?.();
+    stopPan = null;
+    cell.removeClass("is-dragging");
+  });
   cell.addEventListener("dragover", (e) => {
     if (!e.dataTransfer?.types.includes(CHART_DRAG_TYPE)) return;
     if (cell.hasClass("is-dragging")) return;

@@ -205,9 +205,16 @@ describe("a section cannot be dragged across the rule", () => {
     // Both gestures consult it. A rule enforced in one of two paths is a rule
     // with a way round it.
     expect(body).toContain("this.bandOf(section.id)");
-    // Twice: dragover, which decides whether the row is a drop target at all,
-    // and drop, which re-checks rather than trusting that dragover ran.
+    // Twice: the drag source and the drop target each refuse a row that is not
+    // in its own band before the gesture begins.
     expect(body.match(/this\.bandOf\(id\)\.includes\(/g) ?? []).toHaveLength(2);
+    // AND THE LANDING IS CHECKED AGAINST THE DRAG (4.53.0). `accepts` asks
+    // whether what was picked up may go where it is being let go, and both
+    // `dragover` and `drop` ask it — the second because a drop that trusted the
+    // first would be a rule with one path round it.
+    expect(body).toContain("private accepts(onto: string, scope: MoveUnit)");
+    expect(body).toContain("this.bandOf(onto).includes(drag.id)");
+    expect(body.match(/this\.accepts\(id, scope\)/g) ?? []).toHaveLength(2);
   });
 
   it("and an entry really does report three bands", () => {
@@ -225,25 +232,23 @@ describe("a section cannot be dragged across the rule", () => {
     expect(bands.get("The trackers")).toEqual(["trackers"]);
   });
 
-  it("and a dashboard reports three, one row each in the top two", () => {
+  it("and a dashboard reports two, one row in the top one", () => {
     // It reported one until 3.2 §3 fused navigation and the period summary into
-    // a masthead, which is a structural half in the same sense an entry's is: a
-    // section cannot leave it without unmerging the card, and a body block
-    // cannot enter it without landing above navigation.
-    //
-    // 4.10 added the page head above both, and the editor needed no change to
-    // show it — which is this describe block's whole claim, demonstrated twice
-    // now rather than once.
+    // a masthead; 4.10 added the page head above both, and the editor needed no
+    // change to show either — which is this describe block's whole claim,
+    // demonstrated twice rather than once.
     const bands = new Map<string | null, string[]>();
     for (const s of dashboard().model.sections()) {
       bands.set(s.group, [...(bands.get(s.group) ?? []), s.id]);
     }
-    // 4.19 RENAMED THE TOP TWO AND LEFT THE COUNT ALONE. Each holds one section
-    // now — the banner, and the summary the navigation row left behind — and
-    // they stay two bands so the two cannot trade places.
-    expect(bands.size).toBe(3);
+    // AND THREE BECAME TWO IN 4.58.0, WHICH THE EDITOR ALSO NEEDED NO CHANGE
+    // FOR. "The overview" held one section and existed only to keep it out of
+    // the body, which is the restriction that release removes. The banner keeps
+    // its band, alone, because that is what stops a section landing above the
+    // page's own name.
+    expect(bands.size).toBe(2);
     expect(bands.get("The banner")).toEqual(["banner"]);
-    expect(bands.get("The overview")).toEqual(["summary"]);
+    expect(bands.get("The page below")).toContain("summary");
   });
 
   it("while a journal note still reports one, so nothing changes there", () => {
@@ -426,10 +431,21 @@ describe("what a fixed row offers", () => {
     // committed to anything. Letting them lift a row that cannot land, and
     // failing on release, is the same class of lie as a refusal that offers a
     // move — so the guard sits before the flag rather than after it.
+    //
+    // ASKED AS "IS IT IN ITS OWN BAND" SINCE 4.53.0, which is one question
+    // covering both rows that are not: the immovable one, whose band is empty,
+    // and the one being removed, which its band no longer contains. The
+    // `movable` test it replaces answered only the first, so a struck-through
+    // row could still be lifted and could never land.
     const body = editor();
-    const guard = body.indexOf('if (this.view(id)?.movable === false) return;');
+    const guard = body.indexOf("if (!this.bandOf(id).includes(id)) return;");
     expect(guard).toBeGreaterThan(0);
-    expect(guard).toBeLessThan(body.indexOf("row.draggable = true"));
+    expect(guard).toBeLessThan(body.indexOf("el.draggable = true"));
+    // And the drop side asks it too, rather than trusting the source guard: a
+    // rule enforced in one of two paths is a rule with a way round it.
+    expect(
+      body.match(/if \(!this\.bandOf\(id\)\.includes\(id\)\) return;/g) ?? []
+    ).toHaveLength(2);
   });
 
   it("is not in any band, which is what makes it inert three ways", () => {
@@ -478,13 +494,14 @@ describe("what a fixed row offers", () => {
     expect(
       journal().model.sections().every((s) => s.movable)
     ).toBe(true);
-    // On a dashboard the top two rows are both fixed — the banner by decision,
-    // `summary` by being the only unpinned member left in its band — and the
-    // body's are not.
+    // On a dashboard exactly ONE row is fixed as of 4.58.0, and it is the banner,
+    // by decision. `summary` was the other until its band went — it was never
+    // pinned, only stranded — and the body's rows never were.
     const d = dashboard().model.sections();
     expect(d.find((s) => s.id === "banner")!.movable).toBe(false);
-    expect(d.find((s) => s.id === "summary")!.movable).toBe(false);
+    expect(d.find((s) => s.id === "summary")!.movable).toBe(true);
     expect(d.find((s) => s.id === "charts")!.movable).toBe(true);
+    expect(d.filter((s) => !s.movable).map((s) => s.id)).toEqual(["banner"]);
   });
 });
 

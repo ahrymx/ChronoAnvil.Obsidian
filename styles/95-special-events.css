@@ -637,6 +637,28 @@
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   letter-spacing: var(--am-caps-tracking);
+  /* A BUTTON THAT LOOKS LIKE THE TEXT IT REPLACED (4.55). The stamp became a
+     control so an item logged late can be corrected, and a stamp that suddenly
+     looked like a button would put chrome on every card in a list you mostly
+     read. It gains an underline on hover and a real focus ring, which is enough
+     to find and not enough to shout. */
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.journal-capture-time:hover {
+  color: var(--text-normal);
+  text-decoration: underline dotted;
+}
+/* How long it took, beside when it happened. Faint, because the stamp is the
+   fact and the duration is a detail of it. */
+.journal-capture-mins {
+  font-size: var(--am-text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
 }
 /* A hand-typed capture has no stamp. The slot is kept so the bodies below
    still align down the column. */
@@ -715,6 +737,94 @@
   font-size: var(--am-text-sm);
   line-height: 1.45;
   resize: vertical;
+}
+
+/* ── The add box, and the logbook (4.52) ────────────────────────────────
+   The same card list draws a capture log and a LOGBOOK — a standing note for
+   what belongs to the diary and to no single day. The differences are four
+   options rather than a second stylesheet, and only two of them are visible:
+   the logbook has a box to type into (a capture arrives from the capture box,
+   so that list has none), and its stamps carry a date as well as a minute.
+
+   THE STAMP COLUMN IS NOT WIDENED FOR THE DATE, deliberately. `.journal-capture
+   -time` is `tabular-nums` and shrink-wrapped, so `2026-08-21 14:32` takes the
+   room it needs and a capture's bare `14:32` keeps taking less. Fixing a width
+   wide enough for the longer form would indent every capture in the vault to
+   make space for a date it does not have. */
+.journal-capture-add {
+  margin-top: var(--am-space-2);
+}
+/* The add box and the control that opens the *when* row, on one line. */
+.journal-capture-add-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--am-space-1);
+}
+.journal-capture-when-btn {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: var(--am-space-1);
+  cursor: pointer;
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+}
+.journal-capture-when-btn:hover,
+.journal-capture-when-btn.is-active {
+  color: var(--text-accent);
+}
+.journal-capture-when-btn svg {
+  width: 15px;
+  height: 15px;
+}
+/* WHEN IT HAPPENED, AS THREE FIELDS. Shared by the add row and by the stamp on
+   a card, which is why the rule is not scoped to either: one control, one look,
+   in the two places most likely to drift apart. */
+.journal-capture-when {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-1);
+  margin-top: var(--am-space-1);
+}
+.journal-capture-when input {
+  font-size: var(--am-text-2xs);
+  padding: 2px var(--am-space-1);
+  min-width: 0;
+}
+.journal-capture-when-mins {
+  /* Wide enough for three digits and no wider: a minutes box the size of a date
+     field reads as somewhere to write a sentence. */
+  width: 5.5em;
+}
+.journal-capture-add-input {
+  width: 100%;
+  min-height: 2.2em;
+  padding: var(--am-space-1) var(--am-space-2);
+  font-size: var(--am-text-sm);
+  line-height: 1.45;
+  resize: vertical;
+}
+
+/* The logbook's own wrapper. No card and no ground: the widget sits inside a
+   `header:` bar's section on every page that composes it, and a second surface
+   inside that one is the doubling `frame:` exists to prevent. */
+.journal-logbook {
+  display: block;
+}
+.journal-logbook-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--am-space-2);
+}
+/* Meetings: the agenda rows are the events list's own, so they are not
+   restyled here — only made clickable, which they are not on a dashboard. */
+.journal-logbook--agenda .am-ev-row {
+  cursor: pointer;
+}
+.journal-logbook--agenda .am-ev-row:hover {
+  background: var(--background-modifier-hover);
 }
 
 /* ── Year view ─────────────────────────────────────────────────────────
@@ -1274,6 +1384,45 @@
   width: 100%;
   min-width: 0;
 }
+/* ── THE SECTION/WIDGET TOGGLE (4.59.0) ────────────────────────────────
+ *
+ * A CHECKBOX WHERE THE THREE ABOVE ARE BOXES TO FILL IN, and the shape follows
+ * the question: those pick a value out of a list the vault supplies, this has
+ * two answers and one of them is what every catalogue composes. So it is a
+ * thing that is on or off, and the label reads as what ticking it DOES rather
+ * than naming both sides.
+ *
+ * A ROW INSIDE A COLUMN. `.almanac-tpl-field` stacks a label over its control,
+ * which is right for a box whose name is a noun; a checkbox's name is a sentence
+ * and belongs beside it, so this puts the two back on one line under the field's
+ * own label. `flex-start` rather than `center` because the sentence may wrap on
+ * a narrow pane and a box centred against two lines floats.
+ *
+ * IT MAY WRAP, AND THAT IS WHY THE FIELD'S `max-width` IS LIFTED HERE. The other
+ * controls are capped at 20em so a row of them shares the line; this one's text
+ * is the explanation, and truncating it would leave a tick box beside "As a
+ * widget, so it can" — a sentence that stops before the reason. */
+.almanac-tpl-form {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.almanac-tpl-field:has(> .almanac-tpl-form) {
+  max-width: none;
+  flex: 1 1 16em;
+}
+.almanac-tpl-form-box {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.almanac-tpl-form-label {
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+  line-height: 1.35;
+  cursor: pointer;
+  min-width: 0;
+}
 /* The inert form, for a section already in the file: its answer is written in
    the note and this window cannot read it. Styled as text rather than as a
    disabled control, because a greyed dropdown reads as "broken" where a phrase
@@ -1485,6 +1634,19 @@
 .almanac-tpl-arrow:disabled {
   opacity: 0.3;
 }
+/* Take out of the group (4.53.1) and its opposite, Make a group (4.53.2),
+   under the two arrows. Exactly one of the two is ever drawn, because a row is
+   in a group or it is not — so this is one slot, third in a column of three,
+   and the only one of the three that is not a nudge. It is set apart by a
+   hairline rather than by a different shape, which would have made the column
+   read as two controls and a stray. */
+.almanac-tpl-leave,
+.almanac-tpl-join {
+  margin-top: 2px;
+  padding-top: 3px;
+  border-top: 1px solid var(--background-modifier-border);
+  border-radius: 0;
+}
 .almanac-tpl-op-move .almanac-tpl-op-mark {
   color: var(--text-accent);
 }
@@ -1575,6 +1737,28 @@
   gap: 8px;
   padding: 5px 10px;
   border-bottom: var(--am-rule) solid var(--background-modifier-border);
+}
+/* ── The bar is the handle for the whole group (4.53.0) ──────────────────
+   A card has drawn a group since 4.8 and there was no way to move one: the
+   arrows inside it move a COLUMN within the group, so a reader who wanted the
+   group further down the page pressed them on each member in turn and watched
+   it come apart. The bar now carries the group's own two arrows and is the
+   thing you pick up — one level of the list, one place to reach it, the same
+   grab/grabbing cursor the rows have had since 3.0. */
+.almanac-tpl-block-bar[draggable="true"] {
+  cursor: grab;
+}
+.almanac-tpl-block-bar.is-dragging {
+  cursor: grabbing;
+}
+/* The states go on the CARD, not on the bar, because what is being moved is the
+   whole block — the same fade and the same inset rule a row wears, drawn round
+   the object they are actually describing. */
+.almanac-tpl-block.is-dragging {
+  opacity: 0.45;
+}
+.almanac-tpl-block.is-drop-target {
+  box-shadow: inset 0 2px 0 0 var(--text-accent);
 }
 .almanac-tpl-block-title {
   flex: 1 1 auto;

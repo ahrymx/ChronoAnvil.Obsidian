@@ -5,7 +5,21 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
+import { dealInto, MAX_COLUMNS } from "../../core/directive-grammar";
+
 // The row primitive: the widgets in this block, side by side. 4.2 §2.
+//
+// ── THE ONE IMPORT (4.52.1) ──────────────────────────────────────────────
+//
+// This file had none, and the reason it had none is worth keeping: it draws a
+// row out of a list of children and can be tested with neither a vault nor a
+// settings object. `directive-grammar.ts` costs that nothing — it imports
+// nothing itself and is string arithmetic over fence lines — and `MAX_COLUMNS`
+// has to be ONE number, shared with the two files that read the same columns
+// out of the file rather than out of the DOM (`cell-width.ts`, and
+// `regroupFlatNote`'s column phase). A copy here would be a second answer to
+// how many columns a row has, which is the exact fault this project's
+// vocabulary file exists to prevent.
 //
 // ── WHAT THIS IS ─────────────────────────────────────────────────────────
 //
@@ -219,6 +233,49 @@ export function isCellContent(classes: readonly string[]): boolean {
   return !classes.some((c) => NOT_A_CELL.includes(c));
 }
 
+// A row's cells, held to `MAX_COLUMNS`. 4.52.1.
+//
+// DEALT RATHER THAN TRUNCATED, and `MAX_COLUMNS` carries the argument for the
+// cap itself. What belongs here is what dealing DOES to a plan: every child of
+// every run past the cap is handed to `dealInto`, one at a time, so a row of
+// four draws 1 and 2 on the top line with 3 under 1 and 4 under 2 — and not one
+// widget is dropped or hidden.
+//
+// ONE WIDGET AT A TIME, NOT ONE RUN AT A TIME, and the difference is the whole
+// reason this can be trusted. `regroupFlatNote`'s column phase writes the same
+// deal into the file by moving one widget per pass, because that is what
+// `moveCell` moves; a fold that took a three-widget run as a unit would put
+// those three somewhere the Save then puts them one by one, and the page would
+// rearrange itself the first time anybody pressed Save. Dealing the same units
+// in the same order is what makes the render and the file one answer.
+//
+// THE CELLS ARE INDEX LISTS, SO DEALING IS CONCATENATION. A cell has held
+// several children since 4.4 §1; a folded column is that same list with another
+// run appended, which is a shape every walk over `cells` already handles. There
+// is nothing here for `layOutRow` to know about.
+//
+// AND THE EXTRA RUNS' WEIGHTS GO WITH THEIR DELIMITERS. A weight belongs to the
+// column a `cell` line OPENS, and past the cap that line opens no column — so
+// there is no column for its share to be a share OF. Keeping it would mean two
+// numbers describing one cell and no rule for which wins. `columnsOf`
+// (cell-width.ts) reads the file the same way and stops at the same count, so
+// the widths the gesture writes and the widths the row draws stay one answer.
+//
+// A ROW AT OR UNDER THE CAP IS RETURNED UNTOUCHED — the same object, not a copy
+// — which is every fence any catalogue in this plugin composes. The homepage's
+// row is two columns and always has been; this function is here for the fences
+// readers build themselves.
+function capColumns(plan: RowPlan): RowPlan {
+  if (plan.cells.length <= MAX_COLUMNS) return plan;
+  const cells = plan.cells.slice(0, MAX_COLUMNS).map((cell) => [...cell]);
+  for (const extra of plan.cells.slice(MAX_COLUMNS)) {
+    for (const child of extra) {
+      cells[dealInto(cells.map((cell) => cell.length))].push(child);
+    }
+  }
+  return { cells, weights: plan.weights.slice(0, MAX_COLUMNS) };
+}
+
 // Which of a block's children make up each cell of its row. 4.4 §1.
 //
 // THE PART THE ROADMAP SAID WOULD BE THE HARD ONE, reduced to arithmetic so it
@@ -253,10 +310,10 @@ export function cellPlan(
   boundaries: readonly CellBound[]
 ): RowPlan {
   if (boundaries.length === 0) {
-    return {
+    return capColumns({
       cells: content.flatMap((isContent, i) => (isContent ? [[i]] : [])),
       weights: content.filter(Boolean).map(() => 1),
-    };
+    });
   }
   const at = new Map(boundaries.map((b) => [b.at, b.weight]));
   const cells: number[][] = [];
@@ -283,7 +340,7 @@ export function cellPlan(
     cells.push(open);
     weights.push(openWeight);
   }
-  return { cells, weights };
+  return capColumns({ cells, weights });
 }
 
 // ── the pages of one group ────────────────────────────────────────────

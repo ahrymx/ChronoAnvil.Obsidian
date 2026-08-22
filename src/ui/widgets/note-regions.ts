@@ -69,6 +69,15 @@ export interface NoteRegionHost {
     // See note-write-scheduler.ts: absent means "no baseline, do not merge".
     baseline?: string
   ): Promise<void>;
+  // The same write, to a file the caller names rather than the one it was drawn
+  // on — what a `logbook:` widget needs, since it draws another note's items
+  // (4.52). `writeNoteRegionToFile` is this with the file resolved from the ctx.
+  writeRegionOf(
+    file: TFile,
+    key: string,
+    value: string,
+    baseline?: string
+  ): Promise<void>;
 }
 
 /**
@@ -221,6 +230,7 @@ export function renderTaskRow(
     onText: (value: string) => void;
     onPriority: (p: TaskPriority) => void;
     onDue: (d: string | null) => void;
+    onAt: (t: string | null) => void;
     onDelete: () => void;
   }
 ): void {
@@ -280,7 +290,32 @@ export function renderTaskRow(
     cls: "journal-task-due",
   });
   if (task.due) due.value = task.due;
-  due.addEventListener("change", () => cb.onDue(due.value || null));
+
+  // The hour, where there is one (4.55). What moves a task off the time grid's
+  // all-day lane and onto the hours.
+  //
+  // DRAWN ONLY BESIDE A DUE DATE, because an hour on no day is not a time — the
+  // parser drops one and the row must not offer what the file will discard. It
+  // appears the moment a date is picked and goes when the date is cleared,
+  // rather than sitting there greyed out: a disabled field is a question the
+  // form asks and then refuses to accept an answer to.
+  const at = row.createEl("input", {
+    type: "time",
+    cls: "journal-task-at",
+    attr: { "aria-label": "Time it is due" },
+  });
+  if (task.at) at.value = task.at;
+  const syncAt = (): void => {
+    at.toggleClass("is-hidden", !due.value);
+  };
+  syncAt();
+  at.addEventListener("change", () => cb.onAt(at.value || null));
+
+  due.addEventListener("change", () => {
+    cb.onDue(due.value || null);
+    if (!due.value) at.value = "";
+    syncAt();
+  });
 
   // Delete
   const del = row.createEl("button", {
@@ -569,6 +604,14 @@ export function buildTasks(
         },
         onDue: (d) => {
           task.due = d;
+          // The hour goes with the day. `parseTaskLine` drops an `at` with no
+          // `due` on the next read, so leaving it set would show a time on the
+          // row that the file no longer holds.
+          if (!d) task.at = null;
+          persist();
+        },
+        onAt: (t) => {
+          task.at = t;
           persist();
         },
         onDelete: () => {

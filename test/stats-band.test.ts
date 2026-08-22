@@ -455,7 +455,7 @@ describe("the band reaches the pages outside every journal", () => {
       noun: "homepage",
       text: "",
     } as never);
-    const band = model.sections("").find((s) => s.id === "w:stats-band");
+    const band = model.sections("").find((s) => s.id === "w:stats-band#1");
     expect(band, "the homepage's add list").toBeTruthy();
     expect(band!.questions ?? []).toHaveLength(0);
     // AT THE TABLE AS WELL AS AT THE MODEL, because `argsOf` reads three fields

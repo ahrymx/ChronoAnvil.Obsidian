@@ -31,6 +31,7 @@ import {
   eventIcon,
   eventsOnDay,
   isValidIso,
+  readMinutes,
 } from "./events";
 import { deleteEvent, readEvents, saveEvent } from "./eventstore";
 import { today } from "../core/util";
@@ -58,6 +59,9 @@ class EventEditModal extends EditorModal {
   private draft: EventDef;
   private readonly isNew: boolean;
   private dateHost: HTMLElement | null = null;
+  // The duration field's own slot, so the hour field can redraw it alone
+  // when a time is typed or cleared.
+  private durationHost: HTMLElement | null = null;
 
   constructor(
     app: App,
@@ -257,6 +261,68 @@ class EventEditModal extends EditorModal {
         t.setValue(this.draft.end ?? "").onChange((v) => {
           this.draft.end = v || undefined;
         });
+      });
+
+    this.renderTimeField(host);
+  }
+
+  // The hour, and what having one MEANS (4.52).
+  //
+  // AN EMPTY FIELD IS THE ORDINARY CASE and the description says why rather than
+  // apologising for it: a birthday, a holiday and a trip are facts about a day,
+  // and only an appointment happens at a time. That is not a nicety — the
+  // Meetings logbook lists exactly the events that carry one, so this field is
+  // the difference between an event and a meeting, said in one box.
+  //
+  // ON THE SINGLE-EVENT FIELDS AND NOT THE RECURRING ONES, because this
+  // recurrence is annual by construction and an annual 09:00 is a stranger thing
+  // than the field is worth. Nothing in the model refuses it; a hand-edited
+  // `Events.md` with a time on a recurring event keeps it and shows it.
+  private renderTimeField(host: HTMLElement): void {
+    this.durationHost = null;
+    new Setting(host)
+      .setName("Time")
+      .setDesc(
+        "Leave empty for something that is true of the whole day. An event with a time is a meeting, and shows in the Meetings logbook."
+      )
+      .addText((t) => {
+        t.inputEl.type = "time";
+        t.setValue(this.draft.time ?? "").onChange((v) => {
+          this.draft.time = v || undefined;
+          // A LENGTH WITH NO START IS A LENGTH OF NOTHING, and `normalizeEvent`
+          // drops one on read. Cleared here as well so the form cannot show a
+          // duration that the next save will silently discard.
+          if (!this.draft.time) this.draft.duration = undefined;
+          this.renderDurationField();
+        });
+      });
+    this.durationHost = host.createDiv({ cls: "am-ev-duration" });
+    this.renderDurationField();
+  }
+
+  // How long it runs (4.55). Drawn only once there is an hour to run FROM,
+  // which is the same rule the model enforces — a field that could be filled in
+  // and then thrown away on save would be the form lying to the reader.
+  private renderDurationField(): void {
+    this.durationHost?.empty();
+    if (!this.durationHost || !this.draft.time) return;
+    new Setting(this.durationHost)
+      .setName("How long")
+      .setDesc(
+        "Minutes. Leave empty for a moment — the time grid marks it at the hour rather than drawing a block over one."
+      )
+      .addText((t) => {
+        t.inputEl.type = "number";
+        t.inputEl.min = "0";
+        t.inputEl.step = "5";
+        t.setPlaceholder("60");
+        t.setValue(this.draft.duration == null ? "" : String(this.draft.duration))
+          .onChange((v) => {
+            // THROUGH THE MODEL'S OWN READER, so a `0` typed here means what a
+            // `0` in the note means — no duration — rather than the box
+            // inventing a second rule.
+            this.draft.duration = readMinutes(v) ?? undefined;
+          });
       });
   }
 

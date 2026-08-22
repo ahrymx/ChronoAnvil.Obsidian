@@ -35,7 +35,6 @@ import { cellPlan } from "../src/ui/widgets/row";
 import { isPageWidgetId } from "../src/core/widget-sections";
 import type { SectionView } from "../src/core/section-model";
 import { readCss, readSrc } from "./sources";
-import { PAGE_TITLE_LINE } from "../src/core/note-sections";
 import { WIDE_KEYWORD } from "../src/core/directive-grammar";
 
 const ASSETS = resolve(__dirname, "..", "assets");
@@ -87,19 +86,24 @@ describe("the home catalogue is data, which is the point", () => {
     }
   });
 
-  it("locks the diary card and nothing else", () => {
-    // A vault whose homepage has no way into the diary is worse than one with
-    // no homepage: the diary card's destination pills are the note's only
-    // navigation, since there is no `links:` row on it.
+  it("locks the banner and nothing else", () => {
+    // THE DIARY CARD CAME OFF THE LIST IN 4.53. It had been locked since 4.2 on
+    // the argument that this page has no `links:` row, so the card's
+    // destination pills are the homepage's only time navigation — and that is
+    // still true of the PAGE and was never true of the VAULT. The ribbon, the
+    // palette and the diary dashboard are all still there, so the lock was not
+    // holding open the only door; it was refusing a reader a homepage of
+    // journals and charts for nothing. `diary` in `home-sections.ts` records
+    // the reversal.
     //
-    // AND THE BANNER IS LOCKED TOO AS OF 4.19, WHICH IS FELT HARDEST HERE. This
+    // AND THE BANNER IS LOCKED AS OF 4.19, WHICH IS FELT HARDEST HERE. This
     // page's banner carries no navigation, so the argument that locks it
     // elsewhere does not apply — it is locked because ONE rule across nine
     // surfaces beats a rule a reader has to learn per page. `bannerSection`
-    // states the trade and this is the test that records the cost.
+    // states the trade and this is the test that records the cost. It is now
+    // the whole of the list, which is why the name of this test changed.
     expect(HOME_SECTIONS.filter((s) => s.locked).map((s) => s.id)).toEqual([
       "banner",
-      "diary",
     ]);
   });
 
@@ -631,7 +635,13 @@ describe("the home model", () => {
     // homepage has no opinion about is now also addable, appended after
     // everything here — so the question this case is asking has to say which half
     // it means. The widget half gets its own cases below.
-    expect(own(model.addable(home()))).toEqual(["tags"]);
+    //
+    // TWO OF THEM FROM 4.58.1: `time-grid` joins `tags` for the same reason and
+    // ahead of it in catalogue order. A homepage is RECONCILED, so a section it
+    // composed would appear on every homepage that already exists; offering it
+    // is how the grid reaches the readers who want one without arriving for the
+    // readers who do not.
+    expect(own(model.addable(home()))).toEqual(["time-grid", "tags"]);
   });
 
   it("offers every page widget it does not already manage", () => {
@@ -663,7 +673,7 @@ describe("the home model", () => {
     // would then have withheld the search widget from the one page most likely to
     // want it, for a reason nobody could have guessed. The locator now says what
     // may follow the keyword.
-    expect(model.addable(home()).map((s) => s.id)).toContain("w:diary-search");
+    expect(model.addable(home()).map((s) => s.id)).toContain("w:diary-search#1");
   });
 
   it("offers what a stripped homepage is missing", () => {
@@ -673,6 +683,11 @@ describe("the home model", () => {
       "launcher",
       "tasks",
       "on-this-day",
+      // Offered here for the ORDINARY reason rather than the opt-in one: this
+      // homepage is missing nearly everything, and an opt-in section is addable
+      // whether or not the page is stripped. Its place in the list is its place
+      // in the catalogue.
+      "time-grid",
       "journals",
       "charts",
       "tags",
@@ -685,21 +700,26 @@ describe("the home model", () => {
     for (const v of model.sections()) expect(v.group, v.id).toBeNull();
   });
 
-  it("lets every row move, including the locked one", () => {
+  it("lets every row move, and every row but the head go", () => {
     // The lock is on existence, not on order — 2.60.2's distinction. A flat
     // note has no band arithmetic that could strand a section the way the
     // dashboard masthead strands `summary`.
     //
     // EXCEPT THE HEAD, and the exception is why this assertion is still worth
-    // making: the pin is a SECOND rule, on one row, and the locked rows must not
-    // be caught by it. `diary` is locked and still moves.
+    // making: the pin is a SECOND rule, on one row, and a locked row must not
+    // be caught by it.
     for (const v of model.sections()) {
       if (v.id === "banner") continue;
       expect(v.movable, v.id).toBe(true);
     }
-    const locked = model.sections().find((v) => v.id === "diary")!;
-    expect(locked.removable).toBe(false);
-    expect(locked.movable).toBe(true);
+    // THE DIARY CARD IS BOTH AS OF 4.53, and this used to be the test that
+    // recorded it being neither-quite: locked, so `removable` was false, and
+    // moving anyway. It is now an ordinary row and asserted as one — the two
+    // flags are still two questions, and the row that answers them differently
+    // is the head, one test down.
+    const card = model.sections().find((v) => v.id === "diary")!;
+    expect(card.removable).toBe(true);
+    expect(card.movable).toBe(true);
   });
 
   it("fixes the banner in place, and no longer lets it go", () => {
@@ -730,10 +750,17 @@ describe("the home model", () => {
     ).toBe(false);
   });
 
-  it("refuses to remove the diary card, and names the fix", () => {
-    const why = model.refusal("diary", home());
-    expect(why).toContain("can't be removed");
-    expect(why).toContain("move it");
+  it("no longer refuses to remove the diary card", () => {
+    // 4.53, and the sentence it stops saying is worth naming: "Part of what a
+    // homepage is, so it can't be removed. You can still move it." The refusal
+    // is gone because the lock is, and BOTH halves have to go together — a
+    // section with `locked: false` and a refusal would be a Remove button that
+    // does nothing, which is the failure §3 is about.
+    expect(model.refusal("diary", home())).toBeNull();
+    // And the write agrees with the window: unticking it actually takes it out.
+    const out = model.apply(home(), COMPOSED.map((s) => s.id).filter((id) => id !== "diary"));
+    expect(out).not.toBeNull();
+    expect(out).not.toContain("diary:");
   });
 
   it("refuses to remove charts that are holding the reader's own", () => {
@@ -1248,7 +1275,72 @@ describe("the journals block, and the migration that upgrades it", () => {
     expect(scaffold).toContain("await this.cardJournalsBlock(dash)");
     expect(scaffold).toContain("draw the Journals section as one card per journal");
     // The dry run diffs against the LAST link in the chain, or the preview would
-    // be computed against a text the migration had not been applied to.
-    expect(scaffold).toContain("diff: diffText(original, carded)");
+    // be computed against a text the migration had not been applied to. The
+    // chain gained a sixth link in 4.59.0 — the period summary's header bar — so
+    // the name here moved with it; the RULE is what this line pins, and it is
+    // the rule that would be broken by leaving the old name behind.
+    expect(scaffold).toContain("diff: diffText(original, titledSummary)");
+    expect(scaffold).toContain("titleSummaryFence(carded) ?? carded");
+  });
+});
+
+describe("the homepage's time grid", () => {
+  // 4.58.1, and the second of the two surfaces where the grid is honest as a
+  // section. `weekStartOf` falls back to the CURRENT week when the host note
+  // declares no `week-start` — a miss on a month dashboard and the whole intent
+  // here, because a homepage is a page about now.
+  const model = homeSectionModel(ROOT);
+  const grid = HOME_SECTIONS.find((s) => s.id === "time-grid")!;
+
+  it("takes a block of its own rather than a cell", () => {
+    // Seven columns of hours do not fit in half a page. The same call `charts`
+    // and `tags` make, and the reason this section has no `row`.
+    expect(grid.row).toBeUndefined();
+    expect(grid.cell).toBeUndefined();
+  });
+
+  it("composes the header bar and the directive into one fence", () => {
+    const base = home();
+    const out = model.apply(base, [...model.present(base), "time-grid"]);
+    expect(out).toContain(
+      "```almanac\nheader:⏱️ The week by the hour\ntime-grid\n```"
+    );
+  });
+
+  it("is offered, never shipped, and never repaired away", () => {
+    // A homepage is RECONCILED, which is exactly why this is `optIn`: a composed
+    // section would appear on every homepage that already exists, and a reader
+    // who took it off would find repair putting it back.
+    expect(grid.optIn).toBe(true);
+    expect(home()).not.toContain("time-grid");
+    const base = home();
+    const out = model.apply(base, [...model.present(base), "time-grid"]);
+    expect(model.apply(out, model.present(out).filter((id) => id !== "time-grid"))).toBe(
+      base
+    );
+  });
+
+  it("is one per page, where the widget behind it is not", () => {
+    const base = home();
+    const out = model.apply(base, [...model.present(base), "time-grid"]);
+    expect(own(model.addable(out))).not.toContain("time-grid");
+    expect(
+      model.addable(out).map((s) => s.id).filter((id) => id.startsWith("w:time-grid"))
+    ).toEqual([]);
+    // And the widget door is closed here too, because the catalogue writes the
+    // keyword — `pageWidgetKeywords` withholds it on both surfaces that have a
+    // section for it.
+    expect(
+      model.addable(base).map((s) => s.id).filter((id) => id.startsWith("w:time-grid"))
+    ).toEqual([]);
+  });
+
+  it("asks the registry's question rather than its own", () => {
+    const view = model.sections(home()).find((s) => s.id === "time-grid");
+    expect(view?.questions?.[0]?.values?.map((v) => v.value)).toEqual([
+      "events",
+      "logbooks",
+      "tasks",
+    ]);
   });
 });

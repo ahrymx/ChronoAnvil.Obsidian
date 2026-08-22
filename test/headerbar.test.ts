@@ -119,15 +119,43 @@ describe("a bar and the widgets welded into its own fence", () => {
     expect(out).toEqual([false, false, true, true, true]);
   });
 
-  it("folds a charts stack and the blocks beneath it", () => {
-    // The in-block scope has to carry on past the block it opened in: a folded
-    // `📊 Charts` owns the note under it as well as its own chart stack, up to
-    // the next level-1 bar.
+  it("stops a folded section at the fence that gave it a body (4.57.1)", () => {
+    // THE SENTINEL, AS THE FLATTENED WALK SEES IT. A `📊 Charts` fence holds
+    // its bar and its stack, so the section is complete in that block and
+    // `recompute` follows it with a header-that-opens-nothing at the bar's own
+    // level. What the reader put next is theirs.
     const out = computeFoldHidden([
       blockNode(1),
       bar(1, true),
       body(), // the jchart stack
-      body(), // a following block
+      bar(1), // the sentinel: same level, never collapsed
+      body(), // a page widget the reader added below
+      blockNode(1), // the next section's block
+      bar(1),
+      body(),
+    ]);
+    expect(out).toEqual([
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it("still carries a bar alone in its fence over the blocks after it", () => {
+    // THE 2.x SHAPE, WHICH IS WHY THE SCOPE EXISTS AT ALL: a `header:` fence
+    // with nothing under it and the section's body in the blocks that follow.
+    // Every note composed before the two were welded is this, so no sentinel is
+    // emitted and the walk is what it always was.
+    const out = computeFoldHidden([
+      blockNode(1),
+      bar(1, true),
+      body(), // a body block of its own
+      body(), // and another
       blockNode(1), // the next section's block
       bar(1),
       body(),
@@ -228,7 +256,7 @@ describe("section bodies are marked for the surface", () => {
     // And such a bar still CLOSES what was open — it is a level-1 header, so
     // the section before it does not run past it.
     expect(body).toMatch(
-      /if \(level1 && !bar\?\.dataset\.headerKey\) \{\s*return \{ opens: false, closes: true/
+      /if \(level1 && !bar\?\.dataset\.headerKey\) \{\s*return \{\s*opens: false,\s*closes: true,/
     );
   });
 
@@ -267,6 +295,63 @@ describe("section bodies are marked for the surface", () => {
     ]) {
       expect(body, cls).toContain(`:scope .${cls}`);
     }
+  });
+
+  it("ends a section whose own fence drew its body (4.57.1)", () => {
+    // THE BUG: the homepage's last section is the charts fence, every page
+    // widget a reader adds lands in a block below it, and the run took them —
+    // so a logbook added to the homepage came back inside the Trends card on
+    // the next reload, and folded away with the section.
+    //
+    // Both walks ask the one predicate, for `isSectionBoundary`'s reason: a
+    // section that folds one set of blocks and shades another is two claims
+    // about what "this section" means.
+    expect(src).toContain("private bodyInOwnFence(");
+    expect(method("markSectionBodies")).toContain("this.bodyInOwnFence(block)");
+    expect(method("recompute")).toContain("this.bodyInOwnFence(block)");
+  });
+
+  it("asks it of the last bar in the block, not the first", () => {
+    // Study's topic index writes `header:📖 Lessons`, its table,
+    // `header:🛠️ Practice` and its table as ONE fence. The bars before the last
+    // plainly have their bodies here; the only open question is the last one's,
+    // and a trailing bar with nothing under it is a section still waiting for
+    // its blocks.
+    const body = method("bodyInOwnFence");
+    expect(body).toContain("bars[bars.length - 1]");
+  });
+
+  it("does not count the grip and the drop slots as a body", () => {
+    // `attachBlockHead` hangs these on every block, after whatever it drew. They
+    // are empty divs today — so this changes no answer — and an icon in the grip
+    // would otherwise end every section at its own bar.
+    const drag = readSrc("widgets");
+    expect(drag).toContain('const GRIP_CLASS = "jbd-handle";');
+    expect(drag).toContain('export const HEAD_CLASS = "journal-block-head";');
+    expect(drag).toContain("`jbd-slot ${cls}`");
+    expect(src).toContain(
+      'const BLOCK_FURNITURE = ".jbd-slot, .jbd-handle, .journal-block-head";'
+    );
+    expect(method("bodyInOwnFence")).toContain("sib.matches(BLOCK_FURNITURE)");
+  });
+
+  it("leaves a bar alone in its fence owning the blocks after it", () => {
+    // THE 2.x SHAPE, AND WHY THE SCOPE EXISTS. A section used to be two fences
+    // — a `header:` fence and a body fence — because Obsidian renders each block
+    // separately and a section could not contain its own body. Every note
+    // composed before the two were welded is still that, so the predicate is
+    // "did this fence draw a body", and a fence that drew none keeps the walk it
+    // always had.
+    const body = method("bodyInOwnFence");
+    expect(body).toContain("return false;");
+    expect(body).toContain("this.rendersSomething(sib)");
+  });
+
+  it("stops the level-2 indent there too", () => {
+    // Three passes, one predicate. A subsection that folds its own block, shades
+    // its own block and then indents the page under it would be the same
+    // disagreement the boundary rule exists to prevent.
+    expect(method("markL2Body")).toContain("this.bodyInOwnFence(barBlock)");
   });
 
   it("asks that question in both walks rather than twice over", () => {
@@ -476,7 +561,7 @@ describe("section scope in Live Preview", () => {
     expect(at).toBeGreaterThan(0);
     const body = src.slice(at, at + 1400);
     const guard = body.indexOf(
-      "els[i].classList.contains(OBSIDIAN_DOM.editorLine)"
+      "el.classList.contains(OBSIDIAN_DOM.editorLine)"
     );
     const apply = body.indexOf('toggleClass("journal-section-hidden"');
     expect(guard).toBeGreaterThan(0);
@@ -602,13 +687,14 @@ describe("a titled section owns its own block (3.13)", () => {
     expect(body).toContain('addClass("is-first")');
   });
 
-  it("never claims is-last, because Charts owns the note beneath it", () => {
+  it("never claims is-last, because the body may still be arriving", () => {
     // The tempting version gives the head block `is-last` too when its fence
-    // rendered a body beside it. A welded body does not mean the section ENDS
-    // at the block: a Charts fence has its stack inside itself AND owns the
-    // note beneath it up to the next level-1 bar. Whether this is the last
-    // block is unknowable to a bar that has only itself, and guessing is the
-    // same class of error as guessing one frame was enough.
+    // rendered a body beside it. 4.57.1 made that the right ANSWER — a fence that
+    // drew a body ends its section there — and it is still the wrong thing to
+    // claim at mount: this runs as the block attaches, before a `LiveWidget`
+    // has built its subtree, so "my fence drew nothing beside me" is a fact
+    // about the frame rather than about the section. `markSectionBodies` asks
+    // the same question a pass later, when the answer is stable.
     //
     // The honest degradation is a square bottom for one frame.
     const src = readSrc("headerbar");
@@ -742,15 +828,48 @@ describe("computeSectionRuns", () => {
     closes: false,
     hidden: false,
     renders: true,
+    ends: false,
     ...o,
   });
   const head = () => node({ opens: true });
+  // A section whose fence drew its own body — every one the plugin composes.
+  const whole = () => node({ opens: true, ends: true });
 
   it("opens a run on a head and carries it over the blocks that follow", () => {
     const m = computeSectionRuns([head(), node(), node()]);
     expect(m.map((x) => x.member)).toEqual([true, true, true]);
     expect(m.map((x) => x.first)).toEqual([true, false, false]);
     expect(m.map((x) => x.last)).toEqual([false, false, true]);
+  });
+
+  it("ends a section in its own block when the fence drew the body (4.57.1)", () => {
+    // THE BUG THIS RELEASE IS FOR, as arithmetic. The homepage ends with the
+    // charts section, and every page widget a reader adds lands in a block
+    // below it: before this the run swallowed them, so a logbook added to the
+    // homepage came back inside the Trends card after a reload — and folded
+    // away with it.
+    const m = computeSectionRuns([whole(), node(), node()]);
+    expect(m.map((x) => x.member)).toEqual([true, false, false]);
+    // Both ends land on the one block, so it rounds top and bottom.
+    expect(m[0]).toEqual({ member: true, first: true, last: true });
+  });
+
+  it("still runs a section over the blocks after a bar with no body", () => {
+    // The 2.x two-fence shape, which is what the run was written for and what
+    // every note composed before the weld still is.
+    const m = computeSectionRuns([head(), node(), node()]);
+    expect(m.map((x) => x.member)).toEqual([true, true, true]);
+  });
+
+  it("gives two complete sections a block each rather than one run", () => {
+    // The diary dashboard: `⏳ Open tasks`, `🕘 On this day`, Trends, `🏷️ Tags`,
+    // each a fence holding its own body. Before 4.57.1 only the next bar closed
+    // the previous run, which is the same rule wearing a coincidence — the last
+    // section on the page had no next bar, and that is the one readers add to.
+    const m = computeSectionRuns([whole(), whole(), node()]);
+    expect(m.map((x) => x.member)).toEqual([true, true, false]);
+    expect(m.map((x) => x.first)).toEqual([true, true, false]);
+    expect(m.map((x) => x.last)).toEqual([true, true, false]);
   });
 
   it("marks a fully collapsed section as both of its own ends (4.13 §4)", () => {

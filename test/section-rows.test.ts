@@ -21,6 +21,7 @@ import {
   flatNoteModel,
   regroupFlatNote,
 } from "../src/core/note-sections";
+import { cellPlan } from "../src/ui/widgets/row";
 import { readCode } from "./sources";
 
 // A catalogue of the smallest sections that can exist: one line each, matched
@@ -61,6 +62,12 @@ const CAT: FlatSection[] = [
   one("events", "events"),
 ];
 
+// TWO COLUMNS, WHICH IS ALL A ROW HAS AS OF 4.52.1 — and the shape the
+// homepage's own catalogue composes: one wide member beside a column that
+// stacks the rest. It was three columns until this release, and `MAX_COLUMNS`
+// carries the argument for why that is no longer a thing a fence can ask for.
+// The cap's own behaviour is asserted at the bottom of this file, on fences
+// written before it existed.
 const PAGE = [
   "`almanac:spacer`",
   "```almanac",
@@ -68,7 +75,6 @@ const PAGE = [
   "diary:3",
   "cell",
   "launcher",
-  "cell",
   "journals",
   "```",
   "",
@@ -144,8 +150,8 @@ describe("what the editor is shown", () => {
 
   it("refuses to promise a split it could only make by guessing", () => {
     const shared = PAGE.replace(
-      "cell\njournals",
-      "cell\nheader:⏳ Open tasks\ntasks-table:,period"
+      "journals",
+      "header:⏳ Open tasks\ntasks-table:,period"
     );
     const block = flatBlocks(shared, CAT)[0];
     expect(block.ids).toContain("tasks");
@@ -209,8 +215,14 @@ describe("putting a widget into a group", () => {
     expect(body.indexOf("events")).toBeGreaterThan(body.indexOf("journals"));
   });
 
-  it("gives it a delimiter, because this row divides itself", () => {
-    expect(out!.split("\n").filter((l) => l === "cell")).toHaveLength(3);
+  it("divides itself ONCE, because a row has two columns (4.52.1)", () => {
+    // THIS EXPECTED THREE DELIMITERS UNTIL 4.52.1, one per member after the
+    // first, and that is exactly the fence the cap exists to stop being
+    // written: four columns need 1310px of floor and the note column is about
+    // a thousand. The arrival stacks at the foot of the emptier column instead,
+    // so a group of four is a 2x2 and the one delimiter is the seam between
+    // its two columns.
+    expect(out!.split("\n").filter((l) => l === "cell")).toHaveLength(1);
   });
 
   it("leaves one block where there were two", () => {
@@ -303,8 +315,8 @@ describe("what a regroup will not do", () => {
 
   it("leaves a member it cannot bound where it is", () => {
     const shared = PAGE.replace(
-      "cell\njournals",
-      "cell\nheader:⏳ Open tasks\ntasks-table:,period"
+      "journals",
+      "header:⏳ Open tasks\ntasks-table:,period"
     );
     const out = regroupFlatNote(shared, CAT, [
       ["diary", "launcher"],
@@ -322,37 +334,127 @@ describe("the window over it", () => {
   it("draws a card only where a block holds more than one", () => {
     // A block of one is a row in the list, exactly as it always was — the card
     // is for the case the list could not previously describe.
-    expect(editor).toContain("if (group.length < 2) {");
+    //
+    // COUNTED OVER THE MEMBERS THE SAVE WILL WRITE, since 4.53.0. A struck-
+    // through row is not in that file, so a "group" of one member and the row it
+    // is replacing is two rows and no group — and drawing a card round it
+    // promised one the write would not make.
+    expect(editor).toContain("if (kept.length < 2) {");
     expect(editor).toContain("private renderBlock(");
   });
 
   it("keeps a block to one run of consecutive rows", () => {
     // Which is what the catalogue means by a row (`FlatSection.row`:
     // "consecutive members only"), and what makes one bit per row enough.
+    //
+    // THE WALK MOVED TO `core/row-order.ts` IN 4.53.0. The editor kept the bit
+    // and improvised the arrangement around it — four hand-written swaps and
+    // splices, each having to remember what a block is — which is how a move
+    // could hand the write a run that was not one.
     expect(editor).toContain("private joined = new Set<string>()");
-    expect(editor).toContain("if (out.length && this.joined.has(id))");
+    expect(readCode("row-order")).toContain("if (out.length && joined.has(id))");
+    expect(editor).toContain("return blocksOf(ids, this.joined);");
   });
 
   it("offers no split it could not make", () => {
     // A button that plans a move the write declines is the editor lying,
     // which is what `loose` exists to prevent.
-    const at = editor.indexOf('text: "Take out of the group"');
+    //
+    // AN ICON IN `lead` SINCE 4.53.1, so the anchor is the label rather than
+    // the text: the control moved under the arrows, where "up, down, out" are
+    // three answers to one question. An icon button with no accessible name is
+    // the thing that move could have cost, so the name is asserted here too.
+    const at = editor.indexOf('"aria-label": "Take out of the group"');
     expect(at).toBeGreaterThan(-1);
-    expect(editor.slice(at, at + 500)).toContain(
+    expect(editor.slice(at - 200, at)).toContain('lead.createEl("button"');
+    expect(editor.slice(at, at + 600)).toContain('setIcon(out, "unlink")');
+    expect(editor.slice(at, at + 600)).toContain(
       "out.disabled = !this.loose.has(section.id)"
     );
   });
 
+  it("keeps the split with the arrows and away from Remove", () => {
+    // 4.53.1, and the reason the control moved. `lead` is the column the
+    // arrows are in and the reason they are not beside the remove toggle —
+    // "move this up" next to "remove this" is one slip from being expensive —
+    // so a third mover belongs in the same column and not in the actions row.
+    const out = editor.indexOf('"aria-label": "Take out of the group"');
+    const arrows = editor.indexOf('cls: "almanac-tpl-arrow"');
+    expect(arrows).toBeGreaterThan(-1);
+    // Drawn after the two chevrons, so it is under them and not over them.
+    expect(arrows).toBeLessThan(out);
+    expect(editor.slice(out - 200, out)).toContain(
+      'cls: "almanac-tpl-arrow almanac-tpl-leave"'
+    );
+    // And it is no longer one of the pills on the actions line.
+    expect(editor).not.toContain('text: "Take out of the group"');
+  });
+
+  it("draws the way in where it draws the way out", () => {
+    // 4.53.2, and it is one slot rather than two: a row is in a group or it is
+    // not, so exactly one of the two icons is ever drawn on a row. Putting the
+    // opposites anywhere but the same place would make a reader hunt for the
+    // mirror of a control they had just used.
+    const join = editor.indexOf('cls: "almanac-tpl-arrow almanac-tpl-join"');
+    const leave = editor.indexOf('cls: "almanac-tpl-arrow almanac-tpl-leave"');
+    expect(join).toBeGreaterThan(-1);
+    expect(leave).toBeGreaterThan(-1);
+    expect(editor).toContain('setIcon(make, "link")');
+    expect(editor).toContain('setIcon(out, "unlink")');
+    // Both in `lead`, under the arrows, and neither on the actions line.
+    expect(editor.slice(join - 200, join)).toContain('lead.createEl("button"');
+    expect(editor.slice(leave - 200, leave)).toContain('lead.createEl("button"');
+  });
+
+  it("reaches a group that is not the block above it", () => {
+    // The whole of what the icon added. `joinables` answers with a LIST — the
+    // block above plus every group on the page — where `joinTarget` answered
+    // with the one block that happened to be touching, so a widget three rows
+    // under the group it belonged in had to be walked there one arrow at a
+    // time.
+    expect(editor).toContain("joinables(band, this.joined, section.id)");
+    expect(editor).not.toContain("joinTarget(");
+    expect(readCode("row-order")).toContain(
+      "return blocks.filter((b, i) => i !== at && (i === at - 1 || b.length > 1));"
+    );
+  });
+
+  it("asks which group only when there is more than one", () => {
+    // `only` FIRST, and it is `modals.ts`' rule rather than a shortcut: that
+    // block draws the line at whether the choice IS the request or is
+    // bookkeeping for it. The reader pressed a button on a specific row that
+    // means "put this in a group"; with one destination the page has already
+    // answered, and the ordinary note — where the only destination is the block
+    // above — stays at the one press it has always been.
+    // Sliced between the two declarations rather than through `fnBody`, which
+    // walks to the next TOP-LEVEL declaration and would hand back the rest of
+    // the class from a method in the middle of one.
+    const from = editor.indexOf("private async askJoin(");
+    expect(from).toBeGreaterThan(-1);
+    const ask = editor.slice(from, editor.indexOf("private joinLabel(", from));
+    expect(ask).toContain("only(targets) ??");
+    expect(ask).toContain("promptChoice(");
+    // AND THE ARRANGEMENT IS READ AFTER THE AWAIT. The window stays live while
+    // the dialog is open, so a band captured before it is a list and not a
+    // promise about the arrangement it came from.
+    expect(ask.indexOf("await")).toBeLessThan(ask.indexOf("this.settle("));
+    expect(ask).toContain("joinInto(this.arrangement, band, id, pick[0])");
+  });
+
   it("lets a locked section leave a row", () => {
-    // The lock is on existence, not on order (2.60.2) — and the homepage's
-    // locked diary card is in the row this release exists to rearrange. So the
-    // block buttons sit BEFORE the refusal returns, and wear a class of their
-    // own so that the assertion about the remove control still means what it
-    // said.
-    const block = editor.indexOf('text: "Take out of the group"');
+    // The lock is on existence, not on order (2.60.2) — a section a reader may
+    // not delete is still a section they may rearrange, and a row of two cells
+    // is exactly where the two questions come apart. So the block buttons are
+    // drawn BEFORE the refusal returns.
+    //
+    // THE HOMEPAGE'S DIARY CARD USED TO BE THE EXAMPLE and is not one any more
+    // (4.53): it is an ordinary removable row now. The rule outlives the
+    // example, which is why this test still stands — `links` and the four
+    // dashboards' mastheads are locked, and any of them may share a row.
+    const block = editor.indexOf('"aria-label": "Take out of the group"');
     const refusal = editor.indexOf("if (refusal) return;");
+    expect(block).toBeGreaterThan(-1);
     expect(block).toBeLessThan(refusal);
-    expect(editor.slice(block - 200, block)).toContain("almanac-tpl-move");
   });
 
   it("previews the regroup by running it, not by diffing intentions", () => {
@@ -506,15 +608,16 @@ describe("where a group's pages divide", () => {
       PAGE,
       CAT,
       [["diary", "launcher", "journals"], ["tasks"]],
-      ["journals"]
+      ["launcher"]
     );
     expect(out).not.toBeNull();
     const body = out!.split("\n");
-    // The delimiter that opened `journals` as a column is the one promoted —
-    // not a second line added beside it.
+    // The delimiter that opened `launcher` as a column is the one PROMOTED —
+    // not a second line added beside it — so the fence comes back with a `tab`
+    // where its `cell` was and no delimiter left over.
     expect(body.filter((l) => l === "tab")).toHaveLength(1);
-    expect(body.filter((l) => l === "cell")).toHaveLength(1);
-    expect(body.indexOf("tab")).toBeLessThan(body.indexOf("journals"));
+    expect(body.filter((l) => l === "cell")).toHaveLength(0);
+    expect(body.indexOf("tab")).toBeLessThan(body.indexOf("launcher"));
   });
 
   it("reads its own writing back as the page it wrote", () => {
@@ -526,11 +629,11 @@ describe("where a group's pages divide", () => {
       PAGE,
       CAT,
       [["diary", "launcher", "journals"], ["tasks"]],
-      ["journals"]
+      ["launcher"]
     );
     const block = flatBlocks(out!, CAT).find((b) => b.ids.includes("diary"));
     expect(block?.ids).toEqual(["diary", "launcher", "journals"]);
-    expect(block?.pages).toEqual(["journals"]);
+    expect(block?.pages).toEqual(["launcher"]);
   });
 
   it("takes a page boundary away again, leaving the column", () => {
@@ -538,7 +641,7 @@ describe("where a group's pages divide", () => {
       PAGE,
       CAT,
       [["diary", "launcher", "journals"], ["tasks"]],
-      ["journals"]
+      ["launcher"]
     )!;
     const flat = regroupFlatNote(paged, CAT, [
       ["diary", "launcher", "journals"],
@@ -547,8 +650,10 @@ describe("where a group's pages divide", () => {
     expect(flat).not.toBeNull();
     expect(flat!.split("\n").filter((l) => l === "tab")).toHaveLength(0);
     // AND THE COLUMN SURVIVES IT. Removing a page must not stack the two
-    // widgets that were either side of it.
-    expect(flat!.split("\n").filter((l) => l === "cell")).toHaveLength(2);
+    // widgets that were either side of it: the `tab` goes back to being the
+    // `cell` it was promoted from, so `diary` and `launcher` are two columns
+    // again rather than one.
+    expect(flat!.split("\n").filter((l) => l === "cell")).toHaveLength(1);
     expect(blocksOf(flat!)).toEqual([["diary", "launcher", "journals"], ["tasks"]]);
   });
 
@@ -560,7 +665,7 @@ describe("where a group's pages divide", () => {
       PAGE,
       CAT,
       [["diary", "launcher", "journals"], ["tasks"]],
-      ["journals"]
+      ["launcher"]
     )!;
     const again = regroupFlatNote(paged, CAT, [
       ["diary", "launcher", "journals"],
@@ -569,5 +674,123 @@ describe("where a group's pages divide", () => {
     // Nothing to do at all — the blocks already match and no page was named.
     expect(again).toBeNull();
     expect(paged.split("\n").filter((l) => l === "tab")).toHaveLength(1);
+  });
+});
+
+
+// ── the cap: a row holds two columns (4.52.1) ─────────────────────────────
+//
+// THE BUG THIS COMES FROM, REPORTED FROM A VAULT: *"the groups can be easily
+// broken and don't reflect what is shown in the editor."* Four widgets in one
+// `row` fence, on a note column about 1090px wide. Three cells fit at the 320px
+// floor; the fourth wrapped to a line of its own and stretched to the full width
+// of the group, so a column stopped reading as a column.
+//
+// THE CAP IS A NUMBER (`MAX_COLUMNS`) AND THREE PLACES DEAL BY IT: `capColumns`
+// on the render, the column phase here in the file, and `joinInto` on an
+// arrival. What is asserted below is the first two AGAINST EACH OTHER, because
+// that is the pair that can hurt somebody: if they disagreed, a reader would
+// press Save on a page they were happy with and watch two widgets swap places.
+
+describe("a group is dealt into two columns", () => {
+  // A CATALOGUE OF SIX ONE-LINE SECTIONS, so a fence can ask for more columns
+  // than the cap without any of them being a section whose extent is a guess.
+  // `CAT` above holds a titled one, which `widgetRun` refuses as a column —
+  // a refusal asserted three describes up and not the subject here.
+  const LINES = ["a", "b", "c", "d", "e", "f"];
+  const WIDE = LINES.map((line) => one(line, line));
+
+  // The columns of a fence, read back as the ids in each. Written out of the
+  // text rather than out of `flatBlocks`, because `BlockView.ids` is a flat list
+  // and what is being checked here is exactly the structure it flattens away.
+  const columnsIn = (text: string): string[][] => {
+    const out: string[][] = [[]];
+    let inside = false;
+    for (const line of text.split("\n")) {
+      if (line.startsWith("```almanac")) { inside = true; continue; }
+      if (line.startsWith("```")) { inside = false; continue; }
+      if (!inside || line === "row") continue;
+      if (line === "cell") { out.push([]); continue; }
+      if (LINES.includes(line)) out[out.length - 1].push(line);
+    }
+    return out;
+  };
+
+  // The same fence, written the way a reader's own note has it: one `cell` line
+  // per column after the first.
+  const fenceOf = (columns: readonly (readonly string[])[]): string =>
+    [
+      "`almanac:spacer`",
+      "```almanac",
+      "row",
+      ...columns.flatMap((column, n) => [...(n > 0 ? ["cell"] : []), ...column]),
+      "```",
+      "",
+    ].join("\n");
+
+  const wideBlocks = (text: string): string[][] =>
+    flatBlocks(text, WIDE).map((b) => [...b.ids]);
+
+  // And what `cellPlan` draws for it — every child present, one boundary per
+  // delimiter, which is what the dispatcher hands it.
+  const drawnFor = (columns: readonly (readonly string[])[]): string[][] => {
+    const flat = columns.flat();
+    const bounds: { at: number; weight: number }[] = [];
+    let seen = 0;
+    columns.forEach((column, n) => {
+      if (n > 0) bounds.push({ at: seen, weight: 1 });
+      seen += column.length;
+    });
+    return cellPlan(flat.map(() => true), bounds).cells.map((cell) =>
+      cell.map((i) => flat[i])
+    );
+  };
+
+  const shapes: string[][][] = [
+    [["a"], ["b"], ["c"]],
+    [["a"], ["b"], ["c"], ["d"]],
+    [["a"], ["b"], ["c"], ["d"], ["e"]],
+    [["a", "b"], ["c"], ["d"]],
+    [["a"], ["b"], ["c", "d"]],
+    [["a"], ["b"], ["c"], ["d"], ["e"], ["f"]],
+  ];
+
+  for (const shape of shapes) {
+    it(`writes what the render draws, for ${shape.length} columns`, () => {
+      // THE ASSERTION THIS WHOLE DESCRIBE EXISTS FOR. `capColumns` folds the
+      // render one child at a time and the column phase moves the file one
+      // widget at a time; both ask `dealInto` in the same order, and this is
+      // what says so. A page that changed shape on Save would be a worse bug
+      // than the wrap this release fixes.
+      const text = fenceOf(shape);
+      const out = regroupFlatNote(text, WIDE, wideBlocks(text));
+      expect(columnsIn(out ?? text)).toEqual(drawnFor(shape));
+    });
+  }
+
+  it("deals a fence of four into a 2x2 and leaves it there", () => {
+    // AND IT SETTLES. The dealt file is what the editor reads back, so the next
+    // Save is handed a `want` built from it and finds nothing to do — which is
+    // the property that keeps a note out of every sync log in the vault.
+    const text = fenceOf([["a"], ["b"], ["c"], ["d"]]);
+    const out = regroupFlatNote(text, WIDE, wideBlocks(text))!;
+    expect(columnsIn(out)).toEqual([["a", "c"], ["b", "d"]]);
+    expect(regroupFlatNote(out, WIDE, wideBlocks(out))).toBeNull();
+  });
+
+  it("loses nobody on the way", () => {
+    // The cheapest thing that could possibly go wrong with a fold, and the one
+    // worth stating on its own: a reader's widget is never dropped to make the
+    // arithmetic come out.
+    const shape = [["a"], ["b"], ["c"], ["d"], ["e"]];
+    const text = fenceOf(shape);
+    const out = regroupFlatNote(text, WIDE, wideBlocks(text))!;
+    expect(columnsIn(out).flat().sort()).toEqual(shape.flat().sort());
+  });
+
+  it("leaves a group already within the cap byte-identical", () => {
+    // Which is every fence any catalogue in this plugin composes. A phase that
+    // rewrote those would be a Save reshaping a homepage nobody touched.
+    expect(regroupFlatNote(PAGE, CAT, blocksOf(PAGE))).toBeNull();
   });
 });

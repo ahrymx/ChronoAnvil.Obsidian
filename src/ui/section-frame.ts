@@ -41,6 +41,9 @@
 // markdown block as a separate element, so such a section cannot contain its
 // body in the DOM — visibility is derived by walking the note's siblings, and
 // `HeaderBar` does that by finding every `.journal-header-bar` in a block.
+// (Only while the fence gave it no body of its own — see 4.57.1 in
+// `headerbar.ts`. The two ownership models below are unaffected: this is about
+// where a blocks-owning bar's scope stops, not about which kind it is.)
 //
 // A dashboard's inner section owns its OWN CHILDREN. It is a div with a head
 // and a body inside one widget's DOM, and it folds by toggling a class on

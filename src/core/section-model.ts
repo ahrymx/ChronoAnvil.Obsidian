@@ -41,6 +41,8 @@
 
 import {
   argSpanIn,
+  hasSectionBar,
+  isHeaderLine,
   readArg,
   renameSoleKeyword,
   soleArgSpanIn,
@@ -443,7 +445,96 @@ export interface TitleQuestion extends SectionQuestionCommon {
   placeholder: string;
 }
 
-export type SectionQuestion = ChoiceQuestion | FolderQuestion | TitleQuestion;
+// Whether this section is drawn as a SECTION or as a bare WIDGET. 4.59.0.
+//
+// THE FOURTH KIND, AND THE FIRST THAT IS NOT ABOUT A DIRECTIVE'S ARGUMENT. The
+// other three answer "what should this section point at"; this one answers
+// "what should this section BE", and the difference is one line in the fence.
+// A section carries a `header:` bar — a title, a chevron, a fold. A widget
+// carries none, and that absence is not cosmetic: `isSectionFence` refuses a
+// fence that titles itself as a column of a group, because `layOutRow` inserts
+// the group at the first cell child and a bar is not cell content — so the bar
+// would render BELOW the group it was supposed to title. A section cannot be
+// grouped. A widget can.
+//
+// SO THE TOGGLE IS THE HONEST WAY TO OFFER BOTH. The alternative considered was
+// a separate widget entry beside the section, which on a dashboard whose
+// summary cannot be removed would mean two summaries on one page — and on a
+// page where it could, two rows in the picker that draw the same directive and
+// differ by a line the reader cannot see. One row, one directive, two forms.
+//
+// NOT A `frame:` MODIFIER, though the neighbourhood is the same. `frame:
+// section` withholds the block's card and wraps the children in a fold of their
+// own; the period summary's card IS the summary — `.journal-overview-card`
+// carries its background, its border and the inset every band inside it bleeds
+// against — so the section form has to keep the card and add a bar to it. The
+// modifier cannot express that, and widening it to would make a value that
+// means "no card" sometimes mean "card".
+export interface FormQuestion extends SectionQuestionCommon {
+  kind: "form";
+  // The line that makes this a section. Written in when the answer is
+  // `SECTION_FORM`, taken out when it is `WIDGET_FORM`.
+  //
+  // THE CATALOGUE'S OWN STRING, so this file never composes a title. It is the
+  // line the catalogue would have rendered anyway — see the summary section in
+  // `diary-sections.ts`, which passes the same expression to both.
+  bar: string;
+  // What to call each side of the toggle, in the surface's own words. The
+  // control is a checkbox, so `widget` is what ticking it means.
+  section: string;
+  widget: string;
+}
+
+// The two answers a `FormQuestion` takes. Strings rather than a boolean because
+// `SectionChoice.options` is `Record<string, unknown>` read as strings
+// everywhere — a fourth shape through that plumbing would be a fourth thing for
+// `withAnswers`, `answersOn` and the editor's `shownAnswer` to agree about.
+export const SECTION_FORM = "section";
+export const WIDGET_FORM = "widget";
+
+// Which form a fence is written in: it is a section if it titles itself.
+//
+// ASKED OF THE FENCE RATHER THAN OF THE ANSWER, which is what makes the read
+// survive a rename. `attachHeaderRename` rewrites the bar's title in place, so
+// a read that compared the line against `FormQuestion.bar` would report a
+// renamed section as a widget and then, on the next save, write the catalogue's
+// own title back over the reader's. The question is whether there is a bar at
+// all, and `hasSectionBar` is the plugin's one answer to it.
+export function formOf(lines: readonly string[]): string {
+  return hasSectionBar(lines) ? SECTION_FORM : WIDGET_FORM;
+}
+
+// The form of the fence holding the directive at `line`.
+//
+// WALKS BACK TO THE OPENING FENCE rather than taking a run from the caller,
+// because the two callers have different things in hand — `answersOn` has an
+// offset into the whole file and `withAnswers` has one chunk's lines — and the
+// question is about the BLOCK either way. A directive that is in no fence has
+// no bar and cannot gain one, which is a widget by the same definition.
+export function formAt(lines: readonly string[], line: number): string {
+  let open = -1;
+  for (let i = Math.min(line, lines.length - 1); i >= 0; i--) {
+    if (lines[i].startsWith(FENCE_MARK)) {
+      open = i;
+      break;
+    }
+  }
+  if (open < 0) return WIDGET_FORM;
+  const body: string[] = [];
+  for (let i = open + 1; i < lines.length; i++) {
+    if (lines[i].startsWith(FENCE_MARK)) break;
+    body.push(lines[i]);
+  }
+  return formOf(body);
+}
+
+const FENCE_MARK = "```";
+
+export type SectionQuestion =
+  | ChoiceQuestion
+  | FolderQuestion
+  | TitleQuestion
+  | FormQuestion;
 
 // Whether a section may be composed without an answer to this.
 //
@@ -495,6 +586,11 @@ export function fieldLabelOf(q: SectionQuestion): string {
 // answer that cannot be told apart from another section's is one this must not
 // claim to have read. `soleArgSpanIn` states exactly that rule.
 export function answerInText(text: string, q: SectionQuestion): string | null {
+  // A FORM IS NOT AN ARGUMENT ANYWHERE (4.59.0), and this read is over the whole
+  // file rather than one section's fence, so it has nothing to answer from. Its
+  // callers fall back to the model's own `answered`, which is where `formAt`
+  // puts the answer — see `answersOn`.
+  if (q.kind === "form") return null;
   if (!q.directive) return null;
   const lines = text.split("\n");
   const span = soleArgSpanIn(lines, q.directive);
@@ -849,12 +945,44 @@ export function withAnswers(
 ): string[] {
   if (!options) return [...lines];
   let out = [...lines];
+  // ── THE FORM FIRST, BECAUSE IT IS THE ONLY ONE THAT ADDS OR REMOVES A LINE ──
+  //
+  // 4.59.0. Every splice below rewrites the ARGUMENT of a line that is already
+  // there; this writes the line itself in or out. Taken first so the splices
+  // read a settled fence — a `header:` question answered in the same pass would
+  // otherwise be looking for a span in a line this had not written yet.
+  //
+  // AND IT WRITES NOTHING WHEN THE FENCE IS ALREADY IN THAT FORM, which is what
+  // keeps a reader's renamed bar theirs: turning a section that is already a
+  // section back into one must not replace their title with the catalogue's.
+  const form = questions.find((q): q is FormQuestion => q.kind === "form");
+  if (form && typeof options[form.key] === "string") {
+    const want = options[form.key] as string;
+    if (want === WIDGET_FORM) {
+      out = out.filter((l) => !isHeaderLine(l));
+    } else if (want === SECTION_FORM && formOf(out) === WIDGET_FORM) {
+      // DIRECTLY UNDER THE FENCE, which is where every catalogue composes a bar
+      // and where the dispatcher needs it: the bar anchors the widgets that
+      // FOLLOW it, so one written below the summary would title nothing and take
+      // the `button:` line into its actions strip. A chunk with no opening fence
+      // is a section written as loose lines, and the bar goes at the top of it.
+      const open = out.findIndex((l) => l.startsWith(FENCE_MARK));
+      out.splice(open + 1, 0, form.bar);
+    }
+  }
   // A DIRECTIVE IS WRITTEN ONCE, HOWEVER MANY QUESTIONS ANSWER IT (4.16). Two
   // splices of one span is the second overwriting the first — so the questions
   // are grouped by the directive they name, and a group with more than one piece
   // composes its argument before touching the line.
   const byDirective = new Map<string, SectionQuestion[]>();
   for (const q of questions) {
+    // A FORM NAMES ITS DIRECTIVE WITHOUT BEING AN ARGUMENT OF IT, which is the
+    // one place the two meanings of that field come apart. `header` is there so
+    // the editor knows the answer is writable; the answer is the line's
+    // EXISTENCE, already settled above. Left in this loop it would splice the
+    // token "section" into the bar's title — over the reader's own, if they had
+    // renamed it — which is what the first cut of 4.59.0 did.
+    if (q.kind === "form") continue;
     if (!q.directive) continue;
     byDirective.set(q.directive, [...(byDirective.get(q.directive) ?? []), q]);
   }
@@ -935,6 +1063,18 @@ export function describeAnswers(
   for (const q of questions) {
     const answer = options?.[q.key];
     if (typeof answer !== "string") continue;
+    // A title has no list of answers to name one from, and an empty one is the
+    // catalogue's own heading rather than a host folder — so both halves below
+    // are asked per kind rather than of a union that has neither.
+    // A FORM ANSWERS IN ITS OWN TWO WORDS. The catalogue writes both sides, so
+    // the plan reads "how it is drawn → as a widget, so it can join a group"
+    // rather than the bare token the option carries.
+    if (q.kind === "form") {
+      parts.push(
+        `${q.label} → ${answer.trim() === WIDGET_FORM ? q.widget : q.section}`
+      );
+      continue;
+    }
     // A title has no list of answers to name one from, and an empty one is the
     // catalogue's own heading rather than a host folder — so both halves below
     // are asked per kind rather than of a union that has neither.
@@ -1163,48 +1303,9 @@ export function desiredOrder(occupants: string[], want: string[]): string[] {
   ];
 }
 
-// The `joined` bits a reordered list should carry. 4.44.1.
-//
-// ── THE ONE BIT, AND THE ONE ARRANGEMENT IT CANNOT DESCRIBE ──────────────
-//
-// `section-editor.ts` records a block as one bit per row — *this row is with the
-// one above it* — and argues, correctly, that a run of consecutive rows is what a
-// block IS, so one bit says the whole of it. It then says the bit "survives a
-// reorder for free": drag a row out of the middle of a block and it takes its
-// flag with it, and the row that followed keeps a flag now pointing at whatever
-// is above it.
-//
-// That is true of every row of a block EXCEPT THE ONE THAT OPENS IT, and the
-// exception is not a corner: the opener is the row a reader drags when they want
-// their group to start with something else. Its bit is the ABSENCE of a bit, and
-// absence does not travel. Move the homepage's Diary card below Go to and the
-// list says: Go to is joined, so it joins the block above it — the BANNER — and
-// Diary, unjoined, opens a block of its own. One drag, and the arrangement handed
-// to the write is a group the reader never asked for.
-//
-// ── SO THE BOUNDARIES ARE RESTORED BY POSITION, NOT BY ROW ───────────────
-//
-// A block whose members are still together after the move keeps its boundaries:
-// its first row opens it and the rest are joined to it, whichever rows those now
-// are. A block that was BROKEN UP by the move — a row dragged out of it, or
-// another row dropped into the middle of it — is left exactly as the bits
-// describe it, because that reader is regrouping and the bits are how they say
-// so. The two cases are told apart by one question, asked of the new order: are
-// this block's rows still consecutive?
-export function keptBlocks(
-  before: readonly (readonly string[])[],
-  rows: readonly string[],
-  joined: ReadonlySet<string>
-): Set<string> {
-  const out = new Set(joined);
-  for (const block of before) {
-    if (block.length < 2) continue;
-    const at = block.map((id) => rows.indexOf(id)).sort((a, b) => a - b);
-    if (at[0] === -1) continue;
-    if (at.some((n, i) => i > 0 && n !== at[i - 1] + 1)) continue;
-    const ids = at.map((i) => rows[i]);
-    out.delete(ids[0]);
-    for (const id of ids.slice(1)) out.add(id);
-  }
-  return out;
-}
+// The `joined` bits a reordered list should carry MOVED TO `core/row-order.ts`
+// IN 4.53.0, and the note is left here because this is where a reader looking
+// for it will come. `keptBlocks` was one half of a rule — a reorder keeps the
+// boundaries it found — whose other half (`keptPages`) did not exist and whose
+// callers were four hand-written swaps in the editor. All of it now lives in one
+// module with the operations that use it. See `row-order.ts`.

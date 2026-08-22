@@ -822,6 +822,32 @@
 .journal-task-due:not([value=""]) {
   color: var(--text-normal);
 }
+/* The hour, beside the day (4.55). Wears the date field's chrome exactly,
+   because the two are one answer to "when is this due" and a second style
+   would read as a second kind of thing. */
+.journal-task-at {
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: var(--am-radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.journal-task-at:hover {
+  border-color: var(--background-modifier-border);
+}
+.journal-task-at:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+/* NO DAY, NO HOUR. `display: none` rather than a disabled attribute: a field
+   that cannot hold an answer should not be asking. */
+.journal-task-at.is-hidden {
+  display: none;
+}
 .journal-task-del:hover {
   color: var(--text-error, #e05561);
 }

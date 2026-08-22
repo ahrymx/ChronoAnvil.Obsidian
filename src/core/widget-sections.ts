@@ -98,7 +98,18 @@ export const locateKeyword =
     return -1;
   };
 
-// ── a widget that may appear more than once ───────────────────────────
+// ── every widget may appear more than once ────────────────────────────
+//
+// AS MANY COPIES AS THE READER WANTS, AND THAT IS THE RULE FOR ALL OF THEM as
+// of 4.56. It was three widgets under a `repeats` flag, and the flag is gone:
+// `WIDGETS` holds only pure renders — anything owning a keyed span of the note
+// body is excluded from it under `reason: "region"` — so a second copy is a
+// second view and there is nothing left for the flag to protect. The registry's
+// own comment carries the argument in full.
+//
+// SECTIONS DID NOT CHANGE AND MUST NOT. One per page, withheld from the picker
+// once present, because a section persists content into a region keyed by its
+// name and a second one would write over the first.
 //
 // WHAT THE ONE-ANCHOR RULE ACTUALLY SAYS, because this is the place it looks
 // like it is being broken and is not. `parseFlatSections` gives a keyword's
@@ -106,7 +117,7 @@ export const locateKeyword =
 // to one id become one entry in a `Map`, and the first fence's content is then
 // written into both slots — a reader's block silently replaced on Save.
 //
-// The rule is "one id, one run". A repeating widget keeps it exactly, by giving
+// The rule is "one id, one run". Repeating widgets keep it exactly, by giving
 // every occurrence an id of its own. Nothing downstream learns a new shape: a
 // third `journal-card` line is a third section, located, planned, moved and
 // removed by machinery that cannot tell it from any other.
@@ -140,7 +151,10 @@ export function instanceIdOf(
   // `Number("")` is 0 and `Number("1x")` is NaN — both are ids nobody wrote, and
   // an ordinal below 1 is not a position in a list.
   if (!Number.isInteger(n) || n < 1) return null;
-  return WIDGETS[keyword]?.repeats ? { keyword, n } : null;
+  // A KEYWORD THE TABLE HOLDS, AND THAT IS THE WHOLE TEST AS OF 4.56. It used to
+  // also ask whether that keyword `repeats`; every one of them does now, so the
+  // question that is left is whether the id names a widget at all.
+  return WIDGETS[keyword] ? { keyword, n } : null;
 }
 
 export const instanceId = (keyword: string, n: number): string =>
@@ -251,6 +265,11 @@ const VAULT_SOURCES: Record<
     empty:
       "No journals yet — turn on Study or add one in Settings → Almanac → Journals, and it can be shown here.",
   },
+  logbooks: {
+    of: (v) => v.logbooks ?? [],
+    empty:
+      "No logbooks yet — add one in Settings → Almanac → Logbooks, and it can be shown here.",
+  },
 };
 
 // Every question this widget's argument becomes. 4.16.
@@ -357,14 +376,62 @@ const argQuestion = (
   };
 };
 
+// The questions a keyword's argument becomes, for a CATALOGUE that composes that
+// keyword itself. 4.58.1.
+//
+// ONE DECLARATION OF THE ARGUMENT, WHICH IS THE WHOLE REASON THIS IS EXPORTED.
+// `time-grid` is a section on the surfaces whose catalogue writes it and a page
+// widget everywhere else — the same directive, drawn the same way, offered
+// through two doors. Its three sources are declared once, in `widget-registry.ts`,
+// and a catalogue that re-typed them here would be the second table that starts
+// disagreeing the day one of them gains a fourth. `SECTION_TITLES` and the
+// registry are kept apart on purpose because they answer DIFFERENT questions;
+// this is the same question asked from a second place, so it is the same answer.
+//
+// RETURNS AN EMPTY LIST FOR AN UNKNOWN KEYWORD rather than throwing, on
+// `pageWidgetKeywords`' manners: a catalogue asking about a directive the
+// registry has never heard of has nothing to ask, and a section with no
+// questions is the ordinary case.
+export function widgetQuestions(
+  keyword: string,
+  hostFolder: string | null = null,
+  vault?: VaultLists
+): SectionQuestion[] {
+  const spec = WIDGETS[keyword];
+  return spec ? argQuestions(keyword, spec, hostFolder, vault) : [];
+}
+
+// The directive line a catalogue composes for a page widget it offers as a
+// section, with the reader's answers already in it.
+//
+// THE SAME PAIRING AS `widgetQuestions`, AND FOR THE SAME REASON. That exports
+// the questions a catalogue asks; this exports the line those answers spell. A
+// catalogue that asked through the registry and then wrote `time-grid:${answer}`
+// by hand would have re-implemented `renderLine`'s joiner, and the day a widget
+// grows a second argument the section door would compose a line the widget door
+// would not — the exact drift both exports exist to prevent.
+//
+// AN UNKNOWN KEYWORD IS ITS OWN LINE, on `widgetQuestions`' manners again: a
+// directive the registry has never heard of takes no arguments as far as
+// anything here knows, and the bare keyword is what that composes to.
+export function widgetLine(
+  keyword: string,
+  options?: Record<string, unknown>
+): string {
+  const spec = WIDGETS[keyword];
+  return spec ? renderLine(keyword, spec, options) : keyword;
+}
+
 const widgetSection = (
   keyword: string,
   spec: WidgetSpec,
-  // Which occurrence this is, for a widget that repeats. Absent is the widget's
-  // single section, which is every other entry in the registry.
-  n?: number
+  // WHICH OCCURRENCE THIS IS, AND IT IS NEVER ABSENT (4.56). Until then a widget
+  // that could not repeat had one section under a bare `w:<keyword>` id, and the
+  // two forms had to be kept off the same fence by hand — see the comment
+  // `pageWidgetSections` carried about generating both. One form, one rule.
+  n: number
 ): FlatSection => ({
-  id: n === undefined ? `${WIDGET_ID_PREFIX}${keyword}` : instanceId(keyword, n),
+  id: instanceId(keyword, n),
   label: spec.label,
   blurb: spec.blurb,
   icon: spec.glyph,
@@ -376,7 +443,9 @@ const widgetSection = (
     fence: "almanac",
     lines: [renderLine(keyword, spec, options)],
   }),
-  ...(spec.repeats ? { repeatable: true as const } : {}),
+  // EVERY PAGE WIDGET REPEATS. The editor reads this to know that adding one
+  // more is a legal thing to ask for.
+  repeatable: true as const,
   ...(argsOf(spec).length
     ? {
         questions: (noteSpec: {
@@ -386,9 +455,9 @@ const widgetSection = (
           argQuestions(keyword, spec, noteSpec.hostFolder ?? null, noteSpec.vault),
       }
     : {}),
-  // THE NTH LINE FOR AN INSTANCE, THE FIRST FOR EVERYTHING ELSE — which is the
-  // same locator, since the first match is the 1st.
-  locate: n === undefined ? locateKeyword(keyword) : locateNth(keyword, n),
+  // THE NTH LINE, ALWAYS — and for the single occurrence that is most pages,
+  // this is `locateKeyword` exactly, since the first match is the 1st.
+  locate: locateNth(keyword, n),
 });
 
 // The section for any instance id, built from the id alone.
@@ -412,16 +481,23 @@ export function instanceSectionFor(id: string): FlatSection | null {
 // The spare's `locate` returns -1 — there is no nth line — which is precisely
 // what "not present, therefore addable" means, so nothing had to learn a new
 // rule to offer it.
-export function repeatableInstances(
-  catalogue: readonly FlatSection[],
+//
+// AND IT IS WHY A WIDGET NEVER LEAVES THE PICKER (4.56). One row per keyword,
+// always: the instances a page holds are present and the spare behind them is
+// not, however many there are. A section behaves the other way and should — it
+// is withheld once the page has it, because a second one would claim the first
+// one's region.
+//
+// TAKES THE KEYWORDS RATHER THAN THE CATALOGUE, so the probe that produced them
+// runs once per model instead of once per read. See `pageWidgetKeywords`.
+export function widgetInstances(
+  keywords: readonly string[],
   text: string
 ): FlatSection[] {
   const out: FlatSection[] = [];
-  for (const [keyword, spec] of Object.entries(WIDGETS)) {
-    if (!spec.repeats) continue;
-    // A catalogue that manages this keyword itself keeps it, on
-    // `pageWidgetSections`' own de-dup rule: one fence, one owner.
-    if (catalogue.some((s) => s.locate(keyword) >= 0)) continue;
+  for (const keyword of keywords) {
+    const spec = WIDGETS[keyword];
+    if (!spec) continue;
     const held = countKeyword(keyword, text);
     for (let n = 1; n <= held + 1; n++) out.push(widgetSection(keyword, spec, n));
   }
@@ -454,7 +530,7 @@ export function nextInstanceId(
   }
 }
 
-// Every page widget this catalogue has no opinion about, as sections.
+// Every page widget this catalogue has no opinion about, by keyword.
 //
 // THE DE-DUP IS DERIVED, NOT DECLARED, AND IT RUNS BOTH WAYS. A catalogue that
 // already manages a keyword must not also be offered it as a widget, or the same
@@ -490,9 +566,16 @@ export function nextInstanceId(
 // on every call. The probe reads `locate`, which is invariant in that parameter
 // today — but "today" is exactly the kind of thing a cache turns into a bug three
 // releases later.
-export function pageWidgetSections(
+//
+// KEYWORDS RATHER THAN SECTIONS, AS OF 4.56, because a widget's sections are a
+// question about a TEXT — how many of them it holds — and this half is a
+// question about a CATALOGUE. They used to be one function because a
+// non-repeating widget had a section that needed no text; nothing does now, so
+// the split is along the line the two questions were always on. `widgetInstances`
+// is the other half.
+export function pageWidgetKeywords(
   catalogue: readonly FlatSection[]
-): FlatSection[] {
+): string[] {
   const composed = catalogue
     .flatMap((s) => {
       try {
@@ -506,22 +589,24 @@ export function pageWidgetSections(
     })
     .join("\n");
 
-  const out: FlatSection[] = [];
-  for (const [keyword, spec] of Object.entries(WIDGETS)) {
-    // A REPEATING WIDGET IS SUPPLIED PER OCCURRENCE, NOT ONCE (4.15 §4), and
-    // this line is load-bearing rather than tidy. Generating both forms puts two
-    // sections — `w:journal-card` on `locateKeyword` and `w:journal-card#1` on
-    // `locateNth(…, 1)` — over the SAME first fence, and `parseFlatSections`
-    // resolves a contested run by giving it to whichever id it walks into first
-    // and reporting the other as nobody's. That is the one-anchor rule being
-    // broken by the very thing written to honour it.
-    //
-    // `repeatableInstances` is the other half and needs the text, which is why
-    // this function cannot simply do both.
-    if (spec.repeats) continue;
+  const out: string[] = [];
+  for (const keyword of Object.keys(WIDGETS)) {
     if (catalogue.some((s) => s.locate(keyword) >= 0)) continue;
     if (locateKeyword(keyword)(composed) >= 0) continue;
-    out.push(widgetSection(keyword, spec));
+    out.push(keyword);
   }
   return out;
+}
+
+// Both halves, for a caller holding the text already.
+//
+// THE MODEL DOES NOT USE THIS — it hoists `pageWidgetKeywords` out of the read
+// path on purpose, which is the whole reason the two are separable. This is for
+// everywhere else that just wants the answer, and it keeps "what widgets does
+// this note offer" spelled once rather than at each call site.
+export function pageWidgetSections(
+  catalogue: readonly FlatSection[],
+  text: string
+): FlatSection[] {
+  return widgetInstances(pageWidgetKeywords(catalogue), text);
 }

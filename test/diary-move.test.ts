@@ -262,22 +262,22 @@ describe("a dashboard reorders too", () => {
     const want = [...present].reverse();
     const ops = planDiarySections(text, { grain: "monthly" }, want);
     expect(ops.filter((o) => o.kind === "move").length).toBeGreaterThan(0);
-    // Neither masthead section is reported as moving. A plan that named a move
-    // it would not perform is the 2.60.2 defect wearing the other face.
-    for (const id of ["banner", "summary"]) {
-      expect(
-        ops.some((o) => o.kind === "move" && o.sectionId === id),
-        id
-      ).toBe(false);
-    }
+    // The banner is not reported as moving. A plan that named a move it would
+    // not perform is the 2.60.2 defect wearing the other face.
+    //
+    // AND `summary` IS NO LONGER ON THIS LIST (4.58.0). It was here because it
+    // was alone in the masthead band; it is a `body` section now, so it reverses
+    // with everything else and a plan that said otherwise would be the same
+    // defect in the opposite direction — a refusal the write does not honour.
+    expect(
+      ops.some((o) => o.kind === "move" && o.sectionId === "banner")
+    ).toBe(false);
 
-    // The head keeps its row and the masthead keeps its two, in order, at the
-    // top; the body reverses beneath them. Since patch 3 the band is what makes
-    // that true, and it is the half of §4's rule the pin alone does not
-    // deliver: `links` being immovable stops nobody from dragging the charts
-    // above it, and the band does. 4.10 adds a third band and the same sentence
-    // still describes it.
-    const head = ["banner", "summary"];
+    // The banner keeps its row at the top; the body reverses beneath it. The
+    // band is what makes that true, and it is the half of §4's rule the pin
+    // alone does not deliver: a pinned banner stops nobody from dragging the
+    // charts above it, and the band does.
+    const head = ["banner"];
     const body = present.filter((id) => !head.includes(id));
     const next = applyDiarySections(text, { grain: "monthly" }, want)!;
     expect(detectDiarySections(next, { grain: "monthly" })).toEqual([
@@ -337,25 +337,27 @@ describe("a dashboard reorders too", () => {
 
 describe("what a dashboard will not let go of", () => {
   it("locks navigation and the banner, and is honest about which can move", () => {
-    // Both locked, and they no longer get the same sentence. `summary` has four
+    // Both locked, and they do not get the same sentence. `summary` has four
     // movable neighbours, so "You can move it, though." names something the
-    // reader can actually do; `links` does not, so it says what the rule is
+    // reader can actually do; the banner is pinned, so it says what the rule is
     // instead. One message for two different situations was the thing 3.2 §4
     // had to stop doing.
     for (const id of ["banner", "summary"]) {
       expect(DIARY_SECTIONS.find((x) => x.id === id)!.locked, id).toBe(true);
     }
 
-    // `summary` LOST ITS MOVE IN PATCH 3, and this is where that is recorded.
-    // Patch 1 deliberately kept "You can move it, though." here on the grounds
-    // that it had four movable neighbours — true then, and untrue the moment §3
-    // fused it into one card with navigation, which leaves it the only unpinned
-    // member of a two-section band. It is not pinned; it is stranded, by the
-    // same arithmetic that stranded `entry-header`.
+    // `summary` GOT ITS MOVE BACK IN 4.58.0, and this is where that is recorded.
+    // Patch 1 kept "You can move it, though." here on the grounds that it had
+    // four movable neighbours; §3 then fused it into one card with navigation,
+    // leaving it the only unpinned member of a two-section band and stranding it
+    // by arithmetic. 4.19 dissolved the card and left the band behind, so the
+    // strand outlived its cause by four releases. The band is gone and the
+    // section is `body`, so the sentence patch 1 wrote is true again.
     const summary = DIARY_SECTIONS.find((x) => x.id === "summary")!;
+    expect(summary.band).toBe("body");
     const whySummary = diaryRemovalRefusal(summary, monthly())!;
     expect(whySummary).toContain("can't be removed");
-    expect(whySummary).not.toContain("You can still move it");
+    expect(whySummary).toContain("You can still move it");
 
     // THE BANNER IS PINNED AND LOCKED, AND THE LOCK IS WHAT ANSWERS (4.11). It
     // used to reach a `pinned` branch of its own reading "the first thing on
@@ -679,20 +681,50 @@ describe("the pin restricts the editor without relocating anyone's file", () => 
     expect(applyDiarySections(text, { grain: "monthly" }, ids)).toBeNull();
   });
 
-  it("and will not move it back even when asked to", () => {
-    // The pin refuses in BOTH directions. A reader who drags navigation to the
-    // top of a rearranged dashboard is asking for a move, and the answer is the
-    // same one they get for dragging it down: nothing happens, and the plan
-    // says nothing happened.
+  it("and moves the overview back when asked to, as of 4.58.0", () => {
+    // WHAT THIS TEST USED TO ASSERT, AND WHY THE INVERSION IS THE POINT. It read
+    // "and will not move it back even when asked to", on the grounds that the
+    // masthead band refused in both directions. The band is gone: `summary` is a
+    // `body` section, so a reader who drags the overview back above the rollup
+    // is asking for an ordinary reorder and gets one.
+    //
+    // ASKED FOR IT BELOW THE BANNER, not above — the banner is `head` and still
+    // pinned, which the next assertion is about.
     const text = rearranged();
     const ids = detectDiarySections(text, { grain: "monthly" });
-    const want = ["summary", ...ids.filter((id) => id !== "summary")];
+    const want = ["banner", "summary", ...ids.filter(
+      (id) => id !== "summary" && id !== "banner"
+    )];
+    // A MOVE IS NAMED, THOUGH NOT NECESSARILY THIS SECTION'S. `moveOps` reports
+    // the minimal set — hoisting the overview past one block is equally
+    // truthfully "the rollup moved down" — so what is pinned is that the plan
+    // names a move at all and that the write performs the arrangement asked for.
     expect(
       planDiarySections(text, { grain: "monthly" }, want).some(
         (o) => o.kind === "move"
       )
+    ).toBe(true);
+    const next = applyDiarySections(text, { grain: "monthly" }, want)!;
+    expect(next).not.toBeNull();
+    expect(detectDiarySections(next, { grain: "monthly" })).toEqual(want);
+  });
+
+  it("but still refuses to move the banner, in both directions", () => {
+    // The pin is what is left, and it is the whole of the rule now. A reader who
+    // drags the page's own name below the overview is asking for a move, and the
+    // answer is nothing happens and the plan says nothing happened.
+    const text = rearranged();
+    const ids = detectDiarySections(text, { grain: "monthly" });
+    const want = [...ids.filter((id) => id !== "banner"), "banner"];
+    expect(
+      planDiarySections(text, { grain: "monthly" }, want).some(
+        (o) => o.kind === "move" && o.sectionId === "banner"
+      )
     ).toBe(false);
-    expect(applyDiarySections(text, { grain: "monthly" }, want)).toBeNull();
+    expect(detectDiarySections(
+      applyDiarySections(text, { grain: "monthly" }, want) ?? text,
+      { grain: "monthly" }
+    )[0]).toBe("banner");
   });
 
   it("still reorders the body around it", () => {
@@ -749,7 +781,14 @@ describe("the dashboard's masthead is one fence", () => {
       // open this fence is the banner's, so the summary is first here now — and
       // that is what makes `month-summary` insertable to the old keyword
       // reconciler again, which `repair-plan.test.ts` records.
-      expect(body[0], grain).toMatch(/-summary$/);
+      //
+      // AND ITS OWN BAR OPENS IT AS OF 4.59.0. The summary is a section and now
+      // wears a section's bar, which sits directly under the fence for the
+      // reason `withAnswers` gives when it writes one there: a bar anchors the
+      // widgets that FOLLOW it, so one written below the summary would title
+      // nothing and pull the `button:` line into its actions strip.
+      expect(body[0], grain).toMatch(/^header:📅 This /);
+      expect(body[1], grain).toMatch(/-summary$/);
     }
   });
 
@@ -796,18 +835,24 @@ describe("the dashboard's masthead is one fence", () => {
   });
 });
 
-describe("a body section cannot climb above navigation", () => {
+describe("a body section cannot climb above the banner", () => {
   it("which the pin alone does not prevent", () => {
-    // §4 says navigation is the top row. Pinning the banner stops a reader
-    // moving IT — and stops nobody from dragging the charts above it, which puts
-    // something above the top row without touching the pinned thing at all.
+    // §4 says the page's own name is the top row. Pinning the banner stops a
+    // reader moving IT — and stops nobody from dragging the charts above it,
+    // which puts something above the top row without touching the pinned thing
+    // at all.
     //
     // THE BAND DOES NOT REFUSE THE DRAG; IT REINTERPRETS IT. The request is
     // partitioned, so "charts to the top of the page" resolves to "charts to
     // the top of the BODY" — a real move, performed, reported, and landing
-    // below the masthead. That is the same mechanism `planEntrySections` uses
+    // below the banner. That is the same mechanism `planEntrySections` uses
     // for a `want` that interleaves the two halves of an entry: not
     // representable, so not refused with a message either.
+    //
+    // AND THE BODY NOW STARTS AT THE OVERVIEW (4.58.0), where it used to start
+    // below it. `summary` left the masthead for `body`, so "the top of the body"
+    // is a slot above the period summary rather than below it — which is the
+    // whole of what this release gives back.
     const text = monthly();
     const ids = detectDiarySections(text, { grain: "monthly" });
     const want = ["charts", ...ids.filter((id) => id !== "charts")];
@@ -819,28 +864,32 @@ describe("a body section cannot climb above navigation", () => {
 
     const next = applyDiarySections(text, { grain: "monthly" }, want)!;
     const after = detectDiarySections(next, { grain: "monthly" });
-    // "Charts to the top of the page" resolves to "charts to the top of the
-    // BODY" — still below two bands, which as of 4.19 are one row each.
-    expect(after.slice(0, 3)).toEqual(["banner", "summary", "charts"]);
+    expect(after.slice(0, 3)).toEqual(["banner", "charts", "summary"]);
   });
 
-  it("and the two bands are reported to the editor as different groups", () => {
+  it("and the banner is the only row in a group of its own", () => {
     const views = diarySectionModel({ grain: "monthly" }).sections();
     const groupOf = (id: string): string | null =>
       views.find((v) => v.id === id)!.group;
-    // THE TWO BANDS ARE ONE SECTION EACH AS OF 4.19, so what is asserted is that
-    // they are still DIFFERENT groups — which is what stops a body section being
-    // dragged into the masthead — rather than that two rows share one.
+    // ONE BAND SEPARATES ANYTHING FROM ANYTHING, AND IT IS THE BANNER'S. The
+    // masthead was a second, and until 4.58.0 this test asserted that `summary`
+    // sat outside the body — which is exactly the restriction that release
+    // removes. The overview shares the body's group now; the banner does not,
+    // and that is what stops a section being dragged above the page's name.
+    expect(groupOf("charts")).toBe(groupOf("summary"));
     expect(groupOf("banner")).not.toBe(groupOf("summary"));
-    expect(groupOf("charts")).not.toBe(groupOf("summary"));
-    expect(groupOf("charts")).not.toBe(groupOf("banner"));
+    expect(groupOf("banner")).not.toBe(groupOf("charts"));
+    // And the banner is alone in it, which is the arithmetic half of the same
+    // fact: `head` has one member, so there is nowhere for it to go even if the
+    // pin were lifted.
+    expect(views.filter((v) => v.group === groupOf("banner"))).toHaveLength(1);
   });
 
   it("but the body still reorders freely within itself", () => {
     const text = monthly();
     const ids = detectDiarySections(text, { grain: "monthly" });
-    const body = ids.filter((id) => id !== "banner" && id !== "summary");
-    const want = ["links", "summary", ...[...body].reverse()];
+    const body = ids.filter((id) => id !== "banner");
+    const want = ["banner", ...[...body].reverse()];
     expect(applyDiarySections(text, { grain: "monthly" }, want)).not.toBeNull();
   });
 });

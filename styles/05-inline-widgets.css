@@ -348,7 +348,27 @@
  *
  * ONE MECHANISM, NOT TWO. The breakpoint is gone rather than kept alongside
  * this: below the floor every cell is already on its own line, so a rule saying
- * so as well would be a second answer to a question this one has answered. */
+ * so as well would be a second answer to a question this one has answered.
+ *
+ * ── AND AS OF 4.52.1 IT ONLY EVER FIRES ON A PHONE ──────────────────────
+ *
+ * The rule above is unchanged and the number of cells it is given is not. A row
+ * draws at most TWO columns now — `MAX_COLUMNS` in core/directive-grammar.ts
+ * carries the whole argument, and the short of it is that a wrapped column stops
+ * being a column: a fence of four on a 1090px note put three across and stretched
+ * the fourth to the full width of the group, which is a layout whose shape
+ * depends on how wide the reader's sidebar happens to be.
+ *
+ * TWO CELLS AT THE FLOOR PLUS THE GAP IS 650px, which is under the width the
+ * group-making quarters already demand of a block below (`min-width: 660px`,
+ * chosen for exactly this sum). So above a phone this rule now has nothing to
+ * do, and where it still does fire it puts one cell per line — the collapse it
+ * was written for, and the only wrap that was ever right.
+ *
+ * IT STAYS RATHER THAN GOING, because that collapse is the half of it that was
+ * never the bug, and because a `cell: 5` a reader types by hand can still ask
+ * for a basis no pane can hold. The cap counts columns; it does not cap a
+ * weight, and `cellWeightOf` says at length why it must not. */
 .journal-block-row {
   flex-wrap: wrap;
 }
@@ -1501,26 +1521,67 @@
    padding — the strip that is visibly outside the row, which is where a reader
    would aim to say "outside the row".
 
-   AND ABOVE THE CELLS, WHICH TAKES NO ARGUMENT ABOUT NUMBERS: a cell is a
-   stacking context (`container-type: inline-size` implies layout containment),
-   so every slot inside one is sealed in it and any positive z-index on a direct
-   child of the block clears them all. */
+   ── THE BANDS ARE UNDER THE COLUMNS NOW, AND THAT IS A REVERSAL (4.54 §1) ──
+
+   WHAT A VAULT REPORTED: *"a cell can not be dragged above a cell that is at
+   the top, because the wrong box highlights."* Screenshotted mid-drag on the
+   homepage: the pointer is on the head of **Open tasks**, the first card in the
+   right-hand column, and what lights up is a band across the whole group with
+   its accent bar on the group's own top edge — "above this entire block". The
+   place the reader was pointing at could not be reached from anywhere.
+
+   IT WAS THIS RULE, AND THE NUMBER WAS ONLY HALF OF IT. 4.8.7 grew the band
+   from a flat 16px to `clamp(24px, 25%, 72px)` because 16px was a fingertip;
+   72px is four fingertips laid over the top of every column, and the five
+   places on the first card in each of them are inside it. The band's `z-index`
+   did the rest: a cell is a stacking context (`container-type: inline-size`
+   implies layout containment), so every slot inside one is sealed in it and NO
+   number on a cell slot can rise above a positive `z-index` on a direct child
+   of the block. The band did not win the argument — there was no argument to
+   have.
+
+   SO THE GROUND IS SWAPPED RATHER THAN THE NUMBERS, which is 4.8.4's own
+   conclusion applied the other way round: the CELL is lifted out of the block's
+   flow while a drag is in the air, and the block's bands sink under it. A band
+   then covers exactly what no column covers — the group's padding, its foot,
+   and the reach beyond the block — and it needs no ceiling, because the columns
+   themselves are the ceiling. A widget's own five places are unreachable from
+   nowhere.
+
+   AND `--am-slot-reach` IS WHAT PAYS FOR IT. Losing the overlap would leave a
+   band the height of the group's padding, which is 16px again and the thing
+   4.8.7 was right to refuse; the token says why the space outside the block is
+   the right place to find it back. */
 .jbd-slot-edge {
-  /* A SHARE OF THE BLOCK WITH A FLOOR AND A CEILING (4.8.7). It was a flat
-     16px, which is the block's own padding and about a fingertip — reachable in
-     principle and not in practice, and the one number in this design picked
-     without seeing it. A quarter of the block is a target a hand finds; the
-     floor keeps it usable on a short row and the ceiling keeps it from eating
-     the columns on a tall one. */
-  height: clamp(24px, 25%, 72px);
-  z-index: 5;
+  /* A SHARE OF THE BLOCK WITH A FLOOR, PLUS THE REACH. The ceiling that used to
+     be here (72px) went with the overlap it was rationing: nothing this band
+     covers belongs to a column any more, so there is nothing for it to eat. The
+     floor is what a short group in a section run gets, where the box paints no
+     padding at all and the reach is the whole of it. */
+  height: calc(clamp(24px, 25%, 72px) + var(--am-slot-reach));
+  z-index: 2;
 }
 .jbd-slot-above.jbd-slot-edge {
-  top: 0;
+  top: calc(-1 * var(--am-slot-reach));
 }
 .jbd-slot-below.jbd-slot-edge {
   top: auto;
-  bottom: 0;
+  bottom: calc(-1 * var(--am-slot-reach));
+}
+/* THE COLUMNS, LIFTED OVER THE BANDS — the other half of the swap above, and
+   the whole of the fix in one declaration.
+
+   `position: relative` IS ALREADY ON THE CELL for its own slots to stand on, so
+   this is a number and nothing else. `.journal-group-pages` is positioned at
+   `z-index: auto` and `.journal-group` is not positioned at all, so neither
+   seals the cell in: the number resolves in the BLOCK's stacking context, which
+   is where the bands are, which is the only place the two can be compared.
+
+   ONLY WHILE SOMETHING IS IN THE AIR. A page at rest has no drop targets on it
+   and no reason to have its columns re-stacked; keying this on `is-slotting`
+   means the change cannot reach a render the gesture is not part of. */
+.journal-widget-block.is-slotting .journal-block-row > .journal-block-cell {
+  z-index: 5;
 }
 .jbd-slot-above::after,
 .jbd-slot-below::after {
@@ -1533,6 +1594,17 @@
 }
 .jbd-slot-below::after {
   bottom: -2px;
+}
+/* AND THE MARK STAYS ON THE BLOCK'S OWN EDGE, which the reach would otherwise
+   carry out into the margin — a bar floating in the gap between two blocks says
+   the arrival lands in the gap. The band starts `--am-slot-reach` above the
+   block; the bar is put back down by exactly that, and lands where it did
+   before any of this moved. */
+.jbd-slot-above.jbd-slot-edge::after {
+  top: calc(var(--am-slot-reach) - 2px);
+}
+.jbd-slot-below.jbd-slot-edge::after {
+  bottom: calc(var(--am-slot-reach) - 2px);
 }
 /* FIVE PLACES ON EVERY WIDGET IN A ROW (4.8.6), reading outward: the widget's
    edges are the row, and its middle is the widget itself.
@@ -1570,11 +1642,27 @@
   bottom: 0;
   width: 3px;
 }
+/* IN THE MIDDLE OF THE GUTTER, MEASURED BACK FROM THE SLOT (4.54 §2).
+
+   THE BUG THIS FIXES was arithmetic left behind by a hit area. These two read
+   `calc(var(--am-widget-gap) / -2 - 1px)` — half a gutter and half a bar out
+   from the CARD's edge, which is exactly right and was exactly right when the
+   slot's own box started at the card's edge. 4.8.3 then moved the box out to
+   `calc(var(--am-widget-gap) / -2 - 9px)` to widen the target, and the mark, an
+   `::after` inside the box, went with it: a bar meant for the middle of a 10px
+   gutter was being drawn 14px further out, which puts it clear of the gutter and
+   over the neighbouring column. The two slots that name ONE boundary — this
+   cell's `before` and the previous cell's `after` — drew their bars 20px apart,
+   one on each card, and neither on the seam between them.
+
+   SO THE OVERHANG IS ADDED BACK, and it is written as the sum rather than as
+   the 8px it comes to, because the two halves are the two rules that have to
+   stay in step: change the box's inset below and this follows it. */
 .jbd-slot-before::after {
-  left: calc(var(--am-widget-gap) / -2 - 1px);
+  left: calc(var(--am-widget-gap) / 2 + 9px - var(--am-widget-gap) / 2 - 1px);
 }
 .jbd-slot-after::after {
-  right: calc(var(--am-widget-gap) / -2 - 1px);
+  right: calc(var(--am-widget-gap) / 2 + 9px - var(--am-widget-gap) / 2 - 1px);
 }
 /* The two that stack, between the edges. */
 .jbd-slot-over,
@@ -1587,8 +1675,23 @@
 .jbd-slot-over {
   top: 0;
 }
+/* AND THE GAP BETWEEN TWO CARDS BELONGS TO THE ONE ABOVE IT (4.54 §1).
+
+   A column is a flex column with `var(--am-widget-gap)` between its cards, and
+   until the bands sank under the columns that 10px strip was covered by
+   whichever block band happened to reach it. Nothing covers it now, so it would
+   be the one place inside a group that means nothing — a dead line between two
+   live targets, three pixels from each.
+
+   ONE OF THE TWO TAKES IT, NOT BOTH, and which one is arbitrary in effect:
+   "below the card above" and "above the card below" resolve to the same
+   insertion point, so a reader cannot tell them apart by the result. It goes to
+   the card ABOVE because the alternative eats upwards — the first card in a
+   column would reach into the group's padding and take the strip the band above
+   it is now living on, which is the space this release just finished buying. */
 .jbd-slot-under {
-  bottom: 0;
+  bottom: calc(-1 * var(--am-widget-gap));
+  height: calc(20% + var(--am-widget-gap));
 }
 .jbd-slot-over::after,
 .jbd-slot-under::after {
@@ -1599,8 +1702,11 @@
 .jbd-slot-over::after {
   top: 0;
 }
+/* ON THE CARD'S OWN EDGE, not on the slot's. The slot now hangs a gap's worth
+   below the card, and a bar carried down with it would be drawn against the
+   TOP of the next card — naming the boundary from the wrong side. */
 .jbd-slot-under::after {
-  bottom: 0;
+  bottom: var(--am-widget-gap);
 }
 /* And the middle, which is a swap. Its mark is a ring rather than a bar: a bar
    says "the arrival goes on this side of that line" and a swap has no side. */

@@ -507,6 +507,80 @@ describe("page boundaries can be stated rather than gestured", () => {
   it("refuses a block that is not a group", () => {
     expect(setPageBreaks(["diary:3", "tasks-table"], [1])).toBeNull();
   });
+
+  it("drops the line instead where a column would put the page over the cap", () => {
+    // 4.52.1, AND IT IS A BUG A READER REACHES IN TWO CLICKS. The demotion above
+    // is right whenever there WAS a column boundary to promote. A `tab` inserted
+    // above a widget that had no delimiter was not promoted from anything, so
+    // demoting it INVENTS a column — and here that is a third, which a row does
+    // not have.
+    //
+    // The homepage's own group, in one line: `diary` beside three that stack.
+    // Start a page at `recall` and take it away again, and the fence has to come
+    // back as it was rather than with a delimiter it never carried.
+    const home = ["row", "diary:3", "cell", "tasks-table", "recall"];
+    const paged = setPageBreaks(home, [4]);
+    expect(paged).toEqual(["row", "diary:3", "cell", "tasks-table", "tab", "recall"]);
+    expect(setPageBreaks(paged!, [])).toEqual(home);
+  });
+
+  it("moves a page up the fence without deleting the wrong line", () => {
+    // THE INDEX TRAP, AND WHAT IT COSTS IS A WIDGET. Moving a page from one
+    // member to an EARLIER one both demotes a `tab` and inserts one, and the
+    // loop walks back to front — so the insertion happens after the demotion is
+    // recorded, at a lower line, and shifts that line up by one. Acted on
+    // unshifted, the pass below would splice out whatever now sits at the old
+    // index, which here is the directive `b` rather than the delimiter above it.
+    //
+    // The demotion has to go, because `b`, `c` and `d` would be three columns of
+    // one page and a row has two. What must not go with it is a line the reader
+    // wrote.
+    const body = ["row", "a", "b", "tab", "c", "cell", "d"];
+    const out = setPageBreaks(body, [2]);
+    expect(out).toEqual(["row", "a", "tab", "b", "c", "cell", "d"]);
+    // Every directive that went in came out.
+    expect(out!.filter((l) => ["a", "b", "c", "d"].includes(l))).toEqual([
+      "a",
+      "b",
+      "c",
+      "d",
+    ]);
+  });
+
+  it("moves a page down the fence without testing the wrong line", () => {
+    // THE INDEX TRAP, AND IT IS REACHABLE FROM THE EDITOR IN ONE SAVE. Moving a
+    // page from one member to a LOWER one both inserts a `tab` and demotes one,
+    // and the loop walks back to front — so the insertion happens after the
+    // demotion is recorded, at a lower line, and shifts it up by one. Tested at
+    // the unshifted index, the cap check would read whichever line happened to
+    // be there.
+    //
+    // Here `recall` gives up its page to `tasks-table`, which has a column of
+    // its own — so the demoted line stays a `cell`, both pages are within the
+    // cap, and the fence is the one the reader asked for rather than one line
+    // short of it.
+    const body = ["row", "diary:3", "cell", "tasks-table", "tab", "recall"];
+    expect(setPageBreaks(body, [3])).toEqual([
+      "row",
+      "diary:3",
+      "tab",
+      "tasks-table",
+      "cell",
+      "recall",
+    ]);
+  });
+
+  it("still leaves the column where there is room for one", () => {
+    // THE HALF 4.34.2 IS ABOUT, UNTOUCHED. Two widgets and a demoted boundary is
+    // two columns, which is what a row has — so the `cell` stays and the pair
+    // are beside each other again rather than stacked.
+    expect(setPageBreaks(["row", "diary:3", "tab", "tasks-table"], [])).toEqual([
+      "row",
+      "diary:3",
+      "cell",
+      "tasks-table",
+    ]);
+  });
 });
 
 describe("the editor carries the second bit", () => {
@@ -532,9 +606,22 @@ describe("the editor carries the second bit", () => {
 
   it("never lets a group's opener begin a page", () => {
     // Enforced in `pagesOf`, once, rather than at each place that sets the bit.
-    const at = src().indexOf("private pagesOf(");
+    //
+    // AND IN `normalise` FOR THE BITS THEMSELVES, since 4.53.0. Cutting the
+    // group correctly is half of it: a row that stops being in a group also has
+    // to stop carrying a page bit, or a reader who breaks a group up and rebuilds
+    // it gets page boundaries they asked for once, a while ago, on a different
+    // arrangement. `pagesOf` says it about what is drawn and `normalise` says it
+    // about what is held.
+    const order = readSrc("row-order");
+    const at = order.indexOf("export function pagesOf(");
     expect(at).toBeGreaterThan(-1);
-    expect(src().slice(at, at + 400)).toContain("if (i > 0 && this.paged.has(id))");
+    expect(order.slice(at, at + 400)).toContain("if (i > 0 && paged.has(id))");
+    const norm = order.indexOf("export function normalise(");
+    expect(norm).toBeGreaterThan(-1);
+    expect(order.slice(norm, norm + 500)).toContain(
+      "for (const id of paged) if (out.has(id)) pages.add(id);"
+    );
   });
 
   it("stops counting columns on the card", () => {

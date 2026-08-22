@@ -24,9 +24,16 @@ import {
   detectDiarySections,
   renderDiarySection,
   isOptIn,
+  applyDiarySections,
+  diarySectionModel,
+  planDiarySections,
   sectionsForDashboard,
+  titleSummaryFence,
 } from "../src/diary/diary-sections";
 import type { DashboardGrain } from "../src/diary/diary-sections";
+import { isPageWidgetId } from "../src/core/widget-sections";
+import { CLASS_DEFS } from "../src/trackers/trackers";
+import { repairNote } from "../src/core/repair-plan";
 
 // The byte-for-byte diff that stood here through 2.59.2 is gone with the asset
 // files it compared against. It was a MIGRATION gate, not a standing test: its
@@ -229,11 +236,84 @@ describe("what a dashboard already has, and what it could gain", () => {
       const optIn = sectionsForDashboard(ctx)
         .filter((s) => isOptIn(s, ctx))
         .map((s) => s.id);
+      // THE CATALOGUE'S HALF ONLY, AS OF 4.58.0. `addableDiarySections` now also
+      // offers every page widget this grain leaves free — which is the release —
+      // and those are not catalogue sections and are not what this invariant is
+      // about. Filtered by id rather than by set difference so the assertion
+      // still fails if a catalogue section goes missing from it.
       expect(
-        addableDiarySections(ctx, composeDiaryDashboard(g)).map((s) => s.id),
+        addableDiarySections(ctx, composeDiaryDashboard(g))
+          .map((s) => s.id)
+          .filter((id) => !isPageWidgetId(id)),
         g
       ).toEqual(optIn);
     }
+  });
+
+  it("and everything it offers on top of them is a page widget", () => {
+    // THE OTHER SIDE OF THE FILTER ABOVE, so neither assertion can quietly stop
+    // covering what it was written for. A dashboard's add list is the catalogue's
+    // opt-ins plus page widgets, and nothing else: an id that is neither would be
+    // a section this file cannot account for.
+    //
+    // AND EVERY WIDGET IS OFFERED EXACTLY ONCE, however many instances a note
+    // holds — `widgetInstances` gives the held ones plus one spare, and only the
+    // spare is addable. On a freshly composed dashboard that is `#1` for each.
+    for (const g of ["weekly", "monthly", "quarterly", "yearly"] as const) {
+      const ctx = { grain: g };
+      const widgets = addableDiarySections(ctx, composeDiaryDashboard(g))
+        .map((s) => s.id)
+        .filter((id) => isPageWidgetId(id));
+      expect(widgets.length, g).toBeGreaterThan(0);
+      expect(new Set(widgets).size, g).toBe(widgets.length);
+      for (const id of widgets) expect(id, g).toMatch(/#1$/);
+    }
+  });
+
+  it("and withholds the widget for anything the catalogue already writes", () => {
+    // THE DE-DUP, READ OFF THE SURFACE THAT NEEDED IT MOST. Four of the widgets
+    // are period summaries and the `summary` section's `locate` matches all four
+    // — `^(day|week|month|quarter|year)-summary` — so offering any of them would
+    // put two ids on one fence and let a Save write one over the other.
+    //
+    // `links` and `tag-index` are the same fact with narrower anchors: the banner
+    // composes a `links:` row and Tags composes a `tag-index`.
+    for (const g of ["weekly", "monthly", "quarterly", "yearly"] as const) {
+      const offered = new Set(
+        addableDiarySections({ grain: g }, composeDiaryDashboard(g)).map(
+          (s) => s.id
+        )
+      );
+      for (const keyword of [
+        "week-summary",
+        "month-summary",
+        "quarter-summary",
+        "year-summary",
+        "links",
+        "tag-index",
+      ]) {
+        expect(offered.has(`w:${keyword}#1`), `${g}/${keyword}`).toBe(false);
+      }
+    }
+  });
+
+  it("but offers the widget where the section does not apply to this grain", () => {
+    // THE PROBE IS GRAIN-AWARE, AND THAT IS WHAT MAKES IT USEFUL RATHER THAN
+    // MERELY SAFE. A yearly dashboard has no Open Tasks section — 2.58.6 decided
+    // a year of open tasks grouped by source note is a page-long list nobody
+    // reads — so nothing on that grain claims `tasks-table`, and a reader who
+    // wants one anyway may now add it as a card. A week's catalogue writes one,
+    // so a week is offered none.
+    const yearly = addableDiarySections(
+      { grain: "yearly" },
+      composeDiaryDashboard("yearly")
+    ).map((s) => s.id);
+    expect(yearly).toContain("w:tasks-table#1");
+    const weekly = addableDiarySections(
+      { grain: "weekly" },
+      composeDiaryDashboard("weekly")
+    ).map((s) => s.id);
+    expect(weekly).not.toContain("w:tasks-table#1");
   });
 
   it("says what each grain is offered but not given", () => {
@@ -256,10 +336,16 @@ describe("what a dashboard already has, and what it could gain", () => {
     // period, so it applies to every grain equally — and four dashboards each
     // growing an identical cloud over the same folder would be one view drawn
     // four times.
+    //
+    // AND A FOURTH IN 4.58.1: `time-grid` is opt-in on the WEEK ALONE, and the
+    // grain is doing two jobs in that sentence. It is offered on a week because
+    // `weekStartOf` reads the host note's `week-start`, so only there is the
+    // grid scoped to the period the page is about; it is opt-in rather than
+    // shipped because every weekly dashboard that already exists predates it.
     expect(optIn("yearly")).toEqual(["recap", "tags"]);
     expect(optIn("quarterly")).toEqual(["recap", "entry-rollup", "tags"]);
     expect(optIn("monthly")).toEqual(["tags"]);
-    expect(optIn("weekly")).toEqual(["tags"]);
+    expect(optIn("weekly")).toEqual(["time-grid", "tags"]);
   });
 
   it("ships the rollup on a week and a month, and offers it on a quarter", () => {
@@ -313,10 +399,15 @@ describe("what a dashboard already has, and what it could gain", () => {
       /```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```\n\n/,
       ""
     );
-    expect(addableDiarySections(ctx, without).map((s) => s.id)).toEqual([
-      "open-tasks",
-      "tags",
-    ]);
+    expect(
+      addableDiarySections(ctx, without)
+        .map((s) => s.id)
+        .filter((id) => !isPageWidgetId(id))
+      // `time-grid` is here for the SAME reason as `tags` — never composed, so
+      // always addable — and ahead of Open Tasks because the add list runs in
+      // catalogue order, which is where a reader will look for it once it is on
+      // the page.
+    ).toEqual(["time-grid", "open-tasks", "tags"]);
   });
 
   it("finds a section whose header the reader retitled", () => {
@@ -516,5 +607,518 @@ describe("editing sections routes all three surfaces", () => {
     // answers "is this the folder note"; `entryContextFor` is the same test
     // read the other way round, so the two cannot both claim a note.
     expect(src()).toContain("if (this.diaryContextFor(notePath)) return null;");
+  });
+});
+
+
+// ── 4.58.0: the widget door, on the surface that did not have one ─────
+//
+// The release's claim in one describe block: a period dashboard offers what the
+// homepage offers, holds as many of a card as a reader asks for, lets them sit
+// anywhere below the banner, and gives the file back unchanged when they all
+// leave. Each of those is a different part of the model, and the last one is the
+// property that says the other three did not damage anything.
+
+describe("a dashboard holds page widgets", () => {
+  const ctx = { grain: "weekly" } as const;
+  const base = (): string => composeDiaryDashboard("weekly");
+
+  it("adds one, and says so before writing it", () => {
+    const text = base();
+    const want = [...detectDiarySections(text, ctx), "w:events#1"];
+
+    const ops = planDiarySections(text, ctx, want);
+    expect(
+      ops.find((o) => o.sectionId === "w:events#1")
+    ).toMatchObject({ kind: "add", label: "Events" });
+    // AND NOTHING ELSE IS TOUCHED. Every catalogue section is reported kept and
+    // unchanged, which is the whole of what makes the preview worth reading.
+    for (const id of detectDiarySections(text, ctx)) {
+      expect(ops.find((o) => o.sectionId === id), id).toMatchObject({
+        kind: "keep",
+        detail: "unchanged",
+      });
+    }
+
+    const next = applyDiarySections(text, ctx, want)!;
+    expect(next).toContain("```almanac\nevents\n```");
+    expect(detectDiarySections(next, ctx)).toEqual(want);
+  });
+
+  it("and a second, because a widget repeats where a section does not", () => {
+    const one = applyDiarySections(base(), ctx, [
+      ...detectDiarySections(base(), ctx),
+      "w:events#1",
+    ])!;
+    const held = detectDiarySections(one, ctx);
+
+    // The editor asks the MODEL for the next id rather than spelling one, which
+    // is the reason `instanceOf` is a method. `taken` is what the window is
+    // holding, not what the file contains.
+    const model = diarySectionModel(ctx);
+    expect(model.instanceOf!("w:events#1", one, held)).toBe("w:events#2");
+
+    const two = applyDiarySections(one, ctx, [...held, "w:events#2"])!;
+    expect(detectDiarySections(two, ctx)).toEqual([...held, "w:events#2"]);
+    // Two lines, two sections. A single-anchor `locate` would have reported one.
+    expect(two.match(/^events$/gm)).toHaveLength(2);
+  });
+
+  it("and it may sit anywhere below the banner, including above the overview", () => {
+    // THE TWO HALVES OF THIS RELEASE MEETING. The widget is a `body` section and
+    // so, as of this release, is the period summary — so a card can be dragged
+    // above the overview, which the masthead band existed to prevent and which
+    // nothing now does.
+    const one = applyDiarySections(base(), ctx, [
+      ...detectDiarySections(base(), ctx),
+      "w:events#1",
+    ])!;
+    const held = detectDiarySections(one, ctx);
+    const want = [
+      "banner",
+      "w:events#1",
+      ...held.filter((id) => id !== "banner" && id !== "w:events#1"),
+    ];
+    const moved = applyDiarySections(one, ctx, want)!;
+    expect(detectDiarySections(moved, ctx)).toEqual(want);
+
+    // And not above the banner, which is the one thing a dashboard still
+    // refuses. The request is not refused with a message; it is partitioned,
+    // so it resolves to the top of the body.
+    const climbed = applyDiarySections(moved, ctx, [
+      "w:events#1",
+      ...want.filter((id) => id !== "w:events#1"),
+    ]);
+    expect(detectDiarySections(climbed ?? moved, ctx)[0]).toBe("banner");
+  });
+
+  it("and gives the file back byte-for-byte when they all leave", () => {
+    // THE PROPERTY THE OTHER THREE REST ON. A reconciler that adds a card and
+    // cannot take it back out again without a trace is a formatter, which is the
+    // distinction `layout.ts` keeps a list about — and on this surface the trace
+    // would be a widening gap where the block used to be.
+    const text = base();
+    let next = applyDiarySections(text, ctx, [
+      ...detectDiarySections(text, ctx),
+      "w:events#1",
+    ])!;
+    next = applyDiarySections(next, ctx, [
+      ...detectDiarySections(next, ctx),
+      "w:events#2",
+    ])!;
+    expect(next).not.toBe(text);
+
+    const back = applyDiarySections(
+      next,
+      ctx,
+      detectDiarySections(next, ctx).filter((id) => !isPageWidgetId(id))
+    )!;
+    expect(back).toBe(text);
+  });
+
+  it("but never composes one into a fresh dashboard", () => {
+    // THE SEAM THAT KEEPS THIS ADDITIVE. `composeDiaryDashboard` calls
+    // `sectionsForDashboard` with no text, which is the arity that answers with
+    // the catalogue alone — so no shipped note gains a line, and `reconcileLayouts`
+    // has no unit for a widget and will neither insert one nor take one back out.
+    for (const g of ["weekly", "monthly", "quarterly", "yearly"] as const) {
+      expect(
+        sectionsForDashboard({ grain: g }).some((s) => isPageWidgetId(s.id)),
+        g
+      ).toBe(false);
+      expect(
+        detectDiarySections(composeDiaryDashboard(g), { grain: g }).some(
+          isPageWidgetId
+        ),
+        g
+      ).toBe(false);
+    }
+  });
+
+  it("and repair leaves them alone while it puts a missing section back", () => {
+    // THE PATH THAT COULD HAVE COST SOMEBODY THEIR CARDS. `repairNote`
+    // reconciles a note toward the composition this release ships, and the
+    // shipped composition has no widgets in it — so the question is whether a
+    // card a reader added reads as "something the note has that the shipped text
+    // does not", which is the shape of a removal.
+    //
+    // IT DOES NOT, AND FOR A STRUCTURAL REASON RATHER THAN A LUCKY ONE. Repair's
+    // want is *everything the note already has, in the order it has it*, plus the
+    // shipped sections it lacks. The cards are in the first half. `FORBIDDEN`
+    // would throw if the plan produced a `remove` or a `move` for one, so this
+    // test fails loudly rather than quietly if that stops being true.
+    const shipped = base();
+    const model = diarySectionModel(ctx);
+
+    let text = applyDiarySections(shipped, ctx, [
+      ...detectDiarySections(shipped, ctx),
+      "w:events#1",
+    ])!;
+    // ...and a shipped section the reader removed, so repair has real work.
+    text = applyDiarySections(
+      text,
+      ctx,
+      detectDiarySections(text, ctx).filter((id) => id !== "open-tasks")
+    )!;
+
+    const { ops, next } = repairNote(model, text, shipped);
+    expect(ops.map((o) => o.kind)).toEqual(["add"]);
+    expect(detectDiarySections(next!, ctx)).toEqual([
+      "banner",
+      "summary",
+      "entry-rollup",
+      "open-tasks",
+      "charts",
+      "w:events#1",
+    ]);
+    // A second run has nothing left to return, which is what makes idempotence
+    // structural rather than claimed.
+    expect(repairNote(model, next!, shipped).next).toBeNull();
+  });
+
+  it("and each card reads its OWN answer back, not the first one's", () => {
+    // THE REFUSAL THIS ROUTES AROUND. The window reads an answer back by finding
+    // the directive in the whole file and declines when it appears more than
+    // once — right for a window holding a file and no extents, and fatal for a
+    // widget whose directive is plural by design. The model located the section,
+    // so it reads the answer off that section's own line.
+    let text = applyDiarySections(base(), ctx, [
+      ...detectDiarySections(base(), ctx),
+      "w:journal-card#1",
+    ])!;
+    text = applyDiarySections(text, ctx, [
+      ...detectDiarySections(text, ctx),
+      "w:journal-card#2",
+    ])!;
+    text = text
+      .replace(/^journal-card$/m, "journal-card:study")
+      .replace(/^journal-card$/m, "journal-card:work");
+
+    const answered = (id: string): Record<string, string> | undefined =>
+      diarySectionModel(ctx)
+        .sections(text)
+        .find((v) => v.id === id)!.answered;
+    expect(answered("w:journal-card#1")).toEqual({ arg: "study" });
+    expect(answered("w:journal-card#2")).toEqual({ arg: "work" });
+    // And the spare behind them has answered nothing, because it is not there.
+    expect(answered("w:journal-card#3")).toEqual({});
+  });
+
+  it("and asks its questions with the lists the caller supplied", () => {
+    // `DiaryDashboardContext.vault` is the thread `modelForSurface` already held
+    // and dropped on this branch. Without it the Logbook card would be offered
+    // with a dropdown it could not fill — which is the state 4.15 §4 called
+    // `needs-vault-answer` on the four flat surfaces.
+    const withVault = {
+      grain: "weekly" as const,
+      vault: { logbooks: [{ value: "meetings", label: "Meetings" }] },
+    };
+    const q = diarySectionModel(withVault)
+      .addable(base())
+      .find((v) => v.id === "w:logbook#1")!.questions!;
+    expect(q).toHaveLength(1);
+    expect(q[0].kind).toBe("choice");
+    expect(
+      (q[0] as { values: { value: string }[] }).values.map((v) => v.value)
+    ).toEqual(["meetings"]);
+  });
+
+  it("and reports one as removable and movable, never locked", () => {
+    const one = applyDiarySections(base(), ctx, [
+      ...detectDiarySections(base(), ctx),
+      "w:events#1",
+    ])!;
+    const view = diarySectionModel(ctx)
+      .sections(one)
+      .find((v) => v.id === "w:events#1")!;
+    // It is there because a reader added it, so it is theirs to move and theirs
+    // to remove — `widgetSection`'s sentence, surviving the adaptation.
+    expect(view.removable).toBe(true);
+    expect(view.movable).toBe(true);
+    expect(view.repeatable).toBe(true);
+    expect(diarySectionModel(ctx).refusal("w:events#1", one)).toBeNull();
+  });
+});
+describe("the time grid is a section on the week and a widget elsewhere", () => {
+  // 4.58.1. The grid HAD only ever been a page widget, and a widget gets a plain
+  // block head rather than a collapsible bar — which is the difference a reader
+  // reported as "the time-grid section is missing its header bar". It was not
+  // missing one; it was not a section. This block pins both halves of the fix:
+  // the door it gained, and the doors it deliberately did not.
+
+  const idsFor = (grain: DashboardGrain): string[] =>
+    addableDiarySections({ grain }, composeDiaryDashboard(grain)).map((s) => s.id);
+
+  it("offers the week a section and the other three the card", () => {
+    // THE GRAIN IS THE DIRECTIVE'S OWN LIMIT, not a taste. `weekStartOf` reads
+    // `week-start` from the host note and falls back to the CURRENT week, so a
+    // monthly dashboard scoped to March would draw whatever week today is in.
+    // A section of a period page claims to be about that period; this one could
+    // only make that claim on a week.
+    expect(idsFor("weekly")).toContain("time-grid");
+    expect(idsFor("weekly").filter((id) => id.startsWith("w:time-grid"))).toEqual(
+      []
+    );
+    for (const grain of ["monthly", "quarterly", "yearly"] as const) {
+      // STILL ADDABLE, WHICH IS THE POINT OF TWO DOORS — the reader who wants a
+      // grid on their year page may have one. What they do not get is the claim
+      // that it is part of what a year dashboard IS.
+      expect(idsFor(grain), grain).toContain("w:time-grid#1");
+      expect(idsFor(grain), grain).not.toContain("time-grid");
+    }
+  });
+
+  it("composes the header bar and the directive into one fence", () => {
+    // The whole of the reported bug. A `header:` line welded to the directive is
+    // what `headerbar.ts` walks to draw a collapsible bar; a widget's own
+    // `journal-block-head` is not collapsible and is suppressed when the fence
+    // already carries a bar.
+    const ctx = { grain: "weekly" } as const;
+    const model = diarySectionModel(ctx);
+    const base = composeDiaryDashboard("weekly");
+    const out = model.apply(base, [...model.present(base), "time-grid"]);
+    expect(out).toContain(
+      "```almanac\nheader:⏱️ The week by the hour\ntime-grid\n```"
+    );
+  });
+
+  it("is withheld once the page has it, unlike the widget it wraps", () => {
+    // A SECTION IS ONE PER PAGE and a widget is not — `widgetInstances` keeps a
+    // spare behind every instance so a card never leaves the picker, and that is
+    // exactly the behaviour a section must not have: a second grid would claim
+    // the first one's region.
+    const ctx = { grain: "weekly" } as const;
+    const model = diarySectionModel(ctx);
+    const base = composeDiaryDashboard("weekly");
+    const out = model.apply(base, [...model.present(base), "time-grid"]);
+    expect(model.present(out)).toContain("time-grid");
+    expect(model.addable(out).map((s) => s.id)).not.toContain("time-grid");
+    expect(
+      model.addable(out).map((s) => s.id).filter((id) => id.startsWith("w:time-grid"))
+    ).toEqual([]);
+  });
+
+  it("takes the grid back off without a trace", () => {
+    // The promise every opt-in section makes: added and removed leaves the file
+    // it started as, byte for byte. A section that cannot be cleanly removed is
+    // a section a reader is right to be wary of adding.
+    const ctx = { grain: "weekly" } as const;
+    const model = diarySectionModel(ctx);
+    const base = composeDiaryDashboard("weekly");
+    const out = model.apply(base, [...model.present(base), "time-grid"]);
+    expect(
+      model.apply(out, model.present(out).filter((id) => id !== "time-grid"))
+    ).toBe(base);
+  });
+
+  it("asks the registry's question rather than its own", () => {
+    // ONE DECLARATION OF THE THREE SOURCES, in `widget-registry.ts`. The section
+    // and the widget compose the same directive, so a second list here would be
+    // the copy that starts disagreeing the day the grid grows a fourth source.
+    const view = diarySectionModel({ grain: "weekly" })
+      .sections(composeDiaryDashboard("weekly"))
+      .find((s) => s.id === "time-grid");
+    expect(view?.questions?.[0]?.values?.map((v) => v.value)).toEqual([
+      "events",
+      "logbooks",
+      "tasks",
+    ]);
+  });
+
+  it("keeps finding the section after the reader narrows it", () => {
+    // `locate` matches the KEYWORD, not the argument — the rule every catalogue
+    // follows. Matching the whole line would make a narrowed grid invisible and
+    // then offer a second one beside it.
+    const ctx = { grain: "weekly" } as const;
+    const model = diarySectionModel(ctx);
+    const base = composeDiaryDashboard("weekly");
+    const out = model
+      .apply(base, [...model.present(base), "time-grid"])
+      .replace("\ntime-grid\n", "\ntime-grid:events\n");
+    expect(model.present(out)).toContain("time-grid");
+    expect(model.addable(out).map((s) => s.id)).not.toContain("time-grid");
+    // And the answer reads back out of the file, which is what re-pointing it
+    // through the editor depends on.
+    expect(
+      model.sections(out).find((s) => s.id === "time-grid")?.answered
+    ).toEqual({ arg: "events" });
+  });
+
+  it("never arrives on a dashboard that did not ask", () => {
+    // 3.9 §2's rule, and the reason this is `optIn` rather than shipped. Every
+    // weekly dashboard in every vault predates the section, and `repairNote` is
+    // what runs over them — it must add nothing.
+    const base = composeDiaryDashboard("weekly");
+    expect(base).not.toContain("time-grid");
+    const model = diarySectionModel({ grain: "weekly" });
+    // Nothing to do on the page as shipped...
+    expect(repairNote(model, base, base).next).toBeNull();
+    // ...and nothing to undo on the page a reader added it to. Repair is
+    // additive, so the section it never writes is also a section it never takes
+    // away — the two halves that make an opt-in section safe to offer.
+    const out = model.apply(base, [...model.present(base), "time-grid"]);
+    expect(repairNote(model, out, base).next).toBeNull();
+  });
+
+  it("is the reader's to move and the reader's to remove", () => {
+    // Neither locked nor pinned: nothing of theirs is stored in it. The
+    // meetings, the log items and the tasks are in their own notes.
+    const ctx = { grain: "weekly" } as const;
+    const model = diarySectionModel(ctx);
+    const base = composeDiaryDashboard("weekly");
+    const out = model.apply(base, [...model.present(base), "time-grid"]);
+    const view = model.sections(out).find((s) => s.id === "time-grid");
+    expect(view?.removable).toBe(true);
+    expect(view?.movable).toBe(true);
+    expect(model.refusal("time-grid", out)).toBeNull();
+  });
+});
+
+describe("the period summary is a section and wears a section's bar", () => {
+  // 4.59.0. It had none: every other section on a dashboard is a `header:` line
+  // welded to its directive, and this one was the directive alone — so the one
+  // section a reader cannot remove was also the one they could not fold. The
+  // card is what made the omission look deliberate.
+
+  const bodyOf = (text: string, grain: DashboardGrain): string[] => {
+    const lines = text.split("\n");
+    const at = lines.findIndex((l) =>
+      l.startsWith(`${CLASS_DEFS[grain].periodNoun}-summary`)
+    );
+    let open = at;
+    while (open >= 0 && !lines[open].startsWith("```")) open--;
+    const out: string[] = [];
+    for (let i = open + 1; i < lines.length && !lines[i].startsWith("```"); i++) {
+      out.push(lines[i]);
+    }
+    return out;
+  };
+
+  it("composes the bar above the directive, on all four grains", () => {
+    // ABOVE, NOT BESIDE: a bar anchors the widgets that FOLLOW it, so one
+    // written below the summary would title nothing and pull the `button:` line
+    // into its own actions strip.
+    for (const grain of ["weekly", "monthly", "quarterly", "yearly"] as const) {
+      const body = bodyOf(composeDiaryDashboard(grain), grain);
+      expect(body[0], grain).toBe(
+        `${HEADER_PREFIX}📅 This ${CLASS_DEFS[grain].periodNoun}`
+      );
+      expect(body[1], grain).toMatch(/-summary$/);
+    }
+  });
+
+  it("turns into a widget and back without a trace", () => {
+    // The toggle's whole promise. A section that could not be turned back is a
+    // section a reader is right not to touch.
+    for (const grain of ["weekly", "monthly", "quarterly", "yearly"] as const) {
+      const ctx = { grain };
+      const model = diarySectionModel(ctx);
+      const base = composeDiaryDashboard(grain);
+      const asWidget = model.apply(
+        base,
+        model.present(base).map((id) =>
+          id === "summary" ? { id, options: { form: "widget" } } : id
+        )
+      )!;
+      expect(bodyOf(asWidget, grain)[0], grain).toMatch(/-summary$/);
+      const back = model.apply(
+        asWidget,
+        model.present(asWidget).map((id) =>
+          id === "summary" ? { id, options: { form: "section" } } : id
+        )
+      );
+      expect(back, grain).toBe(base);
+    }
+  });
+
+  it("reads its form off the fence, so the editor opens on the truth", () => {
+    const ctx = { grain: "weekly" } as const;
+    const model = diarySectionModel(ctx);
+    const base = composeDiaryDashboard("weekly");
+    const formOn = (text: string): string | undefined =>
+      model.sections(text).find((s) => s.id === "summary")?.answered?.form;
+    expect(formOn(base)).toBe("section");
+    expect(formOn(base.replace("header:📅 This week\n", ""))).toBe("widget");
+  });
+
+  it("leaves a bar the reader renamed exactly as they left it", () => {
+    // `attachHeaderRename` rewrites this very line, so re-answering "a section"
+    // on a fence that already is one must write nothing. The first cut of this
+    // release spliced the token "section" into the bar's title instead, because
+    // the question names `header:` and the argument splices had not been taught
+    // to skip it.
+    const ctx = { grain: "weekly" } as const;
+    const model = diarySectionModel(ctx);
+    const renamed = composeDiaryDashboard("weekly").replace(
+      "header:📅 This week",
+      "header:🗓 My own week"
+    );
+    const out = model.apply(
+      renamed,
+      model.present(renamed).map((id) =>
+        id === "summary" ? { id, options: { form: "section" } } : id
+      )
+    );
+    expect(out === null || out.includes("header:🗓 My own week")).toBe(true);
+    expect(out ?? renamed).not.toContain("header:section");
+  });
+
+  it("says what the toggle does in the plan, in the catalogue's words", () => {
+    const ctx = { grain: "weekly" } as const;
+    const model = diarySectionModel(ctx);
+    const base = composeDiaryDashboard("weekly");
+    const op = model
+      .plan(
+        base,
+        model.present(base).map((id) =>
+          id === "summary" ? { id, options: { form: "widget" } } : id
+        )
+      )
+      .find((o) => o.sectionId === "summary");
+    expect(op?.kind).toBe("reconfigure");
+    expect(op?.detail).toContain("sit in a row");
+  });
+
+  it("titles an untitled fence on a dashboard that predates the bar", () => {
+    // Repair is additive and the section is already there, so the bar can only
+    // arrive as a migration — `ensureTrendsHeader`'s shape, for its reason.
+    for (const grain of ["weekly", "monthly", "quarterly", "yearly"] as const) {
+      const shipped = composeDiaryDashboard(grain);
+      const older = shipped.replace(
+        `${HEADER_PREFIX}📅 This ${CLASS_DEFS[grain].periodNoun}\n`,
+        ""
+      );
+      expect(titleSummaryFence(older), grain).toBe(shipped);
+      // AND IT IS IDEMPOTENT, which is what makes it safe to offer every time
+      // the repair window opens.
+      expect(titleSummaryFence(shipped), grain).toBeNull();
+    }
+  });
+
+  it("declines the two fences a reader has decided something about", () => {
+    const shipped = composeDiaryDashboard("weekly");
+    const older = shipped.replace(`${HEADER_PREFIX}📅 This week\n`, "");
+    // A GROUPED SUMMARY IS THE WIDGET FORM ON PURPOSE. `isSectionFence` refuses
+    // a self-titling fence as cell content, so titling this would drop the bar
+    // below the group it appeared to title and break the layout they built.
+    expect(
+      titleSummaryFence(older.replace("```almanac\nweek-summary", "```almanac\nrow\nweek-summary"))
+    ).toBeNull();
+    // AND A BAR THEY RENAMED IS STILL A BAR. Ours must not land above theirs.
+    expect(
+      titleSummaryFence(shipped.replace("📅 This week", "🗓 My own week"))
+    ).toBeNull();
+  });
+
+  it("still cannot be removed, and can still be moved", () => {
+    // 4.58.0's settlement, untouched: the summary is what makes a dashboard say
+    // which period it is about, and the toggle changes how it is drawn rather
+    // than whether it is there.
+    const ctx = { grain: "weekly" } as const;
+    const model = diarySectionModel(ctx);
+    const base = composeDiaryDashboard("weekly");
+    const view = model.sections(base).find((s) => s.id === "summary");
+    expect(view?.removable).toBe(false);
+    expect(view?.movable).toBe(true);
   });
 });

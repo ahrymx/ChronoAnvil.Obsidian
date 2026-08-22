@@ -922,6 +922,16 @@ describe("what the Banner section became", () => {
     expect(t).toContain('return `${type.name} · Journal`;');
     expect(t).toContain('? "Journals"');
     expect(t).toContain("`Diary · ${OVERVIEW_LABELS[role.unit]}`");
+    // AND THE FIFTH, ADDED IN 4.52. A logbook lives under the diary root and in
+    // no grain folder, so `noteKindOf` answers null and `grainOf` falls back to
+    // `daily` — a work log's head read DAILY ENTRY over its filename. The role
+    // is decided by the folder, BEFORE the grain is asked, which is the half
+    // that matters: the wrong answer here was confident, not absent.
+    expect(t).toContain('return `Diary · ${LOGBOOK_TITLE}`;');
+    expect(t).toContain('return { role: "logbook" };');
+    expect(t.indexOf("role: \"logbook\"")).toBeLessThan(
+      t.indexOf("const grain = grainOf(plugin, file);")
+    );
     // AND TWO THAT DELIBERATELY HAVE NONE. An eyebrow reading HOME over a title
     // reading Homepage is the doubling this release removes.
     expect(t).toContain("HOME AND SEARCH GET NONE, DELIBERATELY");

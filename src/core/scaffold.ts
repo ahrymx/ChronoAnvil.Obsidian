@@ -18,7 +18,7 @@ import {
   quarterOverviewPath,
   yearOverviewPath,
 } from "./util";
-import { composeDiaryDashboard } from "../diary/diary-sections";
+import { composeDiaryDashboard, titleSummaryFence } from "../diary/diary-sections";
 import { DEFAULT_PATHS } from "./constants";
 import { splitEntryFences } from "../trackers/entry-trackers";
 import { mergeBannerFences } from "./note-sections";
@@ -63,6 +63,11 @@ import type { LineDiff } from "./line-diff";
 import { openRepairWindow } from "../ui/repair-modal";
 import { modelForSurface } from "../ui/section-insert";
 import type { ResolvedSurface } from "../ui/section-insert";
+import type { LogbookDef } from "./constants";
+import {
+  composeLogbookNote,
+  composeLogbooksFolderNote,
+} from "../diary/logbook-sections";
 import {
   encodeJournalManifest,
   manifestPathFor,
@@ -237,9 +242,17 @@ export function isReconcilable(note: ShippedNote): boolean {
 //
 // SECOND, NOT LAST, because it is the parameter every caller has and the two
 // after it are a configured vault's own additions to the entry templates.
+//
+// `books` IS REQUIRED ON THE SAME ARGUMENT (4.52), and it is the second list
+// this function takes because a vault has two registries whose members are
+// pages: journals, and now logbooks. A defaulted parameter would compile at
+// every call site while quietly leaving a reader's logbooks out of the create
+// walk and the reconcile walk — which is the hole the paragraph above records,
+// one release later and in the same shape.
 export function shippedNotes(
   p: typeof DEFAULT_PATHS,
   types: readonly JournalType[],
+  books: readonly LogbookDef[],
   extras: Partial<Record<TrackerClass, readonly SectionWant[]>> = {},
   bands: Partial<Record<TrackerClass, readonly string[]>> = {}
 ): ShippedNote[] {
@@ -329,6 +342,34 @@ export function shippedNotes(
     // depends on the order — every entry is independent and `planCreate` writes
     // whatever is missing — but the list is read by people and this is the
     // vault's own shape.
+    // ── the logbooks, and the note about all of them (4.52) ────────────
+    //
+    // ONE NOTE PER REGISTERED LOGBOOK, from the same catalogue the widget's own
+    // create path composes — so a logbook note written by `Set up / repair
+    // vault` and one written by typing the first item into a widget are the
+    // same note. Two spellings of "a logbook's note" is how the two come to
+    // differ, which is the argument this file opens with.
+    //
+    // AND THE FOLDER NOTE, DERIVED (§2.5's rule, applied a third time): a
+    // folder note moves with its folder for free, so there is no path key to
+    // add to `PATH_LABELS`, `ROOT_CHILDREN` or the registry mirror. The
+    // logbooks' OWN paths are configured — see `LogbookDef.path`, which is
+    // stored precisely so a retitle does not orphan a note full of items — and
+    // that is a different question from where the index page lives.
+    ...(books.length
+      ? [
+          {
+            content: composeLogbooksFolderNote(books),
+            dest: folderNotePath(p.logbooks),
+            surface: { kind: "logbooks" as const, ctx: { books } },
+          },
+        ]
+      : []),
+    ...books.map((def) => ({
+      content: composeLogbookNote(def),
+      dest: def.path,
+      surface: { kind: "logbook" as const, ctx: { def } },
+    })),
     ...types.map((type) => ({
       content: composeJournalDashboardNote(type),
       dest: folderNotePath(type.root),
@@ -488,6 +529,28 @@ export class Scaffold {
     const original = await this.app.vault.read(file);
     const carded = collapseJournalsBlocks(original, journalsArgumentFor(path, this.paths));
     if (carded != null) await this.app.vault.modify(file, carded);
+  }
+
+  // The period summary's own header bar, on a dashboard composed before 4.59.0.
+  //
+  // `cardJournalsBlock`'s SHAPE EXACTLY, which is `weldBanner`'s before it: read,
+  // call a pure function, write only on a non-null answer. Sixth migration
+  // written this way, and the repetition is still the point — a migration that
+  // looks like the last one is a migration a reader can check.
+  //
+  // WHY IT IS A MIGRATION AND NOT REPAIR. The section is already on the page, so
+  // `reconcileLayouts` has nothing to add and `repairNote` would throw on
+  // anything else; what changed is one line ABOVE the directive. See
+  // `titleSummaryFence`, which also says which two fences it declines to touch.
+  //
+  // ERRORS ARE THE CALLER'S, inside the same `try` as the other five, so one
+  // page's failure leaves that page exactly as it was.
+  private async titleSummary(path: string): Promise<void> {
+    const file = getFile(this.app, path);
+    if (!(file instanceof TFile)) return;
+    const original = await this.app.vault.read(file);
+    const titled = titleSummaryFence(original);
+    if (titled != null) await this.app.vault.modify(file, titled);
   }
 
   // Overwrite the shipped diary assets with the current bundled versions,
@@ -1002,6 +1065,7 @@ export class Scaffold {
     for (const note of shippedNotes(
       this.paths,
       registeredJournalTypes(this.plugin),
+      this.plugin.settings.logbooks,
       this.plugin.settings.entrySections,
       this.plugin.settings.entrySectionBand
     )) {
@@ -1138,6 +1202,12 @@ export class Scaffold {
       // too, so it is not Study's to create or to skip.
       p.journalsRoot,
     ];
+    // The logbooks folder, WHERE THE FILE LIST WOULD HAVE MADE IT ANYWAY (4.52).
+    // Named here for the reason the five grains are: a folder a reader can open
+    // and file things into should exist because the vault has one, not as a
+    // side effect of a note happening to be written inside it. A vault with
+    // every logbook removed still gets the folder, and finds it empty.
+    if (this.plugin.settings.logbooks.length > 0) folders.push(p.logbooks);
     // Study's root and templates folder are its config's now, created by the
     // custom-journal loop below like every other journal's (3.20).
     for (const cfg of this.plugin.settings.customJournals) {
@@ -1167,6 +1237,7 @@ export class Scaffold {
     for (const note of shippedNotes(
       p,
       registeredJournalTypes(this.plugin),
+      this.plugin.settings.logbooks,
       this.plugin.settings.entrySections,
       this.plugin.settings.entrySectionBand
     )) {
@@ -1283,7 +1354,11 @@ export class Scaffold {
     // THE JOURNAL DASHBOARDS ARE IN THIS WALK TOO (4.36 §0.2), which is what the
     // required parameter buys: this call read `shippedNotes(p)` and would have
     // gone on compiling with the new pages silently absent from the migration.
-    for (const dash of shippedNotes(p, registeredJournalTypes(this.plugin))
+    for (const dash of shippedNotes(
+      p,
+      registeredJournalTypes(this.plugin),
+      this.plugin.settings.logbooks
+    )
       .filter(isReconcilable)
       .map((f) => f.dest)) {
       const file = getFile(this.app, dash);
@@ -1325,7 +1400,12 @@ export class Scaffold {
         // The spelling is the PAGE's, so it is chosen here where the path is known
         // rather than guessed inside a text function that cannot see one.
         const carded = collapseJournalsBlocks(welded, journalsArgumentFor(dash, p)) ?? welded;
-        if (carded === original) continue;
+        // AND THE SUMMARY'S BAR, SIXTH, EXACTLY AS THE WRITE RUNS IT (4.59.0).
+        // Chained on the same text rather than scanned separately, on this
+        // walk's own rule: two migrations touch one file and a reader reads one
+        // diff.
+        const titledSummary = titleSummaryFence(carded) ?? carded;
+        if (titledSummary === original) continue;
         // ONE OP PER MIGRATION THAT ACTUALLY FIRED. `ops` is a list precisely so
         // a file can report more than one, and a page that only needs the weld
         // must not be labelled with the Trends sentence — the window's rows are
@@ -1355,11 +1435,17 @@ export class Scaffold {
             detail: "draw the Journals section as one card per journal",
           });
         }
+        if (titledSummary !== carded) {
+          ops.push({
+            kind: "migrate",
+            detail: "give the period summary the header bar every section has",
+          });
+        }
         out.push({
           path: dash,
           label: dash.split("/").pop() ?? dash,
           ops,
-          diff: diffText(original, carded),
+          diff: diffText(original, titledSummary),
         });
       } catch (e) {
         console.error(`[Almanac] Trends scan failed for ${dash}`, e);
@@ -1645,7 +1731,11 @@ export class Scaffold {
       // §6.1). This walk used to restate the guards inline and had the identical
       // hole for the identical reason: its filter tested the ASSET's extension,
       // and a composed entry has no asset to test.
-      for (const dash of shippedNotes(this.paths, registeredJournalTypes(this.plugin))
+      for (const dash of shippedNotes(
+        this.paths,
+        registeredJournalTypes(this.plugin),
+        this.plugin.settings.logbooks
+      )
         .filter(isReconcilable)
         .map((f) => f.dest)) {
         try {
@@ -1694,6 +1784,17 @@ export class Scaffold {
           // separately in the repair window, so a reader who wants their
           // three-level list keeps it by not ticking it.
           await this.cardJournalsBlock(dash);
+          // AND THE PERIOD SUMMARY'S OWN BAR (4.59.0), sixth and last, in the
+          // order the dry run chains them. Independent of the five above it: they
+          // touch the Trends fence, the banner and the journals block, and this
+          // touches the masthead's, so no two of them can write the same line.
+          //
+          // OPT-IN with the rest, which matters here for a reason the others do
+          // not have: the summary can be turned into a widget on purpose, from
+          // the section editor, so a reader can be holding an untitled fence
+          // deliberately. `titleSummaryFence` declines the grouped case outright;
+          // the `migrations` tick is what covers the rest.
+          await this.titleSummary(dash);
         } catch (e) {
           console.error(`[Almanac] Trends migration failed for ${dash}`, e);
         }

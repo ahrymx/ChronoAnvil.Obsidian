@@ -179,7 +179,10 @@ describe("one question, one resolver", () => {
     ).toBe(index.arg && "source" in index.arg ? index.arg.source : null);
     expect(cards.arg2).toEqual(index.arg2);
     expect(cards.argJoin).toBe(index.argJoin);
-    expect(cards.repeats).toBe(index.repeats);
+    // HOW MANY A PAGE MAY HOLD USED TO BE THE FIFTH FIELD HERE, and it is not a
+    // field any more: every widget repeats as of 4.56, so the two cannot differ
+    // in it. Removed rather than left reading `undefined` against `undefined`,
+    // which is an assertion that has stopped being able to fail.
   });
 
   it("is a keyword rather than an argument, and the switch says so", () => {

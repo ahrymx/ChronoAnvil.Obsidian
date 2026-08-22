@@ -37,8 +37,14 @@ import {
   joinParts,
   partsOf,
   questionIsRequired,
+  SECTION_FORM,
+  WIDGET_FORM,
+  answerInText,
+  formAt,
+  formOf,
+  withAnswers,
 } from "../src/core/section-model";
-import type { SectionModel } from "../src/core/section-model";
+import type { FormQuestion, SectionModel } from "../src/core/section-model";
 
 interface Surface {
   name: string;
@@ -352,6 +358,13 @@ describe("the editor cannot learn which surface it is on", () => {
       "journal index/path",
       "journal index/resources",
       "journal leaf/resources",
+      // A FIFTH KIND IN 4.59.0, AND IT IS THE FIRST THAT IS NOT ABOUT A
+      // DIRECTIVE'S ARGUMENT. `form` asks how the section is DRAWN — with its
+      // own foldable bar, or bare so it can be a column of a row group, which
+      // `isSectionFence` refuses a self-titling fence for. Like `folder` and
+      // `title` and unlike the bridge's `choice` it is never required: unanswered
+      // is the bar, which is what every dashboard already holds.
+      "diary dashboard/summary",
       "diary dashboard/open-tasks",
       "diary dashboard/tags",
       "diary entry/bridge",
@@ -367,15 +380,35 @@ describe("the editor cannot learn which surface it is on", () => {
   });
 
   it("and the interface exposes no method that would answer it", () => {
+    // THE SIX ARE REQUIRED; THE REST OF THE INTERFACE IS OPTIONAL AND DECLARED.
+    // This asserted the six EXACTLY until 4.58.0, which is the release that gave
+    // a dashboard repeating widgets and therefore `instanceOf`. An exact list was
+    // the right shape while every model here implemented only the required half
+    // and would have been the wrong shape the day one of them grew a `blocks`.
+    //
+    // WHAT IS STILL PINNED IS THE WHOLE OF THE POINT: every model answers the six,
+    // and nothing any model exposes is outside the interface. A method that says
+    // which surface this is would fail the second assertion, which is what this
+    // test was written to catch.
+    const required = [
+      "addable",
+      "apply",
+      "plan",
+      "present",
+      "refusal",
+      "sections",
+    ];
+    const optional = ["blocks", "instanceOf", "regroup"];
     for (const { name, model } of surfaces()) {
-      expect(Object.keys(model).sort(), name).toEqual([
-        "addable",
-        "apply",
-        "plan",
-        "present",
-        "refusal",
-        "sections",
-      ]);
+      const keys = Object.keys(model).sort();
+      // Every one of the six, on every surface.
+      expect(keys.filter((k) => required.includes(k)), name).toEqual(required);
+      // And nothing outside the interface. This is the half that would catch a
+      // model growing a method the editor could ask "which surface is this".
+      expect(
+        keys.filter((k) => !required.includes(k) && !optional.includes(k)),
+        name
+      ).toEqual([]);
     }
   });
 
@@ -421,16 +454,16 @@ describe("bands are data, not a branch", () => {
     expect([...groups].every((g) => typeof g === "string")).toBe(true);
   });
 
-  it("and three on a dashboard now that it has a head and a masthead", () => {
-    // 3.2 patch 3, then 4.10. The interface did not change to accommodate
-    // either — `group` has carried the answer since 3.0 and a dashboard simply
-    // used to answer null. That is the point of expressing the rule as data the
-    // model supplies rather than as a check the editor performs: a surface can
-    // grow a band without the editor learning it exists, and has now done so
-    // twice.
+  it("and two on a dashboard, which has a banner nothing may climb above", () => {
+    // 3.2 patch 3, then 4.10, then 4.58.0 taking one back. The interface did not
+    // change to accommodate any of the three — `group` has carried the answer
+    // since 3.0 and a dashboard simply used to answer null. That is the point of
+    // expressing the rule as data the model supplies rather than as a check the
+    // editor performs: a surface can grow a band, and LOSE one, without the
+    // editor learning either happened.
     const model = diarySectionModel({ grain: "monthly" });
     const groups = new Set(model.sections().map((s) => s.group));
-    expect(groups.size).toBe(3);
+    expect(groups.size).toBe(2);
     expect([...groups].every((g) => typeof g === "string")).toBe(true);
   });
 
@@ -539,5 +572,80 @@ describe("a compound argument, split and joined", () => {
         pair[1] ? pair : [pair[0], ""]
       );
     }
+  });
+});
+
+describe("a section that can also be drawn as a widget", () => {
+  // 4.59.0's `form` question, tested at the level it lives: the shared model.
+  // The period summary is the first section to declare one and
+  // `diary-sections.test.ts` covers it end to end; these are the rules any
+  // catalogue that declares one gets.
+
+  const q: FormQuestion = {
+    kind: "form",
+    key: "form",
+    label: "how this is drawn",
+    directive: "header",
+    bar: "header:📅 This week",
+    section: "A section of its own",
+    widget: "As a widget",
+  };
+  const fence = (...body: string[]): string[] => ["```almanac", ...body, "```"];
+
+  it("is a section when it titles itself and a widget when it does not", () => {
+    // ASKED OF THE FENCE, NOT OF THE ANSWER, which is what makes the read
+    // survive a rename: a bar whose title the reader changed is still a bar.
+    expect(formOf(["header:📅 This week", "week-summary"])).toBe(SECTION_FORM);
+    expect(formOf(["header:🗓 Whatever they like", "week-summary"])).toBe(SECTION_FORM);
+    expect(formOf(["week-summary", "button:new-week"])).toBe(WIDGET_FORM);
+  });
+
+  it("writes the bar in under the fence and takes it out again", () => {
+    // UNDER THE FENCE, because a bar anchors the widgets that FOLLOW it — one
+    // written lower would title nothing and pull the next line into its strip.
+    const bare = fence("week-summary", "button:new-week");
+    const titled = withAnswers(bare, [q], { form: SECTION_FORM });
+    expect(titled).toEqual(fence("header:📅 This week", "week-summary", "button:new-week"));
+    expect(withAnswers(titled, [q], { form: WIDGET_FORM })).toEqual(bare);
+  });
+
+  it("writes nothing when the fence is already in that form", () => {
+    // The property the rename case depends on: re-answering "a section" on a
+    // fence that already is one must not replace the reader's title with the
+    // catalogue's.
+    const theirs = fence("header:🗓 My own week", "week-summary");
+    expect(withAnswers(theirs, [q], { form: SECTION_FORM })).toEqual(theirs);
+  });
+
+  it("is never required, because unanswered is the bar", () => {
+    // `folder` and `title`'s posture, not the bridge's `choice`. Every note
+    // written before this release holds the section form, so a row that withheld
+    // itself until the reader answered would be asking about the status quo.
+    expect(questionIsRequired(q)).toBe(false);
+  });
+
+  it("is not an argument of the directive it names", () => {
+    // `header` is there so the editor knows the answer is WRITABLE. Reading it
+    // as an argument is what put the token "section" into a bar's title in the
+    // first cut of this release.
+    expect(answerInText("```almanac\nheader:📅 This week\nweek-summary\n```", q)).toBeNull();
+  });
+
+  it("reads back off whichever fence the directive is in", () => {
+    // Two blocks, one titled and one not, so a walk that found the first bar in
+    // the file rather than this fence's would answer for the wrong section.
+    const text = [
+      "```almanac",
+      "header:🏷️ Tags",
+      "tag-index",
+      "```",
+      "",
+      "```almanac",
+      "week-summary",
+      "```",
+    ].join("\n");
+    const lines = text.split("\n");
+    expect(formAt(lines, lines.indexOf("tag-index"))).toBe(SECTION_FORM);
+    expect(formAt(lines, lines.indexOf("week-summary"))).toBe(WIDGET_FORM);
   });
 });

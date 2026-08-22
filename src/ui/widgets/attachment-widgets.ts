@@ -40,6 +40,7 @@ import {
 } from "obsidian";
 import { basename, ensureFolder, moment, noExt, openFile } from "../../core/util";
 import { isValidNoteKey, readNoteRegion } from "../../core/notestore";
+import { panDuringDrag } from "../drag-scroll";
 import { slugify } from "../../core/util";
 import { confirmAction, promptText } from "../modals";
 import {
@@ -129,12 +130,21 @@ export function wireAttachmentDrag(
   index: number,
   cb: AttachmentHandlers
 ): void {
+  // The list goes on scrolling while a row is in the air (4.57) — an entry with
+  // twenty attachments is taller than the pane it is read in. See
+  // `drag-scroll.ts`.
+  let stopPan: (() => void) | null = null;
   el.addEventListener("dragstart", (e) => {
     e.dataTransfer?.setData(ATTACH_DRAG_TYPE, String(index));
     if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
     el.addClass("is-dragging");
+    stopPan = panDuringDrag(el);
   });
-  el.addEventListener("dragend", () => el.removeClass("is-dragging"));
+  el.addEventListener("dragend", () => {
+    stopPan?.();
+    stopPan = null;
+    el.removeClass("is-dragging");
+  });
   el.addEventListener("dragover", (e) => {
     if (!e.dataTransfer?.types.includes(ATTACH_DRAG_TYPE)) return;
     e.preventDefault();

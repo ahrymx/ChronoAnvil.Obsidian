@@ -32,6 +32,7 @@
 import { MarkdownPostProcessorContext, TFile } from "obsidian";
 import type AlmanacPlugin from "../../main";
 import { overflowButton } from "../section-frame";
+import { panDuringDrag } from "../drag-scroll";
 import type { StatCell } from "../stat-strip";
 import type { JournalType } from "../../journals/journal";
 import {
@@ -201,6 +202,11 @@ function attachCellDrag(band: BandEditContext, cell: StatCell, at: number): void
   const el = cell.root;
   el.draggable = true;
 
+  // The pane goes on scrolling while a cell is in the air (4.57) — one rule for
+  // every drag in the plugin, asserted in `test/drag-scroll.test.ts` rather than
+  // remembered at six call sites. See `drag-scroll.ts`.
+  let stopPan: (() => void) | null = null;
+
   el.addEventListener("dragstart", (evt) => {
     const info = band.ctx.getSectionInfo(el);
     if (!info) {
@@ -218,8 +224,13 @@ function attachCellDrag(band: BandEditContext, cell: StatCell, at: number): void
     evt.dataTransfer?.setData("text/plain", "");
     if (evt.dataTransfer) evt.dataTransfer.effectAllowed = "move";
     el.addClass("is-dragging");
+    stopPan = panDuringDrag(el);
   });
-  el.addEventListener("dragend", () => el.removeClass("is-dragging"));
+  el.addEventListener("dragend", () => {
+    stopPan?.();
+    stopPan = null;
+    el.removeClass("is-dragging");
+  });
 
   el.addEventListener("dragover", (evt) => {
     // ONLY ANOTHER STAT CELL IS A DROP TARGET. A file dragged in from the

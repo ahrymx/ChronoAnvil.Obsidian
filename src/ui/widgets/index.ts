@@ -76,6 +76,8 @@ import { buildNowButton } from "../../diary/periodnav";
 import type { Unit as PeriodGrain } from "../../diary/periodnav";
 import { buildChartGrid, CHART_GRID_EMPTY } from "./chart-grid";
 import { buildCaptureLog } from "./capture-log-widget";
+import { buildLogbook } from "./logbook-widget";
+import { buildTimeGrid } from "../../diary/time-grid-view";
 import {
   buildBridgeNotesRegion,
   buildBridgeReadingsRegion,
@@ -484,6 +486,14 @@ const SECTION_TITLES: Record<string, string> = {
   "entry-rollup": "📖 What the days said",
   "period-recap": "📝 Recap",
   timeline: "📜 All entries",
+  // ONE TITLE FOR EVERY LOGBOOK, and it is generic where the widget is not.
+  // This table is keyed on the KEYWORD — `journals:cards` shares its entry with
+  // `journals` two dozen lines up for the same reason — so it cannot say "Work
+  // log" for one argument and "Meetings" for another. It does not need to: both
+  // catalogues that compose a logbook write a `header:` bar naming it, and this
+  // is what a fence titled by `frame: section` alone falls back to.
+  logbook: "🗒️ Logbook",
+  "time-grid": "⏱️ The week by the hour",
   "on-this-day": "🕘 On this day",
   "tasks-table": "⏳ Open tasks",
   "tag-index": "🏷️ Tags",
@@ -2245,6 +2255,15 @@ export class Widgets implements
         return buildCalendarRegion(this.plugin, rest, ctx);
       case "events":
         return buildEventsRegion(this.plugin, rest, ctx);
+      case "time-grid":
+        // THE WHOLE VAULT IS THE SCOPE, and `""` is what that spells: the grid
+        // reads events, every region-backed logbook and every task with a due
+        // date, and those live wherever their notes do. `folderPrefix("")` is
+        // the empty string, which matches every path — 4.44.0's fix, used here
+        // deliberately rather than tripped over.
+        return liveScopedWidget(this.plugin, ctx, "", () =>
+          buildTimeGrid(this.plugin, rest, ctx)
+        );
       case "year-summary":
         // Live on both the diary folders (the numbers) and this note (the
         // year-start property the picker rewrites).
@@ -2261,6 +2280,19 @@ export class Widgets implements
         return liveFrontmatterWidget(this.plugin, ctx, () =>
           buildWeekSummary(this.plugin, ctx)
         );
+      case "logbook":
+        // THE DIARY'S UNDATED LAYER (4.52). `logbook:work` draws the items in
+        // `02 - Diary/Logbooks/Work log.md` wherever the line is written, which
+        // makes it the one region-backed widget that does not read the note it
+        // sits on — see `writeRegionOf`.
+        //
+        // NOT LIVE-WRAPPED, and for the `note:` field's reason: the list is the
+        // edit surface, so rebuilding it out from under an open card is the one
+        // thing it must not do. It watches its own file instead, which is what
+        // lets an item arriving from another pane appear without taking the
+        // card the reader is typing in.
+        widget = buildLogbook(this, rest, ctx);
+        break;
       case "month-summary":
         return liveFrontmatterWidget(this.plugin, ctx, () =>
           buildMonthSummary(this.plugin, ctx)
@@ -2523,6 +2555,28 @@ export class Widgets implements
   ): Promise<void> {
     const file = this.fileOf(ctx);
     if (!file) return;
+    await this.writeRegionOf(file, key, value, baseline);
+  }
+
+  // THE SAME WRITE, TO A FILE THE CALLER NAMES (4.52).
+  //
+  // Every region widget until now has written to the note it was drawn on, so
+  // resolving the file from the ctx and doing the write were one method. A
+  // `logbook:` widget breaks that: it is drawn on the homepage and writes to
+  // `Work log.md`, because a logbook is a note and the widget is a view of it.
+  //
+  // SO THE FILE MOVED INTO THE PARAMETER AND THE MERGE STAYED HERE, rather than
+  // the widget doing its own `vault.process`. The reconcile above is the only
+  // thing standing between a list on screen and an append that arrived
+  // underneath it, and a second write path would be a second place to forget
+  // it — which is the fault 4.27 closed, re-opened by a caller instead of by a
+  // line.
+  async writeRegionOf(
+    file: TFile,
+    key: string,
+    value: string,
+    baseline?: string
+  ): Promise<void> {
     await this.app.vault.process(file, (text) =>
       writeNoteRegion(
         text,

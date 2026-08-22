@@ -7,11 +7,11 @@
 
 import { describe, it, expect } from "vitest";
 import { readCode } from "./sources";
-import {
-  formatCapture,
-  grainsShowingCapture,
-  offersHostEntry,
-} from "../src/diary/capture";
+import { grainsShowingCapture, offersHostEntry } from "../src/diary/capture";
+// THE FORMATTER MOVED TO THE GRAMMAR'S OWN MODULE IN 4.52 and so did its own
+// describe block; what is left here reads it because a scale note IS a capture,
+// stamped the same way.
+import { formatLogItem } from "../src/diary/log-items";
 import { currentEntryKey, labelForGrain } from "../src/diary/nav";
 import { moment } from "../src/core/util";
 import { TRACKER_CLASSES } from "../src/trackers/trackers";
@@ -26,48 +26,6 @@ import {
   reconcileRegionWrite,
   writeNoteRegion,
 } from "../src/core/notestore";
-
-describe("formatCapture", () => {
-  it("stamps a single line with the time", () => {
-    expect(formatCapture("bought milk", "14:32")).toBe("14:32 — bought milk");
-  });
-
-  // One capture is one moment. Stamping every line would make a three-line
-  // thought read as three separate ones.
-  it("stamps a multi-line capture once, indenting the rest", () => {
-    expect(formatCapture("first\nsecond\nthird", "09:05")).toBe(
-      "09:05 — first\n  second\n  third"
-    );
-  });
-
-  // The stamped line is trimmed, but a continuation line's own indentation is
-  // preserved on top of the block indent — someone who indented a sub-point
-  // meant it, and flattening it would lose the structure they typed.
-  it("trims the stamped line and keeps deliberate inner indentation", () => {
-    expect(formatCapture("  spaced  \n  indented", "10:00")).toBe(
-      "10:00 — spaced\n    indented"
-    );
-  });
-
-  it("keeps blank continuation lines blank rather than indenting them", () => {
-    expect(formatCapture("one\n\ntwo", "10:00")).toBe("10:00 — one\n\n  two");
-  });
-
-  it("drops leading blank lines so the stamp always has text beside it", () => {
-    expect(formatCapture("\n\nactual thought", "11:11")).toBe(
-      "11:11 — actual thought"
-    );
-  });
-
-  it("returns nothing for empty or whitespace-only input", () => {
-    expect(formatCapture("", "12:00")).toBe("");
-    expect(formatCapture("   \n  \n", "12:00")).toBe("");
-  });
-
-  it("strips trailing whitespace", () => {
-    expect(formatCapture("thought\n\n\n", "12:00")).toBe("12:00 — thought");
-  });
-});
 
 // A note with a capture region holding `content`. Module-scoped since 4.27,
 // when the merge tests below needed the same fixture the append tests use —
@@ -175,7 +133,7 @@ import { formatScaleNoteTag, parseScaleNoteLine } from "../src/journals/scale-no
 describe("scale note as a capture line", () => {
   it("stamps a tagged fragment into a parseable capture line", () => {
     const frag = formatScaleNoteTag({ trackerId: "Mood", value: 4, text: "rough day" })!;
-    const line = formatCapture(frag, "09:14");
+    const line = formatLogItem(frag, "09:14");
     expect(line).toBe("09:14 — [scale:Mood=4] rough day");
     expect(parseScaleNoteLine(line)).toEqual({
       trackerId: "Mood", value: 4, text: "rough day",
@@ -184,7 +142,7 @@ describe("scale note as a capture line", () => {
 
   it("stamps a bare (prose-less) note so the reading is still timestamped", () => {
     const frag = formatScaleNoteTag({ trackerId: "Energy", value: 2, text: "" })!;
-    const line = formatCapture(frag, "22:30");
+    const line = formatLogItem(frag, "22:30");
     expect(line).toBe("22:30 — [scale:Energy=2]");
     expect(parseScaleNoteLine(line)!.trackerId).toBe("Energy");
   });
@@ -347,15 +305,29 @@ describe("hasNoteRegion", () => {
 // one write path a `note:` field uses goes through them. Scoped to the method
 // body rather than matched across the file, per RESUME §6 — a bare `indexOf`
 // over a module this size finds the word somewhere and proves nothing.
-describe("writeNoteRegionToFile merges rather than overwrites", () => {
-  const body = (): string => {
+describe("the region write merges rather than overwrites", () => {
+  // THE MERGE MOVED ONE METHOD ALONG IN 4.52, and the two are now a pair worth
+  // asserting as one: `writeRegionOf` takes the file and does the write, and
+  // `writeNoteRegionToFile` is that with the file resolved from the ctx. The
+  // split exists because a `logbook:` widget writes a note it is not drawn on —
+  // and the reason the merge stayed in ONE of them is this test: two write paths
+  // would be two places to forget the reconcile.
+  const method = (name: string): string => {
     const src = readCode("widgets");
-    const at = src.indexOf("async writeNoteRegionToFile(");
-    expect(at, "writeNoteRegionToFile not found").toBeGreaterThan(0);
+    const at = src.indexOf(`async ${name}(`);
+    expect(at, `${name} not found`).toBeGreaterThan(0);
     // To the start of the next method declaration at the same indent.
     const end = src.indexOf("\n  async ", at + 1);
     return src.slice(at, end === -1 ? src.length : end);
   };
+  const body = (): string => method("writeRegionOf");
+
+  it("is the one write the ctx-taking method delegates to", () => {
+    // The call site, not the definition: whatever `writeNoteRegionToFile` does
+    // with a ctx, the write itself has to be the merged one below.
+    expect(method("writeNoteRegionToFile")).toContain("this.writeRegionOf(");
+    expect(method("writeNoteRegionToFile")).not.toContain("vault.process");
+  });
 
   it("reconciles against what is on disk", () => {
     expect(body()).toContain("reconcileRegionWrite(");

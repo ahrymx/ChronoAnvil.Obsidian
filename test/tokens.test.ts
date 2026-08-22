@@ -68,6 +68,11 @@ const SET_FROM_TS = new Set([
   "--am-row-cols",
   "--am-tracker-cell-h",
   "--am-chart-row-track",
+  // 4.55: how many hours the time grid's window spans, set on each day column
+  // by time-grid-view.ts so the hour lines can be `calc(100% / n)` rather than
+  // a pixel step. The number is the week's content, not a design decision, so
+  // it has no sensible value in the token file.
+  "--am-tg-hours",
 ]);
 
 describe("a token reference resolves to a token", () => {

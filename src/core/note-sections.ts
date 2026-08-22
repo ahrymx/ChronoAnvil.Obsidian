@@ -48,16 +48,25 @@ import {
   instanceSectionFor,
   locateNth,
   nextInstanceId,
-  pageWidgetSections,
-  repeatableInstances,
+  pageWidgetKeywords,
+  widgetInstances,
 } from "./widget-sections";
 import type { VaultLists } from "./widget-registry";
 import { fencesOf } from "./block-move";
-import { moveCell, setPageBreaks, widgetRun } from "./cell-move";
+import {
+  columnLoadOf,
+  moveCell,
+  runsOf,
+  setPageBreaks,
+  tabSlices,
+  widgetRun,
+} from "./cell-move";
 import type { CellTarget } from "./cell-move";
 import {
   CELL_KEYWORD,
   LINKS_KEYWORD,
+  MAX_COLUMNS,
+  dealInto,
   ROW_KEYWORD,
   TITLE_KEYWORD,
   WIDE_KEYWORD,
@@ -78,6 +87,7 @@ import {
   SectionQuestion,
   SectionView,
   SectionWant,
+  formAt,
   describeAnswers,
   desiredOrder,
   partsOf,
@@ -387,8 +397,9 @@ export interface BannerSpec {
   // whose time navigation is a widget of its own.
   //
   // ABSENT ON THREE OF THE FOUR FLAT PAGES, and each has already argued it. The
-  // homepage's navigation is the diary card's destination pills — which is why
-  // `diary` is the locked section there and no links section was ever written.
+  // homepage's navigation is the diary card's destination pills, which is why
+  // no links section was ever written there. (That was also the argument that
+  // locked `diary` until 4.53; the lock went and the layout fact did not.)
   // Both folder notes' navigation is likewise the card they are a folder note
   // for. Search is the one that carries a row, and until 4.19 it carried it
   // INSIDE the search block, where no section owned it and the editor could not
@@ -1546,7 +1557,7 @@ const viewFor =
       // window knows which file it opened. See `FlatNoteSpec.hostFolder`.
       ...(questions ? { questions } : {}),
       ...(questions && text !== undefined
-        ? { answered: answersOn(s, questions, text) }
+        ? { answered: answersOn(s.locate(text), questions, text) }
         : {}),
     };
   };
@@ -1569,17 +1580,33 @@ const viewFor =
 // and no catalogue section whose question names a `header:` bar above its own
 // anchor. Those fall through to the window's existing path and behave exactly as
 // they did — this is additive, and deliberately narrower than it could be.
-function answersOn(
-  s: FlatSection,
+//
+// TAKES THE OFFSET RATHER THAN THE SECTION, AS OF 4.58.0, because the dashboard
+// catalogue needs the same answer and does not have a `FlatSection` to hand —
+// its widget rows are `DiarySection`s adapted from one. `locate` was the only
+// thing this ever read off the section, so passing its result is the whole of
+// what the two callers have in common, and neither has to reconstruct a shape
+// for the other.
+export function answersOn(
+  at: number,
   questions: readonly SectionQuestion[],
   text: string
 ): Record<string, string> {
   const out: Record<string, string> = {};
-  const at = s.locate(text);
   if (at < 0) return out;
   const lines = text.split("\n");
   const line = text.slice(0, at).split("\n").length - 1;
   for (const q of questions) {
+    // A FORM IS READ OFF THE FENCE, NOT OFF A LINE'S ARGUMENT (4.59.0), which is
+    // why it is answered before the `directive` guard below rather than through
+    // it. The question names `header` so the editor knows the answer is
+    // WRITABLE — see `SectionEditorModal.readable` — but a section drawn as a
+    // widget has no header line to read, and "there is no bar" is precisely the
+    // answer rather than the absence of one.
+    if (q.kind === "form") {
+      out[q.key] = formAt(lines, line);
+      continue;
+    }
     if (!q.directive) continue;
     const span = argSpansIn(lines, q.directive).find((sp) => sp.line === line);
     if (!span) continue;
@@ -1727,6 +1754,38 @@ function whereIs(
   };
 }
 
+// Where a section joining block `block` should land, in that block's own lines.
+//
+// THE LAST PAGE IS THE ONE THAT MATTERS, because that is where an append lands:
+// `arrival` (cell-move.ts) finds the page containing the target line, and the
+// target line for a join has always been the end of the body. A group whose
+// page 1 is full and whose page 2 has room is not full.
+//
+// NULL MEANS "NOT A ROW, SO THERE IS NO COLUMN TO COUNT", and the caller makes
+// that block a group instead — the branch 4.12 §A added and the reason a join
+// into a fence that was never a row writes `row` and `cell` at all.
+function joinInto(body: readonly string[], block: number): CellTarget | null {
+  if (!body.some(isRowLine)) return null;
+  const pages = tabSlices(body);
+  const span = pages[pages.length - 1] ?? { from: 0, to: body.length };
+  const runs = runsOf(body.slice(span.from, span.to));
+  if (runs.length < MAX_COLUMNS) {
+    return { kind: "cell", block, at: body.length };
+  }
+  // THE FOOT OF THAT COLUMN, WHICH IS THE LAST WIDGET DEALT INTO IT — not the
+  // last widget of its opening run. Past the cap a run is already part of a
+  // column, so a fence asking for four has column one holding runs 1 and 3, and
+  // an arrival stacking under run 1 would land ABOVE run 3's widgets rather
+  // than at the bottom of what the reader can see.
+  const column = dealInto(columnLoadOf(runs));
+  let foot = -1;
+  runs.forEach((run, n) => {
+    if (n % MAX_COLUMNS === column) foot = run.widgets[run.widgets.length - 1];
+  });
+  if (foot < 0) return null;
+  return { kind: "stack", block, at: span.from + foot, after: true };
+}
+
 // The note with its sections grouped into these blocks. 4.8 §2.
 //
 // ONE MOVE AT A TIME, RE-READ EACH TIME, and that is not timidity. Every move
@@ -1845,9 +1904,13 @@ export function regroupFlatNote(
     //
     // `side: "right"` because a join APPENDS, which is the order `want` asked
     // for and what phase three then settles.
-    const dst: CellTarget = to.body.some(isRowLine)
-      ? { kind: "cell", block: to.block, at: to.body.length }
-      : { kind: "group", block: to.block, side: "right" };
+    // AND A FULL ROW STACKS RATHER THAN OPENING A THIRD COLUMN (4.52.1).
+    // `joinInto` is the whole of that: it returns the `cell` target this line
+    // always built while the row has room, and the foot of the emptier column
+    // once it has not. The `group` branch below is unchanged and cannot be
+    // affected — a block that is not a row has no columns to be full of.
+    const dst: CellTarget =
+      joinInto(to.body, to.block) ?? { kind: "group", block: to.block, side: "right" };
     const next = moveCell(lines, { block: from.block, ...run }, dst);
     if (!next) break;
     lines = next;
@@ -1954,6 +2017,88 @@ export function regroupFlatNote(
     }
   }
 
+  // PHASE FIVE: columns, inside a page. 4.52.1.
+  //
+  // THE CAP WRITTEN INTO THE FILE. `MAX_COLUMNS` says a row draws two columns
+  // and `capColumns` (row.ts) makes that true of the RENDER whatever the fence
+  // asks for — so a note nobody has saved since 4.52.1 already looks right. This
+  // is the other half: the next time the section editor saves that note, the
+  // file says what the page has been drawing.
+  //
+  // WITHOUT IT THE TWO DISAGREE FOREVER, and that is the complaint this release
+  // came from — *"the groups... don't reflect what is shown in the editor"* —
+  // arriving from the other direction. A fence whose body lists four columns
+  // while the page draws two is a reader reading their own note and being told
+  // something that is not so.
+  //
+  // ── LAST, AND EVERY PHASE ABOVE IS A REASON ──────────────────────────────
+  //
+  // AFTER THREE, because phase three settles the order inside a block by
+  // comparing `want` against the file's order, and dealing CHANGES that order —
+  // a fence of four comes out `1 3 2 4`. Deal first and phase three reads that
+  // as the wrong order and undoes it, one swap per pass, until the ceiling
+  // stops it. Deal after and the order phase has already finished; the next
+  // Save is handed a `want` built from the dealt file and agrees with it, which
+  // is what makes this idempotent.
+  //
+  // AFTER FOUR, AND THIS IS THE EDGE THAT IS EASY TO GET WRONG. A cap belongs
+  // to a PAGE rather than to a fence — `tabPlan` calls `cellPlan` once per page,
+  // so a two-page group draws two columns in each and a fence of three columns
+  // split down the middle is already legal. Deal before the boundaries are
+  // written and that fence is dealt into two columns first and paged second, so
+  // a reader asking for a page break gets their widgets rearranged instead.
+  // Phase four is what says where the pages are; this reads its answer.
+  //
+  // ── SO THE WALK IS OVER `tabSlices` ──────────────────────────────────────
+  //
+  // One page at a time, every line offset back into the body — `setCellWidths`'
+  // shape one file over, and for its reason: a group whose page 1 is full and
+  // whose page 2 has room is not full.
+  //
+  // ONE WIDGET PER PASS, RE-READ EACH TIME, which is the loop the three phases
+  // above already are and for the reason `regroupFlatNote` gives at its head: a
+  // move rewrites the fence, and every line number computed before it is a line
+  // number in a note that no longer exists.
+  for (let pass = 0; pass < ceiling; pass++) {
+    const now = flatBlocks(lines.join("\n"), sections);
+    let dealt = false;
+    for (const block of now) {
+      const at = whereIs(lines, sections, block.ids[0]);
+      if (!at || !at.body.some(isRowLine)) continue;
+      const spans = tabSlices(at.body);
+      const pageSpans = spans.length ? spans : [{ from: 0, to: at.body.length }];
+      let move: { from: number; to: number } | null = null;
+      let onto: CellTarget | null = null;
+      for (const span of pageSpans) {
+        const runs = runsOf(at.body.slice(span.from, span.to));
+        if (runs.length <= MAX_COLUMNS) continue;
+        // THE COLUMNS AS THEY STAND, WHICH IS THE FIRST `MAX_COLUMNS` RUNS —
+        // not the dealt load `joinInto` asks for. That one counts a widget in
+        // the column it will be drawn in, which is the right answer for an
+        // arrival from outside and the wrong one here: the run being dealt is
+        // the run being asked about, so counting it as already placed would
+        // send it to the column it is already in and the pass would move
+        // nothing.
+        const column = dealInto(columnLoadOf(runs.slice(0, MAX_COLUMNS)));
+        const foot = runs[column].widgets[runs[column].widgets.length - 1];
+        const first = runs[MAX_COLUMNS].widgets[0];
+        move = { from: span.from + first, to: span.from + first + 1 };
+        onto = { kind: "stack", block: at.block, at: span.from + foot, after: true };
+        break;
+      }
+      if (!move || !onto) continue;
+      const next = moveCell(lines, { block: at.block, ...move }, onto);
+      // A MOVE THAT CHANGES NOTHING WOULD LOOP FOREVER, which is the stop
+      // condition every phase above uses and the reason `moveCell` returns null
+      // for it rather than the lines it was given.
+      if (!next) continue;
+      lines = next;
+      dealt = true;
+      break;
+    }
+    if (!dealt) break;
+  }
+
   const out = lines.join("\n");
   return out === text ? null : out;
 }
@@ -1996,33 +2141,39 @@ export function flatNoteModel(spec: FlatNoteSpec): SectionModel {
   // and `applyFlatSections` each destructure `spec.sections` themselves — a tail
   // added anywhere but here would be visible to the window and invisible to the
   // write, which is the worst of the three possible mistakes.
-  const base = [...spec.sections, ...pageWidgetSections(spec.sections)];
+  // WHICH KEYWORDS THIS CATALOGUE LEAVES FREE, PROBED ONCE. The probe reads every
+  // catalogue section's `locate` and is the expensive half; what a text holds is
+  // a line count.
+  const keywords = pageWidgetKeywords(spec.sections);
 
-  // ── and the instances THIS TEXT holds (4.15 §4) ───────────────────────
+  // ── and the instances THIS TEXT holds (4.15 §4, all widgets since 4.56) ─
   //
-  // THE LIST STOPPED BEING A CONSTANT, AND ONLY HERE. A repeating widget has one
-  // section per occurrence, so how many sections a surface has is a question
-  // about a note rather than about a catalogue. Every method below already takes
-  // the text — that is what made this cheap — so each asks for the list it needs
-  // and nothing caches one across two different notes.
-  //
-  // THE BASE IS STILL BUILT ONCE, because `pageWidgetSections` probes every
-  // catalogue section's `locate` and is the expensive half; the instances are a
-  // line count.
+  // THE LIST STOPPED BEING A CONSTANT, AND ONLY HERE. A widget has one section
+  // per occurrence, so how many sections a surface has is a question about a
+  // note rather than about a catalogue. Every method below already takes the
+  // text — that is what made this cheap — so each asks for the list it needs and
+  // nothing caches one across two different notes.
   //
   // AND `sections()` IS THE ONE METHOD WITH NO TEXT, so it takes one. The three
   // models that cannot repeat ignore the parameter and are untouched — the same
   // shape `blocks` and `regroup` already have, where a surface fact arrives or
   // does not.
+  //
+  // NO TEXT NOW MEANS NO WIDGETS, WHERE IT USED TO MEAN THE UNREPEATABLE ONES.
+  // A widget section is an occurrence and an occurrence is a fact about a note,
+  // so with nothing to count there is nothing honest to list — and a caller with
+  // a note in hand is every caller in the tree.
   const sectionsFor = (text?: string): FlatSection[] =>
-    text === undefined ? base : [...base, ...repeatableInstances(spec.sections, text)];
+    text === undefined
+      ? [...spec.sections]
+      : [...spec.sections, ...widgetInstances(keywords, text)];
 
   const specFor = (text?: string): FlatNoteSpec => ({
     ...spec,
     sections: sectionsFor(text),
   });
 
-  // AN ID RESOLVES EVEN WHEN NOTHING LISTED IT. `repeatableInstances` offers what
+  // AN ID RESOLVES EVEN WHEN NOTHING LISTED IT. `widgetInstances` offers what
   // the text holds plus one spare; a reader staging three new cards in one
   // session reaches past that, and those ids are built from their own spelling
   // instead. See `instanceSectionFor`.

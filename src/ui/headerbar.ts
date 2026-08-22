@@ -13,6 +13,12 @@
 // preview, so a header bar can't *contain* its section in the DOM — visibility
 // is instead derived by walking the note's block-level siblings.
 //
+// UNLESS ITS OWN FENCE DREW THE BODY (4.57.1), which is how every page Almanac
+// composes is written now: the bar and its widgets are one fence, so the
+// section is that block and the blocks after it are the reader's. The sentence
+// above is the OTHER shape — a bar alone in its fence — and is why the scope
+// exists. See `SecNode.ends` and `bodyInOwnFence`.
+//
 // A bar owns TWO KINDS OF THING and both are siblings rather than children.
 // The blocks after it, as above; and the widgets welded into its own fence,
 // which render beside it inside the one block that fence became. Sections
@@ -150,6 +156,23 @@ export interface SecNode {
   // Renders something a reader can see. A storage region
   // (`<!--almanac:path-->`) is a real block that renders nothing.
   renders: boolean;
+  // The section is complete in this block, so the run ends where the block
+  // does. Only meaningful with `opens`.
+  //
+  // WHAT THIS IS ABOUT (4.57.1). A bar owns the blocks after it because in 2.x a
+  // section was written as two fences — a `header:` fence and a body fence —
+  // and Obsidian renders each block separately, so a section could not contain
+  // its own body. Every page Almanac composes today welds the two: `header:⏳
+  // Open tasks` and `tasks-table` are one fence, and so is the charts section
+  // that ends the homepage. For those, "the blocks after it" is not the
+  // section's body — it is whatever the reader put next, and the homepage's
+  // last section quietly took every page widget added below it into its card
+  // and into its fold.
+  //
+  // So the rule is what the fence says: a fence that drew a body has named what
+  // its section holds. A bar ALONE in its fence is the 2.x shape and still owns
+  // what follows, which is what keeps every note composed before this working.
+  ends: boolean;
 }
 
 export interface SecMark {
@@ -209,6 +232,11 @@ export function computeSectionRuns(nodes: SecNode[]): SecMark[] {
       close();
       marks[i].member = true;
       run.push(i);
+      // A section whose body is inside its own fence is one block long, and
+      // closing here rather than at the next boundary is what puts both ends of
+      // the surface on it — `is-first` and `is-last` on the same block, which
+      // `close()` already knows how to do for a fully collapsed section.
+      if (n.ends) close();
       return;
     }
     if (n.closes) {
@@ -253,6 +281,13 @@ const READING_HEADING = new RegExp(
 const EDITOR_HEADING = new RegExp(
   `\\b${OBSIDIAN_DOM.editorHeading}\\b|\\b${OBSIDIAN_DOM.editorHeadingLevel}\\b`
 );
+
+// What a block wears that is not its content: the drag grip and the two drop
+// slots `attachBlockHead` hangs on every block, and the head it draws for a
+// block with no bar of its own. Spelled here rather than imported, because
+// `block-drag.ts` reaches the plugin and this module is imported by everything;
+// test/headerbar.test.ts pins the two spellings together.
+const BLOCK_FURNITURE = ".jbd-slot, .jbd-handle, .journal-block-head";
 
 const QUIET_MS = 500;
 const SETTLE_CAP_MS = 10000;
@@ -699,9 +734,10 @@ export class HeaderBar extends MarkdownRenderChild {
   // So the walk is flattened: each rendered block contributes a node, and a
   // block that holds bars also contributes its bars' own siblings, in document
   // order. One stack then governs both, which matters because the two interact
-  // — an in-block bar's scope has to carry on into the blocks that follow it
-  // (that is how a `📊 Charts` fence folds the note beneath it), and a fold
-  // computed separately per level would give the same element two answers.
+  // — an in-block bar's scope carries on into the blocks that follow it while
+  // the fence gave it no body of its own, and a fold computed separately per
+  // level would give the same element two answers. Where that scope stops is
+  // the sentinel at the foot of the loop; 4.57.1's note on it says why.
   private recompute(): void {
     const anchor = this.siblingAnchor();
     const parent = anchor.parentElement;
@@ -710,7 +746,11 @@ export class HeaderBar extends MarkdownRenderChild {
       (n): n is HTMLElement => n.nodeType === 1
     );
 
-    const els: HTMLElement[] = [];
+    // `null` MARKS A NODE WITH NO ELEMENT, which is the sentinel below. The two
+    // arrays are parallel and `hidden[i]` is written back to `els[i]`, so a
+    // scope-closing node that stands for nothing on the page needs a slot to
+    // keep the indices aligned and nothing to paint.
+    const els: (HTMLElement | null)[] = [];
     const nodes: FoldNode[] = [];
     const bars: HTMLElement[] = [];
     // Blocks whose own first bar is level 2, for the body-indent pass below.
@@ -760,6 +800,28 @@ export class HeaderBar extends MarkdownRenderChild {
           if (isBar) bars.push(child);
         }
       }
+
+      // ── WHERE AN IN-BLOCK BAR'S SCOPE STOPS (4.57.1) ────────────────
+      //
+      // A fence that drew its section's body has said what the section holds,
+      // so its scope ends with the block — see `SecNode.ends`, which is the
+      // same rule for the paint pass, and `bodyInOwnFence`, which is the one
+      // question both ask.
+      //
+      // A HEADER THAT OPENS NOTHING, rather than a new kind of node. The rule
+      // `computeFoldHidden` already has is "a header at level L closes any
+      // scope of level >= L", and the shallowest bar in this block is exactly
+      // the level whose scopes this block opened — the block's own node closed
+      // everything at that level or deeper on the way in. So the sentinel needs
+      // no field of its own and the fold arithmetic is untouched.
+      if (this.bodyInOwnFence(block)) {
+        els.push(null);
+        nodes.push({
+          level: Math.min(...inner.map((bar) => this.levelOf(bar))),
+          collapsed: false,
+          heading: false,
+        });
+      }
     }
 
     const hidden = computeFoldHidden(nodes);
@@ -777,8 +839,10 @@ export class HeaderBar extends MarkdownRenderChild {
       // it is narrower than it looks: both agree on which blocks belong to the
       // section. They differ only on whether an empty line is worth taking a
       // risk to hide.
-      if (els[i].classList.contains(OBSIDIAN_DOM.editorLine)) continue;
-      els[i].toggleClass("journal-section-hidden", hidden[i]);
+      const el = els[i];
+      if (!el) continue;
+      if (el.classList.contains(OBSIDIAN_DOM.editorLine)) continue;
+      el.toggleClass("journal-section-hidden", hidden[i]);
     }
 
     // Chevrons, and the level-2 body indent (idempotent).
@@ -833,7 +897,13 @@ export class HeaderBar extends MarkdownRenderChild {
       // reach it ends there.
       if (block.hasClass(OBSIDIAN_DOM.viewFooter) ||
         block.hasClass(OBSIDIAN_DOM.viewUi)) {
-        return { opens: false, closes: true, hidden: false, renders: false };
+        return {
+          opens: false,
+          closes: true,
+          hidden: false,
+          renders: false,
+          ends: false,
+        };
       }
 
       const bar = block.querySelector<HTMLElement>(".journal-header-bar");
@@ -841,7 +911,13 @@ export class HeaderBar extends MarkdownRenderChild {
       // A real markdown heading or independent section/banner ends a section for the same reason it ends a
       // fold: it is its own structure and must not be swallowed into this section's card.
       if (!bar && (this.isHeadingBlock(block) || this.isSectionBoundary(block))) {
-        return { opens: false, closes: true, hidden: false, renders: false };
+        return {
+          opens: false,
+          closes: true,
+          hidden: false,
+          renders: false,
+          ends: false,
+        };
       }
 
       // A SECTION IS OPENED BY A TITLED `header:` BAR AND NOTHING ELSE.
@@ -864,7 +940,13 @@ export class HeaderBar extends MarkdownRenderChild {
       // whatever section preceded it does not continue past it.
       const level1 = !!bar && this.levelOf(bar) === 1;
       if (level1 && !bar?.dataset.headerKey) {
-        return { opens: false, closes: true, hidden: false, renders: false };
+        return {
+          opens: false,
+          closes: true,
+          hidden: false,
+          renders: false,
+          ends: false,
+        };
       }
 
       return {
@@ -872,6 +954,7 @@ export class HeaderBar extends MarkdownRenderChild {
         closes: false,
         hidden: block.hasClass("journal-section-hidden"),
         renders: this.rendersSomething(block),
+        ends: level1 && this.bodyInOwnFence(block),
       };
     });
 
@@ -957,6 +1040,45 @@ export class HeaderBar extends MarkdownRenderChild {
   // `.journal-page-head` JOINS IT IN 4.51.6 for the same reason and before it
   // can bite: the remade Banner section is a page's own head, which is the most
   // obviously self-standing block in the plugin.
+  // Did this block draw its section's body beside the bar?
+  //
+  // ONE PREDICATE FOR BOTH WALKS, for `isSectionBoundary`'s reason: the fold
+  // and the shade must agree about what "this section" means, and a section
+  // that folds one set of blocks and shades another is two claims a reader
+  // meets the first time they collapse something.
+  //
+  // THE LAST BAR IN THE BLOCK IS THE ONE ASKED, because a fence may hold
+  // several — `header:📖 Lessons`, its table, `header:🛠️ Practice`, its table
+  // are one block on Study's topic index. The bars before the last one plainly
+  // have their bodies here; the only open question is whether the last one
+  // does, and a trailing bar with nothing under it is a section still waiting
+  // for its blocks.
+  //
+  // RENDERING SIBLINGS THAT ARE NOT FURNITURE. A storage region welded into the
+  // same fence draws nothing, so it is skipped by `rendersSomething` already;
+  // `BLOCK_FURNITURE` is the other half — the grip and the drop slots
+  // `attachBlockHead` hangs on every block are appended after whatever was
+  // drawn, and they belong to the page's editing gestures rather than to the
+  // section. They happen to be empty divs today, so this changes no answer; it
+  // is here so that giving the grip an icon does not silently end every
+  // section at its own bar.
+  private bodyInOwnFence(block: HTMLElement): boolean {
+    const bars = Array.from(
+      block.querySelectorAll<HTMLElement>(".journal-header-bar")
+    );
+    const last = bars[bars.length - 1];
+    const host = last?.parentElement;
+    if (!host) return false;
+    const kin = Array.from(host.children);
+    const after = kin.slice(kin.indexOf(last) + 1);
+    return after.some(
+      (sib) =>
+        sib instanceof HTMLElement &&
+        !sib.matches(BLOCK_FURNITURE) &&
+        this.rendersSomething(sib)
+    );
+  }
+
   private isSectionBoundary(block: HTMLElement): boolean {
     if (this.isHeadingBlock(block)) return true;
     return !!block.querySelector(
@@ -987,6 +1109,12 @@ export class HeaderBar extends MarkdownRenderChild {
   }
 
   private markL2Body(barBlock: HTMLElement, level: number): void {
+    // THE SAME RULE ONE LEVEL DOWN (4.57.1). A level-2 fence that drew its own
+    // body indents nothing after it, for the reason `SecNode.ends` gives: what
+    // follows such a fence is the reader's, not the subsection's. Asked with
+    // the one predicate, so the indent cannot disagree with the fold and the
+    // shade about where the subsection stops.
+    if (this.bodyInOwnFence(barBlock)) return;
     let sib = barBlock.nextElementSibling as HTMLElement | null;
     while (sib) {
       if (sib.nodeType === 1) {

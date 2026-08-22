@@ -318,17 +318,107 @@ describe("which children land in which cell (4.4 §1)", () => {
   });
 
   it("gives every cell one share when nothing asks", () => {
-    expect(cellPlan(all(3), []).weights).toEqual([1, 1, 1]);
+    expect(cellPlan(all(2), []).weights).toEqual([1, 1]);
   });
 
   it("gives one cell EACH when a row delimits nothing", () => {
-    // THE THING 4.4 IS NOT ALLOWED TO CHANGE. A row of three directives meant
-    // three columns before cells existed, and the arithmetic above — one run,
-    // split by nothing — would give one cell holding all three. The rule lives
-    // in `cellPlan` rather than in its caller so this can be asserted at all.
-    expect(cellPlan(all(3), []).cells).toEqual([[0], [1], [2]]);
+    // THE THING 4.4 IS NOT ALLOWED TO CHANGE. A row of two directives meant two
+    // columns before cells existed, and the arithmetic above — one run, split by
+    // nothing — would give one cell holding both. The rule lives in `cellPlan`
+    // rather than in its caller so this can be asserted at all.
+    //
+    // ASKED OF TWO RATHER THAN THREE SINCE 4.52.1, and the change is the cap
+    // rather than a weakening: three is no longer one cell each, because three
+    // columns is not a thing a row draws. The rule itself is untouched — every
+    // run is its own column, up to the number of columns there are.
+    expect(cellPlan(all(2), []).cells).toEqual([[0], [1]]);
     // Furniture is still left out of it.
     expect(cellPlan([true, false, true], []).cells).toEqual([[0], [2]]);
+  });
+});
+
+// ── the cap: a row draws two columns (4.52.1) ────────────────────────────
+//
+// THE BUG THIS COMES FROM, REPORTED FROM A VAULT: *"the groups can be easily
+// broken and don't reflect what is shown in the editor."* Four widgets in one
+// `row` fence on a note column about 1090px wide. Three cells fit at the 320px
+// floor; the fourth wrapped to a line of its own and `flex-grow` stretched it to
+// the full width of the group, so a column stopped reading as a column. The file
+// said four, the section editor said four, and the page drew three and a band.
+//
+// WHY THESE ROWS ARE THE ONES. The cap is a number in `directive-grammar.ts`
+// and three places deal by it — this one on the render, `regroupFlatNote`'s
+// column phase in the file, and `joinInto` on an arrival. The first two MUST
+// agree exactly, or a reader presses Save on a page they were happy with and
+// watches two widgets swap places; `test/section-rows.test.ts` asserts the pair
+// against each other on six shapes, and what is pinned here is the arithmetic
+// that side of it rests on.
+describe("a row draws at most two columns (4.52.1)", () => {
+  const all = (n: number): boolean[] => Array(n).fill(true);
+
+  it("deals a fourth column back into the two there are", () => {
+    // 1 and 2 keep the top line, 3 goes under 1 and 4 under 2 — the reading
+    // order across and then down, which is what makes this a fold rather than a
+    // rearrangement. Nothing is dropped and nothing is hidden.
+    expect(cellPlan(all(4), []).cells).toEqual([[0, 2], [1, 3]]);
+  });
+
+  it("deals an odd one into the emptier column", () => {
+    expect(cellPlan(all(3), []).cells).toEqual([[0, 2], [1]]);
+    expect(cellPlan(all(5), []).cells).toEqual([[0, 2, 4], [1, 3]]);
+  });
+
+  it("counts widgets rather than runs, which is what keeps the file in step", () => {
+    // `row / a / b / cell / c / cell / d` — the first column already holds two,
+    // so the third run's widget goes to the SECOND rather than to the first.
+    // Dealing by run ordinal instead would send it to column one, and the
+    // column phase — which moves one widget per pass, because that is what
+    // `moveCell` moves — would put it in the other one on the next Save.
+    const plan = cellPlan(all(4), [
+      { at: 2, weight: 1 },
+      { at: 3, weight: 1 },
+    ]);
+    expect(plan.cells).toEqual([[0, 1], [2, 3]]);
+  });
+
+  it("is one number, and the five places that use it read it", () => {
+    // THE VOCABULARY RULE, ASKED OF A CONSTANT. A copy of `2` in any of these
+    // would be a second answer to how many columns a row has, and the two that
+    // deal — the render and the file — would drift apart the first time one of
+    // them was tuned. So it lives in `directive-grammar.ts` beside `row` and
+    // `cell`, where the grammar it describes is, and every reader imports it.
+    expect(readSrc("directive-grammar")).toContain("export const MAX_COLUMNS = 2;");
+    for (const mod of ["row", "cell-move", "cell-width", "block-drag", "note-sections"]) {
+      const code = readSrc(mod);
+      expect(code, mod).toContain("MAX_COLUMNS");
+      // USES IT AND DOES NOT DEFINE IT, which is the whole assertion: a second
+      // `const MAX_COLUMNS` anywhere is a second answer.
+      expect(code, mod).not.toContain("const MAX_COLUMNS");
+    }
+  });
+
+  it("leaves a row at or under the cap exactly as it found it", () => {
+    // Which is every fence any catalogue in this plugin composes: the homepage's
+    // row is one wide member beside a column that stacks the rest.
+    expect(cellPlan(all(2), [{ at: 1, weight: 3 }])).toEqual({
+      cells: [[0], [1]],
+      weights: [1, 3],
+    });
+  });
+
+  it("keeps a weight for each column it actually draws", () => {
+    // A weight belongs to the column a `cell` line OPENS, and past the cap that
+    // line opens no column — so there is no column for its share to be a share
+    // OF. Two numbers describing one cell would be two answers and no rule for
+    // which wins; `columnsOf` (cell-width.ts) stops at the same count so the
+    // width a drag writes and the width the row draws stay one answer.
+    const plan = cellPlan(all(4), [
+      { at: 1, weight: 2 },
+      { at: 2, weight: 3 },
+      { at: 3, weight: 4 },
+    ]);
+    expect(plan.cells).toHaveLength(2);
+    expect(plan.weights).toEqual([1, 2]);
   });
 });
 

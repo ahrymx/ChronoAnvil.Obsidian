@@ -304,7 +304,7 @@ describe("where the pages live, and who agrees about it", () => {
     // 4.36 adds are a separate population with their own file, and mixing them
     // in here would make an assertion about "those two paths" depend on how many
     // journals the fixture happens to carry.
-    const dests = shippedNotes(DEFAULT_PATHS, []).map((n) => n.dest);
+    const dests = shippedNotes(DEFAULT_PATHS, [], []).map((n) => n.dest);
     expect(dests).toContain(DIARY_HOME);
     expect(dests).toContain(JOURNALS_HOME);
   });
@@ -314,7 +314,7 @@ describe("where the pages live, and who agrees about it", () => {
     // not excluded from `reconcileLayouts`. Both halves matter — a template
     // flag here would buy permanent drift the moment a directive is renamed.
     for (const dest of [DIARY_HOME, JOURNALS_HOME]) {
-      const note = shippedNotes(DEFAULT_PATHS, []).find((n) => n.dest === dest);
+      const note = shippedNotes(DEFAULT_PATHS, [], []).find((n) => n.dest === dest);
       expect(note?.content, dest).toBeTruthy();
       expect(note?.asset, dest).toBeUndefined();
       expect(note?.template, dest).toBeFalsy();
@@ -323,7 +323,7 @@ describe("where the pages live, and who agrees about it", () => {
 
   it("writes each catalogue into its own page", () => {
     const byDest = new Map(
-      shippedNotes(DEFAULT_PATHS, []).map((n) => [n.dest, n.content])
+      shippedNotes(DEFAULT_PATHS, [], []).map((n) => [n.dest, n.content])
     );
     expect(byDest.get(DIARY_HOME)).toBe(composeDiaryDashboardNote());
     expect(byDest.get(JOURNALS_HOME)).toBe(composeJournalsDashboardNote());
@@ -398,7 +398,7 @@ describe("where the pages live, and who agrees about it", () => {
     expect(folderNotePath(moved.journalsRoot)).toBe(
       "09 - Notebooks/09 - Notebooks.md"
     );
-    expect(shippedNotes(moved, []).map((n) => n.dest)).toContain(
+    expect(shippedNotes(moved, [], []).map((n) => n.dest)).toContain(
       "09 - Notebooks/09 - Notebooks.md"
     );
   });
@@ -439,26 +439,31 @@ describe("the editor opens on both, as the right page", () => {
     // writes `tasks-table`, `on-this-day` and `tag-index`, so none of the three
     // is offered a second time — and it does not write `events`, which is the
     // whole reason to want a widget door.
-    expect(diary).not.toContain("w:tasks-table");
-    expect(diary).not.toContain("w:on-this-day");
-    expect(diary).not.toContain("w:tag-index");
-    expect(diary).toContain("w:events");
+    // ASKED ON THE KEYWORD, NOT THE ID (4.56). Every widget is offered as an
+    // instance now, so `not.toContain("w:tasks-table")` would pass against a
+    // list holding `w:tasks-table#1` — an assertion that had stopped being able
+    // to fail.
+    expect(diary).not.toContain("w:tasks-table#1");
+    expect(diary).not.toContain("w:on-this-day#1");
+    expect(diary).not.toContain("w:tag-index#1");
+    expect(diary.filter((id) => id.startsWith("w:tasks-table"))).toEqual([]);
+    expect(diary).toContain("w:events#1");
 
     const journals = modelForSurface({ kind: "journals-dashboard" })
       .model.addable(composeJournalsDashboardNote())
       .map((s) => s.id);
-    expect(journals).not.toContain("w:journals");
-    expect(journals).not.toContain("w:review-queue");
-    expect(journals).not.toContain("w:tasks-table");
+    expect(journals).not.toContain("w:journals#1");
+    expect(journals).not.toContain("w:review-queue#1");
+    expect(journals).not.toContain("w:tasks-table#1");
     // `w:topics-table` WAS THE POSITIVE HERE UNTIL 4.16 §3. That word is now an
     // alias for `level-index` and is withheld from the add list for the reason
     // `alias` states — offering both would be a choice between two names for one
     // thing. The widget door is still open; it opens on the word that replaced
     // it, which is what this half of the assertion is really about.
-    expect(journals).not.toContain("w:topics-table");
-    // `#1`, NOT THE BARE ID: `level-index` repeats, so what the add list offers
-    // is an instance — the first free one — and never the un-numbered form. See
-    // `repeatableInstances`.
+    expect(journals).not.toContain("w:topics-table#1");
+    // `#1`, NOT THE BARE ID: every widget repeats, so what the add list offers
+    // is an instance — the first free one — and never the un-numbered form,
+    // which nothing generates. See `widgetInstances`.
     expect(journals).toContain("w:level-index#1");
   });
 

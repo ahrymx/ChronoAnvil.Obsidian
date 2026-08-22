@@ -232,7 +232,7 @@ export function parseFrame(lines: readonly string[]): FrameSpec {
 
   // The contradiction, refused. Only `section` collides: a `header:` above a
   // `frame: none` widget is the composed-dashboard case (§3.3) and is exactly
-  // right — one bar owning the blocks after it, no card underneath.
+  // right — one bar over its own widgets, no card underneath.
   //
   // `hasTitledBar` IS THIS TEST, LIFTED (4.12 §A). It was a local until the drag
   // needed to ask a neighbouring question — whether the fence titles itself at
@@ -278,6 +278,78 @@ export function parseFrame(lines: readonly string[]): FrameSpec {
 // is nothing left to configure. An argument is therefore refused rather than
 // ignored, which is `journals:cards`' rule (4.2 §1.1) one keyword over.
 export const ROW_KEYWORD = "row";
+
+// HOW MANY COLUMNS A ROW DRAWS AT MOST. 4.52.1.
+//
+// ── THE BUG THAT SETTLED THIS, REPORTED FROM A VAULT ─────────────────────
+//
+// *"the groups can be easily broken and don't reflect what is shown in the
+// editor."* Four widgets in one `row` fence, on a note column about 1090px
+// wide. A cell asks for a floor of `--am-row-cell-min` — 320px — so three fit
+// across (980px with the gaps) and the fourth wrapped to a line of its own,
+// where `flex-grow` stretched it to the full width of the group. The file said
+// four columns, the section editor drew four columns, and the page drew three
+// and a band. Nothing was wrong with the arithmetic; the row had been asked for
+// more columns than a pane can hold since 4.2, and a three-cell row does the
+// same thing at 720px.
+//
+// ── WHY A CAP RATHER THAN A BETTER WRAP ──────────────────────────────────
+//
+// A wrapped column stops being a column. That is the whole of it: whatever the
+// wrap does — stretch the survivor, hold it to a third, deal the four into a
+// 2x2 grid — the reader is looking at a row whose shape depends on how wide
+// their sidebar happens to be, and no two panes agree. `row` promises *these
+// widgets are one row*; a promise a pane can revoke is not one.
+//
+// TWO, AND NOT THREE, BECAUSE TWO IS THE ONE THAT ALWAYS FITS. Two cells at the
+// floor plus the gap is 650px, which is under the width the group-making
+// quarters already require of a block (`@container (min-width: 660px)` in
+// styles/05-inline-widgets.css, chosen for exactly this sum). Three needs
+// 980px, which a split pane does not have. So at two the wrap never fires above
+// a phone, and where it does fire — one column per line — that is the collapse
+// it was written for rather than a layout falling apart.
+//
+// ── WHAT IT MEANS FOR A FENCE THAT ASKS FOR MORE ─────────────────────────
+//
+// It is DEALT, not truncated: run `n` of the fence is drawn in column
+// `n % MAX_COLUMNS`, so four widgets read across and then down exactly as they
+// did — 1 and 2 on the top line, 3 under 1 and 4 under 2. Nothing is hidden and
+// nothing changes place in the reading. `cellPlan` does it on the render so a
+// fence somebody typed by hand draws two columns today; `regroupFlatNote`'s
+// column phase writes the same answer into the file the next time the section
+// editor saves, so the two never disagree for long.
+//
+// A NUMBER RATHER THAN A CONTAINER QUERY, and 4.3.1 is the release that
+// established why: a cell is the block divided by however many cells there are,
+// and no `@container` rule can know that count. This is the count.
+export const MAX_COLUMNS = 2;
+
+// WHICH COLUMN THE NEXT WIDGET IS DEALT INTO, given what each holds now.
+//
+// THE COLUMN HOLDING FEWER, AND THE FIRST ON A TIE. That is the whole rule, and
+// stating it as a function rather than as three copies of a loop is the only
+// reason the three places that deal can be trusted to deal the same way:
+//
+//   • `capColumns` (row.ts) deals a fence that asks for too many columns as it
+//     RENDERS it, so a note nobody has saved since 4.52.1 draws two columns.
+//   • `regroupFlatNote`'s column phase deals the same fence in the FILE, so the
+//     next Save writes down what the page has been drawing.
+//   • `joinInto` (note-sections.ts) deals ONE arrival into a row that is
+//     already full, which is what **Add to group** does on its third press.
+//
+// THE FIRST TWO MUST AGREE EXACTLY OR THE PAGE CHANGES SHAPE ON SAVE, which is
+// a worse bug than the one this release fixes — a reader would press Save on a
+// note they were happy with and watch two widgets swap places. They agree
+// because they ask this, one widget at a time, in the same order.
+//
+// AND IT IS WHAT MAKES FOUR WIDGETS A 2x2 rather than a 1-and-3: the third is
+// dealt into a tie and takes the first column, the fourth then finds that one
+// heavier and takes the second.
+export function dealInto(load: readonly number[]): number {
+  let best = 0;
+  for (let n = 1; n < load.length; n++) if (load[n] < load[best]) best = n;
+  return best;
+}
 
 // What a fence's `row` line said, or why it could not be honoured.
 //

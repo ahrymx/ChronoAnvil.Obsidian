@@ -2834,6 +2834,40 @@ function parseOpenRows(file: TFile, text: string): OpenTaskRow[] {
   return rows;
 }
 
+// Open tasks whose `due` falls inside a date range, from anywhere in a set of
+// notes. What `time-grid` needs, and the one question the open-tasks table
+// could not already answer: it groups by NOTE, and a week grid groups by DAY.
+//
+// THROUGH `openTasksInFile`, SO IT SHARES THE CACHE. A grid and a task table on
+// one dashboard read the same notes; a second reader with its own cache would
+// double every read and could disagree about what a note currently says.
+//
+// DUE, NOT DONE. A crossed-off task is not something to do at 15:00, and a grid
+// that kept drawing it would fill a week with work already finished.
+export interface DueTask {
+  file: TFile;
+  task: AlmanacTask;
+}
+
+export async function readDueTasks(
+  app: App,
+  files: TFile[],
+  fromIso: string,
+  toIso: string
+): Promise<DueTask[]> {
+  const perFile = await mapWithLimit(files, 12, (f) => openTasksInFile(app, f));
+  const out: DueTask[] = [];
+  perFile.forEach((rows) => {
+    for (const row of rows) {
+      const due = row.task.due;
+      if (due && due >= fromIso && due <= toIso) {
+        out.push({ file: row.file, task: row.task });
+      }
+    }
+  });
+  return out;
+}
+
 // Count Almanac tasks (open + done) across every `<!--almanac:KEY-->` region in
 // a note's body. Pure given the text. This is the counterpart the week/month
 // summaries need: util.ts::taskCounts reads Obsidian's listItems cache, which

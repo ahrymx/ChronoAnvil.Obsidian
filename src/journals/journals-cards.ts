@@ -71,6 +71,7 @@ import type AlmanacPlugin from "../main";
 import { getFile, getFolder, openFile } from "../core/util";
 import { folderNotePath } from "../core/util";
 import { emptyCallout } from "../ui/empty";
+import { panDuringDrag } from "../ui/drag-scroll";
 import { overflowButton } from "../ui/section-frame";
 import { hueOf, journalChildFolders, registeredJournalTypes } from "./journal";
 import { moveJournalOnto } from "./journal-order";
@@ -449,6 +450,10 @@ function attachCardDrag(
 ): void {
   card.draggable = true;
   card.dataset.journalId = id;
+  // THE GRID SCROLLS UNDER THE DRAG (4.57), on the same terms as the page's own
+  // widgets: a vault with a dozen journals draws more cards than fit, and a
+  // native drag stops the pane moving. See `drag-scroll.ts`.
+  let stopPan: (() => void) | null = null;
   card.addEventListener("dragstart", (e) => {
     // THE ID TRAVELS IN THE PAYLOAD, not in a variable in this closure. A grid
     // rebuilds on every repaint — including the one this drag causes — so a
@@ -459,8 +464,13 @@ function attachCardDrag(
     e.dataTransfer?.setData("text/plain", id);
     if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
     card.addClass("is-dragging");
+    stopPan = panDuringDrag(card);
   });
-  card.addEventListener("dragend", () => card.removeClass("is-dragging"));
+  card.addEventListener("dragend", () => {
+    stopPan?.();
+    stopPan = null;
+    card.removeClass("is-dragging");
+  });
   card.addEventListener("dragover", (e) => {
     // ONLY A JOURNAL CARD IS A DROP TARGET. A file dragged in from the explorer,
     // a link from another note, a selection of text — all of those fire

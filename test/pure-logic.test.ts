@@ -94,6 +94,7 @@ import {
   parseEvents,
   recurringIso,
   serializeEvents,
+  describeEventWhen,
   slugifyEventId,
   upcomingEvents,
 } from "../src/events/events";
@@ -2478,7 +2479,7 @@ describe("tasks format", () => {
     it("parses a plain open task as normal priority, no due", () => {
       const t = parseTaskLine("- ( ) Water plants");
       expect(t).toEqual({
-        done: false, text: "Water plants", priority: "normal", due: null, extraFields: [],
+        done: false, text: "Water plants", priority: "normal", due: null, at: null, extraFields: [],
       });
     });
 
@@ -2520,6 +2521,35 @@ describe("tasks format", () => {
       expect(t?.text).toBe("X");
       expect(t?.extraFields).toEqual(["[tag:: work]"]);
     });
+
+    // ── the hour, 4.55 ────────────────────────────────────────────
+    //
+    // A task with a `due` is a fact about a day and the time grid needs the
+    // ones that are facts about a minute. `[at:: HH:mm]` is that minute, and
+    // the field went in beside `due` rather than into the text because the
+    // grammar has preserved unknown `[k:: v]` verbatim since it was written —
+    // which is also why a note from an older build survives this change
+    // untouched.
+    it("reads an hour beside the day, padding a hand-typed one", () => {
+      const t = parseTaskLine("- ( ) Stand-up [due:: 2026-08-21] [at:: 9:05]");
+      expect(t?.text).toBe("Stand-up");
+      expect(t?.due).toBe("2026-08-21");
+      expect(t?.at).toBe("09:05");
+    });
+
+    it("drops an hour with no day, and does not write it back as an unknown field", () => {
+      // An hour on no day is not a time. Preserving it would let a task carry a
+      // stamp that means nothing and put it on a grid column it has no claim to.
+      const t = parseTaskLine("- ( ) Sometime [at:: 09:05]");
+      expect(t?.at).toBeNull();
+      expect(t?.extraFields).toEqual([]);
+    });
+
+    it("keeps a malformed hour verbatim rather than guessing at one", () => {
+      const t = parseTaskLine("- ( ) X [due:: 2026-08-21] [at:: half nine]");
+      expect(t?.at).toBeNull();
+      expect(t?.extraFields).toContain("[at:: half nine]");
+    });
   });
 
   describe("serializeTaskLine", () => {
@@ -2538,8 +2568,20 @@ describe("tasks format", () => {
     });
 
     it("appends unknown fields", () => {
-      const t: AlmanacTask = { done: false, text: "X", priority: "low", due: null, extraFields: ["[tag:: work]"] };
+      const t: AlmanacTask = { done: false, text: "X", priority: "low", due: null, at: null, extraFields: ["[tag:: work]"] };
       expect(serializeTaskLine(t)).toBe("- ( ) X [priority:: low] [tag:: work]");
+    });
+
+    it("emits the hour after the day (4.55)", () => {
+      const t: AlmanacTask = { done: false, text: "X", priority: "normal", due: "2026-08-21", at: "09:05", extraFields: [] };
+      expect(serializeTaskLine(t)).toBe("- ( ) X [due:: 2026-08-21] [at:: 09:05]");
+    });
+
+    it("writes no hour for a task with no day", () => {
+      // THE COMPATIBILITY CLAIM. Every task already in a vault has no `at`, and
+      // a round trip must not start writing the key onto lines that never had it.
+      const t: AlmanacTask = { done: false, text: "X", priority: "normal", due: null, at: "09:05", extraFields: [] };
+      expect(serializeTaskLine(t)).toBe("- ( ) X");
     });
   });
 
@@ -2548,6 +2590,7 @@ describe("tasks format", () => {
       "- ( ) Water plants",
       "- (x) Reply to email [priority:: low]",
       "- ( ) Draft proposal [priority:: high] [due:: 2026-07-25]",
+      "- ( ) Stand-up [due:: 2026-08-21] [at:: 09:05]",
       "- ( ) Tagged [tag:: work]",
     ];
     it("parse→serialize is stable for each line", () => {
@@ -5126,6 +5169,80 @@ describe("special events", () => {
       const list = [birthday, trip];
       expect(parseEvents(serializeEvents(list))).toEqual(list);
     });
+
+    // ── the hour, 4.52 ──────────────────────────────────────────────
+    //
+    // A meeting is an event with a time on it, which is what let the Meetings
+    // logbook be a VIEW of the events note rather than a second store of dated
+    // things the calendar knows nothing about. What these guard is that adding
+    // the field cost every `Events.md` already in a vault nothing.
+    it("keeps an hour and pads a hand-typed one", () => {
+      // A list sorted as strings has to be padded, or 09:00 sorts after 10:00.
+      const [only] = parseEvents([{ ...trip, time: "9:05" }]);
+      expect(only.time).toBe("09:05");
+    });
+
+    it("drops an unusable time rather than clamping it", () => {
+      // A clamp would turn a typo into a plausible time and file the meeting at
+      // midnight without saying so. An event with no time is a fact about the
+      // day, which is a safe thing for a mistyped one to become.
+      for (const bad of ["25:00", "10:75", "morning", "", 9]) {
+        expect(parseEvents([{ ...trip, time: bad }])[0].time).toBeUndefined();
+      }
+    });
+
+    it("writes no `time` key for an event that has none", () => {
+      // THE COMPATIBILITY CLAIM, ASSERTED. A vault's events note is a file of
+      // events with no times; a round trip must not start writing the key into
+      // every row of it.
+      const out = serializeEvents([birthday, trip]);
+      expect(out.every((row) => !("time" in row))).toBe(true);
+      expect(parseEvents(serializeEvents([{ ...trip, time: "14:00" }]))[0].time).toBe(
+        "14:00"
+      );
+    });
+
+    // ── the length, 4.55 ────────────────────────────────────────────
+    //
+    // MINUTES, NOT AN END TIME, and the reason is the sibling grammar: a log
+    // stamp holds one clock field, so a second `HH:mm` would read as a range
+    // and collide with the `\d{1,2}:\d{2}` alternative in `STAMP_RE`. A count
+    // of minutes goes in the extensible slot both formats already have.
+    it("keeps a length on a timed event", () => {
+      const [only] = parseEvents([{ ...trip, time: "09:00", duration: 90 }]);
+      expect(only.duration).toBe(90);
+    });
+
+    it("takes a length written as a string, and rounds one written as a fraction", () => {
+      // A hand-edited note writes `duration: 45`; YAML hands back whichever of
+      // the two the file happened to quote.
+      expect(parseEvents([{ ...trip, time: "09:00", duration: "45" }])[0].duration).toBe(45);
+      expect(parseEvents([{ ...trip, time: "09:00", duration: 45.4 }])[0].duration).toBe(45);
+    });
+
+    it("drops a length that is not one", () => {
+      for (const bad of [0, -30, "soon", "", null, {}]) {
+        expect(
+          parseEvents([{ ...trip, time: "09:00", duration: bad }])[0].duration
+        ).toBeUndefined();
+      }
+    });
+
+    it("drops a length on an event with no hour", () => {
+      // A length with no start is not a span. A birthday that lasts 90 minutes
+      // is a claim nobody made.
+      expect(parseEvents([{ ...trip, duration: 90 }])[0].duration).toBeUndefined();
+    });
+
+    it("writes no `duration` key for an event that has none", () => {
+      expect(serializeEvents([birthday, trip]).every((row) => !("duration" in row))).toBe(
+        true
+      );
+      const back = parseEvents(
+        serializeEvents([{ ...trip, time: "09:00", duration: 90 }])
+      );
+      expect(back[0].duration).toBe(90);
+    });
   });
 
   describe("ids", () => {
@@ -5266,11 +5383,39 @@ describe("special events", () => {
       const items = upcomingEvents([birthday, trip, sickDay], "2026-03-01", 2);
       expect(items.map((i) => i.def.id)).toEqual(["munich-trip", "sick-day"]);
     });
+
+    it("orders one day's events by the hour, not by the title", () => {
+      // 4.52, and it is a FIX rather than a refinement: within a day the sort
+      // was alphabetical, so a 17:00 review came before a 09:00 stand-up in
+      // every agenda that drew them.
+      const standup = { ...sickDay, id: "standup", title: "Stand-up", time: "09:00" };
+      const review = { ...sickDay, id: "review", title: "A review", time: "17:00" };
+      const items = upcomingEvents([review, standup], "2026-03-11", 5);
+      expect(items.map((i) => i.def.id)).toEqual(["standup", "review"]);
+    });
+
+    it("puts a day's untimed facts before its appointments", () => {
+      // A birthday is true of the whole day; a meeting happens inside it.
+      const meeting = { ...sickDay, id: "meeting", title: "A meeting", time: "09:00" };
+      const items = upcomingEvents([meeting, sickDay], "2026-03-11", 5);
+      expect(items.map((i) => i.def.id)).toEqual(["sick-day", "meeting"]);
+    });
   });
 
   describe("phrasing", () => {
     it("describes a recurring event without a year", () => {
       expect(describeEventDate(birthday)).toBe("12 April, every year");
+    });
+
+    it("says the hour where there is one, and leaves the date alone", () => {
+      // TWO FUNCTIONS RATHER THAN A FLAG (4.52): `describeEventDate` is read by
+      // the calendar, the manager and the settings row, and every one of them is
+      // describing a DAY. Appending a time inside it would have changed what the
+      // rows above are about.
+      expect(describeEventWhen(sickDay)).toBe(describeEventDate(sickDay));
+      expect(describeEventWhen({ ...sickDay, time: "14:00" })).toBe(
+        "11 March 2026, 14:00"
+      );
     });
 
     it("describes a span as a range with its length", () => {

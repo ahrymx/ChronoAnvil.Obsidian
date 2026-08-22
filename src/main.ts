@@ -7,6 +7,7 @@
 
 import { MarkdownView, Menu, Notice, Plugin, TFile } from "obsidian";
 import { DEFAULT_SETTINGS, AlmanacSettings, AlmanacSettingTab } from "./core/settings";
+import { normalizeLogbooks } from "./diary/logbooks";
 import { Diary } from "./diary/diary";
 import { JournalManager, registeredJournalTypes } from "./journals/journal";
 import { normalizeJournalConfigs } from "./journals/custom-journal";
@@ -706,6 +707,19 @@ export default class AlmanacPlugin extends Plugin {
     // value. One pass on load and the id is simply there.
     this.settings.customJournals = normalizeJournalConfigs(
       this.settings.customJournals ?? []
+    );
+
+    // The logbook registry, on the same one-pass rule and for the same reason.
+    // A vault that saved settings before 4.52 has no `logbooks` key at all and
+    // lands on the four defaults; a hand-edited list is repaired in place rather
+    // than discarded. See `normalizeLogbooks`.
+    //
+    // AFTER `paths` IS MERGED, and it has to be: a row with no `path` derives
+    // one from the configured Logbooks folder, and reading that before the deep
+    // merge above would give a vault upgrading from 4.51 the string `undefined`.
+    this.settings.logbooks = normalizeLogbooks(
+      this.settings.logbooks,
+      this.settings.paths.logbooks
     );
 
     // Upgrade legacy Mood/Wake/Bed seeds into built-ins, inject any missing

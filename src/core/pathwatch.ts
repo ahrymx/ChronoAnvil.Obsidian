@@ -91,6 +91,7 @@ const PATH_LABELS: Record<string, string> = {
   templatesDiary: "diary templates",
   documentation: "documentation",
   attachments: "attachments",
+  logbooks: "logbooks folder",
 };
 
 // Rewrite `value` if it names `oldPath` or something beneath it. Returns null
@@ -117,6 +118,13 @@ export function remapConfiguredPaths(
   settings: {
     paths: Record<string, string>;
     customJournals?: { name: string; root: string; templatesFolder: string }[];
+    // A LOGBOOK NAMES A FILE, which is what makes it the only entry here that
+    // a FILE rename may move (4.52). `LogbookDef.path` is stored rather than
+    // derived precisely so the note keeps its items when the label changes —
+    // the cost of that choice is that the string has to follow the file, and
+    // this is where it does. Structural, like the journals above it, so this
+    // module still needs nothing from `constants.ts`.
+    logbooks?: { name: string; path: string }[];
     // Keyed `<notePath>::<section title>`. Not a configured path, but it holds
     // note paths, so a rename invalidates it exactly as it invalidates the rest
     // of this record.
@@ -136,6 +144,17 @@ export function remapConfiguredPaths(
     if (next === null) continue;
     settings.paths[key] = next;
     changed.push(PATH_LABELS[key] ?? key);
+  }
+
+  // BEFORE THE `isFolder` GATE, and deliberately: every other configured path
+  // below names a folder, so only a folder rename can move it, and a logbook
+  // names a note. Dragging `Work log.md` into another folder is the ordinary way
+  // a reader moves one.
+  for (const book of settings.logbooks ?? []) {
+    const next = remapPath(book.path, oldPath, newPath);
+    if (next === null) continue;
+    book.path = next;
+    changed.push(`${book.name} logbook`);
   }
 
   if (isFolder) {

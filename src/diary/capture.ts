@@ -43,31 +43,7 @@ import type { TrackerClass } from "../trackers/trackers";
 import { sectionsForEntry } from "./entry-sections";
 import { currentEntryKey, entryDateKey, labelForGrain } from "./nav";
 import { isManagedTemplate } from "../trackers/entry-trackers";
-
-// Format one capture for the region: a single timestamp heading the block,
-// with any further lines carried underneath it.
-//
-// One timestamp per *capture*, not per line. A three-line thought is one
-// moment; stamping each line would make it read as three separate ones. The
-// continuation lines are indented so the block stays visually attached to its
-// time without needing markup that would fight the region's plain-text
-// contract.
-export function formatCapture(text: string, timestamp: string): string {
-  const lines = text.replace(/\s+$/, "").split("\n");
-  // Drop leading blank lines so a stray newline before the text doesn't
-  // produce a stamp with nothing next to it.
-  while (lines.length > 0 && lines[0].trim() === "") lines.shift();
-  if (lines.length === 0) return "";
-  const [first, ...rest] = lines;
-  const head = `${timestamp} — ${first.trim()}`;
-  if (rest.length === 0) return head;
-  // Blank continuation lines stay blank rather than becoming stray indents.
-  // A line's own leading whitespace is kept on top of the block indent: if
-  // someone indented a sub-point, they meant it, and flattening would lose the
-  // structure they typed.
-  const tail = rest.map((l) => (l.trim() === "" ? "" : `  ${l.trimEnd()}`));
-  return [head, ...tail].join("\n");
-}
+import { formatLogItem } from "./log-items";
 
 // Append a pre-formatted capture block to a specific entry's capture region,
 // inside `vault.process` so it can't interleave with another body write. The
@@ -118,7 +94,11 @@ export async function captureTo(
   const file = await target.resolve();
   if (!file) return null;
 
-  const block = formatCapture(body, moment().format("HH:mm"));
+  // NO DATE ON THE STAMP, and `formatLogItem`'s third argument is where one
+  // would go: a capture lands in a dated entry, so the day is the note's and
+  // repeating it on every line would be the entry's own name, forty times over.
+  // A logbook item carries one because its note spans months (4.52).
+  const block = formatLogItem(body, moment().format("HH:mm"));
   if (!block) return null;
 
   await appendCapture(plugin, file, block);
@@ -131,7 +111,7 @@ export async function captureTo(
 //   09:14 — [scale:Mood=4] rough afternoon
 //
 // The tag comes first in the capture body so the pairing marker is at a stable
-// position, and formatCapture prepends the timestamp exactly as it does for a
+// position, and formatLogItem prepends the timestamp exactly as it does for a
 // quick capture — one capture format, one place. Returns false when the note
 // has no usable text or the tracker id can't be tagged, so the caller knows
 // nothing was written.
@@ -145,7 +125,7 @@ export async function captureScaleNote(
   // A bare tag with no prose is still worth recording — it timestamps that you
   // rated the value and thought about it — but an all-whitespace text should
   // not produce a trailing space. formatScaleNoteTag already trims.
-  const block = formatCapture(tag, moment().format("HH:mm"));
+  const block = formatLogItem(tag, moment().format("HH:mm"));
   if (!block) return false;
   await appendCapture(plugin, file, block);
   return true;

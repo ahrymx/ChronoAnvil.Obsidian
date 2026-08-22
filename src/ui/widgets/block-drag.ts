@@ -78,6 +78,7 @@ import { splitGlyph } from "../section-frame";
 import { moveCell, widgetRun } from "../../core/cell-move";
 import type { CellSource, CellTarget } from "../../core/cell-move";
 import { cellWidthsIn, snapRatio, widenCells } from "../../core/cell-width";
+import { MAX_COLUMNS } from "../../core/directive-grammar";
 import {
   heightAbove,
   resizeCell,
@@ -97,6 +98,7 @@ import {
 } from "./row";
 import { boundsOf } from "../header-title";
 import { getFile } from "../../core/util";
+import { panDuringDrag } from "../drag-scroll";
 
 // The one drag type this file speaks. There were two until 4.8.1, the other
 // being a whole block; see the header for why that one went.
@@ -135,7 +137,13 @@ const GRIP_CLASS = "jbd-handle";
 //
 // Null between drags. Set at `dragstart`, cleared at `dragend`, and read by
 // nothing else.
-let inFlight: { block: number; whole: boolean } | null = null;
+//
+// `frees` IS WHETHER PICKING THIS UP CLOSES A COLUMN (4.52.1), which the two
+// column-opening slots need and cannot work out for themselves: they are asked
+// during `dragover`, where a drag's DATA is unreadable by design, and the fact
+// they want is about the cell the drag came OUT of. Measured once at
+// `dragstart`, where the element is in hand.
+let inFlight: { block: number; whole: boolean; frees: boolean } | null = null;
 
 // Which drag this is, so a block can cache what it worked out for the last one.
 // Bumped once per `dragstart`; see `indexInDrag`.
@@ -330,6 +338,28 @@ function lineOf(el: Element | null): number | null {
   if (raw === null || raw === undefined) return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
+}
+
+// Whether this widget is the only thing in its column. 4.52.1.
+//
+// WHY A SLOT NEEDS IT. `MAX_COLUMNS` says a row draws two columns, so the two
+// slots that open one — the left and right edges of every card in a group — must
+// not light up on a row that already has both. Except when the drag is coming
+// out of THAT ROW and out of a cell holding nothing else: the column it leaves
+// closes as the new one opens, so the count is unchanged and the reader is
+// rearranging rather than adding. Refusing that would take away the only way to
+// move a widget from the right column to the left of the left one.
+//
+// THE STAMPED CHILDREN ARE THE WIDGETS. A divider is a child of the cell too
+// (`GROUP_DIVIDER_CLASS`, added before the content for exactly this kind of
+// walk) and carries no line stamp, which is what makes the count exact.
+//
+// FALSE FOR ANYTHING NOT IN A CELL, which is every whole-block drag: a block
+// arriving from elsewhere in the note frees no column in the row it lands in.
+function onlyInItsCell(el: HTMLElement): boolean {
+  const cell = el.closest(`.${ROW_CELL_CLASS}`);
+  if (!cell) return false;
+  return cell.querySelectorAll(`[${LINE_ATTR}]`).length === 1;
 }
 
 // The bands that are already a head: a section's bar, and the six a widget
@@ -1072,11 +1102,28 @@ export function attachBlockHead(
   // So the two kinds are given different GROUND rather than different numbers:
   //
   //   A ROW BLOCK IS COLUMNS, EXCEPT AT ITS EDGES. Its cells tile it, half a
-  //   column each; the block's own two slots are 16px bands along its top and
-  //   bottom, which is its padding — the strip that is visibly outside the row.
+  //   column each; the block's own two slots are bands along its top and bottom,
+  //   which is its padding — the strip that is visibly outside the row.
   //
   //   EVERY OTHER BLOCK IS ALL PLACES. Its top half means "above this block" and
   //   its bottom half "below it".
+  //
+  // AND THE EDGES ARE A HARD EDGE NOW, NOT A GENEROUS ONE (4.54 §1). 4.8.7 let
+  // the two bands grow to a quarter of the block each so a hand could find them,
+  // and a quarter of a tall group is 72px of "outside the row" lying over the
+  // top and bottom of every column in it. A vault found what that costs: *"a
+  // cell can not be dragged above a cell that is at the top, because the wrong
+  // box highlights."* The first card in a column has its five places entirely
+  // inside the band, and the paragraph above says why no z-index could get them
+  // out — so nothing could ever be dropped above the top widget of a group.
+  //
+  // THE STYLESHEET SWAPS THE GROUND RATHER THAN THE NUMBERS, which is this
+  // release's own rule turned around: the CELL is lifted over the bands while a
+  // drag is in the air, and the bands are given the space OUTSIDE the block to
+  // make up what they lost. See `.jbd-slot-edge` and `--am-slot-reach`. Nothing
+  // changes on this side, and the reason it is written down here is that the two
+  // halves of the fix are in different files and neither reads as deliberate
+  // alone.
   // THE OPEN PAGE, NOT THE FIRST ONE (4.34 §6). This was
   // `querySelector(.${ROW_CLASS})`, which took the only row there was — and a
   // group with pages has one row per page, all of them in the document at once.
@@ -1218,6 +1265,25 @@ export function attachBlockHead(
   // about the widget rather than about a place beside it, so it takes the part
   // of the widget that is not next to anything — and it is symmetric, which
   // means a reader who lands on it by accident undoes it by repeating it.
+  // WHETHER A COLUMN OF ITS OWN IS A PLACE THIS DRAG CAN GO. 4.52.1.
+  //
+  // A ROW DRAWS TWO COLUMNS (`MAX_COLUMNS`), so the two slots that OPEN one —
+  // the left and right edges of every card in the group — have nothing to offer
+  // once there are two. `empty.ts`'s rule applied to a landing place, which is
+  // the same reading 4.8.7 made of the block slots one screen up: a slot that
+  // lights up and then writes something the reader did not ask for is the editor
+  // lying about what it will do.
+  //
+  // AND THE READER KEEPS EVERY REARRANGEMENT. A widget alone in a column of THIS
+  // row still lights them, because its column closes as the new one opens — so
+  // moving the right-hand widget to the left of the left-hand one is still a
+  // drag rather than a trip to the section editor. The three slots that do not
+  // open a column — above, below, and the swap in the middle — are untouched and
+  // are how a third widget joins a full row.
+  const hasRoom = (): boolean =>
+    cells.length < MAX_COLUMNS ||
+    (inFlight !== null && inFlight.frees && inFlight.block === indexNow());
+
   cells.forEach((cell, n) => {
     const before = opens[n];
     // WHERE THE NEXT COLUMN STARTS, or the end of the body for the last one:
@@ -1245,9 +1311,9 @@ export function attachBlockHead(
         slot(child, "jbd-slot-before", CELL_TYPE, (p) => p.cell, () => {
           const i = indexNow();
           return i === null ? null : { kind: "cell", block: i, at: before };
-        });
+        }, hasRoom);
       }
-      slot(child, "jbd-slot-after", CELL_TYPE, (p) => p.cell, after);
+      slot(child, "jbd-slot-after", CELL_TYPE, (p) => p.cell, after, hasRoom);
       slot(child, "jbd-slot-over", CELL_TYPE, (p) => p.cell, () => {
         const i = indexNow();
         return i === null ? null : { kind: "stack", block: i, at: line, after: false };
@@ -1280,6 +1346,12 @@ export function attachBlockHead(
     dim: HTMLElement = host
   ): void => {
     const grip = attachGrip(host, label);
+    // HOW THE READER REACHES THE REST OF THE PAGE (4.57). A native drag stops
+    // the pane scrolling — the browser owns the input stream and sends the page
+    // drag events and nothing else — so a homepage taller than its pane could
+    // only be rearranged among the blocks that happened to be on screen. See
+    // `drag-scroll.ts`, which turns `dragover` coordinates into an edge band.
+    let stopPan: (() => void) | null = null;
     grip.addEventListener("dragstart", (evt) => {
       const block = indexNow();
       const at = ranges();
@@ -1295,10 +1367,13 @@ export function attachBlockHead(
       if (at.cell) evt.dataTransfer?.setData(CELL_TYPE, payload);
       evt.dataTransfer?.setData("text/plain", "");
       dragSeq++;
-      inFlight = { block, whole };
+      inFlight = { block, whole, frees: onlyInItsCell(host) };
       dim.addClass("is-dragging");
+      stopPan = panDuringDrag(grip);
     });
     grip.addEventListener("dragend", () => {
+      stopPan?.();
+      stopPan = null;
       inFlight = null;
       dim.removeClass("is-dragging");
       container.removeClass("is-slotting");

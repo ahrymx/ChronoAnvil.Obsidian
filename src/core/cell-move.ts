@@ -48,6 +48,7 @@ import {
   FRAME_KEYWORD,
   HEADER_KEYWORD,
   HEIGHT_KEYWORD,
+  MAX_COLUMNS,
   ROW_KEYWORD,
   TAB_KEYWORD,
   WIDE_KEYWORD,
@@ -416,6 +417,73 @@ export function splitPage(body: readonly string[]): string[] | null {
 // it was rather than removing it.
 //
 // A HEIGHT TRAVELS WITH ITS WIDGET, on `splitPage`'s rule and for its reason.
+// ── A RUN IS NOT A COLUMN, PAST THE CAP (4.52.1) ─────────────────────────
+//
+// A run is what a delimiter opens; a COLUMN is what gets drawn. Below
+// `MAX_COLUMNS` they are the same thing and this file had no reason to tell
+// them apart. Above it they are not: the extra runs are DEALT into the columns
+// there are, which `capColumns` (row.ts) does on the render and
+// `regroupFlatNote`'s column phase writes into the file. So this walk answers
+// *what does the fence say*, and `columnsOf` (cell-width.ts) answers *what does
+// the row draw* by stopping at the cap.
+//
+// EVERY WIDGET LINE, NOT JUST THE FIRST. `columnsOf` needs only where a column
+// starts; the phase that writes the cap into the file needs to know how many
+// widgets each column already holds and which line is its foot, and both are
+// this list. One walk, three answers, and no second reading of where a boundary
+// is — which is the thing two readings of a fence always turn into.
+export interface ColumnRun {
+  // The `cell` line that opened it, or -1 for the one the `row` line opens and
+  // for every column of an undivided row.
+  opener: number;
+  // The body lines its widgets sit on, in order. Never empty: a run with no
+  // widget in it is not a column and is not returned.
+  widgets: number[];
+}
+
+export function runsOf(body: readonly string[]): ColumnRun[] {
+  if (!body.some(isCellLine)) {
+    return body.flatMap((line, i) =>
+      isWidget(line) ? [{ opener: -1, widgets: [i] }] : []
+    );
+  }
+  const out: ColumnRun[] = [];
+  let opener = -1;
+  let widgets: number[] = [];
+  for (let i = 0; i < body.length; i++) {
+    if (isCellLine(body[i])) {
+      if (widgets.length) {
+        out.push({ opener, widgets });
+        widgets = [];
+      }
+      opener = i;
+      continue;
+    }
+    if (isWidget(body[i])) widgets.push(i);
+  }
+  if (widgets.length) out.push({ opener, widgets });
+  return out;
+}
+
+// How many widgets each drawn column holds, one entry per column, after the
+// deal. 4.52.1.
+//
+// WHO ASKS, AND WHAT FOR. `regroupFlatNote`'s column phase and its join both
+// have to pick which of a full row's two columns a widget goes into, and both
+// answer *the one holding fewer, and the first on a tie*. That is one rule with
+// two callers, so the count it needs is one function rather than a walk in each
+// — and the deal is in it, because a run past the cap is already part of the
+// column it was dealt into and its widgets are already on that column's line.
+export function columnLoadOf(runs: readonly ColumnRun[]): number[] {
+  const load = runs.slice(0, MAX_COLUMNS).map(() => 0);
+  runs.forEach((run, n) => {
+    if (!load.length) return;
+    load[n % load.length] += run.widgets.length;
+  });
+  return load;
+}
+
+
 export function setPageBreaks(
   body: readonly string[],
   openers: readonly number[]
@@ -429,6 +497,16 @@ export function setPageBreaks(
   // BACK TO FRONT, so an insertion does not move the lines the earlier
   // boundaries were located at — `setCellWidths`' own rule, one file over.
   const out = [...body];
+  // WHERE A `tab` WENT BACK TO BEING A `cell`, kept for the pass below.
+  //
+  // AND HOW MANY LINES HAD BEEN INSERTED WHEN IT WAS RECORDED. The loop walks
+  // back to front, so every insertion it makes AFTER this one is at a lower line
+  // — which shifts this index up by one each time. `after` is what turns the
+  // index the loop saw into the index the finished body has, and without it a
+  // call that both adds a page low in the fence and removes one above it would
+  // test the wrong line.
+  const demoted: { at: number; after: number }[] = [];
+  let inserted = 0;
   for (let n = widgets.length - 1; n >= 1; n--) {
     let cut = widgets[n];
     while (cut - 1 > widgets[n - 1] && isHeightLine(out[cut - 1])) cut--;
@@ -439,10 +517,48 @@ export function setPageBreaks(
     if (want.has(widgets[n])) {
       if (isTab) continue;
       if (isCell) out[above] = `${indent}${TAB_KEYWORD}`;
-      else out.splice(cut, 0, `${/^\s*/.exec(out[cut])?.[0] ?? ""}${TAB_KEYWORD}`);
+      else {
+        out.splice(cut, 0, `${/^\s*/.exec(out[cut])?.[0] ?? ""}${TAB_KEYWORD}`);
+        inserted++;
+      }
       continue;
     }
-    if (isTab) out[above] = `${indent}${CELL_KEYWORD}`;
+    if (isTab) {
+      out[above] = `${indent}${CELL_KEYWORD}`;
+      demoted.push({ at: above, after: inserted });
+    }
+  }
+
+  // AND A DEMOTION MAY NOT LEAVE A PAGE OVER THE CAP. 4.52.1.
+  //
+  // 4.34.2's RULE, WITH THE ONE CASE IT COULD NOT SEE. *"The column stays either
+  // way: removing a page boundary puts the two sections back beside each other
+  // rather than stacking them, because a page break is a column break that was
+  // promoted."* True whenever there was a column break to promote — and a `tab`
+  // added above a widget that had no delimiter of its own was never promoted
+  // from anything, so demoting it INVENTS a column.
+  //
+  // THE BUG THAT IS, AND IT IS ONE A READER REACHES IN TWO CLICKS. The homepage
+  // is two columns: `diary` beside the three that stack. Start a page at Open
+  // tasks and take it away again, and the fence comes back with a delimiter it
+  // never had — three columns, which the cap then deals into two that are not
+  // the two the reader started with. A page added and removed must leave the
+  // group it found.
+  //
+  // SO THE COLUMN STAYS WHERE THERE IS ROOM FOR IT AND THE LINE GOES WHERE
+  // THERE IS NOT, which keeps 4.34.2's sentence true of every group it was
+  // written about and makes it true of the ones it was not.
+  //
+  // BACK TO FRONT AGAIN, so a line removed never moves one still to be looked
+  // at — `demoted` is collected in descending order already, since the loop
+  // above walks that way.
+  for (const { at: was, after } of demoted) {
+    const at = was + (inserted - after);
+    const span =
+      tabSlices(out).find((s) => at >= s.from && at < s.to) ??
+      { from: 0, to: out.length, page: 0 };
+    if (runsOf(out.slice(span.from, span.to)).length <= MAX_COLUMNS) continue;
+    out.splice(at, 1);
   }
   return out.join("\n") === body.join("\n") ? null : out;
 }

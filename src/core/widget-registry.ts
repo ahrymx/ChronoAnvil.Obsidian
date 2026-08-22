@@ -114,7 +114,14 @@ export type WidgetArg =
   | {
       kind: "vault";
       label: string;
-      source: "journals";
+      // TWO SOURCES AS OF 4.52, and the second is what the paragraph above
+      // predicted: "trackers and note kinds are the same shape and are
+      // deliberately not added speculatively — each has its own question about
+      // what an id means when the thing is renamed." A logbook's answer is the
+      // one that made it addable: its id is assigned once and never rewritten,
+      // so `logbook:work` keeps meaning the same note however often the reader
+      // retitles it.
+      source: "journals" | "logbooks";
       keywords?: readonly WidgetChoice[];
     };
 
@@ -194,24 +201,36 @@ export interface WidgetSpec {
   // a piece does not rename the ones it had. A saved layout names those keys.
   args?: readonly WidgetArg[];
   argJoin?: string;
-  // Whether a page may hold more than one of these. 4.15 §4.
-  //
-  // ABSENT MEANS ONE, which is what every widget in this table meant before the
-  // field existed and is the honest default: a section is located by one anchor,
-  // and `parseFlatSections` gives a keyword's second fence to nobody precisely
-  // so that two runs answering to one id cannot swap a reader's content on Save.
-  //
-  // A WIDGET THAT REPEATS DOES NOT RELAX THAT RULE — it gets an id per
-  // occurrence, so each id still has exactly one run. See `instanceSection` in
-  // `widget-sections.ts` for how the id is spelled and why it is derived from
-  // the text rather than stored in it.
-  //
-  // AND IT IS NOT THE SAME QUESTION AS `region`. A widget excluded for `region`
-  // owns a keyed span of the note BODY and two would overwrite each other; this
-  // says a widget is a pure render of something it names, so a second one is a
-  // second view rather than a second writer.
-  repeats?: true;
 }
+
+// ── HOW MANY OF ONE WIDGET A PAGE MAY HOLD: AS MANY AS THE READER WANTS ──
+//
+// THERE IS NO FIELD FOR THIS, AND 4.56 IS WHERE THE FIELD WENT. 4.15 §4 added
+// `repeats?: true`, opt-in, absent meaning one — and three widgets opted in.
+// The other thirty were limited by nothing but the default, which is how a page
+// came to be allowed one `logbook` when a reader's whole reason for a homepage
+// is a work log beside what they are focused on beside what is scheduled.
+//
+// THE RULE IS NOW STRUCTURAL RATHER THAN PER-ENTRY, and this table is why it can
+// be. A widget is in `WIDGETS` only if it is a PURE RENDER of something it
+// names: everything that owns a keyed span of the note body is in
+// `NOT_PAGE_WIDGETS` under `reason: "region"`, because two of those would share
+// one region and overwrite each other. That exclusion is the whole of the
+// danger, and it is already handled one table down — so a second copy of
+// anything left in here is a second VIEW, never a second writer, and there is
+// nothing left for a per-entry flag to protect.
+//
+// THE ONE-ANCHOR RULE IS UNTOUCHED. `parseFlatSections` still gives a keyword's
+// second fence to nobody, and every occurrence still gets an id of its own —
+// `w:journal-card#2` is "the second `journal-card` line in this text", derived
+// afresh and never stored. See `widget-sections.ts`, which is where all of that
+// lives and now applies it to every keyword instead of three.
+//
+// SECTIONS ARE STILL ONE PER PAGE, which is the other half of the rule and is
+// unchanged: a catalogue section persists content into a `<!--almanac:key-->`
+// region keyed by name, so `addableFlatSections` withholds one already present
+// and the picker stops offering it. A widget renders; a section remembers. That
+// difference is what decides which of the two may be added twice.
 
 // Why a keyword that dispatches is not offered as a page widget.
 //
@@ -319,6 +338,27 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "🎉",
     blurb: "The special-events manager: every recurring and one-off event, with an Add button.",
   },
+  "time-grid": {
+    label: "Time grid",
+    glyph: "\u23F1\uFE0F",
+    blurb:
+      "The week laid against the hours — meetings, logbook items and what is due, each in its own place.",
+    arg: {
+      kind: "choice",
+      label: "what to draw",
+      // ONE SOURCE PER ROW, WHERE THE DIRECTIVE TAKES A LIST. `time-grid:
+      // events,tasks` is legal and is what a reader types when they want two;
+      // offering every combination here would be seven rows for a question
+      // whose useful answers are "all of it" and "only this". The empty answer
+      // is the first pick because it is the one most readers want.
+      emptyLabel: "Everything",
+      values: [
+        { value: "events", label: "Only events" },
+        { value: "logbooks", label: "Only logbook items" },
+        { value: "tasks", label: "Only tasks that are due" },
+      ],
+    },
+  },
   "sleep-summary": {
     label: "Sleep summary",
     glyph: "😴",
@@ -416,7 +456,6 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     // would make every vault that ever typed it get something they did not ask
     // for. The refusal now names this word instead.
     arg: { kind: "vault", label: "the journal to show", source: "journals" },
-    repeats: true,
   },
   "journals-header": {
     label: "Journals activity",
@@ -479,8 +518,8 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     },
     argJoin: "/",
     // MORE THAN ONE IS THE POINT once it can be pointed: a page can carry
-    // Study's subjects beside Cooking's recipes.
-    repeats: true,
+    // Study's subjects beside Cooking's recipes. True of every widget as of
+    // 4.56; this was one of the three it was true of first.
   },
   // THE CARD ARRANGEMENT OF `level-index`'s QUESTION, 4.36 §2.
   //
@@ -509,7 +548,6 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     argJoin: "/",
     // MORE THAN ONE IS THE POINT, exactly as it is one entry up: a page can
     // carry Study's subjects beside Cooking's recipes.
-    repeats: true,
   },
   // ONE BAND, WHERE THERE WERE TWO (4.46). `topic-stats` and `journal-totals`
   // stood here as separate entries and answered one question — what do the notes
@@ -612,6 +650,26 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     label: "Quick links",
     glyph: "🔗",
     blurb: "A row of destination pills.",
+  },
+
+  // ── the diary's undated layer ───────────────────────────────────────
+  logbook: {
+    label: "Logbook",
+    glyph: "🗒️",
+    blurb:
+      "One standing note's items — a work log, what you are focused on, links to come back to, what is scheduled.",
+    arg: {
+      kind: "vault",
+      label: "the logbook to draw",
+      source: "logbooks",
+    },
+    // AS MANY AS A PAGE WANTS, WHICH IS WHY THE FLAG IS GONE (4.56). This is the
+    // entry that showed the old default was wrong: a homepage carrying the work
+    // log beside Current focus beside what is scheduled is three `logbook:`
+    // lines, and it was allowed one. A logbook widget writes into the LOGBOOK'S
+    // own note rather than the page it sits on, so two of them on one page are
+    // no more contested than the same widget on two different pages — which was
+    // always permitted.
   },
 };
 

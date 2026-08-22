@@ -145,8 +145,8 @@ describe("the contents section takes either spelling of its question", () => {
 
 describe("one page per journal, in every walk that reads the list", () => {
   it("adds exactly one entry per registered type, at its folder note", () => {
-    const none = shippedNotes(DEFAULT_PATHS, []);
-    const one = shippedNotes(DEFAULT_PATHS, [STUDY_JOURNAL]);
+    const none = shippedNotes(DEFAULT_PATHS, [], []);
+    const one = shippedNotes(DEFAULT_PATHS, [STUDY_JOURNAL], []);
     expect(one.length).toBe(none.length + 1);
     const added = one.filter((n) => !none.some((m) => m.dest === n.dest));
     expect(added.map((n) => n.dest)).toEqual([
@@ -162,7 +162,7 @@ describe("one page per journal, in every walk that reads the list", () => {
     // they are not excluded from `reconcileLayouts`. Both halves matter — a
     // template flag here would buy permanent drift the moment a directive is
     // renamed.
-    const note = shippedNotes(DEFAULT_PATHS, TYPES).find(
+    const note = shippedNotes(DEFAULT_PATHS, TYPES, []).find(
       (n) => n.dest === folderNotePath(STUDY_JOURNAL.root)
     );
     expect(note?.content).toBe(composeJournalDashboardNote(STUDY_JOURNAL));
@@ -177,7 +177,7 @@ describe("one page per journal, in every walk that reads the list", () => {
     // four, which is the hole the required `types` parameter exists to close on
     // the other side.
     for (const type of TYPES) {
-      const note = shippedNotes(DEFAULT_PATHS, TYPES).find(
+      const note = shippedNotes(DEFAULT_PATHS, TYPES, []).find(
         (n) => n.dest === folderNotePath(type.root)
       );
       expect(note, type.name).toBeTruthy();
@@ -190,7 +190,7 @@ describe("one page per journal, in every walk that reads the list", () => {
     // `shippedNotes` writes a path with one surface and `modelForSurface` is
     // given another, repair composes a page the section editor opens as
     // something else.
-    const note = shippedNotes(DEFAULT_PATHS, [STUDY_JOURNAL]).find(
+    const note = shippedNotes(DEFAULT_PATHS, [STUDY_JOURNAL], []).find(
       (n) => n.dest === folderNotePath(STUDY_JOURNAL.root)
     );
     expect(note?.surface).toEqual({
@@ -204,7 +204,7 @@ describe("one page per journal, in every walk that reads the list", () => {
     // DERIVED, so there is no key in `DEFAULT_PATHS` to update and no entry in
     // `remapConfiguredPaths` to add.
     const moved = { ...STUDY_JOURNAL, root: "09 - Notebooks/Learning" };
-    expect(shippedNotes(DEFAULT_PATHS, [moved]).map((n) => n.dest)).toContain(
+    expect(shippedNotes(DEFAULT_PATHS, [moved], []).map((n) => n.dest)).toContain(
       "09 - Notebooks/Learning/Learning.md"
     );
     expect(Object.keys(DEFAULT_PATHS)).not.toContain("journalDashboard");
@@ -256,7 +256,7 @@ describe("the editor opens on it, as that journal's page", () => {
     // AND NOT A SECOND COPY THROUGH THE WIDGET DOOR. The page writes
     // `tasks-table`, so the widget half must not offer it again under its own
     // prefix — which is the de-dup `addable` exists for.
-    expect(ids).not.toContain("w:tasks-table");
+    expect(ids.filter((id) => id.startsWith("w:tasks-table"))).toEqual([]);
   });
 });
 

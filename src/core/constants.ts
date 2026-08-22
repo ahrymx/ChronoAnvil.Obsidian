@@ -95,6 +95,24 @@ export const DEFAULT_PATHS = {
   // note — so it is linkable, bookmarkable and editable like the rest, and a
   // user who wants only the search box can delete the other two blocks.
   search: `${ROOT_DIARY}/Search.md`,
+  // THE DIARY'S UNDATED LAYER (4.52). One folder holding one note per logbook —
+  // a work log, what you are focused on, links to come back to, the meetings in
+  // the week ahead.
+  //
+  // UNDER THE DIARY, NOT UNDER `01 - Material`, and the two roots' own comments
+  // decide it. Material holds "the raw stuff entries are made from and point
+  // at": Staging is a transit lounge and Attachments is a store, and neither is
+  // prose somebody wrote on purpose. A work log is written, not collected. The
+  // precedent is `events` four lines up, which sits beside the entries it
+  // decorates on exactly this argument — "a birthday is content, not
+  // machinery".
+  //
+  // A FOLDER RATHER THAN ONE `Logbooks.md`, because a logbook is a note: it can
+  // be opened, linked, searched and exported on its own, and a reader who keeps
+  // six of them does not get one page six screens long. The folder's own note
+  // (`folderNotePath`) carries a widget per logbook, which is how a click on the
+  // folder lands somewhere — the gap 4.1 §2 closed at `02 - Diary/`.
+  logbooks: `${ROOT_DIARY}/Logbooks`,
   // The shared root for every journal type. Each type — Study included — owns
   // one folder beneath it. Named for the role, not for Study, which is only one
   // of its tenants; before 2.45 that sentence was aspirational, because Study's
@@ -150,6 +168,7 @@ export const ROOT_CHILDREN: Record<string, (keyof typeof DEFAULT_PATHS)[]> = {
     "diaryYearly",
     "events",
     "search",
+    "logbooks",
   ],
   // NO FIXED SUB-PATHS (3.21), and the empty list is the statement rather than
   // an omission: the journals root is still a root this table accounts for, and
@@ -333,6 +352,30 @@ export const JOURNAL_DATE_PROPERTY = "date";
 // and `attachments` is counted-not-searchable by the diary index — putting
 // text there would make it invisible to search.
 export const CAPTURE_NOTE_KEY = "capture";
+
+// The body region a LOGBOOK's items live in (4.52).
+//
+// ONE CONSTANT, NOT ONE KEY PER LOGBOOK, and the id is why. `logbook:work`
+// names a NOTE — `02 - Diary/Logbooks/Work log.md` — and reads the region
+// inside it; the id is not a region key and must never become one. A key made
+// from the id would have to survive `isValidNoteKey` for a word a reader typed,
+// and would orphan the whole region the day that id was corrected.
+//
+// It also means the widget asks one question of any note it is pointed at
+// ("what is in your logbook region"), which is what lets `logbook:work` sit on
+// the homepage and on `Work log.md` itself and mean the same thing in both.
+export const LOGBOOK_NOTE_KEY = "logbook";
+
+// The directive that draws one. Named beside the region it reads for the reason
+// `JOURNALS_DIRECTIVE` is named at all: three modules have to agree on the word
+// — the dispatch switch, the widget registry and the plain-markdown export —
+// and a literal in each is three places a rename has to land.
+//
+// THE SAME STRING AS THE REGION KEY, AND THAT IS A COINCIDENCE WORTH NAMING.
+// They are two facts — what the fence says, and what the comment in the body
+// says — that happen to be spelled alike because both are "logbook". Keeping
+// them as two constants is what lets either move without the other.
+export const LOGBOOK_KEYWORD = "logbook";
 
 // Default faces for a scale picker, low → high, mapped across the tracker's
 // min..max range. Editable per-vault in Settings → Trackers (any scale row).
@@ -580,6 +623,114 @@ export function builtinTemplate(kind: BuiltinKind): TrackerDef {
   if (!def) throw new Error(`No built-in template for kind: ${kind}`);
   return { ...def, faces: def.faces ? [...def.faces] : undefined };
 }
+
+// ── Logbooks ──────────────────────────────────────────────────────────
+//
+// The diary's third layer. An ENTRY says what a day was like; an EVENT says
+// what a day is; a LOGBOOK holds what belongs to the diary and to no single day
+// — a work log, what you are focused on now, links to come back to, the
+// meetings ahead.
+//
+// A REGISTRY RATHER THAN FOUR FEATURES, on the argument `DEFAULT_TRACKERS` and
+// `customJournals` already make twice over: the four below are instances of one
+// thing, and a reader who keeps a fifth kind of list should not need a release.
+
+export interface LogbookDef {
+  // The `logbook:` directive's argument, and the def's identity. A slug,
+  // assigned once and never rewritten — the same contract `EventDef.id` has and
+  // for the same reason: it is written into notes, where an opaque hash would
+  // be unreadable and a renamed one would silently unhook every widget.
+  id: string;
+  // What the note is called and what the widget's bar says. A LABEL, freely
+  // retyped, which is exactly why it is not what `path` is derived from.
+  name: string;
+  // An emoji, on `FlatSection.icon`'s idiom and `WidgetSpec.glyph`'s — a list
+  // that mixed emoji with Lucide ids would draw two sizes of one slot.
+  icon: string;
+  // Where the items come from.
+  //
+  //   `region` — the note's own `<!--almanac:logbook-->` block, which is where
+  //   a reader's own logbook keeps its items.
+  //
+  //   `events` — the events note, filtered to the ones carrying a time. See
+  //   `Meetings` below: a meeting is a dated fact with an hour on it, and
+  //   `EventDef` has modelled dated facts, painted them on the calendar and
+  //   listed them in the agenda since 2.20. A second store of dated things the
+  //   calendar knows nothing about is the failure this avoids.
+  source: "region" | "events";
+  // The note. STORED, NOT DERIVED FROM `name`, which is the one place logbooks
+  // depart from the folder-note convention every dashboard in this plugin
+  // follows. A folder note is derived because the FOLDER is the identity; here
+  // the ID is, and the name is a label. Derived, retitling "Work log" to "Work"
+  // would orphan the note; stored, the note keeps its items and PathWatch moves
+  // the string when the file moves in the explorer.
+  path: string;
+  // One sentence, shown in the empty state and in the settings row. Optional
+  // because a reader's own logbook needs no blurb to work, and absent draws
+  // nothing rather than a placeholder.
+  blurb?: string;
+  // Which swatch this book's items wear on the time grid. One of
+  // `EVENT_COLORS`. 4.55.
+  //
+  // THE EVENT PALETTE, NOT A SECOND ONE. The grid draws events and logbook
+  // items side by side, and two colour systems in one view would be two designs
+  // in one view. The eight are already picked for legibility in both themes,
+  // and the stored value is the NAME — a hex here would let a reader choose
+  // something unreadable in one of them, which is the argument `EVENT_COLORS`
+  // makes in its own comment.
+  //
+  // A COLOUR AND AN ICON, WHICH IS ONE DECORATION EACH FOR TWO SURFACES: the
+  // icon names the book in a list, where a coloured square would be a dot
+  // beside an emoji; the colour tells its items apart on a grid, where an emoji
+  // in an 11px block would be most of the block.
+  color: string;
+}
+
+// The four that ship. Every one of them is editable and removable; what they
+// are is a starting vocabulary, not a fixed set.
+export const DEFAULT_LOGBOOKS: LogbookDef[] = [
+  {
+    id: "work",
+    name: "Work log",
+    icon: "💼",
+    source: "region",
+    path: `${DEFAULT_PATHS.logbooks}/Work log.md`,
+    color: "teal",
+    blurb: "What you worked on, stamped with when — across days, not inside one.",
+  },
+  {
+    // "CURRENT FOCUS", NOT "FOCUS", AND IT IS A COLLISION RATHER THAN A
+    // FLOURISH: `DEFAULT_TRACKERS` ships a built-in `Focus`, a 1-5 daily scale
+    // with its own faces. Two things called Focus in one settings tab is
+    // `vocabulary.ts`'s opening complaint at reader scale. The name is a
+    // setting, so this is a default and not a decree.
+    id: "focus",
+    name: "Current focus",
+    icon: "🎯",
+    source: "region",
+    path: `${DEFAULT_PATHS.logbooks}/Current focus.md`,
+    color: "green",
+    blurb: "What you are working towards now, and when that changed.",
+  },
+  {
+    id: "review",
+    name: "Review links",
+    icon: "🔗",
+    source: "region",
+    path: `${DEFAULT_PATHS.logbooks}/Review links.md`,
+    color: "grey",
+    blurb: "Things to come back to, crossed off when you have.",
+  },
+  {
+    id: "meetings",
+    name: "Meetings",
+    icon: "🗓️",
+    source: "events",
+    path: `${DEFAULT_PATHS.logbooks}/Meetings.md`,
+    color: "blue",
+    blurb: "Everything scheduled ahead, from the events note, soonest first.",
+  },
+];
 
 // Seed map for the built-in Study journal type. Matched case-insensitively
 // (see journal.ts's lookupEmoji) against a folder name at *either* level —
