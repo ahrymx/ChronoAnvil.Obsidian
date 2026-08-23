@@ -200,7 +200,7 @@ function highlightMatches(el: HTMLElement, text: string, query: string): void {
 function formatLogText(el: HTMLElement, text: string, query: string): void {
   el.empty();
   const q = query.trim().toLowerCase();
-  const tokenRegex = /(`[^`]+`)|(#[a-zA-Z0-9_\-\/]+)/g;
+  const tokenRegex = /(`[^`]+`)|(#[a-zA-Z0-9_\-/]+)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
