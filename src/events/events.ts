@@ -43,12 +43,46 @@ export interface EventDef {
   kind: EventKind;
 
   // ── recurring only ──────────────────────────────────────────────────
-  // An annual month/day. Deliberately not a rule engine: no nth-weekday, no
-  // movable feasts, no intervals. A recurring event falls on the same calendar
-  // date every year, which covers birthdays, anniversaries and fixed-date
-  // holidays, and anything else can be entered as a single event per year.
+  //
+  // TWO RHYTHMS, AND THE RULE THAT NOW HOLDS. A recurring event repeats either
+  // ANNUALLY on a calendar date (`month` + `day`) or WEEKLY on a weekday
+  // (`every: "week"` + `weekday`), and there is nothing else. No nth-weekday,
+  // no movable feasts, no intervals, no monthly, no skipped occurrences and no
+  // editing one occurrence of a series — every one of those needs an exception
+  // store, and an exception store is the point at which this stops being a list
+  // of events in a note somebody can read.
+  //
+  // WHY WEEKLY EXISTS AT ALL, HAVING BEEN REFUSED (4.62). The annual rule was
+  // written for birthdays and holidays, which are facts about a day. Since 4.52
+  // an event can carry an hour and since 4.55 a length, and since 4.61 the week
+  // is drawn against the clock — so the store that models "a dated thing with
+  // an hour" is now the store a standing meeting belongs in. Entering "every
+  // Wednesday at 09:30" as fifty single events was the alternative, and fifty
+  // rows in a hand-editable note is not a workaround, it is a broken feature.
+  //
+  // WHICH IS WHY WEEKLY REQUIRES A TIME. A weekly event with no hour is "every
+  // Wednesday" as a fact about the whole day, which is a thing nobody enters
+  // and which would put a bar across every Wednesday of every calendar for
+  // ever. `normalizeEvent` refuses to read one.
   month?: number; // 1-12
   day?: number; // 1-31
+
+  // The weekly rhythm. `every` is a word rather than a boolean because a value
+  // that can only be `"week"` says what it is in the file a reader edits, and
+  // because a second rhythm — if one is ever earned — extends it rather than
+  // needing a second flag beside it.
+  every?: "week";
+  weekday?: number; // 0 Sunday … 6 Saturday, `Date.getUTCDay()`'s own numbering
+
+  // The bounds, both inclusive and both optional. A standing meeting usually
+  // has neither; a course that runs a term has both. Absent `from` means "as
+  // far back as anything asks", absent `until` means "with no end in sight" —
+  // which is what a weekly event with no bounds honestly is.
+  //
+  // WEEKLY ONLY. An annual event's bounds would be a second way to say what a
+  // year already says, and a single event has `start` and `end`.
+  from?: string; // YYYY-MM-DD
+  until?: string; // YYYY-MM-DD
 
   // ── single only ─────────────────────────────────────────────────────
   start?: string; // YYYY-MM-DD
@@ -255,6 +289,43 @@ export function daysBetween(fromIso: string, toIso: string): number {
   return Math.round((toMs(toIso) - toMs(fromIso)) / DAY_MS);
 }
 
+// Which day of the week an ISO date falls on, 0 Sunday … 6 Saturday.
+//
+// UTC, LIKE EVERY OTHER DATE SUM IN THIS FILE. A local-time reading would put a
+// Wednesday standup on Tuesday for anyone east of Greenwich for part of the
+// year, which is the whole class of bug `toMs` exists to avoid.
+export function weekdayOf(iso: string): number {
+  return new Date(toMs(iso)).getUTCDay();
+}
+
+// Whether this definition repeats weekly, asked in one place.
+//
+// THE TIME IS PART OF THE TEST, not an extra condition callers remember to add.
+// A weekly event with no hour is not a shape this plugin has — see the field
+// block above — so anything reading `every` has to read `time` with it, and one
+// function is how that stays true.
+export function isWeeklyEvent(def: EventDef): boolean {
+  return (
+    def.kind === "recurring" &&
+    def.every === "week" &&
+    def.weekday != null &&
+    def.weekday >= 0 &&
+    def.weekday <= 6 &&
+    !!def.time
+  );
+}
+
+// The first occurrence on or after `iso`, or null when the series has ended.
+export function nextWeeklyIso(def: EventDef, iso: string): string | null {
+  if (!isWeeklyEvent(def)) return null;
+  const from = def.from && isValidIso(def.from) ? def.from : iso;
+  const search = from > iso ? from : iso;
+  const ahead = (def.weekday! - weekdayOf(search) + 7) % 7;
+  const hit = addDays(search, ahead);
+  if (def.until && isValidIso(def.until) && hit > def.until) return null;
+  return hit;
+}
+
 // ── Parsing ───────────────────────────────────────────────────────────
 // Deliberately lenient. This reads a file a user can hand-edit, and one bad
 // row must not cost them the other forty: anything unusable is dropped and the
@@ -326,6 +397,34 @@ export function normalizeEvent(raw: unknown): EventDef | null {
   const start = asString(r.start);
   const hasSingle = isValidIso(start);
 
+  // WEEKLY IS READ BEFORE EITHER, and wins over a `month`/`day` pair sitting on
+  // the same row. A row carrying both is one somebody converted by hand and did
+  // not finish; `every: week` is the more specific claim and the one they typed
+  // last, and `serializeEvents` writes only one of the two shapes back, so the
+  // stray fields are gone after the next save.
+  const every = asString(r.every).toLowerCase();
+  const weekday = asInt(r.weekday);
+  const from = asString(r.from);
+  const until = asString(r.until);
+  if (
+    every === "week" &&
+    weekday != null &&
+    weekday >= 0 &&
+    weekday <= 6 &&
+    // No hour, no weekly event — a bar across every Wednesday for ever is not
+    // what anybody meant to write.
+    time
+  ) {
+    return {
+      ...base,
+      kind: "recurring",
+      every: "week",
+      weekday,
+      ...(isValidIso(from) ? { from } : {}),
+      ...(isValidIso(until) ? { until } : {}),
+    };
+  }
+
   const kind = asString(r.kind);
   if (kind === "recurring" && hasRecurring) {
     return { ...base, kind: "recurring", month: month!, day: day! };
@@ -374,8 +473,18 @@ export function serializeEvents(defs: EventDef[]): Record<string, unknown>[] {
       kind: d.kind,
     };
     if (d.kind === "recurring") {
-      out.month = d.month;
-      out.day = d.day;
+      // ONE SHAPE OR THE OTHER, NEVER BOTH. A note carrying `month`, `day`,
+      // `every` and `weekday` at once is one nothing can read confidently, and
+      // this is the only writer.
+      if (isWeeklyEvent(d)) {
+        out.every = "week";
+        out.weekday = d.weekday;
+        if (d.from) out.from = d.from;
+        if (d.until) out.until = d.until;
+      } else {
+        out.month = d.month;
+        out.day = d.day;
+      }
     } else {
       out.start = d.start;
       if (d.end && d.end !== d.start) out.end = d.end;
@@ -483,6 +592,21 @@ export function expandEvents(
   for (const def of defs) {
     if (!isEnabled(def)) continue;
 
+    if (isWeeklyEvent(def)) {
+      // WALKED IN SEVENS FROM THE FIRST HIT, not day by day looking for a
+      // match: `expandEvents` is called with a year on the yearly dashboards,
+      // and a weekly event should cost fifty-two steps there rather than
+      // three hundred and sixty-five.
+      const bound =
+        def.until && isValidIso(def.until) && def.until < toIso ? def.until : toIso;
+      let iso = nextWeeklyIso(def, fromIso);
+      while (iso && iso <= bound) {
+        push(iso, { def, iso, pos: "solo" });
+        iso = addDays(iso, 7);
+      }
+      continue;
+    }
+
     if (def.kind === "recurring") {
       for (let year = fromYear; year <= toYear; year++) {
         const hit = recurringIso(def, year);
@@ -566,6 +690,22 @@ export function upcomingEvents(
   for (const def of defs) {
     if (!isEnabled(def)) continue;
 
+    if (isWeeklyEvent(def)) {
+      // ONE ROW, NOT FIFTY-TWO. The agenda answers "what is next"; a standing
+      // meeting's answer is the next one of it, and a weekly event that filled
+      // the list with its own occurrences would push every other event in the
+      // vault off the bottom of a five-row widget.
+      const iso = nextWeeklyIso(def, fromIso);
+      if (!iso) continue;
+      out.push({
+        def,
+        iso,
+        daysAway: daysBetween(fromIso, iso),
+        ongoing: false,
+      });
+      continue;
+    }
+
     if (def.kind === "recurring") {
       // This year's date if it hasn't passed, otherwise next year's.
       const thisYear = recurringIso(def, year);
@@ -608,6 +748,26 @@ export function upcomingEvents(
 
 // ── Display ───────────────────────────────────────────────────────────
 
+// Sunday first, so the index IS `Date.getUTCDay()` and `weekdayOf`'s answer can
+// be used to read this array without a translation nobody would remember.
+export const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+// "18 December 2026". Takes the month names rather than closing over them,
+// because `describeEventDate` builds that list inside itself and one array of
+// month names in this file is enough.
+function longDate(iso: string, months: string[]): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${d} ${months[m - 1]} ${y}`;
+}
+
 // "12 April" / "9–13 March 2026" — the date as an event describes it, which is
 // not the same as the date a diary entry carries. A recurring event has no
 // year to show; a span reads as a range.
@@ -616,6 +776,23 @@ export function describeEventDate(def: EventDef): string {
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
   ];
+  // A NEW BRANCH, AND THE EXISTING STRINGS UNTOUCHED. Every return below this
+  // is asserted byte for byte in the suite — see `describeEventWhen`'s header
+  // for why the hour got its own function rather than a flag in here — so
+  // weekly answers first and leaves the annual sentence exactly as it was.
+  if (isWeeklyEvent(def)) {
+    const bounds = [
+      def.from && isValidIso(def.from) ? `from ${longDate(def.from, MONTHS)}` : "",
+      def.until && isValidIso(def.until)
+        ? `until ${longDate(def.until, MONTHS)}`
+        : "",
+    ].filter((part) => !!part);
+    // "Every Wednesday" on its own, because a standing meeting usually has no
+    // end and saying so would be words for nothing.
+    return `Every ${WEEKDAY_NAMES[def.weekday!]}${
+      bounds.length ? `, ${bounds.join(" ")}` : ""
+    }`;
+  }
   if (def.kind === "recurring") {
     if (def.month == null || def.day == null) return "";
     return `${def.day} ${MONTHS[def.month - 1]}, every year`;
@@ -633,6 +810,79 @@ export function describeEventDate(def: EventDef): string {
         ? `${sd} ${MONTHS[sm - 1]} – ${ed} ${MONTHS[em - 1]} ${sy}`
         : `${sd} ${MONTHS[sm - 1]} ${sy} – ${ed} ${MONTHS[em - 1]} ${ey}`;
   return `${range} (${days} days)`;
+}
+
+// ── the manager's three lists (4.62) ─────────────────────────────────
+//
+// THE ORDER A LIST IS READ IN IS THE ORDER IT SHOULD BE WRITTEN IN, and the
+// manager had one order for two different questions. Single events were drawn
+// newest-first, which was chosen so a just-added event is at the top — true for
+// about a minute after you add it, and false for the rest of the event's life.
+// What a reader actually asks the page is "what is coming", and last month's
+// trip outranking next week's was the answer they got.
+//
+// RECURRING KEEPS ITS BY-MONTH ORDER, which is not the same decision made
+// twice: that list is scanned to check whether every birthday is in it, and
+// month order is what makes a gap visible.
+//
+// AN IN-PROGRESS SPAN IS COMING UP, NOT EARLIER. It has not finished, so it is
+// still a thing to know about — the same call `upcomingEvents` makes about
+// `ongoing`, made here off the same `eventSpan`.
+export function partitionEvents(
+  defs: EventDef[],
+  todayIso: string
+): { recurring: EventDef[]; coming: EventDef[]; earlier: EventDef[] } {
+  // WEEKLY FIRST, THEN THE YEAR (4.62). They are two rhythms in one list and
+  // interleaving them would sort a Wednesday standup against 25 December on a
+  // number neither of them has. Weekly ones are the ones that happen this week,
+  // so they read first, in weekday order; the annual list keeps the by-month
+  // order it is scanned for gaps in.
+  const recurring = defs
+    .filter((d) => d.kind === "recurring")
+    .sort((a, b) => {
+      const aw = isWeeklyEvent(a);
+      const bw = isWeeklyEvent(b);
+      if (aw !== bw) return aw ? -1 : 1;
+      if (aw && bw) return (a.weekday ?? 0) - (b.weekday ?? 0);
+      return (a.month ?? 0) - (b.month ?? 0) || (a.day ?? 0) - (b.day ?? 0);
+    });
+
+  const single = defs.filter((d) => d.kind === "single");
+  const ended = (def: EventDef): string => eventSpan(def)?.end ?? def.start ?? "";
+  const began = (def: EventDef): string => eventSpan(def)?.start ?? def.start ?? "";
+
+  const coming = single
+    .filter((d) => ended(d) >= todayIso)
+    .sort((a, b) => began(a).localeCompare(began(b)));
+  const earlier = single
+    .filter((d) => ended(d) < todayIso)
+    .sort((a, b) => began(b).localeCompare(began(a)));
+
+  return { recurring, coming, earlier };
+}
+
+// Whether one event answers to what was typed in the filter box.
+//
+// TITLE AND NOTE, AND NOTHING ELSE. A reader looking for an event is looking
+// for words they wrote; matching the date would mean deciding what "September"
+// matches in a list where a recurring event has no year, and matching the
+// colour would be matching a word that is nowhere on the row.
+export function matchesEventFilter(def: EventDef, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    def.title.toLowerCase().includes(q) ||
+    (def.note ?? "").toLowerCase().includes(q)
+  );
+}
+
+// "45 min" / "1 h" / "1 h 30" — a length, said the way a reader would say it.
+export function describeLength(mins: number | null | undefined): string {
+  if (mins == null || mins <= 0) return "";
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const rest = mins % 60;
+  return rest === 0 ? `${h} h` : `${h} h ${rest}`;
 }
 
 // "12 April" / "9 March 2026, 14:00" — the date with its hour where it has one.

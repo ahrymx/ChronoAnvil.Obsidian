@@ -85,7 +85,7 @@ import { HEADER_PREFIX, TRENDS_HEADING } from "../core/constants";
 import { composeFlatNote, flatNoteModel, bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
-import { WIDGET_FORM } from "../core/section-model";
+import { WIDGET_FORM, formQuestion } from "../core/section-model";
 import type { SectionModel } from "../core/section-model";
 import { FRAME_KEYWORD } from "../core/directive-grammar";
 
@@ -144,17 +144,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
         `diary:${DASHBOARD_AGENDA}`,
       ],
     }),
-    questions: () => [
-      {
-        kind: "form",
-        key: "form",
-        label: "how this is drawn",
-        directive: FRAME_KEYWORD,
-        bar: "frame: section",
-        section: "A section of its own, with a foldable bar",
-        widget: "As a widget, so it can sit in a row",
-      },
-    ],
+    questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
     locate: (text) => probe(text, /^diary\b/m),
   },
   {
@@ -187,17 +177,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
         "month-summary",
       ],
     }),
-    questions: () => [
-      {
-        kind: "form",
-        key: "form",
-        label: "how this is drawn",
-        directive: FRAME_KEYWORD,
-        bar: "frame: section",
-        section: "A section of its own, with a foldable bar",
-        widget: "As a widget, so it can sit in a row",
-      },
-    ],
+    questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
     locate: (text) => probe(text, /^month-summary\b/m),
   },
   {
@@ -243,10 +223,14 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // Not `optIn`, therefore. On the homepage the flag records "offered, not
     // shipped"; here the section is the point.
     locked: false,
-    render: () => ({
+    render: (opts) => ({
       fence: "almanac",
-      lines: ["header:🕘 On this day", "on-this-day:always"],
+      lines: [
+        ...(opts?.form === WIDGET_FORM ? [] : ["header:🕘 On this day"]),
+        "on-this-day:always",
+      ],
     }),
+    questions: () => [formQuestion("header:🕘 On this day")],
     locate: (text) => probe(text, /^on-this-day\b/m),
   },
   {

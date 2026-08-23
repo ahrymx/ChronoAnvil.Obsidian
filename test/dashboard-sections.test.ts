@@ -547,7 +547,8 @@ describe("what each directive scopes to, and how it says so", () => {
     expect(q?.keywords ?? []).toEqual([]);
     const review = journalsDashboardSectionModel(DEFAULT_PATHS.journalsRoot)
       .sections()
-      .find((s) => s.id === "review")?.questions?.[0];
+      .find((s) => s.id === "review")
+      ?.questions?.find((q) => q.kind === "folder");
     expect(review?.keywords?.map((k) => k.value)).toEqual(["all"]);
   });
 });
@@ -859,5 +860,49 @@ describe("no block on either dashboard is loose content", () => {
     const regrouped = model.regroup!(widgetMode, [["today", "this-month"]]);
     expect(regrouped).not.toBeNull();
     expect(regrouped).toContain("row\ndiary:3\ncell\nmonth-summary");
+  });
+
+  it("allows on-this-day, journals, activity, and contents to switch to widget form", () => {
+    const diaryModel = diaryDashboardSectionModel();
+    const diaryBase = composeDiaryDashboardNote();
+    expect(diaryBase).toContain("header:🕘 On this day\non-this-day:always");
+
+    const onThisDayWidget = diaryModel.apply(
+      diaryBase,
+      diaryModel.present(diaryBase).map((id) =>
+        id === "on-this-day" ? { id, options: { form: "widget" } } : id
+      )
+    );
+    expect(onThisDayWidget).not.toContain("header:🕘 On this day");
+    expect(onThisDayWidget).toContain("on-this-day:always");
+
+    const journalsModel = journalsDashboardSectionModel();
+    const journalsBase = composeJournalsDashboardNote();
+    expect(journalsBase).toContain("frame: section\njournals");
+
+    const journalsWidget = journalsModel.apply(
+      journalsBase,
+      journalsModel.present(journalsBase).map((id) =>
+        id === "journals" ? { id, options: { form: "widget" } } : id
+      )
+    );
+    expect(journalsWidget).not.toContain("frame: section\njournals");
+    expect(journalsWidget).toContain("journals\n");
+
+    const studyModel = journalDashboardSectionModel(STUDY_JOURNAL);
+    const studyBase = composeJournalDashboardNote(STUDY_JOURNAL);
+    expect(studyBase).toContain("frame: section\njournals-header:study");
+    expect(studyBase).toContain("frame: section\nlevel-cards:study");
+
+    const studyWidget = studyModel.apply(
+      studyBase,
+      studyModel.present(studyBase).map((id) =>
+        id === "activity" || id === "contents" ? { id, options: { form: "widget" } } : id
+      )
+    );
+    expect(studyWidget).not.toContain("frame: section\njournals-header:study");
+    expect(studyWidget).toContain("journals-header:study");
+    expect(studyWidget).not.toContain("frame: section\nlevel-cards:study");
+    expect(studyWidget).toContain("level-cards:study");
   });
 });

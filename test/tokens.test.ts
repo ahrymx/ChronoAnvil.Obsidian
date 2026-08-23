@@ -73,6 +73,16 @@ const SET_FROM_TS = new Set([
   // a pixel step. The number is the week's content, not a design decision, so
   // it has no sensible value in the token file.
   "--am-tg-hours",
+  // 4.62: where the current minute falls in that window, as a fraction, set on
+  // the grid body by time-grid-view.ts and moved by a minute ticker. Absent
+  // whenever now is outside the window — which is what `.am-tg-now` being
+  // removed from the DOM says, so there is no reading of it to guard.
+  "--am-tg-at",
+  // 4.62: how many day columns the grid is drawing — seven, or three, or one,
+  // decided by the directive and narrowed by the pane. Set on the grid by
+  // time-grid-view.ts and read by the three rows' templates, so a number that
+  // belongs to one week's rendering is not a design constant in the token file.
+  "--am-tg-cols",
 ]);
 
 describe("a token reference resolves to a token", () => {

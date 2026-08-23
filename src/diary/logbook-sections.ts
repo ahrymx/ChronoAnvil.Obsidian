@@ -22,7 +22,11 @@ import { composeFlatNote, flatNoteModel } from "../core/note-sections";
 import { bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
-import type { SectionModel } from "../core/section-model";
+import {
+  WIDGET_FORM,
+  formQuestion,
+  type SectionModel,
+} from "../core/section-model";
 import { HEADER_PREFIX, LOGBOOK_KEYWORD } from "../core/constants";
 import type { LogbookDef } from "../core/constants";
 
@@ -60,13 +64,16 @@ export function logbookSections(def: LogbookDef): FlatSection[] {
       // logbook note with no logbook on it is a file with an invisible region
       // in it — the items are still on disk and nothing can see them.
       locked: true,
-      render: () => ({
+      render: (options?: Record<string, unknown>) => ({
         fence: "almanac",
         lines: [
-          `${HEADER_PREFIX}${def.icon} ${def.name}`,
+          ...(options?.form === WIDGET_FORM
+            ? []
+            : [`${HEADER_PREFIX}${def.icon} ${def.name}`]),
           `${LOGBOOK_KEYWORD}:${def.id}`,
         ],
       }),
+      questions: () => [formQuestion(`${HEADER_PREFIX}${def.icon} ${def.name}`)],
       locate: (text) => probe(text, directiveRe(def.id)),
     },
   ];
@@ -121,13 +128,16 @@ export function logbooksFolderSections(
       // it here is a reader saying which logbooks they want on the index, which
       // is a customisation and not a breakage.
       locked: false,
-      render: () => ({
+      render: (options?: Record<string, unknown>) => ({
         fence: "almanac",
         lines: [
-          `${HEADER_PREFIX}${def.icon} ${def.name}`,
+          ...(options?.form === WIDGET_FORM
+            ? []
+            : [`${HEADER_PREFIX}${def.icon} ${def.name}`]),
           `${LOGBOOK_KEYWORD}:${def.id}`,
         ],
       }),
+      questions: () => [formQuestion(`${HEADER_PREFIX}${def.icon} ${def.name}`)],
       locate: (text: string) => probe(text, directiveRe(def.id)),
     })),
   ];

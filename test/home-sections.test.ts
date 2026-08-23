@@ -1337,10 +1337,34 @@ describe("the homepage's time grid", () => {
 
   it("asks the registry's question rather than its own", () => {
     const view = model.sections(home()).find((s) => s.id === "time-grid");
-    expect(view?.questions?.[0]?.values?.map((v) => v.value)).toEqual([
-      "events",
-      "logbooks",
-      "tasks",
-    ]);
+    expect(
+      view?.questions?.find((q) => q.key === "arg")?.values?.map((v) => v.value)
+    ).toEqual(["events", "logbooks", "tasks", "captures"]);
+  });
+
+  it("allows journals and time-grid on the homepage to be switched to widget form", () => {
+    const base = home();
+    expect(base).toContain("frame: section\njournals:cards");
+
+    const journalsAsWidget = model.apply(
+      base,
+      model.present(base).map((id) =>
+        id === "journals" ? { id, options: { form: "widget" } } : id
+      )
+    );
+    expect(journalsAsWidget).not.toContain("frame: section\njournals:cards");
+    expect(journalsAsWidget).toContain("journals:cards");
+
+    const withGrid = model.apply(base, [...model.present(base), "time-grid"]);
+    expect(withGrid).toContain("header:⏱️ The week by the hour\ntime-grid");
+
+    const gridAsWidget = model.apply(
+      withGrid,
+      model.present(withGrid).map((id) =>
+        id === "time-grid" ? { id, options: { form: "widget" } } : id
+      )
+    );
+    expect(gridAsWidget).not.toContain("header:⏱️ The week by the hour");
+    expect(gridAsWidget).toContain("time-grid");
   });
 });

@@ -33,6 +33,57 @@
   font-size: var(--font-ui-smaller);
   color: var(--text-faint);
   margin-left: auto;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* A SOURCE, AS A CONTROL. It sat in this corner looking like one and doing
+   nothing; the only change is that pressing it now means something. Off is a
+   drawn-through outline rather than a fade, because a faded chip reads as a
+   chip that cannot be pressed. */
+.am-tg-src {
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+  padding: 1px 7px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  box-shadow: none;
+  height: auto;
+  transition: all 0.15s ease;
+}
+
+.am-tg-src.is-on {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.am-tg-src-events.is-on {
+  border-color: var(--am-tg-blue);
+  color: var(--am-tg-blue);
+  background: color-mix(in srgb, var(--am-tg-blue) 12%, transparent);
+}
+
+.am-tg-src-logbooks.is-on {
+  border-color: var(--am-tg-teal);
+  color: var(--am-tg-teal);
+  background: color-mix(in srgb, var(--am-tg-teal) 12%, transparent);
+}
+
+.am-tg-src-tasks.is-on {
+  border-color: var(--am-tg-red);
+  color: var(--am-tg-red);
+  background: color-mix(in srgb, var(--am-tg-red) 12%, transparent);
+}
+
+.am-tg-src-captures.is-on {
+  border-color: var(--am-tg-grey);
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--am-tg-grey) 15%, transparent);
 }
 
 .am-tg-status,
@@ -45,23 +96,50 @@
 /* WIDE CONTENT SCROLLS INSIDE ITSELF. Seven columns with a floor of 74px
    each plus the rail is 576px, which is wider than a phone and wider than a
    split pane — and a grid that widened the note would push every other
-   widget on the page sideways. */
+   widget on the page sideways.
+
+   BOTH AXES ARE NAMED (4.62). `overflow-x: auto` alone already made the other
+   axis scroll — that is what the cascade does with one axis set — so the
+   vertical scrolling was there by accident, at whatever height the content
+   happened to be. Named, it can be capped: a midnight-to-midnight week is 24
+   rows and would otherwise be a widget two screens tall, and the cap is what
+   gives the open-on-now scroll something to scroll. */
 .am-tg-scroll {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: min(70vh, 620px);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
-  background: var(--background-primary);
+  background: transparent;
 }
 
+/* THE PADDING IS THE LAST HOUR LABEL'S OVERHANG. `.am-tg-hour` sits at
+   `top: 100%` with `translateY(-50%)`, so half of the final mark is below the
+   body it belongs to; without room for it the scroller clipped "6 PM" through
+   the middle, which reads as a rendering fault rather than as more content.
+   It is on the grid rather than on the body because a percentage `top` inside
+   the body resolves against the body's padding box — padding there would put
+   the now line a few minutes late. */
+/* AS WIDE AS THE COLUMNS IT IS DRAWING. A three-day grid in a row cell must
+   not keep a seven-day floor and scroll sideways forever; the floor is the
+   gutter plus one minimum column each. */
 .am-tg-grid {
-  min-width: 576px;
+  min-width: calc(var(--am-tg-gutter) + var(--am-tg-cols) * 74px);
+  padding-bottom: 9px;
+}
+
+/* THE BODY IS AS TALL AS THE WINDOW IS LONG, from the hour count the view
+   sets on it — which the columns then inherit for their hour lines, so the
+   height and the lines cannot disagree. */
+.am-tg-body {
+  position: relative;
+  height: calc(var(--am-tg-row) * var(--am-tg-hours));
 }
 
 .am-tg-head,
 .am-tg-lane,
 .am-tg-body {
   display: grid;
-  grid-template-columns: 52px repeat(7, minmax(74px, 1fr));
+  grid-template-columns: var(--am-tg-gutter) repeat(var(--am-tg-cols), minmax(74px, 1fr));
 }
 
 .am-tg-head {
@@ -121,6 +199,9 @@
   min-height: 30px;
 }
 
+/* ONE LINE, WHATEVER THE GUTTER IS. Two words at this width wrapped, and the
+   second line landed beside the first hour mark. Lower case and hyphenated so
+   it reads as a label rather than as a heading of the lane. */
 .am-tg-lane-label {
   display: flex;
   align-items: center;
@@ -128,8 +209,8 @@
   padding-right: 6px;
   font-size: var(--font-ui-smaller);
   color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .am-tg-lane-cell {
@@ -154,7 +235,6 @@
 
 .am-tg-rail {
   position: relative;
-  min-height: 320px;
 }
 
 .am-tg-hour {
@@ -182,6 +262,43 @@
 
 .am-tg-col.is-today {
   background-color: var(--background-modifier-hover);
+}
+
+/* ── the now line (4.62) ─────────────────────────────────────────────
+   ACROSS EVERY COLUMN, CAPPED ON TODAY. A rule that stopped at today's
+   column would be a rule about one day, and the whole grid is one clock:
+   Tuesday 10:40 has already happened by exactly as much as Thursday's has
+   not. `--am-tg-at` is the fraction of the window, set on the body by the
+   view and moved by the minute; the dot is a child of today's column, so it
+   is positioned by the same fraction without either element having to know
+   where the other one is.
+
+   IT NEVER TAKES A CLICK. A hairline across the middle of the grid sits over
+   whatever is at that hour, which is the one block a reader is most likely to
+   be reaching for. */
+.am-tg-now,
+.am-tg-now-dot {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.am-tg-now {
+  left: var(--am-tg-gutter);
+  right: 0;
+  top: calc(var(--am-tg-at) * 100%);
+  border-top: 1px solid var(--am-tg-now);
+  opacity: 0.75;
+}
+
+.am-tg-now-dot {
+  left: -3px;
+  top: calc(var(--am-tg-at) * 100%);
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--am-tg-now);
 }
 
 /* ── a block ─────────────────────────────────────────────────────────
@@ -261,6 +378,78 @@
   filter: brightness(1.08);
 }
 
+/* ── the grid as somewhere to write (4.62) ───────────────────────────
+   Three cursors, and each of them is a promise about what the next press
+   will do: an empty column draws, a block moves, its bottom edge resizes.
+   A task block promises nothing — it is drawn here and edited in its own
+   note — so it keeps the pointer that only ever meant "this opens". */
+
+.am-tg-col {
+  cursor: crosshair;
+}
+
+.am-tg-blk {
+  cursor: grab;
+}
+
+.am-tg-blk.is-fixed {
+  cursor: pointer;
+}
+
+/* The handle is the bottom edge and nothing else: a grip that stood proud of
+   the block would eat the last line of its title, and a block only 17px tall
+   has one line. */
+.am-tg-grip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+/* WHILE A DRAG IS LIVE. The moving block stays where the FILE says it is and
+   dims; the ghost says where it is going. Nothing else on the grid takes a
+   pointer, so a drag cannot end by opening something. */
+.am-tg-body.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.am-tg-body.is-dragging .am-tg-blk {
+  pointer-events: none;
+}
+
+.am-tg-blk.is-moving {
+  opacity: 0.35;
+}
+
+.am-tg-ghost {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  min-height: 15px;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: var(--radius-s);
+  border: 1px dashed var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  padding: 1px 4px;
+  overflow: hidden;
+}
+
+/* A block is a tab stop now, because the arrows edit it. The ring is the
+   theme's own, drawn outside the block so it is visible on a fill of any
+   colour. */
+.am-tg-blk:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
 /* ── the fills ───────────────────────────────────────────────────────
    THE STORED VALUE IS A NAME AND THIS IS WHERE IT BECOMES A COLOUR, which
    is `am-ev-chip-*`'s arrangement one file over and exists for the same
@@ -283,9 +472,7 @@
    scrolling, so the grid keeps its shape and the container scrolls. What
    changes is the rail, which has no room for "12 PM" at this width. */
 @container (max-width: 400px) {
-  .am-tg-head,
-  .am-tg-lane,
-  .am-tg-body {
-    grid-template-columns: 40px repeat(7, minmax(74px, 1fr));
+  .am-tg {
+    --am-tg-gutter: 40px;
   }
 }

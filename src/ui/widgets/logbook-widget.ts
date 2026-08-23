@@ -40,7 +40,7 @@ import type { PluginNoteRegionHost } from "./note-regions";
 import { LOGBOOK_NOTE_KEY, type LogbookDef } from "../../core/constants";
 import { findLogbook } from "../../diary/logbooks";
 import { composeLogbookNote } from "../../diary/logbook-sections";
-import { buildLogList } from "./log-list";
+import { buildLogList, LogListWatcher, type LogTypeOption } from "./log-list";
 import { moment, today } from "../../core/util";
 import { readEvents } from "../../events/eventstore";
 import {
@@ -50,6 +50,8 @@ import {
 } from "../../events/events";
 import { draftEvent, openEventEditor } from "../../events/event-ui";
 import { emptyLine } from "../empty";
+import { readNoteRegion } from "../../core/notestore";
+import { parseLogItems, serializeLogItems, type LogItem } from "../../diary/log-items";
 
 // How many meetings a bare `logbook:` on an events-backed book lists. Enough to
 // cover the fortnight a reader is actually planning; the events note is where
@@ -63,12 +65,176 @@ export function buildLogbook(
 ): HTMLElement {
   const plugin = host.plugin;
   const id = rest.split(":")[0].trim();
+  if (!id || id.toLowerCase() === "all" || id.toLowerCase() === "logbooks") {
+    return buildAllLogbooks(host, ctx);
+  }
   const def = findLogbook(plugin.settings.logbooks, id);
   if (!def) return refusal(plugin, id);
 
   return def.source === "events"
     ? buildAgenda(plugin, def)
     : buildRegionLogbook(host, def, ctx);
+}
+
+// All logbooks in one unified view with multi-type filter pills.
+export function buildAllLogbooks(
+  host: PluginNoteRegionHost,
+  ctx: MarkdownPostProcessorContext
+): HTMLElement {
+  const plugin = host.plugin;
+  const app = host.app;
+  const logbooks = plugin.settings.logbooks;
+
+  const types: LogTypeOption[] = logbooks.map((b) => ({
+    id: b.id,
+    label: b.name,
+    icon: b.icon,
+    color: b.color,
+  }));
+
+  const itemLogbookMap = new WeakMap<LogItem, LogbookDef>();
+
+  const loadAllItems = async (): Promise<LogItem[]> => {
+    const all: LogItem[] = [];
+    for (const book of logbooks) {
+      if (book.source === "events") {
+        const events = upcomingEvents(readEvents(app, plugin), today(), 64).filter((e) => !!e.def.time);
+        for (const ev of events) {
+          const item: LogItem = {
+            date: ev.iso,
+            time: ev.def.time ?? null,
+            text: ev.def.title + (ev.def.note ? "\n" + ev.def.note : ""),
+            done: null,
+            mins: ev.def.duration ?? null,
+          };
+          itemLogbookMap.set(item, book);
+          all.push(item);
+        }
+      } else {
+        const file = app.vault.getAbstractFileByPath(book.path);
+        if (file instanceof TFile) {
+          try {
+            const text = await app.vault.read(file);
+            const region = readNoteRegion(text, LOGBOOK_NOTE_KEY);
+            const parsed = parseLogItems(region);
+            for (const item of parsed) {
+              itemLogbookMap.set(item, book);
+              all.push(item);
+            }
+          } catch {
+            // Ignore unreadable
+          }
+        }
+      }
+    }
+    return all;
+  };
+
+  const wrap = buildLogList(host, {
+    key: LOGBOOK_NOTE_KEY,
+    file: null,
+    modifier: "journal-note--logbook-all",
+    label: null,
+    collapsible: false,
+    startCollapsed: () => false,
+    onFold: () => {},
+    emptyText: "No items across any logbook yet.",
+    add: {
+      placeholder: "Add an entry to logbook…",
+      stamp: () => ({ date: today(), time: moment().format("HH:mm"), mins: null }),
+    },
+    dated: true,
+    createNote: null,
+    addChild: (child) => ctx.addChild(child),
+    types,
+    getItemType: (item) => itemLogbookMap.get(item)?.id,
+    getItemTypeTag: (item) => {
+      const b = itemLogbookMap.get(item);
+      if (!b) return undefined;
+      return { label: b.name, icon: b.icon, color: b.color };
+    },
+    onAddMulti: async (typeId, item) => {
+      const targetBook = findLogbook(logbooks, typeId);
+      if (!targetBook) return;
+      if (targetBook.source === "events") {
+        openEventEditor(app, plugin, {
+          ...draftEvent(item.date ?? today()),
+          title: item.text,
+          time: item.time ?? "09:00",
+          duration: item.mins ?? undefined,
+        });
+        return;
+      }
+      let targetFile = app.vault.getAbstractFileByPath(targetBook.path);
+      if (!(targetFile instanceof TFile)) {
+        targetFile = await createLogbookNote(host, targetBook);
+      }
+      if (targetFile instanceof TFile) {
+        const text = await app.vault.read(targetFile);
+        const baseline = readNoteRegion(text, LOGBOOK_NOTE_KEY);
+        const existing = parseLogItems(baseline);
+        existing.push(item);
+        const next = serializeLogItems(existing);
+        await host.writeRegionOf(targetFile, LOGBOOK_NOTE_KEY, next, baseline);
+      }
+    },
+    onItemUpdate: async (item, prevItem) => {
+      const book = itemLogbookMap.get(item) ?? itemLogbookMap.get(prevItem);
+      if (!book || book.source === "events") return;
+      const file = app.vault.getAbstractFileByPath(book.path);
+      if (file instanceof TFile) {
+        const text = await app.vault.read(file);
+        const baseline = readNoteRegion(text, LOGBOOK_NOTE_KEY);
+        const parsed = parseLogItems(baseline);
+        const idx = parsed.findIndex(
+          (p) =>
+            p.text === prevItem.text &&
+            p.date === prevItem.date &&
+            p.time === prevItem.time
+        );
+        if (idx !== -1) {
+          parsed[idx] = { ...item };
+          const next = serializeLogItems(parsed);
+          await host.writeRegionOf(file, LOGBOOK_NOTE_KEY, next, baseline);
+        }
+      }
+    },
+    onItemDelete: async (item) => {
+      const book = itemLogbookMap.get(item);
+      if (!book || book.source === "events") return;
+      const file = app.vault.getAbstractFileByPath(book.path);
+      if (file instanceof TFile) {
+        const text = await app.vault.read(file);
+        const baseline = readNoteRegion(text, LOGBOOK_NOTE_KEY);
+        const parsed = parseLogItems(baseline);
+        const idx = parsed.findIndex(
+          (p) =>
+            p.text === item.text &&
+            p.date === item.date &&
+            p.time === item.time
+        );
+        if (idx !== -1) {
+          parsed.splice(idx, 1);
+          const next = serializeLogItems(parsed);
+          await host.writeRegionOf(file, LOGBOOK_NOTE_KEY, next, baseline);
+        }
+      }
+    },
+    itemsProvider: loadAllItems,
+  });
+
+  ctx.addChild(
+    new LogListWatcher(
+      app,
+      wrap,
+      logbooks.map((b) => b.path),
+      () => {
+        void loadAllItems().then(() => {});
+      }
+    )
+  );
+
+  return wrap;
 }
 
 // An id this vault does not have.
@@ -129,6 +295,7 @@ function buildRegionLogbook(
     dated: true,
     createNote: () => createLogbookNote(host, def),
     addChild: (child) => ctx.addChild(child),
+    getItemTypeTag: () => ({ label: def.name, icon: def.icon, color: def.color }),
   });
 }
 

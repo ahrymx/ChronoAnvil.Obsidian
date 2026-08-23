@@ -30,7 +30,7 @@ import { composeFlatNote, flatNoteModel } from "../core/note-sections";
 import { bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
-import type { SectionModel } from "../core/section-model";
+import { WIDGET_FORM, formQuestion, type SectionModel } from "../core/section-model";
 
 const probe = (text: string, re: RegExp): number => text.search(re);
 
@@ -87,10 +87,14 @@ export const SEARCH_SECTIONS: FlatSection[] = [
     // can give — which journal kind a bridge pulls — and this is not one of
     // those. It is two notes each having an opinion, and a catalogue is where
     // a note's opinions go.
-    render: () => ({
+    render: (opts) => ({
       fence: "almanac",
-      lines: ["header:🕘 On this day", "on-this-day:always"],
+      lines: [
+        ...(opts?.form === WIDGET_FORM ? [] : ["header:🕘 On this day"]),
+        "on-this-day:always",
+      ],
     }),
+    questions: () => [formQuestion("header:🕘 On this day")],
     locate: (text) => probe(text, /^on-this-day\b/m),
   },
   {

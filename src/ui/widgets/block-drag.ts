@@ -411,6 +411,7 @@ const BANDS = [
   // deciding one fact, and the two would drift the first time a banner grew a
   // third line.
   "jtc-card",
+  "journal-overview-card",
 ];
 
 // Whether this element already announces itself, in which case a head of ours
@@ -420,6 +421,7 @@ const BANDS = [
 // further in — a cell's widget draws its own, and a block is not that widget —
 // and what decides this is whether the TOP of this element is already a band.
 function hasOwnBar(container: HTMLElement): boolean {
+  if (BANDS.some((c) => container.classList.contains(c))) return true;
   const first = container.firstElementChild;
   if (!first) return false;
   return BANDS.some((c) => first.classList.contains(c));

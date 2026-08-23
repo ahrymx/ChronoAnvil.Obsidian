@@ -100,63 +100,73 @@
    occupy the same pixels once the row got narrow, and printed Today over the
    year. Nothing here is out of flow, so that is no longer reachable. */
 .jc-navhead {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: var(--am-space-2);
   margin: 0 0 13px;
 }
-/* ── The stepper pill (2.51.4) ────────────────────────────────────────────
-   Three loose buttons become one segmented control. They were already one
-   thing — step back, open, step forward, all operating on the year — but drawn
-   as a chevron, a word and a chevron floating 4px apart, which reads as a
-   label with decoration either side rather than as an instrument. Joined
-   inside a single pill and divided by hairlines, the two chevrons stop being
-   ornament and start being the ends of a control, and the year in the middle
-   is visibly a third segment you can press rather than the caption they
-   decorate.
 
-   Still centred, still the grid's middle column: this changes what the
-   navigator looks like, not where it sits, so the `1fr auto 1fr` reasoning in
-   calendar.ts survives intact. */
-.jc-yearnav {
-  grid-column: 2;
-  display: flex;
-  align-items: stretch;
+.journal-calendar .jc-year-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2em;
+  height: 2.2em;
+  margin: 0;
+  padding: 0;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill);
-  overflow: hidden;
-  /* A shade above the recessed band it sits on, so the pill reads as a control
-     resting on the navigator rather than a hole cut into it. */
-  background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
 }
+.journal-calendar .jc-year-step:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover);
+}
+.jc-year-step svg {
+  width: 14px;
+  height: 14px;
+}
+
 .journal-calendar .jc-year-cur {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  /* rem, not the em-derived --am-text-lg: this segment sets the pill's height,
-     and the pill has to keep its proportions against a Today button and a rail
-     that are sized in rem beside it. */
-  font-size: 1rem;
-  font-weight: 700;
+  gap: 8px;
+  height: 2.2em;
+  margin: 0;
+  padding: 0 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-primary);
+  box-shadow: none;
+  font-size: var(--am-text-sm);
+  font-weight: 600;
   letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
-  height: auto;
-  margin: 0;
-  padding: 4px 14px;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
   color: var(--text-normal);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .journal-calendar .jc-year-cur:hover {
   background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
   color: var(--interactive-accent);
 }
-/* Faint at rest, full on hover: present enough to say the year is a door,
-   quiet enough not to compete with the figure it follows. */
+.jc-year-cur-cal-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+.jc-year-cur-cal-icon svg {
+  width: 14px;
+  height: 14px;
+}
 .jc-year-cur-icon {
   display: inline-flex;
   align-items: center;
@@ -164,48 +174,46 @@
   transition: color 0.15s;
 }
 .jc-year-cur-icon svg {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
 }
 .journal-calendar .jc-year-cur:hover .jc-year-cur-icon {
   color: var(--interactive-accent);
 }
-.journal-calendar .jc-year-step {
+
+.jc-navhead-right {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 2rem;
-  /* Stretches to the pill's height, set by the year segment beside it, so the
-     dividers run the full height rather than stopping short. */
-  height: auto;
-  align-self: stretch;
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  color: var(--text-faint);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  gap: var(--am-space-2);
+  flex-shrink: 0;
 }
-.journal-calendar .jc-year-step:hover {
+
+.journal-calendar .jc-today-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 2.2em;
+  padding: 0 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.journal-calendar .jc-today-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover);
 }
-.jc-year-step svg {
-  width: 17px;
-  height: 17px;
-}
-/* The segment dividers. Last, and at the same specificity as the rules above,
-   so it beats their `border: none` on source order — those have to clear the
-   host's border before this can draw the one we want. */
-.journal-calendar .jc-yearnav > * + * {
-  border-left: 1px solid var(--background-modifier-border);
-}
-.jc-navhead .jc-today-btn {
-  grid-column: 3;
-  justify-self: end;
+.jc-today-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--interactive-accent);
 }
 
 /* ── Quarter rail (2.51) ─────────────────────────────────────────────────
@@ -1105,33 +1113,66 @@
    and the badge doesn't read as a hole cut in the day. */
 .cal-badge {
   position: absolute;
-  top: 1px;
-  right: 1px;
+  top: 2px;
+  right: 2px;
   width: 15px;
   height: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--background-primary) 85%, transparent);
+  border-radius: var(--am-radius-xs);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
   color: var(--am-ev-grey);
+  box-shadow: var(--am-shadow-sm);
   pointer-events: none;
+  z-index: 2;
 }
 .cal-badge svg {
-  width: 13px;
-  height: 13px;
-  /* Down from 2.4. A glyph two pixels wider at the same stroke weight reads
-     heavier than the size increase alone asked for. */
-  stroke-width: 2.1;
+  width: 11px;
+  height: 11px;
+  stroke-width: 2.2;
 }
-.cal-badge-red { color: var(--am-ev-red); }
-.cal-badge-amber { color: var(--am-ev-amber); }
-.cal-badge-green { color: var(--am-ev-green); }
-.cal-badge-teal { color: var(--am-ev-teal); }
-.cal-badge-blue { color: var(--am-ev-blue); }
-.cal-badge-purple { color: var(--am-ev-purple); }
-.cal-badge-pink { color: var(--am-ev-pink); }
-.cal-badge-grey { color: var(--am-ev-grey); }
+.cal-badge-red {
+  background: color-mix(in srgb, var(--am-ev-red) 16%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-ev-red) 35%, transparent);
+  color: var(--am-ev-red);
+}
+.cal-badge-amber {
+  background: color-mix(in srgb, var(--am-ev-amber) 16%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-ev-amber) 35%, transparent);
+  color: var(--am-ev-amber);
+}
+.cal-badge-green {
+  background: color-mix(in srgb, var(--am-ev-green) 16%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-ev-green) 35%, transparent);
+  color: var(--am-ev-green);
+}
+.cal-badge-teal {
+  background: color-mix(in srgb, var(--am-ev-teal) 16%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-ev-teal) 35%, transparent);
+  color: var(--am-ev-teal);
+}
+.cal-badge-blue {
+  background: color-mix(in srgb, var(--am-ev-blue) 16%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-ev-blue) 35%, transparent);
+  color: var(--am-ev-blue);
+}
+.cal-badge-purple {
+  background: color-mix(in srgb, var(--am-ev-purple) 16%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-ev-purple) 35%, transparent);
+  color: var(--am-ev-purple);
+}
+.cal-badge-pink {
+  background: color-mix(in srgb, var(--am-ev-pink) 16%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-ev-pink) 35%, transparent);
+  color: var(--am-ev-pink);
+}
+.cal-badge-grey {
+  background: color-mix(in srgb, var(--am-ev-grey) 16%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-ev-grey) 35%, transparent);
+  color: var(--am-ev-grey);
+}
 
 /* The overflow counter, for a day carrying more events than the cell can show.
    Bottom-right as of 2.51 — it sat bottom-left only because the badge held the
@@ -2099,7 +2140,8 @@
    the block. The first cut of this file used `>` throughout and matched
    nothing on any grain — the frames stayed where they were and the release's
    one visible change did not happen. */
-.journal-widget-block.journal-overview-card {
+.journal-widget-block.journal-overview-card,
+.journal-card.journal-overview-card {
   gap: 0;
   padding: 12px 14px;
   margin: 0.5em 0 1.25em;
@@ -2107,6 +2149,10 @@
   /* "Between one card and the next" is this border, seen from either side. */
   border: var(--am-rule) solid var(--background-modifier-border);
   border-radius: var(--am-radius-md);
+}
+.journal-block-cell > .journal-overview-card,
+.journal-block-row > .journal-overview-card {
+  margin: 0;
 }
 /* The live host carries no layout of its own; it exists to be repainted. */
 .journal-overview-card > .journal-live-widget {

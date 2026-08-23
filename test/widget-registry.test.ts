@@ -250,12 +250,7 @@ describe("the exclusions say why, and the reasons are the ones claimed", () => {
         w.arg?.kind === "vault" ? [w.arg.source] : []
       )
     );
-    // TWO SOURCES AS OF 4.52. `logbooks` is the second, and it is the case the
-    // registry's own note said it was waiting for: a source is addable once
-    // there is an answer to "what does an id mean when the thing is renamed",
-    // and a logbook's id is assigned once and never rewritten. Trackers and
-    // note kinds are still deferred.
-    expect([...sources].sort()).toEqual(["journals", "logbooks"]);
+    expect([...sources].sort()).toEqual(["journals"]);
     const wiring = repoFile("src/core/widget-sections.ts");
     for (const s of sources) expect(wiring).toContain(`  ${s}: {`);
   });

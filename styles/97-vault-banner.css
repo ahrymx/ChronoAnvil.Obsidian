@@ -536,34 +536,135 @@
   padding: 0;
   border: none;
   background: transparent;
-  font-size: var(--am-text-lg);
+  font-size: var(--am-text-base);
   color: var(--text-normal);
 }
 .am-search-modal .ams-input:focus {
   box-shadow: none;
 }
+.am-search-modal .ams-clear {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: var(--am-text-sm);
+  line-height: 1;
+  border-radius: var(--am-radius-xs);
+  box-shadow: none;
+}
+.am-search-modal .ams-clear:hover {
+  color: var(--text-normal);
+}
 
 .am-search-modal .ams-bar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--am-space-2);
   padding: var(--am-space-2) var(--am-space-5);
   border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
   background: var(--background-secondary);
 }
-.am-search-modal .ams-sort-label {
-  color: var(--text-faint);
-  font-size: var(--am-text-2xs);
-  font-weight: var(--am-caps-weight);
-  letter-spacing: var(--am-caps-tracking);
-  text-transform: uppercase;
-}
 .am-search-modal .ams-chips {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--am-space-1);
 }
+
+.am-search-modal .ams-year-pills {
+  display: flex;
+  background: var(--background-secondary-alt);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-xs);
+  padding: 1px;
+  gap: 2px;
+}
+.am-search-modal .ams-year-pill {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: var(--am-radius-xs);
+  cursor: pointer;
+  box-shadow: none;
+}
+.am-search-modal .ams-year-pill:hover {
+  color: var(--text-normal);
+}
+.am-search-modal .ams-year-pill.is-active {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: var(--am-shadow-sm);
+}
+
+.am-search-modal .ams-filter-chip {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  padding: 2px 7px;
+  border-radius: var(--am-radius-pill);
+  cursor: pointer;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.am-search-modal .ams-filter-chip:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.am-search-modal .ams-filter-chip.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+.am-search-modal .ams-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--background-modifier-border);
+  margin: 0 2px;
+}
+
+.am-search-modal .ams-compact-btn {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  padding: 2px 7px;
+  border-radius: var(--am-radius-xs);
+  cursor: pointer;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.am-search-modal .ams-compact-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.am-search-modal .ams-compact-btn.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+.am-search-modal .ams-chip-icon {
+  display: inline-flex;
+}
+.am-search-modal .ams-chip-icon svg {
+  width: 11px;
+  height: 11px;
+}
+
 .am-search-modal .ams-chip {
   padding: 2px var(--am-space-3);
   border-radius: var(--am-radius-pill);
@@ -579,10 +680,10 @@
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
-/* WHAT THE QUERY HAS ALREADY DECIDED, said rather than left to be noticed
-   (4.51, Q12). A `kind:` filter that can only match the diary makes this one
-   search over one half, and a reader who does not know that reads the missing
-   journals as a bug in the search. */
+.am-search-modal .ams-count {
+  color: var(--text-faint);
+  font-size: var(--am-text-xs);
+}
 .am-search-modal .ams-narrowed {
   margin-left: var(--am-space-2);
   color: var(--text-faint);
@@ -593,6 +694,12 @@
   height: var(--ams-height);
   overflow-y: auto;
   padding: var(--am-space-2) 0;
+}
+.am-search-modal .ams-results.is-compact .ams-snip {
+  display: none;
+}
+.am-search-modal .ams-results.is-compact .ams-row {
+  padding: var(--am-space-1) var(--am-space-5);
 }
 .am-search-modal .ams-note {
   padding: var(--am-space-6) var(--am-space-5);

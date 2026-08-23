@@ -30,8 +30,10 @@ import {
   eventColor,
   eventIcon,
   eventsOnDay,
+  WEEKDAY_NAMES,
   isValidIso,
   readMinutes,
+  weekdayOf,
 } from "./events";
 import { deleteEvent, readEvents, saveEvent } from "./eventstore";
 import { today } from "../core/util";
@@ -62,6 +64,8 @@ class EventEditModal extends EditorModal {
   // The duration field's own slot, so the hour field can redraw it alone
   // when a time is typed or cleared.
   private durationHost: HTMLElement | null = null;
+  private previewHost: HTMLElement | null = null;
+  private activeCategory: string = "all";
 
   constructor(
     app: App,
@@ -88,11 +92,16 @@ class EventEditModal extends EditorModal {
     const contentEl = this.body;
     this.contentEl.addClass("almanac-event-modal");
 
+    // ── Live Preview Card ──
+    this.previewHost = contentEl.createDiv({ cls: "almanac-event-preview" });
+    this.updatePreview();
+
     new Setting(contentEl).setName("Title").addText((t) => {
       t.setPlaceholder("Anna's birthday")
         .setValue(this.draft.title)
         .onChange((v) => {
           this.draft.title = v;
+          this.updatePreview();
         });
       // Enter saves. Handled by the frame for every single-line input in the
       // window, so the title field no longer needs a listener the other text
@@ -100,20 +109,36 @@ class EventEditModal extends EditorModal {
       window.setTimeout(() => t.inputEl.focus(), 0);
     });
 
-    new Setting(contentEl)
-      .setName("Kind")
-      .setDesc(
-        "Recurring falls on the same date every year. Single happens once, and can span several days."
-      )
-      .addDropdown((d) => {
-        d.addOption("recurring", "Recurring (yearly)")
-          .addOption("single", "Single (one-off)")
-          .setValue(this.draft.kind)
-          .onChange((v) => {
-            this.draft.kind = v === "recurring" ? "recurring" : "single";
-            this.renderDateFields();
-          });
+    // THREE KINDS AND ONE FIELD, styled as a modern segmented button bar.
+    const kindSetting = new Setting(contentEl)
+      .setName("Recurrence")
+      .setDesc(this.kindDescription());
+    const kindBar = kindSetting.controlEl.createDiv({ cls: "almanac-event-kind-bar" });
+    const kinds: Array<{ id: string; label: string }> = [
+      { id: "single", label: "Single (one-off)" },
+      { id: "recurring", label: "Yearly (annual)" },
+      { id: "weekly", label: "Weekly" },
+    ];
+    for (const k of kinds) {
+      const isCur = this.kindChoice() === k.id;
+      const btn = kindBar.createEl("button", {
+        cls: `almanac-event-kind-btn${isCur ? " is-active" : ""}`,
+        text: k.label,
+        attr: { type: "button", "aria-pressed": isCur ? "true" : "false" },
       });
+      btn.addEventListener("click", () => {
+        this.setKindChoice(k.id);
+        kindBar.findAll(".almanac-event-kind-btn").forEach((el) => {
+          el.removeClass("is-active");
+          el.setAttribute("aria-pressed", "false");
+        });
+        btn.addClass("is-active");
+        btn.setAttribute("aria-pressed", "true");
+        kindSetting.setDesc(this.kindDescription());
+        this.renderDateFields();
+        this.updatePreview();
+      });
+    }
 
     this.dateHost = contentEl.createDiv();
     this.renderDateFields();
@@ -162,6 +187,70 @@ class EventEditModal extends EditorModal {
     save.addEventListener("click", () => void this.trySubmit());
   }
 
+  // The description of the current recurrence kind.
+  private kindDescription(): string {
+    const k = this.kindChoice();
+    if (k === "weekly") return "Repeats on the same weekday every week, at a scheduled time.";
+    if (k === "recurring") return "Repeats on the same date every year (e.g. birthday, holiday, anniversary).";
+    return "Happens on one date or spans a consecutive range of days.";
+  }
+
+  // Live preview card showing the event's badge, title, date, and day-cell appearance.
+  private updatePreview(): void {
+    if (!this.previewHost) return;
+    this.previewHost.empty();
+
+    const left = this.previewHost.createDiv({ cls: "almanac-event-preview-left" });
+    const col = eventColor(this.draft);
+    const ico = eventIcon(this.draft);
+
+    const badge = left.createDiv({ cls: `almanac-event-preview-badge cal-badge-${col}` });
+    setIcon(badge, ico);
+
+    const info = left.createDiv({ cls: "almanac-event-preview-info" });
+    info.createDiv({
+      cls: "almanac-event-preview-title",
+      text: this.draft.title.trim() || "Untitled event",
+    });
+
+    const desc = describeEventDate(this.draft) + (this.draft.time ? ` at ${this.draft.time}` : "");
+    info.createDiv({ cls: "almanac-event-preview-date", text: desc });
+
+    // Mini day cell mockup
+    const mockup = this.previewHost.createDiv({ cls: "almanac-event-preview-mockup" });
+    let dayStr = "23";
+    if (this.draft.kind === "recurring" && this.draft.day) {
+      dayStr = String(this.draft.day);
+    } else if (this.draft.start && isValidIso(this.draft.start)) {
+      dayStr = String(Number(this.draft.start.slice(8, 10)));
+    }
+    mockup.createSpan({ text: dayStr });
+    const cellBadge = mockup.createSpan({ cls: `cal-badge cal-badge-${col}` });
+    setIcon(cellBadge, ico);
+  }
+
+  // The dropdown's answer, read off the draft.
+  private kindChoice(): string {
+    if (this.draft.kind !== "recurring") return "single";
+    return this.draft.every === "week" ? "weekly" : "recurring";
+  }
+
+  // And written back to it. `every` is cleared on every other branch, so a
+  // reader who tries weekly and changes their mind does not leave a stray
+  // `every: week` on an annual event for `normalizeEvent` to prefer.
+  private setKindChoice(value: string): void {
+    if (value === "weekly") {
+      this.draft.kind = "recurring";
+      this.draft.every = "week";
+      return;
+    }
+    this.draft.kind = value === "recurring" ? "recurring" : "single";
+    this.draft.every = undefined;
+    this.draft.weekday = undefined;
+    this.draft.from = undefined;
+    this.draft.until = undefined;
+  }
+
   // Give the date fields a real value before they're drawn.
   //
   // Without this the controls show a placeholder the draft doesn't actually
@@ -175,6 +264,17 @@ class EventEditModal extends EditorModal {
   // April rather than 1 January.
   private seedDates(): void {
     const fallback = today();
+    if (this.draft.every === "week") {
+      // THE WEEKDAY OF THE DAY THEY CAME FROM. Right-clicking a Wednesday and
+      // choosing weekly means every Wednesday; with no date in hand it means
+      // the weekday it is today, which is the one a reader is most likely to be
+      // scheduling from.
+      if (this.draft.weekday == null) {
+        const source = isValidIso(this.draft.start) ? this.draft.start! : fallback;
+        this.draft.weekday = weekdayOf(source);
+      }
+      return;
+    }
     if (this.draft.kind === "recurring") {
       if (this.draft.month != null && this.draft.day != null) return;
       const source = isValidIso(this.draft.start) ? this.draft.start! : fallback;
@@ -206,6 +306,51 @@ class EventEditModal extends EditorModal {
     host.empty();
     this.seedDates();
 
+    if (this.draft.every === "week") {
+      new Setting(host)
+        .setName("Day")
+        .setDesc("The same weekday, every week.")
+        .addDropdown((d) => {
+          WEEKDAY_NAMES.forEach((name, i) => d.addOption(String(i), name));
+          d.setValue(String(this.draft.weekday ?? 1)).onChange((v) => {
+            this.draft.weekday = Number(v);
+            this.updatePreview();
+          });
+        });
+
+      // BOUNDS, BOTH OPTIONAL, AND SAID AS "LEAVE EMPTY". A standing meeting
+      // has neither; a course that runs a term has both. An empty pair is the
+      // ordinary answer, so the description has to say so or every reader will
+      // feel obliged to pick two dates.
+      new Setting(host)
+        .setName("First week")
+        .setDesc("Optional. Leave empty and it has always been happening.")
+        .addText((t) => {
+          t.inputEl.type = "date";
+          t.setValue(this.draft.from ?? "").onChange((v) => {
+            this.draft.from = v || undefined;
+            this.updatePreview();
+          });
+        });
+
+      new Setting(host)
+        .setName("Last week")
+        .setDesc("Optional. Leave empty and it carries on.")
+        .addText((t) => {
+          t.inputEl.type = "date";
+          t.setValue(this.draft.until ?? "").onChange((v) => {
+            this.draft.until = v || undefined;
+            this.updatePreview();
+          });
+        });
+
+      // THE TIME IS REQUIRED HERE AND OPTIONAL EVERYWHERE ELSE — see the field
+      // block in `events.ts`. A weekly event with no hour would draw a bar
+      // across every Wednesday of every calendar for ever.
+      this.renderTimeField(host, { required: true });
+      return;
+    }
+
     if (this.draft.kind === "recurring") {
       const month = this.draft.month ?? 1;
       const maxDay = daysInMonth(2024, month);
@@ -217,6 +362,7 @@ class EventEditModal extends EditorModal {
           d.setValue(String(month)).onChange((v) => {
             this.draft.month = Number(v);
             this.clampDay();
+            this.updatePreview();
           });
         })
         .addText((t) => {
@@ -231,6 +377,7 @@ class EventEditModal extends EditorModal {
             const n = Number(v.trim());
             this.draft.day =
               v.trim() !== "" && Number.isInteger(n) && n > 0 ? n : undefined;
+            this.updatePreview();
           });
         });
       // 29 February is legal to enter and handled at render time (shown on the
@@ -250,6 +397,7 @@ class EventEditModal extends EditorModal {
         t.inputEl.type = "date";
         t.setValue(this.draft.start ?? "").onChange((v) => {
           this.draft.start = v;
+          this.updatePreview();
         });
       });
 
@@ -260,6 +408,7 @@ class EventEditModal extends EditorModal {
         t.inputEl.type = "date";
         t.setValue(this.draft.end ?? "").onChange((v) => {
           this.draft.end = v || undefined;
+          this.updatePreview();
         });
       });
 
@@ -278,12 +427,17 @@ class EventEditModal extends EditorModal {
   // recurrence is annual by construction and an annual 09:00 is a stranger thing
   // than the field is worth. Nothing in the model refuses it; a hand-edited
   // `Events.md` with a time on a recurring event keeps it and shows it.
-  private renderTimeField(host: HTMLElement): void {
+  private renderTimeField(
+    host: HTMLElement,
+    opts: { required?: boolean } = {}
+  ): void {
     this.durationHost = null;
     new Setting(host)
       .setName("Time")
       .setDesc(
-        "Leave empty for something that is true of the whole day. An event with a time is a meeting, and shows in the Meetings logbook."
+        opts.required
+          ? "Required. A weekly event is a standing appointment, and it shows in the Meetings logbook."
+          : "Leave empty for something that is true of the whole day. An event with a time is a meeting, and shows in the Meetings logbook."
       )
       .addText((t) => {
         t.inputEl.type = "time";
@@ -294,6 +448,7 @@ class EventEditModal extends EditorModal {
           // duration that the next save will silently discard.
           if (!this.draft.time) this.draft.duration = undefined;
           this.renderDurationField();
+          this.updatePreview();
         });
       });
     this.durationHost = host.createDiv({ cls: "am-ev-duration" });
@@ -322,6 +477,7 @@ class EventEditModal extends EditorModal {
             // `0` in the note means — no duration — rather than the box
             // inventing a second rule.
             this.draft.duration = readMinutes(v) ?? undefined;
+            this.updatePreview();
           });
       });
   }
@@ -338,27 +494,64 @@ class EventEditModal extends EditorModal {
   }
 
   private renderIconPicker(parent: HTMLElement): void {
-    new Setting(parent).setName("Icon").setHeading();
+    const setting = new Setting(parent).setName("Icon");
+    const iconDesc = setting.descEl;
+    iconDesc.setText(eventIcon(this.draft));
+
     const wrap = parent.createDiv({ cls: "almanac-icon-picker" });
-    for (const group of EVENT_ICONS) {
-      wrap.createDiv({ cls: "almanac-icon-group-label", text: group.label });
-      const row = wrap.createDiv({ cls: "almanac-icon-row" });
-      for (const name of group.icons) {
-        const btn = row.createEl("button", {
-          cls: "almanac-icon-swatch",
-          attr: { type: "button", "aria-label": name, title: name },
-        });
-        setIcon(btn, name);
-        btn.toggleClass("is-active", eventIcon(this.draft) === name);
-        btn.addEventListener("click", () => {
-          this.draft.icon = name;
-          wrap
-            .findAll(".almanac-icon-swatch")
-            .forEach((el) => el.removeClass("is-active"));
-          btn.addClass("is-active");
-        });
+
+    // Category Tabs
+    const catBar = wrap.createDiv({ cls: "almanac-icon-cat-bar" });
+    const allGroups = [
+      { key: "all", label: "All" },
+      ...EVENT_ICONS.map((g) => ({ key: g.label.toLowerCase(), label: g.label })),
+    ];
+
+    const grid = wrap.createDiv({ cls: "almanac-icon-grid" });
+
+    const renderGrid = (catKey: string) => {
+      grid.empty();
+      const groupsToRender =
+        catKey === "all"
+          ? EVENT_ICONS
+          : EVENT_ICONS.filter((g) => g.label.toLowerCase() === catKey);
+
+      for (const group of groupsToRender) {
+        for (const name of group.icons) {
+          const btn = grid.createEl("button", {
+            cls: `almanac-icon-swatch${eventIcon(this.draft) === name ? " is-active" : ""}`,
+            attr: { type: "button", "aria-label": name, title: `${name} (${group.label})` },
+          });
+          setIcon(btn, name);
+          btn.addEventListener("click", () => {
+            this.draft.icon = name;
+            iconDesc.setText(name);
+            grid
+              .findAll(".almanac-icon-swatch")
+              .forEach((el) => el.removeClass("is-active"));
+            btn.addClass("is-active");
+            this.updatePreview();
+          });
+        }
       }
+    };
+
+    for (const cat of allGroups) {
+      const isCur = this.activeCategory === cat.key;
+      const catBtn = catBar.createEl("button", {
+        cls: `almanac-icon-cat-btn${isCur ? " is-active" : ""}`,
+        text: cat.label,
+        attr: { type: "button" },
+      });
+      catBtn.addEventListener("click", () => {
+        this.activeCategory = cat.key;
+        catBar.findAll(".almanac-icon-cat-btn").forEach((el) => el.removeClass("is-active"));
+        catBtn.addClass("is-active");
+        renderGrid(cat.key);
+      });
     }
+
+    renderGrid(this.activeCategory);
   }
 
   private renderColorPicker(parent: HTMLElement): void {
@@ -366,22 +559,40 @@ class EventEditModal extends EditorModal {
     const row = parent.createDiv({ cls: "almanac-color-picker" });
     for (const name of EVENT_COLORS) {
       const btn = row.createEl("button", {
-        cls: `almanac-color-swatch almanac-color-${name}`,
+        cls: `almanac-color-swatch almanac-color-${name}${eventColor(this.draft) === name ? " is-active" : ""}`,
         attr: { type: "button", "aria-label": name, title: name },
       });
-      btn.toggleClass("is-active", eventColor(this.draft) === name);
+      btn.style.setProperty("background-color", `var(--am-ev-${name})`);
       btn.addEventListener("click", () => {
         this.draft.color = name;
         row
           .findAll(".almanac-color-swatch")
           .forEach((el) => el.removeClass("is-active"));
         btn.addClass("is-active");
+        this.updatePreview();
       });
     }
   }
 
   protected validate(): string | null {
     if (!this.draft.title.trim()) return "Give the event a title.";
+    if (this.draft.every === "week") {
+      const w = this.draft.weekday;
+      if (w == null || w < 0 || w > 6) return "Pick a weekday.";
+      if (!this.draft.time) return "A weekly event needs a time.";
+      if (this.draft.from && !isValidIso(this.draft.from)) {
+        return "That first week isn't a real date.";
+      }
+      if (this.draft.until && !isValidIso(this.draft.until)) {
+        return "That last week isn't a real date.";
+      }
+      // A series that ends before it starts has no occurrences at all, and it
+      // is worth saying so here rather than saving an event that draws nowhere.
+      if (this.draft.from && this.draft.until && this.draft.until < this.draft.from) {
+        return "The last week is before the first one.";
+      }
+      return null;
+    }
     if (this.draft.kind === "recurring") {
       const m = this.draft.month;
       const d = this.draft.day;
@@ -440,6 +651,18 @@ class EventEditModal extends EditorModal {
       kind: this.draft.kind,
       icon: this.draft.icon,
       color: this.draft.color,
+      // The rhythm is part of "the same shape as this one": entering a term's
+      // worth of weekly classes is exactly the case this button is for, and
+      // dropping back to a yearly event between each would undo it.
+      ...(this.draft.every === "week"
+        ? {
+            every: "week" as const,
+            weekday: this.draft.weekday,
+            time: this.draft.time,
+            ...(this.draft.from ? { from: this.draft.from } : {}),
+            ...(this.draft.until ? { until: this.draft.until } : {}),
+          }
+        : {}),
     };
     this.onDone(true);
     // `refreshBody`, not empty-and-reopen: the old version rebuilt the head and

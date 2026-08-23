@@ -29,6 +29,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_SOURCES,
   EMPTY_WINDOW,
   GRID_SOURCES,
   MIN_WINDOW_HOURS,
@@ -36,13 +37,22 @@ import {
   type GridItem,
   describeWhen,
   dayIndex,
+  fitDays,
+  SNAP_MINUTES,
   formatClock,
   gridWindow,
   itemEnd,
+  minuteAt,
+  movedTo,
+  nowOffset,
   packDay,
   parseClock,
+  parseDays,
   parseSources,
   placeInWindow,
+  resizedTo,
+  spanFromDrag,
+  visibleDays,
   weekDates,
 } from "../src/diary/time-grid";
 
@@ -147,6 +157,139 @@ describe("the window the grid draws", () => {
     expect(win.endHour).toBe(24);
     expect(top).toBeLessThan(1);
     expect(height).toBeGreaterThan(0);
+  });
+});
+
+describe("the window makes room for now (4.62)", () => {
+  it("draws the same rail as before when nothing asks it not to", () => {
+    // THE ARGUMENT IS OPTIONAL AND ABSENT IS THE OLD BEHAVIOUR. Every existing
+    // assertion above calls this function with one argument; this pins that
+    // that is still the whole contract.
+    expect(gridWindow([at(hm(7, 20), 30), at(hm(19, 10), 45)], {})).toEqual({
+      startHour: 7,
+      endHour: 20,
+    });
+  });
+
+  it("keeps the working day when an empty week is being looked at inside it", () => {
+    // 10:40 is already in 08:00–18:00, so there is nothing to widen. An empty
+    // week must not become "the eight hours after now".
+    expect(gridWindow([], { contains: hm(10, 40) })).toEqual(EMPTY_WINDOW);
+  });
+
+  it("stretches an empty week to reach an evening", () => {
+    const win = gridWindow([], { contains: hm(19, 30) });
+    expect(win.startHour).toBe(EMPTY_WINDOW.startHour);
+    expect(win.endHour).toBe(20);
+  });
+
+  it("stretches an empty week backwards to reach an early start", () => {
+    const win = gridWindow([], { contains: hm(6, 5) });
+    expect(win.startHour).toBe(6);
+    expect(win.endHour).toBe(EMPTY_WINDOW.endHour);
+  });
+
+  it("widens a week that has content, rather than moving it", () => {
+    // The 09:00 meeting stays where it was; the window grows down to 21:00.
+    const win = gridWindow([at(hm(9), 60)], { contains: hm(20, 15) });
+    expect(win.startHour).toBe(9);
+    expect(win.endHour).toBe(21);
+  });
+
+  it("obeys the floor after the minute has been folded in", () => {
+    // 12:10, one 20-minute item at 12:00: the content spans one hour and the
+    // minute adds nothing, so the floor is still what decides the window.
+    const win = gridWindow([at(hm(12), 20)], { contains: hm(12, 10) });
+    expect(win.endHour - win.startHour).toBe(MIN_WINDOW_HOURS);
+    expect(win.startHour).toBe(12);
+  });
+
+  it("still clips at midnight with a minute late in the day", () => {
+    const win = gridWindow([at(hm(9), 30)], { contains: hm(23, 59) });
+    expect(win.endHour).toBe(24);
+  });
+});
+
+describe("how many days are drawn (4.62)", () => {
+  const week = weekDates("2026-08-17"); // Mon 17 – Sun 23
+
+  it("reads the second piece of the argument, and empty is the whole week", () => {
+    expect(parseDays("")).toEqual({ days: 7, unknown: null });
+    expect(parseDays("3")).toEqual({ days: 3, unknown: null });
+    expect(parseDays(" 1 ")).toEqual({ days: 1, unknown: null });
+  });
+
+  it("refuses a count it does not draw, rather than picking one", () => {
+    // The same manners `parseSources` has about an unknown source: the caller
+    // draws the refusal and names what is legal.
+    expect(parseDays("5").unknown).toBe("5");
+    expect(parseDays("week").unknown).toBe("week");
+    expect(parseDays("5").days).toBe(7);
+  });
+
+  it("draws the whole week when asked for it", () => {
+    expect(visibleDays(week, 7, "2026-08-19")).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
+  it("centres a narrow window on today", () => {
+    expect(visibleDays(week, 3, "2026-08-19")).toEqual([1, 2, 3]);
+    expect(visibleDays(week, 1, "2026-08-19")).toEqual([2]);
+  });
+
+  it("clamps at both ends rather than borrowing a day from another week", () => {
+    expect(visibleDays(week, 3, "2026-08-17")).toEqual([0, 1, 2]);
+    expect(visibleDays(week, 3, "2026-08-23")).toEqual([4, 5, 6]);
+  });
+
+  it("opens at the start of a week that is not this one", () => {
+    expect(visibleDays(week, 3, "2026-03-04")).toEqual([0, 1, 2]);
+  });
+
+  it("narrows for a pane that has no room, and never widens", () => {
+    expect(fitDays(7, 900)).toBe(7);
+    expect(fitDays(7, 400)).toBe(3);
+    expect(fitDays(7, 300)).toBe(1);
+    // A reader who asked for one day meant it.
+    expect(fitDays(1, 900)).toBe(1);
+    expect(fitDays(3, 900)).toBe(3);
+  });
+
+  it("keeps what it was asked for until it has been measured", () => {
+    // A width of zero is an element that has not been laid out yet, not a pane
+    // with no room in it.
+    expect(fitDays(7, 0)).toBe(7);
+  });
+});
+
+describe("the now line", () => {
+  const win = { startHour: 8, endHour: 18 };
+
+  it("is a fraction of the window, not of the day", () => {
+    expect(nowOffset(win, hm(8))).toBe(0);
+    expect(nowOffset(win, hm(13))).toBeCloseTo(0.5, 10);
+    expect(nowOffset(win, hm(18))).toBe(1);
+  });
+
+  it("is nothing at all outside the window", () => {
+    // A clamped line would say it is eight o'clock at a quarter past six, and a
+    // reader has no reason to doubt a line.
+    expect(nowOffset(win, hm(7, 59))).toBeNull();
+    expect(nowOffset(win, hm(18, 1))).toBeNull();
+    expect(nowOffset(win, 0)).toBeNull();
+  });
+
+  it("agrees with placeInWindow about where a minute is", () => {
+    // The line and a block starting at the same minute have to land on the same
+    // pixel, or the grid contradicts itself.
+    const item = at(hm(11, 30), 30);
+    expect(nowOffset(win, hm(11, 30))).toBeCloseTo(
+      placeInWindow(item, win).top,
+      10
+    );
+  });
+
+  it("has nowhere to be in a window with no span", () => {
+    expect(nowOffset({ startHour: 9, endHour: 9 }, hm(9))).toBeNull();
   });
 });
 
@@ -288,9 +431,23 @@ describe("the week", () => {
 });
 
 describe("the directive's argument", () => {
-  it("means everything when it is empty", () => {
-    expect(parseSources("")).toEqual({ sources: [...GRID_SOURCES], unknown: [] });
-    expect(parseSources("   ")).toEqual({ sources: [...GRID_SOURCES], unknown: [] });
+  it("means the three scheduled sources when it is empty", () => {
+    // NOT `GRID_SOURCES`, which is every word the argument will TAKE. Captures
+    // are nameable and not default: forty fragments a day would bury the three
+    // meetings the grid was built to draw, and a directive written before they
+    // were drawable must keep meaning what it meant.
+    expect(parseSources("")).toEqual({ sources: [...DEFAULT_SOURCES], unknown: [] });
+    expect(parseSources("   ")).toEqual({ sources: [...DEFAULT_SOURCES], unknown: [] });
+    expect(DEFAULT_SOURCES).not.toContain("captures");
+    // Nameable, though — which is the whole of the asymmetry.
+    expect(GRID_SOURCES).toContain("captures");
+  });
+
+  it("takes captures when they are asked for by name", () => {
+    expect(parseSources("captures,events")).toEqual({
+      sources: ["captures", "events"],
+      unknown: [],
+    });
   });
 
   it("reads a comma-joined list, in the order it was written", () => {
@@ -316,5 +473,107 @@ describe("the directive's argument", () => {
 
   it("counts a source named twice once", () => {
     expect(parseSources("events,events").sources).toEqual(["events"]);
+  });
+});
+
+// ── the grid as somewhere to write (4.62) ────────────────────────────
+//
+// A drag that reads back as the wrong minute is the one failure in this feature
+// a reader cannot catch before it happens: the block lands where the pointer
+// was, the file says something else, and the two are only ever compared later.
+// So the reading is tested at the edges — the top of the window, the foot of
+// it, past the foot of it, and backwards.
+
+describe("a pointer, read as a minute", () => {
+  const win = { startHour: 8, endHour: 18 };
+
+  it("reads the top of the window as the hour it starts at", () => {
+    expect(minuteAt(win, 0)).toBe(hm(8));
+  });
+
+  it("reads the foot of the window as the hour it ends at", () => {
+    expect(minuteAt(win, 1)).toBe(hm(18));
+  });
+
+  it("snaps to the quarter hour, both ways", () => {
+    // 10:53 is not a time anyone meant to write.
+    expect(minuteAt(win, (hm(10, 53) - hm(8)) / hm(10))).toBe(hm(11));
+    expect(minuteAt(win, (hm(10, 5) - hm(8)) / hm(10))).toBe(hm(10));
+    expect(minuteAt(win, (hm(10, 8) - hm(8)) / hm(10))).toBe(hm(10, 15));
+  });
+
+  it("gives a drag that left the element the last minute on screen", () => {
+    // Not midnight, and not the hour under the pointer: the hours outside the
+    // window were not drawn, so they were not aimed at.
+    expect(minuteAt(win, 2.4)).toBe(hm(18));
+    expect(minuteAt(win, -3)).toBe(hm(8));
+  });
+});
+
+describe("a drag, read as a block", () => {
+  it("reads the same block whichever way it was drawn", () => {
+    const down = spanFromDrag(hm(14), hm(15, 30));
+    const up = spanFromDrag(hm(15, 30), hm(14));
+    expect(down).toEqual({ start: hm(14), mins: 90 });
+    expect(up).toEqual(down);
+  });
+
+  it("makes a click one slot rather than nothing", () => {
+    // And rather than a moment: a moment is something you record about a minute
+    // that has been, never something you draw on a Thursday to come.
+    expect(spanFromDrag(hm(9), hm(9))).toEqual({ start: hm(9), mins: SNAP_MINUTES });
+  });
+});
+
+describe("moving a block", () => {
+  it("says nothing changed when it landed where it started", () => {
+    // The caller writes a file on a non-null answer, and a file rewritten with
+    // its own contents still shows up in the vault's history as a change.
+    expect(movedTo(at(hm(9), 60), { day: 0, start: hm(9) })).toBe(null);
+  });
+
+  it("moves the day and the minute together", () => {
+    const moved = movedTo(at(hm(9), 60), { day: 3, start: hm(11, 30) });
+    expect(moved?.day).toBe(3);
+    expect(moved?.start).toBe(hm(11, 30));
+    expect(moved?.mins).toBe(60);
+  });
+
+  it("keeps a block inside its own day at the foot", () => {
+    // Otherwise a two-hour meeting dragged to 23:30 is written as ending at
+    // 01:30 tomorrow — in a column that is already on screen and is not this
+    // one.
+    const moved = movedTo(at(hm(9), 120), { day: 0, start: hm(23, 30) });
+    expect(moved?.start).toBe(hm(22));
+  });
+
+  it("keeps a moment inside the day too, with nothing to reserve for it", () => {
+    // `MOMENT_MINUTES` is room on the grid, not length in the file, so it must
+    // not push the last legal minute of the day back off midnight.
+    const moved = movedTo(at(hm(9), null), { day: 0, start: hm(23, 45) });
+    expect(moved?.start).toBe(hm(23, 45));
+    expect(moved?.mins).toBe(null);
+  });
+});
+
+describe("resizing a block", () => {
+  it("takes the new end and keeps the start", () => {
+    const bigger = resizedTo(at(hm(9), 60), hm(10, 30));
+    expect(bigger?.start).toBe(hm(9));
+    expect(bigger?.mins).toBe(90);
+  });
+
+  it("never shrinks past one slot", () => {
+    // A drag up past the block's own top would otherwise write a negative
+    // duration, and `0` is the moment marker — neither is a length.
+    expect(resizedTo(at(hm(9), 60), hm(8))?.mins).toBe(SNAP_MINUTES);
+  });
+
+  it("refuses a moment, which has no length to drag", () => {
+    expect(resizedTo(at(hm(9), null), hm(11))).toBe(null);
+  });
+
+  it("says nothing changed when the length is the length it had", () => {
+    expect(resizedTo(at(hm(9), 60), hm(10))).toBe(null);
   });
 });

@@ -52,7 +52,8 @@ import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import { WIDGETS } from "../core/widget-registry";
 import type { VaultLists } from "../core/widget-registry";
 import { widgetLine, widgetQuestions } from "../core/widget-sections";
-import type { SectionModel } from "../core/section-model";
+import { WIDGET_FORM, formQuestion, type SectionModel } from "../core/section-model";
+import { FRAME_KEYWORD, HEADER_KEYWORD } from "../core/directive-grammar";
 
 const probe = (text: string, re: RegExp): number => text.search(re);
 
@@ -427,12 +428,20 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     optIn: true,
     render: (options) => ({
       fence: "almanac",
-      lines: ["header:⏱️ The week by the hour", widgetLine("time-grid", options)],
+      lines: [
+        ...(options?.form === WIDGET_FORM
+          ? []
+          : ["header:⏱️ The week by the hour"]),
+        widgetLine("time-grid", options),
+      ],
     }),
     // THE REGISTRY'S QUESTION, ASKED FROM HERE — `time-grid`'s three sources are
     // declared once and this composes the same directive, so it asks through
     // `widgetQuestions` rather than re-typing them.
-    questions: () => widgetQuestions("time-grid"),
+    questions: () => [
+      formQuestion("header:⏱️ The week by the hour", HEADER_KEYWORD),
+      ...widgetQuestions("time-grid"),
+    ],
     // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who narrows the grid to
     // `time-grid:events` still has a section the editor can find rather than a
     // second one it offers to add.
@@ -464,7 +473,14 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // opens its dashboard, over four figures about it. `journals` is untouched and
     // still the right answer on a page about journals; the journals dashboard
     // composes it for that reason.
-    render: () => ({ fence: "almanac", lines: ["frame: section", "journals:cards"] }),
+    render: (options) => ({
+      fence: "almanac",
+      lines: [
+        ...(options?.form === WIDGET_FORM ? [] : ["frame: section"]),
+        "journals:cards",
+      ],
+    }),
+    questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
     // MATCHES BOTH SPELLINGS, which is the same shape of locator 4.36 wrote for
     // `level-(index|cards)` and for the same reason: this page is RECONCILED, so
     // a homepage written before this release must be recognised as already having

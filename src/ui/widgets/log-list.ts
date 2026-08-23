@@ -56,7 +56,7 @@ import { MarkdownRenderChild, setIcon } from "obsidian";
 import type { App, TFile } from "obsidian";
 import type { NoteRegionHost } from "./note-regions";
 import { readNoteRegion } from "../../core/notestore";
-import { readMinutes } from "../../events/events";
+import { whenEditor, type WhenValue } from "../when-editor";
 import {
   parseLogItems,
   serializeLogItems,
@@ -68,23 +68,36 @@ import { today } from "../../core/util";
 // `NoteFieldWatcher`, and named separately because the two guard different
 // things: that one protects a cursor in a textarea, this one protects a card
 // that is open for editing.
-class LogListWatcher extends MarkdownRenderChild {
+export class LogListWatcher extends MarkdownRenderChild {
+  private paths: Set<string>;
   constructor(
     private app: App,
     hostEl: HTMLElement,
-    private watchPath: string,
+    watchPathOrPaths: string | readonly string[],
     private refresh: () => void
   ) {
     super(hostEl);
+    this.paths = new Set(
+      typeof watchPathOrPaths === "string"
+        ? [watchPathOrPaths]
+        : watchPathOrPaths
+    );
   }
 
   onload(): void {
     this.registerEvent(
       this.app.vault.on("modify", (f) => {
-        if (f.path === this.watchPath) this.refresh();
+        if (this.paths.has(f.path)) this.refresh();
       })
     );
   }
+}
+
+export interface LogTypeOption {
+  id: string;
+  label: string;
+  icon?: string;
+  color?: string;
 }
 
 export interface LogListOptions {
@@ -147,6 +160,84 @@ export interface LogListOptions {
    * the postprocessor but the one method it uses.
    */
   addChild: (child: MarkdownRenderChild) => void;
+  /** Optional multi-type filter options for logbooks */
+  types?: LogTypeOption[];
+  activeType?: string;
+  getItemType?: (item: LogItem) => string | undefined;
+  getItemTypeTag?: (item: LogItem) => { label: string; icon?: string; color?: string } | undefined;
+  onAddMulti?: (typeId: string, item: LogItem) => Promise<void>;
+  onItemUpdate?: (item: LogItem, prevItem: LogItem) => Promise<void>;
+  onItemDelete?: (item: LogItem) => Promise<void>;
+  itemsProvider?: () => Promise<LogItem[]>;
+}
+
+function highlightMatches(el: HTMLElement, text: string, query: string): void {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    el.setText(text);
+    return;
+  }
+  el.empty();
+  const lower = text.toLowerCase();
+  let start = 0;
+  let idx = lower.indexOf(q, start);
+  while (idx !== -1) {
+    if (idx > start) {
+      el.appendText(text.slice(start, idx));
+    }
+    el.createEl("mark", {
+      cls: "jcl-highlight",
+      text: text.slice(idx, idx + q.length),
+    });
+    start = idx + q.length;
+    idx = lower.indexOf(q, start);
+  }
+  if (start < text.length) {
+    el.appendText(text.slice(start));
+  }
+}
+
+function formatLogText(el: HTMLElement, text: string, query: string): void {
+  el.empty();
+  const q = query.trim().toLowerCase();
+  const tokenRegex = /(`[^`]+`)|(#[a-zA-Z0-9_\-\/]+)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  const appendSegment = (segmentText: string, kind?: "tag" | "code"): void => {
+    if (!segmentText) return;
+    if (kind === "tag") {
+      const tagSpan = el.createSpan({ cls: "jcl-text-tag", text: segmentText });
+      if (q && segmentText.toLowerCase().includes(q)) {
+        highlightMatches(tagSpan, segmentText, q);
+      }
+    } else if (kind === "code") {
+      const codeSpan = el.createEl("code", {
+        cls: "jcl-text-code",
+        text: segmentText.slice(1, -1),
+      });
+      if (q && segmentText.toLowerCase().includes(q)) {
+        highlightMatches(codeSpan, segmentText.slice(1, -1), q);
+      }
+    } else {
+      highlightMatches(el, segmentText, q);
+    }
+  };
+
+  while ((match = tokenRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      appendSegment(text.slice(lastIndex, match.index));
+    }
+    if (match[1]) {
+      appendSegment(match[1], "code");
+    } else if (match[2]) {
+      appendSegment(match[2], "tag");
+    }
+    lastIndex = tokenRegex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    appendSegment(text.slice(lastIndex));
+  }
 }
 
 export function buildLogList(
@@ -179,11 +270,229 @@ export function buildLogList(
       apply(next);
       opts.onFold(next);
     });
-  } else if (opts.label) {
+  } else if (opts.label && (!opts.types || opts.types.length <= 1)) {
     wrap.createDiv({ cls: "journal-note-label", text: opts.label });
   }
 
-  const list = wrap.createDiv({ cls: "journal-capture-list" });
+  // ── CONTROLS DECK (Dropdown Type Selector, Collapsible Search, Status Segment) ───
+  const deck = wrap.createDiv({ cls: "journal-logbook-deck" });
+
+  let searchQuery = "";
+  let activeTypeFilter = opts.activeType ?? "all";
+  let activeStatusFilter: "all" | "open" | "done" | "timed" = "all";
+  let sortOrder: "desc" | "asc" = "desc";
+  let isCompact = false;
+  let searchOpen = false;
+
+  // Top row: Leading type filter dropdown on left (replaces title), Action buttons on right
+  const topBar = deck.createDiv({ cls: "jcl-top-bar" });
+
+  const pillCountMap = new Map<string, HTMLElement>();
+  let typeIconEl: HTMLElement | null = null;
+  let typeLabelEl: HTMLElement | null = null;
+  let dropdownMenuEl: HTMLElement | null = null;
+  let typeDropdownBtn: HTMLButtonElement | null = null;
+
+  if (opts.types && opts.types.length > 1) {
+    const dropdownWrap = topBar.createDiv({ cls: "jcl-dropdown-wrap" });
+    typeDropdownBtn = dropdownWrap.createEl("button", {
+      cls: "jcl-type-dropdown-btn",
+      attr: { type: "button", "aria-label": "Select logbook type" },
+    });
+    typeIconEl = typeDropdownBtn.createSpan({ cls: "jcl-type-icon", text: "📚" });
+    typeLabelEl = typeDropdownBtn.createSpan({ cls: "jcl-type-label", text: "All Logbooks" });
+    const caret = typeDropdownBtn.createSpan({ cls: "jcl-dropdown-caret" });
+    setIcon(caret, "chevron-down");
+
+    dropdownMenuEl = dropdownWrap.createDiv({ cls: "jcl-dropdown-menu" });
+
+    // "All" option
+    const allItem = dropdownMenuEl.createEl("button", {
+      cls: `jcl-dropdown-item${activeTypeFilter === "all" ? " is-selected" : ""}`,
+      attr: { type: "button" },
+    });
+    const allLeft = allItem.createDiv({ cls: "jcl-dropdown-item-left" });
+    allLeft.createSpan({ cls: "jcl-item-icon", text: "📚" });
+    allLeft.createSpan({ cls: "jcl-item-label", text: "All Logbooks" });
+    const allCount = allItem.createSpan({ cls: "jcl-dropdown-badge", text: "0" });
+    pillCountMap.set("all", allCount);
+
+    allItem.addEventListener("click", (e) => {
+      e.stopPropagation();
+      activeTypeFilter = "all";
+      updateDropdownSelection();
+      render();
+    });
+
+    for (const t of opts.types) {
+      const item = dropdownMenuEl.createEl("button", {
+        cls: `jcl-dropdown-item${activeTypeFilter === t.id ? " is-selected" : ""}`,
+        attr: { type: "button" },
+      });
+      const itemLeft = item.createDiv({ cls: "jcl-dropdown-item-left" });
+      if (t.icon) itemLeft.createSpan({ cls: "jcl-item-icon", text: t.icon });
+      itemLeft.createSpan({ cls: "jcl-item-label", text: t.label });
+      const c = item.createSpan({ cls: "jcl-dropdown-badge", text: "0" });
+      pillCountMap.set(t.id, c);
+
+      item.addEventListener("click", (e) => {
+        e.stopPropagation();
+        activeTypeFilter = t.id;
+        updateDropdownSelection();
+        render();
+      });
+    }
+
+    typeDropdownBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = dropdownMenuEl?.hasClass("is-open");
+      dropdownMenuEl?.toggleClass("is-open", !open);
+      typeDropdownBtn?.toggleClass("is-open", !open);
+    });
+
+    document.addEventListener("click", () => {
+      dropdownMenuEl?.removeClass("is-open");
+      typeDropdownBtn?.removeClass("is-open");
+    });
+  }
+
+  const updateDropdownSelection = (): void => {
+    if (!dropdownMenuEl || !typeDropdownBtn || !typeIconEl || !typeLabelEl) return;
+    dropdownMenuEl.removeClass("is-open");
+    typeDropdownBtn.removeClass("is-open");
+    const items = Array.from(
+      dropdownMenuEl.querySelectorAll<HTMLButtonElement>(".jcl-dropdown-item")
+    );
+    if (items[0]) items[0].toggleClass("is-selected", activeTypeFilter === "all");
+    if (opts.types) {
+      opts.types.forEach((t, i) => {
+        if (items[i + 1]) {
+          items[i + 1].toggleClass("is-selected", activeTypeFilter === t.id);
+        }
+      });
+    }
+    if (activeTypeFilter === "all") {
+      typeIconEl.setText("📚");
+      typeLabelEl.setText("All Logbooks");
+    } else {
+      const activeDef = opts.types?.find((t) => t.id === activeTypeFilter);
+      if (activeDef) {
+        typeIconEl.setText(activeDef.icon ?? "🗒️");
+        typeLabelEl.setText(activeDef.label);
+      }
+    }
+  };
+
+  // Top right actions
+  const actionsGroup = topBar.createDiv({ cls: "jcl-actions-group" });
+
+  const searchToggle = actionsGroup.createEl("button", {
+    cls: "jcl-action-chip jcl-search-toggle",
+    attr: { type: "button", title: "Toggle search bar" },
+  });
+  const searchToggleIcon = searchToggle.createSpan({ cls: "jcl-action-icon" });
+  setIcon(searchToggleIcon, "search");
+  searchToggle.createSpan({ text: "Search" });
+
+  const sortBtn = actionsGroup.createEl("button", {
+    cls: "jcl-action-chip",
+    attr: { type: "button", title: "Toggle sort order" },
+  });
+  const sortIcon = sortBtn.createSpan({ cls: "jcl-action-icon" });
+  setIcon(sortIcon, "arrow-down-up");
+  const sortLabel = sortBtn.createSpan({ text: "Newest" });
+  sortBtn.addEventListener("click", () => {
+    sortOrder = sortOrder === "desc" ? "asc" : "desc";
+    sortLabel.setText(sortOrder === "desc" ? "Newest" : "Oldest");
+    render();
+  });
+
+  const compactBtn = actionsGroup.createEl("button", {
+    cls: "jcl-action-chip",
+    attr: { type: "button", title: "Toggle compact view" },
+  });
+  const compactIcon = compactBtn.createSpan({ cls: "jcl-action-icon" });
+  setIcon(compactIcon, "list");
+  compactBtn.createSpan({ text: "Compact" });
+  compactBtn.addEventListener("click", () => {
+    isCompact = !isCompact;
+    compactBtn.toggleClass("is-active", isCompact);
+    scrollContainer.toggleClass("is-compact", isCompact);
+  });
+
+  // Collapsible Search Strip
+  const searchStrip = deck.createDiv({ cls: "jcl-search-strip" });
+  const searchWrap = searchStrip.createDiv({ cls: "jcl-search-wrap" });
+  const searchIcon = searchWrap.createSpan({ cls: "jcl-search-icon" });
+  setIcon(searchIcon, "search");
+  const searchInput = searchWrap.createEl("input", {
+    cls: "jcl-search-input",
+    attr: { type: "text", placeholder: "Filter log items by text, time, #tag…" },
+  });
+  const searchClear = searchWrap.createEl("button", {
+    cls: "jcl-search-clear",
+    text: "✕",
+    attr: { type: "button", "aria-label": "Clear search", style: "display: none;" },
+  });
+
+  searchToggle.addEventListener("click", () => {
+    searchOpen = !searchOpen;
+    searchStrip.toggleClass("is-open", searchOpen);
+    searchToggle.toggleClass("is-active", searchOpen);
+    if (searchOpen) {
+      searchInput.focus();
+    } else {
+      searchInput.value = "";
+      searchQuery = "";
+      searchClear.style.display = "none";
+      render();
+    }
+  });
+
+  searchInput.addEventListener("input", () => {
+    searchQuery = searchInput.value;
+    searchClear.style.display = searchQuery ? "inline-flex" : "none";
+    render();
+  });
+  searchClear.addEventListener("click", () => {
+    searchInput.value = "";
+    searchQuery = "";
+    searchClear.style.display = "none";
+    searchInput.focus();
+    render();
+  });
+
+  // Status Segment Row
+  const statusRow = deck.createDiv({ cls: "jcl-status-row" });
+  const statusSegment = statusRow.createDiv({ cls: "jcl-status-segment" });
+  const statusPills: { id: "all" | "open" | "done" | "timed"; label: string; btn: HTMLButtonElement }[] = [];
+  for (const s of [
+    { id: "all" as const, label: "All" },
+    { id: "open" as const, label: "Open" },
+    { id: "done" as const, label: "Done" },
+    { id: "timed" as const, label: "Timed" },
+  ]) {
+    const btn = statusSegment.createEl("button", {
+      cls: `jcl-status-segment-btn${activeStatusFilter === s.id ? " is-active" : ""}`,
+      text: s.label,
+      attr: { type: "button" },
+    });
+    btn.addEventListener("click", () => {
+      activeStatusFilter = s.id;
+      statusPills.forEach((p) => p.btn.toggleClass("is-active", p.id === activeStatusFilter));
+      render();
+    });
+    statusPills.push({ ...s, btn });
+  }
+
+  // ── CONTAINED SCROLL VIEWPORT ─────────────────────────────────────────
+  const scrollContainer = wrap.createDiv({ cls: "journal-capture-scroll" });
+  const list = scrollContainer.createDiv({ cls: "journal-capture-list" });
+
+  // ── FOOTER STATUS ─────────────────────────────────────────────────────
+  const footer = wrap.createDiv({ cls: "journal-logbook-footer" });
+  const footerCount = footer.createSpan({ cls: "jcl-footer-count" });
+  footer.createSpan({ cls: "jcl-footer-cap", text: "Scrollable viewport" });
 
   let file = opts.file;
   let items: LogItem[] = [];
@@ -204,54 +513,145 @@ export function buildLogList(
 
   const render = (): void => {
     list.empty();
+
+    // Compute dynamic counts per type
+    if (pillCountMap.size > 0) {
+      const allCountEl = pillCountMap.get("all");
+      if (allCountEl) allCountEl.setText(String(items.length));
+      if (opts.types && opts.getItemType) {
+        for (const t of opts.types) {
+          const cEl = pillCountMap.get(t.id);
+          if (cEl) {
+            const count = items.filter((item) => opts.getItemType!(item) === t.id).length;
+            cEl.setText(String(count));
+          }
+        }
+      }
+    }
+
     if (items.length === 0) {
       list.createDiv({ cls: "journal-capture-empty", text: opts.emptyText });
+      footerCount.setText("0 items");
       return;
     }
-    items.forEach((item, index) => {
-      renderLogItemCard(list, item, index === editing, opts.dated, {
-        onWhen: (value) => {
-          // WRITTEN ON EVERY FIELD CHANGE, not on a Save button. Every other
-          // control on this card commits as it is used — the checkbox, the
-          // delete — and a stamp editor that needed confirming would be the one
-          // thing here a reader could lose work in by clicking away.
-          item.date = opts.dated ? value.date : null;
-          item.time = value.time;
-          item.mins = value.mins;
-          persist();
-        },
-        onWhenCancel: () => render(),
-        onToggle: () => {
-          // A date rather than a flag, so a crossed-off item says when.
-          item.done = item.done ? null : today();
-          persist();
-          render();
-        },
-        onEdit: () => {
-          editing = index;
-          render();
-        },
-        onCommit: (text) => {
-          editing = null;
-          if (text.trim() !== item.text.trim()) {
-            item.text = text;
-            persist();
-          }
-          render();
-        },
-        onDelete: () => {
-          // NO CONFIRMATION, which is the task widget's call and not obviously
-          // right for a typed thought. It is the same call because an undo the
-          // reader has is better than a dialog they learn to click through:
-          // Obsidian's own file history holds the note, and an item deleted by
-          // accident is one Ctrl+Z away in source view.
-          items.splice(index, 1);
-          editing = null;
-          persist();
-          render();
-        },
+
+    // Filter items
+    let filtered = items.map((item, originalIndex) => ({ item, originalIndex }));
+
+    if (activeTypeFilter !== "all" && opts.getItemType) {
+      filtered = filtered.filter(({ item }) => opts.getItemType!(item) === activeTypeFilter);
+    }
+
+    if (activeStatusFilter === "open") {
+      filtered = filtered.filter(({ item }) => !item.done);
+    } else if (activeStatusFilter === "done") {
+      filtered = filtered.filter(({ item }) => !!item.done);
+    } else if (activeStatusFilter === "timed") {
+      filtered = filtered.filter(({ item }) => item.mins != null);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(({ item }) => {
+        const matchesText = item.text.toLowerCase().includes(q);
+        const matchesDate = item.date ? item.date.toLowerCase().includes(q) : false;
+        const matchesTime = item.time ? item.time.toLowerCase().includes(q) : false;
+        return matchesText || matchesDate || matchesTime;
       });
+    }
+
+    // Sort items
+    filtered.sort((a, b) => {
+      const stampA = `${a.item.date ?? ""} ${a.item.time ?? ""}`;
+      const stampB = `${b.item.date ?? ""} ${b.item.time ?? ""}`;
+      return sortOrder === "desc" ? stampB.localeCompare(stampA) : stampA.localeCompare(stampB);
     });
+
+    footerCount.setText(`Showing ${filtered.length} of ${items.length} items`);
+
+    if (filtered.length === 0) {
+      list.createDiv({
+        cls: "journal-capture-empty",
+        text: "No log items match the current filter.",
+      });
+      return;
+    }
+
+    filtered.forEach(({ item, originalIndex }) => {
+      const typeTag = opts.getItemTypeTag ? opts.getItemTypeTag(item) : undefined;
+      renderLogItemCard(
+        list,
+        item,
+        originalIndex === editing,
+        opts.dated,
+        searchQuery,
+        typeTag,
+        {
+          onWhen: (value) => {
+            // WRITTEN ON EVERY FIELD CHANGE, not on a Save button. Every other
+            // control on this card commits as it is used — the checkbox, the
+            // delete — and a stamp editor that needed confirming would be the one
+            // thing here a reader could lose work in by clicking away.
+            const prev = { ...item };
+            item.date = opts.dated ? value.date : null;
+            item.time = value.time;
+            item.mins = value.mins;
+            if (opts.onItemUpdate) {
+              void opts.onItemUpdate(item, prev);
+            }
+            persist();
+          },
+          onWhenCancel: () => render(),
+          onToggle: () => {
+            // A date rather than a flag, so a crossed-off item says when.
+            const prev = { ...item };
+            item.done = item.done ? null : today();
+            if (opts.onItemUpdate) {
+              void opts.onItemUpdate(item, prev);
+            }
+            persist();
+            render();
+          },
+          onEdit: () => {
+            editing = originalIndex;
+            render();
+          },
+          onCommit: (text) => {
+            editing = null;
+            if (text.trim() !== item.text.trim()) {
+              const prev = { ...item };
+              item.text = text;
+              if (opts.onItemUpdate) {
+                void opts.onItemUpdate(item, prev);
+              }
+              persist();
+            }
+            render();
+          },
+          onDelete: () => {
+            // NO CONFIRMATION, which is the task widget's call and not obviously
+            // right for a typed thought. It is the same call because an undo the
+            // reader has is better than a dialog they learn to click through:
+            // Obsidian's own file history holds the note, and an item deleted by
+            // accident is one Ctrl+Z away in source view.
+            const [removed] = items.splice(originalIndex, 1);
+            editing = null;
+            if (opts.onItemDelete && removed) {
+              void opts.onItemDelete(removed);
+            }
+            persist();
+            render();
+          },
+        }
+      );
+    });
+  };
+
+  const refresh = async (): Promise<void> => {
+    if (opts.itemsProvider) {
+      items = await opts.itemsProvider();
+      render();
+    }
   };
 
   const load = (text: string): void => {
@@ -274,6 +674,19 @@ export function buildLogList(
     const add = opts.add;
     const row = wrap.createDiv({ cls: "journal-capture-add" });
     const line = row.createDiv({ cls: "journal-capture-add-line" });
+
+    let chosenType = opts.types && opts.types.length > 0 ? opts.types[0].id : undefined;
+    if (opts.types && opts.types.length > 1) {
+      const typeSelect = line.createEl("select", { cls: "jcl-add-type-select" });
+      for (const t of opts.types) {
+        const opt = typeSelect.createEl("option", { value: t.id, text: `${t.icon ? t.icon + " " : ""}${t.label}` });
+        if (t.id === chosenType) opt.selected = true;
+      }
+      typeSelect.addEventListener("change", () => {
+        chosenType = typeSelect.value;
+      });
+    }
+
     const input = line.createEl("textarea", {
       cls: "journal-capture-add-input",
       attr: { placeholder: add.placeholder, rows: "1" },
@@ -327,17 +740,32 @@ export function buildLogList(
       if (!text.trim()) return;
       input.value = "";
       const stamp = chosen ?? add.stamp();
-      // APPENDED TO THE LIST IN HAND AND WRITTEN THROUGH `persist`, so the one
-      // write path — and the one merge — is the one every other control here
-      // uses. A direct `appendToNoteRegion` would be a second writer racing the
-      // first, which is the shape of the bug 4.27 closed.
-      items.push({
+      const newItem: LogItem = {
         date: stamp.date,
         time: stamp.time,
         text,
         done: null,
         mins: stamp.mins ?? null,
-      });
+      };
+
+      if (opts.onAddMulti && chosenType) {
+        void opts.onAddMulti(chosenType, newItem).then(async () => {
+          resetWhen();
+          if (opts.itemsProvider) {
+            await refresh();
+          } else {
+            items.push(newItem);
+            render();
+          }
+        });
+        return;
+      }
+
+      // APPENDED TO THE LIST IN HAND AND WRITTEN THROUGH `persist`, so the one
+      // write path — and the one merge — is the one every other control here
+      // uses. A direct `appendToNoteRegion` would be a second writer racing the
+      // first, which is the shape of the bug 4.27 closed.
+      items.push(newItem);
       resetWhen();
       if (file) {
         persist();
@@ -368,7 +796,9 @@ export function buildLogList(
     input.addEventListener("blur", commit);
   }
 
-  if (file) {
+  if (opts.itemsProvider) {
+    void refresh();
+  } else if (file) {
     watch(file);
     const watchPath = file.path;
     opts.addChild(
@@ -394,88 +824,13 @@ export function buildLogList(
 }
 
 // One item.
-// When an item happened, as three fields.
-//
-// ONE CONTROL, TWO PLACES. The add row uses it to say when a new item happened
-// and the card uses it to correct one that was logged late, and they are the
-// same question — a second spelling would be two answers to "what may a stamp
-// hold", in the two places most likely to disagree.
-//
-// NATIVE INPUTS, on `event-ui.ts`' own choice for the hour it added in 4.52:
-// `type="date"` and `type="time"` bring the platform's picker, its keyboard
-// handling and its locale, and a hand-rolled one would bring none of them.
-//
-// EVERY FIELD MAY BE EMPTIED. A stamp with no time is what a reader typing into
-// a work log by hand writes, and the grammar has read one since 4.52 — the
-// control must be able to produce what the parser accepts, or the two would
-// disagree about what an item is.
-export interface WhenValue {
-  date: string | null;
-  time: string | null;
-  mins: number | null;
-}
-
-function whenEditor(
-  parent: HTMLElement,
-  initial: WhenValue,
-  dated: boolean,
-  onChange: (value: WhenValue) => void
-): HTMLElement {
-  const row = parent.createDiv({ cls: "journal-capture-when" });
-  const value: WhenValue = { ...initial };
-  const emit = (): void => onChange({ ...value });
-
-  if (dated) {
-    const date = row.createEl("input", {
-      cls: "journal-capture-when-date",
-      attr: { type: "date", "aria-label": "The day this happened" },
-    });
-    date.value = value.date ?? "";
-    date.addEventListener("change", () => {
-      value.date = date.value || null;
-      emit();
-    });
-  }
-
-  const time = row.createEl("input", {
-    cls: "journal-capture-when-time",
-    attr: { type: "time", "aria-label": "The time this happened" },
-  });
-  time.value = value.time ?? "";
-  time.addEventListener("change", () => {
-    value.time = time.value || null;
-    emit();
-  });
-
-  const mins = row.createEl("input", {
-    cls: "journal-capture-when-mins",
-    attr: {
-      type: "number",
-      min: "0",
-      step: "5",
-      placeholder: "mins",
-      "aria-label": "How long it took, in minutes",
-    },
-  });
-  mins.value = value.mins == null ? "" : String(value.mins);
-  mins.addEventListener("change", () => {
-    // THE GRAMMAR'S OWN READER DECIDES, not this box. `readMinutes` is what
-    // `[mins:: …]` is parsed with, so a `0` typed here and a `0` typed into the
-    // raw line mean the same thing — no duration — rather than the box
-    // inventing a second rule about what a number means.
-    value.mins = readMinutes(mins.value);
-    if (value.mins == null) mins.value = "";
-    emit();
-  });
-
-  return row;
-}
-
 function renderLogItemCard(
   list: HTMLElement,
   item: LogItem,
   isEditing: boolean,
   dated: boolean,
+  searchQuery: string,
+  typeTag: { label: string; icon?: string; color?: string } | undefined,
   cb: {
     onToggle: () => void;
     onEdit: () => void;
@@ -488,8 +843,18 @@ function renderLogItemCard(
   const card = list.createDiv({
     cls: `journal-capture-card${item.done ? " is-done" : ""}`,
   });
+  if (typeTag?.color) {
+    card.style.borderLeftColor = typeTag.color;
+  }
 
   const head = card.createDiv({ cls: "journal-capture-head" });
+
+  if (typeTag) {
+    const tagEl = head.createSpan({ cls: "journal-capture-type-tag" });
+    if (typeTag.icon) tagEl.createSpan({ cls: "jcl-tag-icon", text: `${typeTag.icon} ` });
+    tagEl.createSpan({ cls: "jcl-tag-label", text: typeTag.label });
+  }
+
   // An item with no stamp is one somebody typed into the region by hand. It is
   // still theirs and still gets a card; it just has nothing to say about when.
   // Drawing an empty slot keeps the bodies aligned down the column.
@@ -518,7 +883,9 @@ function renderLogItemCard(
     });
   }
   clock.addEventListener("click", () => {
-    if (head.querySelector(".journal-capture-when")) {
+    const existing = card.querySelector(".journal-capture-when");
+    if (existing) {
+      existing.remove();
       cb.onWhenCancel();
       return;
     }
@@ -551,7 +918,8 @@ function renderLogItemCard(
     // Text, not markdown. The region is plain text by contract — see the
     // `note:` field this replaces — and rendering it would make an item
     // beginning with `#` into a heading inside a card.
-    card.createDiv({ cls: "journal-capture-text", text: item.text });
+    const textEl = card.createDiv({ cls: "journal-capture-text" });
+    formatLogText(textEl, item.text, searchQuery);
     return;
   }
 

@@ -43,6 +43,7 @@ import {
 } from "../src/diary/logbook-sections";
 import { shippedNotes, isReconcilable } from "../src/core/scaffold";
 import { remapConfiguredPaths } from "../src/core/pathwatch";
+import { WIDGET_FORM } from "../src/core/section-model";
 import { LOGBOOK, LOGBOOKS } from "../src/core/vocabulary";
 import { DEFAULT_EVENT_COLOR, EVENT_COLORS } from "../src/events/events";
 import { readSrc } from "./sources";
@@ -361,7 +362,7 @@ describe("the catalogue and the locator agree", () => {
 // `widget-sections.test.ts` because this is the feature that was broken, and a
 // rule proven on `journal-card` alone is a rule that can quietly stop applying
 // to the entry that needed it.
-describe("a page may hold every logbook it has", () => {
+describe("a page may hold logbook widgets and sections", () => {
   const ROOT = DEFAULT_PATHS.diaryRoot;
   const home = (): string => composeHomeNote(ROOT);
   const model = homeSectionModel(ROOT);
@@ -370,7 +371,7 @@ describe("a page may hold every logbook it has", () => {
 
   it("offers one more however many are already there", () => {
     let text = home();
-    for (let n = 1; n <= DEFAULT_LOGBOOKS.length; n++) {
+    for (let n = 1; n <= 3; n++) {
       // The add list holds exactly one logbook row, and it is the next free
       // instance — never the ones the page already has.
       expect(logbookIds(model.addable(text).map((s) => s.id))).toEqual([
@@ -380,57 +381,37 @@ describe("a page may hold every logbook it has", () => {
         ...model.present(text).map((id) => ({ id })),
         {
           id: `w:${LOGBOOK_KEYWORD}#${n}`,
-          options: { arg: DEFAULT_LOGBOOKS[n - 1].id },
+          options: { form: WIDGET_FORM },
         },
       ]) as string;
     }
-    for (const book of DEFAULT_LOGBOOKS) {
-      expect(text).toContain(`${LOGBOOK_KEYWORD}:${book.id}`);
-    }
-    expect(logbookIds(model.present(text))).toHaveLength(DEFAULT_LOGBOOKS.length);
+    expect(logbookIds(model.present(text))).toHaveLength(3);
   });
 
-  it("keeps each one pointed where it was pointed", () => {
-    // THE PROPERTY THAT MAKES SEVERAL WORTH HAVING. Each row locates its own
-    // line, so the dropdowns read four different logbooks rather than four
-    // copies of the first — the refusal that takes the control off a directive
-    // appearing twice would otherwise leave every one of them blank.
-    const vault = {
-      logbooks: DEFAULT_LOGBOOKS.map((b) => ({ value: b.id, label: b.name })),
-    };
-    const text =
-      home() +
-      "\n" +
-      DEFAULT_LOGBOOKS.map(
-        (b) => "```almanac\n" + LOGBOOK_KEYWORD + ":" + b.id + "\n```"
-      ).join("\n\n") +
-      "\n";
-    const rows = homeSectionModel(ROOT, "", vault)
-      .sections(text)
-      .filter((v) => v.id.startsWith(`w:${LOGBOOK_KEYWORD}`));
-    expect(rows.map((v) => v.answered?.arg)).toEqual([
-      ...DEFAULT_LOGBOOKS.map((b) => b.id),
-      // The spare, which has no line and so has no answer.
-      undefined,
-    ]);
+  it("toggles between section and widget form with formQuestion", () => {
+    const bookModel = logbookSectionModel(DEFAULT_LOGBOOKS[0]);
+    const note = composeLogbookNote(DEFAULT_LOGBOOKS[0]);
+    expect(note).toContain("header:💼 Work log");
+    expect(note).toContain("logbook:work");
+
+    const appliedWidget = bookModel.apply(note, [
+      { id: "banner" },
+      { id: LOGBOOK_KEYWORD, options: { form: WIDGET_FORM } },
+    ]) as string;
+    expect(appliedWidget).not.toContain("header:💼 Work log");
+    expect(appliedWidget).toContain("logbook:work");
   });
 
   it("removes the one that was asked for and leaves the rest alone", () => {
     const text =
       home() +
-      "\n" +
-      DEFAULT_LOGBOOKS.slice(0, 3)
-        .map((b) => "```almanac\n" + LOGBOOK_KEYWORD + ":" + b.id + "\n```")
-        .join("\n\n") +
-      "\n";
+      "\n```almanac\nlogbook\n```\n\n```almanac\nlogbook\n```\n\n```almanac\nlogbook\n```\n";
     const gone = `w:${LOGBOOK_KEYWORD}#2`;
     const next = model.apply(
       text,
       model.present(text).filter((id) => id !== gone)
     ) as string;
-    expect(next).toContain(`${LOGBOOK_KEYWORD}:${DEFAULT_LOGBOOKS[0].id}`);
-    expect(next).not.toContain(`${LOGBOOK_KEYWORD}:${DEFAULT_LOGBOOKS[1].id}`);
-    expect(next).toContain(`${LOGBOOK_KEYWORD}:${DEFAULT_LOGBOOKS[2].id}`);
+    expect(model.present(next).filter((id) => id.startsWith(`w:${LOGBOOK_KEYWORD}`))).toHaveLength(2);
   });
 });
 

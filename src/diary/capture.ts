@@ -30,37 +30,43 @@
 import { App, Notice, TFile } from "obsidian";
 import { EditorModal } from "../ui/editor-modal";
 import type AlmanacPlugin from "../main";
-import { CAPTURE_NOTE_KEY } from "../core/constants";
+import { CAPTURE_NOTE_KEY, LOGBOOK_NOTE_KEY, type LogbookDef } from "../core/constants";
 import {
   appendToNoteRegion,
   ensureNoteRegions,
   hasNoteRegion,
 } from "../core/notestore";
 import { formatScaleNoteTag, type ScaleNote } from "../journals/scale-notes";
-import { frontmatterOf, moment } from "../core/util";
+import { frontmatterOf, getFile, moment, today } from "../core/util";
 import { CLASS_DEFS, TRACKER_CLASSES } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
 import { sectionsForEntry } from "./entry-sections";
 import { currentEntryKey, entryDateKey, labelForGrain } from "./nav";
 import { isManagedTemplate } from "../trackers/entry-trackers";
-import { formatLogItem } from "./log-items";
+import { serializeLogItem } from "./log-items";
+import { whenEditor, type WhenValue } from "../ui/when-editor";
 
 // Append a pre-formatted capture block to a specific entry's capture region,
 // inside `vault.process` so it can't interleave with another body write. The
 // shared core of every capture path — today's quick capture and a scale note
 // on whichever entry the picker sits on both land here, differing only in which
 // file and which block.
+// THE REGION IS AN ARGUMENT AS OF 4.62, and it is the whole of what makes a
+// logbook a destination. A capture and a logbook item are the same line of the
+// same grammar — `serializeLogItem` writes both — differing only in which
+// region they are appended to and whether the stamp carries a day.
 async function appendCapture(
   plugin: AlmanacPlugin,
   file: TFile,
-  block: string
+  block: string,
+  regionKey: string = CAPTURE_NOTE_KEY
 ): Promise<void> {
   await plugin.app.vault.process(file, (fileText) => {
     // Ensure the region exists before appending, so a capture into an entry
     // made from an older template (one without the capture field) still lands
     // somewhere real rather than silently doing nothing.
-    const seeded = ensureNoteRegions(fileText, [CAPTURE_NOTE_KEY]) ?? fileText;
-    return appendToNoteRegion(seeded, CAPTURE_NOTE_KEY, block);
+    const seeded = ensureNoteRegions(fileText, [regionKey]) ?? fileText;
+    return appendToNoteRegion(seeded, regionKey, block);
   });
 }
 
@@ -82,7 +88,8 @@ async function appendCapture(
 export async function captureTo(
   plugin: AlmanacPlugin,
   text: string,
-  target: CaptureTarget
+  target: CaptureTarget,
+  when?: WhenValue
 ): Promise<TFile | null> {
   const body = text.replace(/\s+$/, "");
   if (!body) return null;
@@ -94,14 +101,26 @@ export async function captureTo(
   const file = await target.resolve();
   if (!file) return null;
 
-  // NO DATE ON THE STAMP, and `formatLogItem`'s third argument is where one
-  // would go: a capture lands in a dated entry, so the day is the note's and
-  // repeating it on every line would be the entry's own name, forty times over.
-  // A logbook item carries one because its note spans months (4.52).
-  const block = formatLogItem(body, moment().format("HH:mm"));
+  // THE DATE IS THE DESTINATION'S DECISION, NOT THE CLOCK'S. A capture lands in
+  // a dated entry, so the day is the note's and repeating it on every line
+  // would be the entry's own name, forty times over. A logbook note spans
+  // months, so an item in one that did not say which day it belonged to could
+  // not be placed at all — which is why `LogItem.date` exists (4.52).
+  //
+  // THROUGH `serializeLogItem` RATHER THAN `formatLogItem`, as of 4.62. The two
+  // wrote the same bytes while a capture had only a time; a capture that can
+  // say how long it took has a `[mins:: …]` to write, and there is exactly one
+  // function in this plugin that decides where that goes.
+  const block = serializeLogItem({
+    date: target.dated ? (when?.date ?? today()) : null,
+    time: when?.time ?? moment().format("HH:mm"),
+    text: body,
+    done: null,
+    mins: when?.mins ?? null,
+  });
   if (!block) return null;
 
-  await appendCapture(plugin, file, block);
+  await appendCapture(plugin, file, block, target.regionKey);
   return file;
 }
 
@@ -125,7 +144,13 @@ export async function captureScaleNote(
   // A bare tag with no prose is still worth recording — it timestamps that you
   // rated the value and thought about it — but an all-whitespace text should
   // not produce a trailing space. formatScaleNoteTag already trims.
-  const block = formatLogItem(tag, moment().format("HH:mm"));
+  const block = serializeLogItem({
+    date: null,
+    time: moment().format("HH:mm"),
+    text: tag,
+    done: null,
+    mins: null,
+  });
   if (!block) return false;
   await appendCapture(plugin, file, block);
   return true;
@@ -148,13 +173,55 @@ export async function captureScaleNote(
 // time.
 export interface CaptureTarget {
   // Stable across a rebuild of the list, so the dropdown can round-trip a
-  // choice: `grain:weekly`, or `note` for the entry the reader is on.
+  // choice: `grain:weekly`, `note` for the entry the reader is on, or
+  // `logbook:<id>`.
   id: string;
   label: string;
+  // Which region the block is appended to. An entry keeps its captures in
+  // `capture`; a logbook's items are its own region's contents (4.62).
+  regionKey: string;
+  // Whether the stamp carries a day. FALSE FOR AN ENTRY, whose note IS the day;
+  // true for a logbook, whose note spans months. This is the one difference
+  // between the two destinations that a reader can see.
+  dated: boolean;
+  // The swatch this destination's items wear on the time grid, where it has
+  // one. Only a logbook does; an entry's captures take the capture colour.
+  color?: string;
   // Resolved late, on save. A grain's entry may not exist yet and must not be
   // created just because its name was drawn in a list — a reader who opens the
   // box, reads the options and presses Escape has not asked for five notes.
   resolve: () => Promise<TFile | null>;
+}
+
+// Everything about a destination except how to reach the file, which is the
+// only part that needs a vault. Split so the list a reader is offered can be
+// decided in a test.
+export type CaptureTargetSpec = Omit<CaptureTarget, "resolve">;
+
+// ── logbooks as destinations (4.62) ──────────────────────────────────
+//
+// THE THOUGHT AND THE LOG ENTRY ARE THE SAME KEYSTROKE. A reader with a work
+// log had two ways to write a line into it: open the note and use the widget's
+// add row, or capture into today's entry and move it later by hand. The box
+// already asked WHERE; it simply could not name the notes that most wanted the
+// answer.
+//
+// REGION-BACKED BOOKS ONLY. An `events`-backed book (Meetings) is a VIEW of the
+// events note — its items are `EventDef`s with a title, a date and an hour, and
+// there is no line to append. Offering it would take a thought and drop it into
+// a file that draws none of it.
+export function logbookTargets(books: LogbookDef[]): CaptureTargetSpec[] {
+  return books
+    .filter((book) => book.source === "region" && !!book.path)
+    .map((book) => ({
+      id: `logbook:${book.id}`,
+      label: `Logbook · ${book.name}`,
+      regionKey: LOGBOOK_NOTE_KEY,
+      // A LOGBOOK ITEM IS ALWAYS DATED. Its note is not a day, so an item with
+      // no date has nowhere to sit in the list and nothing to draw on the grid.
+      dated: true,
+      color: book.color,
+    }));
 }
 
 // Which grains can *show* a capture: the ones whose template writes the field.
@@ -199,6 +266,8 @@ export async function captureDestinations(
     return {
       id: `grain:${grain}`,
       label: `${grain === "daily" ? "Today" : `This ${CLASS_DEFS[grain].periodNoun}`} · ${labelForGrain(grain, key)}`,
+      regionKey: CAPTURE_NOTE_KEY,
+      dated: false,
       resolve: () => resolveGrainEntry(plugin, grain, key),
     };
   });
@@ -223,10 +292,30 @@ export async function captureDestinations(
       out.push({
         id: "note",
         label: `This note · ${key ? labelForGrain(entry.grain, key) : host.basename}`,
+        regionKey: CAPTURE_NOTE_KEY,
+        dated: false,
         resolve: async () => host,
       });
     }
   }
+
+  // LAST, AND DELIBERATELY. The entries are where a thought goes by default and
+  // the first row is what the box opens on; a logbook is a place you choose on
+  // purpose, and moving "Today" out of that slot to make room would change what
+  // the hotkey does for every reader who has never opened this list.
+  for (const spec of logbookTargets(plugin.settings.logbooks)) {
+    const path = plugin.settings.logbooks.find(
+      (b: LogbookDef) => `logbook:${b.id}` === spec.id
+    )?.path;
+    out.push({
+      ...spec,
+      // Resolved late like every other row: a logbook's note may have been
+      // renamed or deleted since the settings row was written, and finding that
+      // out must not cost a read every time the box opens.
+      resolve: async () => (path ? getFile(plugin.app, path) : null),
+    });
+  }
+
   return out;
 }
 
@@ -293,9 +382,14 @@ export interface CaptureModalOptions {
   onDestination?: (target: CaptureTarget) => void;
   placeholder?: string;
   initialValue?: string;
-  // Save the text. Returns true on success (modal closes), false to keep it
-  // open with the text intact. Defaults to the quick-capture write to today.
-  onSave?: (text: string) => Promise<boolean>;
+  // Whether the box may say WHEN this happened (4.62). Quick capture may; the
+  // scale-note path may not — its capture timestamps the moment the reading was
+  // thought about, which is now by definition.
+  askWhen?: boolean;
+  // Save the text, and the stamp the box was showing when it was saved.
+  // Returns true on success (modal closes), false to keep it open with the text
+  // intact. Defaults to the quick-capture write to today.
+  onSave?: (text: string, when: WhenValue) => Promise<boolean>;
   // Persist an unsaved draft across restarts. Quick capture does; a scale note
   // does not (it's bound to a reading, not a scratch buffer).
   persistDraft?: boolean;
@@ -320,6 +414,17 @@ export interface CaptureModalOptions {
 export class CaptureModal extends EditorModal {
   private value = "";
   private area: HTMLTextAreaElement | null = null;
+  // The stamp this capture will carry. Seeded with now, which is what every
+  // capture before 4.62 got and still what most of them want.
+  private when: WhenValue = {
+    date: today(),
+    time: moment().format("HH:mm"),
+    mins: null,
+  };
+  // Redrawn when the destination changes, because whether the stamp shows a
+  // day is a fact about where it is going.
+  private whenHost: HTMLElement | null = null;
+  private chosen: CaptureTarget | null = null;
   // Set when the capture is written, so onClose knows not to keep the draft.
   private saved = false;
   private readonly opts: Required<CaptureModalOptions>;
@@ -340,12 +445,18 @@ export class CaptureModal extends EditorModal {
       initialValue: options.initialValue ?? "",
       destinations: options.destinations ?? [],
       onDestination: options.onDestination ?? ((): void => undefined),
+      askWhen: options.askWhen ?? false,
       onSave: options.onSave ?? (async (): Promise<boolean> => false),
       persistDraft: options.persistDraft ?? true,
       successNotice: options.successNotice ?? ((): string => "Captured"),
     };
     super(app, plugin, filled.title, filled.hint, "Capture");
     this.opts = filled;
+  }
+
+  override onOpen(): void {
+    super.onOpen();
+    this.contentEl.addClass("almanac-capture-modal");
   }
 
   protected renderBody(): void {
@@ -368,8 +479,20 @@ export class CaptureModal extends EditorModal {
       select.value = this.opts.destinations[0].id;
       select.addEventListener("change", () => {
         const picked = this.opts.destinations.find((t) => t.id === select.value);
-        if (picked) this.opts.onDestination(picked);
+        if (!picked) return;
+        this.chosen = picked;
+        this.opts.onDestination(picked);
+        // A logbook's stamp carries a day and an entry's does not, so the
+        // control has to change when the destination does — otherwise a reader
+        // who picked a day and then a destination would silently lose it.
+        this.drawWhen();
       });
+    }
+    this.chosen = this.opts.destinations[0] ?? null;
+
+    if (this.opts.askWhen) {
+      this.whenHost = contentEl.createDiv({ cls: "almanac-capture-when" });
+      this.drawWhen();
     }
 
     // A persisted draft only applies to the quick-capture instance; a scale
@@ -405,6 +528,49 @@ export class CaptureModal extends EditorModal {
     }, 0);
   }
 
+  // The stamp, as a line you can press.
+  //
+  // A BUTTON THAT SAYS THE ANSWER, NOT THREE FIELDS THAT ASK THE QUESTION. The
+  // overwhelming majority of captures happen at the minute they are typed, and
+  // a box that opened with an empty time field would make every one of them a
+  // form to fill in. The default is right and visible; pressing it opens the
+  // same three fields the log card has had since 4.55.
+  private drawWhen(): void {
+    const host = this.whenHost;
+    if (!host) return;
+    host.empty();
+    const dated = this.chosen?.dated ?? false;
+    if (!dated) this.when.date = null;
+    else if (!this.when.date) this.when.date = today();
+
+    const row = host.createDiv({ cls: "almanac-capture-when-row" });
+    row.createSpan({ cls: "almanac-capture-dest-label", text: "When" });
+    const stamp = [this.when.date, this.when.time].filter((p) => !!p).join(" ");
+    const btn = row.createEl("button", {
+      cls: "journal-capture-time",
+      text: stamp || "no time",
+      attr: { type: "button", "aria-label": "Change when this happened" },
+    });
+    if (this.when.mins) {
+      row.createSpan({
+        cls: "journal-capture-mins",
+        text: `${this.when.mins} min`,
+      });
+    }
+    btn.addEventListener("click", () => {
+      if (host.querySelector(".journal-capture-when")) {
+        // Pressing it again closes the fields and keeps what they said — the
+        // stamp on the button is the record of that, so nothing is lost by
+        // folding them away.
+        this.drawWhen();
+        return;
+      }
+      whenEditor(host, this.when, dated, (value) => {
+        this.when = value;
+      });
+    });
+  }
+
   private text(): string {
     return (this.area?.value ?? this.value).replace(/\s+$/, "");
   }
@@ -420,7 +586,7 @@ export class CaptureModal extends EditorModal {
   // window open and shows `commitFailureMessage()` when it does — and a failed
   // write must never be the reason someone loses what they just typed.
   protected async commit(): Promise<void> {
-    const ok = await this.opts.onSave(this.text());
+    const ok = await this.opts.onSave(this.text(), { ...this.when });
     if (!ok) throw new Error("capture: onSave reported no write");
     this.saved = true;
     // Clear the draft only once the write has actually succeeded.
@@ -469,13 +635,14 @@ export function openCapture(plugin: AlmanacPlugin, host?: TFile | null): void {
     new CaptureModal(plugin.app, plugin, {
       destinations,
       hint: chosen
-        ? `Appends to ${chosen.label} with the current time.`
+        ? `Appends to ${chosen.label} with the time on the stamp.`
         : "No entry here can show a capture — add a Captured section first.",
+      askWhen: true,
       onDestination: (target) => {
         chosen = target;
       },
-      onSave: async (text) =>
-        chosen != null && (await captureTo(plugin, text, chosen)) != null,
+      onSave: async (text, when) =>
+        chosen != null && (await captureTo(plugin, text, chosen, when)) != null,
       successNotice: () => `Captured to ${chosen?.label ?? "your entry"}`,
     }).open();
   });

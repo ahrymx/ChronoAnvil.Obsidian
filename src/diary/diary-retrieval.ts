@@ -25,12 +25,15 @@ import { MarkdownPostProcessorContext, setIcon, TFile } from "obsidian";
 import type AlmanacPlugin from "../main";
 import {
   anniversaries,
+  buildSnippet,
+  byDateDesc,
   groupByMonth,
   IndexedEntry,
   isEmptyQuery,
   parseQuery,
+  passesFilters,
   readIndex,
-  searchEntries,
+  scoreEntry,
   searchHintLine,
   SearchHit,
 } from "./diary-index";
@@ -63,6 +66,42 @@ function wireOpen(
   });
 }
 
+// Highlight matching search query substring within text
+function highlightFragment(parent: HTMLElement, text: string, query?: string): void {
+  if (!query || !query.trim()) {
+    parent.setText(text);
+    return;
+  }
+  const cleanQ = query.trim().replace(/^#/, "");
+  if (!cleanQ) {
+    parent.setText(text);
+    return;
+  }
+  const lower = text.toLowerCase();
+  const target = cleanQ.toLowerCase();
+  let start = 0;
+  let idx = lower.indexOf(target, start);
+  if (idx === -1) {
+    parent.setText(text);
+    return;
+  }
+  parent.empty();
+  while (idx !== -1) {
+    if (idx > start) {
+      parent.createSpan({ text: text.slice(start, idx) });
+    }
+    parent.createEl("mark", {
+      cls: "jdr-highlight",
+      text: text.slice(idx, idx + target.length),
+    });
+    start = idx + target.length;
+    idx = lower.indexOf(target, start);
+  }
+  if (start < text.length) {
+    parent.createSpan({ text: text.slice(start) });
+  }
+}
+
 // One entry as a row: date gutter, title, snippet, and a facts strip. Used by
 // all three views so an entry reads identically wherever it's listed.
 //
@@ -72,7 +111,12 @@ function entryRow(
   plugin: AlmanacPlugin,
   entry: IndexedEntry,
   sourcePath: string,
-  opts: { snippet?: string; snippetKey?: string | null; dateFormat?: string } = {}
+  opts: {
+    snippet?: string;
+    snippetKey?: string | null;
+    dateFormat?: string;
+    highlightQuery?: string;
+  } = {}
 ): HTMLElement {
   const row = createDiv({ cls: "jdr-row" });
 
@@ -87,9 +131,9 @@ function entryRow(
   const main = row.createDiv({ cls: "jdr-main" });
   const titleEl = main.createEl("a", {
     cls: "internal-link jdr-title",
-    text: entry.title,
     href: noExt(entry.file.path),
   });
+  highlightFragment(titleEl, entry.title, opts.highlightQuery);
   wireOpen(titleEl, plugin, entry.file, sourcePath);
 
   const snippet = opts.snippet ?? "";
@@ -98,7 +142,8 @@ function entryRow(
     if (opts.snippetKey) {
       line.createSpan({ cls: "jdr-snippet-key", text: opts.snippetKey });
     }
-    line.createSpan({ text: snippet });
+    const snippetSpan = line.createSpan();
+    highlightFragment(snippetSpan, snippet, opts.highlightQuery);
   }
 
   // Facts worth seeing without opening the note. Each is omitted when it's
@@ -144,105 +189,288 @@ export function buildDiarySearch(
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   const root = createDiv({ cls: "journal-table jdr-search" });
+  const controls = root.createDiv({ cls: "jdr-timeline-controls" });
+  const summaryEl = root.createDiv({ cls: "jdr-timeline-summary" });
+  const scrollViewport = root.createDiv({ cls: "jdr-timeline-scroll" });
+  const results = scrollViewport.createDiv({ cls: "jdr-results" });
+  results.createDiv({ cls: "jdr-loading", text: "Reading your diary…" });
 
-  const bar = root.createDiv({ cls: "jdr-search-bar" });
-  const iconEl = bar.createDiv({ cls: "jdr-search-icon" });
-  setIcon(iconEl, "search");
-  const input = bar.createEl("input", {
-    cls: "jdr-search-input",
-    attr: { type: "text", placeholder: "Search your diary…", spellcheck: "false" },
-  });
-  const clear = bar.createEl("button", {
-    cls: "journal-btn-ghost jdr-search-clear",
-    attr: { type: "button", "aria-label": "Clear search" },
-  });
-  setIcon(clear.createSpan({ cls: "journal-btn-icon" }), "x");
-  clear.hide();
-
-  root.createDiv({
-    cls: "jdr-search-hint",
-    text: searchHintLine({ kind: "monthly", tag: "health", tracker: "Mood" }),
-  });
-
-  const status = root.createDiv({ cls: "jdr-search-status" });
-  const results = root.createDiv({ cls: "jdr-results" });
-
+  // State
   let entries: IndexedEntry[] | null = null;
-  let pending = "";
+  let searchQuery = "";
+  let selectedYear = "all";
+  let filterTasks = false;
+  let filterAttach = false;
+  let filterMonthly = false;
+  let sortMode: "rank" | "desc" | "asc" = "rank";
+  let isCompact = false;
 
-  const render = (): void => {
-    results.empty();
-    status.empty();
-    if (entries == null) {
-      status.setText("Reading your diary…");
-      return;
-    }
-    const q = parseQuery(pending);
-    if (isEmptyQuery(q)) {
-      status.setText(
-        `${entries.length} ${entries.length === 1 ? "entry" : "entries"} indexed — type to search.`
-      );
-      return;
-    }
-    const hits: SearchHit[] = searchEntries(entries, q);
-    if (hits.length === 0) {
-      results.appendChild(
-        emptyCallout(
-          "search-x",
-          "No matches",
-          "Nothing in your diary matches that. Try fewer words, or widen the date range."
-        )
-      );
-      return;
-    }
-    status.setText(`${hits.length} ${hits.length === 1 ? "match" : "matches"}`);
-    for (const hit of hits) {
-      results.appendChild(
-        entryRow(plugin, hit.entry, ctx.sourcePath, {
-          snippet: hit.snippet,
-          snippetKey: hit.snippetKey,
-        })
-      );
-    }
-  };
-
-  // Debounced so typing doesn't re-score the whole index on every keystroke.
-  // The read itself already happened; this only guards the scoring pass.
-  let timer: number | null = null;
-  const schedule = (): void => {
-    if (timer != null) window.clearTimeout(timer);
-    timer = window.setTimeout(() => {
-      timer = null;
-      render();
-    }, 120);
-  };
-
-  input.addEventListener("input", () => {
-    pending = input.value;
-    if (pending) clear.show();
-    else clear.hide();
-    schedule();
-  });
-  input.addEventListener("keydown", (evt) => {
-    if (evt.key === "Escape") {
-      input.value = "";
-      pending = "";
-      clear.hide();
-      render();
-    }
-  });
-  clear.addEventListener("click", (evt) => {
-    evt.preventDefault();
-    input.value = "";
-    pending = "";
-    clear.hide();
-    input.focus();
-    render();
-  });
-
-  render();
   void readIndex(plugin).then((list) => {
     entries = list;
+
+    // Distinct years in descending order
+    const years = Array.from(
+      new Set(
+        list
+          .map((e) => (e.iso ? e.iso.slice(0, 4) : null))
+          .filter((y): y is string => Boolean(y))
+      )
+    ).sort().reverse();
+
+    // ── Build Controls ──
+    controls.empty();
+
+    // 1. Search Row
+    const searchRow = controls.createDiv({ cls: "jdr-timeline-search-row" });
+    const searchWrap = searchRow.createDiv({ cls: "jdr-timeline-search-wrap" });
+    const searchIcon = searchWrap.createDiv({ cls: "jdr-timeline-search-icon" });
+    setIcon(searchIcon, "search");
+
+    const searchInput = searchWrap.createEl("input", {
+      cls: "jdr-timeline-search-input",
+      attr: {
+        type: "text",
+        placeholder: "Search by text, #tag, [mood>=5], has:task...",
+        spellcheck: "false",
+      },
+    });
+
+    const searchClear = searchWrap.createEl("button", {
+      cls: "jdr-timeline-search-clear",
+      text: "✕",
+      attr: { type: "button", "aria-label": "Clear search" },
+    });
+    searchClear.style.display = "none";
+
+    let timer: number | null = null;
+    const schedule = (): void => {
+      if (timer != null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        render();
+      }, 100);
+    };
+
+    searchInput.addEventListener("input", () => {
+      searchQuery = searchInput.value;
+      searchClear.style.display = searchQuery ? "block" : "none";
+      schedule();
+    });
+
+    searchInput.addEventListener("keydown", (evt) => {
+      if (evt.key === "Escape") {
+        searchInput.value = "";
+        searchQuery = "";
+        searchClear.style.display = "none";
+        render();
+      }
+    });
+
+    searchClear.addEventListener("click", () => {
+      searchInput.value = "";
+      searchQuery = "";
+      searchClear.style.display = "none";
+      searchInput.focus();
+      render();
+    });
+
+    // 2. Filters & View Actions Row
+    const filterRow = controls.createDiv({ cls: "jdr-timeline-filters-row" });
+    const chipsWrap = filterRow.createDiv({ cls: "jdr-timeline-chips" });
+
+    // Year Pills
+    if (years.length > 1) {
+      const yearPills = chipsWrap.createDiv({ cls: "jdr-timeline-year-pills" });
+      const yearOptions = ["all", ...years];
+      for (const y of yearOptions) {
+        const pill = yearPills.createEl("button", {
+          cls: `jdr-timeline-year-pill${selectedYear === y ? " is-active" : ""}`,
+          text: y === "all" ? "All" : y,
+          attr: { type: "button" },
+        });
+        pill.addEventListener("click", () => {
+          selectedYear = y;
+          yearPills
+            .findAll(".jdr-timeline-year-pill")
+            .forEach((p) => p.removeClass("is-active"));
+          pill.addClass("is-active");
+          render();
+        });
+      }
+    }
+
+    // Attribute Filter Buttons
+    const addFilterBtn = (
+      label: string,
+      iconName: string,
+      isChecked: () => boolean,
+      onToggle: (active: boolean) => void
+    ) => {
+      const btn = chipsWrap.createEl("button", {
+        cls: `jdr-timeline-chip${isChecked() ? " is-active" : ""}`,
+        attr: { type: "button" },
+      });
+      const iconSpan = btn.createSpan({ cls: "jdr-timeline-chip-icon" });
+      setIcon(iconSpan, iconName);
+      btn.createSpan({ text: label });
+      btn.addEventListener("click", () => {
+        const next = !isChecked();
+        onToggle(next);
+        btn.toggleClass("is-active", next);
+        render();
+      });
+      return btn;
+    };
+
+    const tasksBtn = addFilterBtn("Tasks", "square", () => filterTasks, (v) => { filterTasks = v; });
+    const attachBtn = addFilterBtn("Files", "paperclip", () => filterAttach, (v) => { filterAttach = v; });
+    const monthlyBtn = addFilterBtn("Monthly", "calendar", () => filterMonthly, (v) => { filterMonthly = v; });
+
+    // View Actions (Sort & Compact)
+    const actionsWrap = filterRow.createDiv({ cls: "jdr-timeline-actions" });
+
+    const sortBtn = actionsWrap.createEl("button", {
+      cls: "jdr-timeline-action-btn",
+      attr: { type: "button", title: "Toggle sort mode" },
+    });
+    const sortIcon = sortBtn.createSpan({ cls: "jdr-timeline-chip-icon" });
+    setIcon(sortIcon, "arrow-down-up");
+    const sortText = sortBtn.createSpan({ text: "Rank" });
+    sortBtn.addEventListener("click", () => {
+      if (sortMode === "rank") sortMode = "desc";
+      else if (sortMode === "desc") sortMode = "asc";
+      else sortMode = "rank";
+      sortText.setText(sortMode === "rank" ? "Rank" : sortMode === "desc" ? "Newest" : "Oldest");
+      render();
+    });
+
+    const compactBtn = actionsWrap.createEl("button", {
+      cls: "jdr-timeline-action-btn",
+      attr: { type: "button", title: "Toggle compact view" },
+    });
+    const compactIcon = compactBtn.createSpan({ cls: "jdr-timeline-chip-icon" });
+    setIcon(compactIcon, "list");
+    compactBtn.createSpan({ text: "Compact" });
+    compactBtn.addEventListener("click", () => {
+      isCompact = !isCompact;
+      compactBtn.toggleClass("is-active", isCompact);
+      scrollViewport.toggleClass("is-compact", isCompact);
+    });
+
+    // Hint line below controls
+    controls.createDiv({
+      cls: "jdr-search-hint",
+      text: searchHintLine({ kind: "monthly", tag: "health", tracker: "Mood" }),
+    });
+
+    // ── Render Function ──
+    const render = (): void => {
+      results.empty();
+      summaryEl.empty();
+
+      if (entries == null) {
+        results.createDiv({ cls: "jdr-loading", text: "Reading your diary…" });
+        return;
+      }
+
+      const q = parseQuery(searchQuery);
+      const isFiltering =
+        !isEmptyQuery(q) ||
+        selectedYear !== "all" ||
+        filterTasks ||
+        filterAttach ||
+        filterMonthly;
+
+      if (!isFiltering) {
+        summaryEl.createSpan({
+          text: `${entries.length} ${entries.length === 1 ? "entry" : "entries"} indexed — type to search or select a filter.`,
+        });
+        results.appendChild(
+          emptyCallout(
+            "search",
+            "Ready to search",
+            "Type search terms, tags, or tracker filters above to find entries."
+          )
+        );
+        return;
+      }
+
+      // Filter entries
+      const hits: SearchHit[] = [];
+      for (const entry of entries) {
+        if (selectedYear !== "all" && (!entry.iso || !entry.iso.startsWith(selectedYear))) {
+          continue;
+        }
+        if (filterTasks && entry.openTasks === 0) continue;
+        if (filterAttach && entry.attachments === 0) continue;
+        if (filterMonthly && entry.kind !== "monthly") continue;
+        if (!passesFilters(entry, q)) continue;
+
+        const score = scoreEntry(entry, q.terms);
+        if (score < 0) continue;
+        const { snippet, key } = buildSnippet(entry, q.terms);
+        hits.push({ entry, score, snippet, snippetKey: key });
+      }
+
+      // Sort
+      if (sortMode === "rank") {
+        hits.sort((a, b) => b.score - a.score || byDateDesc(a.entry.iso, b.entry.iso));
+      } else if (sortMode === "desc") {
+        hits.sort((a, b) => byDateDesc(a.entry.iso, b.entry.iso));
+      } else {
+        hits.sort((a, b) => byDateDesc(b.entry.iso, a.entry.iso));
+      }
+
+      // Summary
+      summaryEl.createSpan({
+        text: `Found ${hits.length} ${hits.length === 1 ? "match" : "matches"} out of ${entries.length} ${
+          entries.length === 1 ? "entry" : "entries"
+        }`,
+      });
+
+      const clearLink = summaryEl.createEl("a", {
+        cls: "jdr-timeline-clear-link",
+        text: "Clear filters",
+      });
+      clearLink.addEventListener("click", () => {
+        searchQuery = "";
+        searchInput.value = "";
+        searchClear.style.display = "none";
+        selectedYear = "all";
+        controls
+          .findAll(".jdr-timeline-year-pill")
+          .forEach((p, idx) => p.toggleClass("is-active", idx === 0));
+        filterTasks = false;
+        filterAttach = false;
+        filterMonthly = false;
+        tasksBtn.removeClass("is-active");
+        attachBtn.removeClass("is-active");
+        monthlyBtn.removeClass("is-active");
+        render();
+      });
+
+      if (hits.length === 0) {
+        results.appendChild(
+          emptyCallout(
+            "search-x",
+            "No matches",
+            "Nothing in your diary matches that. Try fewer words, or widen the filter criteria."
+          )
+        );
+        return;
+      }
+
+      for (const hit of hits) {
+        results.appendChild(
+          entryRow(plugin, hit.entry, ctx.sourcePath, {
+            snippet: hit.snippet,
+            snippetKey: hit.snippetKey,
+            highlightQuery: q.terms.length > 0 ? q.terms.join(" ") : undefined,
+          })
+        );
+      }
+    };
+
     render();
   });
 
@@ -341,75 +569,297 @@ export function buildTimeline(
   initialMonths = TIMELINE_MONTHS
 ): HTMLElement {
   const root = createDiv({ cls: "journal-table jdr-timeline" });
-  const body = root.createDiv({ cls: "jdr-timeline-body" });
+  const controls = root.createDiv({ cls: "jdr-timeline-controls" });
+  const summaryEl = root.createDiv({ cls: "jdr-timeline-summary" });
+  const scrollViewport = root.createDiv({ cls: "jdr-timeline-scroll" });
+  const body = scrollViewport.createDiv({ cls: "jdr-timeline-body" });
   body.createDiv({ cls: "jdr-loading", text: "Reading your diary…" });
 
-  // Held outside the paint so "show earlier" survives a repaint, the same way
-  // calendar.ts holds its viewed month outside its builder.
+  // State held across repaints
   let shown = Math.max(1, initialMonths);
+  let searchQuery = "";
+  let selectedYear = "all";
+  let filterTasks = false;
+  let filterAttach = false;
+  let filterMonthly = false;
+  let sortOrder: "desc" | "asc" = "desc";
+  let isCompact = false;
+  const collapsedMonths = new Set<string>();
 
   void readIndex(plugin).then((entries) => {
-    const groups = groupByMonth(entries);
+    // Distinct years in descending order
+    const years = Array.from(
+      new Set(
+        entries
+          .map((e) => (e.iso ? e.iso.slice(0, 4) : null))
+          .filter((y): y is string => Boolean(y))
+      )
+    ).sort().reverse();
 
+    // ── Build Controls ──
+    controls.empty();
+
+    // 1. Search Row
+    const searchRow = controls.createDiv({ cls: "jdr-timeline-search-row" });
+    const searchWrap = searchRow.createDiv({ cls: "jdr-timeline-search-wrap" });
+    const searchIcon = searchWrap.createDiv({ cls: "jdr-timeline-search-icon" });
+    setIcon(searchIcon, "search");
+
+    const searchInput = searchWrap.createEl("input", {
+      cls: "jdr-timeline-search-input",
+      attr: {
+        type: "text",
+        placeholder: "Filter by text, #tag, [mood>=5], has:task...",
+      },
+    });
+
+    const searchClear = searchWrap.createEl("button", {
+      cls: "jdr-timeline-search-clear",
+      text: "✕",
+      attr: { type: "button" },
+    });
+    searchClear.style.display = "none";
+
+    searchInput.addEventListener("input", () => {
+      searchQuery = searchInput.value;
+      searchClear.style.display = searchQuery ? "block" : "none";
+      paint();
+    });
+
+    searchClear.addEventListener("click", () => {
+      searchInput.value = "";
+      searchQuery = "";
+      searchClear.style.display = "none";
+      searchInput.focus();
+      paint();
+    });
+
+    // 2. Filters & View Actions Row
+    const filterRow = controls.createDiv({ cls: "jdr-timeline-filters-row" });
+    const chipsWrap = filterRow.createDiv({ cls: "jdr-timeline-chips" });
+
+    // Year Pills
+    if (years.length > 1) {
+      const yearPills = chipsWrap.createDiv({ cls: "jdr-timeline-year-pills" });
+      const yearOptions = ["all", ...years];
+      for (const y of yearOptions) {
+        const pill = yearPills.createEl("button", {
+          cls: `jdr-timeline-year-pill${selectedYear === y ? " is-active" : ""}`,
+          text: y === "all" ? "All" : y,
+          attr: { type: "button" },
+        });
+        pill.addEventListener("click", () => {
+          selectedYear = y;
+          yearPills
+            .findAll(".jdr-timeline-year-pill")
+            .forEach((p) => p.removeClass("is-active"));
+          pill.addClass("is-active");
+          paint();
+        });
+      }
+    }
+
+    // Attribute Filter Buttons
+    const addFilterBtn = (
+      label: string,
+      iconName: string,
+      isChecked: () => boolean,
+      onToggle: (active: boolean) => void
+    ) => {
+      const btn = chipsWrap.createEl("button", {
+        cls: `jdr-timeline-chip${isChecked() ? " is-active" : ""}`,
+        attr: { type: "button" },
+      });
+      const iconSpan = btn.createSpan({ cls: "jdr-timeline-chip-icon" });
+      setIcon(iconSpan, iconName);
+      btn.createSpan({ text: label });
+      btn.addEventListener("click", () => {
+        const next = !isChecked();
+        onToggle(next);
+        btn.toggleClass("is-active", next);
+        paint();
+      });
+      return btn;
+    };
+
+    const tasksBtn = addFilterBtn("Tasks", "square", () => filterTasks, (v) => { filterTasks = v; });
+    const attachBtn = addFilterBtn("Files", "paperclip", () => filterAttach, (v) => { filterAttach = v; });
+    const monthlyBtn = addFilterBtn("Monthly", "calendar", () => filterMonthly, (v) => { filterMonthly = v; });
+
+    // View Actions (Sort & Compact)
+    const actionsWrap = filterRow.createDiv({ cls: "jdr-timeline-actions" });
+
+    const sortBtn = actionsWrap.createEl("button", {
+      cls: "jdr-timeline-action-btn",
+      attr: { type: "button", title: "Toggle sort order" },
+    });
+    const sortIcon = sortBtn.createSpan({ cls: "jdr-timeline-chip-icon" });
+    setIcon(sortIcon, "arrow-down-up");
+    const sortText = sortBtn.createSpan({ text: sortOrder === "desc" ? "Newest" : "Oldest" });
+    sortBtn.addEventListener("click", () => {
+      sortOrder = sortOrder === "desc" ? "asc" : "desc";
+      sortText.setText(sortOrder === "desc" ? "Newest" : "Oldest");
+      paint();
+    });
+
+    const compactBtn = actionsWrap.createEl("button", {
+      cls: "jdr-timeline-action-btn",
+      attr: { type: "button", title: "Toggle compact view" },
+    });
+    const compactIcon = compactBtn.createSpan({ cls: "jdr-timeline-chip-icon" });
+    setIcon(compactIcon, "list");
+    compactBtn.createSpan({ text: "Compact" });
+    compactBtn.addEventListener("click", () => {
+      isCompact = !isCompact;
+      compactBtn.toggleClass("is-active", isCompact);
+      scrollViewport.toggleClass("is-compact", isCompact);
+    });
+
+    // ── Paint Function ──
     const paint = (): void => {
       body.empty();
+      summaryEl.empty();
+
+      // Parse full query from input
+      const parsed = parseQuery(searchQuery);
+      const isFiltering =
+        !isEmptyQuery(parsed) ||
+        selectedYear !== "all" ||
+        filterTasks ||
+        filterAttach ||
+        filterMonthly;
+
+      const filtered = entries.filter((e) => {
+        if (selectedYear !== "all" && (!e.iso || !e.iso.startsWith(selectedYear))) {
+          return false;
+        }
+        if (filterTasks && e.openTasks === 0) return false;
+        if (filterAttach && e.attachments === 0) return false;
+        if (filterMonthly && e.kind !== "monthly") return false;
+
+        if (!passesFilters(e, parsed)) return false;
+
+        if (parsed.terms.length > 0) {
+          const score = scoreEntry(e, parsed.terms);
+          if (score < 0) return false;
+        }
+        return true;
+      });
+
+      // Group
+      const sortedEntries = [...filtered].sort((a, b) => {
+        const isoA = a.iso ?? "";
+        const isoB = b.iso ?? "";
+        return sortOrder === "desc"
+          ? isoB.localeCompare(isoA)
+          : isoA.localeCompare(isoB);
+      });
+      const groups = groupByMonth(sortedEntries);
+      if (sortOrder === "asc") {
+        groups.reverse();
+      }
+
+      // Summary
+      summaryEl.createSpan({
+        text: `Showing ${filtered.length} of ${entries.length} ${
+          entries.length === 1 ? "entry" : "entries"
+        } across ${groups.length} ${groups.length === 1 ? "month" : "months"}`,
+      });
+
+      if (isFiltering) {
+        const clearLink = summaryEl.createEl("a", {
+          cls: "jdr-timeline-clear-link",
+          text: "Clear filters",
+        });
+        clearLink.addEventListener("click", () => {
+          searchQuery = "";
+          searchInput.value = "";
+          searchClear.style.display = "none";
+          selectedYear = "all";
+          controls
+            .findAll(".jdr-timeline-year-pill")
+            .forEach((p, idx) => p.toggleClass("is-active", idx === 0));
+          filterTasks = false;
+          filterAttach = false;
+          filterMonthly = false;
+          tasksBtn.removeClass("is-active");
+          attachBtn.removeClass("is-active");
+          monthlyBtn.removeClass("is-active");
+          paint();
+        });
+      }
 
       if (groups.length === 0) {
         body.appendChild(
           emptyCallout(
             "book-open",
-            "No entries yet",
-            "Once you've written a few days, they'll all be listed here newest first."
+            isFiltering ? "No matching entries" : "No entries yet",
+            isFiltering
+              ? "Try adjusting or clearing your search filters."
+              : "Once you've written a few days, they'll all be listed here."
           )
         );
         return;
       }
 
-      const total = entries.length;
-      body.createDiv({
-        cls: "jdr-timeline-summary",
-        text: `${total} ${total === 1 ? "entry" : "entries"} across ${groups.length} ${
-          groups.length === 1 ? "month" : "months"
-        }`,
-      });
-
-      for (const group of groups.slice(0, shown)) {
+      // Render month groups
+      const monthsToRender = isFiltering ? groups : groups.slice(0, shown);
+      for (const group of monthsToRender) {
+        const isCollapsed = collapsedMonths.has(group.month);
         const section = body.createDiv({ cls: "jdr-timeline-month" });
         const head = section.createDiv({ cls: "jdr-timeline-head" });
-        head.createSpan({
-          cls: "jdr-timeline-month-name",
-          text: moment(`${group.month}-01`).format("MMMM YYYY"),
-        });
+
+        const nameEl = head.createDiv({ cls: "jdr-timeline-month-name" });
+        const headIcon = nameEl.createSpan({ cls: "jdr-timeline-head-icon" });
+        setIcon(headIcon, isCollapsed ? "chevron-right" : "chevron-down");
+        nameEl.createSpan({ text: moment(`${group.month}-01`).format("MMMM YYYY") });
+
         head.createSpan({
           cls: "jdr-timeline-count",
           text: `${group.entries.length} ${group.entries.length === 1 ? "entry" : "entries"}`,
         });
-        for (const entry of group.entries) {
-          section.appendChild(
-            entryRow(plugin, entry, ctx.sourcePath, {
-              snippet: firstProse(entry),
-              dateFormat: "D",
-            })
-          );
+
+        head.addEventListener("click", () => {
+          if (collapsedMonths.has(group.month)) {
+            collapsedMonths.delete(group.month);
+          } else {
+            collapsedMonths.add(group.month);
+          }
+          paint();
+        });
+
+        if (!isCollapsed) {
+          for (const entry of group.entries) {
+            section.appendChild(
+              entryRow(plugin, entry, ctx.sourcePath, {
+                snippet: firstProse(entry),
+                dateFormat: "D",
+                highlightQuery: parsed.terms.length > 0 ? parsed.terms.join(" ") : undefined,
+              })
+            );
+          }
         }
       }
 
-      const remaining = groups.length - shown;
-      if (remaining > 0) {
-        const more = body.createEl("button", {
-          cls: "journal-btn jdr-timeline-more",
-          attr: { type: "button" },
-        });
-        setIcon(more.createSpan({ cls: "journal-btn-icon" }), "chevron-down");
-        more.createSpan({
-          cls: "journal-btn-label",
-          text: `Show earlier — ${remaining} more ${remaining === 1 ? "month" : "months"}`,
-        });
-        more.addEventListener("click", (evt) => {
-          evt.preventDefault();
-          shown += TIMELINE_MONTHS;
-          paint();
-        });
+      // Show earlier button (when not filtering)
+      if (!isFiltering) {
+        const remaining = groups.length - shown;
+        if (remaining > 0) {
+          const more = body.createEl("button", {
+            cls: "journal-btn jdr-timeline-more",
+            attr: { type: "button" },
+          });
+          setIcon(more.createSpan({ cls: "journal-btn-icon" }), "chevron-down");
+          more.createSpan({
+            cls: "journal-btn-label",
+            text: `Show earlier — ${remaining} more ${remaining === 1 ? "month" : "months"}`,
+          });
+          more.addEventListener("click", (evt) => {
+            evt.preventDefault();
+            shown += TIMELINE_MONTHS;
+            paint();
+          });
+        }
       }
     };
 

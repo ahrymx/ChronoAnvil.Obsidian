@@ -72,6 +72,7 @@ import {
   reconfigured,
   withAnswers,
   WIDGET_FORM,
+  formQuestion,
 } from "../core/section-model";
 import type { FlatNoteSpec, FlatSection } from "../core/note-sections";
 import {
@@ -514,22 +515,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // the two rows would draw the same directive and differ by a line the reader
     // cannot see. One directive, one row, two forms is the honest shape, and it
     // is why `FormQuestion` is a question rather than a second catalogue entry.
-    questions: (ctx) => [
-      {
-        kind: "form",
-        key: "form",
-        label: "how this is drawn",
-        // NAMES `header` SO THE ANSWER IS KNOWN TO BE WRITABLE — see
-        // `SectionEditorModal.readable`, which declines to draw a control over a
-        // question that names no line. The answer itself is read off the FENCE
-        // rather than off that line's argument, which is what `formAt` is for
-        // and why a widget form (no header line at all) still reads back.
-        directive: HEADER_KEYWORD,
-        bar: summaryBar(ctx),
-        section: "A section of its own, with a foldable bar",
-        widget: "As a widget, so it can sit in a row",
-      },
-    ],
+    questions: (ctx) => [formQuestion(summaryBar(ctx), HEADER_KEYWORD)],
     // STILL MATCHES ANY GRAIN'S SUMMARY, deliberately, and the bar changes
     // nothing about that: a reader who retitled the bar, or turned the section
     // into a widget, or changed which period this note is about, still has a
@@ -570,10 +556,14 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // recap went and offers to put it back, and it says so only when there is
     // something to have lost.
     optIn: true,
-    render: (ctx) => ({
+    render: (ctx, opts) => ({
       fence: "almanac",
-      lines: [`header:📝 Recap`, `period-recap:${noun(ctx)}`],
+      lines: [
+        ...(opts?.form === WIDGET_FORM ? [] : ["header:📝 Recap"]),
+        `period-recap:${noun(ctx)}`,
+      ],
     }),
+    questions: () => [formQuestion("header:📝 Recap")],
     locate: (text) => probe(text, /^period-recap\b/m),
   },
   {
@@ -645,7 +635,10 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // are declared once, in `widget-registry.ts`, and this composes the same
     // directive — so it asks through `widgetQuestions` rather than re-typing the
     // list. See that function for why it is exported.
-    questions: () => widgetQuestions("time-grid"),
+    questions: () => [
+      formQuestion("header:⏱️ The week by the hour"),
+      ...widgetQuestions("time-grid"),
+    ],
     id: "time-grid",
     label: "Time grid",
     // THE REGISTRY'S SENTENCE TOO, because this is the same widget offered
@@ -685,7 +678,12 @@ export const DIARY_SECTIONS: DiarySection[] = [
     optIn: true,
     render: (_ctx, opts) => ({
       fence: "almanac",
-      lines: ["header:⏱️ The week by the hour", widgetLine("time-grid", opts)],
+      lines: [
+        ...(opts?.form === WIDGET_FORM
+          ? []
+          : ["header:⏱️ The week by the hour"]),
+        widgetLine("time-grid", opts),
+      ],
     }),
     // MATCHES THE KEYWORD, NOT THE ARGUMENT — the rule every catalogue follows,
     // so a reader who narrows the grid to `time-grid:events` still has a section

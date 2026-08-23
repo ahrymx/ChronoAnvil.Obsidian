@@ -42,6 +42,7 @@ import {
   answerInText,
   formAt,
   formOf,
+  formQuestion,
   withAnswers,
 } from "../src/core/section-model";
 import type { FormQuestion, SectionModel } from "../src/core/section-model";
@@ -647,5 +648,17 @@ describe("a section that can also be drawn as a widget", () => {
     const lines = text.split("\n");
     expect(formAt(lines, lines.indexOf("tag-index"))).toBe(SECTION_FORM);
     expect(formAt(lines, lines.indexOf("week-summary"))).toBe(WIDGET_FORM);
+  });
+
+  it("constructs a standard form question for headers and frames", () => {
+    const headerQ = formQuestion("header:📝 Recap");
+    expect(headerQ.kind).toBe("form");
+    expect(headerQ.directive).toBe("header");
+    expect(headerQ.bar).toBe("header:📝 Recap");
+
+    const frameQ = formQuestion("frame: section");
+    expect(frameQ.kind).toBe("form");
+    expect(frameQ.directive).toBe("frame");
+    expect(frameQ.bar).toBe("frame: section");
   });
 });

@@ -805,22 +805,18 @@ describe("a dashboard holds page widgets", () => {
   });
 
   it("and asks its questions with the lists the caller supplied", () => {
-    // `DiaryDashboardContext.vault` is the thread `modelForSurface` already held
-    // and dropped on this branch. Without it the Logbook card would be offered
-    // with a dropdown it could not fill — which is the state 4.15 §4 called
-    // `needs-vault-answer` on the four flat surfaces.
     const withVault = {
       grain: "weekly" as const,
-      vault: { logbooks: [{ value: "meetings", label: "Meetings" }] },
+      vault: { journals: [{ value: "study", label: "Study" }] },
     };
     const q = diarySectionModel(withVault)
       .addable(base())
-      .find((v) => v.id === "w:logbook#1")!.questions!;
+      .find((v) => v.id === "w:journal-card#1")!.questions!;
     expect(q).toHaveLength(1);
     expect(q[0].kind).toBe("choice");
     expect(
       (q[0] as { values: { value: string }[] }).values.map((v) => v.value)
-    ).toEqual(["meetings"]);
+    ).toEqual(["study"]);
   });
 
   it("and reports one as removable and movable, never locked", () => {
@@ -912,17 +908,17 @@ describe("the time grid is a section on the week and a widget elsewhere", () => 
   });
 
   it("asks the registry's question rather than its own", () => {
-    // ONE DECLARATION OF THE THREE SOURCES, in `widget-registry.ts`. The section
-    // and the widget compose the same directive, so a second list here would be
-    // the copy that starts disagreeing the day the grid grows a fourth source.
+    // ONE DECLARATION OF THE SOURCES, in `widget-registry.ts`. The section and
+    // the widget compose the same directive, so a second list here would be the
+    // copy that starts disagreeing the day the grid grows a fourth source —
+    // which it did, in 4.62, when captures became drawable. This assertion is
+    // the only place that had to change, which is the arrangement working.
     const view = diarySectionModel({ grain: "weekly" })
       .sections(composeDiaryDashboard("weekly"))
       .find((s) => s.id === "time-grid");
-    expect(view?.questions?.[0]?.values?.map((v) => v.value)).toEqual([
-      "events",
-      "logbooks",
-      "tasks",
-    ]);
+    expect(
+      view?.questions?.find((q) => q.key === "arg")?.values?.map((v) => v.value)
+    ).toEqual(["events", "logbooks", "tasks", "captures"]);
   });
 
   it("keeps finding the section after the reader narrows it", () => {
@@ -939,9 +935,16 @@ describe("the time grid is a section on the week and a widget elsewhere", () => 
     expect(model.addable(out).map((s) => s.id)).not.toContain("time-grid");
     // And the answer reads back out of the file, which is what re-pointing it
     // through the editor depends on.
+    //
+    // TWO KEYS SINCE 4.62, and the second is empty here on purpose: the grid's
+    // argument is now the sources and then the day count, and a line written
+    // before that question existed has answered it with "the whole week". A
+    // reader who narrows the sources and never touches the days must still read
+    // back as somebody who answered both, or re-pointing the first would drop
+    // the second.
     expect(
       model.sections(out).find((s) => s.id === "time-grid")?.answered
-    ).toEqual({ arg: "events" });
+    ).toEqual({ arg: "events", arg2: "", form: "section" });
   });
 
   it("never arrives on a dashboard that did not ask", () => {
@@ -1143,5 +1146,35 @@ describe("the period summary is a section and wears a section's bar", () => {
     const regrouped = model.regroup!(widgetMode, [["summary", "w:events#1"]]);
     expect(regrouped).not.toBeNull();
     expect(regrouped).toContain("row\nweek-summary\nbutton:new-week\ncell\nevents");
+  });
+
+  it("allows recap and time-grid to be switched to widget form", () => {
+    const weeklyModel = diarySectionModel({ grain: "weekly" });
+    const weeklyBase = composeDiaryDashboard("weekly");
+    const withGrid = weeklyModel.apply(weeklyBase, [...weeklyModel.present(weeklyBase), "time-grid"]);
+    expect(withGrid).toContain("header:⏱️ The week by the hour\ntime-grid");
+
+    const gridAsWidget = weeklyModel.apply(
+      withGrid,
+      weeklyModel.present(withGrid).map((id) =>
+        id === "time-grid" ? { id, options: { form: "widget" } } : id
+      )
+    );
+    expect(gridAsWidget).not.toContain("header:⏱️ The week by the hour");
+    expect(gridAsWidget).toContain("time-grid");
+
+    const yearlyModel = diarySectionModel({ grain: "yearly" });
+    const yearlyBase = composeDiaryDashboard("yearly");
+    const withRecap = yearlyModel.apply(yearlyBase, [...yearlyModel.present(yearlyBase), "recap"]);
+    expect(withRecap).toContain("header:📝 Recap\nperiod-recap:year");
+
+    const recapAsWidget = yearlyModel.apply(
+      withRecap,
+      yearlyModel.present(withRecap).map((id) =>
+        id === "recap" ? { id, options: { form: "widget" } } : id
+      )
+    );
+    expect(recapAsWidget).not.toContain("header:📝 Recap");
+    expect(recapAsWidget).toContain("period-recap:year");
   });
 });

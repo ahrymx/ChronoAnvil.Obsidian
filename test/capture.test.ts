@@ -6,8 +6,13 @@
 // LICENSING.md.
 
 import { describe, it, expect } from "vitest";
-import { readCode } from "./sources";
-import { grainsShowingCapture, offersHostEntry } from "../src/diary/capture";
+import { readCode, readCss } from "./sources";
+import {
+  grainsShowingCapture,
+  logbookTargets,
+  offersHostEntry,
+} from "../src/diary/capture";
+import { DEFAULT_LOGBOOKS, LOGBOOK_NOTE_KEY, type LogbookDef } from "../src/core/constants";
 // THE FORMATTER MOVED TO THE GRAMMAR'S OWN MODULE IN 4.52 and so did its own
 // describe block; what is left here reads it because a scale note IS a capture,
 // stamped the same way.
@@ -455,3 +460,74 @@ describe("currentEntryKey", () => {
     }
   });
 });
+
+// ── logbooks as capture destinations (4.62) ──────────────────────────
+//
+// The box has asked WHERE since 4.27 and could only ever answer with entries.
+// Which notes are offered is the whole of the decision here, and it is a pure
+// one: the resolve function needs a vault, the list does not.
+
+describe("which logbooks a capture may go to", () => {
+  const book = (over: Partial<LogbookDef>): LogbookDef => ({
+    id: "work",
+    name: "Work log",
+    icon: "📓",
+    source: "region",
+    path: "Logbooks/Work log.md",
+    color: "teal",
+    ...over,
+  });
+
+  it("offers a region-backed book, dated, into the logbook region", () => {
+    const [target] = logbookTargets([book({})]);
+    expect(target.id).toBe("logbook:work");
+    expect(target.label).toBe("Logbook · Work log");
+    expect(target.regionKey).toBe(LOGBOOK_NOTE_KEY);
+    // A logbook note spans months, so an item that did not say its day could
+    // not be placed in the list or drawn on the grid.
+    expect(target.dated).toBe(true);
+    expect(target.color).toBe("teal");
+  });
+
+  it("refuses an events-backed book, which has no line to append to", () => {
+    // Meetings is a VIEW of the events note: its items are `EventDef`s with a
+    // title and a date. A thought appended to it would land in a file that
+    // draws none of it.
+    expect(logbookTargets([book({ id: "meetings", source: "events" })])).toEqual([]);
+  });
+
+  it("refuses a book with no note behind it", () => {
+    expect(logbookTargets([book({ path: "" })])).toEqual([]);
+  });
+
+  it("offers every default book that can take one, and not Meetings", () => {
+    const ids = logbookTargets(DEFAULT_LOGBOOKS).map((t) => t.id);
+    expect(ids).toContain("logbook:work");
+    expect(ids).not.toContain("logbook:meetings");
+  });
+
+  it("keeps the books in the order they are configured in", () => {
+    // The dropdown is read top to bottom and the settings table is the reader's
+    // own arrangement of it; re-sorting here would be this list disagreeing
+    // with the one they made.
+    const ids = logbookTargets([
+      book({ id: "b", name: "Second" }),
+      book({ id: "a", name: "First" }),
+    ]).map((t) => t.id);
+    expect(ids).toEqual(["logbook:b", "logbook:a"]);
+  });
+});
+
+describe("the capture dialogue visuals", () => {
+  it("tags the modal with almanac-capture-modal class", () => {
+    const code = readCode("capture");
+    expect(code).toContain('addClass("almanac-capture-modal")');
+  });
+
+  it("squares off the edges of the time field and inputs", () => {
+    const css = readCss();
+    expect(css).toContain(".almanac-capture-when-row .journal-capture-time");
+    expect(css).toContain("border-radius: var(--am-radius-xs)");
+  });
+});
+

@@ -781,3 +781,19 @@ describe("3.6 patch 6: the stat strip", () => {
     }
   });
 });
+
+describe("the overview card inside rows and groups", () => {
+  it("wraps overview summary and actions into a single overview card container", () => {
+    const w = readCode("widgets");
+    expect(w).toContain('overviewHost = container.createDiv({');
+    expect(w).toContain('"journal-card journal-overview-card"');
+    expect(w).toContain('overviewHost ?? container');
+  });
+
+  it("styles .journal-card.journal-overview-card with full overview card chrome", () => {
+    const css = readCss();
+    expect(css).toContain(".journal-card.journal-overview-card");
+    expect(css).toContain(".journal-block-cell > .journal-overview-card");
+  });
+});
+

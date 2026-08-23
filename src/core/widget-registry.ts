@@ -343,21 +343,47 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "\u23F1\uFE0F",
     blurb:
       "The week laid against the hours — meetings, logbook items and what is due, each in its own place.",
-    arg: {
-      kind: "choice",
-      label: "what to draw",
-      // ONE SOURCE PER ROW, WHERE THE DIRECTIVE TAKES A LIST. `time-grid:
-      // events,tasks` is legal and is what a reader types when they want two;
-      // offering every combination here would be seven rows for a question
-      // whose useful answers are "all of it" and "only this". The empty answer
-      // is the first pick because it is the one most readers want.
-      emptyLabel: "Everything",
-      values: [
-        { value: "events", label: "Only events" },
-        { value: "logbooks", label: "Only logbook items" },
-        { value: "tasks", label: "Only tasks that are due" },
-      ],
-    },
+    // TWO QUESTIONS DIVIDING ONE ARGUMENT (4.62), which is what `args` is for
+    // and why the grid did not need a grammar of its own to ask the second one.
+    // `time-grid:events|3` is the sources and then the day count, on
+    // `level-index:study/Maths`' compound with the separator the view already
+    // split on.
+    args: [
+      {
+        kind: "choice",
+        label: "what to draw",
+        // ONE SOURCE PER ROW, WHERE THE DIRECTIVE TAKES A LIST. `time-grid:
+        // events,tasks` is legal and is what a reader types when they want two;
+        // offering every combination here would be seven rows for a question
+        // whose useful answers are "all of it" and "only this". The empty answer
+        // is the first pick because it is the one most readers want.
+        emptyLabel: "Everything",
+        // CAPTURES ARE A ROW HERE AND NOT PART OF "EVERYTHING", which is
+        // `DEFAULT_SOURCES`' own asymmetry drawn as a list: a day of thoughts
+        // laid against the clock is a picture worth asking for by name, and a
+        // terrible thing to be given without asking.
+        values: [
+          { value: "events", label: "Only events" },
+          { value: "logbooks", label: "Only logbook items" },
+          { value: "tasks", label: "Only tasks that are due" },
+          { value: "captures", label: "Only captures" },
+        ],
+      },
+      {
+        kind: "choice",
+        label: "how many days",
+        // THE WHOLE WEEK IS THE EMPTY ANSWER, so every grid written before this
+        // question existed is a grid that answered it. The other two are for a
+        // narrow home: a column of a row group cannot draw seven days, and this
+        // is the reader saying so before the pane has to.
+        emptyLabel: "The whole week",
+        values: [
+          { value: "3", label: "Three days, around today" },
+          { value: "1", label: "One day" },
+        ],
+      },
+    ],
+    argJoin: "|",
   },
   "sleep-summary": {
     label: "Sleep summary",
@@ -657,12 +683,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     label: "Logbook",
     glyph: "🗒️",
     blurb:
-      "One standing note's items — a work log, what you are focused on, links to come back to, what is scheduled.",
-    arg: {
-      kind: "vault",
-      label: "the logbook to draw",
-      source: "logbooks",
-    },
+      "Standing notes and captured items, filterable by logbook category or status.",
     // AS MANY AS A PAGE WANTS, WHICH IS WHY THE FLAG IS GONE (4.56). This is the
     // entry that showed the old default was wrong: a homepage carrying the work
     // log beside Current focus beside what is scheduled is three `logbook:`

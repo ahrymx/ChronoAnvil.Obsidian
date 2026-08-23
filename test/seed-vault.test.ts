@@ -32,13 +32,37 @@
 // A test that knew the format would have agreed with the bug.
 
 import { describe, expect, it } from "vitest";
+// The events note stores its events in FRONTMATTER, so what the seeder writes is
+// YAML and what the plugin reads is the value OBSIDIAN parsed out of it —
+// `parseEvents` never sees the text at all. The test therefore takes the same
+// two steps in the same order, and takes the first one with `js-yaml`, which is
+// the plugin's own dependency (see `trackers.ts`) rather than a new one.
+import { load as loadYaml } from "js-yaml";
 
 import { JOURNAL_PRESETS } from "../src/journals/journal";
+import { parseChartDirectives, serializeChartSpec } from "../src/charts/charts";
 import { parseEntries } from "../src/diary/entries";
+import { parseEvents } from "../src/events/events";
+import { parseLogItems } from "../src/diary/log-items";
 import { parseRecall } from "../src/review/recall";
 import { parseTaskLine } from "../src/ui/tasks";
 import {
   activeDays,
+  buildPatches,
+  buildPlan,
+  chartLine,
+  chartableTrackers,
+  clearEvents,
+  ensureRegion,
+  eventsYaml,
+  fillChartsFence,
+  fillEvents,
+  folderNote,
+  logBlock,
+  logbookItems,
+  readRegion,
+  resolveEvents,
+  stampLine,
   fillRegion,
   fillSection,
   fillTemplate,
@@ -57,13 +81,21 @@ import {
 } from "../tools/seed-vault.mjs";
 import {
   CORPUS,
+  DIARY_CAPTURES,
+  DIARY_CHARTS,
   DIARY_CHALLENGES,
   DIARY_FOCUS,
   DIARY_HIGHLIGHTS,
   DIARY_LINES,
   DIARY_TASKS,
+  LOGBOOK_CORPUS,
+  SEED_EVENTS,
   // @ts-expect-error — see above.
 } from "../tools/seed-corpus.mjs";
+
+// The `almanac-events` value, out of a block of frontmatter YAML.
+const yamlList = (text: string): unknown =>
+  (loadYaml(text.replace(/^---\n/, "")) as Record<string, unknown>)["almanac-events"];
 
 describe("seed-vault: the generator", () => {
   it("gives the same sequence for the same seed and a different one otherwise", () => {
@@ -380,5 +412,348 @@ describe("seed-corpus", () => {
     // a reader that the prompts do not matter.
     const all = lists.flat();
     expect(new Set(all).size).toBe(all.length);
+  });
+});
+
+// ── The second pass: charts, logs and events (4.62) ──────────────────────
+//
+// SAME DISCIPLINE, THREE MORE GRAMMARS. The tool now writes stamped log items,
+// `chart:` directives and an events list, and it writes all three in files that
+// cannot import the plugin's serialisers — so each of them is a SECOND SPELLING
+// of a format the plugin owns, which is exactly the situation that produced
+// recall cards in the task format the first time round.
+//
+// So none of the tests below assert on a string this file also spells out. Each
+// one feeds the seeder's output to the plugin's own reader — `parseLogItems`,
+// `parseChartDirectives`, `parseEvents` — and asserts on what comes back. A
+// stamp with the date and the time the wrong way round, a `+y=` written before
+// the scope, a YAML list indented one space too few: all of them produce a file
+// that looks right and a widget that shows nothing, and all of them fail here.
+describe("seed-vault: the log grammar", () => {
+  it("writes items the plugin's own parser reads back whole", () => {
+    const line = stampLine({
+      date: "2026-08-21",
+      time: "14:32",
+      text: "rewrote the pathwatch remap",
+      mins: 45,
+      done: "2026-08-22",
+    });
+    const [item] = parseLogItems(line);
+    expect(item.date).toBe("2026-08-21");
+    expect(item.time).toBe("14:32");
+    expect(item.text).toBe("rewrote the pathwatch remap");
+    expect(item.mins).toBe(45);
+    expect(item.done).toBe("2026-08-22");
+  });
+
+  it("stamps a capture with the minute alone, because its note is the date", () => {
+    const [item] = parseLogItems(stampLine({ time: "09:05", text: "call the dentist" }));
+    expect(item.date).toBeNull();
+    expect(item.time).toBe("09:05");
+    // NOT ZERO. `mins: 0` and `mins: null` are different items — one took no
+    // time, the other is a moment — and only the second is what a capture is.
+    expect(item.mins).toBeNull();
+  });
+
+  it("keeps a multi-line thought one item, blank line and all", () => {
+    const line = stampLine({ time: "10:00", text: "one\n\ntwo" });
+    const items = parseLogItems(line);
+    expect(items).toHaveLength(1);
+    expect(items[0].text).toBe("one\n\ntwo");
+  });
+
+  it("separates items so two of them do not parse as one", () => {
+    // The blank line between items is the thing being pinned. Written without
+    // it, the second stamp reads as text belonging to the first.
+    const region = logBlock([
+      stampLine({ date: "2026-08-01", time: "09:00", text: "first" }),
+      stampLine({ date: "2026-08-02", time: "11:30", text: "second" }),
+    ]).join("\n");
+    const items = parseLogItems(region);
+    expect(items).toHaveLength(2);
+    expect(items.map((i) => i.text)).toEqual(["first", "second"]);
+  });
+
+  it("appends the region a logbook nobody has opened does not have yet", () => {
+    // A logbook note carries its `logbook:` directive from the scaffold and
+    // grows the region on first render, so seeding one means creating it.
+    const note = "---\ntitle: Work log\n---\n\n```almanac\nlogbook:work\n```\n";
+    const withRegion = ensureRegion(note, "logbook");
+    expect(readRegion(withRegion, "logbook")).toBe("");
+    // And it is idempotent: a second pass must not stack a second region, which
+    // would give the widget two places to write and one to read.
+    expect(ensureRegion(withRegion, "logbook")).toBe(withRegion);
+  });
+
+  it("gives each logbook the shape its blurb promises", () => {
+    const dates = activeDays({ today: "2026-08-23", months: 13, rng: mulberry32(7) });
+    const rng = mulberry32(11);
+    const work = logbookItems(LOGBOOK_CORPUS.work, dates, rng).map((l: string) => parseLogItems(l)[0]);
+    const review = logbookItems(LOGBOOK_CORPUS.review, dates, rng).map((l: string) => parseLogItems(l)[0]);
+    const focus = logbookItems(LOGBOOK_CORPUS.focus, dates, rng).map((l: string) => parseLogItems(l)[0]);
+
+    // A WORK LOG IS DENSE AND TIMED, a focus log is neither, and a review list
+    // is half crossed off. Seeding all three alike would render three identical
+    // widgets and teach a reader that the distinction is decorative.
+    expect(work.length).toBeGreaterThan(focus.length * 4);
+    expect(work.some((i) => i.mins != null)).toBe(true);
+    expect(focus.every((i) => i.mins == null)).toBe(true);
+    expect(review.some((i) => i.done != null)).toBe(true);
+    expect(review.some((i) => i.done == null)).toBe(true);
+
+    // Every item dated, timed, and in order — the logbook renders newest last.
+    for (const i of [...work, ...focus, ...review]) {
+      expect(i.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(i.time).toMatch(/^\d{2}:\d{2}$/);
+    }
+    const dated = work.map((i) => i.date);
+    expect([...dated].sort()).toEqual(dated);
+  });
+
+  it("says so when the vault has no journals to fill", () => {
+    // The corpus's four journals cannot be written into a vault that declares
+    // none — there is no shape to derive and no template to fill. Silence there
+    // reads as "seeded", which is how a run that wrote a diary and nothing else
+    // came to look like a complete one.
+    const warnings: string[] = [];
+    buildPlan({
+      settings: { paths: { templatesDiary: "T", diaryDaily: "D" }, customJournals: [], trackers: [] },
+      templates: new Map(),
+      corpus: CORPUS,
+      dates: ["2026-08-23"],
+      rng: mulberry32(1),
+      warn: (m: string) => warnings.push(m),
+    });
+    expect(warnings.some((w) => w.includes("no journals"))).toBe(true);
+    // And it names the journals it would have written, so the warning is
+    // actionable rather than an observation.
+    for (const id of Object.keys(CORPUS)) expect(warnings.join("\n")).toContain(id);
+  });
+
+  it("fills the capture region of the entries it writes", () => {
+    const daily =
+      "---\njournal-date: \"\"\n# almanac:trackers:start\nMood:\n# almanac:trackers:end\n---\n" +
+      "<!--almanac:log\n-->\n\n<!--almanac:capture\n-->\n";
+    const dates = activeDays({ today: "2026-08-23", months: 2, rng: mulberry32(3) });
+    const files = buildPlan({
+      settings: { paths: { templatesDiary: "T", diaryDaily: "D" }, customJournals: [], trackers: [] },
+      templates: new Map([["T/Daily.md", daily]]),
+      corpus: {},
+      dates,
+      rng: mulberry32(5),
+      warn: () => {},
+    });
+    const captured = files
+      .map((f: { content: string }) => readRegion(f.content, "capture"))
+      .filter((r: string) => r !== "");
+    // Some days, not every day — an entry with nothing captured is a normal
+    // entry, and the 4.62 time grid needs the ones that do have something.
+    expect(captured.length).toBeGreaterThan(0);
+    expect(captured.length).toBeLessThan(files.length);
+    for (const region of captured) {
+      const items = parseLogItems(region);
+      expect(items.length).toBeGreaterThan(0);
+      for (const i of items) {
+        // A capture never carries a date; its note is the date.
+        expect(i.date).toBeNull();
+        expect(i.time).toMatch(/^\d{2}:\d{2}$/);
+        expect(DIARY_CAPTURES).toContain(i.text);
+      }
+    }
+  });
+});
+
+describe("seed-vault: charts", () => {
+  it("writes directives byte-for-byte as the plugin would write them back", () => {
+    // NOT JUST PARSEABLE — IDENTICAL. The chart editor rewrites the whole fence
+    // the first time a reader touches one chart, so a seeded directive that
+    // parses but serialises differently turns into a diff nobody made.
+    for (const plan of Object.values(DIARY_CHARTS) as Record<string, unknown>[][]) {
+      for (const spec of plan) {
+        const line = chartLine(spec);
+        const [parsed] = parseChartDirectives([line]);
+        expect(parsed, line).toBeTruthy();
+        expect(serializeChartSpec(parsed)).toBe(line);
+      }
+    }
+  });
+
+  it("carries the plan's own words through to the parsed spec", () => {
+    const [spec] = parseChartDirectives([
+      chartLine({ key: "k", tracker: "Sleep", type: "scatter", range: "365", y: "Mood", avg: true, title: "Does sleep move mood?" }),
+    ]);
+    expect(spec.tracker).toBe("Sleep");
+    expect(spec.tracker2).toBe("Mood");
+    expect(spec.avg).toBe(true);
+    expect(spec.title).toBe("Does sleep move mood?");
+  });
+
+  it("keeps every key unique inside a note, since the key is the handle", () => {
+    for (const [surface, plan] of Object.entries(DIARY_CHARTS) as [string, { key: string }[]][]) {
+      const keys = plan.map((s) => s.key);
+      expect(new Set(keys).size, surface).toBe(keys.length);
+    }
+  });
+
+  it("fills an empty fence and refuses one that already has charts", () => {
+    const note = "`almanac:spacer`\n\n```almanac-charts\nheader:📊 Trends\n```\n";
+    const filled = fillChartsFence(note, ["chart:a:Mood:line:90"]);
+    // THE HEADER SURVIVES. In the merged layout the fence carries the section
+    // title as well as the charts, so a fill that replaced the body would take
+    // the heading off the section it belongs to.
+    expect(filled).toContain("header:📊 Trends");
+    expect(parseChartDirectives(filled.split("\n"))).toHaveLength(1);
+    // Second pass: already answered, so nothing to do. Not an error — this is
+    // what re-running the tool on a seeded vault looks like.
+    expect(fillChartsFence(filled, ["chart:b:Sleep:line:90"])).toBeNull();
+    // And a note with no fence at all is left alone rather than grown one.
+    expect(fillChartsFence("just prose\n", ["chart:a:Mood:line:90"])).toBeNull();
+  });
+
+  it("only charts a tracker the daily template actually writes", () => {
+    // Declared in settings, absent from the template's frontmatter block: the
+    // chart editor would offer it and every reading would be missing. This is
+    // the difference between a demo vault and a vault full of empty tiles.
+    const settings = {
+      trackers: [
+        { id: "Mood", surface: { kind: "diary" } },
+        { id: "Energy", surface: { kind: "diary" } },
+        { id: "confidence", surface: { kind: "journal" } },
+      ],
+    };
+    const daily = "---\n# almanac:trackers:start\nMood:\nSleep:\n# almanac:trackers:end\n---\n";
+    const usable = chartableTrackers({ settings, dailyTemplate: daily });
+    expect([...usable]).toEqual(["Mood"]);
+  });
+});
+
+describe("seed-vault: events", () => {
+  it("writes YAML the plugin's own event reader accepts", () => {
+    const events = resolveEvents(SEED_EVENTS, "2026-08-23");
+    // `eventsYaml` writes what Obsidian's frontmatter parser would hand to
+    // `parseEvents`, so the test parses the YAML and then reads it as events —
+    // the same two steps the plugin takes, in the same order.
+    const yaml = eventsYaml(events);
+    const raw = yamlList(yaml);
+    const parsed = parseEvents(raw);
+    expect(parsed).toHaveLength(events.length);
+    expect(parsed.every((e) => e.id && e.title)).toBe(true);
+    // The three kinds the corpus carries all survive the round trip.
+    expect(parsed.some((e) => e.kind === "single" && e.end)).toBe(true);
+    expect(parsed.some((e) => e.kind === "recurring" && e.month != null)).toBe(true);
+    const weekly = parsed.find((e) => e.every === "week");
+    expect(weekly?.weekday).toBe(3);
+    expect(weekly?.time).toBe("09:30");
+    expect(weekly?.duration).toBe(15);
+  });
+
+  it("resolves the corpus's offsets against the run's own today", () => {
+    const a = resolveEvents(SEED_EVENTS, "2026-08-23");
+    const b = resolveEvents(SEED_EVENTS, "2026-09-23");
+    const single = (list: { kind: string; start?: string }[]) => list.filter((e) => e.kind === "single");
+    // A dated event moves with `--today`; an annual one does not, because a
+    // birthday is a month and a day.
+    expect(single(a)[0].start).not.toBe(single(b)[0].start);
+    expect(a.filter((e) => e.month != null)).toEqual(b.filter((e) => e.month != null));
+  });
+
+  it("fills an empty events list and refuses one somebody has used", () => {
+    const note = "---\nalmanac-events: []\n---\nbody\n";
+    const events = resolveEvents(SEED_EVENTS, "2026-08-23");
+    const filled = fillEvents(note, events);
+    expect(parseEvents(yamlList(filled.split("\n---")[0]))).toHaveLength(events.length);
+    expect(fillEvents(filled, events)).toBeNull();
+    // `--force` empties it first, which is the only way to replace a list — and
+    // is a single decision rather than the caller clearing things behind the
+    // transform's back.
+    expect(fillEvents(clearEvents(filled), events)).not.toBeNull();
+  });
+});
+
+describe("seed-vault: the patch pass", () => {
+  const settings = {
+    paths: {
+      home: "Homepage.md",
+      diaryRoot: "02 - Diary",
+      diaryWeekly: "02 - Diary/Weekly",
+      diaryMonthly: "02 - Diary/Monthly",
+      diaryQuarterly: "02 - Diary/Quarterly",
+      diaryYearly: "02 - Diary/Yearly",
+      diaryDaily: "02 - Diary/Daily",
+      events: "02 - Diary/Events.md",
+      templatesDiary: "T",
+    },
+    trackers: ["Mood", "Sleep", "Wake-Up", "Bedtime"].map((id) => ({ id, surface: { kind: "diary" } })),
+    logbooks: [
+      { id: "work", source: "region", path: "02 - Diary/Logbooks/Work log.md" },
+      { id: "focus", source: "region", path: "02 - Diary/Logbooks/Current focus.md" },
+      { id: "review", source: "region", path: "02 - Diary/Logbooks/Review links.md" },
+      { id: "meetings", source: "events", path: "02 - Diary/Logbooks/Meetings.md" },
+    ],
+  };
+  const templates = new Map([
+    ["T/Daily.md", "---\n# almanac:trackers:start\nMood:\nSleep:\nWake-Up:\nBedtime:\n# almanac:trackers:end\n---\n"],
+  ]);
+  const make = () =>
+    buildPatches({
+      settings,
+      templates,
+      plans: { charts: DIARY_CHARTS, logbooks: LOGBOOK_CORPUS, events: SEED_EVENTS },
+      dates: activeDays({ today: "2026-08-23", months: 13, rng: mulberry32(2) }),
+      today: "2026-08-23",
+      rng: mulberry32(4),
+      warn: () => {},
+    });
+
+  it("finds each dashboard by the folder-note rule rather than by name", () => {
+    // A reader who renames `02 - Diary` still gets their charts, which is the
+    // same reason nothing else in this tool spells a path out.
+    expect(folderNote("02 - Diary/Weekly")).toBe("02 - Diary/Weekly/Weekly.md");
+    const paths = make().map((p: { path: string }) => p.path);
+    expect(paths).toContain("02 - Diary/Weekly/Weekly.md");
+    expect(paths).toContain("Homepage.md");
+  });
+
+  it("patches the six chart surfaces, the three region logbooks and the events note", () => {
+    const byWhat = make().reduce((acc: Record<string, number>, p: { what: string }) => {
+      acc[p.what] = (acc[p.what] ?? 0) + 1;
+      return acc;
+    }, {});
+    expect(byWhat).toEqual({ charts: 6, logbook: 3, events: 1 });
+    // The Meetings logbook is NOT one of them and does not need to be: it reads
+    // the events note, so it fills itself the moment the events patch lands.
+    expect(make().map((p: { path: string }) => p.path)).not.toContain("02 - Diary/Logbooks/Meetings.md");
+  });
+
+  it("leaves a logbook that already has items alone, and replaces it under --force", () => {
+    const patch = make().find((p: { what: string }) => p.what === "logbook");
+    const empty = "```almanac\nlogbook:work\n```\n";
+    const filled = patch.apply(empty, {});
+    expect(parseLogItems(readRegion(filled, "logbook")).length).toBeGreaterThan(0);
+    expect(patch.apply(filled, {})).toBeNull();
+    expect(patch.apply(filled, { force: true })).not.toBeNull();
+  });
+
+  it("drops a chart whose tracker has no readings, and says so", () => {
+    const warnings: string[] = [];
+    const patches = buildPatches({
+      settings,
+      // A template that writes only Mood: every Sleep, Wake-Up and Bedtime chart
+      // in the corpus would be an empty tile, so none of them is written.
+      templates: new Map([["T/Daily.md", "---\n# almanac:trackers:start\nMood:\n# almanac:trackers:end\n---\n"]]),
+      plans: { charts: DIARY_CHARTS, logbooks: {}, events: [] },
+      dates: ["2026-08-23"],
+      today: "2026-08-23",
+      rng: mulberry32(4),
+      warn: (m: string) => warnings.push(m),
+    });
+    expect(warnings.length).toBeGreaterThan(0);
+    const note = "```almanac-charts\nheader:x\n```\n";
+    for (const p of patches.filter((p: { what: string }) => p.what === "charts")) {
+      for (const spec of parseChartDirectives((p.apply(note, {}) as string).split("\n"))) {
+        expect(spec.tracker).toBe("Mood");
+        expect(spec.tracker2 ?? "Mood").toBe("Mood");
+      }
+    }
   });
 });

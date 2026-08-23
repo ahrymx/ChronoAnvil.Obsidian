@@ -83,11 +83,11 @@ import {
   JOURNALS_DIRECTIVE_LINE,
   TRENDS_HEADING,
 } from "../core/constants";
-import { SCOPE_ALL } from "../core/directive-grammar";
+import { FRAME_KEYWORD, SCOPE_ALL } from "../core/directive-grammar";
 import { composeFlatNote, flatNoteModel, bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
-import type { SectionModel } from "../core/section-model";
+import { WIDGET_FORM, formQuestion, type SectionModel } from "../core/section-model";
 
 const probe = (text: string, re: RegExp): number => text.search(re);
 
@@ -121,7 +121,14 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // The widget already renders nothing when no journals are enabled, so the
     // lock costs an empty vault nothing but a heading.
     locked: true,
-    render: () => ({ fence: "almanac", lines: ["frame: section", "journals"] }),
+    render: (opts) => ({
+      fence: "almanac",
+      lines: [
+        ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
+        "journals",
+      ],
+    }),
+    questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
     // ── THE PROBE MATCHES BOTH SPELLINGS (4.38.2) ─────────────────────────
     //
     // It was `/^journals\s*$/m`, and that strictness is what turned 4.37's
@@ -157,6 +164,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // unavailable elsewhere.
     locked: false,
     questions: (spec) => [
+      formQuestion("header:🔁 Review"),
       {
         kind: "folder",
         key: "folder",
@@ -169,9 +177,12 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
         keywords: [{ value: SCOPE_ALL, label: "Every journal" }],
       },
     ],
-    render: () => ({
+    render: (opts) => ({
       fence: "almanac",
-      lines: ["header:🔁 Review", `review-queue:${SCOPE_ALL}`],
+      lines: [
+        ...(opts?.form === WIDGET_FORM ? [] : ["header:🔁 Review"]),
+        `review-queue:${SCOPE_ALL}`,
+      ],
     }),
     locate: (text) => probe(text, /^review-queue\b/m),
   },

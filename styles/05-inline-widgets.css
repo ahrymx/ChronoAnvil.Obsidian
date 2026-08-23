@@ -1155,7 +1155,7 @@
   transition: opacity 120ms ease;
 }
 .journal-widget-card > .journal-block-head:hover,
-.journal-widget-card:focus-within > .journal-block-head,
+.journal-widget-card > .journal-block-head:focus-within,
 .journal-widget-card.is-resizing > .journal-block-head,
 .journal-widget-card.is-dragging > .journal-block-head,
 .journal-widget-block.is-slotting .journal-widget-card > .journal-block-head {
@@ -1264,7 +1264,7 @@
   transition: opacity 120ms ease;
 }
 .journal-widget-block.has-head:not(.journal-widget-card) > .journal-block-head:hover,
-.journal-widget-block.has-head:not(.journal-widget-card):focus-within > .journal-block-head,
+.journal-widget-block.has-head:not(.journal-widget-card) > .journal-block-head:focus-within,
 .journal-widget-block.is-slotting .journal-block-head {
   height: auto;
   padding: 6px 14px 5px;

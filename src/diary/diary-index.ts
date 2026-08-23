@@ -142,7 +142,7 @@ export interface SearchHit {
 // serves both. Quoted phrases survive as single terms. Anything unrecognised
 // stays a search term rather than erroring — a diary search that rejects your
 // query because you typed a colon is worse than one that searches for it.
-const FILTER_RE = /^(from|to|tag|is|has):(.+)$/i;
+const FILTER_RE = /^(from|to|tag|is|has|mood):(.+)$/i;
 const COMPARE_RE = /^([A-Za-z][A-Za-z0-9_-]*)(<=|>=|<|>|=)(-?\d+(?:\.\d+)?)$/;
 
 // What `has:` accepts. NAMED SO THE HINT CAN READ IT — see `searchHintLine`
@@ -198,6 +198,12 @@ export function parseQuery(
   raw: string,
   knownKinds: readonly string[] = ["daily", "monthly"]
 ): DiaryQuery {
+  // Normalize bracketed filter syntax: [key>=val], [key<=val], [key>val], [key<val], [key=val], [key==val]
+  const normalized = raw
+    .replace(/\[\s*([a-zA-Z_-]+)\s*(<=|>=|<|>|==|=)\s*(-?\d+(?:\.\d+)?)\s*\]/g, (_, k, op, v) => `${k}${op === "==" ? "=" : op}${v}`)
+    .replace(/\[\s*([a-zA-Z_-]+)\s*[;:]\s*(<=|>=|<|>|==|=)\s*(-?\d+(?:\.\d+)?)\s*\]/g, (_, k, op, v) => `${k}${op === "==" ? "=" : op}${v}`)
+    .replace(/\[\s*([a-zA-Z_-]+)\s*[;:]\s*(-?\d+(?:\.\d+)?)\s*\]/g, "$1=$2");
+
   const q: DiaryQuery = {
     terms: [],
     from: null,
@@ -207,7 +213,7 @@ export function parseQuery(
     has: [],
     compare: null,
   };
-  for (const token of tokenize(raw)) {
+  for (const token of tokenize(normalized)) {
     const filter = FILTER_RE.exec(token);
     if (filter) {
       const [, key, value] = filter;
@@ -237,6 +243,18 @@ export function parseQuery(
           if (isHasValue(v)) q.has.push(v);
           else q.terms.push(token);
           continue;
+        case "mood": {
+          const cmpMatch = /^(<=|>=|<|>|=)?\s*(-?\d+(?:\.\d+)?)$/.exec(v);
+          if (cmpMatch) {
+            q.compare = {
+              key: "mood",
+              op: (cmpMatch[1] ?? "=") as "<" | "<=" | ">" | ">=" | "=",
+              value: Number(cmpMatch[2]),
+            };
+            continue;
+          }
+          break;
+        }
       }
     }
     const cmp = COMPARE_RE.exec(token);
@@ -303,8 +321,23 @@ export function passesFilters(entry: IndexedEntry, q: DiaryQuery): boolean {
     if (h === "event" && entry.events.length === 0) return false;
   }
   if (q.compare) {
-    const raw = entry.trackers[q.compare.key];
-    const num = raw != null && raw !== "" ? Number(raw) : NaN;
+    let num: number = NaN;
+    if (q.compare.key.toLowerCase() === "mood" && entry.mood != null) {
+      num = entry.mood;
+    } else {
+      const direct = entry.trackers[q.compare.key];
+      if (direct != null && direct !== "") {
+        num = Number(direct);
+      } else {
+        const kLow = q.compare.key.toLowerCase();
+        for (const [k, v] of Object.entries(entry.trackers)) {
+          if (k.toLowerCase() === kLow && v != null && v !== "") {
+            num = Number(v);
+            break;
+          }
+        }
+      }
+    }
     if (!Number.isFinite(num)) return false;
     const { op, value } = q.compare;
     if (op === "<" && !(num < value)) return false;

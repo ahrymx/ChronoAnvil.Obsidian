@@ -23,8 +23,8 @@
  * ============================================================ */
 
 :root {
-  /* Radius: three tiers only — small controls, cards, and pills. Nothing
-     in this file should use a raw px radius outside these three. */
+  /* Radius: four tiers — tight square controls, small controls, cards, and pills. */
+  --am-radius-xs: 3px;   /* tight square tags, stamps, badges */
   --am-radius-sm: 6px;   /* inputs, selects, steppers, ghost icon buttons */
   --am-radius-md: 10px;  /* cards: callouts, calendar, tracker rows, tag groups */
   --am-radius-pill: 999px; /* every pill-shaped button, link and badge */
@@ -450,6 +450,29 @@
   --am-tg-purple: #6b53ac;
   --am-tg-pink: #a84e79;
   --am-tg-grey: #626973;
+
+  /* ── the grid's own geometry, and the now line (4.62) ────────────────
+     THE GUTTER IS ONE NUMBER BECAUSE IT IS ONE COLUMN. The hour rail, the
+     corner cell above it and the all-day lane's label are the same strip of
+     the grid seen in three rows, and they were three literals — which is how
+     "all day" came to wrap onto a second line and land beside the 8 AM mark.
+     The container query narrows the token, not the three templates.
+
+     THE ROW HEIGHT MAKES THE BODY A WHOLE NUMBER OF HOURS. It was a
+     `min-height` on the rail, so a window of any span drew the same box and
+     the last hour label — absolutely positioned at 100% and pulled up half
+     its own height — hung over the foot of the scroller and was clipped
+     through the middle. Height from the hour count means an eight-hour week
+     is a shorter grid than a fourteen-hour one, which is also the honest
+     drawing of it.
+
+     THE NOW LINE IS RED IN BOTH THEMES, on `--am-tg-ink`'s reasoning one
+     block up: it is drawn over fills that stay dark in both, and the one
+     thing on this widget that must never be mistaken for a block. It is not
+     `--am-tg-red`, which is a fill a reader may have chosen for an event. */
+  --am-tg-gutter: 52px;
+  --am-tg-row: 50px;
+  --am-tg-now: #e0484d;
 
   /* ── The spacing scale (3.9 §4) ────────────────────────────────────────
      DEFINED HERE AND READ BY NOTHING IN THE PATCH THAT ADDS IT. That is the

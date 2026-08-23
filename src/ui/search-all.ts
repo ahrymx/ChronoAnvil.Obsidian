@@ -40,6 +40,7 @@ import {
   SortField,
   isEmptyQuery,
   parseQuery,
+  passesFilters,
   queryNarrowsTo,
   readIndex,
   readJournalIndex,
@@ -51,16 +52,6 @@ import { TRACKER_CLASSES } from "../trackers/trackers";
 import { registeredJournalTypes } from "../journals/journal";
 
 // The sort the reader last chose, for as long as Obsidian is running.
-//
-// SESSION ONLY, WHICH IS A DECISION (4.51, Q13). A reader who sorts by Date is
-// usually mid-task and wants it to hold for the next three searches — and a
-// PERSISTED sort is invisible state that makes the first search after a restart
-// quietly wrong for somebody who has forgotten setting it. A module-level
-// variable is exactly "for this session": it dies with the process and nothing
-// writes it to `data.json`.
-//
-// NOT IN SETTINGS, therefore, and deliberately not — see `BannerOptions`, which
-// holds the two things that genuinely are the reader's configuration.
 let sessionSort: SortField = "relevance";
 
 /** Exported for the test that pins the session rule; resets what a reload would. */
@@ -72,10 +63,45 @@ export function openVaultSearch(plugin: AlmanacPlugin): void {
   new VaultSearchModal(plugin.app, plugin).open();
 }
 
-// Which `is:` values mean the diary. Read from the class table rather than
-// written out, so a sixth grain needs no edit here.
+// Which `is:` values mean the diary.
 function diaryKinds(): string[] {
   return [...TRACKER_CLASSES];
+}
+
+// Highlight matching search query substring within text
+function highlightFragment(parent: HTMLElement, text: string, query?: string): void {
+  if (!query || !query.trim()) {
+    parent.setText(text);
+    return;
+  }
+  const cleanQ = query.trim().replace(/^#/, "");
+  if (!cleanQ) {
+    parent.setText(text);
+    return;
+  }
+  const lower = text.toLowerCase();
+  const target = cleanQ.toLowerCase();
+  let start = 0;
+  let idx = lower.indexOf(target, start);
+  if (idx === -1) {
+    parent.setText(text);
+    return;
+  }
+  parent.empty();
+  while (idx !== -1) {
+    if (idx > start) {
+      parent.createSpan({ text: text.slice(start, idx) });
+    }
+    parent.createEl("mark", {
+      cls: "jdr-highlight",
+      text: text.slice(idx, idx + target.length),
+    });
+    start = idx + target.length;
+    idx = lower.indexOf(target, start);
+  }
+  if (start < text.length) {
+    parent.createSpan({ text: text.slice(start) });
+  }
 }
 
 class VaultSearchModal extends Modal {
@@ -84,9 +110,17 @@ class VaultSearchModal extends Modal {
   private hits: SearchHit[] = [];
   private cursor = 0;
 
+  private selectedYear = "all";
+  private filterTasks = false;
+  private filterAttach = false;
+  private filterMonthly = false;
+  private isCompact = false;
+
   private resultsEl!: HTMLElement;
   private chipsEl!: HTMLElement;
   private countEl!: HTMLElement;
+  private inputEl!: HTMLInputElement;
+  private clearEl!: HTMLElement;
 
   constructor(app: App, private plugin: AlmanacPlugin) {
     super(app);
@@ -99,14 +133,20 @@ class VaultSearchModal extends Modal {
 
     const box = contentEl.createDiv({ cls: "ams-query" });
     setIcon(box.createSpan({ cls: "ams-query-icon" }), "search");
-    const input = box.createEl("input", {
+    this.inputEl = box.createEl("input", {
       type: "text",
       cls: "ams-input",
-      attr: { placeholder: "Search your diary and journals…" },
+      attr: { placeholder: "Search by text, #tag, [mood>=5], has:task...", spellcheck: "false" },
     });
 
+    this.clearEl = box.createEl("button", {
+      cls: "ams-clear",
+      text: "✕",
+      attr: { type: "button", "aria-label": "Clear search" },
+    });
+    this.clearEl.style.display = "none";
+
     const bar = contentEl.createDiv({ cls: "ams-bar" });
-    bar.createSpan({ cls: "ams-sort-label", text: "Sort" });
     this.chipsEl = bar.createDiv({ cls: "ams-chips" });
     this.countEl = bar.createDiv({ cls: "ams-count" });
 
@@ -124,12 +164,22 @@ class VaultSearchModal extends Modal {
       item.createSpan({ text: what });
     }
 
-    input.addEventListener("input", () => {
-      this.query = input.value;
+    this.inputEl.addEventListener("input", () => {
+      this.query = this.inputEl.value;
+      this.clearEl.style.display = this.query ? "block" : "none";
       this.render();
     });
-    input.addEventListener("keydown", (evt) => this.onKey(evt));
-    window.setTimeout(() => input.focus(), 0);
+
+    this.clearEl.addEventListener("click", () => {
+      this.inputEl.value = "";
+      this.query = "";
+      this.clearEl.style.display = "none";
+      this.inputEl.focus();
+      this.render();
+    });
+
+    this.inputEl.addEventListener("keydown", (evt) => this.onKey(evt));
+    window.setTimeout(() => this.inputEl.focus(), 0);
 
     this.render();
     void this.load();
@@ -139,29 +189,18 @@ class VaultSearchModal extends Modal {
     this.contentEl.empty();
   }
 
-  // Both halves of the index, concatenated.
-  //
-  // `readIndex` KNOWS THE DIARY'S FOLDERS AND `readJournalIndex` TAKES THEM,
-  // which is the asymmetry that module explains: a journal search is normally
-  // scoped and the diary's never is. Unscoped here means every registered
-  // journal's root — the widest a journal search has ever been asked to be.
   private async load(): Promise<void> {
     const roots = registeredJournalTypes(this.plugin).map((t) => t.root);
     const [diary, journal] = await Promise.all([
       readIndex(this.plugin),
       roots.length ? readJournalIndex(this.plugin, roots) : Promise.resolve([]),
     ]);
-    // THE WINDOW MAY HAVE GONE while that resolved — a reader who opened and
-    // pressed Esc during a cold scan. Writing into a closed modal's DOM throws.
     if (!this.resultsEl.isConnected) return;
     this.entries = [...diary, ...journal];
     this.render();
   }
 
   private parsed(): DiaryQuery {
-    // EVERY KIND EITHER SURFACE KNOWS, so `is:` accepts `daily` and `lesson` in
-    // one box. `parseQuery`'s own rule keeps an unrecognised value a search
-    // TERM rather than an error, which is what makes a wrong guess harmless.
     const kinds = [
       ...diaryKinds(),
       ...registeredJournalTypes(this.plugin).flatMap((t) => [
@@ -183,16 +222,34 @@ class VaultSearchModal extends Modal {
       this.resultsEl.createDiv({ cls: "ams-note", text: "Reading your vault…" });
       return;
     }
-    if (isEmptyQuery(q)) {
+
+    const isFiltering =
+      !isEmptyQuery(q) ||
+      this.selectedYear !== "all" ||
+      this.filterTasks ||
+      this.filterAttach ||
+      this.filterMonthly;
+
+    if (!isFiltering) {
       this.countEl.setText(`${this.entries.length} notes`);
       this.resultsEl.createDiv({
         cls: "ams-note",
-        text: "Type to search. Filters: tag:, from:, to:, is:, has:",
+        text: "Type to search. Supports #tag, [mood>=5], has:task, from:30d...",
       });
       return;
     }
 
-    this.hits = sortHits(searchEntries(this.entries, q, 200), sessionSort);
+    const filtered = this.entries.filter((entry) => {
+      if (this.selectedYear !== "all" && (!entry.iso || !entry.iso.startsWith(this.selectedYear))) {
+        return false;
+      }
+      if (this.filterTasks && entry.openTasks === 0) return false;
+      if (this.filterAttach && entry.attachments === 0) return false;
+      if (this.filterMonthly && entry.kind !== "monthly") return false;
+      return passesFilters(entry, q);
+    });
+
+    this.hits = sortHits(searchEntries(filtered, q, 200), sessionSort);
     this.cursor = 0;
     this.countEl.setText(
       this.hits.length === 1 ? "1 result" : `${this.hits.length} results`
@@ -201,19 +258,61 @@ class VaultSearchModal extends Modal {
       this.resultsEl.createDiv({ cls: "ams-note", text: "Nothing matches." });
       return;
     }
-    this.hits.forEach((hit, i) => this.renderRow(hit, i));
+    this.hits.forEach((hit, i) => this.renderRow(hit, i, q));
   }
 
-  // The sort chips.
-  //
-  // FOUR ALWAYS, AND A TRACKER CHIP NEVER (4.51, Q12). The four are universal
-  // fields of an indexed entry, so a mixed list can be ordered by any of them
-  // without half the rows having nothing to sort on. Mood is the diary's and a
-  // journal rating is declared per KIND — so a fifth chip appears only once the
-  // query has narrowed to one surface, and this release ships the narrowing test
-  // and the readout rather than the chip. `queryNarrowsTo` is the rule.
   private renderChips(q: DiaryQuery): void {
     this.chipsEl.empty();
+
+    // Distinct years
+    if (this.entries) {
+      const years = Array.from(
+        new Set(
+          this.entries
+            .map((e) => (e.iso ? e.iso.slice(0, 4) : null))
+            .filter((y): y is string => Boolean(y))
+        )
+      ).sort().reverse();
+
+      if (years.length > 1) {
+        const yearPills = this.chipsEl.createDiv({ cls: "ams-year-pills" });
+        for (const y of ["all", ...years.slice(0, 3)]) {
+          const pill = yearPills.createEl("button", {
+            cls: `ams-year-pill${this.selectedYear === y ? " is-active" : ""}`,
+            text: y === "all" ? "All" : y,
+            attr: { type: "button" },
+          });
+          pill.addEventListener("click", () => {
+            this.selectedYear = y;
+            this.render();
+          });
+        }
+      }
+    }
+
+    // Quick filter chips
+    const addQuickChip = (label: string, iconName: string, active: boolean, toggle: () => void) => {
+      const chip = this.chipsEl.createEl("button", {
+        cls: `ams-filter-chip${active ? " is-active" : ""}`,
+        attr: { type: "button" },
+      });
+      const icon = chip.createSpan({ cls: "ams-chip-icon" });
+      setIcon(icon, iconName);
+      chip.createSpan({ text: label });
+      chip.addEventListener("click", () => {
+        toggle();
+        this.render();
+      });
+    };
+
+    addQuickChip("Tasks", "square", this.filterTasks, () => { this.filterTasks = !this.filterTasks; });
+    addQuickChip("Files", "paperclip", this.filterAttach, () => { this.filterAttach = !this.filterAttach; });
+    addQuickChip("Monthly", "calendar", this.filterMonthly, () => { this.filterMonthly = !this.filterMonthly; });
+
+    // Divider
+    this.chipsEl.createDiv({ cls: "ams-divider" });
+
+    // Sort chips
     for (const field of SORT_FIELDS) {
       const chip = this.chipsEl.createDiv({
         cls: "ams-chip" + (field.id === sessionSort ? " is-on" : ""),
@@ -225,6 +324,21 @@ class VaultSearchModal extends Modal {
         this.render();
       });
     }
+
+    // Compact mode button
+    const compactBtn = this.chipsEl.createEl("button", {
+      cls: `ams-compact-btn${this.isCompact ? " is-active" : ""}`,
+      attr: { type: "button", title: "Toggle compact view" },
+    });
+    const compactIcon = compactBtn.createSpan({ cls: "ams-chip-icon" });
+    setIcon(compactIcon, "list");
+    compactBtn.createSpan({ text: "Compact" });
+    compactBtn.addEventListener("click", () => {
+      this.isCompact = !this.isCompact;
+      this.resultsEl.toggleClass("is-compact", this.isCompact);
+      compactBtn.toggleClass("is-active", this.isCompact);
+    });
+
     const narrowed = queryNarrowsTo(q, diaryKinds());
     if (narrowed) {
       this.chipsEl.createDiv({
@@ -234,7 +348,7 @@ class VaultSearchModal extends Modal {
     }
   }
 
-  private renderRow(hit: SearchHit, i: number): void {
+  private renderRow(hit: SearchHit, i: number, q?: DiaryQuery): void {
     const { entry } = hit;
     const row = this.resultsEl.createDiv({
       cls: "ams-row" + (i === this.cursor ? " is-sel" : ""),
@@ -245,22 +359,18 @@ class VaultSearchModal extends Modal {
     setIcon(mark, entry.surface === "journal" ? "library" : "calendar-days");
 
     const main = row.createDiv({ cls: "ams-main" });
-    main.createDiv({ cls: "ams-title", text: entry.title });
-    // WHERE THE HIT LIVES, because results now mix surfaces. `crumbs` is on an
-    // indexed entry for exactly this — *"a result row uses them to say where a
-    // hit lives, which matters far more in a journal than in the diary, where
-    // the date already says it."*
+    const titleEl = main.createDiv({ cls: "ams-title" });
+    highlightFragment(titleEl, entry.title, q?.terms.length ? q.terms.join(" ") : undefined);
+
     const where = [...entry.crumbs, entry.kind].filter(Boolean).join(" · ");
     if (where) main.createDiv({ cls: "ams-where", text: where });
     if (hit.snippet) {
       const snip = main.createDiv({ cls: "ams-snip" });
-      // WHICH FIELD IT CAME FROM. `regions` keeps them separate so a hit in a
-      // reader's `log` reads differently from one in a `summary`. Indexed since
-      // 2.33 and never yet shown.
       if (hit.snippetKey) {
         snip.createSpan({ cls: "ams-field", text: hit.snippetKey });
       }
-      snip.createSpan({ text: hit.snippet });
+      const snipText = snip.createSpan();
+      highlightFragment(snipText, hit.snippet, q?.terms.length ? q.terms.join(" ") : undefined);
     }
 
     row.createDiv({ cls: "ams-date", text: entry.iso ?? "—" });
@@ -269,9 +379,6 @@ class VaultSearchModal extends Modal {
 
   private onKey(evt: KeyboardEvent): void {
     if (evt.key === "Tab") {
-      // CYCLES THE SORT, which is what the foot promises. Preventing the default
-      // matters: a Tab that moved focus out of the input would leave the arrow
-      // keys doing nothing.
       evt.preventDefault();
       const ids = SORT_FIELDS.map((f) => f.id);
       sessionSort = ids[(ids.indexOf(sessionSort) + 1) % ids.length];
@@ -293,9 +400,6 @@ class VaultSearchModal extends Modal {
     }
   }
 
-  // MOVES THE CLASS RATHER THAN REBUILDING. A re-render on every arrow key would
-  // rebuild two hundred rows to change one, and would lose the scroll position
-  // the cursor is being scrolled to.
   private paintCursor(): void {
     const rows = Array.from(
       this.resultsEl.querySelectorAll<HTMLElement>(".ams-row")

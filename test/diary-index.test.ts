@@ -116,6 +116,47 @@ describe("parseQuery", () => {
     });
   });
 
+  it("parses bracketed tracker comparisons like [mood>=5] and [mood<=2]", () => {
+    expect(parseQuery("[mood>=5]").compare).toEqual({
+      key: "mood",
+      op: ">=",
+      value: 5,
+    });
+    expect(parseQuery("[mood<=2]").compare).toEqual({
+      key: "mood",
+      op: "<=",
+      value: 2,
+    });
+    expect(parseQuery("[mood=4]").compare).toEqual({
+      key: "mood",
+      op: "=",
+      value: 4,
+    });
+    expect(parseQuery("[mood>3]").compare).toEqual({
+      key: "mood",
+      op: ">",
+      value: 3,
+    });
+    expect(parseQuery("[mood;>=4]").compare).toEqual({
+      key: "mood",
+      op: ">=",
+      value: 4,
+    });
+  });
+
+  it("parses colon mood filter syntax like mood:>=4 and mood:5", () => {
+    expect(parseQuery("mood:>=4").compare).toEqual({
+      key: "mood",
+      op: ">=",
+      value: 4,
+    });
+    expect(parseQuery("mood:5").compare).toEqual({
+      key: "mood",
+      op: "=",
+      value: 5,
+    });
+  });
+
   // A search box that errors on a stray colon is worse than one that searches
   // for it, so unrecognised filter-shaped tokens stay terms.
   it("keeps an unrecognised filter as a search term", () => {
@@ -170,11 +211,14 @@ describe("passesFilters", () => {
   });
 
   it("compares a numeric tracker", () => {
-    const low = entry({ trackers: { Mood: 2 } });
-    const high = entry({ trackers: { Mood: 5 } });
+    const low = entry({ mood: 2, trackers: { Mood: 2 } });
+    const high = entry({ mood: 5, trackers: { Mood: 5 } });
     expect(passesFilters(low, parseQuery("Mood<=2"))).toBe(true);
     expect(passesFilters(high, parseQuery("Mood<=2"))).toBe(false);
     expect(passesFilters(high, parseQuery("Mood>4"))).toBe(true);
+    expect(passesFilters(high, parseQuery("[mood;>=4]"))).toBe(true);
+    expect(passesFilters(low, parseQuery("[mood;>=4]"))).toBe(false);
+    expect(passesFilters(high, parseQuery("mood:>=4"))).toBe(true);
   });
 
   // A blank tracker must not read as 0 and satisfy `Mood<=2` — that would fill
@@ -347,6 +391,15 @@ describe("groupByMonth", () => {
     ]);
     expect(groups.map((g) => g.month)).toEqual(["2026-03", "2026-02"]);
     expect(groups[0].entries.map((e) => e.iso)).toEqual(["2026-03-09", "2026-03-01"]);
+  });
+
+  it("groups entries spanning multiple years in descending order", () => {
+    const groups = groupByMonth([
+      entry({ iso: "2024-12-31" }),
+      entry({ iso: "2025-06-15" }),
+      entry({ iso: "2026-08-23" }),
+    ]);
+    expect(groups.map((g) => g.month)).toEqual(["2026-08", "2025-06", "2024-12"]);
   });
 
   it("returns nothing for no entries", () => {

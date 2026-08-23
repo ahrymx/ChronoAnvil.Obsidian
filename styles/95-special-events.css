@@ -42,6 +42,7 @@
 .am-ev-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 10px;
 }
@@ -125,6 +126,43 @@
   width: 14px;
   height: 14px;
 }
+/* Four icon buttons on a row, and the row is only 24px tall — they sit in one
+   group so the gap between them is the group's, not four separate margins. */
+.am-ev-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+/* Hidden until hover is fine for a mouse and useless for a keyboard, so focus
+   shows them too — otherwise tabbing lands on a control nobody can see. */
+.am-ev-edit:focus-visible {
+  opacity: 1;
+  color: var(--text-normal);
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+/* The filter sits at the far end of the toolbar: the button is what you reach
+   for first, the count is a fact about the list, and the box is the thing you
+   only use once the list has outgrown a glance. */
+.am-ev-filter {
+  margin-left: auto;
+  max-width: 190px;
+  font-size: var(--am-text-2xs);
+}
+
+/* "Earlier" folds. The summary keeps the section heading's type, loses the
+   default triangle's indent, and takes a pointer so it reads as openable. */
+.am-ev-past > summary.am-ev-section {
+  cursor: pointer;
+  list-style-position: inside;
+}
+.am-ev-past > summary.am-ev-section::marker {
+  color: var(--text-faint);
+}
+.am-ev-past[open] > summary.am-ev-section {
+  margin-bottom: 2px;
+}
 
 /* The relative time on the right of an upcoming row — the one thing that list
    says which the calendar can't. */
@@ -139,81 +177,242 @@
   font-weight: 600;
 }
 
-/* ── The editor's pickers ─────────────────────────────────────
-   Both are grids of buttons rather than dropdowns: choosing a decoration is a
-   visual decision, and a <select> listing "cake, gift, party-popper" makes you
-   translate names back into pictures in your head. */
-.almanac-icon-picker {
-  margin: 4px 0 12px;
+/* ── Event Modal Chrome & Controls ───────────────────────────── */
+
+.almanac-event-modal {
+  max-width: 520px;
 }
-.almanac-icon-group-label {
-  margin: 8px 0 4px;
+.almanac-event-modal .almanac-editor-body {
+  padding: 14px 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-space-2);
+}
+
+/* ── Live Preview Card ── */
+.almanac-event-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--am-space-3);
+  padding: 10px 14px;
+  background: var(--background-secondary-alt);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  margin-bottom: var(--am-space-2);
+}
+.almanac-event-preview-left {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-3);
+  min-width: 0;
+}
+.almanac-event-preview-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--am-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  box-shadow: var(--am-shadow-sm);
+}
+.almanac-event-preview-badge svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.2;
+}
+.almanac-event-preview-info {
+  min-width: 0;
+}
+.almanac-event-preview-title {
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.almanac-event-preview-date {
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+}
+.almanac-event-preview-mockup {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--am-radius-sm);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  color: var(--text-normal);
+  flex-shrink: 0;
+  box-shadow: var(--am-shadow-sm);
+}
+.almanac-event-preview-mockup .cal-badge {
+  top: 2px;
+  right: 2px;
+}
+
+/* ── Kind Segmented Switcher ── */
+.almanac-event-kind-bar {
+  display: flex;
+  gap: 3px;
+  background: var(--background-secondary);
+  padding: 3px;
+  border-radius: var(--am-radius-sm);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  width: 100%;
+}
+.almanac-event-kind-btn {
+  flex: 1;
+  padding: 5px 10px;
+  font-size: var(--am-text-xs);
+  font-weight: 500;
+  border-radius: var(--am-radius-xs);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  text-align: center;
+  transition: background 0.12s, color 0.12s;
+}
+.almanac-event-kind-btn:hover {
+  color: var(--text-normal);
+}
+.almanac-event-kind-btn.is-active {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-weight: 600;
+  box-shadow: var(--am-shadow-sm);
+}
+
+/* ── Tabbed Category Icon Picker ── */
+.almanac-icon-picker {
+  margin: 4px 0 8px;
+}
+.almanac-icon-cat-bar {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+}
+.almanac-icon-cat-btn {
+  padding: 3px 10px;
   font-size: var(--am-text-2xs);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-faint);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-secondary);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  white-space: nowrap;
+  transition: all 0.12s ease;
 }
-.almanac-icon-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+.almanac-icon-cat-btn:hover {
+  color: var(--text-normal);
+}
+.almanac-icon-cat-btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+.almanac-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  background: var(--background-primary);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  padding: 8px;
 }
 .almanac-icon-swatch {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  aspect-ratio: 1;
   padding: 0;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
-  background: var(--background-primary);
+  border: 1px solid transparent;
+  border-radius: var(--am-radius-xs);
+  background: transparent;
   color: var(--text-muted);
   cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .almanac-icon-swatch:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
+  border-color: var(--background-modifier-border);
 }
 .almanac-icon-swatch.is-active {
   border-color: var(--interactive-accent);
   color: var(--interactive-accent);
-  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
+  box-shadow: 0 0 0 1px var(--interactive-accent);
 }
 .almanac-icon-swatch svg {
   width: 16px;
   height: 16px;
 }
 
+/* ── Color Swatches ── */
 .almanac-color-picker {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin: 4px 0 12px;
+  gap: 8px;
+  margin: 4px 0 10px;
 }
+.almanac-color-picker button.almanac-color-swatch,
 .almanac-color-swatch {
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 2px solid transparent;
-  border-radius: 50%;
-  cursor: pointer;
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  min-height: 26px !important;
+  padding: 0 !important;
+  border: 2px solid transparent !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  background-image: none !important;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.almanac-color-picker button.almanac-color-swatch:hover,
+.almanac-color-swatch:hover {
+  transform: scale(1.12);
 }
 /* The selected swatch is ringed rather than ticked: a checkmark drawn on top
    of the colour has to be readable against all eight of them. */
+.almanac-color-picker button.almanac-color-swatch.is-active,
 .almanac-color-swatch.is-active {
-  border-color: var(--text-normal);
-  box-shadow: 0 0 0 2px var(--background-primary) inset;
+  transform: scale(1.12);
+  border-color: var(--text-normal) !important;
+  box-shadow: 0 0 0 2px var(--background-primary) inset, 0 0 0 2px var(--interactive-accent) !important;
 }
-.almanac-color-red { background: var(--am-ev-red); }
-.almanac-color-amber { background: var(--am-ev-amber); }
-.almanac-color-green { background: var(--am-ev-green); }
-.almanac-color-teal { background: var(--am-ev-teal); }
-.almanac-color-blue { background: var(--am-ev-blue); }
-.almanac-color-purple { background: var(--am-ev-purple); }
-.almanac-color-pink { background: var(--am-ev-pink); }
-.almanac-color-grey { background: var(--am-ev-grey); }
+.almanac-color-picker button.almanac-color-red,
+.almanac-color-red { background-color: var(--am-ev-red) !important; background: var(--am-ev-red) !important; }
+.almanac-color-picker button.almanac-color-amber,
+.almanac-color-amber { background-color: var(--am-ev-amber) !important; background: var(--am-ev-amber) !important; }
+.almanac-color-picker button.almanac-color-green,
+.almanac-color-green { background-color: var(--am-ev-green) !important; background: var(--am-ev-green) !important; }
+.almanac-color-picker button.almanac-color-teal,
+.almanac-color-teal { background-color: var(--am-ev-teal) !important; background: var(--am-ev-teal) !important; }
+.almanac-color-picker button.almanac-color-blue,
+.almanac-color-blue { background-color: var(--am-ev-blue) !important; background: var(--am-ev-blue) !important; }
+.almanac-color-picker button.almanac-color-purple,
+.almanac-color-purple { background-color: var(--am-ev-purple) !important; background: var(--am-ev-purple) !important; }
+.almanac-color-picker button.almanac-color-pink,
+.almanac-color-pink { background-color: var(--am-ev-pink) !important; background: var(--am-ev-pink) !important; }
+.almanac-color-picker button.almanac-color-grey,
+.almanac-color-grey { background-color: var(--am-ev-grey) !important; background: var(--am-ev-grey) !important; }
 
 .almanac-event-hint {
   margin: -4px 0 8px;
@@ -456,35 +655,272 @@
   border-top: none;
 }
 
-/* Timeline. Grouped by month, since that's the unit people recall in. */
+/* ── Timeline: Scrollable & Filterable ───────────────────────── */
+.jdr-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.jdr-timeline-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  box-shadow: var(--am-shadow-sm);
+}
+
+.jdr-timeline-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.jdr-timeline-search-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  transition: border-color 0.15s ease;
+}
+.jdr-timeline-search-wrap:focus-within {
+  border-color: var(--interactive-accent);
+}
+
+.jdr-timeline-search-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.jdr-timeline-search-icon .svg-icon,
+.jdr-timeline-search-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.jdr-timeline-search-input,
+input.jdr-timeline-search-input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none !important;
+  background: transparent !important;
+  padding: 4px 0 !important;
+  font-size: var(--am-text-xs);
+  color: var(--text-normal);
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.jdr-timeline-search-clear {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: var(--am-text-xs);
+  line-height: 1;
+  border-radius: var(--am-radius-xs);
+  box-shadow: none;
+  flex-shrink: 0;
+}
+.jdr-timeline-search-clear:hover {
+  color: var(--text-normal);
+}
+
+.jdr-timeline-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.jdr-timeline-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.jdr-timeline-year-pills {
+  display: flex;
+  background: var(--background-secondary-alt);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-xs);
+  padding: 2px;
+  gap: 2px;
+}
+
+.jdr-timeline-year-pill {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--am-radius-xs);
+  cursor: pointer;
+  box-shadow: none;
+}
+.jdr-timeline-year-pill:hover {
+  color: var(--text-normal);
+}
+.jdr-timeline-year-pill.is-active {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: var(--am-shadow-sm);
+}
+
+.jdr-timeline-chip {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: var(--am-radius-pill);
+  cursor: pointer;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.12s;
+}
+.jdr-timeline-chip:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.jdr-timeline-chip.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+.jdr-timeline-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.jdr-timeline-action-btn {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  padding: 3px 8px;
+  border-radius: var(--am-radius-xs);
+  cursor: pointer;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.jdr-timeline-action-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.jdr-timeline-action-btn.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  font-weight: 600;
+}
+
 .jdr-timeline-summary {
-  margin: 0 2px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 4px;
   font-size: var(--am-text-xs);
   color: var(--text-muted);
 }
+.jdr-timeline-clear-link {
+  color: var(--interactive-accent);
+  cursor: pointer;
+  font-size: var(--am-text-2xs);
+  text-decoration: underline;
+}
+
+.jdr-timeline-scroll {
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  padding: 0 12px 16px;
+  background: var(--background-secondary-alt);
+  box-shadow: var(--am-shadow-sm);
+}
+
+.jdr-timeline-scroll.is-compact .jdr-snippet {
+  display: none;
+}
+
 .jdr-timeline-month {
   margin-bottom: 14px;
 }
+.jdr-timeline-month:first-child {
+  margin-top: 0;
+}
 .jdr-timeline-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding-bottom: 4px;
+  padding: 8px 4px 6px;
+  background: var(--background-secondary-alt);
   border-bottom: 2px solid var(--background-modifier-border);
+  cursor: pointer;
+  user-select: none;
 }
 .jdr-timeline-month-name {
-  font-size: var(--am-text-base);
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--am-text-sm);
+  font-weight: 700;
 }
+.jdr-timeline-month-name:hover {
+  color: var(--interactive-accent);
+}
+.jdr-timeline-head-icon {
+  display: flex;
+  color: var(--text-faint);
+}
+.jdr-timeline-head-icon svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.2;
+}
+
 .jdr-timeline-count {
   font-size: var(--am-text-2xs);
   color: var(--text-faint);
 }
+
 .jdr-timeline-more {
   width: 100%;
   justify-content: center;
-  margin-top: 4px;
+  margin-top: 6px;
+}
+
+mark.jdr-highlight {
+  background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  color: var(--interactive-accent);
+  padding: 0 2px;
+  border-radius: var(--am-radius-xs);
+  font-weight: 600;
 }
 
 /* Narrow panes: the date gutter costs more than it gives, so it goes inline
@@ -504,16 +940,34 @@
 
 /* ── Quick capture ───────────────────────────────────────────────────── */
 
+.almanac-capture-modal {
+  max-width: 520px;
+}
+.almanac-capture-modal .almanac-editor-body {
+  padding: 14px 4px 6px;
+}
+
 /* `.almanac-capture-hint` retired in 2.56.12 — the hint is the frame's subtitle
    now. It said what this window writes and where, which is the job
    `.almanac-editor-subtitle` already had in every other editor; two rules for
    one sentence in one kind of window is how they end up at different sizes. */
 .almanac-capture-input {
   width: 100%;
-  min-height: 7em;
+  min-height: 8.5em;
+  padding: 12px 14px;
   resize: vertical;
   font-size: var(--am-text-base);
-  line-height: 1.5;
+  line-height: 1.55;
+  border-radius: var(--am-radius-sm);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  margin-top: var(--am-space-3);
+  margin-bottom: var(--am-space-1);
+}
+.almanac-capture-input:focus {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
 }
 
 /* The destination row (4.27) — "Capture to [ Today · 15 Aug ▾ ]".
@@ -526,8 +980,8 @@
 .almanac-capture-dest {
   display: flex;
   align-items: center;
-  gap: var(--am-space-2);
-  margin-bottom: var(--am-space-2);
+  gap: var(--am-space-3);
+  margin-bottom: var(--am-space-3);
 }
 .almanac-capture-dest-label {
   font-size: var(--am-text-2xs);
@@ -536,10 +990,60 @@
   text-transform: uppercase;
   color: var(--text-muted);
   white-space: nowrap;
+  min-width: 82px;
+  flex-shrink: 0;
 }
 .almanac-capture-dest select {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* The stamp the capture will carry (4.62). One line, reading as an answer
+   rather than a form: the button says the minute, and only pressing it opens
+   the three fields the log card has had since 4.55. The fields drop below,
+   inside the same host, so opening them pushes the textarea down instead of
+   reflowing the row. */
+.almanac-capture-when {
+  margin-bottom: var(--am-space-3);
+}
+.almanac-capture-when-row {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-3);
+}
+
+/* The squared-off time trigger button in quick capture */
+.almanac-capture-when-row .journal-capture-time {
+  background: var(--background-secondary-alt);
+  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-xs);
+  padding: 4px 9px;
+  font-size: var(--am-text-xs);
+  font-family: var(--font-monospace);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  letter-spacing: 0.02em;
+  box-shadow: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.almanac-capture-when-row .journal-capture-time:hover {
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+  text-decoration: none;
+}
+.almanac-capture-when-row .journal-capture-time:focus-visible {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+  outline: none;
+}
+
+.almanac-capture-when .journal-capture-when {
+  margin-left: calc(82px + var(--am-space-3));
+  margin-top: var(--am-space-2);
+  gap: var(--am-space-2);
 }
 
 /* Collapsible note field (`note:key#collapse`). The label becomes the fold
@@ -594,24 +1098,351 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── The capture log (4.28) ─────────────────────────────────────────────
-   One card per capture, where the region used to be one textarea. The card is
-   `.jrc-card`'s shape — a bordered surface with a coloured left edge — because
-   a recall card and a capture are the same object at a glance: a small piece
-   of the reader's own text with controls on it. What it does NOT copy is the
-   task row, which is a line: a capture is multi-line by construction and a row
-   that assumes one line would clip the second. */
-.journal-capture-list {
+/* ── The capture log and logbook widgets (4.28 / 4.65) ───────────────────────
+   One card per item, with a filter deck, search bar, multi-category selector,
+   status chips, and a contained scrollable viewport so long logs never blow
+   out the parent layout. */
+.journal-logbook-deck {
   display: flex;
   flex-direction: column;
   gap: var(--am-space-2);
   margin-top: var(--am-space-1);
+  margin-bottom: var(--am-space-2);
 }
+
+.jcl-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--am-space-2);
+}
+
+/* Dropdown type selector on the top left (replaces title) */
+.jcl-dropdown-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.jcl-type-dropdown-btn {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  padding: 4px 10px;
+  border-radius: var(--am-radius-sm);
+  font-size: var(--am-text-xs);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.jcl-type-dropdown-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.jcl-type-dropdown-btn.is-open {
+  border-color: var(--interactive-accent);
+}
+
+.jcl-type-icon {
+  font-size: var(--am-text-xs);
+  display: inline-flex;
+  align-items: center;
+}
+
+.jcl-type-label {
+  font-size: var(--am-text-xs);
+  font-weight: 600;
+}
+
+.jcl-dropdown-caret {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-faint);
+  margin-left: 2px;
+  transition: transform 0.2s ease;
+}
+
+.jcl-dropdown-caret svg {
+  width: 11px;
+  height: 11px;
+}
+
+.jcl-type-dropdown-btn.is-open .jcl-dropdown-caret {
+  transform: rotate(180deg);
+}
+
+.jcl-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 100;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  box-shadow: var(--am-shadow-md);
+  min-width: 190px;
+  padding: 4px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.jcl-dropdown-menu.is-open {
+  display: flex;
+}
+
+.jcl-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  border-radius: var(--am-radius-xs);
+  font-size: var(--am-text-xs);
+  color: var(--text-normal);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  box-shadow: none;
+  transition: background 0.1s ease;
+}
+
+.jcl-dropdown-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.jcl-dropdown-item.is-selected {
+  background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-secondary));
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+.jcl-dropdown-item-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.jcl-item-icon {
+  font-size: var(--am-text-xs);
+}
+
+.jcl-item-label {
+  font-size: var(--am-text-xs);
+}
+
+.jcl-dropdown-badge {
+  font-size: var(--am-text-2xs);
+  font-variant-numeric: tabular-nums;
+  padding: 1px 6px;
+  border-radius: var(--am-radius-pill);
+  background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+  color: var(--text-muted);
+}
+
+.jcl-dropdown-item.is-selected .jcl-dropdown-badge {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.jcl-static-title {
+  font-size: var(--am-text-sm);
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+/* Collapsible search strip */
+.jcl-search-strip {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease, opacity 0.15s ease, margin 0.15s ease;
+  margin-top: 0;
+}
+
+.jcl-search-strip.is-open {
+  max-height: 44px;
+  opacity: 1;
+  margin-top: var(--am-space-1);
+}
+
+.jcl-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-2);
+  padding: 4px var(--am-space-2);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  transition: border-color 0.15s ease;
+}
+
+.jcl-search-wrap:focus-within {
+  border-color: var(--interactive-accent);
+}
+
+.jcl-search-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.jcl-search-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.jcl-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: var(--am-text-sm);
+  color: var(--text-normal);
+  outline: none;
+  padding: 0;
+  box-shadow: none;
+}
+
+.jcl-search-clear {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: var(--am-text-xs);
+  padding: 2px 4px;
+  box-shadow: none;
+}
+
+.jcl-search-clear:hover {
+  color: var(--text-normal);
+}
+
+/* Status Segmented Control */
+.jcl-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--am-space-2);
+}
+
+.jcl-status-segment {
+  display: inline-flex;
+  align-items: center;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+
+.jcl-status-segment-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--am-radius-xs);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: none;
+}
+
+.jcl-status-segment-btn:hover {
+  color: var(--text-normal);
+}
+
+.jcl-status-segment-btn.is-active {
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  box-shadow: var(--am-elev-1);
+}
+
+.jcl-actions-group {
+  display: flex;
+  align-items: center;
+  gap: var(--am-space-1);
+  margin-left: auto;
+}
+
+.jcl-action-chip {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--am-text-xs);
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: var(--am-radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  box-shadow: none;
+}
+
+.jcl-action-chip:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.jcl-action-chip.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+
+.jcl-action-icon {
+  display: flex;
+  align-items: center;
+}
+
+.jcl-action-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Contained Scroll Viewport */
+.journal-capture-scroll {
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: var(--am-space-1);
+  scroll-behavior: smooth;
+}
+
+.journal-capture-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.journal-capture-scroll::-webkit-scrollbar-thumb {
+  background: var(--background-modifier-border);
+  border-radius: var(--am-radius-xs);
+}
+
+.journal-capture-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--background-modifier-border-hover);
+}
+
+.journal-capture-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-space-2);
+}
+
 .journal-capture-empty {
   padding: var(--am-space-2) 0;
   font-size: var(--am-text-sm);
   color: var(--text-faint);
 }
+
 .journal-capture-card {
   padding: var(--am-space-2) var(--am-space-3);
   background: color-mix(in srgb, var(--interactive-accent) 5%, var(--background-secondary));
@@ -792,11 +1623,104 @@
   font-size: var(--am-text-2xs);
   padding: 2px var(--am-space-1);
   min-width: 0;
+  border-radius: var(--am-radius-xs);
 }
 .journal-capture-when-mins {
   /* Wide enough for three digits and no wider: a minutes box the size of a date
      field reads as somewhere to write a sentence. */
   width: 5.5em;
+}
+
+/* Compact mode */
+.journal-capture-scroll.is-compact .journal-capture-card {
+  padding: var(--am-space-1) var(--am-space-2);
+  gap: 2px;
+}
+.journal-capture-scroll.is-compact .journal-capture-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--am-text-xs);
+}
+
+/* Log type tags on cards */
+.journal-capture-type-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: var(--am-radius-xs);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--am-caps-tracking);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+.jcl-tag-icon {
+  font-size: var(--am-text-2xs);
+}
+.jcl-tag-label {
+  font-size: var(--am-text-2xs);
+}
+
+/* Search match highlighting */
+.jcl-highlight {
+  background: color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+  color: var(--text-normal);
+  padding: 0 2px;
+  border-radius: var(--am-radius-xs);
+}
+
+/* Tag and code styling in card text */
+.jcl-text-tag {
+  color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  padding: 1px 5px;
+  border-radius: var(--am-radius-xs);
+  font-size: var(--am-text-xs);
+  font-weight: 500;
+}
+
+.jcl-text-code {
+  font-family: var(--font-monospace);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  padding: 1px 4px;
+  border-radius: var(--am-radius-xs);
+  font-size: var(--am-text-2xs);
+}
+
+/* Add select */
+.jcl-add-type-select {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  font-size: var(--am-text-xs);
+  padding: 4px 8px;
+  border-radius: var(--am-radius-sm);
+  outline: none;
+  cursor: pointer;
+  height: auto;
+}
+
+/* Footer count */
+.journal-logbook-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--am-space-1) var(--am-space-2);
+  font-size: var(--am-text-2xs);
+  color: var(--text-faint);
+  border-top: 1px solid var(--background-modifier-border);
+  margin-top: var(--am-space-2);
+}
+.jcl-footer-count {
+  font-variant-numeric: tabular-nums;
+}
+.jcl-footer-cap {
+  color: var(--text-faint);
 }
 .journal-capture-add-input {
   width: 100%;

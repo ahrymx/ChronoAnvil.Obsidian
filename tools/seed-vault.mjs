@@ -48,17 +48,34 @@
 // it skipped. A seeded vault re-seeded is therefore a no-op, not a silent
 // double-write — which matters because the natural way to use this is to run it
 // again after a release.
+//
+// ── AND, SINCE 4.62, IT FILLS WHAT IS EMPTY ──────────────────────────────
+//
+// Two passes, not one. Files first — every note that does not exist yet — then
+// PATCHES: in-place edits to notes the SCAFFOLD owns. Charts, logbooks and
+// events all live in notes the plugin itself created, so a create-only tool
+// skipped every one of them and produced a vault with a year of tracker
+// readings and not a single chart drawn from them.
+//
+// A patch fills a chart fence that holds no charts, a logbook region that holds
+// no items, an `almanac-events: []` that holds no events — and declines any of
+// them that is already answered, which is the same rule as above with the same
+// `--force` escape. See `buildPatches` for why each refusal is where it is.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import {
   CORPUS,
+  DIARY_CAPTURES,
   DIARY_CHALLENGES,
+  DIARY_CHARTS,
   DIARY_FOCUS,
   DIARY_HIGHLIGHTS,
   DIARY_LINES,
   DIARY_TASKS,
+  LOGBOOK_CORPUS,
+  SEED_EVENTS,
 } from "./seed-corpus.mjs";
 
 // ── Pure helpers, exported for the tests ─────────────────────────────────
@@ -284,6 +301,183 @@ export const taskLine = (t) => `- (${t.done ? "x" : " "}) ${t.text}`;
 export const recallLine = (card) =>
   Array.isArray(card) && card[1] ? `${card[0]} :: ${card[1]}` : String(Array.isArray(card) ? card[0] : card);
 
+// ── The log grammar (4.62) ───────────────────────────────────────────────
+//
+// A stamped line: `2026-08-19 14:32 — text [mins:: 45] [done:: 2026-08-20]`.
+// This is `log-items.ts::serializeLogItem` written a second time, in a file that
+// cannot import it — the tool is plain `.mjs` and the plugin is TypeScript — and
+// a second spelling of a format is exactly the thing this project does not do.
+//
+// SO THE TEST IS THE JOIN. `seed-vault.test.ts` feeds these lines to the
+// plugin's own `parseLogItems` and asserts on what comes back, which is the same
+// discipline the task and recall regions are held to and for the same reason:
+// four region formats share one comment syntax, the write always succeeds, and
+// the only thing that can tell you the format was wrong is the parser.
+//
+// THE DATE IS OPTIONAL AND THAT IS THE WHOLE DIFFERENCE between the two things
+// this writes. A logbook note spans months, so its items carry a day; a capture
+// lives in a dated entry, so its stamp is the minute alone.
+export function stampLine({ date = null, time = null, text, mins = null, done = null }) {
+  const body = String(text).replace(/\s+$/, "");
+  if (!body) return "";
+  const stamp = [date, time].filter((part) => !!part).join(" ");
+  // `mins` BEFORE `done`, which is the order `serializeLogItem` writes them in
+  // and not an arbitrary one: every crossed-off line already on disk carries
+  // `[done:: …]` last.
+  const mark = (mins ? ` [mins:: ${mins}]` : "") + (done ? ` [done:: ${done}]` : "");
+  const [first, ...rest] = body.split("\n");
+  const head = `${stamp ? `${stamp} — ` : ""}${first.trim()}${mark}`;
+  return [head, ...rest.map((l) => (l.trim() === "" ? "" : `  ${l.trimEnd()}`))].join("\n");
+}
+
+// Items, as region lines with one blank line between them.
+//
+// THE BLANK LINE IS LOAD-BEARING, not spacing. `parseLogItems` reads a stamp as
+// the start of an item and everything under it as that item's text, so two items
+// written back to back would parse as one item with a second stamp inside its
+// body — and `appendedSince` only recognises another writer's append when the
+// divergence starts with `\n\n`, which is what keeps a capture arriving while
+// the list is on screen from being clobbered.
+export const logBlock = (items) =>
+  items.filter((l) => l !== "").flatMap((line, i) => (i ? ["", line] : [line]));
+
+// Make sure a region exists, appending an empty one at the end of the note if it
+// does not — `notestore.ts::writeNoteRegion`'s own append, spacing included.
+//
+// NEEDED BECAUSE A LOGBOOK NOTE HAS NO REGION UNTIL IT IS USED. The scaffold
+// writes the note and its `logbook:` directive; the region is created by the
+// widget the first time it renders. A seeder that only ever filled existing
+// regions could therefore fill every daily entry and no logbook at all.
+export function ensureRegion(body, id) {
+  if (body.includes(`<!--almanac:${id}`)) return body;
+  const trimmed = body.replace(/\s*$/, "");
+  const sep = trimmed.length === 0 ? "" : "\n\n";
+  return `${trimmed}${sep}<!--almanac:${id}\n-->\n`;
+}
+
+// ── Charts (4.62) ────────────────────────────────────────────────────────
+
+// One `chart:` directive, in the order `charts.ts::serializeChartSpec` writes
+// them: scope, then `+y=`, then `+avg`, then the title after a bar. A different
+// order would still parse — the suffix parser takes them in any order — and
+// would produce a vault whose directives do not match what the chart editor
+// writes back the first time somebody touches one.
+export function chartLine(spec) {
+  const scope = spec.scope && spec.scope !== "daily" ? `:${spec.scope}` : "";
+  const y = spec.y ? `+y=${spec.y}` : "";
+  const avg = spec.avg ? "+avg" : "";
+  const size = spec.size ? `+size=${spec.size}` : "";
+  const title = spec.title ? `|${spec.title}` : "";
+  return `chart:${spec.key}:${spec.tracker}:${spec.type}:${spec.range}${scope}${y}${avg}${size}${title}`;
+}
+
+// Put chart directives inside a note's ```almanac-charts fence.
+//
+// AND REFUSE ONE THAT ALREADY HAS SOME. The fence is a MANAGED region — the
+// chart editor rewrites it — so a seeder that appended to a populated one would
+// be adding tiles to a list somebody curated. Returns null for "no fence here"
+// and null for "this one is already answered", and the caller reports the
+// difference; both mean the same thing to the run, which is: leave it alone.
+//
+// THE `header:` LINE STAYS WHERE IT IS. In the merged layout the fence carries
+// both its own section title and its charts, so the directives go after
+// whatever is already in it rather than replacing the body.
+export function fillChartsFence(body, lines) {
+  const open = body.indexOf("```almanac-charts");
+  if (open === -1) return null;
+  const bodyStart = body.indexOf("\n", open);
+  if (bodyStart === -1) return null;
+  const close = body.indexOf("\n```", bodyStart);
+  if (close === -1) return null;
+  const inner = body.slice(bodyStart + 1, close + 1);
+  if (/^chart:/m.test(inner)) return null;
+  const kept = inner.replace(/\s*$/, "");
+  return `${body.slice(0, bodyStart + 1)}${kept ? `${kept}\n` : ""}${lines.join("\n")}${body.slice(close)}`;
+}
+
+// ── Events (4.62) ────────────────────────────────────────────────────────
+
+// The corpus's offsets, resolved against the run's own "today", with an id
+// slugged from the title exactly as `slugifyEventId` would.
+//
+// A WEEKLY EVENT IS STORED AS A RECURRING ONE WITH `every: week` (4.62), which
+// is the shape `normalizeEvent` reads — `kind: "weekly"` is this corpus's word
+// for it and nothing else's, translated here rather than in the file a reader
+// edits.
+export function resolveEvents(list, today) {
+  return list.map((e) => {
+    const id = String(e.title)
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48);
+    const out = { id, title: e.title, icon: e.icon, color: e.color };
+    if (e.note) out.note = e.note;
+    if (e.time) out.time = e.time;
+    if (e.duration) out.duration = e.duration;
+    if (e.kind === "weekly") {
+      out.kind = "recurring";
+      out.every = "week";
+      out.weekday = e.weekday;
+      if (e.fromOffset != null) out.from = isoShift(today, e.fromOffset);
+      if (e.untilOffset != null) out.until = isoShift(today, e.untilOffset);
+      return out;
+    }
+    if (e.kind === "recurring") {
+      out.kind = "recurring";
+      out.month = e.month;
+      out.day = e.day;
+      return out;
+    }
+    out.kind = "single";
+    out.start = e.start ?? isoShift(today, e.startOffset ?? 0);
+    if (e.endOffset != null) out.end = isoShift(today, e.endOffset);
+    return out;
+  });
+}
+
+// The events note's frontmatter value, as YAML.
+//
+// WRITTEN BY HAND BECAUSE THE TOOL HAS NO YAML WRITER, and quoted on every
+// string because the titles are prose: an apostrophe, a colon before a space or
+// a leading digit each mean something to a YAML parser and none of them means it
+// in "One-to-one". Numbers stay bare so `month: 4` reads as a number, which is
+// what `asInt` expects to find.
+export function eventsYaml(events, key = "almanac-events") {
+  const out = [`${key}:`];
+  for (const e of events) {
+    const rows = Object.entries(e).map(([k, v]) =>
+      typeof v === "number" ? `${k}: ${v}` : `${k}: "${String(v).replace(/"/g, '\\"')}"`
+    );
+    out.push(`  - ${rows[0]}`);
+    for (const row of rows.slice(1)) out.push(`    ${row}`);
+  }
+  return out.join("\n");
+}
+
+// Replace an EMPTY `almanac-events: []` with a list, and refuse a note that
+// already holds events — somebody's own birthdays are not this tool's to
+// overwrite, and `[]` is the scaffold's own way of saying "none yet".
+export function fillEvents(body, events, key = "almanac-events") {
+  const end = body.indexOf("\n---", 4);
+  if (!body.startsWith("---\n") || end === -1) return null;
+  const head = body.slice(0, end).split("\n");
+  const at = head.findIndex((l) => l.startsWith(`${key}:`));
+  if (at === -1) return null;
+  // EMPTY MEANS TWO THINGS AND NEITHER OF THEM IS "the key line looks short".
+  // `almanac-events:` with nothing after it is also the FIRST LINE of a filled
+  // list — the events are the indented lines beneath it — so the next line has
+  // to be checked as well. A regex that only read the key line matched both and
+  // quietly re-seeded a note that already had a year of events in it.
+  const value = head[at].slice(key.length + 1).trim();
+  if (value !== "" && value !== "[]") return null;
+  if (value === "" && /^\s+\S/.test(head[at + 1] ?? "")) return null;
+  head.splice(at, 1, ...eventsYaml(events, key).split("\n"));
+  return head.join("\n") + body.slice(end);
+}
+
 // `{{token}}` substitution, matching src/core/util.ts::fillTemplate — unknown
 // tokens are left in place so a missing value is visible rather than blank.
 export function fillTemplate(body, tokens) {
@@ -320,6 +514,22 @@ export function buildPlan({ settings, templates, corpus, dates, rng, warn }) {
   // journals and the diary disagree about when the year was busy is worse than
   // one with less in it.
   const nextDate = () => dates[cursor++ % dates.length];
+
+  // A VAULT WITH NO JOURNALS IS A LEGITIMATE VAULT AND A SURPRISING RUN. The
+  // corpus carries four journals and thirty-two notes, and none of them can be
+  // written until the vault has somewhere to put them: the shape comes from
+  // `customJournals` in the vault's own `data.json` and the note bodies come
+  // from the journal's own templates folder, and both of those appear when a
+  // reader adds a journal in Obsidian — not before. So the run finishes with a
+  // diary and nothing else, reports "273 written, 0 warnings", and reads as
+  // complete. This says otherwise, in the place every other disagreement
+  // between the corpus and the vault is reported.
+  if (!journals.length) {
+    warn(
+      "this vault has no journals — Settings → Journals → Presets adds one, " +
+        `then re-run and the corpus fills it (${Object.keys(corpus).join(", ")})`
+    );
+  }
 
   for (const journal of journals) {
     const entry = corpus[journal.id];
@@ -480,11 +690,260 @@ export function buildPlan({ settings, templates, corpus, dates, rng, warn }) {
           uniquePicks(rng, DIARY_TASKS, n).map((text) => taskLine({ text, done: rng() < 0.55 }))
         );
       }
+      // CAPTURES ARE A DIFFERENT GRAMMAR IN THE SAME KIND OF REGION, and the
+      // sixth one this loop writes: stamped items, `HH:mm — text`, with no date
+      // because the entry already is one. They matter beyond the entry — 4.62's
+      // time grid draws them as a source, so a vault seeded without them shows
+      // the grid's fourth track permanently empty on every single day.
+      //
+      // TIMES ASCEND, which the parser does not require and a reader does. A
+      // capture list is the order the thoughts arrived in.
+      if (rng() < 0.6) {
+        let hour = 7 + Math.floor(rng() * 4);
+        fill(
+          "capture",
+          logBlock(
+            uniquePicks(rng, DIARY_CAPTURES, 1 + Math.floor(rng() * 3)).map((text) => {
+              hour = Math.min(23, hour + Math.floor(rng() * 5));
+              const time = `${String(hour).padStart(2, "0")}:${String(Math.floor(rng() * 12) * 5).padStart(2, "0")}`;
+              return stampLine({ time, text, mins: rng() < 0.25 ? [10, 15, 30][Math.floor(rng() * 3)] : null });
+            })
+          )
+        );
+      }
       files.push({ path: `${paths.diaryDaily}/Day-${date}.md`, content: body });
     }
   }
 
   return files;
+}
+
+// ── The second pass: patches ─────────────────────────────────────────────
+//
+// EVERYTHING ABOVE WRITES FILES THAT DO NOT EXIST. That was the whole tool
+// until 4.62, and it cannot express what charts and logbooks need: the
+// homepage, the five diary dashboards, the three logbook notes and the events
+// note are all written by the SCAFFOLD, so by the time this runs they are
+// already there — and a create-only seeder skips every one of them. A vault
+// with a year of readings and not a single chart is the result, which is the
+// exact failure the diary regions were fixed for one pass earlier.
+//
+// So a patch reads a file, transforms it, and hands back the new text — or
+// hands back null, which means LEAVE IT ALONE. Null is not an error and is the
+// common case on a second run: the fence already holds charts, the logbook
+// already holds items, the events note already holds events. The rule the
+// header states for files — it refuses to overwrite — becomes, for the notes
+// the scaffold owns: it fills what is empty, and nothing else.
+//
+// `--force` widens that to "empty it first, then fill", which is why each
+// transform takes the flag rather than the caller clearing things behind its
+// back; the emptying and the filling are the same decision.
+
+// A region's current contents, or null when the note has no such region.
+export function readRegion(body, id) {
+  const open = `<!--almanac:${id}`;
+  const at = body.indexOf(open);
+  if (at === -1) return null;
+  const from = body.indexOf("\n", at);
+  const close = body.indexOf("-->", at);
+  if (from === -1 || close === -1 || from > close) return "";
+  return body.slice(from + 1, close).replace(/\s+$/, "");
+}
+
+// Strip the `chart:` lines from a fence, leaving its `header:` and anything else
+// a reader put there — the `--force` half of `fillChartsFence`.
+export function clearChartsFence(body) {
+  const open = body.indexOf("```almanac-charts");
+  if (open === -1) return body;
+  const bodyStart = body.indexOf("\n", open);
+  const close = body.indexOf("\n```", bodyStart);
+  if (bodyStart === -1 || close === -1) return body;
+  const kept = body
+    .slice(bodyStart + 1, close + 1)
+    .split("\n")
+    .filter((l) => !/^chart:/.test(l))
+    .join("\n")
+    .replace(/\s*$/, "");
+  return `${body.slice(0, bodyStart + 1)}${kept ? `${kept}\n` : ""}${body.slice(close + 1)}`;
+}
+
+// Drop an `almanac-events:` block — the key line and the indented list under it
+// — so a forced run can write a fresh one. Bounded by the next unindented key,
+// which is how a YAML block ends.
+export function clearEvents(body, key = "almanac-events") {
+  const end = body.indexOf("\n---", 4);
+  if (!body.startsWith("---\n") || end === -1) return body;
+  const head = body.slice(0, end).split("\n");
+  const at = head.findIndex((l) => l.startsWith(`${key}:`));
+  if (at === -1) return body;
+  let stop = at + 1;
+  while (stop < head.length && /^\s+\S/.test(head[stop])) stop++;
+  head.splice(at, stop - at, `${key}: []`);
+  return head.join("\n") + body.slice(end);
+}
+
+// The folder-note rule: a folder's own note is the file inside it that carries
+// the folder's name. Every diary dashboard is one, so their paths are DERIVED
+// from `settings.paths` rather than spelled out here — a vault whose weekly
+// folder is called something else still gets its charts.
+export const folderNote = (folder) => `${folder}/${folder.split("/").pop()}.md`;
+
+// Which trackers a chart may name.
+//
+// TWO LISTS HAVE TO AGREE and only their intersection is safe. `settings.trackers`
+// is what the plugin will offer in the chart editor; the Daily template's
+// `# almanac:trackers:start` block is what actually gets WRITTEN into an entry's
+// frontmatter. A tracker in the first but not the second — Energy and Focus, in
+// the vault this was built against — is declared, chartable, and has no readings
+// at all, so a chart naming it is a permanently empty tile. That is precisely the
+// thing the corpus exists to prevent, so it is dropped and reported.
+export function chartableTrackers({ settings, dailyTemplate }) {
+  const declared = new Set(
+    (settings.trackers ?? [])
+      .filter((t) => (t.surface?.kind ?? "") === "diary")
+      .map((t) => t.id)
+  );
+  const front = /# almanac:trackers:start\n([\s\S]*?)\n# almanac:trackers:end/.exec(dailyTemplate ?? "");
+  if (!front) return declared;
+  const written = new Set(
+    front[1]
+      .split("\n")
+      .map((l) => /^([^:#]+):/.exec(l)?.[1]?.trim())
+      .filter(Boolean)
+  );
+  return new Set([...declared].filter((id) => written.has(id)));
+}
+
+// ── The logbooks ─────────────────────────────────────────────────────────
+
+// Stamped items for one region-backed logbook, over the days the vault is
+// active on.
+//
+// THE THREE LOGBOOKS ARE NOT THE SAME SHAPE and seeding them alike would hide
+// what they are for. A work log is dense and carries `[mins:: N]`, because it
+// answers "where did the week go"; a focus log holds seven lines in thirteen
+// months, because it changes when the work changes; a review list is half
+// crossed off, because that is what a list of things to come back to looks like
+// once you have come back to some of them. `LOGBOOK_CORPUS` states each of those
+// as numbers, and this reads them.
+export function logbookItems({ lines, mins = false, perDay = 0, spread = false, crossOff = 0 }, dates, rng) {
+  const items = [];
+  if (spread) {
+    // One item every so often, in order, so the log reads as a sequence rather
+    // than as a shuffle — a focus that moved on the 3rd and back on the 5th is
+    // noise, not history.
+    const step = Math.max(1, Math.floor(dates.length / (lines.length + 1)));
+    lines.forEach((text, i) => {
+      const date = dates[Math.min(dates.length - 1, i * step + Math.floor(rng() * step))];
+      items.push({ date, text });
+    });
+  } else {
+    for (const date of dates) {
+      if (rng() >= perDay) continue;
+      items.push({ date, text: pick(rng, lines) });
+    }
+  }
+  return items
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    .map(({ date, text }) => {
+      const hour = 9 + Math.floor(rng() * 9);
+      const time = `${String(hour).padStart(2, "0")}:${String(Math.floor(rng() * 12) * 5).padStart(2, "0")}`;
+      return stampLine({
+        date,
+        time,
+        text,
+        // A round 30 or 45 rather than 37: these are typed by a person reaching
+        // for the nearest number, and `mins: null` — not 0 — is how the grammar
+        // spells "a moment", which is what every item in the other two logs is.
+        mins: mins && rng() < 0.8 ? [15, 25, 30, 45, 60, 90][Math.floor(rng() * 6)] : null,
+        done: rng() < crossOff ? isoShift(date, 1 + Math.floor(rng() * 20)) : null,
+      });
+    });
+}
+
+// ── The patches ──────────────────────────────────────────────────────────
+
+// The key the logbook widget stores its items under — `LOGBOOK_NOTE_KEY` in
+// src/core/constants.ts, spelled once here rather than at each site below.
+const LOGBOOK_KEY = "logbook";
+
+// Build every in-place edit the run would make, again without touching the disk.
+//
+// Each entry is `{ path, what, apply }`, where `apply(body, { force })` returns
+// the new text or null for "already answered". The caller reports the two apart;
+// to the vault they mean the same thing, which is that nothing was clobbered.
+export function buildPatches({ settings, templates, plans, dates, today, rng, warn }) {
+  const paths = settings.paths;
+  const out = [];
+  const dailyTemplate = templates.get(`${paths.templatesDiary}/Daily.md`) ?? "";
+  const usable = chartableTrackers({ settings, dailyTemplate });
+
+  // Charts, one plan per surface, each surface's note derived from the paths.
+  const surfaces = [
+    ["home", paths.home],
+    ["diary", folderNote(paths.diaryRoot)],
+    ["weekly", folderNote(paths.diaryWeekly)],
+    ["monthly", folderNote(paths.diaryMonthly)],
+    ["quarterly", folderNote(paths.diaryQuarterly)],
+    ["yearly", folderNote(paths.diaryYearly)],
+  ];
+  for (const [surface, path] of surfaces) {
+    const plan = (plans.charts ?? {})[surface] ?? [];
+    const keep = plan.filter((spec) => {
+      const wanted = [spec.tracker, spec.y].filter(Boolean);
+      const missing = wanted.filter((id) => !usable.has(id));
+      if (missing.length) warn(`${surface} chart "${spec.key}": no readings for ${missing.join(", ")} — dropped`);
+      return missing.length === 0;
+    });
+    if (!keep.length) continue;
+    const lines = keep.map(chartLine);
+    out.push({
+      path,
+      what: "charts",
+      apply: (body, { force = false } = {}) => fillChartsFence(force ? clearChartsFence(body) : body, lines),
+    });
+  }
+
+  // The region-backed logbooks. The events-backed one — Meetings — is not
+  // seeded here and does not need to be: it reads the events note, so it fills
+  // itself the moment the patch below lands.
+  for (const book of settings.logbooks ?? []) {
+    if (book.source !== "region") continue;
+    const plan = (plans.logbooks ?? {})[book.id];
+    if (!plan) {
+      warn(`no corpus for logbook "${book.id}" — left empty`);
+      continue;
+    }
+    const lines = logbookItems(plan, dates, rng);
+    out.push({
+      path: book.path,
+      what: "logbook",
+      apply: (body, { force = false } = {}) => {
+        // The region is created by the widget on first render, so a logbook
+        // nobody has opened yet has none — appending an empty one is what
+        // `writeNoteRegion` would have done, and is the difference between
+        // seeding three logbooks and seeding none.
+        const withRegion = ensureRegion(body, LOGBOOK_KEY);
+        if (!force && (readRegion(withRegion, LOGBOOK_KEY) ?? "") !== "") return null;
+        return fillRegion(withRegion, LOGBOOK_KEY, logBlock(lines));
+      },
+    });
+  }
+
+  // The events note, which four things read: the calendars, the upcoming-events
+  // widget, the Meetings logbook and — new in 4.62 — the time grid.
+  if (settings.eventsEnabled !== false && paths.events) {
+    const events = resolveEvents(plans.events ?? [], today);
+    if (events.length) {
+      out.push({
+        path: paths.events,
+        what: "events",
+        apply: (body, { force = false } = {}) => fillEvents(force ? clearEvents(body) : body, events),
+      });
+    }
+  }
+
+  return out;
 }
 
 // ── The run ──────────────────────────────────────────────────────────────
@@ -557,6 +1016,16 @@ function main(argv) {
     warn: (m) => warnings.push(m),
   });
 
+  const patches = buildPatches({
+    settings,
+    templates,
+    plans: { charts: DIARY_CHARTS, logbooks: LOGBOOK_CORPUS, events: SEED_EVENTS },
+    dates,
+    today,
+    rng,
+    warn: (m) => warnings.push(m),
+  });
+
   let written = 0;
   let skipped = 0;
   for (const file of files) {
@@ -570,6 +1039,30 @@ function main(argv) {
       writeFileSync(abs, file.content, "utf8");
     }
     written++;
+  }
+
+  // The patches run after the files, and the order is not incidental: the
+  // charts and the logbooks are only worth looking at once the entries they
+  // read exist, and a dry run that reported them in either order would still be
+  // reporting a vault nobody has.
+  let patched = 0;
+  let intact = 0;
+  let absent = 0;
+  for (const patch of patches) {
+    const abs = join(vault, patch.path);
+    if (!existsSync(abs)) {
+      warnings.push(`${patch.path} is not there — ${patch.what} not seeded`);
+      absent++;
+      continue;
+    }
+    const body = readFileSync(abs, "utf8");
+    const next = patch.apply(body, { force });
+    if (next == null || next === body) {
+      intact++;
+      continue;
+    }
+    if (!dryRun) writeFileSync(abs, next, "utf8");
+    patched++;
   }
 
   // ── The report ─────────────────────────────────────────────────────────
@@ -586,6 +1079,9 @@ function main(argv) {
     `\n  ${dates.length} active days over ${months} months, ` +
       `longest streak ${longestStreak(dates)}` +
       `\n  ${written} written, ${skipped} skipped${skipped && !force ? " (already there — pass --force to overwrite)" : ""}` +
+      `\n  ${patched} ${dryRun ? "to patch" : "patched"}, ${intact} left alone` +
+      `${intact && !force ? " (charts, logs or events already there — pass --force to replace)" : ""}` +
+      `${absent ? `, ${absent} missing` : ""}` +
       `\n  seed ${seed}, ending ${today}\n`
   );
   for (const w of warnings) console.warn(`  ! ${w}`);

@@ -32,7 +32,6 @@ import {
   UpcomingEvent,
 } from "../events/events";
 import { getEventsFile, readEvents } from "../events/eventstore";
-import { buildDiaryActions } from "./diary-header";
 import { buildPeriodNav, periodSpan } from "./periodnav";
 import { bannerSuppressed } from "../ui/vault-banner";
 import { statStrip } from "../ui/stat-strip";
@@ -615,86 +614,38 @@ export function buildCalendar(
   // processor and not by the table it belongs to. The strip reads as the
   // section's because it takes the same four values — a hairline, 4px of air,
   // right-aligned, at the bar's scale — not because it shares its element.
-  if (opts.header && opts.ctx) {
-    root.addClass("jc-has-header");
-    // NO AREA TITLEBAR SINCE 4.8.1. A tinted strip saying DIARY sat above this
-    // band, naming the root the card covers; the block's own head now says what
-    // the block is, one line further up and in the page's own voice. Two bars
-    // over one card, and the upper one repeated what the lower one already
-    // shows in larger type. See `buildAreaTitlebar`'s removal.
-    root.appendChild(buildDiaryActions(plugin, opts.ctx));
-  }
-
   const header = root.createDiv({ cls: "jc-header" });
 
-  // The header is the calendar's period navigator, in two rows (2.26).
-  //
-  // Top: the year, as the title. It was a three-year rail (2025 | 2026 | 2027)
-  // over a `‹ July ›` month stepper; both are gone. The rail spent a full row
-  // on two links you rarely take, and the stepper is redundant the moment
-  // every month is one tap away in the rail below. Chevrons step the year;
-  // the year itself opens The Year, as the centred rail segment used to.
-  //
-  // Below: the quarter rail — twelve months in four bounded groups, the one
-  // holding the shown month lit.
-  //
-  // Until 2.51 the groups were divided by a single hairline and nothing else,
-  // on the 2.18.2 argument that a row of bordered objects on a void reads as
-  // floating pieces. That argument was about *detached* objects; this is one
-  // rail whose segments happen to be separable, with exactly one of the four
-  // lit at a time — a segmented control, not four pills — and the thing the
-  // hairlines could never say is which quarter you are actually in. The Q
-  // label went accent for that and it wasn't enough: an eight-pixel word at
-  // the left edge of a group is not how you mark a region.
-  //
-  // The `Q` labels are the way into the Quarterly Overview, so the navigator
-  // reaches every review scope the plugin has: week from the grid's `Wk`
-  // gutter, month from the selected cell, quarter from its label, year from
-  // the title. Four scopes, four doors, and not one of them a new file.
-  // Three columns, and the year stepper is a group of its own (2.51.1).
-  //
-  // The stepper used to be three loose children of a centred flex row, with
-  // Today absolutely positioned against the row's right edge. That works right
-  // up until the row is narrower than the four buttons want to be — then the
-  // centred group and the absolute one occupy the same pixels, and Today prints
-  // over the year. Absolute positioning is what let them overlap: the year knew
-  // nothing about Today's width, so nothing reserved room for it.
-  //
-  // As a `1fr auto 1fr` grid there is no overlap available. The stepper sits in
-  // the middle column and is exactly centred on the card; Today sits in the
-  // third and is flush right; the first column is the empty counterweight that
-  // makes the centring true rather than approximate. Nothing is positioned out
-  // of flow, so the row cannot collapse onto itself at any width.
   const navHead = header.createDiv({ cls: "jc-navhead" });
-  const yearNav = navHead.createDiv({ cls: "jc-yearnav" });
-  const yearPrevEl = yearNav.createEl("button", {
+  const yearPrevEl = navHead.createEl("button", {
     cls: "jc-year-step jc-year-prev",
     attr: { type: "button", "aria-label": "Previous year" },
   });
   setIcon(yearPrevEl, "chevron-left");
-  const yearCurEl = yearNav.createEl("button", {
+
+  const yearCurEl = navHead.createEl("button", {
     cls: "jc-year-cur",
     attr: { type: "button", title: "Open the year overview" },
   });
-  // The year is the middle segment of the stepper pill and it is also a link to
-  // The Year, which are two different things for one control to be. Until now
-  // the only thing saying so was the tooltip and a hover colour — you had to
-  // already suspect it to find out. The arrow says it at rest.
-  //
-  // A label span rather than the button's own text node, because the icon is a
-  // sibling and `setText` on the button would delete it every render.
+  const yearCurCalIcon = yearCurEl.createSpan({ cls: "jc-year-cur-cal-icon" });
+  setIcon(yearCurCalIcon, "calendar");
   const yearCurLabel = yearCurEl.createSpan({ cls: "jc-year-cur-label" });
-  setIcon(yearCurEl.createSpan({ cls: "jc-year-cur-icon" }), "arrow-up-right");
-  const yearNextEl = yearNav.createEl("button", {
+  const yearCurExtIcon = yearCurEl.createSpan({ cls: "jc-year-cur-icon" });
+  setIcon(yearCurExtIcon, "arrow-up-right");
+
+  const rightCluster = navHead.createDiv({ cls: "jc-navhead-right" });
+  const yearNextEl = rightCluster.createEl("button", {
     cls: "jc-year-step jc-year-next",
     attr: { type: "button", "aria-label": "Next year" },
   });
   setIcon(yearNextEl, "chevron-right");
-  const todayBtn = navHead.createEl("button", {
+
+  const todayBtn = rightCluster.createEl("button", {
     cls: "jc-today-btn",
-    text: "Today",
-    attr: { type: "button" },
+    attr: { type: "button", title: "Jump to today" },
   });
+  todayBtn.createSpan({ cls: "jc-today-dot" });
+  todayBtn.createSpan({ cls: "jc-today-label", text: "Today" });
 
   // Month abbreviations are read off a fixed year so they follow the locale
   // without moment's day-clamping (setting month on the 31st would skid).

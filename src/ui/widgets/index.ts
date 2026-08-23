@@ -917,28 +917,6 @@ export class Widgets implements
       // the summary's nav stack, which reads better and cannot work: the
       // summary is a `LiveWidget` and `rerender()` rebuilds its subtree on
       // every metadata change the diary folders emit. A button parented there
-      // survives until the first entry is edited and then vanishes, with the
-      // directive still in the file. So both of this bar's buttons are siblings
-      // the postprocessor owns, and only their POSITION is borrowed.
-      const openActionsBar = (): HTMLElement => {
-        const created = container.createDiv({ cls: "journal-widget-bar" });
-        if (!isOverviewCard) return created;
-        created.addClass("journal-overview-actions");
-        // FIRST CHILD, so it takes the row's left edge. 3.6 patch 7 moved it
-        // out of the band, where it was the heaviest thing in the masthead and
-        // the least important control in it. The footer is where a control that
-        // acts on the whole card belongs, next to the only other one.
-        if (overviewGrain) {
-          created.appendChild(buildNowButton(this.plugin, ctx, overviewGrain));
-        }
-        return created;
-      };
-      // The single "Habits" cell every boolean tracker in this block folds
-      // into, created lazily at the first one. It takes that first habit's
-      // position in the grid, so a note that opens with Mood and Exercise
-      // still opens with Mood and Exercise — the later habits join the cell
-      // rather than the cell moving to meet them.
-      let habitsCell: HTMLElement | null = null;
       // Set once an `entry-header` has been rendered into this block. It turns
       // the block into the entry banner (see .journal-entry-banner in
       // styles.css): one card holding the nav strip and, welded beneath it, the
@@ -950,13 +928,37 @@ export class Widgets implements
       // A dashboard masthead: the fence holds a period summary, so the card is
       // the block's rather than the summary widget's. 3.2 §3.
       let isOverviewCard = false;
+      let overviewHost: HTMLElement | null = null;
       // WHICH grain, kept as well as whether, because the footer's "This Week"
       // button needs a unit and the footer is built later in the loop, by which
       // point `kind` is `button`. Read off the summary directive that set the
       // flag rather than passed down from the composer: the two would be one
       // more pair to keep in step, and the directive is already the thing that
       // decides what the card is.
+      // The single "Habits" cell every boolean tracker in this block folds
+      // into, created lazily at the first one. It takes that first habit's
+      // position in the grid, so a note that opens with Mood and Exercise
+      // still opens with Mood and Exercise — the later habits join the cell
+      // rather than the cell moving to meet them.
+      let habitsCell: HTMLElement | null = null;
       let overviewGrain: PeriodGrain | null = null;
+      // survives until the first entry is edited and then vanishes, with the
+      // directive still in the file. So both of this bar's buttons are siblings
+      // the postprocessor owns, and only their POSITION is borrowed.
+      const openActionsBar = (): HTMLElement => {
+        const parent = overviewHost ?? container;
+        const created = parent.createDiv({ cls: "journal-widget-bar" });
+        if (!isOverviewCard) return created;
+        created.addClass("journal-overview-actions");
+        // FIRST CHILD, so it takes the row's left edge. 3.6 patch 7 moved it
+        // out of the band, where it was the heaviest thing in the masthead and
+        // the least important control in it. The footer is where a control that
+        // acts on the whole card belongs, next to the only other one.
+        if (overviewGrain) {
+          created.appendChild(buildNowButton(this.plugin, ctx, overviewGrain));
+        }
+        return created;
+      };
       // Same idea as isEntryBanner, for a `journal-header` (see
       // .journal-study-banner in styles.css). Still its own flag, because the
       // two cards are styled differently — but no longer a *behavioural*
@@ -1255,6 +1257,7 @@ export class Widgets implements
         if (!INLINE_KINDS.has(kind)) {
           bar = null;
           headerGroup = null;
+          overviewHost = null;
           // ── A HEAD IS NOT A BANNER, AND TAKES NONE OF ITS CHROME (4.51.6) ──
           //
           // These three flags choose the block's CARD — the accent wash of
@@ -1292,10 +1295,25 @@ export class Widgets implements
           if (OVERVIEW_KINDS.has(kind)) {
             isOverviewCard = true;
             overviewGrain = kind.replace(/-summary$/, "") as PeriodGrain;
-          }
-          container.appendChild(widget);
-          if (SECTION_TITLES[kind]) {
-            named.push({ el: widget, title: SECTION_TITLES[kind] });
+            if (rowSpec.row && kind !== "level-cards") {
+              overviewHost = container.createDiv({
+                cls: "journal-card journal-overview-card",
+              });
+              overviewHost.appendChild(widget);
+              if (SECTION_TITLES[kind]) {
+                named.push({ el: overviewHost, title: SECTION_TITLES[kind] });
+              }
+            } else {
+              container.appendChild(widget);
+              if (SECTION_TITLES[kind]) {
+                named.push({ el: widget, title: SECTION_TITLES[kind] });
+              }
+            }
+          } else {
+            container.appendChild(widget);
+            if (SECTION_TITLES[kind]) {
+              named.push({ el: widget, title: SECTION_TITLES[kind] });
+            }
           }
         } else {
           if (!bar) {

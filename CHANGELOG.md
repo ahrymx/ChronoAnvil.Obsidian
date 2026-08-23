@@ -7,6 +7,130 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.65.0] - 2026-08-23
+
+**Logbook widgets gain unified multi-type aggregation, an interactive category dropdown, collapsible search, segment status controls, and rich tag formatting.**
+
+### Added
+
+- **Unified multi-type logbook widget.** A bare `logbook` or `logbook:all` directive aggregates items from all registered logbooks in the vault, supporting in-widget filtering by category, status, and search query.
+- **Log type filter dropdown selector.** Replaced static titles and wrapping pills with an integrated dropdown picker on the top-left of the logbook header, displaying live entry counters per category.
+- **Collapsible search bar.** Added an animated collapsible search toggle (`🔍 Search`) to the toolbar deck with real-time text matching, keyword highlighting (`<mark class="jcl-highlight">`), and instant clear button.
+- **Segmented status control.** Grouped status filters (`All`, `Open`, `Done`, `Timed`) into a segmented pill control matching native Obsidian design aesthetics.
+- **Enhanced tag and inline code typography.** Log cards format `#tags` as styled pill capsules (`.jcl-text-tag`) and ``` `code` ``` as monospace blocks (`.jcl-text-code`).
+- **Contained scrollable viewport.** Logbook cards are contained in a max-height scrollable viewport (`440px`), preventing long logs from expanding notes indefinitely.
+- **Section editor "Show as widget" toggle.** Added `formQuestion` support for logbook sections and widgets, allowing users to toggle between a foldable section header and a bare embeddable widget.
+
+### Fixed
+
+- **Sticky widget header banner bug.** Fixed `:focus-within` trigger on `.journal-widget-card` that caused the top drag header banner to stick open whenever any button or control inside a widget was clicked.
+- **Timestamp editor duplication.** Fixed click handler on the log item timestamp button to correctly detect and dismiss the active timestamp/duration editor rather than appending duplicate editor rows.
+- **Live reactivity for new entries.** New entries added to unified multi-logbook views are immediately written to their target note and reloaded into the active view without requiring a page reload.
+
+## [4.64.0] - 2026-08-23
+
+**Search surfaces gain quick filter chips, bracketed tracker operators, and keyword highlighting, while the diary calendar header navigators are streamlined.**
+
+### Added
+
+- **Unified bracket filter syntax across search surfaces.** The query parser now supports bracketed expressions such as `[mood>=5]`, `[mood<=2]`, `[mood>3]`, and `[mood=4]`, evaluating against numerical trackers and frontmatter.
+- **Quick filter chips & year selector.** Entry Timeline, Diary Search, and the main Vault Search Modal (`Ctrl/⌘ K`) now provide 1-click Year selector pills (`All`, `2026`, `2025`, etc.) and attribute quick chips (`Tasks`, `Files`, and `Monthly`).
+- **Search match keyword highlighting.** Search terms are highlighted using `<mark class="jdr-highlight">` in both note titles and excerpt snippets.
+- **Compact view toggle.** Added compact single-line mode for high-density scanning across timeline and search results.
+
+### Fixed
+
+- **Timeline search icon text collision.** Fixed placeholder text overlapping the magnifying glass icon by switching to a modern flex container layout.
+- **Sticky timeline month header gap.** Eliminated top bleed gap on the scroll container so sticky month headers dock flush against the scroll boundary.
+- **Streamlined Diary Calendar header.** Removed the redundant top action strip (`Capture` and `Search` buttons).
+- **Diary Calendar navigators redesign.** Redesigned the calendar's year steppers into standalone square navpills (`<` and `>`), a centered standalone year pill trigger (`📅 2026 ↗`), and an interactive Today pill with an accent dot indicator, matching the visual language of diary entry tracker headers.
+
+## [4.63.0] - 2026-08-23
+
+**Period summaries adapt cleanly to rows and groups, static sections gain the widget form, and the capture dialogue is refined.**
+
+### Added
+
+- **Show as a widget across static sections.** Static-sized sections (`recap`, `time-grid`, `journals`, `on-this-day`, `activity`, and `contents`) now offer the "Show as a widget" (`form: widget`) question in their section editors, allowing them to render without an outer section heading.
+- **Tight square radius token.** Added `--am-radius-xs` (3px) for badges, squared-off controls, and compact time indicators.
+
+### Fixed
+
+- **Period summary layout inside groups and multi-column rows.** The overview summary and its action buttons are now unified into a single `.journal-overview-card` container. Grouped or tabbed period summaries no longer split into unintended columns, span their full page width, and preserve complete card chrome.
+- **All-day lane event display.** Fixed one-off and multi-day events rendering in the all-day header cells of the time grid.
+- **Capture dialogue visuals.** Increased spacing across the modal body, label columns, and textarea. Squared off the edges of the timestamp button and time editor fields, and fixed the dropdown chevron background repeat on the destination selector.
+
+## [4.62.0] - 2026-08-23
+
+**The time grid tells the time, takes a drag, and writes back — and capture says when and where.**
+
+### Added
+
+- **A now line.** The grid draws the current minute across every column, capped with a dot on today, and moves it every minute. The window widens to hold the current hour when the week being drawn is this one, and the line is removed rather than pinned to an edge when the clock leaves the window — a line at the top of an 08:00 grid at 06:15 would be a legible falsehood. A grid opens scrolled to the line, once, rather than at the top.
+- **Draw a meeting.** Dragging down an empty column opens the event editor seeded with the day, the hour and the length you drew; a click is one quarter-hour slot. Nothing is written until you save it, because a block on an empty Thursday has no title yet.
+- **Drag to reschedule.** Events, logbook items and captures move by dragging and resize by their bottom edge, snapped to the quarter hour, written straight back to the events note or the logbook region. The arrow keys do the same thing more accurately: Up/Down move, Shift+Up/Down resize, Left/Right change day. A ghost shows where the block is going while the block itself stays where the file still says it is.
+- **A grid that fits its pane.** `time-grid:events|3` now takes a day count as well as its sources — the whole week, three days around today, or one day — and a pane too narrow for the count it was asked for narrows further on its own, keeping the days around today rather than the first ones of the week. Source chips in the bar fold events, logbooks, tasks or captures away without editing the note.
+- **Captures on the grid.** `time-grid:captures` draws the day's captured thoughts against the clock. Nameable and never part of the default, so every grid already in a vault draws exactly what it drew.
+- **An events workbench.** The `events` manager splits into Recurring, Coming up and a folded Earlier with a count, prints the hour and the length rather than only the day, gains a filter box past eight events, and puts turn-off, duplicate and delete on the row. The editor is still the only place a field is edited.
+- **Weekly events.** An event can now repeat on a weekday — "every Wednesday at 09:30" — with an optional first and last week. Weekly recurrence requires a time, takes one row in the agenda rather than fifty-two, and is deliberately all there is: no nth-weekday, no intervals, no monthly, no skipped occurrences.
+- **Capture says when.** The capture box shows the stamp it is about to write as a button; pressing it opens the same day/time/length fields the log card has. A thought at 15:40 about the 09:00 stand-up can now say 09:00.
+- **Capture into a logbook.** The destination list gains every region-backed logbook, so a work-log line and a captured thought are the same keystroke. A logbook destination stamps the day as well as the minute, because its note spans months.
+
+### Fixed
+
+- **The last hour of the grid is no longer clipped.** The scroller now scrolls in both directions explicitly with a height of its own, and the grid reserves the half-line the final hour label hangs into.
+- **A narrow grid no longer squeezes its columns past legibility.** The grid keeps a minimum width per drawn column and scrolls sideways within its pane instead.
+- **The all-day lane label no longer wraps.** "all day" stayed on one line at every gutter width, which is also narrower now in a narrow pane.
+
+### The example vault gets charts, logs and events
+
+`tools/seed-vault.mjs` wrote a year of tracker readings and not one chart drawn
+from them, three empty logbooks, an empty events note and an empty capture region
+in every entry — because everything it wrote was a file that did not exist yet,
+and all four of those live in notes the SCAFFOLD already created. A create-only
+seeder skipped every one of them.
+
+It now runs two passes. Files first, as before; then **patches** — in-place edits
+that fill a chart fence holding no charts, a logbook region holding no items, and
+an `almanac-events: []` holding no events. Each one declines a target that is
+already answered, which is the same rule the file pass has always followed and
+the same `--force` escape: a seeded vault re-seeded stays a no-op.
+
+- **Charts on all six surfaces.** Nineteen directives across the homepage and the
+  five diary dashboards — a mood calendar, sleep against mood as a scatter, the
+  day's start and end on one axis pair — each surface's plan matched to its
+  range. Dashboards are found by the folder-note rule rather than by filename, so
+  a renamed diary folder still gets them. A chart is dropped, with a warning, when
+  its tracker is declared in settings but absent from the Daily template's
+  frontmatter block: it would have no readings, and an empty tile teaches a reader
+  less than no tile.
+- **Three logbooks with three different shapes.** A dense work log stamped with
+  `[mins:: N]`, seven focus lines across thirteen months, and a review list half
+  crossed off — because seeding all three alike would render three identical
+  widgets and teach a reader that the distinction is decorative. The region is
+  created where the widget has not made one yet.
+- **Twelve events**, resolved against the run's own `--today`: annual birthdays
+  and holidays, two trips, a weekly stand-up, and a week of timed meetings. The
+  Meetings logbook is not seeded and does not need to be — it reads the events
+  note.
+- **Captures in the entries.** Stamped thoughts, ascending through the day, in
+  about three fifths of them. Beyond the entry they are what 4.62's
+  `time-grid:captures` draws, so a vault seeded without them showed that source
+  permanently empty.
+
+A run against a vault that declares **no journals** now says so instead of
+reporting a silent success. The corpus's four journals cannot be written until
+the vault has somewhere to put them — the shape comes from `customJournals` and
+the bodies from the journal's own templates, and both appear when a reader adds
+one in Obsidian. Before this, such a run wrote a diary, nothing else, and no
+warnings, which reads as complete.
+
+Every one of these is a second spelling of a format the plugin owns, in a file
+that cannot import the plugin's serialisers — which is exactly how an earlier
+version of this tool came to write recall cards in the task format. So none of the
+new tests assert on a string: each feeds the seeder's output to `parseLogItems`,
+`parseChartDirectives` or `parseEvents` and asserts on what comes back.
+
 ## [4.61.0] - 2026-08-23
 
 **Groups on Diary overviews and folder note, widget-mode grouping, and layout refinements.**

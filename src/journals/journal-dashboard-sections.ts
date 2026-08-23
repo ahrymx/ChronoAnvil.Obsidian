@@ -146,7 +146,8 @@ import {
 } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
-import type { SectionModel } from "../core/section-model";
+import { FRAME_KEYWORD } from "../core/directive-grammar";
+import { WIDGET_FORM, formQuestion, type SectionModel } from "../core/section-model";
 import { DEFAULT_TALLY_TRACKER } from "./journal-sections";
 import { statsBandProbe } from "./stats-band";
 import { plural } from "../core/util";
@@ -204,10 +205,14 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // card. The band is not an overview card, but it is a band with its own
       // ground, and `SECTION_TITLES` has named it "🔥 Activity" since 4.15 §1.
       locked: false,
-      render: () => ({
+      render: (opts) => ({
         fence: "almanac",
-        lines: ["frame: section", `journals-header:${type.id}`],
+        lines: [
+          ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
+          `journals-header:${type.id}`,
+        ],
       }),
+      questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
       locate: (text) => probe(text, /^journals-header\b/m),
     },
 
@@ -220,10 +225,14 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // section: a page about a journal with no way into the journal is worse
       // than no page at all. Here the section IS the page.
       locked: true,
-      render: () => ({
+      render: (opts) => ({
         fence: "almanac",
-        lines: ["frame: section", `level-cards:${type.id}`],
+        lines: [
+          ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
+          `level-cards:${type.id}`,
+        ],
       }),
+      questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
       // EITHER SPELLING, AND THE SECOND ONE IS NOT SPECULATIVE (4.16 §1's rule,
       // reused). 4.36.0 composed `level-index` here — the table — and 4.36.1
       // composes `level-cards`, which is the same question in a card
@@ -356,6 +365,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // page is about one journal, and a control offering "every journal" here
       // would silently widen a page whose every other section is scoped to it.
       questions: (spec) => [
+        formQuestion("header:🔁 Review"),
         {
           kind: "folder",
           key: "folder",
@@ -364,9 +374,12 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
           hostFolder: spec.hostFolder ?? null,
         },
       ],
-      render: () => ({
+      render: (opts) => ({
         fence: "almanac",
-        lines: ["header:🔁 Review", "review-queue"],
+        lines: [
+          ...(opts?.form === WIDGET_FORM ? [] : ["header:🔁 Review"]),
+          "review-queue",
+        ],
       }),
       locate: (text) => probe(text, /^review-queue\b/m),
     },

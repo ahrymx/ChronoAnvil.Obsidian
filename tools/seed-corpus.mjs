@@ -769,3 +769,255 @@ export const DIARY_TASKS = [
   "Write up yesterday's notes while they still mean something",
   "Sort the photos off the phone",
 ];
+
+// ── The logs (4.62) ──────────────────────────────────────────────────────
+//
+// WHY A SEEDED VAULT NEEDED THESE. Four logbooks ship with the scaffold and a
+// `Captured` region sits in every daily template, and until now the seeder wrote
+// to none of them — so the Logbooks note, the Meetings agenda, the capture log
+// and (since 4.61) the time grid all rendered their empty states in the vault
+// that exists to show them full. A stranger opening the example vault learned
+// that half the plugin does nothing.
+//
+// THE LOG GRAMMAR IS ONE GRAMMAR, WRITTEN IN TWO PLACES. A logbook item and a
+// capture are the same stamped line — `log-items.ts` parses both — and the only
+// difference is whether the stamp carries a day. So these are lists of TEXT and
+// the engine stamps them, rather than lists of pre-stamped lines that would have
+// to restate a format the plugin already owns.
+
+// The work log: what somebody did, in the words they would use afterwards.
+// Written as things that TOOK a length, because the whole point of `[mins:: …]`
+// is that a work log can be added up — and a book of moments would draw as a
+// row of flat marks on the time grid and never as a block.
+export const WORK_LOG = [
+  "Rewrote the import path so it reads the manifest instead of guessing",
+  "Paired on the migration script — found two cases the tests never covered",
+  "Wrote up the incident notes while they were still fresh",
+  "Went through the backlog and closed eleven things nobody wanted",
+  "Drafted the API changes for review, badly, on purpose",
+  "Traced the slow query to a missing index and left the fix behind a flag",
+  "Sat with the support inbox for an hour to see what people actually ask",
+  "Reworked the empty states — every one of them said 'no data'",
+  "Read the spec properly rather than the summary of it",
+  "Cut the build in half by stopping it from doing the same work twice",
+  "Interviewed, then wrote the feedback up straight away",
+  "Fixed the flake in the parser suite. It was the clock, as usual",
+  "Moved the docs into the repo so they go stale visibly",
+  "Long planning session — got to a shape everyone could live with",
+  "Cleared the review queue before it turned into a wall",
+  "Wrote the migration note for people upgrading from the old layout",
+  "Took the diagram apart and drew it again with fewer boxes",
+  "Chased the flaky deploy and found a race in the health check",
+];
+
+// The focus book: what you are working towards, and when that changed. Fewer
+// items on purpose — a focus that changes twice a week is not a focus, and a
+// book with forty entries in it would say the opposite of what it is for.
+export const FOCUS_LOG = [
+  "Ship the import path, then stop touching it for a month",
+  "Get the test suite under a minute so people run it",
+  "Learn enough of the query planner to stop guessing",
+  "Write the documentation for the thing before the thing",
+  "One release a fortnight, small enough to describe in a sentence",
+  "Reduce the number of open branches to something I can hold in my head",
+  "Say no to the second project until the first one lands",
+];
+
+// Review links: things to come back to. Crossed off when you have, which is why
+// roughly half of them are marked done by the engine — a list where nothing is
+// ever completed reads as a list nobody uses.
+export const REVIEW_LINKS = [
+  "The talk on incremental parsing someone linked in the channel",
+  "That thread about pagination cursors — worth re-reading properly",
+  "Chapter 4 of the concurrency book, the part I skimmed",
+  "The post comparing the three migration strategies",
+  "Docs for the new date API before the deprecation lands",
+  "The bug report with the beautiful reproduction — worth copying the style",
+  "Half-written note on why the cache invalidation broke in June",
+  "The interview with the person who wrote the original scheduler",
+  "Colour contrast checker for the dark theme",
+  "Old design doc for the layout engine, for the parts we dropped",
+];
+
+// Captures: the raw arriving thought, which is a DIFFERENT register from a
+// diary line and has to read like one. A diary line is written in the evening
+// about the day; a capture is written in the middle of the thing, in a hurry,
+// and often about something that is not what you are doing.
+export const DIARY_CAPTURES = [
+  "The error message is the fix — just print the path it looked at",
+  "Ask about the Tuesday deploy before it turns into a habit",
+  "Book train tickets while they are still cheap",
+  "Idea: fold the two settings pages into one and hide the second half",
+  "Whoever named this variable owes me twenty minutes",
+  "Check whether the old export path is still used by anyone",
+  "The chapter I keep starting is the one I should skip",
+  "Call back about the appointment",
+  "It only fails on the second run, which means something is cached",
+  "Write the release notes before the release, not after",
+  "That phrase from the talk: 'make the change easy, then make the easy change'",
+  "Milk, coffee, the good bread if they have it",
+  "Draft an answer to the question everyone asks in onboarding",
+  "Try the smaller font on the entry header and see if anyone notices",
+  "Remember to actually take the afternoon off on Friday",
+  "The bug is in the timezone, it is always in the timezone",
+];
+
+// ── The events (4.62) ────────────────────────────────────────────────────
+//
+// The list the Meetings logbook reads, the calendars decorate with and the time
+// grid draws — one store, four widgets, and every one of them was empty.
+//
+// DATES ARE OFFSETS, NOT DATES. An example vault whose only meeting was in
+// March 2026 is a vault that looks abandoned the moment the year turns. The
+// birthdays and holidays are annual and carry a real month and day; everything
+// scheduled is written relative to the run's own "today", so the agenda always
+// has something in it and the time grid always has a week to draw.
+//
+// ONE OF EACH SHAPE THE STORE CAN HOLD, deliberately: an annual birthday, a
+// fixed holiday, a multi-day trip, single meetings with an hour and a length,
+// and — new in 4.62 — a weekly one. A demo vault that exercised four of the five
+// would leave the fifth undrawn in every screenshot taken from it.
+export const SEED_EVENTS = [
+  { title: "Anna's birthday", kind: "recurring", month: 4, day: 12, icon: "cake", color: "pink" },
+  { title: "Dad's birthday", kind: "recurring", month: 9, day: 27, icon: "cake", color: "pink" },
+  { title: "New Year's Day", kind: "recurring", month: 1, day: 1, icon: "party-popper", color: "amber" },
+  { title: "Midsummer", kind: "recurring", month: 6, day: 24, icon: "sun", color: "amber" },
+  {
+    title: "Berlin, with the team",
+    kind: "single",
+    startOffset: 12,
+    endOffset: 16,
+    icon: "plane",
+    color: "teal",
+    note: "Flights booked, hotel not",
+  },
+  {
+    title: "Week off",
+    kind: "single",
+    startOffset: -34,
+    endOffset: -28,
+    icon: "palm-tree",
+    color: "green",
+  },
+  {
+    title: "Stand-up",
+    kind: "weekly",
+    weekday: 3,
+    time: "09:30",
+    duration: 15,
+    icon: "users",
+    color: "blue",
+    note: "Fifteen minutes, and it stays fifteen minutes",
+  },
+  {
+    title: "Design review",
+    kind: "single",
+    startOffset: 1,
+    time: "14:00",
+    duration: 60,
+    icon: "presentation",
+    color: "purple",
+  },
+  {
+    title: "One-to-one",
+    kind: "single",
+    startOffset: 2,
+    time: "11:00",
+    duration: 30,
+    icon: "message-circle",
+    color: "blue",
+  },
+  {
+    title: "Dentist",
+    kind: "single",
+    startOffset: 4,
+    time: "08:45",
+    duration: 45,
+    icon: "stethoscope",
+    color: "red",
+  },
+  {
+    title: "Release call",
+    kind: "single",
+    startOffset: 7,
+    time: "16:00",
+    duration: 45,
+    icon: "rocket",
+    color: "amber",
+  },
+  {
+    title: "Dinner with Sam",
+    kind: "single",
+    startOffset: 3,
+    time: "19:30",
+    duration: 120,
+    icon: "utensils",
+    color: "green",
+  },
+];
+
+// ── The charts (4.62) ────────────────────────────────────────────────────
+//
+// Every scaffolded dashboard ships an EMPTY ```almanac-charts fence, so a
+// freshly seeded vault had a year of tracker readings in it and not one chart
+// drawn from them. This is the list that fills them.
+//
+// A PLAN, NOT DIRECTIVES. Each entry names a tracker, a type, a range and a
+// title; the engine spells the `chart:` line and — this is the part that makes
+// it a plan rather than a hardcoded string — DROPS any entry whose tracker the
+// vault does not actually log, reporting it. A chart of a tracker with no
+// readings is an empty tile, which is the thing this whole file exists to avoid.
+//
+// THE SURFACE DECIDES THE RANGE. A weekly dashboard charts `period` — its own
+// week — and the homepage charts a year, because the question you ask on each is
+// different: "how was this week" against "what has the year looked like". `key`
+// is opaque and only has to be unique within its note.
+export const DIARY_CHARTS = {
+  home: [
+    { key: "mood-year", tracker: "Mood", type: "month", range: "365", title: "Mood, the last year" },
+    { key: "sleep-90", tracker: "Sleep", type: "line", range: "90", avg: true, title: "Sleep, last 90 days" },
+    { key: "mood-all", tracker: "Mood", type: "summary", range: "all", title: "Mood at a glance" },
+  ],
+  diary: [
+    { key: "sleep-year", tracker: "Sleep", type: "line", range: "365", avg: true, title: "Sleep over the year" },
+    { key: "sleep-mood", tracker: "Sleep", type: "scatter", range: "365", y: "Mood", title: "Does sleep move mood?" },
+    { key: "day-shape", tracker: "Wake-Up", type: "line", range: "90", y: "Bedtime", title: "When the day starts and ends" },
+    { key: "mood-heat", tracker: "Mood", type: "month", range: "365", title: "Mood" },
+  ],
+  weekly: [
+    { key: "mood-week", tracker: "Mood", type: "bar", range: "period", title: "Mood this week" },
+    { key: "sleep-week", tracker: "Sleep", type: "line", range: "period", title: "Sleep this week" },
+    { key: "sleep-sum", tracker: "Sleep", type: "summary", range: "period", title: "Sleep at a glance" },
+  ],
+  monthly: [
+    { key: "mood-month", tracker: "Mood", type: "month", range: "period", title: "Mood, day by day" },
+    { key: "sleep-month", tracker: "Sleep", type: "line", range: "period", avg: true, title: "Sleep this month" },
+    { key: "wake-month", tracker: "Wake-Up", type: "summary", range: "period", title: "Wake-up" },
+  ],
+  quarterly: [
+    { key: "mood-quarter", tracker: "Mood", type: "line", range: "period", avg: true, title: "Mood across the quarter" },
+    { key: "sleep-quarter", tracker: "Sleep", type: "bar", range: "period", title: "Sleep, day by day" },
+    { key: "mood-sum-q", tracker: "Mood", type: "summary", range: "period", title: "Mood at a glance" },
+  ],
+  yearly: [
+    { key: "mood-cal", tracker: "Mood", type: "month", range: "period", title: "Mood, the whole year" },
+    { key: "sleep-yearline", tracker: "Sleep", type: "line", range: "period", avg: true, title: "Sleep across the year" },
+    { key: "sleep-sum-y", tracker: "Sleep", type: "summary", range: "period", title: "Sleep at a glance" },
+  ],
+};
+
+// Which list fills which logbook, keyed by the id in the vault's settings —
+// the same arrangement `CORPUS` uses for journals, and for the same reason: a
+// vault that renames "Work log" still has a `work` book, and a vault that adds
+// one gets a warning rather than a silently empty note.
+//
+// `mins` SAYS WHETHER THE BOOK'S ITEMS TOOK TIME. A work log adds up and draws
+// on the grid as blocks; a change of focus and a link to come back to are
+// moments — they happened at a minute and took none. That distinction is
+// `LogItem.mins`' whole reason for being null rather than zero, so the seed has
+// to make it rather than giving everything a plausible-looking duration.
+export const LOGBOOK_CORPUS = {
+  work: { lines: WORK_LOG, mins: true, perDay: 0.45, crossOff: 0 },
+  focus: { lines: FOCUS_LOG, mins: false, spread: true, crossOff: 0 },
+  review: { lines: REVIEW_LINKS, mins: false, spread: true, crossOff: 0.5 },
+};

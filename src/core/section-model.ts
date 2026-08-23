@@ -40,6 +40,8 @@
 // the thing it is editing.
 
 import {
+  FRAME_KEYWORD,
+  HEADER_KEYWORD,
   argSpanIn,
   hasSectionBar,
   isFrameLine,
@@ -493,6 +495,22 @@ export interface FormQuestion extends SectionQuestionCommon {
 // `withAnswers`, `answersOn` and the editor's `shownAnswer` to agree about.
 export const SECTION_FORM = "section";
 export const WIDGET_FORM = "widget";
+
+// Standard FormQuestion builder for sections that can also be drawn as widgets.
+export function formQuestion(
+  bar: string,
+  directive?: string
+): FormQuestion {
+  return {
+    kind: "form",
+    key: "form",
+    label: "how this is drawn",
+    directive: directive ?? (bar.startsWith("frame:") ? FRAME_KEYWORD : HEADER_KEYWORD),
+    bar,
+    section: "A section of its own, with a foldable bar",
+    widget: "As a widget, so it can sit in a row",
+  };
+}
 
 // Which form a fence is written in: it is a section if it titles itself.
 //
