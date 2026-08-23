@@ -418,6 +418,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--am-widget-gap);
+  touch-action: pan-y;
 }
 
 /* WITHHELD WHERE THE BLOCK ALREADY PAINTS, which is the four-case rule the block
@@ -488,6 +489,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  touch-action: pan-y;
 }
 /* CLIPPED ONLY WHILE IT IS MOVING, and this rule was `overflow: hidden` at rest
    for one draft — which put a clipping and containment context around EVERY
@@ -550,16 +552,18 @@
   transition: opacity 120ms ease, transform 120ms ease;
 }
 
-/* ── The strip (4.34 §3) ────────────────────────────────────────────────
+/* ── The strip (4.34 §3, 4.66 §Style A) ──────────────────────────────────
  *
- * `[1] [2] [3]` at the right-hand end of the foot, where the column count sits
- * on a group that has no pages. It REPLACES that count rather than joining it:
- * the count said how many columns you can see, and with pages you can see one
- * page's worth while the numbers already say how many there are. */
+ * Floating segmented pill container holding the page numbers and the + button. */
 .journal-group-tabs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  background: color-mix(in srgb, var(--background-secondary) 85%, transparent);
+  border: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  padding: 2px 3px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 .journal-group-tab {
   /* The foot's own voice, which every label in this strip shares — see
@@ -570,28 +574,24 @@
   letter-spacing: var(--am-bar-track);
   color: var(--am-bar-ink);
   line-height: 1;
-  padding: 3px 7px;
+  padding: 3px 8px;
   min-width: 0;
   height: auto;
   border: var(--am-rule-hair) solid transparent;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--am-radius-pill);
   background: none;
   box-shadow: none;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .journal-group-tab:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-/* THE OPEN ONE IS TINTED, NOT FILLED. The strip is chrome at the foot of a box
-   full of cards, and a solid accent pill down there reads louder than anything
-   it is a control for — the wash weight the captured cards took in 4.32, for the
-   same reason and out of the same token. */
 .journal-group-tab.is-open {
-  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
-  border-color: color-mix(in srgb, var(--interactive-accent) 34%, transparent);
-  color: var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  box-shadow: var(--am-elev-1);
 }
 .journal-group-tab:focus-visible {
   outline: 2px solid var(--am-border-focus);
@@ -611,14 +611,19 @@
  * rests on — and the reader who is looking for something finds it in the strip
  * where the group already talks about itself. */
 .journal-group-add {
-  font-size: var(--am-bar-text);
+  font-size: 13px;
   font-weight: 600;
   line-height: 1;
   color: var(--am-bar-ink);
-  margin-left: 6px;
-  padding: 3px 7px;
+  margin-left: 2px;
+  padding: 2px 6px;
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: var(--am-rule-hair) solid transparent;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--am-radius-pill);
   background: none;
   box-shadow: none;
   cursor: pointer;
@@ -630,8 +635,8 @@
   opacity: 1;
 }
 .journal-group-add:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
+  color: var(--interactive-accent);
 }
 .journal-group-add:focus-visible {
   outline: 2px solid var(--am-border-focus);

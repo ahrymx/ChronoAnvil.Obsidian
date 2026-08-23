@@ -520,6 +520,13 @@ export const ACTIONS: Action[] = [
     group: "maintenance",
     run: (p) => void p.scaffold.refreshJournalTemplates(),
   },
+  {
+    id: "maint-generate-vault-canvas",
+    name: "Maintenance: generate vault canvas map",
+    icon: "layout-dashboard",
+    group: "maintenance",
+    run: (p) => void p.scaffold.generateVaultCanvas(),
+  },
 ];
 
 // `Notice` is imported for the one caller below rather than left to main.ts, so

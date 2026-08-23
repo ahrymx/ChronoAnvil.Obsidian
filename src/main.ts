@@ -18,6 +18,7 @@ import { wantsReadingMode } from "./core/viewmode";
 import { PathWatch, pruneCollapsedSections } from "./core/pathwatch";
 import { PageWidth } from "./ui/page-width";
 import { VaultBanner } from "./ui/vault-banner";
+import { MobileControls } from "./ui/mobile-controls";
 import { openVaultSearch } from "./ui/search-all";
 import {
   getFile,
@@ -73,6 +74,7 @@ export default class AlmanacPlugin extends Plugin {
   pathWatch!: PathWatch;
   pageWidth!: PageWidth;
   vaultBanner!: VaultBanner;
+  mobileControls!: MobileControls;
   // Reads and writes the per-journal manifest, and adopts a journal folder
   // that arrived without one. See journal-import.ts.
   journalImport!: JournalImporter;
@@ -131,12 +133,14 @@ export default class AlmanacPlugin extends Plugin {
     this.pathWatch = new PathWatch(this.app, this);
     this.pageWidth = new PageWidth(this.app, this);
     this.vaultBanner = new VaultBanner(this.app, this);
+    this.mobileControls = new MobileControls(this);
     this.journalImport = new JournalImporter(this.app, this);
 
     this.widgets.register();
     this.pathWatch.register();
     this.pageWidth.register();
     this.vaultBanner.register();
+    this.mobileControls.register();
 
     this.addSettingTab(new AlmanacSettingTab(this.app, this));
     this.registerCommands();
@@ -360,6 +364,7 @@ export default class AlmanacPlugin extends Plugin {
   // through this.register*() / this.addCommand(), which Obsidian tears down
   // automatically. The one exception is the mirror's pending write.
   onunload(): void {
+    this.mobileControls?.onunload();
     // Flush any pending mirror write. The debounce exists so typing in a
     // settings field doesn't write the file on every keystroke; it must not
     // mean that the last change before Obsidian closes is the one missing from

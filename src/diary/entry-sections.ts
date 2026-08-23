@@ -50,7 +50,7 @@ import {
 } from "../core/section-model";
 import { regionHasContent } from "../core/notestore";
 import { TRACKER_MARK_END, TRACKER_MARK_START } from "../core/constants";
-import { BANNER_ID } from "../core/note-sections";
+import { BANNER_ID, graphLinksSection } from "../core/note-sections";
 import type { TrackerClass } from "../trackers/trackers";
 
 export interface EntrySectionContext {
@@ -837,6 +837,30 @@ export function composeEntryTemplate(
     ? ["```almanac", ...trackers.flatMap(ownLines), "```", ""]
     : [];
 
+  // WHERE THIS ENTRY SITS, for the graph. Four of these five were the folder
+  // names the diary had BEFORE 2.57 — `02 - Weekly`, `03 - Monthly`,
+  // `04 - Quarterly`, `05 - Yearly` — and nothing has been called any of them
+  // since. They were not dead text: an unresolved wikilink draws a node, so
+  // every vault's graph carried four phantom notes named after folders it does
+  // not have, one per grain, for eleven releases.
+  //
+  // The real parent is the grain's DASHBOARD, which is its folder's own note
+  // (`02 - Diary/Weekly/Weekly.md`, so `Weekly` by basename) — the same
+  // convention `quarterOverviewPath` has returned since 2.57 and the same one
+  // the vault map's quarterly node got wrong in its own way. Daily is the
+  // exception and always was: there is no daily dashboard, so a daily entry's
+  // parent is the diary root itself.
+  const parentName =
+    ctx.grain === "daily"
+      ? "02 - Diary"
+      : ctx.grain === "weekly"
+      ? "Weekly"
+      : ctx.grain === "monthly"
+      ? "Monthly"
+      : ctx.grain === "quarterly"
+      ? "Quarterly"
+      : "Yearly";
+
   return (
     [
       ...frontmatter(ctx),
@@ -858,7 +882,7 @@ export function composeEntryTemplate(
       .filter((s) => s.ownsRegion !== false)
       .map((s) => region(s.id))
       .join("\n\n") +
-    "\n"
+    graphLinksSection([parentName])
   );
 }
 

@@ -116,8 +116,11 @@ describe("what the generator makes", () => {
     // a widget section everything the rejected design wrote off: it can be cut
     // out of a shared fence, it is `loose`, and it is a legal column of a group.
     for (const s of tail) {
-      expect(s.render().lines, s.id).toHaveLength(1);
-      expect(s.render().fence, s.id).toBe("almanac");
+      const rendered = s.id.startsWith("w:logbook")
+        ? s.render({ form: "widget" })
+        : s.render();
+      expect(rendered.lines, s.id).toHaveLength(1);
+      expect(rendered.fence, s.id).toBe("almanac");
     }
   });
 
@@ -156,7 +159,7 @@ describe("what the generator makes", () => {
     for (const s of tail) {
       const w = WIDGETS[kw(s.id)];
       const args = w.args ?? (w.arg ? (w.arg2 ? [w.arg, w.arg2] : [w.arg]) : []);
-      const qs = s.questions?.(spec as never) ?? [];
+      const qs = (s.questions?.(spec as never) ?? []).filter((q) => q.kind !== "form");
       expect(qs, s.id).toHaveLength(args.length);
       const arg = args[0];
       if (!arg) continue;

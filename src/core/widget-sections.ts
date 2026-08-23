@@ -43,9 +43,10 @@
 // generator lives where the rule does not reach, and `note-sections.ts` only
 // calls it.
 
+import { HEADER_PREFIX } from "./constants";
 import { splitDirective } from "./directive-grammar";
 import type { FlatSection } from "./note-sections";
-import { joinParts } from "./section-model";
+import { joinParts, formQuestion, WIDGET_FORM } from "./section-model";
 import type { SectionQuestion } from "./section-model";
 import { WIDGETS } from "./widget-registry";
 import type {
@@ -430,35 +431,44 @@ const widgetSection = (
   // two forms had to be kept off the same fence by hand — see the comment
   // `pageWidgetSections` carried about generating both. One form, one rule.
   n: number
-): FlatSection => ({
-  id: instanceId(keyword, n),
-  label: spec.label,
-  blurb: spec.blurb,
-  icon: spec.glyph,
-  // NOTHING A WIDGET SECTION DOES IS LOCKED OR PINNED. It is there because a
-  // reader added it, so it is theirs to move and theirs to remove.
-  locked: false,
-  optIn: true,
-  render: (options) => ({
-    fence: "almanac",
-    lines: [renderLine(keyword, spec, options)],
-  }),
-  // EVERY PAGE WIDGET REPEATS. The editor reads this to know that adding one
-  // more is a legal thing to ask for.
-  repeatable: true as const,
-  ...(argsOf(spec).length
-    ? {
-        questions: (noteSpec: {
-          hostFolder?: string | null;
-          vault?: VaultLists;
-        }) =>
-          argQuestions(keyword, spec, noteSpec.hostFolder ?? null, noteSpec.vault),
-      }
-    : {}),
-  // THE NTH LINE, ALWAYS — and for the single occurrence that is most pages,
-  // this is `locateKeyword` exactly, since the first match is the 1st.
-  locate: locateNth(keyword, n),
-});
+): FlatSection => {
+  const isLogbook = keyword === "logbook";
+  const bar = `${HEADER_PREFIX}${spec.glyph} ${spec.label}`;
+  return {
+    id: instanceId(keyword, n),
+    label: spec.label,
+    blurb: spec.blurb,
+    icon: spec.glyph,
+    // NOTHING A WIDGET SECTION DOES IS LOCKED OR PINNED. It is there because a
+    // reader added it, so it is theirs to move and theirs to remove.
+    locked: false,
+    optIn: true,
+    render: (options) => ({
+      fence: "almanac",
+      lines: [
+        ...(isLogbook && options?.form !== WIDGET_FORM ? [bar] : []),
+        renderLine(keyword, spec, options),
+      ],
+    }),
+    // EVERY PAGE WIDGET REPEATS. The editor reads this to know that adding one
+    // more is a legal thing to ask for.
+    repeatable: true as const,
+    ...(isLogbook || argsOf(spec).length
+      ? {
+          questions: (noteSpec: {
+            hostFolder?: string | null;
+            vault?: VaultLists;
+          }) => [
+            ...(isLogbook ? [formQuestion(bar)] : []),
+            ...argQuestions(keyword, spec, noteSpec.hostFolder ?? null, noteSpec.vault),
+          ],
+        }
+      : {}),
+    // THE NTH LINE, ALWAYS — and for the single occurrence that is most pages,
+    // this is `locateKeyword` exactly, since the first match is the 1st.
+    locate: locateNth(keyword, n),
+  };
+};
 
 // The section for any instance id, built from the id alone.
 //

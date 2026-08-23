@@ -388,19 +388,19 @@ export function buildLogList(
 
   const searchToggle = actionsGroup.createEl("button", {
     cls: "jcl-action-chip jcl-search-toggle",
-    attr: { type: "button", title: "Toggle search bar" },
+    attr: { type: "button", title: "Toggle search bar", "aria-label": "Toggle search bar" },
   });
   const searchToggleIcon = searchToggle.createSpan({ cls: "jcl-action-icon" });
   setIcon(searchToggleIcon, "search");
-  searchToggle.createSpan({ text: "Search" });
+  searchToggle.createSpan({ cls: "jcl-action-label", text: "Search" });
 
   const sortBtn = actionsGroup.createEl("button", {
     cls: "jcl-action-chip",
-    attr: { type: "button", title: "Toggle sort order" },
+    attr: { type: "button", title: "Toggle sort order", "aria-label": "Toggle sort order" },
   });
   const sortIcon = sortBtn.createSpan({ cls: "jcl-action-icon" });
   setIcon(sortIcon, "arrow-down-up");
-  const sortLabel = sortBtn.createSpan({ text: "Newest" });
+  const sortLabel = sortBtn.createSpan({ cls: "jcl-action-label", text: "Newest" });
   sortBtn.addEventListener("click", () => {
     sortOrder = sortOrder === "desc" ? "asc" : "desc";
     sortLabel.setText(sortOrder === "desc" ? "Newest" : "Oldest");
@@ -409,11 +409,11 @@ export function buildLogList(
 
   const compactBtn = actionsGroup.createEl("button", {
     cls: "jcl-action-chip",
-    attr: { type: "button", title: "Toggle compact view" },
+    attr: { type: "button", title: "Toggle compact view", "aria-label": "Toggle compact view" },
   });
   const compactIcon = compactBtn.createSpan({ cls: "jcl-action-icon" });
   setIcon(compactIcon, "list");
-  compactBtn.createSpan({ text: "Compact" });
+  compactBtn.createSpan({ cls: "jcl-action-label", text: "Compact" });
   compactBtn.addEventListener("click", () => {
     isCompact = !isCompact;
     compactBtn.toggleClass("is-active", isCompact);
@@ -673,11 +673,12 @@ export function buildLogList(
   if (opts.add) {
     const add = opts.add;
     const row = wrap.createDiv({ cls: "journal-capture-add" });
-    const line = row.createDiv({ cls: "journal-capture-add-line" });
+    const box = row.createDiv({ cls: "journal-capture-add-box" });
+    const controls = box.createDiv({ cls: "journal-capture-add-controls" });
 
     let chosenType = opts.types && opts.types.length > 0 ? opts.types[0].id : undefined;
     if (opts.types && opts.types.length > 1) {
-      const typeSelect = line.createEl("select", { cls: "jcl-add-type-select" });
+      const typeSelect = controls.createEl("select", { cls: "jcl-add-type-select" });
       for (const t of opts.types) {
         const opt = typeSelect.createEl("option", { value: t.id, text: `${t.icon ? t.icon + " " : ""}${t.label}` });
         if (t.id === chosenType) opt.selected = true;
@@ -687,42 +688,33 @@ export function buildLogList(
       });
     }
 
-    const input = line.createEl("textarea", {
-      cls: "journal-capture-add-input",
-      attr: { placeholder: add.placeholder, rows: "1" },
-    });
-
-    // ── SAYING WHEN, WITHOUT BEING ASKED EVERY TIME ────────────────────
-    //
-    // `null` means "whatever `add.stamp()` says at the moment I press Enter",
-    // which is what this list has always done and is right for almost every
-    // item: you write it down when it happens. The control is FOLDED until the
-    // reader opens it, and the moment they touch a field this stops being null
-    // and their answer wins.
-    //
-    // AND IT RESETS AFTER EVERY ADD. A reader who back-dated one item has not
-    // asked for every item after it to be back-dated too, and an add row that
-    // silently kept yesterday's date would file a week of work under it.
     let chosen: WhenValue | null = null;
     let when: HTMLElement | null = null;
 
-    const reveal = line.createEl("button", {
+    const reveal = controls.createEl("button", {
       cls: "journal-capture-when-btn",
-      attr: { type: "button", "aria-label": "Say when this happened" },
+      attr: { type: "button", "aria-label": "Say when this happened", title: "Say when this happened" },
     });
     setIcon(reveal, "clock");
+    const revealLabel = reveal.createSpan({ cls: "journal-capture-when-label", text: "Now" });
+
     reveal.addEventListener("click", () => {
       if (when) {
         when.remove();
         when = null;
         chosen = null;
         reveal.removeClass("is-active");
+        revealLabel.setText("Now");
         return;
       }
       const now = add.stamp();
       chosen = { date: now.date, time: now.time, mins: now.mins };
       when = whenEditor(row, chosen, opts.dated, (v) => {
         chosen = v;
+        const parts: string[] = [];
+        if (v.time) parts.push(v.time);
+        else if (v.date) parts.push(v.date);
+        revealLabel.setText(parts.join(" ") || "Custom");
       });
       reveal.addClass("is-active");
     });
@@ -733,7 +725,13 @@ export function buildLogList(
       when = null;
       chosen = null;
       reveal.removeClass("is-active");
+      revealLabel.setText("Now");
     };
+
+    const input = box.createEl("textarea", {
+      cls: "journal-capture-add-input",
+      attr: { placeholder: add.placeholder, rows: "1" },
+    });
 
     const commit = (): void => {
       const text = input.value;

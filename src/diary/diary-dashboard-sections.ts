@@ -82,7 +82,13 @@
 // the whole reason the modifier takes three values rather than two.
 
 import { HEADER_PREFIX, TRENDS_HEADING } from "../core/constants";
-import { composeFlatNote, flatNoteModel, bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
+import {
+  composeFlatNote,
+  flatNoteModel,
+  bannerSection,
+  PAGE_TITLE_IDS,
+  graphLinksSection,
+} from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
 import { WIDGET_FORM, formQuestion } from "../core/section-model";
@@ -292,7 +298,10 @@ const specFor = (hostFolder: string | null = null): FlatNoteSpec => ({
 
 // The diary dashboard's whole markdown.
 export function composeDiaryDashboardNote(): string {
-  return composeFlatNote(DIARY_DASHBOARD_SECTIONS);
+  return (
+    composeFlatNote(DIARY_DASHBOARD_SECTIONS).trimEnd() +
+    graphLinksSection(["Homepage"])
+  );
 }
 
 // The diary dashboard, as the editor sees it.

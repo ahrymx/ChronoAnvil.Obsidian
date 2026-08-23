@@ -508,7 +508,7 @@ export function formQuestion(
     directive: directive ?? (bar.startsWith("frame:") ? FRAME_KEYWORD : HEADER_KEYWORD),
     bar,
     section: "A section of its own, with a foldable bar",
-    widget: "As a widget, so it can sit in a row",
+    widget: "Show as a widget, so it can sit in a row",
   };
 }
 

@@ -726,7 +726,8 @@ describe("the editor carries the defence the add command left it (3.13 §9.1)", 
     // alphabet of things it merely permits. The order is the caller's and the
     // modal never sorts, so the partition survives as a heading over a run.
     expect(src).toContain("[...own, ...widgets]");
-    expect(src).toContain('isPageWidgetId(s.id) ? "Widgets" : "Sections"');
+    expect(src).toContain('? "Widgets"');
+    expect(src).toContain(': "Sections"');
   });
 });
 

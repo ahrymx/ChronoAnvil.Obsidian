@@ -82,6 +82,7 @@
 // is what 2.59 spent six patches removing.
 
 import { JournalType } from "./journal";
+import { graphLinksSection } from "../core/note-sections";
 import {
   JournalSection,
   SectionContext,
@@ -357,7 +358,14 @@ export function parseSections(text: string, ctx: SectionContext): SectionRun[] {
         // therefore in the same raw segment. That is fine: banner is
         // `required` and never removable, so nothing ever needs to splice it.
         filler:
-          isBlank(seg.lines) || (i === 0 && seg.lines[0]?.trim() === "---"),
+          isBlank(seg.lines) ||
+          (i === 0 && seg.lines[0]?.trim() === "---") ||
+          seg.lines.every(
+            (l) =>
+              l.trim() === "" ||
+              l.trim().startsWith("%%") ||
+              l.trim().startsWith("[[")
+          ),
       });
       i++;
       continue;
@@ -997,12 +1005,26 @@ function stripFrontmatter(text: string): string {
 
 function composeFrom(ctx: SectionContext, ids: string[]): string {
   const byId = new Map(sectionsFor(ctx).map((s) => [s.id, s]));
-  return ids.map((id) => {
+  const body = ids
+    .map((id) => {
       const s = byId.get(id);
       return s ? renderSection(s, ctx, sectionOverrides(ctx, id)) : "";
     })
     .filter(Boolean)
     .join("\n\n");
+  // THE TYPE'S OWN NOTE, NOT THE LEVEL'S NOUN. This read
+  // `ctx.type.levels[d].noun` — "Topic", "Lesson" — which is the word a level
+  // is CALLED and never the name of any note, so every journal note in the
+  // vault linked to something that does not exist and Obsidian drew a phantom
+  // node for each distinct noun. `ctx.type.name` is the type's folder note
+  // (`03 - Journals/Study/Study.md`), which always resolves.
+  //
+  // ONE LEVEL COARSER THAN THE TRUTH, deliberately and for now: a lesson's real
+  // parent is its topic's index NOTE, and this context carries the level a note
+  // is at but not the path of the note above it. Naming the type is true —
+  // every note in Study is inside Study — where naming "Lesson" was not.
+  const parentName = ctx.type.name;
+  return body + graphLinksSection([parentName]).trimEnd();
 }
 
 // Re-exported so a caller planning a whole type doesn't need journal-sections

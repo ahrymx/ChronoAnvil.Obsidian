@@ -7,6 +7,71 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.69.0] - 2026-08-23
+
+**Distraction-free mobile view with customizable floating toggle button, swipe gesture isolation, responsive button wrapping, and streamlined narrow Logbook layout.**
+
+### Added
+
+- **Distraction-free mobile view toggle.** A floating quick-toggle button allows hiding Obsidian's mobile overlays (navigation bar, view header, toolbar, and status bar) with a single tap, maximizing reading and dashboard space.
+- **Mobile settings section.** Configurable in settings under "📱 Mobile", allowing customization of floating button placement (`off`, `left`, `right`) and default hide behavior on startup.
+- **System status bar safe area clearance.** Dedicated top safe-area padding ensures the phone's glance bar (time, cellular, wifi, battery) never collides with vault banner controls.
+- **Group tab swipe isolation.** Horizontal swipe gestures across multi-page widget cards are isolated with gesture direction locking and event propagation stops, preventing accidental Obsidian sidebar opens during page changes.
+- **Streamlined narrow Logbook layout.** Action chips collapse into compact icon buttons on narrow viewports to preserve single-line header hierarchy, status filter pills stretch full-width for balanced touch interaction, and the quick-capture box is unified into a cohesive card container with a top selector/timestamp bar and borderless input.
+
+## [4.68.1] - 2026-08-23
+
+**`Set up / repair vault` no longer offers format migrations for notes the current release just wrote.**
+
+### Fixed
+
+- **The diary dashboard was offered a format migration on a freshly created vault.** The period summary migration asked whether the fence carried a `header:` line, but the composer titles that fence with `frame: section` instead — so the repair window proposed inserting a header into a note the scaffolder had written minutes earlier. It now asks `isSectionFence`, the same predicate the drag and the section editor use, which is the union of both ways a fence titles itself.
+- **The documentation was read as a live widget page.** `assets/documentation.md` prints an example fence by wrapping it in a longer, four-backtick fence; the fence scanner matched the three-backtick ```almanac opener inside it and treated the illustration as a widget block, so repair offered to rewrite the docs. Fences now follow the markdown rule that a closing run must be at least as long as the opening one, and a code block this plugin does not own is skipped whole rather than walked into.
+- **A gate against the whole class.** Every format migration the repair window runs is now exercised against every note the release writes, and none may fire. A migration exists to carry an older note forward, so one that fires on current output is a defect whichever side is wrong.
+
+## [4.68.0] - 2026-08-23
+
+**The generated vault map is rebuilt from one spec and one layout engine, and the graph view drops from two hubs to one.**
+
+### Added
+
+- **`Almanac.canvas` regeneration preserves your arrangement.** `Maintenance: generate vault canvas map` now merges rather than overwrites: a node you dragged keeps the position and size you gave it and takes only its rebuilt meaning, a node you added yourself is never touched, and the notice reports how many were kept versus placed.
+- **Subsection-free vault map with full coverage.** Six branches grouped by role rather than by folder, covering all four vault roots — `00 - Infrastructure` and `01 - Material` were previously unrepresented, and the events workbench was absent entirely.
+- **Four node size classes.** `hub` 560×720, `board` 460×600, `panel` 380×480 and `table` 940×360, each sized for what its note actually embeds rather than a flat 320×180 that clipped every dashboard to its title bar.
+- **Canvas nodes use the plugin's own palette.** `CANVAS_HUE` mirrors `--am-ev-*` from `styles/00-tokens.css`, so a logbook's node on the map and its colour in the time grid are the same fact. A registered logbook's panel takes its own colour.
+
+### Fixed
+
+- **Two vault map nodes pointed at files that have never existed.** The quarterly and yearly nodes hardcoded `04 - Quarterly.md` and `05 - Yearly.md`; the dashboards have been folder notes since 2.57. Both now come from `quarterOverviewPath()` / `yearOverviewPath()`, and a test asserts every surface the map draws is a note the scaffold writes.
+- **Overlapping groups on a populated vault.** The Search group was positioned from the hub while every other group was positioned from its neighbour's width — two coordinate systems on one canvas, colliding as soon as the diary held about twelve entries.
+- **Six hidden graph links named notes that do not exist.** Entry templates linked to `02 - Weekly`, `03 - Monthly`, `04 - Quarterly` and `05 - Yearly` — the diary's pre-2.57 folder names — logbook notes to `06 - Logbooks`, and journal notes to a level *noun* such as `[[Lesson]]`. An unresolved wikilink still draws a node, so every vault's graph carried phantom notes for folders it does not have.
+- **The graph view had two hubs.** Every composed note carried a hidden `[[Homepage]]` while `Almanac.canvas` linked to the same surfaces, drawing the same star twice. Notes now name their parent only — an entry names its grain's dashboard, which names the diary, which names the homepage — so the graph shows depth instead of a second wheel. Three notes still name the homepage: the diary dashboard, the journals dashboard and Search.
+- **Dated entries no longer pinned to the map.** The prototype placed the twelve *alphabetically first* daily notes — the twelve oldest days in the vault — on a structural diagram that was stale by the next morning.
+- **Logbooks on the map come from the registry.** A folder scan picked up stray notes and missed a registered logbook whose note had not been written yet, so the map disagreed with the settings tab in both directions.
+
+## [4.67.0] - 2026-08-23
+
+**Universal horizontal drag-to-tab navigation across multi-widget groups and redesigned Style A segmented floating pill footers.**
+
+### Added
+
+- **Universal horizontal drag-to-tab gesture.** Groups of widgets with multiple tabbed pages can now be swiped/dragged horizontally from anywhere across the group surface to switch between pages. Direction locking preserves uninterrupted vertical scrolling within cards.
+- **Style A segmented floating pill footers.** Group footers feature a modern floating pill container (`.journal-group-tabs`) with pill buttons (`--am-radius-pill`), elevated active accent fills, smooth hover transitions, and an integrated `+` add-page button.
+
+## [4.66.0] - 2026-08-23
+
+**Section editor form toggles allow seamless two-way switching for standalone widgets, logbook widgets in groups support custom drag-height resizing and tab paging, and tooltips are refined.**
+
+### Added
+
+- **Custom drag-height resizing for grouped logbooks.** Grouped logbook widgets in multi-cell cards now seamlessly expand and contract using the bottom card drag handle (`--am-card-h`), unlocking heights beyond the default 440px limit.
+- **Logbook group paging and extraction.** Registered 1-line widget form extent for convertible widgets (`w:logbook`, `diary`, `tasks`), enabling the "Start a page here" tab delimiter and "Take out of the group" actions within multi-widget cards.
+
+### Fixed
+
+- **Standalone widget / section toggle lock.** Fixed an issue in the Section Editor where toggling a standalone section into a widget incorrectly classified it as being inside a multi-cell group, locking the toggle into a disabled state. Standalone sections remain interactive and reversible at all times.
+- **Group control tooltip phrasing.** Corrected tooltip descriptions across group split and page break buttons to consistently refer to `widget's` / `widgets'`.
+
 ## [4.65.0] - 2026-08-23
 
 **Logbook widgets gain unified multi-type aggregation, an interactive category dropdown, collapsible search, segment status controls, and rich tag formatting.**

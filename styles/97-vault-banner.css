@@ -286,10 +286,11 @@
    rather than one painted in advance — `94-native-tables.css`'s rule reaching
    the bar, and the reason the trail's cog has always been hover-revealed. */
 .am-vault-banner .avb-nav {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   display: flex;
   align-items: stretch;
   gap: var(--am-space-2);
+  flex-wrap: wrap;
 }
 .am-vault-banner .avb-btn {
   display: flex;
@@ -384,6 +385,7 @@
   display: flex;
   align-items: center;
   gap: var(--am-space-2);
+  flex-wrap: wrap;
   min-width: 0;
   font-size: var(--am-text-xs);
   color: var(--text-muted);
@@ -459,7 +461,7 @@
   }
 }
 
-/* ── The collapse, at 330px of BANNER ──────────────────────────────────
+/* ── The collapse, at 540px and 330px of BANNER ────────────────────────
    4.51, Q5: the nav loses its words and the strip wraps rather than shrinking
    every control at once.
 
@@ -473,6 +475,34 @@
    lockup is the widest fixed thing on the row, and the two lines it carries
    are the two the reader can most afford to lose: they know which vault they
    opened, and the trail below already says which part of it they are in. */
+@container (max-width: 540px) {
+  .am-vault-banner .avb-global {
+    flex-wrap: wrap;
+    gap: var(--am-space-2) var(--am-space-3);
+  }
+  .am-vault-banner .avb-search {
+    order: 3;
+    flex: 1 0 100%;
+  }
+  .am-vault-banner .avb-nav {
+    margin-left: auto;
+  }
+}
+@container (max-width: 440px) {
+  .am-vault-banner .avb-id-text {
+    display: none;
+  }
+  .am-vault-banner .avb-btn-label {
+    display: none;
+  }
+  .am-vault-banner .avb-btn {
+    min-width: 0;
+    padding: var(--am-space-2);
+  }
+  .am-vault-banner .avb-btn-menu {
+    gap: 0;
+  }
+}
 @container (max-width: 330px) {
   .am-vault-banner .avb-global {
     flex-wrap: wrap;

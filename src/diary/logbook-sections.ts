@@ -18,7 +18,7 @@
 // tasks table, another logbook — is an ordinary Add away through the section
 // editor, which this catalogue is what makes possible.
 
-import { composeFlatNote, flatNoteModel } from "../core/note-sections";
+import { composeFlatNote, flatNoteModel, graphLinksSection } from "../core/note-sections";
 import { bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
@@ -87,7 +87,13 @@ const specFor = (def: LogbookDef): FlatNoteSpec => ({
 
 // One logbook's whole markdown.
 export function composeLogbookNote(def: LogbookDef): string {
-  return composeFlatNote(logbookSections(def));
+  return (
+    composeFlatNote(logbookSections(def)).trimEnd() +
+    // `Logbooks`, not `06 - Logbooks`: the folder is `02 - Diary/Logbooks` and
+    // its note is `Logbooks.md`. The old literal named nothing in any vault and
+    // drew a phantom node in every graph — see `graphLinksSection`.
+    graphLinksSection(["Logbooks"])
+  );
 }
 
 // One logbook's note, as the editor sees it.
@@ -144,7 +150,10 @@ export function logbooksFolderSections(
 }
 
 export function composeLogbooksFolderNote(books: readonly LogbookDef[]): string {
-  return composeFlatNote(logbooksFolderSections(books));
+  return (
+    composeFlatNote(logbooksFolderSections(books)).trimEnd() +
+    graphLinksSection(["02 - Diary"])
+  );
 }
 
 export function logbooksFolderSectionModel(

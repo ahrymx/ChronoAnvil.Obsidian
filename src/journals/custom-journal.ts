@@ -25,6 +25,7 @@ import {
   templateTargets,
 } from "./journal-sections";
 import type { SectionOverrides } from "./journal-sections";
+import { graphLinksSection } from "../core/note-sections";
 import { journalSurface } from "../trackers/trackers";
 import type { TrackerDef } from "../trackers/trackers";
 
@@ -564,14 +565,31 @@ export function composeTemplate(
     .filter((s) => ids.has(s.id) || s.required)
     .map((s) => renderSection(s, ctx, layout?.options?.[s.id]))
     .filter(Boolean);
+
+  // THE TYPE'S OWN NOTE, NOT THE LEVEL'S NOUN. This read
+  // `ctx.type.levels[d].noun` — "Topic", "Lesson" — which is the word a level
+  // is CALLED and never the name of any note, so every journal note in the
+  // vault linked to something that does not exist and Obsidian drew a phantom
+  // node for each distinct noun. `ctx.type.name` is the type's folder note
+  // (`03 - Journals/Study/Study.md`), which always resolves.
+  //
+  // ONE LEVEL COARSER THAN THE TRUTH, deliberately and for now: a lesson's real
+  // parent is its topic's index NOTE, and this context carries the level a note
+  // is at but not the path of the note above it. Naming the type is true —
+  // every note in Study is inside Study — where naming "Lesson" was not.
+  const parentName = ctx.type.name;
+
   // Frontmatter abuts what follows it with no blank line, matching every
   // shipped asset. That matters for exactly one line: `almanac:spacer` is
   // documented as sitting on line 0 of the body so a click at the top of the
   // note lands on it rather than inside the banner fence, which would render
   // the fence as raw source.
-  return [`${templateFrontmatter(ctx)}\n${body[0] ?? ""}`, ...body.slice(1)]
-    .join("\n\n")
-    .replace(/\n+$/, "") + "\n";
+  return (
+    [`${templateFrontmatter(ctx)}\n${body[0] ?? ""}`, ...body.slice(1)]
+      .join("\n\n")
+      .replace(/\n+$/, "") +
+    graphLinksSection([parentName])
+  );
 }
 
 // The properties a generated note carries.

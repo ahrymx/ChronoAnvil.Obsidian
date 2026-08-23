@@ -52,7 +52,7 @@ import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import { WIDGETS } from "../core/widget-registry";
 import type { VaultLists } from "../core/widget-registry";
 import { widgetLine, widgetQuestions } from "../core/widget-sections";
-import { WIDGET_FORM, formQuestion, type SectionModel } from "../core/section-model";
+import { WIDGET_FORM, SECTION_FORM, formQuestion, type SectionModel } from "../core/section-model";
 import { FRAME_KEYWORD, HEADER_KEYWORD } from "../core/directive-grammar";
 
 const probe = (text: string, re: RegExp): number => text.search(re);
@@ -247,7 +247,14 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     locked: false,
     // The first cell of the top row. 4.2 §2.
     row: HOME_TOP_ROW,
-    render: () => ({ fence: "almanac", lines: [`diary:${HOME_AGENDA}`] }),
+    render: (options) => ({
+      fence: "almanac",
+      lines: [
+        ...(options?.form === SECTION_FORM ? ["header:📆 Today"] : []),
+        `diary:${HOME_AGENDA}`,
+      ],
+    }),
+    questions: () => [formQuestion("header:📆 Today", HEADER_KEYWORD)],
     // THE KEYWORD AND ITS ARGUMENT, AND NOT A LONGER WORD THAT STARTS WITH IT.
     //
     // This was `/^diary\b/m` until 4.12, and `\b` matches at a hyphen — so this
@@ -319,6 +326,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // from one scoped to a folder that happens to be empty. The catalogue
     // supplies the words, exactly as `level-index`'s second piece does.
     questions: (spec) => [
+      formQuestion("header:⏳ Open tasks", HEADER_KEYWORD),
       {
         kind: "folder",
         key: "folder",
@@ -328,7 +336,15 @@ const HOME_SECTION_DEFS: FlatSection[] = [
         emptyLabel: "the whole vault",
       },
     ],
-    render: () => ({ fence: "almanac", lines: ["tasks-table"] }),
+    render: (options) => ({
+      fence: "almanac",
+      lines: [
+        ...(options?.form === SECTION_FORM ? ["header:⏳ Open tasks"] : []),
+        options?.folder && options.folder !== ""
+          ? `tasks-table:${options.folder}`
+          : "tasks-table",
+      ],
+    }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },
   {

@@ -34,7 +34,16 @@ import {
   composeDiaryDashboard,
   diarySectionModel,
 } from "../src/diary/diary-sections";
-import { DEFAULT_PATHS } from "../src/core/constants";
+import { DEFAULT_PATHS, DEFAULT_LOGBOOKS } from "../src/core/constants";
+import { shippedNotes, isReconcilable } from "../src/core/scaffold";
+import {
+  mergeTrendsSection,
+  ensureTrendsHeader,
+  retitleTrends,
+} from "../src/charts/charts";
+import { titleSummaryFence } from "../src/diary/diary-sections";
+import { mergeBannerFences } from "../src/core/note-sections";
+import { collapseJournalsBlocks } from "../src/diary/home-sections";
 import type { SectionModel } from "../src/core/section-model";
 
 const ROOT = DEFAULT_PATHS.diaryRoot;
@@ -416,5 +425,78 @@ describe("a manifest is a dotfile, and the vault cannot see it", () => {
     // And the notice at the end is unconditional — it is the only thing that
     // tells a reader the command finished at all.
     expect(src).toContain('notify.ok("Almanac: nothing to do")');
+  });
+});
+
+// ── §N. A RELEASE MUST NOT OFFER TO MIGRATE ITS OWN OUTPUT ────────────────
+//
+// `Set up / repair vault` on a vault scaffolded minutes earlier showed
+// "Run format migrations — 2 notes", offering to rewrite `02 - Diary.md` and
+// the DOCUMENTATION. Two distinct defects met in one dialog, and neither was a
+// fact about the reader's vault:
+//
+//   1. `titleSummaryFence` asked `hasSectionBar` — is there a `header:` line —
+//      when the composer titles that fence with `frame: section` instead. So the
+//      migration wanted to insert a header into what the scaffolder had just
+//      written. It converged after one apply, which is the only reason this was
+//      a wart rather than 4.38.2's loop.
+//
+//   2. `segment()` matched a three-backtick ```almanac opener anywhere,
+//      including inside the FOUR-backtick fence `assets/documentation.md` uses
+//      to print an example rather than render it. The docs' illustration of a
+//      bare directive was read as a live widget block.
+//
+// The gate below is deliberately not two regression tests. It is the property
+// both defects broke: run every format migration the repair window runs, over
+// every note this release actually writes, and nothing may fire. A migration
+// exists to carry an OLDER note forward; one that fires on current output is
+// either wrong or the composer is, and this fails without needing to know which.
+describe("format migrations, against what this release writes", () => {
+  const migrated = (path: string, text: string): string => {
+    const merged = mergeTrendsSection(text.split("\n"))?.join("\n") ?? text;
+    const titled = ensureTrendsHeader(merged.split("\n"))?.join("\n") ?? merged;
+    const respelled = retitleTrends(titled.split("\n"))?.join("\n") ?? titled;
+    const welded = mergeBannerFences(respelled) ?? respelled;
+    const carded =
+      collapseJournalsBlocks(
+        welded,
+        path === DEFAULT_PATHS.home ? "journals:cards" : "journals"
+      ) ?? welded;
+    return titleSummaryFence(carded) ?? carded;
+  };
+
+  const shipped = () =>
+    shippedNotes(DEFAULT_PATHS, [], DEFAULT_LOGBOOKS)
+      .filter(isReconcilable)
+      .flatMap((n) => {
+        const text =
+          typeof n.content === "string"
+            ? n.content
+            : n.asset
+            ? readFileSync(join(process.cwd(), "assets", n.asset), "utf8")
+            : null;
+        return text == null ? [] : [{ dest: n.dest, text }];
+      });
+
+  it("offers no migration for any note the scaffolder writes", () => {
+    const notes = shipped();
+    // Not vacuous: the walk has to actually be reading pages. `isReconcilable`
+    // narrowing to nothing would otherwise pass this silently.
+    expect(notes.length).toBeGreaterThan(5);
+    const offered = notes
+      .filter((n) => migrated(n.dest, n.text) !== n.text)
+      .map((n) => n.dest);
+    expect(offered).toEqual([]);
+  });
+
+  // The documentation is prose, and its fences are printed rather than drawn.
+  // Called out on its own because it is the one page where a migration firing is
+  // not merely premature but categorically wrong: there is no widget there to
+  // bring up to date.
+  it("never rewrites the documentation, whose fences are illustrations", () => {
+    const doc = shipped().find((n) => n.dest.endsWith("README.md"));
+    expect(doc, "the documentation is in the reconcilable walk").toBeDefined();
+    expect(doc!.text).toContain("```almanac");
+    expect(migrated(doc!.dest, doc!.text)).toBe(doc!.text);
   });
 });

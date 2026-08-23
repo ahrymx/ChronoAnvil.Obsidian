@@ -53,7 +53,7 @@ import { DEFAULT_PATHS, HEADER_PREFIX, TRENDS_HEADING } from "../core/constants"
 import { segment } from "../core/layout";
 import {
   HEADER_KEYWORD,
-  hasSectionBar,
+  isSectionFence,
   isCellLine,
   isRowLine,
 } from "../core/directive-grammar";
@@ -82,6 +82,7 @@ import {
   flatBlocks,
   locateTitle,
   regroupFlatNote,
+  graphLinksSection,
 } from "../core/note-sections";
 import {
   instanceIdOf,
@@ -1184,7 +1185,9 @@ export function composeDiaryDashboard(grain: DashboardGrain): string {
     [...frontmatter(ctx), "`almanac:spacer`"].join("\n") +
     "\n" +
     blocks.join("\n\n") +
-    "\n"
+    // The parent, and only the parent — see `graphLinksSection`. A period
+    // dashboard is inside the diary; the diary is what names the homepage.
+    graphLinksSection(["02 - Diary"])
   );
 }
 
@@ -1346,7 +1349,15 @@ export function parseDiarySections(
       to: i,
       filler:
         !owners.length &&
-        (isBlank(seg.lines) || (i === 0 && seg.lines[0]?.trim() === "---")),
+        (isBlank(seg.lines) ||
+          (i === 0 && seg.lines[0]?.trim() === "---") ||
+          seg.lines.every(
+            (l) =>
+              l.trim() === "" ||
+              l.trim() === "`almanac:spacer`" ||
+              l.trim().startsWith("%%") ||
+              l.trim().startsWith("[[")
+          )),
     };
   });
 }
@@ -1469,7 +1480,27 @@ export function titleSummaryFence(text: string): string | null {
     if (!body.some((l) => /^(day|week|month|quarter|year)-summary\b/.test(l.trim()))) {
       continue;
     }
-    if (hasSectionBar(body)) return null;
+    // ALREADY FRAMED AS A SECTION IS ALREADY TITLED (4.68.1). This asked
+    // `hasSectionBar`, which sees a `header:` line and nothing else — but a fence
+    // carrying `frame: section` draws its own section chrome, and that is what
+    // `composeDiaryDashboard` writes:
+    //
+    //     ```almanac
+    //     frame: section
+    //     month-summary
+    //     ```
+    //
+    // So this migration wanted to insert a `header:` line into a note the
+    // scaffolder had just composed, and `Set up / repair vault` offered a FORMAT
+    // MIGRATION for `02 - Diary.md` on a vault created minutes earlier. It
+    // converged after one apply, which is the only reason it was a wart rather
+    // than the 4.38.2 loop — but a plugin offering to migrate its own current
+    // output is telling the reader their vault is out of date when it is not.
+    //
+    // `isSectionFence` is the predicate that already answers this question for
+    // the drag and the section editor, and it is the union of the two ways a
+    // fence titles itself. Asking the narrower one here was the whole defect.
+    if (isSectionFence(body)) return null;
     if (body.some((l) => isRowLine(l) || isCellLine(l))) return null;
     const keyword = body
       .map((l) => l.trim().split(":")[0])
@@ -1762,7 +1793,10 @@ export function applyDiarySections(
     }
   }
 
-  const next = chunks.flatMap((c) => c.lines).join("\n");
+  const next = chunks
+    .flatMap((c) => c.lines)
+    .join("\n")
+    .replace(/\n{3,}%% almanac-graph %%/g, "\n\n%% almanac-graph %%");
   return next === text ? null : next;
 }
 

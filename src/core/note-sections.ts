@@ -87,6 +87,7 @@ import {
   SectionQuestion,
   SectionView,
   SectionWant,
+  WIDGET_FORM,
   formAt,
   describeAnswers,
   desiredOrder,
@@ -886,7 +887,11 @@ export function parseFlatSections(
         !owners.length &&
         (isBlank(body) ||
           body.every(
-            (l) => l.trim() === "" || l.trim() === "`almanac:spacer`"
+            (l) =>
+              l.trim() === "" ||
+              l.trim() === "`almanac:spacer`" ||
+              l.trim().startsWith("%%") ||
+              l.trim().startsWith("[[")
           )),
     };
   });
@@ -1042,8 +1047,13 @@ function sharersIn(runs: readonly FlatRun[]): Map<string, string[]> {
 // nothing, because the first had already turned that case away — a gate behind
 // a gate, where the one behind can rot without a test noticing. Now there is a
 // single rule and either caller asking it is the same question.
-const hasKnownExtent = (section: FlatSection | undefined): boolean =>
-  section?.render().lines.length === 1;
+const hasKnownExtent = (section: FlatSection | undefined): boolean => {
+  if (!section) return false;
+  return (
+    section.render().lines.length === 1 ||
+    section.render({ form: WIDGET_FORM }).lines.length === 1
+  );
+};
 
 // Which line of a block is this section's own, or null when that is not a
 // question with an answer.
@@ -1521,7 +1531,10 @@ export function applyFlatSections(
     });
   }
 
-  const next = chunks.flatMap((c) => c.lines).join("\n");
+  const next = chunks
+    .flatMap((c) => c.lines)
+    .join("\n")
+    .replace(/\n{3,}%% almanac-graph %%/g, "\n\n%% almanac-graph %%");
   return next === text ? null : next;
 }
 
@@ -2226,4 +2239,39 @@ function specWithWanted(
     .filter((id) => !have.has(id))
     .flatMap((id) => instanceSectionFor(id) ?? []);
   return extra.length ? { ...spec, sections: [...spec.sections, ...extra] } : spec;
+}
+
+// ── ONE PARENT, NOT A SPOKE TO THE MIDDLE (4.68) ─────────────────────────
+//
+// Hidden zero-width wikilinks in an `almanac-graph` comment, so Obsidian's
+// Graph View and Local Graph know how the vault's composed notes hang together.
+//
+// UNTIL 4.68 EVERY COMPOSED NOTE NAMED `Homepage` HERE, and the graph had two
+// hubs rather than one. The second was `Almanac.canvas`: a canvas node IS a
+// link, so a map that points at eighteen surfaces is an eighteen-spoke star in
+// the graph whether anyone wanted one or not. Two mechanisms were drawing the
+// same wheel over the same set of notes, and the reader got both on top of each
+// other.
+//
+// Only one of the two can be given up. A map that stops pointing at the vault
+// is not a map, so the canvas keeps its star and this stops drawing a second
+// one: a note names its PARENT and nothing else, and only the three surfaces
+// that genuinely hang off the homepage — the diary dashboard, the journals
+// dashboard and Search — still name it.
+//
+// What that buys is not just "one hub": a star says every note is equally near
+// the middle, which is false, and a chain of parents says a daily entry is
+// inside a week inside the diary, which is true and is the one thing the canvas
+// CANNOT say, because a group box has no depth.
+//
+// EVERY NAME HERE MUST RESOLVE TO A NOTE THE SCAFFOLD WRITES. An unresolved
+// wikilink is not inert — Obsidian draws it as a node — so a stale literal
+// invents a vault the reader does not have. Four of them survived here for
+// eleven releases (`02 - Weekly` and friends, the pre-2.57 folder names) and a
+// fifth in the journals. `test/canvas-builder.test.ts` now fails on any name
+// outside the scaffold's own list.
+export function graphLinksSection(links: readonly string[]): string {
+  if (!links || links.length === 0) return "";
+  const wikilinks = links.map((l) => `[[${l}|\u200B]]`).join(" ");
+  return `\n\n%% almanac-graph %%\n${wikilinks}\n`;
 }

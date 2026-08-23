@@ -154,13 +154,21 @@
   color: var(--text-normal);
 }
 
-/* tasks-table — folder-scoped open-task rollup grouped by note. Reuses the
-   per-note task widget's row chrome (.journal-task-row / -check / -text /
-   -prio) so a task reads the same here as in its own note, but rows are
-   read-only apart from the checkbox: text isn't an input, and there's no
-   priority-cycle / delete / due-picker — this is a dashboard view, not an
-   editor. Editing still happens in the source note (one click away via the
-   group heading link). */
+.journal-tasks-table {
+  max-height: 500px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.is-measuring-natural .journal-tasks-table,
+.is-measuring-natural.journal-tasks-table,
+.is-sized .journal-tasks-table,
+.is-sized.journal-tasks-table,
+.journal-widget-card.is-sized .journal-tasks-table,
+.journal-block-cell > .is-sized .journal-tasks-table {
+  max-height: none;
+}
+
 .journal-tasks-table .jtt-loading {
   color: var(--text-faint);
   font-size: var(--am-text-sm);

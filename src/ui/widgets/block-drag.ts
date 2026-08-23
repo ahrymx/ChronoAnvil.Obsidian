@@ -784,7 +784,9 @@ function attachCardResize(
     // never in `track`, where it would be sixty a second.
     card.removeClass(SIZED_CLASS);
     card.style.removeProperty(CARD_H_VAR);
+    card.addClass("is-measuring-natural");
     const natural = card.scrollHeight;
+    card.removeClass("is-measuring-natural");
     restore();
 
     let live: number | null = start;

@@ -549,9 +549,9 @@ export function layOutRow(
   // offered only once there are already tabs could never be pressed. It appears
   // on hover, which is the grip's idiom and the divider's, so a group at rest
   // looks exactly as it did.
-  const addPage = (): void => {
+  const addPage = (host: HTMLElement = foot): void => {
     if (!tabs?.addPage) return;
-    const button = foot.createEl("button", {
+    const button = host.createEl("button", {
       cls: GROUP_ADD_CLASS,
       text: "+",
       attr: {
@@ -742,6 +742,19 @@ export function layOutRow(
     });
   }
 
+  // ── Drag horizontally anywhere across group to switch pages (4.66) ─────
+  attachGroupSwipe(
+    pages,
+    () => rows.length > 1,
+    (dir) => {
+      const to = current + dir;
+      if (to >= 0 && to < rows.length && to !== current) {
+        swapTo(to);
+        tabs?.onOpen(pageOf(to));
+      }
+    }
+  );
+
   // ── LAID OUT ONCE BEFORE IT IS EVER HIDDEN (4.34 §A) ────────────────
   //
   // Every widget in every page is BUILT at render — the dispatcher records its
@@ -760,5 +773,107 @@ export function layOutRow(
   // AFTER THE STRIP, so `+` reads as "one more of these" rather than as a
   // control of its own. Only where the last page still has two columns to
   // divide — see the branch above.
-  if (plans[plans.length - 1].cells.length > 1) addPage();
+  if (plans[plans.length - 1].cells.length > 1) addPage(strip);
+}
+
+// ── Horizontal drag-to-tab navigation across group pages (4.66) ─────────
+//
+// Allows dragging or swiping horizontally anywhere across a group's surface
+// to switch pages. Native vertical scrolling within cards remains untouched
+// through directional threshold checking.
+function attachGroupSwipe(
+  container: HTMLElement,
+  canSwipe: () => boolean,
+  onSwipe: (dir: -1 | 1) => void
+): void {
+  let startX = 0;
+  let startY = 0;
+  let startTime = 0;
+  let activeId: number | null = null;
+  let isAxisDecided = false;
+  let isHorizontal = false;
+
+  const isInteractive = (target: EventTarget | null): boolean => {
+    if (!(target instanceof HTMLElement)) return false;
+    return !!target.closest(
+      "button, input, select, textarea, a, [contenteditable='true'], .jbd-handle, .journal-group-divider, .journal-card-divider, .journal-note-chevron, .am-ev-row, [draggable='true']"
+    );
+  };
+
+  container.addEventListener("pointerdown", (evt) => {
+    if (evt.button !== 0 || !canSwipe() || isInteractive(evt.target)) return;
+    startX = evt.clientX;
+    startY = evt.clientY;
+    startTime = Date.now();
+    activeId = evt.pointerId;
+    isAxisDecided = false;
+    isHorizontal = false;
+  });
+
+  container.addEventListener("pointermove", (evt) => {
+    if (activeId !== evt.pointerId) return;
+    const dx = evt.clientX - startX;
+    const dy = evt.clientY - startY;
+
+    if (!isAxisDecided) {
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+        isAxisDecided = true;
+        isHorizontal = Math.abs(dx) > Math.abs(dy);
+        if (isHorizontal) {
+          try {
+            container.setPointerCapture(evt.pointerId);
+          } catch {
+            // ignore if capture fails
+          }
+        }
+      }
+    }
+
+    if (isHorizontal) {
+      evt.preventDefault();
+      evt.stopPropagation();
+    }
+  });
+
+  const endGesture = (evt: PointerEvent): void => {
+    if (activeId !== evt.pointerId) return;
+    const dx = evt.clientX - startX;
+    const dt = Math.max(1, Date.now() - startTime);
+    const velocity = Math.abs(dx) / dt;
+
+    if (isHorizontal) {
+      evt.preventDefault();
+      evt.stopPropagation();
+      if (dx < -40 || (dx < -20 && velocity > 0.25)) {
+        onSwipe(1);
+      } else if (dx > 40 || (dx > 20 && velocity > 0.25)) {
+        onSwipe(-1);
+      }
+    }
+
+    if (container.hasPointerCapture(evt.pointerId)) {
+      try {
+        container.releasePointerCapture(evt.pointerId);
+      } catch {
+        // ignore
+      }
+    }
+    activeId = null;
+    isAxisDecided = false;
+    isHorizontal = false;
+  };
+
+  container.addEventListener("pointerup", endGesture);
+  container.addEventListener("pointercancel", endGesture);
+
+  // Stop mobile sidebar gestures from intercepting horizontal swipes across groups
+  container.addEventListener(
+    "touchmove",
+    (evt) => {
+      if (isHorizontal) {
+        evt.stopPropagation();
+      }
+    },
+    { passive: true }
+  );
 }

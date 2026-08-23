@@ -833,7 +833,7 @@ export class SectionEditorModal extends EditorModal {
     // visibly refusing, with nothing saying what would make it work.
     if (split.disabled) {
       split.title =
-        "One of these sections' lines can't be told apart from the others in its block, so the group can't be broken up. Move it out of the block by hand first.";
+        "One of these widgets' lines can't be told apart from the others in its block, so the group can't be broken up. Move it out of the block by hand first.";
     }
     split.addEventListener("click", () => {
       this.settle(breakUp(this.arrangement, band, group[0]));
@@ -1060,7 +1060,7 @@ export class SectionEditorModal extends EditorModal {
         out.disabled = !this.loose.has(section.id);
         if (out.disabled) {
           out.title =
-            "This section's lines can't be told apart from the others in its block, so it can't be split out.";
+            "This widget's lines can't be told apart from the others in its block, so it can't be split out.";
         }
         // IT LEAVES THROUGH THE NEAREST EDGE, and `takeOut` is where that is
         // decided. The old handler was `joined.delete(id)`, which does not take
@@ -1103,7 +1103,7 @@ export class SectionEditorModal extends EditorModal {
           page.disabled = !this.loose.has(section.id);
           if (page.disabled) {
             page.title =
-              "This section's lines can't be told apart from the others in its block, so a page can't be started at it.";
+              "This widget's lines can't be told apart from the others in its block, so a page can't be started at it.";
           }
           page.addEventListener("click", () => {
             this.settle(setPage(this.arrangement, band, section.id, !breaks));
@@ -1495,6 +1495,21 @@ export class SectionEditorModal extends EditorModal {
       text: q.widget,
     });
     label.htmlFor = id;
+
+    const band = this.bandOf(section.id);
+    const inGroup = blockOf(band, this.joined, section.id).length > 1;
+
+    if (inGroup) {
+      box.checked = true;
+      box.disabled = true;
+      wrap.addClass("is-disabled");
+      const explanation = "Widgets in a group are automatically drawn as widgets";
+      box.title = explanation;
+      label.title = explanation;
+      box.setAttribute("aria-label", `${q.widget} (${explanation})`);
+      return;
+    }
+
     // UNANSWERED READS AS A SECTION, which is what the catalogue composes and
     // what every note written before this release holds. `shownAnswer` returns
     // the empty string for a section the window has not read, and the empty
@@ -1811,8 +1826,10 @@ export class SectionEditorModal extends EditorModal {
     // already are, so the rule has one home and this file does not know what
     // makes an id a widget. The alternative was a `family` field on
     // `SectionView` that three of the four models would never set.
-    const own = absent.filter((s) => !isPageWidgetId(s.id));
-    const widgets = absent.filter((s) => isPageWidgetId(s.id));
+    const isWidget = (id: string): boolean =>
+      isPageWidgetId(id) && !id.startsWith("w:logbook");
+    const own = absent.filter((s) => !isWidget(s.id));
+    const widgets = absent.filter((s) => isWidget(s.id));
 
     // A SUGGESTER, NOT A `<select>` (4.15 §3).
     //
@@ -1858,7 +1875,12 @@ export class SectionEditorModal extends EditorModal {
         // "Sections" over an undivided list names a distinction that is not on
         // screen.
         ...(grouped
-          ? { group: isPageWidgetId(s.id) ? "Widgets" : "Sections" }
+          ? {
+              group:
+                isPageWidgetId(s.id) && !s.id.startsWith("w:logbook")
+                  ? "Widgets"
+                  : "Sections",
+            }
           : {}),
       })),
       "Add a section…"

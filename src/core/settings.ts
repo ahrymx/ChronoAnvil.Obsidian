@@ -156,6 +156,15 @@ export interface BannerOptions {
   glowEnabled?: boolean;
 }
 
+export type MobileOverlayTogglePosition = "off" | "left" | "right";
+
+export interface MobileOptions {
+  // Position of the floating button that toggles hiding Obsidian's mobile overlay controls.
+  overlayTogglePosition: MobileOverlayTogglePosition;
+  // Whether mobile overlay controls start hidden when Almanac loads.
+  hideOverlaysDefault: boolean;
+}
+
 export interface AlmanacSettings {
   paths: typeof DEFAULT_PATHS;
   attachments: AttachmentOptions;
@@ -286,6 +295,8 @@ export interface AlmanacSettings {
   // a journal, which is the cross-catalogue transfer `layout-transfer.ts`
   // exists to refuse.
   entryLayouts: EntryLayoutConfig[];
+  // Options for mobile layout, gestures, and overlay controls.
+  mobile: MobileOptions;
   // The version of Almanac recorded when settings were last saved / initialized.
   // Used to detect plugin upgrades and prompt the reader when repairs or
   // migrations are pending.
@@ -315,6 +326,10 @@ export const DEFAULT_SETTINGS: AlmanacSettings = {
     art: "topography-minimal.svg",
     artOpacity: 18,
     glowEnabled: true,
+  },
+  mobile: {
+    overlayTogglePosition: "off",
+    hideOverlaysDefault: false,
   },
   sleepEnabled: true,
   eventsEnabled: true,
@@ -797,6 +812,22 @@ export class AlmanacSettingTab extends PluginSettingTab {
       )
     );
 
+    this.renderMobile(
+      this.group(
+        containerEl,
+        "mobile",
+        "📱",
+        "Mobile",
+        "Mobile layout options and overlay controls",
+        false,
+        s.mobile?.overlayTogglePosition && s.mobile.overlayTogglePosition !== "off"
+          ? s.mobile.overlayTogglePosition === "left"
+            ? "Bottom left"
+            : "Bottom right"
+          : "Off"
+      )
+    );
+
     this.renderPaths(
       this.group(
         containerEl,
@@ -1161,6 +1192,56 @@ export class AlmanacSettingTab extends PluginSettingTab {
   }
 
   // ── Paths ───────────────────────────────────────────────────────────────
+  // ── Mobile ──────────────────────────────────────────────────────────────
+  private renderMobile(containerEl: HTMLElement): void {
+    const s = this.plugin.settings;
+    if (!s.mobile) {
+      s.mobile = {
+        overlayTogglePosition: "off",
+        hideOverlaysDefault: false,
+      };
+    }
+    this.note(
+      containerEl,
+      "Controls tailored for mobile devices and small screens.",
+      "A floating corner button allows toggling Obsidian's mobile navigation bar and toolbars to maximize screen space for dashboards and journal notes."
+    );
+
+    new Setting(containerEl)
+      .setName("Overlay controls toggle button")
+      .setDesc(
+        "Show a floating button in the bottom corner on mobile to quickly hide or reveal Obsidian's mobile navigation bar and toolbars."
+      )
+      .addDropdown((d) =>
+        d
+          .addOption("off", "Off (Disabled)")
+          .addOption("left", "Bottom left")
+          .addOption("right", "Bottom right")
+          .setValue(s.mobile.overlayTogglePosition ?? "off")
+          .onChange(async (v) => {
+            s.mobile.overlayTogglePosition = v as MobileOverlayTogglePosition;
+            await this.plugin.saveSettings();
+            this.plugin.mobileControls?.refresh();
+            this.display();
+          })
+      );
+
+    if (s.mobile.overlayTogglePosition && s.mobile.overlayTogglePosition !== "off") {
+      new Setting(containerEl)
+        .setName("Hide overlay controls by default")
+        .setDesc("Automatically start with mobile overlay controls hidden when Obsidian opens.")
+        .addToggle((t) =>
+          t.setValue(s.mobile.hideOverlaysDefault ?? false).onChange(async (v) => {
+            s.mobile.hideOverlaysDefault = v;
+            await this.plugin.saveSettings();
+            this.plugin.mobileControls?.refresh();
+          })
+        );
+    }
+  }
+
+  // ── Paths ───────────────────────────────────────────────────────────────
+  //
   // Five editable roots; everything else is shown read-only beneath the root
   // that owns it.
   //

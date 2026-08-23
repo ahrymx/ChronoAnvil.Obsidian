@@ -20,6 +20,8 @@ import {
 } from "./util";
 import { composeDiaryDashboard, titleSummaryFence } from "../diary/diary-sections";
 import { DEFAULT_PATHS } from "./constants";
+import { buildVaultCanvas, initialVaultCanvas, mergeCanvas } from "./canvas-builder";
+import type { CanvasDocument } from "./canvas-builder";
 import { splitEntryFences } from "../trackers/entry-trackers";
 import { mergeBannerFences } from "./note-sections";
 import { CLASS_DEFS, TRACKER_CLASSES } from "../trackers/trackers";
@@ -321,6 +323,16 @@ export function shippedNotes(
       dest: `${p.templatesDiary}/${CLASS_DEFS[cls].templateFile}`,
       template: true,
     })),
+    // THE VAULT MAP, and it is handed the same `types` and `books` every other
+    // entry in this list is composed from. Until 4.68 the baseline canvas took
+    // only the paths, so a fresh vault got a four-node stub while
+    // `generateVaultCanvas` drew the full map — two arrangements of one thing,
+    // which is precisely the split that let the quarterly node point at a file
+    // that has never existed. One spec now serves both; see canvas-builder §1.
+    {
+      content: JSON.stringify(initialVaultCanvas(p, types, books), null, 2),
+      dest: `${p.infrastructureRoot}/Almanac.canvas`,
+    },
     { asset: "diary.base", dest: `${p.infrastructureRoot}/Diary.base` },
     { asset: "documentation.md", dest: `${p.documentation}/README.md` },
     { asset: "art/topography-minimal.svg", dest: `${p.art}/topography-minimal.svg` },
@@ -911,6 +923,57 @@ export class Scaffold {
         void openFile(this.app, target);
       });
     }
+  }
+
+  // ── Build and write Almanac.canvas map (4.67, merged since 4.68) ──────
+  //
+  // REBUILDING IS NOT OVERWRITING. Until 4.68 this was one `vault.modify` of
+  // the whole file, so a reader who spent ten minutes arranging the map lost it
+  // to one command — the same class of loss `refreshTemplates` refuses by
+  // asking first.
+  //
+  // Asking is the wrong shape here, because the answer would always be "yes,
+  // but keep my layout". The plugin owns what a node MEANS and the reader owns
+  // where it SITS, so the two are merged rather than one being chosen; the four
+  // id cases and the reasoning live on `mergeCanvas`.
+  //
+  // The Notice reports the split rather than saying "Updated", because "kept 14,
+  // placed 1" is the sentence that tells a reader their arrangement survived —
+  // and, the first time it says "placed 18", that it did not.
+  async generateVaultCanvas(): Promise<TFile | null> {
+    const p = this.plugin.settings.paths;
+    const dest = `${p.infrastructureRoot}/Almanac.canvas`;
+    const rebuilt = buildVaultCanvas(this.app, this.plugin);
+    const existing = getFile(this.app, dest);
+
+    if (!existing) {
+      const content = JSON.stringify(rebuilt, null, 2);
+      const file = await createFileEnsuringFolders(this.app, dest, content);
+      notify.ok(`Almanac: Created ${dest} — ${rebuilt.nodes.length} nodes`);
+      return file;
+    }
+
+    // A canvas that is not JSON is not a canvas this plugin wrote, and reading
+    // it must not be able to throw: the whole point of the merge is that the
+    // command never destroys anything, and a parse error that fell through to
+    // the old overwrite would destroy exactly the file it could not read.
+    let disk: CanvasDocument | null = null;
+    try {
+      const raw = await this.app.vault.read(existing);
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") disk = parsed as CanvasDocument;
+    } catch {
+      disk = null;
+    }
+
+    const { doc, kept, placed, foreign } = mergeCanvas(disk, rebuilt);
+    await this.app.vault.modify(existing, JSON.stringify(doc, null, 2));
+    notify.ok(
+      `Almanac: Updated ${dest} — ${kept} kept where you put ${
+        kept === 1 ? "it" : "them"
+      }, ${placed} placed` + (foreign ? `, ${foreign} of your own untouched` : "")
+    );
+    return existing;
   }
 
   // Bring a journal type's templates up to the current shipped shape.

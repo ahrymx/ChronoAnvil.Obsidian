@@ -134,6 +134,27 @@ export function keywordOf(line: string): string {
 }
 
 const FENCE_OPEN = /^```(almanac|almanac-charts|almanac-journal-charts)\s*$/;
+// Any fence opener at all, with the length of its backtick run captured.
+//
+// WHY THE LENGTH MATTERS, AND THE BUG IT IS THE FIX FOR (4.68.1). A markdown
+// fence is closed by a backtick run at least as long as the one that opened it,
+// which is exactly how a document SHOWS a fence rather than rendering one:
+// `assets/documentation.md` wraps its worked example in a four-backtick fence so
+// the three-backtick ```almanac inside it is printed as source.
+//
+// This function used to ignore the outer fence entirely — it matched only
+// `FENCE_OPEN` and pushed everything else to raw — so the example inside it was
+// read as a live widget block. `Set up / repair vault` then offered to rewrite
+// the DOCUMENTATION: two rows in the window, one of them proposing to insert a
+// `header:` line into a prose page's illustration of what a bare directive looks
+// like. Nothing was broken in the reader's vault, which is the worst kind of
+// repair to be offered.
+//
+// So a fence that is not ours is now skipped WHOLE rather than walked into. For
+// every other input the output is unchanged: a non-almanac block's lines went to
+// `raw` one at a time before and go there together now.
+const FENCE_RUN = /^(`{3,})(.*)$/;
+const FENCE_SHUT = /^(`{3,})\s*$/;
 
 export function segment(lines: string[]): Segment[] {
   const out: Segment[] = [];
@@ -145,23 +166,34 @@ export function segment(lines: string[]): Segment[] {
   };
 
   for (let i = 0; i < lines.length; i++) {
-    const open = lines[i].match(FENCE_OPEN);
-    if (!open) {
+    const run = lines[i].match(FENCE_RUN);
+    if (!run) {
       raw.push(lines[i]);
       continue;
     }
-    // Find the closing fence. An unterminated fence is left as raw text: the
-    // note is malformed and guessing where it ends is how a reconciler eats
-    // the rest of the file.
+    const ticks = run[1].length;
+    const open = lines[i].match(FENCE_OPEN);
+    // Find the closing fence — a run of AT LEAST as many backticks, and nothing
+    // after it. An unterminated fence is left as raw text: the note is malformed
+    // and guessing where it ends is how a reconciler eats the rest of the file.
     let close = -1;
     for (let j = i + 1; j < lines.length; j++) {
-      if (lines[j].trim() === "```") {
+      const shut = lines[j].match(FENCE_SHUT);
+      if (shut && shut[1].length >= ticks) {
         close = j;
         break;
       }
     }
     if (close === -1) {
       raw.push(lines[i]);
+      continue;
+    }
+    if (!open) {
+      // SOMEBODY ELSE'S CODE BLOCK, AND ITS CONTENTS ARE LITERAL. Skipped whole
+      // so that a fence drawn INSIDE it — which is what a longer opener is for —
+      // is never mistaken for one this plugin owns.
+      for (let j = i; j <= close; j++) raw.push(lines[j]);
+      i = close;
       continue;
     }
 

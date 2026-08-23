@@ -26,7 +26,7 @@
 // `layout.ts` rewrites `links:` wherever it finds one, so the row is already
 // maintained without a catalogue entry to hold it.
 
-import { composeFlatNote, flatNoteModel } from "../core/note-sections";
+import { composeFlatNote, flatNoteModel, graphLinksSection } from "../core/note-sections";
 import { bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
@@ -129,7 +129,7 @@ const SPEC: FlatNoteSpec = {
 //
 // REPRODUCES `assets/search.md`, which is deleted in the same patch.
 export function composeSearchNote(): string {
-  return composeFlatNote(SEARCH_SECTIONS);
+  return composeFlatNote(SEARCH_SECTIONS).trimEnd() + graphLinksSection(["Homepage"]);
 }
 
 // The Search note, as the editor sees it.

@@ -237,10 +237,11 @@ describe("the table holds what cannot be derived", () => {
     // 25 until 4.34's two page commands. They are the first entries here that
     // exist to be BOUND rather than to be found — a group's pages are switched
     // by a key, and the palette is where a reader discovers that they can be.
-    expect(ACTIONS).toHaveLength(27);
+    // 28 in 4.67 with `maint-generate-vault-canvas`.
+    expect(ACTIONS).toHaveLength(28);
   });
 
-  it("splits them 13 / 0 / 7 / 7", () => {
+  it("splits them 13 / 0 / 7 / 8", () => {
     // `maint-find-journals` is the one that moved groups: it was with the
     // journals because of its subject, and everything else there MAKES a
     // journal note where this one reconciles the vault. It stays in the table
@@ -252,9 +253,8 @@ describe("the table holds what cannot be derived", () => {
     // sense and narrower still: they act on one block of the note in front of
     // the reader and touch no file at all.
     expect(groupOf("notes")).toHaveLength(7);
-    // 6 until 4.31's export, which surveys, shows and then writes — the shape
-    // every other command in this group already has.
-    expect(groupOf("maintenance")).toHaveLength(7);
+    // 6 until 4.31's export, 7 until 4.34, 8 in 4.67 with `maint-generate-vault-canvas`.
+    expect(groupOf("maintenance")).toHaveLength(8);
   });
 
   it("holds no journal-specific action at all", () => {
