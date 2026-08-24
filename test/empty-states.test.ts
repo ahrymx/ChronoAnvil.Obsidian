@@ -559,6 +559,17 @@ describe("every block on the two dashboards says something when empty", () => {
     "tasks-table": { module: "tables", marker: "emptyCallout(" },
     "tag-index": { module: "tables", marker: "emptyCallout(" },
     "on-this-day": { module: "diary-retrieval", marker: "emptyCallout(" },
+    // COMPOSED FOR THE FIRST TIME IN 4.70, and it arrived here as a bare grey
+    // `<p>` rather than a callout — the state a widget stays in when no shipped
+    // page has ever drawn it. Composing it onto the diary dashboard is what
+    // brought it under this rule, and the fix was to say the second half:
+    // "No nights logged yet" plus how to log one.
+    "sleep-summary": { module: "sleep", marker: "emptyCallout(" },
+    // ALSO COMPOSED FOR THE FIRST TIME IN 4.70, and unlike the sleep summary
+    // beside it this one was written under the rule rather than brought under
+    // it: a journal with no notes yet says so, and a vault with no journals at
+    // all says the other thing, which is why `journal-recent.ts` carries two.
+    "journal-recent": { module: "journal-recent", marker: "emptyCallout(" },
     // `emptyLine` — ANNOTATES content that drew itself. Added in 4.1.1, when
     // this fence showed a red "Unknown Almanac widget" on a vault with no
     // journals rather than an empty list.
@@ -603,10 +614,12 @@ describe("every block on the two dashboards says something when empty", () => {
       }
       if (!inFence || !line.trim()) continue;
       const kw = line.split("|")[0].split(":")[0].trim();
-      // Modifiers and bars are not widgets: neither draws anything that could
-      // be empty. `header:` is the section bar, `frame:` is 4.1 §3's block
-      // modifier.
-      if (kw === "header" || kw === "frame") continue;
+      // Modifiers and bars are not widgets: none draws anything that could be
+      // empty. `header:` is the section bar, `frame:` is 4.1 §3's block
+      // modifier, and `row` is 4.2's — a line that divides a fence into columns
+      // and renders nothing of its own. The cells it divides are each read on
+      // their own line, which is where the empty state actually has to be.
+      if (kw === "header" || kw === "frame" || kw === "row" || kw === "cell") continue;
       keywords.add(kw);
     }
   }

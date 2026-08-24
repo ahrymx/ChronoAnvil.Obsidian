@@ -245,25 +245,52 @@ describe("the exclusions say why, and the reasons are the ones claimed", () => {
     // that exist are the lists that are WIRED, so a source cannot be named in
     // the registry and left unresolved, and the five above stay deferred until
     // theirs is built too.
+    //
+    // IT DID AGAIN, IN 4.52 AND 4.70, and both times the deferral moved rather
+    // than the six. `logbooks` came in with 4.52; `trackers` came in with
+    // `tracker-stat`, on the argument the 4.15 note asked for by name — a
+    // `TrackerDef.id` IS the frontmatter property it writes, so it is stable
+    // under a relabel, and changing it makes a new tracker rather than renaming
+    // this one. That is the same stability `journals` was admitted on.
+    //
+    // SO THE SIX ABOVE ARE NOT DEFERRED FOR WANT OF A TRACKER LIST ANY MORE,
+    // and their notes no longer say they are. Four of them want the trackers
+    // the HOST NOTE'S journal accepts, and a `vault` argument is resolved once
+    // for the whole window, before there is a host. The other two want a note
+    // type. This assertion is deliberately over the sources that are WIRED and
+    // not over the count of what is deferred, so lifting a deferral is a change
+    // to one line here and a change to the note that claimed it.
     const sources = new Set(
       Object.values(WIDGETS).flatMap((w) =>
         w.arg?.kind === "vault" ? [w.arg.source] : []
       )
     );
-    expect([...sources].sort()).toEqual(["journals"]);
+    expect([...sources].sort()).toEqual(["journals", "trackers"]);
     const wiring = repoFile("src/core/widget-sections.ts");
     for (const s of sources) expect(wiring).toContain(`  ${s}: {`);
   });
 
-  it("still has no list for the trackers and note kinds it defers", () => {
-    // THE FIVE ARE DEFERRED FOR A REASON THAT SURVIVED §4, and it is worth
-    // separating from the sentence above: `journals` was buildable because a
-    // journal's id is stable and `registeredJournalTypes` already answers it in
-    // one call. A tracker id and a note kind each raise a question this release
-    // did not answer — what the id means after the thing is renamed — so they
-    // are not offered, and their notes still say so in their own terms.
+  it("says which list it lacks, in its own terms, for each of the six", () => {
+    // THE SIX ARE DEFERRED FOR A REASON THAT SURVIVED §4 AND 4.70, and it is
+    // worth separating from the sentence above. `journals` was buildable
+    // because a journal's id is stable and `registeredJournalTypes` answers it
+    // in one call; `trackers` became buildable in 4.70 on the same stability
+    // argument. Neither made these six buildable, because what they name is a
+    // list the HOST NOTE decides — the trackers this journal's notes accept, or
+    // a note type under this journal — and the section window resolves a
+    // `vault` argument before any host is chosen.
+    //
+    // What is asserted is that each note still SAYS which list, in its own
+    // terms. This test was `/tracker|note type/` alone until 4.70, and it went
+    // on passing while all four tracker notes claimed the window had no list of
+    // this vault's trackers — a true regex over a sentence that had become
+    // false. So that exact claim is now asserted ABSENT, and only that one: the
+    // two note-kind entries still say there is no list of this vault's
+    // journals, and they still say it because there still is not one.
     for (const k of of("needs-vault-answer")) {
-      expect(NOT_PAGE_WIDGETS[k].note, k).toMatch(/tracker|note type/);
+      const note = NOT_PAGE_WIDGETS[k].note;
+      expect(note, k).toMatch(/tracker|note type/);
+      expect(note, k).not.toMatch(/no list of this vault's trackers/);
     }
   });
 });

@@ -59,7 +59,7 @@ describe("the launcher shares one destination table", () => {
   });
 
   it("draws a default set, so the directive is writable bare", () => {
-    expect(LAUNCHER_DEFAULT).toEqual(["diary", "search", "journals", "capture"]);
+    expect(LAUNCHER_DEFAULT).toEqual(["week", "month", "quarter", "year"]);
     const widgets = readSrc("widgets");
     expect(widgets).toContain("rest.trim() ? rest.split(\",\") : LAUNCHER_DEFAULT");
   });
@@ -273,7 +273,7 @@ describe("the launcher's grid answers to its cell", () => {
     // A widget the title map cannot name gets no head and no card, so this was
     // four tiles on the page's own background beside three widgets that each
     // had one. The name is the catalogue's own, not a second one.
-    expect(readCode("widgets")).toContain('launcher: "🧭 Go to"');
-    expect(readCode("home-sections")).toContain('label: "Go to"');
+    expect(readCode("widgets")).toContain('launcher: "🧭 Overview navigator"');
+    expect(readCode("home-sections")).toContain('label: "Overview navigator"');
   });
 });

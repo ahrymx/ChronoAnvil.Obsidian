@@ -870,9 +870,10 @@ export interface ArgSpan {
 // splices is handed one section's lines rather than the file's.
 export function argSpanIn(
   lines: readonly string[],
-  keyword: string
+  keyword: string,
+  join?: string
 ): ArgSpan | null {
-  return argSpansIn(lines, keyword, 1)[0] ?? null;
+  return argSpansIn(lines, keyword, 1, join)[0] ?? null;
 }
 
 // EVERY span of `keyword`'s argument in these lines, in file order.
@@ -884,14 +885,45 @@ export function argSpanIn(
 export function argSpansIn(
   lines: readonly string[],
   keyword: string,
-  limit = Infinity
+  limit = Infinity,
+  // ── WHEN `|` IS NOT A LABEL, 4.70 ────────────────────────────────────
+  //
+  // `|` HAS MEANT TWO THINGS SINCE 4.62 AND THIS FUNCTION KNEW ONE OF THEM.
+  // Everywhere else in the grammar `keyword:argument|Label` puts a reader's own
+  // title after a bar, which is why the argument is cut at the first one. Then
+  // `time-grid` declared `argJoin: "|"` — a COMPOUND argument, `events|3` — and
+  // this cut it at the join, so:
+  //
+  //   `time-grid:|3`        read back as an argument of `""`, the `|3` outside
+  //                         the span entirely;
+  //   `time-grid:events|3`  answered on the day count spliced INSIDE that span
+  //                         and left the old tail behind: `events|1|3`.
+  //
+  // Nothing caught it because 4.62 composed the grid onto no page — the section
+  // window could reach the question, and the only surface that could have shown
+  // the damage was a homepage nobody had one on. 4.70 composes `time-grid:|3`,
+  // so it had to be fixed before it could ship.
+  //
+  // THE CALLER SUPPLIES THE JOIN, AND THAT IS THE ONLY WAY IT CAN. This file has
+  // no imports by design — see the note above `parseHeader` — so it cannot ask
+  // the registry which keywords declare one. Every caller that reads a compound
+  // argument is holding the question that declares it (`q.part.join`), so the
+  // fact travels with the reader rather than being looked up twice.
+  //
+  // ABSENT MEANS THE OLD BEHAVIOUR EXACTLY, so every one of the twenty callers
+  // that pass nothing is untouched: an argument still ends at a label bar.
+  join?: string
 ): ArgSpan[] {
   const out: ArgSpan[] = [];
   for (let i = 0; i < lines.length && out.length < limit; i++) {
     const line = lines[i];
     if (splitDirective(line).keyword !== keyword) continue;
 
-    const bar = line.indexOf("|");
+    // A DIRECTIVE JOINED ON `|` HAS NO LABEL, which is a consequence of the
+    // grammar rather than a rule this file invents: the two spellings are the
+    // same character, so a keyword that spends it on a compound has none left
+    // to spend on a title.
+    const bar = join === "|" ? -1 : line.indexOf("|");
     const end = bar === -1 ? line.length : bar;
     const colon = line.slice(0, end).indexOf(":");
 
@@ -943,10 +975,11 @@ export function argSpansIn(
 // blanket "title questions are unreadable" rule would have given up on.
 export function soleArgSpanIn(
   lines: readonly string[],
-  keyword: string
+  keyword: string,
+  join?: string
 ): ArgSpan | null {
   // Two is all it takes to know; a third changes no answer.
-  const found = argSpansIn(lines, keyword, 2);
+  const found = argSpansIn(lines, keyword, 2, join);
   return found.length === 1 ? found[0] : null;
 }
 
@@ -1050,4 +1083,95 @@ export function parseHeaderDirective(rest: string): {
     level: Math.min(2, Math.max(1, Number(m[1]))),
     title: m[2].trim(),
   };
+}
+
+// ── EVERY KEYWORD THAT MODIFIES A BLOCK RATHER THAN BEING ONE (4.70) ─────
+//
+// The five (six, with `header:`) lines a fence can carry that draw nothing:
+// they say something about the block, or about the page, and the dispatcher
+// drops each of them from the loop before it reaches a widget's `case`.
+//
+// WHY IT IS A SET AND NOT SIX PREDICATES. Each `is*Line` answers "is THIS line
+// that modifier", which is the right question inside the dispatcher, where the
+// answer decides whether to keep walking. The other callers ask the opposite
+// question — "which of these keywords are directives" — and were each writing
+// their own partial list to do it. `assetUnits` had exactly one entry in its
+// (`header`), which was complete when it was written and silently wrong from
+// 4.1 onward: a `frame:` or a `row` line read as a widget the note was missing,
+// and the reconciler would splice one in.
+//
+// KEYWORDS, NOT LINES, because that is what the callers hold: `Segment.keywords`
+// is the parsed list a fence declares, and asking it about a keyword avoids
+// reconstructing a line to hand to a predicate.
+export const MODIFIER_KEYWORDS: ReadonlySet<string> = new Set([
+  HEADER_KEYWORD,
+  FRAME_KEYWORD,
+  ROW_KEYWORD,
+  CELL_KEYWORD,
+  WIDE_KEYWORD,
+  TAB_KEYWORD,
+  HEIGHT_KEYWORD,
+]);
+
+// ── CUTTING ONE CELL OUT OF A ROW FENCE (4.70) ───────────────────────────
+//
+// THREE CATALOGUES ASK THIS AND THE FOURTH ASKS IT DIFFERENTLY. A diary
+// dashboard, a journal template and (through `cutFromRun`) anything else that
+// composes a row has to be able to remove ONE of a fence's cells and leave the
+// rest exactly as the reader has them. A flat note does not use this: its parser
+// records which LINE each section sits on, so it cuts by index and this would be
+// re-deriving an answer it already has.
+//
+// BY KEYWORD, NOT BY LINE TEXT. A directive carries the reader's own argument —
+// `tasks-table:Projects,period` where the composer wrote `tasks-table:,period` —
+// so matching the composed string would refuse to cut exactly the fences
+// somebody had configured. The keyword is what a `locate` matches on and what
+// the section actually owns.
+//
+// A KEYWORD A SURVIVOR ALSO WRITES IS SPARED, which is what `spare` is for. Only
+// the cell that opens a row composes the bar, so in every arrangement a
+// catalogue makes this is empty — but a reader who added a second `header:` by
+// hand must not lose it to a removal somewhere else in the same fence.
+//
+// AND THE `row` LINE GOES WITH THE SECOND-TO-LAST CELL, which is `rowRuns`' own
+// rule read backwards: a run of one composes no `row` line, so a fence that has
+// just become a run of one must not keep the one it has. Left behind it renders
+// as a full-width block — so it LOOKS right — and then reappears in the section
+// editor as a group over a section that is grouped with nothing.
+//
+// NULL WHERE THERE IS NOTHING TO CUT, so a caller can tell "I removed lines"
+// from "I found none of them" and keep the block whole rather than rewrite it
+// into the same bytes.
+export function cutFromFence(
+  lines: readonly string[],
+  cutting: ReadonlySet<string>,
+  spare: ReadonlySet<string>
+): string[] | null {
+  const take = [...cutting].filter((k) => !spare.has(k));
+  if (!take.length) return null;
+  const takeSet = new Set(take);
+  const out = lines.filter(
+    (l) => !takeSet.has(splitDirective(l.trim()).keyword)
+  );
+  if (out.length === lines.length) return null;
+  return undoRowOfOne(out);
+}
+
+// A fence body with its `row` and `cell` lines dropped when it holds fewer than
+// two widgets. See `cutFromFence` for the argument; this is separate because the
+// flat-note reconciler cuts by line index and still needs the same tidy-up.
+export function undoRowOfOne(lines: readonly string[]): string[] {
+  const widgets = lines.filter((l) => {
+    const t = l.trim();
+    if (!t || t.startsWith("```")) return false;
+    return !MODIFIER_KEYWORDS.has(splitDirective(t).keyword);
+  }).length;
+  return widgets > 1
+    ? [...lines]
+    : lines.filter(
+        (l) =>
+          !isRowLine(l.trim()) &&
+          !isCellLine(l.trim()) &&
+          !isTabLine(l.trim())
+      );
 }

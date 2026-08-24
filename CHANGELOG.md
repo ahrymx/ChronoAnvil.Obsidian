@@ -7,6 +7,104 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.73.0] - 2026-08-24
+
+**Upgraded Logbooks settings with interactive Emoji Picker, and removed redundant Special Events settings section.**
+
+### Added
+
+- **Interactive Emoji Picker Modal (`EmojiPickerModal`):** Added a dedicated icon button to each logbook row that opens a categorized emoji picker modal (*Productivity & Work*, *Personal & Lifestyle*) plus custom emoji input support.
+
+### Changed
+
+- **Compact Dense Logbooks Table:** Redesigned the Logbooks configuration section into a clean tabular matrix featuring icon picker buttons, inline editable logbook names, styled monospace note paths, color dropdowns, and remove actions.
+- **Removed Special Events Settings Section:** Removed the redundant "Special events" section from plugin settings, keeping event creation and editing in-context via calendar views and event notes.
+
+## [4.72.0] - 2026-08-24
+
+**Rich Cards and interactive Viewmode toggle for Journal Bridges, and streamlined Quick Capture settings.**
+
+### Added
+
+- **Rich Cards for Journal Bridges (`bridge-notes`):** Upgraded notes bridge rendering to display rich, interactive cards showcasing entry title, tag badges, open task counters, and ISO date stamps.
+- **Interactive Viewmode Toggle:** Added an interactive viewmode toggle button to the bridge widget header (and context menu) allowing seamless switching between modern **Cards view** and compact **List view**.
+
+### Changed
+
+- **Streamlined Quick Capture Settings:** Consolidated diary capture inbox configuration into a dedicated **Quick capture** settings card with a clear 5-grain stream matrix, automatic safe template synchronization, default fold toggles, and draft management.
+- **Decoupled Journal Rollups Configuration:** Removed the redundant settings table for journal rollups in favor of on-demand in-context configuration via the note Section Editor (*"Edit this note's sections…"*) and template saves.
+
+## [4.71.0] - 2026-08-24
+
+**Daily entry visual touchup, compact responsive daily trackers, and the Overview Navigator.**
+
+### Changed
+
+- **Overview Navigator (`launcher`):** Renamed the section and widget from "Go to" to **"Overview navigator"** and updated its default destination tiles to link directly to the four diary overviews (`week`, `month`, `quarter`, `year`).
+- **Compact Responsive Daily Trackers:** Redesigned the daily note tracker bar to a compact layout displaying 3 trackers per row on desktop and 2 on mobile/narrow panes. Reduced cell minimum height to 50px with compact padding, refined Mood emoji rating pickers, streamlined Sleep time inputs and live duration readouts, and matching compact "+ Add tracker" button.
+- **Single-Column Daily Entry Layout:** Removed multi-column row pairing from daily entry templates so entry sections stack in a clean, consistent single column.
+- **Retrospective List Borders:** Refined border geometry for Highlights and Challenges cards so all 4 borders remain intact with proper border radii, preventing unsightly fused connections to parent cards.
+- **Captured Log Styling:** Enhanced the captured logbook with a clean background surface card matching other diary sections.
+
+### Fixed
+
+- **Captured Logbook Collapse:** Fixed collapsible capture and note sections so that inner logbook elements (`.journal-logbook-deck`, `.journal-capture-scroll`, `.journal-logbook-footer`, and `.journal-capture-add`) properly hide when folded.
+
+## [4.70.1] - 2026-08-24
+
+**`Take out of the group` was greyed out on every period dashboard's row.**
+
+### Fixed
+
+- **A cell of a composed row could not be taken back out of it.** On a weekly, monthly or quarterly overview, *What the entries said* showed **Take out of the group** and **Start a page here** disabled, with the tooltip *"This widget's lines can't be told apart from the others in its block, so it can't be split out."* Both controls read whether a section's extent is known, which is answered by rendering it in **both** forms — a section is separable if either form is a single line, because a `header:` bar belongs to the band and not to the section under it. The adapter that lets a dashboard's sections through the flat machinery was dropping the form argument, so both probes came back with the bar attached and every section that composes one answered "two lines".
+
+  Present since 4.58.0 and unreachable until now: a section alone in its block is always separable, so the question was only ever asked of a shared block, and 4.70 is the first release in which a dashboard composes one.
+
+  The gate is the property rather than the line — every block a composed dashboard holds more than one section in must report every one of them separable, on all four grains, and the write must perform the split the button offers.
+
+## [4.70.0] - 2026-08-24
+
+**The default page layouts catch up with the layout grammar version 4 built: rows reach the three catalogues that could not compose one, three new widgets fill the holes the fresh vault showed, and a separate opt-in tick offers to regroup the pages you already have.**
+
+Version 4 added a great deal of page furniture — `row`/`cell` groups, per-cell heights, `frame:` chrome, the merged stats band, the time grid, the section/widget toggle — and almost none of it reached a reader who had just run `Set up / repair vault`. A freshly scaffolded vault used `row` **once** in the whole vault and `cell` once, both on the homepage; `tab`, cell weights and `height:` appeared **zero** times; and five shipped page widgets appeared in no default layout at all. The structural cause was that only flat notes could compose a row: the period dashboards, the five entry templates and every journal template are written by catalogues that had **no way to say "these two are one block"**, so they could only ever ship a column of stacked cards however much the renderer supported.
+
+### Added
+
+- **`upcoming[:N]` — the next `N` events**, with a relative *in 3 days* / *day 2 of 5* readout. It has been dispatching as `events:upcoming` since 2.13.1 and was unreachable from the section editor, because `events` is registered with no argument. Its own keyword rather than an argument on `events`, on the `level-index` → `level-cards` precedent: the add list carries one name, one glyph and one sentence per keyword, and "the special-events manager, with an Add button" and "the next five events" are not one row.
+- **`tracker-stat:<tracker>` — one tracker's numbers and its streak.** The latest reading, the mean over the series, and either the current run of true days or the range low–high, over a thirty-day density strip shaded across the series' own minimum and maximum. `sleep-summary` generalised, and neither replaces the other. Distinct from `tracker:<id>`, which is the inline control that *writes* a reading — one records, one reports.
+- **A `trackers` vault source for the section window**, which is what `tracker-stat` needed and what the 4.15 deferral asked for by name. That comment held trackers back over "what an id means when the thing is renamed"; the answer was already in the data — a `TrackerDef.id` **is** the frontmatter property it writes, so it survives a relabel, and editing it makes a new tracker rather than renaming this one.
+- **`journal-recent[:<folder>|all][|N]` — what you wrote lately.** The notes under this scope, newest first, each with the journal and container it lives in, how long ago its `date` was, and its rating where its kind declares one. The journals' answer to `timeline`: every other journal widget asks about structure, asks what is due, or waits for a word to be typed into it, and none of them said what you last did — which is what a dashboard opened cold is being asked.
+- **Rows in the three catalogues that could not compose one.** `DiarySection`, `EntrySection` and `JournalSection` gained `row`/`cell`, and all four catalogues now share one `rowRuns` helper rather than four copies of the rule. `JournalSection.row` is a *predicate* on the note's shape, because a container index and a leaf index are not the same page.
+- **An opt-in regroup migration**, in `Set up / repair vault → Run format migrations`. See *Migration* below.
+
+### Changed
+
+- **The homepage.** The top row is now `diary:3 | launcher + upcoming + tasks-table`, and the **time grid is composed** rather than merely offered — it shipped in 4.55 and a reader who never opened *Edit this note's sections…* had no way to find out it existed. `on-this-day` leaves this page and stays on the two that are *about* retrieval: Search and the diary dashboard.
+- **The diary dashboard** is two rows where it was four stacked blocks: `tasks-table | tag-index` under one *Across the diary* bar, and `on-this-day | sleep-summary` under *Looking back*. **`sleep-summary` is composed**, which is the first default layout it has ever appeared in.
+- **The four period dashboards.** `entry-rollup` and `tasks-table:,period` are now one row under an *Inside this week / month / quarter* bar. The **time grid is composed on the weekly** overview, full width, under the summary. **`period-recap` is composed on the quarterly and yearly** overviews, and **`entry-rollup:month` on the quarterly** — the Yearly overview was a summary and a charts region, the thinnest page the plugin shipped.
+- **The five entry templates.** The shared band composes as **two rows** — `note:focus | tasks:todo`, then `list:highlights | list:challenges` — with `log`, `attachments` and `capture` full width below. `todo` moves up beside `focus` on every grain, in `DIARY_FIELDS` as well as in the templates, so what a rollup gathers and what the page shows stay in the same order.
+- **The journals dashboard and each journal's own.** `review-queue:all | tasks-table` share a *Due and open* band on the journals dashboard, with `journal-recent:all` under it; each journal's dashboard gains a composed **stats band** and a *Lately* row pairing `journal-recent` with its open tasks. The band was opt-in until now for a reason that did not hold — a bare `stats-band` resolves to the scope's own default, so it arrives drawing something on a journal of any shape.
+- **The index journal templates** compose `review-queue | tasks-table` under a *Due and open* bar where the note has containers below it, and the single-cell *Review* and *Open tasks* sections where it does not. Leaf templates stay stacked: only a section rendering exactly one fence block can become a column, and `path`, `resources`, `headings`, `recall`, `checklist` and `prose` emit regions or markdown.
+- **A row that falls to one cell stops being a row.** `row` and `cell` lines are dropped from a fence holding a single widget, in every catalogue, which reverses 4.4 §3 — that release left the lines in place deliberately, and shipping rows in four catalogues turned the argument around.
+
+### Fixed
+
+Five engine defects that only became reachable once these catalogues composed rows, all of them present before this release:
+
+- **`applyDiarySections` did nothing when one cell of a row was removed.** Removing a section that shared a fence with another left the fence untouched, so the section editor reported a change it had not made.
+- **Removing a cell from a row and adding it back did not restore the file** — on flat notes since 4.2, and on diary dashboards as soon as they could compose a row. The section came back in a fence of its own beside the row it had been cut from. It now rejoins the row it left, on the correct side of the existing `cell` divider.
+- **`assetUnits` read `row`, `cell`, `frame:`, `tab:`, `height:` and `wide` as content directives.** Its list of modifier keywords had exactly one entry (`header`), complete when it was written and silently wrong from 4.1 — a `frame:` line was read as a widget the note was missing, and the reconciler would splice one in.
+- **`fenceKeywords` and `ownerOf` in the journal planner had the same partial list**, and the same consequence. All of these now read one `MODIFIER_KEYWORDS` set.
+- **A fence holding two sections was attributed to neither.** The journal planner assumed one fence meant one section, so a row fence was foreign to the plan and `isHandEdited` called a freshly composed template edited. Runs and chunks now carry every section id in the fence.
+
+### Migration
+
+Repair stays **additive**: a section that stops being optional is spliced into a page you already have, at its catalogue position, and nothing already there moves. The `period-recap`, `entry-rollup`, `time-grid`, `sleep-summary` and `stats-band` flips above arrive that way — stacked, not grouped, because an additive reconciler cannot reach a group.
+
+Grouping is a **separate tick**: `Set up / repair vault → Run format migrations` now offers, per page and with the diff shown, to weld the blocks this release groups into the rows it writes. It is the only thing in the plugin that moves your blocks relative to each other, which is why it is never done unasked. It declines outright rather than guessing whenever a cell is missing from the page, written twice, or carrying a `tab:`, `height:`, `frame:` or `wide` you set yourself. Your own arguments come through untouched; a band's header does not, because a row draws one bar above both of its columns and a bar that named one cell is not true of two. The 4.68.1 gate covers it — every format migration is exercised against every note this release writes, and none may fire.
+
+`tab` is deliberately **not** composed anywhere. A page is a gesture you make in the section editor; a shipped page that hides half its content behind a tab on first open is a worse default than a column.
+
 ## [4.69.0] - 2026-08-23
 
 **Distraction-free mobile view with customizable floating toggle button, swipe gesture isolation, responsive button wrapping, and streamlined narrow Logbook layout.**

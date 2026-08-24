@@ -54,7 +54,7 @@ import {
   migrateTrendsTitle,
 } from "../charts/charts";
 import { applyLayout, planLayout } from "./layout";
-import { RepairOp, repairNote } from "./repair-plan";
+import { RepairOp, regroupShippedPages, repairNote } from "./repair-plan";
 import type {
   RepairFileChange,
   RepairGroupId,
@@ -571,6 +571,31 @@ export class Scaffold {
     if (titled != null) await this.app.vault.modify(file, titled);
   }
 
+  // One shipped page's sections, regrouped into the fences this release
+  // composes them in. 4.70.
+  //
+  // `titleSummary`'s SHAPE EXACTLY, which is `cardJournalsBlock`'s before it and
+  // `weldBanner`'s before that: read, call a pure function, write only on a
+  // non-null answer. Seventh migration written this way, and the repetition is
+  // still the point — a migration that looks like the last one is a migration a
+  // reader can check.
+  //
+  // TAKES THE COMPOSED TEXT AS WELL AS THE PATH, which none of the other six do,
+  // because this is the first migration whose answer depends on what the release
+  // WRITES rather than on a shape it can recognise from the text alone. The
+  // caller has it: `shippedNotes` composed it to decide whether the file was
+  // missing. See `regroupShippedPages` for the guard it applies to the pair.
+  //
+  // ERRORS ARE THE CALLER'S, inside the same `try` as the other six, so one
+  // page's failure leaves that page exactly as it was.
+  private async regroupPage(path: string, shipped: string): Promise<void> {
+    const file = getFile(this.app, path);
+    if (!(file instanceof TFile)) return;
+    const original = await this.app.vault.read(file);
+    const regrouped = regroupShippedPages(original, shipped);
+    if (regrouped != null) await this.app.vault.modify(file, regrouped);
+  }
+
   // Overwrite the shipped diary assets with the current bundled versions,
   // whether or not they already exist.
   //
@@ -717,6 +742,27 @@ export class Scaffold {
       }
     }
     notify.ok(`Almanac: refreshed ${updated} diary template${updated === 1 ? "" : "s"} ✅`);
+  }
+
+  // Safely refresh a single diary template file if it exists in the vault.
+  async refreshDiaryTemplate(grain: TrackerClass): Promise<void> {
+    const dest = `${this.paths.templatesDiary}/${CLASS_DEFS[grain].templateFile}`;
+    const extras = this.plugin.settings.entrySections ?? {};
+    const bands = this.plugin.settings.entrySectionBand ?? {};
+    const content = composeEntryTemplate(grain, extras[grain] ?? [], bands[grain] ?? []);
+    const existing = getFile(this.app, dest);
+    if (!existing) return;
+    const disk = await this.app.vault.read(existing);
+    if (disk !== content) {
+      await this.app.vault.modify(existing, content);
+    }
+  }
+
+  // Safely refresh all five diary template files if they exist in the vault.
+  async refreshDiaryTemplates(): Promise<void> {
+    for (const grain of TRACKER_CLASSES) {
+      await this.refreshDiaryTemplate(grain);
+    }
   }
 
   // Every journal template the plugin can generate, paired with the vault path
@@ -1423,13 +1469,16 @@ export class Scaffold {
     // THE JOURNAL DASHBOARDS ARE IN THIS WALK TOO (4.36 §0.2), which is what the
     // required parameter buys: this call read `shippedNotes(p)` and would have
     // gone on compiling with the new pages silently absent from the migration.
-    for (const dash of shippedNotes(
+    for (const note of shippedNotes(
       p,
       registeredJournalTypes(this.plugin),
       this.plugin.settings.logbooks
-    )
-      .filter(isReconcilable)
-      .map((f) => f.dest)) {
+    ).filter(isReconcilable)) {
+      // THE NOTE RATHER THAN ITS PATH, AS OF 4.70. The regroup migration is the
+      // first one that needs to know what this release COMPOSES for the page it
+      // is looking at, and `shippedNotes` already carries it — so the loop stops
+      // throwing that away one line after computing it.
+      const dash = note.dest;
       const file = getFile(this.app, dash);
       if (!file) continue;
       try {
@@ -1474,7 +1523,18 @@ export class Scaffold {
         // walk's own rule: two migrations touch one file and a reader reads one
         // diff.
         const titledSummary = titleSummaryFence(carded) ?? carded;
-        if (titledSummary === original) continue;
+        // AND THE REGROUP, SEVENTH AND LAST (4.70) — see `regroupShippedPages`
+        // for the guard. Last because it is the only one that compares the whole
+        // page against what this release composes, so every earlier migration
+        // has to have run first: a note still holding two Trends fences, or an
+        // unwelded banner, does not look like the shipped page and the guard
+        // would refuse it. Running it here means a reader who has never repaired
+        // gets all seven in one diff rather than needing two passes.
+        const regrouped =
+          note.content != null
+            ? regroupShippedPages(titledSummary, note.content) ?? titledSummary
+            : titledSummary;
+        if (regrouped === original) continue;
         // ONE OP PER MIGRATION THAT ACTUALLY FIRED. `ops` is a list precisely so
         // a file can report more than one, and a page that only needs the weld
         // must not be labelled with the Trends sentence — the window's rows are
@@ -1510,11 +1570,17 @@ export class Scaffold {
             detail: "give the period summary the header bar every section has",
           });
         }
+        if (regrouped !== titledSummary) {
+          ops.push({
+            kind: "migrate",
+            detail: "group this page's sections the way this version lays them out",
+          });
+        }
         out.push({
           path: dash,
           label: dash.split("/").pop() ?? dash,
           ops,
-          diff: diffText(original, titledSummary),
+          diff: diffText(original, regrouped),
         });
       } catch (e) {
         console.error(`[Almanac] Trends scan failed for ${dash}`, e);
@@ -1800,13 +1866,12 @@ export class Scaffold {
       // §6.1). This walk used to restate the guards inline and had the identical
       // hole for the identical reason: its filter tested the ASSET's extension,
       // and a composed entry has no asset to test.
-      for (const dash of shippedNotes(
+      for (const note of shippedNotes(
         this.paths,
         registeredJournalTypes(this.plugin),
         this.plugin.settings.logbooks
-      )
-        .filter(isReconcilable)
-        .map((f) => f.dest)) {
+      ).filter(isReconcilable)) {
+        const dash = note.dest;
         try {
           // ORDER MATTERS, AND IS THE WHOLE REASON THESE ARE TWO CALLS. The
           // merge runs first so the second call finds nothing to do on a
@@ -1864,6 +1929,20 @@ export class Scaffold {
           // deliberately. `titleSummaryFence` declines the grouped case outright;
           // the `migrations` tick is what covers the rest.
           await this.titleSummary(dash);
+          // AND THE REGROUP (4.70), seventh and last, in the order the dry run
+          // chains them — and last for a reason the other six do not have. It is
+          // the only one that compares the WHOLE page against what this release
+          // composes, so it has to see the page the other six leave behind: a
+          // note still holding two Trends fences does not match the shipped
+          // shape, and its guard would decline. Run in this position it sees the
+          // migrated text, which is the text the dry run showed.
+          //
+          // OPT-IN with the rest, and here that is the whole design rather than
+          // a courtesy: this is the only migration that moves a reader's blocks
+          // relative to each other. `regroupShippedPages` refuses any page whose
+          // sections are not exactly this release's, so a reader who has edited
+          // is never asked — and a reader who has not still gets to decline.
+          if (note.content != null) await this.regroupPage(dash, note.content);
         } catch (e) {
           console.error(`[Almanac] Trends migration failed for ${dash}`, e);
         }

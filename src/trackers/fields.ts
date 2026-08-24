@@ -93,10 +93,27 @@ export interface DiaryField {
 // The fields the two diary templates ship, in the order they ship them.
 //
 // Order is load-bearing twice over: it is the order the fields appear in the
-// note (test/pure-logic.test.ts pins the monthly one as "the way a review is
-// written" — theme, then what happened, then loose notes, then attachments,
-// then next month), and it is the order a rollup renders its sections in. One
-// list serves both, so they cannot disagree.
+// note, and it is the order a rollup renders its sections in. One list serves
+// both, so they cannot disagree.
+//
+// ── WHAT THE ORDER IS, AND WHY IT CHANGED IN 4.70 ────────────────────────
+//
+// It was "the way a review is written" — theme, then what happened, then loose
+// notes, then attachments, then NEXT MONTH — with the task list last because a
+// stacked page is read top to bottom and goals are the thing you leave with.
+//
+// The entry templates now compose two ROWS, so the page is no longer a single
+// column and "last" no longer means "at the end of the reading". What the rows
+// group by is WHEN A FIELD IS WRITTEN: the theme and the goals at the start of
+// the period, side by side; what went well and what got in the way at the end of
+// it, side by side; and the prose, the attachments and anything captured
+// underneath, as wide as they want to be. That puts `todo` second rather than
+// last, which is not a demotion of the review — it is the review becoming the
+// SECOND row instead of the middle of a list.
+//
+// A ROLLUP READS THIS ORDER TOO, and the same argument carries: a month's goals
+// section belongs beside its theme rather than after three months of
+// highlights. `rollupFields` filters this list and nothing else reorders it.
 export const DIARY_FIELDS: DiaryField[] = [
   // ── daily ───────────────────────────────────────────────────────────
   {
@@ -113,6 +130,19 @@ export const DIARY_FIELDS: DiaryField[] = [
     // document order, and `focus` happens to be first in the template.
     rollup: "line",
     rollupNoun: "Focus",
+  },
+  {
+    id: "todo",
+    kind: "tasks",
+    class: "daily",
+    label: "Tasks",
+    // A day's tasks are ticked, not reviewed. They roll up through the
+    // open/done counts every scope already carries (IndexedEntry.openTasks /
+    // doneTasks, and tasks-table for the list) rather than as a goals section
+    // — a quarter listing ninety days of "water plants" is not a review of
+    // anything. The month's `todo` is the one that gets `goals`, because a
+    // monthly goal accumulates instead of being ticked.
+    rollup: "none",
   },
   {
     id: "highlights",
@@ -165,19 +195,6 @@ export const DIARY_FIELDS: DiaryField[] = [
     rollup: "none",
   },
   {
-    id: "todo",
-    kind: "tasks",
-    class: "daily",
-    label: "Tasks",
-    // A day's tasks are ticked, not reviewed. They roll up through the
-    // open/done counts every scope already carries (IndexedEntry.openTasks /
-    // doneTasks, and tasks-table for the list) rather than as a goals section
-    // — a quarter listing ninety days of "water plants" is not a review of
-    // anything. The month's `todo` is the one that gets `goals`, because a
-    // monthly goal accumulates instead of being ticked.
-    rollup: "none",
-  },
-  {
     id: "capture",
     kind: "note",
     variant: "collapse",
@@ -200,6 +217,17 @@ export const DIARY_FIELDS: DiaryField[] = [
     placeholder: "What's the theme for this month?",
     rollup: "line",
     rollupNoun: "Theme",
+  },
+  {
+    id: "todo",
+    kind: "tasks",
+    class: "monthly",
+    label: "Goals this month",
+    // The most valuable field in the diary, and the reason the quarter page
+    // exists: goals set versus met across three months is the one question no
+    // single month's note can answer.
+    rollup: "goals",
+    rollupNoun: "Goals",
   },
   {
     id: "highlights",
@@ -233,17 +261,6 @@ export const DIARY_FIELDS: DiaryField[] = [
     class: "monthly",
     label: "Attachments",
     rollup: "none",
-  },
-  {
-    id: "todo",
-    kind: "tasks",
-    class: "monthly",
-    label: "Goals this month",
-    // The most valuable field in the diary, and the reason the quarter page
-    // exists: goals set versus met across three months is the one question no
-    // single month's note can answer.
-    rollup: "goals",
-    rollupNoun: "Goals",
   },
 
   // ── weekly, quarterly, yearly ───────────────────────────────────────
@@ -303,6 +320,13 @@ export const DIARY_FIELDS: DiaryField[] = [
     rollup: "none",
   },
   {
+    id: "todo",
+    kind: "tasks",
+    class: "weekly",
+    label: "Goals this week",
+    rollup: "none",
+  },
+  {
     id: "highlights",
     kind: "list",
     class: "weekly",
@@ -331,13 +355,6 @@ export const DIARY_FIELDS: DiaryField[] = [
     kind: "attach",
     class: "weekly",
     label: "Attachments",
-    rollup: "none",
-  },
-  {
-    id: "todo",
-    kind: "tasks",
-    class: "weekly",
-    label: "Goals this week",
     rollup: "none",
   },
   {
@@ -350,6 +367,13 @@ export const DIARY_FIELDS: DiaryField[] = [
     rollup: "none",
   },
   {
+    id: "todo",
+    kind: "tasks",
+    class: "quarterly",
+    label: "Goals this quarter",
+    rollup: "none",
+  },
+  {
     id: "highlights",
     kind: "list",
     class: "quarterly",
@@ -378,13 +402,6 @@ export const DIARY_FIELDS: DiaryField[] = [
     kind: "attach",
     class: "quarterly",
     label: "Attachments",
-    rollup: "none",
-  },
-  {
-    id: "todo",
-    kind: "tasks",
-    class: "quarterly",
-    label: "Goals this quarter",
     rollup: "none",
   },
   {
@@ -397,6 +414,13 @@ export const DIARY_FIELDS: DiaryField[] = [
     rollup: "none",
   },
   {
+    id: "todo",
+    kind: "tasks",
+    class: "yearly",
+    label: "Goals this year",
+    rollup: "none",
+  },
+  {
     id: "highlights",
     kind: "list",
     class: "yearly",
@@ -425,13 +449,6 @@ export const DIARY_FIELDS: DiaryField[] = [
     kind: "attach",
     class: "yearly",
     label: "Attachments",
-    rollup: "none",
-  },
-  {
-    id: "todo",
-    kind: "tasks",
-    class: "yearly",
-    label: "Goals this year",
     rollup: "none",
   },
 ];

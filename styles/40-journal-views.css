@@ -312,6 +312,67 @@
   color: var(--text-accent);
 }
 
+/* ── Recent notes (4.70) ──────────────────────────────────────────────────
+   `journal-recent` — the journals' answer to `timeline`. A ROW PER NOTE, and
+   the row is `.jrq-row`'s proportions rather than `.jjs-result`'s: a search
+   result carries a snippet and needs the height for it, and this carries a
+   title and one line of facts, which is what the review queue's row is.
+
+   Two columns, not the queue's three: nothing here is actionable, so there is
+   no button on the right and the title takes the width the button would have
+   had. That is the whole difference between "what is due" and "what happened",
+   drawn. */
+.journal-recent {
+  display: flex;
+  flex-direction: column;
+}
+.jrn-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 12px;
+  background: var(--background-secondary);
+  border-top: 1px solid var(--background-modifier-border);
+}
+.jrn-row:first-child {
+  border-top: none;
+}
+.jrn-row:hover {
+  background: var(--background-modifier-hover);
+}
+.jrn-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* WRAPS, WHERE THE QUEUE'S META TRUNCATES. A queue row's meta is a due date
+   and the first words are the ones that matter; these facts are a journal, a
+   container, a date and a rating, and the rating is last — clipping the line
+   in a narrow column would drop exactly the fact the reader came for. */
+.jrn-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--am-text-xs);
+  color: var(--text-faint);
+}
+.jrn-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.jrn-fact-icon .svg-icon {
+  width: 12px;
+  height: 12px;
+}
+/* The journal and the container, which are the two facts that say WHERE — set
+   apart from the date and the rating, which say what. */
+.jrn-where {
+  color: var(--text-muted);
+}
+
 /* ── Recall cards ─────────────────────────────────────────────────────────
    Question/answer cards with the answer behind a reveal. Cards rather than
    rows: a row is for scanning a list, and the one thing this widget must not

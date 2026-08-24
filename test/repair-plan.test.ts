@@ -18,7 +18,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { repairNote } from "../src/core/repair-plan";
+import { regroupShippedPages, repairNote } from "../src/core/repair-plan";
 import {
   MANAGED_FLAGS,
   applyFlags,
@@ -77,7 +77,7 @@ describe("repairNote — the case the keyword reconciler could not reach", () =>
 
   it("restores every section of the top row, one at a time", () => {
     const shipped = home();
-    for (const keyword of ["diary", "launcher", "tasks-table", "on-this-day"]) {
+    for (const keyword of ["diary", "launcher", "tasks-table", "logbook"]) {
       const text = withoutLine(shipped, keyword);
       const { next } = repairNote(homeModel(), text, shipped);
       expect(next, keyword).not.toBeNull();
@@ -164,7 +164,7 @@ describe("a homepage written before the top row existed", () => {
     expect(out).toContain("## My own heading");
     expect(out).toContain("Some prose I wrote.");
     expect(out).not.toContain("year-nav");
-    for (const gained of ["launcher", "tasks-table", "on-this-day:always"]) {
+    for (const gained of ["launcher", "tasks-table", "logbook"]) {
       expect(out, gained).toContain(gained);
     }
   });
@@ -186,9 +186,29 @@ describe("a homepage written before the top row existed", () => {
     const lines = (t: string, want: string): number =>
       L(t).filter((l) => l.trim().split(":")[0] === want).length;
 
+    // ── AND THE OLD PATH STOPPED DOING IT IN 4.70 ─────────────────────
+    //
+    // These two lines asserted the DEFECT — `applyLayout` returning a note with
+    // two heads and two diary cards, so that the fix one paragraph down could
+    // be seen to be a fix. They now assert one of each, and nothing about
+    // `repairNote` changed: `assetUnits` stopped making a UNIT of `wide` and
+    // `row` at all.
+    //
+    // WHICH IS THE SAME DEFECT, CURED AT ITS SOURCE. The sentence above —
+    // *"`wide` and `row` are the first directives of the fence, so `assetUnits`
+    // makes them insertable"* — was the diagnosis, and 4.20 answered it by
+    // routing eight shipped notes through their `SectionModel` instead. What it
+    // did not do is stop the module believing a modifier is a directive, which
+    // it then kept believing about `frame:`, `cell`, `tab` and `height:` as
+    // each arrived. `MODIFIER_KEYWORDS` is that list, in the grammar, and this
+    // is what it looks like from here.
+    //
+    // BOTH PATHS ARE ASSERTED, and the model is still the supported one: three
+    // notes are copied from assets rather than composed, and `applyLayout` is
+    // what reconciles those.
     const old = applyLayout(L(OLD_HOME), L(shipped))?.join("\n") ?? OLD_HOME;
-    expect(lines(old, "title")).toBe(2);
-    expect(lines(old, "diary")).toBe(2);
+    expect(lines(old, "title")).toBe(1);
+    expect(lines(old, "diary")).toBe(1);
 
     const { next } = repairNote(homeModel(), OLD_HOME, shipped);
     expect(lines(next ?? "", "title")).toBe(1);
@@ -299,12 +319,26 @@ describe("retired directives", () => {
 });
 
 describe("managed flags", () => {
+  // SEARCH IS THE FIXTURE AS OF 4.70, AND IT HAS TO BE. `MANAGED_FLAGS` holds
+  // exactly one entry — `on-this-day` — and these cases need a SHIPPED note
+  // that composes that directive, because a flag op is the difference between
+  // the note the reader has and the note the release writes.
+  //
+  // The homepage composed it until 4.70, when `upcoming` took the cell (3.13
+  // §11's unanswered half: the homepage is the one page about now and that was
+  // the one block on it about the past). Search composes it still, with the
+  // same `:always` spelling — that agreement is pinned in
+  // `test/search-sections.test.ts` — so this moved page rather than losing the
+  // coverage.
+  const shippedFlagNote = (): string => composeSearchNote();
+  const flagModel = (): SectionModel => searchSectionModel(ROOT);
+
   it("adds an owned token to a directive that is missing it", () => {
-    const shipped = home();
+    const shipped = shippedFlagNote();
     expect(shipped).toContain("on-this-day:always");
     const text = shipped.replace("on-this-day:always", "on-this-day");
 
-    const { ops, next } = repairNote(homeModel(), text, shipped);
+    const { ops, next } = repairNote(flagModel(), text, shipped);
     expect(ops.some((o) => o.kind === "flag")).toBe(true);
     expect(next ?? "").toContain("on-this-day:always");
   });
@@ -313,27 +347,42 @@ describe("managed flags", () => {
     // `on-this-day[:always][:maxYears]` — `always` is the plugin's, the number
     // is the reader's, and this is the whole reason `MANAGED_FLAGS` is not
     // `MANAGED_ARGS`.
-    const shipped = home();
+    const shipped = shippedFlagNote();
     const text = shipped.replace("on-this-day:always", "on-this-day:5");
-    const { next } = repairNote(homeModel(), text, shipped);
+    const { next } = repairNote(flagModel(), text, shipped);
     expect(next ?? "").toContain("on-this-day:5:always");
   });
 
   it("adds nothing where the shipped note does not carry the flag", () => {
-    const shipped = home().replace("on-this-day:always", "on-this-day");
+    const shipped = shippedFlagNote().replace("on-this-day:always", "on-this-day");
     const text = shipped;
     expect(planFlags(L(text), L(shipped))).toEqual([]);
     expect(applyFlags(L(text), L(shipped))).toBeNull();
   });
 
   it("adds nothing to a note that has no such directive", () => {
-    const shipped = home();
+    const shipped = shippedFlagNote();
     const text = withoutLine(shipped, "on-this-day");
     expect(planFlags(L(text), L(shipped))).toEqual([]);
   });
 
-  it("is idempotent", () => {
+  it("adds nothing to the homepage, which stopped composing the flag", () => {
+    // THE OTHER HALF OF THE MOVE ABOVE, as a test rather than as a comment. A
+    // homepage that still holds the reader's own `on-this-day` — the widget is
+    // not retired, and `planLayout` deletes only what `RETIRED_WIDGETS` names —
+    // must not have `:always` written into it by repair, because the shipped
+    // page it is compared against no longer carries the flag to copy.
     const shipped = home();
+    const text = shipped.replace(
+      "```almanac\nframe: section",
+      "```almanac\non-this-day\n```\n\n```almanac\nframe: section"
+    );
+    expect(text, "fixture matched nothing").not.toBe(shipped);
+    expect(planFlags(L(text), L(shipped))).toEqual([]);
+  });
+
+  it("is idempotent", () => {
+    const shipped = shippedFlagNote();
     expect(applyFlags(L(shipped), L(shipped))).toBeNull();
   });
 
@@ -452,7 +501,14 @@ describe("a manifest is a dotfile, and the vault cannot see it", () => {
 // exists to carry an OLDER note forward; one that fires on current output is
 // either wrong or the composer is, and this fails without needing to know which.
 describe("format migrations, against what this release writes", () => {
-  const migrated = (path: string, text: string): string => {
+  // `composed` is what this release WRITES for the page, where the page is one
+  // it composes — the seventh migration is the first that needs it, because it
+  // asks whether the note already has this release's grouping rather than
+  // whether it has a shape it can recognise on sight. For a note copied from an
+  // asset there is no composed text and the step does not apply; passing the
+  // note's own text where there IS one is exactly the property under test, since
+  // a page identical to the composition must produce no offer.
+  const migrated = (path: string, text: string, composed?: string): string => {
     const merged = mergeTrendsSection(text.split("\n"))?.join("\n") ?? text;
     const titled = ensureTrendsHeader(merged.split("\n"))?.join("\n") ?? merged;
     const respelled = retitleTrends(titled.split("\n"))?.join("\n") ?? titled;
@@ -462,7 +518,10 @@ describe("format migrations, against what this release writes", () => {
         welded,
         path === DEFAULT_PATHS.home ? "journals:cards" : "journals"
       ) ?? welded;
-    return titleSummaryFence(carded) ?? carded;
+    const titledSummary = titleSummaryFence(carded) ?? carded;
+    return composed == null
+      ? titledSummary
+      : regroupShippedPages(titledSummary, composed) ?? titledSummary;
   };
 
   const shipped = () =>
@@ -475,7 +534,9 @@ describe("format migrations, against what this release writes", () => {
             : n.asset
             ? readFileSync(join(process.cwd(), "assets", n.asset), "utf8")
             : null;
-        return text == null ? [] : [{ dest: n.dest, text }];
+        return text == null
+          ? []
+          : [{ dest: n.dest, text, composed: n.content }];
       });
 
   it("offers no migration for any note the scaffolder writes", () => {
@@ -484,7 +545,7 @@ describe("format migrations, against what this release writes", () => {
     // narrowing to nothing would otherwise pass this silently.
     expect(notes.length).toBeGreaterThan(5);
     const offered = notes
-      .filter((n) => migrated(n.dest, n.text) !== n.text)
+      .filter((n) => migrated(n.dest, n.text, n.composed) !== n.text)
       .map((n) => n.dest);
     expect(offered).toEqual([]);
   });
@@ -497,6 +558,143 @@ describe("format migrations, against what this release writes", () => {
     const doc = shipped().find((n) => n.dest.endsWith("README.md"));
     expect(doc, "the documentation is in the reconcilable walk").toBeDefined();
     expect(doc!.text).toContain("```almanac");
-    expect(migrated(doc!.dest, doc!.text)).toBe(doc!.text);
+    expect(migrated(doc!.dest, doc!.text, doc!.composed)).toBe(doc!.text);
+  });
+});
+
+// ── §N+1. THE REGROUP, WHICH IS THE ONLY MIGRATION THAT MOVES A BLOCK ─────
+//
+// 4.70 grouped sections that shipped stacked, and an additive reconciler cannot
+// reach a group: it converges every word on the page and leaves the fences where
+// they are. `regroupShippedPages` is the opt-in half — see its own comment for
+// the three refusals. These are the four properties that make it safe to tick.
+describe("regrouping a page onto this release's rows", () => {
+  const SHIPPED = [
+    "`almanac:spacer`",
+    "```almanac",
+    "frame: section",
+    "diary:3",
+    "```",
+    "",
+    "```almanac",
+    "row",
+    "header:🗂️ Across the diary",
+    "tasks-table",
+    "tag-index",
+    "```",
+    "",
+    "%% almanac-graph %%",
+  ].join("\n");
+
+  // What the release before it wrote for the same page: the same two widgets,
+  // one per fence, each with the bar that was true of it alone, and two other
+  // blocks in between — which is the case the first draft of this could not
+  // handle and the reason it matches by widget rather than by adjacency.
+  const BEFORE = [
+    "`almanac:spacer`",
+    "```almanac",
+    "frame: section",
+    "diary:3",
+    "```",
+    "",
+    "```almanac",
+    "header:⏳ Open tasks",
+    "tasks-table",
+    "```",
+    "",
+    "```almanac-charts",
+    "header:📊 Trends",
+    "jchart:mood",
+    "```",
+    "",
+    "```almanac",
+    "header:🏷️ Tags",
+    "tag-index",
+    "```",
+    "",
+    "%% almanac-graph %%",
+  ].join("\n");
+
+  it("welds two stacked cells into the row, at the first of them", () => {
+    const out = regroupShippedPages(BEFORE, SHIPPED);
+    expect(out).not.toBeNull();
+    expect(out).toContain(
+      ["```almanac", "row", "header:🗂️ Across the diary", "tasks-table", "tag-index", "```"].join(
+        "\n"
+      )
+    );
+    // AT THE TOPMOST CELL, not at the last and not at the composed position: the
+    // band stays where the reader has been looking for it. The charts fence,
+    // which sat between the two, keeps its place and its contents.
+    expect(out!.indexOf("row")).toBeLessThan(out!.indexOf("almanac-charts"));
+    expect(out).toContain("jchart:mood");
+    // AND THE SEPARATOR GOES WITH THE CELL THAT MOVED. Two fences became one, so
+    // the page loses a block and its blank line — not a blank line on its own,
+    // which would widen the gap a little further on every repair.
+    expect(out).not.toContain("\n\n\n");
+    // The bars that named one cell each are gone, because a row draws ONE bar
+    // above BOTH columns and either of those two would now be a lie.
+    expect(out).not.toContain("header:⏳ Open tasks");
+    expect(out).not.toContain("header:🏷️ Tags");
+  });
+
+  it("keeps each cell's own arguments", () => {
+    // The widget lines are the READER's, verbatim. Only the modifiers come from
+    // the composition — the whole point being that a page keeps what it says and
+    // changes only how it is grouped.
+    const out = regroupShippedPages(
+      BEFORE.replace("tasks-table", "tasks-table:,period"),
+      SHIPPED
+    );
+    expect(out).toContain("tasks-table:,period");
+  });
+
+  it("declines a row whose second cell is not on the page yet", () => {
+    // Refusal 1. The diary dashboard's second row pairs `on-this-day` with
+    // `sleep-summary`, which this release also ADDS — so on the first pass there
+    // is nothing to group, and a half-built row is not an improvement on a
+    // stacked one. It welds on the run after the reconciler has added the cell.
+    const short = BEFORE.split("\n").filter((l) => l !== "tag-index").join("\n");
+    expect(regroupShippedPages(short, SHIPPED)).toBeNull();
+  });
+
+  it("declines a cell the page writes twice", () => {
+    // Refusal 2. With `tasks-table` in two fences there is no answer to which
+    // one is the cell, and picking one would silently orphan the other.
+    const twice = BEFORE.replace(
+      "%% almanac-graph %%",
+      "```almanac\ntasks-table\n```\n\n%% almanac-graph %%"
+    );
+    expect(regroupShippedPages(twice, SHIPPED)).toBeNull();
+  });
+
+  it("declines a cell the reader has put on a page or given a height", () => {
+    // Refusal 3, and the reason it is a refusal rather than a dropped line:
+    // `tab:` and `height:` are gestures made in the section editor, and a cell
+    // has no room for either. The block stays exactly where they put it.
+    for (const gesture of ["tab:Later", "height:280", "frame: card", "wide"]) {
+      const fussy = BEFORE.replace("header:🏷️ Tags", `header:🏷️ Tags\n${gesture}`);
+      expect(regroupShippedPages(fussy, SHIPPED), gesture).toBeNull();
+    }
+  });
+
+  it("declines a fence holding more than the row groups", () => {
+    // The other half of refusal 3. Welding this fence would drag `timeline` into
+    // a band that says nothing about it.
+    const extra = BEFORE.replace("tag-index", "tag-index\ntimeline");
+    expect(regroupShippedPages(extra, SHIPPED)).toBeNull();
+  });
+
+  it("is idempotent, which is what makes it safe to tick twice", () => {
+    const once = regroupShippedPages(BEFORE, SHIPPED);
+    expect(once).not.toBeNull();
+    expect(regroupShippedPages(once!, SHIPPED)).toBeNull();
+  });
+
+  it("has nothing to say about a page this release composes no row for", () => {
+    const flat = SHIPPED.split("\n")
+      .filter((l) => l !== "row" && l !== "tag-index")
+      .join("\n");
+    expect(regroupShippedPages(BEFORE, flat)).toBeNull();
   });
 });

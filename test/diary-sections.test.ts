@@ -343,19 +343,39 @@ describe("what a dashboard already has, and what it could gain", () => {
     // `weekStartOf` reads the host note's `week-start`, so only there is the
     // grid scoped to the period the page is about; it is opt-in rather than
     // shipped because every weekly dashboard that already exists predates it.
-    expect(optIn("yearly")).toEqual(["recap", "tags"]);
-    expect(optIn("quarterly")).toEqual(["recap", "entry-rollup", "tags"]);
+    //
+    // ── AND THREE OF THE FOUR ARE GONE IN 4.70 ────────────────────────
+    //
+    // `tags` IS THE ONLY ONE LEFT, and it is the only one whose reason was ever
+    // about the PAGE rather than about a release. Four dashboards each growing
+    // an identical cloud over the same folder is one view drawn four times, and
+    // that is as true today as it was in 3.14.
+    //
+    // The other three reasons all reduced to "this is new and existing vaults
+    // predate it" — 3.9 §2 for `recap`, 4.58.1 for `time-grid` — or to an
+    // overlap that was an argument for the reader choosing rather than for the
+    // page withholding (`entry-rollup` on a quarter). Held across four releases
+    // that is not caution, it is a widget nobody has seen: `period-recap` and
+    // `time-grid` appeared on NO page a repaired vault composes, and the
+    // quarterly and yearly dashboards shipped with three blocks and two.
+    //
+    // WHAT AN EXISTING VAULT GETS is one foldable block per flip, added at the
+    // composed position by additive reconciliation, reordering nothing. The
+    // changelog names all three because that is what a reader will see.
+    expect(optIn("yearly")).toEqual(["tags"]);
+    expect(optIn("quarterly")).toEqual(["tags"]);
     expect(optIn("monthly")).toEqual(["tags"]);
-    expect(optIn("weekly")).toEqual(["time-grid", "tags"]);
+    expect(optIn("weekly")).toEqual(["tags"]);
   });
 
-  it("ships the rollup on a week and a month, and offers it on a quarter", () => {
+  it("ships the rollup on every grain that has entries to roll up", () => {
     // The same fact from the composer's side, which is the side a reader
-    // meets. A section that is opt-in at one grain and shipped at another is
-    // new in 3.11 §5 and `optIn` had to become a predicate to express it.
+    // meets. `optIn` stays a PREDICATE — `DiarySection.optIn` can still vary by
+    // grain and `tags` does not need it to — because the thing that varies here
+    // is `applies`: a year has no rollup at all, and never had.
     expect(composeDiaryDashboard("weekly")).toContain("entry-rollup");
     expect(composeDiaryDashboard("monthly")).toContain("entry-rollup");
-    expect(composeDiaryDashboard("quarterly")).not.toContain("entry-rollup");
+    expect(composeDiaryDashboard("quarterly")).toContain("entry-rollup:month");
     expect(composeDiaryDashboard("yearly")).not.toContain("entry-rollup");
   });
 
@@ -396,19 +416,29 @@ describe("what a dashboard already has, and what it could gain", () => {
     // and Tags because it is never composed in the first place. An opt-in
     // section is addable on a dashboard that has everything.
     const ctx = { grain: "weekly" } as const;
-    const without = composeDiaryDashboard("weekly").replace(
-      /```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```\n\n/,
-      ""
-    );
+    // ── REMOVED THROUGH THE MODEL AS OF 4.70 ─────────────────────────
+    //
+    // This cut a whole fence out with a regex, because Open tasks WAS a whole
+    // fence. It is the second cell of the body row now, so the fence it is in
+    // survives its removal and `cutFromRun` is what takes the line — and a
+    // regex that no longer matches anything would have left the section on the
+    // page and made this assertion pass by asking about a note nobody changed.
+    const full = composeDiaryDashboard("weekly");
+    const without = applyDiarySections(
+      full,
+      ctx,
+      detectDiarySections(full, ctx).filter((id) => id !== "open-tasks")
+    )!;
+    expect(without, "the removal did nothing").not.toContain("tasks-table");
     expect(
       addableDiarySections(ctx, without)
         .map((s) => s.id)
         .filter((id) => !isPageWidgetId(id))
-      // `time-grid` is here for the SAME reason as `tags` — never composed, so
-      // always addable — and ahead of Open Tasks because the add list runs in
-      // catalogue order, which is where a reader will look for it once it is on
-      // the page.
-    ).toEqual(["time-grid", "open-tasks", "tags"]);
+      // `tags` is here for the OTHER reason and the two read off one line: Open
+      // tasks is offered because it was REMOVED, and Tags because it is never
+      // composed on any grain. `time-grid` left this list in 4.70, when it
+      // stopped being opt-in and started arriving on the page.
+    ).toEqual(["open-tasks", "tags"]);
   });
 
   it("finds a section whose header the reader retitled", () => {
@@ -432,7 +462,12 @@ describe("what a dashboard already has, and what it could gain", () => {
       renderDiarySection(section as NonNullable<typeof section>, {
         grain: "weekly",
       })
-    ).toBe("```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```");
+      // NO BAR OF ITS OWN AS OF 4.70. It is the second cell of the body row and
+      // the row gets one `header:` between its cells, composed by the rollup
+      // that opens it — see `BODY_ROW` in the catalogue. Added back on its own,
+      // `joinRowChunk` puts this line into that fence rather than composing it
+      // as a block, so what a reader sees is the row filling in again.
+    ).toBe("```almanac\ntasks-table:,period\n```");
   });
 
   it("offers nothing for a grain that has no dashboard", () => {
@@ -767,6 +802,10 @@ describe("a dashboard holds page widgets", () => {
     expect(detectDiarySections(next!, ctx)).toEqual([
       "banner",
       "summary",
+      // The time grid joined the weekly composition in 4.70 — see the block
+      // about it below. It is here because it is on the page this test starts
+      // from, not because repair added it: the one `add` op is `open-tasks`.
+      "time-grid",
       "entry-rollup",
       "open-tasks",
       "charts",
@@ -852,10 +891,15 @@ describe("the time grid is a section on the week and a widget elsewhere", () => 
     // monthly dashboard scoped to March would draw whatever week today is in.
     // A section of a period page claims to be about that period; this one could
     // only make that claim on a week.
-    expect(idsFor("weekly")).toContain("time-grid");
+    // COMPOSED ON THE WEEK AS OF 4.70, so it is not in the ADD list there — a
+    // section already on the page is withheld, which is the case one block
+    // down. What this asserts on the week is the other half of the same fact:
+    // the widget door is closed too, because the catalogue writes the keyword.
+    expect(idsFor("weekly")).not.toContain("time-grid");
     expect(idsFor("weekly").filter((id) => id.startsWith("w:time-grid"))).toEqual(
       []
     );
+    expect(composeDiaryDashboard("weekly")).toContain("time-grid");
     for (const grain of ["monthly", "quarterly", "yearly"] as const) {
       // STILL ADDABLE, WHICH IS THE POINT OF TWO DOORS — the reader who wants a
       // grid on their year page may have one. What they do not get is the claim
@@ -870,11 +914,12 @@ describe("the time grid is a section on the week and a widget elsewhere", () => 
     // what `headerbar.ts` walks to draw a collapsible bar; a widget's own
     // `journal-block-head` is not collapsible and is suppressed when the fence
     // already carries a bar.
-    const ctx = { grain: "weekly" } as const;
-    const model = diarySectionModel(ctx);
-    const base = composeDiaryDashboard("weekly");
-    const out = model.apply(base, [...model.present(base), "time-grid"]);
-    expect(out).toContain(
+    //
+    // READ OFF THE SHIPPED PAGE AS OF 4.70, where this used to add the section
+    // first. The grid stopped being opt-in on this grain, so the fence it makes
+    // is on every weekly dashboard a repaired vault composes — which is a
+    // stronger assertion of the same fact.
+    expect(composeDiaryDashboard("weekly")).toContain(
       "```almanac\nheader:⏱️ The week by the hour\ntime-grid\n```"
     );
   });
@@ -884,28 +929,31 @@ describe("the time grid is a section on the week and a widget elsewhere", () => 
     // spare behind every instance so a card never leaves the picker, and that is
     // exactly the behaviour a section must not have: a second grid would claim
     // the first one's region.
-    const ctx = { grain: "weekly" } as const;
-    const model = diarySectionModel(ctx);
     const base = composeDiaryDashboard("weekly");
-    const out = model.apply(base, [...model.present(base), "time-grid"]);
-    expect(model.present(out)).toContain("time-grid");
-    expect(model.addable(out).map((s) => s.id)).not.toContain("time-grid");
+    const model = diarySectionModel({ grain: "weekly" });
+    expect(model.present(base)).toContain("time-grid");
+    expect(model.addable(base).map((s) => s.id)).not.toContain("time-grid");
     expect(
-      model.addable(out).map((s) => s.id).filter((id) => id.startsWith("w:time-grid"))
+      model.addable(base).map((s) => s.id).filter((id) => id.startsWith("w:time-grid"))
     ).toEqual([]);
   });
 
-  it("takes the grid back off without a trace", () => {
-    // The promise every opt-in section makes: added and removed leaves the file
-    // it started as, byte for byte. A section that cannot be cleanly removed is
-    // a section a reader is right to be wary of adding.
-    const ctx = { grain: "weekly" } as const;
-    const model = diarySectionModel(ctx);
+  it("takes the grid off and puts it back without a trace", () => {
+    // The promise every removable section makes: taken off and added back
+    // leaves the file it started as, byte for byte. It ran the other way round
+    // until 4.70 — added, then removed — because the grid was not on the page
+    // to start with. Same property, same direction of travel for the reader,
+    // reversed only because the starting state changed.
+    const model = diarySectionModel({ grain: "weekly" });
     const base = composeDiaryDashboard("weekly");
-    const out = model.apply(base, [...model.present(base), "time-grid"]);
-    expect(
-      model.apply(out, model.present(out).filter((id) => id !== "time-grid"))
-    ).toBe(base);
+    const without = model.apply(
+      base,
+      model.present(base).filter((id) => id !== "time-grid")
+    ) as string;
+    expect(without, "the removal did nothing").not.toContain("time-grid");
+    expect(model.apply(without, [...model.present(without), "time-grid"])).toBe(
+      base
+    );
   });
 
   it("asks the registry's question rather than its own", () => {
@@ -928,10 +976,10 @@ describe("the time grid is a section on the week and a widget elsewhere", () => 
     // then offer a second one beside it.
     const ctx = { grain: "weekly" } as const;
     const model = diarySectionModel(ctx);
-    const base = composeDiaryDashboard("weekly");
-    const out = model
-      .apply(base, [...model.present(base), "time-grid"])
-      .replace("\ntime-grid\n", "\ntime-grid:events\n");
+    const out = composeDiaryDashboard("weekly").replace(
+      "\ntime-grid\n",
+      "\ntime-grid:events\n"
+    );
     expect(model.present(out)).toContain("time-grid");
     expect(model.addable(out).map((s) => s.id)).not.toContain("time-grid");
     // And the answer reads back out of the file, which is what re-pointing it
@@ -948,29 +996,40 @@ describe("the time grid is a section on the week and a widget elsewhere", () => 
     ).toEqual({ arg: "events", arg2: "", form: "section" });
   });
 
-  it("never arrives on a dashboard that did not ask", () => {
-    // 3.9 §2's rule, and the reason this is `optIn` rather than shipped. Every
-    // weekly dashboard in every vault predates the section, and `repairNote` is
-    // what runs over them — it must add nothing.
+  it("arrives on an existing dashboard by reconciliation, and only once", () => {
+    // ── 3.9 §2's RULE, TURNED OVER IN 4.70 ────────────────────────────
+    //
+    // This case read *"never arrives on a dashboard that did not ask"*, which
+    // was the whole reason the section was `optIn`: every weekly dashboard in
+    // every vault predates it. That is still true and is now the POINT rather
+    // than the objection — a widget built in 4.55 and extended twice appeared
+    // on no page a repaired vault composes, and reconciliation is the mechanism
+    // that reaches the pages that already exist.
+    //
+    // WHAT REPAIR DOES: adds the block, at the composed position, reordering
+    // nothing and removing nothing.
     const base = composeDiaryDashboard("weekly");
-    expect(base).not.toContain("time-grid");
     const model = diarySectionModel({ grain: "weekly" });
-    // Nothing to do on the page as shipped...
+    const without = model.apply(
+      base,
+      model.present(base).filter((id) => id !== "time-grid")
+    ) as string;
+    const { next } = repairNote(model, without, base);
+    expect(next ?? "").toContain("time-grid");
+
+    // AND ONLY ONCE. Running repair over the page it just wrote must be a
+    // no-op, which is the half that would break silently — a section added on
+    // every pass is a note that grows a block a day.
     expect(repairNote(model, base, base).next).toBeNull();
-    // ...and nothing to undo on the page a reader added it to. Repair is
-    // additive, so the section it never writes is also a section it never takes
-    // away — the two halves that make an opt-in section safe to offer.
-    const out = model.apply(base, [...model.present(base), "time-grid"]);
-    expect(repairNote(model, out, base).next).toBeNull();
+    expect(repairNote(model, next ?? base, base).next).toBeNull();
   });
 
   it("is the reader's to move and the reader's to remove", () => {
     // Neither locked nor pinned: nothing of theirs is stored in it. The
     // meetings, the log items and the tasks are in their own notes.
-    const ctx = { grain: "weekly" } as const;
-    const model = diarySectionModel(ctx);
     const base = composeDiaryDashboard("weekly");
-    const out = model.apply(base, [...model.present(base), "time-grid"]);
+    const model = diarySectionModel({ grain: "weekly" });
+    const out = base;
     const view = model.sections(out).find((s) => s.id === "time-grid");
     expect(view?.removable).toBe(true);
     expect(view?.movable).toBe(true);
@@ -1150,9 +1209,10 @@ describe("the period summary is a section and wears a section's bar", () => {
   });
 
   it("allows recap and time-grid to be switched to widget form", () => {
+    // BOTH ARE COMPOSED AS OF 4.70, so neither is added first — the toggle is
+    // asserted from the page as shipped, which is where a reader will meet it.
     const weeklyModel = diarySectionModel({ grain: "weekly" });
-    const weeklyBase = composeDiaryDashboard("weekly");
-    const withGrid = weeklyModel.apply(weeklyBase, [...weeklyModel.present(weeklyBase), "time-grid"]);
+    const withGrid = composeDiaryDashboard("weekly");
     expect(withGrid).toContain("header:⏱️ The week by the hour\ntime-grid");
 
     const gridAsWidget = weeklyModel.apply(
@@ -1165,8 +1225,7 @@ describe("the period summary is a section and wears a section's bar", () => {
     expect(gridAsWidget).toContain("time-grid");
 
     const yearlyModel = diarySectionModel({ grain: "yearly" });
-    const yearlyBase = composeDiaryDashboard("yearly");
-    const withRecap = yearlyModel.apply(yearlyBase, [...yearlyModel.present(yearlyBase), "recap"]);
+    const withRecap = composeDiaryDashboard("yearly");
     expect(withRecap).toContain("header:📝 Recap\nperiod-recap:year");
 
     const recapAsWidget = yearlyModel.apply(
@@ -1177,5 +1236,76 @@ describe("the period summary is a section and wears a section's bar", () => {
     );
     expect(recapAsWidget).not.toContain("header:📝 Recap");
     expect(recapAsWidget).toContain("period-recap:year");
+  });
+});
+
+// ── EVERY CELL OF EVERY COMPOSED ROW CAN LEAVE IT AGAIN (4.70.1) ─────────
+//
+// THE BUG THIS IS THE GATE FOR. On a weekly overview, *What the entries said*
+// showed **Take out of the group** and **Start a page here** greyed out, with
+// the tooltip *"This widget's lines can't be told apart from the others in its
+// block, so it can't be split out."* Both controls read `BlockView.loose`, which
+// is `hasKnownExtent` — a section is loose if EITHER of its two render forms is
+// a single line, because a `header:` bar is the BAND's line and not the
+// section's.
+//
+// `asFlat`, the adapter that lets a dashboard's sections through the flat
+// machinery, was written as `render: () => s.render(ctx)` and **dropped the
+// options argument**. So both probes came back with the section form, every
+// section composing a bar answered "two lines", and the answer was no.
+//
+// WHY NOTHING CAUGHT IT FOR TWELVE RELEASES. A section alone in its block is
+// loose whatever its extent — the whole fence is already its — so `loose` was
+// only ever consulted on a shared block, and until 4.70 no dashboard section
+// shared one. The first release to compose a row here is the first release
+// where the adapter's answer mattered.
+//
+// SO THE GATE IS THE PROPERTY, NOT THE LINE. Every block a composed dashboard
+// holds more than one section in must report every one of them loose: a group
+// the editor draws and cannot take apart is a dead control, and the reader is
+// told their own file is unreadable.
+describe("every cell of a composed row can be taken back out of it", () => {
+  const GRAINS: DashboardGrain[] = ["weekly", "monthly", "quarterly", "yearly"];
+
+  for (const grain of GRAINS) {
+    it(`offers the split on every ${grain} group`, () => {
+      const text = composeDiaryDashboard(grain);
+      const model = diarySectionModel({ grain });
+      const blocks = model.blocks?.(text) ?? [];
+      expect(blocks.length, "the dashboard parses into blocks").toBeGreaterThan(1);
+      for (const block of blocks) {
+        if (block.ids.length < 2) continue;
+        expect(
+          block.ids.filter((id) => !block.loose.includes(id)),
+          `every cell of [${block.ids.join(", ")}] can leave it`
+        ).toEqual([]);
+      }
+    });
+  }
+
+  it("and the write performs the split the button offers", () => {
+    // A DISABLED BUTTON AND A DECLINED WRITE ARE THE SAME DEFECT SEEN FROM TWO
+    // ENDS, which is why `loose` exists at all — see `BlockView.loose`. Asserting
+    // only that the control is enabled would pass on a model that then refuses.
+    const text = composeDiaryDashboard("weekly");
+    const model = diarySectionModel({ grain: "weekly" });
+    const blocks = (model.blocks?.(text) ?? []).map((b) => b.ids);
+    const group = blocks.find((ids) => ids.length > 1);
+    expect(group, "the weekly overview composes a row").toBeDefined();
+
+    const split = blocks.flatMap((ids) =>
+      ids.length > 1 ? [[ids[0]], ids.slice(1)] : [ids]
+    );
+    const next = model.regroup?.(text, split);
+    expect(next, "taking a cell out changes the file").not.toBeNull();
+    // The row is gone — a row of one is not a row — and both sections are still
+    // there, each in a fence of its own.
+    expect(next).not.toContain("\nrow\n");
+    expect(next).toContain("entry-rollup");
+    expect(next).toContain("tasks-table:,period");
+    // AND THE BAR STAYS WITH THE CELL THAT COMPOSED IT. The band's title was the
+    // opener's line, so it leaves with the opener rather than being orphaned
+    // above whatever happened to be second.
+    expect(next).toContain("header:📖 Inside this week\nentry-rollup");
   });
 });

@@ -42,14 +42,17 @@ const ROOT = DEFAULT_PATHS.diaryRoot;
 const model = homeSectionModel(ROOT, "");
 const home = (): string => composeHomeNote(ROOT);
 
-// The homepage's own top row, which is the group this release is about: the
-// diary card in one column, and three widgets stacked in the other.
-const GROUP = ["diary", "launcher", "tasks", "on-this-day"];
+// The homepage's own top row: Diary + launcher + tasks on page 1, logbook on page 2.
+const GROUP = ["diary", "launcher", "tasks", "logbook"];
+
+// The second row / section.
+const WEEK = ["time-grid"];
 
 // What the editor hands `regroup`: the rows cut into blocks.
 const blocks = (order: readonly string[]): string[][] => [
   ["banner"],
   order.filter((id) => GROUP.includes(id)),
+  [...WEEK],
   ["journals"],
   ["charts"],
 ];
@@ -78,12 +81,12 @@ describe("the plan stops refusing a move that never leaves the block", () => {
       .find((o) => o.detail?.includes("moves with it"))?.detail;
 
   it("says nothing about two cells of one row trading places", () => {
-    const want = ["banner", ...swapped("launcher", "tasks"), "journals", "charts"];
+    const want = ["banner", ...swapped("launcher", "tasks"), "time-grid", "journals", "charts"];
     expect(refusal(want)).toBeUndefined();
   });
 
   it("says nothing when the cell that moves is the one that opens the block", () => {
-    const want = ["banner", ...swapped("diary", "launcher"), "journals", "charts"];
+    const want = ["banner", ...swapped("diary", "launcher"), "time-grid", "journals", "charts"];
     expect(refusal(want)).toBeUndefined();
   });
 
@@ -92,11 +95,12 @@ describe("the plan stops refusing a move that never leaves the block", () => {
     // section landing in the middle of a group is a regroup, not a reorder.
     const want = [
       "banner",
-      "diary",
       "launcher",
       "tasks",
+      "logbook",
       "journals",
-      "on-this-day",
+      "diary",
+      "time-grid",
       "charts",
     ];
     expect(refusal(want)).toContain("Split the block to move them apart");
@@ -106,7 +110,7 @@ describe("the plan stops refusing a move that never leaves the block", () => {
     // The op belongs to the pass that performs it — `layoutOps`, which runs the
     // write and reports what it did. Two passes naming one change would put 2 on
     // the button for one drag.
-    const want = ["banner", ...swapped("launcher", "tasks"), "journals", "charts"];
+    const want = ["banner", ...swapped("launcher", "tasks"), "time-grid", "journals", "charts"];
     expect(model.plan(home(), want).filter((o) => o.kind === "move")).toEqual([]);
   });
 });
@@ -116,7 +120,7 @@ describe("the write reorders the cells and changes nothing else", () => {
     const out = model.regroup?.(
       home(),
       blocks(swapped("launcher", "tasks")),
-      []
+      ["logbook"]
     );
     expect(out).not.toBeNull();
     expect(fenceOf(out as string)).toEqual([
@@ -125,7 +129,8 @@ describe("the write reorders the cells and changes nothing else", () => {
       "cell",
       "tasks-table",
       "launcher",
-      "on-this-day:always",
+      "tab",
+      "logbook",
     ]);
   });
 
@@ -137,7 +142,7 @@ describe("the write reorders the cells and changes nothing else", () => {
     const out = model.regroup?.(
       home(),
       blocks(swapped("launcher", "tasks")),
-      []
+      ["logbook"]
     ) as string;
     expect(fenceOf(out).filter((l) => l === "cell")).toHaveLength(1);
     expect(fenceOf(home()).filter((l) => l === "cell")).toHaveLength(1);
@@ -147,7 +152,7 @@ describe("the write reorders the cells and changes nothing else", () => {
     const out = model.regroup?.(
       home(),
       blocks(swapped("diary", "launcher")),
-      []
+      ["logbook"]
     ) as string;
     expect(fenceOf(out)).toEqual([
       "row",
@@ -155,7 +160,8 @@ describe("the write reorders the cells and changes nothing else", () => {
       "cell",
       "diary:3",
       "tasks-table",
-      "on-this-day:always",
+      "tab",
+      "logbook",
     ]);
   });
 
@@ -163,7 +169,7 @@ describe("the write reorders the cells and changes nothing else", () => {
     const out = model.regroup?.(
       home(),
       blocks(swapped("launcher", "tasks")),
-      []
+      ["logbook"]
     ) as string;
     const untouched = (text: string): string =>
       text
@@ -174,8 +180,8 @@ describe("the write reorders the cells and changes nothing else", () => {
   });
 
   it("puts the group back exactly when the reorder is undone", () => {
-    const once = model.regroup?.(home(), blocks(swapped("launcher", "tasks")), []) as string;
-    expect(model.regroup?.(once, blocks(GROUP), [])).toBe(home());
+    const once = model.regroup?.(home(), blocks(swapped("launcher", "tasks")), ["logbook"]) as string;
+    expect(model.regroup?.(once, blocks(GROUP), ["logbook"])).toBe(home());
   });
 });
 
@@ -186,15 +192,15 @@ describe("what the dry run reports", () => {
     model.sections(home()).find((s) => s.id === id)?.label;
 
   it("names the reorder, minimally, in the plan's own words", () => {
-    const out = model.regroup?.(home(), blocks(swapped("launcher", "tasks")), []) as string;
+    const out = model.regroup?.(home(), blocks(swapped("launcher", "tasks")), ["logbook"]) as string;
     const ops = cellMoveOps(ids(home()), ids(out), label);
     expect(ops).toHaveLength(1);
     expect(ops[0].kind).toBe("move");
-    expect(ops[0].detail).toBe("moves above On this day");
+    expect(ops[0].detail).toBe("moves above Logbook");
   });
 
   it("finds a block whose FIRST cell moved, which is why it matches on members", () => {
-    const out = model.regroup?.(home(), blocks(swapped("diary", "launcher")), []) as string;
+    const out = model.regroup?.(home(), blocks(swapped("diary", "launcher")), ["logbook"]) as string;
     const ops = cellMoveOps(ids(home()), ids(out), label);
     expect(ops.map((o) => o.label)).toEqual(["Diary"]);
   });
@@ -204,8 +210,6 @@ describe("what the dry run reports", () => {
   });
 
   it("leaves a block that gained or lost a member to the regroup ops", () => {
-    // Reported twice, under two different words, is the failure this skip
-    // exists to avoid — "Go to joins one block with Diary" already says it.
     const before = [["a", "b", "c"]];
     const after = [["a", "b"], ["c"]];
     expect(cellMoveOps(before, after, (id) => id)).toEqual([]);
@@ -221,9 +225,7 @@ describe("starting a page inside a group", () => {
     model.sections(home()).find((s) => s.id === id)?.label;
 
   it("writes the boundary the button asked for", () => {
-    // Phase four was never the broken part, and this says so: the `tab` lands
-    // above the section that carries the bit, and above nothing else.
-    const out = blocked(["tasks"]) as string;
+    const out = blocked(["tasks", "logbook"]) as string;
     expect(fenceOf(out)).toEqual([
       "row",
       "diary:3",
@@ -231,17 +233,14 @@ describe("starting a page inside a group", () => {
       "launcher",
       "tab",
       "tasks-table",
-      "on-this-day:always",
+      "tab",
+      "logbook",
     ]);
-    expect(view(out)[1].pages).toEqual(["tasks"]);
+    expect(view(out)[1].pages).toEqual(["tasks", "logbook"]);
   });
 
   it("is named by the dry run, which is what the footer counts", () => {
-    // THE WHOLE OF THE BUG. The write worked, the card re-drew with `Page 1` and
-    // `Page 2` bands, and Save stayed disabled over "No changes" — because the
-    // pane compared which BLOCK each section was in, and a `tab` line moves
-    // nothing between blocks.
-    const out = blocked(["tasks"]) as string;
+    const out = blocked(["tasks", "logbook"]) as string;
     const ops = pageBreakOps(view(home()), view(out), label);
     expect(ops).toHaveLength(1);
     expect(ops[0].kind).toBe("regroup");
@@ -250,24 +249,22 @@ describe("starting a page inside a group", () => {
   });
 
   it("names the other direction too, because the control is a toggle", () => {
-    // "Join the page before" is the only way to unmake a page from this window.
-    // A change that can be made and not unmade is half a control.
-    const paged = blocked(["tasks"]) as string;
+    const paged = blocked(["tasks", "logbook"]) as string;
     const ops = pageBreakOps(view(paged), view(home()), label);
     expect(ops.map((o) => o.detail)).toEqual(["Open tasks joins the page before it"]);
   });
 
   it("names two breaks in the group's own order", () => {
-    const out = blocked(["launcher", "on-this-day"]) as string;
+    const out = blocked(["launcher", "tasks", "logbook"]) as string;
     expect(pageBreakOps(view(home()), view(out), label).map((o) => o.label)).toEqual([
-      "Go to",
-      "On this day",
+      "Overview navigator",
+      "Open tasks",
     ]);
   });
 
   it("says nothing when the pages did not move", () => {
     expect(pageBreakOps(view(home()), view(home()), label)).toEqual([]);
-    const paged = blocked(["tasks"]) as string;
+    const paged = blocked(["tasks", "logbook"]) as string;
     expect(pageBreakOps(view(paged), view(paged), label)).toEqual([]);
   });
 
@@ -278,24 +275,8 @@ describe("starting a page inside a group", () => {
   });
 
   it("takes the page back out, leaving the group it found (4.52.1)", () => {
-    // 4.34.2's RULE, WITH THE ONE CASE IT COULD NOT SEE. *"The column stays
-    // either way: removing a page boundary puts the two sections back beside
-    // each other rather than stacking them, because a page break is a column
-    // break that was promoted."* True whenever there WAS one to promote — and
-    // the boundary above `tasks-table` was not: the homepage stacks those three
-    // in one column, so the `tab` was inserted rather than promoted.
-    //
-    // THIS ASSERTED THE DEMOTION UNTIL 4.52.1 and the demotion was inventing a
-    // column. The fence came back with three where the reader had two, and with
-    // the cap in place those three are then dealt into two that are not the two
-    // they started with — a page added and removed rearranging the homepage.
-    //
-    // SO THE STRONGEST FORM OF IT IS THE ONE TO ASSERT: byte-for-byte the note
-    // that was composed. A boundary a reader can add and remove has to leave
-    // nothing behind, and anything weaker than this would pass while a
-    // delimiter, an indent or a blank line survived the round trip.
-    const paged = blocked(["tasks"]) as string;
-    const back = model.regroup?.(paged, blocks(GROUP), []) as string;
+    const paged = blocked(["tasks", "logbook"]) as string;
+    const back = model.regroup?.(paged, blocks(GROUP), ["logbook"]) as string;
     expect(back).toBe(home());
     expect(fenceOf(back)).toEqual([
       "row",
@@ -303,11 +284,11 @@ describe("starting a page inside a group", () => {
       "cell",
       "launcher",
       "tasks-table",
-      "on-this-day:always",
+      "tab",
+      "logbook",
     ]);
-    expect(model.blocks?.(back)?.[1].pages).toEqual([]);
+    expect(model.blocks?.(back)?.[1].pages).toEqual(["logbook"]);
   });
-
 });
 
 describe("the one bit a reorder could not survive", () => {
@@ -337,7 +318,7 @@ describe("the one bit a reorder could not survive", () => {
     expect(groups(rows, bits)[0]).toEqual(["banner", "launcher"]);
     expect(groups(rows, keptBlocks(groups(ROWS, bits), rows, bits))).toEqual([
       ["banner"],
-      ["launcher", "diary", "tasks", "on-this-day"],
+      ["launcher", "diary", "tasks", "logbook"],
       ["journals"],
       ["charts"],
     ]);
@@ -354,7 +335,7 @@ describe("the one bit a reorder could not survive", () => {
   it("leaves the bits alone when a row is dragged OUT of the block", () => {
     // That reader is regrouping, and the bits are how they say so — restoring
     // boundaries there would undo the gesture.
-    const rows = ["banner", "diary", "launcher", "tasks", "journals", "on-this-day", "charts"];
+    const rows = ["banner", "diary", "launcher", "tasks", "journals", "logbook", "charts"];
     const bits = bitsFor(ROWS);
     expect(keptBlocks(groups(ROWS, bits), rows, bits)).toEqual(bits);
   });

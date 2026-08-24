@@ -50,6 +50,8 @@ import {
   ENTRY_SECTIONS,
   offerableEntrySections,
   parseEntry,
+  sharedBody,
+  isForeignBandLine,
 } from "./entry-sections";
 import type { EntrySection, EntrySectionContext } from "./entry-sections";
 import { answerInText } from "../core/section-model";
@@ -126,9 +128,8 @@ export function entryReloadLoss(
     // damage would refuse every reload that changed anything.
     extra: (t) => {
       const out: EntryLoss[] = [];
-      const shared = parseEntry(t, ctx).shared;
-      for (const b of shared?.body ?? []) {
-        if (b.id !== null || b.line.trim() === "") continue;
+      for (const b of sharedBody(parseEntry(t, ctx))) {
+        if (!isForeignBandLine(b)) continue;
         out.push({
           kind: "foreign",
           label: b.line.trim(),
@@ -152,15 +153,18 @@ export function wantFromEntry(
   text: string,
   ctx: EntrySectionContext
 ): { want: SectionChoice[]; drops: string[] } {
-  const shared = parseEntry(text, ctx).shared;
+  const band = sharedBody(parseEntry(text, ctx));
   const byId = new Map(offerableEntrySections(ctx).map((s) => [s.id, s]));
   const want: SectionChoice[] = [];
   const drops: string[] = [];
   const seen = new Set<string>();
 
-  for (const b of shared?.body ?? []) {
+  for (const b of band) {
     if (b.id === null) {
-      if (b.line.trim() !== "") drops.push(b.line.trim());
+      // A modifier is the catalogue's own furniture rather than a line the
+      // reader wrote, so it is neither carried into the layout nor reported as
+      // dropped — `isForeignBandLine` is the one place that distinction lives.
+      if (isForeignBandLine(b)) drops.push(b.line.trim());
       continue;
     }
     // A second copy of one section is one region shared by two widgets, which

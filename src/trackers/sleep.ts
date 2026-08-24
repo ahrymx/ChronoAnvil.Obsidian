@@ -25,6 +25,7 @@ import {
   weeklyOverviewPath,
 } from "../core/util";
 import { getBuiltinTracker } from "./trackers";
+import { emptyCallout } from "../ui/empty";
 
 export function buildSleepSummary(plugin: AlmanacPlugin): HTMLElement {
   const app = plugin.app;
@@ -35,11 +36,27 @@ export function buildSleepSummary(plugin: AlmanacPlugin): HTMLElement {
   const bed = getBuiltinTracker(plugin, "bed");
   const sleep = getBuiltinTracker(plugin, "sleep");
 
+  // ── THE TWO EMPTY STATES BECAME CALLOUTS IN 4.70, AND COMPOSING THE
+  //    WIDGET IS WHY ─────────────────────────────────────────────────────
+  //
+  // Both were a bare `<p class="journal-sleep-hint">` — a line of grey text
+  // where the band should be, which is what `empty.ts` was written to replace
+  // and which survived only because this widget appeared on no shipped page. A
+  // reader had to type `sleep-summary` to ever see it.
+  //
+  // 4.70 composes it onto the diary dashboard, and that page's own rule is that
+  // every block says what it shows on a vault that has nothing yet — asserted,
+  // in `test/empty-states.test.ts`, against the notes rather than against a
+  // list. So the sentence had to become the two `empty.ts` asks for: what is
+  // missing, and what to do about it.
   if (!wake || !bed) {
-    root.createEl("p", {
-      cls: "journal-sleep-hint",
-      text: "Turn on the Wake-Up and Bedtime built-ins to see a sleep summary.",
-    });
+    root.appendChild(
+      emptyCallout(
+        "moon",
+        "Sleep is not being tracked.",
+        "Turn on the Wake-Up and Bedtime built-ins in Settings → Almanac → Trackers."
+      )
+    );
     return root;
   }
 
@@ -68,10 +85,13 @@ export function buildSleepSummary(plugin: AlmanacPlugin): HTMLElement {
   root.createEl("h3", { text: "😴 Sleep" });
 
   if (!sleeps.length && !wakeMins.length) {
-    root.createEl("p", {
-      cls: "journal-sleep-hint",
-      text: "No sleep data logged yet.",
-    });
+    root.appendChild(
+      emptyCallout(
+        "moon",
+        "No nights logged yet.",
+        "Fill in Wake-Up and Bedtime on a daily entry and this fills in."
+      )
+    );
     return root;
   }
 

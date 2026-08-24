@@ -53,9 +53,12 @@ import { DEFAULT_PATHS, HEADER_PREFIX, TRENDS_HEADING } from "../core/constants"
 import { segment } from "../core/layout";
 import {
   HEADER_KEYWORD,
+  cutFromFence,
   isSectionFence,
   isCellLine,
   isRowLine,
+  ROW_KEYWORD,
+  splitDirective,
 } from "../core/directive-grammar";
 import {
   SectionModel,
@@ -82,6 +85,7 @@ import {
   flatBlocks,
   locateTitle,
   regroupFlatNote,
+  rowRuns,
   graphLinksSection,
 } from "../core/note-sections";
 import {
@@ -186,6 +190,28 @@ export interface DiarySection {
   // `EntrySection.pinned`'s — stated there at length rather than twice, because
   // it is one decision about one row that happens to appear on two surfaces.
   pinned?: boolean;
+  // Which composed ROW this section is a cell of, and which CELL of it — 4.70.
+  //
+  // `FlatSection.row` AND `.cell`, VERBATIM IN MEANING, and the argument for
+  // both is made there at length rather than a second time here: an id rather
+  // than a flag because a page has more than one row; consecutive members only,
+  // because a row is a block and a block is contiguous; and absent `cell` is not
+  // a value, so two sections that both leave it out get a cell each.
+  //
+  // WHY A DASHBOARD DID NOT HAVE THESE UNTIL NOW. The composer's merge rule was
+  // keyed on the BAND — "these sections are one card" — and the one band that
+  // ever merged, `masthead`, was retired in 4.58.0 leaving `ONE_FENCE` empty. So
+  // the four period dashboards could only ever compose a column of stacked
+  // blocks, whatever the renderer supported. `rowRuns` is the rule they now
+  // share with the other three catalogues.
+  //
+  // AND THEY ARE NOT FUNCTIONS OF THE CONTEXT, deliberately. A row pairing two
+  // sections whose `applies` disagree on some grain composes with one member
+  // there, and `rowRuns` drops the `row` line from a run of one — so a catalogue
+  // says which sections belong together and never has to restate which grains
+  // that happens to be true on.
+  row?: string;
+  cell?: string;
   // Which band of the page this section belongs to, and therefore which fence.
   //
   // NEW IN 3.2 PATCH 3, AND IT IS THE PATCH. A dashboard used to be a flat list
@@ -341,6 +367,44 @@ const SUMMARY_TITLES: Record<string, string> = {
 
 const summaryBar = (ctx: DiaryDashboardContext): string =>
   `${HEADER_PREFIX}${SUMMARY_TITLES[noun(ctx)] ?? "📅 This period"}`;
+
+// ── THE BODY ROW, 4.70 ───────────────────────────────────────────────────
+//
+// A period dashboard shipped as four blocks stacked down a page — the summary,
+// the rollup, the tasks table and the charts — and could not have shipped as
+// anything else: the composer merged by BAND, the only band that ever merged
+// was retired in 4.58.0, and `DiarySection` had no way to say "these two are
+// one block" until this release gave it `row`.
+//
+// THE ROLLUP AND THE TASKS TABLE ARE THE PAIR, and they are the right one
+// because they are the same question asked twice. "What the days said" is what
+// the entries of this period wrote; "Open tasks" is what those same entries
+// left undone. Both read the period's own children, both are lists, and neither
+// is a card — so neither loses chrome by taking a column.
+//
+// WHICH IS WHY THE BAR SAYS "INSIDE THIS WEEK" AND NOT "WHAT THE DAYS SAID". A
+// `header:` in a row fence is drawn once, full width, above both columns
+// (`row.ts`), so it titles the BAND; the old wording would have been a sentence
+// about the left column printed over the right one as well.
+//
+// TWO CELLS AT `--am-row-cell-min` PLUS THE GAP IS 660px, AND A PERIOD
+// DASHBOARD IS NOT `wide`. That is deliberate and it fits: `MAX_COLUMNS` is two
+// precisely because two is the count that survives a default note column, and
+// the wrap below it is the phone collapse rather than a layout coming apart. No
+// `wide` line is composed here — it would change the whole page's width for a
+// new vault and leave every existing dashboard narrower than its sibling, which
+// is a divergence additive reconciliation cannot close.
+const BODY_ROW = "body-row";
+
+const ROLLUP_TITLES: Record<string, string> = {
+  week: "📖 Inside this week",
+  month: "📖 Inside this month",
+  quarter: "📖 Inside this quarter",
+  year: "📖 Inside this year",
+};
+
+const rollupBar = (ctx: DiaryDashboardContext): string =>
+  `${HEADER_PREFIX}${ROLLUP_TITLES[noun(ctx)] ?? "📖 Inside this period"}`;
 
 export const DIARY_SECTIONS: DiarySection[] = [
   {
@@ -556,7 +620,27 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // ../review/recap-view.ts is that mitigation — the banner says where the
     // recap went and offers to put it back, and it says so only when there is
     // something to have lost.
-    optIn: true,
+    //
+    // ── COMPOSED AS OF 4.70, AND §2's ARGUMENT IS WHAT ALLOWS IT ─────────
+    //
+    // Read the paragraph above again: every sentence of it is about the RECAP
+    // BEING IN THE BANNER. Unbounded content pushing the stats band off screen,
+    // a reader who cannot say they want the numbers without the wall of text, a
+    // banner that is a document. None of that is true of a section — it is
+    // foldable, it is below the summary rather than inside it, and it can be
+    // removed with one untick. The flag was a transition, and the transition is
+    // three releases old.
+    //
+    // WHAT IT COST BY STAYING: a quarterly dashboard shipped with TWO blocks on
+    // it and a yearly with ONE, which are the thinnest pages in the vault and
+    // are the pages whose whole purpose is to look back over a long stretch.
+    // `period-recap` is the widget that does that and it appeared on no page a
+    // repaired vault composes.
+    //
+    // AND `renderRecapMoved` STAYS. It fires when a banner still holds recap
+    // content the section is not showing, which is a state this flip does not
+    // change — an existing dashboard gains the section by reconciliation and
+    // keeps whatever its banner had.
     render: (ctx, opts) => ({
       fence: "almanac",
       lines: [
@@ -566,6 +650,87 @@ export const DIARY_SECTIONS: DiarySection[] = [
     }),
     questions: () => [formQuestion("header:📝 Recap")],
     locate: (text) => probe(text, /^period-recap\b/m),
+  },
+  {
+    // THE REGISTRY'S OWN QUESTION, ASKED FROM HERE. `time-grid`'s three sources
+    // are declared once, in `widget-registry.ts`, and this composes the same
+    // directive — so it asks through `widgetQuestions` rather than re-typing the
+    // list. See that function for why it is exported.
+    questions: () => [
+      formQuestion("header:⏱️ The week by the hour"),
+      ...widgetQuestions("time-grid"),
+    ],
+    id: "time-grid",
+    label: "Time grid",
+    // THE REGISTRY'S SENTENCE TOO, because this is the same widget offered
+    // through a second door and a reader meeting it on a dashboard should read
+    // what a reader meeting it on a year page reads.
+    blurb: WIDGETS["time-grid"].blurb,
+    icon: WIDGETS["time-grid"].glyph,
+    // Nothing of the reader's lives here: the meetings, the log items and the
+    // tasks are in their own notes, and removing the grid removes a view of them.
+    locked: false,
+    band: "body",
+    // ── WEEKLY ALONE, AND IT IS THE DIRECTIVE THAT DECIDES ───────────────
+    //
+    // `time-grid` draws THE HOST NOTE'S WEEK: `weekStartOf` reads `week-start`
+    // from the note's frontmatter and falls back to the current week when there
+    // is none. A weekly dashboard declares `week-start`, so the grid is scoped to
+    // the period the page is about and `period-nav:week` re-scopes both together
+    // — which is the whole argument for it being a section of that page.
+    //
+    // THE OTHER THREE GRAINS DECLARE `month-start`, `quarter-start` AND
+    // `year-start`. None of those is a week, so on a monthly dashboard scoped to
+    // March the grid would draw whatever week today is in — a block about now on
+    // a page about then. A section of a period dashboard is about that period;
+    // this one could not be.
+    //
+    // AND IT IS STILL ADDABLE THERE, AS A WIDGET, which is the point of the two
+    // doors. `pageWidgetKeywords` withholds a keyword the grain's catalogue
+    // writes, so weekly offers the section and the other three offer the card —
+    // exactly the split `tasks-table` has had since 2.58.6, where a year is the
+    // grain with no Open Tasks section and a reader who wants one anyway may add
+    // it. What a reader loses on a month page is the claim that the grid is part
+    // of what a month dashboard IS, which is a claim that would not be true.
+    applies: (ctx) => ctx.grain === "weekly",
+    // OFFERED, NEVER SHIPPED. 3.9 §2. Every weekly dashboard in every vault
+    // predates this section, and a release that silently grew a seven-column
+    // grid on all of them would be deciding something for people who did not ask.
+    //
+    // ── SHIPPED AS OF 4.70, ON THIS GRAIN AND THE HOMEPAGE ──────────────
+    //
+    // THE PARAGRAPH ABOVE IS AN ARGUMENT ABOUT A RELEASE AND NOT ABOUT A PAGE,
+    // and it has been true of every release since — which is how a widget built
+    // in 4.55, extended in 4.58 and given a day count in 4.62 came to appear on
+    // no page a repaired vault composes. "Nobody asked for it" is indistinguish-
+    // able from "nobody has seen it" when the only way to see it is to type its
+    // keyword.
+    //
+    // AND THE THING IT WAS CAUTIOUS ABOUT IS WHAT RECONCILIATION IS FOR. A
+    // section that stops being `optIn` is ADDED to an existing note, at the
+    // composed position, with nothing reordered and nothing removed — so the
+    // cost to a reader who did not ask is one foldable block they can untick,
+    // which is the same cost every other section on the page already carries.
+    // The changelog names this flip because it is what an existing vault sees.
+    //
+    // FULL WIDTH, ABOVE THE BODY ROW, AND NOT IN IT. Seven columns of hours do
+    // not take a 320px cell — 4.62's day count exists so a narrow column CAN
+    // ask for three days, and a weekly dashboard is the one page in the vault
+    // whose subject is the whole week. Narrowing it here would be answering a
+    // question the page does not have.
+    render: (_ctx, opts) => ({
+      fence: "almanac",
+      lines: [
+        ...(opts?.form === WIDGET_FORM
+          ? []
+          : ["header:⏱️ The week by the hour"]),
+        widgetLine("time-grid", opts),
+      ],
+    }),
+    // MATCHES THE KEYWORD, NOT THE ARGUMENT — the rule every catalogue follows,
+    // so a reader who narrows the grid to `time-grid:events` still has a section
+    // the editor can find rather than a second one it offers to add.
+    locate: (text) => probe(text, /^time-grid\b/m),
   },
   {
     id: "entry-rollup",
@@ -613,13 +778,28 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // an aggregate and a list of the same source — and different enough to
     // both exist. So the quarter gets the choice and does not get it made for
     // it. Weekly and monthly overlap nothing and ship on.
-    optIn: (ctx) => ctx.grain === "quarterly",
-    render: (ctx) =>
+    //
+    // ── THE QUARTER GETS IT TOO, AS OF 4.70 ─────────────────────────────
+    //
+    // The overlap above is real and the conclusion drawn from it was wrong by
+    // one step. "Close enough to be a fair complaint" is an argument for the
+    // two not being REDUNDANT, and the flag answered a different question — it
+    // decided the quarter should have neither by default, because `recap` was
+    // `optIn` as well. A quarterly dashboard therefore shipped as a summary, a
+    // task table and a charts fence: three blocks, none of them about what was
+    // written during the quarter.
+    //
+    // BOTH FLIP TOGETHER OR NEITHER SHOULD, which is the coupling that was
+    // missing. The recap is the aggregate and the rollup is the list; a page
+    // about three months is entitled to both, and a reader who finds them
+    // repetitive removes one — which is the choice the flag was trying to
+    // give and gave by withholding both.
+    render: (ctx, opts) =>
       ctx.grain === "quarterly"
         ? {
             fence: "almanac",
             lines: [
-              "header:📖 What the months said",
+              ...(opts?.form === WIDGET_FORM ? [] : [rollupBar(ctx)]),
               // `:month`, singular, matching `month-start` and
               // `tasks-table:…,month` rather than the index's `monthly`.
               "entry-rollup:month",
@@ -627,69 +807,17 @@ export const DIARY_SECTIONS: DiarySection[] = [
           }
         : {
             fence: "almanac",
-            lines: ["header:📖 What the days said", "entry-rollup"],
+            lines: [
+              ...(opts?.form === WIDGET_FORM ? [] : [rollupBar(ctx)]),
+              "entry-rollup",
+            ],
           },
+    // OPENS THE BODY ROW, AND SO CARRIES ITS BAR — see the note on `BODY_ROW`
+    // above the catalogue for why the wording is the band's rather than this
+    // section's.
+    row: BODY_ROW,
+    questions: (ctx) => [formQuestion(rollupBar(ctx), HEADER_KEYWORD)],
     locate: (text) => probe(text, /^entry-rollup\b/m),
-  },
-  {
-    // THE REGISTRY'S OWN QUESTION, ASKED FROM HERE. `time-grid`'s three sources
-    // are declared once, in `widget-registry.ts`, and this composes the same
-    // directive — so it asks through `widgetQuestions` rather than re-typing the
-    // list. See that function for why it is exported.
-    questions: () => [
-      formQuestion("header:⏱️ The week by the hour"),
-      ...widgetQuestions("time-grid"),
-    ],
-    id: "time-grid",
-    label: "Time grid",
-    // THE REGISTRY'S SENTENCE TOO, because this is the same widget offered
-    // through a second door and a reader meeting it on a dashboard should read
-    // what a reader meeting it on a year page reads.
-    blurb: WIDGETS["time-grid"].blurb,
-    icon: WIDGETS["time-grid"].glyph,
-    // Nothing of the reader's lives here: the meetings, the log items and the
-    // tasks are in their own notes, and removing the grid removes a view of them.
-    locked: false,
-    band: "body",
-    // ── WEEKLY ALONE, AND IT IS THE DIRECTIVE THAT DECIDES ───────────────
-    //
-    // `time-grid` draws THE HOST NOTE'S WEEK: `weekStartOf` reads `week-start`
-    // from the note's frontmatter and falls back to the current week when there
-    // is none. A weekly dashboard declares `week-start`, so the grid is scoped to
-    // the period the page is about and `period-nav:week` re-scopes both together
-    // — which is the whole argument for it being a section of that page.
-    //
-    // THE OTHER THREE GRAINS DECLARE `month-start`, `quarter-start` AND
-    // `year-start`. None of those is a week, so on a monthly dashboard scoped to
-    // March the grid would draw whatever week today is in — a block about now on
-    // a page about then. A section of a period dashboard is about that period;
-    // this one could not be.
-    //
-    // AND IT IS STILL ADDABLE THERE, AS A WIDGET, which is the point of the two
-    // doors. `pageWidgetKeywords` withholds a keyword the grain's catalogue
-    // writes, so weekly offers the section and the other three offer the card —
-    // exactly the split `tasks-table` has had since 2.58.6, where a year is the
-    // grain with no Open Tasks section and a reader who wants one anyway may add
-    // it. What a reader loses on a month page is the claim that the grid is part
-    // of what a month dashboard IS, which is a claim that would not be true.
-    applies: (ctx) => ctx.grain === "weekly",
-    // OFFERED, NEVER SHIPPED. 3.9 §2. Every weekly dashboard in every vault
-    // predates this section, and a release that silently grew a seven-column
-    // grid on all of them would be deciding something for people who did not ask.
-    optIn: true,
-    render: (_ctx, opts) => ({
-      fence: "almanac",
-      lines: [
-        ...(opts?.form === WIDGET_FORM
-          ? []
-          : ["header:⏱️ The week by the hour"]),
-        widgetLine("time-grid", opts),
-      ],
-    }),
-    // MATCHES THE KEYWORD, NOT THE ARGUMENT — the rule every catalogue follows,
-    // so a reader who narrows the grid to `time-grid:events` still has a section
-    // the editor can find rather than a second one it offers to add.
-    locate: (text) => probe(text, /^time-grid\b/m),
   },
   {
     questions: (ctx) => [
@@ -712,10 +840,17 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // page-long list nobody reads (2.58.6).
     band: "body",
     applies: (ctx) => ctx.grain !== "yearly",
-    render: () => ({
-      fence: "almanac",
-      lines: ["header:⏳ Open tasks", "tasks-table:,period"],
-    }),
+    // SECOND CELL OF THE BODY ROW (4.70), SO IT COMPOSES NO BAR. The rollup
+    // beside it carries the one this fence gets — "Inside this week" is true of
+    // the still-open tasks as well, which is the whole reason these two are the
+    // pair. A toggle here would offer a second full-width strip over the same
+    // band.
+    //
+    // AND ON A YEAR IT IS NOT THERE AT ALL, which costs nothing: `rowRuns` drops
+    // the `row` line from a run of one, so a grain where only the rollup applies
+    // composes exactly the block it composed before rows existed.
+    row: BODY_ROW,
+    render: () => ({ fence: "almanac", lines: ["tasks-table:,period"] }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },
   {
@@ -919,18 +1054,37 @@ export function isOptIn(
 // guarantee `flatNoteModel` gives by adding its tail in the model rather than in
 // the catalogue, made the same way.
 
-// A dashboard section as the widget machinery needs to see it: no grain.
+// A dashboard section as the flat machinery needs to see it: no grain.
 //
-// FOR THE PROBE ONLY. `pageWidgetKeywords` asks two questions of a catalogue —
-// what does it compose, and what does its `locate` claim — and both are
-// answerable once the grain is bound. Nothing downstream of it reads this shape.
+// NOT "FOR THE PROBE ONLY" ANY MORE, AND THAT COMMENT WAS THE BUG (4.70.1).
+// It read: *"`pageWidgetKeywords` asks two questions of a catalogue … Nothing
+// downstream of it reads this shape."* True when it was written in 4.58.0, and
+// false as of the line below it in this file: `diarySectionModel` hands the same
+// conversion to `flatBlocks` and `regroupFlatNote`, which is how a period
+// dashboard's blocks and its regroup are computed at all. So the shape is read
+// by the section editor, and anything it drops the editor cannot see.
+//
+// IT DROPPED `opts`, WHICH IS THE ONE THING `hasKnownExtent` ASKS TWICE. That
+// predicate decides whether a section can be cut out of a shared fence, and it
+// asks by rendering BOTH forms: a section is loose if EITHER the section form or
+// the widget form is a single line. `render: () => s.render(ctx)` threw the
+// argument away, so both probes came back with the section form — and every
+// section that composes a `header:` bar answered "two lines" to a question whose
+// whole point is that the bar is the BAND's line and not the section's.
+//
+// Nothing showed it until 4.70, because until 4.70 no dashboard section shared a
+// fence with another, so `loose` was never consulted: a section alone in its
+// block is loose whatever its extent. The first release to compose rows here is
+// the first release where the answer mattered, and *What the entries said* — the
+// section that opens the body row and therefore carries its bar — came back
+// refused, with *Take out of the group* and *Start a page here* both disabled.
 const asFlat = (s: DiarySection, ctx: DiaryDashboardContext): FlatSection => ({
   id: s.id,
   label: s.label,
   blurb: s.blurb,
   icon: s.icon,
   locked: s.locked,
-  render: () => s.render(ctx),
+  render: (opts) => s.render(ctx, opts),
   locate: s.locate,
 });
 
@@ -1150,13 +1304,21 @@ export function composeDiaryDashboard(grain: DashboardGrain): string {
   // The set stays because the band is still the only thing that could make two
   // sections one card, and the next release that wants one should re-open this
   // line rather than rediscover the argument above it.
-  const ONE_FENCE: ReadonlySet<DiarySection["band"]> = new Set();
+  //
+  // ── AND IT IS GONE AS OF 4.70, REPLACED BY A ROW ID ──────────────────
+  //
+  // The line above invited "the next release that wants one should re-open this
+  // line rather than rediscover the argument above it". This is that release,
+  // and the answer it arrives at is that the band was never the right unit: a
+  // band is a REGION OF THE PAGE, and "these two sections are one block" is a
+  // fact about two sections. `DiarySection.row` says it directly, in the words
+  // three other catalogues already use, and `rowRuns` is the one implementation
+  // of what it means.
+  //
+  // WHAT THE BAND STILL DOES IS UNCHANGED: it decides which sections may be
+  // reordered against which, and it keeps the head above the body. It simply no
+  // longer decides what shares a fence.
   const blocks: string[] = [];
-  let run: { fence: string; band: string; lines: string[] } | null = null;
-  const flush = (): void => {
-    if (run) blocks.push(["```" + run.fence, ...run.lines, "```"].join("\n"));
-    run = null;
-  };
   // OPT-IN SECTIONS ARE NOT COMPOSED — 3.9 §2. `sectionsForDashboard` answers
   // "what may this dashboard have", which is the editor's question; this
   // function answers "what does a fresh one come with", which is a different
@@ -1166,21 +1328,12 @@ export function composeDiaryDashboard(grain: DashboardGrain): string {
   // note against this text, so a section absent here is a section repair never
   // adds — and, because `planLayout` only ever deletes a RETIRED_WIDGETS
   // keyword, never removes either once a reader has added it.
-  for (const s of sectionsForDashboard(ctx).filter((s) => !isOptIn(s, ctx))) {
-    const { fence, lines } = s.render(ctx);
-    if (
-      run &&
-      run.fence === fence &&
-      run.band === s.band &&
-      ONE_FENCE.has(s.band)
-    ) {
-      run.lines.push(...lines);
-      continue;
-    }
-    flush();
-    run = { fence, band: s.band, lines: [...lines] };
+  for (const run of rowRuns(
+    sectionsForDashboard(ctx).filter((s) => !isOptIn(s, ctx)),
+    (s) => s.render(ctx)
+  )) {
+    blocks.push(["```" + run.fence, ...run.lines, "```"].join("\n"));
   }
-  flush();
   return (
     [...frontmatter(ctx), "`almanac:spacer`"].join("\n") +
     "\n" +
@@ -1641,6 +1794,128 @@ export function planDiarySections(
   return ops;
 }
 
+// ── A ROW LOSING ONE OF ITS CELLS (4.70) ─────────────────────────────────
+//
+// THE CASE `applyDiarySections` PREDICTED AND DID NOT HANDLE. Its chunk loop
+// carries the sentence *"a chunk that lost one of two sections would need its
+// fence rewritten rather than dropped, and that is a case this release does not
+// create and must not silently mishandle if a later one does"* — written in
+// 4.19 about the masthead, which could not reach it because both its sections
+// were locked. This is the later release: `entry-rollup` and `open-tasks` share
+// a fence and BOTH are unlocked, so unticking either one is an ordinary press.
+//
+// WHAT IT DID WITHOUT THIS. `doomed.length !== run.sectionIds.length` fell
+// through to the keep-it branch, the chunk was re-emitted whole, no other op
+// fired, and `applyDiarySections` returned null — "nothing to do" — for a save
+// the reader had just made. The section window closed and the block was still
+// there.
+//
+// THE CUT ITSELF IS `cutFromFence` (4.70), shared with the journal-template
+// planner, which asks the same question of the same grammar — cut by keyword
+// rather than by line text, spare a keyword a survivor also writes, and take the
+// `row` line with the second-to-last cell. What is computed HERE is only which
+// keywords belong to whom, which is the part that needs this catalogue.
+//
+// NULL WHERE IT CANNOT SEE ITS WAY, and the caller keeps the chunk whole. That
+// is a refusal that shows — the block stays on the page and the plan says the
+// section is still there — rather than a cut that takes a line it guessed at.
+function cutFromRun(
+  lines: readonly string[],
+  doomed: readonly string[],
+  keeping: readonly string[],
+  byId: Map<string, DiarySection>,
+  ctx: DiaryDashboardContext
+): string[] | null {
+  const keywordsOf = (id: string): string[] => {
+    const section = byId.get(id);
+    if (!section) return [];
+    return section.render(ctx).lines.map((l) => splitDirective(l).keyword);
+  };
+  const spare = new Set(keeping.flatMap(keywordsOf));
+  const cutting = new Set(doomed.flatMap(keywordsOf));
+  return cutFromFence(lines, cutting, spare);
+}
+
+// ── A CELL REJOINING THE ROW IT LEFT (4.70) ──────────────────────────────
+//
+// THE OTHER HALF OF `cutFromRun`, AND THE PROPERTY IT EXISTS FOR: remove a
+// section and put it back, and the file is the file you started with. That is
+// the rule `insertionPoint` names as the reason it stops at the first section
+// that outranks the new one — *"it makes remove-then-re-add restore the file
+// exactly, which is the property worth having because it is the one a test can
+// check"* — and a cut cell breaks it, because the ordinary add path composes a
+// FENCE and the cell came out of one.
+//
+// So a section that declares a `row` looks for that row's fence first, and puts
+// its line back inside it. Only then does it fall through to a block of its own.
+//
+// WHERE IN THE FENCE: by catalogue rank, ahead of the first member that
+// outranks it. The same rule as `insertionPoint` one level in, so the two
+// cannot disagree about what order a page is in.
+//
+// AND THE `row` LINE COMES BACK WITH IT, because `cutFromRun` took it when the
+// fence fell to one cell. A fence that gained a second directive without it
+// would be two widgets stacked in one block rather than a row of two.
+//
+// FALSE FOR "NOT MY ROW", which includes the ordinary case of a row whose other
+// cells are not on the page: there is nothing to join, and a block of its own is
+// exactly right.
+function joinRowChunk(
+  chunks: { ids: string[]; lines: string[] }[],
+  section: DiarySection,
+  ctx: DiaryDashboardContext,
+  byId: Map<string, DiarySection>,
+  order: readonly string[],
+  opts: Record<string, unknown> | undefined
+): boolean {
+  if (!section.row) return false;
+  const at = chunks.findIndex(
+    (c) =>
+      c.ids.length > 0 &&
+      c.ids.every((id) => byId.get(id)?.row === section.row)
+  );
+  if (at < 0) return false;
+
+  const chunk = chunks[at];
+  const rank = order.indexOf(section.id);
+  // The first member that outranks the arrival, by the keyword it writes — the
+  // same probe `cutFromRun` cuts by, so the two agree about which line is whose.
+  const later = chunk.ids.find((id) => order.indexOf(id) > rank);
+  const laterKeywords = later
+    ? new Set(byId.get(later)?.render(ctx).lines.map((l) => splitDirective(l).keyword))
+    : null;
+  // Default: last line before the fence closes.
+  let insertAt = chunk.lines.length;
+  for (let n = chunk.lines.length - 1; n >= 0; n--) {
+    if (chunk.lines[n].trim() === "```") {
+      insertAt = n;
+      break;
+    }
+  }
+  if (laterKeywords) {
+    const found = chunk.lines.findIndex((l) =>
+      laterKeywords.has(splitDirective(l.trim()).keyword)
+    );
+    if (found >= 0) insertAt = found;
+  }
+
+  const lines = [...chunk.lines];
+  if (!lines.some((l) => isRowLine(l.trim()))) {
+    const open = lines.findIndex((l) => l.trim().startsWith("```"));
+    lines.splice(open + 1, 0, ROW_KEYWORD);
+    if (insertAt > open) insertAt++;
+  }
+  lines.splice(insertAt, 0, ...section.render(ctx, opts).lines);
+
+  chunks[at] = {
+    ids: [...chunk.ids, section.id].sort(
+      (a, b) => order.indexOf(a) - order.indexOf(b)
+    ),
+    lines,
+  };
+  return true;
+}
+
 // The dashboard with `want`'s sections, or null if nothing would change.
 //
 // SPLICES SEGMENTS VERBATIM, which is the property that makes this a
@@ -1716,6 +1991,23 @@ export function applyDiarySections(
     const lines: string[] = [];
     for (let i = run.from; i <= run.to; i++) lines.push(...segs[i].lines);
     const doomed = run.sectionIds.filter((id) => removing.has(id));
+    const keeping = run.sectionIds.filter((id) => !removing.has(id));
+    if (doomed.length && keeping.length) {
+      const cut = cutFromRun(lines, doomed, keeping, byId, ctx);
+      if (cut) {
+        let out = cut;
+        for (const id of keeping) {
+          if (!rewriting.has(id)) continue;
+          out = withAnswers(
+            out,
+            byId.get(id)?.questions?.(ctx) ?? [],
+            optionsFor(requested, id)
+          );
+        }
+        chunks.push({ ids: keeping, lines: out });
+        continue;
+      }
+    }
     if (!doomed.length || doomed.length !== run.sectionIds.length) {
       // Answers spliced into their own span; everything else in the chunk is
       // the reader's line, unchanged. See `withAnswers`.
@@ -1750,6 +2042,12 @@ export function applyDiarySections(
   for (const id of adding) {
     const section = byId.get(id);
     if (!section) continue;
+    // A CELL GOES BACK INTO ITS ROW BEFORE IT GETS A BLOCK OF ITS OWN — see
+    // `joinRowChunk`, which is what makes remove-then-re-add a round trip for a
+    // section that shares a fence.
+    if (joinRowChunk(chunks, section, ctx, byId, order, optionsFor(requested, id))) {
+      continue;
+    }
     const at = insertionPoint(chunks, order, id);
     chunks.splice(at, 0, {
       ids: [id],

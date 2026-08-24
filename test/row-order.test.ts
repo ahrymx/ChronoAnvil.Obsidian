@@ -65,8 +65,18 @@ import { readSrc } from "./sources";
 
 // The homepage's own shape, which is the arrangement every one of these bugs was
 // reported against: a banner, then a group of four, then two rows on their own.
-const ROWS = ["banner", "diary", "launcher", "tasks", "on-this-day", "journals", "charts"];
-const GROUP = ["diary", "launcher", "tasks", "on-this-day"];
+// UPDATED FOR 4.70's HOMEPAGE, AND THE BUGS ARE UNCHANGED BY IT. `upcoming`
+// took `on-this-day`'s cell, so the group is still four cells with a lone row
+// under it for `journals` to be moved over. What every case here is about — a
+// row below a group, moved past it rather than into it — needs exactly that
+// shape and does not care which widgets fill it.
+//
+// THIS IS A SHAPE, NOT THE PAGE. It is one row short of the real homepage,
+// which also composes `time-grid` between the group and `journals`; the
+// end-to-end block at the bottom of this file reads the composed note and so
+// carries that row, and says why it has to.
+const ROWS = ["banner", "diary", "launcher", "tasks", "upcoming", "journals", "charts"];
+const GROUP = ["diary", "launcher", "tasks", "upcoming"];
 
 const at = (
   rows: readonly string[] = ROWS,
@@ -133,7 +143,7 @@ describe("a cell moves inside its group and cannot leave it", () => {
   it("trades places with the cell beside it", () => {
     expect(shape(moveRow(at(), BAND, "tasks", -1))).toEqual([
       ["banner"],
-      ["diary", "tasks", "launcher", "on-this-day"],
+      ["diary", "tasks", "launcher", "upcoming"],
       ["journals"],
       ["charts"],
     ]);
@@ -144,7 +154,7 @@ describe("a cell moves inside its group and cannot leave it", () => {
     // control a reader actually presses rather than through the helper.
     expect(shape(moveRow(at(), BAND, "diary", 1))).toEqual([
       ["banner"],
-      ["launcher", "diary", "tasks", "on-this-day"],
+      ["launcher", "diary", "tasks", "upcoming"],
       ["journals"],
       ["charts"],
     ]);
@@ -155,9 +165,9 @@ describe("a cell moves inside its group and cannot leave it", () => {
     // is a button that says so; an arrow that sometimes ejected a cell is the
     // ambiguity this release exists to remove.
     expect(canMoveRow(BAND, at().joined, "diary", -1)).toBe(false);
-    expect(canMoveRow(BAND, at().joined, "on-this-day", 1)).toBe(false);
+    expect(canMoveRow(BAND, at().joined, "upcoming", 1)).toBe(false);
     expect(moveRow(at(), BAND, "diary", -1)).toBeNull();
-    expect(moveRow(at(), BAND, "on-this-day", 1)).toBeNull();
+    expect(moveRow(at(), BAND, "upcoming", 1)).toBeNull();
   });
 
   it("says which of the two things it is, before it is pressed", () => {
@@ -186,7 +196,7 @@ describe("the group itself moves as one thing", () => {
   it("is asked of any of its cells, not only the one that opens it", () => {
     // The card's arrows name the block, and the block is the same block
     // whichever member is used to find it.
-    expect(shape(moveBlock(at(), BAND, "on-this-day", 1))).toEqual(
+    expect(shape(moveBlock(at(), BAND, "upcoming", 1))).toEqual(
       shape(moveBlock(at(), BAND, "diary", 1))
     );
   });
@@ -205,7 +215,7 @@ describe("the group itself moves as one thing", () => {
     expect([...out!.paged]).toEqual(["tasks"]);
     expect(pagesOf(blockOf(out!.rows, out!.joined, "diary"), out!.paged)).toEqual([
       ["diary", "launcher"],
-      ["tasks", "on-this-day"],
+      ["tasks", "upcoming"],
     ]);
   });
 });
@@ -218,7 +228,7 @@ describe("taking one cell out of a group", () => {
     // `launcher`, `tasks` and `on-this-day` that the reader never named.
     expect(shape(takeOut(at(), BAND, "launcher"))).toEqual([
       ["banner"],
-      ["diary", "tasks", "on-this-day"],
+      ["diary", "tasks", "upcoming"],
       ["launcher"],
       ["journals"],
       ["charts"],
@@ -229,7 +239,7 @@ describe("taking one cell out of a group", () => {
     expect(shape(takeOut(at(), BAND, "diary"))).toEqual([
       ["banner"],
       ["diary"],
-      ["launcher", "tasks", "on-this-day"],
+      ["launcher", "tasks", "upcoming"],
       ["journals"],
       ["charts"],
     ]);
@@ -238,7 +248,7 @@ describe("taking one cell out of a group", () => {
   it("gives the group a new opener rather than a leading bit", () => {
     const out = takeOut(at(), BAND, "diary");
     expect(out!.joined.has("launcher")).toBe(false);
-    expect([...out!.joined].sort()).toEqual(["on-this-day", "tasks"]);
+    expect([...out!.joined].sort()).toEqual(["tasks", "upcoming"]);
   });
 
   it("ends a group of two rather than leaving one member in one", () => {
@@ -266,7 +276,7 @@ describe("breaking a group up", () => {
       ["diary"],
       ["launcher"],
       ["tasks"],
-      ["on-this-day"],
+      ["upcoming"],
       ["journals"],
       ["charts"],
     ]);
@@ -395,9 +405,9 @@ describe("dragging", () => {
   });
 
   it("reorders cells inside one group", () => {
-    expect(shape(dropCell(at(), BAND, "on-this-day", "launcher"))).toEqual([
+    expect(shape(dropCell(at(), BAND, "upcoming", "launcher"))).toEqual([
       ["banner"],
-      ["diary", "on-this-day", "launcher", "tasks"],
+      ["diary", "upcoming", "launcher", "tasks"],
       ["journals"],
       ["charts"],
     ]);
@@ -438,7 +448,7 @@ describe("the bits stay describable", () => {
     const out = moveRow(a, BAND, "tasks", -1);
     expect(pagesOf(blockOf(out!.rows, out!.joined, "diary"), out!.paged)).toEqual([
       ["diary", "tasks"],
-      ["launcher", "on-this-day"],
+      ["launcher", "upcoming"],
     ]);
   });
 
@@ -488,6 +498,24 @@ describe("the file it all comes out as", () => {
   const model = homeSectionModel(DEFAULT_PATHS.diaryRoot, "");
   const home = (): string => composeHomeNote(DEFAULT_PATHS.diaryRoot);
 
+  // THE PAGE, WHERE EVERYTHING ABOVE USED A SHAPE. `apply` writes the note the
+  // list describes, so a list that is one row short of the homepage does not
+  // exercise `regroup` — it deletes a block first and asks about what is left.
+  // These are the ids `composeHomeNote` actually writes, in the order it writes
+  // them: the group of four, then `time-grid` as a block of its own, then the
+  // two lone rows.
+  const PAGE = [
+    "banner", "diary", "launcher", "tasks", "logbook",
+    "time-grid", "journals", "charts",
+  ];
+  const PAGE_GROUP = ["diary", "launcher", "tasks", "logbook"];
+  const at = (): Arrangement => ({
+    rows: PAGE,
+    joined: new Set(PAGE_GROUP.slice(1)),
+    paged: new Set<string>(["logbook"]),
+  });
+  const BAND = PAGE;
+
   const fenceOf = (text: string): string[] => {
     const all = text.split("\n");
     const from = all.indexOf("row");
@@ -501,7 +529,7 @@ describe("the file it all comes out as", () => {
   // getting a correct "nothing to do" back.
   const written = (out: Arrangement | null): string => {
     const base = model.apply(home(), [...(out?.rows ?? [])]) ?? home();
-    return model.regroup?.(base, shape(out), []) ?? base;
+    return model.regroup?.(base, shape(out), out?.paged ? [...out.paged] : []) ?? base;
   };
 
   it("writes a row joined from further down into the group's fence", () => {
@@ -510,7 +538,7 @@ describe("the file it all comes out as", () => {
     // move has to land inside somebody else's fence rather than beside it.
     //
     // THE TRIP, IN THE PRESSES A READER WOULD MAKE. Take the diary card out of
-    // the top row, walk it down past the journals card, then put it back in the
+    // the top row, walk it down past the time grid, then put it back in the
     // group from where it now is — which is two blocks away, and is the press
     // that had no control before this release.
     //
@@ -523,19 +551,21 @@ describe("the file it all comes out as", () => {
     out = moveBlock(out!, out!.rows, "diary", 1);
     expect(shape(out)).toEqual([
       ["banner"],
-      GROUP.slice(1),
-      ["journals"],
+      PAGE_GROUP.slice(1),
+      ["time-grid"],
       ["diary"],
+      ["journals"],
       ["charts"],
     ]);
-    out = joinInto(out!, out!.rows, "diary", "tasks");
+    out = joinInto(out!, out!.rows, "diary", "logbook");
     // It came from below, so it arrives as the group's LAST column — the group
     // it left, with its first cell now its fourth, which is what "put it back
     // from over here" honestly means.
     const next = written(out);
     expect(model.blocks?.(next)?.map((b) => b.ids)).toEqual([
       ["banner"],
-      [...GROUP.slice(1), "diary"],
+      [...PAGE_GROUP.slice(1), "diary"],
+      ["time-grid"],
       ["journals"],
       ["charts"],
     ]);
@@ -550,8 +580,9 @@ describe("the file it all comes out as", () => {
     expect(fenceOf(next)).toEqual(fenceOf(home()));
     expect(model.blocks?.(next)?.map((b) => b.ids)).toEqual([
       ["banner"],
+      PAGE_GROUP,
       ["journals"],
-      GROUP,
+      ["time-grid"],
       ["charts"],
     ]);
   });
@@ -563,6 +594,7 @@ describe("the file it all comes out as", () => {
     const next = written(moveRow(at(), BAND, "journals", -1));
     expect(next.split("\n").filter((l) => l === "row")).toHaveLength(1);
     expect(next.split("\n").filter((l) => l === "cell")).toHaveLength(1);
+    expect(next.split("\n").filter((l) => l === "tab")).toHaveLength(1);
   });
 });
 

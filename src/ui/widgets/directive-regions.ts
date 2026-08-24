@@ -61,6 +61,7 @@ import {
 import { buildLinks } from "../../core/links";
 import { buildOnThisDay, buildTimeline } from "../../diary/diary-retrieval";
 import { buildJournalSearch } from "../../journals/journal-search";
+import { buildJournalRecent } from "../../journals/journal-recent";
 import { journalFolderScope } from "../../journals/journal";
 import {
   buildJournalsHeader,
@@ -550,6 +551,29 @@ export function buildJournalSearchRegion(
   const file = fileOfCtx(plugin, ctx);
   const hostFolder = file?.parent?.path ?? null;
   return buildJournalSearch(plugin, ctx, rest, hostFolder);
+}
+
+export function buildJournalRecentRegion(
+  plugin: AlmanacPlugin,
+  rest: string,
+  ctx: MarkdownPostProcessorContext
+): HTMLElement | null {
+  // `journal-recent` (host folder) / `:all` / `:journal` / `:<folder>`, then
+  // `|N` — the same scope grammar `review-queue` and `journal-search` take,
+  // through the same `journalFolderScope`.
+  //
+  // LIVE-SCOPED, UNLIKE THE SEARCH BESIDE IT. The search is unwrapped because a
+  // rebuild would tear out the input mid-keystroke; this has no input to lose,
+  // and "what did I write lately" is the one list on the page that is WRONG the
+  // moment a note is written. `liveScopedWidget` takes one folder, so a
+  // multi-root scope watches the first — see the note there; the vault-wide
+  // repaint on `all` is `""`, which matches every path.
+  const file = fileOfCtx(plugin, ctx);
+  const hostFolder = file?.parent?.path ?? null;
+  const folders = journalFolderScope(plugin, rest.split("|")[0].trim(), hostFolder);
+  return liveScopedWidget(plugin, ctx, folders.length === 1 ? folders[0] : "", () =>
+    buildJournalRecent(plugin, rest, ctx, hostFolder)
+  );
 }
 
 export function buildTagIndexRegion(

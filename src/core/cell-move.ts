@@ -161,7 +161,7 @@ const STRUCTURE = new Set<string>([
 // nothing.
 function isContent(line: string): boolean {
   const t = line.trim();
-  if (!t || t.startsWith("#")) return false;
+  if (!t || t.startsWith("#") || t.startsWith("```")) return false;
   if (isRowLine(t) || isCellLine(t) || isFrameLine(t)) return false;
   return !STRUCTURE.has(splitDirective(t).keyword);
 }
@@ -599,7 +599,7 @@ function opensSomething(body: readonly string[], i: number): boolean {
   return false;
 }
 
-function tidyCells(body: readonly string[]): string[] {
+export function tidyCells(body: readonly string[]): string[] {
   return body.filter((line, i) => !isCellLine(line) || opensSomething(body, i));
 }
 
@@ -626,7 +626,7 @@ function opensPage(body: readonly string[], i: number): boolean {
 // empty. `tabSlices` already declines to draw it, so this is not a correctness
 // fix; it is not leaving a line in the reader's file that describes a page that
 // is not there.
-function tidyTabs(body: readonly string[]): string[] {
+export function tidyTabs(body: readonly string[]): string[] {
   return body.filter((line, i) => !isTabLine(line) || opensPage(body, i));
 }
 

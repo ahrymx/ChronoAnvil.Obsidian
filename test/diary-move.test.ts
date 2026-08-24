@@ -26,6 +26,7 @@ import {
   sectionsForDashboard,
   DIARY_SECTIONS,
   diarySectionModel,
+  parseDiarySections,
 } from "../src/diary/diary-sections";
 import {
   composeEntryTemplate,
@@ -278,11 +279,26 @@ describe("a dashboard reorders too", () => {
     // alone does not deliver: a pinned banner stops nobody from dragging the
     // charts above it, and the band does.
     const head = ["banner"];
-    const body = present.filter((id) => !head.includes(id));
     const next = applyDiarySections(text, { grain: "monthly" }, want)!;
+    // ── A ROW REVERSES AS ONE THING (4.70) ─────────────────────────────
+    //
+    // The reversal used to be a plain reverse of the body, because every body
+    // section was its own fence. `entry-rollup` and `tasks-table` are now one
+    // ROW, which is one fence and therefore one chunk — and a chunk moves whole,
+    // keeping the order of the cells inside it.
+    //
+    // THAT IS THE SAME ANSWER THE HOMEPAGE GIVES, and it is the answer a reader
+    // has already been given by the section editor: `row-order.ts` moves a group
+    // as a unit and has a SEPARATE operation for moving a cell inside one, on
+    // the argument that a group a keypress can take apart is not a group. What
+    // would be wrong is the row silently coming apart in the file, which is
+    // exactly what 4.53.2 fixed on the other surface.
     expect(detectDiarySections(next, { grain: "monthly" })).toEqual([
       ...head,
-      ...[...body].reverse(),
+      "charts",
+      "entry-rollup",
+      "open-tasks",
+      "summary",
     ]);
   });
 
@@ -740,11 +756,37 @@ describe("the pin restricts the editor without relocating anyone's file", () => 
 
     const next = applyDiarySections(text, { grain: "monthly" }, want);
     expect(next).not.toBeNull();
-    const after = detectDiarySections(next!, { grain: "monthly" });
     // The masthead is still where the author left it. It is one row as of 4.19
     // rather than two — the navigation half moved up into the banner — so what
     // is asserted is its position rather than its internal order.
-    expect(after.indexOf("summary")).toBe(ids.indexOf("summary"));
+    //
+    // ── BY BLOCK, NOT BY SECTION ID, AS OF 4.70 ────────────────────────
+    //
+    // This compared `indexOf("summary")` in the two flat lists of section ids,
+    // which was the same question until a body block could hold TWO sections.
+    // The rollup and the tasks table are one row now, so the id list counts
+    // three things before the summary and the file holds two blocks — and the
+    // summary "moving" from index 3 to index 2 is the row passing it, which is
+    // what the reorder was asked to do.
+    //
+    // The property is about SLOTS: three body blocks, the outer two trade, and
+    // the summary is left in the middle exactly where the author put it.
+    const blocks = (t: string): string[][] =>
+      parseDiarySections(t, { grain: "monthly" })
+        .filter((r) => r.sectionIds.length)
+        .map((r) => r.sectionIds);
+    expect(blocks(text)).toEqual([
+      ["banner"],
+      ["entry-rollup", "open-tasks"],
+      ["summary"],
+      ["charts"],
+    ]);
+    expect(blocks(next!)).toEqual([
+      ["banner"],
+      ["charts"],
+      ["summary"],
+      ["entry-rollup", "open-tasks"],
+    ]);
   });
 });
 

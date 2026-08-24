@@ -59,17 +59,23 @@ import {
   runsOf,
   setPageBreaks,
   tabSlices,
+  tidyCells,
+  tidyHeights,
+  tidyTabs,
   widgetRun,
 } from "./cell-move";
 import type { CellTarget } from "./cell-move";
 import {
   CELL_KEYWORD,
+  TAB_KEYWORD,
   LINKS_KEYWORD,
   MAX_COLUMNS,
   dealInto,
   ROW_KEYWORD,
   TITLE_KEYWORD,
   WIDE_KEYWORD,
+  HEADER_KEYWORD,
+  isCellLine,
   isHeightLine,
   isLinksLine,
   isRowLine,
@@ -79,6 +85,8 @@ import {
   parseWide,
   argSpansIn,
   readArg,
+  splitDirective,
+  undoRowOfOne,
 } from "./directive-grammar";
 import {
   BlockView,
@@ -199,6 +207,7 @@ export interface FlatSection {
   // reason: a section added back arrives in a block of its own rather than
   // writing itself into a cell the reader may have rearranged since.
   cell?: string;
+  tab?: boolean;
   render: (opts?: Record<string, unknown>) => { fence: string; lines: string[] };
   // What this section can be asked, and where the answer is written.
   //
@@ -583,15 +592,77 @@ export function mergeBannerFences(text: string): string | null {
 //
 // The spacer is line 0 for the reason the banner's is: it stops a click at the
 // top of the note landing inside the first widget.
-export function composeFlatNote(sections: readonly FlatSection[]): string {
-  // ROWS ARE THE ONE MERGE, AND THEY ARE NOT THE MERGE THE PARAGRAPH ABOVE
-  // FORBIDS. What that one warns against is welding a BAND into a fence —
-  // fusing sections that merely follow each other, which would collapse the
-  // page. A row is the opposite: a run of sections that have SAID they are one
-  // block, named by `row`, and a section without the field is untouched.
+// ── one row rule, four catalogues ─────────────────────────────────────
+
+// What `rowRuns` needs to know about a section, and the whole of it.
+//
+// TWO OPTIONAL FIELDS AND NO ID. Every catalogue's section type carries these
+// two under the names and the meanings `FlatSection.row` and `FlatSection.cell`
+// argue for at length; nothing here needs to know which type it has been handed,
+// which is `SectionModel`'s discipline applied to composition rather than to
+// editing.
+export interface RowMember {
+  row?: string;
+  cell?: string;
+  tab?: boolean;
+}
+
+// A catalogue's sections, grouped into the fences they compose to. 4.70.
+//
+// ── WHY THIS IS A FUNCTION AND NOT FOUR COPIES OF A LOOP ─────────────────
+//
+// The rule was `composeFlatNote`'s alone until this release, because flat notes
+// were the only surface whose section type had a `row` field. 4.70 gives the
+// other three the same field, and a rule stated four times is four things that
+// can disagree about what a `cell` line means — which is the fault
+// `dealInto` was hoisted to prevent one level down, in this same grammar, for
+// exactly this reason.
+//
+// So the decision lives here once and the four composers differ only in what
+// they do with the runs afterwards: a flat note joins them with a spacer on top,
+// a dashboard adds its graph links, an entry template partitions by band first,
+// and a journal template has markdown blocks between them.
+//
+// ── WHAT IT DECIDES ──────────────────────────────────────────────────────
+//
+// A run continues while the row id holds AND the fence kind holds. The second
+// condition is not hypothetical: a charts section is an `almanac-charts` fence
+// and could never share a block with an `almanac` one, and a catalogue that
+// asked for it would otherwise compose a fence whose kind silently belongs to
+// whichever section came first.
+//
+// The `row` line goes in first, before any directive, which is where a reader
+// would type it and where `parseRow` reads it from regardless.
+//
+// ── OPT-IN IS THE CALLER'S ───────────────────────────────────────────────
+//
+// Every catalogue spells "not composed by default" differently — `optIn` is a
+// boolean here, a predicate on the diary side, and `chosenSectionIds` on the
+// journal side — so the members handed in are the ones that are actually being
+// written. That also keeps `divided` honest: an opt-in section declaring a cell
+// must not put a delimiter into a row it is not in.
+export function rowRuns<T extends RowMember>(
+  members: readonly T[],
+  render: (member: T) => { fence: string; lines: string[] },
+  // WHETHER A MEMBER WITH NO ROW OF ITS OWN JOINS THE ONE BEFORE IT. 4.70.
   //
-  // The `row` line goes in first, before any directive, which is where a reader
-  // would type it and where `parseRow` reads it from regardless.
+  // FALSE IS "A SECTION IS A BLOCK", which is what a flat note, a dashboard and
+  // a journal template all mean: a section that has not asked to share takes a
+  // fence of its own, and that is the shape those three have always composed.
+  //
+  // TRUE IS "A BAND IS A BLOCK", which is what a diary ENTRY means and what its
+  // composer has hardcoded since 3.2 patch 2 — see `composeEntryTemplate`, where
+  // the argument for one fence per band is made in full. An entry's shared band
+  // is a single card holding Focus, Highlights, Challenges and the rest, and
+  // splitting it per section would put a border between every field on the page.
+  //
+  // WHAT IT DOES NOT DO IS WELD ACROSS A ROW. An unrowed member joins the run
+  // before it only when that run is also unrowed; one that follows a row starts
+  // a new block instead. Without that clause the first field after a two-cell
+  // row would silently become its third cell — a column the reader never asked
+  // for, in a fence they cannot see the shape of.
+  weld = false
+): { fence: string; lines: string[] }[] {
   // WHICH ROWS DIVIDE THEMSELVES AT ALL, computed before the loop. A row where
   // nobody declares a cell composes with no `cell` lines — the 4.2 markup,
   // unchanged — and one where somebody does gets a delimiter wherever the id
@@ -599,41 +670,84 @@ export function composeFlatNote(sections: readonly FlatSection[]): string {
   // delimiter between every pair, which renders identically and reads as noise
   // the reader did not write.
   const divided = new Set(
-    sections.filter((s) => !s.optIn && s.row && s.cell !== undefined).map((s) => s.row)
+    members.filter((s) => s.row && s.cell !== undefined).map((s) => s.row)
   );
   // Two sections share a cell only when both NAME the same one. Absent is not a
   // value: it means "a cell of my own", so two of them are two cells.
   const sameCell = (a: string | undefined, b: string | undefined): boolean =>
     a !== undefined && a === b;
 
-  const runs: { fence: string; lines: string[] }[] = [];
-  let openRow: string | null = null;
+  const runs: { fence: string; lines: string[]; members: number }[] = [];
+  let openRow: string | undefined;
   let openCell: string | undefined;
-  for (const s of sections) {
-    if (s.optIn) continue;
-    const { fence, lines } = s.render();
+  for (const s of members) {
+    const { fence, lines } = render(s);
     const last = runs[runs.length - 1];
-    // A row continues only while the id AND the fence kind hold. The second
-    // condition is not hypothetical: the charts section is an `almanac-charts`
-    // fence and could never share a block with an `almanac` one, and a
-    // catalogue that asked for it would otherwise compose a fence whose kind
-    // silently belongs to whichever section came first.
-    if (s.row && s.row === openRow && last && last.fence === fence) {
-      // The delimiter goes in only where the cell CHANGES, and never before the
+    const continues =
+      last !== undefined &&
+      last.fence === fence &&
+      (s.row !== undefined ? s.row === openRow : weld && openRow === undefined);
+    if (continues) {
+      // The delimiter goes in only where the cell or page CHANGES, and never before the
       // first member — that one opens the row's first cell by being first, and
-      // a leading delimiter would be a `cell` line the reader has to read past
+      // a leading delimiter would be a line the reader has to read past
       // to find out it means nothing.
-      if (divided.has(s.row) && !sameCell(openCell, s.cell)) {
+      if (s.tab) {
+        last.lines.push(TAB_KEYWORD);
+      } else if (divided.has(s.row) && !sameCell(openCell, s.cell)) {
         last.lines.push(CELL_KEYWORD);
       }
       last.lines.push(...lines);
+      last.members += 1;
       openCell = s.cell;
       continue;
     }
-    openRow = s.row ?? null;
+    openRow = s.row;
     openCell = s.cell;
-    runs.push({ fence, lines: s.row ? [ROW_KEYWORD, ...lines] : [...lines] });
+    runs.push({
+      fence,
+      lines: s.row ? [ROW_KEYWORD, ...lines] : [...lines],
+      members: 1,
+    });
   }
+  // A ROW OF ONE IS NOT A ROW, and it is composed as though it had never been
+  // asked for. 4.70.
+  //
+  // WHY THIS ARRIVED WITH THE OTHER THREE CATALOGUES. A flat note's membership
+  // is fixed — the homepage's row has had the same four sections since 4.2 — so
+  // a run could not lose members and the case never came up. A dashboard's does:
+  // `applies` is per grain, so a row pairing the entry rollup with the open-task
+  // table is two cells on a week and one on a year, where the rollup does not
+  // apply. Left in, that composes `row` over a single directive — a line that
+  // renders identically to no line at all and that a reader would have to read
+  // past to discover means nothing, which is the same objection `divided`
+  // already makes about a `cell` delimiter nobody asked for.
+  //
+  // DECIDED HERE RATHER THAN BY THE CATALOGUE, because the alternative is every
+  // row id becoming a function of the context — four catalogues each restating
+  // which of their sections happen to coincide on which grain, and each able to
+  // get it wrong in a way that only shows up in composed markdown.
+  return runs.map(({ fence, lines, members }) =>
+    members === 1 && lines[0] === ROW_KEYWORD
+      ? { fence, lines: lines.slice(1) }
+      : { fence, lines }
+  );
+}
+
+export function composeFlatNote(sections: readonly FlatSection[]): string {
+  // ROWS ARE THE ONE MERGE, AND THEY ARE NOT THE MERGE THE PARAGRAPH ABOVE
+  // FORBIDS. What that one warns against is welding a BAND into a fence —
+  // fusing sections that merely follow each other, which would collapse the
+  // page. A row is the opposite: a run of sections that have SAID they are one
+  // block, named by `row`, and a section without the field is untouched.
+  //
+  // THE RULE ITSELF MOVED TO `rowRuns` IN 4.70, when the other three catalogues
+  // gained the same two fields. Nothing about what this composes changed; see
+  // that function for why one copy rather than four.
+  const runs = rowRuns(
+    sections.filter((s) => !s.optIn),
+    (s) => s.render()
+  );
   const blocks = runs.map((r) =>
     ["```" + r.fence, ...r.lines, "```"].join("\n")
   );
@@ -1367,6 +1481,166 @@ export function planFlatSections(
 // than a formatter: every untouched run is re-emitted as the exact lines it was
 // read as, so a reader's blank lines, indentation and hand-written blocks all
 // survive byte-for-byte.
+// ── A FLAT NOTE'S ROW LOSING A CELL, AND GETTING IT BACK (4.70) ──────────
+//
+// THE HOMEPAGE HAS COMPOSED A ROW SINCE 4.2 AND NEITHER HALF OF THIS WORKED.
+// Untick Launcher and the fence loses its line correctly; tick it again and it
+// comes back as a BLOCK OF ITS OWN, above the row it was a cell of. The page
+// the reader restored is not the page they started with, and the only way back
+// is to drag the widget into the group by hand. Four years of releases and one
+// test away from being noticed: `dashboard-sections.test.ts` checks exactly this
+// round trip, and picks the first freely removable section on each page — which
+// on all three of its pages was one that had no row.
+//
+// 4.70 PUT ROWS ON THOSE PAGES, so the test found it. The fix is the pair
+// `diary-sections.ts` names in full — read `cutFromRun` and `joinRowChunk`
+// there for the argument, which is the same argument and is not restated here.
+// What differs is only what each catalogue can see: a flat note cuts by LINE,
+// because `parseFlatSections` recorded which line is whose and `hasKnownExtent`
+// has already refused the sections whose extent is a guess.
+
+// Does this section compose a title bar of its own?
+//
+// ONLY ASKED OF A SECTION WHOSE EXTENT IS KNOWN, so its widget form is one line
+// and a `header:` in its section form is therefore the bar the toggle drops.
+// That is what makes the line above an anchor attributable at all.
+const isBarLine = (line: string): boolean =>
+  splitDirective(line.trim()).keyword === HEADER_KEYWORD;
+
+const composesBar = (section: FlatSection | undefined): boolean => {
+  if (!section) return false;
+  const lines = section.render().lines;
+  return (
+    lines.length > 1 && splitDirective(lines[0]).keyword === HEADER_KEYWORD
+  );
+};
+
+// A ROW OF ONE IS NOT A ROW — `undoRowOfOne` in `directive-grammar.ts` is the
+// rule and the argument, shared with the two catalogues that cut by keyword
+// rather than by line.
+//
+// ASKED ONLY WHERE THE CATALOGUE WROTE THE ROW, which the caller decides and is
+// the whole of what keeps this a reconciler. A reader's own `row:cards` fence
+// holding two `journal-card:` widgets is a row THEY made, out of widget sections
+// that declare no `row` at all; cutting one of the two must leave their grammar
+// exactly as they typed it, argument included. So the caller asks it only when
+// every section in the run declares a row, which is true of a composed one and
+// false of every hand-built fence.
+
+// A section that declares a row rejoins that row's fence instead of composing a
+// block. False for "no row of mine on this page", which is the ordinary case and
+// where a block of its own is exactly right.
+function joinFlatRowChunk(
+  chunks: { ids: string[]; lines: string[] }[],
+  section: FlatSection,
+  byId: Map<string, FlatSection>,
+  order: readonly string[],
+  opts: Record<string, unknown> | undefined
+): boolean {
+  if (!section.row) return false;
+  const at = chunks.findIndex(
+    (c) =>
+      c.ids.length > 0 && c.ids.every((id) => byId.get(id)?.row === section.row)
+  );
+  if (at < 0) return false;
+
+  const chunk = chunks[at];
+  const rank = order.indexOf(section.id);
+  // Ahead of the first member that outranks it, found by the keyword that
+  // member writes — the same probe the cut above works by, so the two cannot
+  // disagree about which line belongs to whom.
+  const later = chunk.ids.find((id) => order.indexOf(id) > rank);
+  const laterKeywords = later
+    ? new Set(
+        (byId.get(later)?.render().lines ?? []).map(
+          (l) => splitDirective(l).keyword
+        )
+      )
+    : null;
+  let insertAt = chunk.lines.length;
+  for (let n = chunk.lines.length - 1; n >= 0; n--) {
+    if (chunk.lines[n].trim() === "```") {
+      insertAt = n;
+      break;
+    }
+  }
+  if (laterKeywords) {
+    const found = chunk.lines.findIndex((l) =>
+      laterKeywords.has(splitDirective(l.trim()).keyword)
+    );
+    if (found >= 0) insertAt = found;
+  }
+
+  const lines = [...chunk.lines];
+  // The `row` line comes back with the cell, because the cut took it when the
+  // fence fell to one widget. A fence that gained a second directive without it
+  // would be two widgets stacked in one block rather than a row of two.
+  if (!lines.some((l) => isRowLine(l.trim()))) {
+    const open = lines.findIndex((l) => l.trim().startsWith("```"));
+    lines.splice(open + 1, 0, ROW_KEYWORD);
+    if (insertAt > open) insertAt++;
+  }
+
+  // ── AND THE `cell` DELIMITER, WHERE THE ROW HAS ONE ──────────────────
+  //
+  // `rowRuns` writes a delimiter only where the cell id CHANGES and only in a
+  // row where somebody named one, so an arrival has to answer the same question
+  // about the one place it is landing: does the member ahead of me sit in a
+  // different cell? The homepage is the page that makes this concrete — its row
+  // is `diary:3` in one cell and three widgets stacked in the other — and
+  // without this, re-adding the first of those three would put it in the diary
+  // card's column.
+  //
+  // A DELIMITER ALREADY THERE IS THE ANSWER, NOT A SECOND ONE. Cutting one of
+  // several cells leaves the fence's `cell` lines exactly where they were, so
+  // the commonest rejoin lands directly after one and needs nothing added.
+  // Arriving FIRST is the mirror image: the delimiter above the insert point
+  // belongs between this section and the one below it, so the arrival goes
+  // ABOVE it rather than gaining one of its own.
+  const rowMembers = order.filter((id) => byId.get(id)?.row === section.row);
+  const divided = rowMembers.some((id) => byId.get(id)?.cell !== undefined);
+  const sameCell = (a: string | undefined, b: string | undefined): boolean =>
+    a !== undefined && a === b;
+  const before = chunk.ids.filter((id) => order.indexOf(id) < rank);
+  const prev = before.length ? before[before.length - 1] : undefined;
+  let delimiter: string | false = false;
+  if (section.tab) {
+    delimiter = !(insertAt > 0 && isTabLine(lines[insertAt - 1].trim()))
+      ? TAB_KEYWORD
+      : false;
+  } else if (prev !== undefined) {
+    delimiter =
+      divided &&
+      !sameCell(byId.get(prev)?.cell, section.cell) &&
+      !(insertAt > 0 && isCellLine(lines[insertAt - 1].trim()))
+        ? CELL_KEYWORD
+        : false;
+  } else if (insertAt > 0 && isCellLine(lines[insertAt - 1].trim())) {
+    insertAt--;
+  } else if (later !== undefined) {
+    delimiter =
+      divided && !sameCell(section.cell, byId.get(later)?.cell)
+        ? CELL_KEYWORD
+        : false;
+  }
+
+  lines.splice(
+    insertAt,
+    0,
+    ...section.render(opts).lines,
+    ...(delimiter && prev === undefined ? [delimiter] : [])
+  );
+  if (delimiter && prev !== undefined) lines.splice(insertAt, 0, delimiter);
+
+  chunks[at] = {
+    ids: [...chunk.ids, section.id].sort(
+      (a, b) => order.indexOf(a) - order.indexOf(b)
+    ),
+    lines,
+  };
+  return true;
+}
+
 export function applyFlatSections(
   text: string,
   spec: FlatNoteSpec,
@@ -1439,14 +1713,30 @@ export function applyFlatSections(
     // and the two answers together are what makes "a height cannot be orphaned"
     // true of every path rather than of most of them.
     if (doomed.length && doomed.length !== run.sectionIds.length) {
+    //
+    // AND ITS `header:` BAR, ON EXACTLY THE SAME ARGUMENT ONE LINE FURTHER UP
+    // (4.70). A bar composed by a cell is that cell's — `composesBar` is what
+    // decides so, and only a section whose widget form is a single line can
+    // answer yes. Left behind, it titles whichever cell moved up into the gap,
+    // which is the `height:` failure again with a label on it.
       const cut = new Set<number>();
       for (const id of doomed) {
         const at = cellLineIn(byId.get(id), run);
         if (at === null) continue;
         cut.add(at);
-        if (at > 0 && isHeightLine(lines[at - 1])) cut.add(at - 1);
+        let above = at - 1;
+        if (above > 0 && isHeightLine(lines[above])) {
+          cut.add(above);
+          above--;
+        }
+        if (above > 0 && composesBar(byId.get(id)) && isBarLine(lines[above])) {
+          cut.add(above);
+        }
       }
-      lines = lines.filter((_, i) => !cut.has(i));
+      const remaining = tidyHeights(tidyCells(tidyTabs(lines.filter((_, i) => !cut.has(i)))));
+      lines = run.sectionIds.every((id) => byId.get(id)?.row !== undefined)
+        ? undoRowOfOne(remaining)
+        : remaining;
     }
     // ALL OF THE RUN'S SECTIONS, OR NONE OF THEM — the whole-block path, which
     // is unchanged and still the only one that deletes a fence. A block emptied
@@ -1481,6 +1771,15 @@ export function applyFlatSections(
   for (const id of adding) {
     const section = byId.get(id);
     if (!section) continue;
+    // A CELL GOES BACK INTO ITS ROW, NOT BESIDE IT. `joinFlatRowChunk` is what
+    // makes remove-then-re-add a round trip for a grouped section; everything
+    // below is the block path, unchanged, and is what runs when the row is not
+    // on this page.
+    if (
+      joinFlatRowChunk(chunks, section, byId, order, optionsFor(requested, id))
+    ) {
+      continue;
+    }
     const at = insertionPoint(chunks, order, id);
     const body = renderFlatSection(section, optionsFor(requested, id)).split(
       "\n"
@@ -1621,7 +1920,9 @@ export function answersOn(
       continue;
     }
     if (!q.directive) continue;
-    const span = argSpansIn(lines, q.directive).find((sp) => sp.line === line);
+    const span = argSpansIn(lines, q.directive, Infinity, q.part?.join).find(
+      (sp) => sp.line === line
+    );
     if (!span) continue;
     const whole = readArg(lines, span);
     // A COMPOUND ARGUMENT IS READ BACK THROUGH THE FUNCTION THAT WROTE IT

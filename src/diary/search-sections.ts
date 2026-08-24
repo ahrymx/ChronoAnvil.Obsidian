@@ -34,6 +34,27 @@ import { WIDGET_FORM, formQuestion, type SectionModel } from "../core/section-mo
 
 const probe = (text: string, re: RegExp): number => text.search(re);
 
+// ── 4.70 LOOKED AT THIS PAGE FOR A ROW AND DID NOT FIND ONE ──────────────
+//
+// The release is about default layouts, and every other flat note in the vault
+// gained a two-column band. This one did not, which is a decision and is worth
+// the paragraph so the next reader does not read it as the page having been
+// missed.
+//
+// THREE SECTIONS, EACH FULL WIDTH FOR ITS OWN REASON. `diary-search` is a
+// search box with a filter row — half a page of it is a text field you cannot
+// read your own query in. `timeline` is every entry ever written, grouped by
+// month, and a column halves how much of it is on screen. That leaves
+// `on-this-day` as the only candidate, and a cell needs two.
+//
+// THE PLAN'S SUGGESTION WAS `upcoming` BESIDE IT, AND IT IS WRONG HERE. Search
+// is the page you go to on purpose to find something you already wrote; the
+// next five events are neither written nor found. That widget's home is the
+// homepage, where the page's tense is now.
+//
+// A PAGE THAT IS ALREADY SHORT DOES NOT NEED SHORTENING, which is the measure
+// the rest of this release used: the diary dashboard went from seven blocks to
+// five because seven was a scroll. Four is not.
 export const SEARCH_SECTIONS: FlatSection[] = [
   // THE BANNER, FIRST. 4.10 — the head; 4.19 — the banner. Until 4.10 the only
   // route to the section editor on this note was the command palette:

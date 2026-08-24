@@ -50,7 +50,14 @@ import {
 } from "../core/section-model";
 import { regionHasContent } from "../core/notestore";
 import { TRACKER_MARK_END, TRACKER_MARK_START } from "../core/constants";
-import { BANNER_ID, graphLinksSection } from "../core/note-sections";
+import { BANNER_ID, graphLinksSection, rowRuns } from "../core/note-sections";
+import {
+  MODIFIER_KEYWORDS,
+  ROW_KEYWORD,
+  isCellLine,
+  isRowLine,
+  splitDirective,
+} from "../core/directive-grammar";
 import type { TrackerClass } from "../trackers/trackers";
 
 export interface EntrySectionContext {
@@ -165,6 +172,20 @@ export interface EntrySection {
   // below would file it with Highlights and Notes. So an entry has three fences
   // above the rule's two, and the third is the one this field adds.
   fence: "own" | "trackers" | "shared";
+  // Which composed ROW this section is a cell of, and which CELL of it — 4.70.
+  //
+  // `FlatSection.row` AND `.cell`'s MEANINGS, argued in full there. What is
+  // particular to an entry is what happens to a section that declares NEITHER,
+  // and it is not what happens on the other three surfaces: a band of an entry
+  // is ONE fence, so an unrowed section joins the block beside it rather than
+  // taking one of its own. See `rowRuns`' `weld` parameter, which is that rule.
+  //
+  // A ROW MAY NOT CROSS A BAND, and nothing here has to enforce that: the
+  // composer runs each band separately, so two sections in different bands are
+  // never candidates to share a run however they are labelled. That is `fence`
+  // being a property rather than a position, one more time.
+  row?: string;
+  cell?: string;
   // Whether this section persists into a note region of its own, keyed by its
   // id. True for every section that ships, and the assumption three separate
   // pieces of machinery were written on before 3.8 made one that isn't.
@@ -268,7 +289,15 @@ const on = (
   return (ctx) => map[ctx.grain] ?? null;
 };
 
-// Ordered as they appear in the fence, which is the order on screen.
+// ── SINGLE COLUMN ENTRIES ────────────────────────────────────────────────
+//
+// Entries stack each section in a single column rather than multi-column rows.
+// Multi-column rows squeeze multi-line textareas and task lists, leading to
+// cramped inputs and border collision anomalies against outer containers.
+// Keeping entries strictly single-column gives each field (Focus, Tasks,
+// Highlights, Challenges, Notes, Attachments, Captured) full width and
+// consistent visual hierarchy.
+
 export const ENTRY_SECTIONS: EntrySection[] = [
   {
     id: BANNER_ID,
@@ -336,8 +365,8 @@ export const ENTRY_SECTIONS: EntrySection[] = [
     // the file's name, its navigation and the control that edits it. The grid is
     // none of those — it is the note's most-used CONTENT — and it was in the
     // banner for a reason that had nothing to do with what it is: the markers
-    // needed somewhere to live, and the banner's fence was the only fence above
-    // the rule.
+    // needed somewhere above the rule to live, and the banner's fence was the only fence
+    // there.
     //
     // LOCKED, WHICH IS NOT INHERITED FROM THE BANNER BUT ARGUED FOR ITSELF. A
     // daily entry with no tracker grid cannot record a mood, a sleep time or
@@ -384,6 +413,21 @@ export const ENTRY_SECTIONS: EntrySection[] = [
       monthly: "note:focus#line:What's the theme for this month?|Monthly focus",
       quarterly: "note:focus#line:What's the theme for this quarter?|Focus",
       yearly: "note:focus#line:What's the theme for this year?|Focus",
+    }),
+  },
+  {
+    id: "todo",
+    label: "Tasks",
+    blurb: "Almanac tasks belonging to this entry.",
+    icon: "✅",
+    locked: false,
+    fence: "shared",
+    directive: on({
+      daily: "tasks:todo|Tasks",
+      weekly: "tasks:todo|Goals this week",
+      monthly: "tasks:todo|Goals this month",
+      quarterly: "tasks:todo|Goals this quarter",
+      yearly: "tasks:todo|Goals this year",
     }),
   },
   {
@@ -467,21 +511,6 @@ export const ENTRY_SECTIONS: EntrySection[] = [
       monthly: "attach:attachments|Attachments",
       quarterly: "attach:attachments|Attachments",
       yearly: "attach:attachments|Attachments",
-    }),
-  },
-  {
-    id: "todo",
-    label: "Tasks",
-    blurb: "Almanac tasks belonging to this entry.",
-    icon: "✅",
-    locked: false,
-    fence: "shared",
-    directive: on({
-      daily: "tasks:todo|Tasks",
-      weekly: "tasks:todo|Goals this week",
-      monthly: "tasks:todo|Goals this month",
-      quarterly: "tasks:todo|Goals this quarter",
-      yearly: "tasks:todo|Goals this year",
     }),
   },
   {
@@ -795,7 +824,7 @@ export function composeEntryTemplate(
     : sharedAll;
 
   // Built from the catalogue rather than from a hardcoded skeleton as of
-  // 2.60.2, and written into ONE fence as of 3.2 patch 2.
+  // 2.60.2, and written into ONE fence per band as of 3.2 patch 2.
   //
   // WHY ONE. Obsidian renders each ```almanac fence as its own block with the
   // note's spacing between, so two fences above the rule can be made to
@@ -804,6 +833,26 @@ export function composeEntryTemplate(
   // down, when the nav strip and the tracker grid merged. The `links:` row is
   // the piece that merge left behind. One fence is one container, so the card
   // is real rather than a resemblance.
+  //
+  // ── AND IT IS ONE FENCE PER ROW RUN AS OF 4.70 ──────────────────────
+  //
+  // THE RULE ABOVE IS NOT WITHDRAWN; IT IS GIVEN ITS EXCEPTION IN WRITING, which
+  // is this file's convention and the reason 3.2 patch 2's paragraph is left
+  // standing above rather than deleted.
+  //
+  // What that paragraph establishes is that sections which are to look like one
+  // card must share one fence. What it did not have to consider is a section
+  // that wants to sit BESIDE another rather than under it — `row` did not exist
+  // for another eight releases — and a row divides ONE fence into columns. So an
+  // entry that wants Focus beside Tasks and Highlights beside Challenges cannot
+  // express it inside a single block: two independent rows are two fences,
+  // necessarily, because a fence has one `row` line.
+  //
+  // THE COST IS PAID ONLY WHERE IT IS ASKED FOR. `rowRuns` welds every section
+  // that declares no row into the block beside it, so a band whose catalogue
+  // names no rows composes exactly the one fence it composed in 4.69 — which is
+  // what `entry-template.test.ts` pins, byte for byte, and what makes this
+  // landable on five shipped templates at once.
   //
   // WHAT DID NOT CHANGE: the directives, their order, the tracker markers, and
   // every line below the rule. What moves is one pair of fence lines — the same
@@ -822,6 +871,17 @@ export function composeEntryTemplate(
     ...(sec.below?.(ctx) ?? []),
   ];
 
+  // One band's sections as the fences they compose to.
+  //
+  // `weld: true` IS THE BAND RULE, and it is the one thing that differs from the
+  // three other catalogues — see the paragraph above and `rowRuns`' parameter.
+  const bandFences = (
+    members: readonly EntrySection[],
+    lines: (sec: EntrySection) => string[]
+  ): string[] =>
+    rowRuns(members, (sec) => ({ fence: "almanac", lines: lines(sec) }), true)
+      .flatMap((run) => ["```almanac", ...run.lines, "```", ""]);
+
   // THE TRACKER FENCE, BETWEEN THE BANNER AND THE RULE (4.20).
   //
   // A BLOCK OF ITS OWN, WHICH IS THE WHOLE CHANGE. It sat inside the banner's
@@ -833,9 +893,7 @@ export function composeEntryTemplate(
   // OMITTED ENTIRELY WHEN NOTHING WANTS IT, rather than composed empty. A reader
   // who removes the section gets no fence, and an empty ```almanac block renders
   // as a bordered gap where a card used to be.
-  const trackerFence = trackers.length
-    ? ["```almanac", ...trackers.flatMap(ownLines), "```", ""]
-    : [];
+  const trackerFence = trackers.length ? bandFences(trackers, ownLines) : [];
 
   // WHERE THIS ENTRY SITS, for the graph. Four of these five were the folder
   // names the diary had BEFORE 2.57 — `02 - Weekly`, `03 - Monthly`,
@@ -865,17 +923,11 @@ export function composeEntryTemplate(
     [
       ...frontmatter(ctx),
       "`almanac:spacer`",
-      "```almanac",
-      ...own.flatMap(ownLines),
-      "```",
-      "",
+      ...bandFences(own, ownLines),
       ...trackerFence,
       "---",
       "",
-      "```almanac",
-      ...shared.map((s) => directiveFor(s, ctx) as string),
-      "```",
-      "",
+      ...bandFences(shared, (s) => [directiveFor(s, ctx) as string]),
       "",
     ].join("\n") +
     shared
@@ -1109,14 +1161,40 @@ interface EntryShape {
   // also all that is left to want: nothing splices the structural half any more
   // (patch 1), so its extent stopped mattering when its permutation did.
   own: { id: string; at: number }[];
-  // The single widget fence below the rule, and what is in it. `id` is null for
-  // a line the catalogue did not write — those keep their index and are never
-  // touched.
+  // The widget fences below the rule, in file order, and what is in each.
+  // `id` is null for a line the catalogue did not write — those keep their
+  // index and are never touched.
+  //
+  // ── A LIST AS OF 4.70, WHERE IT WAS ONE FENCE OR NULL ────────────────
+  //
+  // 3.2 patch 2 welded the shared band into one fence, so "the widget fence"
+  // was a thing there was exactly one of and every reader of this field said
+  // `shape.shared` in the singular. `composeEntryTemplate` now writes ONE FENCE
+  // PER ROW RUN — the rule is stated there in full — so a daily entry has
+  // three: Focus beside Tasks, Highlights beside Challenges, and the prose
+  // welded underneath.
+  //
+  // THE BAND IS THE CONCATENATION, IN FILE ORDER, which is what `sharedBody`
+  // below returns and what every consumer wants. A reorder still permutes the
+  // whole band and a section still cannot cross the rule; what changed is that
+  // the slots a permutation fills are spread over several fences instead of
+  // one, so a section moved from the second row into the third crosses a fence
+  // boundary and stays inside its band.
+  //
+  // EVERY SHARING FENCE, NOT THE LAST ONE. The narrowing at 3.0 §9 picked "the
+  // last fence that holds a shared directive and no structural one" to keep the
+  // editor out of a reader's pasted example block. That choice is no longer
+  // available — a composed entry's first shared fence is as real as its last —
+  // and the ambiguity it was hedging against was already acknowledged as
+  // genuine rather than merely unhandled: "a fence holding a real `note:log:`
+  // line is still indistinguishable from the real one". So all of them are
+  // taken, which is right for every note the plugin composes and no worse than
+  // before for the one it does not.
   shared: {
     open: number;
     close: number;
     body: { id: string | null; line: string }[];
-  } | null;
+  }[];
   // Body regions, by section id.
   regions: Map<string, { from: number; to: number }>;
 }
@@ -1178,7 +1256,7 @@ export function parseEntry(
     probes.find((p) => p.s.fence !== "shared" && p.re.test(line.trim()))?.s.id ??
     null;
 
-  const shape: EntryShape = { own: [], shared: null, regions: new Map() };
+  const shape: EntryShape = { own: [], shared: [], regions: new Map() };
 
   // Fences, classified by what is in them.
   //
@@ -1233,20 +1311,25 @@ export function parseEntry(
   });
 
   const candidates = classified.filter((f) => !f.owns.length);
-  const last =
-    [...candidates].reverse().find((f) => f.shares) ??
-    candidates[candidates.length - 1];
+  // EVERY SHARING FENCE, AND THE LAST NON-STRUCTURAL ONE WHEN NONE SHARES —
+  // see `EntryShape.shared`. The fallback is unchanged and is what makes an
+  // entry whose directives someone deleted by hand still addable to; it is a
+  // list of one because there is one place for an add to go.
+  const sharing = candidates.filter((f) => f.shares);
+  const chosen = sharing.length
+    ? sharing
+    : candidates.length
+    ? [candidates[candidates.length - 1]]
+    : [];
 
   for (const f of classified) shape.own.push(...f.owns);
-  if (last) {
-    shape.shared = {
-      open: last.open,
-      close: last.close,
-      body: lines
-        .slice(last.open + 1, last.close)
-        .map((line) => ({ id: ownerOf(line, "shared"), line })),
-    };
-  }
+  shape.shared = chosen.map((f) => ({
+    open: f.open,
+    close: f.close,
+    body: lines
+      .slice(f.open + 1, f.close)
+      .map((line) => ({ id: ownerOf(line, "shared"), line })),
+  }));
 
   // Regions. Located by their own markers rather than by position, because
   // `readNoteRegion` locates one by a whole-file scan and a region a reader
@@ -1373,8 +1456,60 @@ export function detectEntrySections(
   const shape = parseEntry(text, ctx);
   return [
     ...shape.own.map((o) => o.id),
-    ...(shape.shared?.body.map((b) => b.id).filter((id): id is string => id !== null) ?? []),
+    ...sharedBody(shape)
+      .map((b) => b.id)
+      .filter((id): id is string => id !== null),
   ];
+}
+
+// The whole shared band, in file order, however many fences hold it.
+//
+// ONE ACCESSOR RATHER THAN A LOOP AT EVERY CALLER, because "the band" is what
+// every reader of `EntryShape.shared` actually wants — which order the reader's
+// sections are in — and the fence a line happens to sit in matters only to the
+// one function that writes lines back. That function keeps the fences; everybody
+// else asks this.
+export function sharedBody(
+  shape: EntryShape
+): { id: string | null; line: string }[] {
+  return shape.shared.flatMap((f) => f.body);
+}
+
+// A MODIFIER IS NOT A FOREIGN DIRECTIVE (4.70). `row`, `cell`, `header:` and the
+// rest are the catalogue's own furniture — `composeEntryTemplate` writes the
+// `row` lines — so a band scan that called them unrecognised would report the
+// plugin's own layout to the reader as lines it did not write, and an
+// entry-template reload would refuse itself over them.
+const isModifierLine = (line: string): boolean =>
+  MODIFIER_KEYWORDS.has(splitDirective(line.trim()).keyword);
+
+// One fence body, with its `row` line made true of what the fence now holds.
+//
+// `rowRuns` composes a `row` line for a run of two or more and none for a run
+// of one; this is that rule applied to a fence being REWRITTEN, where the
+// membership changed under it. Two directives or more and the line is there;
+// one and it is not.
+//
+// THE LINE GOES BACK AT THE TOP, which is where the composer puts it and the
+// only place it can go: `row` opens a fence and a `row` line in the middle of
+// one is not the grammar. A reader who typed their own `row:cards` keeps it,
+// because a fence whose widget count did not cross one is not touched at all.
+function tidyRowLine(body: readonly string[]): string[] {
+  const widgets = body.filter((l) => l.trim() && !isModifierLine(l)).length;
+  const hasRow = body.some((l) => isRowLine(l.trim()));
+  if (widgets > 1) {
+    return hasRow ? [...body] : [ROW_KEYWORD, ...body];
+  }
+  return body.filter((l) => !isRowLine(l.trim()) && !isCellLine(l.trim()));
+}
+
+// A band line that is the reader's own: not the catalogue's, not blank, and not
+// one of the layout modifiers above.
+export function isForeignBandLine(b: {
+  id: string | null;
+  line: string;
+}): boolean {
+  return b.id === null && b.line.trim() !== "" && !isModifierLine(b.line);
 }
 
 // What could still be added here: applies to this grain, and is not already in
@@ -1493,9 +1628,7 @@ export function planEntrySections(
   // Anything in the widget fence the catalogue did not write, counted rather
   // than named: the reader knows what their own directives are, and the useful
   // fact is that the plan is not going to touch them.
-  const foreign = shape.shared?.body.filter(
-    (b) => b.id === null && b.line.trim() !== ""
-  ).length ?? 0;
+  const foreign = sharedBody(shape).filter(isForeignBandLine).length;
   if (foreign) {
     ops.push({
       kind: "foreign",
@@ -1555,7 +1688,7 @@ export function applyEntrySections(
   // composing a structure into a file whose author may have removed it on
   // purpose, and the plan's §9 risk is precisely notes that have been
   // rearranged by hand.
-  if (!shape.shared && (removing.size || adding.length)) return null;
+  if (!shape.shared.length && (removing.size || adding.length)) return null;
 
   // ── the structural half: nothing happens to it ──
   //
@@ -1571,9 +1704,33 @@ export function applyEntrySections(
   // them even in principle.
 
   // ── the personal half: directive lines trade slots ──
-  let sharedBody: string[] = [];
-  if (shape.shared) {
-    const kept = shape.shared.body
+  //
+  // ACROSS EVERY FENCE OF THE BAND (4.70), which is what makes a permutation of
+  // the band still a permutation now that the band is several fences. The lines
+  // are flattened with the fence each came from remembered, edited as one list
+  // exactly as they were edited when there was one fence, and dealt back into
+  // the fences afterwards by that remembered index. So a section moved from the
+  // first row to the third lands in the third row's fence, and the number of
+  // widgets in each row is whatever the reader's order makes it.
+  //
+  // A ROW THAT FALLS TO ONE WIDGET LOSES ITS `row` LINE, and one that gains a
+  // second gets it back — `rowRuns`' rule, applied to a fence that is being
+  // rewritten rather than composed. Without it, removing Challenges leaves
+  // `row` over Highlights alone: a full-width block that renders correctly and
+  // reports itself to the editor as a group over a section grouped with
+  // nothing.
+  const fenceOf = new Map<{ id: string | null; line: string }, number>();
+  const flat: { id: string | null; line: string }[] = [];
+  shape.shared.forEach((f, n) => {
+    for (const b of f.body) {
+      fenceOf.set(b, n);
+      flat.push(b);
+    }
+  });
+  const bodies: string[][] = shape.shared.map(() => []);
+  if (shape.shared.length) {
+    const lastFence = shape.shared.length - 1;
+    const kept = flat
       .filter((b) => b.id === null || !removing.has(b.id))
       // A SETTLED SECTION'S ANSWER, CHANGED IN PLACE — 3.15 patch 5, and the
       // one property of this function that changed. The line is still the
@@ -1612,7 +1769,9 @@ export function applyEntrySections(
         optionsFor(want, id)
       );
       if (directive == null) continue;
-      kept.push({ id, line: directive });
+      const line = { id, line: directive };
+      fenceOf.set(line, lastFence);
+      kept.push(line);
     }
     const slots: number[] = [];
     kept.forEach((b, i) => {
@@ -1624,11 +1783,23 @@ export function applyEntrySections(
       idsOf(want).filter((id) => byId.get(id)?.fence === "shared")
     );
     const byLine = new Map(slots.map((i) => [kept[i].id as string, kept[i]]));
+    // THE SLOT KEEPS ITS FENCE, NOT THE LINE. A permutation moves ids between
+    // positions and the positions are what the fences are made of — so the
+    // arrival takes over the slot's fence rather than carrying its old one
+    // along, which is the same rule as "a section moved into the second row is
+    // in the second row".
+    const homes = slots.map((i) => fenceOf.get(kept[i]) ?? lastFence);
     slots.forEach((slot, n) => {
       const wanted = byLine.get(desired[n]);
-      if (wanted) kept[slot] = wanted;
+      if (wanted) {
+        kept[slot] = wanted;
+        fenceOf.set(wanted, homes[n]);
+      }
     });
-    sharedBody = kept.map((b) => b.line);
+    for (const b of kept) bodies[fenceOf.get(b) ?? lastFence].push(b.line);
+    for (let n = 0; n < bodies.length; n++) {
+      bodies[n] = tidyRowLine(bodies[n]);
+    }
   }
 
   // ── removed regions ──
@@ -1650,9 +1821,18 @@ export function applyEntrySections(
   const out: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     if (regionSkip.has(i)) continue;
-    if (shape.shared && i === shape.shared.open) {
-      out.push(lines[i], ...sharedBody, lines[shape.shared.close]);
-      i = shape.shared.close;
+    const fence = shape.shared.findIndex((f) => f.open === i);
+    if (fence >= 0) {
+      // A FENCE EMPTIED BY THE REMOVALS GOES WITH THEM, and its blank separator
+      // with it. An empty ```almanac block renders as a bordered gap where a
+      // card used to be — `trackerFence`'s own reason for composing nothing
+      // rather than composing empty, one band up.
+      if (bodies[fence].some((l) => l.trim() && !isModifierLine(l))) {
+        out.push(lines[i], ...bodies[fence], lines[shape.shared[fence].close]);
+      } else if (lines[shape.shared[fence].close + 1]?.trim() === "") {
+        i += 1;
+      }
+      i = Math.max(i, shape.shared[fence].close);
       continue;
     }
     out.push(lines[i]);

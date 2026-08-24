@@ -289,10 +289,12 @@ describe("locked means unremovable, not unmovable", () => {
 
   it("builds the structural fence from the catalogue, not a skeleton", () => {
     // Was `own.flatMap(ownFence)` while each structural section had a fence of
-    // its own. 3.2 patch 2 makes it one fence and the assertion follows the
-    // rename — what it is guarding is unchanged: the composer enumerates the
-    // catalogue rather than hardcoding two directives it happens to know.
-    expect(readSrc("entry-sections")).toContain("own.flatMap(ownLines)");
+    // its own; then `own.flatMap(ownLines)` when 3.2 patch 2 made it one fence;
+    // now `bandFences(own, …)`, since 4.70 makes it one fence PER ROW RUN. The
+    // assertion has followed each rename and what it guards is unchanged: the
+    // composer enumerates the catalogue rather than hardcoding two directives it
+    // happens to know.
+    expect(readSrc("entry-sections")).toContain("bandFences(own, ownLines)");
   });
 });
 
@@ -658,4 +660,70 @@ describe("the parser reads both shapes", () => {
       expect(ids).not.toContain("entry-header");
     }
   });
+});
+
+// ── THE PROPERTY THAT MADE THE SHARED BAND SAFE TO SPLIT (4.70) ──────────
+//
+// Until this release the shared band was ONE fence, on purpose, and the rule was
+// argued in this file's header: the band renders as one card (2.18.4). 4.70
+// re-opens it, because a `row` divides a single fence into columns and one fence
+// cannot hold two independent rows — so Focus|Tasks and Highlights|Challenges
+// need the band to be one fence PER ROW RUN.
+//
+// That is an unbounded-looking change to five shipped templates, and this is the
+// bound. The band splits ON ROW IDS AND NOTHING ELSE: take the row ids away and
+// the catalogue composes exactly what it composed before, one fence, in one
+// order, byte for byte. Every template that declares no rows is therefore
+// untouched by the change — which is the whole of the risk, discharged by a
+// comparison rather than by a reading.
+//
+// MUTATES THE CATALOGUE AND PUTS IT BACK, because that is the only way to ask
+// the question: `composeEntryTemplate` reads the module's own array, and a copy
+// of it would be testing a copy of the rule. The restore is in a `finally` so a
+// failing expectation cannot leak a rowless catalogue into the next file.
+describe("splitting the shared band is caused by row ids and nothing else", () => {
+  const withoutRows = <T>(run: () => T): T => {
+    const saved = ENTRY_SECTIONS.map((s) => s.row);
+    for (const s of ENTRY_SECTIONS) delete (s as { row?: string }).row;
+    try {
+      return run();
+    } finally {
+      ENTRY_SECTIONS.forEach((s, i) => {
+        if (saved[i] !== undefined) (s as { row?: string }).row = saved[i];
+      });
+    }
+  };
+
+  const bands = (text: string): string[][] =>
+    text
+      .split("```almanac\n")
+      .slice(1)
+      .map((chunk) => chunk.split("\n```")[0].split("\n"))
+      .filter((lines) => lines.some((l) => /^(note|list|tasks|attach):/.test(l)));
+
+  for (const grain of ["daily", "weekly", "monthly", "quarterly", "yearly"] as const) {
+    it(`composes ${grain} as one shared fence when no section declares a row`, () => {
+      const rowless = withoutRows(() => composeEntryTemplate(grain));
+      const shipped = composeEntryTemplate(grain);
+
+      // ONE fence, where the shipped template has one per row run.
+      expect(bands(rowless)).toHaveLength(1);
+      expect(bands(shipped).length).toBeGreaterThanOrEqual(1);
+
+      // And its contents are the shipped fences' contents, in the same order,
+      // with only the `row` lines gone. Not "similar" — the same lines.
+      expect(bands(rowless)[0]).toEqual(
+        bands(shipped)
+          .flat()
+          .filter((l) => l !== "row" && l !== "cell")
+      );
+
+      // The rest of the file — frontmatter, banner, trackers fence, regions, the
+      // graph link — is untouched either way, which is the other half of the
+      // bound: the split moved a boundary and nothing else on the page.
+      const outside = (t: string): string =>
+        t.replace(/```almanac\n[\s\S]*?\n```\n/g, "").replace(/\n{2,}/g, "\n").trimEnd();
+      expect(outside(rowless)).toBe(outside(shipped));
+    });
+  }
 });

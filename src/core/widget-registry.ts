@@ -121,7 +121,24 @@ export type WidgetArg =
       // one that made it addable: its id is assigned once and never rewritten,
       // so `logbook:work` keeps meaning the same note however often the reader
       // retitles it.
-      source: "journals" | "logbooks";
+      // THREE SOURCES AS OF 4.70, and the third is the one the paragraph above
+      // named first and deferred: *"trackers and note kinds are the same shape
+      // and are deliberately not added speculatively — each has its own question
+      // about what an id means when the thing is renamed."*
+      //
+      // A TRACKER'S ANSWER IS THE STRONGEST OF THE THREE, and it was already
+      // written down: `TrackerDef.id` IS the frontmatter property name, is
+      // already the widget id in `tracker:<id>`, and changing it "effectively
+      // creates a new one" (`trackers.ts`). So the id cannot drift under a
+      // relabel — the label is a separate field and is the only thing a rename
+      // touches — which is exactly the stability a logbook was admitted on in
+      // 4.52.
+      //
+      // NOTE KINDS ARE STILL NOT HERE, and the deferral stands for them alone: a
+      // kind's id is declared per journal, so `kind-table:lesson` means nothing
+      // without knowing which journal is being asked, and that is a second piece
+      // of argument this source has no way to carry.
+      source: "journals" | "logbooks" | "trackers";
       keywords?: readonly WidgetChoice[];
     };
 
@@ -338,6 +355,52 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "🎉",
     blurb: "The special-events manager: every recurring and one-off event, with an Add button.",
   },
+  // THE NEXT FEW, AS A KEYWORD OF ITS OWN — 4.70.
+  //
+  // `events:upcoming[:N]` HAS DISPATCHED SINCE 2.13.1 AND WAS REACHABLE BY
+  // NOBODY. It is documented in `reference.md`, `buildUpcomingEvents` renders it,
+  // and the entry above declares no `arg` — so the section window offered the
+  // manager and had no way to say the other word. A directive a reader can only
+  // find by reading the reference is a directive this table exists to end.
+  //
+  // ── WHY NOT AN ARGUMENT ON `events` ──────────────────────────────────
+  //
+  // Because `WidgetSpec` carries ONE `label`, ONE `glyph` and ONE `blurb` per
+  // keyword, and those describe the row in the add list. "The special-events
+  // manager, with an Add button" and "the next few, with a countdown" are two
+  // things a reader picks between, not one thing configured two ways — and a
+  // single row saying the first while a dropdown underneath it silently means
+  // the second is the shape `journals` / `journals:cards` got away with only
+  // because both draw every journal.
+  //
+  // This is `level-index` → `level-cards` (4.36 §2): the same question, two
+  // arrangements, two rows, one builder — so the two cannot come to look
+  // different depending on which door a reader came through.
+  //
+  // `events:upcoming` GOES ON DISPATCHING and is not retired: it is in shipped
+  // documentation and may be in someone's note. It is not a separate `case`, so
+  // it needs no entry in `NOT_PAGE_WIDGETS` — the union that table maintains is
+  // over the switch's keywords, and `upcoming` as an ARGUMENT of `events` was
+  // never one of those.
+  upcoming: {
+    label: "Upcoming events",
+    glyph: "⏭️",
+    blurb: "The next few events, each with how long until it — or how far into it you are.",
+    arg: {
+      kind: "choice",
+      label: "how many to show",
+      // THE BUILDER'S OWN DEFAULT NAMED, rather than a fourth row that writes
+      // it out. `DEFAULT_UPCOMING` is five, a bare directive resolves to it, and
+      // `emptyLabel` is what makes a choice optional (4.46) — so this widget can
+      // be added without answering anything and still draws something.
+      emptyLabel: "The next five",
+      values: [
+        { value: "3", label: "Three" },
+        { value: "5", label: "Five" },
+        { value: "10", label: "Ten" },
+      ],
+    },
+  },
   "time-grid": {
     label: "Time grid",
     glyph: "\u23F1\uFE0F",
@@ -390,6 +453,38 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "😴",
     blurb:
       "Nights logged, average sleep, typical bedtime and wake-up, across every daily entry.",
+  },
+  // ONE TRACKER'S NUMBERS, FOR ANY TRACKER — 4.70.
+  //
+  // THE ENTRY ABOVE IS WHY THIS ONE EXISTS. `sleep-summary` is the only page
+  // widget that says anything about a tracker, and it says it about exactly two
+  // hardcoded built-ins; everything else a tracker can tell you had to be a
+  // CHART, which answers "how has this moved" rather than "how am I doing",
+  // takes a fence of its own, and cannot sit in a stat row. A reader logging
+  // Mood every day had nowhere to put today's mood beside the month's average.
+  //
+  // NEITHER REPLACES THE OTHER. `sleep-summary` reads two coupled properties and
+  // DERIVES a third — typical bedtime is the typical wake minus the average
+  // sleep, wrapped across midnight, because a mean of raw bedtimes is wrong —
+  // and none of that is "one tracker's numbers".
+  //
+  // NOT A COUSIN OF `tracker:`, WHICH IS A DIFFERENT WIDGET IN A DIFFERENT
+  // PLACE. That one is the CONTROL — it writes a value onto the note it is in,
+  // which is why it sits in `NOT_PAGE_WIDGETS` under `inline`. This reads every
+  // entry and writes nothing, so it is a page widget for the same reason that
+  // one is not.
+  "tracker-stat": {
+    label: "Tracker numbers",
+    glyph: "📉",
+    blurb:
+      "One tracker's latest reading, its average and its streak, over a month-long density strip.",
+    // REQUIRED, WITH NO `keywords` AND NO EMPTY STATE, unlike the two vault
+    // arguments above it. `journals-header` bare means every journal and
+    // `review-queue` takes `all`, because a band over several journals is a
+    // coherent thing. Several TRACKERS averaged together is not — mood and
+    // kilometres do not add — so there is no answer this can fall back to and
+    // the question is one `questionIsRequired` holds the section back for.
+    arg: { kind: "vault", label: "the tracker to show", source: "trackers" },
   },
 
   // ── the period dashboards ───────────────────────────────────────────
@@ -630,6 +725,57 @@ export const WIDGETS: Record<string, WidgetSpec> = {
       keywords: [{ value: "all", label: "Every journal" }],
     },
   },
+  // ── WHAT YOU WROTE LATELY — 4.70 ────────────────────────────────────
+  //
+  // THE THREE ENTRIES ABOVE ARE WHY THIS ONE EXISTS. Every journal widget
+  // answers a question about STRUCTURE — what is below this note, the notes of
+  // one kind, what is DUE — or waits for a word to be typed into it. None of
+  // them says what the reader last did, which is what a dashboard opened cold
+  // is being asked, and it is why the per-journal dashboards are the thinnest
+  // pages the plugin ships. The diary has had `timeline` for this since 2.x.
+  //
+  // `folder`, NOT `vault`/`journals`, AND THE DIFFERENCE IS NOT COSMETIC. It
+  // resolves through `journalFolderScope` — literally the function behind the
+  // two entries above — which takes a PATH, `all`, `journal`, or nothing.
+  // `journals-header` takes a vault argument because it resolves journal IDS.
+  // Declaring the wrong one here would offer a menu of ids to a resolver that
+  // reads them as folder names, and every pick would scope to a folder that
+  // does not exist.
+  //
+  // BARE IS THE ANSWER THE SHIPPED PAGES COMPOSE, on this table's own rule for
+  // the per-journal dashboard: that page's own folder IS the journal root, so a
+  // bare directive means this journal and carries no path to go stale when the
+  // folder is renamed.
+  "journal-recent": {
+    label: "Recent notes",
+    glyph: "🕒",
+    blurb: "The notes you wrote most recently, newest first, with where each one lives.",
+    args: [
+      {
+        kind: "folder",
+        label: "the folder to list",
+        keywords: [{ value: "all", label: "Every journal" }],
+      },
+      {
+        kind: "choice",
+        label: "how many to show",
+        // EIGHT IS THE BUILDER'S OWN DEFAULT and `emptyLabel` names it rather
+        // than adding a row that writes it out — `upcoming`'s shape, for
+        // `upcoming`'s reason. Both shipped placements put this in a COLUMN of a
+        // row group, so the useful other answers are shorter and not longer.
+        emptyLabel: "The last eight",
+        values: [
+          { value: "4", label: "Four" },
+          { value: "8", label: "Eight" },
+          { value: "15", label: "Fifteen" },
+        ],
+      },
+    ],
+    // `|` RATHER THAN `/`, WHICH IS THE DEFAULT, because the first piece is a
+    // FOLDER and a folder is full of slashes. `time-grid` chose the same
+    // separator for the same reason one release earlier.
+    argJoin: "|",
+  },
 
   // ── across the vault ────────────────────────────────────────────────
   "tasks-table": {
@@ -668,9 +814,9 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     blurb: "Open and completed tasks bucketed by date, drawn as three month heatmaps.",
   },
   launcher: {
-    label: "Launcher",
+    label: "Overview navigator",
     glyph: "🧭",
-    blurb: "A grid of the places this vault goes.",
+    blurb: "Tiles for the weekly, monthly, quarterly, and yearly overviews.",
   },
   links: {
     label: "Quick links",
@@ -800,21 +946,44 @@ export const NOT_PAGE_WIDGETS: Record<string, WidgetExclusion> = {
   },
 
   // Needs a list only the vault can supply.
+  //
+  // ── AND AS OF 4.70 THE VAULT SUPPLIES ONE, WHICH NARROWS THIS ──────────
+  //
+  // `tracker-stat` wired `trackers` as a `vault` source, so "the section
+  // window has no list of this vault's trackers" — the sentence these four
+  // notes carried through eight minor versions — is simply false now. What
+  // holds instead is one step in from it, and it is the same step `journals`
+  // did NOT need: the list these four want is not the VAULT'S, it is the HOST
+  // NOTE'S.
+  //
+  // `journalSurfaceRefusal` is the proof. It refuses a tracker whose surface
+  // the host's journal type does not accept (`surfaceAcceptsType`), so which
+  // trackers `journal-chart` may name depends on which journal the page sits
+  // in; `bridgeCatalogue` filters by the surface being bridged TO, which comes
+  // off the host the same way; and `journal-tally` narrows further still,
+  // to `select` alone, which is the exact complement of `chartableType` and so
+  // the exact complement of the list that now exists.
+  //
+  // A `vault` argument is resolved ONCE for the whole section window
+  // (`section-insert.ts`'s `vault()`), before a surface is chosen. It can hand
+  // over a list the vault knows. It cannot hand over a list that only the note
+  // being edited knows. That is the boundary now, and the shape of the thing
+  // that would move it is a host-scoped argument kind, not another list.
   "journal-chart": {
     reason: "needs-vault-answer",
-    note: "must name a tracker, and the section window has no list of this vault's trackers",
+    note: "must name a tracker this journal's notes accept, and that list follows from the host note rather than the vault",
   },
   "journal-breakdown": {
     reason: "needs-vault-answer",
-    note: "must name a tracker, and the section window has no list of this vault's trackers",
+    note: "must name a tracker this journal's notes accept, and that list follows from the host note rather than the vault",
   },
   "journal-tally": {
     reason: "needs-vault-answer",
-    note: "must name a tracker, and the section window has no list of this vault's trackers",
+    note: "must name a select tracker this journal's notes accept, which is neither the vault's tracker list nor derivable from it",
   },
   "bridge-readings": {
     reason: "needs-vault-answer",
-    note: "must name a tracker, and the section window has no list of this vault's trackers",
+    note: "must name a tracker of the surface it bridges to, and that surface follows from the host note rather than the vault",
   },
   "bridge-notes": {
     reason: "needs-vault-answer",

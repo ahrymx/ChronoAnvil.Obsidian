@@ -88,13 +88,21 @@ import {
   SectionContext,
   SectionOverrides,
   SectionPart,
+  composeSectionRuns,
   renderBlock,
   renderSection,
+  rowOf,
   sectionOverrides,
   sectionRemovable,
   sectionsFor,
 } from "./journal-sections";
 import { Segment, keywordOf, segment } from "../core/layout";
+import {
+  MODIFIER_KEYWORDS,
+  ROW_KEYWORD,
+  cutFromFence,
+  splitDirective,
+} from "../core/directive-grammar";
 import {
   SectionModel,
   SectionOp,
@@ -117,7 +125,13 @@ import {
 // `sectionId` is null for a run the catalogue did not write: the reader's own
 // prose, a hand-added fence, frontmatter. Those are reported and never moved.
 export interface SectionRun {
+  // The section this run belongs to, or the FIRST of them where a row fence
+  // holds several — 4.70. Kept beside `sectionIds` rather than replaced by it
+  // because every consumer that asks "whose block is this" wants one answer,
+  // and for every run but a row it is the only one there is.
   sectionId: string | null;
+  // Every section in this run, in file order. Empty for a run that is nobody's.
+  sectionIds: string[];
   // Index into the segment list, inclusive.
   from: number;
   to: number;
@@ -163,8 +177,17 @@ export interface TemplatePlan {
 // Headers are excluded because they are retitleable: layout.ts settled that
 // for dashboards ("a user who renames `header:⏳ Open tasks` keeps it") and the
 // same holds here. What identifies a fence is the widgets in it.
+// A fence's CONTENT keywords: what it draws, with the furniture dropped.
+//
+// `MODIFIER_KEYWORDS` AS OF 4.70, WHERE IT WAS `k !== "header"`. That list was
+// complete when it was written and became silently wrong as the grammar grew:
+// a `frame:` line, and now a `row`, counted as a widget, so a fence carrying one
+// matched no signature and the section in it read as absent. Same list, same
+// release, same reason as `assetUnits`.
 function fenceKeywords(lines: string[]): string[] {
-  return lines.map(keywordOf).filter((k) => k.length > 0 && k !== "header");
+  return lines
+    .map(keywordOf)
+    .filter((k) => k.length > 0 && !MODIFIER_KEYWORDS.has(k));
 }
 
 function sameKeywords(a: string[], b: string[]): boolean {
@@ -287,7 +310,7 @@ function ownerOf(seg: Segment, sigs: Signature[]): JournalSection | null {
   if (OPAQUE_FENCE_KINDS.has(kind)) {
     return sigs.find((c) => c.fenceKind === kind)?.section ?? null;
   }
-  const kw = (seg.keywords ?? []).filter((k) => k !== "header");
+  const kw = (seg.keywords ?? []).filter((k) => !MODIFIER_KEYWORDS.has(k));
   const exact = sigs.find(
     (c) => !OPAQUE_FENCE_KINDS.has(c.fenceKind) && sameKeywords(c.keywords, kw)
   );
@@ -322,6 +345,55 @@ function ownerOf(seg: Segment, sigs: Signature[]): JournalSection | null {
   );
 }
 
+// EVERY SECTION IN ONE FENCE, WHICH IS MORE THAN ONE WHEN THE FENCE IS A ROW.
+//
+// `ownerOf` above answers "whose fence is this", and until 4.70 that question
+// had one answer by construction: a journal template composed one fence per
+// section. `composeSectionRuns` now welds a row's cells into a single fence, so
+// a subject index's `row / review-queue / tasks-table` is two sections in one
+// block, and a matcher that can only say one of them reports the other absent
+// and offers to add a second copy.
+//
+// DEALT OFF THE FRONT, LONGEST FIRST. The fence's content keywords are consumed
+// by signatures in file order: at each position the longest signature that
+// matches the next N keywords wins, and the walk continues after it. Longest
+// first is what stops a one-keyword section swallowing the head of a
+// two-keyword one — the `children` / `tasks` pair is exactly that shape.
+//
+// ALL OR NOTHING. If the walk cannot consume the whole list the answer is the
+// empty array and the block is foreign, which is the same conservatism
+// `ownerOf` applies: a fence the catalogue cannot fully account for is the
+// reader's, and half-attributing it is how a reconciler cuts a line it did not
+// write.
+function ownersOf(seg: Segment, sigs: Signature[]): JournalSection[] {
+  const one = ownerOf(seg, sigs);
+  if (one) return [one];
+  if (seg.kind !== "fence") return [];
+  const kind = seg.fenceKind ?? "almanac";
+  if (OPAQUE_FENCE_KINDS.has(kind)) return [];
+  if (!(seg.keywords ?? []).some((k) => k === ROW_KEYWORD)) return [];
+
+  const kw = (seg.keywords ?? []).filter((k) => !MODIFIER_KEYWORDS.has(k));
+  const usable = sigs
+    .filter((c) => !OPAQUE_FENCE_KINDS.has(c.fenceKind) && c.fenceKind === kind)
+    .filter((c) => c.keywords.length > 0)
+    .sort((a, b) => b.keywords.length - a.keywords.length);
+
+  const out: JournalSection[] = [];
+  let at = 0;
+  while (at < kw.length) {
+    const hit = usable.find(
+      (c) =>
+        at + c.keywords.length <= kw.length &&
+        sameKeywords(c.keywords, kw.slice(at, at + c.keywords.length))
+    );
+    if (!hit) return [];
+    out.push(hit.section);
+    at += hit.keywords.length;
+  }
+  return out.length > 1 ? out : [];
+}
+
 const isBlank = (lines: string[]): boolean =>
   lines.every((l) => l.trim() === "");
 
@@ -340,12 +412,14 @@ export function parseSections(text: string, ctx: SectionContext): SectionRun[] {
   let i = 0;
   while (i < segs.length) {
     const seg = segs[i];
+    const owners = ownersOf(seg, fences);
     const owner =
-      ownerOf(seg, fences) ?? markdownOwnerOf(seg, ctx, sectionsFor(ctx));
+      owners[0] ?? markdownOwnerOf(seg, ctx, sectionsFor(ctx)) ?? null;
 
     if (!owner) {
       runs.push({
         sectionId: null,
+        sectionIds: [],
         from: i,
         to: i,
         // Blank separators and the frontmatter block. Neither is a block the
@@ -396,7 +470,13 @@ export function parseSections(text: string, ctx: SectionContext): SectionRun[] {
       end = j;
       j++;
     }
-    runs.push({ sectionId: owner.id, from: i, to: end, filler: false });
+    runs.push({
+      sectionId: owner.id,
+      sectionIds: owners.length ? owners.map((o) => o.id) : [owner.id],
+      from: i,
+      to: end,
+      filler: false,
+    });
     i = end + 1;
   }
   return runs;
@@ -412,7 +492,7 @@ export function parseSections(text: string, ctx: SectionContext): SectionRun[] {
 export function sectionsPresent(text: string, ctx: SectionContext): string[] {
   const out: string[] = [];
   for (const run of parseSections(text, ctx)) {
-    if (run.sectionId && !out.includes(run.sectionId)) out.push(run.sectionId);
+    for (const id of run.sectionIds) if (!out.includes(id)) out.push(id);
   }
   return out;
 }
@@ -495,9 +575,7 @@ export function planSections(
 ): SectionOp[] {
   const want = idsOf(requested);
   const runs = parseSections(text, ctx);
-  const present = new Set(
-    runs.map((r) => r.sectionId).filter((id): id is string => id !== null)
-  );
+  const present = new Set(runs.flatMap((r) => r.sectionIds));
   const sections = sectionsFor(ctx);
   const byId = new Map(sections.map((s) => [s.id, s]));
   const segs = segment(text.split("\n"));
@@ -506,11 +584,14 @@ export function planSections(
 
   // Removals, keeps and reconfigures, in file order, so the plan reads down the
   // file.
-  for (const run of runs) {
-    if (run.sectionId === null) continue;
-    const section = byId.get(run.sectionId);
+  // EVERY SECTION OF EVERY RUN, WHICH IS TWO FOR A ROW FENCE (4.70). Each cell
+  // gets its own op — its own keep, its own remove, its own refusal — because
+  // that is what the reader is ticking. What they share is the run they sit in,
+  // which is why the region and gap scans below are computed from the run.
+  for (const run of runs) for (const runId of run.sectionIds) {
+    const section = byId.get(runId);
     if (!section) continue;
-    if (want.includes(run.sectionId)) {
+    if (want.includes(runId)) {
       const runLines: string[] = [];
       for (let i = run.from; i <= run.to; i++) runLines.push(...segs[i].lines);
       const gaps = missingParts(runLines, section, ctx);
@@ -626,8 +707,8 @@ export function planSections(
   // when the reader dragged Review. What actually moved is what is not in the
   // longest run that kept its relative order.
   const surviving = runs
-    .map((r) => r.sectionId)
-    .filter((id): id is string => id !== null && want.includes(id));
+    .flatMap((r) => r.sectionIds)
+    .filter((id) => want.includes(id));
   const target = want.filter(
     (id) => surviving.includes(id) || adding.includes(id)
   );
@@ -642,7 +723,7 @@ export function planSections(
   // Anything the catalogue did not write, counted rather than named: the
   // reader knows what their own blocks are, and the useful fact is that the
   // plan is not going to touch them.
-  const foreign = runs.filter((r) => r.sectionId === null && !r.filler).length;
+  const foreign = runs.filter((r) => !r.sectionIds.length && !r.filler).length;
   if (foreign) {
     ops.push({
       kind: "foreign",
@@ -805,7 +886,10 @@ export function applySections(
   const byId = new Map(sectionsFor(ctx).map((s) => [s.id, s]));
 
   interface Chunk {
-    id: string | null;
+    // Every section in this chunk, in file order — a list as of 4.70 for the
+    // same reason `SectionRun` grew one: a row fence is two sections in one
+    // block, and a chunk is what a block becomes on the way out.
+    ids: string[];
     filler: boolean;
     lines: string[];
   }
@@ -816,26 +900,57 @@ export function applySections(
     const lines: string[] = [];
     for (let i = run.from; i <= run.to; i++) lines.push(...segs[i].lines);
 
-    if (!run.sectionId || !removing.has(run.sectionId)) {
+    const doomed = run.sectionIds.filter((id) => removing.has(id));
+    const keeping = run.sectionIds.filter((id) => !removing.has(id));
+
+    if (!doomed.length) {
       // Answers spliced into their own span, on a section the plan named as a
       // reconfigure and on no other. Everything else here is the reader's file,
       // copied out verbatim — which is what `applySections` has done since it
       // was written and what patch 5 was most likely to cost.
-      const rewritten =
-        run.sectionId && rewriting.has(run.sectionId)
-          ? withAnswers(
-              lines,
-              byId.get(run.sectionId)?.questions?.(ctx) ?? [],
-              optionsFor(requested, run.sectionId)
-            )
-          : lines;
-      const section = run.sectionId ? byId.get(run.sectionId) : null;
-      const extended =
-        section && extending.has(section.id)
-          ? withMissingParts(rewritten, section, ctx)
-          : rewritten;
-      chunks.push({ id: run.sectionId, filler: run.filler, lines: extended });
+      let out = lines;
+      for (const id of run.sectionIds) {
+        if (rewriting.has(id)) {
+          out = withAnswers(
+            out,
+            byId.get(id)?.questions?.(ctx) ?? [],
+            optionsFor(requested, id)
+          );
+        }
+        const section = byId.get(id);
+        if (section && extending.has(section.id)) {
+          out = withMissingParts(out, section, ctx);
+        }
+      }
+      chunks.push({ ids: run.sectionIds, filler: run.filler, lines: out });
       continue;
+    }
+
+    // ── ONE CELL OF A ROW, WHERE THE OTHERS ARE STAYING (4.70) ──────────
+    //
+    // The fence is rewritten rather than dropped: the doomed cell's own
+    // keywords come out, a keyword a survivor also writes is spared, and the
+    // `row` line goes if the fence has fallen to a single widget. All three are
+    // `cutFromFence`, shared with the diary dashboards, which is where the
+    // argument for each is written down.
+    if (keeping.length) {
+      const keywordsOf = (id: string): string[] => {
+        const section = byId.get(id);
+        if (!section) return [];
+        return section
+          .render(ctx, sectionOverrides(ctx, id))
+          .flatMap((b) => (b.kind === "fence" ? b.lines : []))
+          .map((l) => splitDirective(l).keyword);
+      };
+      const cut = cutFromFence(
+        lines,
+        new Set(doomed.flatMap(keywordsOf)),
+        new Set(keeping.flatMap(keywordsOf))
+      );
+      if (cut) {
+        chunks.push({ ids: keeping, filler: false, lines: cut });
+        continue;
+      }
     }
 
     // Removing: the fence goes, a region with the reader's writing in it
@@ -844,7 +959,7 @@ export function applySections(
     // keeping it is one keystroke.
     const survivors = keepNonEmptyRegions(segs, run);
     if (survivors.length) {
-      chunks.push({ id: null, filler: false, lines: survivors });
+      chunks.push({ ids: [], filler: false, lines: survivors });
       continue;
     }
     // Nothing survived, so take the blank separator that followed it too —
@@ -870,8 +985,18 @@ export function applySections(
       ...sectionOverrides(ctx, id),
       ...(optionsFor(requested, id) ?? {}),
     });
+    // A CELL GOES BACK INTO ITS ROW, NOT BESIDE IT — the other half of the cut
+    // above, and the property `insertionPoint` names as the reason it stops
+    // where it does: remove a section, put it back, get the file you started
+    // with. The ordinary add path composes a BLOCK, and a cut cell came out of
+    // a fence somebody else is still in.
+    if (joinRowChunk(chunks, section, ctx, byId, order, requested)) continue;
     const at = insertionPoint(chunks, order, id);
-    chunks.splice(at, 0, { id, filler: false, lines: ["", ...markdown.split("\n")] });
+    chunks.splice(at, 0, {
+      ids: [id],
+      filler: false,
+      lines: ["", ...markdown.split("\n")],
+    });
   }
 
   // Reordering, last, so it is a permutation of the final set rather than of
@@ -888,18 +1013,18 @@ export function applySections(
   if (moving) {
     const slots: number[] = [];
     for (let i = 0; i < chunks.length; i++) {
-      if (chunks[i].id !== null) slots.push(i);
+      if (chunks[i].ids.length) slots.push(i);
     }
     // The order the reader asked for, restricted to what is actually present,
     // then anything present that `want` does not mention appended in the order
     // it already had. The second half matters: a section the reader never
     // touched must not be dropped because it was not in the list.
-    const occupants = slots.map((i) => chunks[i].id as string);
+    const occupants = slots.map((i) => chunks[i].ids[0]);
     const desired = [
       ...want.filter((id) => occupants.includes(id)),
       ...occupants.filter((id) => !want.includes(id)),
     ];
-    const byIdChunk = new Map(slots.map((i) => [chunks[i].id as string, chunks[i]]));
+    const byIdChunk = new Map(slots.map((i) => [chunks[i].ids[0], chunks[i]]));
     slots.forEach((slot, n) => {
       const wanted = byIdChunk.get(desired[n]);
       if (wanted) chunks[slot] = wanted;
@@ -908,6 +1033,86 @@ export function applySections(
 
   const next = chunks.flatMap((c) => c.lines).join("\n");
   return next === text ? null : next;
+}
+
+// ── A CELL REJOINING THE ROW IT LEFT (4.70) ──────────────────────────────
+//
+// The third copy of this rule and the last, after the diary dashboards and the
+// flat notes: a section that declares a row looks for that row's fence before it
+// composes a block of its own, and puts its line back inside it. See
+// `diary-sections.ts` for the argument in full — this differs only in that a
+// journal section renders a LIST of blocks, so a section that is not a lone
+// fence has nothing a cell line could hold and is turned away at the top.
+//
+// FALSE FOR "NOT MY ROW", which includes the ordinary case of a row whose other
+// cells are not on this surface at all: there is nothing to join, and a block of
+// its own is exactly right.
+function joinRowChunk(
+  chunks: { ids: string[]; filler: boolean; lines: string[] }[],
+  section: JournalSection,
+  ctx: SectionContext,
+  byId: Map<string, JournalSection>,
+  order: string[],
+  requested: readonly SectionWant[]
+): boolean {
+  const row = rowOf(section, ctx);
+  if (!row) return false;
+  const opts = { ...sectionOverrides(ctx, section.id), ...(optionsFor(requested, section.id) ?? {}) };
+  const blocks = section.render(ctx, opts);
+  if (blocks.length !== 1 || blocks[0].kind !== "fence") return false;
+  const mine = blocks[0];
+
+  const at = chunks.findIndex(
+    (c) => c.ids.length > 0 && c.ids.every((id) => {
+      const other = byId.get(id);
+      return other !== undefined && rowOf(other, ctx) === row;
+    })
+  );
+  if (at < 0) return false;
+
+  const chunk = chunks[at];
+  const rank = order.indexOf(section.id);
+  const later = chunk.ids.find((id) => order.indexOf(id) > rank);
+  const laterKeywords = later
+    ? new Set(
+        (byId.get(later)?.render(ctx, sectionOverrides(ctx, later)) ?? [])
+          .flatMap((b) => (b.kind === "fence" ? b.lines : []))
+          .map((l) => splitDirective(l).keyword)
+      )
+    : null;
+
+  const lines = [...chunk.lines];
+  let insertAt = lines.length;
+  for (let n = lines.length - 1; n >= 0; n--) {
+    if (lines[n].trim() === "```") {
+      insertAt = n;
+      break;
+    }
+  }
+  if (laterKeywords) {
+    const found = lines.findIndex((l) =>
+      laterKeywords.has(splitDirective(l.trim()).keyword)
+    );
+    if (found >= 0) insertAt = found;
+  }
+  // The `row` line comes back with the cell, because the cut took it when the
+  // fence fell to one widget.
+  if (!lines.some((l) => l.trim() === ROW_KEYWORD)) {
+    const open = lines.findIndex((l) => l.trim().startsWith("```"));
+    if (open < 0) return false;
+    lines.splice(open + 1, 0, ROW_KEYWORD);
+    if (insertAt > open) insertAt++;
+  }
+  lines.splice(insertAt, 0, ...mine.lines);
+
+  chunks[at] = {
+    ids: [...chunk.ids, section.id].sort(
+      (a, b) => order.indexOf(a) - order.indexOf(b)
+    ),
+    filler: false,
+    lines,
+  };
+  return true;
 }
 
 // The lines of a removed section's run that must survive: its non-empty
@@ -939,14 +1144,14 @@ function keepNonEmptyRegions(segs: Segment[], run: SectionRun): string[] {
 // Falls through to the end, which is where "add a section to this note" has
 // always put things.
 function insertionPoint(
-  chunks: { id: string | null }[],
+  chunks: { ids: string[] }[],
   order: string[],
   id: string
 ): number {
   const rank = order.indexOf(id);
   let after = -1;
   for (let i = 0; i < chunks.length; i++) {
-    const k = chunks[i].id;
+    const k = chunks[i].ids[0];
     if (!k) continue;
     const r = order.indexOf(k);
     if (r === -1) continue;
@@ -1005,13 +1210,23 @@ function stripFrontmatter(text: string): string {
 
 function composeFrom(ctx: SectionContext, ids: string[]): string {
   const byId = new Map(sectionsFor(ctx).map((s) => [s.id, s]));
-  const body = ids
-    .map((id) => {
-      const s = byId.get(id);
-      return s ? renderSection(s, ctx, sectionOverrides(ctx, id)) : "";
-    })
-    .filter(Boolean)
-    .join("\n\n");
+  // THROUGH `composeSectionRuns`, NOT SECTION BY SECTION (4.70). This mapped
+  // each id to its own block and joined them, which was the same thing while
+  // one section meant one fence and became a different note the moment a row
+  // welded two of them together: the baseline showed two blocks where the file
+  // has one, so `isHandEdited` called every freshly composed subject index
+  // edited and the reload gate reported its own row as a loss.
+  //
+  // The same function `composeTemplate` uses, so the baseline is composed by
+  // the code that composes the file rather than by a second implementation that
+  // has to be remembered.
+  const body = composeSectionRuns(
+    ids
+      .map((id) => byId.get(id))
+      .filter((s): s is JournalSection => s !== undefined),
+    ctx,
+    (s) => sectionOverrides(ctx, s.id)
+  ).join("\n\n");
   // THE TYPE'S OWN NOTE, NOT THE LEVEL'S NOUN. This read
   // `ctx.type.levels[d].noun` — "Topic", "Lesson" — which is the word a level
   // is CALLED and never the name of any note, so every journal note in the

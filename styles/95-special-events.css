@@ -1078,11 +1078,8 @@ mark.jdr-highlight {
 }
 /* Hide the field itself, not the bar, so the label stays clickable and the
    entry keeps a visible anchor for where captures live.
-   Two children, one rule: the capture log (4.28) folds with the same bar and
-   the same remembered state, so it hides here rather than in a rule of its own
-   that would have to be kept agreeing with this one. */
-.journal-note--collapsible.is-collapsed > .journal-note-input,
-.journal-note--collapsible.is-collapsed > .journal-capture-list {
+   All children except the collapse bar hide when folded. */
+.journal-note--collapsible.is-collapsed > :not(.journal-note-collapse-bar) {
   display: none;
 }
 
@@ -1444,6 +1441,24 @@ body.is-mobile .jcl-action-chip {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  padding: 10px 12px;
+  margin: 0 0 0.9em;
+  transition: border-color 0.15s ease;
+}
+
+.journal-capture-log:focus-within {
+  border-color: var(--interactive-accent);
+}
+
+.journal-capture-log.journal-note--collapsible > .journal-note-collapse-bar {
+  margin-bottom: var(--am-space-1);
+}
+
+.journal-capture-log.journal-note--collapsible.is-collapsed > .journal-note-collapse-bar {
+  margin-bottom: 0;
 }
 
 .journal-widget-card.is-sized > .journal-capture-log,

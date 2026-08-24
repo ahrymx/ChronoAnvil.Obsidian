@@ -202,7 +202,7 @@ describe("patch 6: the setting `extra` has been describing since 2.60.1", () => 
     // surface can set is the same "built and unreachable" shape §1 of the plan
     // opens on, one release later and in the release that quotes it.
     const src = readCode("settings");
-    expect(src).toContain("renderEntrySections");
+    expect(src).toContain("renderCapture");
     expect(src).toContain("s.entrySections[grain] = list");
     // Sparse by grain, so a vault that has customised nothing stores nothing
     // and the default stays `{}` in fact rather than only in name.
@@ -682,12 +682,12 @@ describe("entrySectionMatrix", () => {
   });
 });
 
-describe("the Diary entries group is a derived table", () => {
+describe("the Quick capture group is a derived table", () => {
   // Scoped to the method body — a bare match over a file this size finds a
   // word somewhere and proves nothing (RESUME §6).
   const renderer = (): string => {
     const src = readCode("settings");
-    const at = src.indexOf("private renderEntrySections(");
+    const at = src.indexOf("private renderCapture(");
     expect(at).toBeGreaterThan(0);
     const end = src.indexOf("\n  private ", at + 1);
     return src.slice(at, end === -1 ? src.length : end);
@@ -711,7 +711,7 @@ describe("the Diary entries group is a derived table", () => {
 
   it("keeps the blurb, which is the only thing saying what a section is", () => {
     expect(renderer()).toContain("col-name-sub");
-    expect(renderer()).toContain("section.blurb");
+    expect(renderer()).toContain("captureSection.blurb");
   });
 });
 

@@ -40,21 +40,18 @@ import {
   diarySurface,
   normalizeTrackers,
   surfaceKey,
-  TRACKER_CLASSES,
   trackersScopedToType,
   trackersToSeed,
 } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
 import type { SectionChoice } from "./section-model";
-import { entrySectionMatrix } from "../diary/entry-sections";
+import { ENTRY_SECTIONS, entrySectionMatrix } from "../diary/entry-sections";
 import { bandWithSection } from "../diary/entry-template";
 import type { EntryLayoutConfig } from "../diary/entry-template";
 import type {
   EntrySection,
   EntrySectionContext,
 } from "../diary/entry-sections";
-import { bridgeCatalogue } from "../ui/widgets/bridge-widgets";
-import { otherSurface } from "./bridge";
 import {
   countReadingsOnSurface,
   journalTypeNamer,
@@ -65,14 +62,8 @@ import { syncTrackerConfig } from "../charts/charts";
 import {
   DEFAULT_EVENT_COLOR,
   EVENT_COLORS,
-  EventDef,
-  describeEventDate,
-  eventColor,
-  eventIcon,
 } from "../events/events";
-import { readEvents } from "../events/eventstore";
-import { draftEvent, openEventEditor } from "../events/event-ui";
-import { confirmAction, promptSuggester } from "../ui/modals";
+import { confirmAction, promptEmoji, promptSuggester } from "../ui/modals";
 import { today } from "./util";
 import { initialsOf } from "../ui/vault-banner";
 import {
@@ -120,34 +111,14 @@ export interface AttachmentOptions {
   confirmDelete: boolean;
 }
 
-// What the vault banner is allowed to vary. 4.51.
-//
-// TWO FIELDS, AND THE SECOND IS THE ONLY THING THE READER PICKS. The nav slots
-// are fixed for this release — see `vault-banner.ts` — because configurable nav
-// is a settings surface, an ordering question and a migration, and none of it is
-// needed to find out whether the banner is right.
+// What the vault banner is allowed to vary.
 export interface BannerOptions {
-  enabled: boolean;
-  // What the tile shows. Empty falls back to two initials from the vault's name,
-  // so a fresh vault has something in it rather than a blank square.
-  //
-  // A STRING RATHER THAN AN EMOJI TYPE: an emoji, one letter, three letters, a
-  // symbol — the tile is 38px and the CSS scales to fit whatever is put there.
+  // Optional legacy flag; banner is standard and always active on recognized surfaces.
+  enabled?: boolean;
+  // What the tile shows. Empty falls back to two initials from the vault's name.
   glyph: string;
-  // Whether Almanac's own head and Properties window stand in for Obsidian's
-  // inline title and property panel, on the notes the bar reaches. 4.51.6.
-  //
-  // ON BY DEFAULT, WHICH `hideInlineTitle` WAS NOT (4.51.5, one release old).
-  // That flag hid a title and put nothing in its place, so it was a subtraction
-  // and had to be opted into. This is a REPLACEMENT: the page head names the
-  // note, in a face that says what kind of note it is and with the name
-  // editable, and the bar's Properties button holds every field the panel held.
-  // Turning it off is how a reader gets Obsidian's own two back — and turning
-  // the bar off does it too, which is what keeps the whole release reversible.
-  //
-  // SCOPED TO THE NOTES THE BAR DRAWS ON, always. A note Almanac has nothing to
-  // say about keeps Obsidian's chrome whatever this says.
-  absorb: boolean;
+  // Optional legacy flag; title and properties absorption is standard.
+  absorb?: boolean;
   // Background art pattern file inside `00 - Infrastructure/Art/` (or "none").
   art?: string;
   // Art pattern opacity percentage (0-100).
@@ -705,7 +676,6 @@ export class AlmanacSettingTab extends PluginSettingTab {
     const customCount = s.trackers.filter((t) => !t.builtin).length;
     // Study is in this list now (3.20), so there is nothing to add to it.
     const journalCount = s.customJournals.length;
-    const eventCount = readEvents(this.app, this.plugin).length;
 
     this.renderTrackers(
       this.group(
@@ -731,22 +701,6 @@ export class AlmanacSettingTab extends PluginSettingTab {
       )
     );
 
-    this.renderEvents(
-      this.group(
-        containerEl,
-        "events",
-        "🗓️",
-        "Special events",
-        "Birthdays, holidays, trips — drawn on the diary calendars",
-        false,
-        s.eventsEnabled
-          ? eventCount === 1
-            ? "1 event"
-            : `${eventCount} events`
-          : "Off"
-      )
-    );
-
     this.renderLogbooks(
       this.group(
         containerEl,
@@ -759,29 +713,11 @@ export class AlmanacSettingTab extends PluginSettingTab {
       )
     );
 
-    this.renderEntrySections(
-      this.group(
-        containerEl,
-        "entry-sections",
-        "📓",
-        "Diary entries",
-        "What every new entry starts with, beyond what its grain ships",
-        false,
-        (() => {
-          const n = TRACKER_CLASSES.reduce(
-            (total, g) => total + (s.entrySections[g]?.length ?? 0),
-            0
-          );
-          return n === 0 ? "Default" : n === 1 ? "1 added" : `${n} added`;
-        })()
-      )
-    );
-
     this.renderCapture(
       this.group(
         containerEl,
         "capture",
-        "✏️",
+        "⚡",
         "Quick capture",
         "Getting a thought into an entry without opening it",
         false,
@@ -807,8 +743,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
         "🏷️",
         "Vault banner",
         "The strip above every Almanac note",
-        false,
-        s.banner.enabled ? "On" : "Off"
+        false
       )
     );
 
@@ -842,48 +777,15 @@ export class AlmanacSettingTab extends PluginSettingTab {
 
   // ── The vault banner ────────────────────────────────────────────────────
   //
-  // TWO ROWS, AND NOT ONE MORE (4.51). The nav's four destinations are fixed
-  // for this release (Q9) and the search's sort is session state that
-  // deliberately never reaches `data.json` (Q13), so what is left is the only
-  // two things that are genuinely the reader's: whether the strip is there, and
-  // what its tile says.
-  //
-  // BOTH CALL `refresh()`, because every open note is already showing the old
-  // answer. A setting that takes effect on the next file-open is a setting the
-  // reader presses twice.
+  // The nav's four destinations are fixed (Q9) and the search's sort is session
+  // state that deliberately never reaches `data.json` (Q13). What the reader
+  // customizes is the tile glyph and the banner art / styling.
   private renderBanner(containerEl: HTMLElement): void {
     const s = this.plugin.settings;
     this.note(
       containerEl,
-      "A bar at the top of every note in your diary, your journals and your home page: search, the four places you go most, where this note sits, and its title.",
-      "While it is on, the header block inside those notes draws nothing — nothing is rewritten, so turning it off puts every note back exactly as it was."
+      "A bar at the top of every note in your diary, your journals and your home page: search, the four places you go most, where this note sits, and its title."
     );
-
-    new Setting(containerEl)
-      .setName("Show the banner")
-      .setDesc("Off restores the in-note headers.")
-      .addToggle((c) =>
-        c.setValue(s.banner.enabled).onChange(async (v) => {
-          s.banner.enabled = v;
-          await this.plugin.saveSettings();
-          this.plugin.vaultBanner.refresh();
-          // REDRAWN, because the group's own badge reads On or Off.
-          this.display();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Use Almanac's title and properties")
-      .setDesc(
-        "On the notes this bar appears on, replace Obsidian's note title with Almanac's page head, and its property panel with the bar's Properties button. The note's path, which Obsidian repeats in the tab's own header, is hidden with them. Off puts all three back."
-      )
-      .addToggle((c) =>
-        c.setValue(s.banner.absorb).onChange(async (v) => {
-          s.banner.absorb = v;
-          await this.plugin.saveSettings();
-          this.plugin.vaultBanner.refresh();
-        })
-      );
 
     new Setting(containerEl)
       .setName("Tile")
@@ -990,11 +892,10 @@ export class AlmanacSettingTab extends PluginSettingTab {
   private renderLogbooks(containerEl: HTMLElement): void {
     const s = this.plugin.settings;
 
-    containerEl.createEl("p", {
-      text:
-        "A logbook is a standing note for what belongs to the diary but not to one day — what you worked on, what you are focused on, links to come back to, what is scheduled. Each one is a note in the Logbooks folder, and the logbook: widget draws it on any page.",
-      cls: "setting-item-description",
-    });
+    this.note(
+      containerEl,
+      "A logbook is a standing note for what belongs to the diary but not to one day (work logs, active focuses, links, or scheduled meetings). Embed any logbook into notes and period overviews using the logbook:name widget."
+    );
 
     this.sectionHeader(containerEl, "Logbooks", {
       label: "New logbook",
@@ -1026,172 +927,103 @@ export class AlmanacSettingTab extends PluginSettingTab {
       return;
     }
 
+    const { tbody } = this.createTable(containerEl, [
+      "Icon",
+      "Logbook",
+      "Target note",
+      "Color",
+      "Actions",
+    ]);
+
     for (const book of s.logbooks) {
-      const setting = new Setting(containerEl)
-        .setName(book.name)
-        .setDesc(
-          book.source === "events"
-            ? `${book.path} · everything scheduled ahead, read from the events note`
-            : book.path
-        );
+      const tr = tbody.createEl("tr");
 
-      setting.addText((t) =>
-        t
-          .setPlaceholder("🗒️")
-          .setValue(book.icon)
-          .onChange(async (v) => {
-            book.icon = v.trim() || "🗒️";
+      // 1. Icon / Emoji Button
+      const iconCell = tr.createEl("td");
+      const iconBtn = iconCell.createEl("button", {
+        cls: "almanac-emoji-btn",
+        text: book.icon || "🗒️",
+        attr: {
+          title: "Click to choose icon",
+          "aria-label": "Change logbook icon",
+        },
+      });
+      iconBtn.addEventListener("click", () => {
+        void promptEmoji(this.app, book.icon).then(async (emoji) => {
+          if (emoji && emoji !== book.icon) {
+            book.icon = emoji;
             await this.plugin.saveSettings();
-          })
-      );
-
-      setting.addText((t) =>
-        t
-          .setPlaceholder("Name")
-          .setValue(book.name)
-          .onChange(async (v) => {
-            const next = v.trim();
-            if (!next) return;
-            // THE NOTE DOES NOT FOLLOW THE NAME, and that is the contract
-            // `LogbookDef.path` is stored to keep: a label is retyped, and a
-            // note full of items must not be orphaned by a retype. Rename the
-            // file in the explorer to move it — PathWatch carries the setting.
-            book.name = next;
-            await this.plugin.saveSettings();
-          })
-      );
-
-      // The swatch its items wear on the time grid (4.55).
-      //
-      // A DROPDOWN OF NAMES, NOT A COLOUR PICKER, which is `EVENT_COLORS`' own
-      // rule said again: the stored value is a name the stylesheet resolves per
-      // theme, and a free picker would let a reader choose something that
-      // vanishes in one of the two.
-      //
-      // ON EVERY BOOK, INCLUDING MEETINGS — whose items are events and take
-      // their own colours, so this one is inert. It is drawn anyway rather than
-      // hidden on a `source` test: a row missing a control its neighbours have
-      // reads as a bug, and the honest place for the exception is here.
-      setting.addDropdown((d) => {
-        for (const name of EVENT_COLORS) {
-          d.addOption(name, name.charAt(0).toUpperCase() + name.slice(1));
-        }
-        d.setValue(book.color).onChange(async (v) => {
-          book.color = v;
-          await this.plugin.saveSettings();
+            this.display();
+          }
         });
       });
 
-      setting.addExtraButton((b) =>
-        b
-          .setIcon("trash")
-          .setTooltip("Remove this logbook")
-          .onClick(async () => {
-            // THE NOTE IS LEFT ON DISK, deliberately and without asking. This
-            // list says which logbooks Almanac draws; it is not a filing
-            // cabinet, and a settings row that deleted a reader's writing when
-            // they tidied it away would be the worst kind of surprise.
-            s.logbooks = s.logbooks.filter((other) => other.id !== book.id);
-            await this.plugin.saveSettings();
-            this.display();
-          })
-      );
-    }
-  }
-
-  private renderEvents(containerEl: HTMLElement): void {
-    const s = this.plugin.settings;
-
-    new Setting(containerEl)
-      .setName("Show special events")
-      .setDesc(
-        "Draw recurring and one-off events on the diary calendars. Turning this off hides the decorations and stops new entries recording the day's events, but never changes the events note itself."
-      )
-      .addToggle((t) =>
-        t.setValue(s.eventsEnabled).onChange(async (v) => {
-          s.eventsEnabled = v;
+      // 2. Logbook Name (Clean text input)
+      const nameCell = tr.createEl("td");
+      const nameInput = nameCell.createEl("input", {
+        cls: "almanac-logbook-name-input",
+        type: "text",
+        value: book.name,
+      });
+      nameInput.addEventListener("change", async () => {
+        const next = nameInput.value.trim();
+        if (next && next !== book.name) {
+          book.name = next;
           await this.plugin.saveSettings();
           this.display();
-        })
-      );
+        }
+      });
 
-    new Setting(containerEl)
-      .setName("Events note")
-      .setDesc(
-        "The note whose frontmatter holds the event list. Created on demand; follows a rename automatically."
-      )
-      .addText((t) =>
-        t.setValue(s.paths.events).onChange(async (v) => {
-          const trimmed = v.trim();
-          if (!trimmed) return;
-          s.paths.events = trimmed;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    this.sectionHeader(containerEl, "Events", {
-      label: "New event",
-      icon: "plus",
-      onClick: () =>
-        openEventEditor(this.app, this.plugin, draftEvent(), () =>
-          this.display()
-        ),
-    });
-
-    const defs = readEvents(this.app, this.plugin);
-    if (!defs.length) {
-      this.emptyState(
-        containerEl,
-        "calendar-plus",
-        "No events yet. Birthdays and holidays recur every year; trips, sick days and milestones happen once and can span several days."
-      );
-      return;
-    }
-
-    const ordered = [...defs].sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === "recurring" ? -1 : 1;
-      if (a.kind === "recurring") {
-        return (a.month ?? 0) - (b.month ?? 0) || (a.day ?? 0) - (b.day ?? 0);
-      }
-      return (b.start ?? "").localeCompare(a.start ?? "");
-    });
-
-    const list = containerEl.createDiv({ cls: "almanac-list" });
-    for (const def of ordered) {
-      this.renderEventRow(list, def);
-    }
-  }
-
-  private renderEventRow(containerEl: HTMLElement, def: EventDef): void {
-    const { row, actions } = createListRow(containerEl, {
-      token: "",
-      title: def.title,
-      subtitle: def.note
-        ? `${describeEventDate(def)} · ${def.note}`
-        : describeEventDate(def),
-      pills: [
-        {
-          text: def.kind === "recurring" ? "Yearly" : "One-off",
-          tone: "muted",
+      // 3. Target note path / source
+      const pathCell = tr.createEl("td");
+      pathCell.createDiv({
+        cls: "almanac-logbook-path-cell",
+        text:
+          book.source === "events"
+            ? "Special events (from events note)"
+            : book.path,
+        attr: {
+          title:
+            book.source === "events"
+              ? "Everything scheduled ahead, read from the events note"
+              : book.path,
         },
-      ],
-    });
+      });
 
-    // The same coloured icon token the calendar and the widgets use, so an
-    // event is recognisable wherever it appears.
-    const token = row.querySelector<HTMLElement>(".almanac-list-token");
-    if (token) {
-      token.empty();
-      token.addClass(`am-ev-chip-${eventColor(def)}`);
-      setIcon(token, eventIcon(def));
+      // 4. Color Accent
+      const colorCell = tr.createEl("td");
+      const colorSelect = colorCell.createEl("select", {
+        cls: "dropdown",
+      });
+      for (const name of EVENT_COLORS) {
+        const opt = colorSelect.createEl("option", {
+          value: name,
+          text: name.charAt(0).toUpperCase() + name.slice(1),
+        });
+        if (name === book.color) opt.selected = true;
+      }
+      colorSelect.addEventListener("change", async () => {
+        book.color = colorSelect.value;
+        await this.plugin.saveSettings();
+      });
+
+      // 5. Actions
+      const actionsCell = tr.createEl("td", { cls: "col-actions-cell" });
+      const actions = actionsCell.createDiv({ cls: "col-actions" });
+      rowButton(
+        actions,
+        "trash-2",
+        "Remove this logbook",
+        async () => {
+          s.logbooks = s.logbooks.filter((other) => other.id !== book.id);
+          await this.plugin.saveSettings();
+          this.display();
+        },
+        { danger: true }
+      );
     }
-
-    rowButton(actions, "pencil", "Edit event", () =>
-      openEventEditor(this.app, this.plugin, def, () => this.display())
-    );
   }
 
-  // ── Paths ───────────────────────────────────────────────────────────────
   // ── Mobile ──────────────────────────────────────────────────────────────
   private renderMobile(containerEl: HTMLElement): void {
     const s = this.plugin.settings;
@@ -1371,12 +1203,60 @@ export class AlmanacSettingTab extends PluginSettingTab {
     });
   }
 
-  // ── Attachments ─────────────────────────────────────────────────────────
-  // Governs where the `attach:` widget puts files dropped or pasted into it.
-  // Nothing here rewrites existing links: changing a pattern only affects the
-  // next file added.
+  // ── Quick capture ───────────────────────────────────────────────────────
+  // Governs quick capture inboxes, default fold state, and unsaved drafts.
   private renderCapture(containerEl: HTMLElement): void {
     const s = this.plugin.settings;
+
+    this.note(
+      containerEl,
+      "Quick capture lets you drop thoughts into diary entries without opening them. Captured thoughts are appended to the entry's capture inbox. Entries you already have keep what they have (to add a section, open the note and run “Edit this note's sections…”)."
+    );
+
+    const captureSection = ENTRY_SECTIONS.find((sec) => sec.id === "capture");
+    if (captureSection) {
+      const matrix = entrySectionMatrix();
+      const { tbody } = this.createTable(containerEl, [
+        "Capture stream",
+        ...matrix.grains.map((g) => CLASS_DEFS[g].label),
+      ]);
+
+      const tr = tbody.createEl("tr");
+      const nameCell = tr.createEl("td");
+      const name = nameCell.createDiv({ cls: "col-name" });
+      name.createSpan({ cls: "col-name-token", text: captureSection.icon });
+      name.createSpan({ text: captureSection.label });
+      nameCell.createDiv({
+        cls: "col-name-sub",
+        text: captureSection.blurb,
+      });
+
+      for (const grain of matrix.grains) {
+        const td = tr.createEl("td", { cls: "col-grain" });
+        const state = matrix.cell("capture", grain);
+        if (state === "ships") {
+          td.createSpan({
+            cls: "almanac-cell-ships",
+            text: "Ships",
+            attr: {
+              title: `A new ${CLASS_DEFS[grain].adjective} entry already writes ${captureSection.label}.`,
+            },
+          });
+          continue;
+        }
+        if (state === "absent") {
+          td.createSpan({
+            cls: "almanac-cell-absent",
+            text: "—",
+            attr: {
+              title: `${captureSection.label} is not offered on ${CLASS_DEFS[grain].adjective} entries.`,
+            },
+          });
+          continue;
+        }
+        this.renderEntrySectionCell(td, grain, captureSection, { grain });
+      }
+    }
 
     new Setting(containerEl)
       .setName("Collapse captures by default")
@@ -1413,7 +1293,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
     }
   }
 
-  // ── Diary entries ───────────────────────────────────────────────────────
+  // ── Journal rollups & Entry sections ────────────────────────────────────
   //
   // THE CONTROL §8's PATCH 6 OWED AND DID NOT SHIP. `entrySections` existed,
   // both scaffold paths composed with it, and nothing could write it: the
@@ -1436,151 +1316,8 @@ export class AlmanacSettingTab extends PluginSettingTab {
   // the vault, which is the line layout.ts draws in its own header — and a
   // command would be a third way to do a thing that already has two.
   // Answers to a section's questions that are not yet a complete set. See
-  // `renderEntrySectionRow`: the setting stores complete choices only, so a
-  // partially answered row needs somewhere to live between renders, and this
-  // window is exactly the right lifetime for it.
   private pendingSectionAnswers = new Map<string, Record<string, unknown>>();
 
-  private renderEntrySections(containerEl: HTMLElement): void {
-    this.note(
-      containerEl,
-      "Manage extra sections for new entry templates. Entries you already have keep what they have (to add a section, open the note and run “Edit this note's sections…”)."
-    );
-
-    new Setting(containerEl)
-      .setName("Apply to the templates")
-      .setDesc(
-        "Rewrites the five entry templates from the catalogue and the choices below. Nothing else in the vault is touched, and no entry you have already written is read or changed."
-      )
-      .addButton((b) =>
-        b
-          .setButtonText("Refresh entry templates")
-          .onClick(() => this.plugin.scaffold.refreshTemplates())
-      );
-
-    // The answers to any question a section asks, assembled once for the whole
-    // list rather than per row: it is the same vault five times over, and it
-    // is the same list `section-insert.ts` hands the editor and a refusal
-    // prints. A bridge on an entry reads the surface its host is not on.
-    const journalKinds = bridgeCatalogue(this.plugin, otherSurface("diary")).kinds;
-
-    // ── ONE TABLE, NOT FIVE STACKS (4.27 §3) ──────────────────────────
-    //
-    // This was a headed stack per grain, and across all five grains exactly two
-    // sections are ever offerable — so it drew "From the journals" four times
-    // and "Captured" four times with a heading between each. The same facts are
-    // a grid: a row per section, a column per grain.
-    //
-    // EVERY DECISION IS `entrySectionMatrix`'S. The two calls that used to be
-    // inline here moved into the catalogue, where the suite can reach them —
-    // this loop draws what it is handed and works out nothing for itself.
-    //
-    // HEADERS DERIVED, NEVER FIVE LITERALS. `test/tracker-grains.test.ts`
-    // records the reason: "a sixth grain is a table edit away; a layout that
-    // only works at five breaks silently the moment the table grows".
-    const matrix = entrySectionMatrix(journalKinds);
-    if (!matrix.rows.length) {
-      this.emptyState(
-        containerEl,
-        "layout-template",
-        "Every grain's template already writes every section this catalogue offers."
-      );
-      return;
-    }
-
-    const { tbody } = this.createTable(containerEl, [
-      "Section",
-      ...matrix.grains.map((g) => CLASS_DEFS[g].label),
-    ]);
-
-    for (const section of matrix.rows) {
-      const tr = tbody.createEl("tr");
-      const ctxFor = (grain: TrackerClass): EntrySectionContext => ({
-        grain,
-        journalKinds,
-      });
-
-      // Nothing in the vault to answer this section's question with — a
-      // sentence in the section's own words rather than an empty menu, exactly
-      // as the stacked row said it.
-      //
-      // SAID ONCE, IN THE ROW, rather than in each of four cells: the answer
-      // does not vary by grain (it is the same vault five times over, which is
-      // why `journalKinds` is assembled once above), so four copies would be
-      // one fact repeated until it read as noise. The grain cells then draw no
-      // control, because a dropdown whose only entry is "Not added" is a
-      // control that cannot do its job.
-      const offering = matrix.grains.find(
-        (g) => matrix.cell(section.id, g) === "offer"
-      );
-      const unanswerable = offering
-        ? (section.questions?.(ctxFor(offering)) ?? []).find(
-            (q) => q.kind === "choice" && !q.values.length
-          )
-        : undefined;
-
-      const nameCell = tr.createEl("td");
-      const name = nameCell.createDiv({ cls: "col-name" });
-      name.createSpan({ cls: "col-name-token", text: section.icon });
-      name.createSpan({ text: section.label });
-      nameCell.createDiv({
-        cls: "col-name-sub",
-        text:
-          unanswerable && unanswerable.kind === "choice"
-            ? `${section.blurb} — ${unanswerable.empty}`
-            : section.blurb,
-      });
-
-      for (const grain of matrix.grains) {
-        const td = tr.createEl("td", { cls: "col-grain" });
-        const state = matrix.cell(section.id, grain);
-        if (state === "ships") {
-          // A STATEMENT OF FACT IS NOT A STATUS CHIP. Plain muted text, with
-          // the reason on hover — five pills across a row is decoration where
-          // the eye is looking for the one cell that has a control in it.
-          td.createSpan({
-            cls: "almanac-cell-ships",
-            text: "Ships",
-            attr: {
-              title: `A new ${CLASS_DEFS[grain].adjective} entry already writes ${section.label}.`,
-            },
-          });
-          continue;
-        }
-        if (state === "absent") {
-          td.createSpan({
-            cls: "almanac-cell-absent",
-            text: "—",
-            attr: {
-              title: `${section.label} is not offered on ${CLASS_DEFS[grain].adjective} entries.`,
-            },
-          });
-          continue;
-        }
-        if (unanswerable) continue;
-        this.renderEntrySectionCell(td, grain, section, ctxFor(grain));
-      }
-    }
-  }
-
-  // One offerable section, for one grain.
-  //
-  // TWO CONTROL SHAPES, AND THE SECTION DECIDES WHICH. A section that asks the
-  // reader nothing is a toggle. A section that asks something is the QUESTION,
-  // with "Not added" as its first answer — because for the one section that
-  // asks, the two decisions are one decision: a bridge with no journal to pull
-  // is not an off bridge, it is not a bridge. Splitting them into a toggle plus
-  // a dropdown would produce a fourth state (on, unanswered) that means
-  // nothing, and the editor's whole patch-7 rule exists to keep that state from
-  // being savable.
-  //
-  // AND HERE THE ANSWER STAYS EDITABLE, where in the section editor it does
-  // not. That asymmetry is not an oversight and is worth stating in the one
-  // place a reader might notice it: a template is COMPOSED from this setting
-  // every time it is refreshed, so rewriting the answer costs nothing. An
-  // entry is the reader's file, its directive line is copied out verbatim on
-  // Save, and rewriting it would be this window editing prose it did not write.
-  // Same field, two surfaces, and the difference is who owns the bytes.
   private renderEntrySectionCell(
     td: HTMLElement,
     grain: TrackerClass,
@@ -1592,25 +1329,6 @@ export class AlmanacSettingTab extends PluginSettingTab {
     const chosen = current.find((c) => c.id === section.id);
     const questions = section.questions?.(ctx) ?? [];
 
-    // Answers given but not yet complete, held across the re-render `write`
-    // triggers. Keyed by grain and section so two rows cannot read each
-    // other's.
-    //
-    // THE SETTING IS NOT THE RIGHT PLACE TO HOLD HALF AN ANSWER, which is why
-    // this is a field on the tab rather than a permissive `entrySections`. A
-    // stored half-choice would compose a directive the catalogue already knows
-    // will refuse, and `composeEntryTemplate` has no way to tell one from a
-    // finished one. So the storage stays complete-or-absent and the partial
-    // lives exactly as long as the settings window does.
-    //
-    // WITHOUT THIS THE SECOND QUESTION IS UNANSWERABLE. `write(null)` deletes
-    // the choice, `display()` re-renders from the setting, and the first
-    // dropdown comes back reading "Not added" — so answering question two
-    // discards question one, forever. Unreachable today: `bridge` asks exactly
-    // one thing, so `complete` is true on the first answer and `write(null)` is
-    // never taken with anything worth keeping. It is a trap laid for whoever
-    // adds the second question rather than a defect anyone can hit, and it is
-    // cheaper to close now than to find later.
     const pendingKey = `${grain}:${section.id}`;
     const held = {
       ...(this.pendingSectionAnswers.get(pendingKey) ?? {}),
@@ -1620,27 +1338,12 @@ export class AlmanacSettingTab extends PluginSettingTab {
     const write = async (next: SectionChoice | null): Promise<void> => {
       const rest = current.filter((c) => c.id !== section.id);
       const list = next ? [...rest, next] : rest;
-      // Sparse by grain: an empty list is an absent key, so a vault that has
-      // customised nothing stores nothing and `DEFAULT_SETTINGS.entrySections`
-      // stays `{}` in fact as well as in name.
       if (list.length) s.entrySections[grain] = list;
       else delete s.entrySections[grain];
-      // AND THE SAVED BAND KEEPS UP (4.29).
-      //
-      // A grain whose reader has pressed "Save this page as the default" has a
-      // BAND, and a band is authoritative: it is the shared band, membership
-      // and order. So this toggle has to reach it, or ticking Captured for
-      // weekly here would change a setting and nothing else — the exact
-      // "built and unreachable" shape this table was added to fix, arriving by
-      // the other door.
-      //
-      // THE DECISION IS `bandWithSection`'S, not this closure's. A rule written
-      // inside a `write` handler is one the suite cannot reach, and a wrong
-      // answer here looks like a setting that does nothing rather than like a
-      // bug. A grain with no band gets `undefined` back and is left alone.
       const band = bandWithSection(s.entrySectionBand[grain], section.id, next != null);
       if (band) s.entrySectionBand[grain] = band;
       await this.plugin.saveSettings();
+      await this.plugin.scaffold.refreshDiaryTemplate(grain);
       this.display();
     };
 
@@ -1677,7 +1380,10 @@ export class AlmanacSettingTab extends PluginSettingTab {
         d.addOption("", "Not added");
         for (const v of q.values) d.addOption(v.value, v.label);
         d.setValue(typeof answer === "string" ? answer : "");
+        if (typeof answer === "string" && answer) d.selectEl.addClass("has-value");
         d.onChange((v) => {
+          if (v) d.selectEl.addClass("has-value");
+          else d.selectEl.removeClass("has-value");
           const options = { ...held };
           if (v) options[q.key] = v;
           else delete options[q.key];

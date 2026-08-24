@@ -16,6 +16,7 @@ import { JOURNAL_CHARTS_FENCE } from "../charts/journal-charts";
 import { plural } from "../core/util";
 import type { SectionQuestion } from "../core/section-model";
 import { SCOPE_ALL, SCOPE_JOURNAL } from "../core/directive-grammar";
+import { rowRuns } from "../core/note-sections";
 import {
   STATS_BAND_WORDS,
   STAT_PRESET_SHORTHAND,
@@ -280,6 +281,47 @@ export interface JournalSection {
   // agree — a schematic that used different icons from the finished note would
   // be teaching an arrangement nobody is going to see.
   icon: string;
+  // Which composed ROW this section is a cell of, and which CELL of it — 4.70.
+  //
+  // `FlatSection.row` AND `.cell`'s MEANINGS, argued in full there and not
+  // repeated: an id rather than a flag, consecutive members only, and an absent
+  // `cell` is not a value.
+  //
+  // ── AND ONLY A SINGLE-FENCE SECTION CAN HONOUR THEM ──────────────────
+  //
+  // This is the one catalogue where the field is a REQUEST rather than an
+  // instruction, and the reason is `SectionBlock`. A journal section renders a
+  // LIST of blocks, and three of the kinds cannot be a column of anything: a
+  // `region` is the reader's writing in the note body and lives outside every
+  // fence, and `markdown` is prose indistinguishable from theirs. So a section
+  // that emits either has nothing a `cell` line could delimit, and
+  // `composeSectionRuns` drops its row rather than composing a fence that would
+  // swallow the blocks after it.
+  //
+  // WHICH SECTIONS THAT EXCLUDES IS NOT A LIST KEPT HERE, deliberately — it is
+  // whatever `render` returns, asked at compose time, so a section that gains a
+  // region next release stops being a column without anybody remembering to
+  // come back and say so. Today it is `path`, `resources`, `headings`, `recall`,
+  // `checklist` and `prose`.
+  //
+  // ── A FUNCTION OF THE CONTEXT, WHERE THE OTHER THREE CATALOGUES TAKE A
+  //    STRING ──────────────────────────────────────────────────────────
+  //
+  // One catalogue serves two shapes of page here — a container index and a leaf
+  // index — and `default` already reads `ctx.hasSubContainers` to tell them
+  // apart. A row that a section joins on one and not the other cannot be a
+  // constant, and the alternative is worse than a callback: it is the same
+  // section written twice, once per surface, with the drift that always
+  // follows.
+  //
+  // WHAT IT IS ACTUALLY FOR is the bar. A `header:` in a row fence is drawn
+  // ONCE, full width, above the columns (`row.ts`), so a row carries exactly one
+  // title, worded for the band, composed by the cell that OPENS it — and the
+  // cells after it compose none. A section that is a column on one surface and a
+  // full-width block on the other therefore has to render differently on each,
+  // and the two answers have to agree. Asking one predicate is how they do.
+  row?: string | ((ctx: SectionContext) => string | undefined);
+  cell?: string;
   surface: SectionSurface;
 
   // Structurally possible here at all. Distinct from `default`: a section that
@@ -484,6 +526,78 @@ export function renderSection(
   }, "");
 }
 
+// A run of sections as the markdown blocks they compose to. 4.70.
+//
+// WHAT THIS ADDS TO `renderSection`, WHICH IS ONE THING: adjacent sections that
+// asked to share a row, and can, are returned as ONE fence instead of two.
+// Everything else about what a section renders is unchanged, which is why this
+// wraps that function rather than replacing it.
+//
+// ── CHUNKED FIRST, SO THE ROW RULE IS STILL `rowRuns`' ───────────────────
+//
+// Only a section whose whole render is a single `fence` block can be a column
+// (see `JournalSection.row`). Rather than teach the shared row rule about block
+// kinds — a fact that exists in this catalogue and nowhere else — the list is
+// split into maximal runs of column-capable sections, and only those runs are
+// handed to `rowRuns`. A section that cannot be a column is emitted between
+// them, whole and untouched.
+//
+// That keeps one implementation of what a `row` line and a `cell` delimiter
+// mean, which is the property the extraction was for: four catalogues that
+// compose rows, one function that decides what a row is.
+// A section's row on this surface, whichever way the catalogue declared it.
+export function rowOf(
+  section: JournalSection,
+  ctx: SectionContext
+): string | undefined {
+  return typeof section.row === "function" ? section.row(ctx) : section.row;
+}
+
+export function composeSectionRuns(
+  sections: readonly JournalSection[],
+  ctx: SectionContext,
+  optionsFor?: (section: JournalSection) => SectionOverrides | undefined
+): string[] {
+  const rendered = sections.map((section) => {
+    const opts = optionsFor?.(section);
+    const blocks = section.render(ctx, opts);
+    return {
+      section,
+      opts,
+      // A LONE FENCE AND NOTHING ELSE. Asked of what `render` actually returned,
+      // so the answer cannot go stale against a section that grows a region.
+      column: blocks.length === 1 && blocks[0].kind === "fence",
+      blocks,
+    };
+  });
+
+  const out: string[] = [];
+  let chunk: typeof rendered = [];
+  const flush = (): void => {
+    if (!chunk.length) return;
+    for (const run of rowRuns(
+      chunk.map((r) => ({ row: rowOf(r.section, ctx), cell: r.section.cell, r })),
+      ({ r }) => {
+        const block = r.blocks[0] as Extract<SectionBlock, { kind: "fence" }>;
+        return { fence: block.info, lines: block.lines };
+      }
+    )) {
+      out.push(renderBlock({ kind: "fence", info: run.fence, lines: run.lines }));
+    }
+    chunk = [];
+  };
+  for (const r of rendered) {
+    if (r.column) {
+      chunk.push(r);
+      continue;
+    }
+    flush();
+    out.push(renderSection(r.section, ctx, r.opts));
+  }
+  flush();
+  return out;
+}
+
 // Whether a section can be removed from a file it is already in.
 //
 // DERIVED, not declared. A section is removable exactly when everything it
@@ -633,6 +747,39 @@ function trackerSeeds(ctx: SectionContext, opts?: SectionOverrides): string[] {
   }
   return out;
 }
+
+// ── THE ONE ROW A JOURNAL TEMPLATE COMPOSES (4.70) ───────────────────────
+//
+// A CONTAINER INDEX ONLY, which `hasSubContainers` is the discriminator for and
+// which is not a hedge: on a container index both cells are composed by default
+// — Review always, Open tasks because there is a tree beneath to collect from —
+// and on a leaf index Open tasks is not. A row of one is not a row, so declaring
+// it there would rely on `rowRuns` undoing it, and a reader who ticked Open
+// tasks onto a Topic index would get the two welded under a band title neither
+// of them had asked for.
+//
+// "DUE AND OPEN" IS THE BAND, AND IT IS THE THIRD PAGE TO USE THOSE WORDS —
+// the journals dashboard and each journal's own dashboard pair the same two
+// widgets under the same bar. That is deliberate: a reader who learns what the
+// band means on one page has learned it everywhere, and the wording is true of
+// the pair rather than of either half, which is what a row's single full-width
+// bar requires.
+//
+// ── AND THE TWO ROWS 4.70 LOOKED AT AND DID NOT COMPOSE ─────────────────
+//
+// FIND BESIDE REVIEW was the obvious first pairing — they are adjacent, both
+// compact, both a single fence. There is no honest name for the band. "Find" is
+// a control the reader types into and "Review" is a list the plugin produces,
+// and a bar naming one of them over both is worse than a bar naming neither.
+//
+// STATS BESIDE REVIEW on the leaf index, which is the pairing the release plan
+// proposed for Topic, Project and Title. Declined because `stats-band` is
+// ALREADY a horizontal band: four numbered cells dividing the width of the
+// block, laid out by the widget rather than by the fence. Halving that width
+// does not compress it, it wraps it into two rows of two — the same objection
+// the tracker grid makes one file over, and the reason neither is a column.
+const DUE_ROW = "due";
+const DUE_BAR = "header:🔁 Due and open";
 
 export const JOURNAL_SECTIONS: JournalSection[] = [
   {
@@ -993,7 +1140,61 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     ],
     claims: ["header", "review-queue"],
     locate: (t) => probe(t, /^review-queue\b/m),
-    render: () => [fence(["header:🔁 Review", "review-queue"])],
+    // THE CELL THAT OPENS THE ROW, so on a container index this composes the
+    // band's single bar and Open tasks below composes none. On a leaf index
+    // there is no row and it keeps the title it has always written.
+    row: (ctx) => (ctx.hasSubContainers ? DUE_ROW : undefined),
+    render: (ctx) => [
+      fence([ctx.hasSubContainers ? DUE_BAR : "header:🔁 Review", "review-queue"]),
+    ],
+  },
+
+  {
+    id: "tasks",
+    // ⏳ AND NOT 📊 — 4.25 §1. This was the charts glyph on the open-tasks
+    // section, and it was the only one: `widget-registry.ts`, both dashboard
+    // catalogues and `home-sections.ts` all token this widget with the hourglass.
+    // The `header:` line two dozen lines below carried the same mistake, so one
+    // section drew the wrong icon in the section editor AND wrote the wrong one
+    // into the note.
+    icon: "⏳",
+    label: "Open tasks",
+    blurb: "Every unfinished task in the notes beneath this one.",
+    surface: "index",
+    default: (ctx) => ctx.hasSubContainers,
+    questions: (ctx) => [
+      {
+        kind: "folder",
+        key: "folder",
+        label: "the folder to collect tasks from",
+        directive: "tasks-table",
+        hostFolder: ctx.hostFolder ?? null,
+        // 3.18 §5.3. Offered BY NAME rather than left for a reader to guess the
+        // spelling of, which is the rule 3.15 §9.1 settled for `journal-search`.
+        // `all` is deliberately not offered here: every registered journal's
+        // open tasks on one subject's dashboard is a table nobody asked for,
+        // and the word means something broader than the button that cycles to
+        // this one says.
+        keywords: [{ value: SCOPE_JOURNAL, label: "This whole journal" }],
+      },
+    ],
+    claims: ["header", "tasks-table"],
+    locate: (t) => probe(t, /^tasks-table\b/m),
+    // THE SECOND CELL, AND SO NO BAR — see `DUE_BAR` above the catalogue. Ticked
+    // onto a leaf index, where there is no row, it composes its own title again.
+    //
+    // MOVED UP THE CATALOGUE IN 4.70, from last among the index sections to
+    // directly under Review, because catalogue order is composition order and
+    // two cells of one row have to be adjacent. What it displaced — Progress and
+    // Charts — are the two blocks that read as the bottom of the page anyway.
+    row: (ctx) => (ctx.hasSubContainers ? DUE_ROW : undefined),
+    render: (ctx) => [
+      fence(
+        ctx.hasSubContainers
+          ? ["tasks-table"]
+          : ["header:⏳ Open tasks", "tasks-table"]
+      ),
+    ],
   },
 
   {
@@ -1078,40 +1279,6 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     render: (_ctx, opts) => [
       fence([`journal-tally:${opts?.tracker ?? DEFAULT_TALLY_TRACKER}`]),
     ],
-  },
-
-  {
-    id: "tasks",
-    // ⏳ AND NOT 📊 — 4.25 §1. This was the charts glyph on the open-tasks
-    // section, and it was the only one: `widget-registry.ts`, both dashboard
-    // catalogues and `home-sections.ts` all token this widget with the hourglass.
-    // The `header:` line two dozen lines below carried the same mistake, so one
-    // section drew the wrong icon in the section editor AND wrote the wrong one
-    // into the note.
-    icon: "⏳",
-    label: "Open tasks",
-    blurb: "Every unfinished task in the notes beneath this one.",
-    surface: "index",
-    default: (ctx) => ctx.hasSubContainers,
-    questions: (ctx) => [
-      {
-        kind: "folder",
-        key: "folder",
-        label: "the folder to collect tasks from",
-        directive: "tasks-table",
-        hostFolder: ctx.hostFolder ?? null,
-        // 3.18 §5.3. Offered BY NAME rather than left for a reader to guess the
-        // spelling of, which is the rule 3.15 §9.1 settled for `journal-search`.
-        // `all` is deliberately not offered here: every registered journal's
-        // open tasks on one subject's dashboard is a table nobody asked for,
-        // and the word means something broader than the button that cycles to
-        // this one says.
-        keywords: [{ value: SCOPE_JOURNAL, label: "This whole journal" }],
-      },
-    ],
-    claims: ["header", "tasks-table"],
-    locate: (t) => probe(t, /^tasks-table\b/m),
-    render: () => [fence(["header:⏳ Open tasks", "tasks-table"])],
   },
 
   {

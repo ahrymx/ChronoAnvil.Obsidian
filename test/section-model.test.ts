@@ -366,6 +366,10 @@ describe("the editor cannot learn which surface it is on", () => {
       // `title` and unlike the bridge's `choice` it is never required: unanswered
       // is the bar, which is what every dashboard already holds.
       "diary dashboard/summary",
+      // 4.70: the rollup opens the body row and so owns the one `header:` that
+      // row gets, which is a `FormQuestion` — the same bar toggle `summary` has
+      // carried since 4.59.
+      "diary dashboard/entry-rollup",
       "diary dashboard/open-tasks",
       "diary dashboard/tags",
       "diary entry/bridge",

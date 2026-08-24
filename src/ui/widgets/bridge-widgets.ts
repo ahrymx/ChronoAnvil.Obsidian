@@ -27,7 +27,7 @@
 // The switch in index.ts still keeps the routing. What it does not keep is the
 // work.
 
-import { MarkdownPostProcessorContext, Menu, TFile } from "obsidian";
+import { MarkdownPostProcessorContext, Menu, setIcon, TFile } from "obsidian";
 import type AlmanacPlugin from "../../main";
 import {
   otherSurface,
@@ -308,7 +308,14 @@ function bridgeHeader(
   label: string | null,
   count: number | null,
   snap: { frozen: boolean; takenIso: string | null },
-  actions: { freeze: () => void; refresh: () => void; thaw: () => void; rescoping: boolean }
+  actions: {
+    freeze: () => void;
+    refresh: () => void;
+    thaw: () => void;
+    rescoping: boolean;
+    toggleMode?: () => void;
+    mode?: "cards" | "list";
+  }
 ): void {
   // A BRIDGE IS A SECTION. That is what it is to a reader — a titled band with
   // a count and a menu, holding a list — so it is built from the same frame as
@@ -341,7 +348,30 @@ function bridgeHeader(
         : plan.window.label,
   });
 
+  if (actions.toggleMode && !snap.frozen) {
+    const viewBtn = frame.actions.createEl("button", {
+      cls: "clickable-icon journal-widget-viewmode",
+      attr: {
+        "aria-label": "Toggle cards / list view",
+        title: "Toggle cards / list view",
+      },
+    });
+    setIcon(viewBtn, actions.mode === "cards" ? "list" : "layout-grid");
+    viewBtn.addEventListener("click", (evt) => {
+      evt.stopPropagation();
+      actions.toggleMode?.();
+    });
+  }
+
   const buildMenu = (menu: Menu): void => {
+    if (actions.toggleMode && !snap.frozen) {
+      menu.addItem((i) =>
+        i
+          .setTitle(actions.mode === "cards" ? "Switch to list view" : "Switch to cards view")
+          .setIcon(actions.mode === "cards" ? "list" : "layout-grid")
+          .onClick(actions.toggleMode!)
+      );
+    }
     // Freezing is not offered where it cannot mean anything — a dashboard that
     // re-scopes in place would keep the snapshot when the reader pressed next.
     if (!snap.frozen && actions.rescoping) {
@@ -562,23 +592,34 @@ function buildBridge(
         ? region.split("\n").filter((l) => l.trim()).length
         : null;
 
+      let mode: "cards" | "list" = "cards";
       const head = createDiv();
-      bridgeHeader(head, plan, label, frozenRows, snap, {
-        freeze: act(
-          async () => writeSnapshot(plugin, path, key, await rowsFor(plan), false),
-          "Bridge frozen."
-        ),
-        refresh: act(
-          async () => writeSnapshot(plugin, path, key, await rowsFor(plan), true),
-          "Snapshot refreshed."
-        ),
-        thaw: act(async () => {
-          await clearSnapshot(plugin, path, key);
-          return true;
-        }, "Bridge is live again."),
-        rescoping: isRescopingDashboard(plugin, path),
-      });
-      el.prepend(...Array.from(head.children));
+      const redrawHeader = (currentMode: "cards" | "list") => {
+        head.empty();
+        bridgeHeader(head, plan, label, frozenRows, snap, {
+          freeze: act(
+            async () => writeSnapshot(plugin, path, key, await rowsFor(plan), false),
+            "Bridge frozen."
+          ),
+          refresh: act(
+            async () => writeSnapshot(plugin, path, key, await rowsFor(plan), true),
+            "Snapshot refreshed."
+          ),
+          thaw: act(async () => {
+            await clearSnapshot(plugin, path, key);
+            return true;
+          }, "Bridge is live again."),
+          rescoping: isRescopingDashboard(plugin, path),
+          mode: currentMode,
+          toggleMode: () => {
+            mode = mode === "cards" ? "list" : "cards";
+            (body as HTMLElement & { toggleMode?: (m: "cards" | "list") => void }).toggleMode?.(mode);
+            redrawHeader(mode);
+          },
+        });
+      };
+      redrawHeader(mode);
+      el.prepend(head);
 
       if (snap.frozen && region.trim()) renderFrozen(body, region);
       else fill(body, plan);
@@ -628,18 +669,64 @@ export function buildBridgeNotesRegion(
           );
           return;
         }
-        const list = body.createEl("ul", { cls: "am-bridge-list" });
-        for (const hit of hits) {
-          const row = list.createEl("li", { cls: "am-bridge-row" });
-          row.createEl("a", {
-            cls: "internal-link",
-            text: hit.entry.title,
-            href: hit.entry.path,
-          });
-          if (hit.entry.iso) {
-            row.createSpan({ cls: "am-bridge-date", text: hit.entry.iso });
+
+        let mode: "cards" | "list" = "cards";
+        const renderContent = () => {
+          body.empty();
+          if (mode === "cards") {
+            const cards = body.createDiv({ cls: "am-bridge-cards" });
+            for (const hit of hits) {
+              const card = cards.createDiv({ cls: "am-bridge-card" });
+              card.addEventListener("click", (e) => {
+                if (!(e.target instanceof HTMLAnchorElement)) {
+                  void plugin.app.workspace.openLinkText(hit.entry.path, "");
+                }
+              });
+              const main = card.createDiv({ cls: "am-bridge-card-main" });
+              main.createEl("a", {
+                cls: "internal-link am-bridge-card-title",
+                text: hit.entry.title,
+                href: hit.entry.path,
+              });
+              if (hit.entry.tags && hit.entry.tags.length > 0) {
+                const meta = main.createDiv({ cls: "am-bridge-card-meta" });
+                for (const tag of hit.entry.tags.slice(0, 3)) {
+                  meta.createSpan({ cls: "tag", text: tag.startsWith("#") ? tag : `#${tag}` });
+                }
+              }
+              const right = card.createDiv({ cls: "am-bridge-card-right" });
+              if (hit.entry.openTasks > 0) {
+                right.createSpan({
+                  cls: "am-bridge-badge",
+                  text: `✓ ${hit.entry.openTasks}`,
+                });
+              }
+              if (hit.entry.iso) {
+                right.createSpan({ cls: "am-bridge-date", text: hit.entry.iso });
+              }
+            }
+          } else {
+            const list = body.createEl("ul", { cls: "am-bridge-list" });
+            for (const hit of hits) {
+              const row = list.createEl("li", { cls: "am-bridge-row" });
+              row.createEl("a", {
+                cls: "internal-link",
+                text: hit.entry.title,
+                href: hit.entry.path,
+              });
+              if (hit.entry.iso) {
+                row.createSpan({ cls: "am-bridge-date", text: hit.entry.iso });
+              }
+            }
           }
-        }
+        };
+
+        (body as HTMLElement & { toggleMode?: (m: "cards" | "list") => void }).toggleMode = (m) => {
+          mode = m;
+          renderContent();
+        };
+
+        renderContent();
       })();
     },
     (plan) => (plan.surface === "journal" ? journalFolders : diaryFolders(plugin)),

@@ -127,6 +127,73 @@ describe("reading a template back", () => {
     expect(isHandEdited(hacked, ctx)).toBe(true);
   });
 
+  // ── THE ROW FENCE, WHICH IS TWO SECTIONS IN ONE BLOCK (4.70) ──────────
+  //
+  // A subject index composes `row / header:🔁 Due and open / review-queue /
+  // tasks-table`. Every property this describe block asserts about a template
+  // was written when one fence meant one section, so the row is the first thing
+  // that could break any of them — and the three cases below are the ones that
+  // only a row can reach.
+  it("attributes both cells of a row fence", () => {
+    const subject = allTemplates().find((t) => t.file.includes("subject"))!;
+    const present = sectionsPresent(subject.text, subject.ctx);
+    expect(present).toContain("review");
+    expect(present).toContain("tasks");
+    // And in file order, which is what the reorder pass is measured against.
+    expect(present.indexOf("review")).toBeLessThan(present.indexOf("tasks"));
+  });
+
+  it("cuts one cell out of a row and leaves the other exactly as it was", () => {
+    // The case `applySections` could not reach before this release: a fence
+    // that loses SOME of its sections has to be rewritten rather than dropped
+    // or kept. Both directions are checked, because the cell that opens the row
+    // composes the band's bar and the one after it composes none — so removing
+    // the first takes a `header:` line with it and removing the second does
+    // not, and each has to leave a fence that is still valid grammar.
+    const subject = allTemplates().find((t) => t.file.includes("subject"))!;
+    const ids = sectionsPresent(subject.text, subject.ctx);
+
+    const noReview = applySections(
+      subject.text,
+      subject.ctx,
+      ids.filter((id) => id !== "review")
+    );
+    expect(noReview).toContain("```almanac\ntasks-table\n```");
+    expect(noReview).not.toContain("review-queue");
+    // A ROW OF ONE IS NOT A ROW — the `row` line goes with the second-to-last
+    // cell, or the editor draws a group over a section grouped with nothing.
+    expect(noReview).not.toContain("\nrow\n");
+
+    const noTasks = applySections(
+      subject.text,
+      subject.ctx,
+      ids.filter((id) => id !== "tasks")
+    );
+    expect(noTasks).toContain("```almanac\nheader:🔁 Due and open\nreview-queue\n```");
+    expect(noTasks).not.toContain("tasks-table");
+  });
+
+  it("puts a cut cell back into its row, not beside it", () => {
+    // THE PROPERTY THE CUT EXISTS FOR: remove a section, put it back, and the
+    // file is the file you started with. The ordinary add path composes a
+    // BLOCK, and a cut cell came out of a fence somebody else is still in — so
+    // without `joinRowChunk` this restores a template whose row has become two
+    // stacked blocks, and nothing tells the reader their page changed shape.
+    const subject = allTemplates().find((t) => t.file.includes("subject"))!;
+    const ids = sectionsPresent(subject.text, subject.ctx);
+    for (const drop of ["review", "tasks"]) {
+      const without = applySections(
+        subject.text,
+        subject.ctx,
+        ids.filter((id) => id !== drop)
+      );
+      expect(without, drop).not.toBeNull();
+      expect(applySections(without as string, subject.ctx, ids), drop).toBe(
+        subject.text
+      );
+    }
+  });
+
   it("keeps a retitled header attributed to its section", () => {
     // Headers are retitleable, which layout.ts settled for dashboards. A
     // reader who renamed a section's bar still has that section, and a parser

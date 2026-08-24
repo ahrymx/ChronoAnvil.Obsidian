@@ -19,7 +19,7 @@ import { keywordOf } from "../../core/layout";
 import {
   buildDiarySearch,
 } from "../../diary/diary-retrieval";
-import { buildStudyHeader, buildJournalContext } from "../../journals/study-header";
+import { buildJournalContext } from "../../journals/study-header";
 // The one copy of what each superseded band spelling means. See the two arms
 // in `buildFromSpec` that read it.
 import { STATS_BAND_ALIASES } from "../../journals/stats-band";
@@ -90,6 +90,7 @@ import {
   buildJournalTallyRegion,
   buildJournalChartRegion,
   buildJournalSearchRegion,
+  buildJournalRecentRegion,
   buildJournalsHeaderRegion,
   buildJournalCardRegion,
   buildJournalCardsRegion,
@@ -128,6 +129,7 @@ import {
   recomputeSleepInFrontmatter,
 } from "../../trackers/trackers";
 import { buildSleepSummary } from "../../trackers/sleep";
+import { buildTrackerStat } from "../../trackers/tracker-stat";
 import {
   describeSurfaceMismatch,
   directiveAllowedOn,
@@ -140,7 +142,6 @@ import {
   parseChartDirectives,
 } from "../../charts/charts";
 import {
-  buildEntryHeader,
   buildEntryContext,
 } from "../../diary/entryheader";
 import { buildPeriodNav } from "../../diary/periodnav";
@@ -176,7 +177,6 @@ import {
   cardWidget,
   stampLines,
 } from "./block-drag";
-import { buildPageTitle } from "./page-title";
 import { livePageHead } from "./page-head";
 import { buildLauncher, LAUNCHER_DEFAULT } from "./launcher";
 import {
@@ -445,10 +445,13 @@ const SECTION_TITLES: Record<string, string> = {
   logbook: "🗒️ Logbook",
   "time-grid": "⏱️ The week by the hour",
   "on-this-day": "🕘 On this day",
+  upcoming: "⏭️ Coming up",
+  "tracker-stat": "📉 Tracker",
   "tasks-table": "⏳ Open tasks",
   "tag-index": "🏷️ Tags",
   "review-queue": "🔁 Review",
   "journal-search": "🔎 Find",
+  "journal-recent": "🕒 Lately",
   "diary-search": "🔎 Search",
   "topics-table": "🗂 Topics",
   // The band gets a head; the tally does not, because it draws its own title
@@ -468,12 +471,12 @@ const SECTION_TITLES: Record<string, string> = {
   "pages-table": "📄 Pages",
   "kind-table": "🗂 Notes",
   "activity-chart": "📈 Activity",
-  // THE NAME THE CATALOGUE ALREADY GIVES IT (`home-sections.ts`, "Go to"), and
+  // THE NAME THE CATALOGUE ALREADY GIVES IT (`home-sections.ts`, "Overview navigator"), and
   // it is here for what the name BRINGS rather than for the name. A widget the
   // map cannot name gets no head and no card, so the launcher was four tiles on
   // the page's own background beside three widgets that each had a surface —
   // the one block on the homepage that looked unfinished. 4.8.1.
-  launcher: "🧭 Go to",
+  launcher: "🧭 Overview navigator",
   // ── the six that had none, 4.15 §1 ──────────────────────────────────
   //
   // THE COMMENT ABOVE WAS TRUE OF SIX MORE WIDGETS AND SAID SO ABOUT ONE. A
@@ -2092,6 +2095,15 @@ export class Widgets implements
         // readout. Its own writes re-derive the Sleep property.
         widget = buildSleep(this, ctx);
         break;
+      // EVERY DIARY GRAIN IS A SOURCE, so the scope is the diary root rather than
+      // the daily folder: `scopesFor` decides which folder a tracker's readings
+      // live in, and a monthly tracker's band must repaint when a monthly entry
+      // is written. `sleep-summary` below can scope to `diaryDaily` because the
+      // two built-ins it reads are daily by construction; this one cannot.
+      case "tracker-stat":
+        return liveScopedWidget(this.plugin, ctx, this.plugin.settings.paths.diaryRoot, () =>
+          buildTrackerStat(this.plugin, rest)
+        );
       case "sleep-summary":
         return liveScopedWidget(this.plugin, ctx, this.plugin.settings.paths.diaryDaily, () =>
           buildSleepSummary(this.plugin)
@@ -2119,34 +2131,7 @@ export class Widgets implements
       // been. A line with nothing to draw is a fact about the fence.
       case "entry-header":
       case "journal-header":
-        // THE HEAD, WHERE THE BAR IS DRAWING (4.51.6). Not `null` — see the
-        // note at the `drawable` filter for what `null` from a case means, and
-        // not nothing, because a required section that renders nothing is a
-        // section waiting to be deleted.
-        //
-        // ASKED HERE RATHER THAN PASSED IN, because this switch is a method of
-        // its own and the fence's `quiet` is a local two hundred lines up. The
-        // question is pure — settings and a path — so asking it twice per note
-        // costs nothing and passing it would thread a parameter through every
-        // case in the file.
-        //
-        // AND LIVE, LIKE THE BANNER IT STANDS IN FOR (4.51.7). The two lines
-        // below say why, and every word of it is true of the head — see
-        // `livePageHead`, which is where 4.51.6 dropped the wrapper.
-        if (bannerSuppressed(this.plugin, ctx.sourcePath)) {
-          return livePageHead(this.plugin, ctx);
-        }
-        // BOTH LIVE ON FRONTMATTER, AND FOR ONE REASON: an entry's title and a
-        // journal note's crumbs and date are all properties, so an edit
-        // repaints the band rather than waiting for the next file open. The two
-        // arms were separate until 4.51 and said this twice.
-        return kind === "entry-header"
-          ? liveFrontmatterWidget(this.plugin, ctx, () =>
-              buildEntryHeader(this.plugin, ctx)
-            )
-          : liveFrontmatterWidget(this.plugin, ctx, () =>
-              buildStudyHeader(this.plugin, ctx)
-            );
+        return livePageHead(this.plugin, ctx);
       case "links":
         return buildLinksRegion(this.plugin, rest, ctx);
       case "period-nav": {
@@ -2175,6 +2160,16 @@ export class Widgets implements
         return buildCalendarRegion(this.plugin, rest, ctx);
       case "events":
         return buildEventsRegion(this.plugin, rest, ctx);
+      // ONE BUILDER, TWO DOORS (4.70). `upcoming:5` and `events:upcoming:5` are
+      // the same list from the same function, so the widget a reader adds from
+      // the section window cannot drift from the one already in their note. See
+      // `WIDGETS.upcoming` for why it is a keyword rather than an argument.
+      case "upcoming":
+        return buildEventsRegion(
+          this.plugin,
+          `upcoming${rest.trim() ? `:${rest.trim()}` : ""}`,
+          ctx
+        );
       case "time-grid":
         // THE WHOLE VAULT IS THE SCOPE, and `""` is what that spells: the grid
         // reads events, every region-backed logbook and every task with a due
@@ -2319,6 +2314,8 @@ export class Widgets implements
         return buildReviewQueueRegion(this.plugin, rest, ctx);
       case "journal-search":
         return buildJournalSearchRegion(this.plugin, rest, ctx);
+      case "journal-recent":
+        return buildJournalRecentRegion(this.plugin, rest, ctx);
       case "tag-index":
         return buildTagIndexRegion(this.plugin, rest, ctx);
       case "tasks-table":
@@ -2328,30 +2325,7 @@ export class Widgets implements
       case "activity-chart":
         return buildActivityChartRegion(this.plugin, ctx);
       case "title":
-        // The page's own name, with the control that acts on the page. 4.5 §4.
-        //
-        // A DASHBOARD'S BANNER IS THIS DIRECTIVE, which is what makes it a
-        // member of `BANNER_KINDS` — and therefore one of the three that draw
-        // the PAGE HEAD instead of themselves while the bar is on (4.51.6).
-        // 4.51 guarded the two directives *called* headers and missed this one.
-        if (bannerSuppressed(this.plugin, ctx.sourcePath)) {
-          return livePageHead(this.plugin, ctx);
-        }
-        //
-        // THE ARGUMENT IS THE HEAD'S DESTINATIONS, NOT ITS NAME (4.10). The name
-        // is still the file's, which is the whole of that decision — see
-        // page-title.ts. What `title:home,diary,journals` adds is the second row:
-        // where this page can go, drawn from the same `resolveTarget` table
-        // `links:` and the launcher read.
-        //
-        // A LIST, on `launcher`'s argument one line down: an unknown id costs
-        // its own link and nothing else. Bare `title` draws no second row at
-        // all, which is what the homepage composes and why it is unchanged.
-        return buildPageTitle(
-          this.plugin,
-          ctx,
-          rest.trim() ? rest.split(",") : []
-        );
+        return livePageHead(this.plugin, ctx);
       case "launcher":
         // A grid of places to go. `launcher` alone draws the default four;
         // `launcher:diary,search` draws those two. A LIST rather than a single

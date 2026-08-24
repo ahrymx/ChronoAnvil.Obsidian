@@ -615,7 +615,7 @@ export function answerInText(text: string, q: SectionQuestion): string | null {
   if (q.kind === "form") return null;
   if (!q.directive) return null;
   const lines = text.split("\n");
-  const span = soleArgSpanIn(lines, q.directive);
+  const span = soleArgSpanIn(lines, q.directive, q.part?.join);
   if (span) return expandShorthand(q, readArg(lines, span));
   // A SUPERSEDED SPELLING ANSWERS ITSELF (4.46.1). The reader's line says
   // `topic-stats`, the question names `stats-band`, and the answer is neither
@@ -1026,13 +1026,18 @@ export function withAnswers(
     // the file changes and the reader is told nothing changed, which is the
     // silence `reconfigure` exists to end, arriving from the other direction.
     const answering = group.some((q) => typeof options[q.key] === "string");
+    // THE JOIN THIS GROUP DECLARES, HANDED TO THE READER OF THE SPAN (4.70).
+    // `argSpanIn` cuts an argument at a label bar and a compound joined on `|`
+    // has no label — see the note there. Read off the question rather than
+    // guessed, so a widget that changes its separator changes it once.
+    const argJoin = group.find((q) => q.part)?.part?.join;
     // WHAT THE OLD SPELLING MEANT, KEPT ACROSS THE RENAME (4.47). An alias
     // carries no argument — a bare `topic-stats` — so renaming it and then
     // seeding from the empty line would throw away the arrangement the reader
     // was looking at, and a reader who changed the SECOND cell would find the
     // first three gone.
     let meant: string | null = null;
-    if (answering && !argSpanIn(out, directive)) {
+    if (answering && !argSpanIn(out, directive, argJoin)) {
       for (const [word, means] of Object.entries(group[0].supersedes ?? {})) {
         const renamed = renameSoleKeyword(out, word, directive);
         if (renamed) {
@@ -1042,7 +1047,7 @@ export function withAnswers(
         }
       }
     }
-    const span = argSpanIn(out, directive);
+    const span = argSpanIn(out, directive, argJoin);
     if (!span) continue;
     const compound = group.find((q) => q.part);
     if (!compound?.part) {

@@ -3765,9 +3765,15 @@ describe("shipped monthly template", () => {
     expect(regions).toContain("challenges");
   });
 
-  it("orders the fields the way a review is written", () => {
-    // theme -> what happened -> loose notes -> attachments -> next month.
-    const order = ["note:focus", "list:highlights", "list:challenges", "note:log", "attach:", "tasks:"];
+  it("orders the fields by when they are written, in two rows", () => {
+    // 4.70. It was theme -> what happened -> loose notes -> attachments ->
+    // next month, one column, goals last because last is what you leave with.
+    // The template composes two rows now, so the grouping is by WHEN a field is
+    // filled in: the theme and the goals at the start of the month, what went
+    // well and what got in the way at the end of it, and the prose and
+    // attachments underneath. `fields.ts` carries the argument; this is the
+    // shipped consequence.
+    const order = ["note:focus", "tasks:", "list:highlights", "list:challenges", "note:log", "attach:"];
     const at = order.map((d) => monthly.indexOf(d));
     expect(at.every((i) => i !== -1)).toBe(true);
     expect(at).toEqual([...at].sort((a, b) => a - b));
@@ -4024,10 +4030,21 @@ describe("subject Progress section", () => {
   it("gives the Subject and Topic dashboards a review section", () => {
     // The only surface in the study journal that gives a reason to reopen a
     // note that already exists.
+    //
+    // TWO TITLES FOR ONE SECTION AS OF 4.70, and the difference is the row. On
+    // a Subject index the queue is the opening cell of "🔁 Due and open" — it
+    // sits beside the open-task table and one bar spans both — and on a Topic
+    // index there is no such row, because Open tasks is not composed there, so
+    // it keeps the title it has always written. `journal-sections.ts` carries
+    // the argument; this is what each page ends up saying.
+    const BAR: Record<string, string> = {
+      "Subject Index.md": "header:🔁 Due and open",
+      "Topic Index.md": "header:🔁 Review",
+    };
     for (const f of ["Subject Index.md", "Topic Index.md"]) {
       const t = asset(f);
       expect(t).toContain("review-queue");
-      expect(t).toContain("header:🔁 Review");
+      expect(t).toContain(BAR[f]);
       // A confidence trend, still — as of 2.35 held in the note's managed
       // charts region rather than written out as a `confidence-trend`
       // directive. What the dashboard shows is what this is pinning.

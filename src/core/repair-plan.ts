@@ -57,6 +57,12 @@
 // the reader's, which is the whole rule. The gain here is that it arrives AT
 // ALL, and at its catalogue position; where it sits inside the page is theirs.
 
+import {
+  CELL_KEYWORD,
+  HEADER_KEYWORD,
+  MODIFIER_KEYWORDS,
+  ROW_KEYWORD,
+} from "./directive-grammar";
 import { SectionModel, SectionOp, SectionWant } from "./section-model";
 import type { LineDiff } from "./line-diff";
 import {
@@ -68,6 +74,7 @@ import {
   segment,
   stripRetired,
 } from "./layout";
+import type { Segment } from "./layout";
 
 // One change repair would make, in the shape both plan sources already answer in
 // and the dialog already reads.
@@ -311,4 +318,190 @@ function directiveWords(shipped: string): string[] {
     }
   }
   return out;
+}
+
+// ── OFFERING A SHIPPED PAGE THE GROUPING THIS RELEASE COMPOSES (4.70) ────
+//
+// Reconciliation is ADDITIVE and stays that way. A section that stops being
+// `optIn` is spliced in at its catalogue position and nothing already on the
+// page moves — which is the right default, and the reason a reader can run
+// repair without reading the diff first. But 4.70 did not only add sections: it
+// GROUPED them, and a group is not something an additive reconciler can reach.
+// A 4.69 diary dashboard has `tasks-table` and `tag-index` in two fences with
+// two other blocks between them; this release writes them as the two cells of
+// one. Repair converges every WORD on that page and still leaves it stacked,
+// forever.
+//
+// SO THE REGROUP IS A MIGRATION, AND IT IS OFFERED RATHER THAN APPLIED. Pure
+// text in, text or null out, on `collapseJournalsBlocks`'s pattern — which is
+// what lets the repair window's dry run BE the migration with the write taken
+// off, so the diff a reader ticks is the diff they get. It is the only thing in
+// this release that MOVES a reader's blocks relative to each other, which is
+// exactly why it is a tick and not a default. Nothing regroups a page unasked.
+//
+// ── ONE ROW AT A TIME, NOT THE WHOLE PAGE ──
+//
+// The first draft compared the reader's whole page against the composed one and
+// rebuilt it from the composition's skeleton when the two held the same widgets
+// in the same order. Simpler, and useless: 4.70 also ADDS sections, so a 4.69
+// page never holds the same list, and the function returned `null` for every
+// real page in the vault it was written for. A guard that can only pass on a
+// page needing nothing is not a guard.
+//
+// What it does instead is local, one row at a time. For each ROW the
+// composition writes, find the fence on the reader's page that holds each of
+// its cells; weld those fences into the one the composition writes, at the
+// position of the topmost of them. Everything else is untouched, in place, in
+// order: a section they added, a section they removed, a section this release
+// adds later, prose, headings, their charts. A row whose cells are not all on
+// the page is not welded at all — the diary dashboard's `on-this-day` row waits
+// for `sleep-summary` to arrive rather than being half-built.
+//
+// ── THE THREE THINGS THAT MAKE IT DECLINE ──
+//
+//   1. A CELL THIS PAGE DOES NOT HAVE. Nothing to group; the row is skipped and
+//      the rest of the page's rows are still considered.
+//
+//   2. A CELL WRITTEN TWICE. If `tasks-table` appears in two fences there is no
+//      answer to which one is the cell, and picking one would silently orphan
+//      the other. Refuse the row.
+//
+//   3. A FENCE HOLDING MORE THAN THE ROW ASKS FOR, or holding a modifier a cell
+//      has no place for. A fence carrying `tab:`, `height:`, `frame:` or `wide`
+//      is a gesture the reader made in the section editor — putting a block on a
+//      page, giving it a height — and there is no honest way to carry it into a
+//      shape with no room for it. A fence holding a widget the row says nothing
+//      about would have that widget dragged along by the weld. Both refuse.
+//
+// ── WHAT IS CARRIED, AND WHAT COMES FROM THE COMPOSITION ──
+//
+// The WIDGET LINES are the reader's, verbatim, arguments and all: `diary:3`
+// stays `diary:3` and `on-this-day:always` keeps its argument. The MODIFIERS are
+// the composition's, because they are what a row IS — the `row` line, the `cell`
+// divider, and the band's `header:`. That last is the only thing a reader can
+// lose here and it is deliberate: a bar reading "Open tasks" was true of a fence
+// holding `tasks-table` alone and is false the moment the band holds `tag-index`
+// too, because a row draws ONE bar above BOTH columns (see `row.ts`). A reader
+// who had renamed it sees the rename in the diff and can decline.
+//
+// ── WHY IT MAY WELD MORE THAN THE WINDOW SHOWED ──
+//
+// The dry run reads the file on disk; the write re-reads it after the `pages`
+// group has reconciled, which is where a newly-composed cell arrives. A reader
+// who ticks BOTH groups can therefore get one row welded the preview did not
+// show — the row whose second cell they agreed to add in the same dialog.
+// Ticking migrations ALONE always applies exactly the diff shown, because then
+// nothing runs before it. Stated rather than fixed: the alternative is running
+// the reconciler inside the migration scan, which would put those additions in
+// two rows of the window with two diffs, and a reader reads one diff per file.
+export function regroupShippedPages(text: string, shipped: string): string | null {
+  const rows = composedRows(shipped);
+  if (!rows.length) return null;
+
+  let segs = segment(text.split("\n"));
+  let changed = false;
+  for (const row of rows) {
+    const cells = locateCells(segs, row.words);
+    if (!cells) continue;
+    const at = Math.min(...cells.map((c) => c.seg));
+    const body = row.lines.map((l) => {
+      const word = keywordOf(l);
+      if (MODIFIER_KEYWORDS.has(word)) return l;
+      return cells.find((c) => c.word === word)?.line ?? l;
+    });
+    const welded: Segment = {
+      kind: "fence",
+      fenceKind: "almanac",
+      lines: ["```almanac", ...body, "```"],
+      keywords: body.map((l) => keywordOf(l)),
+    };
+    const doomed = new Set(cells.map((c) => c.seg));
+    if (doomed.size === 1 && segs[at].lines.join("\n") === welded.lines.join("\n"))
+      continue;
+    // A CELL LEAVES ITS SEPARATOR WITH IT. Cutting a fence out of the middle of
+    // a page and leaving the blank line that divided it from its neighbour would
+    // open a widening gap every time a row welded — so the blank line above each
+    // fence being moved goes too, which is exactly the pair the composition
+    // wrote when it put the fence there.
+    for (const i of [...doomed]) {
+      if (i === at) continue;
+      const above = segs[i - 1];
+      if (above?.kind === "raw" && above.lines.every((l) => l.trim() === ""))
+        doomed.add(i - 1);
+    }
+    segs = segs.flatMap((seg, i) =>
+      i === at ? [welded] : doomed.has(i) ? [] : [seg]
+    );
+    changed = true;
+  }
+  return changed ? segs.flatMap((s) => s.lines).join("\n") : null;
+}
+
+// Every row the composition writes: the fence's body, and the widget keywords it
+// groups. A fence with no `row` line groups nothing, and a row of one is not a
+// group either — `undoRowOfOne` means the composition never writes one, but
+// asking rather than assuming costs a comparison.
+function composedRows(shipped: string): { lines: string[]; words: string[] }[] {
+  const out: { lines: string[]; words: string[] }[] = [];
+  for (const seg of segment(shipped.split("\n"))) {
+    if (seg.kind !== "fence" || seg.fenceKind !== "almanac") continue;
+    const body = seg.lines.slice(1, -1).filter((l) => keywordOf(l).length > 0);
+    if (!body.some((l) => keywordOf(l) === ROW_KEYWORD)) continue;
+    const words = body
+      .filter((l) => !MODIFIER_KEYWORDS.has(keywordOf(l)))
+      .map(keywordOf);
+    if (words.length > 1) out.push({ lines: body, words });
+  }
+  return out;
+}
+
+// The widget lines a fence holds, in order, with its modifiers dropped.
+function widgetLines(seg: Segment): string[] {
+  return seg.lines.slice(1, -1).filter((l) => {
+    const word = keywordOf(l);
+    return word.length > 0 && !MODIFIER_KEYWORDS.has(word);
+  });
+}
+
+// Which fence on the page holds each of this row's cells, and the reader's own
+// line for it. `null` if any of the three refusals above applies — the row is
+// then left exactly as the page has it.
+function locateCells(
+  segs: readonly Segment[],
+  words: readonly string[]
+): { word: string; line: string; seg: number }[] | null {
+  const out: { word: string; line: string; seg: number }[] = [];
+  for (const word of words) {
+    let found: { word: string; line: string; seg: number } | null = null;
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
+      if (seg.kind !== "fence" || seg.fenceKind !== "almanac") continue;
+      const line = widgetLines(seg).find((l) => keywordOf(l) === word);
+      if (line == null) continue;
+      if (found) return null; // written twice — refusal 2
+      // Refusal 3, in its two halves: nothing here the row does not group, and
+      // no modifier a cell has no room for.
+      if (widgetLines(seg).some((l) => !words.includes(keywordOf(l)))) return null;
+      if (
+        seg.lines
+          .slice(1, -1)
+          .map(keywordOf)
+          .some((k) => MODIFIER_KEYWORDS.has(k) && !weldable(k))
+      )
+        return null;
+      found = { word, line, seg: i };
+    }
+    if (!found) return null; // not on this page — refusal 1
+    out.push(found);
+  }
+  return out;
+}
+
+// Whether a fence carrying this modifier can still be welded into a row.
+// `header:` is the one a fence may bring and lose, and the paragraph above says
+// why losing it is right; `row` and `cell` are the row's own, so a half-welded
+// page converges rather than being refused. Everything else — `tab:`, `height:`,
+// `frame:`, `wide` — leaves the fence exactly where the reader put it.
+function weldable(keyword: string): boolean {
+  return keyword === HEADER_KEYWORD || keyword === ROW_KEYWORD || keyword === CELL_KEYWORD;
 }

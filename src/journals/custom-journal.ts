@@ -20,7 +20,7 @@ import {
   TemplateLayout,
   chosenSectionIds,
   kindPlural,
-  renderSection,
+  composeSectionRuns,
   sectionsFor,
   templateTargets,
 } from "./journal-sections";
@@ -557,14 +557,16 @@ export function composeTemplate(
   // journalTemplateFiles passes no ids for a non-wizard caller, so without it
   // every variant of a kind would compose identically.
   const ids = new Set(sectionIds ?? chosenSectionIds(ctx, layout));
-  const body = sectionsFor(ctx, layout)
-    // `required` is enforced here rather than trusted from the caller. The
-    // wizard cannot untick the banner, but this function is also the one item
-    // 4 and any future caller reach, and a note with no banner is the defect
-    // 2.28 shipped to end.
-    .filter((s) => ids.has(s.id) || s.required)
-    .map((s) => renderSection(s, ctx, layout?.options?.[s.id]))
-    .filter(Boolean);
+  const body = composeSectionRuns(
+    sectionsFor(ctx, layout)
+      // `required` is enforced here rather than trusted from the caller. The
+      // wizard cannot untick the banner, but this function is also the one item
+      // 4 and any future caller reach, and a note with no banner is the defect
+      // 2.28 shipped to end.
+      .filter((s) => ids.has(s.id) || s.required),
+    ctx,
+    (s) => layout?.options?.[s.id]
+  ).filter(Boolean);
 
   // THE TYPE'S OWN NOTE, NOT THE LEVEL'S NOUN. This read
   // `ctx.type.levels[d].noun` — "Topic", "Lesson" — which is the word a level

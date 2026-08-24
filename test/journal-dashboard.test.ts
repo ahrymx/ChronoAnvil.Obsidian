@@ -47,19 +47,41 @@ import { readSrc } from "./sources";
 // page would be asserting a page that happens to be the one the author had open.
 const TYPES: JournalType[] = JOURNAL_PRESETS.map((p) => buildJournalType(p.config));
 
-const COMPOSED = ["banner", "activity", "contents", "open-tasks"];
+// SIX AND FOUR AS OF 4.70, WHERE IT WAS FOUR AND FIVE. Two sections crossed the
+// line, in the release whose subject is what a repaired vault's default pages
+// hold:
+//
+//   `stats`  — the band had been offered since 4.46 on a reason its own comment
+//              names as expiring: composing it is a decision worth its own
+//              release rather than a side effect of a merge. This is that
+//              release, and a bare band resolves to `activity`, which counts
+//              notes and dates and so draws honestly on a journal that
+//              registers no trackers at all.
+//   `recent` — new, and the answer this page had to no question: it counted,
+//              grouped and listed what was undone, and could not say what had
+//              been written lately.
+//
 // `totals` BECAME `stats` IN 4.46. The section is the same one — it offers the
 // band — and the widget under it merged with `topic-stats`, so Totals is now one
 // of the four presets rather than a section of its own.
-const OFFERED = ["stats", "tally", "review", "tags", "charts"];
+const COMPOSED = [
+  "banner",
+  "activity",
+  "contents",
+  "stats",
+  "recent",
+  "open-tasks",
+];
+const OFFERED = ["tally", "review", "tags", "charts"];
 
 describe("the catalogue, for every journal a reader can start from", () => {
   for (const type of TYPES) {
     describe(type.name, () => {
-      it("composes four sections and offers five", () => {
-        // THE RELEASE'S OWN ANSWER, ASSERTED RATHER THAN DESCRIBED. Four
+      it("composes six sections and offers four", () => {
+        // THE RELEASE'S OWN ANSWER, ASSERTED RATHER THAN DESCRIBED. Six
         // compose — the page's name, what has been happening, what is in the
-        // journal, what is still open — and five are offered. Moving one across
+        // journal, its numbers, what was written lately and what is still open
+        // — and four are offered. Moving one across
         // that line is a decision about what repair writes into every journal in
         // every vault, so it should not be possible to make it quietly.
         const sections = journalDashboardSections(type);

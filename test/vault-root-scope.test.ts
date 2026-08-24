@@ -159,16 +159,16 @@ describe("the homepage's open tasks widget", () => {
   });
 
   it("writes an answer into its own line and leaves the rest of the row alone", () => {
-    // The tasks table shares a fence with the diary card, the launcher and On
-    // this day. A splice into the directive's own span is what keeps the other
-    // three byte-identical.
+    // The tasks table shares a fence with the diary card, the launcher and
+    // Coming up (which took On this day's cell in 4.70). A splice into the
+    // directive's own span is what keeps the other three byte-identical.
     const out = model.apply(home, [
       ...composed.filter((id) => id !== "tasks"),
       { id: "tasks", options: { folder: "02 - Diary" } },
     ]) as string;
     expect(out).toContain("tasks-table:02 - Diary");
     expect(out.split("\n").filter((l) => l.startsWith("tasks-table"))).toHaveLength(1);
-    for (const untouched of ["diary:3", "launcher", "on-this-day:always"]) {
+    for (const untouched of ["diary:3", "launcher", "logbook"]) {
       expect(out).toContain(untouched);
     }
 

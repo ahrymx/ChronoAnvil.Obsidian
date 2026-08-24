@@ -219,7 +219,6 @@ export class VaultBanner {
     // it hides the title and properties of whatever note arrives next —
     // including notes this plugin has nothing to do with.
     host.removeClass(HIDE_TITLE_CLASS);
-    if (!this.plugin.settings.banner.enabled) return;
 
     const file = view.file;
     if (!(file instanceof TFile)) return;
@@ -227,12 +226,7 @@ export class VaultBanner {
     if (!surface) return;
 
     host.prepend(this.build(file, surface, host));
-    // AND ONLY WHERE THE BAR ACTUALLY DREW. The setting is *use Almanac's where
-    // Almanac has one*; putting the class on before the surface test would take
-    // Obsidian's away on notes with nothing to have replaced them.
-    if (this.plugin.settings.banner.absorb) {
-      host.addClass(HIDE_TITLE_CLASS);
-    }
+    host.addClass(HIDE_TITLE_CLASS);
   }
 
   // ── the strip ──────────────────────────────────────────────────────────
@@ -741,7 +735,6 @@ export function initialsOf(name: string): string {
 // A LATER RELEASE MAKES THESE A SMALLER SECONDARY BANNER rather than deleting
 // them — which is the other reason not to retire the words now.
 export function bannerSuppressed(plugin: AlmanacPlugin, path: string): boolean {
-  if (!plugin.settings.banner.enabled) return false;
   return bannerSurfaceOf(path, bannerScopeOf(plugin)) !== null;
 }
 

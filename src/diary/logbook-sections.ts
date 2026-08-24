@@ -119,6 +119,30 @@ export function logbookSectionModel(
 // says so by removing three sections rather than by configuring a widget. It
 // also means this page needs no new directive: it is the same `logbook:` line,
 // N times.
+//
+// ── STACKED, NOT PAIRED, AND 4.70 IS WHERE THAT WAS DECIDED ──────────────
+//
+// This page is the obvious candidate in the whole vault for a two-column band:
+// four blocks of the same widget, each a short list, one after another down a
+// page. Pairing them would halve it. It is not done, and the reason is a
+// property of the grammar rather than a preference.
+//
+// A `header:` IN A ROW FENCE IS DRAWN ONCE, FULL WIDTH, ABOVE THE COLUMNS —
+// `row.ts` says so at its head, and it is right to: a bar is a section's title
+// strip and a row is one section. So a row of two logbooks gets ONE bar between
+// them.
+//
+// AND THE BAR IS THE ONLY THING THAT NAMES A LOGBOOK. `buildLogbook` draws the
+// items and nothing else — no heading, no icon, no name — because on a
+// logbook's own note the note is the name. Two logbooks side by side under one
+// bar are two indistinguishable lists of text, and the bar names one of them,
+// which is worse than untitled. The diary dashboard's row works precisely
+// because a task table and a tag cloud cannot be mistaken for each other.
+//
+// SO THE FIX IS A PER-CELL TITLE, WHICH IS A GRAMMAR CHANGE AND NOT THIS
+// RELEASE. Noted here rather than in a roadmap because this is the page that
+// wants it, and the next reader looking for somewhere to put a row will land
+// here first.
 export function logbooksFolderSections(
   books: readonly LogbookDef[]
 ): FlatSection[] {

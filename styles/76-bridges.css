@@ -40,6 +40,80 @@
   border-top: 1px solid var(--background-modifier-border);
 }
 
+.am-bridge-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.am-bridge-card {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.am-bridge-card:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.am-bridge-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.am-bridge-card-title {
+  font-weight: 600;
+  font-size: var(--am-text-sm);
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.am-bridge-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+}
+
+.am-bridge-card-meta .tag {
+  font-size: var(--am-text-2xs);
+  padding: 1px 5px;
+  background: var(--background-primary);
+  border-radius: var(--am-radius-xs);
+  color: var(--text-muted);
+}
+
+.am-bridge-card-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.am-bridge-badge {
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+  background: var(--background-primary);
+  padding: 2px 6px;
+  border-radius: var(--am-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+}
+
 .am-bridge-date,
 .am-bridge-value {
   font-size: var(--font-ui-smaller);

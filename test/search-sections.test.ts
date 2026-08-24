@@ -129,13 +129,23 @@ describe("the two flat notes, where they overlap", () => {
     expect(search()).toContain("on-this-day:always");
   });
 
-  it("keeps the empty state on both, because both reserve the space", () => {
-    // The composed notes, where the row above asserts the catalogue. A cell in
-    // a row and a block on Search are both space already given to this widget,
-    // and space that has been given has to say what it is for — otherwise a
-    // vault younger than a year shows a gap on one page and a heading with
-    // nothing under it on the other.
-    expect(composeHomeNote(ROOT)).toContain("on-this-day:always");
+  it("composes it on Search only, as of 4.70", () => {
+    // THE COMPOSED NOTES, WHERE THE TWO NOW DIVERGE AND THE CATALOGUES DO NOT.
+    // The test above pins the SPELLING and finds it identical in both
+    // catalogues; this one pins where the spelling is actually WRITTEN, and
+    // 4.70 made those different questions.
+    //
+    // `upcoming` took the homepage's cell — 3.13 §11's unanswered half, that
+    // the homepage is the one note about now and this is the one block on it
+    // about the past — so the homepage OFFERS the section and composes no line
+    // for it. Search, whose whole job is retrieval, composes it as it always
+    // has.
+    //
+    // WHICH MAKES THE EMPTY STATE SEARCH'S REASON ALONE NOW. A block on a page
+    // about the past is space already given to this widget, and space that has
+    // been given has to say what it is for — otherwise a vault younger than a
+    // year shows a heading with nothing under it.
+    expect(composeHomeNote(ROOT)).not.toContain("on-this-day");
     expect(composeSearchNote()).toContain("on-this-day:always");
   });
 

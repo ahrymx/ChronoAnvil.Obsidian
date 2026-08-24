@@ -271,6 +271,16 @@ const VAULT_SOURCES: Record<
     empty:
       "No logbooks yet — add one in Settings → Almanac → Logbooks, and it can be shown here.",
   },
+  trackers: {
+    of: (v) => v.trackers ?? [],
+    // NAMES THE GATE, NOT JUST THE PLACE. A vault can have half a dozen
+    // trackers and offer none of them here: a `select` has no arithmetic and a
+    // journal tracker has no diary grain to read from, so `isChartable` refuses
+    // both. A sentence saying only "add one" would send a reader who has six to
+    // add a seventh and watch it not appear either.
+    empty:
+      "No trackers with numbers to summarise — add a scale, quantity or habit in Settings → Almanac → Trackers, and it can be shown here.",
+  },
 };
 
 // Every question this widget's argument becomes. 4.16.

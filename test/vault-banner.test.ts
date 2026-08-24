@@ -210,14 +210,6 @@ describe("bannerSuppressed", () => {
     ).toBe(true);
   });
 
-  it("leaves the in-note header alone when the banner is off", () => {
-    // NOTHING IS REWRITTEN AND THAT IS THE POINT. The directives stay in every
-    // note; turning the bar off restores each one exactly as it was.
-    expect(
-      bannerSuppressed(fakePlugin(false), "02 - Diary/Daily/2026-08-20.md")
-    ).toBe(false);
-  });
-
   it("leaves a note the bar never reaches showing its own header", () => {
     // The failure this row exists for: suppressing more widely than the banner
     // draws leaves a note with NEITHER banner, which looks like nothing rather
@@ -303,8 +295,7 @@ describe("the in-note header defers to the bar", () => {
     // directives that share an arm, once for `title`. Asserted as the pair
     // rather than as a distance from each `case`, which is a measurement of the
     // comments between them and nothing else.
-    const pair =
-      "if (bannerSuppressed(this.plugin, ctx.sourcePath)) {\n          return livePageHead(this.plugin, ctx);\n        }";
+    const pair = "return livePageHead(this.plugin, ctx);";
     expect(t.split(pair).length - 1).toBe(2);
     for (const kind of ["entry-header", "journal-header", "title"]) {
       expect(t, kind).toContain(`case "${kind}":`);
@@ -422,11 +413,9 @@ describe("the banner's hook", () => {
     // above the settings check and above the surface test.
     const t = banner();
     const remove = t.indexOf(`querySelector(\`:scope > .\${BANNER_CLASS}\`)?.remove()`);
-    const enabled = t.indexOf("if (!this.plugin.settings.banner.enabled) return;");
     const surface = t.indexOf("if (!surface) return;");
     expect(remove).toBeGreaterThan(0);
-    expect(enabled).toBeGreaterThan(remove);
-    expect(surface).toBeGreaterThan(enabled);
+    expect(surface).toBeGreaterThan(remove);
   });
 
   it("mounts on the leaf, not on anything the note creates", () => {
@@ -460,7 +449,6 @@ describe("the banner's hook", () => {
     const t = banner();
     const remove = t.indexOf("host.querySelector");
     expect(remove).toBeGreaterThan(0);
-    expect(t.indexOf("if (!this.plugin.settings.banner.enabled) return;")).toBeGreaterThan(remove);
     expect(t.indexOf("if (!surface) return;")).toBeGreaterThan(remove);
   });
 
@@ -620,22 +608,18 @@ describe("the bar's own anatomy", () => {
 describe("the settings rows", () => {
   const settings = () => readSrc("settings");
 
-  it("offers the three things that are actually the reader's", () => {
+  it("offers the customization options that are actually the reader's", () => {
     const t = settings();
-    expect(t).toContain('.setName("Show the banner")');
     expect(t).toContain('.setName("Tile")');
-    // RENAMED IN 4.51.6, because it stopped being a hide. Obsidian's title and
-    // its property panel are both replaced now — by the page head and by the
-    // bar's Properties window — so the row says what the reader gets, not what
-    // it takes away.
-    expect(t).toContain('.setName("Use Almanac\'s title and properties")');
+    expect(t).toContain('.setName("Background art pattern")');
+    expect(t).toContain('.setName("Ambient accent glow")');
   });
 
   it("re-derives every open note on every one of them", () => {
     // A setting that takes effect on the next file-open is a setting the reader
     // presses twice.
     const t = settings();
-    expect(t.match(/this\.plugin\.vaultBanner\.refresh\(\)/g)?.length).toBe(6);
+    expect(t.match(/this\.plugin\.vaultBanner\.refresh\(\)/g)?.length).toBe(4);
   });
 
   it("takes the inline-title class off a leaf as readily as it puts it on", () => {
@@ -648,7 +632,6 @@ describe("the settings rows", () => {
     const clear = t.indexOf("host.removeClass(HIDE_TITLE_CLASS);");
     const add = t.indexOf("host.addClass(HIDE_TITLE_CLASS);");
     expect(clear).toBeGreaterThan(0);
-    expect(t.indexOf("if (!this.plugin.settings.banner.enabled) return;")).toBeGreaterThan(clear);
     // And it goes on only after the surface test — the setting is *hide it
     // where this names the note*, not *hide it everywhere*.
     expect(add).toBeGreaterThan(t.indexOf("if (!surface) return;"));

@@ -214,17 +214,18 @@
 .journal-list--challenges {
   border: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
+  border-radius: var(--am-radius-md);
   padding: 9px 12px 10px;
   transition: border-color 0.15s ease;
 }
-.journal-list--highlights {
+.journal-list--highlights:has(+ .journal-list--challenges) {
   border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
   border-bottom: none;
   margin-bottom: 0;
 }
 /* Cancels the container's flex gap so the two halves actually touch. The
    divider the user sees is the challenges half's own top border. */
-.journal-list--challenges {
+.journal-list--highlights + .journal-list--challenges {
   border-radius: 0 0 var(--am-radius-md) var(--am-radius-md);
   margin-top: calc(-1 * var(--am-widget-gap));
 }

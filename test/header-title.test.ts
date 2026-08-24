@@ -26,6 +26,7 @@ import { describe, expect, it } from "vitest";
 import { studyTemplate } from "./study-template";
 import { readCode, readCss, readSrc } from "./sources";
 import {
+  MODIFIER_KEYWORDS,
   argSpanIn,
   argSpansIn,
   readArg,
@@ -85,10 +86,16 @@ describe("the defect that shipped", () => {
     expect(editor).not.toMatch(/argSpanIn\(lines, q\.directive\)/);
 
     const model = readCode("section-model");
-    expect(model).toContain("soleArgSpanIn(lines, q.directive)");
+    // A THIRD ARGUMENT SINCE 4.70 and it is not a widening. `argSpansIn` cuts an
+    // argument at a label bar, and a compound joined on `|` — `time-grid:|3` —
+    // has no label to cut at; the join travels from the question that declares
+    // it. The claim this case makes is about WHICH span function the shared read
+    // uses, not about its arity, so the pattern allows the join and nothing
+    // else.
+    expect(model).toMatch(/soleArgSpanIn\(lines, q\.directive(, q\.part\?\.join)?\)/);
     // Lowercase `a` — `soleArgSpanIn` carries a capital, so this catches a
     // widening back to the whole-file read and nothing else.
-    expect(model).not.toMatch(/[^A-Za-z]argSpanIn\(lines, q\.directive\)/);
+    expect(model).not.toMatch(/[^A-Za-z]argSpanIn\(lines, q\.directive/);
   });
 });
 
@@ -294,7 +301,13 @@ describe("what a rename must not disturb", () => {
     // `fenceKeywords` already excludes `header:` from what identifies a fence,
     // and says why. That is the property making a rename safe: no `locate`, no
     // probe and no plan reads a header's text.
-    expect(readCode("journal-plan")).toContain('k !== "header"');
+    //
+    // ASSERTED THROUGH THE SET AS OF 4.70. The exclusion was written as
+    // `k !== "header"` and is now `!MODIFIER_KEYWORDS.has(k)` — a superset, so
+    // the property this test is about is strictly stronger than it was, and
+    // pinning the old literal would have failed on a change that improved it.
+    expect(readCode("journal-plan")).toContain("MODIFIER_KEYWORDS.has(k)");
+    expect(MODIFIER_KEYWORDS.has("header")).toBe(true);
   });
 });
 

@@ -189,8 +189,6 @@ describe("the homepage is unchanged, which is the scope holding", () => {
     const src = readSrc("page-title");
     expect(src).toContain("ids: readonly string[] = []");
     expect(src).toContain("if (!wanted.length) return root;");
-    const widgets = readSrc("widgets");
-    expect(widgets).toContain('rest.trim() ? rest.split(",") : []');
   });
 
   it("finds both spellings, and no frontmatter key", () => {

@@ -634,8 +634,29 @@ describe("no card sits under a header bar", () => {
     //
     // Nothing changes for the two folder-note dashboards: neither has an `optIn`
     // section, so this walks exactly what it walked before.
+    //
+    // ── A ROW'S TITLE IS THE ROW'S (4.70) ──────────────────────────────
+    //
+    // A `header:` in a row fence is drawn ONCE, full width, ABOVE the columns
+    // (`row.ts`), so a two-cell row has one bar between it. The section that
+    // OPENS the row composes it and words it for the band — "Across the diary"
+    // over the tasks table and the tag cloud together — and the cells after it
+    // compose no bar at all, because a second one would be a second full-width
+    // strip over the same band naming neither half of it.
+    //
+    // SO THE RULE IS UNCHANGED AND ITS UNIT MOVED: nothing on the page is
+    // untitled, and what carries the title is the BLOCK rather than always the
+    // section. A later cell is exempt exactly when an earlier section in the
+    // same row is titled — which is checked here rather than assumed, so a row
+    // whose opener lost its bar still fails.
     for (const page of PAGES) {
-      for (const s of page.sections.filter((x) => !x.optIn)) {
+      const composed = page.sections.filter((x) => !x.optIn);
+      const titledRows = new Set(
+        composed
+          .filter((s) => s.row && s.render().lines.some((l) => /^header:/.test(l)))
+          .map((s) => s.row as string)
+      );
+      for (const s of composed) {
         const { fence, lines } = s.render();
         // The chart fence carries its header INSIDE itself — the charts
         // processor reads it and makes the whole section self-titled.
@@ -643,7 +664,9 @@ describe("no card sits under a header bar", () => {
         const keywords = lines.map(keywordOf);
         if (keywords.some((k) => CARD_DRAWING.includes(k))) continue;
         const titled =
-          keywords.includes("header") || lines.some((l) => /^frame:/.test(l));
+          keywords.includes("header") ||
+          lines.some((l) => /^frame:/.test(l)) ||
+          (!!s.row && titledRows.has(s.row));
         expect(titled, `${page.name}: ${s.id} is untitled`).toBe(true);
       }
     }
@@ -654,14 +677,20 @@ describe("the homepage becomes a place to start", () => {
   const home = composeHomeNote(DEFAULT_PATHS.diaryRoot);
 
   it("stays a short page, and every block on it is one you navigate from", () => {
-    // §0's measure, which was "three blocks" and is now four: the title card
-    // 4.5 added names the page, and 4.4's row folded what used to be separate
-    // blocks into one. The COUNT was always a proxy — what §0 wanted is a
-    // homepage that is not the page containing everything — so it is asserted
-    // as a bound plus the identity of what is there, which is what would
-    // actually be violated by the page growing back.
+    // §0's measure, which was "three blocks", became four with 4.5's title card
+    // and is five as of 4.70. The COUNT was always a proxy — what §0 wanted is a
+    // homepage that is not the page containing everything — so it is asserted as
+    // a bound plus the identity of what is there, which is what would actually
+    // be violated by the page growing back.
+    //
+    // THE FIFTH BLOCK IS THE TIME GRID, AND IT PASSES §0's REAL TEST. "Every
+    // block on it is one you navigate from" — the grid is an hour-by-hour week
+    // whose every entry opens the note behind it, which is the most literal
+    // reading of that sentence on the page. And the count moved by one while
+    // the page gained TWO sections, because `upcoming` arrived into a cell the
+    // page already had.
     const fences = segment(home.split("\n")).filter((f) => f.kind === "fence");
-    expect(fences.length).toBeLessThanOrEqual(4);
+    expect(fences.length).toBeLessThanOrEqual(5);
     const composed = homeSections(DEFAULT_PATHS.diaryRoot)
       .filter((x) => !x.optIn)
       .map((x) => x.id);
@@ -670,7 +699,8 @@ describe("the homepage becomes a place to start", () => {
       "diary",
       "launcher",
       "tasks",
-      "on-this-day",
+      "logbook",
+      "time-grid",
       "journals",
       "charts",
     ]);
@@ -686,21 +716,24 @@ describe("the homepage becomes a place to start", () => {
     expect(composeDiaryDashboardNote()).toContain("tag-index");
   });
 
-  it("shows on this day on both pages, in the shape each one has room for", () => {
-    // 3.13 §11 took this off the homepage for being about the past, and the
-    // diary dashboard took it up because a page about the diary is allowed to
-    // be about the past. 4.2 §2 put it back on the homepage — not by reversing
-    // that argument but by changing what "on the page" costs: it is a cell of
-    // the top row there, and a block of its own here.
+  it("shows on this day where the page is allowed to be about the past", () => {
+    // ── THREE POSITIONS IN FIVE RELEASES, AND ONE ARGUMENT THROUGHOUT ─────
     //
-    // The two are still different answers to different questions, which is what
-    // this row has always asserted; what changed is that the homepage's answer
-    // is now a position rather than an absence.
+    // 3.13 §11 took it off the homepage for being about the past, and the diary
+    // dashboard took it up because a page about the diary IS allowed to be about
+    // the past. 4.2 §2 put it back — not by reversing that but by changing what
+    // "on the page" cost, since a cell of a row is not a band pushing the page
+    // down. 4.70 takes it off again, because `upcoming` wants that cell and a
+    // homepage is the note about NOW: when two sections want one slot, the space
+    // argument stops deciding and §11's sentence is what is left.
+    //
+    // What this row has always asserted is that the two pages give DIFFERENT
+    // answers, and they still do. The dashboard's is composed; the homepage's is
+    // offered.
     const otd = homeSections(DEFAULT_PATHS.diaryRoot).find(
       (s) => s.id === "on-this-day"
     );
-    expect(otd?.optIn).toBeFalsy();
-    expect(otd?.row, "on the homepage it is a cell, not a block").toBeTruthy();
+    expect(otd?.optIn, "offered on the homepage, not composed").toBe(true);
     const here = DIARY_DASHBOARD_SECTIONS.find((s) => s.id === "on-this-day");
     expect(here?.optIn).toBeFalsy();
   });
@@ -865,7 +898,11 @@ describe("no block on either dashboard is loose content", () => {
   it("allows on-this-day, journals, activity, and contents to switch to widget form", () => {
     const diaryModel = diaryDashboardSectionModel();
     const diaryBase = composeDiaryDashboardNote();
-    expect(diaryBase).toContain("header:🕘 On this day\non-this-day:always");
+    // THE BAR IS THE ROW'S AS OF 4.70, so its wording is the band's — On this
+    // day OPENS the Looking back row and composes the one title over it and the
+    // sleep aggregate beside it. The toggle is unchanged: this section owns the
+    // line, so this section's form question turns it off.
+    expect(diaryBase).toContain("header:🕘 Looking back\non-this-day:always");
 
     const onThisDayWidget = diaryModel.apply(
       diaryBase,
@@ -873,7 +910,7 @@ describe("no block on either dashboard is loose content", () => {
         id === "on-this-day" ? { id, options: { form: "widget" } } : id
       )
     );
-    expect(onThisDayWidget).not.toContain("header:🕘 On this day");
+    expect(onThisDayWidget).not.toContain("header:🕘 Looking back");
     expect(onThisDayWidget).toContain("on-this-day:always");
 
     const journalsModel = journalsDashboardSectionModel();

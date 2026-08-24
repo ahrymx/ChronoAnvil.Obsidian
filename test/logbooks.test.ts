@@ -51,6 +51,7 @@ import { toPlainMarkdown } from "../src/core/plain-markdown";
 import { writeNoteRegion } from "../src/core/notestore";
 import { serializeLogItems } from "../src/diary/log-items";
 import { composeHomeNote, homeSectionModel } from "../src/diary/home-sections";
+import { composeSearchNote, searchSectionModel } from "../src/diary/search-sections";
 
 const WORK = DEFAULT_LOGBOOKS[0];
 
@@ -363,14 +364,13 @@ describe("the catalogue and the locator agree", () => {
 // rule proven on `journal-card` alone is a rule that can quietly stop applying
 // to the entry that needed it.
 describe("a page may hold logbook widgets and sections", () => {
-  const ROOT = DEFAULT_PATHS.diaryRoot;
-  const home = (): string => composeHomeNote(ROOT);
-  const model = homeSectionModel(ROOT);
+  const note = (): string => composeSearchNote();
+  const model = searchSectionModel();
   const logbookIds = (ids: readonly string[]): string[] =>
     ids.filter((id) => id.startsWith(`w:${LOGBOOK_KEYWORD}`));
 
   it("offers one more however many are already there", () => {
-    let text = home();
+    let text = note();
     for (let n = 1; n <= 3; n++) {
       // The add list holds exactly one logbook row, and it is the next free
       // instance — never the ones the page already has.
@@ -390,11 +390,11 @@ describe("a page may hold logbook widgets and sections", () => {
 
   it("toggles between section and widget form with formQuestion", () => {
     const bookModel = logbookSectionModel(DEFAULT_LOGBOOKS[0]);
-    const note = composeLogbookNote(DEFAULT_LOGBOOKS[0]);
-    expect(note).toContain("header:💼 Work log");
-    expect(note).toContain("logbook:work");
+    const noteText = composeLogbookNote(DEFAULT_LOGBOOKS[0]);
+    expect(noteText).toContain("header:💼 Work log");
+    expect(noteText).toContain("logbook:work");
 
-    const appliedWidget = bookModel.apply(note, [
+    const appliedWidget = bookModel.apply(noteText, [
       { id: "banner" },
       { id: LOGBOOK_KEYWORD, options: { form: WIDGET_FORM } },
     ]) as string;
@@ -404,7 +404,7 @@ describe("a page may hold logbook widgets and sections", () => {
 
   it("removes the one that was asked for and leaves the rest alone", () => {
     const text =
-      home() +
+      note() +
       "\n```almanac\nlogbook\n```\n\n```almanac\nlogbook\n```\n\n```almanac\nlogbook\n```\n";
     const gone = `w:${LOGBOOK_KEYWORD}#2`;
     const next = model.apply(

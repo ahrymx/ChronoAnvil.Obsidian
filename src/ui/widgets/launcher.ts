@@ -49,12 +49,9 @@ import { resolveTarget } from "../../core/links";
 import { getFile, openFile } from "../../core/util";
 import { emptyCallout } from "../empty";
 
-// What a bare `launcher` draws.
-//
-// THE FOUR THE REFERENCE HAS, in its order, and each is a place rather than an
-// action except the last: the diary, the search note, the journals dashboard,
-// and the capture window. A reader who wants others writes them.
-export const LAUNCHER_DEFAULT = ["diary", "search", "journals", "capture"];
+// What a bare `launcher` (overview navigator) draws: the four diary overviews
+// (weekly, monthly, quarterly, and yearly).
+export const LAUNCHER_DEFAULT = ["week", "month", "quarter", "year"];
 
 export function buildLauncher(
   plugin: AlmanacPlugin,

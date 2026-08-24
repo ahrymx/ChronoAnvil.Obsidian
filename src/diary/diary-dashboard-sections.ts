@@ -93,7 +93,7 @@ import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
 import { WIDGET_FORM, formQuestion } from "../core/section-model";
 import type { SectionModel } from "../core/section-model";
-import { FRAME_KEYWORD } from "../core/directive-grammar";
+import { FRAME_KEYWORD, HEADER_KEYWORD } from "../core/directive-grammar";
 
 const probe = (text: string, re: RegExp): number => text.search(re);
 
@@ -115,6 +115,59 @@ const chartLinesIn = (text: string): number =>
 // which is work this release has not done; the honest state is that the card is
 // kept, the differentiation is the page, and the question is still open.
 const DASHBOARD_AGENDA = 3;
+
+// ── THE TWO ROWS THIS PAGE COMPOSES, 4.70 ────────────────────────────────
+//
+// The page shipped as SEVEN stacked blocks, which is the complaint this release
+// is about: a note you scroll for a minute to see what is on it. Two rows take
+// it to five without hiding anything, and the pairs are not arbitrary.
+//
+// THE TWO CARDS ARE NOT IN EITHER ROW, and that is the first decision. `diary`
+// and `month-summary` are composite cards — a greeting, a stat strip, a month
+// grid and an agenda; an overview card and a date navigator — and both carry
+// `frame: section`, which is a modifier on the FENCE. A card in a cell would
+// either lose its frame or wrap the whole row in one, and neither is the thing
+// the modifier was built to say. They keep their width, their frame and their
+// bytes.
+//
+// SO THE ROWS ARE THE FOUR SMALL SECTIONS, PAIRED BY WHAT THEY ARE:
+//
+//   • `INDEXES` — what is open beside what is tagged. Both read the whole
+//     diary folder, both take the same `folder` question with the same host,
+//     and both are lists you scan rather than read.
+//   • `LOOKING_BACK` — this date in previous years beside the sleep aggregate.
+//     Both are the diary's HISTORY summarised, which is what makes this page
+//     different from the homepage, and neither exists anywhere else.
+//
+// AND THE PAGE STOPS OPENING LIKE THE HOMEPAGE. §2.3 left open the question of
+// two pages that both begin with `diary:3`; 4.70 did NOT answer it by copying
+// the homepage's top row down here, which was the available and wrong move —
+// two pages whose first screen is the same row are one page written twice. The
+// card stays full width here and narrow there, and what follows it diverges.
+//
+// ── WHO OWNS A ROW'S TITLE ───────────────────────────────────────────────
+//
+// THE FIRST CELL COMPOSES IT, AND IT NAMES THE ROW RATHER THAN THE CELL. This
+// page's own rule is that no fence is loose content — every block is titled by
+// a `header:` bar or by `frame: section`, because §3.1 found that a bare widget
+// in a markdown note has nothing standing in for a title. A row is one fence,
+// and `row.ts` draws a `header:` in one full width ABOVE the columns, so a row
+// gets exactly ONE bar however many cells it has. Two cells each composing
+// their own would put two full-width bars over a two-column band, naming
+// neither column.
+//
+// SO THE BAR IS THE BAND'S, and it is worded that way: "Across the diary" and
+// "Looking back" are true of both cells under them, where "Open tasks" would be
+// a title lying about half of what it sits over.
+//
+// THE COST, STATED: removing the first cell removes the bar with it, because a
+// section's lines go when the section does. The row survives, untitled, until
+// the reader ticks the bar back on whichever cell now opens it — which is the
+// same trade every `header:` in this catalogue already makes, one cell wider.
+const INDEXES = "indexes";
+const INDEXES_BAR = "header:🗂️ Across the diary";
+const LOOKING_BACK = "back";
+const LOOKING_BACK_BAR = "header:🕘 Looking back";
 
 export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
   // THE BANNER, FIRST. 4.10 gave this page a head; 4.19 made the head a banner
@@ -200,6 +253,8 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // is scoped to a period. This page is scoped to a FOLDER, has no period
     // property for the flag to read, and its whole job is the diary entire.
     locked: false,
+    // FIRST CELL OF THE INDEXES ROW — see the note above the catalogue.
+    row: INDEXES,
     questions: (spec) => [
       {
         kind: "folder",
@@ -208,12 +263,57 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
         directive: "tasks-table",
         hostFolder: spec.hostFolder ?? null,
       },
+      formQuestion(INDEXES_BAR, HEADER_KEYWORD),
     ],
-    render: () => ({
+    // THE BAR IT COMPOSES IS THE ROW'S, NOT ITS OWN — "Across the diary"
+    // rather than "Open tasks", because it is drawn over the tag cloud beside
+    // it as well. See the note above the catalogue, which owns this argument.
+    render: (options) => ({
       fence: "almanac",
-      lines: ["header:⏳ Open tasks", "tasks-table"],
+      lines: [
+        ...(options?.form === WIDGET_FORM ? [] : [INDEXES_BAR]),
+        "tasks-table",
+      ],
     }),
     locate: (text) => probe(text, /^tasks-table\b/m),
+  },
+  {
+    id: "tags",
+    label: "Tags",
+    blurb: "Every tag under the diary, most-used first, with the notes carrying it.",
+    icon: "🏷️",
+    // MOVED HERE FROM THE HOMEPAGE (§2.1), where it is one of five sections
+    // today and is the one most likely to be unwanted on a page you land on.
+    //
+    // "Moved" is a change to what a NEW vault composes, and nothing else:
+    // `home-sections.ts` marks its copy `optIn` rather than deleting it, so an
+    // existing homepage keeps its Tags block AND keeps having a catalogue that
+    // recognises it. That is 3.13 §11's mechanism, reused rather than
+    // reinvented — see the note there.
+    //
+    // MOVED AGAIN IN 4.70, UP TWO PLACES, to sit beside Open tasks in the
+    // indexes row. The catalogue's order is the order a NEW page is composed
+    // in; an existing one is not reordered, because `reconcileLayouts` is
+    // additive and touches nothing that is already there.
+    locked: false,
+    row: INDEXES,
+    // NO FORM QUESTION, WHICH IS THE SECOND CELL'S SHAPE. The row's one bar is
+    // Open tasks' to compose; a toggle here would offer the reader a second
+    // full-width bar over the same band, which is the doubling the whole rule
+    // exists to prevent.
+    questions: (spec) => [
+      {
+        kind: "folder",
+        key: "folder",
+        label: "the folder to read tags from",
+        directive: "tag-index",
+        hostFolder: spec.hostFolder ?? null,
+      },
+    ],
+    render: () => ({ fence: "almanac", lines: ["tag-index"] }),
+    // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who repoints the cloud
+    // at their own folder still has a section the editor can find.
+    locate: (text) => probe(text, /^tag-index\b/m),
   },
   {
     id: "on-this-day",
@@ -228,16 +328,59 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     //
     // Not `optIn`, therefore. On the homepage the flag records "offered, not
     // shipped"; here the section is the point.
+    //
+    // AND AS OF 4.70 IT IS THE HOMEPAGE'S ONLY COPY NO LONGER OFFERED IN A ROW
+    // THERE EITHER — `upcoming` took the cell it used to be offered into. The
+    // widget is not retired and every existing homepage keeps its block; what
+    // changed is which page COMPOSES it, and that page is this one.
     locked: false,
-    render: (opts) => ({
+    row: LOOKING_BACK,
+    render: (options) => ({
       fence: "almanac",
       lines: [
-        ...(opts?.form === WIDGET_FORM ? [] : ["header:🕘 On this day"]),
+        ...(options?.form === WIDGET_FORM ? [] : [LOOKING_BACK_BAR]),
         "on-this-day:always",
       ],
     }),
-    questions: () => [formQuestion("header:🕘 On this day")],
+    questions: () => [formQuestion(LOOKING_BACK_BAR, HEADER_KEYWORD)],
     locate: (text) => probe(text, /^on-this-day\b/m),
+  },
+  {
+    id: "sleep",
+    label: "Sleep",
+    blurb: "Nights logged, average sleep, and the typical bedtime and wake-up.",
+    icon: "😴",
+    // ── COMPOSED SOMEWHERE, AT LAST (4.70) ───────────────────────────────
+    //
+    // `sleep-summary` shipped in 3.2, survived 3.11's retirement review by name
+    // — that roadmap declines to retire it twice, at §153 and §419 — and until
+    // this release appeared on NO page a repaired vault composes. A widget that
+    // is only reachable by typing its keyword is a widget nobody has.
+    //
+    // NOT THE HOMEPAGE, AND ITS REFUSAL THERE STILL STANDS. `home-sections.ts`
+    // declines this section because "sleep is a chart, and Trends and
+    // Statistics is where a chart goes" — an argument about a page that is
+    // about NOW, where an aggregate over every night ever logged is the wrong
+    // tense. This page is about the diary ENTIRE, which is the tense the widget
+    // is written in: `sleep-summary` scopes to the daily folder wholesale, so
+    // there is exactly one page in the vault whose scope is its scope, and this
+    // is it.
+    //
+    // AND IT IS NOT WHAT A CHART SAYS. Typical bedtime is derived — the typical
+    // wake minus the average sleep, wrapped across midnight, because a naive
+    // mean of bedtimes is wrong — and "shortest night" is an extreme rather
+    // than a trend. Neither is a line a chart draws.
+    //
+    // NOT `tracker-stat:Sleep`, WHICH 4.70 ALSO ADDED. That widget says the
+    // four things true of ANY tracker; this one reads two coupled properties
+    // and derives a third. The registry states the same distinction from the
+    // other end, and it is why both exist.
+    locked: false,
+    row: LOOKING_BACK,
+    // SECOND CELL, SO NO BAR AND NO TOGGLE FOR ONE — On this day composes the
+    // row's, and it says "Looking back" because it is drawn over this too.
+    render: () => ({ fence: "almanac", lines: ["sleep-summary"] }),
+    locate: (text) => probe(text, /^sleep-summary\b/m),
   },
   {
     id: "charts",
@@ -255,37 +398,6 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
       lines: [`${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`],
     }),
     locate: (text) => probe(text, /^```almanac-charts/m),
-  },
-  {
-    id: "tags",
-    label: "Tags",
-    blurb: "Every tag under the diary, most-used first, with the notes carrying it.",
-    icon: "🏷️",
-    // MOVED HERE FROM THE HOMEPAGE (§2.1), where it is one of five sections
-    // today and is the one most likely to be unwanted on a page you land on.
-    //
-    // "Moved" is a change to what a NEW vault composes, and nothing else:
-    // `home-sections.ts` marks its copy `optIn` rather than deleting it, so an
-    // existing homepage keeps its Tags block AND keeps having a catalogue that
-    // recognises it. That is 3.13 §11's mechanism, reused rather than
-    // reinvented — see the note there.
-    locked: false,
-    questions: (spec) => [
-      {
-        kind: "folder",
-        key: "folder",
-        label: "the folder to read tags from",
-        directive: "tag-index",
-        hostFolder: spec.hostFolder ?? null,
-      },
-    ],
-    render: () => ({
-      fence: "almanac",
-      lines: ["header:🏷️ Tags", "tag-index"],
-    }),
-    // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who repoints the cloud
-    // at their own folder still has a section the editor can find.
-    locate: (text) => probe(text, /^tag-index\b/m),
   },
 ];
 

@@ -54,6 +54,7 @@ import { openTemplateEditor } from "./template-editor";
 import { splitLayoutTargets } from "../journals/journal-sections";
 import { toPlainMarkdown } from "../core/plain-markdown";
 import { notify } from "../core/notify";
+import { isChartable } from "../charts/charts";
 
 // ── Add a section to this note ────────────────────────────────────────────
 //
@@ -368,6 +369,14 @@ export class SectionInserter {
         label: `${t.emoji} ${t.name}`.trim(),
       })),
       logbooks: logbookChoices(this.plugin.settings.logbooks),
+      // FILTERED BY `isChartable`, WHICH IS THE SAME GATE THE CHART EDITOR USES
+      // (`chart-ui.ts`). A `select` tracker has no arithmetic to average and a
+      // journal tracker has no diary grain to read from, so offering either
+      // would put a row in the menu that composes a widget refusing in the note.
+      // One predicate, two menus.
+      trackers: this.plugin.settings.trackers
+        .filter(isChartable)
+        .map((t) => ({ value: t.id, label: t.label })),
     };
   }
 

@@ -1043,3 +1043,93 @@ export function confirmPlan(
     new PlanModal(app, title, lead, groups, confirmLabel, resolve).open();
   });
 }
+
+// ── Emoji Picker Modal ──────────────────────────────────────────────────
+export class EmojiPickerModal extends Modal {
+  private resolve: (value: string | null) => void = () => {};
+  private current: string;
+
+  constructor(app: App, current: string) {
+    super(app);
+    this.current = current || "🗒️";
+  }
+
+  openAndGetValue(resolve: (value: string | null) => void): void {
+    this.resolve = resolve;
+    this.open();
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("almanac-emoji-modal");
+
+    contentEl.createEl("h3", { text: "Choose an icon" });
+
+    new Setting(contentEl)
+      .setName("Custom icon")
+      .setDesc("Type or paste any emoji or symbol")
+      .addText((t) => {
+        t.setValue(this.current);
+        t.inputEl.addClass("almanac-emoji-input");
+        t.inputEl.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            const val = t.getValue().trim();
+            this.resolve(val || this.current);
+            this.close();
+          }
+        });
+      })
+      .addButton((b) =>
+        b.setButtonText("Save").setCta().onClick(() => {
+          const input = contentEl.querySelector(".almanac-emoji-input") as HTMLInputElement;
+          const val = input?.value?.trim();
+          this.resolve(val || this.current);
+          this.close();
+        })
+      );
+
+    const categories: { label: string; emojis: string[] }[] = [
+      {
+        label: "Productivity & Work",
+        emojis: [
+          "💼", "🎯", "🔗", "📅", "🗒️", "💡", "🚀", "📚",
+          "📝", "⚡", "📌", "🏷️", "📊", "📋", "🛠️", "🔍"
+        ],
+      },
+      {
+        label: "Personal & Lifestyle",
+        emojis: [
+          "☕", "✨", "🧘", "🩺", "💰", "🏃", "🏆", "🎨",
+          "⏱️", "⭐", "🌿", "🍎", "🏠", "✈️", "🎧", "💬"
+        ],
+      },
+    ];
+
+    for (const cat of categories) {
+      contentEl.createDiv({ cls: "almanac-emoji-cat-title", text: cat.label });
+      const grid = contentEl.createDiv({ cls: "almanac-emoji-grid" });
+      for (const emoji of cat.emojis) {
+        const btn = grid.createEl("button", {
+          cls: "almanac-emoji-tile",
+          text: emoji,
+        });
+        if (emoji === this.current) btn.addClass("is-selected");
+        btn.addEventListener("click", () => {
+          this.resolve(emoji);
+          this.close();
+        });
+      }
+    }
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
+export function promptEmoji(app: App, current = "🗒️"): Promise<string | null> {
+  return new Promise((resolve) => {
+    new EmojiPickerModal(app, current).openAndGetValue(resolve);
+  });
+}

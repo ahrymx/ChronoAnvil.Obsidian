@@ -1,56 +1,59 @@
 /* ── Daily tracker modules ───────────────────────────────────────────────
    A bar made up of `tracker:` directives (Mood, steppers, times, selects)
-   is the daily note's logging grid. Each module becomes a bordered cell of
-   equal width and height, laid out exactly two per row. An odd final cell
-   sits alone in the left column. Below a narrow threshold the grid drops to
-   a single column so cells never get crushed. Only bars tagged by the
-   code-block processor get this — header and dashboard bars keep their
-   inline flow. */
+   is the daily note's logging grid. Laid out exactly 3 per row on desktop,
+   and 2 per row on mobile / narrow containers. */
 .journal-widget-bar.journal-tracker-bar {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   align-items: stretch;
-  gap: 10px;
+  gap: 8px;
 }
-/* Narrow panes (split view, mobile, small popouts): one column so a cell's
-   label + control never overflow or wrap awkwardly. */
-@container (max-width: 520px) {
+/* Mobile & narrow panes: exactly 2 per row */
+@container (max-width: 640px) {
   .journal-widget-bar.journal-tracker-bar {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 }
+@media (max-width: 640px) {
+  .journal-widget-bar.journal-tracker-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+body.is-mobile .journal-widget-bar.journal-tracker-bar {
+  grid-template-columns: repeat(2, 1fr);
+}
+
 .journal-tracker-bar .journal-tracker-cell {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   width: 100%;
   /* Anchor for the per-cell remove button, which is pinned to the corner
-     rather than given a slot in the flow — a logging cell is already a label
-     over a control, and a third row for a button you almost never press would
-     cost every cell height for one cell's benefit. */
+     rather than given a slot in the flow. */
   position: relative;
-  /* Every logging cell — Mood, steppers, times, selects, and the coupled
-     Sleep module — shares one row height so the grid reads as an even set of
-     tiles rather than a ragged mix. Each cell is an eyebrow label pinned to
-     the top-left over a control that owns the full width beneath it; the
-     Sleep cell (two labelled time fields + a live readout) is the tallest
-     natural content, so this min-height is sized to hold it, and shorter
-     cells centre their label+control block within the same box. */
-  min-height: var(--am-tracker-cell-h, 76px);
+  /* Compact cell height: sized to hold metric controls with high space efficiency. */
+  min-height: var(--am-tracker-cell-h, 50px);
   min-width: 0; /* let a cell shrink within its grid track instead of overflowing */
   box-sizing: border-box;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--am-radius-md);
-  /* Semantic inset surface (`--am-surface-inset` / `--background-primary-alt`).
-     The cells sit inside a section card painted with `--background-secondary`.
-     Using a recessed inset gives the logging grid clear visual containment
-     and depth without matching the note's base page background. */
+  /* Semantic inset surface (`--am-surface-inset` / `--background-primary-alt`). */
   background: var(--am-surface-inset);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
+
+.journal-tracker-bar .journal-tracker-cell:hover {
+  border-color: var(--background-modifier-border-hover);
+}
+
+.journal-tracker-bar .journal-tracker-cell:focus-within {
+  border-color: var(--interactive-accent);
+}
+
 /* Eyebrow label: small, muted, uppercase, tucked at the top-left so the
    metric control below is the cell's focus. The emoji/icon that leads each
    label keeps its colour (uppercasing only affects letters). */
@@ -136,8 +139,7 @@
 
 /* The add tile reads as an empty slot rather than a filled cell: dashed
    border, no fill, muted text. It sits in the grid as a real cell so it
-   inherits the two-per-row rhythm instead of orphaning itself on its own row,
-   and it lifts to the accent colour on hover so it's clearly pressable. */
+   inherits the grid rhythm, and it lifts to the accent colour on hover. */
 .journal-tracker-bar .journal-tracker-cell.journal-tracker-add {
   align-items: center;
   justify-content: center;
@@ -157,14 +159,14 @@
   gap: 6px;
   width: 100%;
   height: 100%;
-  min-height: var(--am-tracker-cell-h, 76px);
-  padding: var(--am-space-4) var(--am-space-6);
+  min-height: var(--am-tracker-cell-h, 50px);
+  padding: var(--am-space-2) var(--am-space-4);
   border: none;
   border-radius: inherit;
   background: transparent;
   box-shadow: none;
   color: var(--text-muted);
-  font-size: var(--am-text-sm);
+  font-size: var(--am-text-xs);
   font-weight: 500;
   cursor: pointer;
 }
@@ -172,6 +174,58 @@
   color: var(--text-normal);
 }
 .journal-tracker-add .journal-tracker-add-btn .svg-icon {
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
 }
+
+/* ── The tracker stat strip (4.70) ───────────────────────────────────────
+   `tracker-stat:<tracker>` — one tracker's latest reading, its mean and its
+   streak, over a thirty-day density strip. `sleep-summary` generalised: that
+   widget's four numbers are sentences about sleep ("typical bedtime"), and
+   these four are the ones true of any tracker.
+
+   TWO NAMES WERE TAKEN, WHICH IS WHY THE PREFIX IS THE THIRD ONE.
+   `.journal-tracker-cell` is defined eight rules above, and `.jts-cell` is
+   RETIRED — it was the hand-rolled topic band that 4.46 folded into
+   `stats-band`, and `test/stats-band.test.ts` asserts the stylesheet never
+   says it again, so reusing the prefix would have re-broken a merge. The
+   surviving name is the time grid's `am-*` convention.
+
+   NOT `.journal-tracker-cell`, WHICH THIS FILE ALREADY DEFINES eight rules
+   above as a bordered logging module you type into. A day of history and an
+   input control are not the same thing and must not share a selector; every
+   rule up there happens to be scoped under `.journal-tracker-bar`, so the
+   collision would have been latent rather than immediate, which is worse.
+
+   The numbers come from the shared `.journal-stat-strip`
+   (`96-stat-strip.css`), so this file styles only the strip below them. */
+.journal-tracker-stat > h3 {
+  margin: 0 0 var(--am-space-6);
+  font-size: var(--am-text-base);
+}
+/* One row of thirty, sized to fit rather than scrolled. The cells are the
+   only thing that flexes: a strip that scrolled would make "the last month"
+   into a thing you have to drag, which is the opposite of a glance. */
+.am-tstat-strip {
+  display: flex;
+  gap: 2.5px;
+  margin-top: var(--am-space-6);
+}
+.am-tstat-cell {
+  flex: 1 1 0;
+  height: 22px;
+  min-width: 3px;
+  border-radius: 3px;
+  /* An unlogged day, and the same grey the other two strips use for one. */
+  background: var(--background-modifier-border);
+}
+/* Activity ramp — the same four stops `journals-header` and the subject
+   Activity heatmap use, so a shade means "more of it" everywhere in the
+   plugin. What differs is what it is scaled ACROSS: those two count notes
+   against a maximum, and this scales a reading against the series' own low
+   and high, because a mood tracker declared 1–5 whose month sits between 3
+   and 4 would otherwise draw thirty cells of one colour. */
+.am-tstat-cell.am-act-1 { background: var(--am-act-1); }
+.am-tstat-cell.am-act-2 { background: var(--am-act-2); }
+.am-tstat-cell.am-act-3 { background: var(--am-act-3); }
+.am-tstat-cell.am-act-4 { background: var(--am-act-4); }

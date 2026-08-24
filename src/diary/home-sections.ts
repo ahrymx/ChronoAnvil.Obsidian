@@ -177,6 +177,29 @@ const HOME_TOP_ROW = "today";
 // section moved out of it should not leave the name lying.
 const HOME_ASIDE = "aside";
 
+// ── WHAT 4.70 CONSIDERED AND DID NOT DO: A SECOND ROW ────────────────────
+//
+// The obvious shape for this release on this page was `time-grid | logbook` —
+// the week as it was scheduled beside the week as it was logged, which is a
+// genuinely good pair, and it would have put the last two things version 4
+// built onto the one page a reader opens.
+//
+// IT COSTS A SHIPPED FEATURE, AND THE FEATURE WINS. `pageWidgetKeywords`
+// withholds a widget from the add list on any page whose CATALOGUE writes its
+// keyword — the rule that stops one directive being offered through two doors,
+// and the rule `time-grid` is subject to one entry down. A SECTION is withheld
+// once the page has it; a WIDGET is offered again however many the page holds,
+// which is exactly what 4.56 built (`widgetInstances`' spare) and exactly what
+// the report behind it asked for: *"a homepage carrying the work log beside
+// Current focus beside what is scheduled is three `logbook:` lines."*
+//
+// So a `logbook` section here would trade three logbooks for one, on the page
+// the feature was reported against. `time-grid` pays no such price — it is one
+// per page either way — which is the whole of the difference between the two.
+//
+// The logbooks are still composed, on their own folder note, one section per
+// registered book (`logbook-sections.ts`).
+
 const HOME_SECTION_DEFS: FlatSection[] = [
   // THE BANNER, FIRST — and as of 4.19 it is `bannerSection`'s, not a fourth
   // near-copy of one. The homepage carried its own until this release because
@@ -271,8 +294,8 @@ const HOME_SECTION_DEFS: FlatSection[] = [
   },
   {
     id: "launcher",
-    label: "Go to",
-    blurb: "Tiles for the diary, search, journals and quick capture.",
+    label: "Overview navigator",
+    blurb: "Tiles for the weekly, monthly, quarterly, and yearly overviews.",
     icon: "🧭",
     locked: false,
     // THE TOP OF THE ASIDE, above the two lists. It is the smallest block on
@@ -291,40 +314,9 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     label: "Open tasks",
     blurb: "Every unticked task in the vault, grouped by the note it is in.",
     icon: "⏳",
-    // NEW ON THE HOMEPAGE IN 4.2, and it is the row that earned it a place. The
-    // widget is not new — `tasks-table` ships on the four period dashboards and
-    // on every journal index — but the homepage had no room for it while the
-    // page was one column: it would have been a fourth full-width block on a
-    // note whose whole job is to be glanced at. Beside the diary card it costs
-    // no scrolling at all.
-    //
-    // BARE, WHICH ON THIS NOTE MEANS THE WHOLE VAULT. Every folder-scoped
-    // directive defaults to its host note's own folder and the homepage's is the
-    // vault root, so the bare form already means what the page wants — and, per
-    // "Caveat on paths", a directive with no argument is the one that never
-    // needs updating when a folder is renamed.
-    //
-    // IT DID NOT MEAN THAT UNTIL 4.44.0, AND THE SENTENCE ABOVE IS WHY THE BUG
-    // SURVIVED THREE RELEASES. The catalogue said the right thing, the composer
-    // wrote the right line, and the reader saw "No notes here yet" on a vault
-    // with 135 open tasks in it — because the root resolves to the path `/` and
-    // every scope test in the plugin asked `path.startsWith(folder + "/")`.
-    // Nothing starts with `//`. See `core/util.ts::isVaultRoot`.
     locked: false,
     row: HOME_TOP_ROW,
     cell: HOME_ASIDE,
-    // AND THE WINDOW CAN NOW REPOINT IT, which every other `tasks-table` in the
-    // plugin has allowed since 3.15 and this one alone did not. The diary
-    // dashboard, the journals dashboard and every journal index all declare this
-    // question over the same directive; the homepage's copy was the odd one out,
-    // so the section editor drew a row with a Remove button and no field, and
-    // "the whole vault" was a scope the reader could neither confirm nor change.
-    //
-    // `emptyLabel` BECAUSE "This note's folder" IS TRUE HERE AND SAYS NOTHING.
-    // The homepage's own folder IS the vault root — the placeholder would be
-    // technically correct and would leave the reader unable to tell this widget
-    // from one scoped to a folder that happens to be empty. The catalogue
-    // supplies the words, exactly as `level-index`'s second piece does.
     questions: (spec) => [
       formQuestion("header:⏳ Open tasks", HEADER_KEYWORD),
       {
@@ -346,6 +338,47 @@ const HOME_SECTION_DEFS: FlatSection[] = [
       ],
     }),
     locate: (text) => probe(text, /^tasks-table\b/m),
+  },
+  {
+    id: "logbook",
+    label: WIDGETS.logbook.label,
+    blurb: WIDGETS.logbook.blurb,
+    icon: WIDGETS.logbook.glyph,
+    locked: false,
+    row: HOME_TOP_ROW,
+    tab: true,
+    render: (options) => ({
+      fence: "almanac",
+      lines: [
+        ...(options?.form === SECTION_FORM ? ["header:🗒️ Logbook"] : []),
+        widgetLine("logbook", options),
+      ],
+    }),
+    questions: () => [
+      formQuestion("header:🗒️ Logbook", HEADER_KEYWORD),
+      ...widgetQuestions("logbook"),
+    ],
+    locate: (text) => probe(text, /^logbook\b/m),
+  },
+  {
+    id: "upcoming",
+    label: WIDGETS.upcoming.label,
+    blurb: WIDGETS.upcoming.blurb,
+    icon: WIDGETS.upcoming.glyph,
+    locked: false,
+    optIn: true,
+    render: (options) => ({
+      fence: "almanac",
+      lines: [
+        ...(options?.form === SECTION_FORM ? ["header:⏭️ Coming up"] : []),
+        widgetLine("upcoming", options),
+      ],
+    }),
+    questions: () => [
+      formQuestion("header:⏭️ Coming up", HEADER_KEYWORD),
+      ...widgetQuestions("upcoming"),
+    ],
+    locate: (text) => probe(text, /^upcoming\b/m),
   },
   {
     id: "on-this-day",
@@ -411,8 +444,33 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // the section is now visible from day one and tells the reader what it is
     // waiting for, rather than materialising a year later.
     locked: false,
-    row: HOME_TOP_ROW,
-    cell: HOME_ASIDE,
+    // ── OFFERED AGAIN AS OF 4.70, AND 3.13 §11 IS WHY ────────────────────
+    //
+    // That paragraph ends: *"If the row is ever undone, this argument comes back
+    // with it and the entry should go back to `optIn`."* The row is not undone —
+    // the cell is still there and still full — so this is the weaker half of
+    // that sentence coming due rather than the stated trigger, and it is worth
+    // saying which.
+    //
+    // WHAT 4.2 ACTUALLY ANSWERED was the SPACE half: "a third of a row is not
+    // what a full-width block was". True then, true now, and it stops deciding
+    // anything the moment something else wants the cell. §11's other half was
+    // never answered and is the one that holds — *the homepage is the only note
+    // in the vault that is about NOW, and this is the one block here about the
+    // past* — and the section that takes the cell is `upcoming`, which is the
+    // same sentence from the other end.
+    //
+    // AND NOTHING IS LOST. Search still composes it, with the same `:always`
+    // spelling, and Search is the page whose whole job is the past. The widget
+    // is not retired, an existing homepage keeps the block it has — `planLayout`
+    // deletes only what `RETIRED_WIDGETS` names — and the section window still
+    // offers it here.
+    //
+    // `:always` STAYS ON THE RENDER, and 4.3.1's reason survives being offered
+    // rather than composed: a reader who adds this back has asked for it, and a
+    // block that draws nothing at all for a year is a worse answer to that than
+    // one saying what it is waiting for.
+    optIn: true,
     render: () => ({ fence: "almanac", lines: ["on-this-day:always"] }),
     locate: (text) => probe(text, /^on-this-day\b/m),
   },
@@ -439,12 +497,37 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // because a homepage is a page about now. It is the only surface where the
     // fallback is the intent rather than a miss.
     //
-    // A HOMEPAGE IS RECONCILED, so `optIn` below is what keeps it off the
-    // homepages that already exist — see there.
-    optIn: true,
+    // ── COMPOSED AS OF 4.70, AND STILL A BLOCK OF ITS OWN ────────────────
+    //
+    // THE PARAGRAPH ABOVE SURVIVES 4.70 INTACT, which is worth saying because
+    // the release that composes this is the release about rows and the obvious
+    // thing to do with a newly-default block is put it in one. 4.62 gave the
+    // grid a day count precisely so it could take a column — the registry says
+    // so: *"a column of a row group cannot draw seven days, and this is the
+    // reader saying so before the pane has to"* — so `row` here with `|3` was
+    // available and was tried.
+    //
+    // IT IS NOT TAKEN, BECAUSE THE HOMEPAGE IS `wide` AND THE WEEK IS THE
+    // POINT. Three days around today is the compromise a narrow column forces,
+    // and this page does not force it; a homepage that shows yesterday, today
+    // and tomorrow has thrown away the half of the week a reader opens a grid
+    // to see. The day count is for the pages that are genuinely short of
+    // width, and this is not one.
+    //
+    // (The other half of that attempt — `logbook` beside it — is recorded
+    // above the catalogue, and is why there is no second row here at all.)
+    //
+    // `optIn` IS GONE, so this arrives on existing homepages at the next
+    // repair — stacked, at the composed position, because reconciliation is
+    // additive and reorders nothing. That is stated in the changelog because it
+    // is what an existing vault will actually see.
     render: (options) => ({
       fence: "almanac",
       lines: [
+        // `WIDGET_FORM`, AS IT HAS BEEN SINCE 4.59. A full-width block above a
+        // full-width `journals:cards` needs the bar to say where one ends; the
+        // one-line rule that strips bars applies to a section that shares a
+        // fence, and this shares none.
         ...(options?.form === WIDGET_FORM
           ? []
           : ["header:⏱️ The week by the hour"]),

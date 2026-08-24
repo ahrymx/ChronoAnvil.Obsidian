@@ -2,12 +2,16 @@
 .journal-mood-picker {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  width: 100%;
+  justify-content: space-between;
 }
 .journal-scale-faces {
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  width: 100%;
+  justify-content: space-between;
 }
 /* The context-note pencil: a badge pinned to the corner of the SELECTED face,
    rather than a button sitting after the row. It marks the reading it belongs
@@ -48,8 +52,8 @@
   border: 1px solid transparent;
   border-radius: var(--am-radius-sm);
   background: transparent;
-  padding: 1px 4px;
-  font-size: 1.25em;
+  padding: 1px 2px;
+  font-size: 1.1em;
   line-height: 1.1;
   cursor: pointer;
   filter: grayscale(0.7) opacity(0.55);
@@ -67,7 +71,7 @@
 }
 .journal-mood-face.is-selected {
   filter: grayscale(0) opacity(1);
-  transform: scale(1.15);
+  transform: scale(1.12);
   background: var(--background-secondary);
   border-color: var(--interactive-accent);
 }
@@ -281,7 +285,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: stretch;
-  gap: 6px;
+  gap: 3px;
   /* Neutralise the standalone chrome now that the cell provides it. */
   padding: 0;
   border: 0;
@@ -290,19 +294,18 @@
   min-width: 0;
 }
 /* Bedtime and Wake-Up sit side by side, each an eyebrow label over its own
-   time input — matching the eyebrow treatment of every other cell. They drop
-   to a stacked pair only on genuinely tiny cells. */
+   time input — matching the eyebrow treatment of every other cell. */
 .journal-sleep-inputs {
   display: flex;
-  align-items: flex-end;
-  gap: 6px 12px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  flex-wrap: nowrap;
 }
 .journal-sleep-field {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 3px;
+  gap: 1px;
   flex: 1 1 0;
   min-width: 0;
 }
@@ -326,16 +329,16 @@
   border-radius: var(--am-radius-sm);
   background: var(--background-primary);
   color: var(--text-normal);
-  font-size: var(--am-text-sm);
-  padding: var(--am-space-1) var(--am-space-3);
+  font-size: var(--am-text-xs);
+  padding: 2px 4px;
   cursor: pointer;
 }
 .journal-sleep-readout {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px 10px;
-  font-size: var(--am-text-sm);
+  gap: 2px 6px;
+  font-size: var(--am-text-2xs);
   font-weight: 600;
 }
 .journal-sleep-asleep {
@@ -860,8 +863,23 @@
   border: none;
   padding: 0;
 }
-.almanac-settings-table .col-grain .setting-item-control {
-  justify-content: center;
+.almanac-settings-table .col-grain .dropdown {
+  max-width: 100%;
+  font-size: var(--am-text-xs);
+  border-radius: var(--am-radius-sm);
+  padding: 3px 6px;
+  cursor: pointer;
+  background-color: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+.almanac-settings-table .col-grain .dropdown:hover {
+  border-color: var(--interactive-accent);
+}
+.almanac-settings-table .col-grain .dropdown.has-value {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+  font-weight: 500;
 }
 
 /* The blurb under a row's name. THE ROW KEEPS ITS WORDS: a table of emoji and
@@ -876,13 +894,106 @@
   max-width: 34ch;
 }
 
-/* "Ships" and "—". Plain and quiet on purpose — see `renderEntrySections`:
-   a statement of fact is not a status chip, and the eye is scanning for the
-   cells that DO have a control. */
-.almanac-cell-ships,
+/* "Ships" and "—". Plain and quiet on purpose — see `renderEntrySections`. */
+.almanac-cell-ships {
+  color: var(--text-success);
+  font-size: var(--am-text-2xs);
+  font-weight: 500;
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--am-radius-pill);
+  background: rgba(61, 214, 140, 0.1);
+}
 .almanac-cell-absent {
   color: var(--text-faint);
   font-size: var(--am-text-2xs);
+}
+
+/* ── Logbooks Settings Table & Emoji Picker (4.72.0) ───────────────────── */
+.almanac-emoji-btn {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.almanac-emoji-btn:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  transform: scale(1.05);
+}
+.almanac-logbook-name-input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--am-radius-sm);
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  color: var(--text-normal);
+  padding: 4px 8px;
+  width: 100%;
+  max-width: 220px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.almanac-logbook-name-input:hover {
+  background: var(--background-secondary);
+  border-color: var(--background-modifier-border);
+}
+.almanac-logbook-name-input:focus {
+  background: var(--background-secondary);
+  border-color: var(--interactive-accent);
+  outline: none;
+}
+.almanac-logbook-path-cell {
+  font-size: var(--am-text-xs);
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.almanac-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.almanac-emoji-tile {
+  width: 38px;
+  height: 38px;
+  font-size: 20px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.almanac-emoji-tile:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  transform: scale(1.1);
+}
+.almanac-emoji-tile.is-selected {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-active-hover);
+}
+.almanac-emoji-cat-title {
+  font-size: var(--am-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 12px 0 6px;
 }
 
 /* --- Section header (label + optional action) --------------------------- */

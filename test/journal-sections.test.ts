@@ -794,10 +794,15 @@ describe("the section catalogue", () => {
         "trackers",
         "children",
         "find",
+        // 4.70 MOVED OPEN TASKS UP TO SIT BESIDE REVIEW, because the two are
+        // now one row — "🔁 Due and open" — and two cells of a row have to be
+        // adjacent in the catalogue for `rowRuns` to weld them. What it
+        // displaced, Progress and Charts, are the two blocks that read as the
+        // bottom of the page anyway.
         "review",
+        "tasks",
         "progress",
         "charts",
-        "tasks",
       ]);
     });
 

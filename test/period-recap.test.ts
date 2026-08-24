@@ -20,8 +20,10 @@ import {
   composeDiaryDashboard,
   detectDiarySections,
   diaryRemovalRefusal,
+  diarySectionModel,
 } from "../src/diary/diary-sections";
 import { planLayout } from "../src/core/layout";
+import { repairNote } from "../src/core/repair-plan";
 
 // ── §1: the month strip ───────────────────────────────────────────────
 
@@ -176,30 +178,49 @@ describe("§2: four scopes, one mark", () => {
 
 // ── §2: the recap ─────────────────────────────────────────────────────
 
-describe("the rollup is a section, and an opt-in one", () => {
-  it("ships neither banner a recap", () => {
+describe("the rollup is a section, and a composed one as of 4.70", () => {
+  // ── THE FLAG THIS BLOCK WAS WRITTEN AROUND IS GONE ─────────────────────
+  //
+  // It read "and an opt-in one", and every case in it asserted the same shape:
+  // the page ships WITHOUT the recap, the editor offers it, adding it puts it
+  // between the summary and the charts, and repair neither adds nor removes it.
+  //
+  // 3.9 §2's argument for the flag was about the BANNER — an unbounded recap
+  // pushing the stats band off screen, on a page where the reader could not say
+  // they wanted the numbers and not the wall of text. None of that survives the
+  // recap being a foldable section below the summary, which is what §2 itself
+  // built. What the flag went on costing is on the page: a quarterly dashboard
+  // shipped with three blocks and a yearly with two, and `period-recap` — the
+  // one widget in the plugin whose whole job is looking back over a long
+  // stretch — appeared on neither.
+  //
+  // SO THE CASES ARE THE SAME FOUR, READ FROM THE OTHER SIDE. The page ships
+  // WITH it, the editor withholds it, removing and re-adding is a round trip,
+  // and repair adds it to a dashboard that predates the flip and then leaves it
+  // alone.
+
+  it("ships both banners a recap", () => {
     for (const g of ["yearly", "quarterly"] as const) {
-      expect(composeDiaryDashboard(g), g).not.toContain("period-recap");
+      expect(composeDiaryDashboard(g), g).toContain(
+        `period-recap:${g === "yearly" ? "year" : "quarter"}`
+      );
     }
   });
 
-  it("offers it on both, and adds it where the catalogue says", () => {
+  it("puts it where the catalogue says, and offers it no more", () => {
     // Placement is the catalogue's business (`insertionPoint`), so what is
     // asserted is the ORDER rather than an offset: below the masthead card,
     // above the charts fence it used to sit above as part of the banner.
     for (const g of ["yearly", "quarterly"] as const) {
-      const fresh = composeDiaryDashboard(g);
+      const out = composeDiaryDashboard(g);
       const ctx = { grain: g };
-      expect(addableDiarySections(ctx, fresh).map((s) => s.id), g).toContain(
-        "recap"
-      );
+      // A section the page HAS is not a section the editor offers.
+      expect(
+        addableDiarySections(ctx, out).map((s) => s.id),
+        g
+      ).not.toContain("recap");
+      expect(detectDiarySections(out, ctx), g).toContain("recap");
 
-      const next = applyDiarySections(fresh, ctx, [
-        ...detectDiarySections(fresh, ctx),
-        "recap",
-      ]);
-      expect(next, g).not.toBeNull();
-      const out = next!;
       expect(out.indexOf(`${g === "yearly" ? "year" : "quarter"}-summary`)).toBeLessThan(
         out.indexOf("period-recap")
       );
@@ -209,21 +230,25 @@ describe("the rollup is a section, and an opt-in one", () => {
     }
   });
 
-  it("round-trips: remove what was added and the file is back", () => {
+  it("round-trips: remove it and put it back and the file is back", () => {
     // `insertionPoint`'s stated property, and the one worth having because it
-    // is the one a test can check.
+    // is the one a test can check. It ran added-then-removed while the section
+    // was opt-in; the property is the same and the reader's first press is now
+    // the other one.
     const ctx = { grain: "yearly" } as const;
     const fresh = composeDiaryDashboard("yearly");
-    const added = applyDiarySections(fresh, ctx, [
-      ...detectDiarySections(fresh, ctx),
-      "recap",
-    ])!;
     const removed = applyDiarySections(
-      added,
+      fresh,
       ctx,
-      detectDiarySections(added, ctx).filter((id) => id !== "recap")
-    );
-    expect(removed).toBe(fresh);
+      detectDiarySections(fresh, ctx).filter((id) => id !== "recap")
+    )!;
+    expect(removed, "the removal did nothing").not.toContain("period-recap");
+    expect(
+      applyDiarySections(removed, ctx, [
+        ...detectDiarySections(removed, ctx),
+        "recap",
+      ])
+    ).toBe(fresh);
   });
 
   it("refuses nothing — the recap holds no writing", () => {
@@ -237,29 +262,36 @@ describe("the rollup is a section, and an opt-in one", () => {
     expect(diaryRemovalRefusal(recap, "period-recap:year")).toBeNull();
   });
 
-  it("is never inserted or deleted by a repair", () => {
-    // THE PROPERTY THE OPT-IN DECISION RESTS ON, in both directions.
+  it("is never deleted by a repair, and is added exactly once", () => {
+    // THE PROPERTY THE FLIP RESTS ON, in both directions.
     //
-    // Forward: the section is not in the composed asset, so `reconcileLayouts`
-    // has no unit for it and repair never adds it — which is what "off by
-    // default" means for a reader who already has these notes.
+    // Forward: every yearly and quarterly dashboard in every vault predates the
+    // section, and reconciliation is what reaches them — additively, at the
+    // composed position, reordering nothing.
     //
-    // Backward, and this is the one that would have bitten: a reader who opts
-    // in and then runs "Set up / repair vault" must not have it taken away
-    // again. `planLayout` only ever deletes a RETIRED_WIDGETS keyword, so the
-    // block is foreign and left where they put it — but that is a property of
-    // another module, and this is the release that starts depending on it.
+    // Backward, and this is the one that would have bitten either way round: a
+    // reader who removes it and then runs "Set up / repair vault" gets it back,
+    // because repair reconciles toward the shipped page — but a reader who
+    // KEEPS it must not have it duplicated, and `planLayout` must never delete
+    // it. `planLayout` only ever deletes a `RETIRED_WIDGETS` keyword, and this
+    // is the release that starts depending on that for a composed section.
     const ctx = { grain: "yearly" } as const;
-    const asset = composeDiaryDashboard("yearly");
-    const withRecap = applyDiarySections(asset, ctx, [
-      ...detectDiarySections(asset, ctx),
-      "recap",
-    ])!;
+    const shipped = composeDiaryDashboard("yearly");
+    const model = diarySectionModel(ctx);
+    const without = applyDiarySections(
+      shipped,
+      ctx,
+      detectDiarySections(shipped, ctx).filter((id) => id !== "recap")
+    )!;
 
-    expect(planLayout(asset.split("\n"), asset.split("\n"))).toEqual([]);
-    const ops = planLayout(withRecap.split("\n"), asset.split("\n"));
+    expect(repairNote(model, shipped, shipped).next).toBeNull();
+    const { next } = repairNote(model, without, shipped);
+    expect(next ?? "").toContain("period-recap:year");
+    expect(repairNote(model, next ?? shipped, shipped).next).toBeNull();
+
+    expect(planLayout(shipped.split("\n"), shipped.split("\n"))).toEqual([]);
+    const ops = planLayout(shipped.split("\n"), shipped.split("\n"));
     expect(ops.filter((o) => o.kind === "delete")).toEqual([]);
-    expect(ops.filter((o) => o.keyword === "period-recap")).toEqual([]);
   });
 });
 

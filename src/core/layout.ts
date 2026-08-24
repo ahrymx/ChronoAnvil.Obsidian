@@ -47,6 +47,7 @@
 // module a fourth verb.
 
 import { RETIRED_WIDGETS } from "./constants";
+import { MODIFIER_KEYWORDS } from "./directive-grammar";
 
 // Directives whose *arguments* this module may rewrite in place.
 //
@@ -284,6 +285,25 @@ export interface AssetUnit {
 // The consequence worth stating: a user who renames `header:⏳ Open tasks` to
 // something of their own keeps it. Headers are never rewritten, only inserted
 // alongside a block that was missing entirely.
+//
+// ── AND NEITHER IS ANY OTHER MODIFIER (4.70) ─────────────────────────────
+//
+// `header:` was the only line of its kind when this was written and the filter
+// named it directly. There are four more now — `frame:` (4.1 §3), `row` and
+// `cell` (4.2/4.4), `wide` (4.12) — and every argument in the paragraph above
+// is true of all of them: they repeat within a note, they are never
+// independent, and each is an attribute of the block it modifies rather than a
+// thing the block IS.
+//
+// WHAT IT WOULD HAVE DONE. `row` reaching this list makes a UNIT of a line that
+// draws nothing: `planLayout` would report "row is missing" against a note that
+// has the widgets and not the grouping, and `applyLayout` would splice a bare
+// `row` line in as though it were a block. That is a fence gaining a modifier
+// nobody asked for, decided by a reconciler that does not know what a row is.
+//
+// ONE SET, FROM THE GRAMMAR. `MODIFIER_KEYWORDS` is where the dispatcher's own
+// "drop this line from the loop" list lives, so this cannot drift from it the
+// way a second literal would.
 export function assetUnits(assetLines: string[]): AssetUnit[] {
   const out: AssetUnit[] = [];
   let pending: Segment[] = [];
@@ -291,7 +311,7 @@ export function assetUnits(assetLines: string[]): AssetUnit[] {
   for (const seg of segment(assetLines)) {
     if (seg.kind !== "fence") continue;
     const keys = seg.keywords ?? [];
-    const content = keys.filter((k) => k !== "header");
+    const content = keys.filter((k) => !MODIFIER_KEYWORDS.has(k));
     if (!content.length) {
       // Header-only (or a chart fence, which has no keywords at all). A chart
       // fence must not be held pending — it is not a title for what follows.

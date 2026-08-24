@@ -147,7 +147,7 @@ import {
 } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
-import { FRAME_KEYWORD } from "../core/directive-grammar";
+import { FRAME_KEYWORD, HEADER_KEYWORD } from "../core/directive-grammar";
 import { WIDGET_FORM, formQuestion, type SectionModel } from "../core/section-model";
 import { DEFAULT_TALLY_TRACKER } from "./journal-sections";
 import { statsBandProbe } from "./stats-band";
@@ -164,14 +164,34 @@ const probe = (text: string, re: RegExp): number => text.search(re);
 const journalChartLinesIn = (text: string): number =>
   text.split("\n").filter((l) => /^\s*jchart:/.test(l)).length;
 
+// ── THE ONE ROW ON THIS PAGE, AND WHY ITS BAR READS AS IT DOES ───────────
+//
+// A `header:` line in a ROW fence is drawn ONCE, full width, above the columns
+// — `row.ts` says so at its head, and it is right to: a bar is a section's title
+// strip and a row is one section. So a row gets exactly one bar however many
+// cells it holds, the OPENING cell is the only one that composes it, and the
+// wording has to be true of the whole band rather than of the column that
+// happens to write it.
+//
+// "Lately" is that wording here. Under it sit the notes written most recently
+// and the tasks still open — two answers to "where is this journal right now",
+// which is the question this page had no block for at all before 4.70.
+const LATELY_ROW = "lately";
+const LATELY_BAR = `${HEADER_KEYWORD}:🕒 Lately`;
+
 // The whole catalogue for one journal, shipped and offered together.
 //
-// ORDER IS COMPOSITION ORDER FOR THE FOUR THAT COMPOSE, and insertion rank for
-// the five that do not: `planFlatSections` puts an added section at its
+// ORDER IS COMPOSITION ORDER FOR THE SIX THAT COMPOSE, and insertion rank for
+// the four that do not: `planFlatSections` puts an added section at its
 // catalogue position, so where an `optIn` row sits here is where it lands in the
-// note when a reader ticks it. The stats band and Tally therefore sit directly under
-// Contents — a band of numbers about the journal belongs above its task list
-// rather than under it — even though neither is composed.
+// note when a reader ticks it. Tally therefore sits directly under the stats
+// band — a second band of numbers about the journal belongs beside the first
+// rather than under the task list — even though it is not composed.
+//
+// 4.70 MOVED TWO OF THE FOUR ACROSS THAT LINE. The stats band composes now (see
+// its entry for the argument it had been holding since 4.46), and Recent notes
+// is new and composes, which took the page from three blocks under the banner —
+// the thinnest in the vault — to four, one of them a row.
 export function journalDashboardSections(type: JournalType): FlatSection[] {
   const topLevel = type.levels[0];
 
@@ -279,7 +299,27 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // RECONCILED, so a section that composes is a section repair writes into
       // every journal in every vault at the next release. Making that move is a
       // decision worth its own release rather than a side effect of a merge.
-      optIn: true,
+      //
+      // ── AND 4.70 IS THAT RELEASE ────────────────────────────────────
+      //
+      // The paragraph above names its own expiry: the surviving reason was
+      // never that composing this would be WRONG, it was that composing it is a
+      // decision that should be made on purpose rather than fall out of a merge
+      // (4.46). This release is about what a repaired vault's default pages
+      // hold, so it is the one that gets to make it.
+      //
+      // WHAT THE PAGE WAS WITHOUT IT: a journals-header card, a level-cards
+      // card and a task table — two chrome-heavy composites and a list, with no
+      // number on the page that a reader could choose. `stats-band` is the one
+      // widget here whose cells are the reader's own picks, and it drew on no
+      // journal dashboard in any vault.
+      //
+      // BARE IS WHAT MAKES IT SAFE TO COMPOSE. `resolveStatPreset` gives a bare
+      // band the scope's default — `activity` on a journal folder note — which
+      // counts notes and dates and needs no tracker at all. So the journal with
+      // no trackers registered gets a band that says something true rather than
+      // an empty strip, which is the objection the 4.46 entry raised first and
+      // answered in the same paragraph.
       // NO QUESTIONS HERE EITHER, AS OF 4.48. The four boxes moved onto the
       // cells — one `⋯` per cell, revealed on hover — for the reason
       // `journal-sections.ts` gives at its own copy of this section: a row of
@@ -292,7 +332,22 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // gives a bare band the scope's default — `activity` here — which is the
       // preset a page about a whole journal wants, and an argument the plugin
       // would have supplied anyway is one more thing to go stale.
-      render: () => ({ fence: "almanac", lines: ["stats-band"] }),
+      // FRAMED, NOW THAT IT COMPOSES, AND FRAMED RATHER THAN BARRED. Every
+      // composed block on a dashboard is titled — see
+      // `test/dashboard-sections.test.ts` — and a bare band was untitled the
+      // moment it stopped being optIn. `frame: section` is the answer the two
+      // blocks directly above it already give, and it needs no new string: a
+      // framed fence titles itself from `SECTION_TITLES`, which has named this
+      // keyword "🔢 Stats" since the 4.46 merge. A `header:` bar would be a
+      // second name for the same widget, kept in a second place.
+      render: (opts) => ({
+        fence: "almanac",
+        lines: [
+          ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
+          "stats-band",
+        ],
+      }),
+      questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
       // ALL THREE SPELLINGS. A page composed before 4.46 that a reader had ticked
       // Totals onto carries `journal-totals`, and a locator that knew only the
       // new word would call the section missing and offer to add a second band.
@@ -315,6 +370,50 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
         lines: [`journal-tally:${DEFAULT_TALLY_TRACKER}`],
       }),
       locate: (text) => probe(text, /^journal-tally:/m),
+    },
+
+    {
+      id: "recent",
+      label: "Recent notes",
+      blurb: `The notes you wrote most recently in ${type.name}, newest first.`,
+      icon: "🕒",
+      // ── THE THING A JOURNAL DASHBOARD COULD NOT SAY ─────────────────
+      //
+      // This page counted (`journals-header`), grouped (`level-cards`) and
+      // listed what was undone (`tasks-table`), and had no answer at all to
+      // "what have I been writing". The diary's own dashboard has `timeline`
+      // for that question; a journal had nothing, on any page, at any scope.
+      //
+      // BARE, WHICH IS THE JOURNAL ROOT. This note is the journal's folder
+      // note, so `journalFolderScope` resolves an empty argument to exactly the
+      // subtree the page is about — and a path written into the directive would
+      // be one more thing to go stale when the folder is renamed. Every other
+      // scoped directive on this page makes the same call and states it.
+      //
+      // NO `all` KEYWORD OFFERED, unlike the journals dashboard's copy: this
+      // page is about one journal, and a control offering "every journal" would
+      // silently widen a page whose every other section is scoped to it. That
+      // is `review`'s sentence below, and it is the same rule.
+      locked: false,
+      row: LATELY_ROW,
+      questions: (spec) => [
+        formQuestion(LATELY_BAR, HEADER_KEYWORD),
+        {
+          kind: "folder",
+          key: "folder",
+          label: "the folder to list",
+          directive: "journal-recent",
+          hostFolder: spec.hostFolder ?? null,
+        },
+      ],
+      render: (opts) => ({
+        fence: "almanac",
+        lines: [
+          ...(opts?.form === WIDGET_FORM ? [] : [LATELY_BAR]),
+          "journal-recent",
+        ],
+      }),
+      locate: (text) => probe(text, /^journal-recent\b/m),
     },
 
     {
@@ -341,10 +440,12 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
           hostFolder: spec.hostFolder ?? null,
         },
       ],
-      render: () => ({
-        fence: "almanac",
-        lines: ["header:⏳ Open tasks", "tasks-table"],
-      }),
+      // SECOND CELL OF THE LATELY ROW (4.70), SO NO BAR AND NO TOGGLE FOR ONE.
+      // Recent notes opens the row and composes the single title this fence
+      // gets — see `LATELY_BAR` above the catalogue for why it is worded for
+      // the band rather than for either column.
+      row: LATELY_ROW,
+      render: () => ({ fence: "almanac", lines: ["tasks-table"] }),
       locate: (text) => probe(text, /^tasks-table\b/m),
     },
 

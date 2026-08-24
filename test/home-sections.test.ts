@@ -154,22 +154,29 @@ describe("what the homepage composes to", () => {
   });
 
   it("composes the top row as one block, in catalogue order", () => {
-    expect(home()).toContain(
-      "```almanac\nrow\ndiary:3\ncell\nlauncher\ntasks-table\non-this-day:always\n```"
-    );
+    expect(home()).toContain(TOP_ROW);
   });
 
-  it("stacks the two small widgets in one cell, and the diary card in its own", () => {
+  it("composes the time grid, which shipped onto no page until 4.70", () => {
+    // PART OF THE POINT OF THE RELEASE, IN ONE ASSERTION. `time-grid` shipped
+    // in 4.55, was extended twice, and was `optIn` on the one page where its
+    // week-fallback is honest — so a freshly repaired vault had never drawn it.
+    //
+    // AT FULL WIDTH AND WITH ITS BAR, which is the shape it has had since 4.55
+    // and which 4.70 did not change: what changed is `optIn`, and nothing else.
+    expect(home()).toContain(GRID_BLOCK);
+  });
+
+  it("stacks the small widgets in one cell, and the diary card in its own", () => {
     // 4.4 §3, and the arrangement the render asked for: the diary card is a
-    // greeting, a stat strip, a month grid and an agenda; the other two are a
-    // list and a list. Two halves, not three thirds.
+    // greeting, a stat strip, a month grid and an agenda; the others are a list
+    // and a list. Two halves, not three thirds.
     expect(home()).toContain(TOP_ROW);
     const tasks = HOME_SECTIONS.find((s) => s.id === "tasks");
-    const otd = HOME_SECTIONS.find((s) => s.id === "on-this-day");
     const diary = HOME_SECTIONS.find((s) => s.id === "diary");
     expect(tasks?.cell).toBeTruthy();
-    expect(otd?.cell).toBe(tasks?.cell);
     expect(HOME_SECTIONS.find((s) => s.id === "launcher")?.cell).toBe(tasks?.cell);
+    expect(HOME_SECTIONS.find((s) => s.id === "logbook")?.tab).toBe(true);
     // Absent is not a value: the diary card names no cell, so it gets its own.
     expect(diary?.cell).toBeUndefined();
   });
@@ -190,7 +197,8 @@ describe("what the homepage composes to", () => {
       "cell",
       "launcher",
       "tasks-table",
-      "on-this-day:always",
+      "tab",
+      "logbook",
     ]);
   });
 
@@ -278,9 +286,53 @@ describe("what the homepage composes to", () => {
       },
     ];
     const note = composeFlatNote(fake);
-    expect(note).toContain("```almanac\nrow\ndiary\n```");
-    expect(note).toContain("```almanac-charts\nrow\nchart:Mood\n```");
+    // TWO FENCES, EACH ITS OWN KIND — the guard, and the whole point of the
+    // test. What each of them then says about rows is 4.70's separate rule
+    // below: the split leaves one member on each side, and a row of one is
+    // composed as no row at all.
+    expect(note).toContain("```almanac\ndiary\n```");
+    expect(note).toContain("```almanac-charts\nchart:Mood\n```");
     expect(segment(note.split("\n")).filter((s) => s.kind === "fence")).toHaveLength(2);
+  });
+
+  it("composes a row of one as no row at all", () => {
+    // 4.70. A row id is a request to share a block, and a section left alone in
+    // one has nobody to share with — on the shipped catalogues that happens when
+    // `applies` excludes a row's other member on some grain. A `row` line over a
+    // single directive renders identically to no line and reads as something the
+    // reader has to look up to discover means nothing, which is the objection
+    // `divided` already makes about an unasked-for `cell` delimiter.
+    const lone: FlatSection[] = [
+      {
+        id: "a",
+        label: "A",
+        blurb: "",
+        icon: "🅰️",
+        locked: false,
+        row: "r",
+        render: () => ({ fence: "almanac", lines: ["diary"] }),
+        locate: (t) => t.search(/^diary\b/m),
+      },
+    ];
+    expect(composeFlatNote(lone)).toContain("```almanac\ndiary\n```");
+    expect(composeFlatNote(lone)).not.toContain("row");
+
+    // AND TWO IS STILL A ROW, so the guard cannot be satisfied by never
+    // composing one.
+    const pair: FlatSection[] = [
+      lone[0],
+      {
+        id: "b",
+        label: "B",
+        blurb: "",
+        icon: "🅱️",
+        locked: false,
+        row: "r",
+        render: () => ({ fence: "almanac", lines: ["launcher"] }),
+        locate: (t) => t.search(/^launcher\b/m),
+      },
+    ];
+    expect(composeFlatNote(pair)).toContain("```almanac\nrow\ndiary\nlauncher\n```");
   });
 
   it("only joins a row's members while they are consecutive", () => {
@@ -412,7 +464,14 @@ describe("what the homepage composes to", () => {
 // A BLOCK THE READER DID NOT MAKE, and that is the change: these refusals and
 // cuts now run on a page Almanac writes, so "it only happens if you arranged it
 // yourself" stopped being the safety net and the behaviour has to be right.
-const TOP_ROW = "```almanac\nrow\ndiary:3\ncell\nlauncher\ntasks-table\non-this-day:always\n```";
+// THE TOP ROW AS COMPOSED: Diary + launcher + tasks on Page 1, logbook on Page 2.
+const TOP_ROW =
+  "```almanac\nrow\ndiary:3\ncell\nlauncher\ntasks-table\ntab\nlogbook\n```";
+
+// The time grid, composed as of 4.70 and NOT in a row — the catalogue entry
+// argues both halves of that, and the block above the catalogue says why there
+// is no second row on this page at all.
+const GRID_BLOCK = "```almanac\nheader:⏱️ The week by the hour\ntime-grid\n```";
 
 // A block holding a section whose extent is NOT one line: Tags is a `header:`
 // bar and its directive. Hand-built, because no catalogue composes one — which
@@ -449,27 +508,47 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
 
   it("says it is removing it, and then removes it", () => {
     // The plan and the apply have to agree — the whole point of the 4.2 work.
+    // `upcoming` is the cell 4.70 put where `on-this-day` was, so it is the one
+    // this case unticks; the property is about a cell, not about that widget.
     const ops = model.plan(home(), ["diary", "tasks", "journals", "charts"]);
-    expect(ops.find((o) => o.sectionId === "on-this-day")?.kind).toBe("remove");
+    expect(ops.find((o) => o.sectionId === "logbook")?.kind).toBe("remove");
   });
 
-  it("leaves the delimiter behind when a cell is emptied, and that is harmless", () => {
-    // THE ONE 4.4 §3 SAID TO LOOK AT FIRST. Unticking both sections of the
-    // right-hand cell leaves `row / diary:3 / cell` — a delimiter with nothing
-    // after it.
+  it("takes the row apart when a cell is emptied, and puts it back", () => {
+    // THE ONE 4.4 §3 SAID TO LOOK AT FIRST, AND 4.70 GAVE THE OTHER ANSWER.
     //
-    // IT IS LEFT, AND THAT IS THE DECISION. Removing it would mean the apply
-    // pass deleting a line the reader did not untick, which is the formatter
-    // behaviour this catalogue refuses everywhere else — and it would be
-    // deleting the one line that says where a cell they may want back goes.
-    // `cellPlan` drops empty runs precisely so this costs nothing: the block
-    // renders as the single cell it now is.
+    // WHAT 4.4 DECIDED. Unticking every section of the right-hand cell left
+    // `row / diary:3 / cell` — a delimiter with nothing after it — and that was
+    // kept, because removing it would mean the apply pass deleting a line the
+    // reader did not untick, which is the formatter behaviour this catalogue
+    // refuses everywhere else.
+    //
+    // WHAT CHANGED THE ANSWER: the argument was about a line the READER might
+    // have wanted, and the line is not theirs. `rowRuns` composes `row` and
+    // `cell` only for sections that DECLARE them, so a fence whose every
+    // section declares this row holds furniture the catalogue wrote, and
+    // leaving a row over one widget is a group drawn in the section editor over
+    // a section grouped with nothing. The reconciler's rule is intact where it
+    // was actually about the reader: `undoRowOfOne` is asked only when every
+    // section in the run declares a row, so a hand-built `row:cards` fence
+    // losing one of two cards keeps its grammar exactly as typed.
+    //
+    // AND IT IS AN EXACT ROUND TRIP, which is what the old shape could not be:
+    // `joinFlatRowChunk` puts the `row` line and the `cell` delimiter back with
+    // the cells that come back.
     const out = model.apply(home(), ["diary", "journals", "charts"]);
     expect(out).not.toBeNull();
-    expect(out).toContain("```almanac\nrow\ndiary:3\ncell\n```");
+    expect(out).toContain("```almanac\ndiary:3\n```");
     expect(out).not.toContain("tasks-table");
     expect(out).not.toContain("on-this-day");
-    // And the row it leaves is a row of one cell, not a row with a hole in it.
+    expect(
+      model.apply(
+        out as string,
+        HOME_SECTIONS.filter((x) => !x.optIn).map((x) => x.id)
+      )
+    ).toBe(home());
+    // And the row it left behind, before the cells came back, was a row of one
+    // cell rather than a row with a hole in it.
     expect(cellPlan([true], [{ at: 1, weight: 1 }]).cells).toEqual([[0]]);
   });
 
@@ -479,7 +558,10 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     // out from where its neighbours' anchors sit — and inferring it wrong
     // deletes a line the reader wrote. `applyFlatSections` is a reconciler.
     const note = MULTILINE_ROW();
-    const keepAll = ["banner", "diary", "launcher", "tasks", "on-this-day", "journals", "charts"];
+    const keepAll = [
+      "banner", "diary", "launcher", "tasks", "logbook",
+      "time-grid", "journals", "charts",
+    ];
     const ops = model.plan(note, keepAll);
     const tags = ops.find((o) => o.sectionId === "tags");
     expect(tags?.kind).toBe("keep");
@@ -507,18 +589,21 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     // one cell are a smaller version of the same thing — so the refusal that
     // already existed covers it, and covers it honestly: it names the sections
     // the block holds rather than a block the reader cannot see.
-    const ops = model.plan(home(), ["on-this-day", "diary", "tasks", "journals", "charts"]);
+    const ops = model.plan(home(), ["tasks", "diary", "logbook", "journals", "charts"]);
     const refusal = ops.find((o) => o.detail.includes("moves with it"));
-    expect(refusal?.sectionId).toBe("on-this-day");
-    expect(refusal?.detail).toContain("Diary");
+    // IT LANDS ON THE SECTION THAT WAS DISPLACED, which is the diary card here:
+    // asking for `tasks` first is asking for the card to come second, and a
+    // plan names what the reader did.
+    expect(refusal?.sectionId).toBe("diary");
     expect(refusal?.detail).toContain("Open tasks");
+    expect(refusal?.detail).toContain("Overview navigator");
     expect(ops.filter((o) => o.kind === "move")).toHaveLength(0);
   });
 
   it("refuses to move one cell out of its block", () => {
     // The reorder pass permutes CHUNKS and a chunk is a block, so a move naming
     // one cell of a row could never happen. It used to be reported anyway.
-    const ops = model.plan(home(), ["on-this-day", "diary", "tasks", "journals", "charts"]);
+    const ops = model.plan(home(), ["tasks", "diary", "logbook", "journals", "charts"]);
     expect(ops.filter((o) => o.kind === "move")).toHaveLength(0);
     const refusal = ops.find((o) => o.detail.includes("moves with it"));
     expect(refusal, "no explanation for the move that cannot happen").toBeDefined();
@@ -542,7 +627,8 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
       "diary",
       "launcher",
       "tasks",
-      "on-this-day",
+      "logbook",
+      "time-grid",
       "journals",
       "charts",
     ]);
@@ -559,7 +645,8 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
         "diary",
         "launcher",
         "tasks",
-        "on-this-day",
+        "logbook",
+        "time-grid",
         "journals",
         "charts",
       ])
@@ -576,7 +663,8 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
       "diary",
       "launcher",
       "tasks",
-      "on-this-day",
+      "logbook",
+      "time-grid",
       "journals",
     ]);
     expect(out).not.toBeNull();
@@ -641,7 +729,14 @@ describe("the home model", () => {
     // composed would appear on every homepage that already exists; offering it
     // is how the grid reaches the readers who want one without arriving for the
     // readers who do not.
-    expect(own(model.addable(home()))).toEqual(["time-grid", "tags"]);
+    //
+    // BACK TO TWO IN 4.70, AND THEY TRADED PLACES. `time-grid` is composed now,
+    // in a cell, at three days — the width objection that kept it out of a row
+    // was answered by 4.62's day count rather than by this page — and
+    // `on-this-day` takes the slot it vacates, because `upcoming` took the cell
+    // and a homepage is the note about now. Both entries argue it at length; the
+    // number staying the same across the swap is a coincidence and not a rule.
+    expect(own(model.addable(home()))).toEqual(["upcoming", "on-this-day", "tags"]);
   });
 
   it("offers every page widget it does not already manage", () => {
@@ -682,11 +777,9 @@ describe("the home model", () => {
       "banner",
       "launcher",
       "tasks",
+      "logbook",
+      "upcoming",
       "on-this-day",
-      // Offered here for the ORDINARY reason rather than the opt-in one: this
-      // homepage is missing nearly everything, and an opt-in section is addable
-      // whether or not the page is stripped. Its place in the list is its place
-      // in the catalogue.
       "time-grid",
       "journals",
       "charts",
@@ -920,7 +1013,10 @@ describe("the home model", () => {
 
   it("applies only what the plan named", () => {
     // The property the whole preview rests on.
-    const want = ["banner", "diary", "launcher", "tasks", "on-this-day", "charts"];
+    const want = [
+      "banner", "diary", "launcher", "tasks", "logbook",
+      "time-grid", "charts",
+    ];
     const ops = model.plan(home(), want);
     const removed = ops.filter((o) => o.kind === "remove").map((o) => o.sectionId);
     expect(removed).toEqual(["journals"]);
@@ -934,18 +1030,20 @@ describe("the home model", () => {
 });
 
 describe("what the homepage deliberately does not offer", () => {
-  it("has no journals-header, upcoming-events or sleep-summary section", () => {
-    // 3.11 §8, and the reason is on record: the journals card already carries
-    // the activity band, the diary card already ends with the upcoming-events
-    // agenda, and sleep is a chart. Each would be a second way to see
-    // something the page already shows once.
+  it("has no journals-header or sleep-summary section", () => {
+    // 3.11 §8, and two thirds of it are on record and still hold: the journals
+    // card already carries the activity band, and sleep is a chart. Each would
+    // be a second way to see something the page already shows once.
     //
     // Pinned as a test because "we decided not to" is invisible in a
-    // catalogue, and the next reader's instinct on finding three dispatching
+    // catalogue, and the next reader's instinct on finding two dispatching
     // widgets with no section will be to add them.
+    //
+    // AND THE OLD SPELLING IS STILL ABSENT, which is the half of this that
+    // never changed: `events:upcoming` is the pre-4.70 argument form, kept
+    // dispatching for notes that already carry it and composed by nothing.
     const ids = HOME_SECTIONS.map((s) => s.id);
     expect(ids).not.toContain("journals-header");
-    expect(ids).not.toContain("upcoming");
     expect(ids).not.toContain("sleep-summary");
     expect(home()).not.toContain("journals-header");
     expect(home()).not.toContain("events:upcoming");
@@ -953,24 +1051,11 @@ describe("what the homepage deliberately does not offer", () => {
   });
 });
 
-describe("on this day ships again, as a cell (4.2 §2)", () => {
+describe("on this day is offered again (3.13 §11, 4.70)", () => {
   const model = homeSectionModel(ROOT);
 
-  it("writes it as a cell, without adding a block to the page", () => {
-    // 3.13 §11 TOOK IT OFF THE PAGE, AND 4.2 §2 ANSWERS THAT ARGUMENT RATHER
-    // THAN IGNORING IT. Both halves of it were about a block in a COLUMN: that
-    // it appears unannounced after a reader's first year, and that it was the
-    // one block here about the past on a note that is about NOW. In a row it
-    // arrives in a cell that is already drawn, and it is a third of a row
-    // rather than a band pushing the page down.
-    //
-    // IT COSTS NO BLOCK, which is the assertion that says so. The page has one
-    // more fence than it did in 4.3 — 4.5's title card — and this section is
-    // not it: `on-this-day` is a line inside the row's second cell, sharing a
-    // block with two other widgets.
-    expect(home()).toContain("on-this-day");
-    const rowBlock = home().slice(home().indexOf("```almanac\nrow"));
-    expect(rowBlock.slice(0, rowBlock.indexOf("```", 3))).toContain("on-this-day");
+  it("is not composed", () => {
+    expect(home()).not.toContain("on-this-day");
   });
 
   it("keeps it in the catalogue, addable, movable and removable", () => {
@@ -997,14 +1082,14 @@ describe("on this day ships again, as a cell (4.2 §2)", () => {
     //
     // It is still a FULL CITIZEN, which is what §11.4 was really protecting:
     // it can be taken out and put back, and the page is coherent both times.
-    const without = model.apply(home(), ["diary", "tasks", "journals", "charts"]) as string;
-    expect(without).not.toContain("on-this-day");
-    const back = model.apply(without, composedIds) as string;
+    // ADDED RATHER THAN RE-ADDED AS OF 4.70, and the property is the same one:
+    // a section that is not in the composed page arrives in a block of its own
+    // when the reader asks for it, and the page is coherent afterwards.
+    const back = model.apply(home(), [...composedIds, "on-this-day"]) as string;
     expect(back).toContain("on-this-day");
     expect(back).toContain("```almanac\non-this-day:always\n```");
-    // The row it left is still a row, with the cell that stayed — and the
-    // delimiter still marks where the second one was.
-    expect(back).toContain("```almanac\nrow\ndiary:3\ncell\ntasks-table\n```");
+    // And the rows it did not join are untouched.
+    expect(back).toContain(TOP_ROW);
   });
 
   it("leaves an existing homepage's block alone when repair runs", () => {
@@ -1019,7 +1104,9 @@ describe("on this day ships again, as a cell (4.2 §2)", () => {
     // same position, so it is asserted beside `on-this-day` rather than
     // separately: the rule is "nothing is removed from an existing homepage",
     // and it is one rule.
-    const older = model.apply(home(), ["diary", "on-this-day", "journals", "charts", "tags"]) as string;
+    const older = model.apply(home(), [
+      "diary", "on-this-day", "journals", "charts", "tags",
+    ]) as string;
     const ops = planLayout(older.split("\n"), home().split("\n"));
     expect(ops.filter((o) => o.keyword === "on-this-day")).toHaveLength(0);
     expect(ops.filter((o) => o.keyword === "tag-index")).toHaveLength(0);
@@ -1276,11 +1363,13 @@ describe("the journals block, and the migration that upgrades it", () => {
     expect(scaffold).toContain("draw the Journals section as one card per journal");
     // The dry run diffs against the LAST link in the chain, or the preview would
     // be computed against a text the migration had not been applied to. The
-    // chain gained a sixth link in 4.59.0 — the period summary's header bar — so
-    // the name here moved with it; the RULE is what this line pins, and it is
-    // the rule that would be broken by leaving the old name behind.
-    expect(scaffold).toContain("diff: diffText(original, titledSummary)");
+    // chain gained a sixth link in 4.59.0 — the period summary's header bar —
+    // and a seventh in 4.70 — the regroup — so the name here has moved twice;
+    // the RULE is what this line pins, and it is the rule that would be broken
+    // by leaving the old name behind.
+    expect(scaffold).toContain("diff: diffText(original, regrouped)");
     expect(scaffold).toContain("titleSummaryFence(carded) ?? carded");
+    expect(scaffold).toContain("regroupShippedPages(titledSummary, note.content)");
   });
 });
 
@@ -1292,41 +1381,52 @@ describe("the homepage's time grid", () => {
   const model = homeSectionModel(ROOT);
   const grid = HOME_SECTIONS.find((s) => s.id === "time-grid")!;
 
-  it("takes a block of its own rather than a cell", () => {
-    // Seven columns of hours do not fit in half a page. The same call `charts`
-    // and `tags` make, and the reason this section has no `row`.
+  it("takes a block of its own, and 4.70 kept it that way", () => {
+    // THE CASE THAT WAS RE-OPENED AND CLOSED THE SAME WAY. 4.62 gave the grid a
+    // day count so it could take a column — the registry says the question is
+    // for *"a column of a row group [that] cannot draw seven days"* — which
+    // made `row` here available for the first time, and this release is the one
+    // about rows, so it was tried.
+    //
+    // THE HOMEPAGE IS `wide` AND THE WEEK IS THE POINT. Three days around today
+    // is the compromise a narrow column forces and this page does not force it.
+    // The day count is for pages genuinely short of width; a homepage that
+    // showed yesterday, today and tomorrow would have thrown away the half of
+    // the week the grid is opened for.
     expect(grid.row).toBeUndefined();
     expect(grid.cell).toBeUndefined();
+    expect(home()).toContain(GRID_BLOCK);
   });
 
-  it("composes the header bar and the directive into one fence", () => {
-    const base = home();
-    const out = model.apply(base, [...model.present(base), "time-grid"]);
-    expect(out).toContain(
-      "```almanac\nheader:⏱️ The week by the hour\ntime-grid\n```"
+  it("composes the whole week, with no day count written", () => {
+    // NO ARGUMENT AT ALL, which is what "the whole week" is spelled as — the
+    // empty answer to 4.62's second question. A composed `|3` would be the page
+    // pre-answering a question on the reader's behalf, and the reader can still
+    // answer it themselves in the section window.
+    expect(home()).toContain("\ntime-grid\n");
+    expect(home()).not.toContain("time-grid:");
+    const three = model.apply(
+      home(),
+      model.present(home()).map((id) =>
+        id === "time-grid" ? { id, options: { arg2: "3" } } : id
+      )
     );
+    expect(three).toContain("time-grid:|3");
   });
 
-  it("is offered, never shipped, and never repaired away", () => {
-    // A homepage is RECONCILED, which is exactly why this is `optIn`: a composed
-    // section would appear on every homepage that already exists, and a reader
-    // who took it off would find repair putting it back.
-    expect(grid.optIn).toBe(true);
-    expect(home()).not.toContain("time-grid");
-    const base = home();
-    const out = model.apply(base, [...model.present(base), "time-grid"]);
-    expect(model.apply(out, model.present(out).filter((id) => id !== "time-grid"))).toBe(
-      base
-    );
+  it("is composed now, and arrives on an existing homepage by reconciliation", () => {
+    // `optIn` IS GONE. It was there because a homepage is RECONCILED and a
+    // composed section appears on every homepage that already exists — which is
+    // still true, and is now the intent rather than the thing being avoided:
+    // 4.55 built the grid, 4.62 gave it a column width, and no page a reader
+    // opens composed it. Additive reconciliation is how it reaches them.
+    expect(grid.optIn).toBeUndefined();
+    expect(home()).toContain("time-grid");
   });
 
   it("is one per page, where the widget behind it is not", () => {
     const base = home();
-    const out = model.apply(base, [...model.present(base), "time-grid"]);
-    expect(own(model.addable(out))).not.toContain("time-grid");
-    expect(
-      model.addable(out).map((s) => s.id).filter((id) => id.startsWith("w:time-grid"))
-    ).toEqual([]);
+    expect(own(model.addable(base))).not.toContain("time-grid");
     // And the widget door is closed here too, because the catalogue writes the
     // keyword — `pageWidgetKeywords` withholds it on both surfaces that have a
     // section for it.
@@ -1342,7 +1442,7 @@ describe("the homepage's time grid", () => {
     ).toEqual(["events", "logbooks", "tasks", "captures"]);
   });
 
-  it("allows journals and time-grid on the homepage to be switched to widget form", () => {
+  it("allows journals and time-grid on the homepage to be switched to section form", () => {
     const base = home();
     expect(base).toContain("frame: section\njournals:cards");
 
@@ -1355,12 +1455,15 @@ describe("the homepage's time grid", () => {
     expect(journalsAsWidget).not.toContain("frame: section\njournals:cards");
     expect(journalsAsWidget).toContain("journals:cards");
 
-    const withGrid = model.apply(base, [...model.present(base), "time-grid"]);
-    expect(withGrid).toContain("header:⏱️ The week by the hour\ntime-grid");
-
+    // THE GRID'S TOGGLE STARTS FROM THE OTHER SIDE, because it is a block and
+    // not a cell: it composes WITH its bar and the question turns the bar off.
+    // Same key, same toggle, opposite starting side — which is exactly what
+    // `WIDGET_FORM` rather than `SECTION_FORM` in the render decides, and the
+    // reason the two are worth asserting side by side in one case.
+    expect(base).toContain("header:⏱️ The week by the hour");
     const gridAsWidget = model.apply(
-      withGrid,
-      model.present(withGrid).map((id) =>
+      base,
+      model.present(base).map((id) =>
         id === "time-grid" ? { id, options: { form: "widget" } } : id
       )
     );

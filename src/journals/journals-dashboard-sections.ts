@@ -83,7 +83,7 @@ import {
   JOURNALS_DIRECTIVE_LINE,
   TRENDS_HEADING,
 } from "../core/constants";
-import { FRAME_KEYWORD, SCOPE_ALL } from "../core/directive-grammar";
+import { FRAME_KEYWORD, HEADER_KEYWORD, SCOPE_ALL } from "../core/directive-grammar";
 import {
   composeFlatNote,
   flatNoteModel,
@@ -101,6 +101,20 @@ const probe = (text: string, re: RegExp): number => text.search(re);
 // dashboard make. One rule about what a configured chart looks like.
 const chartLinesIn = (text: string): number =>
   text.split("\n").filter((l) => /^\s*chart:/.test(l)).length;
+
+// ── THE DUE-AND-OPEN ROW, 4.70 ───────────────────────────────────────────
+//
+// The review queue and the tasks table are the pair, and they are the same
+// question asked of two stores: what across the journals is still waiting for
+// you. One reads recall schedules, the other reads unticked boxes; both are
+// lists, neither draws a card, and a reader scanning for "what should I do
+// next" was scrolling past one to reach the other.
+//
+// THE BAR IS THE BAND'S. A `header:` in a row fence is drawn once, full width,
+// above both columns (`row.ts`), so "Review" would have been a title printed
+// over a task table as well. `review` opens the row and composes it.
+const DUE_ROW = "due";
+const DUE_BAR = "header:🔁 Due and open";
 
 export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
   // THE BANNER, FIRST. 4.10 gave this page a head; 4.19 made the head a banner
@@ -169,8 +183,9 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // place, and it is the one section here that shows something genuinely
     // unavailable elsewhere.
     locked: false,
+    row: DUE_ROW,
     questions: (spec) => [
-      formQuestion("header:🔁 Review"),
+      formQuestion(DUE_BAR, HEADER_KEYWORD),
       {
         kind: "folder",
         key: "folder",
@@ -186,7 +201,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     render: (opts) => ({
       fence: "almanac",
       lines: [
-        ...(opts?.form === WIDGET_FORM ? [] : ["header:🔁 Review"]),
+        ...(opts?.form === WIDGET_FORM ? [] : [DUE_BAR]),
         `review-queue:${SCOPE_ALL}`,
       ],
     }),
@@ -226,11 +241,55 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
         hostFolder: spec.hostFolder ?? null,
       },
     ],
-    render: () => ({
-      fence: "almanac",
-      lines: ["header:⏳ Open tasks", "tasks-table"],
-    }),
+    // SECOND CELL OF THE DUE-AND-OPEN ROW (4.70), SO NO BAR AND NO TOGGLE FOR
+    // ONE — the queue beside it composes the single title this fence gets.
+    row: DUE_ROW,
+    render: () => ({ fence: "almanac", lines: ["tasks-table"] }),
     locate: (text) => probe(text, /^tasks-table\b/m),
+  },
+  {
+    id: "recent",
+    label: "Recent notes",
+    blurb: "The notes you wrote most recently across every journal, newest first.",
+    icon: "🕒",
+    // ── WHAT THIS PAGE HAD NO ANSWER FOR ────────────────────────────────
+    //
+    // Everything above it is a QUEUE. The journals card counts what each
+    // journal holds, the review queue says what is due, the tasks table says
+    // what is open — three views of work outstanding, and nothing at all
+    // saying what you actually wrote. The diary has `timeline` for exactly
+    // this; the journals had no equivalent on any page.
+    //
+    // `:all`, NOT BARE, AND IT MATCHES THE QUEUE ABOVE RATHER THAN THE TASKS
+    // TABLE. The bare form scopes to the host note's own folder, which here is
+    // the journals root — right for `tasks-table`, whose scope is a subtree,
+    // and wrong for this: a journal may be rooted outside `03 - Journals/`, and
+    // a page about every journal that quietly skipped that one would be lying
+    // by omission. `review-queue:all` makes the same call for the same reason.
+    //
+    // NO COUNT WRITTEN. The second argument defaults to eight (`DEFAULT_RECENT`)
+    // and composing `|8` would be the page pre-answering a question the reader
+    // can answer themselves — the same call the homepage's time grid makes.
+    locked: false,
+    questions: (spec) => [
+      formQuestion("header:🕒 Recently written", HEADER_KEYWORD),
+      {
+        kind: "folder",
+        key: "folder",
+        label: "the folder to list",
+        directive: "journal-recent",
+        hostFolder: spec.hostFolder ?? null,
+        keywords: [{ value: SCOPE_ALL, label: "Every journal" }],
+      },
+    ],
+    render: (opts) => ({
+      fence: "almanac",
+      lines: [
+        ...(opts?.form === WIDGET_FORM ? [] : ["header:🕒 Recently written"]),
+        `journal-recent:${SCOPE_ALL}`,
+      ],
+    }),
+    locate: (text) => probe(text, /^journal-recent\b/m),
   },
   {
     id: "charts",
