@@ -62,9 +62,9 @@ const fenceHolding = (text: string, probe: (l: string) => boolean): string[] => 
   return lines.slice(open + 1, close);
 };
 
-// The fence carrying the navigation row — the banner, on every diary surface.
+// The fence carrying the banner, on every diary surface.
 const banner = (text: string): string[] =>
-  fenceHolding(text, (l) => l.startsWith("links:"));
+  fenceHolding(text, (l) => l.startsWith("title:") || l.startsWith("entry-header") || l.startsWith("links:"));
 
 // The fence carrying the period summary. On an entry that is the banner itself
 // (its `entry-header` is what a summary is to a dashboard); on a dashboard it is
@@ -98,32 +98,23 @@ describe("above the rule, an entry and an overview are the same object", () => {
     // The rows are still asserted to differ by that one id and nothing else.
     for (const grain of TRACKER_CLASSES) {
       expect(banner(composeEntryTemplate(grain))[0], grain).toBe(
-        "links:home,today,scopes#diary"
+        "entry-header"
       );
     }
     for (const grain of DASHBOARD_GRAINS) {
       const body = banner(composeDiaryDashboard(grain));
-      // The dashboard's banner opens with the page's NAME and carries the
-      // navigation row beneath it — one block, two directives, which is the
-      // whole of what the merge changed here.
       expect(body[0], grain).toBe("title:home,diary,journals");
-      expect(body[1], grain).toBe("links:today,scopes#diary");
     }
   });
 
-  it("and the pill an overview gave up is the one its head took over", () => {
-    // The other half of the boundary above. A row that lost Home with nothing
-    // replacing it would pass every assertion in this file and be a page with
-    // no route home.
+  it("and overview carries title line while entry has entry-header", () => {
     for (const grain of DASHBOARD_GRAINS) {
       const text = composeDiaryDashboard(grain);
       expect(text, grain).toContain("title:home,diary,journals");
-      // The links row — the second line of the banner now — still has no Home.
-      expect(banner(text)[1], grain).not.toContain("home");
     }
-    // And an entry has no head, which is what keeps `home` in its row.
     for (const grain of TRACKER_CLASSES) {
       expect(composeEntryTemplate(grain), grain).not.toContain("title:");
+      expect(composeEntryTemplate(grain), grain).toContain("entry-header");
     }
   });
 
@@ -182,7 +173,7 @@ describe("below the rule they diverge, and nothing forces them together", () => 
     // is a fact about its body and must not have leaked upward.
     const yearly = composeDiaryDashboard("yearly");
     expect(yearly).not.toContain("tasks-table");
-    expect(banner(yearly)[1]).toBe("links:today,scopes#diary");
+    expect(banner(yearly)[0]).toBe("title:home,diary,journals");
   });
 });
 

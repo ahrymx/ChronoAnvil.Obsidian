@@ -145,7 +145,6 @@ describe("assetUnits", () => {
       // be the first directive of a three-directive block, and `insertable`
       // carries the whole block.
       "title",
-      "links",
       "month-summary",
       // 3.3 gave monthly the scoped period button the other three have had
       // since 2.57, so the masthead carries three directives and therefore
@@ -208,7 +207,7 @@ describe("planLayout", () => {
   it("plans the three operations 2.52 actually needed", () => {
     const ops = planLayout(L(OLD_YEAR), L(asset("year.md")));
     const kinds = ops.map((o) => `${o.kind}:${o.keyword}`);
-    expect(kinds).toContain("rewrite:links");
+    expect(kinds).toContain("insert:title");
     expect(kinds).toContain("delete:year-nav");
   });
 
@@ -256,9 +255,9 @@ describe("applyLayout", () => {
   it("converges an old note onto the shipped directive set", () => {
     const out = applyLayout(L(OLD_MONTHLY), monthly) as string[];
     const text = out.join("\n");
-    expect(text).toContain("links:today,scopes#diary");
+    expect(text).toContain("title:home,diary,journals");
     expect(text).toContain("entry-rollup");
-    expect(text).not.toContain("links:home,week,all#diary");
+    expect(text).toContain("links:home,week,all#diary");
   });
 
   it("gives a dashboard that predates the head one, at the top", () => {
@@ -276,37 +275,13 @@ describe("applyLayout", () => {
     expect(text).toContain("title:home,diary,journals");
 
     const head = text.indexOf("title:home,diary,journals");
-    const nav = text.indexOf("links:");
     const summary = text.indexOf("month-summary");
     expect(head).toBeGreaterThan(-1);
-    expect(head).toBeLessThan(nav);
     expect(head).toBeLessThan(summary);
 
     // THE SUMMARY ARRIVES ALONE, WHICH IS STILL THE GUARD THAT MATTERS HERE.
     expect(text.match(/month-summary/g)).toHaveLength(1);
-
-    // ── AND THE NAVIGATION ROW ARRIVES TWICE, WHICH IS ASSERTED RATHER THAN
-    //    FIXED (4.19) ──────────────────────────────────────────────────
-    //
-    // This read `toHaveLength(1)` until 4.19, and it was the assertion that made
-    // the page head a band of its own: an insert carrying the masthead's whole
-    // fence would put a second navigation row in the note.
-    //
-    // 4.19 welded the head and the navigation row into one banner, so the block
-    // step 3 inserts now CONTAINS a `links:` line — and `OLD_MONTHLY` already
-    // has one. `applyLayout` duplicates it. That is real, and it is not a
-    // regression, because **no dashboard reaches this function any more**:
-    // `shippedNotes` gives every composed page a `surface`, and
-    // `reconcileLayouts` sends every note that has one through `repairNote`,
-    // which matches on section identity and adds nothing to a note whose banner
-    // is already present under either of its anchors. `staging.md` is the only
-    // shipped note without a surface, and it has no banner.
-    //
-    // SO THE NUMBER IS PINNED AT 2 DELIBERATELY. It is the receipt for the
-    // sentence above: the hazard 4.10 designed around is still in this function,
-    // it is simply no longer reachable, and the day something routes a composed
-    // page back through `applyLayout` this test says exactly what it will cost.
-    expect(text.match(/links:/g)).toHaveLength(2);
+    expect(text.match(/links:/g)).toHaveLength(1);
   });
 
   it("adds no second head to a dashboard that already has one", () => {
@@ -504,24 +479,14 @@ describe("the shipped assets agree with each other", () => {
     // home rather than a rung of the ladder.
     rows.delete("staging.md");
 
-    // The population is non-empty, asserted rather than assumed. This is the
-    // line that would have caught the emptying above on the day it happened.
-    expect(rows.size).toBeGreaterThan(4);
+    // Redundant in-note links lines are removed in favor of Vault Banner
+    expect(rows.size).toBe(0);
 
-    const distinct = new Set(rows.values());
-    // `home` LEFT THE LADDER IN 4.10, and the point of this assertion is that
-    // it left EVERY note at once — which is the failure mode the whole test was
-    // written for, one release's worth of notes updated and one forgotten.
-    expect(Array.from(distinct)).toEqual(["links:today,scopes#diary"]);
-
-    // AND IT LEFT BECAUSE SOMETHING ELSE CARRIES IT. A ladder that quietly lost
-    // its route home would pass the assertion above and be a worse page; every
-    // note that gave up the pill has the head that took it over.
-    for (const [name, row] of rows) {
-      expect(row, name).not.toContain("home");
-      const text = authored.find((a) => a.name === name)!.text;
-      expect(text, `${name} dropped home with nothing to replace it`).toContain(
-        "title:home,"
+    for (const item of authored) {
+      if (item.name === "staging.md") continue;
+      const text = item.text;
+      expect(text, `${item.name} should not have in-note links banner`).not.toContain(
+        "links:today,scopes#diary"
       );
     }
   });

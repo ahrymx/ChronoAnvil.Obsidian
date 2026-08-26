@@ -7,6 +7,25 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.74.0] - 2026-08-26
+
+**Enhanced mobile Time-Grid gestures and controls, optimized responsive header bar navigation, and fixed section surface background rendering on initial page load.**
+
+### Added
+
+- **Mobile Time-Grid Touch Event Creation:** Added support for long-press drag gestures on touch devices to draw new events directly on the Time-Grid, locking scrollbar movement during drawing gestures and prompting the creation dialog upon release.
+- **Enabled Mobile Overlay Controls by Default:** Configured the bottom-left floating mobile overlay controls toggle to be enabled by default for new installations.
+
+### Changed
+
+- **Responsive Header Bar Block Buttons:** Increased header bar destination and action buttons (`home`, `capture`, `diary`, `journals`, `overviews`) by ~15% on compact mobile widths and increased button spacing for touch ergonomics.
+- **Time-Grid All-Day Row Sizing:** Doubled the default minimum height of the all-day row on Time-Grid (from 30px to 60px) to provide ample touch targets.
+- **Header Art and Surface Scoping Simplification:** Unified Tracker and Entry Header layouts to use the modern pattern across all note types, removing legacy art definitions and confining path-based surface scoping strictly to page headers, spacers, and note properties.
+
+### Fixed
+
+- **Section Surface Background Loading Fix:** Initialized `HeaderBar` dataset attributes (`data-headerKey` and `data-headerLevel`) synchronously in constructor, preventing premature paint passes by sibling observers from misidentifying titled section blocks (such as *Trends and statistics*) as untitled bars and stripping their card background and border styling on initial page load.
+
 ## [4.73.0] - 2026-08-24
 
 **Upgraded Logbooks settings with interactive Emoji Picker, and removed redundant Special Events settings section.**

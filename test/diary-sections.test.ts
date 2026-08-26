@@ -290,7 +290,6 @@ describe("what a dashboard already has, and what it could gain", () => {
         "month-summary",
         "quarter-summary",
         "year-summary",
-        "links",
         "tag-index",
       ]) {
         expect(offered.has(`w:${keyword}#1`), `${g}/${keyword}`).toBe(false);
@@ -487,7 +486,7 @@ describe("what a dashboard already has, and what it could gain", () => {
   });
 
   it("resolves through the one resolver, not a second path test", () => {
-    expect(readSrc("section-insert")).toContain("noteKindOf(paths, notePath)");
+    expect(readSrc("section-insert")).toContain("noteKindOf(paths, notePath,");
   });
 });
 
@@ -529,7 +528,7 @@ describe("editing sections routes all three surfaces", () => {
     // Both diary resolvers open the same two lines — read the surface paths,
     // ask `noteKindOf` — so neither can drift from what the entry header and
     // the tracker surfaces believe about the same file.
-    const calls = src().match(/noteKindOf\(paths, notePath\)/g) ?? [];
+    const calls = src().match(/noteKindOf\(paths, notePath,/g) ?? [];
     expect(calls.length).toBe(2);
     expect(src()).toContain("surfacePathConfig(this.plugin)");
   });

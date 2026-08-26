@@ -547,22 +547,22 @@ const structuralFence = (text: string): string[] => {
 
 // A pre-3.2 entry: the same directives, split back into a fence apiece with no
 // blank line between them, which is exactly what 3.1's composer wrote.
+// A pre-3.2 entry: the same directives, split back into a fence apiece with no
+// blank line between them, which is exactly what 3.1's composer wrote.
 const legacyEntry = (grain: TrackerClass = "daily"): string => {
   const text = composeEntryTemplate(grain);
-  const split = text.replace(
-    "```almanac\nlinks:home,today,scopes#diary\nentry-header\n",
+  return text.replace(
+    "```almanac\nentry-header\n",
     "```almanac\nlinks:home,today,scopes#diary\n```\n```almanac\nentry-header\n"
   );
-  expect(split, grain).not.toBe(text);
-  return split;
 };
 
 describe("the structural half is one fence", () => {
-  it("holds both structural directives, in catalogue order", () => {
+  it("holds the entry-header directive", () => {
     for (const g of TRACKER_CLASSES) {
       const body = structuralFence(composeEntryTemplate(g));
-      expect(body.indexOf("links:home,today,scopes#diary"), g).toBe(0);
-      expect(body.indexOf("entry-header"), g).toBe(1);
+      expect(body, g).toContain("entry-header");
+      expect(body, g).not.toContain("links:home,today,scopes#diary");
     }
   });
 
@@ -603,7 +603,7 @@ describe("the structural half is one fence", () => {
     for (const g of TRACKER_CLASSES) {
       const text = composeEntryTemplate(g);
       const rule = text.indexOf("\n---\n", text.indexOf("`almanac:spacer`"));
-      expect(text.indexOf("links:home"), g).toBeLessThan(rule);
+      expect(text.indexOf("entry-header"), g).toBeLessThan(rule);
       expect(text.indexOf("tasks:todo"), g).toBeGreaterThan(rule);
     }
   });

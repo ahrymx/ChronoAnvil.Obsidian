@@ -1277,58 +1277,6 @@ a.jjs-row-link:hover {
   border-radius: var(--am-radius-md);
   background: var(--background-secondary);
 }
-/* THE FIGURE: a 45deg hatch, with the accent bleeding in from the leading edge.
- *
- * The mark an engraved heading is shaded with, which is the register an almanac
- * is printed in — and, unlike a tint or a shadow, it is a TEXTURE, so it reads
- * as a material rather than as a state. That matters on a surface that sits
- * above six cards which use tint and shadow to mean things.
- *
- * A LAYER OF ITS OWN rather than a background on the card, so `--am-head-figure`
- * is the only dial and no text inherits an opacity. `pointer-events: none`
- * because it covers the whole card including the title, which is click-to-edit.
- *
- * BOTH GRADIENTS ARE TOKEN-DERIVED. The wash is `--interactive-accent` through
- * `color-mix`, so a reader's accent colour drives it and no hex is written here;
- * the hatch is plain white at the figure, which the light theme flips. */
-.jtc-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--interactive-accent) 13%, transparent) 0%,
-      transparent 42%
-    ),
-    repeating-linear-gradient(
-      135deg,
-      rgba(255, 255, 255, var(--am-head-figure)) 0 1px,
-      transparent 1px 6px
-    );
-}
-/* Dark ink on a light ground needs more of it to read as texture, and the wash
-   needs less before it reads as a colour rather than as light. Keyed on
-   Obsidian's own theme class, which is the only thing that knows. */
-.theme-light .jtc-card {
-  --am-head-figure: 0.055;
-}
-.theme-light .jtc-card::before {
-  background-image:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--interactive-accent) 10%, transparent) 0%,
-      transparent 42%
-    ),
-    repeating-linear-gradient(
-      135deg,
-      rgba(0, 0, 0, var(--am-head-figure)) 0 1px,
-      transparent 1px 6px
-    );
-}
-/* ABOVE THE FIGURE. The layer is absolute and the rows are in flow, so without
-   a positioning context of their own the figure paints over the title. */
 .jtc-row {
   position: relative;
   display: flex;
@@ -1527,11 +1475,6 @@ a.jjs-row-link:hover {
  * to deliberately. So the links band is welded to the BOTTOM edge, and takes a
  * `border-top` divider where the others take `border-bottom`.
  *
- * THE FIGURE STAYS WITH THE NAME. `.jtc-card::before` is `inset: 0` on a
- * positioned `.jtc-card`, so it covers the name half and stops at the divider —
- * which is right: the hatch is what makes the name read as engraved, and running
- * it under a row of pills would make the pills look printed on.
- *
  * ONLY WHEN THE BLOCK IS A CARD. `chromeClasses` withholds this class for
  * `frame: section` and `frame: none`, which take `is-unframed` instead — so a
  * reader who unframes their banner gets two plain widgets and no box, the same
@@ -1543,71 +1486,12 @@ a.jjs-row-link:hover {
   border-radius: var(--am-radius-md);
   background: var(--background-secondary);
 }
-/* ── THE FIGURE IS THE BLOCK'S, NOT THE NAME CARD'S (4.19.1 — V3) ──────
- *
- * The wash and the hatch used to stop at the rule, so the banner read as a
- * figured card with a plain strip bolted under it — two materials, one block.
- * Running them across the whole banner is what makes it one object, and it is
- * the reading `60-heroes-and-banners.css` opens by claiming for this file:
- * *the loud bands: what a page or a card opens with*.
- *
- * MOVED RATHER THAN COPIED. `.jtc-card::before` is suppressed below, because two
- * figures over one banner is two hatches at slightly different origins — the
- * 45° repeat would beat against itself at the seam, which is the one artefact a
- * texture cannot survive.
- *
- * THE POSITIONING RULE IS THE ONE `.jtc-card` ALREADY DOCUMENTED. `inset: 0`
- * needs a positioned ancestor or it resolves against whatever happens to be
- * positioned — in Live Preview the code-block widget, in reading view the note's
- * sizer. That is 4.7.0's grip bug, and it is why `position: relative` is on the
- * block and on both of its children. */
-.journal-page-banner::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--interactive-accent) 13%, transparent) 0%,
-      transparent 42%
-    ),
-    repeating-linear-gradient(
-      135deg,
-      rgba(255, 255, 255, var(--am-head-figure)) 0 1px,
-      transparent 1px 6px
-    );
-}
-/* Dark ink on a light ground needs more of it to read as texture, and the wash
-   needs less before it reads as a colour rather than as light. The same pair
-   `.jtc-card` carries, keyed on Obsidian's own theme class. */
-.theme-light .journal-page-banner {
-  --am-head-figure: 0.055;
-}
-.theme-light .journal-page-banner::before {
-  background-image:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--interactive-accent) 10%, transparent) 0%,
-      transparent 42%
-    ),
-    repeating-linear-gradient(
-      135deg,
-      rgba(0, 0, 0, var(--am-head-figure)) 0 1px,
-      transparent 1px 6px
-    );
-}
-/* The name card gives up the frame AND the figure it drew for itself; the block
-   has both now. It keeps `position: relative` so it sits above the block's
-   figure rather than under it. */
+/* The name card gives up the frame; the block has it now. */
 .journal-page-banner > .jtc-card {
   position: relative;
   border: none;
   border-radius: 0;
   background: none;
-}
-.journal-page-banner > .jtc-card::before {
-  content: none;
 }
 /* The pill row, welded under the name.
  *

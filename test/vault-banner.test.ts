@@ -993,20 +993,10 @@ describe("what the Banner section became", () => {
   });
 
   it("takes none of the banner's card while the bar is on", () => {
-    // THE FLAG THAT CHOOSES THE CHROME IS NOT THE ONE THAT CHOOSES THE WIDGET.
-    // `isPageBanner` / `isEntryBanner` / `isStudyBanner` paint the block — the
-    // accent wash and the slim band — and they are set from the same three
-    // keywords that now draw the head. Left on, the head would open every note
-    // inside exactly the banner this release was asked to remake.
-    //
-    // `chromeClasses`' own comment says why this is the row that earns a test:
-    // *"the rule most likely to be broken by accident … 'the card came back' is
-    // the one a screenshot would catch late."*
+    // BANNER_KINDS always draws the page head directly without legacy banner cards.
     const t = readSrc("widgets");
-    expect(t).toMatch(
-      /if \(!quiet\) \{\s*\n\s*if \(kind === "entry-header"\) isEntryBanner = true;/
-    );
-    expect(t).toContain("} else if (BANNER_KINDS.has(kind)) {");
+    expect(t).toContain("if (BANNER_KINDS.has(kind)) {");
+    expect(t).toContain("pageHead = widget;");
     // And nothing new paints in their place: a block with no chrome class is a
     // plain flex column, which is what `.journal-widget-block` has always been.
     expect(t).not.toContain('out.push("journal-head-block")');
@@ -1019,7 +1009,7 @@ describe("what the Banner section became", () => {
     // is above all of it.
     const t = readSrc("widgets");
     expect(t).toContain(
-      'else if (pageHead) pageHead.insertAdjacentElement("afterend", strip);'
+      'if (pageHead) pageHead.insertAdjacentElement("afterend", strip);'
     );
     expect(t).toContain(
       'if (pageHead) pageHead.insertAdjacentElement("afterend", facts);'

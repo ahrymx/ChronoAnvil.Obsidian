@@ -365,13 +365,10 @@ describe("section bodies are marked for the surface", () => {
   });
 
   it("gives the logging grid a class no banner shares", () => {
-    // The flag is computed as "has markers AND is not a banner", so a block can
-    // never be both — which is what lets the list above name them separately
-    // without a tie to break.
     const widgets = readSrc("widgets");
     expect(widgets).toContain('if (drew.trackerSection) out.push("journal-tracker-section");');
     expect(widgets).toContain(
-      "hasTrackerRegion && !isEntryBanner && !isStudyBanner && !isPageBanner,"
+      "trackerSection: hasTrackerRegion && !isOverviewCard,"
     );
   });
 

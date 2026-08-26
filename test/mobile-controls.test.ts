@@ -14,9 +14,9 @@ import {
 import { readCss } from "./sources";
 
 describe("Mobile settings and controls", () => {
-  it("defaults to overlayTogglePosition 'off' and hideOverlaysDefault false", () => {
+  it("defaults to overlayTogglePosition 'left' (bottom left) and hideOverlaysDefault false", () => {
     expect(DEFAULT_SETTINGS.mobile).toBeDefined();
-    expect(DEFAULT_SETTINGS.mobile.overlayTogglePosition).toBe("off");
+    expect(DEFAULT_SETTINGS.mobile.overlayTogglePosition).toBe("left");
     expect(DEFAULT_SETTINGS.mobile.hideOverlaysDefault).toBe(false);
   });
 

@@ -88,6 +88,31 @@ export function orderedKeys(
   return [...known, ...rest];
 }
 
+/**
+ * Which semantic type icon a property row earns in Obsidian's style.
+ */
+export function propertyIconOf(
+  key: string,
+  value: unknown,
+  shape: Shape
+): string {
+  if (shape === "boolean") return "check-square";
+  if (shape === "number") return "hash";
+  if (shape === "list") {
+    return key.toLowerCase().includes("tag") ? "tags" : "list";
+  }
+  const k = key.toLowerCase();
+  if (
+    k.includes("date") ||
+    k.includes("created") ||
+    k.endsWith("-start") ||
+    (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value))
+  ) {
+    return "calendar";
+  }
+  return "lines-of-text";
+}
+
 export function openProperties(app: App, file: TFile): void {
   new PropertiesModal(app, file).open();
 }
@@ -165,8 +190,14 @@ class PropertiesModal extends Modal {
 
   private renderRow(body: HTMLElement, key: string, value: unknown): void {
     const shape = shapeOf(value);
-    const row = new Setting(body).setName(key);
+    const row = new Setting(body);
     row.settingEl.addClass("amp-row");
+
+    const nameEl = row.nameEl;
+    nameEl.empty();
+    const iconSpan = nameEl.createSpan({ cls: "amp-prop-icon" });
+    setIcon(iconSpan, propertyIconOf(key, value, shape));
+    nameEl.createSpan({ cls: "amp-prop-key", text: key });
 
     if (shape === "opaque") {
       // SHOWN AND NOT TOUCHED. See the module head: flattening a nested value
@@ -184,6 +215,7 @@ class PropertiesModal extends Modal {
     } else if (shape === "number") {
       row.addText((c) => {
         c.inputEl.type = "number";
+        c.setPlaceholder("Empty");
         c.setValue(String(value ?? ""));
         // ON BLUR, NOT ON EVERY KEYSTROKE. `processFrontMatter` rewrites the
         // file, and a write per character is a write per character into the
@@ -199,6 +231,7 @@ class PropertiesModal extends Modal {
     } else if (shape === "list") {
       row.setDesc("Separate with commas.");
       row.addText((c) => {
+        c.setPlaceholder("Empty");
         c.setValue(listToText(value));
         c.inputEl.addEventListener("blur", () =>
           void this.write(key, textToList(c.getValue()))
@@ -206,6 +239,7 @@ class PropertiesModal extends Modal {
       });
     } else {
       row.addText((c) => {
+        c.setPlaceholder("Empty");
         c.setValue(value === null || value === undefined ? "" : String(value));
         c.inputEl.addEventListener("blur", () => {
           const next = c.getValue();

@@ -72,7 +72,6 @@ import {
   SNAP_MINUTES,
   describeWhen,
   dayIndex,
-  fitDays,
   formatClock,
   minuteAt,
   movedTo,
@@ -204,7 +203,7 @@ export function buildTimeGrid(
 
   const render = (): void => {
     if (!ready) return;
-    showing = fitDays(asked, root.clientWidth);
+    showing = asked;
     const cols = visibleDays(dates, showing, moment().format("YYYY-MM-DD"));
     span.setText(
       cols.length === 1
@@ -252,14 +251,6 @@ export function buildTimeGrid(
 
   reload();
 
-  // The pane may be any width, and it may change without the note changing —
-  // dragged splitter, a row group re-laid out, a phone rotated.
-  ctx.addChild(
-    new FitWatcher(root, () => {
-      if (fitDays(asked, root.clientWidth) !== showing) render();
-    })
-  );
-
   return root;
 }
 
@@ -297,24 +288,6 @@ function sourceChips(
       chip.setAttribute("aria-pressed", off.has(source) ? "false" : "true");
       render();
     });
-  }
-}
-
-// Repaints when the pane's width crosses a threshold.
-//
-// A `ResizeObserver` RATHER THAN A CONTAINER QUERY, and the difference is which
-// question is being asked. CSS can hide a column; it cannot decide that the
-// three columns worth keeping are the three around today. The measurement is
-// the style's, the choice is the view's.
-class FitWatcher extends MarkdownRenderChild {
-  constructor(el: HTMLElement, private readonly onResize: () => void) {
-    super(el);
-  }
-
-  onload(): void {
-    const ro = new ResizeObserver(() => this.onResize());
-    ro.observe(this.containerEl);
-    this.register(() => ro.disconnect());
   }
 }
 
@@ -748,7 +721,8 @@ function paint(
       opts.scroll,
       body,
       showsToday ? nowOffset(win, nowMinutes()) : null,
-      win
+      win,
+      todayCol
     );
   }
 }
@@ -767,7 +741,8 @@ function openOn(
   scroll: HTMLElement,
   body: HTMLElement,
   at: number | null,
-  win: GridWindow
+  win: GridWindow,
+  todayCol?: HTMLElement | null
 ): void {
   const defaultFrac = (DEFAULT_OPEN_HOUR - win.startHour) / (win.endHour - win.startHour);
   const target = at ?? defaultFrac;
@@ -776,12 +751,17 @@ function openOn(
   // has been round once.
   window.requestAnimationFrame(() => {
     const span = body.offsetHeight;
-    if (!span || scroll.scrollHeight <= scroll.clientHeight) return;
-    const offset =
-      at != null
-        ? target * span - scroll.clientHeight / 3
-        : target * span;
-    scroll.scrollTop = Math.max(0, body.offsetTop + offset);
+    if (span && scroll.scrollHeight > scroll.clientHeight) {
+      const offset =
+        at != null
+          ? target * span - scroll.clientHeight / 3
+          : target * span;
+      scroll.scrollTop = Math.max(0, body.offsetTop + offset);
+    }
+    if (todayCol && scroll.scrollWidth > scroll.clientWidth) {
+      const left = todayCol.offsetLeft - 60;
+      scroll.scrollLeft = Math.max(0, left);
+    }
   });
 }
 
@@ -838,6 +818,8 @@ type DragMode = "draw" | "move" | "resize";
 // pixels is about two minutes on the rail — below the snap, so nothing that
 // counts as a drag can fail to change anything.
 const DRAG_SLOP_PX = 4;
+const TOUCH_LONG_PRESS_MS = 350;
+const TOUCH_SLOP_PX = 10;
 
 // Which block to put the focus back on after a repaint, when the edit came from
 // the keyboard. A repaint rebuilds every element, so the focused block is gone
@@ -906,6 +888,7 @@ function wireGestures(edit: EditCtx): void {
 
   body.addEventListener("pointerdown", (evt: PointerEvent) => {
     if (evt.button !== 0) return;
+    const isTouch = evt.pointerType === "touch";
     dragged = false;
     const target = evt.target as HTMLElement | null;
     if (!target) return;
@@ -928,13 +911,50 @@ function wireGestures(edit: EditCtx): void {
     const from = minuteAt(edit.win, fractionAt(edit, evt.clientY));
     const downX = evt.clientX;
     const downY = evt.clientY;
+    const scrollEl = body.closest(".am-tg-scroll") as HTMLElement | null;
 
-    const ghost = createDiv({ cls: `am-tg-ghost is-${mode}` });
+    let ghost: HTMLElement | null = null;
     let started = false;
     let preview: Preview | null = null;
+    let longPressTimer: number | null = null;
+    let isPointerCaptured = false;
+    let lastClientY = downY;
 
-    const advance = (e: PointerEvent): void => {
-      const to = minuteAt(edit.win, fractionAt(edit, e.clientY));
+    const startDrag = (initialClientY: number): void => {
+      started = true;
+      dragged = true;
+      if (scrollEl) {
+        scrollEl.addClass("is-locked");
+        scrollEl.style.overflow = "hidden";
+      }
+      if (!isTouch) {
+        try {
+          body.setPointerCapture(evt.pointerId);
+          isPointerCaptured = true;
+        } catch (_) {}
+      }
+      body.addClass("is-dragging");
+      blockEl?.addClass("is-moving");
+      ghost = createDiv({ cls: `am-tg-ghost is-${mode}` });
+      const initialTo = minuteAt(edit.win, fractionAt(edit, initialClientY));
+      if (mode === "draw") {
+        const span = spanFromDrag(from, initialTo);
+        preview = { day: startCol.day, start: span.start, mins: span.mins };
+      } else if (mode === "resize" && item) {
+        preview = {
+          day: item.day,
+          start: item.start,
+          mins: Math.max(SNAP_MINUTES, initialTo - item.start),
+        };
+      } else if (item) {
+        preview = { day: startCol.day, start: item.start, mins: item.mins };
+      }
+      if (preview && ghost) drawGhost(edit, ghost, preview);
+    };
+
+    const advanceAt = (clientX: number, clientY: number): void => {
+      lastClientY = clientY;
+      const to = minuteAt(edit.win, fractionAt(edit, clientY));
       if (mode === "draw") {
         const span = spanFromDrag(from, to);
         preview = { day: startCol.day, start: span.start, mins: span.mins };
@@ -945,7 +965,7 @@ function wireGestures(edit: EditCtx): void {
           mins: Math.max(SNAP_MINUTES, to - item.start),
         };
       } else if (item) {
-        const col = columnAt(edit, e.clientX) ?? startCol;
+        const col = columnAt(edit, clientX) ?? startCol;
         // SNAPPED AFTER THE OFFSET IS APPLIED, so a block that was hand-written
         // at 09:07 lands on the quarter hour rather than carrying its seven
         // minutes around the week for ever.
@@ -959,55 +979,140 @@ function wireGestures(edit: EditCtx): void {
         );
         preview = { day: col.day, start, mins: item.mins };
       }
-      if (preview) drawGhost(edit, ghost, preview);
+      if (preview && ghost) drawGhost(edit, ghost, preview);
     };
 
     const onMove = (e: PointerEvent): void => {
-      if (
-        !started &&
-        Math.abs(e.clientX - downX) < DRAG_SLOP_PX &&
-        Math.abs(e.clientY - downY) < DRAG_SLOP_PX
-      ) {
+      const dx = Math.abs(e.clientX - downX);
+      const dy = Math.abs(e.clientY - downY);
+
+      if (isTouch && !started) {
+        // If the finger moves beyond slop before long-press fires, cancel timer -> normal scroll
+        if (dx > TOUCH_SLOP_PX || dy > TOUCH_SLOP_PX) {
+          if (longPressTimer !== null) {
+            window.clearTimeout(longPressTimer);
+            longPressTimer = null;
+          }
+        }
         return;
       }
-      started = true;
-      dragged = true;
-      body.addClass("is-dragging");
-      blockEl?.addClass("is-moving");
-      advance(e);
+
+      if (!isTouch && !started) {
+        if (dx < DRAG_SLOP_PX && dy < DRAG_SLOP_PX) return;
+        startDrag(e.clientY);
+      }
+
+      if (started) {
+        advanceAt(e.clientX, e.clientY);
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent): void => {
+      if (!isTouch) return;
+      if (started) {
+        if (e.cancelable) e.preventDefault();
+        if (e.touches.length > 0) {
+          advanceAt(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      } else if (e.touches.length > 0) {
+        const dx = Math.abs(e.touches[0].clientX - downX);
+        const dy = Math.abs(e.touches[0].clientY - downY);
+        if (dx > TOUCH_SLOP_PX || dy > TOUCH_SLOP_PX) {
+          if (longPressTimer !== null) {
+            window.clearTimeout(longPressTimer);
+            longPressTimer = null;
+          }
+        }
+      }
     };
 
     const finish = (): void => {
+      if (longPressTimer !== null) {
+        window.clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      if (scrollEl) {
+        scrollEl.removeClass("is-locked");
+        scrollEl.style.overflow = "";
+      }
       body.removeEventListener("pointermove", onMove);
       body.removeEventListener("pointerup", onUp);
       body.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onCancel);
+      if (isPointerCaptured) {
+        try {
+          body.releasePointerCapture(evt.pointerId);
+        } catch (_) {}
+        isPointerCaptured = false;
+      }
       body.removeClass("is-dragging");
       blockEl?.removeClass("is-moving");
-      ghost.remove();
+      ghost?.remove();
+      ghost = null;
+      started = false;
     };
 
     const onCancel = (): void => finish();
 
-    const onUp = (e: PointerEvent): void => {
+    const commitGesture = (finalClientY: number, wasStarted: boolean, currentPreview: Preview | null): void => {
       finish();
+
       if (mode === "draw") {
-        // A CLICK IS ONE SLOT. `spanFromDrag` says so; this is where a reader
-        // meets it, because tapping an empty Thursday afternoon is how most
-        // meetings get made.
-        const to = started ? minuteAt(edit.win, fractionAt(edit, e.clientY)) : from;
+        if (isTouch) {
+          // On mobile touch: an event is created only if long-tap triggered drag-mode
+          if (wasStarted) {
+            const to = minuteAt(edit.win, fractionAt(edit, finalClientY));
+            openDraft(edit, startCol, spanFromDrag(from, to));
+          }
+          return;
+        }
+        // On desktop mouse:
+        const to = wasStarted ? minuteAt(edit.win, fractionAt(edit, finalClientY)) : from;
         openDraft(edit, startCol, spanFromDrag(from, to));
         return;
       }
-      if (!started || !item || !preview) return;
+
+      if (!wasStarted || !item || !currentPreview) return;
       const next =
         mode === "resize"
-          ? resizedTo(item, preview.start + (preview.mins ?? 0))
-          : movedTo(item, { day: preview.day, start: preview.start });
+          ? resizedTo(item, currentPreview.start + (currentPreview.mins ?? 0))
+          : movedTo(item, { day: currentPreview.day, start: currentPreview.start });
       if (!next) return;
       void applyEdit(edit, item, next);
     };
 
-    body.setPointerCapture(evt.pointerId);
+    const onUp = (e: PointerEvent): void => {
+      if (isTouch && started) return; // handled via touchend
+      commitGesture(e.clientY, started, preview);
+    };
+
+    const onTouchEnd = (e: TouchEvent): void => {
+      const finalY = e.changedTouches.length > 0 ? e.changedTouches[0].clientY : lastClientY;
+      commitGesture(finalY, started, preview);
+    };
+
+    if (isTouch) {
+      longPressTimer = window.setTimeout(() => {
+        longPressTimer = null;
+        if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+          try {
+            navigator.vibrate(25);
+          } catch (_) {}
+        }
+        startDrag(downY);
+      }, TOUCH_LONG_PRESS_MS);
+      window.addEventListener("touchmove", onTouchMove, { passive: false });
+      window.addEventListener("touchend", onTouchEnd);
+      window.addEventListener("touchcancel", onCancel);
+    } else {
+      try {
+        body.setPointerCapture(evt.pointerId);
+        isPointerCaptured = true;
+      } catch (_) {}
+    }
+
     body.addEventListener("pointermove", onMove);
     body.addEventListener("pointerup", onUp);
     body.addEventListener("pointercancel", onCancel);

@@ -457,7 +457,9 @@ export class SectionInserter {
   // control rather than one that appears and then explains it cannot help.
   diaryContextFor(notePath: string): DiaryDashboardContext | null {
     const paths = surfacePathConfig(this.plugin);
-    const kind = noteKindOf(paths, notePath);
+    const file = this.app.vault.getAbstractFileByPath(notePath);
+    const fm = file instanceof TFile ? this.app.metadataCache.getFileCache(file)?.frontmatter : undefined;
+    const kind = noteKindOf(paths, notePath, fm?.["journal"], fm?.["type"]);
     if (kind == null || kind.surface !== "diary") return null;
     if (kind.grain === "daily") return null; // no daily dashboard exists
     if (notePath !== folderNotePath(paths[CLASS_DEFS[kind.grain].folderKey])) {
@@ -525,7 +527,9 @@ export class SectionInserter {
   // test read the other way round.
   entryContextFor(notePath: string): EntrySectionContext | null {
     const paths = surfacePathConfig(this.plugin);
-    const kind = noteKindOf(paths, notePath);
+    const file = this.app.vault.getAbstractFileByPath(notePath);
+    const fm = file instanceof TFile ? this.app.metadataCache.getFileCache(file)?.frontmatter : undefined;
+    const kind = noteKindOf(paths, notePath, fm?.["journal"], fm?.["type"]);
     if (kind == null || kind.surface !== "diary") return null;
     if (this.diaryContextFor(notePath)) return null;
     // THE ANSWERS TO THE ONE QUESTION AN ENTRY SECTION ASKS, assembled here

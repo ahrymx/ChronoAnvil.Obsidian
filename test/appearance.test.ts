@@ -1060,18 +1060,11 @@ describe("the banner is one material, and the minimal one is quiet", () => {
     return t.slice(at, t.indexOf("}", at));
   };
 
-  it("puts the figure on the block, and takes it off the card (V3)", () => {
-    // THE WASH AND THE HATCH RUN THE WHOLE BANNER. Stopping them at the rule
-    // made the banner read as a figured card with a plain strip bolted under
-    // it — two materials in one block, which is what the merge existed to end.
-    expect(body(".journal-page-banner::before")).toContain("repeating-linear-gradient");
-    expect(body(".journal-page-banner::before")).toContain("--interactive-accent");
-
-    // AND ONLY ONCE. Two figures over one banner is two 45° hatches at
-    // different origins, beating against each other at the seam — the one
-    // artefact a texture cannot survive, and invisible in any test that only
-    // asks whether the figure is present.
-    expect(body(".journal-page-banner > .jtc-card::before")).toContain("content: none");
+  it("keeps banners clean without pseudo-element art hatches", () => {
+    const css = readCss();
+    expect(css).not.toContain(".journal-page-banner::before");
+    expect(css).not.toContain(".journal-slim-banner::before");
+    expect(css).not.toContain(".jtc-card::before");
 
     // The children sit above it rather than under it. `inset: 0` needs a
     // positioned ancestor or it resolves against the code-block widget in Live
@@ -1210,12 +1203,10 @@ describe("the banner is one material, and the minimal one is quiet", () => {
     expect(strips).toContain("border-bottom: var(--am-rule)");
   });
 
-  it("applies subtle banner tinting and engraved texture to the slim banner", () => {
-    // The slim banner receives subtle accent tinting and fine engraved hatching
-    // texture on .journal-slim-banner::before, while child wrappers stay clean.
+  it("keeps slim banners clean without pseudo-element art texture", () => {
     const css = readCss();
-    expect(css).toContain(".journal-slim-banner::before");
-    expect(css).toContain("--am-head-figure");
+    expect(css).not.toContain(".journal-slim-banner::before");
+    expect(css).not.toContain("--am-head-figure");
     for (const sel of [".journal-entry-banner", ".journal-study-banner"]) {
       expect(css, sel).not.toContain(`${sel}::before {`);
     }

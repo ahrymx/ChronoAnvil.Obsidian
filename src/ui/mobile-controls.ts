@@ -49,7 +49,7 @@ export class MobileControls {
   }
 
   private apply(): void {
-    const position = this.plugin.settings.mobile?.overlayTogglePosition ?? "off";
+    const position = this.plugin.settings.mobile?.overlayTogglePosition ?? "left";
 
     if (position === "off") {
       this.cleanup();

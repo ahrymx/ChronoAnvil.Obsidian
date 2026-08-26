@@ -68,7 +68,7 @@ export const SEARCH_SECTIONS: FlatSection[] = [
   // section — a section a reader may remove, whose blurb says nothing about
   // navigation, and which the editor could not show as a nav row because it was
   // not one. The page rendered two strips and reported one section.
-  bannerSection({ ids: PAGE_TITLE_IDS, links: "today,scopes#diary" }),
+  bannerSection({ ids: PAGE_TITLE_IDS }),
   {
     id: "search",
     label: "Search the diary",

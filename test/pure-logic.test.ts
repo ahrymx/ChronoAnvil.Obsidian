@@ -3677,9 +3677,8 @@ describe("shipped daily template", () => {
       return lines.slice(open + 1, close).map((l) => l.trim());
     };
 
-    // The banner: its navigation row and the strip that names the note, and
-    // nothing else.
-    const banner = fenceAfter("links:home,today,scopes#diary");
+    // The banner: the strip that names the note, and nothing else.
+    const banner = fenceAfter("entry-header");
     expect(banner).toContain("entry-header");
     expect(banner).not.toContain("# almanac:trackers:start");
     expect(banner).not.toContain("tracker:Mood");
@@ -3706,19 +3705,14 @@ describe("shipped daily template", () => {
     ]);
   });
 
-  it("and the writable span still cannot reach the navigation row", () => {
-    // 3.2 patch 2 puts a third directive in this fence. `TrackerRegion`'s whole
-    // promise is that a splice between bodyStart and bodyEnd can never touch
-    // the markers, the fence, or a directive sharing the block — `links:` is
-    // now one of those, and it is the one whose loss would leave a reader with
-    // no way out of the note.
+  it("and the writable span still cannot reach the header row", () => {
     const lines = daily.split("\n");
     const region = locateTrackerRegion(lines)!;
-    const linksAt = lines.findIndex((l) => l.startsWith("links:"));
-    expect(linksAt).toBeGreaterThan(0);
-    expect(linksAt).toBeLessThan(region.bodyStart);
+    const headerAt = lines.findIndex((l) => l.startsWith("entry-header"));
+    expect(headerAt).toBeGreaterThan(0);
+    expect(headerAt).toBeLessThan(region.bodyStart);
     expect(lines.slice(region.bodyStart, region.bodyEnd).join("\n")).not.toContain(
-      "links:"
+      "entry-header"
     );
   });
 });
@@ -3728,7 +3722,7 @@ describe("shipped monthly template", () => {
 
   it("carries the interactive widgets the daily template has", () => {
     expect(monthly).toContain("entry-header");
-    expect(monthly).toContain("links:home,today,scopes#diary");
+    expect(monthly).not.toContain("links:home,today,scopes#diary");
     expect(monthly).toContain("note:focus#line:");
     expect(monthly).toContain("note:log:");
     expect(monthly).toContain("attach:attachments|Attachments");

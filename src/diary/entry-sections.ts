@@ -346,7 +346,7 @@ export const ENTRY_SECTIONS: EntrySection[] = [
     // the doubling this release removes rather than a shape it should copy.
     // `masthead.test.ts` pins the consequence: an entry's row keeps `home` where
     // a dashboard's dropped it, because on an entry nothing else offers it.
-    above: () => ["links:home,today,scopes#diary"],
+    above: () => [],
     directive: () => "entry-header",
   },
   {

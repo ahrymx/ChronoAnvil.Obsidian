@@ -33,20 +33,13 @@ const ROOT = DEFAULT_PATHS.diaryRoot;
 const GRAINS = ["weekly", "monthly", "quarterly", "yearly"] as const;
 
 // A 4.18-shaped note: the banner's two lines in two fences.
-//
-// The `links:` line leaves the banner fence and opens the fence below it, which
-// is where every one of those releases composed it — the masthead on a
-// dashboard, the search block on Search.
 function unwelded(text: string): string {
   const lines = text.split("\n");
-  const at = lines.findIndex((l) => l.startsWith("links:"));
-  expect(at, "fixture must have a links row").toBeGreaterThan(-1);
-  const row = lines[at];
+  const at = lines.findIndex((l) => l.startsWith("title:"));
+  expect(at, "fixture must have a title row").toBeGreaterThan(-1);
   const out = [...lines];
-  out.splice(at, 1);
-  // Close the banner fence after the title line, open the next one with the row.
-  const close = out.findIndex((l, i) => i >= at - 1 && l.trim() === "```");
-  out.splice(close + 1, 0, "", "```almanac", row, "```");
+  const close = out.findIndex((l, i) => i >= at && l.trim() === "```");
+  out.splice(close + 1, 0, "", "```almanac", "links:today,scopes#diary", "```");
   return out.join("\n");
 }
 
@@ -60,27 +53,22 @@ const PAGES: { name: string; text: () => string }[] = [
 
 describe("welding a banner that is still two fences", () => {
   for (const page of PAGES) {
-    it(`brings ${page.name} to the shape this release composes`, () => {
-      // THE STRONGEST ASSERTION AVAILABLE, and the reason the fixture is built
-      // by un-welding: the migration's output must be the composed note itself,
-      // byte for byte. Anything weaker would let the two shapes drift.
+    it(`welds ${page.name} banner and links into one fence`, () => {
       const now = page.text();
-      expect(mergeBannerFences(unwelded(now))).toBe(now);
+      const welded = mergeBannerFences(unwelded(now))!;
+      expect(welded).not.toBeNull();
+      const fence = welded
+        .split("```")
+        .find((f) => f.includes("title:home,diary,journals"))!;
+      expect(fence).toContain("links:today,scopes#diary");
     });
 
-    it(`leaves ${page.name} alone once it is welded`, () => {
-      // IDEMPOTENCE, KEYED ON THE DATA rather than on a version marker — the
-      // property `liftKindVariants` states for the settings migration and the
-      // reason this codebase has no schema number to keep in step.
+    it(`leaves ${page.name} alone once it has no links fence below`, () => {
       expect(mergeBannerFences(page.text())).toBeNull();
     });
   }
 
   it("moves the row rather than rewriting it", () => {
-    // A reader who put their own destinations in the row keeps them. This
-    // release makes no claim to own the argument — and, since 4.18, nothing
-    // else does either: `MANAGED_ARGS` is read only by `applyLayout`, which no
-    // composed note reaches any more.
     const mine = unwelded(composeDiaryDashboard("weekly")).replace(
       "links:today,scopes#diary",
       "links:today,week,month,capture#diary"

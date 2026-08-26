@@ -264,16 +264,8 @@ describe("the de-dup probe, which runs both ways", () => {
     }
   });
 
-  it("withholds one the catalogue writes INSIDE another section's fence", () => {
-    // DIRECTION (b), AND IT IS NOT OPTIONAL. The Search note's search fence holds
-    // `links:today,scopes#diary`, and no `SEARCH_SECTIONS` entry locates a
-    // `links` line — so asking only "does the catalogue claim what this would
-    // write?" says no, `w:links` is generated, its `locate` finds the composed
-    // note, and `present()` reports a section the reader never added. The second
-    // direction — "would this widget claim a line the catalogue writes?" — is
-    // what catches it. This was found by running the first draft against Search.
+  it("withholds one the catalogue writes as a section of its own", () => {
     const search = searchSectionModel();
-    expect(composeSearchNote()).toContain("links:");
     expect(search.present(composeSearchNote())).not.toContain("w:links");
     expect(search.addable(composeSearchNote()).map((s) => s.id)).not.toContain(
       "w:links"

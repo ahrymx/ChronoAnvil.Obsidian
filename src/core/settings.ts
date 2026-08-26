@@ -299,7 +299,7 @@ export const DEFAULT_SETTINGS: AlmanacSettings = {
     glowEnabled: true,
   },
   mobile: {
-    overlayTogglePosition: "off",
+    overlayTogglePosition: "left",
     hideOverlaysDefault: false,
   },
   sleepEnabled: true,
@@ -1029,7 +1029,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
     const s = this.plugin.settings;
     if (!s.mobile) {
       s.mobile = {
-        overlayTogglePosition: "off",
+        overlayTogglePosition: "left",
         hideOverlaysDefault: false,
       };
     }
@@ -1049,7 +1049,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
           .addOption("off", "Off (Disabled)")
           .addOption("left", "Bottom left")
           .addOption("right", "Bottom right")
-          .setValue(s.mobile.overlayTogglePosition ?? "off")
+          .setValue(s.mobile.overlayTogglePosition ?? "left")
           .onChange(async (v) => {
             s.mobile.overlayTogglePosition = v as MobileOverlayTogglePosition;
             await this.plugin.saveSettings();

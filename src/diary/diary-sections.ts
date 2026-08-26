@@ -451,34 +451,8 @@ export const DIARY_SECTIONS: DiarySection[] = [
       fence: "almanac",
       lines: [
         PAGE_TITLE_LINE,
-        // `home` LEFT THIS LINE IN 4.10 — the title line above carries it, and
-        // two pills to the same page on one screen is the doubling that release
-        // began and this one finishes.
-        //
-        // AND THE CLAIM THAT USED TO BE HERE WAS FALSE, WHICH IS WORTH THE
-        // SENTENCE. It read: *"Repair applies it to notes that already exist
-        // without a migration: `links` is in `MANAGED_ARGS`, so step 2 rewrites
-        // the arguments wherever it finds them."* That was true when it was
-        // written and stopped being true in 4.18: `MANAGED_ARGS` is read only by
-        // `planLayout`/`applyLayout`, and `reconcileLayouts` now sends every note
-        // carrying a `surface` — all eight composed notes, these four among them
-        // — through `repairNote` instead. Step 2 of THAT pass is `planFlags`,
-        // which reads `MANAGED_FLAGS` and nothing else. So no dashboard written
-        // before 4.10 has ever had this argument rewritten, and 4.19 must carry
-        // its own migration rather than inherit one that was not running.
-        //
-        // AND THE ENTRY'S ROW STILL KEEPS `home`, which is not drift. An entry
-        // has no `title:` line — `entry-header` already renames the note, so a
-        // second name above it would be the page's name twice — so nothing else
-        // on an entry offers Home. `masthead.test.ts` asserts the difference is
-        // exactly that one id.
-        "links:today,scopes#diary",
       ],
     }),
-    // EITHER LINE ANCHORS IT — `bannerSection` argues this in full. The short
-    // version: the head was removable until this release, so a dashboard with a
-    // navigation row and no title line is a state a reader was invited into, and
-    // a title-only anchor would compose them a second navigation row.
     locate: (text) => {
       const at = locateTitle(text);
       return at >= 0 ? at : probe(text, /^links:/m);

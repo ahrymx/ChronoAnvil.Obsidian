@@ -387,37 +387,6 @@
   border-radius: var(--am-radius-md);
   box-shadow: inset 0 1px 0 var(--am-edge-highlight);
 }
-.journal-slim-banner::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: calc(var(--am-radius-md) - 1px);
-  background-image:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--interactive-accent) 8%, transparent) 0%,
-      transparent 45%
-    ),
-    repeating-linear-gradient(
-      135deg,
-      rgba(255, 255, 255, var(--am-head-figure)) 0 1px,
-      transparent 1px 6px
-    );
-}
-.theme-light .journal-slim-banner::before {
-  background-image:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--interactive-accent) 6%, transparent) 0%,
-      transparent 45%
-    ),
-    repeating-linear-gradient(
-      135deg,
-      rgba(0, 0, 0, var(--am-head-figure)) 0 1px,
-      transparent 1px 6px
-    );
-}
 /* ── BAND 1: THE NOTE'S NAME, AND THE COG (4.21.1) ─────────────────────
  *
  * THE NAME IS FIRST NOW. Both slim banners opened with their navigation — the

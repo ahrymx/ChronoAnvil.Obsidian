@@ -138,18 +138,8 @@ describe("the two slim banners are one banner (4.21.1)", () => {
       head.indexOf('cls: "jsh-nav')
     );
 
-    // AN ENTRY FLIPS IN THE DOM, because its nav band is a separate widget and
-    // the fence composes `links:` above `entry-header`. Swapping the composed
-    // lines would need a migration — repair is additive-and-retired-only — and
-    // until every note took it the vault would hold BOTH arrangements, which is
-    // the defect rather than the fix. Moving the node changes no file and keeps
-    // reading order equal to screen order, which a CSS `order` would not.
     const w = readCode("widgets");
-    const at = w.indexOf("if (isEntryBanner) {");
-    expect(at).toBeGreaterThan(0);
-    const move = w.slice(at, w.indexOf("// ── THE CHROME", at));
-    expect(move).toContain("container.insertBefore(host, nav)");
-    expect(move).toContain('addClass("journal-banner-nav")');
+    expect(w).toContain("if (pageHead) pageHead.insertAdjacentElement(\"afterend\", strip)");
     expect(w).not.toContain("order: 2");
   });
 
@@ -232,27 +222,22 @@ describe("the two slim banners are one banner (4.21.1)", () => {
 });
 
 describe("the footer is welded by the block that owns the card", () => {
-  it("appended by the postprocessor, not parented into the live header", () => {
+  it("placed by the postprocessor, not parented into the live header", () => {
     // The distinction 3.2 paid for and 3.6 patch 7 paid for again: a control
     // PARENTED INTO a LiveWidget's subtree is destroyed on its next rebuild.
     // `entry-header` rebuilds on every change to the note's own frontmatter —
     // which is to say, every time the reader edits the title the footer is
     // there to sit beneath.
     const w = readCode("widgets");
-    expect(w).toContain("buildEntryContext(this.plugin, ctx, quiet)");
-    expect(w).toContain("container.appendChild(strip)");
+    expect(w).toContain("buildEntryContext(this.plugin, ctx, true)");
+    expect(w).toContain("container.prepend(strip)");
   });
 
-  it("heads the tracker section on a new note and foots the banner on an old one", () => {
-    // ONE CONDITION, BOTH SHAPES. A note composed by 4.20 or later keeps its
-    // markers in a fence of their own, so the strip heads that block; every
-    // entry that already exists keeps them in the banner's fence, so the strip
-    // is the footer it has been since 3.7 — under the grid, where that release
-    // put it. Neither reader sees anything move, and nothing is migrated.
+  it("heads the tracker section under the page head or at the top of the block", () => {
     const w = readCode("widgets");
-    const at = w.indexOf("buildEntryContext(this.plugin, ctx, quiet)");
+    const at = w.indexOf("buildEntryContext(this.plugin, ctx, true)");
     const after = w.slice(at, at + 260);
-    expect(after).toContain("if (isEntryBanner) container.appendChild(strip)");
+    expect(after).toContain("if (pageHead) pageHead.insertAdjacentElement(\"afterend\", strip)");
     expect(after).toContain("else container.prepend(strip)");
   });
 
@@ -261,7 +246,7 @@ describe("the footer is welded by the block that owns the card", () => {
     // a tracker section as well — and an entry's strip would tell it which day
     // it was.
     const w = readCode("widgets");
-    const at = w.indexOf("buildEntryContext(this.plugin, ctx, quiet)");
+    const at = w.indexOf("buildEntryContext(this.plugin, ctx, true)");
     const guard = w.slice(at - 400, at);
     expect(guard).toContain("hasTrackerRegion");
     expect(guard).toContain("entryContextFor(ctx.sourcePath)");

@@ -28,6 +28,7 @@
 // file's.
 
 import { describe, expect, it } from "vitest";
+import { readCss, readSrc } from "./sources";
 import {
   DEFAULT_SOURCES,
   EMPTY_WINDOW,
@@ -575,5 +576,32 @@ describe("resizing a block", () => {
 
   it("says nothing changed when the length is the length it had", () => {
     expect(resizedTo(at(hm(9), 60), hm(10))).toBe(null);
+  });
+});
+
+describe("mobile controls and horizontal scrolling", () => {
+  it("keeps the rail, corner and lane label sticky on horizontal scroll", () => {
+    const css = readCss();
+    const cornerIdx = css.indexOf(".am-tg-corner {");
+    expect(cornerIdx).toBeGreaterThan(-1);
+    expect(css.slice(cornerIdx, css.indexOf("}", cornerIdx))).toContain("position: sticky;");
+    expect(css.slice(cornerIdx, css.indexOf("}", cornerIdx))).toContain("left: 0;");
+
+    const railIdx = css.indexOf(".am-tg-rail {");
+    expect(railIdx).toBeGreaterThan(-1);
+    expect(css.slice(railIdx, css.indexOf("}", railIdx))).toContain("position: sticky;");
+    expect(css.slice(railIdx, css.indexOf("}", railIdx))).toContain("left: 0;");
+
+    const laneIdx = css.indexOf(".am-tg-lane-label {");
+    expect(laneIdx).toBeGreaterThan(-1);
+    expect(css.slice(laneIdx, css.indexOf("}", laneIdx))).toContain("position: sticky;");
+    expect(css.slice(laneIdx, css.indexOf("}", laneIdx))).toContain("left: 0;");
+  });
+
+  it("handles touch long-press and slop before dragging on mobile", () => {
+    const src = readSrc("time-grid-view");
+    expect(src).toContain("TOUCH_LONG_PRESS_MS");
+    expect(src).toContain("TOUCH_SLOP_PX");
+    expect(src).toContain("evt.pointerType === \"touch\"");
   });
 });

@@ -216,9 +216,9 @@ describe("entries and journal notes were not touched", () => {
     }
   });
 
-  it("and keep Home in their links row, because nothing else offers it", () => {
+  it("and omit redundant in-note links banners in favor of Vault Banner", () => {
     for (const grain of TRACKER_CLASSES) {
-      expect(composeEntryTemplate(grain), grain).toContain(
+      expect(composeEntryTemplate(grain), grain).not.toContain(
         "links:home,today,scopes#diary"
       );
     }
@@ -238,24 +238,9 @@ describe("the head is drawn as the page, not as another card", () => {
     expect(card).toContain("overflow: hidden");
   });
 
-  it("figures its ground on a layer of its own, from one token", () => {
-    // A layer rather than a background on the card, so no text inherits an
-    // opacity — and one token rather than a number baked into a gradient, so
-    // the figure can be turned down without editing a hatch.
-    const fig = ruleFor(".jtc-card::before");
-    expect(fig).toContain("var(--am-head-figure)");
-    expect(fig).toContain("repeating-linear-gradient");
-    expect(fig).toContain("pointer-events: none");
-    // The accent wash is derived, not a hex.
-    expect(fig).toContain("var(--interactive-accent)");
-    expect(fig).not.toMatch(/#[0-9a-f]{3,8}\b/i);
-  });
-
-  it("turns the figure up rather than redefining it in light mode", () => {
-    // Dark ink on a light ground needs more of it to read as texture. Keyed on
-    // Obsidian's own theme class, which is the only thing that knows.
-    expect(rules).toContain(".theme-light .jtc-card");
-    expect(ruleFor(".theme-light .jtc-card")).toContain("--am-head-figure");
+  it("keeps the title card unfigured without pseudo-element art hatches", () => {
+    expect(rules).not.toContain(".jtc-card::before");
+    expect(rules).not.toContain(".theme-light .jtc-card");
   });
 
   it("sets the page's name in the one face that is not the UI sans", () => {

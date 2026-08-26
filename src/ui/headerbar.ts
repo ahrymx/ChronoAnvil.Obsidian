@@ -449,6 +449,10 @@ export class HeaderBar extends MarkdownRenderChild {
     private level: number
   ) {
     super(barEl);
+    this.barEl.addClass("journal-header-collapsible");
+    this.barEl.dataset.headerKey = this.key;
+    this.barEl.dataset.headerLevel = String(this.level);
+    this.whenAttached();
   }
 
   // The pending attachment poll, and when it started. See `whenAttached`.
@@ -572,9 +576,14 @@ export class HeaderBar extends MarkdownRenderChild {
   // the settle rule uses, because a block that has not been inserted after ten
   // seconds is not going to be.
   private whenAttached(): void {
+    if (this.attachFrame !== null) {
+      window.cancelAnimationFrame(this.attachFrame);
+      this.attachFrame = null;
+    }
     const el = this.siblingAnchor();
     const parent = el.parentElement;
     if (isSectionParent(parent)) {
+      this.attachSince = 0;
       this.claimOwnBlock(el);
       this.joinNotePass(parent as HTMLElement);
       this.recompute();

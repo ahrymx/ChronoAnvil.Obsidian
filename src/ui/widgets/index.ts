@@ -922,12 +922,6 @@ export class Widgets implements
       // every metadata change the diary folders emit. A button parented there
       // Set once an `entry-header` has been rendered into this block. It turns
       // the block into the entry banner (see .journal-entry-banner in
-      // styles.css): one card holding the nav strip and, welded beneath it, the
-      // note's logging grid. The two used to be separate ```almanac fences and
-      // so separate sibling blocks, which no styling could join — the same
-      // limit journals-section.ts describes. One fence is one container, so the
-      // card is real rather than a resemblance.
-      let isEntryBanner = false;
       // A dashboard masthead: the fence holds a period summary, so the card is
       // the block's rather than the summary widget's. 3.2 §3.
       let isOverviewCard = false;
@@ -962,20 +956,6 @@ export class Widgets implements
         }
         return created;
       };
-      // Same idea as isEntryBanner, for a `journal-header` (see
-      // .journal-study-banner in styles.css). Still its own flag, because the
-      // two cards are styled differently — but no longer a *behavioural*
-      // separation. It was one when a study banner's cells were fixed fields
-      // the template declared; now that a journal tracker is a registry entry
-      // a reader can add and remove from the note, the reasoning that kept the
-      // add-tile and the remove-× off this banner is the reasoning for putting
-      // them on it.
-      let isStudyBanner = false;
-      // Set once a `title` has been rendered into this block. 4.19 welded the
-      // page's name and its navigation row into one fence, and this is what
-      // makes that fence one card rather than two — `BlockComposites.pageBanner`
-      // has the argument.
-      let isPageBanner = false;
       // The page head this fence drew, if the bar is on and it drew one. Not a
       // flag: what the code below needs is the ELEMENT, so that a strip which
       // prepends to the block lands under the note's name rather than over it.
@@ -1270,21 +1250,7 @@ export class Widgets implements
           // asked to remove: *"the old Banner Sections need to be completely
           // remade into stylistic property/page titles."*
           //
-          // WITH THEM OFF THE BLOCK IS AN ORDINARY ONE — `.journal-widget-block`
-          // paints nothing on its own — so the head sits on the page's ground
-          // the way a heading does. **And it is exactly the block 4.51.5 built**,
-          // where these directives were filtered out before the loop ever saw
-          // them: a legacy fence whose markers live inside the banner still
-          // becomes the tracker section, with its card, its caption and its
-          // page-context strip. The head is one more child of it.
-          if (!quiet) {
-            if (kind === "entry-header") isEntryBanner = true;
-            if (JOURNAL_BANNER_KINDS.has(kind)) isStudyBanner = true;
-            if (kind === TITLE_KEYWORD) isPageBanner = true;
-          } else if (BANNER_KINDS.has(kind)) {
-            // KEPT SO THE STRIP CAN GO UNDER IT. Everything that prepends to
-            // this block does so because it is the tracker section's head; the
-            // note's own name is above all of it.
+          if (BANNER_KINDS.has(kind)) {
             pageHead = widget;
           }
           // The three flags above and `BANNER_KINDS` are one fact told twice —
@@ -1333,16 +1299,6 @@ export class Widgets implements
             widget.addClass("journal-tracker-cell");
             bar.addClass("journal-tracker-bar");
             attachTrackerRemove(this, widget, line, ctx);
-            trackerBar = bar;
-          } else if (isStudyBanner) {
-            // A non-tracker widget in a study banner — anything hand-added. It joins the same grid as the trackers (one
-            // set of rules now; the parallel .journal-property-* block is
-            // gone) but gets no remove-×, because there is no directive in the
-            // tracker region for one to remove. A cell with an × beside a cell
-            // without is the honest rendering: the ones a reader curated can
-            // be uncurated, and the one the template hard-codes can't.
-            widget.addClass("journal-tracker-cell");
-            bar.addClass("journal-tracker-bar");
             trackerBar = bar;
           }
           bar.appendChild(widget);
@@ -1412,7 +1368,7 @@ export class Widgets implements
         this.plugin.sections.entryContextFor(ctx.sourcePath) &&
         !isManagedTemplate(this.plugin, ctx.sourcePath)
       ) {
-        const strip = buildEntryContext(this.plugin, ctx, quiet);
+        const strip = buildEntryContext(this.plugin, ctx, true);
         // PREPENDED ON THE NEW SHAPE, APPENDED ON THE OLD ONE, and the two are
         // the same decision rather than a special case. On a note composed by
         // 4.20 or later this block is the tracker section and the strip is its
@@ -1421,22 +1377,13 @@ export class Widgets implements
         // FOOTER it has been since 3.7 — under the grid, where that release put
         // it. Neither reader sees anything move.
         if (strip) {
-          // AND UNDER THE HEAD WHERE THERE IS ONE (4.51.6). "Prepend" means
-          // *the head of this section*, and on a legacy fence the note's own
-          // name is now the first child of it — a strip above that would put
-          // the date over the title it belongs to.
-          if (isEntryBanner) container.appendChild(strip);
-          else if (pageHead) pageHead.insertAdjacentElement("afterend", strip);
+          if (pageHead) pageHead.insertAdjacentElement("afterend", strip);
           else container.prepend(strip);
         }
       }
 
-      // AND THE JOURNAL NOTE'S OWN, which says its level and its kind. Same
-      // block, same reason, different facts — `buildJournalContext` has the
-      // argument. Guarded on the tracker section rather than on a banner because
-      // a journal note's markers moved out of its banner in 4.20 and, unlike an
-      // entry's, were never composed anywhere else.
-      if (hasTrackerRegion && !isEntryBanner && !isStudyBanner && !isPageBanner) {
+      // AND THE JOURNAL NOTE'S OWN, which says its level and its kind.
+      if (hasTrackerRegion && !isOverviewCard) {
         const facts = buildJournalContext(this.plugin, ctx);
         // Under the head, for the reason one block up.
         if (facts) {
@@ -1515,28 +1462,7 @@ export class Widgets implements
       // the node keeps ONE arrangement on every entry ever written, changes no
       // file, and keeps reading order and tab order equal to what is on screen,
       // which a CSS `order` would not.
-      //
-      // AFTER `stampLines`, WHICH IS NOT AN ACCIDENT. That maps children to
-      // source lines BY INDEX; once it has run each element carries its own line
-      // and can be moved without the mapping following it.
-      if (isEntryBanner) {
-        const nav = container.querySelector<HTMLElement>(
-          ":scope > .journal-links-card"
-        );
-        // The band class is applied here rather than in `buildLinks`, because
-        // this is the only place that knows the card landed in a banner: the
-        // same card drawn on a dashboard is a block of its own and styles
-        // itself.
-        nav?.addClass("journal-banner-nav");
-        // The header is live-wrapped, so what sits in the container is the host
-        // rather than the band — see `liveFrontmatterWidget`.
-        const host = container
-          .querySelector<HTMLElement>(".journal-banner-name")
-          ?.closest<HTMLElement>(".journal-live-widget");
-        if (nav && host && host.parentElement === container) {
-          container.insertBefore(host, nav);
-        }
-      }
+
 
       // ── THE CHROME, CHOSEN AFTER THE LOOP ───────────────────────────
       //
@@ -1550,12 +1476,11 @@ export class Widgets implements
       // take `is-unframed` instead. The rule is `chromeClasses`, which is pure
       // and tested; this line is only its application.
       for (const cls of chromeClasses(frameSpec.frame, {
-        entryBanner: isEntryBanner,
+        entryBanner: false,
         overviewCard: isOverviewCard,
-        studyBanner: isStudyBanner,
-        pageBanner: isPageBanner,
-        trackerSection:
-          hasTrackerRegion && !isEntryBanner && !isStudyBanner && !isPageBanner,
+        studyBanner: false,
+        pageBanner: false,
+        trackerSection: hasTrackerRegion && !isOverviewCard,
       })) {
         if (!rowSpec.row || cls === "is-unframed") {
           container.addClass(cls);

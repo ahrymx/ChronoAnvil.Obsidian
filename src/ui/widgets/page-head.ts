@@ -45,7 +45,7 @@ import { MarkdownPostProcessorContext, TFile } from "obsidian";
 import type AlmanacPlugin from "../../main";
 import { liveFrontmatterWidget } from "./live-widgets";
 import { BannerSurface, bannerSurfaceOf, titleTargetFor } from "../../core/banner-scope";
-import { bannerScopeOf, bannerSuppressed } from "../vault-banner";
+import { bannerScopeOf } from "../vault-banner";
 import { attachNoteRename, attachPropertyRename } from "../header-title";
 import { TITLE_PROP, entryDateLabel } from "../../diary/entryheader";
 import { journalTypeAtPath } from "../../journals/journal";
@@ -210,7 +210,6 @@ export function pageHeadText(
   plugin: AlmanacPlugin,
   file: TFile
 ): PageHeadText | null {
-  if (!bannerSuppressed(plugin, file.path)) return null;
   const surface = bannerSurfaceOf(file.path, bannerScopeOf(plugin));
   if (!surface) return null;
   const eyebrow = eyebrowFor(plugin, file, surface);

@@ -205,19 +205,6 @@
   --am-head-face: "Iowan Old Style", "Palatino Linotype", Palatino,
                   "Book Antiqua", Georgia, ui-serif, serif;
 
-  /* HOW STRONGLY THE HEAD'S GROUND IS FIGURED, as ONE number.
-   *
-   * The head is drawn on a hatched ground, which is the other half of what
-   * stops it reading as one more card. A figure is the easiest thing in a
-   * stylesheet to get wrong by a factor of two, and the easiest to want to turn
-   * off — so it is a dial rather than a value baked into a gradient, and the
-   * light theme raises it (dark ink on a light ground needs more of it to read
-   * as texture) instead of redefining the pattern.
-   *
-   * NOT AN OPACITY ON THE ELEMENT. The figure is a layer of its own so no text
-   * ever inherits it; see `.jtc-card::before`. */
-  --am-head-figure: 0.045;
-
   /* One small-caps voice for every key label in the plugin: the diary eyebrow,
      the stat captions, the weekday header, the agenda heading and its month
      abbreviation. Up to 2.51.1 these ran at 0.04em / 0.06em / 0.08em / 0.12em

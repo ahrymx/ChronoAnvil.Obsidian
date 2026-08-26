@@ -112,6 +112,10 @@
   background: transparent;
 }
 
+.am-tg-scroll.is-locked {
+  overflow: hidden !important;
+}
+
 /* THE PADDING IS THE LAST HOUR LABEL'S OVERHANG. `.am-tg-hour` sits at
    `top: 100%` with `translateY(-50%)`, so half of the final mark is below the
    body it belongs to; without room for it the scroller clipped "6 PM" through
@@ -147,6 +151,10 @@
 }
 
 .am-tg-corner {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--background-primary);
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
@@ -159,6 +167,7 @@
   text-align: center;
   padding: 8px 4px 6px;
   border-left: 1px solid var(--background-modifier-border-hover);
+  background: var(--background-primary);
 }
 
 .am-tg-dow {
@@ -196,13 +205,17 @@
 .am-tg-lane {
   border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
-  min-height: 30px;
+  min-height: 60px;
 }
 
 /* ONE LINE, WHATEVER THE GUTTER IS. Two words at this width wrapped, and the
    second line landed beside the first hour mark. Lower case and hyphenated so
    it reads as a label rather than as a heading of the lane. */
 .am-tg-lane-label {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--background-secondary);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -234,7 +247,10 @@
 /* ── the rail and the columns ──────────────────────────────────────── */
 
 .am-tg-rail {
-  position: relative;
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--background-primary);
 }
 
 .am-tg-hour {
@@ -414,6 +430,7 @@
 .am-tg-body.is-dragging {
   cursor: grabbing;
   user-select: none;
+  touch-action: none;
 }
 
 .am-tg-body.is-dragging .am-tg-blk {
