@@ -50,7 +50,6 @@ import { readSrc } from "./sources";
 import { toPlainMarkdown } from "../src/core/plain-markdown";
 import { writeNoteRegion } from "../src/core/notestore";
 import { serializeLogItems } from "../src/diary/log-items";
-import { composeHomeNote, homeSectionModel } from "../src/diary/home-sections";
 import { composeSearchNote, searchSectionModel } from "../src/diary/search-sections";
 
 const WORK = DEFAULT_LOGBOOKS[0];

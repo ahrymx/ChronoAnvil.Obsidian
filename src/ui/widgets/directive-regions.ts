@@ -686,6 +686,34 @@ export function buildTasksTableRegion(
   const arg = rest.replace(PERIOD_FLAG_RE, "").trim();
   const file = fileOfCtx(plugin, ctx);
   const hostFolder = file?.parent?.path ?? null;
+  const paths = plugin.settings.paths;
+
+  // When resolving the default folder (arg === ""):
+  // On diary notes (or when period-scoped on a diary dashboard), bare folder
+  // scopes to the whole diary root so daily entries inside the period are collected,
+  // rather than scoping to `Weekly/` or `Monthly/` where no daily notes exist.
+  const isDiary =
+    hostFolder != null &&
+    (hostFolder === paths.diaryRoot ||
+      hostFolder.startsWith(`${paths.diaryRoot}/`) ||
+      hostFolder === paths.diaryDaily ||
+      hostFolder === paths.diaryWeekly ||
+      hostFolder === paths.diaryMonthly ||
+      hostFolder === paths.diaryQuarterly ||
+      hostFolder === paths.diaryYearly);
+
+  let defaultFolder = hostFolder;
+  if (arg === "") {
+    if (isDiary) {
+      defaultFolder = paths.diaryRoot;
+    } else if (hostFolder) {
+      const customRoot = registeredJournalTypes(plugin).find(
+        (t) => hostFolder === t.root || hostFolder.startsWith(`${t.root}/`)
+      )?.root;
+      if (customRoot) defaultFolder = customRoot;
+    }
+  }
+
   // ROUTED THROUGH THE SHARED SCOPE GRAMMAR SINCE 3.18 (§5.3), where it used to
   // resolve its own folder. `review-queue` and `journal-search` have always gone
   // through `journalFolderScope`, and the three must agree about what a scope
@@ -698,7 +726,7 @@ export function buildTasksTableRegion(
   // two keywords that can name several (`all`, and a `journal` on a note outside
   // every root) resolve to the first or to nothing rather than being flattened
   // into a fake parent.
-  const folders = journalFolderScope(plugin, arg, hostFolder);
+  const folders = journalFolderScope(plugin, arg, defaultFolder);
   // `== null`, NOT FALSY (4.44.0). The vault root is a folder whose path is the
   // EMPTY STRING wherever a path is derived by cutting at the last slash — and
   // a falsy test threw that answer away and drew nothing at all, which is the
@@ -711,7 +739,7 @@ export function buildTasksTableRegion(
   // keyword rather than by testing the path a second way — the button must not
   // offer a state that would resolve to nothing.
   const inJournal =
-    journalFolderScope(plugin, SCOPE_JOURNAL, hostFolder).length > 0;
+    journalFolderScope(plugin, SCOPE_JOURNAL, defaultFolder).length > 0;
 
   // THE SCOPE BUTTON MAY BE HOSTED IN THE SECTION'S HEADER BAR (3.19.2), in
   // which case this widget must not draw a second one inside itself. The bar's
@@ -737,7 +765,7 @@ export function buildTasksTableRegion(
         ? null
         : {
             arg,
-            hostFolder,
+            hostFolder: defaultFolder,
             inJournal,
             cycle: (next) => {
               void setTasksScope(plugin, ctx.sourcePath, next);
@@ -764,13 +792,37 @@ export function tasksScopeFor(
   const arg = rest.replace(PERIOD_FLAG_RE, "").trim();
   const file = fileOfCtx(plugin, ctx);
   const hostFolder = file?.parent?.path ?? null;
+  const paths = plugin.settings.paths;
+
+  const isDiary =
+    hostFolder != null &&
+    (hostFolder === paths.diaryRoot ||
+      hostFolder.startsWith(`${paths.diaryRoot}/`) ||
+      hostFolder === paths.diaryDaily ||
+      hostFolder === paths.diaryWeekly ||
+      hostFolder === paths.diaryMonthly ||
+      hostFolder === paths.diaryQuarterly ||
+      hostFolder === paths.diaryYearly);
+
+  let defaultFolder = hostFolder;
+  if (arg === "") {
+    if (isDiary) {
+      defaultFolder = paths.diaryRoot;
+    } else if (hostFolder) {
+      const customRoot = registeredJournalTypes(plugin).find(
+        (t) => hostFolder === t.root || hostFolder.startsWith(`${t.root}/`)
+      )?.root;
+      if (customRoot) defaultFolder = customRoot;
+    }
+  }
+
   // `== null` for the reason the region states: the vault root can be spelled
   // with the empty string, and a falsy test reads that as "unresolvable".
-  if (journalFolderScope(plugin, arg, hostFolder)[0] == null) return null;
+  if (journalFolderScope(plugin, arg, defaultFolder)[0] == null) return null;
   return {
     arg,
-    hostFolder,
-    inJournal: journalFolderScope(plugin, SCOPE_JOURNAL, hostFolder).length > 0,
+    hostFolder: defaultFolder,
+    inJournal: journalFolderScope(plugin, SCOPE_JOURNAL, defaultFolder).length > 0,
     cycle: (next) => {
       void setTasksScope(plugin, ctx.sourcePath, next);
     },

@@ -7,6 +7,19 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.79.0] - 2026-08-28
+
+**Fixed period-scoped Open Tasks discovery on diary dashboards, resolved lint test issues, and streamlined mobile week group headers.**
+
+### Added
+
+- **Smart Diary Default Scoping for Open Tasks:** Bare `tasks-table` directives on diary overview notes (Weekly, Monthly, Quarterly) now automatically resolve to the configured diary root (`02 - Diary`), collecting daily entries and custom journal notes inside the period rather than looking only inside the overview's subfolder.
+- **Robust Frontmatter Date Matching:** Broadened `buildTasksTable` period date filtering across `journal-date`, `date`, `week-start`, `month`, `quarter-start`, `year-start`, and date-based note basenames (`YYYY-MM-DD`).
+
+### Changed
+
+- **Compact Week Congregation Headers:** Streamlined week bucket titles to `🗓️ Week N` (omitting redundant date ranges), keeping headers clean and single-line on mobile devices while preserving note day labels.
+
 ## [4.78.0] - 2026-08-28
 
 **Upgraded group swipe navigation with button drag disambiguation, mobile edge guards, and live edge tint feedback, and enforced single-line inline priority pill layout on Open Tasks.**

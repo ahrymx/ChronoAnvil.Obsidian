@@ -931,7 +931,9 @@ function wireGestures(edit: EditCtx): void {
         try {
           body.setPointerCapture(evt.pointerId);
           isPointerCaptured = true;
-        } catch (_) {}
+        } catch {
+          // ignore pointer capture error
+        }
       }
       body.addClass("is-dragging");
       blockEl?.addClass("is-moving");
@@ -1044,7 +1046,9 @@ function wireGestures(edit: EditCtx): void {
       if (isPointerCaptured) {
         try {
           body.releasePointerCapture(evt.pointerId);
-        } catch (_) {}
+        } catch {
+          // ignore pointer release error
+        }
         isPointerCaptured = false;
       }
       body.removeClass("is-dragging");
@@ -1099,7 +1103,9 @@ function wireGestures(edit: EditCtx): void {
         if (typeof navigator !== "undefined" && "vibrate" in navigator) {
           try {
             navigator.vibrate(25);
-          } catch (_) {}
+          } catch {
+            // ignore vibration error
+          }
         }
         startDrag(downY);
       }, TOUCH_LONG_PRESS_MS);
@@ -1110,7 +1116,9 @@ function wireGestures(edit: EditCtx): void {
       try {
         body.setPointerCapture(evt.pointerId);
         isPointerCaptured = true;
-      } catch (_) {}
+      } catch {
+        // ignore pointer capture error
+      }
     }
 
     body.addEventListener("pointermove", onMove);

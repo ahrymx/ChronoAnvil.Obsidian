@@ -1094,7 +1094,6 @@ describe("the drag is the journal cards' gesture, on a smaller surface", () => {
   });
 
   it("declares micro-ring ribbon styling for compact telemetry presentation", () => {
-    const css = readCss();
     expect(cssRule(".am-stat-ring-wrap")).toContain("display: inline-flex");
     expect(cssRule(".am-stat-ring-svg")).toContain("rotate(-90deg)");
     expect(cssRule(".am-stat-ring-bg")).toContain("stroke: var(--background-modifier-border)");

@@ -3307,9 +3307,21 @@ export function buildTasksTable(
   // Filter before reading: a scoped table on a folder with years of notes
   // should not pay to read the notes it's about to discard.
   const files = period
-    ? allFiles.filter((f) =>
-        inPeriod(isoDate(frontmatterOf(app, f)["journal-date"]), period)
-      )
+    ? allFiles.filter((f) => {
+        const fm = frontmatterOf(app, f);
+        const rawDate =
+          fm["journal-date"] ??
+          fm["date"] ??
+          fm["week-start"] ??
+          fm["month"] ??
+          fm["quarter-start"] ??
+          fm["year-start"] ??
+          null;
+        const d =
+          (rawDate != null ? isoDate(rawDate) : null) ||
+          (/^\d{4}-\d{2}-\d{2}$/.test(f.basename) ? f.basename : null);
+        return inPeriod(d, period);
+      })
     : allFiles;
 
   if (files.length === 0) {
@@ -3437,7 +3449,6 @@ export function buildTasksTable(
       if (dailyDate) {
         const m = moment(dailyDate);
         const ws = m.clone().startOf("isoWeek");
-        const we = m.clone().endOf("isoWeek");
         const wk = ws.isoWeek();
         const yr = ws.year();
         const bucketId = `week-${yr}-${wk}`;
@@ -3447,7 +3458,7 @@ export function buildTasksTable(
         if (!b) {
           b = {
             id: bucketId,
-            title: `🗓️ Week ${wk} · ${ws.format("D MMM")}–${we.format("D MMM YYYY")}`,
+            title: `🗓️ Week ${wk}`,
             orderKey: yr * 100 + wk,
             notes: [],
           };
@@ -3586,7 +3597,7 @@ export function buildTasksTable(
           const rawText = row.task.text;
           const tags: string[] = [];
           const cleanText = rawText
-            .replace(/(?:^|\s)(#[a-zA-Z0-9_\-\/]+)/g, (_m, t) => {
+            .replace(/(?:^|\s)(#[a-zA-Z0-9_\-/]+)/g, (_m, t) => {
               tags.push(t);
               return "";
             })
