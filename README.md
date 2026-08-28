@@ -45,12 +45,7 @@ dependencies first if they are missing.
 
 ## Documentation
 
-- [Reference](docs/reference.md) — every widget directive, tracker type,
-  journal concept and chart option, plus the project layout.
-- [What it replaces](docs/what-it-replaces.md) — the plugins this took over
-  from, and what each one used to do.
 - [Changelog](CHANGELOG.md) — reader-facing release notes.
-- [Dev log](docs/dev-log.md) — every release with its reasoning.
 
 ## Contributing
 

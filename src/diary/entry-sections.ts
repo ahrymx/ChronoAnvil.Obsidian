@@ -416,21 +416,6 @@ export const ENTRY_SECTIONS: EntrySection[] = [
     }),
   },
   {
-    id: "todo",
-    label: "Tasks",
-    blurb: "Almanac tasks belonging to this entry.",
-    icon: "✅",
-    locked: false,
-    fence: "shared",
-    directive: on({
-      daily: "tasks:todo|Tasks",
-      weekly: "tasks:todo|Goals this week",
-      monthly: "tasks:todo|Goals this month",
-      quarterly: "tasks:todo|Goals this quarter",
-      yearly: "tasks:todo|Goals this year",
-    }),
-  },
-  {
     id: "highlights",
     label: "Highlights",
     blurb: "A list of what went well.",
@@ -603,6 +588,21 @@ export const ENTRY_SECTIONS: EntrySection[] = [
           : "";
       return `bridge-notes:${target}|From the journals`;
     },
+  },
+  {
+    id: "todo",
+    label: "Tasks",
+    blurb: "Almanac tasks belonging to this entry.",
+    icon: "✅",
+    locked: false,
+    fence: "shared",
+    directive: on({
+      daily: "tasks:todo|Tasks",
+      weekly: "tasks:todo|Goals this week",
+      monthly: "tasks:todo|Goals this month",
+      quarterly: "tasks:todo|Goals this quarter",
+      yearly: "tasks:todo|Goals this year",
+    }),
   },
   {
     id: "capture",

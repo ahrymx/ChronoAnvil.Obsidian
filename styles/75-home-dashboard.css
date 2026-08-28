@@ -698,174 +698,144 @@
 /* --- Tasks manager ------------------------------------------------------- */
 
 .journal-tasks {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  padding: 10px 12px;
   margin: 0 0 0.9em;
+  transition: border-color 0.15s ease;
+}
+.journal-tasks:focus-within {
+  border-color: var(--interactive-accent);
+}
+.journal-tasks.journal-note--collapsible > .journal-tasks-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  border-bottom: none;
+  margin-bottom: var(--am-space-2);
+}
+.journal-tasks.journal-note--collapsible.is-collapsed > .journal-tasks-head {
+  margin-bottom: 0;
+}
+.journal-tasks-title-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.journal-tasks.journal-note--collapsible > .journal-tasks-head:hover .journal-tasks-label {
+  color: var(--text-normal);
+}
+.journal-tasks-chevron {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+  transition: transform 120ms ease;
+}
+.journal-tasks-chevron .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.journal-tasks.is-collapsed .journal-tasks-chevron {
+  transform: rotate(-90deg);
+}
+.journal-tasks.is-collapsed > :not(.journal-tasks-head) {
+  display: none;
 }
 .journal-tasks-label {
   font-size: var(--am-text-xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: var(--am-caps-weight);
+  letter-spacing: var(--am-caps-tracking);
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-bottom: 5px;
+  margin: 0;
 }
-.journal-tasks-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.journal-tasks-empty {
-  font-size: var(--am-text-sm);
-  color: var(--text-faint);
-  font-style: italic;
-  padding: 6px 2px;
-}
-.journal-task-row {
+.journal-tasks-head-right {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 8px;
-  border: 1px solid transparent;
-  border-radius: var(--am-radius-sm);
-  transition: background 0.12s ease, border-color 0.12s ease;
 }
-.journal-task-row:hover {
-  background: var(--background-secondary);
-  border-color: var(--background-modifier-border);
-}
-.journal-task-check {
-  flex: 0 0 auto;
-  cursor: pointer;
-  accent-color: var(--interactive-accent);
-}
-.journal-task-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-normal);
-  font-family: inherit;
-  font-size: var(--am-text-base);
-  padding: 3px 4px;
-  border-radius: var(--am-radius-sm);
-}
-.journal-task-text:hover {
-  background: var(--background-primary);
-}
-.journal-task-text:focus {
-  outline: none;
-  background: var(--background-primary);
-  box-shadow: 0 0 0 1px var(--interactive-accent);
-}
-.journal-task-row.is-done .journal-task-text {
-  text-decoration: line-through;
-  color: var(--text-faint);
-}
-/* Priority pip: a small ghost button whose icon colour encodes priority. */
-.journal-task-prio,
-.journal-task-del {
-  flex: 0 0 auto;
+.journal-tasks-compact-toggle {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 1.7em;
-  height: 1.7em;
-  padding: 0;
-  border: none;
+  gap: 4px;
+  padding: 2px 7px;
   background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
   color: var(--text-muted);
-  border-radius: var(--am-radius-sm);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
   cursor: pointer;
   box-shadow: none;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: all 0.15s ease;
 }
-.journal-task-prio:hover,
-.journal-task-del:hover {
+.journal-tasks-compact-toggle:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
 }
-.journal-task-prio .svg-icon,
-.journal-task-del .svg-icon {
-  width: 1em;
-  height: 1em;
-}
-/* Priority colour: high = accent/red-ish, low = muted, normal = faint. Uses the
-   row modifier class set by the widget. */
-.journal-task-high .journal-task-prio {
-  color: var(--color-red, #e05561);
-}
-.journal-task-low .journal-task-prio {
-  color: var(--text-faint);
-}
-.journal-task-normal .journal-task-prio {
-  color: var(--text-faint);
-  opacity: 0.6;
-}
-.journal-task-due {
-  flex: 0 0 auto;
-  border: 1px solid transparent;
-  border-radius: var(--am-radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: var(--am-text-xs);
-  padding: 2px 4px;
-  cursor: pointer;
-}
-.journal-task-due:hover {
-  border-color: var(--background-modifier-border);
-}
-.journal-task-due:focus {
-  outline: none;
+.journal-tasks-compact-toggle.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
+  color: var(--interactive-accent);
   border-color: var(--interactive-accent);
-  color: var(--text-normal);
 }
-/* Empty date input reads as faint until a date is chosen. */
-.journal-task-due:not([value=""]) {
-  color: var(--text-normal);
+.journal-tasks-compact-icon {
+  display: inline-flex;
 }
-/* The hour, beside the day (4.55). Wears the date field's chrome exactly,
-   because the two are one answer to "when is this due" and a second style
-   would read as a second kind of thing. */
-.journal-task-at {
-  flex: 0 0 auto;
-  border: 1px solid transparent;
-  border-radius: var(--am-radius-sm);
-  background: transparent;
+.journal-tasks-compact-icon .svg-icon {
+  width: 12px;
+  height: 12px;
+}
+.journal-tasks-progress {
+  font-size: var(--am-text-2xs);
   color: var(--text-muted);
-  font-size: var(--am-text-xs);
-  padding: 2px 4px;
-  cursor: pointer;
-}
-.journal-task-at:hover {
-  border-color: var(--background-modifier-border);
-}
-.journal-task-at:focus {
-  outline: none;
-  border-color: var(--interactive-accent);
-  color: var(--text-normal);
-}
-/* NO DAY, NO HOUR. `display: none` rather than a disabled attribute: a field
-   that cannot hold an answer should not be asking. */
-.journal-task-at.is-hidden {
-  display: none;
-}
-.journal-task-del:hover {
-  color: var(--text-error, #e05561);
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
+  padding: 2px 8px;
+  border-radius: var(--am-radius-pill);
+  border: 1px solid var(--background-modifier-border);
+  font-weight: 600;
+  white-space: nowrap;
 }
 .journal-tasks-add {
-  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--am-space-2);
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.journal-tasks-add-icon {
+  color: var(--text-muted);
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.journal-tasks-add-icon .svg-icon {
+  width: 1.1em;
+  height: 1.1em;
 }
 .journal-tasks-add-input {
+  flex: 1;
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
-  background: var(--background-secondary);
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 15%, var(--background-modifier-border));
+  border-radius: var(--am-radius-sm);
+  background: color-mix(in srgb, var(--interactive-accent) 4%, var(--background-secondary));
   color: var(--text-normal);
   font-family: inherit;
-  font-size: var(--am-text-base);
-  padding: var(--am-space-4) var(--am-space-6);
-  transition: border-color 0.15s ease, background 0.15s ease;
+  font-size: var(--am-text-sm);
+  padding: var(--am-space-2) var(--am-space-4);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 .journal-tasks-add-input::placeholder {
   color: var(--text-faint);
@@ -873,7 +843,452 @@
 .journal-tasks-add-input:focus {
   outline: none;
   border-color: var(--interactive-accent);
-  background: var(--background-primary);
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 124, 58, 237), 0.15);
+}
+.journal-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-space-2);
+}
+.journal-tasks-empty {
+  font-size: var(--am-text-sm);
+  color: var(--text-faint);
+  padding: 12px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.journal-tasks-empty-icon {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.journal-tasks-empty-icon .svg-icon {
+  width: 1.2em;
+  height: 1.2em;
+}
+.journal-task-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
+  border-left: 3px solid color-mix(in srgb, var(--interactive-accent) 60%, var(--background-modifier-border));
+  border-radius: var(--am-radius-md);
+  background: color-mix(in srgb, var(--interactive-accent) 5%, var(--background-secondary));
+  box-shadow: var(--am-elev-1);
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.journal-task-row:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 9%, var(--background-secondary));
+  border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border-hover));
+  box-shadow: var(--am-shadow-md);
+}
+/* Priority-tinted backgrounds & spines */
+.journal-task-row.journal-task-high {
+  background: color-mix(in srgb, var(--color-red, #e05561) 7%, var(--background-secondary));
+  border-color: color-mix(in srgb, var(--color-red, #e05561) 22%, var(--background-modifier-border));
+  border-left-color: var(--color-red, #e05561);
+}
+.journal-task-row.journal-task-high:hover {
+  background: color-mix(in srgb, var(--color-red, #e05561) 11%, var(--background-secondary));
+  border-color: color-mix(in srgb, var(--color-red, #e05561) 38%, var(--background-modifier-border-hover));
+}
+.journal-task-row.journal-task-low {
+  background: color-mix(in srgb, var(--am-ev-teal) 7%, var(--background-secondary));
+  border-color: color-mix(in srgb, var(--am-ev-teal) 22%, var(--background-modifier-border));
+  border-left-color: var(--am-ev-teal);
+}
+.journal-task-row.journal-task-low:hover {
+  background: color-mix(in srgb, var(--am-ev-teal) 11%, var(--background-secondary));
+  border-color: color-mix(in srgb, var(--am-ev-teal) 38%, var(--background-modifier-border-hover));
+}
+.journal-task-row.journal-task-normal {
+  background: color-mix(in srgb, var(--interactive-accent) 5%, var(--background-secondary));
+  border-color: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
+  border-left-color: color-mix(in srgb, var(--interactive-accent) 60%, var(--background-modifier-border));
+}
+.journal-task-row.journal-task-normal:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 9%, var(--background-secondary));
+  border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border-hover));
+}
+/* Top line: checkbox + full task title */
+.journal-task-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.journal-task-check {
+  flex: 0 0 auto;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border-radius: var(--am-radius-xs);
+}
+.journal-task-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--am-text-sm);
+  line-height: 1.45;
+  padding: 2px 4px;
+  border-radius: var(--am-radius-xs);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.journal-task-text:hover {
+  background: rgba(var(--interactive-accent-rgb, 124, 58, 237), 0.08);
+}
+.journal-task-text:focus {
+  outline: none;
+  background: var(--background-secondary);
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+.journal-task-row.is-done {
+  opacity: 0.55;
+}
+.journal-task-row.is-done .journal-task-text {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+/* Bottom line: metadata chips & action buttons */
+.journal-task-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-left: 28px;
+  flex-wrap: wrap;
+}
+.journal-task-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+/* Priority chip button */
+.journal-task-prio {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 15%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
+  color: var(--text-muted);
+  border-radius: var(--am-radius-pill);
+  cursor: pointer;
+  box-shadow: none;
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.journal-task-prio:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary));
+  color: var(--text-normal);
+  border-color: var(--interactive-accent);
+}
+.journal-task-prio-icon {
+  display: inline-flex;
+}
+.journal-task-prio-icon .svg-icon {
+  width: 0.95em;
+  height: 0.95em;
+}
+.journal-task-high .journal-task-prio {
+  color: var(--color-red, #e05561);
+  background: rgba(var(--color-red-rgb, 224, 85, 97), 0.14);
+  border-color: rgba(var(--color-red-rgb, 224, 85, 97), 0.35);
+  font-weight: 700;
+}
+.journal-task-low .journal-task-prio {
+  color: var(--am-ev-teal);
+  background: rgba(63, 163, 163, 0.14);
+  border-color: rgba(63, 163, 163, 0.35);
+}
+.journal-task-normal .journal-task-prio {
+  color: var(--text-faint);
+  opacity: 0.8;
+}
+/* Due date pill */
+.journal-task-due-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 15%, var(--background-modifier-border));
+  border-radius: var(--am-radius-pill);
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.journal-task-due-wrap:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary));
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+.journal-task-due-icon {
+  display: inline-flex;
+}
+.journal-task-due-icon .svg-icon {
+  width: 0.95em;
+  height: 0.95em;
+}
+.journal-task-due {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+}
+.journal-task-due:not([value=""]) {
+  color: var(--text-normal);
+  font-weight: 500;
+}
+/* Time pill */
+.journal-task-at-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 15%, var(--background-modifier-border));
+  border-radius: var(--am-radius-pill);
+  font-size: var(--am-text-2xs);
+  color: var(--text-muted);
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.journal-task-at-wrap:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary));
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+.journal-task-at-wrap.is-hidden {
+  display: none;
+}
+.journal-task-at-icon {
+  display: inline-flex;
+}
+.journal-task-at-icon .svg-icon {
+  width: 0.95em;
+  height: 0.95em;
+}
+.journal-task-at {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+}
+.journal-task-at:not([value=""]) {
+  color: var(--text-normal);
+  font-weight: 500;
+}
+/* Delete button */
+.journal-task-del {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--am-radius-sm);
+  cursor: pointer;
+  box-shadow: none;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, background 0.12s ease, color 0.12s ease;
+}
+.journal-task-row:hover .journal-task-del {
+  opacity: 1;
+}
+.journal-task-del:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-error, #e05561);
+}
+.journal-task-del .svg-icon {
+  width: 1em;
+  height: 1em;
+}
+
+/* Compact mode: collapses row to single line, inlining meta chips */
+.journal-tasks.is-compact .journal-tasks-list {
+  gap: 4px;
+}
+.journal-tasks.is-compact .journal-task-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px 4px 10px;
+  min-height: 32px;
+}
+.journal-tasks.is-compact .journal-task-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.journal-tasks.is-compact .journal-task-meta {
+  padding-left: 0;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+.journal-tasks.is-compact .journal-task-chips {
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+/* Priority tag and delete button are hidden in compact mode */
+.journal-tasks.is-compact .journal-task-prio,
+.journal-tasks.is-compact .journal-task-del {
+  display: none;
+}
+.journal-tasks.is-compact .journal-task-due-wrap,
+.journal-tasks.is-compact .journal-task-at-wrap {
+  padding: 1px 6px;
+  font-size: var(--am-text-2xs);
+}
+.journal-tasks.is-compact .journal-task-text {
+  font-size: var(--am-text-sm);
+}
+
+/* Touch targets & responsive layout for mobile */
+@media (max-width: 520px) {
+  .journal-task-row {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .journal-task-meta {
+    padding-left: 28px;
+    gap: 8px;
+  }
+  .journal-task-del {
+    opacity: 0.85;
+  }
+
+  /* In compact mode on mobile: date & time become icon-only trigger buttons */
+  .journal-tasks.is-compact .journal-task-row {
+    padding: 4px 6px 4px 8px;
+    gap: 6px;
+  }
+  .journal-tasks.is-compact .journal-task-due-wrap {
+    position: relative;
+    padding: 4px 6px;
+    min-width: 24px;
+    justify-content: center;
+  }
+  .journal-tasks.is-compact .journal-task-due {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+  .journal-tasks.is-compact .journal-task-due-wrap.has-due {
+    color: var(--interactive-accent);
+    background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
+    border-color: var(--interactive-accent);
+  }
+  .journal-tasks.is-compact .journal-task-at-wrap {
+    position: relative;
+    padding: 4px 6px;
+    min-width: 24px;
+    justify-content: center;
+  }
+  .journal-tasks.is-compact .journal-task-at {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+  .journal-tasks.is-compact .journal-task-at-wrap.has-at {
+    color: var(--interactive-accent);
+    background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
+    border-color: var(--interactive-accent);
+  }
+}
+
+body.is-mobile .journal-task-row {
+  padding: 10px 12px;
+}
+body.is-mobile .journal-task-check {
+  width: 22px;
+  height: 22px;
+}
+body.is-mobile .journal-task-prio,
+body.is-mobile .journal-task-due-wrap,
+body.is-mobile .journal-task-at-wrap {
+  min-height: calc(var(--am-control-min) * 0.75);
+  padding: 4px 10px;
+}
+body.is-mobile .journal-task-del {
+  min-height: calc(var(--am-control-min) * 0.75);
+  min-width: calc(var(--am-control-min) * 0.75);
+  opacity: 0.85;
+}
+
+/* On mobile devices in compact mode */
+body.is-mobile .journal-tasks.is-compact .journal-task-row {
+  padding: 4px 6px 4px 8px;
+  gap: 6px;
+}
+body.is-mobile .journal-tasks.is-compact .journal-task-due-wrap {
+  position: relative;
+  padding: 4px 8px;
+  min-width: 28px;
+  justify-content: center;
+}
+body.is-mobile .journal-tasks.is-compact .journal-task-due {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+body.is-mobile .journal-tasks.is-compact .journal-task-due-wrap.has-due {
+  color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
+  border-color: var(--interactive-accent);
+}
+body.is-mobile .journal-tasks.is-compact .journal-task-at-wrap {
+  position: relative;
+  padding: 4px 8px;
+  min-width: 28px;
+  justify-content: center;
+}
+body.is-mobile .journal-tasks.is-compact .journal-task-at {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+body.is-mobile .journal-tasks.is-compact .journal-task-at-wrap.has-at {
+  color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
+  border-color: var(--interactive-accent);
 }
 
 /* Touch has no hover to reveal this with — and on a wall of thumbnails this is

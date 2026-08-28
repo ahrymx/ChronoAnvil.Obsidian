@@ -70,7 +70,6 @@ import type { MarkdownPostProcessorContext, Menu } from "obsidian";
 import type AlmanacPlugin from "../main";
 import { getFile, getFolder, openFile } from "../core/util";
 import { folderNotePath } from "../core/util";
-import { emptyCallout } from "../ui/empty";
 import { panDuringDrag } from "../ui/drag-scroll";
 import { overflowButton } from "../ui/section-frame";
 import { hueOf, journalChildFolders, registeredJournalTypes } from "./journal";
@@ -504,21 +503,6 @@ export function buildJournalCards(
 ): HTMLElement {
   const root = createDiv({ cls: "jjc-grid" });
   const types = registeredJournalTypes(plugin);
-
-  if (types.length === 0) {
-    // `emptyCallout` REPLACES content, which is this case: there is no grid to
-    // draw and the callout stands in for it. `empty.ts`'s rule wants both what
-    // will appear and how to make it happen, and both are sayable here.
-    root.addClass("is-empty");
-    root.appendChild(
-      emptyCallout(
-        "book-open",
-        "No journals yet",
-        "Turn on Study or add a journal in Settings → Almanac → Journals, and each one gets a card here."
-      )
-    );
-    return root;
-  }
 
   for (const type of types) {
     const card = buildCard(plugin, ctx, type);

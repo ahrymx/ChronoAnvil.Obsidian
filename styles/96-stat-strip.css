@@ -55,7 +55,58 @@
      still push the column — explicit is a line, and the bug it prevents is a
      column that only misbehaves at one width. */
   box-sizing: border-box;
-  padding: 9px 13px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 38px;
+}
+.am-stat-ring-wrap {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.am-stat-ring-svg {
+  transform: rotate(-90deg);
+  width: 24px;
+  height: 24px;
+}
+.am-stat-ring-bg {
+  stroke: var(--background-modifier-border);
+  stroke-width: 3;
+  fill: transparent;
+}
+.am-stat-ring-val {
+  stroke: var(--interactive-accent);
+  stroke-width: 3;
+  fill: transparent;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s ease;
+}
+.am-stat-ring-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  line-height: 1;
+}
+.am-stat-data {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  flex: 1;
+}
+.am-stat-val-row {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
 }
 .am-stat-label {
   font-size: var(--am-text-2xs);
@@ -63,20 +114,26 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .am-stat-value {
-  font-size: 1.2em;
+  font-size: 1.15em;
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1.15;
   font-variant-numeric: tabular-nums;
   color: var(--text-normal);
   white-space: nowrap;
 }
 .am-stat-sub {
-  margin-top: 2px;
-  min-height: 1.2em;
   font-size: var(--am-text-2xs);
   color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.am-stat-sub:empty {
+  display: none;
 }
 
 /* Four across becomes two by two.

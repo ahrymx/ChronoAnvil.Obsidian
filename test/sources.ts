@@ -48,7 +48,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { resolve, join, sep } from "node:path";
 
-const ROOT = resolve(__dirname, "..");
+export const ROOT = resolve(__dirname, "..");
 const SRC = join(ROOT, "src");
 
 // Logical name -> path relative to src/, for the cases a search cannot guess:

@@ -1092,4 +1092,14 @@ describe("the drag is the journal cards' gesture, on a smaller surface", () => {
     }
     expect(css).not.toMatch(/(^|[},])\s*\.am-stat\.is-(dragging|drop-target)/);
   });
+
+  it("declares micro-ring ribbon styling for compact telemetry presentation", () => {
+    const css = readCss();
+    expect(cssRule(".am-stat-ring-wrap")).toContain("display: inline-flex");
+    expect(cssRule(".am-stat-ring-svg")).toContain("rotate(-90deg)");
+    expect(cssRule(".am-stat-ring-bg")).toContain("stroke: var(--background-modifier-border)");
+    expect(cssRule(".am-stat-ring-val")).toContain("stroke: var(--interactive-accent)");
+    expect(cssRule(".am-stat-data")).toContain("display: flex");
+    expect(cssRule(".am-stat-val-row")).toContain("display: flex");
+  });
 });

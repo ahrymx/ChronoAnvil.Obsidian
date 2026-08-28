@@ -1626,6 +1626,7 @@ export function buildStatsBand(
       add({
         value: String(n),
         label: (n === 1 ? kind.label : kindPlural(kind)).toLowerCase(),
+        icon: kind.emoji || undefined,
       });
       continue;
     }
@@ -1642,6 +1643,7 @@ export function buildStatsBand(
               ? "note"
               : "notes",
           value: String(n),
+          icon: sole?.emoji || type?.emoji || "📄",
         });
         break;
       }
@@ -1657,6 +1659,7 @@ export function buildStatsBand(
           add({
             value: String(n),
             label: (n === 1 ? kind.label : kindPlural(kind)).toLowerCase(),
+            icon: kind.emoji || undefined,
           });
         }
         break;
@@ -1679,6 +1682,7 @@ export function buildStatsBand(
             ? below.noun
             : plural(below.noun)
           ).toLowerCase(),
+          icon: type?.levels[(containerDepth(type, file.parent.path) || 0) + 1]?.fallbackEmoji || "🗂️",
         });
         break;
       }
@@ -1697,16 +1701,20 @@ export function buildStatsBand(
         // readings is absent, not zero — 0.0/5 reads as "you understand none of
         // this" rather than "nothing logged yet". `buildTopicStats`' rule, and
         // this band is the wide one that keeps the denominator with it.
+        const avgNum = conf && conf.avg !== "—" ? parseFloat(conf.avg) : null;
+        const ratio = avgNum != null && def.max != null && def.max > 0 ? avgNum / def.max : null;
         add({
           label: `avg ${ratingWord(def)}`,
           value: conf ? conf.avg : "—",
           sub: def.max != null ? `/${def.max}` : null,
+          ratio: ratio ?? undefined,
+          icon: def.type === "scale" ? "★" : undefined,
         });
         break;
       }
       case "open": {
         openAt = cells.length;
-        add({ label: "open tasks", value: "…" });
+        add({ label: "open tasks", value: "…", icon: "⏳" });
         break;
       }
       case "last": {
@@ -1715,7 +1723,7 @@ export function buildStatsBand(
           const d = isoDate(p.fm["date"]);
           if (d && (!latest || d > latest)) latest = d;
         }
-        add({ label: "last", value: relativeActivity(latest) || "—" });
+        add({ label: "last", value: relativeActivity(latest) || "—", icon: "🕒" });
         break;
       }
       case "totals": {
@@ -3394,61 +3402,239 @@ export function buildTasksTable(
       text: `${total} open · ${groups.length} note${groups.length === 1 ? "" : "s"}`,
     });
 
-    for (const group of groups) {
-      const groupEl = body.createDiv({ cls: "jtt-group" });
-      const heading = groupEl.createDiv({ cls: "jtt-group-head" });
-      internalLink(heading, app, group.file, group.file.basename, ctx.sourcePath);
-      heading.createSpan({ cls: "jtt-group-count", text: String(group.rows.length) });
+    // Form structured buckets:
+    // 1. Weekly buckets for daily notes (congregated into respective ISO week)
+    // 2. Journal buckets for notes in custom journals (with journal emoji and name)
+    // 3. Other/Folder buckets for remaining notes
+    interface TaskSubgroup {
+      file: TFile;
+      sublabel?: string;
+      rows: OpenTaskRow[];
+    }
+    interface TaskBucket {
+      id: string;
+      title: string;
+      orderKey: number;
+      notes: TaskSubgroup[];
+    }
 
-      // Within a note: high → normal → low, then earliest due first (undated
-      // last), then original order — the same "most pressing first" reading the
-      // old query's default gave.
-      const rows = group.rows.slice().sort((a, b) => {
-        const p = PRIO_WEIGHT[a.task.priority] - PRIO_WEIGHT[b.task.priority];
-        if (p !== 0) return p;
-        const ad = a.task.due ?? "\uffff";
-        const bd = b.task.due ?? "\uffff";
-        return ad.localeCompare(bd);
+    const weekBuckets = new Map<string, TaskBucket>();
+    const journalBuckets = new Map<string, TaskBucket>();
+    const otherBuckets = new Map<string, TaskBucket>();
+
+    const journalTypes = registeredJournalTypes(plugin);
+
+    for (const group of groups) {
+      const fm = frontmatterOf(app, group.file);
+      const jd = typeof fm["journal-date"] === "string" ? fm["journal-date"].trim() : null;
+      const dailyDate =
+        jd && /^\d{4}-\d{2}-\d{2}$/.test(jd)
+          ? jd
+          : /^\d{4}-\d{2}-\d{2}$/.test(group.file.basename)
+            ? group.file.basename
+            : null;
+
+      if (dailyDate) {
+        const m = moment(dailyDate);
+        const ws = m.clone().startOf("isoWeek");
+        const we = m.clone().endOf("isoWeek");
+        const wk = ws.isoWeek();
+        const yr = ws.year();
+        const bucketId = `week-${yr}-${wk}`;
+        const dayLabel = m.format("ddd D MMM");
+
+        let b = weekBuckets.get(bucketId);
+        if (!b) {
+          b = {
+            id: bucketId,
+            title: `🗓️ Week ${wk} · ${ws.format("D MMM")}–${we.format("D MMM YYYY")}`,
+            orderKey: yr * 100 + wk,
+            notes: [],
+          };
+          weekBuckets.set(bucketId, b);
+        }
+        b.notes.push({ file: group.file, sublabel: dayLabel, rows: group.rows });
+        continue;
+      }
+
+      const jType = journalTypes.find((j) => group.file.path.startsWith(j.root));
+      if (jType) {
+        const bucketId = `journal-${jType.id}`;
+        let b = journalBuckets.get(bucketId);
+        if (!b) {
+          b = {
+            id: bucketId,
+            title: `${jType.emoji} ${jType.name} Journal`,
+            orderKey: journalTypes.indexOf(jType),
+            notes: [],
+          };
+          journalBuckets.set(bucketId, b);
+        }
+        b.notes.push({ file: group.file, rows: group.rows });
+        continue;
+      }
+
+      const parentFolder = group.file.parent?.name ?? "Notes";
+      const bucketId = `folder-${group.file.parent?.path ?? "other"}`;
+      let b = otherBuckets.get(bucketId);
+      if (!b) {
+        b = {
+          id: bucketId,
+          title: `📁 ${parentFolder}`,
+          orderKey: 0,
+          notes: [],
+        };
+        otherBuckets.set(bucketId, b);
+      }
+      b.notes.push({ file: group.file, rows: group.rows });
+    }
+
+    const sortedBuckets: TaskBucket[] = [
+      ...Array.from(weekBuckets.values()).sort((a, b) => b.orderKey - a.orderKey),
+      ...Array.from(journalBuckets.values()).sort((a, b) => a.orderKey - b.orderKey),
+      ...Array.from(otherBuckets.values()),
+    ];
+
+    for (const bucket of sortedBuckets) {
+      const bucketTotal = bucket.notes.reduce((s, n) => s + n.rows.length, 0);
+      const bucketOverdue = bucket.notes.reduce(
+        (s, n) =>
+          s +
+          n.rows.filter(
+            (r) => r.task.due && todayIso !== "" && r.task.due < todayIso
+          ).length,
+        0
+      );
+
+      const bucketEl = body.createDiv({ cls: "jtt-group jtt-bucket" });
+      const heading = bucketEl.createDiv({ cls: "jtt-group-head jtt-bucket-head" });
+
+      const titleLeft = heading.createDiv({ cls: "jtt-bucket-title-wrap" });
+      const chevron = titleLeft.createSpan({ cls: "jtt-group-chevron" });
+      setIcon(chevron, "chevron-down");
+      titleLeft.createSpan({ cls: "jtt-bucket-title", text: bucket.title });
+
+      const pillsRight = heading.createDiv({ cls: "jtt-bucket-pills" });
+      if (bucketOverdue > 0) {
+        pillsRight.createSpan({
+          cls: "jtt-pill jtt-pill-danger",
+          text: `${bucketOverdue} overdue`,
+        });
+      }
+      pillsRight.createSpan({
+        cls: "jtt-group-count",
+        text: `${bucketTotal} open`,
       });
 
-      const list = groupEl.createDiv({ cls: "jtt-list" });
-      for (const row of rows) {
-        const rowEl = list.createDiv({
-          cls: `journal-task-row jtt-row journal-task-${row.task.priority}`,
+      heading.addEventListener("click", () => {
+        bucketEl.toggleClass("is-collapsed", !bucketEl.hasClass("is-collapsed"));
+      });
+
+      const bucketBody = bucketEl.createDiv({ cls: "jtt-bucket-body" });
+
+      for (const note of bucket.notes) {
+        if (bucket.notes.length > 1 || note.sublabel) {
+          const subHead = bucketBody.createDiv({ cls: "jtt-subgroup-head" });
+          const linkText = note.sublabel
+            ? `${note.sublabel} · ${note.file.basename}`
+            : note.file.basename;
+          internalLink(subHead, app, note.file, linkText, ctx.sourcePath);
+          subHead.createSpan({
+            cls: "jtt-subgroup-count",
+            text: String(note.rows.length),
+          });
+        } else if (bucket.notes.length === 1 && !note.sublabel) {
+          const subHead = bucketBody.createDiv({ cls: "jtt-subgroup-head" });
+          internalLink(subHead, app, note.file, note.file.basename, ctx.sourcePath);
+        }
+
+        // Within a note: high → normal → low, then earliest due first (undated
+        // last), then original order — the same "most pressing first" reading the
+        // old query's default gave.
+        const rows = note.rows.slice().sort((a, b) => {
+          const p = PRIO_WEIGHT[a.task.priority] - PRIO_WEIGHT[b.task.priority];
+          if (p !== 0) return p;
+          const ad = a.task.due ?? "\uffff";
+          const bd = b.task.due ?? "\uffff";
+          return ad.localeCompare(bd);
         });
 
-        const box = rowEl.createEl("input", {
-          type: "checkbox",
-          cls: "journal-task-check",
-        });
-        box.checked = false;
-        box.addEventListener("change", () => {
-          // Optimistically dim the row; the LiveWidget repaint drops it. Guard
-          // against a double-fire (disabled input can still receive a
-          // programmatic change) by disabling immediately.
-          rowEl.addClass("is-done");
-          box.disabled = true;
-          void toggleTaskDone(app, row.file, row.key, row.line, row.index);
-        });
+        const list = bucketBody.createDiv({ cls: "jtt-list" });
+        for (const row of rows) {
+          const rowEl = list.createDiv({
+            cls: `journal-task-row jtt-row journal-task-${row.task.priority}`,
+          });
 
-        rowEl.createSpan({ cls: "journal-task-text jtt-text", text: row.task.text });
+          const main = rowEl.createDiv({ cls: "journal-task-main" });
 
-        // Priority now reads from the row's left edge (driven by the
-        // `journal-task-<priority>` modifier in CSS), so there's no trailing
-        // pip. `aria-label` on the row carries the priority for screen readers.
-        rowEl.setAttr("aria-label", `${row.task.priority} priority task`);
+          const box = main.createEl("input", {
+            type: "checkbox",
+            cls: "journal-task-check",
+            attr: { "aria-label": "Mark task complete" },
+          });
+          box.checked = false;
+          box.addEventListener("change", () => {
+            // Optimistically dim the row; the LiveWidget repaint drops it. Guard
+            // against a double-fire (disabled input can still receive a
+            // programmatic change) by disabling immediately.
+            rowEl.addClass("is-done");
+            box.disabled = true;
+            void toggleTaskDone(app, row.file, row.key, row.line, row.index);
+          });
 
-        if (row.task.due) {
-          // `todayIso` is hoisted above the group loop; a null (unparseable
-          // clock) yields "" there, and dueLabel treats any real due date as a
-          // valid comparison — when todayIso is "" we skip the label entirely.
-          if (todayIso !== "") {
-            const { text, overdue } = dueLabel(row.task.due, todayIso);
-            const due = rowEl.createSpan({
-              cls: `jtt-due${overdue ? " jtt-due-overdue" : ""}`,
-              text,
+          // Extract inline tags from task text
+          const rawText = row.task.text;
+          const tags: string[] = [];
+          const cleanText = rawText
+            .replace(/(?:^|\s)(#[a-zA-Z0-9_\-\/]+)/g, (_m, t) => {
+              tags.push(t);
+              return "";
+            })
+            .trim();
+
+          main.createSpan({ cls: "journal-task-text jtt-text", text: cleanText || rawText });
+          rowEl.setAttr("aria-label", `${row.task.priority} priority task`);
+
+          const meta = rowEl.createDiv({ cls: "journal-task-meta" });
+          const chips = meta.createDiv({ cls: "journal-task-chips" });
+
+          for (const tag of tags) {
+            chips.createSpan({ cls: "journal-task-tag", text: tag });
+          }
+
+          if (row.task.priority !== "normal") {
+            const prio = chips.createSpan({
+              cls: `journal-task-prio journal-task-${row.task.priority}`,
+              attr: { title: `Priority: ${row.task.priority}` },
             });
-            setIcon(due.createSpan({ cls: "jtt-due-icon" }), "calendar");
+            const prioIcon = row.task.priority === "high" ? "chevrons-up" : "chevrons-down";
+            setIcon(prio.createSpan({ cls: "journal-task-prio-icon" }), prioIcon);
+            prio.createSpan({
+              cls: "journal-task-prio-label",
+              text: row.task.priority === "high" ? "High" : "Low",
+            });
+          }
+
+          if (row.task.due) {
+            // `todayIso` is hoisted above the group loop; a null (unparseable
+            // clock) yields "" there, and dueLabel treats any real due date as a
+            // valid comparison — when todayIso is "" we skip the label entirely.
+            if (todayIso !== "") {
+              const { text, overdue } = dueLabel(row.task.due, todayIso);
+              const due = chips.createSpan({
+                cls: `jtt-due${overdue ? " jtt-due-overdue" : ""}`,
+                text,
+              });
+              setIcon(due.createSpan({ cls: "jtt-due-icon" }), "calendar");
+            }
+          }
+
+          if (row.task.at) {
+            const at = chips.createSpan({
+              cls: "jtt-at journal-task-at-wrap",
+              text: row.task.at,
+            });
+            setIcon(at.createSpan({ cls: "jtt-at-icon" }), "clock");
           }
         }
       }

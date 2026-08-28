@@ -178,12 +178,10 @@ describe("registry shape", () => {
 
   it("rolls up the month's theme, both lists, and its goals", () => {
     expect(rollupFields("monthly").map((f) => f.id)).toEqual([
-      // 4.70 moved the goals up beside the theme — see `fields.ts` for why
-      // the template's two rows are what set this order.
       "focus",
-      "todo",
       "highlights",
       "challenges",
+      "todo",
     ]);
   });
 
@@ -297,12 +295,10 @@ describe("readRollup", () => {
   it("returns one value per rollupable field, in template order", () => {
     const values = readRollup(monthRegions, "monthly");
     expect(values.map((v) => v.field.id)).toEqual([
-      // 4.70 moved the goals up beside the theme — see `fields.ts` for why
-      // the template's two rows are what set this order.
       "focus",
-      "todo",
       "highlights",
       "challenges",
+      "todo",
     ]);
   });
 

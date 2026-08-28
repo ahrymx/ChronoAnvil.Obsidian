@@ -450,6 +450,12 @@ describe("section bodies are marked for the surface", () => {
     expect(check).not.toContain("offsetHeight");
   });
 
+  it("does not treat zero-width or empty comment blocks as rendering content", () => {
+    const check = method("rendersSomething");
+    expect(check).toContain("\\u200B");
+  });
+
+
   it("contains the child margins so the run paints as one surface", () => {
     // The first attempt came out striped. These wrappers have no vertical
     // padding and no border, so a child's margins collapse THROUGH them and the

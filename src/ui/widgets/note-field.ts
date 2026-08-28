@@ -292,6 +292,18 @@ export function buildNote(
           autoGrow();
           return;
         }
+        // If onDisk matches the current buffer or is a prefix of what the user is typing,
+        // it is the user's own keystrokes arriving from disk, not an external append.
+        const trimmedDisk = onDisk.replace(/\s+$/, "");
+        const trimmedInput = input.value.replace(/\s+$/, "");
+        if (
+          onDisk === input.value ||
+          trimmedDisk === trimmedInput ||
+          (trimmedDisk.length > 0 && trimmedInput.startsWith(trimmedDisk))
+        ) {
+          baseline = onDisk;
+          return;
+        }
         const tail = appendedSince(baseline, onDisk);
         if (tail == null) return;
         const at = input.selectionStart;

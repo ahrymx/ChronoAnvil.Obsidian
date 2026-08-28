@@ -526,6 +526,7 @@ export const STUDY_CONFIG: JournalConfig = {
     "index:1": {
       order: [
         "banner",
+        "trackers",
         "stats",
         "review",
         "charts",

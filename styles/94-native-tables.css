@@ -223,13 +223,108 @@
   color: var(--text-error, #e05561);
 }
 .journal-tasks-table .jtt-group {
-  margin-bottom: 0.8em;
+  margin-bottom: 0.85em;
+}
+.journal-tasks-table .jtt-bucket {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  margin-bottom: 0.85em;
+  background: var(--background-secondary);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+.journal-tasks-table .jtt-bucket-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--background-secondary-alt);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.journal-tasks-table .jtt-bucket-head:hover {
+  background: var(--background-modifier-hover);
+}
+.journal-tasks-table .jtt-bucket-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--am-text-sm);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.journal-tasks-table .jtt-group-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+  color: var(--text-muted);
+}
+.journal-tasks-table .jtt-group-chevron .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.journal-tasks-table .jtt-bucket.is-collapsed .jtt-group-chevron {
+  transform: rotate(-90deg);
+}
+.journal-tasks-table .jtt-bucket.is-collapsed .jtt-bucket-body {
+  display: none;
+}
+.journal-tasks-table .jtt-bucket-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.journal-tasks-table .jtt-subgroup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px 4px 20px;
+  background: rgba(0, 0, 0, 0.04);
+  border-top: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.journal-tasks-table .jtt-subgroup-head:first-child {
+  border-top: none;
+}
+.journal-tasks-table .jtt-subgroup-head a.internal-link {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.journal-tasks-table .jtt-subgroup-head a.internal-link:hover {
+  color: var(--interactive-accent);
+}
+.journal-tasks-table .jtt-subgroup-count {
+  font-size: var(--am-text-2xs);
+  line-height: 1.4;
+  padding: 0 6px;
+  border-radius: var(--am-radius-pill);
+  background: var(--background-secondary);
+  color: var(--text-faint);
+}
+.journal-tasks-table .journal-task-tag {
+  font-size: var(--am-text-2xs);
+  font-family: var(--font-monospace);
+  padding: 1px 6px;
+  border-radius: var(--am-radius-xs);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.journal-tasks-table .journal-task-tag:hover {
+  color: var(--text-accent);
+  border-color: var(--text-accent);
 }
 .journal-tasks-table .jtt-group-head {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 .journal-tasks-table .jtt-group-head a.internal-link {
   font-weight: 600;
@@ -247,34 +342,46 @@
   background: var(--background-secondary);
   color: var(--text-muted);
 }
-/* Rows read as a light list, not filled bars: no surface fill, a hairline
-   separator between rows, and a thin priority accent on the left. Padding is
-   kept modest so rows don't feel chunky. */
+/* Rows read as a clean list with left priority accent and hairline separators. */
 .journal-tasks-table .jtt-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  padding: 5px 4px 5px 8px;
+  padding: 6px 8px;
   border-bottom: 1px solid var(--background-modifier-border);
-  border-left: 2px solid transparent;
+  border-left: var(--am-rule-edge) solid transparent;
+  border-radius: var(--am-radius-xs);
+  transition: background 0.12s ease;
+}
+.journal-tasks-table .jtt-row:hover {
+  background: var(--background-modifier-hover);
 }
 .journal-tasks-table .jtt-list .jtt-row:last-child {
   border-bottom: none;
 }
-/* Priority accent on the left edge — only high priority gets a visible mark so
-   the list stays calm; normal/low read as plain rows. Amber is intentionally
-   left free for a future "due soon" state. */
+/* Priority accent and background tint */
 .journal-tasks-table .jtt-row.journal-task-high {
+  background: color-mix(in srgb, var(--color-red, #e05561) 7%, var(--background-secondary));
   border-left-color: var(--color-red, #e05561);
 }
+.journal-tasks-table .jtt-row.journal-task-high:hover {
+  background: color-mix(in srgb, var(--color-red, #e05561) 12%, var(--background-secondary));
+}
 .journal-tasks-table .jtt-row.journal-task-low {
+  background: color-mix(in srgb, var(--am-ev-teal) 7%, var(--background-secondary));
+  border-left-color: var(--am-ev-teal);
   opacity: 0.85;
+}
+.journal-tasks-table .jtt-row.journal-task-low:hover {
+  background: color-mix(in srgb, var(--am-ev-teal) 12%, var(--background-secondary));
 }
 /* Read-only text: not an <input>, so drop the field affordances the editable
    per-note widget carries and let it sit as plain flowing text. */
 .journal-tasks-table .jtt-text {
   cursor: default;
   flex: 1;
+  line-height: 1.4;
 }
 .journal-tasks-table .jtt-row.is-done .jtt-text {
   text-decoration: line-through;
@@ -287,10 +394,14 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   font-size: var(--am-text-2xs);
   color: var(--text-muted);
   white-space: nowrap;
+  padding: var(--am-space-1) var(--am-space-3);
+  border-radius: var(--am-radius-pill);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
 }
 .journal-tasks-table .jtt-due-icon {
   display: inline-flex;
@@ -305,8 +416,37 @@
   padding: 1px 8px;
   border-radius: var(--am-radius-pill);
   background: rgba(var(--color-red-rgb, 224, 85, 97), 0.15);
+  border-color: transparent;
   color: var(--text-error, #e05561);
   font-weight: 600;
+}
+
+/* Mobile layout for tasks-table */
+@media (max-width: 520px) {
+  .journal-tasks-table .jtt-row {
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    padding: 8px;
+  }
+  .journal-tasks-table .jtt-row .journal-task-check {
+    order: 1;
+  }
+  .journal-tasks-table .jtt-text {
+    order: 2;
+    flex: 1 1 calc(100% - 38px);
+  }
+  .journal-tasks-table .jtt-due {
+    order: 3;
+    margin-left: 28px;
+  }
+}
+
+body.is-mobile .journal-tasks-table .jtt-row {
+  padding: 8px;
+}
+body.is-mobile .journal-tasks-table .jtt-row .journal-task-check {
+  width: 1.3em;
+  height: 1.3em;
 }
 
 /* tag-index — a table of tags, most-used first. Each row is a

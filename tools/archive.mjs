@@ -72,7 +72,7 @@ const DIST = path.join(ROOT, "dist", "ahrymx.almanac");
 // one version; a repository inside it carries every other version as well, plus
 // remotes, credentials in a config, and whatever is on branches nobody meant to
 // hand over. A snapshot that contains its own history is not a snapshot.
-const SOURCE_SKIP = new Set(["node_modules", "dist", ".git"]);
+const SOURCE_SKIP = new Set(["node_modules", "dist", ".git", "docs"]);
 
 // What each archive must contain to be worth keeping. Read back OUT of the file
 // on disk, not asserted about the directory that went in.

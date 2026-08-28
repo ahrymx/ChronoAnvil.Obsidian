@@ -31,7 +31,9 @@ import {
   isPageWidget,
 } from "../src/core/widget-registry";
 import { RETIRED_WIDGETS } from "../src/core/constants";
-import { repoFile, readSrc } from "./sources";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { repoFile, readSrc, ROOT } from "./sources";
 
 const index = repoFile("src/ui/widgets/index.ts");
 
@@ -377,50 +379,54 @@ describe("SECTION_TITLES and the registry answer different questions", () => {
   });
 });
 
-describe("the reference table and the registry agree on what exists", () => {
-  // NOT GENERATED FROM EACH OTHER, and that is deliberate: the essay-length
-  // cells in `docs/reference.md` are the documentation's value, and a generator
-  // would either destroy them or need them as input, at which point it is not a
-  // generator. What is asserted is PARITY of the keyword sets, in both
-  // directions — which kills a row for a widget that no longer exists and forces
-  // a row for one that has been shipping undocumented, without this test having
-  // any opinion about the prose in between.
-  const reference = repoFile("docs/reference.md");
-  const table = reference.slice(
-    reference.indexOf("## Almanac widget reference"),
-    reference.indexOf("## Trackers")
-  );
-  // The keyword is the first backticked word of a row, up to the first
-  // separator the grammar uses: `:` opens an argument, `[` an optional one,
-  // and `|` a label.
-  const documented = new Set(
-    [...table.matchAll(/^\| `([a-z0-9-]+)[`:[|]/gm)].map((m) => m[1])
-  );
+const hasDocs = existsSync(join(ROOT, "docs/reference.md"));
+(hasDocs ? describe : describe.skip)(
+  "the reference table and the registry agree on what exists",
+  () => {
+    // NOT GENERATED FROM EACH OTHER, and that is deliberate: the essay-length
+    // cells in `docs/reference.md` are the documentation's value, and a generator
+    // would either destroy them or need them as input, at which point it is not a
+    // generator. What is asserted is PARITY of the keyword sets, in both
+    // directions — which kills a row for a widget that no longer exists and forces
+    // a row for one that has been shipping undocumented, without this test having
+    // any opinion about the prose in between.
+    const reference = hasDocs ? repoFile("docs/reference.md") : "";
+    const table = reference.slice(
+      reference.indexOf("## Almanac widget reference"),
+      reference.indexOf("## Trackers")
+    );
+    // The keyword is the first backticked word of a row, up to the first
+    // separator the grammar uses: `:` opens an argument, `[` an optional one,
+    // and `|` a label.
+    const documented = new Set(
+      [...table.matchAll(/^\| `([a-z0-9-]+)[`:[|]/gm)].map((m) => m[1])
+    );
 
-  it("finds the table", () => {
-    expect(table.length).toBeGreaterThan(1000);
-    expect(documented.size).toBeGreaterThanOrEqual(20);
-  });
+    it("finds the table", () => {
+      expect(table.length).toBeGreaterThan(1000);
+      expect(documented.size).toBeGreaterThanOrEqual(20);
+    });
 
-  it("documents every widget a page can be given", () => {
-    expect(widgetKeys.filter((k) => !documented.has(k)).sort()).toEqual([]);
-  });
+    it("documents every widget a page can be given", () => {
+      expect(widgetKeys.filter((k) => !documented.has(k)).sort()).toEqual([]);
+    });
 
-  it("names nothing that does not dispatch and is not retired", () => {
-    // `header` IS THE ONE ALLOWANCE, and it is stated here rather than added to
-    // a table so that the exception cannot quietly acquire company. It has no
-    // `case`: the fence loop intercepts it before `buildFromSpec` is ever
-    // called, because a header bar anchors the widgets that follow it and so
-    // has to be built by the thing that knows what follows. It is documented
-    // for the same reason it is intercepted — a reader types it.
-    //
-    // A RETIRED KEYWORD IS ALSO ALLOWED TO HAVE A ROW. That row is how a reader
-    // holding a note from two releases ago finds out what happened to it, which
-    // is the job `RETIRED_WIDGETS` does in the renderer and the table does here.
-    const dead = [...documented]
-      .filter((k) => k !== "header")
-      .filter((k) => !dispatched.has(k) && !(k in RETIRED_WIDGETS))
-      .sort();
-    expect(dead).toEqual([]);
-  });
-});
+    it("names nothing that does not dispatch and is not retired", () => {
+      // `header` IS THE ONE ALLOWANCE, and it is stated here rather than added to
+      // a table so that the exception cannot quietly acquire company. It has no
+      // `case`: the fence loop intercepts it before `buildFromSpec` is ever
+      // called, because a header bar anchors the widgets that follow it and so
+      // has to be built by the thing that knows what follows. It is documented
+      // for the same reason it is intercepted — a reader types it.
+      //
+      // A RETIRED KEYWORD IS ALSO ALLOWED TO HAVE A ROW. That row is how a reader
+      // holding a note from two releases ago finds out what happened to it, which
+      // is the job `RETIRED_WIDGETS` does in the renderer and the table does here.
+      const dead = [...documented]
+        .filter((k) => k !== "header")
+        .filter((k) => !dispatched.has(k) && !(k in RETIRED_WIDGETS))
+        .sort();
+      expect(dead).toEqual([]);
+    });
+  }
+);

@@ -2574,5 +2574,5 @@ function specWithWanted(
 export function graphLinksSection(links: readonly string[]): string {
   if (!links || links.length === 0) return "";
   const wikilinks = links.map((l) => `[[${l}|\u200B]]`).join(" ");
-  return `\n\n%% almanac-graph %%\n${wikilinks}\n`;
+  return `\n\n%% almanac-graph %%\n%% ${wikilinks} %%\n`;
 }

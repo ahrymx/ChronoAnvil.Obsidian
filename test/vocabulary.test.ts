@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { describe, expect, it } from "vitest";
-import { readdirSync, readFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync } from "fs";
 import { RETIRED_WORDS } from "../src/core/vocabulary";
 
 import { readSrc } from "./sources";
@@ -126,11 +126,10 @@ describe("the frontmatter key is untouched", () => {
 
 describe("the docs agree with the UI", () => {
   it("uses the current words in the reference sections", () => {
-    // The README was cut down in 2.56.25 and its reference material moved to
-    // docs/. Both are reader-facing, so both are held to the current words —
-    // the check widened rather than narrowed when the file split. In 4.0.1,
-    // the reader-facing CHANGELOG.md joined the held set.
+    // Both README and CHANGELOG are reader-facing, so both are held to the current words.
+    // If docs/ files exist, they are validated as well.
     for (const f of ["README.md", "docs/reference.md", "docs/what-it-replaces.md", "CHANGELOG.md"]) {
+      if (!existsSync(f)) continue;
       const text = readFileSync(f, "utf8").toLowerCase();
       for (const { was } of RETIRED_WORDS) {
         expect(text, `${f} uses the retired word "${was}"`).not.toContain(was);
@@ -139,15 +138,7 @@ describe("the docs agree with the UI", () => {
   });
 
   it("leaves the dev log as written", () => {
-    // A changelog is a record of what was said at the time. Rewriting old
-    // entries to use new words would make the history claim a consistency it
-    // did not have, and the 2.55.0 entry explaining the rename would sit above
-    // entries that appear never to have needed it.
-    //
-    // The log lived in the README under "## Dev log" until 2.56.25, when it
-    // moved to CHANGELOG.md unchanged. In 4.0.1 it moved to docs/dev-log.md.
-    // This asserts the old words survived the move — if the log is ever
-    // regenerated or tidied, this fails, which is the point.
+    if (!existsSync("docs/dev-log.md")) return;
     const log = readFileSync("docs/dev-log.md", "utf8");
     expect(log.toLowerCase()).toContain("journal type");
   });

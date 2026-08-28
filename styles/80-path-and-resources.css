@@ -1,22 +1,53 @@
-/* ── Learning Path (path: widget) ─────────────────────────────────────────
+/* ── Task Manager / Learning Path (path: widget) ───────────────────────────
    A re-orderable checklist. Shares the task-line store with `tasks:` but is
    presented as an ordered table: a step number, checkbox, editable text, and
    up/down/delete controls. Order is the content, so the move buttons are a
    first-class control rather than the priority/due pair a `tasks:` row carries. */
+.journal-path {
+  display: block;
+  margin: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+.journal-path-label {
+  font-size: var(--am-text-xs);
+  font-weight: var(--am-caps-weight);
+  letter-spacing: var(--am-caps-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
 .journal-path-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.journal-path-add-icon {
+  color: var(--text-muted);
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.journal-path-add-icon .svg-icon {
+  width: 1.1em;
+  height: 1.1em;
 }
 .journal-path-add-input {
+  flex: 1;
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--am-radius-sm);
   background: var(--background-secondary);
   color: var(--text-normal);
   font-family: inherit;
   font-size: var(--am-text-base);
-  padding: var(--am-space-4) var(--am-space-6);
-  transition: border-color 0.15s ease, background 0.15s ease;
+  padding: var(--am-space-2) var(--am-space-4);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 .journal-path-add-input::placeholder {
   color: var(--text-faint);
@@ -25,15 +56,22 @@
   outline: none;
   border-color: var(--interactive-accent);
   background: var(--background-primary);
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 124, 58, 237), 0.15);
+}
+.journal-path-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .journal-path-empty {
   color: var(--text-faint);
-  font-size: var(--am-text-base);
-  padding: 4px 8px;
+  font-size: var(--am-text-sm);
+  padding: 8px 4px;
 }
 .journal-path-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   padding: 4px 8px;
   border: 1px solid transparent;
@@ -44,53 +82,79 @@
   background: var(--background-secondary);
   border-color: var(--background-modifier-border);
 }
-/* Step number: a muted, fixed-width index so the sequence reads even before the
-   move buttons are used. Tabular figures keep 1 and 10 the same width. */
+.journal-path-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Step number: a clean, rounded pill badge */
 .journal-path-num {
   flex: 0 0 auto;
-  min-width: 1.4em;
-  text-align: right;
-  color: var(--text-faint);
-  font-size: var(--am-text-xs);
+  min-width: 1.6em;
+  height: 1.6em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-pill);
+  color: var(--text-muted);
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .journal-path-check {
   flex: 0 0 auto;
   cursor: pointer;
   accent-color: var(--interactive-accent);
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border-radius: var(--am-radius-xs);
 }
 .journal-path-text {
   flex: 1 1 auto;
   min-width: 0;
-  border: none;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--text-normal);
   font-family: inherit;
   font-size: var(--am-text-base);
-  padding: 3px 4px;
-  border-radius: var(--am-radius-sm);
+  line-height: 1.45;
+  padding: 2px 6px;
+  border-radius: var(--am-radius-xs);
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 .journal-path-text:hover {
-  background: var(--background-primary);
+  background: var(--background-modifier-hover);
 }
 .journal-path-text:focus {
   outline: none;
   background: var(--background-primary);
+  border-color: var(--interactive-accent);
   box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+.journal-path-row.is-done {
+  opacity: 0.55;
 }
 .journal-path-row.is-done .journal-path-text {
   text-decoration: line-through;
   color: var(--text-faint);
 }
 .journal-path-row.is-done .journal-path-num {
-  opacity: 0.55;
+  opacity: 0.6;
 }
-/* Move buttons sit together as a pair; delete is set slightly apart. Same ghost-
-   button shape as the task row's controls. */
-.journal-path-moves {
+.journal-path-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex: 0 0 auto;
+}
+.journal-path-moves {
   display: inline-flex;
-  gap: 1px;
+  gap: 2px;
 }
 .journal-path-move,
 .journal-path-del {
@@ -98,35 +162,62 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.7em;
-  height: 1.7em;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  border: none;
-  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
   color: var(--text-muted);
   border-radius: var(--am-radius-sm);
   cursor: pointer;
   box-shadow: none;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 .journal-path-move:hover,
 .journal-path-del:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
 }
 .journal-path-move:disabled {
   opacity: 0.3;
   cursor: default;
   background: transparent;
+  border-color: transparent;
   color: var(--text-faint);
 }
 .journal-path-del:hover {
   color: var(--text-error, #e05561);
+  background: rgba(var(--color-red-rgb, 224, 85, 97), 0.12);
 }
 .journal-path-move .svg-icon,
 .journal-path-del .svg-icon {
   width: 1em;
   height: 1em;
+}
+
+/* Mobile layout & touch metrics */
+@media (max-width: 520px) {
+  .journal-path-row {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .journal-path-actions {
+    gap: 4px;
+  }
+}
+
+body.is-mobile .journal-path-row {
+  padding: 10px 12px;
+}
+body.is-mobile .journal-path-check {
+  width: 22px;
+  height: 22px;
+}
+body.is-mobile .journal-path-move,
+body.is-mobile .journal-path-del {
+  min-height: calc(var(--am-control-min) * 0.75);
+  min-width: calc(var(--am-control-min) * 0.75);
 }
 
 /* ── Resources: three attachment sections ─────────────────────────────────

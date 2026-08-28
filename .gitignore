@@ -22,6 +22,7 @@ styles.css
 coverage/
 .eslintcache
 *.tgz
+docs/
 
 # Credentials. Nothing in this project reads an environment file today; the
 # line is here so that the day something does, the file is already ignored.

@@ -36,6 +36,7 @@ import {
   registeredJournalTypes,
 } from "../src/journals/journal";
 import { journalTemplateFiles } from "../src/journals/custom-journal";
+import { sectionsFor, templateTargets } from "../src/journals/journal-sections";
 import { readCode } from "./sources";
 import { studyTemplate } from "./study-template";
 
@@ -94,6 +95,31 @@ describe("a preset is an ordinary journal", () => {
       settings: { customJournals: [] },
     } as unknown as Parameters<typeof registeredJournalTypes>[0];
     expect(registeredJournalTypes(plugin)).toEqual([]);
+  });
+
+  it("places the trackers section in 2nd position (under banner) in every preset template where it appears", () => {
+    for (const preset of JOURNAL_PRESETS) {
+      const type = buildJournalType(preset.config);
+      const targets = templateTargets(type);
+      for (const target of targets) {
+        const layout = type.layout?.[target.key];
+        const sections = sectionsFor(target.ctx, layout);
+        const trackerIndex = sections.findIndex((s) => s.id === "trackers");
+        if (trackerIndex !== -1) {
+          expect(trackerIndex, `${preset.id} ${target.key}`).toBe(1);
+          expect(sections[0].id, `${preset.id} ${target.key} banner`).toBe("banner");
+        }
+      }
+      if (preset.config.layout) {
+        for (const [key, tLayout] of Object.entries(preset.config.layout)) {
+          const list = tLayout.sections ?? tLayout.order;
+          if (list && list.includes("trackers")) {
+            expect(list.indexOf("trackers"), `${preset.id} layout.${key}`).toBe(1);
+            expect(list[0], `${preset.id} layout.${key} banner`).toBe("banner");
+          }
+        }
+      }
+    }
   });
 });
 

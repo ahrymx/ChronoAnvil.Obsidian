@@ -49,6 +49,7 @@ import {
   parseTasks,
   serializeTasks,
 } from "../tasks";
+import { noteFoldState, setNoteFold } from "./note-field";
 
 /**
  * What a body-region widget needs in order to persist itself.
@@ -169,19 +170,26 @@ export function renderPathRow(
     cls: `journal-path-row${step.done ? " is-done" : ""}`,
   });
 
-  // Step number, so the sequence reads at a glance even before the buttons.
-  row.createDiv({ cls: "journal-path-num", text: String(index + 1) });
+  const main = row.createDiv({ cls: "journal-path-main" });
 
-  const box = row.createEl("input", {
+  // Step number badge
+  const num = main.createDiv({ cls: "journal-path-num", text: String(index + 1) });
+  num.setAttr("title", `Step ${index + 1}`);
+
+  const box = main.createEl("input", {
     type: "checkbox",
     cls: "journal-path-check",
+    attr: {
+      "aria-label": step.done ? `Mark step ${index + 1} incomplete` : `Mark step ${index + 1} complete`,
+    },
   });
   box.checked = step.done;
   box.addEventListener("change", () => cb.onToggle());
 
-  const text = row.createEl("input", {
+  const text = main.createEl("input", {
     type: "text",
     cls: "journal-path-text",
+    attr: { "aria-label": `Step ${index + 1} description` },
   });
   text.value = step.text;
   const commitText = (): void => {
@@ -196,10 +204,11 @@ export function renderPathRow(
     }
   });
 
-  const moves = row.createDiv({ cls: "journal-path-moves" });
+  const actions = row.createDiv({ cls: "journal-path-actions" });
+  const moves = actions.createDiv({ cls: "journal-path-moves" });
   const up = moves.createEl("button", {
     cls: "journal-path-move",
-    attr: { "aria-label": "Move step up", type: "button" },
+    attr: { "aria-label": "Move step up", title: "Move up", type: "button" },
   });
   setIcon(up, "chevron-up");
   up.disabled = index === 0;
@@ -207,15 +216,15 @@ export function renderPathRow(
 
   const down = moves.createEl("button", {
     cls: "journal-path-move",
-    attr: { "aria-label": "Move step down", type: "button" },
+    attr: { "aria-label": "Move step down", title: "Move down", type: "button" },
   });
   setIcon(down, "chevron-down");
   down.disabled = index === count - 1;
   down.addEventListener("click", () => cb.onMoveDown());
 
-  const del = row.createEl("button", {
+  const del = actions.createEl("button", {
     cls: "journal-path-del",
-    attr: { "aria-label": "Delete step", type: "button" },
+    attr: { "aria-label": "Delete step", title: "Delete step", type: "button" },
   });
   setIcon(del, "x");
   del.addEventListener("click", () => cb.onDelete());
@@ -240,18 +249,21 @@ export function renderTaskRow(
     }`,
   });
 
-  // Checkbox
-  const box = row.createEl("input", {
+  // Top line: Checkbox + Editable Task Text
+  const main = row.createDiv({ cls: "journal-task-main" });
+
+  const box = main.createEl("input", {
     type: "checkbox",
     cls: "journal-task-check",
+    attr: { "aria-label": task.done ? "Mark task incomplete" : "Mark task complete" },
   });
   box.checked = task.done;
   box.addEventListener("change", () => cb.onToggle());
 
-  // Editable text (commits on blur / Enter)
-  const text = row.createEl("input", {
+  const text = main.createEl("input", {
     type: "text",
     cls: "journal-task-text",
+    attr: { "aria-label": "Task description" },
   });
   text.value = task.text;
   const commitText = (): void => {
@@ -266,10 +278,18 @@ export function renderTaskRow(
     }
   });
 
-  // Priority cycle: normal → high → low → normal
-  const prioBtn = row.createEl("button", {
+  // Bottom line: Metadata chips & actions
+  const meta = row.createDiv({ cls: "journal-task-meta" });
+  const chips = meta.createDiv({ cls: "journal-task-chips" });
+
+  // Priority cycle pill: normal → high → low → normal
+  const prioBtn = chips.createEl("button", {
     cls: "journal-task-prio",
-    attr: { "aria-label": "Cycle priority", type: "button" },
+    attr: {
+      "aria-label": `Cycle priority (currently ${task.priority})`,
+      title: `Priority: ${task.priority}`,
+      type: "button",
+    },
   });
   const PRIO_ORDER: TaskPriority[] = ["normal", "high", "low"];
   const PRIO_ICON: Record<TaskPriority, string> = {
@@ -277,50 +297,71 @@ export function renderTaskRow(
     normal: "minus",
     low: "chevrons-down",
   };
-  setIcon(prioBtn, PRIO_ICON[task.priority]);
+  const PRIO_LABEL: Record<TaskPriority, string> = {
+    high: "High",
+    normal: "Normal",
+    low: "Low",
+  };
+  setIcon(prioBtn.createSpan({ cls: "journal-task-prio-icon" }), PRIO_ICON[task.priority]);
+  prioBtn.createSpan({ cls: "journal-task-prio-label", text: PRIO_LABEL[task.priority] });
   prioBtn.addEventListener("click", () => {
     const next =
       PRIO_ORDER[(PRIO_ORDER.indexOf(task.priority) + 1) % PRIO_ORDER.length];
     cb.onPriority(next);
   });
 
-  // Due date
-  const due = row.createEl("input", {
+  // Due date pill
+  const dueWrap = chips.createDiv({
+    cls: `journal-task-due-wrap${task.due ? " has-due" : ""}`,
+  });
+  setIcon(dueWrap.createSpan({ cls: "journal-task-due-icon" }), "calendar");
+  const due = dueWrap.createEl("input", {
     type: "date",
     cls: "journal-task-due",
+    attr: {
+      "aria-label": "Due date",
+      title: task.due ? `Due: ${task.due}` : "Set due date",
+    },
   });
   if (task.due) due.value = task.due;
 
-  // The hour, where there is one (4.55). What moves a task off the time grid's
-  // all-day lane and onto the hours.
-  //
-  // DRAWN ONLY BESIDE A DUE DATE, because an hour on no day is not a time — the
-  // parser drops one and the row must not offer what the file will discard. It
-  // appears the moment a date is picked and goes when the date is cleared,
-  // rather than sitting there greyed out: a disabled field is a question the
-  // form asks and then refuses to accept an answer to.
-  const at = row.createEl("input", {
+  // Time pill (beside due date)
+  const atWrap = chips.createDiv({
+    cls: `journal-task-at-wrap${task.at ? " has-at" : ""}`,
+  });
+  setIcon(atWrap.createSpan({ cls: "journal-task-at-icon" }), "clock");
+  const at = atWrap.createEl("input", {
     type: "time",
     cls: "journal-task-at",
-    attr: { "aria-label": "Time it is due" },
+    attr: {
+      "aria-label": "Time it is due",
+      title: task.at ? `Time: ${task.at}` : "Set due time",
+    },
   });
   if (task.at) at.value = task.at;
   const syncAt = (): void => {
-    at.toggleClass("is-hidden", !due.value);
+    atWrap.toggleClass("is-hidden", !due.value);
   };
   syncAt();
-  at.addEventListener("change", () => cb.onAt(at.value || null));
+  at.addEventListener("change", () => {
+    atWrap.toggleClass("has-at", Boolean(at.value));
+    cb.onAt(at.value || null);
+  });
 
   due.addEventListener("change", () => {
+    dueWrap.toggleClass("has-due", Boolean(due.value));
     cb.onDue(due.value || null);
-    if (!due.value) at.value = "";
+    if (!due.value) {
+      at.value = "";
+      atWrap.removeClass("has-at");
+    }
     syncAt();
   });
 
-  // Delete
-  const del = row.createEl("button", {
+  // Delete action button
+  const del = meta.createEl("button", {
     cls: "journal-task-del",
-    attr: { "aria-label": "Delete task", type: "button" },
+    attr: { "aria-label": "Delete task", title: "Delete task", type: "button" },
   });
   setIcon(del, "x");
   del.addEventListener("click", () => cb.onDelete());
@@ -457,6 +498,8 @@ export function buildPath(
   }
 
   const addRow = wrap.createDiv({ cls: "journal-path-add" });
+  const addIcon = addRow.createSpan({ cls: "journal-path-add-icon" });
+  setIcon(addIcon, "circle-plus");
   const addInput = addRow.createEl("input", {
     type: "text",
     cls: "journal-path-add-input",
@@ -551,8 +594,75 @@ export function buildTasks(
   label: string | null
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
-  const wrap = createDiv({ cls: "journal-tasks" });
-  if (label) wrap.createDiv({ cls: "journal-tasks-label", text: label });
+  const wrap = createDiv({
+    cls: "journal-tasks journal-note--collapsible",
+  });
+
+  const isCollapsed = (): boolean =>
+    "plugin" in host
+      ? noteFoldState((host as PluginNoteRegionHost).plugin, ctx.sourcePath, key)
+      : false;
+
+  const setFold = (collapsed: boolean): void => {
+    if ("plugin" in host) {
+      void setNoteFold(
+        (host as PluginNoteRegionHost).plugin,
+        ctx.sourcePath,
+        key,
+        collapsed
+      );
+    }
+  };
+
+  const head = wrap.createDiv({
+    cls: "journal-tasks-head journal-note-collapse-bar",
+  });
+  const titleLeft = head.createDiv({ cls: "journal-tasks-title-left" });
+  const chevron = titleLeft.createDiv({
+    cls: "journal-note-chevron journal-tasks-chevron",
+  });
+  setIcon(chevron, "chevron-down");
+  const titleEl = titleLeft.createDiv({
+    cls: "journal-note-label journal-tasks-label",
+  });
+  titleEl.setText(label ?? "Tasks");
+
+  const headRight = head.createDiv({ cls: "journal-tasks-head-right" });
+
+  let isCompact = false;
+  const compactBtn = headRight.createEl("button", {
+    cls: "journal-tasks-compact-toggle",
+    attr: {
+      type: "button",
+      title: "Toggle compact view",
+      "aria-label": "Toggle compact view",
+    },
+  });
+  const compactIcon = compactBtn.createSpan({ cls: "journal-tasks-compact-icon" });
+  setIcon(compactIcon, "list");
+  compactBtn.createSpan({ text: "Compact" });
+
+  compactBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    isCompact = !isCompact;
+    wrap.toggleClass("is-compact", isCompact);
+    compactBtn.toggleClass("is-active", isCompact);
+  });
+
+  const progressEl = headRight.createDiv({ cls: "journal-tasks-progress" });
+
+  const applyFold = (collapsed: boolean): void => {
+    wrap.toggleClass("is-collapsed", collapsed);
+  };
+  applyFold(isCollapsed());
+
+  head.addEventListener("click", (e) => {
+    e.preventDefault();
+    const next = !wrap.hasClass("is-collapsed");
+    applyFold(next);
+    setFold(next);
+  });
 
   if (!isValidNoteKey(key)) {
     wrap.createDiv({
@@ -563,6 +673,8 @@ export function buildTasks(
   }
 
   const addRow = wrap.createDiv({ cls: "journal-tasks-add" });
+  const addIcon = addRow.createSpan({ cls: "journal-tasks-add-icon" });
+  setIcon(addIcon, "circle-plus");
   const addInput = addRow.createEl("input", {
     type: "text",
     cls: "journal-tasks-add-input",
@@ -574,17 +686,27 @@ export function buildTasks(
   // widget mutates this and persists + re-renders.
   let tasks: AlmanacTask[] = [];
 
+  const updateProgress = (): void => {
+    if (tasks.length === 0) {
+      progressEl.style.display = "none";
+    } else {
+      progressEl.style.display = "";
+      const done = tasks.filter((t) => t.done).length;
+      progressEl.textContent = `${done}/${tasks.length} done`;
+    }
+  };
+
   const persist = (): void => {
     void host.writeNoteRegionToFile(ctx, key, serializeTasks(tasks));
   };
 
   const render = (): void => {
     list.empty();
+    updateProgress();
     if (tasks.length === 0) {
-      list.createDiv({
-        cls: "journal-tasks-empty",
-        text: "No tasks yet.",
-      });
+      const empty = list.createDiv({ cls: "journal-tasks-empty" });
+      setIcon(empty.createSpan({ cls: "journal-tasks-empty-icon" }), "check-check");
+      empty.createSpan({ text: "No tasks yet — add one above." });
     }
     tasks.forEach((task, index) => {
       renderTaskRow(list, task, {
@@ -609,6 +731,7 @@ export function buildTasks(
           // row that the file no longer holds.
           if (!d) task.at = null;
           persist();
+          render();
         },
         onAt: (t) => {
           task.at = t;

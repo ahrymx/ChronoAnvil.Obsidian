@@ -1113,8 +1113,12 @@ export class HeaderBar extends MarkdownRenderChild {
   // and no text is one Obsidian created for something that renders to nothing —
   // in practice a body storage region, which is a comment.
   private rendersSomething(block: HTMLElement): boolean {
-    if (block.childElementCount > 0) return true;
-    return (block.textContent ?? "").trim() !== "";
+    const text = (block.textContent ?? "").replace(/[\s\u200B\uFEFF]/g, "");
+    if (text !== "") return true;
+    if (block.childElementCount === 0) return false;
+    return !!block.querySelector(
+      "img, svg, canvas, input, button, select, textarea, iframe, video, audio, .journal-widget-block, .journal-sec, .journal-attach-zone, .journal-tracker-cell, .journal-card, .callout"
+    );
   }
 
   private markL2Body(barBlock: HTMLElement, level: number): void {

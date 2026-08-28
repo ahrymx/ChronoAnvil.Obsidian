@@ -29,6 +29,8 @@ export interface StatCard {
   label: string;
   value: string;
   sub?: string | null;
+  icon?: string | null;
+  ratio?: number | null;
 }
 
 /** The handles a caller needs to fill a cell in later. */
@@ -64,14 +66,48 @@ export function statStrip(
 
   const cells = cards.map((c) => {
     const root = grid.createDiv({ cls: "am-stat" });
+    if (c.ratio != null || c.icon) {
+      const ringWrap = root.createDiv({ cls: "am-stat-ring-wrap" });
+      if (c.ratio != null) {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 36 36");
+        svg.setAttribute("class", "am-stat-ring-svg");
+
+        const bgPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        bgPath.setAttribute("class", "am-stat-ring-bg");
+        bgPath.setAttribute(
+          "d",
+          "M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+        );
+
+        const valPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        valPath.setAttribute("class", "am-stat-ring-val");
+        const pct = Math.min(Math.max(Math.round(c.ratio * 100), 0), 100);
+        valPath.setAttribute("stroke-dasharray", `${pct}, 100`);
+        valPath.setAttribute(
+          "d",
+          "M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+        );
+
+        svg.appendChild(bgPath);
+        svg.appendChild(valPath);
+        ringWrap.appendChild(svg);
+      }
+      if (c.icon) {
+        ringWrap.createSpan({ cls: "am-stat-ring-icon", text: c.icon });
+      }
+    }
+
+    const data = root.createDiv({ cls: "am-stat-data" });
     // Label first in the DOM as well as on screen. It is what the value means,
     // and a screen reader that hit "145" before "Diary entries" would be
     // reading the answer before the question.
-    root.createDiv({ cls: "am-stat-label", text: c.label });
-    const value = root.createDiv({ cls: "am-stat-value", text: c.value });
+    data.createDiv({ cls: "am-stat-label", text: c.label });
+    const valRow = data.createDiv({ cls: "am-stat-val-row" });
+    const value = valRow.createDiv({ cls: "am-stat-value", text: c.value });
     // Always created, even when empty: a sub-line that appears when an async
     // read lands would change the cell's height and shift the row under it.
-    const sub = root.createDiv({ cls: "am-stat-sub", text: c.sub ?? "" });
+    const sub = valRow.createDiv({ cls: "am-stat-sub", text: c.sub ?? "" });
     return { root, value, sub };
   });
 

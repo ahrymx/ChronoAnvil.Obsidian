@@ -102,11 +102,12 @@ describe("nothing dead is drawn", () => {
     expect(src).not.toContain("TODO");
   });
 
-  it("says what will appear and how, when there are no journals", () => {
-    // `empty.ts`'s rule. `emptyCallout` REPLACES content, which is this case —
-    // there is no grid to draw and the callout stands in for it.
-    expect(src).toContain("emptyCallout(");
-    expect(src).toContain("Settings → Almanac → Journals");
+  it("draws the New journal tile when there are no journals", () => {
+    // A vault without any journals draws the grid ending in the New journal tile
+    // rather than replacing it with an empty callout, so the creation affordance
+    // is always available directly on the homepage.
+    expect(src).toContain('cls: "jld-add jld-add-tile jjc-add"');
+    expect(src).toContain("plugin.openJournalSettings();");
   });
 });
 

@@ -7,6 +7,55 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.77.0] - 2026-08-28
+
+**Upgraded Open Tasks section with collapsible ISO week groups, journal congregation, and right-aligned tags, and restored "+ New journal" card on empty vaults.**
+
+### Added
+
+- **Collapsible Week Groups in Open Tasks:** Daily note tasks are now congregated into ISO week buckets (e.g. `🗓️ Week 35 · 24–30 Aug 2026`) with smooth chevron collapse/expand accordions, aggregate open counts, and overdue warning badges.
+- **Journal Name Congregation:** Tasks originating from registered custom journals (e.g. Study, Projects) are aggregated under dedicated journal header bars with journal glyphs, names, and note sub-group links.
+- **Inline Right-Hand Tags:** `#tags` in task lines are parsed and rendered neatly on the right-hand metadata cluster alongside priority badges and due dates, maintaining high-density 32px task rows without secondary line wrapping.
+
+### Fixed
+
+- **Homepage Journals on Empty Vaults:** Restored the `+ New journal` card on vaults without registered journals, ensuring the creation flow is immediately accessible from the homepage without being hidden behind an empty callout.
+- **Empty Card Below Resources:** Prevented graph link comments from leaking visible text that caused empty cards under Resources sections, and hardened header bar render detection against zero-width characters.
+
+## [4.76.0] - 2026-08-28
+
+**Implemented Proposal A Micro-Ring Ribbon on Stats Bar, established uniform 2nd-position placement for Trackers across all Journal presets, repositioned Diary Tasks section, and excluded docs from release archives.**
+
+### Added
+
+- **Micro-Ring Ribbon Stats Bar (`am-stats`):** Redesigned the stat strip into a space-efficient ~38px horizontal telemetry ribbon featuring SVG circular progress micro-rings (`am-stat-ring-svg`), metric icons, uppercase labels, and inline value/sub rows.
+- **Micro-Ring Progress Support:** Extended `StatCard` and `statStrip` to dynamically compute and render circular progress rings for rating averages and scale completion ratios.
+
+### Changed
+
+- **Uniform Tracker Section Placement:** Standardized the `trackers` section to always render at position 2 directly underneath `banner` across all Journal presets (`Study`, `Projects`, `Exercise & Diet`, `Media`) and layout configurations.
+- **Diary Grain Templates Task Placement:** Moved the Tasks section (`todo`) to the second-to-last position (directly above the captured log) in Diary grain templates (`daily`, `weekly`, `monthly`, `quarterly`, `yearly`).
+- **Release Packaging Exclusions:** Excluded the `docs` directory from distribution packages and source archives.
+
+## [4.75.0] - 2026-08-27
+
+**Redesigned Tasks and Learning Path sections with Compact Mode, collapsible progress headers, priority-tinted cards, and fixed Focus and Notes line-break duplication.**
+
+### Added
+
+- **Tasks Compact Mode (`☵ Compact`):** Added a compact single-line view toggle button in the Tasks header next to the progress badge. In compact mode, task rows collapse to a streamlined 32px single line, inlining due date and time metadata on the right while hiding redundant priority tags and delete buttons.
+- **Priority-Tinted Backgrounds:** Applied soft priority-tinted background colors (`color-mix`) and border accents across task cards for High (red), Low (teal), and Normal priorities on both single-note Tasks and multi-note rolled-up Tasks tables.
+- **Responsive Mobile Date & Time Icons:** In compact mode on mobile viewports, due date and time controls collapse into touch-friendly calendar (`📅`) and clock (`⏱`) icon triggers that open the native date/time pickers.
+- **Diary Tasks Collapsible Header:** Implemented collapsible fold header bar for Diary tasks (`tasks:`) with animated chevron, uppercase label, progress counter (`0/2 done`), and persistent fold state.
+
+### Changed
+
+- **Flush Learning Path Surface Layout:** Streamlined Journal Learning Path (`path:`) widget styling to render flush directly onto the Journal section card surface without nested container borders or duplicate headings.
+
+### Fixed
+
+- **Focus and Notes Line Break Text Duplication:** Fixed a race condition in `buildNote` / `NoteFieldWatcher` where pressing Enter or typing new lines in free-text prose fields (Focus, Notes, log fields) caused the file-watcher to falsely identify the user's own keystrokes as an external append and duplicate text in the textarea.
+
 ## [4.74.0] - 2026-08-26
 
 **Enhanced mobile Time-Grid gestures and controls, optimized responsive header bar navigation, and fixed section surface background rendering on initial page load.**

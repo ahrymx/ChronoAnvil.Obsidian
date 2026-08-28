@@ -132,19 +132,6 @@ export const DIARY_FIELDS: DiaryField[] = [
     rollupNoun: "Focus",
   },
   {
-    id: "todo",
-    kind: "tasks",
-    class: "daily",
-    label: "Tasks",
-    // A day's tasks are ticked, not reviewed. They roll up through the
-    // open/done counts every scope already carries (IndexedEntry.openTasks /
-    // doneTasks, and tasks-table for the list) rather than as a goals section
-    // — a quarter listing ninety days of "water plants" is not a review of
-    // anything. The month's `todo` is the one that gets `goals`, because a
-    // monthly goal accumulates instead of being ticked.
-    rollup: "none",
-  },
-  {
     id: "highlights",
     kind: "list",
     class: "daily",
@@ -195,6 +182,19 @@ export const DIARY_FIELDS: DiaryField[] = [
     rollup: "none",
   },
   {
+    id: "todo",
+    kind: "tasks",
+    class: "daily",
+    label: "Tasks",
+    // A day's tasks are ticked, not reviewed. They roll up through the
+    // open/done counts every scope already carries (IndexedEntry.openTasks /
+    // doneTasks, and tasks-table for the list) rather than as a goals section
+    // — a quarter listing ninety days of "water plants" is not a review of
+    // anything. The month's `todo` is the one that gets `goals`, because a
+    // monthly goal accumulates instead of being ticked.
+    rollup: "none",
+  },
+  {
     id: "capture",
     kind: "note",
     variant: "collapse",
@@ -217,17 +217,6 @@ export const DIARY_FIELDS: DiaryField[] = [
     placeholder: "What's the theme for this month?",
     rollup: "line",
     rollupNoun: "Theme",
-  },
-  {
-    id: "todo",
-    kind: "tasks",
-    class: "monthly",
-    label: "Goals this month",
-    // The most valuable field in the diary, and the reason the quarter page
-    // exists: goals set versus met across three months is the one question no
-    // single month's note can answer.
-    rollup: "goals",
-    rollupNoun: "Goals",
   },
   {
     id: "highlights",
@@ -261,6 +250,17 @@ export const DIARY_FIELDS: DiaryField[] = [
     class: "monthly",
     label: "Attachments",
     rollup: "none",
+  },
+  {
+    id: "todo",
+    kind: "tasks",
+    class: "monthly",
+    label: "Goals this month",
+    // The most valuable field in the diary, and the reason the quarter page
+    // exists: goals set versus met across three months is the one question no
+    // single month's note can answer.
+    rollup: "goals",
+    rollupNoun: "Goals",
   },
 
   // ── weekly, quarterly, yearly ───────────────────────────────────────
@@ -320,13 +320,6 @@ export const DIARY_FIELDS: DiaryField[] = [
     rollup: "none",
   },
   {
-    id: "todo",
-    kind: "tasks",
-    class: "weekly",
-    label: "Goals this week",
-    rollup: "none",
-  },
-  {
     id: "highlights",
     kind: "list",
     class: "weekly",
@@ -355,6 +348,13 @@ export const DIARY_FIELDS: DiaryField[] = [
     kind: "attach",
     class: "weekly",
     label: "Attachments",
+    rollup: "none",
+  },
+  {
+    id: "todo",
+    kind: "tasks",
+    class: "weekly",
+    label: "Goals this week",
     rollup: "none",
   },
   {
@@ -367,13 +367,6 @@ export const DIARY_FIELDS: DiaryField[] = [
     rollup: "none",
   },
   {
-    id: "todo",
-    kind: "tasks",
-    class: "quarterly",
-    label: "Goals this quarter",
-    rollup: "none",
-  },
-  {
     id: "highlights",
     kind: "list",
     class: "quarterly",
@@ -402,6 +395,13 @@ export const DIARY_FIELDS: DiaryField[] = [
     kind: "attach",
     class: "quarterly",
     label: "Attachments",
+    rollup: "none",
+  },
+  {
+    id: "todo",
+    kind: "tasks",
+    class: "quarterly",
+    label: "Goals this quarter",
     rollup: "none",
   },
   {
@@ -414,13 +414,6 @@ export const DIARY_FIELDS: DiaryField[] = [
     rollup: "none",
   },
   {
-    id: "todo",
-    kind: "tasks",
-    class: "yearly",
-    label: "Goals this year",
-    rollup: "none",
-  },
-  {
     id: "highlights",
     kind: "list",
     class: "yearly",
@@ -449,6 +442,13 @@ export const DIARY_FIELDS: DiaryField[] = [
     kind: "attach",
     class: "yearly",
     label: "Attachments",
+    rollup: "none",
+  },
+  {
+    id: "todo",
+    kind: "tasks",
+    class: "yearly",
+    label: "Goals this year",
     rollup: "none",
   },
 ];

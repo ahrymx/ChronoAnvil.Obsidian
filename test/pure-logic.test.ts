@@ -3767,7 +3767,7 @@ describe("shipped monthly template", () => {
     // well and what got in the way at the end of it, and the prose and
     // attachments underneath. `fields.ts` carries the argument; this is the
     // shipped consequence.
-    const order = ["note:focus", "tasks:", "list:highlights", "list:challenges", "note:log", "attach:"];
+    const order = ["note:focus", "list:highlights", "list:challenges", "note:log", "attach:", "tasks:"];
     const at = order.map((d) => monthly.indexOf(d));
     expect(at.every((i) => i !== -1)).toBe(true);
     expect(at).toEqual([...at].sort((a, b) => a - b));
