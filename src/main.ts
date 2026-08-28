@@ -7,6 +7,7 @@
 
 import { MarkdownView, Menu, Notice, Plugin, TFile } from "obsidian";
 import { DEFAULT_SETTINGS, AlmanacSettings, AlmanacSettingTab } from "./core/settings";
+import { normalizeBannerArt } from "./core/constants";
 import { normalizeLogbooks } from "./diary/logbooks";
 import { Diary } from "./diary/diary";
 import { JournalManager, registeredJournalTypes } from "./journals/journal";
@@ -19,6 +20,7 @@ import { PathWatch, pruneCollapsedSections } from "./core/pathwatch";
 import { PageWidth } from "./ui/page-width";
 import { VaultBanner } from "./ui/vault-banner";
 import { MobileControls } from "./ui/mobile-controls";
+import { AppearanceManager } from "./ui/appearance";
 import { openVaultSearch } from "./ui/search-all";
 import {
   getFile,
@@ -75,6 +77,7 @@ export default class AlmanacPlugin extends Plugin {
   pageWidth!: PageWidth;
   vaultBanner!: VaultBanner;
   mobileControls!: MobileControls;
+  appearance!: AppearanceManager;
   // Reads and writes the per-journal manifest, and adopts a journal folder
   // that arrived without one. See journal-import.ts.
   journalImport!: JournalImporter;
@@ -134,6 +137,7 @@ export default class AlmanacPlugin extends Plugin {
     this.pageWidth = new PageWidth(this.app, this);
     this.vaultBanner = new VaultBanner(this.app, this);
     this.mobileControls = new MobileControls(this);
+    this.appearance = new AppearanceManager(this);
     this.journalImport = new JournalImporter(this.app, this);
 
     this.widgets.register();
@@ -141,6 +145,7 @@ export default class AlmanacPlugin extends Plugin {
     this.pageWidth.register();
     this.vaultBanner.register();
     this.mobileControls.register();
+    this.appearance.register();
 
     this.addSettingTab(new AlmanacSettingTab(this.app, this));
     this.registerCommands();
@@ -365,6 +370,7 @@ export default class AlmanacPlugin extends Plugin {
   // automatically. The one exception is the mirror's pending write.
   onunload(): void {
     this.mobileControls?.onunload();
+    this.appearance?.unload();
     // Flush any pending mirror write. The debounce exists so typing in a
     // settings field doesn't write the file on every keystroke; it must not
     // mean that the last change before Obsidian closes is the one missing from
@@ -704,6 +710,17 @@ export default class AlmanacPlugin extends Plugin {
       DEFAULT_SETTINGS.banner,
       this.settings.banner ?? {}
     );
+
+    // 4.80: `banner.art` held the filename of an SVG scaffolded into
+    // `00 - Infrastructure/Art/`. The folder is gone and the six patterns are
+    // data URIs in the stylesheet, so the saved filename is mapped to its
+    // preset id here — once, on load, rather than at each paint, on the same
+    // rule as the journal ids below. A value naming neither a preset nor one
+    // of the six shipped files is a texture the reader added to that folder
+    // themselves; it lands on "none", because the vault is no longer read for
+    // images and substituting a pattern they never chose would be worse than a
+    // flat banner. Their file is untouched — Almanac has never deleted it.
+    this.settings.banner.art = normalizeBannerArt(this.settings.banner.art);
 
     // Give every journal level the stable id 2.43 introduced. Done once, here,
     // rather than as a fallback at each read: a fallback evaluated on every

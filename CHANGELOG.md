@@ -7,6 +7,21 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.80.0] - 2026-08-28
+
+**Added three aesthetic presets with temporal grain accents, nineteen selectable page ground textures, and moved the banner's background art out of the vault and into the plugin.**
+
+### Added
+
+- **Aesthetic Presets:** Three design archetypes applied across Almanac notes and surfaces, chosen under **Appearance & Themes** — Modern Fluent (clean sans and glass), Editorial Monastic (serif and parchment), and Technical HUD (monospace and instrument panel). Each carries its own typography suite, surface treatment and border language.
+- **Temporal Grain Accents:** Daily, Weekly, Monthly, Quarterly and Yearly entries each carry a semantic accent colour (Solar Daily, Emerald Weekly, Indigo Monthly and their siblings), bound through `data-am-grain` on page heads and vault banners, with custom journal spines tinted from the same palette. A **Grain accent intensity** setting steps the whole scheme between vibrant, subtle and monochrome.
+- **Page Grounds:** Nineteen background textures for Almanac's markdown surfaces, selectable under **Appearance & Themes** and grouped by family — Paper (dot grid, graph paper, ruled lines, crosshatch, isometric), Weave & tile (checkerboard, argyle, zigzag, carbon fibre), Print & screen (halftone, scanlines, pinstripe, candy stripe), Ground & light (topographic, wave scales, aurora, stardust) and Crystal (facets, smoke). Every ground is drawn from CSS gradients and a shared grain film over the theme's own colours, so it follows dark and light mode and the chosen aesthetic preset rather than sitting on top of them. A **Ground strength** setting picks faint, standard or full.
+
+### Changed
+
+- **Banner Background Art Is Built In:** The six banner textures (Topography, Dot Matrix, Constellations, Aurora Mesh, Isometric Grid, Minimal Waves) are now data URIs inside Almanac's own stylesheet, selected by preset id. The patterns themselves are unchanged — a banner set to Topography draws exactly what it drew before.
+- **Removed the `00 - Infrastructure/Art/` Folder:** Almanac no longer scaffolds an Art folder, and the settings dropdown no longer lists image files found inside one. That scan had turned a scaffolded vault folder into an informal styling API, which is not something Almanac asks of anyone. Existing folders are left exactly as they are — repair does not delete them — and a banner still set to a file added by hand falls back to no texture rather than silently substituting a pattern that was never chosen.
+
 ## [4.79.0] - 2026-08-28
 
 **Fixed period-scoped Open Tasks discovery on diary dashboards, resolved lint test issues, and streamlined mobile week group headers.**

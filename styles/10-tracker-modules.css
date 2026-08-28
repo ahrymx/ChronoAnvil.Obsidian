@@ -38,20 +38,20 @@ body.is-mobile .journal-widget-bar.journal-tracker-bar {
   min-width: 0; /* let a cell shrink within its grid track instead of overflowing */
   box-sizing: border-box;
   padding: 6px 10px;
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--am-border-subtle);
   border-radius: var(--am-radius-md);
-  /* Semantic inset surface (`--am-surface-inset` / `--background-primary-alt`). */
+  /* Semantic inset surface (`--am-surface-inset`). */
   background: var(--am-surface-inset);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .journal-tracker-bar .journal-tracker-cell:hover {
-  border-color: var(--background-modifier-border-hover);
+  background: var(--am-surface-raised);
+  border-color: var(--am-border-hover);
 }
 
 .journal-tracker-bar .journal-tracker-cell:focus-within {
-  border-color: var(--interactive-accent);
+  border-color: var(--am-grain-accent);
 }
 
 /* Eyebrow label: small, muted, uppercase, tucked at the top-left so the

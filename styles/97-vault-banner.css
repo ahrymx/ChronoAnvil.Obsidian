@@ -94,6 +94,87 @@
   z-index: 2;
 }
 
+/* ── The six art presets (4.80) ──────────────────────────────────────────
+   Until 4.80 each of these was an SVG file scaffolded into
+   `00 - Infrastructure/Art/`, loaded back out of the vault through
+   `getResourcePath`, and painted with a geometry described in
+   `constants.ts` — four facts about how a background looks, held in
+   TypeScript because the pattern itself was a file TypeScript owned.
+
+   THE FOLDER IS GONE and the reason is what it invited rather than what it
+   cost: the settings dropdown listed every `.svg`, `.png` and `.jpg` the
+   reader had dropped in there, so a vault folder quietly became a styling
+   API for a plugin that does not ask anyone to write styles.
+
+   THE SOURCE IS VERBATIM. Each URI below is the file that shipped, minified
+   onto one line and percent-encoded — same geometry, same stroke opacities,
+   same tile. A banner set to Topography before 4.80 draws exactly what it
+   drew after it, which is the whole point of moving rather than redrawing.
+
+   EACH RULE SETS TOKENS, IT DOES NOT PAINT. `::after` above is still the only
+   thing that paints; a preset is a bundle of values it reads. That is what
+   lets the opacity slider stay a single property set from TypeScript while
+   everything else about a preset lives here.
+
+   `vault-banner.ts` puts `data-am-art` on the root and nothing else. An id
+   here with no entry in `ART_PRESETS` is a pattern nothing can select; an id
+   there with no rule here is a dropdown entry that paints nothing. Neither is
+   visible by reading one file, so `test/vault-banner.test.ts` reads both. */
+
+/* Topography — contour lines */
+.am-vault-banner[data-am-art="topography"] {
+  --am-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200' viewBox='0 0 400 200'%3E%3Cpath d='M0,50 Q100,10 200,60 T400,40 M0,90 Q120,40 220,100 T400,80 M0,130 Q140,80 240,140 T400,120 M0,170 Q160,120 260,180 T400,160 M50,0 Q150,100 250,30 T350,200 M150,0 Q220,80 320,50 T400,180' fill='none' stroke='%23ffffff' stroke-width='1.2' stroke-opacity='0.4'/%3E%3C/svg%3E");
+  --am-header-art-size: 400px 200px;
+  --am-header-art-repeat: repeat;
+  --am-header-art-position: center;
+  --am-header-art-blend: soft-light;
+}
+
+/* Dot Matrix — technical grid */
+.am-vault-banner[data-am-art="dot-grid"] {
+  --am-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23ffffff' fill-opacity='0.5'/%3E%3C/svg%3E");
+  --am-header-art-size: 24px 24px;
+  --am-header-art-repeat: repeat;
+  --am-header-art-position: center;
+  --am-header-art-blend: soft-light;
+}
+
+/* Constellations — geometric nodes */
+.am-vault-banner[data-am-art="constellations"] {
+  --am-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Ccircle cx='20' cy='30' r='2' fill='%23ffffff' fill-opacity='0.6'/%3E%3Ccircle cx='90' cy='20' r='1.5' fill='%23ffffff' fill-opacity='0.5'/%3E%3Ccircle cx='140' cy='70' r='2' fill='%23ffffff' fill-opacity='0.6'/%3E%3Ccircle cx='70' cy='110' r='2.5' fill='%23ffffff' fill-opacity='0.7'/%3E%3Ccircle cx='30' cy='130' r='1.5' fill='%23ffffff' fill-opacity='0.4'/%3E%3Cpath d='M20,30 L90,20 L140,70 L70,110 L30,130 L20,30 M90,20 L70,110' stroke='%23ffffff' stroke-width='0.75' stroke-opacity='0.25' fill='none'/%3E%3C/svg%3E");
+  --am-header-art-size: 160px 160px;
+  --am-header-art-repeat: repeat;
+  --am-header-art-position: center;
+  --am-header-art-blend: soft-light;
+}
+
+/* Aurora Mesh — luminous gradient */
+.am-vault-banner[data-am-art="aurora-mesh"] {
+  --am-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='150' viewBox='0 0 300 150'%3E%3Cdefs%3E%3CradialGradient id='g1' cx='70%25' cy='30%25' r='60%25'%3E%3Cstop offset='0%25' stop-color='%23a855f7' stop-opacity='0.6'/%3E%3Cstop offset='100%25' stop-color='%233b82f6' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='300' height='150' fill='url(%23g1)'/%3E%3C/svg%3E");
+  --am-header-art-size: cover;
+  --am-header-art-repeat: no-repeat;
+  --am-header-art-position: center;
+  --am-header-art-blend: screen;
+}
+
+/* Isometric Grid — 3D cube lattice */
+.am-vault-banner[data-am-art="isometric-grid"] {
+  --am-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='69.282' viewBox='0 0 40 69.282'%3E%3Cpath d='M40 34.641L20 23.094 0 34.641 0 57.735l20 11.547 20-11.547zM0 11.547L20 0l20 11.547v23.094L20 46.188 0 34.641z' fill='none' stroke='%23ffffff' stroke-width='0.8' stroke-opacity='0.35'/%3E%3C/svg%3E");
+  --am-header-art-size: 40px 69.3px;
+  --am-header-art-repeat: repeat;
+  --am-header-art-position: center;
+  --am-header-art-blend: overlay;
+}
+
+/* Minimal Waves — ripples */
+.am-vault-banner[data-am-art="subtle-waves"] {
+  --am-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='20' viewBox='0 0 100 20'%3E%3Cpath d='M0 10 Q25 20 50 10 T100 10' fill='none' stroke='%23ffffff' stroke-width='1' stroke-opacity='0.35'/%3E%3C/svg%3E");
+  --am-header-art-size: 100px 20px;
+  --am-header-art-repeat: repeat;
+  --am-header-art-position: center;
+  --am-header-art-blend: soft-light;
+}
+
 .am-vault-banner > * {
   position: relative;
   z-index: 3;

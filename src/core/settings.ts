@@ -11,8 +11,6 @@ import {
   Notice,
   PluginSettingTab,
   Setting,
-  TFile,
-  TFolder,
   setIcon,
 } from "obsidian";
 import type AlmanacPlugin from "../main";
@@ -26,6 +24,12 @@ import {
   ART_PRESETS,
 } from "./constants";
 import type { LogbookDef } from "./constants";
+import {
+  PAGE_GROUND_FAMILIES,
+  PAGE_GROUND_STRENGTHS,
+  groundsInFamily,
+} from "./page-grounds";
+import type { PageGroundId, PageGroundStrength } from "./page-grounds";
 import { remapConfiguredPaths } from "./pathwatch";
 import { logbookNotePath } from "../diary/logbooks";
 import { JOURNAL_PRESETS } from "../journals/journal";
@@ -119,7 +123,9 @@ export interface BannerOptions {
   glyph: string;
   // Optional legacy flag; title and properties absorption is standard.
   absorb?: boolean;
-  // Background art pattern file inside `00 - Infrastructure/Art/` (or "none").
+  // Which built-in banner texture to draw, by `ART_PRESETS` id (or "none").
+  // HELD A FILENAME UNTIL 4.80, when the Art folder it named was removed; a
+  // saved filename is mapped to its id once, on load, by `normalizeBannerArt`.
   art?: string;
   // Art pattern opacity percentage (0-100).
   artOpacity?: number;
@@ -136,7 +142,25 @@ export interface MobileOptions {
   hideOverlaysDefault: boolean;
 }
 
+export type AestheticPreset = "modern" | "editorial" | "technical";
+export type GrainAestheticIntensity = "vibrant" | "subtle" | "monochrome";
+
+export interface AppearanceSettings {
+  // Design archetype preset (Modern Fluent, Editorial Monastic, Technical HUD).
+  aestheticPreset: AestheticPreset;
+  // Intensity of grain accents and colored spines across notes.
+  grainAesthetics: GrainAestheticIntensity;
+  // Background texture drawn behind Almanac notes, from PAGE_GROUNDS. Optional
+  // rather than required, and deliberately: every vault saved before 4.80 has
+  // an `appearance` block without these two, and a required field would make
+  // the type lie about what is on disk.
+  pageGround?: PageGroundId;
+  // How much of that texture is let through.
+  pageGroundStrength?: PageGroundStrength;
+}
+
 export interface AlmanacSettings {
+  appearance?: AppearanceSettings;
   paths: typeof DEFAULT_PATHS;
   attachments: AttachmentOptions;
   // One name→emoji map shared by both Study levels (Subject and Topic) —
@@ -275,6 +299,15 @@ export interface AlmanacSettings {
 }
 
 export const DEFAULT_SETTINGS: AlmanacSettings = {
+  appearance: {
+    aestheticPreset: "modern",
+    grainAesthetics: "vibrant",
+    // OFF BY DEFAULT. A background is the one setting that touches every note
+    // at once, so it is a thing a reader turns on rather than one they discover
+    // already on and have to find the switch for.
+    pageGround: "off",
+    pageGroundStrength: "standard",
+  },
   paths: { ...DEFAULT_PATHS },
   attachments: { ...DEFAULT_ATTACHMENT_OPTIONS },
   // A FRESH VAULT HAS NO JOURNALS (3.20). It shipped with Study registered, so
@@ -294,7 +327,7 @@ export const DEFAULT_SETTINGS: AlmanacSettings = {
     enabled: true,
     glyph: "",
     absorb: true,
-    art: "topography-minimal.svg",
+    art: "topography",
     artOpacity: 18,
     glowEnabled: true,
   },
@@ -334,7 +367,6 @@ const DERIVED_PATH_LABELS: Record<string, string> = {
   templates: "Templates",
   templatesDiary: "Diary templates",
   documentation: "Documentation",
-  art: "Art & Textures",
   staging: "Staging",
   attachments: "Attachments",
   diaryDaily: "Daily entries",
@@ -736,6 +768,17 @@ export class AlmanacSettingTab extends PluginSettingTab {
       )
     );
 
+    this.renderAppearance(
+      this.group(
+        containerEl,
+        "appearance",
+        "🎨",
+        "Appearance & Themes",
+        "Aesthetic presets and grain accent styling",
+        false
+      )
+    );
+
     this.renderBanner(
       this.group(
         containerEl,
@@ -775,6 +818,130 @@ export class AlmanacSettingTab extends PluginSettingTab {
     );
   }
 
+  // ── Appearance & Themes ──────────────────────────────────────────────────
+  private renderAppearance(containerEl: HTMLElement): void {
+    const s = this.plugin.settings;
+    this.note(
+      containerEl,
+      "Choose a visual design archetype for Almanac notes and customize the intensity of temporal grain accents (Daily, Weekly, Monthly, etc.) and custom journal spines."
+    );
+
+    const isDark = document.body.classList.contains("theme-dark");
+    new Setting(containerEl)
+      .setName("Dark mode")
+      .setDesc("Toggle between dark and light appearance mode.")
+      .addToggle((toggle) => {
+        toggle.setValue(isDark).onChange(async (val) => {
+          const targetTheme = val ? "obsidian" : "moonstone";
+          const appAny = this.app as unknown as {
+            changeTheme?: (theme: string) => void;
+            setTheme?: (theme: string) => void;
+            customCss?: { setTheme?: (theme: string) => void };
+            vault?: { setConfig?: (key: string, val: unknown) => void };
+          };
+          if (typeof appAny.changeTheme === "function") {
+            appAny.changeTheme(targetTheme);
+          } else if (typeof appAny.setTheme === "function") {
+            appAny.setTheme(targetTheme);
+          }
+          if (typeof appAny.customCss?.setTheme === "function") {
+            appAny.customCss.setTheme(targetTheme);
+          }
+          try {
+            appAny.vault?.setConfig?.("theme", targetTheme);
+          } catch {
+            // ignore
+          }
+          document.body.toggleClass("theme-dark", val);
+          document.body.toggleClass("theme-light", !val);
+          this.plugin.appearance.apply();
+          this.app.workspace.trigger("css-change");
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Aesthetic preset")
+      .setDesc("Design archetype and typography suite applied to Almanac notes and surfaces.")
+      .addDropdown((d) => {
+        d.addOption("modern", "1. Modern Fluent (Default — Clean Sans & Glass)");
+        d.addOption("editorial", "2. Editorial Monastic (Serif & Warm Parchment)");
+        d.addOption("technical", "3. Technical HUD (Monospace Telemetry)");
+        d.setValue(s.appearance?.aestheticPreset || "modern").onChange(async (v) => {
+          if (!s.appearance) s.appearance = { aestheticPreset: "modern", grainAesthetics: "vibrant" };
+          s.appearance.aestheticPreset = v as AestheticPreset;
+          await this.plugin.saveSettings();
+          this.plugin.appearance.apply();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Grain accent intensity")
+      .setDesc("How boldly temporal diary grains (Solar Daily, Emerald Weekly, Indigo Monthly) and journal spines are tinted.")
+      .addDropdown((d) => {
+        d.addOption("vibrant", "Vibrant (Distinct grain colors, telemetry rings & spines)");
+        d.addOption("subtle", "Subtle (Muted hairline accents and quiet chips)");
+        d.addOption("monochrome", "Monochrome (Strict theme accent only)");
+        d.setValue(s.appearance?.grainAesthetics || "vibrant").onChange(async (v) => {
+          if (!s.appearance) s.appearance = { aestheticPreset: "modern", grainAesthetics: "vibrant" };
+          s.appearance.grainAesthetics = v as GrainAestheticIntensity;
+          await this.plugin.saveSettings();
+          this.plugin.appearance.apply();
+        });
+      });
+
+    // ── The page ground ──────────────────────────────────────────────────
+    //
+    // GROUPED, AND BUILT FROM THE TABLE. Nineteen textures in one flat list is
+    // a wall a reader scrolls past; five families of four is four rows to read
+    // before deciding. `<optgroup>` is the element that says so, and Obsidian's
+    // dropdown hands out its `<select>` for exactly this kind of case — the
+    // component's own `addOption` can only append to the top level.
+    new Setting(containerEl)
+      .setName("Page ground")
+      .setDesc(
+        "Background texture drawn behind Almanac notes, in reading view and Live Preview. Off paints nothing."
+      )
+      .addDropdown((d) => {
+        d.addOption("off", "Off (no texture)");
+        for (const family of PAGE_GROUND_FAMILIES) {
+          const group = d.selectEl.createEl("optgroup", {
+            attr: { label: `${family.name} — ${family.note}` },
+          });
+          for (const ground of groundsInFamily(family.id)) {
+            group.createEl("option", {
+              value: ground.id,
+              text: `${ground.name} — ${ground.note}`,
+            });
+          }
+        }
+        d.setValue(s.appearance?.pageGround || "off").onChange(async (v) => {
+          if (!s.appearance) s.appearance = { aestheticPreset: "modern", grainAesthetics: "vibrant" };
+          s.appearance.pageGround = v as PageGroundId;
+          await this.plugin.saveSettings();
+          this.plugin.appearance.apply();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Ground strength")
+      .setDesc(
+        "How much of the texture is let through. Faint is the setting for a note that is mostly calendar or table — two grids at once is the one way a ground goes wrong."
+      )
+      .addDropdown((d) => {
+        for (const level of PAGE_GROUND_STRENGTHS) {
+          d.addOption(level.id, level.name);
+        }
+        d.setValue(s.appearance?.pageGroundStrength || "standard").onChange(
+          async (v) => {
+            if (!s.appearance) s.appearance = { aestheticPreset: "modern", grainAesthetics: "vibrant" };
+            s.appearance.pageGroundStrength = v as PageGroundStrength;
+            await this.plugin.saveSettings();
+            this.plugin.appearance.apply();
+          }
+        );
+      });
+  }
+
   // ── The vault banner ────────────────────────────────────────────────────
   //
   // The nav's four destinations are fixed (Q9) and the search's sort is session
@@ -807,42 +974,18 @@ export class AlmanacSettingTab extends PluginSettingTab {
       );
 
     // ── Background Art & Texture ──────────────────────────────────────
-    const artFolder = this.app.vault.getAbstractFileByPath(s.paths.art);
-    const artFiles: string[] = [];
-    if (artFolder instanceof TFolder) {
-      for (const child of artFolder.children) {
-        if (
-          child instanceof TFile &&
-          (child.extension === "svg" ||
-            child.extension === "png" ||
-            child.extension === "jpg")
-        ) {
-          artFiles.push(child.name);
-        }
-      }
-    }
-
-    const artOptions = new Set([
-      "none",
-      ...Object.keys(ART_PRESETS),
-      ...artFiles,
-    ]);
-
-    const artLabels: Record<string, string> = {
-      none: "None (Clean / Flat)",
-      ...Object.fromEntries(
-        Object.entries(ART_PRESETS).map(([k, v]) => [k, v.name])
-      ),
-    };
-
+    //
+    // SIX BUILT-INS AND NOTHING ELSE. Until 4.80 this list was the six unioned
+    // with every image file found in `00 - Infrastructure/Art/`, which is how a
+    // scaffolded folder became an invitation to author textures — a thing
+    // Almanac does not ask of anyone, and the folder went with the scan.
     new Setting(containerEl)
       .setName("Background art pattern")
-      .setDesc(
-        `Vector pattern or texture from ${s.paths.art}/ to layer over the banner.`
-      )
+      .setDesc("A subtle texture layered over the banner behind its contents.")
       .addDropdown((d) => {
-        for (const opt of artOptions) {
-          d.addOption(opt, artLabels[opt] ?? opt);
+        d.addOption("none", "None (Clean / Flat)");
+        for (const preset of Object.values(ART_PRESETS)) {
+          d.addOption(preset.id, preset.name);
         }
         d.setValue(s.banner.art || "none").onChange(async (v) => {
           s.banner.art = v;

@@ -70,7 +70,7 @@ import {
   bannerSurfaceOf,
   titleTargetFor,
 } from "../core/banner-scope";
-import { openFile, getFile } from "../core/util";
+import { openFile } from "../core/util";
 import { ART_PRESETS } from "../core/constants";
 import { resolveTarget, reviewScopes } from "../core/links";
 import {
@@ -80,14 +80,14 @@ import {
   metaFor,
   renderCrumb,
 } from "../journals/study-header";
-import { entryDateLabel } from "../diary/entryheader";
-import { TITLE_PROP } from "../diary/entryheader";
+import { entryDateLabel, TITLE_PROP } from "../diary/entryheader";
 import { entryContext } from "../diary/nav";
-import { journalTypeAtPath } from "../journals/journal";
+import { hueOf, journalTypeAtPath } from "../journals/journal";
 import { openVaultSearch } from "./search-all";
 import { openProperties } from "./properties";
 import { sectionsMenuFor } from "./widgets/page-title";
 import { WIDE_PAGE_CLASS } from "./page-width";
+import { noteKindOf } from "../trackers/trackers";
 
 /** The class the banner's own element carries, spelled once. */
 export const BANNER_CLASS = "am-vault-banner";
@@ -177,26 +177,11 @@ export class VaultBanner {
     for (const view of this.markdownViews()) this.apply(view);
   }
 
-  // One view, re-derived from its own file.
+  // Paint the banner onto one view.
   //
-  // ── IT MOUNTS ON THE LEAF, NOT IN THE NOTE (4.51.3) ────────────────────
+  // THE MOUNT POINT IS THE VIEW'S ROOT (`view.containerEl`). 4.51.3.
   //
-  // Until now this went into `.markdown-preview-sizer` / `.cm-sizer`, the
-  // element Obsidian sizes a note's content against, so the bar sat above the
-  // first block and scrolled with the page. **It did not always draw**, and the
-  // vault render caught it: a reader opened the homepage and got NEITHER banner
-  // — no bar, and no in-note header either, because the suppression is decided
-  // by the note's own render and had already run.
-  //
-  // THE SIZER DOES NOT ALWAYS EXIST WHEN THE SWEEP ASKS FOR IT. It is created
-  // by the mode that mounts it, so at `onLayoutReady` on a restored workspace —
-  // exactly the startup case — the leaf is there and its sizer is not. The
-  // sweep found nothing to prepend to, nothing else fired, and the note was
-  // left bare. Every mount that depends on a child of a view being ready is a
-  // race with whatever creates it.
-  //
-  // `view.containerEl` IS THE LEAF'S OWN ELEMENT AND IT EXISTS FOR AS LONG AS
-  // THE VIEW DOES. Nothing creates it late and nothing unloads it. Prepended
+  // It was the scroll container (`.markdown-preview-sizer` / `.cm-sizer`), and
   // there the bar lands **above Obsidian's view header** — between the tab strip
   // and the note's own toolbar, which is where the reference design the reader
   // asked this to follow puts it, and which is what they asked for by name.
@@ -219,6 +204,9 @@ export class VaultBanner {
     // it hides the title and properties of whatever note arrives next —
     // including notes this plugin has nothing to do with.
     host.removeClass(HIDE_TITLE_CLASS);
+    host.removeAttribute("data-am-surface");
+    host.removeAttribute("data-am-grain");
+    host.removeAttribute("data-am-journal");
 
     const file = view.file;
     if (!(file instanceof TFile)) return;
@@ -238,6 +226,31 @@ export class VaultBanner {
   ): HTMLElement {
     const root = createDiv({ cls: BANNER_CLASS });
     root.setAttr("data-surface", surface);
+    root.setAttr("data-am-surface", surface);
+    view.setAttr("data-am-surface", surface);
+
+    if (surface === "diary") {
+      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+      const kind = noteKindOf(
+        this.plugin.settings.paths,
+        file.path,
+        fm["journal"],
+        fm["type"]
+      );
+      const grain = kind?.surface === "diary" ? kind.grain : "daily";
+      root.setAttr("data-am-grain", grain);
+      view.setAttr("data-am-grain", grain);
+    } else if (surface === "journal") {
+      const type = journalTypeAtPath(this.plugin, file.path);
+      if (type) {
+        root.setAttr("data-am-journal", type.id);
+        view.setAttr("data-am-journal", type.id);
+        const hue = `hsl(${hueOf(type.id)}, 65%, 55%)`;
+        root.style.setProperty("--am-journal-accent", hue);
+        view.style.setProperty("--am-journal-accent", hue);
+      }
+    }
+
     this.applyArt(root);
     this.buildGlobal(root, file, surface);
     this.buildContext(root, file, surface, view);
@@ -246,29 +259,24 @@ export class VaultBanner {
 
   private applyArt(root: HTMLElement): void {
     const banner = this.plugin.settings.banner;
-    const art = banner.art;
-    if (art && art !== "none") {
-      const artPath = `${this.plugin.settings.paths.art}/${art}`;
-      const file = getFile(this.app, artPath);
-      if (file) {
-        const url = this.app.vault.getResourcePath(file);
-        root.style.setProperty("--am-header-art-pattern", `url("${url}")`);
-      }
-
-      // Check if this art file matches a built-in preset spec
-      const preset = ART_PRESETS[art];
-      if (preset) {
-        root.style.setProperty("--am-header-art-size", preset.size);
-        root.style.setProperty("--am-header-art-repeat", preset.repeat);
-        root.style.setProperty("--am-header-art-position", preset.position);
-        root.style.setProperty("--am-header-art-blend", preset.blend);
-      }
-
-      const opacity = banner.artOpacity ?? preset?.defaultOpacity ?? 18;
+    // A PRESET ID OR "none", NEVER A FILENAME. `normalizeBannerArt` settles
+    // that once on load; before 4.80 this read a file out of the vault's Art
+    // folder and had to cope with the file having been renamed or deleted
+    // under it. There is no file now — the pattern is a data URI in
+    // `97-vault-banner.css`, selected by the attribute set below.
+    const preset = ART_PRESETS[banner.art ?? "none"];
+    if (preset) {
+      root.setAttr("data-am-art", preset.id);
+      // THE ONE VISUAL FACT STILL SET FROM HERE, because it is the one the
+      // reader drags a slider for. Everything else about a preset — its
+      // geometry, its tiling, its blend mode — is a declaration in the
+      // stylesheet, where a stylesheet's facts belong.
+      const opacity = banner.artOpacity ?? preset.defaultOpacity;
       root.style.setProperty("--am-header-art-opacity", String(opacity / 100));
-    } else if (art === "none") {
-      root.style.setProperty("--am-header-art-pattern", "none");
     }
+    // NO ATTRIBUTE IS THE OFF STATE, and it needs no branch of its own:
+    // `--am-header-art-pattern` defaults to `none` in `00-tokens.css`, so the
+    // `::after` layer paints nothing until a preset rule gives it something.
 
     if (banner.glowEnabled === false) {
       root.style.setProperty("--am-header-bg-gradient", "none");

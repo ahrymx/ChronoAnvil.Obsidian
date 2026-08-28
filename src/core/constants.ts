@@ -45,81 +45,91 @@ export const ROOT_JOURNALS = "03 - Journals";
 export const ROOT_STUDY = `${ROOT_JOURNALS}/Study`;
 
 export const TEMPLATES_ROOT = `${ROOT_INFRASTRUCTURE}/Templates`;
-export const ART_ROOT = `${ROOT_INFRASTRUCTURE}/Art`;
 
+// ── the banner's background art (4.80) ───────────────────────────────────
+//
+// A PRESET IS A NAME AND A DEFAULT STRENGTH, and nothing else. Until 4.80 it
+// was also a filename, a background-size, a repeat, a position and a blend
+// mode — because the pattern itself was an SVG file scaffolded into
+// `00 - Infrastructure/Art/`, which meant TypeScript had to describe how to
+// paint a file it could only reach through the vault.
+//
+// THE FOLDER IS GONE. The six patterns are data URIs in `97-vault-banner.css`,
+// selected by `data-am-art` on the banner root, and every visual fact about a
+// preset — its geometry, how it tiles, how it blends — is a declaration in
+// that file rather than a string here. What is left in TypeScript is what the
+// settings tab needs to draw a dropdown, which is the only reason this table
+// still exists.
+//
+// The reason the folder went: it was scanned for whatever `.svg`, `.png` or
+// `.jpg` the reader had dropped into it, which made "bring your own texture"
+// an accidental feature of a plugin that does not otherwise invite people to
+// author their own styles. `test/vault-banner.test.ts` holds the two halves
+// together — an id here with no rule there is a dropdown entry that paints
+// nothing, and it is caught rather than seen.
 export interface ArtPresetSpec {
   id: string;
   name: string;
-  file: string;
-  size: string;
-  repeat: string;
-  position: string;
-  blend: string;
   defaultOpacity: number;
 }
 
 export const ART_PRESETS: Record<string, ArtPresetSpec> = {
-  "topography-minimal.svg": {
+  topography: {
     id: "topography",
     name: "Topography (Contour lines)",
-    file: "topography-minimal.svg",
-    size: "400px 200px",
-    repeat: "repeat",
-    position: "center",
-    blend: "soft-light",
     defaultOpacity: 18,
   },
-  "dot-grid.svg": {
+  "dot-grid": {
     id: "dot-grid",
     name: "Dot Matrix (Technical grid)",
-    file: "dot-grid.svg",
-    size: "24px 24px",
-    repeat: "repeat",
-    position: "center",
-    blend: "soft-light",
     defaultOpacity: 25,
   },
-  "constellations.svg": {
+  constellations: {
     id: "constellations",
     name: "Constellations (Geometric nodes)",
-    file: "constellations.svg",
-    size: "160px 160px",
-    repeat: "repeat",
-    position: "center",
-    blend: "soft-light",
     defaultOpacity: 22,
   },
-  "aurora-mesh.svg": {
+  "aurora-mesh": {
     id: "aurora-mesh",
     name: "Aurora Mesh (Luminous gradient)",
-    file: "aurora-mesh.svg",
-    size: "cover",
-    repeat: "no-repeat",
-    position: "center",
-    blend: "screen",
     defaultOpacity: 35,
   },
-  "isometric-grid.svg": {
+  "isometric-grid": {
     id: "isometric-grid",
     name: "Isometric Grid (3D cube lattice)",
-    file: "isometric-grid.svg",
-    size: "40px 69.3px",
-    repeat: "repeat",
-    position: "center",
-    blend: "overlay",
     defaultOpacity: 16,
   },
-  "subtle-waves.svg": {
+  "subtle-waves": {
     id: "subtle-waves",
     name: "Minimal Waves (Ripples)",
-    file: "subtle-waves.svg",
-    size: "100px 20px",
-    repeat: "repeat",
-    position: "center",
-    blend: "soft-light",
     defaultOpacity: 20,
   },
 };
+
+// What `banner.art` used to hold: the filename of a scaffolded SVG. Read once
+// on load by `normalizeBannerArt`, never at paint time — a fallback evaluated
+// on every read is the re-derivation this codebase removes on sight.
+//
+// A VALUE THAT IS NEITHER A PRESET ID NOR A NAME BELOW is a file the reader
+// put in the Art folder themselves. It becomes "none" rather than a preset:
+// the vault is no longer read for textures, and quietly substituting a pattern
+// they did not choose would be worse than the flat banner that says so.
+export const LEGACY_ART_FILES: Record<string, string> = {
+  "topography-minimal.svg": "topography",
+  "dot-grid.svg": "dot-grid",
+  "constellations.svg": "constellations",
+  "aurora-mesh.svg": "aurora-mesh",
+  "isometric-grid.svg": "isometric-grid",
+  "subtle-waves.svg": "subtle-waves",
+};
+
+// Where a saved `banner.art` lands in the current vocabulary. Preset ids pass
+// through, the six shipped filenames map, everything else goes flat.
+export function normalizeBannerArt(saved: string | undefined): string {
+  if (!saved || saved === "none") return "none";
+  if (ART_PRESETS[saved]) return saved;
+  return LEGACY_ART_FILES[saved] ?? "none";
+}
 
 export const DEFAULT_PATHS = {
   // The page both banners live on. Named "Journal Home.md" until 2.51, which
@@ -202,7 +212,6 @@ export const DEFAULT_PATHS = {
   templates: TEMPLATES_ROOT,
   templatesDiary: `${TEMPLATES_ROOT}/Diary`,
   documentation: `${ROOT_INFRASTRUCTURE}/Documentation`,
-  art: ART_ROOT,
   // Deliberately *not* under the infrastructure root: a photo taken on a
   // Wednesday in July is content, not vault machinery, and filing it beside the
   // templates means any export or sync of "my diary" either drags the system
@@ -230,12 +239,7 @@ export const DEFAULT_PATHS = {
 // a root carry its children along by prefix (the same remap PathWatch performs
 // when a folder is renamed in the file explorer).
 export const ROOT_CHILDREN: Record<string, (keyof typeof DEFAULT_PATHS)[]> = {
-  infrastructureRoot: [
-    "templates",
-    "templatesDiary",
-    "documentation",
-    "art",
-  ],
+  infrastructureRoot: ["templates", "templatesDiary", "documentation"],
   materialRoot: ["staging", "attachments"],
   diaryRoot: [
     "diaryDaily",

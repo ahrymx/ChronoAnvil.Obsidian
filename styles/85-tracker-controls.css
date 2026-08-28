@@ -1,17 +1,18 @@
 /* ── Mood emoji-face picker (built-in Mood tracker) ─────────────────────── */
 .journal-mood-picker {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   width: 100%;
   justify-content: space-between;
 }
 .journal-scale-faces {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   width: 100%;
   justify-content: space-between;
+  flex: 1 1 auto;
 }
 /* The context-note pencil: a badge pinned to the corner of the SELECTED face,
    rather than a button sitting after the row. It marks the reading it belongs
@@ -52,17 +53,25 @@
   border: 1px solid transparent;
   border-radius: var(--am-radius-sm);
   background: transparent;
-  padding: 1px 2px;
-  font-size: 1.1em;
+  padding: 4px 2px;
+  font-size: 1.2em;
   line-height: 1.1;
   cursor: pointer;
   filter: grayscale(0.7) opacity(0.55);
   transition: filter 0.12s, transform 0.12s, background 0.12s, border-color 0.12s;
+  flex: 1 1 0px;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 /* The glyph is its own node so the badge above can be a sibling rather than a
    stray child of a button whose text gets rewritten. */
 .journal-mood-face-glyph {
   display: inline-block;
+  font-size: 1.25em;
+  line-height: 1;
 }
 .journal-mood-face:hover {
   filter: grayscale(0) opacity(1);
@@ -71,8 +80,8 @@
 }
 .journal-mood-face.is-selected {
   filter: grayscale(0) opacity(1);
-  transform: scale(1.12);
-  background: var(--background-secondary);
+  transform: scale(1.08);
+  background: var(--am-surface-raised);
   border-color: var(--interactive-accent);
 }
 /* The selected face carries the badge, so it must not clip it — and the scale

@@ -5,8 +5,12 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
+import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { readCss, readSrc, styleSheets } from "./sources";
+import { join } from "node:path";
+import { readCss, readSrc, repoFile, ROOT, styleSheets } from "./sources";
+import { ART_PRESETS, DEFAULT_PATHS, normalizeBannerArt } from "../src/core/constants";
+import { DEFAULT_SETTINGS } from "../src/core/settings";
 import { BANNER_KINDS, SUPPRESSED_KINDS } from "../src/ui/widgets/index";
 import {
   BannerScope,
@@ -1064,5 +1068,136 @@ describe("what the Banner section became", () => {
     expect(sheet!.css).toContain(".journal-page-head {");
     const banner = styleSheets().find((s) => s.name === "97-vault-banner.css");
     expect(banner!.css).not.toContain(".journal-page-head");
+  });
+});
+
+// ── the banner's art presets (4.80) ───────────────────────────────────────
+//
+// The six patterns were SVG files scaffolded into `00 - Infrastructure/Art/`
+// and read back out of the vault. They are data URIs in the stylesheet now,
+// and the folder is gone — with it the settings scan that listed whatever
+// image the reader had dropped in there, which is the whole reason for the
+// change: a scaffolded folder had become a styling API.
+//
+// WHAT IS ASSERTED IS THE SEAM. A preset is an id in TypeScript and a rule in
+// CSS, and neither file can see the other, so an id with no rule (a dropdown
+// entry that paints nothing) and a rule with no id (a pattern nothing can
+// select) are both invisible to a reader of either half.
+
+describe("banner art presets", () => {
+  const css = repoFile("styles/97-vault-banner.css");
+  const ids = Object.keys(ART_PRESETS);
+
+  const styled = new Set(
+    [...css.matchAll(/\.am-vault-banner\[data-am-art="([a-z0-9-]+)"\]/g)].map(
+      (m) => m[1]
+    )
+  );
+
+  it("gives every preset in the table a rule in the stylesheet", () => {
+    for (const id of ids) {
+      expect(styled.has(id), `${id} has no [data-am-art] rule`).toBe(true);
+    }
+  });
+
+  it("gives every rule in the stylesheet a preset in the table", () => {
+    for (const id of styled) {
+      expect(ART_PRESETS[id], `${id} is styled but not selectable`).toBeDefined();
+    }
+  });
+
+  it("keys every preset by its own id", () => {
+    // The table was keyed by FILENAME until 4.80 and carried the id beside it,
+    // so two spellings of one preset could disagree. The key is the id now.
+    for (const [key, preset] of Object.entries(ART_PRESETS)) {
+      expect(preset.id).toBe(key);
+    }
+  });
+
+  it("states all four painting facts in each preset's rule", () => {
+    // `::after` reads six properties; opacity comes from the slider and the
+    // pattern is the preset's own, so a rule that sets the pattern and forgets
+    // the size inherits the *previous* preset's geometry from the token file.
+    for (const id of ids) {
+      const rule = css.slice(
+        css.indexOf(`.am-vault-banner[data-am-art="${id}"]`),
+        css.indexOf("}", css.indexOf(`.am-vault-banner[data-am-art="${id}"]`))
+      );
+      for (const prop of [
+        "--am-header-art-pattern",
+        "--am-header-art-size",
+        "--am-header-art-repeat",
+        "--am-header-art-blend",
+      ]) {
+        expect(rule, `${id} does not set ${prop}`).toContain(`${prop}:`);
+      }
+    }
+  });
+
+  it("paints from the stylesheet, not from a file in the vault", () => {
+    const t = readSrc("vault-banner");
+    expect(t).toContain('root.setAttr("data-am-art", preset.id)');
+    // The three reads that made the vault the source of a texture.
+    expect(t).not.toContain("getResourcePath");
+    expect(t).not.toContain("paths.art");
+    // Opacity is the one visual fact still set from TypeScript, because it is
+    // the one the reader drags a slider for.
+    expect(t).toContain('root.style.setProperty("--am-header-art-opacity"');
+    expect(t).not.toContain('setProperty("--am-header-art-size"');
+  });
+
+  it("no longer offers the reader's own files as patterns", () => {
+    const t = readSrc("settings");
+    expect(t).not.toContain("artFiles");
+    expect(t).not.toContain('child.extension === "svg"');
+  });
+
+  it("ships no art folder, and scaffolds none", () => {
+    expect(existsSync(join(ROOT, "assets", "art"))).toBe(false);
+    expect(readSrc("scaffold")).not.toContain('asset: "art/');
+    // The path key went with the folder: a configurable path to a folder
+    // nothing writes and nothing reads is a settings row that does nothing.
+    expect(DEFAULT_PATHS).not.toHaveProperty("art");
+  });
+
+  it("starts on a preset the stylesheet can actually draw", () => {
+    const art = DEFAULT_SETTINGS.banner?.art;
+    expect(art).toBeDefined();
+    expect(ART_PRESETS[art as string]).toBeDefined();
+  });
+});
+
+describe("normalizeBannerArt", () => {
+  it("maps every filename that used to be scaffolded", () => {
+    expect(normalizeBannerArt("topography-minimal.svg")).toBe("topography");
+    expect(normalizeBannerArt("dot-grid.svg")).toBe("dot-grid");
+    expect(normalizeBannerArt("constellations.svg")).toBe("constellations");
+    expect(normalizeBannerArt("aurora-mesh.svg")).toBe("aurora-mesh");
+    expect(normalizeBannerArt("isometric-grid.svg")).toBe("isometric-grid");
+    expect(normalizeBannerArt("subtle-waves.svg")).toBe("subtle-waves");
+  });
+
+  it("leaves a value that is already an id alone", () => {
+    for (const id of Object.keys(ART_PRESETS)) {
+      expect(normalizeBannerArt(id)).toBe(id);
+    }
+  });
+
+  it("sends a file the reader added to none, not to a default", () => {
+    // Their own texture cannot be drawn any more. Substituting one they never
+    // chose would change the look of their banner without saying so; a flat
+    // banner is the visible version of what happened.
+    expect(normalizeBannerArt("my-own-paper.png")).toBe("none");
+    expect(normalizeBannerArt("none")).toBe("none");
+    expect(normalizeBannerArt(undefined)).toBe("none");
+    expect(normalizeBannerArt("")).toBe("none");
+  });
+
+  it("runs once on load rather than at every paint", () => {
+    const t = readSrc("main");
+    expect(t).toContain("this.settings.banner.art = normalizeBannerArt(");
+    // The banner NAMES it in a comment, which is the point of the comment; what
+    // it must not do is call it, once per paint, on a value already settled.
+    expect(readSrc("vault-banner")).not.toContain("normalizeBannerArt(");
   });
 });

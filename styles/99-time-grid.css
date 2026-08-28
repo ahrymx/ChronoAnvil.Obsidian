@@ -204,8 +204,8 @@
 
 .am-tg-lane {
   border-bottom: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary);
-  min-height: 60px;
+  background: var(--background-secondary-alt);
+  min-height: 52px;
 }
 
 /* ONE LINE, WHATEVER THE GUTTER IS. Two words at this width wrapped, and the
@@ -215,15 +215,20 @@
   position: sticky;
   left: 0;
   z-index: 4;
-  background: var(--background-secondary);
+  background: var(--background-secondary-alt);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   padding-right: 6px;
-  font-size: var(--font-ui-smaller);
+  font-size: 11px;
+  line-height: 1;
   color: var(--text-faint);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   white-space: nowrap;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: var(--am-tg-gutter);
 }
 
 .am-tg-lane-cell {
@@ -232,16 +237,82 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .am-tg-chip {
+  display: block;
   font-size: var(--font-ui-smaller);
-  color: var(--am-tg-ink);
+  font-weight: 500;
+  color: var(--text-normal);
   border-radius: var(--radius-s);
-  padding: 1px 6px;
+  padding: 2px 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--background-modifier-border);
+  border-left-width: 3px;
+  border-left-style: solid;
+  background: var(--background-primary);
+  transition: transform 0.1s ease, border-color 0.1s ease;
+}
+
+.am-tg-chip:hover {
+  transform: translateY(-1px);
+}
+
+.am-tg-chip.am-tg-fill-red {
+  background: color-mix(in srgb, var(--am-tg-red) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-tg-red) 35%, var(--background-modifier-border));
+  border-left-color: var(--am-tg-red);
+  color: var(--text-normal);
+}
+.am-tg-chip.am-tg-fill-amber {
+  background: color-mix(in srgb, var(--am-tg-amber) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-tg-amber) 35%, var(--background-modifier-border));
+  border-left-color: var(--am-tg-amber);
+  color: var(--text-normal);
+}
+.am-tg-chip.am-tg-fill-green {
+  background: color-mix(in srgb, var(--am-tg-green) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-tg-green) 35%, var(--background-modifier-border));
+  border-left-color: var(--am-tg-green);
+  color: var(--text-normal);
+}
+.am-tg-chip.am-tg-fill-teal {
+  background: color-mix(in srgb, var(--am-tg-teal) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-tg-teal) 35%, var(--background-modifier-border));
+  border-left-color: var(--am-tg-teal);
+  color: var(--text-normal);
+}
+.am-tg-chip.am-tg-fill-blue {
+  background: color-mix(in srgb, var(--am-tg-blue) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-tg-blue) 35%, var(--background-modifier-border));
+  border-left-color: var(--am-tg-blue);
+  color: var(--text-normal);
+}
+.am-tg-chip.am-tg-fill-purple {
+  background: color-mix(in srgb, var(--am-tg-purple) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-tg-purple) 35%, var(--background-modifier-border));
+  border-left-color: var(--am-tg-purple);
+  color: var(--text-normal);
+}
+.am-tg-chip.am-tg-fill-pink {
+  background: color-mix(in srgb, var(--am-tg-pink) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-tg-pink) 35%, var(--background-modifier-border));
+  border-left-color: var(--am-tg-pink);
+  color: var(--text-normal);
+}
+.am-tg-chip.am-tg-fill-grey {
+  background: color-mix(in srgb, var(--am-tg-grey) 15%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--am-tg-grey) 35%, var(--background-modifier-border));
+  border-left-color: var(--am-tg-grey);
+  color: var(--text-normal);
 }
 
 /* ── the rail and the columns ──────────────────────────────────────── */

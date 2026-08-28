@@ -29,6 +29,16 @@
   --am-radius-md: 10px;  /* cards: callouts, calendar, tracker rows, tag groups */
   --am-radius-pill: 999px; /* every pill-shaped button, link and badge */
 
+  /* Page-ground strength (4.80). How much of a ground's pattern film is let
+     through, as the film's own opacity. Three settings pick between three
+     values and `12-grounds.css` reads nothing else, so a ground gets quieter
+     without any of its nineteen layer stacks being touched.
+
+     A LITERAL, AND UNCONDITIONAL, so the read carries no fallback. The strength
+     classes below override it on `body`, which wins over `:root` for `body` and
+     everything under it. */
+  --am-tex-strength: 0.75;
+
   /* THE SURFACE AND BORDER ALIASES MOVED TO `body` IN 4.42 — see the block at
      the foot of this file. Every one of them names an OBSIDIAN variable, and
      Obsidian declares its colours on `body` (`.theme-dark` / `.theme-light` are
@@ -442,6 +452,22 @@
   --am-tg-pink: #a84e79;
   --am-tg-grey: #626973;
 
+  /* ── Semantic Grain Palette & Typography (4.80) ──────────────────────
+     Each temporal diary grain and journal has a dedicated signature accent
+     and RGB components for adaptive alpha layering and micro-spines. */
+  --am-grain-daily: #e58e26;
+  --am-grain-daily-rgb: 229, 142, 38;
+  --am-grain-weekly: #0fb9b1;
+  --am-grain-weekly-rgb: 15, 185, 177;
+  --am-grain-monthly: #8854d0;
+  --am-grain-monthly-rgb: 136, 84, 208;
+  --am-grain-quarterly: #eb6834;
+  --am-grain-quarterly-rgb: 235, 104, 52;
+  --am-grain-yearly: #f1c40f;
+  --am-grain-yearly-rgb: 241, 196, 15;
+  --am-font-heading: inherit;
+  --am-font-telemetry: inherit;
+
   /* ── the grid's own geometry, and the now line (4.62) ────────────────
      THE GUTTER IS ONE NUMBER BECAUSE IT IS ONE COLUMN. The hour rail, the
      corner cell above it and the all-day lane's label are the same strip of
@@ -744,6 +770,84 @@ body {
     var(--interactive-accent) 6%,
     var(--background-secondary)
   );
+
+  /* Active Grain and Journal Context Tokens (4.80) */
+  --am-grain-accent: var(--interactive-accent);
+  --am-grain-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+  --am-grain-tint: rgba(var(--am-grain-accent-rgb), 0.08);
+  --am-grain-spine: var(--am-grain-accent);
+  --am-journal-accent: var(--interactive-accent);
+  --am-journal-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+
+  /* Editorial Monastic Presets */
+  --am-preset-editorial-bg: #1a1815;
+  --am-preset-editorial-card: #24201c;
+  --am-preset-editorial-raised: #2e2a25;
+  --am-preset-editorial-inset: #1e1b18;
+  --am-preset-editorial-border: rgba(214, 188, 153, 0.22);
+  --am-preset-editorial-border-inner: rgba(214, 188, 153, 0.12);
+  --am-preset-editorial-bg-light: #f7f3eb;
+  --am-preset-editorial-card-light: #ffffff;
+  --am-preset-editorial-raised-light: #ede6d8;
+  --am-preset-editorial-inset-light: #f0ebd9;
+  --am-preset-editorial-border-light: rgba(139, 111, 71, 0.25);
+  --am-preset-editorial-border-inner-light: rgba(139, 111, 71, 0.15);
+
+  /* Technical HUD Presets */
+  --am-preset-technical-bg: #0b0e14;
+  --am-preset-technical-card: #131822;
+  --am-preset-technical-raised: #1a202c;
+  --am-preset-technical-inset: #0f141c;
+  --am-preset-technical-border: #263040;
+  --am-preset-technical-border-inner: rgba(255, 255, 255, 0.1);
+  --am-preset-technical-slot-edge: rgba(88, 166, 255, 0.35);
+  --am-preset-technical-bg-light: #edf2f7;
+  --am-preset-technical-card-light: #ffffff;
+  --am-preset-technical-raised-light: #e2e8f0;
+  --am-preset-technical-inset-light: #e6ecf2;
+  --am-preset-technical-border-light: #94a3b8;
+  --am-preset-technical-border-inner-light: rgba(0, 0, 0, 0.08);
+
+  /* ── PAGE-GROUND INK (4.80) ─────────────────────────────────────────────
+     Seven values and two noise fields carry all nineteen grounds in
+     `12-grounds.css`. A ground is a base colour it does not set, a film of
+     gradients drawn from these, and one shared grain layer.
+
+     DARK IS THE BASE HERE, like every other pair in this file, and
+     `body.theme-light` at the foot of the file carries the twin. The numbers
+     are not one sign flip apart: a 7.5% white hairline over a near-black note
+     and a 7.5% black one over a near-white note are the same measurement and
+     not the same line, which is the argument the edge-highlight pair already
+     makes two hundred lines up.
+
+     THE ACCENT IS A MIX OVER A THEME COLOUR, which is the whole reason this
+     block is `body` and not `:root` — see the header of this rule. */
+  --am-tex-ink: rgba(214, 228, 242, 0.075);
+  --am-tex-ink-2: rgba(214, 228, 242, 0.15);
+  --am-tex-fill: rgba(214, 228, 242, 0.05);
+  --am-tex-shade: rgba(0, 0, 0, 0.34);
+  --am-tex-hi: rgba(214, 228, 242, 0.13);
+  --am-tex-warm: rgba(238, 206, 158, 0.1);
+  --am-tex-cool: rgba(158, 196, 238, 0.1);
+  --am-tex-accent: color-mix(in srgb, var(--interactive-accent) 26%, transparent);
+
+  /* The grain every ground wears, and the one thing that stops a gradient
+     pattern reading as clip art. Theme-independent: it is greyscale noise
+     composited in `overlay`, so it lightens a dark ground and darkens a light
+     one from the same bytes.
+
+     A DATA URI AND NOT A FILE, so nothing ships in `assets/` and neither
+     `scaffold.ts` nor `tools/package.mjs` gains an entry for a background. */
+  --am-tex-grain: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='200' height='200' filter='url(%23g)' opacity='0.4'/></svg>");
+
+  /* Contour lines from a noise field, for the Topographic ground: the alpha
+     table keeps two steps of sixteen opaque, so the bands land where the field
+     crosses those two values and wander instead of ruling.
+
+     THE ONLY BAKED COLOUR IN THE SET. An SVG filter matrix cannot read a custom
+     property, so this is the one token whose light twin changes more than a
+     number. */
+  --am-tex-topo: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='560' height='560'><filter id='t'><feTurbulence type='fractalNoise' baseFrequency='0.0035' numOctaves='4' seed='12' stitchTiles='stitch' result='n'/><feColorMatrix in='n' type='matrix' values='0 0 0 0 0.84  0 0 0 0 0.9  0 0 0 0 0.95  1 0 0 0 0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0 1 0 0 1 0 0 1 0 0 1 0 0'/></feComponentTransfer></filter><rect width='560' height='560' filter='url(%23t)' opacity='0.13'/></svg>");
 }
 
 /* NO TOKEN IN THIS FILE DIFFERS BY THEME ANY MORE (4.13.1 §3b). The one that did
@@ -773,4 +877,18 @@ body.theme-light {
     var(--interactive-accent) 5%,
     var(--background-secondary)
   );
+
+  /* ── PAGE-GROUND INK, LIGHT (4.80) ──────────────────────────────────────
+     Ink goes dark and the highlight goes white, and neither is the dark value
+     negated. `--am-tex-shade` is the pair that moves furthest: on a dark note a
+     weave's shadow side is 34% black over near-black and still reads as a
+     shadow, while 34% black over parchment is a stain. */
+  --am-tex-ink: rgba(46, 52, 62, 0.075);
+  --am-tex-ink-2: rgba(46, 52, 62, 0.15);
+  --am-tex-fill: rgba(46, 52, 62, 0.045);
+  --am-tex-shade: rgba(46, 52, 62, 0.07);
+  --am-tex-hi: rgba(255, 255, 255, 0.66);
+  --am-tex-warm: rgba(206, 164, 102, 0.13);
+  --am-tex-cool: rgba(102, 146, 206, 0.11);
+  --am-tex-topo: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='560' height='560'><filter id='t'><feTurbulence type='fractalNoise' baseFrequency='0.0035' numOctaves='4' seed='12' stitchTiles='stitch' result='n'/><feColorMatrix in='n' type='matrix' values='0 0 0 0 0.16  0 0 0 0 0.19  0 0 0 0 0.24  1 0 0 0 0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0 1 0 0 1 0 0 1 0 0 1 0 0'/></feComponentTransfer></filter><rect width='560' height='560' filter='url(%23t)' opacity='0.13'/></svg>");
 }

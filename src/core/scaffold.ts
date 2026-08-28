@@ -335,12 +335,17 @@ export function shippedNotes(
     },
     { asset: "diary.base", dest: `${p.infrastructureRoot}/Diary.base` },
     { asset: "documentation.md", dest: `${p.documentation}/README.md` },
-    { asset: "art/topography-minimal.svg", dest: `${p.art}/topography-minimal.svg` },
-    { asset: "art/dot-grid.svg", dest: `${p.art}/dot-grid.svg` },
-    { asset: "art/constellations.svg", dest: `${p.art}/constellations.svg` },
-    { asset: "art/aurora-mesh.svg", dest: `${p.art}/aurora-mesh.svg` },
-    { asset: "art/isometric-grid.svg", dest: `${p.art}/isometric-grid.svg` },
-    { asset: "art/subtle-waves.svg", dest: `${p.art}/subtle-waves.svg` },
+    // THE ART FOLDER USED TO BE WRITTEN HERE — six SVG patterns copied into
+    // `00 - Infrastructure/Art/` for the banner to load through the vault.
+    // 4.80 removed it: the settings tab scanned that folder for any image the
+    // reader had added, which made "author your own texture" a feature of a
+    // plugin that does not otherwise ask anyone to write styles. The six
+    // patterns are data URIs in `97-vault-banner.css` now and nothing lands in
+    // the vault at all.
+    //
+    // A VAULT SET UP BEFORE 4.80 STILL HAS THE FOLDER, and repair leaves it
+    // alone rather than deleting it: the reader may have put their own files
+    // in there, and this list only ever states what Almanac writes.
     // ONE FOLDER-NOTE DASHBOARD PER REGISTERED JOURNAL, 4.36 §0.2.
     //
     // The gap 4.1 §2 closed at `02 - Diary/` and `03 - Journals/` exists again

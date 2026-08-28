@@ -48,7 +48,7 @@ import { BannerSurface, bannerSurfaceOf, titleTargetFor } from "../../core/banne
 import { bannerScopeOf } from "../vault-banner";
 import { attachNoteRename, attachPropertyRename } from "../header-title";
 import { TITLE_PROP, entryDateLabel } from "../../diary/entryheader";
-import { journalTypeAtPath } from "../../journals/journal";
+import { hueOf, journalTypeAtPath } from "../../journals/journal";
 import { CLASS_DEFS, noteKindOf, TrackerClass } from "../../trackers/trackers";
 import { OVERVIEW_LABELS, OverviewUnit } from "../../diary/calendar";
 import { periodAnchor, valueLabel } from "../../diary/periodnav";
@@ -295,6 +295,31 @@ export function buildPageHead(
 
   const root = createDiv({ cls: PAGE_HEAD_CLASS });
   root.setAttr("data-surface", said.surface);
+  root.setAttr("data-am-surface", said.surface);
+
+  if (said.surface === "diary") {
+    const role = diaryRoleOf(plugin, file);
+    root.setAttr("data-am-role", role.role);
+    if (role.role === "overview") {
+      const g =
+        role.unit === "week"
+          ? "weekly"
+          : role.unit === "month"
+            ? "monthly"
+            : role.unit === "quarter"
+              ? "quarterly"
+              : "yearly";
+      root.setAttr("data-am-grain", g);
+    } else if (role.role === "entry") {
+      root.setAttr("data-am-grain", grainOf(plugin, file));
+    }
+  } else if (said.surface === "journal") {
+    const type = journalTypeAtPath(plugin, file.path);
+    if (type) {
+      root.setAttr("data-am-journal", type.id);
+      root.style.setProperty("--am-journal-accent", `hsl(${hueOf(type.id)}, 65%, 55%)`);
+    }
+  }
 
   if (said.eyebrow) root.createDiv({ cls: "jph-eyebrow", text: said.eyebrow });
 

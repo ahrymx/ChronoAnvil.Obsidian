@@ -1,0 +1,325 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+ *
+ * Licensed under the GNU Affero General Public License v3.0 or later, with
+ * attribution and naming terms under its section 7. See LICENSE and
+ * LICENSING.md.
+ */
+
+/* ============================================================
+ *  Almanac Aesthetic Presets & Grain Accents (4.80)
+ *  Presets: Modern Fluent (Default), Editorial Monastic, Technical HUD
+ * ============================================================ */
+
+/* --- Grain Context Binding ---------------------------------- */
+[data-am-grain="daily"],
+.journal-page-head[data-am-grain="daily"],
+.am-vault-banner[data-am-grain="daily"] {
+  --am-grain-accent: var(--am-grain-daily);
+  --am-grain-accent-rgb: var(--am-grain-daily-rgb);
+  --am-grain-tint: rgba(var(--am-grain-daily-rgb), 0.08);
+  --am-grain-spine: var(--am-grain-daily);
+}
+
+[data-am-grain="weekly"],
+.journal-page-head[data-am-grain="weekly"],
+.am-vault-banner[data-am-grain="weekly"] {
+  --am-grain-accent: var(--am-grain-weekly);
+  --am-grain-accent-rgb: var(--am-grain-weekly-rgb);
+  --am-grain-tint: rgba(var(--am-grain-weekly-rgb), 0.08);
+  --am-grain-spine: var(--am-grain-weekly);
+}
+
+[data-am-grain="monthly"],
+.journal-page-head[data-am-grain="monthly"],
+.am-vault-banner[data-am-grain="monthly"] {
+  --am-grain-accent: var(--am-grain-monthly);
+  --am-grain-accent-rgb: var(--am-grain-monthly-rgb);
+  --am-grain-tint: rgba(var(--am-grain-monthly-rgb), 0.08);
+  --am-grain-spine: var(--am-grain-monthly);
+}
+
+[data-am-quarterly="quarterly"],
+[data-am-grain="quarterly"],
+.journal-page-head[data-am-grain="quarterly"],
+.am-vault-banner[data-am-grain="quarterly"] {
+  --am-grain-accent: var(--am-grain-quarterly);
+  --am-grain-accent-rgb: var(--am-grain-quarterly-rgb);
+  --am-grain-tint: rgba(var(--am-grain-quarterly-rgb), 0.08);
+  --am-grain-spine: var(--am-grain-quarterly);
+}
+
+[data-am-grain="yearly"],
+.journal-page-head[data-am-grain="yearly"],
+.am-vault-banner[data-am-grain="yearly"] {
+  --am-grain-accent: var(--am-grain-yearly);
+  --am-grain-accent-rgb: var(--am-grain-yearly-rgb);
+  --am-grain-tint: rgba(var(--am-grain-yearly-rgb), 0.08);
+  --am-grain-spine: var(--am-grain-yearly);
+}
+
+[data-am-journal],
+.journal-page-head[data-am-journal],
+.am-vault-banner[data-am-journal] {
+  --am-grain-accent: var(--am-journal-accent);
+  --am-grain-accent-rgb: var(--am-journal-accent-rgb);
+  --am-grain-tint: rgba(var(--am-journal-accent-rgb), 0.08);
+  --am-grain-spine: var(--am-journal-accent);
+}
+
+/* --- Grain Intensity Modifiers ------------------------------- */
+body.am-grain-monochrome {
+  --am-grain-accent: var(--interactive-accent);
+  --am-grain-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+  --am-grain-tint: rgba(var(--interactive-accent-rgb, 138, 92, 245), 0.05);
+  --am-grain-spine: var(--interactive-accent);
+  --am-journal-accent: var(--interactive-accent);
+  --am-journal-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+}
+
+body.am-grain-subtle {
+  --am-grain-tint: rgba(var(--am-grain-accent-rgb), 0.03);
+}
+
+/* --- Micro-Spine & Eyebrow Accents on Page Head & Banner ---- */
+.journal-page-head[data-am-grain],
+.journal-page-head[data-am-journal],
+[data-am-grain] .journal-page-head,
+[data-am-journal] .journal-page-head {
+  border-left: 3px solid var(--am-grain-spine);
+  padding-left: 14px;
+  background: linear-gradient(180deg, var(--am-grain-tint) 0%, transparent 100%);
+}
+
+.journal-page-head[data-am-grain] .jph-eyebrow,
+.journal-page-head[data-am-journal] .jph-eyebrow,
+[data-am-grain] .journal-page-head .jph-eyebrow,
+[data-am-journal] .journal-page-head .jph-eyebrow {
+  color: var(--am-grain-accent);
+}
+
+.am-vault-banner[data-am-grain],
+.am-vault-banner[data-am-journal],
+[data-am-grain] .am-vault-banner,
+[data-am-journal] .am-vault-banner {
+  border-top: 2px solid var(--am-grain-spine);
+}
+
+/* Accents on Task Buckets and Telemetry */
+[data-am-grain] .jtt-bucket-head,
+[data-am-journal] .jtt-bucket-head {
+  background: var(--am-grain-tint);
+  color: var(--am-grain-accent);
+}
+
+[data-am-grain] .am-stat-ring-val,
+[data-am-journal] .am-stat-ring-val {
+  stroke: var(--am-grain-accent);
+}
+
+/* Section Card Surface Propagation */
+.journal-sec-block {
+  background: var(--am-surface-card);
+  border-left-color: var(--am-border-subtle);
+  border-right-color: var(--am-border-subtle);
+}
+.journal-sec-block.is-first {
+  border-top-color: var(--am-border-subtle);
+}
+.journal-sec-block.is-last {
+  border-bottom-color: var(--am-border-subtle);
+}
+
+.am-stat {
+  background: var(--am-surface-card);
+}
+.am-stats {
+  background: var(--am-border-subtle);
+}
+
+/* Sunken / Inset Input Surfaces (prevents washed out punchouts) */
+.am-input,
+.am-search-input,
+.journal-tracker-input,
+.journal-scale-note-input {
+  background: var(--am-surface-inset);
+  border: 1px solid var(--am-border-subtle);
+  color: var(--text-normal);
+}
+
+/* ============================================================
+ *  Preset 2: Editorial Monastic (Candidate 2)
+ *  Classical serif typography, warm parchment borders, crisp seams
+ * ============================================================ */
+body.am-preset-editorial {
+  --am-font-heading: var(--font-serif, "Lora", "Georgia", "Merriweather", "Cambria", serif);
+  --am-radius-xs: 2px;
+  --am-radius-sm: 4px;
+  --am-radius-md: 6px;
+  --am-radius-pill: 4px;
+}
+
+body.am-preset-editorial .jph-title,
+body.am-preset-editorial .am-sec-title,
+body.am-preset-editorial .am-bar-title,
+body.am-preset-editorial .callout-title,
+body.am-preset-editorial .am-vb-title,
+body.am-preset-editorial .am-vb-crumb,
+body.am-preset-editorial .jtt-bucket-title,
+body.am-preset-editorial .journal-task-main {
+  font-family: var(--am-font-heading);
+}
+
+body.am-preset-editorial .journal-page-head[data-am-grain],
+body.am-preset-editorial .journal-page-head[data-am-journal],
+body.am-preset-editorial [data-am-grain] .journal-page-head,
+body.am-preset-editorial [data-am-journal] .journal-page-head {
+  border-left-width: 2px;
+}
+
+body.theme-dark.am-preset-editorial {
+  --background-primary: var(--am-preset-editorial-bg);
+  --background-primary-alt: var(--am-preset-editorial-inset);
+  --background-secondary: var(--am-preset-editorial-card);
+  --background-secondary-alt: var(--am-preset-editorial-raised);
+  --background-modifier-border: var(--am-preset-editorial-border);
+  --am-surface-card: var(--am-preset-editorial-card);
+  --am-surface-raised: var(--am-preset-editorial-raised);
+  --am-surface-inset: var(--am-preset-editorial-inset);
+  --am-border-subtle: var(--am-preset-editorial-border);
+  --am-border-inner: var(--am-preset-editorial-border-inner);
+}
+
+body.theme-light.am-preset-editorial {
+  --background-primary: var(--am-preset-editorial-bg-light);
+  --background-primary-alt: var(--am-preset-editorial-inset-light);
+  --background-secondary: var(--am-preset-editorial-card-light);
+  --background-secondary-alt: var(--am-preset-editorial-raised-light);
+  --background-modifier-border: var(--am-preset-editorial-border-light);
+  --am-surface-card: var(--am-preset-editorial-card-light);
+  --am-surface-raised: var(--am-preset-editorial-raised-light);
+  --am-surface-inset: var(--am-preset-editorial-inset-light);
+  --am-border-subtle: var(--am-preset-editorial-border-light);
+  --am-border-inner: var(--am-preset-editorial-border-inner-light);
+}
+
+body.am-preset-editorial .workspace-leaf-content[data-type="markdown"],
+body.am-preset-editorial .markdown-reading-view,
+body.am-preset-editorial .markdown-preview-view {
+  background-color: var(--background-primary);
+}
+
+body.am-preset-editorial .am-vault-banner {
+  background-color: var(--am-surface-card);
+  border-bottom: 1px solid var(--am-border-subtle);
+}
+
+body.am-preset-editorial .am-vb-tile {
+  background-color: var(--am-surface-raised);
+  border: 1px solid var(--am-border-subtle);
+}
+
+body.am-preset-editorial .journal-mood-face.is-selected,
+body.am-preset-editorial .journal-scale-face.is-selected {
+  background-color: var(--am-surface-raised);
+  border-color: var(--am-grain-accent);
+}
+
+/* ============================================================
+ *  Preset 3: Technical HUD (Candidate 3)
+ *  High-contrast telemetry, monospace figures, angular corners
+ * ============================================================ */
+body.am-preset-technical {
+  --am-font-telemetry: var(--font-monospace, "JetBrains Mono", "Fira Code", monospace);
+  --am-radius-xs: 1px;
+  --am-radius-sm: 2px;
+  --am-radius-md: 4px;
+  --am-radius-pill: 2px;
+}
+
+body.am-preset-technical .jph-title,
+body.am-preset-technical .am-sec-title,
+body.am-preset-technical .am-bar-title,
+body.am-preset-technical .callout-title,
+body.am-preset-technical .am-stat-val,
+body.am-preset-technical .am-stat-label,
+body.am-preset-technical .journal-task-main,
+body.am-preset-technical .jtt-tag,
+body.am-preset-technical .jtt-prio,
+body.am-preset-technical .jtt-bucket-title,
+body.am-preset-technical .am-vb-title,
+body.am-preset-technical .am-vb-crumb,
+body.am-preset-technical .am-vb-tile,
+body.am-preset-technical .am-btn {
+  font-family: var(--am-font-telemetry);
+}
+
+body.am-preset-technical .journal-page-head[data-am-grain],
+body.am-preset-technical .journal-page-head[data-am-journal],
+body.am-preset-technical [data-am-grain] .journal-page-head,
+body.am-preset-technical [data-am-journal] .journal-page-head {
+  border-left-width: 3px;
+}
+
+body.theme-dark.am-preset-technical {
+  --background-primary: var(--am-preset-technical-bg);
+  --background-primary-alt: var(--am-preset-technical-inset);
+  --background-secondary: var(--am-preset-technical-card);
+  --background-secondary-alt: var(--am-preset-technical-raised);
+  --background-modifier-border: var(--am-preset-technical-border);
+  --am-surface-card: var(--am-preset-technical-card);
+  --am-surface-raised: var(--am-preset-technical-raised);
+  --am-surface-inset: var(--am-preset-technical-inset);
+  --am-border-subtle: var(--am-preset-technical-border);
+  --am-border-inner: var(--am-preset-technical-border-inner);
+  --am-slot-edge: var(--am-preset-technical-slot-edge);
+}
+
+body.theme-light.am-preset-technical {
+  --background-primary: var(--am-preset-technical-bg-light);
+  --background-primary-alt: var(--am-preset-technical-inset-light);
+  --background-secondary: var(--am-preset-technical-card-light);
+  --background-secondary-alt: var(--am-preset-technical-raised-light);
+  --background-modifier-border: var(--am-preset-technical-border-light);
+  --am-surface-card: var(--am-preset-technical-card-light);
+  --am-surface-raised: var(--am-preset-technical-raised-light);
+  --am-surface-inset: var(--am-preset-technical-inset-light);
+  --am-border-subtle: var(--am-preset-technical-border-light);
+  --am-border-inner: var(--am-preset-technical-border-inner-light);
+}
+
+body.am-preset-technical .workspace-leaf-content[data-type="markdown"],
+body.am-preset-technical .markdown-reading-view,
+body.am-preset-technical .markdown-preview-view {
+  background-color: var(--background-primary);
+}
+
+body.am-preset-technical .am-vault-banner {
+  background-color: var(--am-surface-card);
+  border-bottom: 1px solid var(--am-border-subtle);
+}
+
+body.am-preset-technical .am-vb-tile {
+  background-color: var(--am-surface-raised);
+  border: 1px solid var(--am-border-subtle);
+}
+
+body.am-preset-technical .journal-sec-block,
+body.am-preset-technical .callout[data-callout="note"],
+body.am-preset-technical .journal-calendar,
+body.am-preset-technical .am-stat {
+  border-radius: 4px;
+}
+
+body.am-preset-technical .am-btn,
+body.am-preset-technical .jtt-prio,
+body.am-preset-technical .jtt-tag {
+  border-radius: 2px;
+}
+
+body.am-preset-technical .journal-mood-face.is-selected,
+body.am-preset-technical .journal-scale-face.is-selected {
+  background-color: var(--am-surface-raised);
+  border-color: var(--am-grain-accent);
+}
