@@ -79,4 +79,12 @@ describe("Mobile settings and controls", () => {
     expect(css).toContain("body.am-hide-mobile-overlays .view-header");
     expect(css).toContain("body.am-hide-mobile-overlays .mobile-header");
   });
+
+  it("declares swipe edge tint overlays on group pages", () => {
+    const css = readCss();
+    expect(css).toContain(".journal-group-pages::before");
+    expect(css).toContain(".journal-group-pages::after");
+    expect(css).toContain("opacity: var(--am-swipe-tint-left);");
+    expect(css).toContain("opacity: var(--am-swipe-tint-right);");
+  });
 });

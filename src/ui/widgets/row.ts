@@ -742,10 +742,13 @@ export function layOutRow(
     });
   }
 
-  // ── Drag horizontally anywhere across group to switch pages (4.66) ─────
+  // ── Drag horizontally anywhere across group to switch pages (4.66, 4.77) ──
   attachGroupSwipe(
     pages,
-    () => rows.length > 1,
+    (dir) => {
+      const to = current + dir;
+      return to >= 0 && to < rows.length;
+    },
     (dir) => {
       const to = current + dir;
       if (to >= 0 && to < rows.length && to !== current) {
@@ -776,14 +779,14 @@ export function layOutRow(
   if (plans[plans.length - 1].cells.length > 1) addPage(strip);
 }
 
-// ── Horizontal drag-to-tab navigation across group pages (4.66) ─────────
+// ── Horizontal drag-to-tab navigation across group pages (4.66, 4.77) ───────
 //
 // Allows dragging or swiping horizontally anywhere across a group's surface
 // to switch pages. Native vertical scrolling within cards remains untouched
 // through directional threshold checking.
 function attachGroupSwipe(
   container: HTMLElement,
-  canSwipe: () => boolean,
+  canSwipe: (dir: -1 | 1) => boolean,
   onSwipe: (dir: -1 | 1) => void
 ): void {
   let startX = 0;
@@ -792,22 +795,32 @@ function attachGroupSwipe(
   let activeId: number | null = null;
   let isAxisDecided = false;
   let isHorizontal = false;
+  let didDrag = false;
 
-  const isInteractive = (target: EventTarget | null): boolean => {
+  // Controls that own horizontal drag internally (range sliders, dividers).
+  // Buttons, chips, and cards are NOT excluded — swiping over them switches
+  // tabs, while tapping without dragging still clicks normally.
+  const isStrictDragControl = (target: EventTarget | null): boolean => {
     if (!(target instanceof HTMLElement)) return false;
     return !!target.closest(
-      "button, input, select, textarea, a, [contenteditable='true'], .jbd-handle, .journal-group-divider, .journal-card-divider, .journal-note-chevron, .am-ev-row, [draggable='true']"
+      "input[type='range'], select, textarea, [contenteditable='true'], .jbd-handle, .journal-group-divider, .journal-card-divider, [draggable='true']"
     );
   };
 
+  const isNearScreenEdge = (clientX: number): boolean => {
+    const edgeThreshold = 18;
+    return clientX < edgeThreshold || clientX > (window.innerWidth - edgeThreshold);
+  };
+
   container.addEventListener("pointerdown", (evt) => {
-    if (evt.button !== 0 || !canSwipe() || isInteractive(evt.target)) return;
+    if (evt.button !== 0 || isStrictDragControl(evt.target) || isNearScreenEdge(evt.clientX)) return;
     startX = evt.clientX;
     startY = evt.clientY;
     startTime = Date.now();
     activeId = evt.pointerId;
     isAxisDecided = false;
     isHorizontal = false;
+    didDrag = false;
   });
 
   container.addEventListener("pointermove", (evt) => {
@@ -816,10 +829,11 @@ function attachGroupSwipe(
     const dy = evt.clientY - startY;
 
     if (!isAxisDecided) {
-      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
         isAxisDecided = true;
-        isHorizontal = Math.abs(dx) > Math.abs(dy);
+        isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
         if (isHorizontal) {
+          didDrag = true;
           try {
             container.setPointerCapture(evt.pointerId);
           } catch {
@@ -832,6 +846,19 @@ function attachGroupSwipe(
     if (isHorizontal) {
       evt.preventDefault();
       evt.stopPropagation();
+
+      // Live visual edge tint feedback (pulling left/right reveals hint of destination tab)
+      const dir: -1 | 1 = dx > 0 ? -1 : 1;
+      const allowed = canSwipe(dir);
+      const progress = allowed ? Math.min(1, Math.abs(dx) / 75) : 0;
+
+      if (dx > 0) {
+        container.style.setProperty("--am-swipe-tint-left", String(progress));
+        container.style.setProperty("--am-swipe-tint-right", "0");
+      } else {
+        container.style.setProperty("--am-swipe-tint-right", String(progress));
+        container.style.setProperty("--am-swipe-tint-left", "0");
+      }
     }
   });
 
@@ -841,14 +868,30 @@ function attachGroupSwipe(
     const dt = Math.max(1, Date.now() - startTime);
     const velocity = Math.abs(dx) / dt;
 
+    // Reset visual tints
+    container.style.removeProperty("--am-swipe-tint-left");
+    container.style.removeProperty("--am-swipe-tint-right");
+
     if (isHorizontal) {
       evt.preventDefault();
       evt.stopPropagation();
-      if (dx < -40 || (dx < -20 && velocity > 0.25)) {
-        onSwipe(1);
-      } else if (dx > 40 || (dx > 20 && velocity > 0.25)) {
-        onSwipe(-1);
+      if (dx < -36 || (dx < -18 && velocity > 0.22)) {
+        if (canSwipe(1)) onSwipe(1);
+      } else if (dx > 36 || (dx > 18 && velocity > 0.22)) {
+        if (canSwipe(-1)) onSwipe(-1);
       }
+    }
+
+    // If the gesture turned into a drag, suppress the trailing click event
+    if (didDrag) {
+      const suppressClick = (e: MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+      };
+      window.addEventListener("click", suppressClick, { capture: true, once: true });
+      setTimeout(() => {
+        window.removeEventListener("click", suppressClick, { capture: true });
+      }, 80);
     }
 
     if (container.hasPointerCapture(evt.pointerId)) {
@@ -861,6 +904,7 @@ function attachGroupSwipe(
     activeId = null;
     isAxisDecided = false;
     isHorizontal = false;
+    didDrag = false;
   };
 
   container.addEventListener("pointerup", endGesture);

@@ -342,9 +342,10 @@
   background: var(--background-secondary);
   color: var(--text-muted);
 }
-/* Rows read as a clean list with left priority accent and hairline separators. */
+/* Rows read as a clean single-line list with left priority accent and right metadata. */
 .journal-tasks-table .jtt-row {
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -353,12 +354,49 @@
   border-left: var(--am-rule-edge) solid transparent;
   border-radius: var(--am-radius-xs);
   transition: background 0.12s ease;
+  flex-wrap: nowrap;
 }
 .journal-tasks-table .jtt-row:hover {
   background: var(--background-modifier-hover);
 }
 .journal-tasks-table .jtt-list .jtt-row:last-child {
   border-bottom: none;
+}
+.journal-tasks-table .jtt-row .journal-task-main {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.journal-tasks-table .jtt-row .journal-task-meta {
+  padding-left: 0;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.journal-tasks-table .jtt-row .journal-task-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.journal-tasks-table .jtt-row .journal-task-prio {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  font-size: var(--am-text-2xs);
+  font-weight: 600;
+  border-radius: var(--am-radius-pill);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 /* Priority accent and background tint */
 .journal-tasks-table .jtt-row.journal-task-high {
@@ -424,25 +462,13 @@
 /* Mobile layout for tasks-table */
 @media (max-width: 520px) {
   .journal-tasks-table .jtt-row {
-    flex-wrap: wrap;
-    gap: 6px 8px;
-    padding: 8px;
-  }
-  .journal-tasks-table .jtt-row .journal-task-check {
-    order: 1;
-  }
-  .journal-tasks-table .jtt-text {
-    order: 2;
-    flex: 1 1 calc(100% - 38px);
-  }
-  .journal-tasks-table .jtt-due {
-    order: 3;
-    margin-left: 28px;
+    padding: 6px 8px;
+    gap: 8px;
   }
 }
 
 body.is-mobile .journal-tasks-table .jtt-row {
-  padding: 8px;
+  padding: 6px 8px;
 }
 body.is-mobile .journal-tasks-table .jtt-row .journal-task-check {
   width: 1.3em;

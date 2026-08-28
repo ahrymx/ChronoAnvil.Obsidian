@@ -491,6 +491,29 @@
   flex-direction: column;
   touch-action: pan-y;
 }
+/* Edge swipe hint overlays */
+.journal-group-pages::before,
+.journal-group-pages::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 36px;
+  pointer-events: none;
+  z-index: 5;
+  border-radius: var(--am-radius-md);
+  transition: opacity 80ms ease;
+}
+.journal-group-pages::before {
+  left: 0;
+  background: linear-gradient(to right, color-mix(in srgb, var(--interactive-accent) 26%, transparent), transparent);
+  opacity: var(--am-swipe-tint-left);
+}
+.journal-group-pages::after {
+  right: 0;
+  background: linear-gradient(to left, color-mix(in srgb, var(--interactive-accent) 26%, transparent), transparent);
+  opacity: var(--am-swipe-tint-right);
+}
 /* CLIPPED ONLY WHILE IT IS MOVING, and this rule was `overflow: hidden` at rest
    for one draft — which put a clipping and containment context around EVERY
    group in the plugin, pages or not, in a release whose whole compatibility

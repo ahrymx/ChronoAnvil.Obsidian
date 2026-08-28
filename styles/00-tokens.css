@@ -101,6 +101,10 @@
   --am-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
   --am-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
 
+  /* Group page swipe tint opacities (0..1) */
+  --am-swipe-tint-left: 0;
+  --am-swipe-tint-right: 0;
+
   /* Vertical rhythm between stacked widgets in one ```almanac block. Named
      because it is a flex `gap`, not a margin — a widget that wants to butt up
      against its neighbour (the joined highlights/challenges box) has to cancel

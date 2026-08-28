@@ -7,6 +7,20 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.78.0] - 2026-08-28
+
+**Upgraded group swipe navigation with button drag disambiguation, mobile edge guards, and live edge tint feedback, and enforced single-line inline priority pill layout on Open Tasks.**
+
+### Added
+
+- **Swipe Over Interactive Controls:** Enhanced `attachGroupSwipe` to permit swiping to start over buttons, links, chips, and calendar cells. When a horizontal drag intent is recognized, trailing click events are automatically intercepted and cancelled while taps continue to click normally.
+- **Mobile Sidebar Edge Guard & Isolation:** Added an 18px screen edge deadzone so intentional mobile sidebar pulls work seamlessly without conflicting with group page switching.
+- **Live Swipe Edge Tint Overlays:** Introduced dynamic edge tint feedback (`--am-swipe-tint-left`, `--am-swipe-tint-right`) that illuminates the destination edge during horizontal drags.
+
+### Fixed
+
+- **Open Tasks Inline Priority Layout:** Enforced strict single-line flex row layout on Open Tasks rows (`.journal-tasks-table .jtt-row`), ensuring priority badges, due dates, and tags always align inline on the right side without wrapping onto a secondary line in narrow columns or viewports.
+
 ## [4.77.0] - 2026-08-28
 
 **Upgraded Open Tasks section with collapsible ISO week groups, journal congregation, and right-aligned tags, and restored "+ New journal" card on empty vaults.**
