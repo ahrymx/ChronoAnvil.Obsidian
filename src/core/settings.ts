@@ -2381,9 +2381,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
   // toggle.
   private renderSleepSupersetRow(tbody: HTMLElement): void {
     const on = this.plugin.settings.sleepEnabled;
-    const bed = this.plugin.settings.trackers.find((x) => x.builtin === "bed");
-    const wake = this.plugin.settings.trackers.find((x) => x.builtin === "wake");
-    const name = `${bed?.label ?? "🌙 Bedtime"} + ${wake?.label ?? "😴 Wake-Up"} → Sleep`;
+    const name = "Sleep";
 
     const tr = tbody.createEl("tr");
     if (!on) tr.addClass("is-locked");

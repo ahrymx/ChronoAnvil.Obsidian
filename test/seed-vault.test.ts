@@ -40,7 +40,14 @@ import { describe, expect, it } from "vitest";
 import { load as loadYaml } from "js-yaml";
 
 import { JOURNAL_PRESETS } from "../src/journals/journal";
+import { DEFAULT_TRACKERS } from "../src/core/constants";
 import { parseChartDirectives, serializeChartSpec } from "../src/charts/charts";
+import {
+  parseJournalChartDirectives,
+  serializeJournalChartSpec,
+} from "../src/charts/journal-charts";
+import { locateTrackerRegion, noteTrackerDirectives } from "../src/trackers/entry-trackers";
+import { sleepHours } from "../src/core/util";
 import { parseEntries } from "../src/diary/entries";
 import { parseEvents } from "../src/events/events";
 import { parseLogItems } from "../src/diary/log-items";
@@ -50,9 +57,19 @@ import {
   activeDays,
   buildPatches,
   buildPlan,
+  addTrackerDirective,
   chartLine,
   chartableTrackers,
   clearEvents,
+  clearJournalChartsFence,
+  dayModel,
+  fillJournalChartsFence,
+  gapEdges,
+  journalChartLine,
+  journalChartTrackers,
+  pickFresh,
+  taskAging,
+  trackerValueFor,
   ensureRegion,
   eventsYaml,
   fillChartsFence,
@@ -74,6 +91,10 @@ import {
   safeName,
   setFrontmatter,
   taskLine,
+  entryFolder,
+  periodHierarchy,
+  seedGraphGroups,
+  setGraphLinks,
   uniquePicks,
   // @ts-expect-error — a plain .mjs tool with no declaration file; the point of
   // this suite is to run it, and typing it would mean maintaining a second
@@ -87,8 +108,13 @@ import {
   DIARY_FOCUS,
   DIARY_HIGHLIGHTS,
   DIARY_LINES,
+  DIARY_LINES_BY_TONE,
+  DIARY_LINES_GOOD,
+  DIARY_LINES_HARD,
+  DIARY_LINES_MIXED,
   DIARY_TASKS,
   LOGBOOK_CORPUS,
+  PERIOD_CORPUS,
   SEED_EVENTS,
   // @ts-expect-error — see above.
 } from "../tools/seed-corpus.mjs";
@@ -755,5 +781,518 @@ describe("seed-vault: the patch pass", () => {
         expect(spec.tracker2 ?? "Mood").toBe("Mood");
       }
     }
+  });
+});
+
+describe("seed-vault: period hierarchy and nested entries", () => {
+  const paths = {
+    diaryRoot: "02 - Diary",
+    diaryEntries: "02 - Diary/Entries",
+    templatesDiary: "00 - Infrastructure/Templates/Diary",
+  };
+
+  it("calculates containing period hierarchy accurately", () => {
+    const h = periodHierarchy("2026-08-29");
+    expect(h.day.name).toBe("Day-2026-08-29");
+    expect(h.week.name).toBe("Week-2026-W35");
+    expect(h.month.name).toBe("Month-2026-08");
+    expect(h.quarter.name).toBe("Quarter-2026-Q3");
+    expect(h.year.name).toBe("Year-2026");
+  });
+
+  it("computes nested folder paths for all grains", () => {
+    expect(entryFolder(paths, "yearly", "2026-08-29")).toBe("02 - Diary/Entries/Year-2026");
+    expect(entryFolder(paths, "quarterly", "2026-08-29")).toBe("02 - Diary/Entries/Year-2026/Quarter-2026-Q3");
+    expect(entryFolder(paths, "monthly", "2026-08-29")).toBe("02 - Diary/Entries/Year-2026/Quarter-2026-Q3/Month-2026-08");
+    expect(entryFolder(paths, "weekly", "2026-08-29")).toBe("02 - Diary/Entries/Year-2026/Quarter-2026-Q3/Month-2026-08/Week-2026-W35");
+    expect(entryFolder(paths, "daily", "2026-08-29")).toBe("02 - Diary/Entries/Year-2026/Quarter-2026-Q3/Month-2026-08/Week-2026-W35");
+  });
+});
+
+describe("seed-vault: graph links and zero-width spines", () => {
+  it("embeds and updates zero-width hidden graph links", () => {
+    const original = "# Title\n\nSome body text.\n";
+    const linked = setGraphLinks(original, ["Week-2026-W35"]);
+    expect(linked).toContain("%% almanac-graph %%\n%% [[Week-2026-W35|\u200B]] %%");
+
+    const relinked = setGraphLinks(linked, ["Week-2026-W36"]);
+    expect(relinked).toContain("%% almanac-graph %%\n%% [[Week-2026-W36|\u200B]] %%");
+    expect(relinked).not.toContain("Week-2026-W35");
+
+    const stripped = setGraphLinks(relinked, []);
+    expect(stripped).not.toContain("%% almanac-graph %%");
+  });
+});
+
+describe("seed-vault: period entries generation and corpus", () => {
+  it("generates week, month, quarter, and year notes when templates are provided", () => {
+    const templates = new Map([
+      ["T/Daily.md", "---\njournal-date: \"\"\n---\n<!--almanac:log\n-->\n"],
+      ["T/Weekly Entry.md", "---\nweek-start: \"\"\n---\n<!--almanac:focus\n-->\n<!--almanac:highlights\n-->\n<!--almanac:todo\n-->\n"],
+      ["T/Monthly Entry.md", "---\nmonth: \"\"\n---\n<!--almanac:focus\n-->\n<!--almanac:highlights\n-->\n<!--almanac:log\n-->\n"],
+      ["T/Quarterly Entry.md", "---\nquarter-start: \"\"\n---\n<!--almanac:focus\n-->\n<!--almanac:highlights\n-->\n"],
+      ["T/Yearly Entry.md", "---\nyear-start: \"\"\n---\n<!--almanac:focus\n-->\n<!--almanac:highlights\n-->\n<!--almanac:log\n-->\n"],
+    ]);
+
+    const settings = {
+      paths: {
+        templatesDiary: "T",
+        diaryRoot: "02 - Diary",
+        diaryEntries: "02 - Diary/Entries",
+      },
+      customJournals: [],
+      trackers: [],
+    };
+
+    const files = buildPlan({
+      settings,
+      templates,
+      corpus: {},
+      dates: ["2026-08-28", "2026-08-29"],
+      rng: mulberry32(42),
+      warn: () => {},
+    });
+
+    const pathsList = files.map((f: { path: string }) => f.path);
+    expect(pathsList).toContain("02 - Diary/Entries/Year-2026/Year-2026.md");
+    expect(pathsList).toContain("02 - Diary/Entries/Year-2026/Quarter-2026-Q3/Quarter-2026-Q3.md");
+    expect(pathsList).toContain("02 - Diary/Entries/Year-2026/Quarter-2026-Q3/Month-2026-08/Month-2026-08.md");
+    expect(pathsList).toContain("02 - Diary/Entries/Year-2026/Quarter-2026-Q3/Month-2026-08/Week-2026-W35/Week-2026-W35.md");
+    expect(pathsList).toContain("02 - Diary/Entries/Year-2026/Quarter-2026-Q3/Month-2026-08/Week-2026-W35/Day-2026-08-28.md");
+    expect(pathsList).toContain("02 - Diary/Entries/Year-2026/Quarter-2026-Q3/Month-2026-08/Week-2026-W35/Day-2026-08-29.md");
+
+    // Check graph link chain: Day -> Week -> Month -> Quarter -> Year (Year detached)
+    const dayFile = files.find((f: { path: string }) => f.path.endsWith("Day-2026-08-29.md"));
+    expect(dayFile.content).toContain("[[Week-2026-W35|\u200B]]");
+
+    const weekFile = files.find((f: { path: string }) => f.path.endsWith("Week-2026-W35.md"));
+    expect(weekFile.content).toContain("[[Month-2026-08|\u200B]]");
+
+    const monthFile = files.find((f: { path: string }) => f.path.endsWith("Month-2026-08.md"));
+    expect(monthFile.content).toContain("[[Quarter-2026-Q3|\u200B]]");
+
+    const quarterFile = files.find((f: { path: string }) => f.path.endsWith("Quarter-2026-Q3.md"));
+    expect(quarterFile.content).toContain("[[Year-2026|\u200B]]");
+
+    const yearFile = files.find((f: { path: string }) => f.path.endsWith("Year-2026.md"));
+    expect(yearFile.content).not.toContain("%% almanac-graph %%");
+  });
+});
+
+// ── 4.83: the day model, the task window, and the charts that parse ──────
+//
+// THE DISCIPLINE IS THE ONE THIS FILE OPENED WITH, applied to three more
+// formats. Nothing below asserts on a string this repository spells twice: the
+// day's numbers are checked against the plugin's own `sleepHours`, the task
+// lines against `parseTaskLine`, the chart directives against
+// `parseChartDirectives` — and the last of those is not decoration. The seeder
+// briefly wrote `chart:…:period:daily-by-month`, which the plugin's own
+// serialiser produces and its own `CHART_TAG` does not accept: every line was
+// written, every fence looked right, and four charts would have been dropped on
+// the first read with nothing said. A test that knew the format would have
+// agreed with the bug; this one asks the parser.
+
+describe("seed-vault: the day model", () => {
+  const model = (date: string, seed = 7) => dayModel({ date, rng: mulberry32(seed) });
+
+  it("derives Sleep from its own two times, the way the plugin recomputes it", () => {
+    // The seeded value has to be the one `recomputeSleepInFrontmatter` would
+    // write, or the example vault holds a number that changes the moment
+    // anybody edits the note it is in.
+    for (const date of ["2026-08-24", "2026-08-29", "2026-08-30", "2026-01-01"]) {
+      for (let seed = 1; seed <= 40; seed++) {
+        const m = model(date, seed);
+        expect(m.sleep).toBe(sleepHours(m.bed, m.wake));
+      }
+    }
+  });
+
+  it("gives a weekend a later morning than a weekday", () => {
+    const wake = (date: string) => {
+      let total = 0;
+      for (let seed = 1; seed <= 120; seed++) {
+        const [h, mn] = model(date, seed).wake.split(":").map(Number);
+        total += h * 60 + mn;
+      }
+      return total / 120;
+    };
+    // 2026-08-29 is a Saturday, 2026-08-26 a Wednesday.
+    expect(wake("2026-08-29")).toBeGreaterThan(wake("2026-08-26") + 45);
+  });
+
+  it("moves mood with sleep without making it a function of it", () => {
+    const days: { sleep: number; mood: number }[] = [];
+    const rng = mulberry32(20260818);
+    for (let i = 0; i < 400; i++) {
+      const m = dayModel({ date: isoShift("2025-08-01", i), rng });
+      days.push({ sleep: m.sleep, mood: m.moodN });
+    }
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const xs = days.map((d) => d.sleep);
+    const ys = days.map((d) => d.mood);
+    const mx = mean(xs);
+    const my = mean(ys);
+    const cov = mean(days.map((d) => (d.sleep - mx) * (d.mood - my)));
+    const r = cov / (Math.sqrt(mean(xs.map((x) => (x - mx) ** 2))) * Math.sqrt(mean(ys.map((y) => (y - my) ** 2))));
+    // A SLOPE, AND NOT A LINE. The diary ships a chart called "Does sleep move
+    // mood?"; against independent draws the honest answer it drew was a
+    // shapeless cloud, and against a formula it would draw a straight line and
+    // demonstrate nothing but arithmetic.
+    expect(r).toBeGreaterThan(0.25);
+    expect(r).toBeLessThan(0.85);
+    // And the whole scale is used — a year that never has a bad day makes the
+    // mood chart a flat band near the top.
+    expect(Math.min(...ys)).toBeLessThan(0.3);
+    expect(Math.max(...ys)).toBeGreaterThan(0.75);
+  });
+
+  it("tells the prose what kind of day it was", () => {
+    const rng = mulberry32(3);
+    const tones = new Set<string>();
+    for (let i = 0; i < 300; i++) tones.add(dayModel({ date: isoShift("2026-01-01", i), rng }).tone);
+    expect([...tones].sort()).toEqual(["good", "hard", "mixed"]);
+  });
+
+  it("reads a tracker off the day by its builtin kind, not by its name", () => {
+    const m = model("2026-08-26");
+    // A RENAMED TRACKER IS STILL THE SAME TRACKER. The id follows the label, so
+    // a reader whose mood scale is called "Humour" must still get mood values.
+    const humour = { id: "Humour", builtin: "mood", type: "scale", min: 1, max: 5, step: 1 };
+    const v = trackerValueFor(humour, m, mulberry32(1));
+    expect(Number.isInteger(v)).toBe(true);
+    expect(v).toBeGreaterThanOrEqual(1);
+    expect(v).toBeLessThanOrEqual(5);
+    // And a scale the plugin has never heard of is scaled into ITS range.
+    const tenner = { id: "Steps", type: "number", min: 0, max: 10, step: 0.5 };
+    const s = trackerValueFor(tenner, m, mulberry32(1));
+    expect(s).toBeGreaterThanOrEqual(0);
+    expect(s).toBeLessThanOrEqual(10);
+    expect(Number.isInteger(s * 2)).toBe(true);
+  });
+
+  it("finds the edges of the lapse without being told where it is", () => {
+    const dates = ["2026-01-01", "2026-01-02", "2026-01-03", "2026-01-25", "2026-01-26"];
+    const { before, after } = gapEdges(dates);
+    expect(before.has("2026-01-03")).toBe(true);
+    expect(after.has("2026-01-26")).toBe(true);
+    expect(before.has("2026-01-25")).toBe(false);
+  });
+});
+
+describe("seed-vault: the month that bounds the open tasks", () => {
+  it("closes everything older than the window, with no exceptions", () => {
+    const rng = mulberry32(11);
+    for (let age = 31; age < 400; age += 7) {
+      const t = taskAging({ date: isoShift("2026-08-29", -age), today: "2026-08-29", rng });
+      expect(t.done).toBe(true);
+    }
+  });
+
+  it("leaves some of the last month open, more of it the nearer it is", () => {
+    const openAt = (age: number): number => {
+      const rng = mulberry32(4242);
+      let open = 0;
+      for (let i = 0; i < 300; i++) {
+        if (!taskAging({ date: isoShift("2026-08-29", -age), today: "2026-08-29", rng }).done) open++;
+      }
+      return open;
+    };
+    expect(openAt(0)).toBeGreaterThan(openAt(28));
+    expect(openAt(28)).toBeGreaterThan(0);
+  });
+
+  it("writes due dates and hours the plugin's own task parser reads back", () => {
+    const line = taskLine({
+      text: "Collect the parcel before the depot shuts",
+      done: false,
+      priority: "high",
+      due: "2026-08-30",
+      at: "17:30",
+    });
+    const task = parseTaskLine(line);
+    expect(task?.done).toBe(false);
+    expect(task?.priority).toBe("high");
+    expect(task?.due).toBe("2026-08-30");
+    // AN HOUR IS WHAT THE TIME GRID DRAWS A TASK AS A BLOCK BY, and it is
+    // dropped by the parser when the line carries no day — so the writer must
+    // never emit one alone.
+    expect(task?.at).toBe("17:30");
+    expect(parseTaskLine(taskLine({ text: "x", done: false, at: "09:00" }))?.at).toBeNull();
+    // The minimal form stays minimal: a normal, undated task is a plain line.
+    expect(taskLine({ text: "Back up the vault", done: true })).toBe("- (x) Back up the vault");
+  });
+
+  it("seeds a whole vault with no open task older than the window", () => {
+    const templates = new Map([
+      [
+        "T/Daily.md",
+        [
+          "---",
+          'journal-date: ""',
+          "# almanac:trackers:start",
+          "Mood:",
+          "# almanac:trackers:end",
+          "---",
+          "```almanac",
+          "# almanac:trackers:start",
+          "tracker:Mood",
+          "# almanac:trackers:end",
+          "```",
+          "<!--almanac:log",
+          "-->",
+          "<!--almanac:todo",
+          "-->",
+        ].join("\n"),
+      ],
+      [
+        "T/Weekly Entry.md",
+        '---\nweek-start: ""\n---\n<!--almanac:focus\n-->\n<!--almanac:todo\n-->\n',
+      ],
+    ]);
+    const settings = {
+      paths: { templatesDiary: "T", diaryRoot: "02 - Diary", diaryEntries: "02 - Diary/Entries" },
+      customJournals: [],
+      trackers: [
+        { id: "Mood", builtin: "mood", type: "scale", min: 1, max: 5, step: 1, surface: { kind: "diary", classes: ["daily"] } },
+      ],
+    };
+    const today = "2026-08-29";
+    const rng = mulberry32(20260818);
+    const dates = activeDays({ today, months: 13, rng });
+    const files = buildPlan({ settings, templates, corpus: {}, dates, rng, today, warn: () => {} });
+
+    const stale: string[] = [];
+    let open = 0;
+    for (const f of files as { path: string; content: string }[]) {
+      const date = /Day-(\d{4}-\d{2}-\d{2})/.exec(f.path)?.[1] ?? null;
+      const week = /week-start: "(\d{4}-\d{2}-\d{2})"/.exec(f.content)?.[1] ?? null;
+      const on = date ?? week;
+      for (const line of f.content.split("\n")) {
+        const task = parseTaskLine(line);
+        if (!task || task.done) continue;
+        open++;
+        if (on && isoDaysBetween(on, today) > 30) stale.push(`${f.path} — ${line}`);
+      }
+    }
+    // THE WHOLE POINT, IN ONE ASSERTION. Before this the same run left about
+    // two hundred open tasks in the vault, the oldest of them thirteen months
+    // stale, and `tasks-table` — a folder-scoped rollup of every open task
+    // under a folder — opened onto a wall of them.
+    expect(stale).toEqual([]);
+    // And not so few that the widgets have nothing to draw.
+    expect(open).toBeGreaterThan(3);
+    expect(open).toBeLessThan(60);
+  });
+
+  it("always ends on today, so the vault does not read as abandoned", () => {
+    for (const seed of [1, 2, 3, 20260818]) {
+      const dates = activeDays({ today: "2026-08-29", months: 13, rng: mulberry32(seed) });
+      expect(dates[dates.length - 1]).toBe("2026-08-29");
+      expect(dates).toContain("2026-08-28");
+      // Still sorted and still without duplicates after the two are ensured.
+      expect([...dates].sort()).toEqual(dates);
+      expect(new Set(dates).size).toBe(dates.length);
+    }
+  });
+});
+
+describe("seed-vault: charts the plugin can read back", () => {
+  it("round-trips every chart in the corpus through the plugin's own parser", () => {
+    const lost: string[] = [];
+    const drifted: string[] = [];
+    for (const [surface, specs] of Object.entries(DIARY_CHARTS as Record<string, never[]>)) {
+      for (const spec of specs) {
+        const line = chartLine(spec);
+        const [parsed] = parseChartDirectives([line]);
+        if (!parsed) {
+          lost.push(`${surface}: ${line}`);
+          continue;
+        }
+        // AND BYTE-IDENTICAL ON THE WAY BACK OUT, because the chart editor
+        // rewrites the whole fence the first time somebody touches one — a
+        // directive that parses but re-serialises differently turns into a diff
+        // in the reader's vault that nobody asked for.
+        if (serializeChartSpec(parsed) !== line) drifted.push(`${line} → ${serializeChartSpec(parsed)}`);
+      }
+    }
+    expect(lost).toEqual([]);
+    expect(drifted).toEqual([]);
+  });
+
+  it("keeps every chart key unique within its own note", () => {
+    for (const [surface, specs] of Object.entries(DIARY_CHARTS as Record<string, { key: string }[]>)) {
+      const keys = specs.map((s) => s.key);
+      expect([surface, new Set(keys).size]).toEqual([surface, keys.length]);
+    }
+  });
+
+  it("writes journal charts the journal parser reads back", () => {
+    const line = journalChartLine({ key: "js1", shape: "breakdown", tracker: "intensity" });
+    const [spec] = parseJournalChartDirectives([line]);
+    expect(spec.shape).toBe("breakdown");
+    expect(spec.tracker).toBe("intensity");
+    expect(serializeJournalChartSpec(spec)).toBe(line);
+  });
+
+  it("adds a journal-charts fence above the graph block, and only once", () => {
+    const note = "```almanac\njournal-header\n```\n\n%% almanac-graph %%\n%% [[Study|​]] %%\n";
+    const filled = fillJournalChartsFence(note, ["jchart:js1:trend:confidence"]);
+    expect(filled).toContain("```almanac-journal-charts");
+    // The hidden link pair is found by matching to the END of the note, so a
+    // fence written under it would take the note's graph edge with it.
+    expect(filled.indexOf("almanac-journal-charts")).toBeLessThan(filled.indexOf("%% almanac-graph %%"));
+    expect(parseJournalChartDirectives(filled.split("\n"))).toHaveLength(1);
+    // A second run is a no-op, which is the rule every patch in this tool
+    // follows: it fills what is empty and nothing else.
+    expect(fillJournalChartsFence(filled, ["jchart:js2:trend:accuracy"])).toBeNull();
+    // …until --force empties it first.
+    expect(fillJournalChartsFence(clearJournalChartsFence(filled), ["jchart:js2:trend:accuracy"])).toContain(
+      "jchart:js2:trend:accuracy"
+    );
+  });
+
+  it("charts a journal's own quantities before the ones every journal shares", () => {
+    const settings = {
+      trackers: [
+        { id: "confidence", type: "number", surface: { kind: "journal", typeId: null } },
+        { id: "status", type: "select", surface: { kind: "journal", typeId: null } },
+        { id: "duration", type: "number", surface: { kind: "journal", typeId: "exercise-diet" } },
+      ],
+    };
+    const have = new Set(["confidence", "status", "duration"]);
+    expect(journalChartTrackers(settings, "exercise-diet", have)).toEqual(["duration", "confidence"]);
+    // A select is not a magnitude — `chartableType` refuses one and so does
+    // this, or the dashboard gets a trend line through a set of words.
+    expect(journalChartTrackers(settings, "exercise-diet", have)).not.toContain("status");
+    // And a tracker with no readings is not charted at all, which is the same
+    // refusal `chartableTrackers` makes for the diary.
+    expect(journalChartTrackers(settings, "media", new Set())).toEqual([]);
+  });
+});
+
+describe("seed-vault: per-entry trackers", () => {
+  const NOTE = [
+    "---",
+    'journal-date: "2026-08-29"',
+    "# almanac:trackers:start",
+    "Mood:",
+    "# almanac:trackers:end",
+    "---",
+    "```almanac",
+    "entry-header",
+    "```",
+    "",
+    "```almanac",
+    "# almanac:trackers:start",
+    "tracker:Mood",
+    "sleep",
+    "# almanac:trackers:end",
+    "```",
+    "",
+  ].join("\n");
+
+  it("adds the widget inside the note's own tracker fence", () => {
+    const next = addTrackerDirective(NOTE, "tracker:Energy");
+    // Asked of the plugin's own reader, because the marker this splices at
+    // appears TWICE in a daily note — once in the frontmatter, listing keys, and
+    // once in a fence, listing widgets — and only one of them is a fence.
+    expect(noteTrackerDirectives(next.split("\n"))).toEqual(["tracker:Mood", "sleep", "tracker:Energy"]);
+    const region = locateTrackerRegion(next.split("\n"));
+    expect(region?.marked).toBe(true);
+    // The frontmatter block is untouched: still one key, still closed.
+    expect(next.split("---")[1]).toBe('\njournal-date: "2026-08-29"\n# almanac:trackers:start\nMood:\n# almanac:trackers:end\n');
+  });
+
+  it("adds it once, and refuses a note with no fence to put it in", () => {
+    const once = addTrackerDirective(NOTE, "tracker:Energy");
+    expect(addTrackerDirective(once, "tracker:Energy")).toBe(once);
+    expect(addTrackerDirective("---\nx: 1\n---\n\nplain note\n", "tracker:Energy")).toBeNull();
+  });
+
+  it("charts a per-entry tracker once the run has actually written one", () => {
+    const settings = {
+      trackers: [
+        { id: "Mood", surface: { kind: "diary", classes: ["daily"] } },
+        { id: "Energy", surface: { kind: "diary", classes: ["daily"] } },
+        { id: "Focus", surface: { kind: "diary", classes: ["daily"] } },
+      ],
+    };
+    const daily = "---\n# almanac:trackers:start\nMood:\n# almanac:trackers:end\n---\n";
+    // Unseeded, the old answer stands: declared, chartable, and no readings.
+    expect([...chartableTrackers({ settings, dailyTemplate: daily })]).toEqual(["Mood"]);
+    expect([...chartableTrackers({ settings, dailyTemplate: daily, seeded: ["Energy"] })]).toEqual([
+      "Mood",
+      "Energy",
+    ]);
+    // And a tracker nobody declared is still not chartable however loudly the
+    // run claims to have written it.
+    expect([...chartableTrackers({ settings, dailyTemplate: daily, seeded: ["Nonsense"] })]).toEqual(["Mood"]);
+  });
+});
+
+describe("seed-vault: the corpus says what the vault can hold", () => {
+  it("gives every status a value the Status tracker actually offers", () => {
+    // TWENTY-FOUR NOTES ONCE SAID `status: "done"`, which is not one of the
+    // three options the built-in declares. Nothing failed: the key existed, the
+    // write succeeded, `journal-tally:status` drew a bar for a value nothing
+    // defined, and `scheduleFor` — which drops a COMPLETED note out of the
+    // review queue — went on offering all twenty-four of them for review for
+    // ever.
+    const status = DEFAULT_TRACKERS.find((t) => t.builtin === "status");
+    const options = new Set(
+      String(status?.options ?? "")
+        .split(",")
+        .map((pair) => pair.split("=")[0].trim())
+    );
+    expect(options.size).toBeGreaterThan(0);
+    const bad: string[] = [];
+    const walk = (nodes: { children?: unknown[]; notes?: { title: string; status?: string }[] }[]): void => {
+      for (const n of nodes) {
+        for (const note of n.notes ?? []) {
+          if (note.status && !options.has(note.status)) bad.push(`${note.title}: ${note.status}`);
+        }
+        if (n.children) walk(n.children as never);
+      }
+    };
+    for (const j of Object.values(CORPUS) as { containers: never[] }[]) walk(j.containers);
+    expect(bad).toEqual([]);
+  });
+
+  it("answers a good day and a hard one with different sentences", () => {
+    const tones = [DIARY_LINES_GOOD, DIARY_LINES_MIXED, DIARY_LINES_HARD];
+    for (const list of tones) expect(list.length).toBeGreaterThanOrEqual(8);
+    const all = tones.flat();
+    expect(new Set(all).size).toBe(all.length);
+    expect(DIARY_LINES).toEqual(all);
+    for (const tone of ["good", "mixed", "hard"] as const) {
+      expect(DIARY_LINES_BY_TONE[tone].length).toBeGreaterThanOrEqual(8);
+    }
+  });
+
+  it("does not repeat a line while it is still the one a reader just saw", () => {
+    const rng = mulberry32(9);
+    const recent: string[] = [];
+    const drawn: string[] = [];
+    for (let i = 0; i < 60; i++) drawn.push(pickFresh(rng, DIARY_FOCUS, recent));
+    // Within any window the size of the memory, no line comes back — which is
+    // what the on-this-day widget shows a column of.
+    for (let i = 0; i < drawn.length; i++) {
+      const window = drawn.slice(Math.max(0, i - Math.floor(DIARY_FOCUS.length / 2) + 1), i);
+      expect(window).not.toContain(drawn[i]);
+    }
+  });
+
+  it("puts something in every month of the history, not just the fortnight ahead", () => {
+    // A demo vault whose only scheduled events were within a fortnight of today
+    // showed every past month's calendar empty — the widget working and the
+    // person apparently doing nothing.
+    const events = resolveEvents(SEED_EVENTS, "2026-08-29");
+    const past = events.filter((e) => e.kind === "single" && e.start < "2026-08-29");
+    expect(past.length).toBeGreaterThanOrEqual(10);
+    const months = new Set(past.map((e) => e.start.slice(0, 7)));
+    expect(months.size).toBeGreaterThanOrEqual(8);
+    // Ids stay unique, because an id is how the manager addresses one.
+    const ids = events.map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });

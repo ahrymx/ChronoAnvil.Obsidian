@@ -33,7 +33,7 @@ import { journalChartRefusal } from "./charts";
 import { describeSurface } from "../trackers/trackers";
 import type { TrackerDef, TrackerSurface } from "../trackers/trackers";
 import { journalTypeNamer } from "../trackers/entry-trackers";
-import { journalTypeOfNote } from "../journals/journal";
+import { journalTypeAtPath } from "../journals/journal";
 import type { JournalType } from "../journals/journal";
 import { cleanLabel } from "./journal-charts";
 import type { JournalChartShape, JournalChartSpec } from "./journal-charts";
@@ -150,7 +150,7 @@ class JournalChartEditModal extends EditorModal {
       opts.spec ? "Save" : "Add chart"
     );
     this.isNew = !opts.spec;
-    this.type = journalTypeOfNote(plugin, opts.notePath) ?? null;
+    this.type = journalTypeAtPath(plugin, opts.notePath) ?? null;
     const namer = journalTypeNamer(plugin);
     this.chartable = chartableJournalTrackers(
       plugin.settings.trackers,

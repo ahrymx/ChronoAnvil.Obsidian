@@ -41,6 +41,14 @@ export function hexToRgbInt(hex: string): number {
   return isNaN(num) ? 0 : num;
 }
 
+export const GRAIN_GRAPH_HUES = {
+  yearly: "#86efac",     // Brightest (vibrant light emerald)
+  quarterly: "#4ade80",  // Second brightest (bright spring green)
+  monthly: "#22c55e",    // Mid-tone (lush green)
+  weekly: "#16a34a",     // Deeper (forest green)
+  daily: "#166534",      // Darkest (deep pine green)
+};
+
 /**
  * Build the standard set of Obsidian Graph View color groups for an Almanac vault.
  */
@@ -66,22 +74,47 @@ export function buildAlmanacGraphGroups(
       query: `file:"${diaryRootName}" OR file:"${journalsRootName}" OR path:"${p.diaryDashboards}"`,
       color: { a: 1, rgb: hexToRgbInt(CANVAS_HUE.red) },
     },
-    // 3. Diary Entries (Emerald Green)
+    // 3. Yearly Entries (Brightest Green)
+    {
+      query: `path:"${p.diaryRoot}" file:Year-`,
+      color: { a: 1, rgb: hexToRgbInt(GRAIN_GRAPH_HUES.yearly) },
+    },
+    // 4. Quarterly Entries (Second Brightest Green)
+    {
+      query: `path:"${p.diaryRoot}" file:Quarter-`,
+      color: { a: 1, rgb: hexToRgbInt(GRAIN_GRAPH_HUES.quarterly) },
+    },
+    // 5. Monthly Entries (Mid-tone Green)
+    {
+      query: `path:"${p.diaryRoot}" file:Month-`,
+      color: { a: 1, rgb: hexToRgbInt(GRAIN_GRAPH_HUES.monthly) },
+    },
+    // 6. Weekly Entries (Deeper Green)
+    {
+      query: `path:"${p.diaryRoot}" file:Week-`,
+      color: { a: 1, rgb: hexToRgbInt(GRAIN_GRAPH_HUES.weekly) },
+    },
+    // 7. Daily Entries (Darkest Pine Green)
+    {
+      query: `path:"${p.diaryRoot}" file:Day-`,
+      color: { a: 1, rgb: hexToRgbInt(GRAIN_GRAPH_HUES.daily) },
+    },
+    // 8. Diary Entries Fallback (Emerald Green)
     {
       query: `path:"${entriesPath}"`,
       color: { a: 1, rgb: hexToRgbInt(CANVAS_HUE.green) },
     },
-    // 4. Journals (Indigo Blue)
+    // 9. Journals (Indigo Blue)
     {
       query: `path:"${p.journalsRoot}" -file:"${journalsRootName}"`,
       color: { a: 1, rgb: hexToRgbInt(CANVAS_HUE.blue) },
     },
-    // 5. Logbooks (Purple)
+    // 10. Logbooks (Purple)
     {
       query: `path:"${p.logbooks}"`,
       color: { a: 1, rgb: hexToRgbInt(CANVAS_HUE.purple) },
     },
-    // 6. Infrastructure Machinery (Slate Grey)
+    // 11. Infrastructure Machinery (Slate Grey)
     {
       query: `path:"${p.infrastructureRoot}"`,
       color: { a: 1, rgb: hexToRgbInt(CANVAS_HUE.grey) },
@@ -98,6 +131,11 @@ const ALMANAC_QUERY_PREFIXES = [
   "path:00 - Infrastructure",
   "file:02 - Diary",
   "file:03 - Journals",
+  "file:Year-",
+  "file:Quarter-",
+  "file:Month-",
+  "file:Week-",
+  "file:Day-",
 ];
 
 function isAlmanacQuery(query: string, p: typeof DEFAULT_PATHS): boolean {

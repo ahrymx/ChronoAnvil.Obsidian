@@ -1023,7 +1023,7 @@ export const MEDIA_PRESET: JournalPreset = {
       min: 1,
       max: 5,
       step: 1,
-      faces: ["★", "★★", "★★★", "★★★★", "★★★★★"],
+      faces: ["★", "★", "★", "★", "★"],
     },
     { id: "pagesRead", label: "📖 Pages read", type: "number", min: 0, step: 10, unit: "pages", reduce: "sum" },
     { id: "minutes", label: "⏱️ Minutes", type: "number", min: 0, step: 5, unit: "min", reduce: "sum" },

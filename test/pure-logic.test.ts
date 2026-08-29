@@ -39,6 +39,7 @@ import {
   sleepHours,
   awakeHours,
   formatDuration,
+  formatSleepRatio,
   meanClock,
   daysSinceWeekStart,
   aggregateActivity,
@@ -80,7 +81,7 @@ import {
 import { isCompletedStatus } from "../src/ui/tables";
 import { bucketByMonth, formatPeriodLabel } from "../src/charts/charts";
 import { relativeActivity } from "../src/core/query";
-import { journalTypeOfPath } from "../src/trackers/trackers";
+import { TRACKER_CLASSES, journalTypeOfPath } from "../src/trackers/trackers";
 import { deriveJournalFolders } from "../src/journals/custom-journal";
 import {
   DEFAULT_EVENT_COLOR,
@@ -132,7 +133,7 @@ import {
   ALL_TIME_DAYS,
 } from "../src/charts/charts";
 import type { ChartSpec, ChartPoint } from "../src/charts/charts";
-import type { ChartSpan } from "../src/trackers/trackers";
+import type { ChartScope, ChartSpan } from "../src/trackers/trackers";
 import { toValue } from "../src/charts/chart-render";
 import {
   formatScaleNoteTag,
@@ -646,6 +647,19 @@ describe("formatDuration", () => {
   });
 });
 
+describe("formatSleepRatio", () => {
+  it("renders hours and minutes in H:MMhrs format", () => {
+    expect(formatSleepRatio(7.5833)).toBe("7:35hrs");
+    expect(formatSleepRatio(16.4166)).toBe("16:25hrs");
+    expect(formatSleepRatio(8)).toBe("8:00hrs");
+    expect(formatSleepRatio(7.5)).toBe("7:30hrs");
+  });
+  it("em dash for a non-value", () => {
+    expect(formatSleepRatio(null)).toBe("—");
+    expect(formatSleepRatio(NaN)).toBe("—");
+  });
+});
+
 describe("meanClock", () => {
   it("averages morning wake times back to HH:mm", () => {
     expect(meanClock([420, 480])).toBe("07:30"); // 7:00 & 8:00
@@ -695,7 +709,30 @@ describe("chart scope", () => {
   });
 
   it("rejects an unknown scope rather than guessing", () => {
-    expect(parseChartDirectives(["chart:c1:Weight:line:365:weekly"])).toEqual([]);
+    // `weekly` USED TO BE THE EXAMPLE HERE, and it was the wrong one — this
+    // test was written when the grammar's scope group read `(daily|monthly)`
+    // and every grain became chartable in 2.58.5, so what it pinned was not the
+    // refusal but the gap. A token that is genuinely no scope at all makes the
+    // same assertion without depending on the list being short.
+    expect(parseChartDirectives(["chart:c1:Weight:line:365:hourly"])).toEqual([]);
+    expect(parseChartDirectives(["chart:c1:Weight:line:365:daily-by-week"])).toEqual([]);
+  });
+
+  it("reads back every scope its own serialiser can write", () => {
+    // THE GAP THIS CLOSES WAS SILENT AND HAD BEEN OPEN SINCE 2.52.
+    // `serializeChartSpec` will write any `ChartScope`, and the parser accepted
+    // two of the six — so a chart scoped to `daily-by-month` (the editor's
+    // *"Daily entries, by month"*) or to any grain but daily and monthly was
+    // written correctly, dropped on the next read, and vanished off the note
+    // with nothing said. Asserting the pair against the whole scope list is
+    // what stops the two drifting apart a third time.
+    for (const scope of [...TRACKER_CLASSES, "daily-by-month"] as ChartScope[]) {
+      const spec: ChartSpec = { key: "c1", tracker: "Mood", type: "line", range: "period", scope };
+      const line = serializeChartSpec(spec);
+      const [back] = parseChartDirectives([line]);
+      expect([scope, back]).toEqual([scope, scope === "daily" ? { ...spec, scope: undefined } : spec]);
+      expect(serializeChartSpec(back)).toBe(line);
+    }
   });
 
   it("filters monthly points against day-resolution windows", () => {

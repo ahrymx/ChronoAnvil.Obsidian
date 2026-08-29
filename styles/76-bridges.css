@@ -19,7 +19,76 @@
    been painted. */
 
 .am-bridge {
-  display: flow-root;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--am-radius-md);
+  padding: 10px 12px;
+  margin: 0 0 0.9em;
+  transition: border-color 0.15s ease;
+}
+
+.am-bridge:focus-within {
+  border-color: var(--interactive-accent);
+}
+
+/* Withhold surface when already inside a section card/block surface */
+.journal-sec-block .am-bridge,
+.journal-sec-fold .am-bridge {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.am-bridge .journal-sec {
+  padding: 2px 0;
+  margin-bottom: var(--am-space-2);
+}
+
+.am-bridge-chevron {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: transform 120ms ease;
+  flex: 0 0 auto;
+  margin-right: 4px;
+}
+
+.am-bridge-chevron .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.am-bridge.is-collapsed .am-bridge-chevron {
+  transform: rotate(-90deg);
+}
+
+.am-bridge.is-collapsed > .am-bridge-body {
+  display: none;
+}
+
+.am-bridge.is-collapsed .journal-sec {
+  margin-bottom: 0;
+}
+
+.am-bridge .journal-sec.is-foldable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.am-bridge .journal-sec.is-foldable:hover .journal-header-title {
+  color: var(--text-normal);
+}
+
+.am-bridge-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-space-2);
 }
 
 .am-bridge-list {
@@ -44,11 +113,11 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
-  margin-top: 6px;
+  margin-top: 2px;
 }
 
 .am-bridge-card {
-  background: var(--background-secondary);
+  background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--am-radius-sm);
   padding: 10px 14px;

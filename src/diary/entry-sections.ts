@@ -53,7 +53,6 @@ import { TRACKER_MARK_END, TRACKER_MARK_START } from "../core/constants";
 import { BANNER_ID, rowRuns } from "../core/note-sections";
 import {
   MODIFIER_KEYWORDS,
-  ROW_KEYWORD,
   isCellLine,
   isRowLine,
   splitDirective,
@@ -1475,20 +1474,16 @@ const isModifierLine = (line: string): boolean =>
 
 // One fence body, with its `row` line made true of what the fence now holds.
 //
-// `rowRuns` composes a `row` line for a run of two or more and none for a run
-// of one; this is that rule applied to a fence being REWRITTEN, where the
-// membership changed under it. Two directives or more and the line is there;
-// one and it is not.
-//
-// THE LINE GOES BACK AT THE TOP, which is where the composer puts it and the
-// only place it can go: `row` opens a fence and a `row` line in the middle of
-// one is not the grammar. A reader who typed their own `row:cards` keeps it,
-// because a fence whose widget count did not cross one is not touched at all.
+// A fence that HAD a `row` line keeps it while it holds two or more widgets,
+// and loses it when removals drop it to one — `rowRuns`' rule, applied to a
+// fence being REWRITTEN. A fence that never had a `row` line is an unrowed
+// stack (like an entry's shared band) and does NOT gain one.
 function tidyRowLine(body: readonly string[]): string[] {
-  const widgets = body.filter((l) => l.trim() && !isModifierLine(l)).length;
   const hasRow = body.some((l) => isRowLine(l.trim()));
+  if (!hasRow) return [...body];
+  const widgets = body.filter((l) => l.trim() && !isModifierLine(l)).length;
   if (widgets > 1) {
-    return hasRow ? [...body] : [ROW_KEYWORD, ...body];
+    return [...body];
   }
   return body.filter((l) => !isRowLine(l.trim()) && !isCellLine(l.trim()));
 }

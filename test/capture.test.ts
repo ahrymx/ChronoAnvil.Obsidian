@@ -11,6 +11,7 @@ import {
   grainsShowingCapture,
   logbookTargets,
   offersHostEntry,
+  scaleNoteCaptureHint,
 } from "../src/diary/capture";
 import { DEFAULT_LOGBOOKS, LOGBOOK_NOTE_KEY, type LogbookDef } from "../src/core/constants";
 // THE FORMATTER MOVED TO THE GRAMMAR'S OWN MODULE IN 4.52 and so did its own
@@ -150,6 +151,32 @@ describe("scale note as a capture line", () => {
     const line = formatLogItem(frag, "22:30");
     expect(line).toBe("22:30 — [scale:Energy=2]");
     expect(parseScaleNoteLine(line)!.trackerId).toBe("Energy");
+  });
+});
+
+describe("scaleNoteCaptureHint", () => {
+  it("describes the landing region as this entry for a diary entry", () => {
+    expect(
+      scaleNoteCaptureHint(false, "2026-08-29", "Intensity", 3, "2026-08-29")
+    ).toBe(
+      "Adds a timestamped note to this entry's Captured log, tagged to Intensity = 3."
+    );
+  });
+
+  it("describes the landing region as today's Captured log for a journal entry on today", () => {
+    expect(
+      scaleNoteCaptureHint(true, "2026-08-29", "Intensity", 3, "2026-08-29")
+    ).toBe(
+      "Adds a timestamped note to today's Captured log, tagged to Intensity = 3."
+    );
+  });
+
+  it("describes the landing region as the target date's Captured log for a past journal entry", () => {
+    expect(
+      scaleNoteCaptureHint(true, "2026-08-15", "Intensity", 3, "2026-08-29")
+    ).toBe(
+      "Adds a timestamped note to 2026-08-15's Captured log, tagged to Intensity = 3."
+    );
   });
 });
 

@@ -33,13 +33,26 @@ import { MarkdownPostProcessorContext, setIcon } from "obsidian";
 import type { EntryControlHost } from "./controls";
 import { CAPTURE_NOTE_KEY } from "../../core/constants";
 import { readNoteRegion } from "../../core/notestore";
-import { awakeHours, formatDuration, sleepHours } from "../../core/util";
+import {
+  awakeHours,
+  formatSleepRatio,
+  frontmatterOf,
+  isoDate,
+  sleepHours,
+  today,
+} from "../../core/util";
 import {
   TrackerDef,
   getBuiltinTracker,
   getTracker,
+  noteKindOf,
 } from "../../trackers/trackers";
-import { describeDirective, isManagedTemplate } from "../../trackers/entry-trackers";
+import {
+  describeDirective,
+  isManagedTemplate,
+  surfacePathConfig,
+} from "../../trackers/entry-trackers";
+import { locateEntry } from "../../diary/lineage";
 import { hasScaleNoteFor } from "../../journals/scale-notes";
 import { TagsEditor } from "../tags-editor";
 import {
@@ -73,6 +86,26 @@ export async function hasScaleNote(
 ): Promise<boolean> {
   const file = deps.fileOf(ctx);
   if (!file) return false;
+  const paths = surfacePathConfig(deps.plugin);
+  const fm = frontmatterOf(deps.plugin.app, file);
+  const kind = noteKindOf(paths, file.path, fm["journal"], fm["type"]);
+  if (kind?.surface === "journal") {
+    const targetDate =
+      isoDate(fm["date"]) ?? isoDate(fm["journal-date"]) ?? today();
+    const dayFile = locateEntry(
+      deps.plugin.app,
+      deps.plugin.settings.paths,
+      "daily",
+      targetDate
+    );
+    if (!dayFile) return false;
+    const text = await deps.plugin.app.vault.cachedRead(dayFile);
+    return hasScaleNoteFor(
+      readNoteRegion(text, CAPTURE_NOTE_KEY),
+      trackerId,
+      value
+    );
+  }
   const text = await deps.plugin.app.vault.cachedRead(file);
   return hasScaleNoteFor(
     readNoteRegion(text, CAPTURE_NOTE_KEY),
@@ -181,15 +214,25 @@ export function buildHabitChip(
 }
 
 
+export function cleanFaceGlyph(rawFace: string): string {
+  const trimmed = rawFace.trim();
+  const chars = Array.from(trimmed);
+  if (chars.length > 1 && chars.every((c) => c === chars[0])) {
+    return chars[0];
+  }
+  return trimmed;
+}
+
 export function buildScalePicker(
   deps: EntryControlHost,
   def: TrackerDef,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
-  const faces = def.faces ?? [];
-  if (faces.length < 2 || def.min == null || def.max == null || def.max <= def.min) {
+  const rawFaces = def.faces ?? [];
+  if (rawFaces.length < 2 || def.min == null || def.max == null || def.max <= def.min) {
     return null;
   }
+  const faces = rawFaces.map(cleanFaceGlyph);
   const step = def.step && def.step > 0 ? def.step : 1;
   const span = def.max - def.min;
   // Value each face maps to, snapped onto the tracker's own scale.
@@ -199,7 +242,12 @@ export function buildScalePicker(
     return Math.round(snapped * 1e6) / 1e6;
   };
 
-  const wrap = createSpan({ cls: "journal-widget journal-mood-picker" });
+  const isStars =
+    def.id.toLowerCase().includes("star") ||
+    (faces.length > 0 && faces.every((f) => f === "★" || f === "⭐"));
+  const wrap = createSpan({
+    cls: `journal-widget journal-mood-picker${isStars ? " is-stars" : ""}`,
+  });
   const facesRow = wrap.createSpan({ cls: "journal-scale-faces" });
   const initial = deps.currentValue(ctx, def.id);
   const initialNum =
@@ -312,6 +360,7 @@ export function buildScalePicker(
     // rather than a stray node beside a text child — `setText` on the
     // button would otherwise wipe the badge out.
     btn.createSpan({ cls: "journal-mood-face-glyph", text: face });
+    btn.createSpan({ cls: "journal-mood-face-val", text: String(value) });
     const selected = (): boolean =>
       known != null && Math.abs(valueFor(i) - known) < 1e-9;
     btn.addEventListener("click", (evt) => {
@@ -336,6 +385,16 @@ export function buildScalePicker(
       evt.stopPropagation();
       clear();
     });
+    if (isStars) {
+      btn.addEventListener("mouseenter", () => {
+        buttons.forEach((b, idx) => {
+          b.toggleClass("is-star-trail", idx <= i);
+        });
+      });
+      btn.addEventListener("mouseleave", () => {
+        buttons.forEach((b) => b.removeClass("is-star-trail"));
+      });
+    }
     buttons.push(btn);
   });
 
@@ -386,11 +445,15 @@ export function buildSleep(
     const awake = awakeHours(bedInput.value, wakeInput.value);
     readout.createSpan({
       cls: "journal-sleep-asleep",
-      text: `😴 ${formatDuration(hrs)} asleep`,
+      text: `😴 ${formatSleepRatio(hrs)}`,
+    });
+    readout.createSpan({
+      cls: "journal-sleep-divider",
+      text: "/",
     });
     readout.createSpan({
       cls: "journal-sleep-awake",
-      text: `☀️ ${formatDuration(awake)} awake`,
+      text: `${formatSleepRatio(awake)} ☀️`,
     });
   };
 

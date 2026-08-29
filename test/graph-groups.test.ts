@@ -11,6 +11,7 @@ import {
   buildAlmanacGraphGroups,
   mergeGraphConfig,
   configureGraphGroups,
+  GRAIN_GRAPH_HUES,
 } from "../src/core/graph-groups";
 import { DEFAULT_PATHS } from "../src/core/constants";
 import { CANVAS_HUE } from "../src/core/canvas-builder";
@@ -33,11 +34,23 @@ describe("graph-groups", () => {
   });
 
   describe("buildAlmanacGraphGroups", () => {
-    it("builds the standard six Almanac color groups", () => {
+    it("builds the standard eleven Almanac color groups with green hierarchy", () => {
       const groups = buildAlmanacGraphGroups(DEFAULT_PATHS);
-      expect(groups.length).toBe(6);
+      expect(groups.length).toBe(11);
 
-      const [workbenches, dashboards, entries, journals, logbooks, infra] = groups;
+      const [
+        workbenches,
+        dashboards,
+        yearly,
+        quarterly,
+        monthly,
+        weekly,
+        daily,
+        entriesFallback,
+        journals,
+        logbooks,
+        infra,
+      ] = groups;
 
       expect(workbenches.query).toBe("file:Homepage OR file:Search OR file:Staging");
       expect(workbenches.color.rgb).toBe(hexToRgbInt(CANVAS_HUE.amber));
@@ -45,8 +58,24 @@ describe("graph-groups", () => {
       expect(dashboards.query).toBe('file:"02 - Diary" OR file:"03 - Journals" OR path:"02 - Diary/Dashboards"');
       expect(dashboards.color.rgb).toBe(hexToRgbInt(CANVAS_HUE.red));
 
-      expect(entries.query).toBe('path:"02 - Diary/Entries"');
-      expect(entries.color.rgb).toBe(hexToRgbInt(CANVAS_HUE.green));
+      // Hierarchical greens: Year brightest (#86efac) -> Day darkest (#166534)
+      expect(yearly.query).toBe('path:"02 - Diary" file:Year-');
+      expect(yearly.color.rgb).toBe(hexToRgbInt(GRAIN_GRAPH_HUES.yearly));
+
+      expect(quarterly.query).toBe('path:"02 - Diary" file:Quarter-');
+      expect(quarterly.color.rgb).toBe(hexToRgbInt(GRAIN_GRAPH_HUES.quarterly));
+
+      expect(monthly.query).toBe('path:"02 - Diary" file:Month-');
+      expect(monthly.color.rgb).toBe(hexToRgbInt(GRAIN_GRAPH_HUES.monthly));
+
+      expect(weekly.query).toBe('path:"02 - Diary" file:Week-');
+      expect(weekly.color.rgb).toBe(hexToRgbInt(GRAIN_GRAPH_HUES.weekly));
+
+      expect(daily.query).toBe('path:"02 - Diary" file:Day-');
+      expect(daily.color.rgb).toBe(hexToRgbInt(GRAIN_GRAPH_HUES.daily));
+
+      expect(entriesFallback.query).toBe('path:"02 - Diary/Entries"');
+      expect(entriesFallback.color.rgb).toBe(hexToRgbInt(CANVAS_HUE.green));
 
       expect(journals.query).toBe('path:"03 - Journals" -file:"03 - Journals"');
       expect(journals.color.rgb).toBe(hexToRgbInt(CANVAS_HUE.blue));
@@ -75,10 +104,15 @@ describe("graph-groups", () => {
       const groups = buildAlmanacGraphGroups(customPaths);
       expect(groups[0].query).toBe("file:Home OR file:Find OR file:Inbox");
       expect(groups[1].query).toBe('file:"Journal" OR file:"Notebooks" OR path:"Journal/Boards"');
-      expect(groups[2].query).toBe('path:"Journal/Entries"');
-      expect(groups[3].query).toBe('path:"Notebooks" -file:"Notebooks"');
-      expect(groups[4].query).toBe('path:"Journal/Logs"');
-      expect(groups[5].query).toBe('path:"System"');
+      expect(groups[2].query).toBe('path:"Journal" file:Year-');
+      expect(groups[3].query).toBe('path:"Journal" file:Quarter-');
+      expect(groups[4].query).toBe('path:"Journal" file:Month-');
+      expect(groups[5].query).toBe('path:"Journal" file:Week-');
+      expect(groups[6].query).toBe('path:"Journal" file:Day-');
+      expect(groups[7].query).toBe('path:"Journal/Entries"');
+      expect(groups[8].query).toBe('path:"Notebooks" -file:"Notebooks"');
+      expect(groups[9].query).toBe('path:"Journal/Logs"');
+      expect(groups[10].query).toBe('path:"System"');
     });
   });
 
@@ -112,11 +146,11 @@ describe("graph-groups", () => {
       expect(parsed.linkDistance).toBe(300);
       expect(parsed.showArrow).toBe(true);
 
-      // 6 fresh Almanac groups + 2 preserved user groups (#project and Archive)
-      expect(parsed.colorGroups.length).toBe(8);
-      expect(parsed.colorGroups.slice(0, 6)).toEqual(groups);
-      expect(parsed.colorGroups[6]).toEqual({ query: "tag:#project", color: { a: 1, rgb: 123456 } });
-      expect(parsed.colorGroups[7]).toEqual({ query: "path:Archive", color: { a: 1, rgb: 654321 } });
+      // 11 fresh Almanac groups + 2 preserved user groups (#project and Archive)
+      expect(parsed.colorGroups.length).toBe(13);
+      expect(parsed.colorGroups.slice(0, 11)).toEqual(groups);
+      expect(parsed.colorGroups[11]).toEqual({ query: "tag:#project", color: { a: 1, rgb: 123456 } });
+      expect(parsed.colorGroups[12]).toEqual({ query: "path:Archive", color: { a: 1, rgb: 654321 } });
     });
   });
 
@@ -147,8 +181,8 @@ describe("graph-groups", () => {
 
       const parsed = JSON.parse(storage[".obsidian/graph.json"]);
       expect(parsed.repulseStrength).toBe(20);
-      expect(parsed.colorGroups.length).toBe(7);
-      expect(parsed.colorGroups[6]).toEqual({ query: "tag:#reading", color: { a: 1, rgb: 111111 } });
+      expect(parsed.colorGroups.length).toBe(12);
+      expect(parsed.colorGroups[11]).toEqual({ query: "tag:#reading", color: { a: 1, rgb: 111111 } });
     });
   });
 });

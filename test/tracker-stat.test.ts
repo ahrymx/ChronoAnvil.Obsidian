@@ -19,6 +19,10 @@ import { moment } from "./obsidian-stub";
 import { trackerCards } from "../src/trackers/tracker-stat";
 import type { TrackerDef } from "../src/trackers/trackers";
 import type { ChartPoint } from "../src/charts/charts";
+import { confidenceKinds, confidenceStats } from "../src/ui/tables";
+import { cleanFaceGlyph } from "../src/ui/widgets/tracker-controls";
+import { MEDIA_PRESET } from "../src/journals/journal";
+import type AlmanacPlugin from "../src/main";
 
 beforeAll(() => {
   // `window.moment` IS OBSIDIAN'S GLOBAL, not an import, so the shim has to be
@@ -122,3 +126,109 @@ describe("the cells a tracker can fill", () => {
     expect(cards[1].sub).toBe("over 1 entry");
   });
 });
+
+describe("confidenceKinds and confidenceStats on journal containers and roots", () => {
+  const plugin = {
+    settings: {
+      customJournals: [
+        {
+          id: "study",
+          name: "Study",
+          emoji: "🎓",
+          root: "03 - Journals/Study",
+          levels: [
+            { id: "subject", noun: "Subject" },
+            { id: "topic", noun: "Topic" },
+          ],
+          kinds: [
+            { id: "lesson", label: "Lesson", rating: "confidence" },
+            { id: "practice", label: "Practice", rating: "accuracy" },
+          ],
+        },
+        {
+          id: "media",
+          name: "Media",
+          emoji: "🍿",
+          root: "03 - Journals/Media",
+          levels: [{ id: "medium", noun: "Medium" }],
+          kinds: [{ id: "title", label: "Title", rating: "stars" }],
+        },
+      ],
+      trackers: [],
+    },
+  } as unknown as AlmanacPlugin;
+
+  it("resolves kinds for container folder paths, journal roots, and dashboard paths", () => {
+    expect(
+      confidenceKinds(plugin, "03 - Journals/Study/Linear Algebra", "confidence")
+    ).toEqual(["lesson"]);
+    expect(
+      confidenceKinds(plugin, "03 - Journals/Study", "confidence")
+    ).toEqual(["lesson"]);
+    expect(
+      confidenceKinds(plugin, "03 - Journals/Study/Study.md", "confidence")
+    ).toEqual(["lesson"]);
+    expect(
+      confidenceKinds(plugin, "03 - Journals/Media/Books", "stars")
+    ).toEqual(["title"]);
+    expect(
+      confidenceKinds(plugin, "03 - Journals/Media", "stars")
+    ).toEqual(["title"]);
+  });
+
+  it("returns empty array for paths outside any journal root", () => {
+    expect(
+      confidenceKinds(plugin, "01 - Workbenches/Homepage.md", "confidence")
+    ).toEqual([]);
+  });
+
+  it("computes confidenceStats average over typed pages in a container", () => {
+    const pages = [
+      {
+        file: { basename: "Lesson 1", path: "03 - Journals/Study/Linear Algebra/Vector Spaces/Lesson 1.md" } as any,
+        fm: { type: "lesson", confidence: 4, date: "2026-08-01" },
+      },
+      {
+        file: { basename: "Lesson 2", path: "03 - Journals/Study/Linear Algebra/Vector Spaces/Lesson 2.md" } as any,
+        fm: { type: "lesson", confidence: 5, date: "2026-08-02" },
+      },
+      {
+        file: { basename: "Practice 1", path: "03 - Journals/Study/Linear Algebra/Vector Spaces/Practice 1.md" } as any,
+        fm: { type: "practice", accuracy: 90, date: "2026-08-02" },
+      },
+    ];
+    const kinds = confidenceKinds(
+      plugin,
+      "03 - Journals/Study/Linear Algebra/Vector Spaces",
+      "confidence"
+    );
+    const stats = confidenceStats(pages, "confidence", kinds);
+    expect(stats).not.toBeNull();
+    expect(stats?.avg).toBe("4.5");
+    expect(stats?.count).toBe(2);
+  });
+});
+
+describe("scale picker faces and value labels", () => {
+  it("simplifies repeating face strings to a single emoji/glyph", () => {
+    expect(cleanFaceGlyph("★")).toBe("★");
+    expect(cleanFaceGlyph("★★★★")).toBe("★");
+    expect(cleanFaceGlyph("⭐⭐⭐⭐⭐")).toBe("⭐");
+    expect(cleanFaceGlyph("🔥🔥🔥")).toBe("🔥");
+    expect(cleanFaceGlyph("😄")).toBe("😄");
+    expect(cleanFaceGlyph("Low")).toBe("Low");
+  });
+
+  it("MEDIA_PRESET defines one star emoji per value", () => {
+    const starTracker = MEDIA_PRESET.trackers.find((t) => t.id === "stars");
+    expect(starTracker?.faces).toEqual(["★", "★", "★", "★", "★"]);
+  });
+
+  it("maps legacy repeating star strings cleanly across min..max", () => {
+    const legacyFaces = ["★", "★★", "★★★", "★★★★", "★★★★★"];
+    const cleaned = legacyFaces.map(cleanFaceGlyph);
+    expect(cleaned).toEqual(["★", "★", "★", "★", "★"]);
+  });
+});
+
+

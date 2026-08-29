@@ -37,12 +37,12 @@ import {
   hasNoteRegion,
 } from "../core/notestore";
 import { formatScaleNoteTag, type ScaleNote } from "../journals/scale-notes";
-import { frontmatterOf, getFile, moment, today } from "../core/util";
-import { CLASS_DEFS, TRACKER_CLASSES } from "../trackers/trackers";
+import { frontmatterOf, getFile, isoDate, moment, today } from "../core/util";
+import { CLASS_DEFS, TRACKER_CLASSES, noteKindOf } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
 import { sectionsForEntry } from "./entry-sections";
 import { currentEntryKey, entryDateKey, labelForGrain } from "./nav";
-import { isManagedTemplate } from "../trackers/entry-trackers";
+import { isManagedTemplate, surfacePathConfig } from "../trackers/entry-trackers";
 import { serializeLogItem } from "./log-items";
 import { whenEditor, type WhenValue } from "../ui/when-editor";
 
@@ -648,28 +648,63 @@ export function openCapture(plugin: AlmanacPlugin, host?: TFile | null): void {
   });
 }
 
+// How the scale-note capture window describes where the context note will land.
+//
+// A diary entry holds its own `capture` region, so the note lands in "this
+// entry's Captured log". A journal note has no capture region (journals are not
+// supposed to have capture logs), but sends the capture over to the diary
+// subsystem — targeting the daily entry for the journal note's date (or today).
+export function scaleNoteCaptureHint(
+  isJournal: boolean,
+  targetDate: string,
+  label: string,
+  value: number,
+  todayStr: string = today()
+): string {
+  const dest = isJournal
+    ? targetDate === todayStr
+      ? "today's"
+      : `${targetDate}'s`
+    : "this entry's";
+  return `Adds a timestamped note to ${dest} Captured log, tagged to ${label} = ${value}.`;
+}
+
 // Open the capture overlay to attach a context note to one scale reading. Same
 // box as quick capture, but bound to a specific reading: it writes a tagged
-// capture into `file`'s log (the entry the picker is on, which may be a
-// back-filled past day), doesn't touch the global quick-capture draft, and
-// seeds itself with the reading's label + value so the box says what it's for.
+// capture into the entry's log (for a diary entry) or routes the capture to the
+// diary subsystem (for a journal note, since journals do not have capture logs),
+// doesn't touch the global quick-capture draft, and seeds itself with the
+// reading's label + value so the box says what it's for.
 export function openScaleNoteCapture(
   plugin: AlmanacPlugin,
   file: TFile,
   note: { trackerId: string; value: number; label: string; initialText?: string }
 ): void {
+  const paths = surfacePathConfig(plugin);
+  const fm = frontmatterOf(plugin.app, file);
+  const kind = noteKindOf(paths, file.path, fm["journal"], fm["type"]);
+  const isJournal = kind?.surface === "journal";
+  const targetDate = isoDate(fm["date"]) ?? isoDate(fm["journal-date"]) ?? today();
+  const hint = scaleNoteCaptureHint(isJournal, targetDate, note.label, note.value);
+
   new CaptureModal(plugin.app, plugin, {
     title: `Note on ${note.label}`,
-    hint: `Adds a timestamped note to this entry's Captured log, tagged to ${note.label} = ${note.value}.`,
+    hint,
     placeholder: "Why? (optional)",
     initialValue: note.initialText ?? "",
     persistDraft: false,
-    onSave: (text) =>
-      captureScaleNote(plugin, file, {
+    onSave: async (text) => {
+      let targetFile: TFile | null = file;
+      if (isJournal) {
+        targetFile = await plugin.diary.openOrCreateDay(targetDate, { reveal: false });
+        if (!targetFile) return false;
+      }
+      return captureScaleNote(plugin, targetFile, {
         trackerId: note.trackerId,
         value: note.value,
         text,
-      }),
+      });
+    },
     successNotice: () => `Noted on ${note.label}`,
   }).open();
 }

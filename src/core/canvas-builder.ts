@@ -644,7 +644,8 @@ export function mergeCanvas(
     newX += node.width + GAP;
   }
 
-  const foreign = disk.nodes.filter((n) => n && !rebuiltIds.has(n.id));
+  const isAlmanacId = (id: string) => id.startsWith("node-") || id.startsWith("group-");
+  const foreign = disk.nodes.filter((n) => n && !rebuiltIds.has(n.id) && !isAlmanacId(n.id));
   return {
     doc: { nodes: [...nodes, ...foreign], edges: rebuilt.edges },
     kept,

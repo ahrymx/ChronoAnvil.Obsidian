@@ -49,7 +49,7 @@ describe("no widget borrows Study's identity any more", () => {
   it("resolves a host note's type without a default", () => {
     expect(tables()).toContain("): JournalType | null {");
     expect(tables()).toContain(
-      "return journalTypeOfNote(plugin, notePath) ?? null;"
+      "return journalTypeAtPath(plugin, notePath) ?? null;"
     );
   });
 
@@ -125,7 +125,7 @@ describe("no widget borrows Study's identity any more", () => {
     // For a note outside every root the honest answer is none — it used to be
     // Study's kinds, so an average counted whatever Study-shaped notes were
     // lying around nearby.
-    expect(tables()).toMatch(/const type = journalTypeOfNote\(plugin, notePath\);\s*\n\s*if \(!type\) return \[\];/);
+    expect(tables()).toMatch(/const type = journalTypeAtPath\(plugin, notePath\);\s*\n\s*if \(!type\) return \[\];/);
   });
 
   it("shows no activity date rather than a foreign one", () => {

@@ -631,7 +631,7 @@ describe("canvas-builder · mergeCanvas", () => {
     // A retired id is one the PLUGIN put there — prefixed like the rest — so it
     // is dropped rather than treated as the reader's own.
     const { doc } = mergeCanvas(disk, rebuilt());
-    expect(byId(doc, "node-daily-7")).toBeDefined();
+    expect(byId(doc, "node-daily-7")).toBeUndefined();
   });
 
   // THE RULE THAT MAKES THE FILE SAFE TO WORK IN.

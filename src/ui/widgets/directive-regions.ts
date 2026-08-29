@@ -76,7 +76,7 @@ import {
   buildUpcomingEvents,
   DEFAULT_UPCOMING,
 } from "../../events/event-widgets";
-import { journalTypeOfNote, registeredJournalTypes } from "../../journals/journal";
+import { journalTypeAtPath, registeredJournalTypes } from "../../journals/journal";
 import { buildJournalsSection } from "../../journals/journals-section";
 import { buildCard, buildJournalCards } from "../../journals/journals-cards";
 import { queueScope } from "../../review/review-queue";
@@ -403,7 +403,7 @@ export function buildJournalChartRegion(
   const trackerId = preset
     ? getBuiltinTracker(plugin, "confidence")?.id ?? "confidence"
     : rest.trim();
-  const type = journalTypeOfNote(plugin, ctx.sourcePath);
+  const type = journalTypeAtPath(plugin, ctx.sourcePath);
   const namer = journalTypeNamer(plugin);
   const def = getTracker(plugin, trackerId);
   const refusal = journalChartRefusal(

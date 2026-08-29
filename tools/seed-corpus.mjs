@@ -51,7 +51,7 @@ export const CORPUS = {
                 kind: "lesson",
                 title: "Chirality and R,S notation",
                 rating: 4,
-                status: "done",
+                status: "completed",
                 sections: {
                   Overview:
                     "A carbon with four different groups has a non-superimposable mirror image. Naming which one you have is the whole of R,S — everything downstream (optical rotation, biological activity, reaction outcomes) depends on getting it right first.",
@@ -110,7 +110,7 @@ export const CORPUS = {
                 kind: "practice",
                 title: "Assigning R and S — 20 structures",
                 rating: 5,
-                status: "done",
+                status: "completed",
                 sections: {
                   "Related Lessons": [
                     "[[Chirality and R,S notation]] — the priority rules this drills.",
@@ -183,7 +183,7 @@ export const CORPUS = {
                 kind: "lesson",
                 title: "Basis and dimension",
                 rating: 4,
-                status: "done",
+                status: "completed",
                 sections: {
                   Overview:
                     "A basis is the smallest set of vectors that still describes everything in the space. Dimension is how many you needed — and the surprise is that the number never depends on which basis you picked.",
@@ -234,7 +234,7 @@ export const CORPUS = {
                 kind: "practice",
                 title: "Row reduction drill",
                 rating: 4,
-                status: "done",
+                status: "completed",
                 sections: {
                   "Related Lessons": ["[[Rank and nullity]] — reading rank off the echelon form."],
                   Summary: "Clean run. Echelon form is automatic now; reading nullity off it still needs a pause.",
@@ -309,8 +309,9 @@ export const CORPUS = {
             notes: [
               {
                 kind: "decision",
+                trackers: { confidence: 4 },
                 title: "Run the under-cabinet lighting on its own circuit",
-                status: "done",
+                status: "completed",
                 sections: {
                   Overview: [
                     "**Decision:** its own 6A circuit off the consumer unit, not spurred from the ring.",
@@ -329,8 +330,9 @@ export const CORPUS = {
               },
               {
                 kind: "update",
+                trackers: { confidence: 3 },
                 title: "First fix complete",
-                status: "done",
+                status: "completed",
                 sections: {
                   Overview:
                     "All cable runs in, back boxes set, board work done. The new RCBO is in and labelled. Everything is dead until the sockets go on.",
@@ -344,6 +346,7 @@ export const CORPUS = {
               },
               {
                 kind: "update",
+                trackers: { confidence: 4 },
                 title: "Second fix and sign-off",
                 status: "in-progress",
                 sections: {
@@ -362,8 +365,9 @@ export const CORPUS = {
             notes: [
               {
                 kind: "update",
+                trackers: { confidence: 5 },
                 title: "Beds built and filled",
-                status: "done",
+                status: "completed",
                 sections: {
                   Overview:
                     "Three raised beds, 2.4m by 1.2m, scaffold boards doubled. Filled with a topsoil and compost mix, roughly three to one.",
@@ -386,8 +390,9 @@ export const CORPUS = {
             notes: [
               {
                 kind: "decision",
+                trackers: { confidence: 4 },
                 title: "Journal order lives in the settings array",
-                status: "done",
+                status: "completed",
                 sections: {
                   Overview: [
                     "**Decision:** reorder `customJournals` itself rather than adding an order field to each journal.",
@@ -405,8 +410,9 @@ export const CORPUS = {
               },
               {
                 kind: "update",
+                trackers: { confidence: 3 },
                 title: "Drag on the cards, a window on the sections",
-                status: "done",
+                status: "completed",
                 sections: {
                   Overview:
                     "The homepage draws journals as cards, so those are dragged. The Journals page draws them as full-width sections with their contents inside, so that gets a button and a small window. One write underneath both.",
@@ -420,8 +426,9 @@ export const CORPUS = {
               },
               {
                 kind: "update",
+                trackers: { confidence: 2 },
                 title: "Card borders were never drawing",
-                status: "done",
+                status: "completed",
                 sections: {
                   Overview:
                     "Three releases of white card edges traced to one rule: a token that named a theme colour was declared on `:root`, and Obsidian declares its colours on `body`. A custom property's references resolve where it is declared, so the token was invalid everywhere.",
@@ -448,7 +455,7 @@ export const CORPUS = {
             kind: "workout",
             title: "Easy 5k",
             rating: 2,
-            status: "done",
+            status: "completed",
             trackers: { duration: 31, distance: 5.1, calories: 380 },
             sections: {
               Overview: [
@@ -463,7 +470,7 @@ export const CORPUS = {
             kind: "workout",
             title: "Intervals — 6 × 800m",
             rating: 4,
-            status: "done",
+            status: "completed",
             trackers: { duration: 44, distance: 8.2, calories: 610 },
             sections: {
               Overview: [
@@ -478,7 +485,7 @@ export const CORPUS = {
             kind: "workout",
             title: "Long run — 16k",
             rating: 3,
-            status: "done",
+            status: "completed",
             trackers: { duration: 98, distance: 16.4, calories: 1150 },
             sections: {
               Overview: ["16.4k, rolling, deliberately slow.", "Fuelled at 8k and 13k."],
@@ -489,7 +496,7 @@ export const CORPUS = {
           {
             kind: "meal",
             title: "Overnight oats",
-            status: "done",
+            status: "completed",
             trackers: { calories: 520, protein: 28 },
             sections: {
               Overview: [
@@ -505,7 +512,7 @@ export const CORPUS = {
           {
             kind: "meal",
             title: "Chicken, rice and greens",
-            status: "done",
+            status: "completed",
             trackers: { calories: 680, protein: 52 },
             sections: {
               Overview: ["200g chicken thigh", "150g cooked rice", "Broccoli", "Soy and ginger"],
@@ -523,7 +530,7 @@ export const CORPUS = {
             kind: "workout",
             title: "Lower — squat focus",
             rating: 4,
-            status: "done",
+            status: "completed",
             trackers: { duration: 62, calories: 430 },
             sections: {
               Overview: [
@@ -539,7 +546,7 @@ export const CORPUS = {
             kind: "workout",
             title: "Upper — press focus",
             rating: 3,
-            status: "done",
+            status: "completed",
             trackers: { duration: 55, calories: 360 },
             sections: {
               Overview: [
@@ -554,7 +561,7 @@ export const CORPUS = {
           {
             kind: "meal",
             title: "Post-session shake",
-            status: "done",
+            status: "completed",
             trackers: { calories: 340, protein: 40 },
             sections: {
               Overview: ["2 scoops whey", "Banana", "300ml milk"],
@@ -578,7 +585,7 @@ export const CORPUS = {
             kind: "title",
             title: "The Design of Everyday Things",
             rating: 5,
-            status: "done",
+            status: "completed",
             trackers: { pagesRead: 368 },
             sections: {
               Overview:
@@ -607,7 +614,7 @@ export const CORPUS = {
             kind: "title",
             title: "Piranesi",
             rating: 5,
-            status: "done",
+            status: "completed",
             trackers: { pagesRead: 245 },
             sections: {
               Overview: "A man, a house of endless halls and tides, and a journal he cannot fully trust.",
@@ -625,7 +632,7 @@ export const CORPUS = {
             kind: "title",
             title: "Arrival",
             rating: 5,
-            status: "done",
+            status: "completed",
             trackers: { minutes: 116 },
             sections: {
               Overview: "First contact told through linguistics, and a structure that only resolves at the end.",
@@ -637,7 +644,7 @@ export const CORPUS = {
             kind: "title",
             title: "Paddington 2",
             rating: 5,
-            status: "done",
+            status: "completed",
             trackers: { minutes: 103 },
             sections: {
               Overview: "A bear, a pop-up book, and a prison kitchen turned around by marmalade.",
@@ -655,7 +662,7 @@ export const CORPUS = {
             kind: "title",
             title: "The Bear — series one",
             rating: 4,
-            status: "done",
+            status: "completed",
             trackers: { minutes: 240 },
             sections: {
               Overview: "A fine-dining chef inherits a sandwich shop and everyone's grief with it.",
@@ -673,7 +680,7 @@ export const CORPUS = {
             kind: "title",
             title: "Outer Wilds",
             rating: 5,
-            status: "done",
+            status: "completed",
             trackers: { minutes: 1320 },
             sections: {
               Overview: "A solar system on a 22-minute loop, and the only progression is what you understand.",
@@ -693,31 +700,81 @@ export const CORPUS = {
 // drawn from rather than assigned in order, so a year of entries does not read
 // as a loop — the engine's seeded generator picks, which is what keeps the same
 // seed producing the same year.
-export const DIARY_LINES = [
-  "Quiet start, then the afternoon ran away. Better than yesterday.",
-  "Long walk before it got warm. Worth the early alarm.",
-  "Slow morning on purpose. No guilt about it.",
+// ── WHY THE DAY LINES ARE THREE LISTS AND NOT ONE (4.83) ─────────────────
+//
+// The engine now knows what kind of day it generated — five hours' sleep and a
+// mood of 2 is not the same day as eight hours and a 5 — and a corpus drawn
+// from uniformly cannot say so. A year in which "Cleared the desk, cleared the
+// inbox, cleared the head" lands on the worst-rated day of the month is a year
+// whose numbers and whose prose are about two different people, and the reader
+// who notices is the reader looking closely enough to be worth convincing.
+//
+// So the tone is part of the corpus rather than a thing the engine infers from
+// the words. `DIARY_LINES` stays exported as the flat concatenation, because a
+// line is a line and the "no two lists share a sentence" invariant is asserted
+// over all of them at once.
+export const DIARY_LINES_GOOD = [
   "Got the difficult thing done first and the rest was easy.",
-  "Rained all day. Read instead, which was the right trade.",
-  "Two good hours of work and then nothing useful. Fine.",
-  "Cooked properly for once rather than assembling something.",
-  "Went in early to get ahead of the noise. It worked.",
-  "Nothing much happened and that was the point.",
-  "Caught up on the backlog that had been bothering me all week.",
-  "Legs sore from yesterday. Kept it easy.",
-  "Good conversation over lunch that changed how I'm thinking about the project.",
-  "Late night, and I'll pay for it tomorrow.",
   "Cleared the desk, cleared the inbox, cleared the head.",
-  "Frustrating day — three attempts at the same problem, none of them right.",
   "Finally saw why it wasn't working. Obvious in hindsight.",
+  "Long walk before it got warm. Worth the early alarm.",
+  "Went in early to get ahead of the noise. It worked.",
+  "Caught up on the backlog that had been bothering me all week.",
+  "Cooked properly for once rather than assembling something.",
+  "Woke before the alarm and the morning was twice as long.",
+  "Wrote the thing in one sitting, which almost never happens.",
+  "Said no to two meetings and got the afternoon back.",
 ];
+
+export const DIARY_LINES_MIXED = [
+  "Quiet start, then the afternoon ran away. Better than yesterday.",
+  "Two good hours of work and then nothing useful. Fine.",
+  "Slow morning on purpose. No guilt about it.",
+  "Nothing much happened and that was the point.",
+  "Rained all day. Read instead, which was the right trade.",
+  "Good conversation over lunch that changed how I'm thinking about the project.",
+  "Half a day of admin, half a day of the real thing. About the usual split.",
+  "Kept moving without ever quite getting going. Some days are that.",
+  "Errands all morning, so the work started late and finished late.",
+  "Nothing finished, but three things are closer than they were.",
+];
+
+export const DIARY_LINES_HARD = [
+  "Frustrating day — three attempts at the same problem, none of them right.",
+  "Late night, and I'll pay for it tomorrow.",
+  "Legs sore from yesterday. Kept it easy.",
+  "Woke at four and never really got back to sleep.",
+  "Everything took twice as long as it should have.",
+  "Ran out of patience before I ran out of day.",
+  "Too many small interruptions to hold anything in my head.",
+  "Under the weather. Did the minimum and stopped early.",
+  "Read the same paragraph until I gave up and went outside.",
+  "One of those days that is mostly about getting to the end of it.",
+];
+
+// The flat list, which is what the tone-blind callers and the corpus tests
+// want. Order is good → mixed → hard and nothing depends on it.
+export const DIARY_LINES = [...DIARY_LINES_GOOD, ...DIARY_LINES_MIXED, ...DIARY_LINES_HARD];
+
+// Keyed by the tone the day model reports, so the engine asks for a tone and
+// never for an index. A tone this map does not have falls back to the flat list
+// at the call site rather than here.
+export const DIARY_LINES_BY_TONE = {
+  good: DIARY_LINES_GOOD,
+  mixed: DIARY_LINES_MIXED,
+  hard: DIARY_LINES_HARD,
+};
 
 // The daily's four written regions. Kept as four separate lists rather than one
 // blob because the template asks four different QUESTIONS — "what are you
 // focusing on today?", "what went well?", "what got in the way?" — and a seeded
 // vault whose Challenges read like its Highlights teaches the reader that the
 // prompts do not matter. Each list is written to answer its own prompt.
-
+//
+// LENGTH IS A FEATURE HERE (4.83). Ten lines over two hundred and seventy days
+// is each line seventeen times, which a reader scrolling the on-this-day widget
+// sees immediately; the engine also refuses to repeat a line while it is still
+// recent, and a short list makes that refusal impossible to honour.
 export const DIARY_FOCUS = [
   "Finish the stereochemistry problem set before it stacks up.",
   "One long run, then leave the legs alone.",
@@ -729,6 +786,14 @@ export const DIARY_FOCUS = [
   "Nothing scheduled. Keep it that way.",
   "Test coverage on the parser — it has been owed for a fortnight.",
   "Cook something that takes longer than twenty minutes.",
+  "One task, start to finish, before opening anything else.",
+  "Write the migration note while the reasoning is still in my head.",
+  "Walk at lunch whatever the weather.",
+  "Answer the three emails I have been stepping around.",
+  "Close two branches rather than opening a third.",
+  "Revision only — no new material today.",
+  "Leave the desk at six and mean it.",
+  "Plan the week properly instead of improvising it on Tuesday.",
 ];
 
 export const DIARY_HIGHLIGHTS = [
@@ -742,6 +807,14 @@ export const DIARY_HIGHLIGHTS = [
   "Cooked properly and there were leftovers.",
   "The refactor came out smaller than the thing it replaced.",
   "Slept through the night without waking at four.",
+  "Explained the design out loud and it held up.",
+  "Found the bug by reading rather than by printing.",
+  "Went outside between the two hard blocks and came back sharper.",
+  "Closed the oldest thing on the list.",
+  "Wrote two pages that will not need rewriting.",
+  "The test suite went green on the first run.",
+  "Turned down something I would have said yes to a year ago.",
+  "Made the diagram simple enough that nobody asked about it.",
 ];
 
 export const DIARY_CHALLENGES = [
@@ -755,8 +828,26 @@ export const DIARY_CHALLENGES = [
   "Ate badly because I had not planned anything.",
   "Started the difficult thing at five o'clock, which was too late.",
   "Went round in circles on a decision that did not matter.",
+  "Answered messages all afternoon and finished nothing.",
+  "Sat down to write and reorganised my notes instead.",
+  "The build broke for a reason nobody could reproduce.",
+  "Skipped lunch and felt it by three.",
+  "Said yes to a meeting I should have declined.",
+  "Too warm to sleep, so the whole day started behind.",
+  "Kept switching between two tasks and did neither well.",
+  "Spent an hour on a setting nobody will ever notice.",
 ];
 
+// ── The tasks, and the two shapes a seeded one comes in (4.83) ───────────
+//
+// `DIARY_TASKS` is the everyday list: small, personal, done within a day or two
+// of being written, and the reason the engine can cross almost all of them off
+// without the vault reading as fiction.
+//
+// `DIARY_TASKS_STANDING` is the other kind — the ones with an hour and a date,
+// which is the only kind the TIME GRID can draw. A task without `due` is a fact
+// about no particular day, so a vault seeded entirely from the list above left
+// the grid's task lane empty on every one of its days.
 export const DIARY_TASKS = [
   "Reply to the email that has been sitting there",
   "Book the appointment",
@@ -768,6 +859,25 @@ export const DIARY_TASKS = [
   "Stretch, properly, for ten minutes",
   "Write up yesterday's notes while they still mean something",
   "Sort the photos off the phone",
+  "Pay the invoice before it goes late",
+  "Ring the bank about the duplicate charge",
+  "Put the winter clothes somewhere sensible",
+  "Water the plants that are still alive",
+  "Order the part for the bike",
+  "Update the CV while there is something to add",
+  "Cancel the thing I signed up to in January",
+  "Take the recycling out properly this time",
+  "Send the photos I promised three weeks ago",
+  "Print the form and actually post it",
+];
+
+export const DIARY_TASKS_STANDING = [
+  "Call the surgery when the line opens",
+  "Collect the parcel before the depot shuts",
+  "Join the retro call",
+  "Drop the car in for its service",
+  "Meet Ben at the station",
+  "Sign the paperwork before the deadline",
 ];
 
 // ── The logs (4.62) ──────────────────────────────────────────────────────
@@ -808,6 +918,14 @@ export const WORK_LOG = [
   "Wrote the migration note for people upgrading from the old layout",
   "Took the diagram apart and drew it again with fewer boxes",
   "Chased the flaky deploy and found a race in the health check",
+  "Wrote the failing test first, which made the fix obvious",
+  "Went through the error strings and rewrote the six nobody could act on",
+  "Split the settings page in two so each half fits on a screen",
+  "Spent the morning deleting code that had no callers left",
+  "Walked a new starter through the layout and found three things I could not explain",
+  "Benchmarked the parser properly rather than guessing at it",
+  "Merged the long-running branch before it grew a second week of drift",
+  "Turned the runbook into a script, which is what it always wanted to be",
 ];
 
 // The focus book: what you are working towards, and when that changed. Fewer
@@ -860,6 +978,14 @@ export const DIARY_CAPTURES = [
   "Try the smaller font on the entry header and see if anyone notices",
   "Remember to actually take the afternoon off on Friday",
   "The bug is in the timezone, it is always in the timezone",
+  "Ask whether anyone still reads the weekly summary",
+  "Two words for the release notes: fewer, clearer",
+  "The empty state is the first screen most people see — treat it like one",
+  "Move the appointment, that week is already full",
+  "Somebody should write down why we stopped doing it the other way",
+  "Half the settings could be one setting with a better name",
+  "Buy a card for Anna before the weekend",
+  "If it needs a comment to be safe, it needs a test to stay safe",
 ];
 
 // ── The events (4.62) ────────────────────────────────────────────────────
@@ -954,6 +1080,136 @@ export const SEED_EVENTS = [
     icon: "utensils",
     color: "green",
   },
+
+  // ── THE PAST, WHICH THE OFFSETS ABOVE LEFT EMPTY (4.83) ────────────────
+  //
+  // Every scheduled event in this list used to sit within a fortnight of the
+  // run's "today", because the list was written to make the AGENDA look alive.
+  // It did — and it left a year of calendars with nothing on them but two
+  // birthdays, so scrolling a demo vault back one month showed the month view
+  // working and the person using it apparently doing nothing at all.
+  //
+  // These are the same shape with the sign reversed: far enough back to fill
+  // the history, spaced so no month is bare, and each one the sort of thing you
+  // would still be able to name a year later. They move with `--today` exactly
+  // as the future ones do, so the history stays a history rather than becoming
+  // an archive of early 2026.
+  {
+    title: "Moving day",
+    kind: "single",
+    startOffset: -337,
+    endOffset: -336,
+    icon: "truck",
+    color: "amber",
+    note: "Van booked for eight, keys back by six",
+  },
+  {
+    title: "Winter conference",
+    kind: "single",
+    startOffset: -298,
+    endOffset: -295,
+    icon: "presentation",
+    color: "purple",
+  },
+  {
+    title: "Half marathon",
+    kind: "single",
+    startOffset: -244,
+    time: "09:00",
+    duration: 150,
+    icon: "medal",
+    color: "green",
+  },
+  {
+    title: "Sarah and Tom's wedding",
+    kind: "single",
+    startOffset: -212,
+    time: "13:00",
+    duration: 480,
+    icon: "heart",
+    color: "pink",
+  },
+  {
+    title: "Module exam",
+    kind: "single",
+    startOffset: -176,
+    time: "09:30",
+    duration: 180,
+    icon: "graduation-cap",
+    color: "red",
+    note: "Stereochemistry and mechanisms",
+  },
+  {
+    title: "Parents visiting",
+    kind: "single",
+    startOffset: -148,
+    endOffset: -146,
+    icon: "home",
+    color: "teal",
+  },
+  {
+    title: "Flu jab",
+    kind: "single",
+    startOffset: -121,
+    time: "16:20",
+    duration: 15,
+    icon: "syringe",
+    color: "red",
+  },
+  {
+    title: "Team offsite",
+    kind: "single",
+    startOffset: -96,
+    endOffset: -94,
+    icon: "users",
+    color: "blue",
+    note: "Two days of planning and one of walking",
+  },
+  {
+    title: "Car service",
+    kind: "single",
+    startOffset: -78,
+    time: "08:00",
+    duration: 30,
+    icon: "car",
+    color: "grey",
+  },
+  {
+    title: "Spring release",
+    kind: "single",
+    startOffset: -63,
+    time: "15:00",
+    duration: 60,
+    icon: "rocket",
+    color: "amber",
+  },
+  {
+    title: "Concert with Ben",
+    kind: "single",
+    startOffset: -41,
+    time: "19:30",
+    duration: 180,
+    icon: "music",
+    color: "purple",
+  },
+  {
+    title: "Eye test",
+    kind: "single",
+    startOffset: -22,
+    time: "11:15",
+    duration: 30,
+    icon: "eye",
+    color: "teal",
+  },
+  {
+    title: "Quarterly review",
+    kind: "single",
+    startOffset: -9,
+    time: "10:00",
+    duration: 90,
+    icon: "clipboard-check",
+    color: "blue",
+  },
 ];
 
 // ── The charts (4.62) ────────────────────────────────────────────────────
@@ -974,35 +1230,86 @@ export const SEED_EVENTS = [
 // is opaque and only has to be unique within its note.
 export const DIARY_CHARTS = {
   home: [
-    { key: "mood-year", tracker: "Mood", type: "month", range: "365", title: "Mood, the last year" },
+    { key: "mood-year", tracker: "Mood", type: "month", range: "365", size: "wide", title: "Mood, the last year" },
     { key: "sleep-90", tracker: "Sleep", type: "line", range: "90", avg: true, title: "Sleep, last 90 days" },
     { key: "mood-all", tracker: "Mood", type: "summary", range: "all", title: "Mood at a glance" },
+    { key: "energy-90", tracker: "Energy", type: "line", range: "90", avg: true, title: "Energy, last 90 days" },
+    { key: "sleep-mood-90", tracker: "Sleep", type: "scatter", range: "90", y: "Mood", title: "Sleep against mood" },
   ],
   diary: [
-    { key: "sleep-year", tracker: "Sleep", type: "line", range: "365", avg: true, title: "Sleep over the year" },
+    { key: "sleep-year", tracker: "Sleep", type: "line", range: "365", avg: true, size: "wide", title: "Sleep over the year" },
     { key: "sleep-mood", tracker: "Sleep", type: "scatter", range: "365", y: "Mood", title: "Does sleep move mood?" },
     { key: "day-shape", tracker: "Wake-Up", type: "line", range: "90", y: "Bedtime", title: "When the day starts and ends" },
     { key: "mood-heat", tracker: "Mood", type: "month", range: "365", title: "Mood" },
+    { key: "focus-year", tracker: "Focus", type: "line", range: "365", avg: true, title: "Focus, when it was logged" },
+    { key: "energy-sum", tracker: "Energy", type: "summary", range: "all", title: "Energy at a glance" },
+    { key: "wake-sum", tracker: "Wake-Up", type: "summary", range: "365", title: "Wake-up over the year" },
   ],
   weekly: [
     { key: "mood-week", tracker: "Mood", type: "bar", range: "period", title: "Mood this week" },
     { key: "sleep-week", tracker: "Sleep", type: "line", range: "period", title: "Sleep this week" },
     { key: "sleep-sum", tracker: "Sleep", type: "summary", range: "period", title: "Sleep at a glance" },
+    { key: "energy-week", tracker: "Energy", type: "bar", range: "period", title: "Energy this week" },
+    { key: "day-shape-week", tracker: "Wake-Up", type: "line", range: "period", y: "Bedtime", title: "When the day started and ended" },
   ],
   monthly: [
-    { key: "mood-month", tracker: "Mood", type: "month", range: "period", title: "Mood, day by day" },
+    { key: "mood-month", tracker: "Mood", type: "month", range: "period", size: "wide", title: "Mood, day by day" },
     { key: "sleep-month", tracker: "Sleep", type: "line", range: "period", avg: true, title: "Sleep this month" },
     { key: "wake-month", tracker: "Wake-Up", type: "summary", range: "period", title: "Wake-up" },
+    { key: "energy-month", tracker: "Energy", type: "line", range: "period", avg: true, title: "Energy this month" },
+    { key: "sleep-mood-month", tracker: "Sleep", type: "scatter", range: "period", y: "Mood", title: "Sleep against mood, this month" },
   ],
+  // ── A QUARTER AND A YEAR ARE BUCKETED, NOT DRAWN RAW ──────────────────
+  //
+  // `period` on the quarter note is ninety-two daily points and on the year note
+  // three hundred and sixty-five, which is a line that reads as noise. That is
+  // the case `daily-by-month` was added for — *"one point a month, out of
+  // history that already exists"* — so the trends here take it and the calendar
+  // keeps its raw days, because a heat map with one cell per month is not a
+  // calendar.
+  //
+  // NO `+avg` ON A BUCKETED SERIES. The rolling average is what makes a dense
+  // line legible; over twelve points it is the same line half a step late, and
+  // over a quarter's three it is nothing at all.
+  //
+  // This scope could not be seeded until the grammar was fixed: the plugin
+  // wrote `:daily-by-month` and its own `CHART_TAG` did not read it back, so a
+  // chart carrying it vanished on the next parse. `test/pure-logic.test.ts` now
+  // asserts the serialiser and the parser agree over every scope, and
+  // `test/seed-vault.test.ts` asserts every spec in this file survives the round
+  // trip — the pair is what makes it safe to write one here.
   quarterly: [
+    { key: "mood-cal-q", tracker: "Mood", type: "month", range: "period", size: "wide", title: "Mood, day by day" },
     { key: "mood-quarter", tracker: "Mood", type: "line", range: "period", avg: true, title: "Mood across the quarter" },
-    { key: "sleep-quarter", tracker: "Sleep", type: "bar", range: "period", title: "Sleep, day by day" },
+    { key: "sleep-quarter", tracker: "Sleep", type: "line", range: "period", scope: "daily-by-month", title: "Sleep, month by month" },
     { key: "mood-sum-q", tracker: "Mood", type: "summary", range: "period", title: "Mood at a glance" },
+    { key: "energy-quarter", tracker: "Energy", type: "bar", range: "period", scope: "daily-by-month", title: "Energy, month by month" },
   ],
   yearly: [
-    { key: "mood-cal", tracker: "Mood", type: "month", range: "period", title: "Mood, the whole year" },
-    { key: "sleep-yearline", tracker: "Sleep", type: "line", range: "period", avg: true, title: "Sleep across the year" },
+    { key: "mood-cal", tracker: "Mood", type: "month", range: "period", size: "large", title: "Mood, the whole year" },
+    { key: "sleep-yearline", tracker: "Sleep", type: "line", range: "period", scope: "daily-by-month", title: "Sleep, month by month" },
     { key: "sleep-sum-y", tracker: "Sleep", type: "summary", range: "period", title: "Sleep at a glance" },
+    { key: "mood-yearline", tracker: "Mood", type: "line", range: "period", scope: "daily-by-month", title: "Mood, month by month" },
+    { key: "wake-sum-y", tracker: "Wake-Up", type: "summary", range: "period", title: "Wake-up at a glance" },
+  ],
+  // ── THE JOURNALS DASHBOARD, WHICH NOTHING FILLED (4.83) ────────────────
+  //
+  // `03 - Journals` ships the same empty `almanac-charts` fence the five diary
+  // pages do — `journals-dashboard-sections.ts` says so in as many words: *"The
+  // diary's chart fence, not a journal dashboard's … This page sits above every
+  // journal rather than inside one, so it takes the former."* The seeder filled
+  // the other six surfaces and left this one, so the demo vault's journals page
+  // has shown an empty chart manager since the fence was added.
+  //
+  // DIARY TRACKERS ON A JOURNALS PAGE IS NOT A CATEGORY ERROR: the question the
+  // page asks is "how has the work been going", and Focus and Energy are the two
+  // readings in the vault that answer it. The journal's OWN quantities are
+  // charted by `jchart:` on the journal's own dashboard, which is a different
+  // fence reading a different store.
+  journals: [
+    { key: "focus-90", tracker: "Focus", type: "line", range: "90", avg: true, size: "wide", title: "Focus, last 90 days" },
+    { key: "energy-focus", tracker: "Energy", type: "scatter", range: "365", y: "Focus", title: "Energy against focus" },
+    { key: "focus-sum", tracker: "Focus", type: "summary", range: "365", title: "Focus at a glance" },
   ],
 };
 
@@ -1020,4 +1327,142 @@ export const LOGBOOK_CORPUS = {
   work: { lines: WORK_LOG, mins: true, perDay: 0.45, crossOff: 0 },
   focus: { lines: FOCUS_LOG, mins: false, spread: true, crossOff: 0 },
   review: { lines: REVIEW_LINKS, mins: false, spread: true, crossOff: 0.5 },
+};
+
+// Content for period entries (weeks, months, quarters, years)
+export const PERIOD_CORPUS = {
+  weekly: {
+    focus: [
+      "Ship the core architecture refactoring and establish stable foundations.",
+      "Deep focus on study materials, chemistry problem sets, and revision.",
+      "Consolidate daily habit tracking and keep circadian rhythm aligned.",
+      "Wrap up active sprint backlog tasks and plan incoming quarter objectives.",
+      "Prioritize recovery, rest days, and consistent sleep hygiene.",
+      "Execute high-leverage project milestones and refine documentation.",
+      "Get the week's hard thing done by Wednesday, not on Friday afternoon.",
+      "Fewer open threads at the end of the week than at the start.",
+      "Protect two long focus blocks a day and let the rest be admin.",
+      "Catch up on the reading that has been sliding for a fortnight.",
+      "Train three times without making the fourth a guilt trip.",
+      "Close the loop on everything still open from last week.",
+    ],
+    highlights: [
+      "Completed 100% of planned study objectives and lab notes.",
+      "Hit consecutive daily journaling and sleep tracking streak.",
+      "Successfully drafted and reviewed system architecture notes.",
+      "Cleared active staging inbox and consolidated references.",
+      "Maintained consistent morning workouts and evening reviews.",
+      "Made great breakthrough on chemistry problem sets.",
+      "Three clean training sessions and no aches to show for them.",
+      "Finished the week with an empty inbox and no open branches.",
+      "Wrote something on Tuesday that still read well on Friday.",
+      "Two long focus blocks a day, most days, without defending them.",
+      "Said no to a piece of work that would have eaten the week.",
+    ],
+    challenges: [
+      "Context switching between multiple tasks reduced focus on Thursday.",
+      "Late evening work session impacted next morning's wake-up time.",
+      "Unexpected interruptions delayed planned review session.",
+      "Two poor nights midweek and everything after them was slower.",
+      "Started the week without a plan and spent Monday making one.",
+      "The admin pile grew faster than I cleared it.",
+      "Left the hardest task until Friday, again.",
+    ],
+    review: [
+      "Pacing was consistent throughout the week; energy levels peaked midweek.",
+      "Morning routine supported deep focus blocks without distraction.",
+      "Good balance between analytical work and restorative downtime.",
+      "Fewer context switches this week led to higher quality outputs.",
+      "The week ran on the mornings; the afternoons were mostly admin.",
+      "Sleep held steady and so did everything that depends on it.",
+      "Too much started, not enough finished — worth watching next week.",
+      "A quiet week, and quiet weeks are where the backlog actually shrinks.",
+    ],
+    tasks: [
+      "Review sprint goals and check progress against milestones",
+      "Archive processed staging notes and update indexes",
+      "Prepare study deck for upcoming module review",
+      "Audit weekly tracker trends and sleep averages",
+      "Write the week's summary while it is still fresh",
+      "Clear the review queue down to nothing",
+      "Plan next week's two hard tasks before Sunday evening",
+      "Tidy the staging folder and file what is worth keeping",
+    ],
+  },
+  monthly: {
+    focus: [
+      "Consistent academic momentum and disciplined morning focus routines.",
+      "Establish deep mastery of core principles and active recall practice.",
+      "Consolidate personal knowledge base and streamline note linking.",
+      "Fewer projects, further along — no new commitments this month.",
+      "Rebuild the training base after the layoff, slowly.",
+      "Finish the two things carried over rather than starting a third.",
+    ],
+    summary: [
+      "A productive month marked by steady execution across core study topics and consistent daily logging.",
+      "Solid habit momentum maintained across all four weeks, with clear progress on major milestones.",
+      "Balanced focus between deep academic study and structured personal project development.",
+      "Great consolidation period; established dependable daily rhythms and clear next steps.",
+    ],
+    highlights: [
+      "Maintained over 85% habit consistency across all tracked metrics.",
+      "Completed full revision of organic chemistry stereochemistry lessons.",
+      "Streamlined note taxonomy and improved dashboard glanceability.",
+      "Four unbroken weeks of logging, including the difficult one.",
+      "Shipped the thing that had been three weeks from done since spring.",
+      "Sleep average up half an hour on last month, and it showed.",
+    ],
+    challenges: [
+      "Mid-month travel caused a minor dip in sleep consistency.",
+      "Balancing multiple project deadlines required proactive prioritization.",
+    ],
+    reflections: [
+      "Consistent small daily efforts compound noticeably across four weeks.",
+      "Protecting morning focus blocks made the biggest difference in weekly throughput.",
+      "Clear boundaries around evening wind-down improved overall sleep quality and readiness.",
+      "Looking forward to building on this foundation for the upcoming month.",
+    ],
+  },
+  quarterly: {
+    focus: [
+      "Broad foundational mastery and system consolidation.",
+      "High-output project execution and health habit optimization.",
+    ],
+    objectives: [
+      "Master foundational subject areas and compile comprehensive study decks.",
+      "Achieve dependable daily tracking coverage and analyze sleep/mood trends.",
+      "Complete major project deliverables and streamline personal knowledge base.",
+      "Cultivate sustainable work-rest balance and maintain steady habit streaks.",
+    ],
+    highlights: [
+      "Successfully delivered all planned quarterly milestones ahead of schedule.",
+      "Documented clear correlations between sleep quality and daily focus ratings.",
+      "Organized knowledge base with clear hierarchical separation and clean graph topology.",
+    ],
+    challenges: [
+      "Managing peak workload periods without compromising sleep hygiene.",
+    ],
+    review: [
+      "High level of goal completion across all target areas; strong consistency.",
+      "Trends and charts demonstrate positive correlation between consistent sleep and focus.",
+      "Successfully transitioned ideas from staging to structured long-term notes.",
+      "Quarterly milestones accomplished on schedule with minimal friction.",
+    ],
+  },
+  yearly: {
+    focus: [
+      "Cultivating enduring mastery, lifelong learning, and systematic habit excellence.",
+    ],
+    highlights: [
+      "Completed comprehensive study curricula with 100% active recall coverage.",
+      "Maintained unbroken year-long streak of reflection and data tracking.",
+      "Transformed personal workflow into a calm, reliable, and expressive system.",
+    ],
+    retrospective: [
+      "A transformative year of structured learning, deep journaling, and habit cultivation.",
+      "Built an enduring body of knowledge across multiple disciplines with rich interlinking.",
+      "Maintained high fidelity diary coverage and gained invaluable insights from temporal trends.",
+      "Established clear personal systems that make steady progress enjoyable and automatic.",
+    ],
+  },
 };

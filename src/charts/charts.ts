@@ -20,7 +20,7 @@ import type {
   TrackerDef,
   TrackerSurface,
 } from "../trackers/trackers";
-import { diaryClassOf, isJournalSurface, surfaceAcceptsType } from "../trackers/trackers";
+import { TRACKER_CLASSES, diaryClassOf, isJournalSurface, surfaceAcceptsType } from "../trackers/trackers";
 import { syncTrackersIntoVault } from "../trackers/trackers";
 import {
   cleanLabel,
@@ -1170,8 +1170,31 @@ export function spanOf(
 // — which is what makes the FIRST bar on the line unambiguously the delimiter
 // and lets the title itself hold bars, colons, plusses and equals signs. No id
 // on disk can contain a bar: there has never been a way to write one here.
-const CHART_TAG =
-  /^chart:([^:|]+):([^|]+):(line|bar|summary|month|scatter|streak):(period|30|90|365|all)(?::(daily|monthly))?((?:\+[^|+]+)*)(?:\|(.*))?$/;
+// ── THE SCOPE TOKENS ARE DERIVED, AND THEY USED TO BE TYPED OUT ──────────
+//
+// This group read `(daily|monthly)`, which was every scope that existed when it
+// was written and has been wrong twice since. `daily-by-month` arrived in 2.52
+// and the other three grains in 2.58.5 — *"a grain that exists can be charted"*
+// — and both times `serializeChartSpec` learned to WRITE a token this refused to
+// READ. The failure is silent in the worst way available: the write succeeds,
+// the fence looks right, and the directive is dropped on the next parse, so a
+// chart configured in the editor disappears the moment the note is reopened and
+// nothing anywhere says why.
+//
+// So the alternation is now built from `TRACKER_CLASSES` — the same list
+// `scopesFor` offers from — plus the one compound. LONGEST FIRST, because a
+// shorter alternative that is a prefix of a longer one (`daily` inside
+// `daily-by-month`) would otherwise match first and leave the remainder to a
+// group that cannot take it; the engine backtracks out of that today, and
+// sorting means it never has to.
+const CHART_SCOPES = [...TRACKER_CLASSES, "daily-by-month"]
+  .sort((a, b) => b.length - a.length)
+  .join("|");
+
+const CHART_TAG = new RegExp(
+  `^chart:([^:|]+):([^|]+):(line|bar|summary|month|scatter|streak):(period|30|90|365|all)` +
+    `(?::(${CHART_SCOPES}))?((?:\\+[^|+]+)*)(?:\\|(.*))?$`
+);
 
 // The suffix group (m[6]) holds zero or more `+token` segments in any order.
 // Parsed here rather than in the master regex so their order doesn't matter and

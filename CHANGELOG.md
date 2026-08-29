@@ -7,6 +7,38 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.84.0] - 2026-08-29
+
+**Added hierarchical green color groups for diary grains in Obsidian Graph View, discrete star scale pickers with progressive hover trails, single-row sleep duration ratio metrics, and retired canvas node pruning.**
+
+### Added
+
+- **Hierarchical Green Spectrum for Diary Grains in Graph View:** Obsidian Graph View color group generation now colors diary entries across 5 distinct shades of green reflecting chronological depth — Years (brightest light emerald `#86efac`), Quarters (vibrant spring green `#4ade80`), Months (lush green `#22c55e`), Weeks (forest green `#16a34a`), and Days (darkest deep pine `#166534`).
+- **Discrete Star Scale & Scale Picker UI:** Scale and star trackers now render discrete single-emoji interactive buttons (`[★][★][★][★][★]`) with monospace numeric values underneath and progressive star trail hover fills.
+- **Top-Right Context Note Badge:** Repositioned the tracker scale note badge to the top-right corner to avoid colliding with numeric value sub-labels.
+
+### Changed
+
+- **Compact Single-Row Sleep Ratio Readout:** Redesigned the sleep tracker's duration readout into a compact, single-line format (`😴 7:35hrs / 16:25hrs ☀️`) with refined monospace and tabular time figures.
+- **Simplified Sleep Tracker Name:** Renamed the built-in Sleep tracker setting row title from compound descriptions to `"Sleep"`.
+
+### Fixed
+
+- **Phantom Link & Retired Node Pruning in `Almanac.canvas`:** `mergeCanvas` now cleanly discards retired plugin-generated `node-*` and `group-*` IDs during canvas regeneration, preventing legacy references (such as `node-journals` or `node-staging`) from persisting as phantom nodes or duplicate links in Graph View.
+
+## [4.83.0] - 2026-08-29
+
+**Added surface card framing and collapse support to From the journals bridge sections, routed journal note captures to diary daily entries, and preserved unrowed layouts in section edits.**
+
+### Added
+
+- **Bridge Section Card Surface & Collapse Support:** The `bridge-notes` ("From the journals") directive now renders inside a styled section card surface matching Tasks, Captured, and Attachments. Includes an inline collapsible chevron toggle and persistent fold state via note section settings.
+- **Journal Note Capture Routing to Diary Subsystem:** Capturing tracker scale notes initiated from journal notes now seamlessly routes to the corresponding diary daily note under `02 - Diary/Entries/` without polluting the journal leaf with capture regions or logs.
+
+### Fixed
+
+- **Preserved Unrowed Fences in Entry Section Edits:** Fixed `tidyRowLine` to prevent injecting unwanted multi-column `row` keywords into unrowed shared entry fences when applying section changes in the Section Editor.
+
 ## [4.82.0] - 2026-08-29
 
 **Added automated Obsidian Graph View color group configuration for Almanac vaults, matching workbenches, dashboards, diary entries, journals, logbooks, and infrastructure.**

@@ -321,6 +321,7 @@ function bridgeHeader(
     rescoping: boolean;
     toggleMode?: () => void;
     mode?: "cards" | "list";
+    toggleFold?: () => void;
   }
 ): void {
   // A BRIDGE IS A SECTION. That is what it is to a reader — a titled band with
@@ -341,6 +342,7 @@ function bridgeHeader(
   const frame = sectionFrame(host, {
     title: `🌉 ${label ?? plan.targetLabel}`,
     level: 2,
+    owns: "children",
     // The rows, once they are known. Null while the read is still out, because
     // a pill reading `0` because nothing has counted yet is worse than no pill.
     count,
@@ -353,6 +355,22 @@ function bridgeHeader(
         ? `${plan.window.label} · frozen ${snap.takenIso}`
         : plan.window.label,
   });
+
+  const chevron = createDiv({ cls: "journal-note-chevron am-bridge-chevron" });
+  setIcon(chevron, "chevron-down");
+  frame.root.prepend(chevron);
+  frame.root.addClass("is-foldable");
+
+  if (actions.toggleFold) {
+    frame.root.addEventListener("click", (evt) => {
+      const target = evt.target as HTMLElement;
+      if (target.closest(".journal-header-widgets, a, button, input, select")) {
+        return;
+      }
+      evt.preventDefault();
+      actions.toggleFold?.();
+    });
+  }
 
   if (actions.toggleMode && !snap.frozen) {
     const viewBtn = frame.actions.createEl("button", {
@@ -518,6 +536,34 @@ async function clearSnapshot(
   );
 }
 
+export function bridgeFoldKey(sourcePath: string, key: string): string {
+  return `${sourcePath}::bridge:${key}`;
+}
+
+export function bridgeFoldState(
+  plugin: AlmanacPlugin,
+  sourcePath: string,
+  key: string
+): boolean {
+  return (
+    plugin.settings.collapsedNoteSections?.[bridgeFoldKey(sourcePath, key)] ===
+    true
+  );
+}
+
+export async function setBridgeFold(
+  plugin: AlmanacPlugin,
+  sourcePath: string,
+  key: string,
+  value: boolean
+): Promise<void> {
+  if (!plugin.settings.collapsedNoteSections) {
+    plugin.settings.collapsedNoteSections = {};
+  }
+  plugin.settings.collapsedNoteSections[bridgeFoldKey(sourcePath, key)] = value;
+  await plugin.saveSettings();
+}
+
 // Plan, then render, or refuse. The one entry point both directives share, so
 // the guard cannot be present on one and forgotten on the other.
 function buildBridge(
@@ -566,6 +612,11 @@ function buildBridge(
   return liveScopedWidget(plugin, ctx, scope(plan), () => {
     const el = createDiv({ cls: "am-bridge" });
     const body = el.createDiv({ cls: "am-bridge-body" });
+
+    const applyFold = (collapsed: boolean): void => {
+      el.toggleClass("is-collapsed", collapsed);
+    };
+    applyFold(bridgeFoldState(plugin, path, key));
 
     // THE FROZEN STATE IS READ FROM THE FILE, ASYNCHRONOUSLY, AND THAT ORDER
     // IS FORCED. LiveWidget's `build` is synchronous by contract; Obsidian has
@@ -621,6 +672,11 @@ function buildBridge(
             mode = mode === "cards" ? "list" : "cards";
             (body as HTMLElement & { toggleMode?: (m: "cards" | "list") => void }).toggleMode?.(mode);
             redrawHeader(mode);
+          },
+          toggleFold: () => {
+            const next = !el.hasClass("is-collapsed");
+            applyFold(next);
+            void setBridgeFold(plugin, path, key, next);
           },
         });
       };

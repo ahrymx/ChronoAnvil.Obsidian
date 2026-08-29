@@ -34,7 +34,11 @@ import {
 } from "../src/core/bridge";
 import { snapshotChecksum } from "../src/core/bridge";
 import type { SnapshotRow } from "../src/core/bridge";
-import { parseSnapshotLine } from "../src/ui/widgets/bridge-widgets";
+import {
+  bridgeFoldKey,
+  bridgeFoldState,
+  parseSnapshotLine,
+} from "../src/ui/widgets/bridge-widgets";
 import { isValidNoteKey } from "../src/core/notestore";
 import { DEFAULT_PATHS, ROOT_CHILDREN } from "../src/core/constants";
 import type {
@@ -474,6 +478,22 @@ describe("every bridge names the period it covered", () => {
       expect(css).not.toContain(`.${cls}`);
     }
     expect(css).toContain(".am-bridge-row");
+    expect(css).toContain(".am-bridge-chevron");
+  });
+
+  it("persists and reads collapse state", () => {
+    const key = bridgeFoldKey("diary/2026-08-29.md", "notes:lesson");
+    expect(key).toBe("diary/2026-08-29.md::bridge:notes:lesson");
+    const fakePlugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        collapsedNoteSections: {
+          [key]: true,
+        },
+      },
+    } as any;
+    expect(bridgeFoldState(fakePlugin, "diary/2026-08-29.md", "notes:lesson")).toBe(true);
+    expect(bridgeFoldState(fakePlugin, "diary/2026-08-29.md", "notes:other")).toBe(false);
   });
 });
 

@@ -1008,6 +1008,15 @@ export function formatDuration(hours: number | null): string {
   return m ? `${h}h ${m}m` : `${h}h`;
 }
 
+// "7:35hrs" / "16:25hrs" from a decimal-hours value for compact single-line sleep ratio readouts.
+export function formatSleepRatio(hours: number | null): string {
+  if (hours == null || !Number.isFinite(hours)) return "—";
+  const total = Math.round(hours * 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${h}:${String(m).padStart(2, "0")}hrs`;
+}
+
 // Mean of a list of clock-minute values, rendered back as "HH:mm" — used by the
 // sleep summary for a "typical wake time". Simple linear mean is fine for
 // morning wake times (they cluster and don't wrap midnight); bedtimes, which

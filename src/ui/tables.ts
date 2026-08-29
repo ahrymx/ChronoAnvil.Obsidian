@@ -42,6 +42,7 @@ import {
   getJournalType,
   hueOf,
   journalChildFolders,
+  journalTypeAtPath,
   journalTypeOfNote,
   kindsCarrying,
   registeredJournalTypes,
@@ -450,7 +451,7 @@ function hostType(
   plugin: AlmanacPlugin,
   notePath: string
 ): JournalType | null {
-  return journalTypeOfNote(plugin, notePath) ?? null;
+  return journalTypeAtPath(plugin, notePath) ?? null;
 }
 
 // How deep a container folder sits in its type: 0 for a top-level folder, 1
@@ -1933,7 +1934,7 @@ export function buildJournalTally(
   const file = hostFile(app, ctx);
   if (!file?.parent) return root;
 
-  const type = journalTypeOfNote(plugin, file.path);
+  const type = journalTypeAtPath(plugin, file.path);
   const namer = journalTypeNamer(plugin);
   const def = getTracker(plugin, trackerId);
   const refusal = journalTallyRefusal(
@@ -2416,7 +2417,7 @@ function isContainerFolder(
   if (!note) return true; // no folder note at all — still a container
   const t = app.metadataCache.getFileCache(note)?.frontmatter?.["type"];
   const value = typeof t === "string" ? t : "";
-  const type = journalTypeOfNote(plugin, note.path);
+  const type = journalTypeAtPath(plugin, note.path);
   // No journal, so no leaf kinds to recognise — and the permissive answer is
   // already this function's documented default two lines up: a folder note
   // whose `type` names nothing we know is still a container (3.19.1). Reading
@@ -2458,7 +2459,7 @@ export function buildJournalBreakdown(
   const file = hostFile(app, ctx);
   if (!file?.parent) return root;
 
-  const type = journalTypeOfNote(plugin, file.path);
+  const type = journalTypeAtPath(plugin, file.path);
   const namer = journalTypeNamer(plugin);
   const def = getTracker(plugin, trackerId);
   const refusal = journalChartRefusal(
@@ -2650,7 +2651,7 @@ export function confidenceKinds(
   // carries. Handing back `["lesson", "practice"]` there made an average count
   // whatever Study-shaped notes happened to be lying around, in a vault that
   // may not have Study enabled at all.
-  const type = journalTypeOfNote(plugin, notePath);
+  const type = journalTypeAtPath(plugin, notePath);
   if (!type) return [];
   if (trackerId === EVERY_KIND) return type.kinds.map((k) => k.id);
   return kindsCarrying(type, trackerId);

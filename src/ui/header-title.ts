@@ -65,7 +65,7 @@ import {
 } from "../core/util";
 import { splitGlyph } from "./section-frame";
 import type AlmanacPlugin from "../main";
-import { journalTypeOfNote } from "../journals/journal";
+import { journalTypeAtPath } from "../journals/journal";
 import type { JournalKind, JournalType } from "../journals/journal";
 import { promptKindRename } from "./modals";
 import { notify } from "../core/notify";
@@ -255,7 +255,7 @@ async function offerKindRename(
   before: string,
   after: string
 ): Promise<void> {
-  const type = journalTypeOfNote(plugin, notePath);
+  const type = journalTypeAtPath(plugin, notePath);
   if (!type) return;
   const kind = kindHeadedBy(lines, span, type);
   if (!kind) return;

@@ -518,6 +518,18 @@ describe("what an entry will not let go of", () => {
       ...present,
       "capture",
     ]);
+    expect(next).not.toMatch(/```almanac\nrow\n/);
+  });
+
+  it("does not inject a row line into a daily entry when adding a section", () => {
+    const text = composeEntryTemplate("daily");
+    const present = detectEntrySections(text, { grain: "daily" });
+    const next = applyEntrySections(text, { grain: "daily" }, [
+      ...present,
+      { id: "bridge", options: { target: "Workout" } },
+    ])!;
+    expect(next).toContain("bridge-notes:Workout|From the journals");
+    expect(next).not.toMatch(/```almanac\nrow\n/);
   });
 
   it("will not add a second copy of something already there", () => {

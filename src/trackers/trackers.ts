@@ -1110,7 +1110,7 @@ export interface EntryPathConfig {
 }
 
 function pathInFolder(notePath: string, folder: string): boolean {
-  return folder !== "" && notePath.startsWith(`${folder}/`);
+  return folder !== "" && (notePath === folder || notePath.startsWith(`${folder}/`));
 }
 
 // The journal type a note belongs to, by path, or null.

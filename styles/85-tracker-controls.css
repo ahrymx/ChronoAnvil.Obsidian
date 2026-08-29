@@ -26,8 +26,8 @@
    one. */
 .journal-scale-note-mark {
   position: absolute;
-  right: -3px;
-  bottom: -3px;
+  top: -4px;
+  right: -4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -53,42 +53,87 @@
   border: 1px solid transparent;
   border-radius: var(--am-radius-sm);
   background: transparent;
-  padding: 4px 2px;
-  font-size: 1.2em;
-  line-height: 1.1;
+  padding: 4px 2px 3px;
+  font-size: 1.15em;
+  line-height: 1;
   cursor: pointer;
   filter: grayscale(0.7) opacity(0.55);
-  transition: filter 0.12s, transform 0.12s, background 0.12s, border-color 0.12s;
+  transition: filter 0.12s, transform 0.12s, background 0.12s, border-color 0.12s, box-shadow 0.12s;
   flex: 1 1 0px;
   min-width: 0;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
+  gap: 2px;
 }
 /* The glyph is its own node so the badge above can be a sibling rather than a
    stray child of a button whose text gets rewritten. */
 .journal-mood-face-glyph {
   display: inline-block;
-  font-size: 1.25em;
+  font-size: 1.18em;
   line-height: 1;
+  transition: transform 0.12s ease;
+}
+.journal-mood-face-val {
+  display: block;
+  font-size: var(--am-text-2xs);
+  line-height: 1;
+  color: var(--text-faint);
+  font-weight: 500;
+  pointer-events: none;
+  user-select: none;
+  transition: color 0.12s ease, font-weight 0.12s ease;
 }
 .journal-mood-face:hover {
   filter: grayscale(0) opacity(1);
   transform: translateY(-1px);
   background: var(--background-modifier-hover);
 }
+.journal-mood-face:hover .journal-mood-face-glyph {
+  transform: scale(1.08);
+}
+.journal-mood-face:hover .journal-mood-face-val {
+  color: var(--text-muted);
+}
 .journal-mood-face.is-selected {
   filter: grayscale(0) opacity(1);
-  transform: scale(1.08);
+  transform: scale(1.06);
   background: var(--am-surface-raised);
   border-color: var(--interactive-accent);
-}
-/* The selected face carries the badge, so it must not clip it — and the scale
-   transform above would otherwise shrink the mark with it, which is why the
-   badge sizes in `em` off the face's own font size and lands consistent. */
-.journal-mood-face.is-selected {
   overflow: visible;
+}
+.journal-mood-face.is-selected .journal-mood-face-glyph {
+  transform: scale(1.12);
+}
+.journal-mood-face.is-selected .journal-mood-face-val {
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+/* Star scale special treatment & progressive fill */
+.journal-mood-picker.is-stars .journal-mood-face-glyph {
+  opacity: 0.55;
+  filter: grayscale(0.5);
+  transition: transform 0.12s ease, opacity 0.12s ease, filter 0.12s ease;
+}
+.journal-mood-picker.is-stars .journal-mood-face:hover .journal-mood-face-glyph,
+.journal-mood-picker.is-stars .journal-mood-face.is-star-trail .journal-mood-face-glyph {
+  opacity: 1;
+  filter: none;
+  color: var(--text-accent);
+}
+.journal-mood-picker.is-stars .journal-mood-face.is-selected .journal-mood-face-glyph {
+  opacity: 1;
+  filter: none;
+  color: var(--text-accent);
+}
+.journal-mood-picker.is-stars .journal-mood-face.is-star-trail {
+  background: var(--background-modifier-hover);
+}
+.journal-mood-picker.is-stars .journal-mood-face.is-star-trail .journal-mood-face-val {
+  color: var(--text-muted);
 }
 
 /* ── Habit / boolean checkbox ───────────────────────────────────────────────
@@ -294,7 +339,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: stretch;
-  gap: 3px;
+  gap: 4px;
   /* Neutralise the standalone chrome now that the cell provides it. */
   padding: 0;
   border: 0;
@@ -307,14 +352,14 @@
 .journal-sleep-inputs {
   display: flex;
   align-items: center;
-  gap: 4px 6px;
+  gap: 8px;
   flex-wrap: nowrap;
 }
 .journal-sleep-field {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 1px;
+  gap: 2px;
   flex: 1 1 0;
   min-width: 0;
 }
@@ -335,26 +380,49 @@
   min-width: 0;
   box-sizing: border-box;
   border: 1px solid var(--background-modifier-border);
+  border-color: var(--am-border-inner);
   border-radius: var(--am-radius-sm);
-  background: var(--background-primary);
+  background: var(--am-surface-inset);
   color: var(--text-normal);
+  font-family: var(--font-monospace, monospace);
   font-size: var(--am-text-xs);
-  padding: 2px 4px;
+  padding: 4px 6px;
   cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.journal-sleep-field input[type="time"]:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--am-edge-highlight);
+}
+.journal-sleep-field input[type="time"]:focus {
+  border-color: var(--interactive-accent);
+  background: var(--am-surface-raised);
+  outline: none;
 }
 .journal-sleep-readout {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 2px 6px;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 5px;
   font-size: var(--am-text-2xs);
+  font-family: var(--font-monospace, monospace);
   font-weight: 600;
+  margin-top: 2px;
+  white-space: nowrap;
 }
 .journal-sleep-asleep {
   color: var(--am-mood-5);
+  font-weight: 600;
+}
+.journal-sleep-divider {
+  color: var(--text-faint);
+  font-weight: 400;
+  opacity: 0.6;
 }
 .journal-sleep-awake {
   color: var(--text-muted);
+  font-weight: 500;
 }
 .journal-sleep-hint {
   color: var(--text-faint);
