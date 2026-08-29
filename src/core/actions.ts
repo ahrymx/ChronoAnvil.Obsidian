@@ -527,6 +527,13 @@ export const ACTIONS: Action[] = [
     group: "maintenance",
     run: (p) => void p.scaffold.generateVaultCanvas(),
   },
+  {
+    id: "maint-setup-graph-groups",
+    name: "Maintenance: configure graph view color groups",
+    icon: "git-fork",
+    group: "maintenance",
+    run: (p) => void p.scaffold.configureGraphGroups(),
+  },
 ];
 
 // `Notice` is imported for the one caller below rather than left to main.ts, so

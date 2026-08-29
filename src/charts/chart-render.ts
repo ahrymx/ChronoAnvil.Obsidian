@@ -68,6 +68,7 @@ import {
   weekStartDay,
 } from "../core/util";
 import type { ActivityCount } from "../core/util";
+import { entriesOfGrain } from "../diary/lineage";
 import { countBodyTasks } from "../ui/tables";
 import { pagesUnder } from "../core/query";
 
@@ -279,11 +280,16 @@ export function collectPoints(
   // an output granularity, not a folder — so it resolves to the daily grain
   // here and is re-examined at the return.
   const grain: TrackerClass = scope === "daily-by-month" ? "daily" : scope;
-  const root = plugin.settings.paths[CLASS_DEFS[grain].folderKey];
   const pattern = entryPattern(grain);
 
+  // THE GRAIN'S ENTRIES, NOT ITS FOLDER (4.81). A series read the grain folder,
+  // which under the period tree holds only what was written before 4.81 — so
+  // every chart would have stopped at the release and drawn a flat line after
+  // it. `entryPattern` still has to match: the legacy pass returns whatever is
+  // in the folder, including a note a reader renamed by hand, and a name this
+  // cannot date is a point with no x.
   const out: ChartPoint[] = [];
-  for (const f of filesUnder(app, root)) {
+  for (const f of entriesOfGrain(app, plugin.settings.paths, grain)) {
     const m = f.basename.match(pattern);
     if (!m) continue;
     const value = toValue(def, frontmatterOf(app, f)[def.id]);

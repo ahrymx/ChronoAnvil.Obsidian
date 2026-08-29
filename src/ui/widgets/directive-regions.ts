@@ -644,6 +644,37 @@ async function setTasksScope(
   await plugin.app.vault.modify(file, out.join("\n"));
 }
 
+// Is the note hosting this directive part of the diary?
+//
+// WRITTEN OUT TWICE, IDENTICALLY, until 4.81 — once for `tasks-table` and once
+// for the scope cycle beside it — and the release that moved the dashboards is
+// exactly the release where two copies of a path test would have diverged. A
+// dashboard now lives in `02 - Diary/Dashboards`, which is not any grain folder
+// and is caught by the root prefix; a reader who points one grain outside the
+// diary is caught by the five that follow.
+export function hostIsDiary(
+  paths: {
+    diaryRoot: string;
+    diaryDaily: string;
+    diaryWeekly: string;
+    diaryMonthly: string;
+    diaryQuarterly: string;
+    diaryYearly: string;
+  },
+  hostFolder: string | null
+): boolean {
+  if (hostFolder == null) return false;
+  return (
+    hostFolder === paths.diaryRoot ||
+    hostFolder.startsWith(`${paths.diaryRoot}/`) ||
+    hostFolder === paths.diaryDaily ||
+    hostFolder === paths.diaryWeekly ||
+    hostFolder === paths.diaryMonthly ||
+    hostFolder === paths.diaryQuarterly ||
+    hostFolder === paths.diaryYearly
+  );
+}
+
 export function buildTasksTableRegion(
   plugin: AlmanacPlugin,
   rest: string,
@@ -692,15 +723,7 @@ export function buildTasksTableRegion(
   // On diary notes (or when period-scoped on a diary dashboard), bare folder
   // scopes to the whole diary root so daily entries inside the period are collected,
   // rather than scoping to `Weekly/` or `Monthly/` where no daily notes exist.
-  const isDiary =
-    hostFolder != null &&
-    (hostFolder === paths.diaryRoot ||
-      hostFolder.startsWith(`${paths.diaryRoot}/`) ||
-      hostFolder === paths.diaryDaily ||
-      hostFolder === paths.diaryWeekly ||
-      hostFolder === paths.diaryMonthly ||
-      hostFolder === paths.diaryQuarterly ||
-      hostFolder === paths.diaryYearly);
+  const isDiary = hostIsDiary(paths, hostFolder);
 
   let defaultFolder = hostFolder;
   if (arg === "") {
@@ -794,15 +817,7 @@ export function tasksScopeFor(
   const hostFolder = file?.parent?.path ?? null;
   const paths = plugin.settings.paths;
 
-  const isDiary =
-    hostFolder != null &&
-    (hostFolder === paths.diaryRoot ||
-      hostFolder.startsWith(`${paths.diaryRoot}/`) ||
-      hostFolder === paths.diaryDaily ||
-      hostFolder === paths.diaryWeekly ||
-      hostFolder === paths.diaryMonthly ||
-      hostFolder === paths.diaryQuarterly ||
-      hostFolder === paths.diaryYearly);
+  const isDiary = hostIsDiary(paths, hostFolder);
 
   let defaultFolder = hostFolder;
   if (arg === "") {

@@ -126,8 +126,13 @@ export function liveDiaryWidget(
   alsoHost = false
 ): HTMLElement {
   const paths = plugin.settings.paths;
+  // THE ROOT, THEN THE TWO LEGACY FOLDERS (4.81). An entry written under the
+  // period tree is at `02 - Diary/Year-2026/…`, which starts with neither of
+  // the two folders this listed — so writing a day no longer repainted the
+  // calendar beside it. The root covers the tree and both folders in the
+  // default layout; the two stay for a vault that points a grain elsewhere.
   const prefixes = Array.from(
-    new Set([paths.diaryDaily, paths.diaryMonthly])
+    new Set([paths.diaryRoot, paths.diaryDaily, paths.diaryMonthly])
   ).map((f) => normalizePath(f) + "/");
   const host = createDiv({ cls: "journal-live-widget" });
   ctx.addChild(

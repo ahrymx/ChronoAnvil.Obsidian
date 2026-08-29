@@ -300,12 +300,9 @@ export interface AlmanacSettings {
 
 export const DEFAULT_SETTINGS: AlmanacSettings = {
   appearance: {
-    aestheticPreset: "modern",
+    aestheticPreset: "editorial",
     grainAesthetics: "vibrant",
-    // OFF BY DEFAULT. A background is the one setting that touches every note
-    // at once, so it is a thing a reader turns on rather than one they discover
-    // already on and have to find the switch for.
-    pageGround: "off",
+    pageGround: "scanline",
     pageGroundStrength: "standard",
   },
   paths: { ...DEFAULT_PATHS },
@@ -374,6 +371,8 @@ const DERIVED_PATH_LABELS: Record<string, string> = {
   diaryMonthly: "Monthly entries",
   diaryQuarterly: "Quarterly entries",
   diaryYearly: "Yearly entries",
+  diaryEntries: "Entries folder",
+  diaryDashboards: "Period dashboards",
   events: "Events note",
   search: "Search note",
 };
@@ -863,11 +862,11 @@ export class AlmanacSettingTab extends PluginSettingTab {
       .setName("Aesthetic preset")
       .setDesc("Design archetype and typography suite applied to Almanac notes and surfaces.")
       .addDropdown((d) => {
-        d.addOption("modern", "1. Modern Fluent (Default — Clean Sans & Glass)");
-        d.addOption("editorial", "2. Editorial Monastic (Serif & Warm Parchment)");
+        d.addOption("editorial", "1. Editorial Monastic (Default — Serif & Warm Parchment)");
+        d.addOption("modern", "2. Modern Fluent (Clean Sans & Glass)");
         d.addOption("technical", "3. Technical HUD (Monospace Telemetry)");
-        d.setValue(s.appearance?.aestheticPreset || "modern").onChange(async (v) => {
-          if (!s.appearance) s.appearance = { aestheticPreset: "modern", grainAesthetics: "vibrant" };
+        d.setValue(s.appearance?.aestheticPreset || "editorial").onChange(async (v) => {
+          if (!s.appearance) s.appearance = { aestheticPreset: "editorial", grainAesthetics: "vibrant", pageGround: "scanline", pageGroundStrength: "standard" };
           s.appearance.aestheticPreset = v as AestheticPreset;
           await this.plugin.saveSettings();
           this.plugin.appearance.apply();
@@ -882,7 +881,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
         d.addOption("subtle", "Subtle (Muted hairline accents and quiet chips)");
         d.addOption("monochrome", "Monochrome (Strict theme accent only)");
         d.setValue(s.appearance?.grainAesthetics || "vibrant").onChange(async (v) => {
-          if (!s.appearance) s.appearance = { aestheticPreset: "modern", grainAesthetics: "vibrant" };
+          if (!s.appearance) s.appearance = { aestheticPreset: "editorial", grainAesthetics: "vibrant", pageGround: "scanline", pageGroundStrength: "standard" };
           s.appearance.grainAesthetics = v as GrainAestheticIntensity;
           await this.plugin.saveSettings();
           this.plugin.appearance.apply();
@@ -891,8 +890,8 @@ export class AlmanacSettingTab extends PluginSettingTab {
 
     // ── The page ground ──────────────────────────────────────────────────
     //
-    // GROUPED, AND BUILT FROM THE TABLE. Nineteen textures in one flat list is
-    // a wall a reader scrolls past; five families of four is four rows to read
+    // GROUPED, AND BUILT FROM THE TABLE. Seventeen textures in one flat list is
+    // a wall a reader scrolls past; five families is four rows to read
     // before deciding. `<optgroup>` is the element that says so, and Obsidian's
     // dropdown hands out its `<select>` for exactly this kind of case — the
     // component's own `addOption` can only append to the top level.
@@ -914,8 +913,8 @@ export class AlmanacSettingTab extends PluginSettingTab {
             });
           }
         }
-        d.setValue(s.appearance?.pageGround || "off").onChange(async (v) => {
-          if (!s.appearance) s.appearance = { aestheticPreset: "modern", grainAesthetics: "vibrant" };
+        d.setValue(s.appearance?.pageGround || "scanline").onChange(async (v) => {
+          if (!s.appearance) s.appearance = { aestheticPreset: "editorial", grainAesthetics: "vibrant", pageGround: "scanline", pageGroundStrength: "standard" };
           s.appearance.pageGround = v as PageGroundId;
           await this.plugin.saveSettings();
           this.plugin.appearance.apply();
@@ -933,13 +932,28 @@ export class AlmanacSettingTab extends PluginSettingTab {
         }
         d.setValue(s.appearance?.pageGroundStrength || "standard").onChange(
           async (v) => {
-            if (!s.appearance) s.appearance = { aestheticPreset: "modern", grainAesthetics: "vibrant" };
+            if (!s.appearance) s.appearance = { aestheticPreset: "editorial", grainAesthetics: "vibrant", pageGround: "scanline", pageGroundStrength: "standard" };
             s.appearance.pageGroundStrength = v as PageGroundStrength;
             await this.plugin.saveSettings();
             this.plugin.appearance.apply();
           }
         );
       });
+
+    new Setting(containerEl)
+      .setName("Graph view color groups")
+      .setDesc(
+        "Configure Obsidian Graph View color groups to color-code Almanac entries, journals, dashboards, and workbenches based on your current vault paths."
+      )
+      .addButton((b) =>
+        b
+          .setButtonText("Set up graph groups")
+          .setIcon("git-fork")
+          .setTooltip("Write color groups to .obsidian/graph.json")
+          .onClick(async () => {
+            await this.plugin.scaffold.configureGraphGroups();
+          })
+      );
   }
 
   // ── The vault banner ────────────────────────────────────────────────────
@@ -953,6 +967,64 @@ export class AlmanacSettingTab extends PluginSettingTab {
       containerEl,
       "A bar at the top of every note in your diary, your journals and your home page: search, the four places you go most, where this note sits, and its title."
     );
+
+    // Live interactive banner preview card
+    const previewWrap = containerEl.createDiv({
+      cls: "almanac-settings-banner-preview-wrap",
+    });
+    const bannerEl = previewWrap.createDiv({
+      cls: "am-vault-banner almanac-settings-banner-preview",
+    });
+    bannerEl.setAttr("data-am-grain", "daily");
+
+    const row = bannerEl.createDiv({ cls: "avb-global" });
+    const id = row.createDiv({ cls: "avb-id" });
+    const tileEl = id.createDiv({
+      cls: "avb-tile",
+      text: s.banner.glyph || initialsOf(this.app.vault.getName()),
+    });
+    const idText = id.createDiv({ cls: "avb-id-text" });
+    idText.createDiv({ cls: "avb-id-name", text: this.app.vault.getName() });
+    idText.createDiv({ cls: "avb-id-sub", text: "Daily Entry" });
+
+    const search = row.createDiv({ cls: "avb-search" });
+    setIcon(search.createSpan({ cls: "avb-search-icon" }), "search");
+    search.createSpan({ cls: "avb-search-text", text: "Search everything…" });
+
+    const nav = row.createDiv({ cls: "avb-nav" });
+    const diaryBtn = nav.createDiv({ cls: "avb-btn is-on" });
+    setIcon(diaryBtn.createSpan({ cls: "avb-btn-icon" }), "calendar");
+    diaryBtn.createSpan({ cls: "avb-btn-label", text: "Diary" });
+
+    const journalBtn = nav.createDiv({ cls: "avb-btn" });
+    setIcon(journalBtn.createSpan({ cls: "avb-btn-icon" }), "book-open");
+    journalBtn.createSpan({ cls: "avb-btn-label", text: "Journals" });
+
+    const updatePreview = () => {
+      tileEl.setText(s.banner.glyph || initialsOf(this.app.vault.getName()));
+      if (s.banner.art && s.banner.art !== "none") {
+        bannerEl.setAttribute("data-am-art", s.banner.art);
+        const opacity = s.banner.artOpacity ?? 18;
+        bannerEl.style.setProperty(
+          "--am-header-art-opacity",
+          String(opacity / 100)
+        );
+      } else {
+        bannerEl.removeAttribute("data-am-art");
+        bannerEl.style.removeProperty("--am-header-art-opacity");
+      }
+
+      if (s.banner.glowEnabled === false) {
+        bannerEl.style.setProperty("--am-header-bg-gradient", "none");
+      } else {
+        bannerEl.style.setProperty(
+          "--am-header-bg-gradient",
+          "radial-gradient(circle at 85% 20%, rgba(var(--interactive-accent-rgb), 0.15) 0%, transparent 60%)"
+        );
+      }
+    };
+
+    updatePreview();
 
     new Setting(containerEl)
       .setName("Tile")
@@ -968,6 +1040,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
             // twelve-character tile is a broken row and the reader should see
             // it refuse in the field they typed it into.
             s.banner.glyph = v.trim().slice(0, 4);
+            updatePreview();
             await this.plugin.saveSettings();
             this.plugin.vaultBanner.refresh();
           })
@@ -989,6 +1062,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
         }
         d.setValue(s.banner.art || "none").onChange(async (v) => {
           s.banner.art = v;
+          updatePreview();
           await this.plugin.saveSettings();
           this.plugin.vaultBanner.refresh();
         });
@@ -1004,6 +1078,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
           .setDynamicTooltip()
           .onChange(async (v) => {
             s.banner.artOpacity = v;
+            updatePreview();
             await this.plugin.saveSettings();
             this.plugin.vaultBanner.refresh();
           })
@@ -1015,6 +1090,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
       .addToggle((t) =>
         t.setValue(s.banner.glowEnabled ?? true).onChange(async (v) => {
           s.banner.glowEnabled = v;
+          updatePreview();
           await this.plugin.saveSettings();
           this.plugin.vaultBanner.refresh();
         })

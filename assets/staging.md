@@ -13,3 +13,6 @@ half-formed thought, a link, a note from a call — then file it into **Diary**,
 ```almanac
 tasks-table:01 - Material/Staging
 ```
+
+%% almanac-graph %%
+%% [[Homepage|​]] %%

@@ -32,15 +32,14 @@ import { periodSpan } from "../diary/periodnav";
 import { readIndex } from "../diary/diary-index";
 import { MonthRollup, QuarterStats, quarterStats } from "./quarter-stats";
 import {
-  filesUnder,
   frontmatterOf,
   isoDate,
   moment,
   quarterMonths,
   quarterOfMonth,
   today,
-  weeklyOverviewPath,
 } from "../core/util";
+import { entriesOfGrain } from "../diary/lineage";
 import { sectionFrame } from "../ui/section-frame";
 import { recapDataOf, renderRecapMoved } from "./recap-view";
 
@@ -91,10 +90,8 @@ export function buildQuarterSummary(
   // The stats strip counts daily entries, and those come from the metadata
   // cache synchronously — so the band paints complete on first frame and only
   // the rollup below it waits on the index (which needs note *bodies*).
-  const dashboard = weeklyOverviewPath(paths);
   const quarterFiles: TFile[] = [];
-  for (const f of filesUnder(app, paths.diaryDaily)) {
-    if (f.path === dashboard) continue;
+  for (const f of entriesOfGrain(app, paths, "daily")) {
     const iso = isoDate(frontmatterOf(app, f)["journal-date"]);
     if (iso && iso >= startIso && iso <= endIso) quarterFiles.push(f);
   }

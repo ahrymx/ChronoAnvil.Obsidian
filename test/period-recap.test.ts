@@ -129,8 +129,11 @@ describe("§2: four scopes, one mark", () => {
     // same folders as the entries and hold the same properties, so counting
     // them would make the CURRENT period always claim an entry — and the claim
     // would move as you browsed.
+    // Through `entriesOfGrain` as of 4.81 — one walk that knows both layouts —
+    // so the exclusion is its property now and `diary-lineage.test.ts` exercises
+    // it against a vault rather than against this file's text.
     expect(readSrc("calendar")).toMatch(
-      /buildPeriodEntryKeys[\s\S]{0,700}folderNotePath\(folder\)[\s\S]{0,300}continue/
+      /buildPeriodEntryKeys[\s\S]{0,700}entriesOfGrain\(app, paths, grain\)/
     );
   });
 

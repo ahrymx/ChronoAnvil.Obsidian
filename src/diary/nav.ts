@@ -33,9 +33,8 @@ import {
 } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
 import type { MomentLike } from "../core/util";
+import { entriesOfGrain } from "./lineage";
 import {
-  folderNotePath,
-  filesUnder,
   frontmatterOf,
   isoDate,
   moment,
@@ -113,14 +112,11 @@ export function entryContext(
   const grain: TrackerClass =
     kind?.surface === "diary" ? kind.grain : "daily";
   const def = CLASS_DEFS[grain];
-  const folder = paths[def.folderKey];
-  const dashboard = folderNotePath(folder);
 
   // The entry's own date, from wherever its grain keeps it — see `entryDateKey`.
   const keyOf = (fm: Record<string, unknown>): string => entryDateKey(fm, grain);
 
-  const entries = filesUnder(app, folder)
-    .filter((f) => f.path !== dashboard)
+  const entries = entriesOfGrain(app, paths, grain)
     .map((f) => ({ file: f, key: keyOf(frontmatterOf(app, f)) }))
     .filter((x) => x.key)
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));

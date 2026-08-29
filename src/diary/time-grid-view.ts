@@ -58,7 +58,7 @@ import {
   weekStartDay,
 } from "../core/util";
 import { readDueTasks } from "../ui/tables";
-import { CLASS_DEFS } from "../trackers/trackers";
+import { locateEntry } from "./lineage";
 import { eventColor, eventsOnDay, type EventDef } from "../events/events";
 import { readEvents, saveEvent } from "../events/eventstore";
 import { draftEvent, openEventEditor } from "../events/event-ui";
@@ -120,9 +120,7 @@ const CAPTURE_COLOR = "grey";
 // is exactly wrong here: a grid is a view, and reading a week must not leave
 // seven entries behind in a vault that had none.
 function dayNoteOf(plugin: AlmanacPlugin, iso: string): TFile | null {
-  const def = CLASS_DEFS.daily;
-  const folder = plugin.settings.paths[def.folderKey];
-  return getFile(plugin.app, `${folder}/${def.filePrefix}${iso}.md`);
+  return locateEntry(plugin.app, plugin.settings.paths, "daily", iso);
 }
 
 // Which day the week opens on, and where the week comes from.

@@ -17,7 +17,13 @@ import {
   DEFAULT_MOOD_FACES,
   builtinTemplate,
 } from "../core/constants";
-import { getFile, normaliseTypeValue, sleepHours } from "../core/util";
+import {
+  basename,
+  dashboardGrainOf,
+  getFile,
+  normaliseTypeValue,
+  sleepHours,
+} from "../core/util";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -1084,6 +1090,14 @@ export interface JournalRootRef {
 }
 
 export interface EntryPathConfig {
+  // THE TREE'S ROOT (4.81), OPTIONAL. A 4.81 entry lives in no grain folder —
+  // it is inside the periods that contain it — so the prefix pass below needs
+  // to know where the diary is. Optional because the five grain keys are not:
+  // a caller with an old-shaped config keeps the folder pass and loses only the
+  // classification of notes it cannot have yet.
+  diaryRoot?: string;
+  // Optional for the same reason: only the dashboard pass reads it.
+  diaryDashboards?: string;
   diaryDaily: string;
   diaryWeekly: string;
   diaryMonthly: string;
@@ -1186,6 +1200,31 @@ export function noteKindOf(
       return { surface: "diary", grain };
     }
   }
+  // THEN THE FILENAME, INSIDE THE DIARY (4.81). The period tree files
+  // `Day-2026-08-29.md` under `Year-2026/Quarter-2026-Q3/Month-2026-08/
+  // Week-2026-W35/`, which is in NO grain folder — so the folder pass below,
+  // alone, classified every entry written after 4.81 as null.
+  //
+  // The prefix is a real declaration and not a guess: `entryNoteName` writes it
+  // from `CLASS_DEFS[grain].filePrefix`, the same table read here, and the five
+  // prefixes are mutually exclusive. Scoped to the diary root so a reader's
+  // `Week-in-review.md` elsewhere in the vault is not swept up.
+  if (paths.diaryRoot != null && pathInFolder(notePath, paths.diaryRoot)) {
+    const name = basename(notePath);
+    for (const grain of TRACKER_CLASSES) {
+      if (name.startsWith(CLASS_DEFS[grain].filePrefix)) {
+        return { surface: "diary", grain };
+      }
+    }
+  }
+  // The four period dashboards, at either address. Before the folder pass
+  // because it answers the same question exactly where that one used to: until
+  // 4.81 a dashboard WAS its grain folder's note, and moving the file into
+  // `Dashboards/` would otherwise have made the weekly dashboard gainless.
+  const dashboard = dashboardGrainOf(paths, notePath);
+  if (dashboard) return { surface: "diary", grain: dashboard };
+  // The grain folders, for every vault written before 4.81 — and for a reader
+  // who keeps filing entries there by hand.
   for (const grain of TRACKER_CLASSES) {
     if (pathInFolder(notePath, paths[CLASS_DEFS[grain].folderKey])) {
       return { surface: "diary", grain };

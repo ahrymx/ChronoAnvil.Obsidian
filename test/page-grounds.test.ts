@@ -217,8 +217,8 @@ describe("the shared film, which is what makes a pattern a surface", () => {
 });
 
 describe("the table itself", () => {
-  it("has nineteen grounds in five families, none of them empty", () => {
-    expect(PAGE_GROUNDS.length).toBe(19);
+  it("has seventeen grounds in five families, none of them empty", () => {
+    expect(PAGE_GROUNDS.length).toBe(17);
     expect(PAGE_GROUND_FAMILIES.length).toBe(5);
     for (const family of PAGE_GROUND_FAMILIES) {
       expect(groundsInFamily(family.id).length, family.id).toBeGreaterThan(0);
@@ -258,12 +258,12 @@ describe("the reader's half", () => {
     // match, so a vault with no ground gets no overlay at all rather than a
     // transparent one on every note.
     const src = readSrc("appearance");
-    expect(src).toMatch(/const ground = s\.pageGround \?\? "off";/);
+    expect(src).toMatch(/const ground = s\.pageGround \?\? "scanline";/);
     expect(src).toMatch(/if \(ground !== "off"\) \{[\s\S]*?addClass\(PAGE_GROUND_MARKER\)/);
   });
 
   it("builds the dropdown from the table, grouped by family", () => {
-    // Nineteen literals in the settings file is how the settings file and the
+    // Seventeen literals in the settings file is how the settings file and the
     // stylesheet come to disagree.
     const src = readSrc("settings");
     expect(src).toContain("for (const family of PAGE_GROUND_FAMILIES)");
@@ -273,8 +273,8 @@ describe("the reader's half", () => {
     expect(src).toContain('d.addOption("off"');
   });
 
-  it("ships off, at standard", () => {
-    expect(DEFAULT_SETTINGS.appearance?.pageGround).toBe("off");
+  it("ships scanlines, at standard", () => {
+    expect(DEFAULT_SETTINGS.appearance?.pageGround).toBe("scanline");
     expect(DEFAULT_SETTINGS.appearance?.pageGroundStrength).toBe("standard");
   });
 });

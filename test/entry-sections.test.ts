@@ -110,7 +110,6 @@ describe("the composer is what scaffold writes", () => {
       expect(out.startsWith("---\n"), g).toBe(true);
       expect(out, g).toContain("`almanac:spacer`");
       expect(out, g).toContain(`journal: ${CLASS_DEFS[g].journalProperty}`);
-      expect(out, g).toContain("%% almanac-graph %%");
       expect(out.endsWith("\n"), g).toBe(true);
     }
   });

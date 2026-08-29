@@ -17,6 +17,7 @@
 
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { readSrc } from "./sources";
 import { join } from "node:path";
 import { regroupShippedPages, repairNote } from "../src/core/repair-plan";
 import {
@@ -35,7 +36,11 @@ import {
   diarySectionModel,
 } from "../src/diary/diary-sections";
 import { DEFAULT_PATHS, DEFAULT_LOGBOOKS } from "../src/core/constants";
-import { shippedNotes, isReconcilable } from "../src/core/scaffold";
+import {
+  shippedNotes,
+  isReconcilable,
+  retargetDiaryBase,
+} from "../src/core/scaffold";
 import {
   mergeTrendsSection,
   ensureTrendsHeader,
@@ -696,5 +701,104 @@ describe("regrouping a page onto this release's rows", () => {
       .filter((l) => l !== "row" && l !== "tag-index")
       .join("\n");
     expect(regroupShippedPages(BEFORE, flat)).toBeNull();
+  });
+});
+
+// ── The vault's own Diary.base ────────────────────────────────────────────
+//
+// It is not a reconcilable note — it is a YAML document the reader edits — so
+// repair has never converged it, and the folder filter it shipped with names
+// the two folders that held every entry until 4.81. Left alone, the table stops
+// on the day the reader upgrades.
+
+describe("aiming Diary.base at the diary", () => {
+  const ROOT = DEFAULT_PATHS.diaryRoot;
+  const shipped = readFileSync(
+    join(__dirname, "..", "assets", "diary.base"),
+    "utf8"
+  );
+  const legacy = `filters:
+  and:
+    - journal != null
+    - or:
+        - file.inFolder("${ROOT}/Weekly")
+        - file.inFolder("${ROOT}/Monthly")
+formulas:
+  Type: 'if(journal == "Monthly Entry", "📆 Monthly", "📝 Daily")'
+`;
+
+  it("replaces the two folders with the one that contains them", () => {
+    const out = retargetDiaryBase(legacy, ROOT)!;
+    expect(out).toContain(`- file.inFolder("${ROOT}")`);
+    expect(out).not.toContain("Weekly\")");
+    expect(out).not.toContain("Monthly\")");
+    // And it changes NOTHING else: the base is the reader's document. The
+    // `or:` goes with the branch it was introducing — one folder needs no or.
+    const rest = (t: string): string[] =>
+      t.split("\n").filter((l) => !l.includes("inFolder") && !/- or:/.test(l));
+    expect(rest(out)).toEqual(rest(legacy));
+  });
+
+  it("leaves the base this release ships alone", () => {
+    // Which is what stops repair offering a migration on a vault created five
+    // minutes ago — the wart 4.68.1 caught in `titleSummaryFence`.
+    expect(retargetDiaryBase(shipped, ROOT)).toBeNull();
+    expect(shipped).toContain(`file.inFolder("${ROOT}")`);
+  });
+
+  it("declines a filter that names somewhere outside the diary", () => {
+    // Widening this to the diary root would silently drop the reader's term.
+    const mixed = legacy.replace(
+      `${ROOT}/Monthly`,
+      "03 - Journals/Cooking"
+    );
+    expect(retargetDiaryBase(mixed, ROOT)).toBeNull();
+  });
+
+  it("has nothing to say about a base with no folder list", () => {
+    expect(retargetDiaryBase("filters:\n  and:\n    - journal != null\n", ROOT)).toBeNull();
+    expect(retargetDiaryBase("", ROOT)).toBeNull();
+  });
+});
+
+// ── The dashboards' move, and the gap it must not look like ──────────────
+//
+// `create` runs before `migrations` in one apply. Both groups have an opinion
+// about `Dashboards/Weekly.md` — one sees a shipped note that is absent, the
+// other sees a note that is somewhere else — and only one of them is right.
+
+describe("moving the four dashboards", () => {
+  const src = readSrc("scaffold");
+  const createLoop = src.slice(
+    src.indexOf("for (const note of shippedNotes("),
+    src.indexOf("// Custom journals' default templates.")
+  );
+
+  it("does not create a dashboard that is waiting to be moved", () => {
+    // Without this the reader ends a repair with two Weekly dashboards: an
+    // empty new one, and their own — charts and all — stranded in the old
+    // folder, because the move then declines an occupied destination.
+    expect(createLoop).toContain("this.dashboardAwaitingMove(dest)");
+  });
+
+  it("asks the moves themselves rather than restating their conditions", () => {
+    const at = src.indexOf("private dashboardAwaitingMove(");
+    const body = src.slice(at, src.indexOf("\n  }", at));
+    expect(body).toContain("this.plannedDashboardMoves()");
+  });
+
+  it("makes the folder before it renames into it", () => {
+    // A reader may tick `migrations` alone, and `create` is what would
+    // otherwise have made `Dashboards/`.
+    const at = src.indexOf("private async moveDashboards(");
+    const body = src.slice(at, src.indexOf("\n  }\n", at));
+    expect(body).toContain("ensureFolder(this.app, this.paths.diaryDashboards)");
+    expect(body.indexOf("ensureFolder")).toBeLessThan(
+      body.indexOf("renameFile")
+    );
+    // Through `fileManager`, which rewrites every link that pointed at the
+    // note — the hidden graph links included. `vault.rename` moves the bytes
+    // and breaks them.
+    expect(body).toContain("this.app.fileManager.renameFile");
   });
 });

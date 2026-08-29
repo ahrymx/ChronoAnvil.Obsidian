@@ -59,12 +59,11 @@ import type { TrackerClass } from "../trackers/trackers";
 import { entryContext } from "./nav";
 import type { EntryContext } from "./nav";
 import {
-  filesUnder,
   frontmatterOf,
   moment,
-  folderNotePath,
   openFile,
 } from "../core/util";
+import { entriesOfGrain } from "./lineage";
 
 // The frontmatter property the entry title is stored in. A plain scalar, kept
 // separate from Obsidian's native `aliases` (an array meant for link targets)
@@ -180,12 +179,7 @@ function dateOptions(
   //
   // Newest first, which is the one thing this differs from entryContext in —
   // the picker reads top-down and the arrows step forward in time.
-  const def = CLASS_DEFS[grain];
-  const folder = paths[def.folderKey];
-  const dashboard = folderNotePath(folder);
-
-  return filesUnder(app, folder)
-    .filter((f) => f.path !== dashboard)
+  return entriesOfGrain(app, paths, grain)
     .map((f) => ({ file: f, key: entryDateKey(frontmatterOf(app, f), grain) }))
     .filter((x) => x.key)
     .sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0))

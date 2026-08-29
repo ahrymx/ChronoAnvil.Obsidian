@@ -781,30 +781,140 @@ export function isFolderNote(file: {
   return parent.name === file.basename;
 }
 
-// The weekly overview: the folder note of the folder holding daily entries.
-// `Weekly/Weekly.md` — the folder already says "the week", so a separate
-// "Overview" in the filename would only restate its container.
-// The four dashboards, each the folder note of the folder holding that period's
-// entries. Derived rather than stored: a dashboard is not an independent
-// location, it is a fact about its folder, and a second setting pointing at the
-// same place is a second thing that can disagree.
+// ── THE FOUR PERIOD DASHBOARDS (4.81) ──────────────────────────────────
+//
+// Notes in one folder, and no longer the folder notes of the four grain
+// folders. A dashboard WAS "a fact about its folder" — that is why these were
+// derived rather than stored, and the derivation was right for as long as
+// `02 - Diary/Weekly/` was where weekly entries lived. Under the period tree it
+// is not: an entry is filed by the period that contains it, so the grain folder
+// holds nothing new and a note at the top of it would be a dashboard for an
+// empty room.
+//
+// STILL DERIVED, from one configured folder instead of four. There is no second
+// setting per dashboard for the same reason there was none before — a location
+// stored twice is a location that can disagree with itself.
+//
+// THE BASENAMES ARE THE POINT AND THEY DO NOT MOVE. `[[Weekly]]` is what every
+// hidden link, the vault map and `grainFallbackName` name, and Obsidian resolves
+// it by basename wherever the file sits. Written out here rather than read from
+// `CLASS_DEFS[grain].label`, which is the same four words: this module is
+// imported BY trackers.ts, so reaching back for them would be a cycle.
 //
 // There is no dailyOverviewPath. A daily entry is the note — see the diary
 // block in constants.ts.
-export function weeklyOverviewPath(paths: { diaryWeekly: string }): string {
-  return folderNotePath(paths.diaryWeekly);
+const DASHBOARD_BASENAME = {
+  weekly: "Weekly",
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  yearly: "Yearly",
+} as const;
+
+export function weeklyOverviewPath(paths: { diaryDashboards: string }): string {
+  return `${paths.diaryDashboards}/${DASHBOARD_BASENAME.weekly}.md`;
 }
 
-export function monthlyOverviewPath(paths: { diaryMonthly: string }): string {
-  return folderNotePath(paths.diaryMonthly);
+export function monthlyOverviewPath(paths: { diaryDashboards: string }): string {
+  return `${paths.diaryDashboards}/${DASHBOARD_BASENAME.monthly}.md`;
 }
 
-export function quarterOverviewPath(paths: { diaryQuarterly: string }): string {
-  return folderNotePath(paths.diaryQuarterly);
+export function quarterOverviewPath(paths: {
+  diaryDashboards: string;
+}): string {
+  return `${paths.diaryDashboards}/${DASHBOARD_BASENAME.quarterly}.md`;
 }
 
-export function yearOverviewPath(paths: { diaryYearly: string }): string {
-  return folderNotePath(paths.diaryYearly);
+export function yearOverviewPath(paths: { diaryDashboards: string }): string {
+  return `${paths.diaryDashboards}/${DASHBOARD_BASENAME.yearly}.md`;
+}
+
+// Where a vault written before 4.81 keeps the same four notes: the folder note
+// of the grain folder. Read by the move migration and by nothing else — every
+// other caller wants today's answer.
+export function legacyOverviewPath(
+  paths: LegacyGrainFolders,
+  grain: "weekly" | "monthly" | "quarterly" | "yearly"
+): string {
+  const folder = {
+    weekly: paths.diaryWeekly,
+    monthly: paths.diaryMonthly,
+    quarterly: paths.diaryQuarterly,
+    yearly: paths.diaryYearly,
+  }[grain];
+  // EMPTY RATHER THAN A CRASH on a config that does not carry the key. The
+  // grain folders are settings, and a caller assembling a partial one — the
+  // journal-side tests do — would otherwise take a `folderNotePath(undefined)`
+  // for a grain it never asked about. No note's path is "", so an empty answer
+  // matches nothing.
+  return folder ? folderNotePath(folder) : "";
+}
+
+interface LegacyGrainFolders {
+  diaryWeekly?: string;
+  diaryMonthly?: string;
+  diaryQuarterly?: string;
+  diaryYearly?: string;
+}
+
+// Where this vault's period dashboard actually is.
+//
+// TWO ADDRESSES, ONE ANSWER, and the reason is that 4.81's move happens on
+// REPAIR while every reader of a dashboard happens on click. A vault that has
+// upgraded and not yet repaired still keeps `Weekly.md` in its grain folder, and
+// the accessors above — which name where a dashboard BELONGS — would have had
+// the calendar answer "Weekly Overview note not found" on every week of it, and
+// the command palette create a second, empty one beside the real note.
+//
+// The new address first, so a repaired vault never looks at the old one; the old
+// address only when a file is actually there; and the new address as the answer
+// when neither exists, because that is where a note being created should go.
+export function resolveOverviewPath(
+  app: App,
+  paths: {
+    diaryDashboards: string;
+    diaryWeekly: string;
+    diaryMonthly: string;
+    diaryQuarterly: string;
+    diaryYearly: string;
+  },
+  grain: "weekly" | "monthly" | "quarterly" | "yearly"
+): string {
+  const here = {
+    weekly: weeklyOverviewPath,
+    monthly: monthlyOverviewPath,
+    quarterly: quarterOverviewPath,
+    yearly: yearOverviewPath,
+  }[grain](paths);
+  if (getFile(app, here)) return here;
+  const legacy = legacyOverviewPath(paths, grain);
+  return legacy !== "" && getFile(app, legacy) ? legacy : here;
+}
+
+// Which period dashboard this note IS, or null for everything else.
+//
+// BOTH ADDRESSES, because 4.81 moved the four notes and a vault that has not
+// repaired yet still keeps them where they were. A caller asking "is this the
+// weekly dashboard" wants one answer in both vaults, and the alternative — a
+// path test written out at each call site — is exactly the pair of divergent
+// spellings `shippedNotes` had to be rescued from.
+//
+// A `paths` shaped like the settings object, so the one caller that has only
+// the entry-path subset can pass what it has.
+export function dashboardGrainOf(
+  paths: LegacyGrainFolders & { diaryDashboards?: string },
+  notePath: string
+): "weekly" | "monthly" | "quarterly" | "yearly" | null {
+  const grains = ["weekly", "monthly", "quarterly", "yearly"] as const;
+  for (const grain of grains) {
+    if (
+      paths.diaryDashboards != null &&
+      notePath === `${paths.diaryDashboards}/${DASHBOARD_BASENAME[grain]}.md`
+    ) {
+      return grain;
+    }
+    if (notePath === legacyOverviewPath(paths, grain)) return grain;
+  }
+  return null;
 }
 
 // Map a heat-map tracker value to one of the 1..5 shade buckets styles.css

@@ -23,13 +23,10 @@ import { MobileControls } from "./ui/mobile-controls";
 import { AppearanceManager } from "./ui/appearance";
 import { openVaultSearch } from "./ui/search-all";
 import {
+  resolveOverviewPath,
   getFile,
   moment,
-  monthlyOverviewPath,
   openFile,
-  weeklyOverviewPath,
-  quarterOverviewPath,
-  yearOverviewPath,
 } from "./core/util";
 import { danglingTypeIds } from "./trackers/trackers";
 import { Charts } from "./charts/charts-manager";
@@ -196,7 +193,7 @@ export default class AlmanacPlugin extends Plugin {
     const p = this.settings.paths;
     const isInitialized = Boolean(
       this.app.vault.getAbstractFileByPath(p.staging) ||
-      this.app.vault.getAbstractFileByPath(p.diaryDaily)
+      this.app.vault.getAbstractFileByPath(p.diaryRoot)
     );
 
     if (isInitialized && installed !== undefined) {
@@ -546,22 +543,22 @@ export default class AlmanacPlugin extends Plugin {
     const now = moment();
     const spec = {
       week: {
-        path: weeklyOverviewPath(paths),
+        path: resolveOverviewPath(this.app, paths, "weekly"),
         prop: "week-start" as const,
         mu: "isoWeek" as const,
       },
       month: {
-        path: monthlyOverviewPath(paths),
+        path: resolveOverviewPath(this.app, paths, "monthly"),
         prop: "month-start" as const,
         mu: "month" as const,
       },
       quarter: {
-        path: quarterOverviewPath(paths),
+        path: resolveOverviewPath(this.app, paths, "quarterly"),
         prop: "quarter-start" as const,
         mu: "quarter" as const,
       },
       year: {
-        path: yearOverviewPath(paths),
+        path: resolveOverviewPath(this.app, paths, "yearly"),
         prop: "year-start" as const,
         mu: "year" as const,
       },

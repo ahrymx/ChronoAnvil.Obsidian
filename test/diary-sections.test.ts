@@ -476,13 +476,15 @@ describe("what a dashboard already has, and what it could gain", () => {
     expect(src).toContain('if (kind.grain === "daily") return null;');
   });
 
-  it("tells a dashboard apart from an entry in the same folder", () => {
-    // The grain alone cannot: `Weekly/Week-2026-W30.md` and `Weekly/Weekly.md`
-    // are both weekly. Only the folder-note path distinguishes them, and
-    // offering dashboard sections to an entry would write a summary widget
-    // into someone's week.
+  it("tells a dashboard apart from an entry of the same grain", () => {
+    // The grain alone cannot: `Week-2026-W30.md` and `Weekly.md` are both
+    // weekly, and offering dashboard sections to an entry would write a summary
+    // widget into someone's week. Only the dashboard's ADDRESS distinguishes
+    // them — which as of 4.81 is `Dashboards/Weekly.md` in a repaired vault and
+    // the grain folder's note in one that has not repaired, so the test is the
+    // resolver that knows both rather than a path written out here.
     const src = readSrc("section-insert");
-    expect(src).toContain("folderNotePath(paths[CLASS_DEFS[kind.grain].folderKey])");
+    expect(src).toContain("dashboardGrainOf(paths, notePath) !== kind.grain");
   });
 
   it("resolves through the one resolver, not a second path test", () => {

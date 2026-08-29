@@ -178,18 +178,18 @@ describe("one page per journal, in every walk that reads the list", () => {
     // not change what the six fixed pages are or where they go.
     expect(one.slice(0, none.length).map((n) => n.dest)).toEqual(none.map((n) => n.dest));
 
-    // ONE ENTRY IS LEGITIMATELY JOURNAL-SENSITIVE, as of 4.68, and this pins
-    // that it is the only one. `Almanac.canvas` is a map OF this vault, so
-    // registering a journal puts a node on it — which is the property that
-    // makes the baseline map and the one `generateVaultCanvas` rebuilds the
-    // same map rather than two arrangements to keep in step (canvas-builder §7).
-    // Anything ELSE appearing here is a fixed page quietly becoming
-    // journal-dependent, which is what the assertion above was written to catch.
+    // NOTHING FIXED IS JOURNAL-SENSITIVE, and that is stronger than it was.
+    // 4.68 allowed one exception here — `Almanac.canvas` is a map OF this vault,
+    // so registering a journal put a node on it — and 4.81's shrink to four
+    // cards removed even that: the map draws the journals TREE, not its types,
+    // so the baseline is the same bytes either way. Anything appearing here is
+    // a fixed page quietly becoming journal-dependent, which is what the
+    // assertion above was written to catch.
     const shifted = one
       .slice(0, none.length)
       .filter((n, i) => JSON.stringify(n) !== JSON.stringify(none[i]))
       .map((n) => n.dest);
-    expect(shifted).toEqual([`${DEFAULT_PATHS.infrastructureRoot}/Almanac.canvas`]);
+    expect(shifted).toEqual([]);
   });
 
   it("writes them as composed notes rather than assets or templates", () => {

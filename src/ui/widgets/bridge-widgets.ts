@@ -133,9 +133,15 @@ export function bridgeHostFacts(
 // disagree, and read off the class table so a sixth grain needs no edit.
 function diaryFolders(plugin: AlmanacPlugin): string[] {
   const paths = plugin.settings.paths;
+  // AND THE DIARY ROOT (4.81), which is where an entry written under the period
+  // tree actually is — in no grain folder at all. The five stay for a vault
+  // that points a grain outside the diary.
   return Array.from(
     new Set(
-      TRACKER_CLASSES.map((g) => paths[CLASS_DEFS[g].folderKey]).filter(Boolean)
+      [
+        paths.diaryRoot,
+        ...TRACKER_CLASSES.map((g) => paths[CLASS_DEFS[g].folderKey]),
+      ].filter(Boolean)
     )
   );
 }

@@ -9,11 +9,11 @@
 
 /* ============================================================
  *  Almanac Page Grounds (4.80)
- *  Nineteen background textures, in five families:
+ *  Seventeen background textures, in five families:
  *    Paper           dot grid, graph, ruled, crosshatch, isometric
  *    Weave and tile  checkerboard, argyle, zigzag, carbon fibre
  *    Print and screen halftone, scanlines, pinstripe, candy stripe
- *    Ground and light topographic, wave scales, aurora, star dust
+ *    Ground and light wave scales, star dust
  *    Crystal         facet, smoke
  *
  *  EVERY ONE IS THE SAME THREE LAYERS: the note's own background colour,
@@ -266,19 +266,9 @@ body.am-ground-candy .workspace-leaf-content[data-type="markdown"]::before {
 
 /* ============================================================
  *  Family 4 — Ground and light
- *  No repeat a reader can point at. Three of the four are sized to the
- *  element rather than tiled, so they scale with the pane instead of
- *  gaining rows in it.
+ *  No repeat a reader can point at. Both are sized to the
+ *  element or coprime dot grids, so they scale smoothly.
  * ============================================================ */
-
-/* Contour lines from a noise field, thresholded. A map with no place on it. */
-body.am-ground-topo .workspace-leaf-content[data-type="markdown"]::before {
-  background-image:
-    radial-gradient(90% 70% at 18% 4%, var(--am-tex-hi) 0%, transparent 62%),
-    var(--am-tex-topo);
-  background-size: 100% 100%, 560px 560px;
-  background-repeat: no-repeat, repeat;
-}
 
 /* Seigaiha — the overlapping fans on every Japanese textile and half the web.
    The second layer is the first offset by half a tile, which is what brickworks
@@ -289,17 +279,6 @@ body.am-ground-seigaiha .workspace-leaf-content[data-type="markdown"]::before {
     repeating-radial-gradient(circle at 50% 0, transparent 0 17px, var(--am-tex-ink) 17px 18px, transparent 18px);
   background-size: 76px 38px;
   background-position: 0 0, 38px 19px;
-}
-
-/* Four soft blobs, warm against cool. */
-body.am-ground-aurora .workspace-leaf-content[data-type="markdown"]::before {
-  background-image:
-    radial-gradient(38% 32% at 12% 16%, var(--am-tex-warm) 0%, transparent 70%),
-    radial-gradient(44% 36% at 84% 10%, var(--am-tex-cool) 0%, transparent 70%),
-    radial-gradient(52% 42% at 64% 92%, var(--am-tex-accent) 0%, transparent 72%),
-    radial-gradient(34% 30% at 26% 76%, var(--am-tex-hi) 0%, transparent 68%);
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
 }
 
 /* Four coprime dot grids under a vignette — 91/83, 67/71, 53/59, 43/47 — so no

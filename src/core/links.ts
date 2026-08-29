@@ -30,14 +30,11 @@ import { Menu, App, MarkdownPostProcessorContext, setIcon, TFile } from "obsidia
 import type AlmanacPlugin from "../main";
 import { openCapture } from "../diary/capture";
 import {
+  resolveOverviewPath,
   getFile,
-  monthlyOverviewPath,
   noExt,
   openFile,
-  weeklyOverviewPath,
   folderNotePath,
-  quarterOverviewPath,
-  yearOverviewPath,
 } from "./util";
 
 export interface LinkTarget {
@@ -102,13 +99,13 @@ export function resolveTarget(
       return {
         icon: "calendar",
         label: "Week",
-        file: getFile(app, weeklyOverviewPath(paths)),
+        file: getFile(app, resolveOverviewPath(app, paths, "weekly")),
       };
     case "month":
       return {
         icon: "calendar-days",
         label: "Month",
-        file: getFile(app, monthlyOverviewPath(paths)),
+        file: getFile(app, resolveOverviewPath(app, paths, "monthly")),
       };
     case "all":
       // Points at the Search note's timeline, not Diary.base. The `.base`
@@ -125,13 +122,13 @@ export function resolveTarget(
       return {
         icon: "calendar",
         label: "Quarter",
-        file: getFile(app, quarterOverviewPath(paths)),
+        file: getFile(app, resolveOverviewPath(app, paths, "quarterly")),
       };
     case "year":
       return {
         icon: "calendar",
         label: "Year",
-        file: getFile(app, yearOverviewPath(paths)),
+        file: getFile(app, resolveOverviewPath(app, paths, "yearly")),
       };
     // ── The two folder-note dashboards and the capture window (4.5) ──
     //

@@ -7,18 +7,12 @@
 
 import { App, normalizePath } from "obsidian";
 import type AlmanacPlugin from "../main";
-import {
-  folderNotePath,
-  getFile,
-  monthlyOverviewPath,
-  quarterOverviewPath,
-  weeklyOverviewPath,
-  yearOverviewPath,
-} from "./util";
+import { getFile } from "./util";
 import { registeredJournalTypes } from "../journals/journal";
 import type { JournalType } from "../journals/journal";
 import type { EventColor } from "../events/events";
 import type { DEFAULT_PATHS, LogbookDef } from "./constants";
+import { CLASS_DEFS } from "../trackers/trackers";
 
 export type CanvasSide = "top" | "bottom" | "left" | "right";
 
@@ -191,7 +185,7 @@ export const CANVAS_HUE: Record<EventColor, string> = {
 // The hub's own colour, named once. Amber because it is the one node that is
 // not a branch, and every branch hue is therefore free to mean a branch.
 const HUB_HUE: EventColor = "amber";
-const HUB_ID = "node-home";
+const HUB_ID = "node-docs";
 
 // Layout constants. GAP separates nodes, PAD insets a group from its contents,
 // BRANCH_GAP separates two group boxes, BAND_GAP separates the two rows of
@@ -203,30 +197,17 @@ const BAND_GAP = 120;
 
 // ── §4. THE SPEC ─────────────────────────────────────────────────────────
 //
-// GROUPED BY ROLE, NOT BY FOLDER, which is what the prototype already did
-// without saying so: `Search.md` lives under `02 - Diary/` and was drawn in a
-// group of its own. Stating the rule lets `Diary.base` sit where it belongs —
-// its role is "read every entry as a table", and `links.ts` already files
-// `base` beside `search` and `all` in the tile vocabulary.
+// INFRASTRUCTURE CANVAS: Holds onto the infrastructure-related nodes
+// (Documentation/README, Diary.base, and the Diary entry templates), completely
+// detached from the homepage, diary root, journals, or any user-facing notes.
 //
-// COVERAGE IS THE OTHER HALF. The prototype represented two of the vault's four
-// roots: nothing stood for `00 - Infrastructure` or `01 - Material`, and
-// `Events.md` — a whole workbench since 4.62 — was absent. A map missing half
-// the vault is not a map.
-//
-// AND IT SHOWS STRUCTURE, NEVER INSTANCES. The old builder pinned
-// `filesUnder(diaryDaily).slice(0, 12)` to the canvas: the twelve
-// ALPHABETICALLY first daily notes, which is the twelve oldest days in the
-// vault, on a diagram that is stale by morning. The instances already have a
-// calendar, a timeline and a `.base` table. The same rule one level in stops
-// the journals branch at one node per registered type — a type's own dashboard
-// draws its level cards, so listing its subjects here would be the same mistake
-// with a different folder. This is the call 4.58 made when widgets stopped at
-// dashboards.
+// This keeps the infrastructure machinery in its own cleanly contained graph
+// cluster around `Almanac.canvas`, without cross-linking or cluttering the
+// user-facing workspace.
 export function vaultSpec(
   p: typeof DEFAULT_PATHS,
-  types: readonly JournalType[],
-  books: readonly LogbookDef[]
+  types: readonly JournalType[] = [],
+  books: readonly LogbookDef[] = []
 ): VaultSpec {
   const s = (
     id: string,
@@ -235,108 +216,57 @@ export function vaultSpec(
     extra: Partial<SurfaceSpec> = {}
   ): SurfaceSpec => ({ id, path: normalizePath(path), size, ...extra });
 
+  void types;
+  void books;
+
   return {
-    home: normalizePath(p.home),
+    home: normalizePath(`${p.documentation}/README.md`),
     branches: [
       {
-        id: "infra",
-        label: "⚙️ Infrastructure & material",
-        hue: "grey",
-        band: 0,
-        col: 0,
-        // Both optional: a vault whose reader deleted the shipped README, or who
-        // has never captured anything, should show a smaller map rather than two
-        // apologies.
-        spine: s("node-docs", `${p.documentation}/README.md`, "panel", {
-          optional: true,
-        }),
-        members: [
-          s("node-staging", `${p.staging}/Staging.md`, "panel", { optional: true }),
-        ],
-      },
-      {
-        id: "find",
-        label: "🔎 Find & retrieve",
-        hue: "green",
-        band: 0,
-        col: 2,
-        spine: s("node-search", p.search, "board"),
-        members: [
-          // OPTIONAL, because `Events.md` is written only when
-        // `settings.eventsEnabled` — see `Scaffold.plan`. The baseline canvas
-        // carries it (the setting ships on, and scaffolding writes both files
-        // in the same pass); a vault that turns events off loses the node the
-        // next time the map is rebuilt, rather than keeping a placeholder,
-        // which is the whole reason this flag exists.
-        s("node-events", p.events, "board", { optional: true }),
-          s("node-base", `${p.infrastructureRoot}/Diary.base`, "table", {
-            optional: true,
-          }),
-        ],
-      },
-      {
-        id: "diary",
-        label: "📆 The diary",
-        hue: "blue",
+        id: "base",
+        label: "📊 Database",
+        hue: "teal",
         band: 1,
         col: 0,
-        spine: s("node-diary", folderNotePath(p.diaryRoot), "hub"),
-        // THE FOUR OVERVIEW HELPERS, NOT FOUR PATH LITERALS. This is the line the
-        // whole of §1 is about; see `test/canvas-builder.test.ts`, which asserts
-        // these nodes carry exactly what the helpers return.
-        members: [
-          s("node-weekly", weeklyOverviewPath(p), "board"),
-          s("node-monthly", monthlyOverviewPath(p), "board"),
-          s("node-quarterly", quarterOverviewPath(p), "board"),
-          s("node-yearly", yearOverviewPath(p), "board"),
-        ],
-        // WHAT THE BOX CANNOT SAY. A group around four period dashboards says
-        // they are the diary's; it cannot say a week rolls up into a month into a
-        // quarter into a year, which is the actual relationship between them and
-        // the reason there are four rather than one.
-        chain: ["node-weekly", "node-monthly", "node-quarterly", "node-yearly"],
-        chainLabel: "rolls up",
+        spine: s("node-base", `${p.infrastructureRoot}/Diary.base`, "table"),
+        members: [],
       },
       {
-        id: "journals",
-        label: "📚 Journals",
+        id: "templates",
+        label: "📝 Templates",
         hue: "purple",
         band: 1,
         col: 1,
-        spine: s("node-journals", folderNotePath(p.journalsRoot), "board"),
-        members: types.map((t) =>
-          // KEYED ON THE TYPE'S ID, which is stable across a rename; the folder
-          // is not. A reader who renames Study to Studies and re-runs the command
-          // keeps the node where they put it.
-          s(`node-journal-${t.id}`, folderNotePath(`${p.journalsRoot}/${t.name}`), "board")
+        spine: s(
+          "node-tpl-daily",
+          `${p.templatesDiary}/${CLASS_DEFS.daily.templateFile}`,
+          "panel"
         ),
-      },
-      {
-        id: "logbooks",
-        label: "🗒 Logbooks",
-        hue: "teal",
-        band: 1,
-        col: 2,
-        spine: s("node-logbooks", folderNotePath(p.logbooks), "board"),
-        // FROM THE REGISTRY, NOT FROM A FOLDER SCAN. The prototype used
-        // `filesUnder(p.logbooks)`, which finds any stray note a reader dropped in
-        // the folder and misses a registered logbook whose note has not been
-        // written yet — so the map disagreed with the settings tab in both
-        // directions. `LogbookDef` carries the path, and it carries the colour.
-        members: books.map((b) =>
-          s(`node-logbook-${b.id}`, b.path, "panel", { hue: hueOfBook(b) })
-        ),
+        members: [
+          s(
+            "node-tpl-weekly",
+            `${p.templatesDiary}/${CLASS_DEFS.weekly.templateFile}`,
+            "panel"
+          ),
+          s(
+            "node-tpl-monthly",
+            `${p.templatesDiary}/${CLASS_DEFS.monthly.templateFile}`,
+            "panel"
+          ),
+          s(
+            "node-tpl-quarterly",
+            `${p.templatesDiary}/${CLASS_DEFS.quarterly.templateFile}`,
+            "panel"
+          ),
+          s(
+            "node-tpl-yearly",
+            `${p.templatesDiary}/${CLASS_DEFS.yearly.templateFile}`,
+            "panel"
+          ),
+        ],
       },
     ],
   };
-}
-
-// A logbook's registered colour, narrowed to the palette. A hand-edited
-// data.json can hold anything; `parseLogbooks` already validates on read, and
-// this is the second belt because an unknown name here would emit `undefined`
-// into the canvas JSON rather than a colour.
-function hueOfBook(b: LogbookDef): EventColor {
-  return (b.color in CANVAS_HUE ? b.color : "grey") as EventColor;
 }
 
 // Drop the optional surfaces this vault does not have. Runs BEFORE layout, so
@@ -409,10 +339,11 @@ function packBranch(b: BranchSpec): { nodes: Placed[]; w: number; h: number } {
       // BELOW EVERYTHING PLACED SO FAR, INCLUDING THE SPINE. An earlier cut
       // advanced by the current row's height, which is zero when the table is
       // the FIRST member — so it landed on top of the spine. That is only
-      // reachable when an optional member ahead of it has been pruned away
-      // (`node-events` off, `node-base` promoted to first), which is exactly
-      // the case no one would think to look at: pinned by
-      // "drops an optional surface the vault does not have".
+      // reachable when an optional member ahead of it has been pruned away,
+      // which is exactly the case no one would think to look at. No branch on
+      // the shipped map has members at all since 4.81, so it is pinned against
+      // the fixture spec in `test/canvas-builder.test.ts` — "places a table
+      // that pruning made the first member clear of the spine".
       const below = bounds(nodes).h + GAP;
       nodes.push({ ...m, x: PAD, y: below, w: d.w, h: d.h });
       cy = below + d.h + GAP;
@@ -523,17 +454,24 @@ export function layOut(spec: VaultSpec): CanvasDocument {
     const at = origin.get(p.b.id)!;
     const hue = CANVAS_HUE[p.b.hue];
 
-    // The group box comes first so it sits behind its contents.
-    nodes.push({
-      id: `group-${p.b.id}`,
-      type: "group",
-      label: p.b.label,
-      x: at.x,
-      y: at.y,
-      width: p.w,
-      height: p.h,
-      color: hue,
-    });
+    // The group box comes first so it sits behind its contents — AND ONLY WHEN
+    // THERE ARE CONTENTS (4.81). A box around a single card is a second label
+    // for a node that already carries its own name, which is the argument
+    // `VaultSpec.home` has always made for the hub not being a one-member
+    // branch. Since §4 shrank every branch to its spine there is nothing left
+    // for a box to group, and the branch's label and hue survive on the card.
+    if (p.b.members.length > 0) {
+      nodes.push({
+        id: `group-${p.b.id}`,
+        type: "group",
+        label: p.b.label,
+        x: at.x,
+        y: at.y,
+        width: p.w,
+        height: p.h,
+        color: hue,
+      });
+    }
 
     const placed = new Map<string, Placed>();
     for (const n of p.nodes) {

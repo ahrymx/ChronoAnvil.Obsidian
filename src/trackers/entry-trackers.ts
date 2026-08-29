@@ -61,6 +61,8 @@ import {
 } from "../journals/journal";
 import type { JournalType } from "../journals/journal";
 import { filesUnder, frontmatterOf, getFile, normaliseTypeValue } from "../core/util";
+import { entriesOfGrain } from "../diary/lineage";
+import type { DiaryPaths } from "../diary/lineage";
 
 // The bare directive standing for the coupled Wake-Up + Bedtime control. It is
 // not `tracker:<id>` because it renders *two* properties through one widget —
@@ -935,6 +937,22 @@ export function countReadingsOnSurface(
 ): number {
   let n = 0;
   const seen = new Set<string>();
+  // THE DIARY HALF ASKS THE GRAIN (4.81). `surfaceFolders` answers in folders,
+  // and a diary grain's folder no longer holds its entries — so the confirm
+  // would have said "3 readings" about a surface carrying three hundred, which
+  // is an undercount in the direction that makes a destructive move look safe.
+  // `paths` may be a partial config here, so the walk is skipped when it cannot
+  // name the diary root rather than guessing at one.
+  if (surface.kind === "diary" && paths.diaryRoot != null) {
+    for (const grain of surface.classes) {
+      for (const f of entriesOfGrain(app, paths as DiaryPaths, grain)) {
+        if (seen.has(f.path)) continue;
+        seen.add(f.path);
+        if (!isEmptyValue(frontmatterOf(app, f)[trackerId])) n += 1;
+      }
+    }
+    return n;
+  }
   for (const folder of surfaceFolders(paths, surface)) {
     for (const f of filesUnder(app, folder)) {
       // A `typeId: null` built-in spans every journal root, and one root can

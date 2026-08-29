@@ -827,8 +827,6 @@ body {
   --am-tex-fill: rgba(214, 228, 242, 0.05);
   --am-tex-shade: rgba(0, 0, 0, 0.34);
   --am-tex-hi: rgba(214, 228, 242, 0.13);
-  --am-tex-warm: rgba(238, 206, 158, 0.1);
-  --am-tex-cool: rgba(158, 196, 238, 0.1);
   --am-tex-accent: color-mix(in srgb, var(--interactive-accent) 26%, transparent);
 
   /* The grain every ground wears, and the one thing that stops a gradient
@@ -839,15 +837,6 @@ body {
      A DATA URI AND NOT A FILE, so nothing ships in `assets/` and neither
      `scaffold.ts` nor `tools/package.mjs` gains an entry for a background. */
   --am-tex-grain: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='200' height='200' filter='url(%23g)' opacity='0.4'/></svg>");
-
-  /* Contour lines from a noise field, for the Topographic ground: the alpha
-     table keeps two steps of sixteen opaque, so the bands land where the field
-     crosses those two values and wander instead of ruling.
-
-     THE ONLY BAKED COLOUR IN THE SET. An SVG filter matrix cannot read a custom
-     property, so this is the one token whose light twin changes more than a
-     number. */
-  --am-tex-topo: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='560' height='560'><filter id='t'><feTurbulence type='fractalNoise' baseFrequency='0.0035' numOctaves='4' seed='12' stitchTiles='stitch' result='n'/><feColorMatrix in='n' type='matrix' values='0 0 0 0 0.84  0 0 0 0 0.9  0 0 0 0 0.95  1 0 0 0 0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0 1 0 0 1 0 0 1 0 0 1 0 0'/></feComponentTransfer></filter><rect width='560' height='560' filter='url(%23t)' opacity='0.13'/></svg>");
 }
 
 /* NO TOKEN IN THIS FILE DIFFERS BY THEME ANY MORE (4.13.1 §3b). The one that did
@@ -888,7 +877,4 @@ body.theme-light {
   --am-tex-fill: rgba(46, 52, 62, 0.045);
   --am-tex-shade: rgba(46, 52, 62, 0.07);
   --am-tex-hi: rgba(255, 255, 255, 0.66);
-  --am-tex-warm: rgba(206, 164, 102, 0.13);
-  --am-tex-cool: rgba(102, 146, 206, 0.11);
-  --am-tex-topo: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='560' height='560'><filter id='t'><feTurbulence type='fractalNoise' baseFrequency='0.0035' numOctaves='4' seed='12' stitchTiles='stitch' result='n'/><feColorMatrix in='n' type='matrix' values='0 0 0 0 0.16  0 0 0 0 0.19  0 0 0 0 0.24  1 0 0 0 0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0 1 0 0 1 0 0 1 0 0 1 0 0'/></feComponentTransfer></filter><rect width='560' height='560' filter='url(%23t)' opacity='0.13'/></svg>");
 }

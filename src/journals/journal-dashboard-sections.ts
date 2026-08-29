@@ -143,7 +143,6 @@ import {
   flatNoteModel,
   bannerSection,
   PAGE_TITLE_IDS,
-  graphLinksSection,
 } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
@@ -582,11 +581,10 @@ const specFor = (
 });
 
 // One journal dashboard's whole markdown.
+// Journal notes start from the journal's named dashboard (e.g. `Study.md`),
+// detached from the general journal dashboard `03 - Journals.md`.
 export function composeJournalDashboardNote(type: JournalType): string {
-  return (
-    composeFlatNote(journalDashboardSections(type)).trimEnd() +
-    graphLinksSection(["03 - Journals"])
-  );
+  return composeFlatNote(journalDashboardSections(type));
 }
 
 // One journal dashboard, as the editor sees it.

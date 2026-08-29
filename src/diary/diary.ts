@@ -26,9 +26,29 @@ import {
   today,
   thisMonth,
 } from "../core/util";
+import { setGraphLinks } from "../core/note-sections";
+import {
+  containingPeriods,
+  entryPath,
+  grainFallbackName,
+  graphParentName,
+  locateEntry,
+} from "./lineage";
+import type { ContainingPeriod } from "./lineage";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;
+
+// Which argument `openOrCreatePeriodEntry` takes for a grain, for the three
+// grains it makes. Monthly has its own creator and daily is contained by
+// nothing, so neither is here — see `createPeriod`.
+const PERIOD_ENTRY_UNIT: Partial<
+  Record<TrackerClass, "week" | "quarter" | "year">
+> = {
+  weekly: "week",
+  quarterly: "quarter",
+  yearly: "year",
+};
 
 // The review-scope cursor properties, and the moment unit each one snaps to.
 // These name periods you *read over*; the periods you *write in* are
@@ -69,9 +89,13 @@ export class Diary {
       new Notice("Use the format YYYY-MM-DD");
       return null;
     }
-    const path = `${this.paths.diaryDaily}/Day-${dateStr}.md`;
-    let file = getFile(this.app, path);
+    // FOUND WHEREVER IT IS, WRITTEN WHERE THIS RELEASE FILES IT. `locateEntry`
+    // probes the period tree and then the flat grain folder, so a vault that has
+    // `Daily/Day-2026-08-29.md` opens THAT note rather than making a second one
+    // in the tree beside it.
+    let file = locateEntry(this.app, this.paths, "daily", dateStr);
     if (!file) {
+      const path = entryPath(this.paths, "daily", dateStr);
       const tpl = await readTemplate(
         this.app,
         `${this.paths.templatesDiary}/Daily.md`
@@ -80,10 +104,14 @@ export class Diary {
         new Notice("Daily template missing — run 'Set up / repair vault'.");
         return null;
       }
+      // AFTER THE TEMPLATE CHECK, NOT BEFORE IT. A day whose own template is
+      // missing is a day that will not be written, and four period entries made
+      // for a note that never arrives is a vault worse off than it started.
+      const parent = await this.ensureLineage("daily", dateStr);
       file = await createFileEnsuringFolders(
         this.app,
         path,
-        fillDailyTemplate(tpl, dateStr)
+        setGraphLinks(fillDailyTemplate(tpl, dateStr), parent ? [parent] : [])
       );
       await this.stampEvents(file, dateStr);
     }
@@ -145,29 +173,38 @@ export class Diary {
   // quick capture needs the entry to exist and must not take the reader out of
   // whatever they were doing. 4.27, when capture gained a destination picker
   // and could be pointed at a grain other than daily.
+  // `quiet` SUPPRESSES THE MISSING-TEMPLATE NOTICE, and only that (4.81). The
+  // month is the one grain in the chain whose creator refuses rather than
+  // falling back to bare frontmatter, so a vault with no Monthly template would
+  // otherwise tell a reader who asked for TODAY'S entry that a template they
+  // never mentioned is missing. The refusal is unchanged and still returns null;
+  // `ensureLineage` reads that as "no month" and links the quarter instead.
   async openOrCreateMonth(
     monthStr: string,
-    opts: { reveal?: boolean } = {}
+    opts: { reveal?: boolean; quiet?: boolean } = {}
   ): Promise<TFile | null> {
     if (!MONTH_RE.test(monthStr)) {
       new Notice("Use the format YYYY-MM");
       return null;
     }
-    const path = `${this.paths.diaryMonthly}/Month-${monthStr}.md`;
-    let file = getFile(this.app, path);
+    let file = locateEntry(this.app, this.paths, "monthly", monthStr);
     if (!file) {
+      const path = entryPath(this.paths, "monthly", monthStr);
       const tpl = await readTemplate(
         this.app,
         `${this.paths.templatesDiary}/Monthly Entry.md`
       );
       if (tpl == null) {
-        new Notice("Monthly template missing — run 'Set up / repair vault'.");
+        if (!opts.quiet) {
+          new Notice("Monthly template missing — run 'Set up / repair vault'.");
+        }
         return null;
       }
+      const parent = await this.ensureLineage("monthly", monthStr);
       file = await createFileEnsuringFolders(
         this.app,
         path,
-        fillMonthlyTemplate(tpl, monthStr)
+        setGraphLinks(fillMonthlyTemplate(tpl, monthStr), parent ? [parent] : [])
       );
     }
     if (opts.reveal !== false) await openFile(this.app, file);
@@ -213,34 +250,32 @@ export class Diary {
     opts: { reveal?: boolean } = {}
   ): Promise<TFile | null> {
     const p = this.paths;
-    const at = moment(startIso);
     // Prefixed like `Day-` and `Month-`, so a filename states its grain without
     // needing its folder to say it. The bare `2026-W30.md` this shipped with
     // first was the odd one out in a naming scheme five files deep.
+    // NAMED FROM THE CLASS TABLE AS OF 4.81, not from three format strings
+    // written out here. `Quarter-${YYYY}-Q${month/3+1}` was a second spelling of
+    // `CLASS_DEFS.quarterly.fileFormat`, and the hidden links now have to name
+    // these files from the outside — see `entryNoteName`, which is the one
+    // answer both sides read.
     const spec = {
       week: {
         cls: "weekly" as TrackerClass,
-        folder: p.diaryWeekly,
         prop: "week-start" as PeriodProp,
-        name: `Week-${at.format("YYYY-[W]WW")}`,
       },
       quarter: {
         cls: "quarterly" as TrackerClass,
-        folder: p.diaryQuarterly,
         prop: "quarter-start" as PeriodProp,
-        name: `Quarter-${at.format("YYYY")}-Q${Math.floor(at.month() / 3) + 1}`,
       },
       year: {
         cls: "yearly" as TrackerClass,
-        folder: p.diaryYearly,
         prop: "year-start" as PeriodProp,
-        name: `Year-${at.format("YYYY")}`,
       },
     }[unit];
 
-    const path = `${spec.folder}/${spec.name}.md`;
-    let file = getFile(this.app, path);
+    let file = locateEntry(this.app, p, spec.cls, startIso);
     if (!file) {
+      const path = entryPath(p, spec.cls, startIso);
       // SEEDED FROM THE CLASS TEMPLATE. The first version wrote bare
       // frontmatter and argued there was "nothing worth templating" — which was
       // wrong twice over. The note came out empty, so the button that exists to
@@ -262,10 +297,85 @@ export class Diary {
               new RegExp(`^${spec.prop}:.*$`, "m"),
               `${spec.prop}: ${startIso}`
             );
-      file = await createFileEnsuringFolders(this.app, path, body);
+      // The bare-frontmatter fallback has no hidden block for `setGraphLinks` to
+      // re-aim, so it gets one appended — which is the case that comment covers,
+      // and the reason a note written without a template still joins the spine.
+      const parent = await this.ensureLineage(spec.cls, startIso);
+      file = await createFileEnsuringFolders(
+        this.app,
+        path,
+        setGraphLinks(body, parent ? [parent] : [])
+      );
     }
     if (opts.reveal !== false) await openFile(this.app, file);
     return file;
+  }
+
+  // ── §  KEEPING THE SPINE COMPLETE (4.81) ─────────────────────────────
+  //
+  // Creating an entry creates every period above it that has no note yet, and
+  // returns the name the new entry's hidden link should carry.
+  //
+  // WHY CREATE THEM AT ALL. The alternative — name the period whether or not it
+  // exists — draws a hollow node for every unwritten week, and a hollow node
+  // emits no links: the whole of August would hang off a `Quarter-2026-Q3` with
+  // no edge back to the diary. The alternative to THAT is naming only what
+  // exists, which is honest and leaves the stream as ragged as the reader's
+  // habits. Making the period is the only answer where the graph reads the same
+  // way in every vault.
+  //
+  // AND WHAT IT COSTS, STATED PLAINLY: a period entry made this way is EMPTY,
+  // and "an entry exists" is how four other surfaces answer "did I write
+  // anything" — the calendar's period underlines (`buildPeriodEntryKeys`, whose
+  // own comment says the entry "is the thing that is either written or not"),
+  // the coverage line on a period summary, `Diary.base`, and the diary index.
+  // Those now say "yes" for a week you have not touched. That is the trade this
+  // release makes for a graph with one shape.
+  //
+  // ONE HOP, THEN RECURSION. This creates the IMMEDIATE parent only; that
+  // creator runs this again for its own parent, so a day made in a fresh vault
+  // walks up to the year and stops. Four levels, bounded by `CONTAINING_GRAIN`
+  // ending at null — not by a counter this could get wrong.
+  private async ensureLineage(
+    grain: TrackerClass,
+    iso: string
+  ): Promise<string | null> {
+    const chain = containingPeriods(grain, iso);
+    if (chain.length === 0) return grainFallbackName(this.paths, grain);
+    await this.createPeriod(chain[0]);
+    // ASKED AGAIN AFTER THE WRITE, rather than assuming the parent is there. A
+    // grain whose template is missing refuses (see `openOrCreateMonth`), and
+    // `graphParentName` then walks to the next period up instead of naming a
+    // note nobody made.
+    return graphParentName(grain, iso, (p) => this.periodExists(p), this.paths);
+  }
+
+  private periodExists(period: ContainingPeriod): boolean {
+    return (
+      locateEntry(this.app, this.paths, period.grain, period.startIso) != null
+    );
+  }
+
+  // One containing period, made if it is missing.
+  //
+  // THROUGH THE PUBLIC CREATORS, which is what stops this becoming a second
+  // opinion about where a weekly entry lives and what it is seeded from. Both
+  // are no-ops on a note that already exists, and both are told not to steal
+  // focus: the reader asked for a day, not for the year it is in.
+  private async createPeriod(period: ContainingPeriod): Promise<void> {
+    if (this.periodExists(period)) return;
+    if (period.grain === "monthly") {
+      await this.openOrCreateMonth(period.startIso.slice(0, 7), {
+        reveal: false,
+        quiet: true,
+      });
+      return;
+    }
+    // `daily` cannot appear here — nothing contains a day — and the map says so
+    // by having no entry for it rather than by a comment claiming it.
+    const unit = PERIOD_ENTRY_UNIT[period.grain];
+    if (!unit) return;
+    await this.openOrCreatePeriodEntry(unit, period.startIso, { reveal: false });
   }
 
   async newWeekEntry(sourcePath: string): Promise<void> {

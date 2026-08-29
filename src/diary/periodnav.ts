@@ -34,15 +34,13 @@
 import { App, MarkdownPostProcessorContext, setIcon, TFile } from "obsidian";
 import type AlmanacPlugin from "../main";
 import {
-  filesUnder,
   frontmatterOf,
   isoDate,
   moment,
-  monthlyOverviewPath,
   quarterMonths,
   quarterOfMonth,
-  weeklyOverviewPath,
 } from "../core/util";
+import { entriesOfGrain } from "./lineage";
 import type { PeriodProp, PeriodUnit } from "./diary";
 
 export type Unit = "week" | "month" | "quarter" | "year";
@@ -212,9 +210,7 @@ function periodOptions(
   const paths = plugin.settings.paths;
   const counts = new Map<string, number>();
 
-  const dailyDash = weeklyOverviewPath(paths);
-  for (const f of filesUnder(app, paths.diaryDaily)) {
-    if (f.path === dailyDash) continue;
+  for (const f of entriesOfGrain(app, paths, "daily")) {
     const d = isoDate(frontmatterOf(app, f)["journal-date"]);
     if (!d) continue;
     const k = keyOf(unit, d);
@@ -229,9 +225,7 @@ function periodOptions(
   // and before 2.52 the year picker (`buildYearNav`) listed years by daily
   // entries alone, so that year did not appear in it at all.
   if (unit === "month" || unit === "quarter" || unit === "year") {
-    const monthlyDash = monthlyOverviewPath(paths);
-    for (const f of filesUnder(app, paths.diaryMonthly)) {
-      if (f.path === monthlyDash) continue;
+    for (const f of entriesOfGrain(app, paths, "monthly")) {
       const fm = frontmatterOf(app, f);
       const raw = fm["month"] ? String(fm["month"]) : isoDate(fm["journal-date"]) ?? "";
       const k = raw.slice(0, 7);

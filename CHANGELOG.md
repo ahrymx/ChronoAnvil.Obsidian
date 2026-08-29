@@ -7,6 +7,30 @@ All notable changes to Almanac will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.82.0] - 2026-08-29
+
+**Added automated Obsidian Graph View color group configuration for Almanac vaults, matching workbenches, dashboards, diary entries, journals, logbooks, and infrastructure.**
+
+### Added
+
+- **Automated Graph View Color Groups:** Almanac can now automatically configure and synchronize `.obsidian/graph.json` color groups based on your active vault paths, visually distinguishing Workbenches (Amber), Dashboards (Coral Red), Diary Entries (Emerald Green), Journals (Indigo Blue), Logbooks (Purple), and Infrastructure (Slate Grey) in Obsidian's global graph.
+- **Graph Group Maintenance Action & Settings Control:** Added `Almanac: Maintenance: configure graph view color groups` to the command palette and a **Set up graph groups** button under **Appearance & Themes** in Settings.
+- **Non-Destructive Graph Configuration Merge:** Color group setup automatically adapts to custom or renamed folder paths while preserving custom user-defined graph groups, force physics, and display settings.
+
+## [4.81.0] - 2026-08-29
+
+**Reorganized period entries into `02 - Diary/Entries/` with nested year containment, rebuilt the infrastructure canvas, and restructured graph links to isolate period entries, journal trees, and the homepage workbench.**
+
+### Added
+
+- **Hierarchical Period Nesting under `02 - Diary/Entries/`:** Period entries are now organized into nested folders on disk (`02 - Diary/Entries/Year-2026/Quarter-2026-Q3/Month-2026-08/Week-2026-W35/Day-2026-08-29.md`), matching chronological containment and keeping the diary root clean.
+- **Infrastructure Canvas Isolation:** `00 - Infrastructure/Almanac.canvas` now houses only infrastructure nodes (`README.md` documentation hub, `Diary.base` database, and diary templates), completely decoupled from user-facing workspace notes.
+
+### Changed
+
+- **Graph Link Separation:** Diary entries now start from their respective `Year-...` nodes as roots of the chronological period tree, without artificial links to `02 - Diary` or `Homepage`. Journal notes start directly from each journal's named dashboard (e.g. `Study.md`), detached from the general `03 - Journals` overview.
+- **Homepage Workbench Hub:** `Homepage.md` cleanly connects to the primary dashboards and workbenches (`02 - Diary`, `03 - Journals`, `Search`, and `Staging`), without pulling in all dated entries or journal trees into a dense graph cluster.
+
 ## [4.80.0] - 2026-08-28
 
 **Added three aesthetic presets with temporal grain accents, nineteen selectable page ground textures, and moved the banner's background art out of the vault and into the plugin.**

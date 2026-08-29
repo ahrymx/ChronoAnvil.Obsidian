@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { studyFile, studyTemplate } from "./study-template";
 import { composeDiaryDashboard } from "../src/diary/diary-sections";
 import { TFile, TFolder } from "./obsidian-stub";
+import type { App } from "obsidian";
 import { ensureJournalsBlock } from "../src/journals/journal";
 import { composeHomeNote } from "../src/diary/home-sections";
 import {
@@ -23,6 +24,8 @@ import {
   monthlyOverviewPath,
   quarterOverviewPath,
   yearOverviewPath,
+  legacyOverviewPath,
+  resolveOverviewPath,
   isoDate,
   fillTemplate,
   parseHeaderDirective,
@@ -3385,29 +3388,85 @@ describe("folderNotePath", () => {
 });
 
 describe("the period overviews", () => {
-  // One rule as of 2.57: a folder holds that period's entries, and its folder
-  // note is that period's dashboard. Before, `Weekly/` held *daily* entries and
-  // Quarter/Year were bare notes — three rules wearing one name.
-  it("are the folder notes of their own folders", () => {
-    expect(weeklyOverviewPath({ diaryWeekly: "02 - Diary/Weekly" })).toBe(
-      "02 - Diary/Weekly/Weekly.md"
+  // ONE FOLDER, FOUR NOTES, AS OF 4.81. The 2.57 rule — "a folder holds that
+  // period's entries and its folder note is that period's dashboard" — held for
+  // as long as the grain folder was where entries lived. Under the period tree
+  // it is not, so a dashboard would be the folder note of a folder holding
+  // nothing. The four move into `Dashboards/` and keep their basenames, which
+  // is what every hidden link and the vault map resolve by.
+  it("sit together in the dashboards folder", () => {
+    const p = { diaryDashboards: "02 - Diary/Dashboards" };
+    expect(weeklyOverviewPath(p)).toBe("02 - Diary/Dashboards/Weekly.md");
+    expect(monthlyOverviewPath(p)).toBe("02 - Diary/Dashboards/Monthly.md");
+    expect(quarterOverviewPath(p)).toBe("02 - Diary/Dashboards/Quarterly.md");
+    expect(yearOverviewPath(p)).toBe("02 - Diary/Dashboards/Yearly.md");
+  });
+
+  it("follow a renamed dashboards folder", () => {
+    expect(weeklyOverviewPath({ diaryDashboards: "Log/Boards" })).toBe(
+      "Log/Boards/Weekly.md"
     );
-    expect(monthlyOverviewPath({ diaryMonthly: "02 - Diary/Monthly" })).toBe(
-      "02 - Diary/Monthly/Monthly.md"
-    );
-    expect(quarterOverviewPath({ diaryQuarterly: "02 - Diary/Quarterly" })).toBe(
-      "02 - Diary/Quarterly/Quarterly.md"
-    );
-    expect(yearOverviewPath({ diaryYearly: "02 - Diary/Yearly" })).toBe(
-      "02 - Diary/Yearly/Yearly.md"
+    expect(quarterOverviewPath({ diaryDashboards: "Log/Boards" })).toBe(
+      "Log/Boards/Quarterly.md"
     );
   });
 
-  it("follow a renamed folder", () => {
-    expect(weeklyOverviewPath({ diaryWeekly: "Log/Weeks" })).toBe(
+  // Where the same four notes are in a vault written before 4.81, which is the
+  // one thing the move migration has to know and nothing else may use.
+  it("remembers the address they are moved from", () => {
+    const p = {
+      diaryWeekly: "02 - Diary/Weekly",
+      diaryMonthly: "02 - Diary/Monthly",
+      diaryQuarterly: "02 - Diary/Quarterly",
+      diaryYearly: "02 - Diary/Yearly",
+    };
+    expect(legacyOverviewPath(p, "weekly")).toBe("02 - Diary/Weekly/Weekly.md");
+    expect(legacyOverviewPath(p, "yearly")).toBe("02 - Diary/Yearly/Yearly.md");
+    expect(legacyOverviewPath({ ...p, diaryWeekly: "Log/Weeks" }, "weekly")).toBe(
       "Log/Weeks/Weeks.md"
     );
-    expect(quarterOverviewPath({ diaryQuarterly: "Log/Qs" })).toBe("Log/Qs/Qs.md");
+  });
+
+  // ── AND A VAULT THAT HAS NOT REPAIRED YET STILL HAS FOUR ─────────────
+  //
+  // The move happens on repair; a click happens whenever the reader likes. Every
+  // opener asking for the new address alone would have told a whole upgraded
+  // vault "Weekly Overview note not found" — and the command palette would have
+  // CREATED a second, empty one beside the real note.
+  it("opens whichever of the two addresses the vault actually has", () => {
+    const p = DEFAULT_PATHS;
+    const vault = (paths: readonly string[]): App =>
+      ({
+        vault: {
+          getAbstractFileByPath: (path: string) =>
+            paths.includes(path) ? new TFile(path) : null,
+        },
+      }) as unknown as App;
+
+    const repaired = vault(["02 - Diary/Dashboards/Weekly.md"]);
+    expect(resolveOverviewPath(repaired, p, "weekly")).toBe(
+      "02 - Diary/Dashboards/Weekly.md"
+    );
+
+    const old = vault(["02 - Diary/Weekly/Weekly.md"]);
+    expect(resolveOverviewPath(old, p, "weekly")).toBe(
+      "02 - Diary/Weekly/Weekly.md"
+    );
+
+    // Mid-repair, both on disk: the new address wins, so nothing reads the note
+    // that is about to be gone.
+    const both = vault([
+      "02 - Diary/Dashboards/Weekly.md",
+      "02 - Diary/Weekly/Weekly.md",
+    ]);
+    expect(resolveOverviewPath(both, p, "weekly")).toBe(
+      "02 - Diary/Dashboards/Weekly.md"
+    );
+
+    // And neither: the answer is where a note being created should go.
+    expect(resolveOverviewPath(vault([]), p, "quarterly")).toBe(
+      "02 - Diary/Dashboards/Quarterly.md"
+    );
   });
 
   it("gives the daily folder no dashboard at all", () => {
@@ -6766,6 +6825,60 @@ describe("per-entry trackers", () => {
     it("doesn't match a folder by name prefix alone", () => {
       // "02 - Diary/Weekly Archive" is not inside "02 - Diary/Weekly".
       expect(classifyNote(paths, "02 - Diary/Weekly Archive/Day-2026-07-14.md")).toBeNull();
+    });
+
+    // ── the 4.81 period tree ──────────────────────────────────────────
+    //
+    // An entry written today is in NO grain folder — it is inside the periods
+    // that contain it — so the folder pass alone returned null for every one of
+    // them, and a note that classifies as nothing gets no tracker, no head and
+    // no section menu. The filename carries the grain because `entryNoteName`
+    // put it there.
+    it("classifies an entry in the period tree by its filename", () => {
+      const tree = "02 - Diary/Entries/Year-2026/Quarter-2026-Q3/Month-2026-08";
+      expect(
+        classifyNote(DEFAULT_PATHS, `${tree}/Week-2026-W35/Day-2026-08-29.md`)
+      ).toEqual(diarySurface("daily"));
+      expect(
+        classifyNote(DEFAULT_PATHS, `${tree}/Week-2026-W35/Week-2026-W35.md`)
+      ).toEqual(diarySurface("weekly"));
+      expect(classifyNote(DEFAULT_PATHS, `${tree}/Month-2026-08.md`)).toEqual(
+        diarySurface("monthly")
+      );
+      expect(
+        classifyNote(
+          DEFAULT_PATHS,
+          "02 - Diary/Entries/Year-2026/Quarter-2026-Q3/Quarter-2026-Q3.md"
+        )
+      ).toEqual(diarySurface("quarterly"));
+      expect(
+        classifyNote(DEFAULT_PATHS, "02 - Diary/Entries/Year-2026/Year-2026.md")
+      ).toEqual(diarySurface("yearly"));
+    });
+
+    it("only reads the prefix inside the diary", () => {
+      // The prefixes are the plugin's, not the vault's. A reader's own
+      // `Week-in-review` is not a weekly entry, and would be handed the weekly
+      // trackers and a **WEEKLY ENTRY** eyebrow if this pass were global.
+      expect(
+        classifyNote(DEFAULT_PATHS, "01 - Notes/Week-in-review.md")
+      ).toBeNull();
+      expect(classifyNote(DEFAULT_PATHS, "02 - Diary/Homepage.md")).toBeNull();
+    });
+
+    it("knows the period dashboards at both addresses", () => {
+      // 4.81 moved these into `Dashboards/`, where no grain folder contains
+      // them; until then each one WAS its grain folder's note. Both vaults have
+      // a weekly dashboard.
+      expect(
+        classifyNote(DEFAULT_PATHS, "02 - Diary/Dashboards/Weekly.md")
+      ).toEqual(diarySurface("weekly"));
+      expect(
+        classifyNote(DEFAULT_PATHS, "02 - Diary/Dashboards/Yearly.md")
+      ).toEqual(diarySurface("yearly"));
+      expect(
+        classifyNote(DEFAULT_PATHS, "02 - Diary/Quarterly/Quarterly.md")
+      ).toEqual(diarySurface("quarterly"));
     });
 
     // ── the journal half ──────────────────────────────────────────────

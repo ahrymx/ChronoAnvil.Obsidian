@@ -165,11 +165,40 @@ export const DEFAULT_PATHS = {
   //
   // Entries are `Day-`, `Week-`, `Month-`, `Quarter-`, `Year-` prefixed, so a
   // filename says its grain without its folder.
+  //
+  // ── AND AS OF 4.81 THEY HOLD NOTHING NEW ─────────────────────────────
+  //
+  // A new entry is filed under the period that contains it —
+  // `02 - Diary/Year-2026/Quarter-2026-Q3/Month-2026-08/Week-2026-W35/` — so
+  // the file explorer shows the same containment the graph draws, and a
+  // period's note is its folder's own note the way a subject's is. See
+  // `entryPath`.
+  //
+  // THESE FIVE KEYS STAY, AND THEY ARE NOT DEAD. They name where a vault
+  // written before 4.81 filed its entries, which is where those entries still
+  // are: nothing moves anything, so every scan reads the tree AND the folder
+  // its grain used to have (`entriesOfGrain`), and a reader who never repairs
+  // notices only that new notes land somewhere better. They are also still the
+  // answer for a reader who has pointed a grain at a folder of their own.
   diaryDaily: `${ROOT_DIARY}/Daily`,
   diaryWeekly: `${ROOT_DIARY}/Weekly`,
   diaryMonthly: `${ROOT_DIARY}/Monthly`,
   diaryQuarterly: `${ROOT_DIARY}/Quarterly`,
   diaryYearly: `${ROOT_DIARY}/Yearly`,
+  // The folder holding the year period trees (`02 - Diary/Entries/Year-2026/...`)
+  diaryEntries: `${ROOT_DIARY}/Entries`,
+  // ── THE FOUR PERIOD DASHBOARDS, IN ONE FOLDER (4.81) ─────────────────
+  //
+  // A dashboard used to be its grain folder's own note — `02 - Diary/Weekly/
+  // Weekly.md` — which was exactly right while that folder held the weekly
+  // entries and nothing else. Under the period tree it would be a note sitting
+  // at the top of a folder that no longer holds anything, so the four of them
+  // move here and become plain notes in a folder of their own.
+  //
+  // THE NAMES DO NOT CHANGE. `Weekly`, `Monthly`, `Quarterly` and `Yearly` are
+  // what every hidden link, every breadcrumb and the vault map already call
+  // them, and Obsidian resolves `[[Weekly]]` by basename wherever it sits.
+  diaryDashboards: `${ROOT_DIARY}/Dashboards`,
   // The special-events note. One file, holding every recurring and single
   // event in its frontmatter (see events.ts for why it lives in the vault
   // rather than data.json). Sits beside the entries it decorates rather than
@@ -247,6 +276,8 @@ export const ROOT_CHILDREN: Record<string, (keyof typeof DEFAULT_PATHS)[]> = {
     "diaryMonthly",
     "diaryQuarterly",
     "diaryYearly",
+    "diaryEntries",
+    "diaryDashboards",
     "events",
     "search",
     "logbooks",

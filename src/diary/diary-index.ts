@@ -44,6 +44,7 @@ import { parseTasks } from "../ui/tasks";
 import { mapWithLimit } from "../ui/tables";
 import { tagsOf } from "../core/query";
 import { filesUnder, folderPrefix, frontmatterOf, isoDate, moment } from "../core/util";
+import { entriesOfGrain } from "./lineage";
 import { journalAncestors, journalTypeOfNote } from "../journals/journal";
 import { TITLE_PROP } from "./entryheader";
 import { ENTRY_EVENTS_PROPERTY, JOURNAL_DATE_PROPERTY } from "../core/constants";
@@ -865,10 +866,36 @@ export async function readIndex(plugin: AlmanacPlugin): Promise<IndexedEntry[]> 
   // is search and the timeline, which now find the three grains of entry a
   // reader can create and could not previously look up. That is the fix, not a
   // side effect of it.
-  const folders = Array.from(
-    new Set(TRACKER_CLASSES.map((g) => paths[CLASS_DEFS[g].folderKey]).filter(Boolean))
+  //
+  // ── AND BY GRAIN RATHER THAN BY FOLDER AS OF 4.81 ───────────────────
+  //
+  // The five folders hold what was written before the period tree and nothing
+  // after it, so this — the index behind search, the timeline, the rollups and
+  // every `-stats` widget — would have shown a vault that stopped on the day it
+  // upgraded. `entriesOfGrain` reads both layouts.
+  //
+  // NOT SIMPLY `filesUnder(diaryRoot)`, which would have been one line: the
+  // tree's folders also hold logbooks and anything else a reader files in their
+  // diary, and a dated note that is not an entry would then arrive in search
+  // results and on the timeline as one. The scan asks for entries.
+  const files = Array.from(
+    new Map(
+      TRACKER_CLASSES.flatMap((g) => entriesOfGrain(plugin.app, paths, g)).map(
+        (f) => [f.path, f] as const
+      )
+    ).values()
   );
-  return readFolders(plugin, folders, () => ({
+  // The sweep's scope is still the folders, plus the root the tree lives in: a
+  // cache entry for a file no longer scanned has to be reachable to be dropped.
+  const scopes = Array.from(
+    new Set(
+      [
+        paths.diaryRoot,
+        ...TRACKER_CLASSES.map((g) => paths[CLASS_DEFS[g].folderKey]),
+      ].filter(Boolean)
+    )
+  );
+  return readScanned(plugin, files, scopes, () => ({
     ...DIARY_SPEC,
     moodKey: plugin.settings.moodTrackerId,
   }));
@@ -929,6 +956,23 @@ async function readFolders(
       files.push(f);
     }
   }
+  return readScanned(plugin, files, folders, specFor);
+}
+
+// The same scan, given the files directly.
+//
+// SPLIT IN 4.81, because "which files" and "what does this read cover" stopped
+// being the same question: the diary picks its files by grain — an entry is not
+// a folder any more — while the sweep still has to name the folders those files
+// can be under, or a cache entry for a deleted note would be kept forever.
+async function readScanned(
+  plugin: AlmanacPlugin,
+  files: TFile[],
+  folders: string[],
+  specFor: (file: TFile) => IndexSpec
+): Promise<IndexedEntry[]> {
+  const app = plugin.app;
+  const seen = new Set(files.map((f) => f.path));
 
   const results = await mapWithLimit(files, 12, (f) => indexEntry(app, f, specFor(f)));
 

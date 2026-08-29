@@ -84,6 +84,8 @@ const PATH_LABELS: Record<string, string> = {
   diaryMonthly: "monthly entries",
   diaryQuarterly: "quarterly entries",
   diaryYearly: "yearly entries",
+  diaryEntries: "entries folder",
+  diaryDashboards: "period dashboards",
   materialRoot: "material root",
   journalsRoot: "journals root",
   infrastructureRoot: "infrastructure",

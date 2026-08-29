@@ -2571,8 +2571,59 @@ function specWithWanted(
 // eleven releases (`02 - Weekly` and friends, the pre-2.57 folder names) and a
 // fifth in the journals. `test/canvas-builder.test.ts` now fails on any name
 // outside the scaffold's own list.
+//
+// ── WHAT 4.68 GOT ONE HOP SHORT OF (4.81) ────────────────────────────────
+//
+// The paragraph above promises depth — "a daily entry is inside a week inside
+// the diary" — and what a COMPOSED note can say is depth between GRAINS: a
+// weekly entry template names `Weekly`, which names `02 - Diary`. Every day in
+// a vault named the same one note, so the graph drew a star per grain and the
+// stream the promise describes existed in no vault.
+//
+// Depth between PERIODS cannot be composed, because the parent's NAME depends
+// on the entry's date and a template has no date. So it is written when the
+// entry is created: `setGraphLinks` below re-aims this block, `lineage.ts`
+// decides what at, and this function keeps composing exactly what it always
+// did — the shipped notes, the dashboards, the five templates, the logbooks.
 export function graphLinksSection(links: readonly string[]): string {
   if (!links || links.length === 0) return "";
   const wikilinks = links.map((l) => `[[${l}|\u200B]]`).join(" ");
   return `\n\n%% almanac-graph %%\n%% ${wikilinks} %%\n`;
 }
+
+// The same block, re-aimed — the half a COMPOSED note never needs.
+//
+// A shipped note is composed from nothing on every repair, so `graphLinksSection`
+// is all it has ever taken. An ENTRY is not composed: it is a template filled in
+// once and then owned by whoever writes in it, and the one thing about it that
+// stays Almanac's is this comment. `diary.ts` fills the template, then points
+// this line at the period the entry sits inside — see `graphParentName`.
+//
+// APPENDS WHEN THERE IS NO BLOCK, rather than declining. An entry written before
+// 4.68 has none at all, and a note with no hidden link is a node with no edges:
+// it floats. Adding a comment to the end of a file is the smallest thing that
+// can be added to it, and it is the only text in an entry this plugin claims.
+//
+// THE REPLACEMENT IS A FUNCTION, NOT A STRING, because `$&` and friends are
+// special in a replacement string and a folder a reader named `Diary $ Notes`
+// would otherwise land here mangled.
+export function setGraphLinks(text: string, links: readonly string[]): string {
+  const validLinks = (links ?? []).filter(
+    (l) => typeof l === "string" && l.trim() !== ""
+  );
+  if (validLinks.length === 0) {
+    return GRAPH_BLOCK_RE.test(text)
+      ? text
+          .replace(GRAPH_BLOCK_RE, "")
+          .replace(/\n{3,}/g, "\n\n")
+          .replace(/\s*$/, "") + "\n"
+      : text;
+  }
+  const block = graphLinksSection(validLinks);
+  return GRAPH_BLOCK_RE.test(text)
+    ? text.replace(GRAPH_BLOCK_RE, () => block.trim())
+    : text.replace(/\s*$/, "") + block;
+}
+
+// The block as it is written above: the marker line, then the links line.
+const GRAPH_BLOCK_RE = /%% almanac-graph %%\n%%[^\n]*%%/;

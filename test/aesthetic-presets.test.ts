@@ -50,7 +50,7 @@ describe("aesthetic presets and grain styling", () => {
 
   it("provides default appearance settings in DEFAULT_SETTINGS", () => {
     expect(DEFAULT_SETTINGS.appearance).toBeDefined();
-    expect(DEFAULT_SETTINGS.appearance?.aestheticPreset).toBe("modern");
+    expect(DEFAULT_SETTINGS.appearance?.aestheticPreset).toBe("editorial");
     expect(DEFAULT_SETTINGS.appearance?.grainAesthetics).toBe("vibrant");
   });
 });

@@ -39,7 +39,6 @@ import { lineOf, readRollup } from "../trackers/fields";
 import { allNoteRegions } from "../core/notestore";
 import {
   daysSinceWeekStart,
-  filesUnder,
   frontmatterOf,
   getFile,
   isoDate,
@@ -53,12 +52,11 @@ import {
   thisMonth,
   today,
   weekStartDay,
-  folderNotePath,
-  weeklyOverviewPath,
-  monthlyOverviewPath,
-  quarterOverviewPath,
-  yearOverviewPath,
+  resolveOverviewPath,
 } from "../core/util";
+import { entriesOfGrain } from "./lineage";
+import type { TrackerClass } from "../trackers/trackers";
+import type { DiaryPaths } from "./lineage";
 
 interface DayEntry {
   iso: string;
@@ -68,13 +66,15 @@ interface DayEntry {
 // iso date -> { mood } for every real diary entry (dashboard note excluded).
 function buildDayMap(
   app: App,
-  diaryDaily: string,
+  paths: DiaryPaths,
   moodKey: string
 ): Map<string, DayEntry> {
   const map = new Map<string, DayEntry>();
-  const dashboard = folderNotePath(diaryDaily);
-  for (const f of filesUnder(app, diaryDaily)) {
-    if (f.path === dashboard) continue;
+  // THE GRAIN, NOT THE FOLDER (4.81). A daily entry written under the period
+  // tree is in no grain folder, and this map is what draws the heat, the dots
+  // and the month rail — a folder walk would have left the calendar blank for
+  // every day written since the tree landed.
+  for (const f of entriesOfGrain(app, paths, "daily")) {
     const fm = frontmatterOf(app, f);
     const iso = isoDate(fm["journal-date"]);
     if (!iso) continue;
@@ -91,11 +91,9 @@ function buildDayMap(
 
 // "YYYY-MM" -> monthly review file, only for entries with a `month` property
 // set (matches the original calendar's dot-indicator logic exactly).
-function buildMonthMap(app: App, diaryMonthly: string): Map<string, TFile> {
+function buildMonthMap(app: App, paths: DiaryPaths): Map<string, TFile> {
   const map = new Map<string, TFile>();
-  const dashboard = folderNotePath(diaryMonthly);
-  for (const f of filesUnder(app, diaryMonthly)) {
-    if (f.path === dashboard) continue;
+  for (const f of entriesOfGrain(app, paths, "monthly")) {
     const month = frontmatterOf(app, f)["month"];
     if (!month) continue;
     map.set(String(month).slice(0, 7), f);
@@ -127,18 +125,18 @@ type PeriodKeys = Set<string>;
 
 function buildPeriodEntryKeys(
   app: App,
-  folder: string,
+  paths: DiaryPaths,
+  grain: TrackerClass,
   prop: string,
   keyOf: (m: MomentLike) => string
 ): PeriodKeys {
   const keys = new Set<string>();
-  // The folder note is that period's dashboard, and it carries the very same
-  // property — as a CURSOR, pointing at whatever period you last looked at.
-  // Counting it would mean the current week always claims an entry, and the
-  // claim would move as you browsed.
-  const dashboard = folderNotePath(folder);
-  for (const f of filesUnder(app, folder)) {
-    if (f.path === dashboard) continue;
+  // The dashboard carries the very same property — as a CURSOR, pointing at
+  // whatever period you last looked at. Counting it would mean the current week
+  // always claims an entry, and the claim would move as you browsed. It is not
+  // an entry of its grain and `entriesOfGrain` does not return it, at either of
+  // the two addresses it can have.
+  for (const f of entriesOfGrain(app, paths, grain)) {
     const iso = isoDate(frontmatterOf(app, f)[prop]);
     if (!iso) continue;
     const m = moment(iso);
@@ -562,8 +560,8 @@ export function buildCalendar(
 ): HTMLElement {
   const app = plugin.app;
   const paths = plugin.settings.paths;
-  const dayMap = buildDayMap(app, paths.diaryDaily, plugin.settings.moodTrackerId);
-  const monthMap = buildMonthMap(app, paths.diaryMonthly);
+  const dayMap = buildDayMap(app, paths, plugin.settings.moodTrackerId);
+  const monthMap = buildMonthMap(app, paths);
   // The other three grains' entries, for the underline (3.17 §2). Read once per
   // build rather than per render: a render is a navigation (the year stepper,
   // a month cell, Today) and the vault has not changed underneath it. The card
@@ -576,19 +574,22 @@ export function buildCalendar(
   // property their grain uses, and nothing needs the file.
   const weekEntries = buildPeriodEntryKeys(
     app,
-    paths.diaryWeekly,
+    paths,
+    "weekly",
     "week-start",
     isoWeekKey
   );
   const quarterEntries = buildPeriodEntryKeys(
     app,
-    paths.diaryQuarterly,
+    paths,
+    "quarterly",
     "quarter-start",
     quarterKeyOf
   );
   const yearEntries = buildPeriodEntryKeys(
     app,
-    paths.diaryYearly,
+    paths,
+    "yearly",
     "year-start",
     yearKeyOf
   );
@@ -764,7 +765,7 @@ export function buildCalendar(
   // one click from where you land, on the overview's own "New entry" button,
   // and still available here through the jump row.
   const openMonthOverview = (mk: string) => {
-    const path = monthlyOverviewPath(paths);
+    const path = resolveOverviewPath(app, paths, "monthly");
     const file = getFile(app, path);
     if (!file) {
       setStatus("Monthly Overview note not found.");
@@ -780,7 +781,7 @@ export function buildCalendar(
   // week from the calendar is the same move the date-finder makes: snap that
   // property to the clicked week, then reveal the note.
   const openWeek = (weekStartIso: string) => {
-    const path = weeklyOverviewPath(paths);
+    const path = resolveOverviewPath(app, paths, "weekly");
     const file = getFile(app, path);
     if (!file) {
       setStatus("Weekly Overview note not found.");
@@ -797,7 +798,7 @@ export function buildCalendar(
   // has run on an existing vault, so the rail's Q labels have to say so rather
   // than throw.
   const openQuarter = (quarterKey: string) => {
-    const path = quarterOverviewPath(paths);
+    const path = resolveOverviewPath(app, paths, "quarterly");
     const file = getFile(app, path);
     if (!file) {
       setStatus("Quarter note not found — run 'Set up / repair vault'.");
@@ -812,7 +813,7 @@ export function buildCalendar(
   // title's year snaps it to the shown year so browsing to another year and
   // clicking it lands on that year rather than the current one.
   const openYear = (year: number) => {
-    const path = yearOverviewPath(paths);
+    const path = resolveOverviewPath(app, paths, "yearly");
     const file = getFile(app, path);
     if (!file) {
       setStatus("Year note not found.");
@@ -1360,11 +1361,10 @@ export function buildWeekSummary(
   ws = ws.startOf("isoWeek"); // Monday
   const end = ws.clone().add(6, "days");
 
-  // iso date -> diary entry file (dashboard note itself excluded).
+  // iso date -> diary entry file. `entriesOfGrain` reads both layouts and
+  // returns no dashboard, at either address (4.81).
   const byDate = new Map<string, TFile>();
-  const dashboard = weeklyOverviewPath(paths);
-  for (const f of filesUnder(app, paths.diaryDaily)) {
-    if (f.path === dashboard) continue;
+  for (const f of entriesOfGrain(app, paths, "daily")) {
     const iso = isoDate(frontmatterOf(app, f)["journal-date"]);
     if (iso) byDate.set(iso, f);
   }
@@ -1605,15 +1605,9 @@ export function buildMonthSummary(
   ms = ms.startOf("month");
   const days = ms.daysInMonth();
 
-  const dayMap = buildDayMap(app, paths.diaryDaily, plugin.settings.moodTrackerId);
+  const dayMap = buildDayMap(app, paths, plugin.settings.moodTrackerId);
   const byDate = new Map<string, { iso: string; file: TFile; mood: number | null }>();
-  const dashboard = folderNotePath(paths.diaryDaily);
-  for (const f of filesUnder(app, paths.diaryDaily)) {
-    // Skip the Weekly Overview folder note explicitly, as buildDayMap and
-    // buildWeekSummary do. It carries `week-start`, not `journal-date`, so it
-    // was already filtered out incidentally — but relying on that would mean a
-    // dashboard that ever gained a date silently became an "entry".
-    if (f.path === dashboard) continue;
+  for (const f of entriesOfGrain(app, paths, "daily")) {
     const iso = isoDate(frontmatterOf(app, f)["journal-date"]);
     if (iso) byDate.set(iso, { iso, file: f, mood: dayMap.get(iso)?.mood ?? null });
   }
@@ -1675,7 +1669,7 @@ export function buildMonthSummary(
   body.createEl("h4", { cls: "jms-year-heading", text: `${ms.format("YYYY")} entries` });
   const yearWrap = body.createDiv({ cls: "journal-calendar journal-year-calendar jc-embedded" });
   const yearGridEl = yearWrap.createDiv({ cls: "jc-year-grid" });
-  const monthMap = buildMonthMap(app, paths.diaryMonthly);
+  const monthMap = buildMonthMap(app, paths);
   // Re-scoping writes this note's `month-start`; the widget is live over the
   // host note (liveScopedWidget's shouldRefresh includes ctx.sourcePath), so
   // the whole card — grid, banner, stats, and the entry rollup below it —

@@ -49,7 +49,12 @@ import { promptChoice, promptDetailedSuggester, promptText } from "./modals";
 import { ArgSuggest } from "./arg-suggest";
 import { bridgeCatalogue } from "./widgets/bridge-widgets";
 import { otherSurface } from "../core/bridge";
-import { folderNotePath, getFile, openFile } from "../core/util";
+import {
+  dashboardGrainOf,
+  folderNotePath,
+  getFile,
+  openFile,
+} from "../core/util";
 import { openTemplateEditor } from "./template-editor";
 import { splitLayoutTargets } from "../journals/journal-sections";
 import { toPlainMarkdown } from "../core/plain-markdown";
@@ -462,9 +467,13 @@ export class SectionInserter {
     const kind = noteKindOf(paths, notePath, fm?.["journal"], fm?.["type"]);
     if (kind == null || kind.surface !== "diary") return null;
     if (kind.grain === "daily") return null; // no daily dashboard exists
-    if (notePath !== folderNotePath(paths[CLASS_DEFS[kind.grain].folderKey])) {
-      return null;
-    }
+    // THE DASHBOARD'S ADDRESS, NOT ITS GRAIN FOLDER'S NOTE (4.81). This asked
+    // `notePath === folderNotePath(<the grain folder>)`, which was the same
+    // question until the four dashboards moved into `Dashboards/`. After the
+    // move it answered null for every one of them — so the section control
+    // vanished from all four dashboards, and `entryContextFor` below, which is
+    // this test read the other way round, offered them ENTRY sections instead.
+    if (dashboardGrainOf(paths, notePath) !== kind.grain) return null;
     // `diaryRoot` because this is the caller that can supply it: the Tags
     // section (3.14 §3) writes the folder it reads into the note, and the
     // composer — which builds its context from a grain alone — never renders

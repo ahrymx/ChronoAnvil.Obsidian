@@ -532,6 +532,42 @@
 
 .almanac-settings {
   --am-set-gap: 10px;
+  container-type: inline-size;
+}
+
+/* Ensure setting items and dropdown controls never squish descriptions into vertical ribbons */
+.almanac-settings .setting-item {
+  min-width: 0;
+}
+
+.almanac-settings .setting-item-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.almanac-settings .setting-item-control {
+  flex: 0 1 auto;
+  max-width: 60%;
+}
+
+.almanac-settings .setting-item-control select,
+.almanac-settings .setting-item-control .dropdown {
+  max-width: 100%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+/* Stacking for narrow panes / mobile sidebars */
+@container (max-width: 520px) {
+  .almanac-settings .setting-item:not(.setting-item-inline) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .almanac-settings .setting-item:not(.setting-item-inline) .setting-item-control {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 /* --- Hero + general block ---------------------------------------------- */
@@ -701,6 +737,18 @@
 }
 .almanac-settings-note p + p {
   margin-top: 5px;
+}
+
+/* --- Settings Banner Live Preview ------------------------------------- */
+.almanac-settings-banner-preview-wrap {
+  margin: 6px 0 12px;
+  border-radius: var(--am-radius-md);
+  border: 1px solid var(--background-modifier-border);
+  overflow: hidden;
+  box-shadow: var(--am-elev-1);
+}
+.almanac-settings-banner-preview {
+  border-bottom: none;
 }
 
 /* --- Settings Tables (for Trackers, Journals, etc.) -------------------- */

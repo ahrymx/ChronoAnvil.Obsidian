@@ -1,11 +1,9 @@
 filters:
   and:
     - journal != null
-    - or:
-        - file.inFolder("02 - Diary/Weekly")
-        - file.inFolder("02 - Diary/Monthly")
+    - file.inFolder("02 - Diary")
 formulas:
-  Type: 'if(journal == "Monthly Entry", "📆 Monthly", "📝 Daily")'
+  Type: 'if(journal == "Yearly Entry", "🗓️ Yearly", if(journal == "Quarterly Entry", "🍂 Quarterly", if(journal == "Monthly Entry", "📆 Monthly", if(journal == "Weekly Entry", "🗒️ Weekly", "📝 Daily"))))'
 properties:
   file.name:
     displayName: Entry

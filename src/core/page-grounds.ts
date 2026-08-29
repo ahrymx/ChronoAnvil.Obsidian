@@ -28,7 +28,7 @@ export type PageGroundFamilyId =
   | "light"
   | "crystal";
 
-/** A ground, or `off` — which is the default and paints nothing at all. */
+/** A ground, or `off` — which paints nothing at all. */
 export type PageGroundId =
   | "off"
   | "dotgrid"
@@ -44,9 +44,7 @@ export type PageGroundId =
   | "scanline"
   | "pinstripe"
   | "candy"
-  | "topo"
   | "seigaiha"
-  | "aurora"
   | "stardust"
   | "facet"
   | "smoke";
@@ -162,22 +160,10 @@ export const PAGE_GROUNDS: PageGroundSpec[] = [
   },
   // ── Ground & light ─────────────────────────────────────────────────────
   {
-    id: "topo",
-    name: "Topographic",
-    family: "light",
-    note: "Contour lines from a noise field",
-  },
-  {
     id: "seigaiha",
     name: "Wave scales",
     family: "light",
     note: "Seigaiha — overlapping fans, brickworked",
-  },
-  {
-    id: "aurora",
-    name: "Aurora",
-    family: "light",
-    note: "Four soft blobs, warm against cool",
   },
   {
     id: "stardust",

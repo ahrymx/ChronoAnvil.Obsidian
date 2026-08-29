@@ -26,7 +26,8 @@ import {
   serializeEvents,
   slugifyEventId,
 } from "./events";
-import { createFileEnsuringFolders, frontmatterOf, getFile } from "../core/util";
+import { basename, createFileEnsuringFolders, frontmatterOf, getFile } from "../core/util";
+import { graphLinksSection } from "../core/note-sections";
 
 // The events note's initial content. It carries the `events` widget in its own
 // body, so the note isn't just a data file — it's the page where you manage
@@ -36,7 +37,19 @@ import { createFileEnsuringFolders, frontmatterOf, getFile } from "../core/util"
 // reads the vault and writes in one call, which is right for every caller that
 // wants the note to exist; the repair window has to say what it would create
 // before it creates anything, and that needs the content on its own.
-export function eventsNoteTemplate(): string {
+//
+// TAKES THE DIARY ROOT, AS OF 4.81, for the hidden parent link at the bottom.
+// The events note sits beside the entries it decorates and belongs to the diary
+// in the graph as well as in the folder tree; without the link it is a note
+// with no edges, which draws as a loose dot however tidy the rest is. The name
+// is the root's own basename rather than the literal `02 - Diary`, because a
+// reader who renames the folder renames the note the link has to resolve to —
+// and an unresolved wikilink is not inert, Obsidian draws a phantom node for it.
+//
+// WRITTEN AT CREATION, NOT REPAIRED IN. An events note that already exists is
+// the reader's file — its frontmatter is the only part this plugin owns — so an
+// older vault's note stays loose until it is re-created.
+export function eventsNoteTemplate(diaryRoot: string): string {
   return [
     "---",
     `${EVENTS_PROPERTY}: []`,
@@ -53,8 +66,9 @@ export function eventsNoteTemplate(): string {
     "```almanac",
     "events",
     "```",
-    "",
-  ].join("\n");
+    // The block below opens with its own blank line, which is where the note's
+    // trailing newline went.
+  ].join("\n") + graphLinksSection([basename(diaryRoot)]);
 }
 
 export function eventsNotePath(plugin: AlmanacPlugin): string {
@@ -94,7 +108,7 @@ export async function ensureEventsNote(
     return await createFileEnsuringFolders(
       app,
       eventsNotePath(plugin),
-      eventsNoteTemplate()
+      eventsNoteTemplate(plugin.settings.paths.diaryRoot)
     );
   } catch (e) {
     console.error("[Almanac] could not create the events note", e);

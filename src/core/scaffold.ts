@@ -17,6 +17,9 @@ import {
   openFile,
   quarterOverviewPath,
   yearOverviewPath,
+  weeklyOverviewPath,
+  monthlyOverviewPath,
+  legacyOverviewPath,
 } from "./util";
 import { composeDiaryDashboard, titleSummaryFence } from "../diary/diary-sections";
 import { DEFAULT_PATHS } from "./constants";
@@ -90,6 +93,7 @@ import { composeHomeNote, collapseJournalsBlocks } from "../diary/home-sections"
 import { composeDiaryDashboardNote } from "../diary/diary-dashboard-sections";
 import { composeJournalsDashboardNote } from "../journals/journals-dashboard-sections";
 import { composeSearchNote } from "../diary/search-sections";
+import { configureGraphGroups } from "./graph-groups";
 import { notify } from "./notify";
 
 
@@ -216,6 +220,56 @@ export function isReconcilable(note: ShippedNote): boolean {
   return true;
 }
 
+// Point a vault's `Diary.base` at the diary root instead of at two folders.
+//
+// ── WHY THE SHIPPED BASE WENT BLIND (4.81) ───────────────────────────────
+//
+// The base has always filtered `file.inFolder("02 - Diary/Weekly")` OR
+// `.../Monthly` — the two folders that held entries when it was written. Under
+// the period tree an entry is at `02 - Diary/Year-2026/Quarter-2026-Q3/…`,
+// which is in neither, so a reader who opened Diary.base after upgrading would
+// have seen a table that stopped on the day they upgraded. `journal != null`
+// beside it is what actually selects entries; the folder test only has to say
+// "the diary".
+//
+// TEXT, NOT A YAML ROUND TRIP, for the reason `syncDiaryBase` states about the
+// same file: it is a user-editable document whose shape is open-ended, and
+// re-emitting it would reformat every line the reader wrote. This rewrites the
+// one list it recognises and returns null for everything else — including a
+// base already naming the root, so repair does not offer a migration for a
+// vault that has had it.
+//
+// EVERY MEMBER MUST BE A FOLDER INSIDE THE DIARY. A reader who added
+// `file.inFolder("03 - Journals")` to that `or:` meant something this cannot
+// preserve by widening, so it declines rather than quietly dropping their term.
+export function retargetDiaryBase(
+  text: string,
+  diaryRoot: string
+): string | null {
+  const lines = text.split("\n");
+  const orAt = lines.findIndex((l) => /^\s*- or:\s*$/.test(l));
+  if (orAt === -1) return null;
+  const indent = lines[orAt].match(/^\s*/)?.[0] ?? "";
+  const members: string[] = [];
+  let end = orAt + 1;
+  for (; end < lines.length; end++) {
+    const m = lines[end].match(/^(\s*)- file\.inFolder\("([^"]*)"\)\s*$/);
+    if (!m || m[1].length <= indent.length) break;
+    members.push(m[2]);
+  }
+  if (members.length === 0) return null;
+  // Nothing to do when it already names the root, and nothing safe to do when a
+  // member is outside the diary.
+  if (members.includes(diaryRoot)) return null;
+  if (!members.every((f) => f.startsWith(`${diaryRoot}/`))) return null;
+  const out = [
+    ...lines.slice(0, orAt),
+    `${indent}- file.inFolder("${diaryRoot}")`,
+    ...lines.slice(end),
+  ];
+  return out.join("\n");
+}
+
 // `extras` is the vault's own additions to each grain's entry template —
 // `AlmanacSettings.entrySections`. Defaulted to none rather than made required,
 // because the three call sites in this file all have it and the shape of the
@@ -291,14 +345,20 @@ export function shippedNotes(
       surface: { kind: "journals-dashboard" },
     },
     { asset: "staging.md", dest: `${p.staging}/Staging.md` },
+    // THROUGH THE ACCESSORS, ALL FOUR (4.81). Two of these named
+    // `folderNotePath(p.diaryWeekly)` directly while the quarterly and yearly
+    // ones went through `quarterOverviewPath`/`yearOverviewPath` — two spellings
+    // of one location, which held only while both said the same thing. They
+    // stopped saying the same thing the moment the dashboards moved into
+    // `Dashboards/`.
     {
       content: composeDiaryDashboard("weekly"),
-      dest: folderNotePath(p.diaryWeekly),
+      dest: weeklyOverviewPath(p),
       surface: { kind: "dashboard", ctx: { grain: "weekly" } },
     },
     {
       content: composeDiaryDashboard("monthly"),
-      dest: folderNotePath(p.diaryMonthly),
+      dest: monthlyOverviewPath(p),
       surface: { kind: "dashboard", ctx: { grain: "monthly" } },
     },
     // COMPOSED AS OF 3.11 §3, and `assets/search.md` is gone with it.
@@ -505,6 +565,88 @@ export class Scaffold {
         }
       }
     }
+  }
+
+  // The base's folder filter, widened to the diary root — the write half of
+  // `retargetDiaryBase`, on this file's standing idiom: read, call a pure
+  // function, write only on a non-null answer.
+  private async retargetBase(): Promise<void> {
+    const file = getFile(this.app, `${this.paths.infrastructureRoot}/Diary.base`);
+    if (!file) return;
+    try {
+      const original = await this.app.vault.read(file);
+      const aimed = retargetDiaryBase(original, this.paths.diaryRoot);
+      if (aimed != null && aimed !== original) {
+        await this.app.vault.modify(file, aimed);
+      }
+    } catch (e) {
+      console.error("[Almanac] Diary.base migration failed", e);
+    }
+  }
+
+  // ── THE FOUR DASHBOARDS, MOVED INTO `Dashboards/` (4.81) ──────────────
+  //
+  // A MOVE RATHER THAN A REWRITE, which makes it the odd one out in this file:
+  // every other migration reads a note, calls a pure function and writes the
+  // answer back. There is nothing to rewrite here — the note is byte-identical
+  // at its new address — and the thing that has to happen is the thing a
+  // rewrite cannot do.
+  //
+  // THROUGH `fileManager.renameFile`, NOT `vault.rename`, and that is the whole
+  // safety argument: Obsidian rewrites every link in the vault that pointed at
+  // the file, so a reader's own `[[Weekly]]` and the hidden graph links survive
+  // the move. `vault.rename` moves the bytes and leaves the links broken.
+  //
+  // ONLY WHEN THE DESTINATION IS FREE. A vault that already has
+  // `Dashboards/Weekly.md` — because repair created one before this ran, or
+  // because the reader made it — gets nothing done to it. Two notes named
+  // `Weekly` is exactly the state this migration exists to avoid, and blindly
+  // moving a third into place is how it would create one.
+  private async moveDashboards(): Promise<void> {
+    for (const move of this.plannedDashboardMoves()) {
+      const file = getFile(this.app, move.from);
+      if (!file) continue;
+      try {
+        // The folder first: `create` makes it, but a reader may tick
+        // `migrations` alone, and a rename into a folder that is not there
+        // throws.
+        await ensureFolder(this.app, this.paths.diaryDashboards);
+        await this.app.fileManager.renameFile(file, move.to);
+      } catch (e) {
+        console.error(`[Almanac] could not move ${move.from}`, e);
+      }
+    }
+  }
+
+  // Which dashboards are still at their pre-4.81 address, with nothing in the
+  // way of the new one. Read by the survey and by the write, so the window
+  // cannot list a move the apply would decline.
+  private plannedDashboardMoves(): { from: string; to: string; grain: string }[] {
+    const p = this.paths;
+    const to: Record<string, string> = {
+      weekly: weeklyOverviewPath(p),
+      monthly: monthlyOverviewPath(p),
+      quarterly: quarterOverviewPath(p),
+      yearly: yearOverviewPath(p),
+    };
+    return (["weekly", "monthly", "quarterly", "yearly"] as const)
+      .map((grain) => ({ grain, from: legacyOverviewPath(p, grain), to: to[grain] }))
+      .filter(
+        (m) =>
+          m.from !== m.to &&
+          getFile(this.app, m.from) != null &&
+          getFile(this.app, m.to) == null
+      );
+  }
+
+  // Is this destination a dashboard whose note is still at its old address?
+  //
+  // The one question `planCreate` has to ask before it fills a gap that is not
+  // one. Asked of the PLANNED MOVES rather than of the paths directly, so the
+  // two can only ever agree: a move this declines to wait for is a move that is
+  // not going to happen.
+  private dashboardAwaitingMove(dest: string): boolean {
+    return this.plannedDashboardMoves().some((m) => m.to === dest);
   }
 
   // One composed page's banner, welded from two fences into one. 4.19.
@@ -1027,6 +1169,17 @@ export class Scaffold {
     return existing;
   }
 
+  // Configure Obsidian Graph View color groups matching current vault paths.
+  async configureGraphGroups(): Promise<boolean> {
+    const ok = await configureGraphGroups(this.app, this.plugin.settings.paths);
+    if (ok) {
+      notify.ok("Almanac: Graph view color groups configured");
+    } else {
+      notify.fail("Almanac: Could not write graph view color groups");
+    }
+    return ok;
+  }
+
   // Bring a journal type's templates up to the current shipped shape.
   //
   // setupVault() writes a template only when it is missing and never
@@ -1308,13 +1461,16 @@ export class Scaffold {
     const p = this.paths;
     const folders = [
       p.staging,
-      // All five grains. Each holds that period's entries; the four above daily
-      // also hold their dashboard as a folder note, which the file list writes.
-      p.diaryDaily,
-      p.diaryWeekly,
-      p.diaryMonthly,
-      p.diaryQuarterly,
-      p.diaryYearly,
+      // THE DIARY ROOT AND THE DASHBOARDS, AND NOT THE FIVE GRAINS (4.81).
+      //
+      // An entry is filed under the period that contains it, so the grain
+      // folders would be five empty rooms in a vault set up today —
+      // `entryPath` never writes into one and `createFileEnsuringFolders` makes
+      // the period folders as it goes. A vault that already HAS them keeps them
+      // and everything in them; this list only says what a vault is given.
+      p.diaryRoot,
+      p.diaryEntries,
+      p.diaryDashboards,
       p.templatesDiary,
       p.documentation,
       p.attachments,
@@ -1363,6 +1519,16 @@ export class Scaffold {
     )) {
       const { asset, dest } = note;
       if (getFile(this.app, dest)) continue; // don't overwrite
+      // AND DON'T CREATE A DASHBOARD THAT IS ABOUT TO BE MOVED HERE (4.81).
+      //
+      // `create` runs before `migrations`, so on a vault upgrading from 4.80
+      // this loop saw no `Dashboards/Weekly.md`, wrote a fresh one — and
+      // `plannedDashboardMoves` then declined the move because the destination
+      // was occupied. The reader ended with two Weekly dashboards: an empty new
+      // one and their own, with their charts in it, stranded in the old folder.
+      // The note is not missing; it is somewhere else, and the migration is the
+      // group that knows what to do about that.
+      if (this.dashboardAwaitingMove(dest)) continue;
       const content =
         note.content ?? (asset == null ? null : await this.readAsset(asset));
       if (content == null) {
@@ -1436,7 +1602,7 @@ export class Scaffold {
     // The special-events note, through the store's own definition of what a
     // fresh one contains rather than from a bundled asset.
     if (this.plugin.settings.eventsEnabled && !getFile(this.app, p.events)) {
-      files.push({ dest: p.events, content: eventsNoteTemplate() });
+      files.push({ dest: p.events, content: eventsNoteTemplate(p.diaryRoot) });
     }
 
     return { folders, files, missingAssets };
@@ -1452,6 +1618,51 @@ export class Scaffold {
   private async planMigrations(): Promise<RepairFileChange[]> {
     const out: RepairFileChange[] = [];
     const p = this.paths;
+
+    // FIRST IN THE LIST AND FIRST IN THE WRITE, because the four pages this
+    // moves are the same four the page walk below reconciles: converging one at
+    // its old address and then moving it would be right, and reading two rows
+    // about one note in the window would not.
+    //
+    // NO `diff`, LIKE A CREATE. The lines do not change — see `moveDashboards`.
+    for (const move of this.plannedDashboardMoves()) {
+      out.push({
+        path: move.from,
+        label: move.from.split("/").pop() ?? move.from,
+        ops: [
+          {
+            kind: "migrate",
+            detail: `move this dashboard to ${move.to}`,
+          },
+        ],
+      });
+    }
+
+    // The vault's own `Diary.base`, whose folder filter names two folders that
+    // no longer hold entries. Read here rather than reconciled, because the base
+    // is a document the reader edits and only this one list is the plugin's.
+    const baseFile = getFile(this.app, `${p.infrastructureRoot}/Diary.base`);
+    if (baseFile) {
+      try {
+        const original = await this.app.vault.read(baseFile);
+        const aimed = retargetDiaryBase(original, p.diaryRoot);
+        if (aimed != null && aimed !== original) {
+          out.push({
+            path: baseFile.path,
+            label: baseFile.name,
+            ops: [
+              {
+                kind: "migrate",
+                detail: "point this table at the whole diary, not two folders",
+              },
+            ],
+            diff: diffText(original, aimed),
+          });
+        }
+      } catch (e) {
+        console.error("[Almanac] Diary.base scan failed", e);
+      }
+    }
 
     for (const root of [p.diaryDaily, p.diaryMonthly]) {
       for (const file of filesUnder(this.app, root)) {
@@ -1796,6 +2007,7 @@ export class Scaffold {
       }
       if (created > 0) parts.push(`created ${created} file(s)`);
       if (failed > 0) parts.push(`${failed} file(s) failed — check the console`);
+      await configureGraphGroups(this.app, this.paths);
     }
 
     if (chosen.has("pages")) {
@@ -1861,8 +2073,15 @@ export class Scaffold {
     }
 
     if (chosen.has("migrations")) {
+      // The dashboards' move, before anything reads a dashboard's path (4.81).
+      await this.moveDashboards();
+
       // Separate each existing entry's tracker fence from its entry banner (4.20+).
       await this.splitEntryBanners();
+
+      // And aim the vault's Diary.base at the diary rather than at the two
+      // folders that used to hold every entry (4.81).
+      await this.retargetBase();
 
       // Converge each shipped page's Trends & Statistics section on the 2.1
       // self-titled layout. User charts are preserved verbatim.

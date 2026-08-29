@@ -196,21 +196,56 @@ function makeMoment(d: Date, valid: boolean): MomentShim {
         "July", "August", "September", "October", "November", "December",
       ];
       const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      // Longer tokens first so `MMMM` wins before `MMM`, `MMM`/`DD` before
-      // `MM`/`D`, and `dddd` before `ddd`. `MMMM` arrived with the quarter
-      // view, whose month rollups are labelled with the full month name.
-      return fmt
-        .replace(/YYYY/g, String(d.getUTCFullYear()))
-        .replace(/dddd/g, DOW[d.getUTCDay()])
-        .replace(/ddd/g, DOW[d.getUTCDay()])
-        .replace(/MMMM/g, MON_FULL[d.getUTCMonth()])
-        .replace(/MMM/g, MON[d.getUTCMonth()])
-        .replace(/MM/g, pad(d.getUTCMonth() + 1))
-        .replace(/DD/g, pad(d.getUTCDate()))
-        .replace(/\bD\b/g, String(d.getUTCDate()))
-        .replace(/HH/g, pad(d.getUTCHours()))
-        .replace(/mm/g, pad(d.getUTCMinutes()))
-        .replace(/ss/g, pad(d.getUTCSeconds()));
+      // ── ONE PASS, AND `[...]` IS A LITERAL (4.81) ────────────────────
+      //
+      // This was a chain of ten `.replace()` calls over its own output, which
+      // is why `D` needed `\bD\b` — by the time it ran, "December" was already
+      // in the string and its D was a token as far as the next regex knew. One
+      // alternation, longest token first, never re-scans what it substituted,
+      // so the guard is unnecessary rather than load-bearing.
+      //
+      // AND IT UNDERSTANDS moment's ESCAPE. `CLASS_DEFS.weekly.fileFormat` is
+      // `YYYY-[W]WW` and the quarterly one is `YYYY-[Q]Q` — the class table's
+      // own spelling of how an entry is NAMED — so a stub that did not know
+      // brackets answered `Week-2026-[W]WW` and any test naming a real entry
+      // file failed for a reason that had nothing to do with the code.
+      const isoWeekOf = (): number => {
+        const c = new Date(d.getTime());
+        const day = c.getUTCDay() || 7;
+        c.setUTCDate(c.getUTCDate() + 4 - day);
+        const jan1 = Date.UTC(c.getUTCFullYear(), 0, 1);
+        return Math.ceil(((c.getTime() - jan1) / 86400000 + 1) / 7);
+      };
+      // The ISO week-YEAR: the calendar year of this week's Thursday, which is
+      // not the date's own year in the last days of December. See isoWeekKey.
+      const isoWeekYear = (): number => {
+        const c = new Date(d.getTime());
+        const day = c.getUTCDay() || 7;
+        c.setUTCDate(c.getUTCDate() + 4 - day);
+        return c.getUTCFullYear();
+      };
+      const TOKEN: Record<string, () => string> = {
+        YYYY: () => String(d.getUTCFullYear()),
+        GGGG: () => String(isoWeekYear()),
+        dddd: () => DOW[d.getUTCDay()],
+        ddd: () => DOW[d.getUTCDay()],
+        MMMM: () => MON_FULL[d.getUTCMonth()],
+        MMM: () => MON[d.getUTCMonth()],
+        MM: () => pad(d.getUTCMonth() + 1),
+        DD: () => pad(d.getUTCDate()),
+        D: () => String(d.getUTCDate()),
+        HH: () => pad(d.getUTCHours()),
+        mm: () => pad(d.getUTCMinutes()),
+        ss: () => pad(d.getUTCSeconds()),
+        WW: () => pad(isoWeekOf()),
+        W: () => String(isoWeekOf()),
+        Q: () => String(Math.floor(d.getUTCMonth() / 3) + 1),
+      };
+      return fmt.replace(
+        /\[([^\]]*)\]|YYYY|GGGG|dddd|ddd|MMMM|MMM|MM|DD|D|HH|mm|ss|WW|W|Q/g,
+        (tok, literal: string | undefined) =>
+          literal !== undefined ? literal : TOKEN[tok]()
+      );
     },
     clone: () => makeMoment(new Date(d.getTime()), valid),
     day: () => d.getUTCDay(),
@@ -282,10 +317,14 @@ function makeMoment(d: Date, valid: boolean): MomentShim {
 
 export function moment(input?: unknown): MomentShim {
   if (typeof input === "string") {
-    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(input);
+    // `YYYY-MM` PARSES TO THE FIRST OF THAT MONTH, as it does in moment itself.
+    // A monthly entry's date key IS `YYYY-MM` (`CLASS_DEFS.monthly.dateProperty`
+    // is `month`), so a stub that answered "invalid" to it made every monthly
+    // entry undated under test while it was fine in a vault.
+    const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?/.exec(input);
     if (m) {
       const d = new Date(
-        Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+        Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3] ?? "1"))
       );
       return makeMoment(d, true);
     }

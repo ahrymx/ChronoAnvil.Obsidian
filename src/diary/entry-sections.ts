@@ -50,7 +50,7 @@ import {
 } from "../core/section-model";
 import { regionHasContent } from "../core/notestore";
 import { TRACKER_MARK_END, TRACKER_MARK_START } from "../core/constants";
-import { BANNER_ID, graphLinksSection, rowRuns } from "../core/note-sections";
+import { BANNER_ID, rowRuns } from "../core/note-sections";
 import {
   MODIFIER_KEYWORDS,
   ROW_KEYWORD,
@@ -908,17 +908,7 @@ export function composeEntryTemplate(
   // the vault map's quarterly node got wrong in its own way. Daily is the
   // exception and always was: there is no daily dashboard, so a daily entry's
   // parent is the diary root itself.
-  const parentName =
-    ctx.grain === "daily"
-      ? "02 - Diary"
-      : ctx.grain === "weekly"
-      ? "Weekly"
-      : ctx.grain === "monthly"
-      ? "Monthly"
-      : ctx.grain === "quarterly"
-      ? "Quarterly"
-      : "Yearly";
-
+  //
   return (
     [
       ...frontmatter(ctx),
@@ -934,7 +924,7 @@ export function composeEntryTemplate(
       .filter((s) => s.ownsRegion !== false)
       .map((s) => region(s.id))
       .join("\n\n") +
-    graphLinksSection([parentName])
+    "\n"
   );
 }
 

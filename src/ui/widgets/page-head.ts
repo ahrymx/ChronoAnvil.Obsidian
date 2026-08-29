@@ -52,7 +52,11 @@ import { hueOf, journalTypeAtPath } from "../../journals/journal";
 import { CLASS_DEFS, noteKindOf, TrackerClass } from "../../trackers/trackers";
 import { OVERVIEW_LABELS, OverviewUnit } from "../../diary/calendar";
 import { periodAnchor, valueLabel } from "../../diary/periodnav";
-import { folderNotePath, folderPrefix } from "../../core/util";
+import {
+  dashboardGrainOf,
+  folderNotePath,
+  folderPrefix,
+} from "../../core/util";
 import { LOGBOOK_TITLE } from "../../core/vocabulary";
 
 /** The class the head carries. Named once — `headerbar.ts` reads it too. */
@@ -191,6 +195,17 @@ function diaryRoleOf(plugin: AlmanacPlugin, file: TFile): DiaryRole {
   if (paths.logbooks && file.path.startsWith(folderPrefix(paths.logbooks))) {
     return { role: "logbook" };
   }
+  // THE DASHBOARD IS A FILE NOW, NOT A FOLDER'S NOTE (4.81). This asked
+  // `file.path === folderNotePath(<the grain folder>)`, which was true of
+  // `02 - Diary/Weekly/Weekly.md` and is true of nothing once the four notes
+  // live in `Dashboards/` — so every one of them would have read **WEEKLY
+  // ENTRY** over its filename, the exact wrong-eyebrow bug the table above this
+  // type was written to make impossible. `dashboardGrainOf` knows both
+  // addresses, so an un-repaired vault keeps the head it has today.
+  const dashboard = dashboardGrainOf(paths, file.path);
+  const dashboardUnit = dashboard ? OVERVIEW_UNIT[dashboard] : undefined;
+  if (dashboardUnit) return { role: "overview", unit: dashboardUnit };
+
   const grain = grainOf(plugin, file);
   const unit = OVERVIEW_UNIT[grain];
   if (file.path === folderNotePath(paths[CLASS_DEFS[grain].folderKey])) {

@@ -16,14 +16,13 @@
 
 import type AlmanacPlugin from "../main";
 import {
-  filesUnder,
   frontmatterOf,
   formatDuration,
   meanClock,
   parseClock,
   sleepHours,
-  weeklyOverviewPath,
 } from "../core/util";
+import { entriesOfGrain } from "../diary/lineage";
 import { getBuiltinTracker } from "./trackers";
 import { emptyCallout } from "../ui/empty";
 
@@ -60,12 +59,13 @@ export function buildSleepSummary(plugin: AlmanacPlugin): HTMLElement {
     return root;
   }
 
-  const dashboard = weeklyOverviewPath(paths);
   const sleeps: number[] = []; // hours asleep per night
   const wakeMins: number[] = []; // wake time, minutes since midnight
 
-  for (const f of filesUnder(app, paths.diaryDaily)) {
-    if (f.path === dashboard) continue;
+  // EVERY DAILY ENTRY, IN BOTH LAYOUTS (4.81). This walked `paths.diaryDaily`,
+  // which holds nothing written after the period tree landed — so a vault that
+  // had repaired would have reported a fortnight of sleep as no data at all.
+  for (const f of entriesOfGrain(app, paths, "daily")) {
     const fm = frontmatterOf(app, f);
 
     // Prefer the stored derived value; else compute from this note's own times.

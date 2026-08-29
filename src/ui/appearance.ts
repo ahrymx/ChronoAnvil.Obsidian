@@ -26,8 +26,10 @@ export class AppearanceManager {
 
   apply(): void {
     const s = this.plugin.settings.appearance ?? {
-      aestheticPreset: "modern",
+      aestheticPreset: "editorial",
       grainAesthetics: "vibrant",
+      pageGround: "scanline",
+      pageGroundStrength: "standard",
     };
 
     const body = document.body;
@@ -36,13 +38,13 @@ export class AppearanceManager {
     body.removeClass("am-preset-modern", "am-preset-editorial", "am-preset-technical");
     body.removeClass("am-grain-vibrant", "am-grain-subtle", "am-grain-monochrome");
 
-    // Apply active preset
-    if (s.aestheticPreset === "editorial") {
-      body.addClass("am-preset-editorial");
+    // Apply active preset (editorial is the default)
+    if (s.aestheticPreset === "modern") {
+      body.addClass("am-preset-modern");
     } else if (s.aestheticPreset === "technical") {
       body.addClass("am-preset-technical");
     } else {
-      body.addClass("am-preset-modern");
+      body.addClass("am-preset-editorial");
     }
 
     // Apply grain intensity
@@ -55,20 +57,9 @@ export class AppearanceManager {
     }
 
     // ── The page ground (4.80) ────────────────────────────────────────────
-    //
-    // CLEARED FROM THE TABLE AND NOT FROM MEMORY. There are nineteen of these
-    // and the class that was applied last time is not something this method
-    // knows — it may have been applied by a previous session, or by a version
-    // that had a ground this one does not. Removing the whole set is the only
-    // clear that cannot leave one behind, and it is why `PAGE_GROUND_CLASSES`
-    // exists rather than a `groundClass(s.pageGround)` call here.
     body.removeClasses(PAGE_GROUND_CLASSES);
 
-    // `off` is the default and the state of every vault saved before 4.80, so
-    // the marker goes on only when there is something to draw. Without it the
-    // shared film rules do not match at all, which is what makes Off cost
-    // nothing rather than cost a transparent overlay on every note.
-    const ground = s.pageGround ?? "off";
+    const ground = s.pageGround ?? "scanline";
     if (ground !== "off") {
       body.addClass(PAGE_GROUND_MARKER);
       body.addClass(groundClass(ground));
