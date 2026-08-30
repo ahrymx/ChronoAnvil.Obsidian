@@ -499,6 +499,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     const details = containerEl.createEl("details", {
       cls: "ca-settings-group",
     });
+    details.setAttribute("data-group-key", key);
     details.open = !collapsed;
 
     const summary = details.createEl("summary", {
@@ -686,31 +687,87 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     //
     // THE TAGLINE STAYS. It says what the settings are FOR, which the name does
     // not, and it is the only line on the screen that does.
-    const hero = containerEl.createDiv({ cls: "ca-settings-hero" });
-    const heroText = hero.createDiv({ cls: "ca-hero-text" });
-    heroText.createEl("p", {
+    // ── Header Card ──────────────────────────────────────────────────────
+    const hero = containerEl.createDiv({ cls: "ca-settings-hero-card" });
+    const heroInfo = hero.createDiv({ cls: "ca-hero-info" });
+    heroInfo.createDiv({
+      cls: "ca-hero-title",
+      text: "Configuration & Registry",
+    });
+    heroInfo.createDiv({
+      cls: "ca-hero-sub",
       text: "Journaling, trackers and study journals, configured in one place.",
     });
 
-    // ── Vault setup / general, above the collapsible groups because they
-    // apply everywhere and are the first thing a new vault needs.
-    const general = containerEl.createDiv({ cls: "ca-settings-general" });
+    const heroLinks = hero.createDiv({ cls: "ca-settings-links" });
+    const repoLink = heroLinks.createEl("a", {
+      cls: "ca-settings-link",
+      href: "https://github.com/ahrymx/ChronoAnvil.Obsidian",
+    });
+    repoLink.setAttr("target", "_blank");
+    repoLink.setAttr("rel", "noopener");
+    repoLink.setAttr("aria-label", "GitHub repository");
+    repoLink.setAttr("title", "GitHub repository");
+    setIcon(repoLink.createSpan(), "github");
+    repoLink.createSpan({ text: "GitHub" });
 
-    new Setting(general)
-      .setName("Set up / repair vault")
-      .setDesc(
-        "Audit and repair your ChronoAnvil vault: create missing folders, update dashboard layouts, sync journal index notes, refresh templates, and run format migrations. Safe to run anytime with full change preview."
-      )
-      .addButton((b) =>
-        b
-          .setButtonText("Set up / repair vault")
-          .setIcon("wrench")
-          .setCta()
-          .setTooltip("Audit and repair vault files")
-          .onClick(async () => {
-            await this.plugin.scaffold.setupVault();
-          })
-      );
+    const kofiLink = heroLinks.createEl("a", {
+      cls: "ca-settings-link ca-settings-link-kofi",
+      href: "https://ko-fi.com/ahrymx",
+    });
+    kofiLink.setAttr("target", "_blank");
+    kofiLink.setAttr("rel", "noopener");
+    kofiLink.setAttr("aria-label", "Support on Ko-fi");
+    kofiLink.setAttr("title", "Support on Ko-fi");
+    setIcon(kofiLink.createSpan(), "heart");
+    kofiLink.createSpan({ text: "Ko-fi" });
+
+    // ── Toolbar: Category Tabs & Quick Search ────────────────────────────
+    const toolbar = containerEl.createDiv({ cls: "ca-settings-toolbar" });
+
+    // Toolbar search row with compact repair vault button
+    const toolbarRow = toolbar.createDiv({ cls: "ca-settings-toolbar-row" });
+
+    // Quick Search Input
+    const searchWrap = toolbarRow.createDiv({ cls: "ca-settings-search-wrap" });
+    const searchIcon = searchWrap.createSpan({ cls: "ca-settings-search-icon" });
+    setIcon(searchIcon, "search");
+    const searchInput = searchWrap.createEl("input", {
+      cls: "ca-settings-search-input",
+      type: "text",
+      placeholder: "Search settings, trackers, journals, paths…",
+    });
+    const clearBtn = searchWrap.createEl("button", {
+      cls: "ca-settings-search-clear is-hidden",
+    });
+    setIcon(clearBtn, "x");
+
+    // Repair vault button next to search bar
+    const repairBtn = toolbarRow.createEl("button", {
+      cls: "ca-settings-repair-btn",
+    });
+    repairBtn.setAttr(
+      "title",
+      "Audit and repair vault files: create missing folders, sync templates, refresh layouts"
+    );
+    repairBtn.setAttr("aria-label", "Audit and repair vault");
+    setIcon(repairBtn.createSpan(), "wrench");
+    repairBtn.createSpan({ text: "Repair vault" });
+    repairBtn.addEventListener("click", async () => {
+      await this.plugin.scaffold.setupVault();
+    });
+
+    // Category Tabs
+    const tabsContainer = toolbar.createDiv({ cls: "ca-settings-tabs" });
+    const tabs = [
+      { id: "all", label: "All Settings", icon: "layout-grid" },
+      { id: "trackers", label: "Trackers & Capture", icon: "bar-chart-2" },
+      { id: "journals", label: "Journals & Logs", icon: "book-open" },
+      { id: "appearance", label: "Appearance & Banner", icon: "palette" },
+      { id: "vault", label: "Vault & System", icon: "folder" },
+    ];
+    let activeTabId = "all";
+    const tabButtons: HTMLElement[] = [];
 
     // ── Collapsible groups ──────────────────────────────────────────────
     const customCount = s.trackers.filter((t) => !t.builtin).length;
@@ -824,6 +881,74 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
         false
       )
     );
+
+    const noResults = containerEl.createDiv({
+      cls: "ca-settings-no-match is-hidden",
+      text: "No settings match your search.",
+    });
+
+    const updateFilter = () => {
+      const q = searchInput.value.trim().toLowerCase();
+      clearBtn.classList.toggle("is-hidden", !q);
+
+      const groups = containerEl.querySelectorAll<HTMLDetailsElement>(".ca-settings-group");
+      let visibleGroups = 0;
+
+      groups.forEach((g) => {
+        const key = g.getAttribute("data-group-key") ?? "";
+        const inCategory =
+          activeTabId === "all" ||
+          (activeTabId === "trackers" && (key === "trackers" || key === "capture")) ||
+          (activeTabId === "journals" && (key === "journals" || key === "logbooks")) ||
+          (activeTabId === "appearance" && (key === "appearance" || key === "banner")) ||
+          (activeTabId === "vault" && (key === "attachments" || key === "mobile" || key === "paths"));
+
+        if (!q) {
+          if (inCategory) {
+            g.removeClass("is-hidden");
+            visibleGroups++;
+          } else {
+            g.addClass("is-hidden");
+          }
+          return;
+        }
+
+        const text = g.textContent?.toLowerCase() ?? "";
+        if (text.includes(q)) {
+          g.removeClass("is-hidden");
+          g.open = true;
+          visibleGroups++;
+        } else {
+          g.addClass("is-hidden");
+        }
+      });
+
+      noResults.classList.toggle("is-hidden", visibleGroups > 0);
+    };
+
+    tabs.forEach((t) => {
+      const btn = tabsContainer.createEl("button", {
+        cls: `ca-settings-tab-btn ${t.id === activeTabId ? "is-active" : ""}`,
+      });
+      setIcon(btn.createSpan(), t.icon);
+      btn.createSpan({ text: t.label });
+      btn.addEventListener("click", () => {
+        activeTabId = t.id;
+        tabButtons.forEach((b) => b.removeClass("is-active"));
+        btn.addClass("is-active");
+        updateFilter();
+      });
+      tabButtons.push(btn);
+    });
+
+    clearBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      clearBtn.addClass("is-hidden");
+      updateFilter();
+      searchInput.focus();
+    });
+
+    searchInput.addEventListener("input", updateFilter);
   }
 
   // ── Appearance & Themes ──────────────────────────────────────────────────

@@ -9,6 +9,49 @@ It replaces Templater, Meta Bind, Tracker, Tasks and Dataview for this workflow.
 [Bases](https://help.obsidian.md/bases) is still needed for the standalone
 `.base` files.
 
+## Visual Tour
+
+![ChronoAnvil Dashboard](dev-screenshots/dashboard.png)
+
+ChronoAnvil renders rich dashboards, activity heat maps, multi-grain calendars, custom journals, and metric visualisations directly inside your notes with no external dependencies.
+
+| Native Calendars & Heat Maps | Custom Journals & Study Presets |
+| :---: | :---: |
+| ![Calendar & Heat Map](dev-screenshots/calendar-heatmap.png) | ![Study Journal](dev-screenshots/study-journal.png) |
+| *Interactive heat maps & event calendars* | *Hierarchical journals, note types & reviews* |
+
+| Integrated Charts & Telemetry | Unified Metric Trackers |
+| :---: | :---: |
+| ![Native Charts](dev-screenshots/charts.png) | ![Trackers & Controls](dev-screenshots/trackers.png) |
+| *Frontmatter-driven bar, line, & streak charts* | *Steppers, scales, habit chips, & quick capture* |
+
+## What it does
+
+- **Diary** — daily and monthly entries, a calendar with heat map and special
+  events, an entry navigator, week/month/quarter/year dashboards, full-text
+  search with date, tag and tracker filters, on-this-day and a timeline.
+- **Journals** — define your own journals with their own levels and note types.
+  A built-in Study journal (subjects → topics → lessons and practice) ships as
+  an optional preset.
+- **Trackers** — define one once and it is synced into the templates and
+  `Diary.base`. Steppers, scales, times, dates, dropdowns, habit chips. Any
+  tracker can be added to a single entry on the day.
+- **Charts** — line, bar, calendar heat map, scatter, streak and summary, drawn
+  natively from your own frontmatter. Per-note chart sections on dashboards and
+  journal index notes.
+- **Quick capture** straight into any entry that can hold one, review queues, recall decks,
+  attachments and task rollups.
+
+## Keyboard
+
+ChronoAnvil claims no shortcuts. Every command is in the palette under
+**ChronoAnvil:**, and any of them can be bound in **Settings → Hotkeys**.
+
+The one worth binding first is **Search everything** — full-text across the
+diary and every journal, with date, tag and tracker filters. `Ctrl K` / `⌘ K` is
+what it was designed around, though that is also core Obsidian's *Insert
+Markdown link*, so bind whichever you reach for more.
+
 ## Install
 
 Download `main.js`, `manifest.json` and `styles.css` from a
@@ -55,39 +98,12 @@ vault root the first time it starts without a `data.json`.
 
 ```bash
 npm install
-npm test          # 5,109 tests
+npm test          # 5,091 tests
 npm run package   # -> dist/chronoanvil/, ready to copy into a vault
 ```
 
 `npm run dev` watches. `./build.sh` is a thin wrapper that installs
 dependencies first if they are missing.
-
-## What it does
-
-- **Diary** — daily and monthly entries, a calendar with heat map and special
-  events, an entry navigator, week/month/quarter/year dashboards, full-text
-  search with date, tag and tracker filters, on-this-day and a timeline.
-- **Journals** — define your own journals with their own levels and note types.
-  A built-in Study journal (subjects → topics → lessons and practice) ships as
-  an optional preset.
-- **Trackers** — define one once and it is synced into the templates and
-  `Diary.base`. Steppers, scales, times, dates, dropdowns, habit chips. Any
-  tracker can be added to a single entry on the day.
-- **Charts** — line, bar, calendar heat map, scatter, streak and summary, drawn
-  natively from your own frontmatter. Per-note chart sections on dashboards and
-  journal index notes.
-- **Quick capture** straight into any entry that can hold one, review queues, recall decks,
-  attachments and task rollups.
-
-## Keyboard
-
-ChronoAnvil claims no shortcuts. Every command is in the palette under
-**ChronoAnvil:**, and any of them can be bound in **Settings → Hotkeys**.
-
-The one worth binding first is **Search everything** — full-text across the
-diary and every journal, with date, tag and tracker filters. `Ctrl K` / `⌘ K` is
-what it was designed around, though that is also core Obsidian's *Insert
-Markdown link*, so bind whichever you reach for more.
 
 ## Documentation
 

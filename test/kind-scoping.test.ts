@@ -11,12 +11,12 @@ import { studyFile, studyTemplate } from "./study-template";
 import {
   STUDY_JOURNAL,
   declaredTrackerIds,
+  folderEmoji,
   kindAllowsTracker,
   kindsCarrying,
   ratingTrackerFor,
 } from "../src/journals/journal";
 import type { JournalType } from "../src/journals/journal";
-import { STUDY_JOURNAL, folderEmoji } from "../src/journals/journal";
 import { buildJournalType } from "../src/journals/custom-journal";
 import type { JournalKindConfig } from "../src/journals/custom-journal";
 import { normaliseKinds } from "../src/core/settings-editors";

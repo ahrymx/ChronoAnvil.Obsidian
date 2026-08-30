@@ -197,7 +197,12 @@ async function main() {
   try {
     await cp(ROOT, path.join(staging, name), {
       recursive: true,
-      filter: (from) => !SOURCE_SKIP.has(path.relative(ROOT, from)),
+      filter: (from) => {
+        const rel = path.relative(ROOT, from);
+        if (!rel) return true;
+        const top = rel.split(path.sep)[0];
+        return !SOURCE_SKIP.has(top);
+      },
     });
     await run("zip", ["-rq", sourceZip, name], staging);
   } finally {

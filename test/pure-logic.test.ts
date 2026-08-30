@@ -226,7 +226,7 @@ import {
   splitExtension,
   uniquePath,
 } from "../src/ui/attachments";
-import { remapPath, remapConfiguredPaths } from "../src/core/pathwatch";
+import { remapPath } from "../src/core/pathwatch";
 import {
   parseEntries,
   serializeEntries,

@@ -719,11 +719,11 @@
    take light text, the two lightest keep dark. */
 .ca-journal-act-cell.ca-act-1,
 .ca-journal-act-cell.ca-act-2 {
-  color: #173404;
+  color: var(--ca-act-ink-dark);
 }
 .ca-journal-act-cell.ca-act-3,
 .ca-journal-act-cell.ca-act-4 {
-  color: #f2fbf4;
+  color: var(--ca-act-ink-light);
 }
 /* A day in the month with no tasks: faint. A leading grid-padding day (so the
    1st lands in its true weekday column): invisible. */

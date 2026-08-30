@@ -414,6 +414,8 @@
   --ca-act-2: #94ca7c;
   --ca-act-3: #5aa84c;
   --ca-act-4: #22c55e;
+  --ca-act-ink-dark: #173404;
+  --ca-act-ink-light: #f2fbf4;
 
   /* Event palette — the eight swatches a special event can be decorated with.
      Named rather than free-form on purpose: a hex picker lets you choose

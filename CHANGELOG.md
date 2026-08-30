@@ -1,15 +1,29 @@
 # Changelog
 
-> Detailed development history prior to 4.0.1 is available in [docs/dev-log.md](docs/dev-log.md).
-
 All notable changes to ChronoAnvil will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [5.1.0] - 2026-08-30
 
-**Fixed the shipped notes not reaching an install that came from the community plugin store, stopped shipping 519 KB of design commentary inside the stylesheet, dropped the bundled YAML parser, and cleared the Obsidian plugin review checklist.**
+**Redesigned the settings interface with category navigation tabs, real-time keyword search, header links card, and an integrated repair vault toolbar button.**
+
+### Added
+
+- **Settings Category Tabs Navigation**: Added quick-filter category pills (**All Settings**, **Trackers & Capture**, **Journals & Logs**, **Appearance & Banner**, **Vault & System**) reducing vertical scroll depth and improving settings discoverability.
+- **Settings Real-Time Keyword Search**: Instant live filtering across all setting options, titles, descriptions, and tracker items with automatic expansion of matched `<details>` groups.
+- **Settings Masthead Card & Repository Links**: Styled top configuration card featuring title, subtitle, and direct icon links to the GitHub repository and Ko-fi sponsor page.
+- **Integrated Repair Vault Action**: Placed a compact, dedicated "Repair vault" button directly in the search toolbar row beside the search input.
+- **Visual Tour in README**: Added a screenshot gallery showcasing native dashboards, multi-grain calendars, heat maps, study journals, and chart visualizations.
+- **Themed Activity Ramp Tokens**: Added `--ca-act-ink-dark` and `--ca-act-ink-light` custom properties to ensure text contrast across light and dark themes.
+
+### Changed
+
+- **Clean Section Hierarchy**: Restructured README and documentation to surface visual tours and features first.
+- **Plugin Manifest Metadata**: Added `fundingUrl` pointing to Ko-fi and updated `authorUrl` to GitHub profile.
+
+## [5.0.0] - 2026-08-29
 
 ### Changed
 
@@ -39,9 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [5.0.0] - 2026-08-29
 
-**Renamed the plugin from Almanac to ChronoAnvil, across the product name, the plugin id, the vault format and the CSS namespace, with a migration tool and read-compatibility for vaults written under the old name.**
+**Initial major public release under the ChronoAnvil identity, establishing a unified journaling and study system with native calendars, heat maps, charts, trackers, dashboards, and automated vault scaffolding.**
 
-> **Why 5.0.0 and not 4.85.0.** The plugin id, the vault format and the CSS namespace all changed. A vault written by 4.x keeps working — the plugin reads both spellings where a missed token would cost content — but custom CSS snippets break, and section locators are not dual-read. Run `npm run migrate:vault` (or **Set up / repair vault**) against a vault written under the old name.
+> **Vault Compatibility:** Builds on the complete 4.x foundation with the new `chronoanvil` plugin id, unified `--ca-*` styling architecture, and updated vault tokens. Vaults created in pre-release versions remain fully compatible via automatic dual-reading and the built-in migration tool (`npm run migrate:vault` or **ChronoAnvil: Maintenance: set up / repair vault**).
 
 ### Changed
 
