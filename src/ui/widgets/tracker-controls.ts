@@ -163,7 +163,7 @@ export function attachTrackerRemove(
   if (isManagedTemplate(deps.plugin, ctx.sourcePath)) return;
   const name = describeDirective(deps.plugin.settings.trackers, directive);
   const btn = cell.createEl("button", {
-    cls: "journal-tracker-remove",
+    cls: "ca-journal-tracker-remove",
     attr: {
       "aria-label": `Remove ${name} from this entry`,
       title: `Remove ${name} from this entry`,
@@ -185,8 +185,8 @@ export function buildCheckbox(
   def: TrackerDef,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
-  const wrap = createSpan({ cls: "journal-widget journal-habit" });
-  const box = wrap.createEl("button", { cls: "journal-habit-box" });
+  const wrap = createSpan({ cls: "ca-journal-widget ca-journal-habit" });
+  const box = wrap.createEl("button", { cls: "ca-journal-habit-box" });
   wireHabit(deps, box, box, def, ctx);
   return wrap;
 }
@@ -200,12 +200,12 @@ export function buildHabitChip(
   directive: string,
   ctx: MarkdownPostProcessorContext
 ): void {
-  const row = cell.querySelector(".journal-habits-row");
+  const row = cell.querySelector(".ca-journal-habits-row");
   if (!(row instanceof HTMLElement)) return;
-  const chip = row.createSpan({ cls: "journal-habit-chip" });
-  const press = chip.createEl("button", { cls: "journal-habit-chip-btn" });
-  const box = press.createSpan({ cls: "journal-habit-box" });
-  press.createSpan({ cls: "journal-habit-chip-name", text: label });
+  const chip = row.createSpan({ cls: "ca-journal-habit-chip" });
+  const press = chip.createEl("button", { cls: "ca-journal-habit-chip-btn" });
+  const box = press.createSpan({ cls: "ca-journal-habit-box" });
+  press.createSpan({ cls: "ca-journal-habit-chip-name", text: label });
   wireHabit(deps, box, press, def, ctx, (known) => {
     chip.toggleClass("is-done", known === 1);
     chip.toggleClass("is-not-done", known === 0);
@@ -246,9 +246,9 @@ export function buildScalePicker(
     def.id.toLowerCase().includes("star") ||
     (faces.length > 0 && faces.every((f) => f === "★" || f === "⭐"));
   const wrap = createSpan({
-    cls: `journal-widget journal-mood-picker${isStars ? " is-stars" : ""}`,
+    cls: `ca-journal-widget ca-journal-mood-picker${isStars ? " is-stars" : ""}`,
   });
-  const facesRow = wrap.createSpan({ cls: "journal-scale-faces" });
+  const facesRow = wrap.createSpan({ cls: "ca-journal-scale-faces" });
   const initial = deps.currentValue(ctx, def.id);
   const initialNum =
     initial == null || initial === "" ? NaN : Number(initial);
@@ -271,7 +271,7 @@ export function buildScalePicker(
   // without one), which is the right way round: annotating a reading is the
   // thing you do daily, and unsetting one is the thing you do by mistake.
   let hasNote = false;
-  const noteMark = createSpan({ cls: "journal-scale-note-mark" });
+  const noteMark = createSpan({ cls: "ca-journal-scale-note-mark" });
   setIcon(noteMark, "pencil");
 
   const paintNote = (): void => {
@@ -353,14 +353,14 @@ export function buildScalePicker(
   faces.forEach((face, i) => {
     const value = valueFor(i);
     const btn = facesRow.createEl("button", {
-      cls: "journal-mood-face",
+      cls: "ca-journal-mood-face",
       attr: { "aria-label": `${def.label}: ${value}` },
     });
     // The glyph is its own span so the note badge can be a sibling of it
     // rather than a stray node beside a text child — `setText` on the
     // button would otherwise wipe the badge out.
-    btn.createSpan({ cls: "journal-mood-face-glyph", text: face });
-    btn.createSpan({ cls: "journal-mood-face-val", text: String(value) });
+    btn.createSpan({ cls: "ca-journal-mood-face-glyph", text: face });
+    btn.createSpan({ cls: "ca-journal-mood-face-val", text: String(value) });
     const selected = (): boolean =>
       known != null && Math.abs(valueFor(i) - known) < 1e-9;
     btn.addEventListener("click", (evt) => {
@@ -410,17 +410,17 @@ export function buildSleep(
   const wake = getBuiltinTracker(deps.plugin, "wake");
   if (!bed || !wake) {
     return createSpan({
-      cls: "journal-widget-error",
+      cls: "ca-journal-widget-error",
       text: "Sleep needs the Wake-Up and Bedtime built-ins (Settings → Trackers).",
     });
   }
 
-  const wrap = createDiv({ cls: "journal-widget journal-sleep" });
-  const inputs = wrap.createDiv({ cls: "journal-sleep-inputs" });
+  const wrap = createDiv({ cls: "ca-journal-widget ca-journal-sleep" });
+  const inputs = wrap.createDiv({ cls: "ca-journal-sleep-inputs" });
 
   const field = (def: TrackerDef): HTMLInputElement => {
-    const group = inputs.createDiv({ cls: "journal-sleep-field" });
-    group.createSpan({ cls: "journal-sleep-label", text: def.label });
+    const group = inputs.createDiv({ cls: "ca-journal-sleep-field" });
+    group.createSpan({ cls: "ca-journal-sleep-label", text: def.label });
     const input = group.createEl("input", { type: "time" });
     const cur = deps.currentValue(ctx, def.id);
     if (cur != null && cur !== "") input.value = String(cur);
@@ -430,29 +430,29 @@ export function buildSleep(
   // Bedtime first, then Wake-Up — the order a night runs.
   const bedInput = field(bed);
   const wakeInput = field(wake);
-  const readout = wrap.createDiv({ cls: "journal-sleep-readout" });
+  const readout = wrap.createDiv({ cls: "ca-journal-sleep-readout" });
 
   const refresh = (): void => {
     readout.empty();
     const hrs = sleepHours(bedInput.value, wakeInput.value);
     if (hrs == null) {
       readout.createSpan({
-        cls: "journal-sleep-hint",
+        cls: "ca-journal-sleep-hint",
         text: "Set both times to see your sleep.",
       });
       return;
     }
     const awake = awakeHours(bedInput.value, wakeInput.value);
     readout.createSpan({
-      cls: "journal-sleep-asleep",
+      cls: "ca-journal-sleep-asleep",
       text: `😴 ${formatSleepRatio(hrs)}`,
     });
     readout.createSpan({
-      cls: "journal-sleep-divider",
+      cls: "ca-journal-sleep-divider",
       text: "/",
     });
     readout.createSpan({
-      cls: "journal-sleep-awake",
+      cls: "ca-journal-sleep-awake",
       text: `${formatSleepRatio(awake)} ☀️`,
     });
   };
@@ -476,11 +476,11 @@ export function buildTrackerAddCell(
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   const cell = createSpan({
-    cls: "journal-widget journal-tracker-cell journal-tracker-add",
+    cls: "ca-journal-widget ca-journal-tracker-cell ca-journal-tracker-add",
   });
-  const btn = cell.createEl("button", { cls: "journal-tracker-add-btn" });
-  setIcon(btn.createSpan({ cls: "journal-btn-icon" }), "plus");
-  btn.createSpan({ cls: "journal-btn-label", text: "Add tracker" });
+  const btn = cell.createEl("button", { cls: "ca-journal-tracker-add-btn" });
+  setIcon(btn.createSpan({ cls: "ca-journal-btn-icon" }), "plus");
+  btn.createSpan({ cls: "ca-journal-btn-label", text: "Add tracker" });
   const hint = "Add a tracker to this entry only";
   btn.setAttr("aria-label", hint);
   btn.setAttr("title", hint);
@@ -520,7 +520,7 @@ function buildTagsField(
   def: TrackerDef,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
-  const wrap = createDiv({ cls: "journal-widget journal-tags-field" });
+  const wrap = createDiv({ cls: "ca-journal-widget ca-journal-tags-field" });
 
   // WHAT THIS NOTE CARRIES, HELD LOCALLY ONCE IT HAS BEEN WRITTEN — the same
   // `known` that every stepper, checkbox and picker in this file keeps, and
@@ -575,10 +575,10 @@ function buildTagsField(
     // nothing else; this one now does too.
     if (tags.length === 0) {
       const add = wrap.createEl("button", {
-        cls: "journal-tags-add",
+        cls: "ca-journal-tags-add",
         attr: { type: "button", "aria-label": `Add ${def.label.toLowerCase()}` },
       });
-      setIcon(add.createSpan({ cls: "journal-btn-icon" }), "plus");
+      setIcon(add.createSpan({ cls: "ca-journal-btn-icon" }), "plus");
       add.createSpan({ text: "Add tags" });
       add.addEventListener("click", () => openWindow(paint));
       return;
@@ -588,17 +588,17 @@ function buildTagsField(
     // list they belong to, so the reading and the way to change it are the
     // same target rather than a readout with a button beside it.
     const chips = wrap.createEl("button", {
-      cls: "journal-tags-chips",
+      cls: "ca-journal-tags-chips",
       attr: {
         type: "button",
         "aria-label": `Manage ${def.label.toLowerCase()} (${tags.length})`,
       },
     });
     for (const tag of tags) {
-      chips.createSpan({ cls: "journal-tags-chip", text: `#${tag}` });
+      chips.createSpan({ cls: "ca-journal-tags-chip", text: `#${tag}` });
     }
     setIcon(
-      chips.createSpan({ cls: "journal-btn-icon journal-tags-pencil" }),
+      chips.createSpan({ cls: "ca-journal-btn-icon ca-journal-tags-pencil" }),
       "pencil"
     );
     chips.addEventListener("click", () => openWindow(paint));
@@ -617,7 +617,7 @@ export function buildTracker(
   const def = getTracker(deps.plugin, id);
   if (!def) {
     const err = createSpan({
-      cls: "journal-widget-error",
+      cls: "ca-journal-widget-error",
       text: `Unknown tracker: ${id} (check Settings → Trackers)`,
     });
     return err;

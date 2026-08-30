@@ -9,7 +9,7 @@
 //
 // WHY THIS FILE EXISTS
 //
-// Almanac shows 112 notices. Thirty-seven of them carry a ✅ or ❌ marker and
+// ChronoAnvil shows 112 notices. Thirty-seven of them carry a ✅ or ❌ marker and
 // seventy-five do not, and among the marked ones thirty put it at the front and
 // seven at the end. Nobody decided that; each notice was written where it was
 // needed, and the marker went wherever it felt right that afternoon.

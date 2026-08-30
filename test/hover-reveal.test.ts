@@ -115,7 +115,7 @@ describe("a hover-revealed affordance has a resting state on touch", () => {
     for (const m of css.matchAll(
       /@media\s*\(hover:\s*none\)\s*\{([\s\S]*?)\n\}/g
     )) {
-      expect(m[1]).not.toMatch(/min-height|--am-space-unit/);
+      expect(m[1]).not.toMatch(/min-height|--ca-space-unit/);
     }
   });
 });
@@ -127,7 +127,7 @@ describe("the mobile scope is read once (3.9 §3.4)", () => {
     // so there is one place to change the decision — the property the whole
     // section exists to buy.
     const css = readCss();
-    const defs = css.match(/body\.is-mobile\s*\{[^}]*--am-space-unit/g) ?? [];
+    const defs = css.match(/body\.is-mobile\s*\{[^}]*--ca-space-unit/g) ?? [];
     expect(defs).toHaveLength(1);
   });
 
@@ -137,9 +137,9 @@ describe("the mobile scope is read once (3.9 §3.4)", () => {
     // that reports a count is not a target, and growing one to 40px would push
     // a table row half again as tall for nothing.
     const css = readCss();
-    expect(css).toMatch(/body\.is-mobile\s*\{[^}]*--am-control-min:\s*40px/);
-    expect(css).toMatch(/min-height:\s*var\(--am-control-min\)/);
+    expect(css).toMatch(/body\.is-mobile\s*\{[^}]*--ca-control-min:\s*40px/);
+    expect(css).toMatch(/min-height:\s*var\(--ca-control-min\)/);
     // Off by default: a pointer device keeps whatever height its content makes.
-    expect(css).toMatch(/--am-control-min:\s*auto/);
+    expect(css).toMatch(/--ca-control-min:\s*auto/);
   });
 });

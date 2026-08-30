@@ -22,11 +22,11 @@
 // renderPeriodStats was extracted to give the first two in 2.10.
 //
 // The tracker charts on this page are not built here. They are the ordinary
-// `almanac-charts` fence, scoped by `quarter-start` through
+// `chronoanvil-charts` fence, scoped by `quarter-start` through
 // resolvePeriodBounds, exactly as the year note's are by `year-start`.
 
 import { MarkdownPostProcessorContext, setIcon, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { buildOverviewBanner, renderPeriodStats } from "../diary/calendar";
 import { periodSpan } from "../diary/periodnav";
 import { readIndex } from "../diary/diary-index";
@@ -57,7 +57,7 @@ const QUARTER_PROP = "quarter-start";
 // recap would have made it two, and two is how the banner and the section below
 // it come to name different quarters after somebody edits one of them.
 export function selectedQuarter(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): string | null {
   const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
@@ -70,13 +70,13 @@ export function selectedQuarter(
 // ── quarter-summary ───────────────────────────────────────────────────
 
 export function buildQuarterSummary(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   const app = plugin.app;
   const paths = plugin.settings.paths;
   const root = createDiv({
-    cls: "journal-quarter-summary journal-overview-summary",
+    cls: "ca-journal-quarter-summary ca-journal-overview-summary",
   });
 
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
@@ -112,8 +112,8 @@ export function buildQuarterSummary(
   root.appendChild(band);
   renderPeriodStats(textCol, quarterFiles, { start: startIso, end: endIso }, app);
 
-  const body = root.createDiv({ cls: "journal-overview-body" });
-  body.createDiv({ cls: "jq-loading", text: "Reading your quarter…" });
+  const body = root.createDiv({ cls: "ca-journal-overview-body" });
+  body.createDiv({ cls: "ca-jq-loading", text: "Reading your quarter…" });
 
   void readIndex(plugin).then((entries) => {
     const stats = quarterStats(quarter, entries, today());
@@ -128,7 +128,7 @@ export function buildQuarterSummary(
 
 function renderBody(
   body: HTMLElement,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   s: QuarterStats
 ): void {
@@ -161,7 +161,7 @@ function renderBody(
     s.months.every((m) => !m.highlights.length && !m.challenges.length);
   if (nothing) {
     body.createDiv({
-      cls: "jq-empty",
+      cls: "ca-jq-empty",
       text:
         s.months.every((m) => m.future)
           ? "This quarter hasn't started yet."
@@ -185,7 +185,7 @@ function renderBody(
 function renderCoverage(parent: HTMLElement, s: QuarterStats): void {
   if (!s.daysElapsed) return;
 
-  const line = parent.createDiv({ cls: "jq-coverage" });
+  const line = parent.createDiv({ cls: "ca-jq-coverage" });
   // NO RANGE HERE ANY MORE — 3.6 patch 2. This printed `1 Jul – 2 Aug · 33
   // days so far`, which was the third statement of this quarter's stretch of
   // days on one screen: the band's span above it, the stats line under that,
@@ -196,7 +196,7 @@ function renderCoverage(parent: HTMLElement, s: QuarterStats): void {
   // three monthly reviews exist — the number that actually caps everything
   // below this row.
   line.createSpan({
-    cls: "jq-coverage-rate",
+    cls: "ca-jq-coverage-rate",
     text: `${s.dailyCount} ${
       s.dailyCount === 1 ? "entry" : "entries"
     } · ${Math.round(s.entryRate * 100)}% of days`,
@@ -205,7 +205,7 @@ function renderCoverage(parent: HTMLElement, s: QuarterStats): void {
   // section below is a function of it — so it says so rather than leaving a
   // reader to count the cards.
   line.createSpan({
-    cls: "jq-coverage-reviews",
+    cls: "ca-jq-coverage-reviews",
     text: `${s.reviewsWritten}/3 entries`,
   });
 }
@@ -216,32 +216,32 @@ function renderCoverage(parent: HTMLElement, s: QuarterStats): void {
 // entries, never into itself.
 function renderMonthCards(
   parent: HTMLElement,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   s: QuarterStats
 ): void {
-  const row = parent.createDiv({ cls: "jq-months" });
+  const row = parent.createDiv({ cls: "ca-jq-months" });
   for (const m of s.months) {
     const card = row.createDiv({
       cls:
-        "jq-month" +
+        "ca-jq-month" +
         (m.path ? " is-written" : "") +
         (m.future ? " is-future" : ""),
     });
 
-    const head = card.createDiv({ cls: "jq-month-head" });
-    head.createSpan({ cls: "jq-month-name", text: m.label });
-    const dot = head.createSpan({ cls: "jq-month-dot" });
+    const head = card.createDiv({ cls: "ca-jq-month-head" });
+    head.createSpan({ cls: "ca-jq-month-name", text: m.label });
+    const dot = head.createSpan({ cls: "ca-jq-month-dot" });
     if (m.path) dot.addClass("is-logged");
 
     // A future month reads as "not yet" rather than as a review you failed to
     // write — the same distinction the year view's dashed month bars make.
     if (m.future) {
-      card.createDiv({ cls: "jq-month-note", text: "Not yet" });
+      card.createDiv({ cls: "ca-jq-month-note", text: "Not yet" });
       continue;
     }
 
     const action = card.createEl("a", {
-      cls: "jq-month-link",
+      cls: "ca-jq-month-link",
       attr: {
         title: m.path
           ? `Open the ${m.label} entry`
@@ -249,7 +249,7 @@ function renderMonthCards(
       },
     });
     setIcon(
-      action.createSpan({ cls: "jq-month-icon" }),
+      action.createSpan({ cls: "ca-jq-month-icon" }),
       m.path ? "notebook" : "plus"
     );
     action.createSpan({
@@ -260,7 +260,7 @@ function renderMonthCards(
       void plugin.diary.openOrCreateMonth(m.monthKey);
     });
 
-    if (m.focus) card.createDiv({ cls: "jq-month-focus", text: m.focus });
+    if (m.focus) card.createDiv({ cls: "ca-jq-month-focus", text: m.focus });
   }
 }
 
@@ -282,7 +282,7 @@ export function renderGoals(
   const total = goalsDone + goalsOpen;
   if (!total) return;
 
-  const sec = parent.createDiv({ cls: "jq-section" });
+  const sec = parent.createDiv({ cls: "ca-jq-section" });
   // `owns: "children"` — this section's body is the divs below it inside this
   // widget's own DOM, not the note's following blocks. See section-frame.ts:
   // giving it the block-owning marker would make the enclosing dashboard read
@@ -296,18 +296,18 @@ export function renderGoals(
 
   for (const m of months) {
     if (!m.goals.length) continue;
-    const group = sec.createDiv({ cls: "jq-group" });
-    group.createDiv({ cls: "jq-group-label", text: m.label });
-    const list = group.createDiv({ cls: "jq-goals" });
+    const group = sec.createDiv({ cls: "ca-jq-group" });
+    group.createDiv({ cls: "ca-jq-group-label", text: m.label });
+    const list = group.createDiv({ cls: "ca-jq-goals" });
     for (const g of m.goals) {
       const row = list.createDiv({
-        cls: "jq-goal" + (g.done ? " is-done" : ""),
+        cls: "ca-jq-goal" + (g.done ? " is-done" : ""),
       });
       setIcon(
-        row.createSpan({ cls: "jq-goal-icon" }),
+        row.createSpan({ cls: "ca-jq-goal-icon" }),
         g.done ? "check-square" : "square"
       );
-      row.createSpan({ cls: "jq-goal-text", text: g.text });
+      row.createSpan({ cls: "ca-jq-goal-text", text: g.text });
     }
   }
 }
@@ -325,7 +325,7 @@ export function renderList(
   if (!groups.length) return;
 
   const count = groups.reduce((n, m) => n + pick(m).length, 0);
-  const sec = parent.createDiv({ cls: "jq-section" });
+  const sec = parent.createDiv({ cls: "ca-jq-section" });
   sectionFrame(sec, {
     title,
     level: 2,
@@ -335,9 +335,9 @@ export function renderList(
   });
 
   for (const m of groups) {
-    const group = sec.createDiv({ cls: "jq-group" });
-    group.createDiv({ cls: "jq-group-label", text: m.label });
-    const list = group.createEl("ul", { cls: "jq-items" });
+    const group = sec.createDiv({ cls: "ca-jq-group" });
+    group.createDiv({ cls: "ca-jq-group-label", text: m.label });
+    const list = group.createEl("ul", { cls: "ca-jq-items" });
     for (const item of pick(m)) list.createEl("li", { text: item });
   }
 }

@@ -55,7 +55,7 @@ export const TEMPLATES_ROOT = `${ROOT_INFRASTRUCTURE}/Templates`;
 // paint a file it could only reach through the vault.
 //
 // THE FOLDER IS GONE. The six patterns are data URIs in `97-vault-banner.css`,
-// selected by `data-am-art` on the banner root, and every visual fact about a
+// selected by `data-ca-art` on the banner root, and every visual fact about a
 // preset — its geometry, how it tiles, how it blends — is a declaration in
 // that file rather than a string here. What is left in TypeScript is what the
 // settings tab needs to draw a dropdown, which is the only reason this table
@@ -255,7 +255,7 @@ export const DEFAULT_PATHS = {
   // A REAL PATH KEY RATHER THAN A CONSTANT, so PathWatch follows a rename of the
   // folder in the file explorer for free (folders are carried automatically;
   // only `FILE_PATH_KEYS` are special-cased). A reader who moves it keeps it.
-  exportRoot: "Almanac Export",
+  exportRoot: "ChronoAnvil Export",
 };
 
 // Which root each of the remaining paths sits under.
@@ -304,9 +304,9 @@ export const ROOT_CHILDREN: Record<string, (keyof typeof DEFAULT_PATHS)[]> = {
 // four thousand screenshots in it is miserable to browse in the file explorer
 // (and slow to sync). Set it to "" for one flat folder.
 export const DEFAULT_ATTACHMENT_OPTIONS = {
-  // "almanac" = paths.attachments + subfolder; "obsidian" = defer to the
+  // "chronoanvil" = paths.attachments + subfolder; "obsidian" = defer to the
   // vault's own Files & Links attachment setting; "note" = next to the note.
-  location: "almanac" as "almanac" | "obsidian" | "note",
+  location: "chronoanvil" as "chronoanvil" | "obsidian" | "note",
   subfolder: "{yyyy}/{mm}",
   namePattern: "{name} {date} {time}",
   // Ask before moving a file to the trash when removing its tile. The plain
@@ -324,7 +324,7 @@ export const DEFAULT_ATTACHMENT_OPTIONS = {
 export const JOURNALS_TITLE = "📚 Journals";
 
 // The directive that *is* the Journals section as of 2.13.9: one line in one
-// ```almanac fence, rendering the whole section — hero band, per-type header
+// ```chronoanvil fence, rendering the whole section — hero band, per-type header
 // rows, subject groups, topic rows — as a single widget, the way `diary`
 // renders the whole Diary section. Both titles above are kept only so the
 // migration can find and replace an older, markdown-generated container.
@@ -392,7 +392,7 @@ export const TRENDS_HEADING = "## 📊 Trends and statistics";
 // Every spelling this heading has shipped under, newest first, EXCLUDING the
 // current one.
 //
-// WHAT BELONGS HERE, AND WHAT MUST NOT. Only strings Almanac itself has written
+// WHAT BELONGS HERE, AND WHAT MUST NOT. Only strings ChronoAnvil itself has written
 // into a note. A reader who retitles their own Trends bar has made it theirs —
 // `retitleTrends` rewrites a title only when it is on this list, so an unknown
 // title is left alone rather than "corrected" to the house spelling. That is
@@ -405,13 +405,13 @@ export const TRENDS_HEADINGS_PAST: readonly string[] = [
   "## 📊 Trends and Statistics",
 ];
 
-// The literal tokens of an ```almanac fenced block and the `header:` directive
+// The literal tokens of a ```chronoanvil fenced block and the `header:` directive
 // inside it. Centralised so the section-locator (util.ts::locateSection), the
 // widget renderer, and the home/chart rebuilders all agree on the exact syntax
 // — a change here (e.g. the fence language tag) propagates to every consumer
 // instead of needing a hand-edit in each. FENCE_OPEN is the info-string line;
 // FENCE_CLOSE is the bare closing line.
-export const FENCE_OPEN = "```almanac";
+export const FENCE_OPEN = "```chronoanvil";
 export const FENCE_CLOSE = "```";
 export const HEADER_PREFIX = "header:";
 
@@ -421,12 +421,28 @@ export const DEFAULT_TOPIC_EMOJI = "📂";
 
 // ── Trackers ───────────────────────────────────────────────────────────
 // Marker lines used to delimit the plugin-managed region inside the daily
-// template's frontmatter block and its ```almanac widget block. Both are
+// template's frontmatter block and its ```chronoanvil widget block. Both are
 // plain "# " comments — YAML treats them as comments in frontmatter, and
 // widgets.ts already strips any fenced-block line starting with "#", so
 // the same marker text works, unmodified, in both places.
-export const TRACKER_MARK_START = "# almanac:trackers:start";
-export const TRACKER_MARK_END = "# almanac:trackers:end";
+export const TRACKER_MARK_START = "# chronoanvil:trackers:start";
+export const TRACKER_MARK_END = "# chronoanvil:trackers:end";
+// The pre-rename spellings. Every WRITE emits the constants above; every READ
+// goes through the predicates below, because a marker the sync cannot find is
+// not a no-op — it looks like a template with no tracker region, so a second
+// one gets appended beside the first and the entry ends up listing its
+// trackers twice. Matching both keeps an unmigrated vault merely stale rather
+// than corrupted. `tools/migrate-vault.mjs` rewrites them for good.
+export const LEGACY_TRACKER_MARK_START = "# almanac:trackers:start";
+export const LEGACY_TRACKER_MARK_END = "# almanac:trackers:end";
+export function isTrackerMarkStart(line: string): boolean {
+  const t = line.trim();
+  return t === TRACKER_MARK_START || t === LEGACY_TRACKER_MARK_START;
+}
+export function isTrackerMarkEnd(line: string): boolean {
+  const t = line.trim();
+  return t === TRACKER_MARK_END || t === LEGACY_TRACKER_MARK_END;
+}
 
 // The derived Sleep tracker's property/column key. Referenced by the sync
 // (Diary.base column), the widget (readout) and the derived-value writer.
@@ -436,12 +452,16 @@ export const SLEEP_TRACKER_ID = "Sleep";
 // The frontmatter key holding the event list in the events note, and the key
 // stamped into a diary entry naming the events that fell on its date.
 //
-// The list key is namespaced (`almanac-events`) because it is plugin-managed
+// The list key is namespaced (`chronoanvil-events`) because it is plugin-managed
 // structured data and a collision with a user's own `events` property would be
 // destructive. The per-entry key is the bare `events` precisely because it is
 // *not* plugin-managed after it's written — it's there for the user to query in
 // Bases or decorate the page with, so it gets the obvious name.
-export const EVENTS_PROPERTY = "almanac-events";
+export const EVENTS_PROPERTY = "chronoanvil-events";
+// Read-only fallback for the pre-rename property name, so an events note
+// written before the rename still yields its events instead of appearing
+// empty and being re-seeded from scratch.
+export const LEGACY_EVENTS_PROPERTY = "almanac-events";
 export const ENTRY_EVENTS_PROPERTY = "events";
 
 // The frontmatter property a journal LEAF note carries its date in.
@@ -761,7 +781,7 @@ export interface LogbookDef {
   icon: string;
   // Where the items come from.
   //
-  //   `region` — the note's own `<!--almanac:logbook-->` block, which is where
+  //   `region` — the note's own `<!--chronoanvil:logbook-->` block, which is where
   //   a reader's own logbook keeps its items.
   //
   //   `events` — the events note, filtered to the ones carrying a time. See
@@ -904,7 +924,7 @@ export const DEFAULT_FOLDER_EMOJIS: Record<string, string> = {
 //
 // Two jobs, and the second is the one that matters.
 //
-// The renderer stops shouting `Unknown Almanac widget` at a note that is not
+// The renderer stops shouting `Unknown ChronoAnvil widget` at a note that is not
 // broken but merely old — `year-nav` was not a typo, it was retired into the
 // Yearly Overview banner in 2.52, and a red error with no hint of what replaced
 // it is the worst of both. And `layout.ts` reads this to know which stray
@@ -964,14 +984,14 @@ export const RETIRED_WIDGETS: Record<string, { since: string; note: string }> = 
 
 // ── Obsidian's own DOM, named once ────────────────────────────────────────
 
-// Class names OBSIDIAN owns and Almanac only reads.
+// Class names OBSIDIAN owns and ChronoAnvil only reads.
 //
 // WHY A TABLE FOR EIGHT STRINGS USED IN ONE FILE. Every one of them is
 // load-bearing, and one of them being wrong has already cost a release:
 // `markdown-rendered` is the note's container in reading view AND the container
 // of a single code-block widget inside `.cm-embed-block`, so treating it as
 // "the note" made every fence in Live Preview see only itself — a section's
-// scope stopped at its own ```almanac block, and folding stopped with it.
+// scope stopped at its own ```chronoanvil block, and folding stopped with it.
 //
 // The plugin's entire section system is derived from block-level sibling walks
 // over these containers. So the question worth being able to answer cheaply is

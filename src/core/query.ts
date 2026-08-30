@@ -24,7 +24,7 @@ export interface PageInfo {
 // `where` filters on frontmatter/file, same shape as Dataview's
 // `.where(p => ...)`. Task counts used to ride along here (via taskCounts),
 // but that read the listItems cache, which only sees Obsidian's `- [ ]` and
-// never Almanac's `- ( )` marker — so it always reported 0 and no caller uses
+// never ChronoAnvil's `- ( )` marker — so it always reported 0 and no caller uses
 // it anymore. Counting now happens from note bodies where it's asked for
 // (tables.ts::sumBodyTasks / countBodyTasks), so the field is gone.
 export function pagesUnder(

@@ -132,7 +132,7 @@ describe("an empty resources category can be removed", () => {
     // case so a future removal has to argue with something.
     const css = readCss();
     expect(css).toMatch(
-      /@media \(hover: none\)[\s\S]{0,400}\.journal-attach-remove/
+      /@media \(hover: none\)[\s\S]{0,400}\.ca-journal-attach-remove/
     );
   });
 });
@@ -141,8 +141,8 @@ describe("the scope button is visible where it was moved to", () => {
   const css = (): string => readCss();
   const rule = (): string =>
     css().slice(
-      css().indexOf(".journal-tasks-scope {"),
-      css().indexOf(".journal-tasks-scope:hover")
+      css().indexOf(".ca-journal-tasks-scope {"),
+      css().indexOf(".ca-journal-tasks-scope:hover")
     );
 
   it("is an ordinary flex item, not an absolutely positioned corner control", () => {
@@ -168,14 +168,14 @@ describe("the scope button is visible where it was moved to", () => {
     // A fence carrying `tasks-table` with no `header:` above it has no actions
     // strip to host the control, so the table draws its own — and that case
     // must not lose the placement the absolute rule was written for.
-    expect(css()).toContain(".journal-tasks-table > .journal-tasks-scope");
+    expect(css()).toContain(".ca-journal-tasks-table > .ca-journal-tasks-scope");
     const scoped = css().slice(
-      css().indexOf(".journal-tasks-table > .journal-tasks-scope")
+      css().indexOf(".ca-journal-tasks-table > .ca-journal-tasks-scope")
     );
     expect(scoped).toContain("position: absolute;");
   });
 
   it("has a positioning context for that fallback", () => {
-    expect(css()).toMatch(/\.journal-tasks-table \{[^}]*position: relative;/);
+    expect(css()).toMatch(/\.ca-journal-tasks-table \{[^}]*position: relative;/);
   });
 });

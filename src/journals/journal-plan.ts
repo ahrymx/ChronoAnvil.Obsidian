@@ -56,7 +56,7 @@
 // every time it runs.
 //
 // One more, specific to sections: NEVER DELETE A NON-EMPTY REGION. A section's
-// `<!--almanac:key-->` region holds the reader's own writing — recall cards,
+// `<!--chronoanvil:key-->` region holds the reader's own writing — recall cards,
 // task lists, the Path text.
 //
 // HOW THAT RULE IS HONOURED CHANGED IN 2.59.7, and the rule itself did not.
@@ -170,8 +170,8 @@ export interface TemplatePlan {
 //
 // Uses layout.ts's keywordOf on both sides of the comparison rather than a
 // second extractor of its own, because the two only have to disagree once —
-// on `# almanac:trackers:start`, say, whose keyword is the odd but perfectly
-// consistent `# almanac` — for a section to stop being findable in the file
+// on `# chronoanvil:trackers:start`, say, whose keyword is the odd but perfectly
+// consistent `# chronoanvil` — for a section to stop being findable in the file
 // that just wrote it.
 //
 // Headers are excluded because they are retitleable: layout.ts settled that
@@ -200,11 +200,11 @@ function sameKeywords(a: string[], b: string[]): boolean {
 // Fences whose body is chart specs rather than directives, so they yield no
 // keywords and are matched by their info string instead. One section owns each,
 // which is what makes that unambiguous — asserted, not assumed.
-const OPAQUE_FENCE_KINDS = new Set(["almanac-charts", "almanac-journal-charts"]);
+const OPAQUE_FENCE_KINDS = new Set(["chronoanvil-charts", "chronoanvil-journal-charts"]);
 
 // Which region keys a segment holds, and how many non-blank lines each has.
 //
-// A region is `<!--almanac:key` … `-->`. notestore.ts locates one by a
+// A region is `<!--chronoanvil:key` … `-->`. notestore.ts locates one by a
 // whole-file indexOf, so it need not be adjacent to anything; here it only has
 // to be findable, which is weaker.
 function regionsIn(lines: string[]): Map<string, number> {
@@ -213,7 +213,7 @@ function regionsIn(lines: string[]): Map<string, number> {
   let count = 0;
   for (const line of lines) {
     if (key === null) {
-      const m = line.match(/^<!--almanac:([A-Za-z0-9_-]+)\s*$/);
+      const m = line.match(/^<!--chronoanvil:([A-Za-z0-9_-]+)\s*$/);
       if (m) {
         key = m[1];
         count = 0;
@@ -306,7 +306,7 @@ function isSubMultiset(sub: string[], all: string[]): boolean {
 
 function ownerOf(seg: Segment, sigs: Signature[]): JournalSection | null {
   if (seg.kind !== "fence") return null;
-  const kind = seg.fenceKind ?? "almanac";
+  const kind = seg.fenceKind ?? "chronoanvil";
   if (OPAQUE_FENCE_KINDS.has(kind)) {
     return sigs.find((c) => c.fenceKind === kind)?.section ?? null;
   }
@@ -369,7 +369,7 @@ function ownersOf(seg: Segment, sigs: Signature[]): JournalSection[] {
   const one = ownerOf(seg, sigs);
   if (one) return [one];
   if (seg.kind !== "fence") return [];
-  const kind = seg.fenceKind ?? "almanac";
+  const kind = seg.fenceKind ?? "chronoanvil";
   if (OPAQUE_FENCE_KINDS.has(kind)) return [];
   if (!(seg.keywords ?? []).some((k) => k === ROW_KEYWORD)) return [];
 
@@ -427,7 +427,7 @@ export function parseSections(text: string, ctx: SectionContext): SectionRun[] {
         // would have every untouched template report "two blocks here aren't
         // the catalogue's" — true, useless, and alarming.
         //
-        // The frontmatter run also carries the banner's `almanac:spacer`,
+        // The frontmatter run also carries the banner's `chronoanvil:spacer`,
         // which sits on line 0 of the body with no blank line above it and is
         // therefore in the same raw segment. That is fine: banner is
         // `required` and never removable, so nothing ever needs to splice it.

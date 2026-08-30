@@ -1,6 +1,6 @@
 # Licensing
 
-Almanac is licensed under the **GNU Affero General Public License v3.0 or
+ChronoAnvil is licensed under the **GNU Affero General Public License v3.0 or
 later**, with attribution and naming terms under its section 7. One licence,
 no tiers, no paid edition.
 
@@ -17,15 +17,15 @@ project means them.
 
 **Without asking anyone**, if you are:
 
-- an individual using Almanac in your own vault, for anything, including paid
+- an individual using ChronoAnvil in your own vault, for anything, including paid
   work;
-- a company using Almanac internally, on your own machines, for your own notes;
+- a company using ChronoAnvil internally, on your own machines, for your own notes;
 - a school, university, or research group;
 - writing a patch, a plugin on top of it, a review, or a blog post.
 
 Note the second: **ordinary internal business use is free and always will be.**
 The AGPL's obligations bite when you *distribute* or *serve over a network*,
-not when you use software yourself. A company whose staff keep notes in Almanac
+not when you use software yourself. A company whose staff keep notes in ChronoAnvil
 owes nothing and needs no permission.
 
 ## What you owe in return
@@ -33,7 +33,7 @@ owes nothing and needs no permission.
 If you distribute it, or offer it as a network service:
 
 1. **Keep the notices** — copyright, licence, and the `NOTICE` file.
-2. **Keep the attribution** — *"Almanac, originally developed by AhryMX"* — in
+2. **Keep the attribution** — *"ChronoAnvil, originally developed by AhryMX"* — in
    your documentation, credits, or about screen. This is a section 7 term, not
    a courtesy.
 3. **Mark a modified version as different** from the original, in a reasonable
@@ -42,14 +42,14 @@ If you distribute it, or offer it as a network service:
 5. **Provide the complete corresponding source** to everyone who receives it,
    including users who only reach it over a network.
 6. **Pick your own name** if you fork, and don't imply the original project
-   endorses your version. Saying factually that it is derived from Almanac is
+   endorses your version. Saying factually that it is derived from ChronoAnvil is
    required by term 1, not forbidden.
 
 ---
 
 ## FAQ
 
-**Can somebody else sell Almanac?**
+**Can somebody else sell ChronoAnvil?**
 Yes. AGPL-3.0 section 4 says anyone may charge any price for a copy they
 convey. What they cannot do is make it proprietary: they must pass on the
 complete source under the AGPL, keep every notice, keep the attribution, and
@@ -60,12 +60,13 @@ so plainly than imply an exclusivity it does not have.
 **Can somebody fork it and rename it?**
 Fork, yes — deliberately so. Rename, only with the credit intact: the section 7
 terms require the attribution to survive and require a modified version to be
-marked as different, and the name "Almanac" is not licensed for use as the name
-of your fork. A fork under its own name that credits its origin is welcome and
+marked as different, and the names "ChronoAnvil" and "Almanac" — the project
+carried the second through 4.84 — are not licensed for use as the name of your
+fork. A fork under its own name that credits its origin is welcome and
 expected. A fork presenting itself as original work is a licence violation.
 
 **Is there a commercial or proprietary licence?**
-Not offered as standing terms. Almanac carried one briefly in 2.56.25 and it
+Not offered as standing terms. ChronoAnvil carried one briefly in 2.56.25 and it
 was withdrawn as unnecessary: the AGPL already permits commercial use and sale,
 so the only thing such a licence sells is relief from copyleft, and no one has
 asked for it. As sole copyright holder, AhryMX can still grant proprietary
@@ -89,11 +90,11 @@ own terms. The copyright holder can choose different terms for future versions,
 as any copyright holder can.
 
 **What about the plugin's dependencies?**
-Almanac bundles Chart.js, @kurkle/color and js-yaml, all MIT. Their notices are
+ChronoAnvil bundles Chart.js, @kurkle/color and js-yaml, all MIT. Their notices are
 in [`NOTICE`](./NOTICE) and inside the compiled `main.js`, and must be
 preserved.
 
-**Is Almanac open source?**
+**Is ChronoAnvil open source?**
 Yes. AGPL-3.0 is an OSI-approved open source licence, and the section 7 terms
 used here — attribution, honest naming, no trademark grant — are among those
 the licence itself permits. They add no restriction on your freedom to use,

@@ -24,7 +24,7 @@ import { JournalEditModal } from "../src/core/settings-editors";
 import { presetAsNewJournal } from "../src/journals/custom-journal";
 import type { JournalConfig } from "../src/journals/custom-journal";
 import { STUDY_PRESET } from "../src/journals/journal";
-import type AlmanacPlugin from "../src/main";
+import type ChronoAnvilPlugin from "../src/main";
 import { readCss } from "./sources";
 
 const PATHS = {
@@ -38,7 +38,7 @@ const PATHS = {
 const fakePlugin = (
   journals: JournalConfig[] = [],
   occupied: string[] = []
-): AlmanacPlugin =>
+): ChronoAnvilPlugin =>
   ({
     settings: { customJournals: journals, paths: PATHS },
     app: {
@@ -47,7 +47,7 @@ const fakePlugin = (
           occupied.includes(p) ? ({} as never) : null,
       },
     },
-  }) as unknown as AlmanacPlugin;
+  }) as unknown as ChronoAnvilPlugin;
 
 class Probe extends JournalEditModal {
   identityProblem(): string | null {
@@ -58,7 +58,7 @@ class Probe extends JournalEditModal {
   }
 }
 
-const wizard = (plugin: AlmanacPlugin, draft: JournalConfig): Probe =>
+const wizard = (plugin: ChronoAnvilPlugin, draft: JournalConfig): Probe =>
   new Probe(
     (plugin as unknown as { app: never }).app,
     plugin,
@@ -74,7 +74,7 @@ describe("starting from a preset", () => {
   it("passes the Identity step untouched", () => {
     // THE REPORT. `idIsFree` reserved the literal id "study", which was right
     // while Study lived outside `customJournals` and invisible to the loop that
-    // checks for collisions — and became a rule that the one journal Almanac
+    // checks for collisions — and became a rule that the one journal ChronoAnvil
     // ships is the one journal it will not let you install.
     const p = wizard(fakePlugin(), studyDraft());
     expect(p.identityProblem()).toBeNull();
@@ -120,8 +120,8 @@ describe("a validation message a reader can read", () => {
     // DECLARATIONS ONLY, comments stripped — the rule explains what it stopped
     // doing, and a naive substring check trips on its own explanation.
     const rule = css().slice(
-      css().indexOf(".almanac-editor-error {"),
-      css().indexOf(".almanac-editor-error:empty")
+      css().indexOf(".ca-editor-error {"),
+      css().indexOf(".ca-editor-error:empty")
     );
     const declarations = rule
       .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -138,13 +138,13 @@ describe("a validation message a reader can read", () => {
   it("still follows the theme rather than a fixed colour", () => {
     // The tint is composed from the theme's own red, which is what the rule it
     // replaces was trying to do.
-    const rule = css().slice(css().indexOf(".almanac-editor-error {"));
+    const rule = css().slice(css().indexOf(".ca-editor-error {"));
     expect(rule).toMatch(/rgba\(var\(--color-red-rgb\)/);
   });
 
   it("takes up no room when it has nothing to say", () => {
     // An empty message is a bug rather than a state, but it rendered as a bare
     // red bar — which is precisely the symptom that got reported.
-    expect(css()).toContain(".almanac-editor-error:empty");
+    expect(css()).toContain(".ca-editor-error:empty");
   });
 });

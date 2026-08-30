@@ -128,7 +128,7 @@ describe("what the homepage composes to", () => {
     // cog can write one and where every other dashboard now carries it — so the
     // homepage has no frontmatter at all and is a flat note in full.
     const lines = home().split("\n");
-    expect(lines[0]).toBe("`almanac:spacer`");
+    expect(lines[0]).toBe("`chronoanvil:spacer`");
     expect(lines).not.toContain("---");
   });
 
@@ -187,9 +187,9 @@ describe("what the homepage composes to", () => {
     // to find out it means nothing. And never between two sections that named
     // the same cell.
     const note = home();
-    const open = note.indexOf("```almanac\nrow");
+    const open = note.indexOf("```chronoanvil\nrow");
     expect(open, "the top row is gone").toBeGreaterThan(-1);
-    const body = note.slice(open + "```almanac\n".length);
+    const body = note.slice(open + "```chronoanvil\n".length);
     const rowLines = body.slice(0, body.indexOf("```")).split("\n").filter(Boolean);
     expect(rowLines).toEqual([
       "row",
@@ -214,14 +214,14 @@ describe("what the homepage composes to", () => {
       icon: "🔹",
       locked: false,
       ...(row ? { row } : {}),
-      render: () => ({ fence: "almanac", lines: [line] }),
+      render: () => ({ fence: "chronoanvil", lines: [line] }),
       locate: (t) => t.search(new RegExp(`^${line}\\b`, "m")),
     });
     const note = composeFlatNote([
       cell("a", "diary", "r"),
       cell("b", "journals", "r"),
     ]);
-    expect(note).toContain("```almanac\nrow\ndiary\njournals\n```");
+    expect(note).toContain("```chronoanvil\nrow\ndiary\njournals\n```");
     expect(note).not.toContain("cell");
   });
 
@@ -240,7 +240,7 @@ describe("what the homepage composes to", () => {
       locked: false,
       row: "r",
       ...(name ? { cell: name } : {}),
-      render: () => ({ fence: "almanac", lines: [line] }),
+      render: () => ({ fence: "chronoanvil", lines: [line] }),
       locate: (t) => t.search(new RegExp(`^${line}\\b`, "m")),
     });
     const note = composeFlatNote([
@@ -249,7 +249,7 @@ describe("what the homepage composes to", () => {
       cell("c", "timeline", "x"),
     ]);
     expect(note).toContain(
-      "```almanac\nrow\ndiary\ncell\njournals\ncell\ntimeline\n```"
+      "```chronoanvil\nrow\ndiary\ncell\njournals\ncell\ntimeline\n```"
     );
     // And the same rule one level down, where the delimiters are read back.
     expect(cellPlan([true, true], []).cells).toEqual([[0], [1]]);
@@ -257,7 +257,7 @@ describe("what the homepage composes to", () => {
 
   it("never merges across fence kinds, or a block's kind is whoever got there first", () => {
     // NOT REACHABLE FROM THE SHIPPED CATALOGUES, which is why it is built here:
-    // the charts section is the only `almanac-charts` fence and it is in no
+    // the charts section is the only `chronoanvil-charts` fence and it is in no
     // row, so nothing on the homepage can exercise the guard. That makes it
     // exactly the kind of condition that rots — a catalogue that later put a
     // charts section in a row would compose a fence whose kind silently
@@ -271,7 +271,7 @@ describe("what the homepage composes to", () => {
         icon: "🅰️",
         locked: false,
         row: "r",
-        render: () => ({ fence: "almanac", lines: ["diary"] }),
+        render: () => ({ fence: "chronoanvil", lines: ["diary"] }),
         locate: (t) => t.search(/^diary\b/m),
       },
       {
@@ -281,7 +281,7 @@ describe("what the homepage composes to", () => {
         icon: "🅱️",
         locked: false,
         row: "r",
-        render: () => ({ fence: "almanac-charts", lines: ["chart:Mood"] }),
+        render: () => ({ fence: "chronoanvil-charts", lines: ["chart:Mood"] }),
         locate: (t) => t.search(/^chart:/m),
       },
     ];
@@ -290,8 +290,8 @@ describe("what the homepage composes to", () => {
     // test. What each of them then says about rows is 4.70's separate rule
     // below: the split leaves one member on each side, and a row of one is
     // composed as no row at all.
-    expect(note).toContain("```almanac\ndiary\n```");
-    expect(note).toContain("```almanac-charts\nchart:Mood\n```");
+    expect(note).toContain("```chronoanvil\ndiary\n```");
+    expect(note).toContain("```chronoanvil-charts\nchart:Mood\n```");
     expect(segment(note.split("\n")).filter((s) => s.kind === "fence")).toHaveLength(2);
   });
 
@@ -310,11 +310,11 @@ describe("what the homepage composes to", () => {
         icon: "🅰️",
         locked: false,
         row: "r",
-        render: () => ({ fence: "almanac", lines: ["diary"] }),
+        render: () => ({ fence: "chronoanvil", lines: ["diary"] }),
         locate: (t) => t.search(/^diary\b/m),
       },
     ];
-    expect(composeFlatNote(lone)).toContain("```almanac\ndiary\n```");
+    expect(composeFlatNote(lone)).toContain("```chronoanvil\ndiary\n```");
     expect(composeFlatNote(lone)).not.toContain("row");
 
     // AND TWO IS STILL A ROW, so the guard cannot be satisfied by never
@@ -328,11 +328,11 @@ describe("what the homepage composes to", () => {
         icon: "🅱️",
         locked: false,
         row: "r",
-        render: () => ({ fence: "almanac", lines: ["launcher"] }),
+        render: () => ({ fence: "chronoanvil", lines: ["launcher"] }),
         locate: (t) => t.search(/^launcher\b/m),
       },
     ];
-    expect(composeFlatNote(pair)).toContain("```almanac\nrow\ndiary\nlauncher\n```");
+    expect(composeFlatNote(pair)).toContain("```chronoanvil\nrow\ndiary\nlauncher\n```");
   });
 
   it("only joins a row's members while they are consecutive", () => {
@@ -352,7 +352,7 @@ describe("what the homepage composes to", () => {
       icon: "🔹",
       locked: false,
       ...(row ? { row } : {}),
-      render: () => ({ fence: "almanac", lines: [line] }),
+      render: () => ({ fence: "chronoanvil", lines: [line] }),
       locate: (t) => t.search(new RegExp(`^${line}\\b`, "m")),
     });
     const note = composeFlatNote([
@@ -364,8 +364,8 @@ describe("what the homepage composes to", () => {
     expect(note).not.toContain("journals\ntimeline");
   });
 
-  it("keeps the charts block in its own almanac-charts fence", () => {
-    expect(home()).toContain(`\`\`\`almanac-charts\n${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}\n\`\`\``);
+  it("keeps the charts block in its own chronoanvil-charts fence", () => {
+    expect(home()).toContain(`\`\`\`chronoanvil-charts\n${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}\n\`\`\``);
   });
 
   it("separates every fence with exactly one blank line", () => {
@@ -389,8 +389,8 @@ describe("what the homepage composes to", () => {
     expect(home()).not.toContain("---");
     expect(home()).not.toContain("cssclasses");
     expect(home().split("\n").slice(0, 4)).toEqual([
-      "`almanac:spacer`",
-      "```almanac",
+      "`chronoanvil:spacer`",
+      "```chronoanvil",
       WIDE_KEYWORD,
       // AND IT CARRIES THE THREE DESTINATIONS AS OF 4.20, where it was the bare
       // `title` from 4.5 onward. `home-sections.ts` has the argument: the
@@ -407,14 +407,14 @@ describe("what the homepage composes to", () => {
     // it would read as a rendering fault.
     //
     // Asserted on the stylesheet because that is where the decision lives: the
-    // page takes `--am-page-width` rather than `--file-line-width`, which is a
+    // page takes `--ca-page-width` rather than `--file-line-width`, which is a
     // number about how many characters read comfortably in a line of prose.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
     const at = rules.indexOf(`.markdown-preview-view.${HOME_CSS_CLASS}`);
     expect(at, "no reading-view width rule").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain(`.markdown-source-view.${HOME_CSS_CLASS} .cm-sizer`);
-    expect(rule).toContain("max-width: var(--am-page-width)");
+    expect(rule).toContain("max-width: var(--ca-page-width)");
     expect(rule).not.toContain("--file-line-width");
   });
 
@@ -462,24 +462,24 @@ describe("what the homepage composes to", () => {
 // about. It was a hand-built fixture until the catalogue grew a row.
 //
 // A BLOCK THE READER DID NOT MAKE, and that is the change: these refusals and
-// cuts now run on a page Almanac writes, so "it only happens if you arranged it
+// cuts now run on a page ChronoAnvil writes, so "it only happens if you arranged it
 // yourself" stopped being the safety net and the behaviour has to be right.
 // THE TOP ROW AS COMPOSED: Diary + launcher + tasks on Page 1, logbook on Page 2.
 const TOP_ROW =
-  "```almanac\nrow\ndiary:3\ncell\nlauncher\ntasks-table\ntab\nlogbook\n```";
+  "```chronoanvil\nrow\ndiary:3\ncell\nlauncher\ntasks-table\ntab\nlogbook\n```";
 
 // The time grid, composed as of 4.70 and NOT in a row — the catalogue entry
 // argues both halves of that, and the block above the catalogue says why there
 // is no second row on this page at all.
-const GRID_BLOCK = "```almanac\nheader:⏱️ The week by the hour\ntime-grid\n```";
+const GRID_BLOCK = "```chronoanvil\nheader:⏱️ The week by the hour\ntime-grid\n```";
 
 // A block holding a section whose extent is NOT one line: Tags is a `header:`
 // bar and its directive. Hand-built, because no catalogue composes one — which
 // is exactly why the refusal it triggers still needs a test.
 const MULTILINE_ROW = (): string =>
   home().replace(
-    "```almanac\nframe: section\njournals:cards\n```",
-    `\`\`\`almanac\nrow\njournals\nheader:🏷️ Tags\ntag-index:${ROOT}\n\`\`\``
+    "```chronoanvil\nframe: section\njournals:cards\n```",
+    `\`\`\`chronoanvil\nrow\njournals\nheader:🏷️ Tags\ntag-index:${ROOT}\n\`\`\``
   );
 
 describe("a block holding two sections is the unit (4.2 §2)", () => {
@@ -500,10 +500,10 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     // cells stay, and the block is still a block.
     const out = model.apply(home(), ["diary", "tasks", "journals", "charts"]);
     expect(out).not.toBeNull();
-    expect(out).toContain("```almanac\nrow\ndiary:3\ncell\ntasks-table\n```");
+    expect(out).toContain("```chronoanvil\nrow\ndiary:3\ncell\ntasks-table\n```");
     expect(out).not.toContain("on-this-day");
     // The rest of the page is untouched.
-    expect(out).toContain("```almanac\nframe: section\njournals:cards\n```");
+    expect(out).toContain("```chronoanvil\nframe: section\njournals:cards\n```");
   });
 
   it("says it is removing it, and then removes it", () => {
@@ -538,7 +538,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     // the cells that come back.
     const out = model.apply(home(), ["diary", "journals", "charts"]);
     expect(out).not.toBeNull();
-    expect(out).toContain("```almanac\ndiary:3\n```");
+    expect(out).toContain("```chronoanvil\ndiary:3\n```");
     expect(out).not.toContain("tasks-table");
     expect(out).not.toContain("on-this-day");
     expect(
@@ -580,7 +580,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     expect(out).not.toBeNull();
     expect(out).not.toContain("tag-index");
     expect(out).not.toContain("\njournals");
-    expect(out).toContain("almanac-charts");
+    expect(out).toContain("chronoanvil-charts");
   });
 
   it("does not make a cell a unit of its own, and says so truthfully", () => {
@@ -618,10 +618,10 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     // move, because a plan names what the reader did.
     const shared = home()
       .replace(
-        `\`\`\`almanac\n${WIDE_KEYWORD}\n${PAGE_TITLE_LINE}\n\`\`\``,
-        `\`\`\`almanac\n${WIDE_KEYWORD}\n${PAGE_TITLE_LINE}\njournals\n\`\`\``
+        `\`\`\`chronoanvil\n${WIDE_KEYWORD}\n${PAGE_TITLE_LINE}\n\`\`\``,
+        `\`\`\`chronoanvil\n${WIDE_KEYWORD}\n${PAGE_TITLE_LINE}\njournals\n\`\`\``
       )
-      .replace("\n```almanac\nframe: section\njournals:cards\n```\n", "");
+      .replace("\n```chronoanvil\nframe: section\njournals:cards\n```\n", "");
     const ops = model.plan(shared, [
       "banner",
       "diary",
@@ -668,7 +668,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
       "journals",
     ]);
     expect(out).not.toBeNull();
-    expect(out!.indexOf("almanac-charts")).toBeLessThan(out!.indexOf("row"));
+    expect(out!.indexOf("chronoanvil-charts")).toBeLessThan(out!.indexOf("row"));
     expect(out).toContain(TOP_ROW);
   });
 
@@ -772,7 +772,7 @@ describe("the home model", () => {
   });
 
   it("offers what a stripped homepage is missing", () => {
-    const bare = "`almanac:spacer`\n```almanac\ndiary:3\n```\n";
+    const bare = "`chronoanvil:spacer`\n```chronoanvil\ndiary:3\n```\n";
     expect(own(model.addable(bare))).toEqual([
       "banner",
       "launcher",
@@ -931,7 +931,7 @@ describe("the home model", () => {
     // one frontmatter property, so it belongs on the note that records it), so it
     // is a directive that renders, is not a page widget, and never will be —
     // which makes the exclusion table load-bearing here rather than decorative.
-    const mine = home() + "\n```almanac\nslider:Mood|Mood\n```\n";
+    const mine = home() + "\n```chronoanvil\nslider:Mood|Mood\n```\n";
     const ops = model.plan(mine, HOME_SECTIONS.map((s) => s.id));
     const foreign = ops.find((o) => o.kind === "foreign");
     // AND IT AGREES WITH ITSELF ABOUT NUMBER. This said "1 block ... aren't"
@@ -940,7 +940,7 @@ describe("the home model", () => {
     // foreign block, which is also the case a reader meets most often.
     expect(foreign?.detail).toContain("1 block");
     expect(foreign?.detail).toContain("isn't the catalogue's");
-    const two = mine + "\n```almanac\nslider:Mood|Mood\n```\n";
+    const two = mine + "\n```chronoanvil\nslider:Mood|Mood\n```\n";
     const bothOps = model.plan(two, HOME_SECTIONS.map((s) => s.id));
     expect(bothOps.find((o) => o.kind === "foreign")?.detail).toContain(
       "2 blocks in this file aren't"
@@ -969,7 +969,7 @@ describe("the home model", () => {
     // "ignore raw runs": a reader's own fence under their own frontmatter is
     // still theirs and must still be reported. A fix that made the note quiet
     // would have traded a false alarm for a silence.
-    const mine = home() + "\n```almanac\nslider:Mood|Mood\n```\n";
+    const mine = home() + "\n```chronoanvil\nslider:Mood|Mood\n```\n";
     expect(model.plan(mine, composedIds).find((o) => o.kind === "foreign"))
       .toBeDefined();
   });
@@ -996,7 +996,7 @@ describe("the home model", () => {
     // that is not at the top of it. A rule that searched the run for `---`
     // instead of requiring it on line 0 would take the paragraph as frontmatter
     // and the page would stop reporting the reader's own writing.
-    const body = home().slice(home().indexOf("`almanac:spacer`"));
+    const body = home().slice(home().indexOf("`chronoanvil:spacer`"));
     const withIntro = "Some notes of my own.\n\n---\n\n" + body;
     expect(model.plan(withIntro, composedIds).find((o) => o.kind === "foreign"))
       .toBeDefined();
@@ -1087,7 +1087,7 @@ describe("on this day is offered again (3.13 §11, 4.70)", () => {
     // when the reader asks for it, and the page is coherent afterwards.
     const back = model.apply(home(), [...composedIds, "on-this-day"]) as string;
     expect(back).toContain("on-this-day");
-    expect(back).toContain("```almanac\non-this-day:always\n```");
+    expect(back).toContain("```chronoanvil\non-this-day:always\n```");
     // And the rows it did not join are untouched.
     expect(back).toContain(TOP_ROW);
   });
@@ -1151,7 +1151,7 @@ describe("the journals block, and the migration that upgrades it", () => {
     // 4.1 §2.2 refused a per-journal dashboard on those grounds. The dashboard
     // exists now, so enumerating a journal's contents HERE is the duplication that
     // release was written to remove.
-    expect(home()).toContain("```almanac\nframe: section\njournals:cards\n```");
+    expect(home()).toContain("```chronoanvil\nframe: section\njournals:cards\n```");
     expect(home()).not.toMatch(/^journals$/m);
   });
 
@@ -1170,12 +1170,12 @@ describe("the journals block, and the migration that upgrades it", () => {
     const journals = homeSections(ROOT).find((s) => s.id === "journals");
     expect(journals, "no journals section").toBeTruthy();
     const locate = journals!.locate;
-    const fence = (line: string): string => `\`\`\`almanac\nframe: section\n${line}\n\`\`\``;
+    const fence = (line: string): string => `\`\`\`chronoanvil\nframe: section\n${line}\n\`\`\``;
     expect(locate(fence("journals")), "pre-4.37 spelling not found").toBeGreaterThan(-1);
     expect(locate(fence("journals:cards")), "current spelling not found").toBeGreaterThan(-1);
     // And a page with no journals block at all is still a miss, or repair would
     // never add the section to a homepage that genuinely lacks it.
-    expect(locate("```almanac\ndiary:3\n```")).toBe(-1);
+    expect(locate("```chronoanvil\ndiary:3\n```")).toBe(-1);
   });
 
   it("upgrades an existing homepage exactly, and only once", () => {
@@ -1195,7 +1195,7 @@ describe("the journals block, and the migration that upgrades it", () => {
     expect(collapseJournalsBlocks(fresh, "journals:cards")).toBeNull();
   });
 
-  it("touches nothing outside an almanac fence, or that the reader chose", () => {
+  it("touches nothing outside a chronoanvil fence, or that the reader chose", () => {
     // "journals" IS AN ORDINARY ENGLISH WORD. A reader's heading or prose must not
     // be rewritten, so the fence state is tracked rather than inferred from
     // position — a homepage may hold several fences and the reader may have moved
@@ -1205,18 +1205,18 @@ describe("the journals block, and the migration that upgrades it", () => {
     expect(cards("# journals\n\njournals\n")).toBeNull();
     expect(cards("```js\njournals\n```")).toBeNull();
     // ALREADY RIGHT IS A NO-OP — the property that lets a reader run repair twice.
-    expect(cards("```almanac\njournals:cards\n```")).toBeNull();
+    expect(cards("```chronoanvil\njournals:cards\n```")).toBeNull();
     // AND `journals-header:study` IS A DIFFERENT WIDGET that happens to share
     // seven letters, and it sits on every journal dashboard. Matching by prefix
     // would have rewritten it into oblivion; the directive is matched whole.
-    expect(cards("```almanac\njournals-header:study\n```")).toBeNull();
-    expect(collapseJournalsBlocks("```almanac\njournals-header:study\n```", "journals")).toBeNull();
+    expect(cards("```chronoanvil\njournals-header:study\n```")).toBeNull();
+    expect(collapseJournalsBlocks("```chronoanvil\njournals-header:study\n```", "journals")).toBeNull();
     // And it does fire on the real shape, so the negatives above are not vacuous.
-    expect(cards("```almanac\njournals\n```")).toBe("```almanac\njournals:cards\n```");
+    expect(cards("```chronoanvil\njournals\n```")).toBe("```chronoanvil\njournals:cards\n```");
     // BOTH DIRECTIONS, which is new in 4.38.2 and is the half the dashboard needs:
     // that page wants the bare form back.
-    expect(collapseJournalsBlocks("```almanac\njournals:cards\n```", "journals")).toBe(
-      "```almanac\njournals\n```"
+    expect(collapseJournalsBlocks("```chronoanvil\njournals:cards\n```", "journals")).toBe(
+      "```chronoanvil\njournals\n```"
     );
   });
 
@@ -1253,8 +1253,8 @@ describe("the journals block, and the migration that upgrades it", () => {
       // A vault that ran the broken migration has two or more journals fences on a
       // page, and no amount of correct behaviour from here on removes them.
       const twice = dash().replace(
-        "```almanac\nframe: section\njournals\n```",
-        "```almanac\nframe: section\njournals:cards\n```\n\n```almanac\nframe: section\njournals:cards\n```"
+        "```chronoanvil\nframe: section\njournals\n```",
+        "```chronoanvil\nframe: section\njournals:cards\n```\n\n```chronoanvil\nframe: section\njournals:cards\n```"
       );
       expect(twice.match(/^journals(:cards)?$/gm)).toHaveLength(2);
       const fixed = collapseJournalsBlocks(twice, "journals");
@@ -1269,9 +1269,9 @@ describe("the journals block, and the migration that upgrades it", () => {
       // deliberately, and a migration that relocates a section is doing more than
       // it was asked.
       const moved =
-        "```almanac\njournals:cards\n```\n\n# Notes\n\n```almanac\njournals\n```\n";
+        "```chronoanvil\njournals:cards\n```\n\n# Notes\n\n```chronoanvil\njournals\n```\n";
       expect(collapseJournalsBlocks(moved, "journals")).toBe(
-        "```almanac\njournals\n```\n\n# Notes\n"
+        "```chronoanvil\njournals\n```\n\n# Notes\n"
       );
     });
 
@@ -1341,12 +1341,12 @@ describe("the journals block, and the migration that upgrades it", () => {
       expect(journals, "no journals section on the dashboard").toBeTruthy();
       const at = journals!.locate;
       const fence = (line: string): string =>
-        `\`\`\`almanac\nframe: section\n${line}\n\`\`\``;
+        `\`\`\`chronoanvil\nframe: section\n${line}\n\`\`\``;
       expect(at(fence("journals")), "composed spelling not found").toBeGreaterThan(-1);
       expect(at(fence("journals:cards")), "migrated spelling not found").toBeGreaterThan(-1);
       // A page that genuinely lacks the section is still a miss, or repair could
       // never add it to a dashboard that needs one.
-      expect(at("```almanac\ndiary:3\n```")).toBe(-1);
+      expect(at("```chronoanvil\ndiary:3\n```")).toBe(-1);
       // AND A DIFFERENT WIDGET IS NOT IT.
       expect(at(fence("journals-header:study"))).toBe(-1);
     });

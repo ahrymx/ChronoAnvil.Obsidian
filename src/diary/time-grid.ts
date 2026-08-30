@@ -9,7 +9,7 @@
 //
 // WHY THIS FILE EXISTS, AND WHY IT HOLDS NO `App`
 //
-// Almanac has three calendar-family widgets and every one of them is a DAY
+// ChronoAnvil has three calendar-family widgets and every one of them is a DAY
 // GRID: a cell per day, and what happened that day listed inside it. Two of its
 // stores have carried an hour since 4.52 — `EventDef.time`, the field that
 // makes a meeting a meeting, and `LogItem.time`, on every capture and every

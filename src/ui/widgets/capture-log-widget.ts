@@ -37,9 +37,9 @@ export function buildCaptureLog(
 ): HTMLElement {
   const key = rest.split(":")[0].split("#")[0].trim();
   if (!isValidNoteKey(key)) {
-    const wrap = createDiv({ cls: "journal-capture-log journal-note" });
+    const wrap = createDiv({ cls: "ca-journal-capture-log ca-journal-note" });
     wrap.createDiv({
-      cls: "journal-widget-error",
+      cls: "ca-journal-widget-error",
       text: `Invalid capture key: "${key}"`,
     });
     return wrap;
@@ -48,7 +48,7 @@ export function buildCaptureLog(
   return buildLogList(host, {
     key,
     file: host.fileOf(ctx),
-    modifier: "journal-note--capture",
+    modifier: "ca-journal-note--capture",
     label,
     collapsible: opts.collapsible,
     startCollapsed: opts.startCollapsed,

@@ -2,10 +2,59 @@
 
 > Detailed development history prior to 4.0.1 is available in [docs/dev-log.md](docs/dev-log.md).
 
-All notable changes to Almanac will be documented in this file.
+All notable changes to ChronoAnvil will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+**Fixed the shipped notes not reaching an install that came from the community plugin store, stopped shipping 519 KB of design commentary inside the stylesheet, dropped the bundled YAML parser, and cleared the Obsidian plugin review checklist.**
+
+### Changed
+
+- **The Stylesheet No Longer Ships Its Own Commentary:** `tools/build-css.mjs` concatenated `styles/*.css` verbatim, and 58.6% of the 885 KB that produced was comment text — the design arguments, which run to paragraphs and are the most valuable thing in the directory. Every byte of it was parsed by every vault on every launch, phones included, and none of it was legible where it landed: whoever reads a design argument has the repository open, and whoever opens the plugin folder has a generated file they were told not to edit. The sources keep every word; the shipped `styles.css` goes from **882 KB to 358 KB**. This is still not a minifier — selectors, declarations, whitespace inside rules and the order of everything are untouched, so the stylesheet stays readable in devtools and diffable between releases. A comment that must reach the shipped file says so with `/*!`, which is the convention esbuild already applies to `main.js`; one such notice now carries the licence that the twenty-five stripped SPDX headers used to, and each source file leaves a `/*! <filename> */` marker so a rule seen in devtools can be traced back to the file whose comments explain it.
+- **Unified CSS Namespace (`ca-`):** Completed the fold of all remaining selectors and TS class applications under the single `ca-` prefix (~910 classes, including `journal-*`, `cal-*`, `jjs-*`, `jbd-*`, `jtc-*`, etc.), preventing selector collision in the shared global scope. Guarded by `test/css-namespace.test.ts` (3 assertions verifying all stylesheet selectors and TypeScript string literals).
+- **No Default Keyboard Shortcut:** **Search everything** declared `Mod K` as a `hotkeys` default. The argument for it was reasonable on its own terms — a declared default is rebindable, and Obsidian surfaces the clash with core's *Insert Markdown link* in its own Hotkeys pane — but claiming a binding in every vault that installs the plugin is a different act from choosing it in one, and the review guidelines are explicit that a plugin should not. The command is unchanged and one row away in **Settings → Hotkeys**; the README now says so, because nothing in the interface can. The vault banner's search field drew a `⌘ K` / `Ctrl K` chip spelling the old default and no longer does — with no default to spell, that chip would name a key that does nothing, and it cannot be taught to read your actual binding without reaching into Obsidian's internals.
+- **The Settings Tab No Longer Repeats Its Own Name:** Obsidian draws "ChronoAnvil" above the settings body, and the tab drew it again as an `<h2>` immediately underneath — the word you are already looking at, on the screen twice. The tagline stays.
+
+- **YAML Goes Through Obsidian Instead of a Bundled Copy:** `Diary.base` is the one file the plugin reads and rewrites as YAML, and it carried `js-yaml` into `main.js` to do it — 52 KB of parser for two calls, and a runtime dependency with two open advisories and no fixed version on any line, in a plugin about to be listed publicly. Both calls now use Obsidian's own `parseYaml` and `stringifyYaml`, which are the same library reached through the host. **`main.js` drops from 1,117 KB to 1,065 KB, and `npm audit --omit=dev` goes from one high-severity advisory to none.** `js-yaml` stays installed as a development dependency, where it backs the test suite's stand-in for Obsidian and serves as an independent parser in the vault-seeding tests — a role it is better suited to now that it is not also the parser under test.
+
+  The one thing given up is `{ lineWidth: -1 }`: `stringifyYaml` takes no options, so whether a long value is folded across lines is Obsidian's decision rather than the plugin's. Nothing depends on it. `Diary.base` has exactly one value long enough to fold — the 210-character `formulas.Type` expression — and the tests run the file through both line widths and assert the same document comes back, because YAML folds at a space and reads the break back as that space. What line width can change is how the file looks after a sync, not what Bases reads out of it.
+
+### Fixed
+
+- **Bundled Assets Travel Inside `main.js`:** `Scaffold.readAsset` resolved `manifest.dir + "/assets/<name>"` through the vault adapter at runtime. Obsidian's community installer writes `manifest.json`, `main.js` and `styles.css` into the plugin folder and creates no subdirectories, so `assets/` did not exist for anyone who installed the ordinary way — the plugin loaded and rendered perfectly, and then **Maintenance: set up / repair vault** built the folder tree, silently skipped `Diary.base`, `Staging.md` and the in-vault documentation README, and finished on a notice about three missing assets. The three files are now compiled into `main.js` at build time and read from there, so every install route carries them. Hand-installs from the release zip were never affected, which is why this survived the whole of 4.x: every build tested here was a zip.
+- **A Click Listener That Outlived Every Log Widget:** The log list's type filter attached an anonymous `document` click handler to dismiss its dropdown, once per widget render, with no reference kept — so it could not be removed even in principle. It survived the note being closed and the plugin being disabled, and a vault with several log widgets accumulated one per render for the length of the session. The handler is now attached when the menu opens and removed when it closes.
+
+### Added
+
+- **`tools/build-assets.mjs`:** Compiles `assets/` into `generated/bundled-assets.ts`, on the same footing as `tools/build-css.mjs` — generated, gitignored, and rebuilt by `npm run build`, `npm run typecheck`, `npm test` and `npm run dev`, which also watches `assets/` so an edit to the documentation is picked up without a restart. The markdown stays markdown: `assets/` is still where these notes are written and reviewed.
+- **`test/bundled-assets.test.ts`:** Five assertions holding the fix in place — every asset `scaffold.ts` names is in the bundle, each matches `assets/` byte for byte, nothing in `assets/` is skipped by the extension filter, a `Scaffold` with no app and no plugin folder still serves every note, and `scaffold.ts` does not read assets through the vault adapter again.
+- **`test/css-build.test.ts`:** Six assertions over the comment strip, the first of them written against a deliberately different implementation than the build's — a regex normalisation where the build is a character walk — so that the two agreeing is evidence rather than a function being compared to itself. It also asserts the one thing the stripper assumes: that no string in `styles/` contains a comment delimiter — the inline SVG data URIs being exactly where such a thing would arrive unnoticed.
+- **`test/review-checklist.test.ts`:** The Obsidian review checklist as assertions that run on every commit rather than once per submission. Each finding above had been true for releases, because all of them are invisible from inside the vault the plugin was developed in. The listener check sweeps every file under `src/` for a `document` or `window` listener with no matching removal — per file rather than per module, since a module-level count let one file's leak be covered by another file's `once: true` from three hundred lines away.
+- **`no-restricted-globals` for `app` and `moment`:** The review guidelines forbid the global `app` and `moment` in favour of `this.app` and Obsidian's own import. Nothing here used either, but a text search cannot tell a global from a parameter of the same name, and nearly every file in this project takes `app` as a parameter or reads `plugin.app` into a const. ESLint resolves scopes, so the question is now answered by `npx eslint src test` on every commit instead of by grep on submission day.
+- **`test/obsidian-yaml.test.ts`:** Seven assertions around the YAML swap. The round-trip checks run `Diary.base` through both line widths so that a question about a host which cannot be run from a test — does Obsidian fold long lines? — stops mattering rather than being guessed at. The rest close the door behind the change: no module under `src/` may import `js-yaml`, it may not return to `dependencies`, and the third-party lists in `NOTICE` and in the `main.js` banner must both match the lockfile's production closure. That last one is a licence obligation rather than tidiness, and the banner is the only notice a community-store install carries at all, since the installer writes three files and `NOTICE` is not one of them.
+- **`test/product-name.test.ts`:** Five assertions that the product has one name. It does not check the spelling — it derives the name from `manifest.json`, the one place Obsidian itself reads, and requires `package.json`, the repository URL, `LICENSE`, `NOTICE`, `README.md`, `LICENSING.md` and the `main.js` banner to agree with it. The attribution string in particular is a term of the licence rather than a description, and four documents quote it; nothing but a side-by-side reading would have caught them disagreeing.
+
+## [5.0.0] - 2026-08-29
+
+**Renamed the plugin from Almanac to ChronoAnvil, across the product name, the plugin id, the vault format and the CSS namespace, with a migration tool and read-compatibility for vaults written under the old name.**
+
+> **Why 5.0.0 and not 4.85.0.** The plugin id, the vault format and the CSS namespace all changed. A vault written by 4.x keeps working — the plugin reads both spellings where a missed token would cost content — but custom CSS snippets break, and section locators are not dual-read. Run `npm run migrate:vault` (or **Set up / repair vault**) against a vault written under the old name.
+
+### Changed
+
+- **Product Rename — Almanac is now ChronoAnvil:** The display name, every user-facing string, the documentation and the licence's section 7 attribution now read ChronoAnvil. The plugin id changed from `ahrymx.almanac` to `chronoanvil` — the previous id contained a period, which the community-plugin manifest charset does not allow, so this had to change before any public release regardless of the rename.
+- **Vault Format Tokens Renamed:** Fenced blocks are now ` ```chronoanvil `, ` ```chronoanvil-charts ` and ` ```chronoanvil-journal-charts `; body regions open `<!--chronoanvil:<key>`; the tracker region markers are `# chronoanvil:trackers:start` / `:end`; the graph marker is `%% chronoanvil-graph %%`; the events frontmatter property is `chronoanvil-events`. The settings mirror is `.chronoanvil-registry.json`, per-journal manifests are `.chronoanvil-journal.json`, and the vault map is `ChronoAnvil.canvas`.
+- **A Mark of Its Own:** The ribbon button drew Lucide's `book-open` — an icon three other plugins also use, on the button whose whole job is to say which plugin this is — and the banner tile drew the vault's initials. Both now draw the ChronoAnvil mark, an anvil whose waist is an hourglass — the name and the mark say the same thing — authored on Lucide's 24-unit grid so it sits correctly beside the built-ins. The banner tile's **Tile** setting still takes a letter or an emoji; leaving it empty now gives the mark rather than initials.
+- **Single CSS Namespace:** The stylesheet used two prefixes — `--am-*`/`.am-*` and a second `.almanac-*` family that had accumulated alongside it. Both are now `--ca-*` / `.ca-*`, folding 419 selectors into one namespace. **Any custom CSS snippet targeting `.am-*` or `.almanac-*` needs updating.**
+
+### Added
+
+- **`tools/migrate-vault.mjs`:** Rewrites a vault written under the old name in a single pass — note tokens, file names, and the plugin folder so `data.json` moves with it. Dry-run by default; `--write` applies, and it takes a full vault backup first unless given `--no-backup`. Idempotent, and it deliberately leaves `.obsidian/` alone apart from the plugin folder.
+- **Read-Compatibility for Pre-Rename Vaults:** The plugin writes only the new spellings but reads both at every point where failing to find a token would cost content rather than merely look wrong: body regions (a region it cannot see renders empty and the next save would append a second one beside it, orphaning what the reader wrote), tracker region markers, journal manifests, the settings mirror, the events property, and all three fence languages. Legacy `` `almanac:` `` inline spans still render.
+- **Settings Survive the Id Change:** Because the plugin id changed, the first launch finds no `data.json`. `Registry.read()` now falls back to the pre-rename mirror filename and version key, so trackers, journals and paths are restored rather than silently reset to defaults.
 
 ## [4.84.0] - 2026-08-29
 
@@ -24,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Phantom Link & Retired Node Pruning in `Almanac.canvas`:** `mergeCanvas` now cleanly discards retired plugin-generated `node-*` and `group-*` IDs during canvas regeneration, preventing legacy references (such as `node-journals` or `node-staging`) from persisting as phantom nodes or duplicate links in Graph View.
+- **Phantom Link & Retired Node Pruning in `ChronoAnvil.canvas`:** `mergeCanvas` now cleanly discards retired plugin-generated `node-*` and `group-*` IDs during canvas regeneration, preventing legacy references (such as `node-journals` or `node-staging`) from persisting as phantom nodes or duplicate links in Graph View.
 
 ## [4.83.0] - 2026-08-29
 
@@ -41,12 +90,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.82.0] - 2026-08-29
 
-**Added automated Obsidian Graph View color group configuration for Almanac vaults, matching workbenches, dashboards, diary entries, journals, logbooks, and infrastructure.**
+**Added automated Obsidian Graph View color group configuration for ChronoAnvil vaults, matching workbenches, dashboards, diary entries, journals, logbooks, and infrastructure.**
 
 ### Added
 
-- **Automated Graph View Color Groups:** Almanac can now automatically configure and synchronize `.obsidian/graph.json` color groups based on your active vault paths, visually distinguishing Workbenches (Amber), Dashboards (Coral Red), Diary Entries (Emerald Green), Journals (Indigo Blue), Logbooks (Purple), and Infrastructure (Slate Grey) in Obsidian's global graph.
-- **Graph Group Maintenance Action & Settings Control:** Added `Almanac: Maintenance: configure graph view color groups` to the command palette and a **Set up graph groups** button under **Appearance & Themes** in Settings.
+- **Automated Graph View Color Groups:** ChronoAnvil can now automatically configure and synchronize `.obsidian/graph.json` color groups based on your active vault paths, visually distinguishing Workbenches (Amber), Dashboards (Coral Red), Diary Entries (Emerald Green), Journals (Indigo Blue), Logbooks (Purple), and Infrastructure (Slate Grey) in Obsidian's global graph.
+- **Graph Group Maintenance Action & Settings Control:** Added `ChronoAnvil: Maintenance: configure graph view color groups` to the command palette and a **Set up graph groups** button under **Appearance & Themes** in Settings.
 - **Non-Destructive Graph Configuration Merge:** Color group setup automatically adapts to custom or renamed folder paths while preserving custom user-defined graph groups, force physics, and display settings.
 
 ## [4.81.0] - 2026-08-29
@@ -56,7 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Hierarchical Period Nesting under `02 - Diary/Entries/`:** Period entries are now organized into nested folders on disk (`02 - Diary/Entries/Year-2026/Quarter-2026-Q3/Month-2026-08/Week-2026-W35/Day-2026-08-29.md`), matching chronological containment and keeping the diary root clean.
-- **Infrastructure Canvas Isolation:** `00 - Infrastructure/Almanac.canvas` now houses only infrastructure nodes (`README.md` documentation hub, `Diary.base` database, and diary templates), completely decoupled from user-facing workspace notes.
+- **Infrastructure Canvas Isolation:** `00 - Infrastructure/ChronoAnvil.canvas` now houses only infrastructure nodes (`README.md` documentation hub, `Diary.base` database, and diary templates), completely decoupled from user-facing workspace notes.
 
 ### Changed
 
@@ -69,14 +118,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Aesthetic Presets:** Three design archetypes applied across Almanac notes and surfaces, chosen under **Appearance & Themes** — Modern Fluent (clean sans and glass), Editorial Monastic (serif and parchment), and Technical HUD (monospace and instrument panel). Each carries its own typography suite, surface treatment and border language.
-- **Temporal Grain Accents:** Daily, Weekly, Monthly, Quarterly and Yearly entries each carry a semantic accent colour (Solar Daily, Emerald Weekly, Indigo Monthly and their siblings), bound through `data-am-grain` on page heads and vault banners, with custom journal spines tinted from the same palette. A **Grain accent intensity** setting steps the whole scheme between vibrant, subtle and monochrome.
-- **Page Grounds:** Nineteen background textures for Almanac's markdown surfaces, selectable under **Appearance & Themes** and grouped by family — Paper (dot grid, graph paper, ruled lines, crosshatch, isometric), Weave & tile (checkerboard, argyle, zigzag, carbon fibre), Print & screen (halftone, scanlines, pinstripe, candy stripe), Ground & light (topographic, wave scales, aurora, stardust) and Crystal (facets, smoke). Every ground is drawn from CSS gradients and a shared grain film over the theme's own colours, so it follows dark and light mode and the chosen aesthetic preset rather than sitting on top of them. A **Ground strength** setting picks faint, standard or full.
+- **Aesthetic Presets:** Three design archetypes applied across ChronoAnvil notes and surfaces, chosen under **Appearance & Themes** — Modern Fluent (clean sans and glass), Editorial Monastic (serif and parchment), and Technical HUD (monospace and instrument panel). Each carries its own typography suite, surface treatment and border language.
+- **Temporal Grain Accents:** Daily, Weekly, Monthly, Quarterly and Yearly entries each carry a semantic accent colour (Solar Daily, Emerald Weekly, Indigo Monthly and their siblings), bound through `data-ca-grain` on page heads and vault banners, with custom journal spines tinted from the same palette. A **Grain accent intensity** setting steps the whole scheme between vibrant, subtle and monochrome.
+- **Page Grounds:** Nineteen background textures for ChronoAnvil's markdown surfaces, selectable under **Appearance & Themes** and grouped by family — Paper (dot grid, graph paper, ruled lines, crosshatch, isometric), Weave & tile (checkerboard, argyle, zigzag, carbon fibre), Print & screen (halftone, scanlines, pinstripe, candy stripe), Ground & light (topographic, wave scales, aurora, stardust) and Crystal (facets, smoke). Every ground is drawn from CSS gradients and a shared grain film over the theme's own colours, so it follows dark and light mode and the chosen aesthetic preset rather than sitting on top of them. A **Ground strength** setting picks faint, standard or full.
 
 ### Changed
 
-- **Banner Background Art Is Built In:** The six banner textures (Topography, Dot Matrix, Constellations, Aurora Mesh, Isometric Grid, Minimal Waves) are now data URIs inside Almanac's own stylesheet, selected by preset id. The patterns themselves are unchanged — a banner set to Topography draws exactly what it drew before.
-- **Removed the `00 - Infrastructure/Art/` Folder:** Almanac no longer scaffolds an Art folder, and the settings dropdown no longer lists image files found inside one. That scan had turned a scaffolded vault folder into an informal styling API, which is not something Almanac asks of anyone. Existing folders are left exactly as they are — repair does not delete them — and a banner still set to a file added by hand falls back to no texture rather than silently substituting a pattern that was never chosen.
+- **Banner Background Art Is Built In:** The six banner textures (Topography, Dot Matrix, Constellations, Aurora Mesh, Isometric Grid, Minimal Waves) are now data URIs inside ChronoAnvil's own stylesheet, selected by preset id. The patterns themselves are unchanged — a banner set to Topography draws exactly what it drew before.
+- **Removed the `00 - Infrastructure/Art/` Folder:** ChronoAnvil no longer scaffolds an Art folder, and the settings dropdown no longer lists image files found inside one. That scan had turned a scaffolded vault folder into an informal styling API, which is not something ChronoAnvil asks of anyone. Existing folders are left exactly as they are — repair does not delete them — and a banner still set to a file added by hand falls back to no texture rather than silently substituting a pattern that was never chosen.
 
 ## [4.79.0] - 2026-08-28
 
@@ -99,7 +148,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Swipe Over Interactive Controls:** Enhanced `attachGroupSwipe` to permit swiping to start over buttons, links, chips, and calendar cells. When a horizontal drag intent is recognized, trailing click events are automatically intercepted and cancelled while taps continue to click normally.
 - **Mobile Sidebar Edge Guard & Isolation:** Added an 18px screen edge deadzone so intentional mobile sidebar pulls work seamlessly without conflicting with group page switching.
-- **Live Swipe Edge Tint Overlays:** Introduced dynamic edge tint feedback (`--am-swipe-tint-left`, `--am-swipe-tint-right`) that illuminates the destination edge during horizontal drags.
+- **Live Swipe Edge Tint Overlays:** Introduced dynamic edge tint feedback (`--ca-swipe-tint-left`, `--ca-swipe-tint-right`) that illuminates the destination edge during horizontal drags.
 
 ### Fixed
 
@@ -126,7 +175,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Micro-Ring Ribbon Stats Bar (`am-stats`):** Redesigned the stat strip into a space-efficient ~38px horizontal telemetry ribbon featuring SVG circular progress micro-rings (`am-stat-ring-svg`), metric icons, uppercase labels, and inline value/sub rows.
+- **Micro-Ring Ribbon Stats Bar (`ca-stats`):** Redesigned the stat strip into a space-efficient ~38px horizontal telemetry ribbon featuring SVG circular progress micro-rings (`ca-stat-ring-svg`), metric icons, uppercase labels, and inline value/sub rows.
 - **Micro-Ring Progress Support:** Extended `StatCard` and `statStrip` to dynamically compute and render circular progress rings for rating averages and scale completion ratios.
 
 ### Changed
@@ -290,7 +339,7 @@ Grouping is a **separate tick**: `Set up / repair vault → Run format migration
 ### Fixed
 
 - **The diary dashboard was offered a format migration on a freshly created vault.** The period summary migration asked whether the fence carried a `header:` line, but the composer titles that fence with `frame: section` instead — so the repair window proposed inserting a header into a note the scaffolder had written minutes earlier. It now asks `isSectionFence`, the same predicate the drag and the section editor use, which is the union of both ways a fence titles itself.
-- **The documentation was read as a live widget page.** `assets/documentation.md` prints an example fence by wrapping it in a longer, four-backtick fence; the fence scanner matched the three-backtick ```almanac opener inside it and treated the illustration as a widget block, so repair offered to rewrite the docs. Fences now follow the markdown rule that a closing run must be at least as long as the opening one, and a code block this plugin does not own is skipped whole rather than walked into.
+- **The documentation was read as a live widget page.** `assets/documentation.md` prints an example fence by wrapping it in a longer, four-backtick fence; the fence scanner matched the three-backtick ```chronoanvil opener inside it and treated the illustration as a widget block, so repair offered to rewrite the docs. Fences now follow the markdown rule that a closing run must be at least as long as the opening one, and a code block this plugin does not own is skipped whole rather than walked into.
 - **A gate against the whole class.** Every format migration the repair window runs is now exercised against every note the release writes, and none may fire. A migration exists to carry an older note forward, so one that fires on current output is a defect whichever side is wrong.
 
 ## [4.68.0] - 2026-08-23
@@ -299,17 +348,17 @@ Grouping is a **separate tick**: `Set up / repair vault → Run format migration
 
 ### Added
 
-- **`Almanac.canvas` regeneration preserves your arrangement.** `Maintenance: generate vault canvas map` now merges rather than overwrites: a node you dragged keeps the position and size you gave it and takes only its rebuilt meaning, a node you added yourself is never touched, and the notice reports how many were kept versus placed.
+- **`ChronoAnvil.canvas` regeneration preserves your arrangement.** `Maintenance: generate vault canvas map` now merges rather than overwrites: a node you dragged keeps the position and size you gave it and takes only its rebuilt meaning, a node you added yourself is never touched, and the notice reports how many were kept versus placed.
 - **Subsection-free vault map with full coverage.** Six branches grouped by role rather than by folder, covering all four vault roots — `00 - Infrastructure` and `01 - Material` were previously unrepresented, and the events workbench was absent entirely.
 - **Four node size classes.** `hub` 560×720, `board` 460×600, `panel` 380×480 and `table` 940×360, each sized for what its note actually embeds rather than a flat 320×180 that clipped every dashboard to its title bar.
-- **Canvas nodes use the plugin's own palette.** `CANVAS_HUE` mirrors `--am-ev-*` from `styles/00-tokens.css`, so a logbook's node on the map and its colour in the time grid are the same fact. A registered logbook's panel takes its own colour.
+- **Canvas nodes use the plugin's own palette.** `CANVAS_HUE` mirrors `--ca-ev-*` from `styles/00-tokens.css`, so a logbook's node on the map and its colour in the time grid are the same fact. A registered logbook's panel takes its own colour.
 
 ### Fixed
 
 - **Two vault map nodes pointed at files that have never existed.** The quarterly and yearly nodes hardcoded `04 - Quarterly.md` and `05 - Yearly.md`; the dashboards have been folder notes since 2.57. Both now come from `quarterOverviewPath()` / `yearOverviewPath()`, and a test asserts every surface the map draws is a note the scaffold writes.
 - **Overlapping groups on a populated vault.** The Search group was positioned from the hub while every other group was positioned from its neighbour's width — two coordinate systems on one canvas, colliding as soon as the diary held about twelve entries.
 - **Six hidden graph links named notes that do not exist.** Entry templates linked to `02 - Weekly`, `03 - Monthly`, `04 - Quarterly` and `05 - Yearly` — the diary's pre-2.57 folder names — logbook notes to `06 - Logbooks`, and journal notes to a level *noun* such as `[[Lesson]]`. An unresolved wikilink still draws a node, so every vault's graph carried phantom notes for folders it does not have.
-- **The graph view had two hubs.** Every composed note carried a hidden `[[Homepage]]` while `Almanac.canvas` linked to the same surfaces, drawing the same star twice. Notes now name their parent only — an entry names its grain's dashboard, which names the diary, which names the homepage — so the graph shows depth instead of a second wheel. Three notes still name the homepage: the diary dashboard, the journals dashboard and Search.
+- **The graph view had two hubs.** Every composed note carried a hidden `[[Homepage]]` while `ChronoAnvil.canvas` linked to the same surfaces, drawing the same star twice. Notes now name their parent only — an entry names its grain's dashboard, which names the diary, which names the homepage — so the graph shows depth instead of a second wheel. Three notes still name the homepage: the diary dashboard, the journals dashboard and Search.
 - **Dated entries no longer pinned to the map.** The prototype placed the twelve *alphabetically first* daily notes — the twelve oldest days in the vault — on a structural diagram that was stale by the next morning.
 - **Logbooks on the map come from the registry.** A folder scan picked up stray notes and missed a registered logbook whose note had not been written yet, so the map disagreed with the settings tab in both directions.
 
@@ -320,7 +369,7 @@ Grouping is a **separate tick**: `Set up / repair vault → Run format migration
 ### Added
 
 - **Universal horizontal drag-to-tab gesture.** Groups of widgets with multiple tabbed pages can now be swiped/dragged horizontally from anywhere across the group surface to switch between pages. Direction locking preserves uninterrupted vertical scrolling within cards.
-- **Style A segmented floating pill footers.** Group footers feature a modern floating pill container (`.journal-group-tabs`) with pill buttons (`--am-radius-pill`), elevated active accent fills, smooth hover transitions, and an integrated `+` add-page button.
+- **Style A segmented floating pill footers.** Group footers feature a modern floating pill container (`.journal-group-tabs`) with pill buttons (`--ca-radius-pill`), elevated active accent fills, smooth hover transitions, and an integrated `+` add-page button.
 
 ## [4.66.0] - 2026-08-23
 
@@ -328,7 +377,7 @@ Grouping is a **separate tick**: `Set up / repair vault → Run format migration
 
 ### Added
 
-- **Custom drag-height resizing for grouped logbooks.** Grouped logbook widgets in multi-cell cards now seamlessly expand and contract using the bottom card drag handle (`--am-card-h`), unlocking heights beyond the default 440px limit.
+- **Custom drag-height resizing for grouped logbooks.** Grouped logbook widgets in multi-cell cards now seamlessly expand and contract using the bottom card drag handle (`--ca-card-h`), unlocking heights beyond the default 440px limit.
 - **Logbook group paging and extraction.** Registered 1-line widget form extent for convertible widgets (`w:logbook`, `diary`, `tasks`), enabling the "Start a page here" tab delimiter and "Take out of the group" actions within multi-widget cards.
 
 ### Fixed
@@ -381,7 +430,7 @@ Grouping is a **separate tick**: `Set up / repair vault → Run format migration
 ### Added
 
 - **Show as a widget across static sections.** Static-sized sections (`recap`, `time-grid`, `journals`, `on-this-day`, `activity`, and `contents`) now offer the "Show as a widget" (`form: widget`) question in their section editors, allowing them to render without an outer section heading.
-- **Tight square radius token.** Added `--am-radius-xs` (3px) for badges, squared-off controls, and compact time indicators.
+- **Tight square radius token.** Added `--ca-radius-xs` (3px) for badges, squared-off controls, and compact time indicators.
 
 ### Fixed
 
@@ -421,7 +470,7 @@ seeder skipped every one of them.
 
 It now runs two passes. Files first, as before; then **patches** — in-place edits
 that fill a chart fence holding no charts, a logbook region holding no items, and
-an `almanac-events: []` holding no events. Each one declines a target that is
+a `chronoanvil-events: []` holding no events. Each one declines a target that is
 already answered, which is the same rule the file pass has always followed and
 the same `--force` escape: a seeded vault re-seeded stays a no-op.
 
@@ -483,7 +532,7 @@ new tests assert on a string: each feeds the seeder's output to `parseLogItems`,
 - **Always-visible cog wheel on the vault banner.** Previously hover-revealed, the cog wheel now stays discoverable at a resting opacity (`0.65`) with smooth elevation to `1.0` on hover, keyboard focus, and touch devices.
 - **Header background art and texture subsystem (`00 - Infrastructure/Art/`).** A new customizable art directory seeded with 6 starter vector patterns (Topography, Dot Matrix, Constellations, Aurora Mesh, Isometric Grid, and Minimal Waves).
 - **Built-in preset map.** Each bundled pattern automatically applies its optimized background size, repetition, and blend mode (`soft-light`, `screen`, `overlay`).
-- **Banner customization settings.** Choose active background art, fine-tune pattern opacity with a slider (0–60%), and toggle subtle ambient theme accent glow directly from **Settings → Almanac → Vault banner** or from the cog menu's new **"Banner art & settings…"** shortcut.
+- **Banner customization settings.** Choose active background art, fine-tune pattern opacity with a slider (0–60%), and toggle subtle ambient theme accent glow directly from **Settings → ChronoAnvil → Vault banner** or from the cog menu's new **"Banner art & settings…"** shortcut.
 
 ## [4.59.0] - 2026-08-22
 
@@ -597,7 +646,7 @@ came back inside its card after a reload — and would have folded away with it.
 A `header:` bar has always owned the blocks that follow it, because a section
 used to be written as two fences: a title fence, then a body fence. Obsidian
 renders every block separately, so that was the only way a section could have a
-body at all. Every page Almanac composes now welds the two — the bar and its
+body at all. Every page ChronoAnvil composes now welds the two — the bar and its
 widgets are one fence — which makes "the blocks after it" not the section's body
 but whatever you put next. The page's last section therefore took everything
 added below it, and the homepage's last section is *Trends and statistics*.
@@ -650,14 +699,14 @@ folds and shades exactly as it did.
 - **A second copy written by hand is a row in the editor, not an untouchable
   block.** Two `events` fences used to be one section and one *block nobody
   owns* — reported, unmovable and impossible to remove from the window, because
-  Almanac managed only the first fence holding a given widget. Each occurrence
+  ChronoAnvil managed only the first fence holding a given widget. Each occurrence
   has its own row now, and removing one leaves the other exactly as it was.
 
 ## [4.55.0] - 2026-08-22
 
 **The week, laid against the hours — and a way to say when something happened.**
 
-Almanac has drawn three calendars and every one of them was a day grid: a cell
+ChronoAnvil has drawn three calendars and every one of them was a day grid: a cell
 per day, with what happened listed inside it. Two of its stores have carried an
 hour since 4.52 and nothing could show it. This is the view that can, and the
 controls that let a reader set the hour in the first place.
@@ -693,7 +742,7 @@ controls that let a reader set the hour in the first place.
   stamp line.
 - **An hour on a task that is due.** Beside the date, and hidden until there is a
   date to hang it on: an hour on no day is not a time.
-- **A colour per logbook,** chosen in Settings → Almanac → Logbooks from the same
+- **A colour per logbook,** chosen in Settings → ChronoAnvil → Logbooks from the same
   eight the events use — because the grid draws both, and two palettes in one
   view would be two designs in one view. Work, Current focus, Review and Meetings
   ship with four different ones.
@@ -938,8 +987,8 @@ nowhere to go, because it belongs to the diary and to no single day.
   **Review links** and **Meetings** — each a note under `02 - Diary/Logbooks/`,
   listed together on that folder's own note, and written by *Set up / repair
   vault* alongside everything else it writes.
-- **Add your own** in Settings → Almanac → **Logbooks**. Removing one there
-  leaves its note where it is: the list says which logbooks Almanac draws, not
+- **Add your own** in Settings → ChronoAnvil → **Logbooks**. Removing one there
+  leaves its note where it is: the list says which logbooks ChronoAnvil draws, not
   which files you keep.
 - **`logbook:<id>` draws one anywhere.** It shows the logbook's own note rather
   than the note it sits on, so `logbook:work` on the homepage shows — and takes
@@ -1020,7 +1069,7 @@ that never arrived.
 
 ## [4.51.6] - 2026-08-20
 
-**The note's title and its properties are Almanac's now.** Obsidian draws a
+**The note's title and its properties are ChronoAnvil's now.** Obsidian draws a
 filename in a large face and six rows of properties above everything you opened
 the note to write in; on the notes the bar appears on, both are replaced.
 
@@ -1033,9 +1082,9 @@ the note to write in; on the notes the bar appears on, both are replaced.
   window with one field per property: a switch for a checkbox, a number field
   for a number, commas for a list. Add a property, empty one, or remove it.
   Nested values are shown and left alone — edit those in the note itself.
-- **Obsidian's inline title and property panel are hidden** where Almanac draws
-  its own. The setting is now *Use Almanac's title and properties* (Settings →
-  Almanac → Vault banner) and it is **on** by default — it was *Hide Obsidian's
+- **Obsidian's inline title and property panel are hidden** where ChronoAnvil draws
+  its own. The setting is now *Use ChronoAnvil's title and properties* (Settings →
+  ChronoAnvil → Vault banner) and it is **on** by default — it was *Hide Obsidian's
   note title*, off by default, when it took something away without replacing it.
 - **The bar's trail ends in plain text.** It is a breadcrumb again — where you
   are — now that the head below carries the name and the pencil.
@@ -1059,7 +1108,7 @@ said twice.**
 - **The date is no longer printed twice** on an entry with no title of its own.
 - **The search field is capped** rather than growing with the window, so the bar
   reads as one object instead of three groups pinned to opposite edges.
-- **New setting: *Hide Obsidian's note title*** (Settings → Almanac → Vault
+- **New setting: *Hide Obsidian's note title*** (Settings → ChronoAnvil → Vault
   banner). Off by default. On the notes the bar appears on, it hides the large
   heading Obsidian draws under it — which the bar already names at the end of
   its trail.
@@ -1111,7 +1160,7 @@ the reference design it was asked to follow.
   looking for it.
 - **The mark has the vault's name beside it**, with a second line saying which
   part of the vault you are in — *Diary*, *Home*, or the journal's own name.
-  Pressing any of it opens Almanac's settings, as before.
+  Pressing any of it opens ChronoAnvil's settings, as before.
 - **The four destinations are proper buttons** — the icon above the word, in a
   row you can hit without aiming, instead of four small links.
 - **The bar looks like a toolbar.** It has a ground, a border and its own edge,
@@ -1133,7 +1182,7 @@ faults, all in how 4.51 met notes that already existed.
   to a note — they open the day's entry and the capture window — and the bar was
   only drawing destinations that were notes. All four again, and *Today* creates
   the entry if it is not there yet.
-- **A doubled rule under the bar.** The thin "Almanac" line at the top of each
+- **A doubled rule under the bar.** The thin "ChronoAnvil" line at the top of each
   note was a top boundary, and the bar is a louder one right above it. It keeps
   its line — that is where your cursor lands when a note opens — and gives up the
   rule and the wordmark.
@@ -1142,7 +1191,7 @@ faults, all in how 4.51 met notes that already existed.
 
 ## [4.51.0] - 2026-08-20
 
-**Every Almanac note now opens with one bar.**
+**Every ChronoAnvil note now opens with one bar.**
 
 Search, the four places you go most, where this note sits, and its title —
 above the note's content, scrolling with it. It replaces the header block that
@@ -1151,7 +1200,7 @@ used to be built into each note.
 **What is on it**
 
 - **The tile.** Your vault's initials, or a letter or emoji of your own. Press
-  it to open Almanac's settings.
+  it to open ChronoAnvil's settings.
 - **Search everything.** One list over your diary *and* every journal —
   `Ctrl K`, or press the field. Sort by relevance, date, title or open tasks;
   `Tab` cycles, arrows move, `Enter` opens.
@@ -1162,7 +1211,7 @@ used to be built into each note.
   title property, because the filename is the date your diary finds it by.
 - **A cog**, offering what the old banner's cog offered on the same notes.
 
-**It appears on Almanac's notes only** — your diary, your journals, your home
+**It appears on ChronoAnvil's notes only** — your diary, your journals, your home
 page. A note outside all three gets nothing.
 
 **Nothing is rewritten.** The header block is still in every note; while the bar
@@ -1181,7 +1230,7 @@ Reported with a screenshot showing the giveaway —
 dates is one note binned twice, because the row was still on screen after the
 first move.
 
-**The table was not listening for a note MOVING.** Almanac's live tables rebuild
+**The table was not listening for a note MOVING.** ChronoAnvil's live tables rebuild
 when a note's *contents* change, and a move changes no contents — so every
 folder-scoped table in the plugin (what's below this note, the page index, the
 note-type tables) drew its rows once and then sat there while notes were moved,
@@ -1215,7 +1264,7 @@ setting can be set to delete permanently, or to a `.trash` folder the file
 explorer does not show you — so "moved to your vault's trash" was, depending on
 your settings, either a place you could not find or not a place at all.
 
-**Almanac already had a bin and this now uses it.** A binned title goes to
+**ChronoAnvil already had a bin and this now uses it.** A binned title goes to
 `00 - Infrastructure/Bin/`, the same folder a deleted journal's folders have gone
 to since 4.17 — an ordinary folder you can open, look inside, drag a note back
 out of, and empty when you mean to. Nothing is deleted, and links from your other
@@ -1263,7 +1312,7 @@ always visible on a touchscreen. It holds:
   there are some.
 
 Both bins ask first and name what they are about to take. *(4.50.0 sent them to
-your Obsidian trash; 4.50.1 corrects that to Almanac's own bin — see above.)*
+your Obsidian trash; 4.50.1 corrects that to ChronoAnvil's own bin — see above.)*
 
 ## [4.49.0] - 2026-08-20
 
@@ -1580,11 +1629,11 @@ reuses a leaf across file switches. This one is re-read from whichever file the
 leaf is showing, so a leaf showing a narrow note has the class removed on the same
 pass that adds it elsewhere. Nothing about the declaration changed: it is still
 one `wide` line in the block you are looking at, deleting it still narrows the
-page, and no part of Almanac writes it back.
+page, and no part of ChronoAnvil writes it back.
 
 The `:has()` rules are gone rather than kept alongside — two carriers of one
 decision would disagree for exactly as long as it takes a card to be unloaded,
-which is the whole of this bug. `cssclasses: almanac-wide` still works, because
+which is the whole of this bug. `cssclasses: ca-wide` still works, because
 that is Obsidian's own class applied by Obsidian from the file, and it is what
 keeps a homepage composed before 4.11 wide.
 
@@ -1912,13 +1961,13 @@ stranger downloads shows the plugin instead of showing its empty states.**
 ### `npm run seed -- <vault>`
 
 `tools/seed-vault.mjs` writes a year of diary entries and a populated journal
-tree into an already-scaffolded vault. Every widget in Almanac renders somebody's
+tree into an already-scaffolded vault. Every widget in ChronoAnvil renders somebody's
 notes, and on an empty vault every one of them renders its empty state — an
 honest picture of nothing and a useless picture of the plugin.
 
 **It derives; it does not restate.** Nothing about the vault's shape is written
 into the tool. Paths come from the vault's own
-`.obsidian/plugins/ahrymx.almanac/data.json`; each journal's levels, kinds and
+`.obsidian/plugins/chronoanvil/data.json`; each journal's levels, kinds and
 template filenames come from that same file; note bodies come from the vault's
 templates, edited in place rather than reproduced. A preset that gains a level, a
 template that gains a section, or a reader who renamed `02 - Diary` are all
@@ -1943,13 +1992,13 @@ precisely that you can look back and see where you fell off. A default run over
 
 ### Four format bugs the first real seed found, and one it did not
 
-Four different things live in `<!--almanac:… -->` regions and they look alike
+Four different things live in `<!--chronoanvil:… -->` regions and they look alike
 from a distance. **The region's name does not say which format it holds, and
 nothing warns when the wrong one goes in** — the write succeeds, the file looks
 plausible, and the widget renders rubbish.
 
 - **Recall cards were written in the task format.** `- ( ) question` into
-  `<!--almanac:recall-->`: it parsed, it produced a card, and the card's prompt
+  `<!--chronoanvil:recall-->`: it parsed, it produced a card, and the card's prompt
   read `- ( ) What makes an atom a stereocentre?` with nothing behind the reveal.
   Fifty notes, zero warnings. Recall is `question :: answer`, and the corpus now
   carries answers rather than questions alone — a card with a blank reveal
@@ -1959,7 +2008,7 @@ plausible, and the widget renders rubbish.
   `note:log` and `tasks:todo`, each backed by a region. The first version wrote
   `## Title` and a line at the end of the file, so every seeded day rendered a
   column of empty prompts with a stray heading below them — which teaches a
-  reader opening the example vault that Almanac's daily note does not work.
+  reader opening the example vault that ChronoAnvil's daily note does not work.
 - **Not every day gets every field**, now that they are filled. A year where all
   five regions are full every single day is a year nobody lived, and it hides the
   thing an example should show: a half-filled entry is a normal entry.
@@ -2047,7 +2096,7 @@ open their dashboards; and three smaller things off the same screenshot.**
 
 ### The `:root` fault, third diagnosis and the one that holds
 
-**`--am-border-inner` had never drawn since 4.35.2 introduced it.** Every card
+**`--ca-border-inner` had never drawn since 4.35.2 introduced it.** Every card
 reading it came back `#dadada` — `currentColor`, the initial `border-color`,
 which is what an element gets when the colour it asked for is invalid. 4.40
 blamed the border shorthand (real, fixed, not the cause). 4.40.1 blamed `:root`
@@ -2059,18 +2108,18 @@ screenshot still measured `#dadada`.
 `html` element and has none of them. And a custom property's `var()` references
 are substituted **on the element that declares it** — which has nothing to do
 with `color-mix`. 4.40.1 asserted that a lone `var()` was somehow lazier; it is
-not. `--am-surface-inset: var(--background-primary-alt)` on `:root` was broken by
+not. `--ca-surface-inset: var(--background-primary-alt)` on `:root` was broken by
 exactly the same mechanism, and the mix on `body` was reading *it*.
 
 **Nine tokens were affected**, and all nine are on `body` now:
-`--am-surface-card`, `--am-surface-raised`, `--am-surface-inset`,
-`--am-border-subtle`, `--am-border-hover`, `--am-border-focus`, `--am-bar-ink`,
-`--am-sec-title-ink`, and the seam itself. **`--am-border-inner` is a plain
+`--ca-surface-card`, `--ca-surface-raised`, `--ca-surface-inset`,
+`--ca-border-subtle`, `--ca-border-hover`, `--ca-border-focus`, `--ca-bar-ink`,
+`--ca-sec-title-ink`, and the seam itself. **`--ca-border-inner` is a plain
 `rgba` rather than a mix** — the mix was the better idea and has never once
 drawn, and an adaptive value that renders as `currentColor` is not adaptive.
 
 **A visible consequence beyond the borders.** `.jjs-group-name` asks for
-`--am-bar-ink`, so with that token invalid the subject titles fell through to
+`--ca-bar-ink`, so with that token invalid the subject titles fell through to
 Obsidian's `.internal-link` — chem and Maths measured `#a68af9` on the
 screenshot. They read as the bar's own voice now, which is what 4.13 designed
 and what has never rendered.
@@ -2192,7 +2241,7 @@ white — so `color-mix` works fine here, and the mix was failing for another
 reason. It is deleted rather than left standing as a wrong explanation with a
 passing test on top of it.
 
-**The actual cause: `--am-border-inner` was declared on `:root`.** Obsidian's
+**The actual cause: `--ca-border-inner` was declared on `:root`.** Obsidian's
 colour variables live on **`body`** — `--background-modifier-border` comes from
 `.theme-dark` / `.theme-light`, which are classes on `body`, and the `html`
 element has none of them. And a `color-mix()` inside a custom property is
@@ -2204,11 +2253,11 @@ been doing that since 4.35.2 introduced it — every `.jjs-card`, every
 
 **A lone `var()` does not behave that way, and that asymmetry is what hid it.** A
 custom property whose value is just `var(--x)` is a *pending-substitution value*:
-it is substituted where it is **used**, so `--am-surface-inset:
+it is substituted where it is **used**, so `--ca-surface-inset:
 var(--background-primary-alt)` on the same `:root` works perfectly. Wrap the
 identical reference in `color-mix()` and it resolves at the declaration instead.
 
-The proof was in the same file the whole time: `--am-surface-accent-subtle` is
+The proof was in the same file the whole time: `--ca-surface-accent-subtle` is
 the same construct — a `color-mix` over two theme variables — declared on `body`,
 and it has always worked.
 
@@ -2249,7 +2298,7 @@ record as having drifted.
 has always been `settings.customJournals.map(buildJournalType)` — the array *is*
 the order, and every surface that lists journals already draws them in it. So
 this is a permutation of a list the plugin owns: no new setting, no migration,
-nothing that a folder renamed outside Almanac could fall out of. Study is not a
+nothing that a folder renamed outside ChronoAnvil could fall out of. Study is not a
 special case; it is the first entry.
 
 **Nothing moves on disk, and the window says so before you touch anything.**
@@ -2274,7 +2323,7 @@ surface already has, not the half a keyboard can reach.
 ### The dashed edge, and the fault underneath it
 
 **Toned down, as asked.** The add tile and the empty add card now draw their
-edge in `--am-slot-edge` — a hair above the surface rather than against it. A
+edge in `--ca-slot-edge` — a hair above the surface rather than against it. A
 dashed border is already the loudest edge in the vocabulary (it is broken, so it
 flickers as the eye travels it) and it does not also need contrast: it marks
 *where* a card would go, and the label inside says what pressing it does. A plain
@@ -2292,7 +2341,7 @@ values at once is a signature, not a coincidence.
 the colour — `border-width`, `border-style` and `border-color` all revert,
 because a shorthand containing an unresolvable `var()` is invalid at
 computed-value time as one declaration. `.jjs-card` read
-`border: 1px solid var(--am-border-inner)`, so wherever that token failed the
+`border: 1px solid var(--ca-border-inner)`, so wherever that token failed the
 card lost its border *entirely* (`border-style: none`), and the one place a
 style was stated separately — `.jjs-card-add`'s `dashed` — inherited the 3px
 `currentColor` rope as the only survivor of the three.
@@ -2300,7 +2349,7 @@ style was stated separately — `.jjs-card-add`'s `dashed` — inherited the 3px
 Two independent fixes, because only one of them survives being wrong about the
 cause:
 
-- **Longhands.** Every use of `--am-border-inner` is now `border-*-width` /
+- **Longhands.** Every use of `--ca-border-inner` is now `border-*-width` /
   `-style` / `-color`. A colour that cannot be computed costs the colour and
   nothing else.
 - **An `@supports` guard on the token.** A custom property *cannot* fall back by
@@ -2554,7 +2603,7 @@ items)*, and got no writes and no notice — not even an error. The migration th
 window named was innocent; the group **above** it was the problem, and the chain
 is worth writing down because every link was individually reasonable.
 
-A journal's manifest is `.almanac-journal.json`, and **Obsidian keeps dotfiles
+A journal's manifest is `.chronoanvil-journal.json`, and **Obsidian keeps dotfiles
 out of the vault index**. `journal-manifest.ts` has said so since manifests
 existed — *"the adapter while the rest of the plugin talks to the vault"* — and
 `writeManifest` obeys it. The repair planner did not:
@@ -2562,7 +2611,7 @@ existed — *"the adapter while the rest of the plugin talks to the vault"* — 
 1. It asked `getFile()` whether the manifest existed. The vault always answers
    *no* for a dotfile, whatever is on disk — so **every manifest was listed as
    "create this file" on every repair, forever.** The reported window shows four
-   identical `.almanac-journal.json` rows on a vault that already had all four.
+   identical `.chronoanvil-journal.json` rows on a vault that already had all four.
 2. Applying then called `vault.create()` on a path that was already there, which
    throws *"File already exists"*.
 3. The create loop was the one group in `applyRepair` with **no `try`**, so the
@@ -2678,7 +2727,7 @@ which is 4.36.3's deletion applied to the other card family; it survived this lo
 only because the two are built by two widgets.
 
 **Both ＋ glyphs state their size.** The head's was 12.24px and nothing said so —
-`--am-text-sm` at 0.85em, then 0.9em of that — which is why it was the smallest
+`--ca-text-sm` at 0.85em, then 0.9em of that — which is why it was the smallest
 mark on the card while being the tallest thing in its band. It is 15px now, the
 title's cap height beside it; the tile's is 20px, because on an empty surface the
 ＋ *is* the content. Two named values, so nobody later "fixes" them into
@@ -2710,7 +2759,7 @@ recorded because the *method* that caught them is the transferable part.
 
 > A third correction is smaller but the same shape: `.jjs-group-name` was recorded
 > as already using `--text-accent`, which is why the card title was moved to it
-> "for consistency". It does not — it is `--am-bar-ink`, and `.jjs-row-link` is
+> "for consistency". It does not — it is `--ca-bar-ink`, and `.jjs-row-link` is
 > `--text-normal`. The move stands on Obsidian's own link colour and on
 > `.jsh-crumbs a.jn-pill`, the plugin's other link to a container's folder note.
 > The wrong justification was in a code comment and a test; both now say what is
@@ -2778,7 +2827,7 @@ repair would not add a *second* journals block beside yours. Correct, and it wou
 have left every existing homepage on the old arrangement forever. So this is a
 one-off migration beside the Trends pair and the banner weld: one word on one
 line, ticked separately in **Set up / repair vault**, and it touches only a bare
-`journals` inside an `almanac` fence — never your prose, and never an argument you
+`journals` inside a `chronoanvil` fence — never your prose, and never an argument you
 chose yourself.
 
 ### Internal
@@ -3005,8 +3054,8 @@ introduces.
 **A CSS assertion can no longer pass by finding nothing.** Thirty-odd tests
 reach for a rule as `slice(indexOf(sel), indexOf("}", …))`, which fails two ways
 that both end in a green suite: an unanchored match reads a DIFFERENT rule when
-one selector ends with another (`.almanac-section-title` inside
-`.almanac-head-fold .almanac-section-title`), and a renamed selector returns an
+one selector ends with another (`.ca-section-title` inside
+`.ca-head-fold .ca-section-title`), and a renamed selector returns an
 empty string on which every negative assertion succeeds while asserting
 nothing. `cssRule` walks the stylesheet by brace depth, compares whole
 selectors, reaches inside `@container` blocks, and **throws** when there is no
@@ -3018,14 +3067,14 @@ inherits its bugs as passes.
 **A journal card no longer draws its section's edge a second time.** The card
 sits inside the section card, and both used the same border ink — so one
 boundary was stated twice, twelve pixels apart. It takes a new
-`--am-border-inner` now: the same colour mixed toward the surface the card sits
+`--ca-border-inner` now: the same colour mixed toward the surface the card sits
 on, so the outer edge reads as the boundary and the inner one as a seam. The
 grounds already differed, which is what the stylesheet's own note says makes a
 card inside a card deliberate; what changed is that the two edges are no longer
 the same weight.
 
 **The two columns on a card row say what they are.** A row reads
-"Almanac — —" on a journal you have just made: the columns explain themselves
+"ChronoAnvil — —" on a journal you have just made: the columns explain themselves
 once there is data ("3d ago", "2 ◻") and say nothing at all before then. Both
 carry a name now, so hovering explains them and a screen reader reads them —
 it heard "dash dash" in either state before, since neither cell had ever
@@ -3242,7 +3291,7 @@ line divides the block itself — into pages, one on screen at a time, with a
 numbered strip in the group's foot to switch between them:
 
 ````
-```almanac
+```chronoanvil
 row
 diary:3
 cell
@@ -3293,7 +3342,7 @@ row, or one above a widget that has nothing to show. The strip never offers a
 number that opens onto nothing.
 
 **And a group with no `tab` line is exactly what it was:** one row, its columns,
-and the column count in the foot. Every dashboard Almanac ships is one of those
+and the column count in the foot. Every dashboard ChronoAnvil ships is one of those
 and none of them has changed.
 
 ## [4.33.1] - 2026-08-16
@@ -3367,7 +3416,7 @@ says exactly what, and points you at *Edit sections…*, which changes a note's
 sections without losing anything.
 
 **Charts you added are now protected, and previously they were not reported at
-all.** A journal note's charts live in a block Almanac treats as opaque, so the
+all.** A journal note's charts live in a block ChronoAnvil treats as opaque, so the
 existing "preview changes" window would tell you a page's charts were unchanged
 while a rebuild was about to replace every one of them. A rebuild now refuses.
 
@@ -3393,15 +3442,15 @@ everything.
 
 **A refined surface hierarchy for diary pages and subsystems.**
 - **Banner Tinting & Texture**: Grain headers (`.journal-slim-banner`) now feature subtle theme-driven accent gradient tinting combined with fine engraved diagonal hatching texture and top edge highlights.
-- **Recessed Tracker Cells**: Tracker widgets (`.journal-tracker-cell`) now use the semantic recessed inset surface (`--am-surface-inset`), giving the logging grid crisp visual containment that no longer punches through to the note page ground.
+- **Recessed Tracker Cells**: Tracker widgets (`.journal-tracker-cell`) now use the semantic recessed inset surface (`--ca-surface-inset`), giving the logging grid crisp visual containment that no longer punches through to the note page ground.
 - **Accent-Washed Captured Cards**: The captured log cards (`.journal-capture-card`) now sport a subtle accent background wash, crisp border, accent left spine, and refined elevation.
-- **Global Surface Token Harmony**: Standardized `--am-surface-card` and `--am-surface-inset` tokens across Settings tables, notes, icon tokens, and groups for consistent depth across light and dark themes.
+- **Global Surface Token Harmony**: Standardized `--ca-surface-card` and `--ca-surface-inset` tokens across Settings tables, notes, icon tokens, and groups for consistent depth across light and dark themes.
 
 ## [4.31.0] - 2026-08-15
 
 **Now the whole lot at once.** 4.30 gave you one page on the clipboard. There is
 now **Maintenance: export as plain markdown**, which writes every diary entry and
-every journal note into one folder — `Almanac Export` by default, and you can
+every journal note into one folder — `ChronoAnvil Export` by default, and you can
 move it in Settings → Paths — as ordinary markdown anybody can read.
 
 **You see the full list before a single file is written.** The same window a
@@ -3413,13 +3462,13 @@ time on an unchanged vault tells you so and stops.
 **Your properties come with the note, written into the page.** This is the one
 place the export differs from the clipboard copy, and it matters: a copy that
 kept its properties as properties would still say `journal: Daily Notes`, and
-Almanac would read it as a second Tuesday — in your calendar, your rollups and
+ChronoAnvil would read it as a second Tuesday — in your calendar, your rollups and
 every chart. So the properties become a short block at the top of the page
 instead. Nothing is lost, everything is visible, and no copy can be mistaken for
 the entry it came from.
 
 **It only ever writes inside the export folder.** Nothing else in your vault is
-touched, read back, or changed by any of it — the copies are copies, and Almanac
+touched, read back, or changed by any of it — the copies are copies, and ChronoAnvil
 never reads them again.
 
 **Entries and journal notes only.** Dashboards, the homepage and Search are
@@ -3432,7 +3481,7 @@ attachments — an exported note's `![[picture.png]]` still points into the vaul
 
 ## [4.30.0] - 2026-08-15
 
-**Your writing can leave.** Almanac keeps what you type in two places a reader
+**Your writing can leave.** ChronoAnvil keeps what you type in two places a reader
 cannot see without the plugin: the words themselves sit inside HTML comments,
 which Obsidian hides, and the name of each field — *Today's focus*, *Highlights*
 — lives inside a fenced block that shows up as code. Uninstall the plugin, or
@@ -3462,7 +3511,7 @@ they are already in the properties, and one number in two places is one number
 that can end up disagreeing with itself.
 
 If you have renamed a section — the header bar on any field is editable — the
-copy uses **your** name for it, not the one Almanac shipped.
+copy uses **your** name for it, not the one ChronoAnvil shipped.
 
 ## [4.29.0] - 2026-08-15
 
@@ -3531,7 +3580,7 @@ the top of the box. Cmd/Ctrl+Enter still captures in one keystroke without
 touching it.
 
 It offers the entries that can actually show a capture: today always, plus any
-grain you tick *Captured* for in **Settings → Almanac → Diary entries**, plus
+grain you tick *Captured* for in **Settings → ChronoAnvil → Diary entries**, plus
 the note you are on when it is an entry with a Captured field of its own. A
 destination that would swallow the text into a note that draws nothing is not
 offered at all.
@@ -3554,20 +3603,20 @@ whatever theme you use.
 
 **Trends and statistics now matches every other heading.** 4.25 put the whole
 plugin's section titles into sentence case and had to leave this one behind: it
-is the heading Almanac uses to *find* your chart section, not only to show it,
+is the heading ChronoAnvil uses to *find* your chart section, not only to show it,
 and renaming it would have quietly unhooked two old repairs from the notes that
-still need them. Almanac now remembers every spelling a heading has shipped
+still need them. ChronoAnvil now remembers every spelling a heading has shipped
 under, so the words could change without anything losing track of the section.
 
 **Nothing on your pages changes until you say so.** Existing dashboards keep
 reading "Trends and Statistics" and keep working exactly as they do — the charts
 draw, the toolbar appears, the section folds. To take the new spelling, run
-**Almanac: Maintenance: set up / repair vault** and tick *migrations*; you get
+**ChronoAnvil: Maintenance: set up / repair vault** and tick *migrations*; you get
 the usual line-by-line preview first, and declining costs you nothing but a
 capital S.
 
 **A Trends bar you renamed yourself is left alone.** If your chart section is
-called "My numbers", it stays "My numbers". Almanac only rewrites headings it
+called "My numbers", it stays "My numbers". ChronoAnvil only rewrites headings it
 wrote itself, which is why it keeps a list of its own past wording rather than
 guessing from the shape of the words.
 
@@ -3581,7 +3630,7 @@ the bar over a folded block now agree: *Open tasks*, *On this day*, *All
 entries*, *Search the diary*.
 
 Your notes keep whatever their headings currently say — nothing is rewritten
-behind you. To take the new wording, run **Almanac: Maintenance: set up / repair
+behind you. To take the new wording, run **ChronoAnvil: Maintenance: set up / repair
 vault** and accept the changes it lists; each one shows you the exact line
 before and after. Declining leaves everything working, and a heading you
 retitled yourself is still yours.
@@ -3606,8 +3655,8 @@ it is one constant now.
 ## [4.24.0] - 2026-08-14
 
 **Visual excellence: frames, depth hierarchy, and interface consolidation.**
-- **Surface Elevation**: Defined a structured 3-tier surface depth system (`--am-surface-card`, `--am-surface-raised`, `--am-surface-inset`) with subtle top-edge highlights (`--am-edge-highlight`) across all callouts, cards, and section blocks.
-- **Card Frames & Boundaries**: Standardized 1px borders with smooth 10px radius (`--am-radius-md`) and seamless hover transitions.
+- **Surface Elevation**: Defined a structured 3-tier surface depth system (`--ca-surface-card`, `--ca-surface-raised`, `--ca-surface-inset`) with subtle top-edge highlights (`--ca-edge-highlight`) across all callouts, cards, and section blocks.
+- **Card Frames & Boundaries**: Standardized 1px borders with smooth 10px radius (`--ca-radius-md`) and seamless hover transitions.
 - **Modal Scaffolding**: Consolidated dialog architectures (`RepairModal`, `EditorModal`, pickers) with isolated scrollports, discrete 6px webkit scrollbars, and pinned footer action rows.
 - **Accessible Focus Rings**: Modern `:focus-visible` rings for buttons, inputs, and selects.
 
@@ -3652,7 +3701,7 @@ the same mark, in the same place, doing the job it was drawn for.
 
 **A diary entry and a journal note said their name twice.** Obsidian draws the
 note's name above the note and the banner draws it again, larger, with a rename
-on it. Almanac has hidden Obsidian's copy on its dashboards since 4.5.1; the rule
+on it. ChronoAnvil has hidden Obsidian's copy on its dashboards since 4.5.1; the rule
 only ever recognised the dashboard banner, so the two page kinds you are in most
 have been showing both names ever since. Remove the banner and Obsidian's title
 comes back, exactly as on a dashboard.
@@ -3719,7 +3768,7 @@ wore a different icon from the same section on every other page.
 
 **A diary entry's banner shows what the note is called.** It used to show a
 `title` property from the frontmatter, falling back to a formatted date — so an
-entry was the one Almanac page whose banner did not show its own file name, and
+entry was the one ChronoAnvil page whose banner did not show its own file name, and
 the one place renaming from the banner did not rename the file. It does now, like
 every other page. **Your existing titles are not lost**: they moved down to the
 tracker section, along with the prev/next date stepper, and the cog came up to
@@ -3851,19 +3900,19 @@ chose, and they stay their own sections.
   overview: a page with two blocks matching one section could have the second
   written over the first when you reordered anything, with nothing in the
   preview saying so. The first block in the file is the section now, and the
-  second is reported as a block Almanac does not manage.
+  second is reported as a block ChronoAnvil does not manage.
 
 ## [4.18.2] - 2026-08-13
 
 **Renaming something now updates it everywhere it is on screen, not just in the
-tab you are reading.** Almanac blocks can be drawn outside an ordinary note tab —
+tab you are reading.** ChronoAnvil blocks can be drawn outside an ordinary note tab —
 by a dashboard or homepage plugin that embeds your notes, or anywhere else a note
 is rendered inside another view. Until now those copies kept whatever words they
 were drawn with: rename a note type from *Lessons* to *Seminars* and the heading
 in your note updated while the same section, embedded in a dashboard beside it,
 still said *Lessons* until something happened to redraw it.
 
-**This includes the buttons.** The per-topic buttons Almanac writes into table
+**This includes the buttons.** The per-topic buttons ChronoAnvil writes into table
 cells are the ones a rename renames, and they were the most visible half of the
 disagreement.
 
@@ -3881,7 +3930,7 @@ it. Nothing is written on that path, exactly as before.
   open in a markdown tab, because re-rendering the note was the only way it knew
   to redraw a block. Each rendered block now knows how to draw itself again, so
   the repaint reaches embeds, dashboards and any other host that renders a note.
-- **Inline `almanac:` widgets repaint too**, including the table-cell buttons
+- **Inline `chronoanvil:` widgets repaint too**, including the table-cell buttons
   that a rename gives new labels.
 
 ### Changed
@@ -4071,7 +4120,7 @@ and there is nothing to run.**
 - **A journal card widget, and you can have several.** `journal-card:study`
   draws one journal as a card — the same card the Journals grid draws, from the
   same builder — so a page can put Study beside Cooking, or hold three of the
-  six journals a vault has. It is the first widget Almanac lets you repeat: add
+  six journals a vault has. It is the first widget ChronoAnvil lets you repeat: add
   it as many times as you like from the sections editor, and each row carries a
   dropdown naming which journal it shows. Naming a journal that no longer exists
   lists the ones that do rather than drawing an empty card.
@@ -4093,7 +4142,7 @@ and there is nothing to run.**
   description and its buttons, so all three had been quietly shrunk to fit —
   including a question that rendered as *"Choose a journal to p"*. The controls
   now sit on a line of their own under the row, each with a label saying what
-  the box is. Only the sections editor changes; every other list in Almanac is
+  the box is. Only the sections editor changes; every other list in ChronoAnvil is
   exactly as it was.
 
 ### Fixed
@@ -4463,7 +4512,7 @@ there is nothing to run.**
   buttons where there are any, because folding acts on the whole section and a
   button acts on something inside it. It points **down when the section is closed
   and up when it is open**, which is the way round every other collapsing thing
-  works — and the three places Almanac draws one now agree, where two of them used
+  works — and the three places ChronoAnvil draws one now agree, where two of them used
   to disagree on the same screen.
 
 - **A section's emoji sits in a fixed slot on every page.** On the homepage the
@@ -4476,7 +4525,7 @@ there is nothing to run.**
   draws its own border any more — the section is already a card, and a box inside a
   box was the plugin saying the same thing twice. Outside one, the box stays.
 
-  **And the heading is Almanac's colour now.** It had never set one, so it took
+  **And the heading is ChronoAnvil's colour now.** It had never set one, so it took
   whatever your theme happened to paint an unrecognised callout — which is why one
   of these was blue and the one beside it violet, and why it could have been a
   third colour on a different theme.
@@ -4494,7 +4543,7 @@ there is nothing to run.**
 
 ## [4.12.0] - 2026-08-09
 
-Every widget Almanac can draw is now something you can add from the section
+Every widget ChronoAnvil can draw is now something you can add from the section
 window, a group stops accepting things it cannot lay out, and two ways of losing
 work are closed. **Nothing in your vault is rewritten and there is nothing to
 run.**
@@ -4515,7 +4564,7 @@ run.**
 
   **A widget the page already writes is not offered twice.** The diary dashboard
   does not offer *Open tasks*, because it composes one. And where you have written
-  a second copy of a widget by hand, Almanac manages the first and leaves yours
+  a second copy of a widget by hand, ChronoAnvil manages the first and leaves yours
   alone, reporting it as a block that is not the catalogue's.
 
   A few widgets are deliberately not on the list: the ones bound to a single
@@ -4540,7 +4589,7 @@ run.**
   the same widget appeared in two blocks — an `events` list and an
   `events:upcoming` list, say — both blocks answered to the same section, and
   reordering anything on that page could write the second block's content over the
-  first's. Almanac now manages the first block holding a given widget and leaves
+  first's. ChronoAnvil now manages the first block holding a given widget and leaves
   any others exactly as you wrote them.
 
 - **The Diary card on the homepage claimed a diary-search block.** Its name
@@ -4582,7 +4631,7 @@ kinds of bar. **Nothing in your vault is rewritten and there is nothing to run**
 the one thing that writes to a note is the new toggle, and only when you use it.
 
 ### Added
-- **Wide page, on every dashboard's cog.** Almanac's pages are 1100px wide when
+- **Wide page, on every dashboard's cog.** ChronoAnvil's pages are 1100px wide when
   they ask to be — two full-size columns and the gap between them — because a
   row splits the pane and Obsidian's *readable line length* would otherwise
   decide, at its 700px default, that every widget on the page renders in its
@@ -4653,7 +4702,7 @@ the one thing that writes to a note is the new toggle, and only when you use it.
 
 ## [4.10.0] - 2026-08-09
 
-Every Almanac dashboard now opens with its own name, the places it can go, and
+Every ChronoAnvil dashboard now opens with its own name, the places it can go, and
 the control that edits it. Your existing pages are updated in place the next time
 repair runs; nothing you wrote is touched.
 
@@ -4664,11 +4713,11 @@ repair runs; nothing you wrote is touched.
   **Journals** — and the cog that opens **Edit sections…**.
 
   **The cog is the point.** It has existed since 4.5 and was drawn on the
-  homepage only, so on every other Almanac page the section editor was reachable
+  homepage only, so on every other ChronoAnvil page the section editor was reachable
   only through the command palette. It now sits where the page is.
 
   The head is drawn as the page rather than as another card: the name is set in
-  a book face on a faintly hatched ground, which is the one place in Almanac
+  a book face on a faintly hatched ground, which is the one place in ChronoAnvil
   that is not the interface's own typeface. It keeps the same border and corner
   radius as everything else, so it belongs without being one more thing to read.
 
@@ -4692,7 +4741,7 @@ repair runs; nothing you wrote is touched.
   and **03 - Journals** there. Clicking the name renames the folder as well as
   the note — which is what a folder note is, and what renaming a journal index
   has always done. To change how it reads, rename the folder in
-  **Settings → Almanac → Paths**.
+  **Settings → ChronoAnvil → Paths**.
 
 ### Fixed
 - **Removing a section from the top of a page and adding it back leaves the file
@@ -4870,7 +4919,7 @@ Blocks and the widgets in them say what they are. Nothing in your vault is
 rewritten and there is nothing to run.
 
 ### Added
-- **A head on every block Almanac can name.** A slim bar across the top of the
+- **A head on every block ChronoAnvil can name.** A slim bar across the top of the
   block carrying the widget's name — the same names the section editor uses, so
   a block titled **📚 Journals** there is titled that here. The drag grip lives
   in that bar now, as a small patch of dots in the middle rather than a strip
@@ -4918,7 +4967,7 @@ reading it. Nothing in your vault is rewritten and there is nothing to run.
   the top of it; pick it up, drop it on another block, and the two trade places.
   The note is rewritten to match — the same writer the section editor has always
   used, so everything it does not touch comes back as the exact lines it was read
-  as, including anything of your own sitting between two Almanac blocks.
+  as, including anything of your own sitting between two ChronoAnvil blocks.
 
   **A whole block moves, with everything in it.** A row goes with its columns and
   each column with its widgets. That is the rule the section editor already
@@ -4929,7 +4978,7 @@ reading it. Nothing in your vault is rewritten and there is nothing to run.
   **To undo a move, drag it back.** Two blocks trading places is undone by
   trading them again, which is why nothing pops up to offer it.
 
-  **Reading mode only, which is how Almanac's pages now open.** In editing mode
+  **Reading mode only, which is how ChronoAnvil's pages now open.** In editing mode
   you are looking at the text itself, where the blocks can be moved by cutting
   and pasting them.
 
@@ -4942,12 +4991,12 @@ reading it. Nothing in your vault is rewritten and there is nothing to run.
 
 ## [4.6.0] - 2026-08-08
 
-Almanac's own pages open in reading mode. Nothing in your vault is rewritten and
+ChronoAnvil's own pages open in reading mode. Nothing in your vault is rewritten and
 there is nothing to run — this applies to the notes you already have, not only to
 new ones.
 
 ### Changed
-- **An Almanac page opens in reading mode rather than editing mode.** The
+- **A ChronoAnvil page opens in reading mode rather than editing mode.** The
   homepage, Search, the diary and journals dashboards, the four period
   dashboards, every journal note and every diary entry. These are pages of
   widgets: in editing mode they also show the Properties block, and clicking
@@ -4956,7 +5005,7 @@ new ones.
   and every button, tracker and field work exactly the same in reading view.
 
   **Ctrl+E still wins.** Switching an open note to editing mode is never undone;
-  Almanac only acts when a note is *opened*. Switching tabs away and back counts
+  ChronoAnvil only acts when a note is *opened*. Switching tabs away and back counts
   as opening it again, so it returns to reading mode.
 
   **To stop it for one note**, add `obsidianUIMode: source` to that note's
@@ -4980,7 +5029,7 @@ vault is rewritten and there is nothing to run.
   far edge of the block. **Click the name to rename the note** — it renames the
   file, so every link pointing at it follows. The cog opens **Edit sections…**
   and **Add a section…**, the same two the ⋯ on a journal note offers. On a note
-  whose sections Almanac has nothing to say about, you get the name and no cog
+  whose sections ChronoAnvil has nothing to say about, you get the name and no cog
   rather than a menu that opens and then apologises.
 
   **Obsidian's own title above the note is hidden while this block is there**, so
@@ -5000,7 +5049,7 @@ vault is rewritten and there is nothing to run.
 ### Changed
 - **A new homepage opens with its own name**, and its right-hand column starts
   with the launcher, above your open tasks and this date in previous years.
-- **Your existing homepage keeps the layout you have.** Almanac writes that note
+- **Your existing homepage keeps the layout you have.** ChronoAnvil writes that note
   only when it is missing. To take the new one: delete the note and run
   **Maintenance: set up / repair vault** — anything you added to it is deleted
   with it, so move that somewhere first. Or just add the two lines by hand:
@@ -5018,7 +5067,7 @@ rewritten and there is nothing to run.
   `cell` lines share one and stack inside it:
 
   ````
-  ```almanac
+  ```chronoanvil
   row
   diary:3
   cell
@@ -5045,7 +5094,7 @@ rewritten and there is nothing to run.
   the column, the row and everything beside it. Emptying a column keeps its
   `cell` line, which marks where the column was and draws nothing; a widget
   written after it goes back there.
-- **Your existing homepage keeps the layout you have.** Almanac writes that note
+- **Your existing homepage keeps the layout you have.** ChronoAnvil writes that note
   only when it is missing. To take the new one: delete the note and run
   **Maintenance: set up / repair vault** — anything you added to it is deleted
   with it, so move that somewhere first.
@@ -5102,7 +5151,7 @@ below for the one way to take the new layout if you want it.
   page. A third of a row is not that. It still shows nothing at all until you
   have a year of entries, so a new vault sees an empty cell rather than a
   heading with nothing under it.
-- **Your existing homepage keeps the layout you have.** Almanac writes that note
+- **Your existing homepage keeps the layout you have.** ChronoAnvil writes that note
   only when it is missing, so nothing is rearranged under you. To take the new
   one: delete the note and run **Maintenance: set up / repair vault**. Anything
   you had added to it is deleted with it, so move it somewhere first.
@@ -5135,7 +5184,7 @@ gave them, and the new lines only do anything where you type them.
   look, so one you have already set up is picked up with nothing to configure.
   A journal with no banner gets a colour of its own, derived from its name, so
   it stays the same colour as you add others.
-- **`row` — widgets side by side.** A line you can put in any `almanac` block
+- **`row` — widgets side by side.** A line you can put in any `chronoanvil` block
   saying that its widgets sit next to each other instead of stacking. The cells
   are the lines you wrote, so three directives make three columns and there is
   no number to keep in step. On a narrow pane — a sidebar, a split, a phone —
@@ -5148,24 +5197,24 @@ gave them, and the new lines only do anything where you type them.
 
 ### Changed
 - **A new homepage sets its own width.** It is composed with a `cssclasses`
-  property, and Almanac gives that class a width wider than Obsidian's
+  property, and ChronoAnvil gives that class a width wider than Obsidian's
   *readable line length* — and a limit where that setting has none. Readable
   line length is a setting about how many characters read comfortably in a line
   of prose, and a homepage of rows is a calendar and a card, so it no longer
   decides how much room each widget gets. **A homepage you already have is not
   touched** and keeps following your own setting. To give it the new width, add
-  `cssclasses: almanac-wide` to its properties; to take it off a new one, delete
+  `cssclasses: ca-wide` to its properties; to take it off a new one, delete
   that line and nothing will put it back.
 
 ### Fixed
 - **The section window called a homepage's own properties a stray block.**
   Opening "Edit this note's sections…" on a homepage with any properties on it
-  reported that a block in the file wasn't Almanac's and had been left alone —
+  reported that a block in the file wasn't ChronoAnvil's and had been left alone —
   about the properties themselves. Your own blocks are still reported, as they
   should be; the note's properties no longer are. The message also said "1 block
   … aren't", which now agrees with itself.
 - **Unticking one of two widgets that share a block did nothing, after saying it
-  would.** If you had put two sections in one `almanac` block, the preview
+  would.** If you had put two sections in one `chronoanvil` block, the preview
   offered to remove one and then left the file exactly as it was. The window now
   says why it cannot — naming the block and the two ways out — instead of
   promising an edit it will not make. Unticking every section in a block still
@@ -5192,7 +5241,7 @@ are untouched and there is nothing to run — the pages repaint themselves.
 - **Empty widgets sat flush against the edge** of a canvas node or another
   plugin's tile, with nothing around them, which read as a failed render rather
   than as "nothing here yet". They are inset and centred now. Widgets on an
-  ordinary Almanac page are unchanged.
+  ordinary ChronoAnvil page are unchanged.
 
 ## [4.1.1] - 2026-08-08
 
@@ -5208,7 +5257,7 @@ a vault contains, and nothing to run — the pages repaint themselves.
   leaving DAYS LOGGED and TASKS DONE crowded to the left. The rule that lets the
   band's rows fill its width was written to apply only where the card was, and
   the card is exactly what those sections had just given up.
-- **The review list on the journals dashboard showed a red *Unknown Almanac
+- **The review list on the journals dashboard showed a red *Unknown ChronoAnvil
   widget*** on a vault with no journals in it yet. It is a valid list with
   nothing in scope, and now says so.
 
@@ -5236,7 +5285,7 @@ already have keeps every section it has.
   index notes, so there was nowhere to see the whole vault's queue at once.
 - Both pages work with **Edit this note's sections…** and **Add a section to
   this note…**, like the homepage and the period dashboards.
-- **`frame:`** — a line you can put in any `almanac` block saying what its
+- **`frame:`** — a line you can put in any `chronoanvil` block saying what its
   widgets should be drawn inside: `card` (the default, unchanged), `section` (a
   collapsible titled bar) or `none` (no chrome, for a canvas node or another
   plugin's tile). Blocks with no `frame:` line are unaffected.

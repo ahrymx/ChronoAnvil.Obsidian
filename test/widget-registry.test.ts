@@ -392,7 +392,7 @@ const hasDocs = existsSync(join(ROOT, "docs/reference.md"));
     // any opinion about the prose in between.
     const reference = hasDocs ? repoFile("docs/reference.md") : "";
     const table = reference.slice(
-      reference.indexOf("## Almanac widget reference"),
+      reference.indexOf("## ChronoAnvil widget reference"),
       reference.indexOf("## Trackers")
     );
     // The keyword is the first backticked word of a row, up to the first

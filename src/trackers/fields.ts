@@ -9,7 +9,7 @@
 //
 // A *field* is a body region a diary entry is written into — the `note:`,
 // `list:`, `tasks:` and `attach:` directives the daily and monthly templates
-// carry, backed by the `<!--almanac:key-->` regions notestore.ts reads and
+// carry, backed by the `<!--chronoanvil:key-->` regions notestore.ts reads and
 // writes. Until 2.52 they were directive strings hand-written into two template
 // assets, and the only code that knew any of them by name was quarter-stats.ts,
 // which named four as string literals.
@@ -34,7 +34,7 @@
 // ── what this is NOT authoritative over ───────────────────────────────
 //
 // notestore.ts::allNoteRegions discovers keys it was never told about, and it
-// must keep doing so. A hand-edited note carrying `<!--almanac:dreams-->` is
+// must keep doing so. A hand-edited note carrying `<!--chronoanvil:dreams-->` is
 // still indexed, still searchable, still counted, and still survives a round
 // trip untouched. The registry says which regions a *review scope* rolls up; it
 // says nothing about which regions exist. An unregistered region is invisible to
@@ -73,7 +73,7 @@ export type FieldVariant = "line" | "collapse";
 export type FieldRollup = "none" | "line" | "items" | "goals";
 
 export interface DiaryField {
-  // The region key: `<!--almanac:focus-->`. Unique per (id, class), not
+  // The region key: `<!--chronoanvil:focus-->`. Unique per (id, class), not
   // globally — `focus` is a field of the day *and* a field of the month, with
   // different prompts and different meanings, and they are two declarations.
   id: string;

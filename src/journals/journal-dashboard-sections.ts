@@ -226,7 +226,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // ground, and `SECTION_TITLES` has named it "🔥 Activity" since 4.15 §1.
       locked: false,
       render: (opts) => ({
-        fence: "almanac",
+        fence: "chronoanvil",
         lines: [
           ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
           `journals-header:${type.id}`,
@@ -246,7 +246,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // than no page at all. Here the section IS the page.
       locked: true,
       render: (opts) => ({
-        fence: "almanac",
+        fence: "chronoanvil",
         lines: [
           ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
           `level-cards:${type.id}`,
@@ -340,7 +340,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // keyword "🔢 Stats" since the 4.46 merge. A `header:` bar would be a
       // second name for the same widget, kept in a second place.
       render: (opts) => ({
-        fence: "almanac",
+        fence: "chronoanvil",
         lines: [
           ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
           "stats-band",
@@ -365,7 +365,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // journal and every note type in `constants.ts`, and the only select this
       // catalogue can name without reading a registry it cannot see.
       render: () => ({
-        fence: "almanac",
+        fence: "chronoanvil",
         lines: [`journal-tally:${DEFAULT_TALLY_TRACKER}`],
       }),
       locate: (text) => probe(text, /^journal-tally:/m),
@@ -406,7 +406,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
         },
       ],
       render: (opts) => ({
-        fence: "almanac",
+        fence: "chronoanvil",
         lines: [
           ...(opts?.form === WIDGET_FORM ? [] : [LATELY_BAR]),
           "journal-recent",
@@ -418,7 +418,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
     {
       id: "open-tasks",
       label: "Open tasks",
-      blurb: `Still-open Almanac tasks from every note in ${type.name}.`,
+      blurb: `Still-open ChronoAnvil tasks from every note in ${type.name}.`,
       icon: "⏳",
       // The tasks live in the notes this aggregates, not here, so removing the
       // section costs nothing but the view — every other catalogue makes the
@@ -444,7 +444,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // gets — see `LATELY_BAR` above the catalogue for why it is worded for
       // the band rather than for either column.
       row: LATELY_ROW,
-      render: () => ({ fence: "almanac", lines: ["tasks-table"] }),
+      render: () => ({ fence: "chronoanvil", lines: ["tasks-table"] }),
       locate: (text) => probe(text, /^tasks-table\b/m),
     },
 
@@ -476,7 +476,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
         },
       ],
       render: (opts) => ({
-        fence: "almanac",
+        fence: "chronoanvil",
         lines: [
           ...(opts?.form === WIDGET_FORM ? [] : ["header:🔁 Review"]),
           "review-queue",
@@ -505,7 +505,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
         },
       ],
       render: () => ({
-        fence: "almanac",
+        fence: "chronoanvil",
         lines: ["header:🏷️ Tags", "tag-index"],
       }),
       // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who repoints the
@@ -521,7 +521,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       locked: false,
       // OFFERED RATHER THAN COMPOSED, unlike every other dashboard in the
       // plugin, and the difference is which fence this is. The four diary pages
-      // and the two folder notes compose `almanac-charts` SEEDED WITH NOTHING —
+      // and the two folder notes compose `chronoanvil-charts` SEEDED WITH NOTHING —
       // an empty managed region with an Add button, which is a working
       // affordance. This region is the same shape, and would be the same
       // affordance; what makes it `optIn` is that it is the fourth chart surface
@@ -535,8 +535,8 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       optIn: true,
       holds: (text) => journalChartLinesIn(text),
       // THE JOURNAL FENCE, NOT THE DIARY'S — and 4.1 drew this line in advance.
-      // `journals-dashboard-sections.ts` takes `almanac-charts` on the stated
-      // grounds that *"`almanac-journal-charts` belongs to a journal's own index
+      // `journals-dashboard-sections.ts` takes `chronoanvil-charts` on the stated
+      // grounds that *"`chronoanvil-journal-charts` belongs to a journal's own index
       // notes and reads a different store. This page sits above every journal
       // rather than inside one, so it takes the former."* This page sits inside
       // one.

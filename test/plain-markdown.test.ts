@@ -23,8 +23,8 @@ import { readSrc } from "./sources";
 // region the text under a heading actually came from.
 function fill(text: string): string {
   return text.replace(
-    /<!--almanac:([A-Za-z0-9_-]+)\n-->/g,
-    (_m, key: string) => `<!--almanac:${key}\nwriting-in-${key}\n-->`
+    /<!--chronoanvil:([A-Za-z0-9_-]+)\n-->/g,
+    (_m, key: string) => `<!--chronoanvil:${key}\nwriting-in-${key}\n-->`
   );
 }
 
@@ -78,7 +78,7 @@ describe("every section a page can hold comes out with its name on it", () => {
       const sections = plainSections(fill(file.content), journalSectionModel(ctx));
       // The regions the template actually ships, read off the file rather than
       // listed here — the same reason the grain sweep reads the registry.
-      const keys = [...file.content.matchAll(/<!--almanac:([A-Za-z0-9_-]+)/g)].map(
+      const keys = [...file.content.matchAll(/<!--chronoanvil:([A-Za-z0-9_-]+)/g)].map(
         (m) => m[1]
       );
       expect(sections.map((s) => s.id)).toEqual(keys);
@@ -98,7 +98,7 @@ describe("what is left out", () => {
   // design this release rejected.
   it("gives a derived widget no section at all, however many are on the page", () => {
     const text = [
-      "```almanac",
+      "```chronoanvil",
       "links:home,today",
       "entry-header",
       "diary",
@@ -114,11 +114,11 @@ describe("what is left out", () => {
       "bridge-notes:lesson",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "note:focus|Today's focus",
       "```",
       "",
-      "<!--almanac:focus",
+      "<!--chronoanvil:focus",
       "the only thing anybody wrote",
       "-->",
     ].join("\n");
@@ -147,15 +147,15 @@ describe("what is left out", () => {
 
   it("reports a section whose region is empty, and keeps it out of the markdown", () => {
     const text = [
-      "```almanac",
+      "```chronoanvil",
       "note:focus|Today's focus",
       "note:log|Notes",
       "```",
       "",
-      "<!--almanac:focus",
+      "<!--chronoanvil:focus",
       "-->",
       "",
-      "<!--almanac:log",
+      "<!--chronoanvil:log",
       "written",
       "-->",
     ].join("\n");
@@ -171,8 +171,8 @@ describe("what is left out", () => {
   it("drops the plugin's own spacer and band rule, and keeps a rule a reader typed", () => {
     const composed = fill(composeEntryTemplate("daily", []));
     const out = toPlainMarkdown(composed, daily);
-    expect(out).not.toContain("almanac:spacer");
-    // The band rule sits alone in its own run and is Almanac's separator.
+    expect(out).not.toContain("chronoanvil:spacer");
+    // The band rule sits alone in its own run and is ChronoAnvil's separator.
     //
     // ASSERTED OVER THE BODY, not the whole file: frontmatter is fenced by two
     // `---` lines of its own, so a match over the file would find those and
@@ -190,9 +190,9 @@ describe("what is left out", () => {
 
 describe("the writers it borrows, and the one it does not", () => {
   const wrap = (directive: string, key: string, body: string): string =>
-    ["```almanac", directive, "```", "", `<!--almanac:${key}`, body, "-->"].join("\n");
+    ["```chronoanvil", directive, "```", "", `<!--chronoanvil:${key}`, body, "-->"].join("\n");
 
-  it("turns Almanac's checkbox into GFM and keeps the inline fields", () => {
+  it("turns ChronoAnvil's checkbox into GFM and keeps the inline fields", () => {
     const text = wrap(
       "tasks:todo|Tasks",
       "todo",
@@ -265,11 +265,11 @@ describe("the writers it borrows, and the one it does not", () => {
 describe("what the heading says", () => {
   it("takes the label a reader renamed, not the catalogue's", () => {
     const text = [
-      "```almanac",
+      "```chronoanvil",
       "note:focus|What I am doing today",
       "```",
       "",
-      "<!--almanac:focus",
+      "<!--chronoanvil:focus",
       "shipping it",
       "-->",
     ].join("\n");
@@ -278,7 +278,7 @@ describe("what the heading says", () => {
   });
 
   it("falls back to the model when a directive carries no label of its own", () => {
-    const text = ["```almanac", "note:log", "```", "", "<!--almanac:log", "x", "-->"].join(
+    const text = ["```chronoanvil", "note:log", "```", "", "<!--chronoanvil:log", "x", "-->"].join(
       "\n"
     );
     // `log` is the entry catalogue's "Notes".
@@ -287,12 +287,12 @@ describe("what the heading says", () => {
 
   it("lets a bar over one field be that field's name", () => {
     const text = [
-      "```almanac",
+      "```chronoanvil",
       "header:🧭 Learning Path",
       "path:path",
       "```",
       "",
-      "<!--almanac:path",
+      "<!--chronoanvil:path",
       "step one",
       "-->",
     ].join("\n");
@@ -304,17 +304,17 @@ describe("what the heading says", () => {
 
   it("makes a bar over several fields the name of the group", () => {
     const text = [
-      "```almanac",
+      "```chronoanvil",
       "header:📚 Resources",
       "attach:res-docs|Docs",
       "attach:res-tutorials|Tutorials",
       "```",
       "",
-      "<!--almanac:res-docs",
+      "<!--chronoanvil:res-docs",
       "- [[a]]",
       "-->",
       "",
-      "<!--almanac:res-tutorials",
+      "<!--chronoanvil:res-tutorials",
       "- [[b]]",
       "-->",
     ].join("\n");
@@ -336,7 +336,7 @@ describe("the page's own writing, and its properties", () => {
       "mood: 4",
       "---",
     ].join("\n");
-    const text = [front, "", "```almanac", "note:log|Notes", "```", "", "<!--almanac:log", "x", "-->"].join(
+    const text = [front, "", "```chronoanvil", "note:log|Notes", "```", "", "<!--chronoanvil:log", "x", "-->"].join(
       "\n"
     );
     const out = toPlainMarkdown(text, daily);
@@ -348,7 +348,7 @@ describe("the page's own writing, and its properties", () => {
 
   it("passes a prose skeleton's headings through untouched", () => {
     const text = [
-      "```almanac",
+      "```chronoanvil",
       "journal-header",
       "```",
       "",
@@ -356,11 +356,11 @@ describe("the page's own writing, and its properties", () => {
       "",
       "What is this lesson about?",
       "",
-      "```almanac",
+      "```chronoanvil",
       "tasks:tasks|Tasks",
       "```",
       "",
-      "<!--almanac:tasks",
+      "<!--chronoanvil:tasks",
       "- ( ) revise",
       "-->",
     ].join("\n");
@@ -372,7 +372,7 @@ describe("the page's own writing, and its properties", () => {
 
   it("never leaves a region marker in the output", () => {
     const out = toPlainMarkdown(fill(composeEntryTemplate("daily", [])), daily);
-    expect(out).not.toContain("<!--almanac:");
+    expect(out).not.toContain("<!--chronoanvil:");
     expect(out).not.toContain("```");
   });
 });

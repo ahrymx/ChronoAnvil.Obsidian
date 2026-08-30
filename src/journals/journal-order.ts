@@ -32,11 +32,11 @@
 // list expressed as a sequence of pairwise moves would write four times and fire
 // four repaints; a pair expressed as a whole list costs one array copy.
 
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { dropOnto } from "../core/drop-onto";
 
 // The journal ids, in the order every surface draws them.
-export function journalOrder(plugin: AlmanacPlugin): string[] {
+export function journalOrder(plugin: ChronoAnvilPlugin): string[] {
   return (plugin.settings.customJournals ?? []).map((j) => j.id);
 }
 
@@ -55,7 +55,7 @@ export function journalOrder(plugin: AlmanacPlugin): string[] {
 // downstream, but the REPAINT is not: notifying on a no-op would rebuild every
 // journals widget on every open note to draw the same thing.
 export async function applyJournalOrder(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ids: readonly string[]
 ): Promise<boolean> {
   const current = plugin.settings.customJournals ?? [];
@@ -100,7 +100,7 @@ export async function applyJournalOrder(
 // `core/drop-onto.ts`, which the chart grid and the section editor call too.
 // What is left here is the settings read and write around it.
 export async function moveJournalOnto(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   fromId: string,
   ontoId: string
 ): Promise<boolean> {

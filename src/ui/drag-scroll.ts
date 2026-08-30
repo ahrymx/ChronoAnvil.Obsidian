@@ -17,7 +17,7 @@
 //
 // ── WHY IT IS LOCKED, AND WHY THIS IS THE FIX RATHER THAN A SETTING ──
 //
-// Almanac drags with the HTML5 drag-and-drop API — `draggable`, `dragstart`,
+// ChronoAnvil drags with the HTML5 drag-and-drop API — `draggable`, `dragstart`,
 // `dataTransfer` — in all three places it drags at all: a widget on the page
 // (`block-drag.ts`), a row in the section editor, and a journal card. That
 // choice is load-bearing and is argued at each site: `dataTransfer.types` is

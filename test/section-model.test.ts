@@ -595,7 +595,7 @@ describe("a section that can also be drawn as a widget", () => {
     section: "A section of its own",
     widget: "As a widget",
   };
-  const fence = (...body: string[]): string[] => ["```almanac", ...body, "```"];
+  const fence = (...body: string[]): string[] => ["```chronoanvil", ...body, "```"];
 
   it("is a section when it titles itself and a widget when it does not", () => {
     // ASKED OF THE FENCE, NOT OF THE ANSWER, which is what makes the read
@@ -633,19 +633,19 @@ describe("a section that can also be drawn as a widget", () => {
     // `header` is there so the editor knows the answer is WRITABLE. Reading it
     // as an argument is what put the token "section" into a bar's title in the
     // first cut of this release.
-    expect(answerInText("```almanac\nheader:📅 This week\nweek-summary\n```", q)).toBeNull();
+    expect(answerInText("```chronoanvil\nheader:📅 This week\nweek-summary\n```", q)).toBeNull();
   });
 
   it("reads back off whichever fence the directive is in", () => {
     // Two blocks, one titled and one not, so a walk that found the first bar in
     // the file rather than this fence's would answer for the wrong section.
     const text = [
-      "```almanac",
+      "```chronoanvil",
       "header:🏷️ Tags",
       "tag-index",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "week-summary",
       "```",
     ].join("\n");

@@ -18,8 +18,8 @@
 // succession can't clobber each other.
 
 import { App, Notice, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
-import { EVENTS_PROPERTY } from "../core/constants";
+import type ChronoAnvilPlugin from "../main";
+import { EVENTS_PROPERTY, LEGACY_EVENTS_PROPERTY } from "../core/constants";
 import {
   EventDef,
   parseEvents,
@@ -54,8 +54,8 @@ export function eventsNoteTemplate(diaryRoot: string): string {
     "---",
     `${EVENTS_PROPERTY}: []`,
     "---",
-    "`almanac:spacer`",
-    "```almanac",
+    "`chronoanvil:spacer`",
+    "```chronoanvil",
     "header:🗓️ Special events",
     "```",
     "",
@@ -63,7 +63,7 @@ export function eventsNoteTemplate(diaryRoot: string): string {
     "Single events (trips, sick days, milestones) can span a range of days.",
     "Both decorate the diary calendars — neither creates a diary entry.",
     "",
-    "```almanac",
+    "```chronoanvil",
     "events",
     "```",
     // The block below opens with its own blank line, which is where the note's
@@ -71,11 +71,11 @@ export function eventsNoteTemplate(diaryRoot: string): string {
   ].join("\n") + graphLinksSection([basename(diaryRoot)]);
 }
 
-export function eventsNotePath(plugin: AlmanacPlugin): string {
+export function eventsNotePath(plugin: ChronoAnvilPlugin): string {
   return plugin.settings.paths.events;
 }
 
-export function getEventsFile(app: App, plugin: AlmanacPlugin): TFile | null {
+export function getEventsFile(app: App, plugin: ChronoAnvilPlugin): TFile | null {
   return getFile(app, eventsNotePath(plugin));
 }
 
@@ -89,10 +89,11 @@ export function getEventsFile(app: App, plugin: AlmanacPlugin): TFile | null {
 // the settings list and the manager widget the moment you turned drawing off,
 // so the only way to edit an event would be to re-enable the feature first.
 // The gate belongs at each drawing surface; see calendar.ts::gridEvents.
-export function readEvents(app: App, plugin: AlmanacPlugin): EventDef[] {
+export function readEvents(app: App, plugin: ChronoAnvilPlugin): EventDef[] {
   const file = getEventsFile(app, plugin);
   if (!file) return [];
-  return parseEvents(frontmatterOf(app, file)[EVENTS_PROPERTY]);
+  const fm = frontmatterOf(app, file);
+  return parseEvents(fm[EVENTS_PROPERTY] ?? fm[LEGACY_EVENTS_PROPERTY]);
 }
 
 // Create the events note if it's absent, and return it. Called before any
@@ -100,7 +101,7 @@ export function readEvents(app: App, plugin: AlmanacPlugin): EventDef[] {
 // vault that predates this feature without a trip through "Set up / repair".
 export async function ensureEventsNote(
   app: App,
-  plugin: AlmanacPlugin
+  plugin: ChronoAnvilPlugin
 ): Promise<TFile | null> {
   const existing = getEventsFile(app, plugin);
   if (existing) return existing;
@@ -111,8 +112,8 @@ export async function ensureEventsNote(
       eventsNoteTemplate(plugin.settings.paths.diaryRoot)
     );
   } catch (e) {
-    console.error("[Almanac] could not create the events note", e);
-    new Notice("Almanac: could not create the events note — check the console.");
+    console.error("[ChronoAnvil] could not create the events note", e);
+    new Notice("ChronoAnvil: could not create the events note — check the console.");
     return null;
   }
 }
@@ -122,7 +123,7 @@ export async function ensureEventsNote(
 // write can't leave the file in a half-updated state.
 export async function writeEvents(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   defs: EventDef[]
 ): Promise<boolean> {
   const file = await ensureEventsNote(app, plugin);
@@ -138,7 +139,7 @@ export async function writeEvents(
 // in the list — the one place ids are minted, so they can't collide.
 export async function saveEvent(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   def: EventDef
 ): Promise<boolean> {
   const list = readEvents(app, plugin);
@@ -165,7 +166,7 @@ export async function saveEvent(
 
 export async function deleteEvent(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   id: string
 ): Promise<boolean> {
   const list = readEvents(app, plugin);

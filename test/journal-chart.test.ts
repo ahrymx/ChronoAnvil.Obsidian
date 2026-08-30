@@ -203,7 +203,7 @@ describe("journal-chart widget registration", () => {
     // `confidence-trend` sits in every shipped Topic template, so a vault that
     // rates nothing must not show a refusal on every topic page.
     expect(block).toMatch(/if \(preset\) return null;/);
-    expect(block).toContain("journal-widget-error");
+    expect(block).toContain("ca-journal-widget-error");
   });
 });
 
@@ -257,7 +257,7 @@ describe("what a stored chart means", () => {
       spec({ tracker: "pages:read" }),
     ]) {
       expect(parseJournalChartRegion([
-        "```almanac-journal-charts",
+        "```chronoanvil-journal-charts",
         serializeJournalChartSpec(s),
         "```",
       ])).toEqual([s]);
@@ -269,7 +269,7 @@ describe("what a stored chart means", () => {
     // the left; the id is the last positional token, so nothing bounds it on
     // the right and nothing needs to.
     expect(parseJournalChartRegion([
-      "```almanac-journal-charts",
+      "```chronoanvil-journal-charts",
       "jchart:j1:breakdown:a:b:c|Odd",
       "```",
     ])).toEqual([{ key: "j1", shape: "breakdown", tracker: "a:b:c", label: "Odd" }]);
@@ -280,7 +280,7 @@ describe("reading the region", () => {
   const fence = (...body: string[]): string[] => [
     "# Topic",
     "",
-    "```almanac-journal-charts",
+    "```chronoanvil-journal-charts",
     ...body,
     "```",
     "",
@@ -304,7 +304,7 @@ describe("reading the region", () => {
     // `jchart:` one and neither parser should ever see the other's.
     expect(
       parseJournalChartRegion([
-        "```almanac-charts",
+        "```chronoanvil-charts",
         "chart:c1:Mood:line:30",
         "```",
       ])
@@ -323,11 +323,11 @@ describe("writing the region", () => {
     "---",
     "type: topic",
     "---",
-    "```almanac",
+    "```chronoanvil",
     "review-queue",
     "```",
     "",
-    "```almanac-journal-charts",
+    "```chronoanvil-journal-charts",
     "header:📊 Charts",
     "jchart:j1:trend:confidence",
     "```",
@@ -360,7 +360,7 @@ describe("writing the region", () => {
   it("empties cleanly, leaving a section to add into", () => {
     const out = spliceJournalChartRegion(note, [])!;
     expect(out.join("\n")).not.toContain("jchart:");
-    expect(out.join("\n")).toContain("```almanac-journal-charts");
+    expect(out.join("\n")).toContain("```chronoanvil-journal-charts");
     expect(parseJournalChartRegion(out)).toEqual([]);
   });
 
@@ -451,8 +451,8 @@ describe("how the region is wired up", () => {
   const main = readSrc("main");
 
   it("registers its own fence, separate from the diary's", () => {
-    expect(widgets).toContain('"almanac-journal-charts"');
-    expect(widgets).toContain('"almanac-charts"');
+    expect(widgets).toContain('"chronoanvil-journal-charts"');
+    expect(widgets).toContain('"chronoanvil-charts"');
   });
 
   it("draws each chart through the ordinary directive path", () => {
@@ -493,7 +493,7 @@ describe("the shipped index templates carry a region", () => {
 
   it("gives a subject index both readings of confidence", () => {
     const t = studyTemplate("Subject Index.md");
-    expect(t).toContain("```almanac-journal-charts");
+    expect(t).toContain("```chronoanvil-journal-charts");
     expect(parseJournalChartRegion(t.split("\n")).map((s) => s.shape)).toEqual([
       "trend",
       "breakdown",

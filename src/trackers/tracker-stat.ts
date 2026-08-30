@@ -34,7 +34,7 @@
 // bedtimes is wrong — and none of that is expressible as "one tracker's
 // numbers". Two widgets, two questions.
 
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { statStrip } from "../ui/stat-strip";
 import type { StatCard } from "../ui/stat-strip";
 import { collectPoints } from "../charts/chart-render";
@@ -137,17 +137,17 @@ export function trackerCards(
 }
 
 export function buildTrackerStat(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string
 ): HTMLElement {
-  // `am-tstat-` FOR THE PARTS, NOT `journal-tracker-`. `.journal-tracker-cell` is
+  // `ca-tstat-` FOR THE PARTS, NOT `journal-tracker-`. `.ca-journal-tracker-cell` is
   // already taken, by the daily bar's logging modules in
   // `10-tracker-modules.css`, and it means a bordered control you type into.
-  // Every rule there is scoped under `.journal-tracker-bar`, so a second
+  // Every rule there is scoped under `.ca-journal-tracker-bar`, so a second
   // meaning would not collide TODAY — it would collide the first time somebody
   // writes the bare selector, and the two things look nothing alike. The root
   // keeps the readable name because a root is what a reader inspects.
-  const root = createDiv({ cls: "journal-tracker-stat" });
+  const root = createDiv({ cls: "ca-journal-tracker-stat" });
   const id = rest.split(":")[0].split("|")[0].trim();
 
   // ── WHAT THIS VAULT HAS, WHERE THE ANSWER IS "NOT THAT" ──────────────
@@ -167,7 +167,7 @@ export function buildTrackerStat(
         id ? `No tracker called “${id}”.` : "Name a tracker to show.",
         chartable.length
           ? `This vault tracks: ${chartable.map((t) => t.id).join(", ")}.`
-          : "Add one in Settings → Almanac → Trackers, and it can be shown here."
+          : "Add one in Settings → ChronoAnvil → Trackers, and it can be shown here."
       )
     );
     return root;
@@ -215,7 +215,7 @@ function drawStrip(
   const values = points.map((p) => p.value);
   const lo = Math.min(...values);
   const hi = Math.max(...values);
-  const strip = parent.createDiv({ cls: "am-tstat-strip" });
+  const strip = parent.createDiv({ cls: "ca-tstat-strip" });
 
   const last = [...points].sort((a, b) => a.date.localeCompare(b.date)).pop();
   if (!last) return;
@@ -225,11 +225,11 @@ function drawStrip(
     const day = end.clone().subtract(back, "days");
     const iso = day.format("YYYY-MM-DD");
     const value = byDate.get(iso);
-    const cell = strip.createDiv({ cls: "am-tstat-cell" });
+    const cell = strip.createDiv({ cls: "ca-tstat-cell" });
     if (value === undefined) {
       // NO RAMP CLASS AT ALL, rather than a fifth stop named "none". The base
       // rule's `--background-modifier-border` is what an unlogged day looks
-      // like on both of the other two strips, and a `am-act-0` would be a
+      // like on both of the other two strips, and a `ca-act-0` would be a
       // shade in the ramp that means "outside the ramp".
       cell.setAttr("aria-label", `${day.format("D MMM")} — nothing logged`);
       continue;
@@ -241,7 +241,7 @@ function drawStrip(
     // "every day the same" is not "every day the least".
     const span = hi - lo;
     const level = span === 0 ? 4 : 1 + Math.floor(((value - lo) / span) * 3.999);
-    cell.addClass(`am-act-${level}`);
+    cell.addClass(`ca-act-${level}`);
     cell.setAttr(
       "aria-label",
       `${day.format("D MMM")} — ${show(def, value)}`

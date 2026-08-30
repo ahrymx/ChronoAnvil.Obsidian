@@ -11,7 +11,7 @@
 // touches an existing one, so every asset change lands only in vaults that
 // don't have the note yet — which is no vault that has been used. 2.52 changed
 // six shipped assets and, on the developer's own vault, changed nothing: the
-// Year page went on rendering a red `Unknown Almanac widget: year-nav` until
+// Year page went on rendering a red `Unknown ChronoAnvil widget: year-nav` until
 // the file was deleted by hand.
 //
 // The never-overwrite rule is correct and survives. A dashboard is
@@ -23,7 +23,7 @@
 //
 // An earlier design fenced a contiguous plugin-owned "spine" in each dashboard
 // with marker comments. Two things killed it. Every dashboard is already almost
-// nothing but ```almanac fences, so the markers would be a second — deletable,
+// nothing but ```chronoanvil fences, so the markers would be a second — deletable,
 // movable — encoding of what the fence syntax already says. And a note with no
 // markers is *every existing vault*, so the very first run would have to guess
 // where the spine ended, on notes whose content it would then overwrite.
@@ -95,16 +95,16 @@ export const MANAGED_FLAGS: Record<string, readonly string[]> = {
 
 // ── parsing ───────────────────────────────────────────────────────────
 
-// Every fence info-string the plugin writes. `almanac-charts` is the diary's
-// chart stack, `almanac-journal-charts` a journal dashboard's — different
+// Every fence info-string the plugin writes. `chronoanvil-charts` is the diary's
+// chart stack, `chronoanvil-journal-charts` a journal dashboard's — different
 // owners (charts.ts and journal-charts.ts), same property: the contents are
 // chart specs rather than directives, so neither yields keywords.
-export type FenceKind = "almanac" | "almanac-charts" | "almanac-journal-charts";
+export type FenceKind = "chronoanvil" | "chronoanvil-charts" | "chronoanvil-journal-charts";
 
 // A fence whose body is user data rather than directives. Segmented so it can
 // anchor a position, never read for keywords — migrateTrends and
 // journal-charts.ts each own their own.
-const OPAQUE_FENCES: FenceKind[] = ["almanac-charts", "almanac-journal-charts"];
+const OPAQUE_FENCES: FenceKind[] = ["chronoanvil-charts", "chronoanvil-journal-charts"];
 
 // A note as alternating fences and everything-else, so a reconciler can splice
 // whole fences without ever rewriting the prose, frontmatter or user blocks
@@ -134,14 +134,14 @@ export function keywordOf(line: string): string {
   return colon === -1 ? t : t.slice(0, colon);
 }
 
-const FENCE_OPEN = /^```(almanac|almanac-charts|almanac-journal-charts)\s*$/;
+const FENCE_OPEN = /^```(chronoanvil|chronoanvil-charts|chronoanvil-journal-charts)\s*$/;
 // Any fence opener at all, with the length of its backtick run captured.
 //
 // WHY THE LENGTH MATTERS, AND THE BUG IT IS THE FIX FOR (4.68.1). A markdown
 // fence is closed by a backtick run at least as long as the one that opened it,
 // which is exactly how a document SHOWS a fence rather than rendering one:
 // `assets/documentation.md` wraps its worked example in a four-backtick fence so
-// the three-backtick ```almanac inside it is printed as source.
+// the three-backtick ```chronoanvil inside it is printed as source.
 //
 // This function used to ignore the outer fence entirely — it matched only
 // `FENCE_OPEN` and pushed everything else to raw — so the example inside it was
@@ -152,7 +152,7 @@ const FENCE_OPEN = /^```(almanac|almanac-charts|almanac-journal-charts)\s*$/;
 // repair to be offered.
 //
 // So a fence that is not ours is now skipped WHOLE rather than walked into. For
-// every other input the output is unchanged: a non-almanac block's lines went to
+// every other input the output is unchanged: a non-chronoanvil block's lines went to
 // `raw` one at a time before and go there together now.
 const FENCE_RUN = /^(`{3,})(.*)$/;
 const FENCE_SHUT = /^(`{3,})\s*$/;
@@ -315,7 +315,7 @@ export function assetUnits(assetLines: string[]): AssetUnit[] {
     if (!content.length) {
       // Header-only (or a chart fence, which has no keywords at all). A chart
       // fence must not be held pending — it is not a title for what follows.
-      if (seg.fenceKind === "almanac" && keys.length) pending.push(seg);
+      if (seg.fenceKind === "chronoanvil" && keys.length) pending.push(seg);
       else pending = [];
       continue;
     }
@@ -366,14 +366,14 @@ export function planLayout(
 
   const noteLineFor = new Map<string, string>();
   for (const seg of segs) {
-    // `almanac` FENCES ONLY, WHICH IS WHAT THE WRITE ALREADY MEANT. This walk
-    // read every fence and the three passes below it each filter to `almanac`,
+    // `chronoanvil` FENCES ONLY, WHICH IS WHAT THE WRITE ALREADY MEANT. This walk
+    // read every fence and the three passes below it each filter to `chronoanvil`,
     // so a chart spec whose first word happened to be a directive keyword put a
     // line in this map that nothing could act on: an insert would be skipped for
     // a block the note does not have, and a retired keyword would be NAMED by
     // the plan and left by the write — which surfaces as `layout plan/apply
     // disagreed` in the console and no repair.
-    if (seg.kind !== "fence" || seg.fenceKind !== "almanac") continue;
+    if (seg.kind !== "fence" || seg.fenceKind !== "chronoanvil") continue;
     for (const l of seg.lines) {
       const k = keywordOf(l);
       if (!k || k === "header" || l.trim().startsWith("```")) continue;
@@ -431,7 +431,7 @@ export function retiredIn(
 ): string[] {
   const out: string[] = [];
   for (const seg of segment(noteLines)) {
-    if (seg.kind !== "fence" || seg.fenceKind !== "almanac") continue;
+    if (seg.kind !== "fence" || seg.fenceKind !== "chronoanvil") continue;
     for (const l of seg.lines) {
       if (l.trim().startsWith("```")) continue;
       const k = keywordOf(l);
@@ -451,7 +451,7 @@ export function retiredDetail(keyword: string): string {
 //
 // Line-level, so a fence holding a retired directive beside a live one keeps the
 // live one; a fence left with no directives at all goes, since an empty
-// ```almanac fence renders as an empty block.
+// ```chronoanvil fence renders as an empty block.
 export function stripRetired(
   noteLines: string[],
   keep: (keyword: string) => boolean
@@ -460,7 +460,7 @@ export function stripRetired(
   if (!gone.size) return null;
   const segs = segment(noteLines)
     .map((seg) => {
-      if (seg.kind !== "fence" || seg.fenceKind !== "almanac") return seg;
+      if (seg.kind !== "fence" || seg.fenceKind !== "chronoanvil") return seg;
       const kept = seg.lines.filter((l) => {
         if (l.trim().startsWith("```")) return true;
         const k = keywordOf(l);
@@ -531,7 +531,7 @@ export function applyFlags(
     wanted.set(op.keyword, [...(wanted.get(op.keyword) ?? []), op.flag]);
   }
   const segs = segment(noteLines).map((seg) => {
-    if (seg.kind !== "fence" || seg.fenceKind !== "almanac") return seg;
+    if (seg.kind !== "fence" || seg.fenceKind !== "chronoanvil") return seg;
     return {
       ...seg,
       lines: seg.lines.map((l) => {
@@ -570,7 +570,7 @@ function argTokens(line: string): string[] {
 function argumentsByKeyword(lines: string[]): Map<string, string[]> {
   const out = new Map<string, string[]>();
   for (const seg of segment(lines)) {
-    if (seg.kind !== "fence" || seg.fenceKind !== "almanac") continue;
+    if (seg.kind !== "fence" || seg.fenceKind !== "chronoanvil") continue;
     for (const l of seg.lines) {
       if (l.trim().startsWith("```")) continue;
       const k = keywordOf(l);
@@ -606,7 +606,7 @@ export function applyLayout(
   for (const u of units) {
     if (!MANAGED_ARGS.has(u.keyword)) continue;
     for (const seg of segs) {
-      if (seg.kind !== "fence" || seg.fenceKind !== "almanac") continue;
+      if (seg.kind !== "fence" || seg.fenceKind !== "chronoanvil") continue;
       const idx = seg.lines.findIndex(
         (l) => !l.trim().startsWith("```") && keywordOf(l) === u.keyword
       );

@@ -125,7 +125,7 @@ export class LiveWidget extends MarkdownRenderChild {
   }
 }
 
-// ── WHERE ALMANAC HAS DRAWN, WHEREVER THAT IS ───────────────────────────
+// ── WHERE CHRONOANVIL HAS DRAWN, WHEREVER THAT IS ───────────────────────────
 //
 // `repaintOpenNotes` below could only ever reach a markdown leaf, because
 // re-rendering the note was the only way it knew to re-run a block processor.
@@ -136,7 +136,7 @@ export class LiveWidget extends MarkdownRenderChild {
 // with until something else happened to rebuild it.
 //
 // The fix is to stop asking the HOST to re-render and let the block re-run
-// itself. Every Almanac render site registers here, keeps the arguments it was
+// itself. Every ChronoAnvil render site registers here, keeps the arguments it was
 // called with, and can draw itself again on demand. `repaintOpenNotes` then
 // covers markdown leaves the way it always did and every other site directly.
 //
@@ -198,7 +198,7 @@ export type BlockRenderer = (
   ctx: MarkdownPostProcessorContext
 ) => void;
 
-// A fenced ```almanac block, held open so it can be drawn again.
+// A fenced ```chronoanvil block, held open so it can be drawn again.
 //
 // `containerEl` is the element Obsidian handed the processor, and it stays put:
 // a repaint empties it and draws into it again, so the removal-driven unload
@@ -266,7 +266,7 @@ export function mountBlock(
   ctx.addChild(new BlockSite(el, source, ctx, render));
 }
 
-// The legacy inline `almanac:...` syntax, same treatment.
+// The legacy inline `chronoanvil:...` syntax, same treatment.
 //
 // IT HAS NO ELEMENT OF ITS OWN TO KEEP. The fenced path is given a container and
 // draws inside it; this one REPLACES the `<code>` it was written as, so the

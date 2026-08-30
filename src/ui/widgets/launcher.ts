@@ -44,7 +44,7 @@
 import { setIcon, TFile } from "obsidian";
 import type { MarkdownPostProcessorContext } from "obsidian";
 
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import { resolveTarget } from "../../core/links";
 import { getFile, openFile } from "../../core/util";
 import { emptyCallout } from "../empty";
@@ -54,11 +54,11 @@ import { emptyCallout } from "../empty";
 export const LAUNCHER_DEFAULT = ["week", "month", "quarter", "year"];
 
 export function buildLauncher(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   ids: readonly string[]
 ): HTMLElement {
-  const root = createDiv({ cls: "jlx-grid" });
+  const root = createDiv({ cls: "ca-jlx-grid" });
   const file = getFile(plugin.app, ctx.sourcePath);
   // `resolveTarget` needs the host note — `up` is relative to it, and every
   // other id ignores it. Without one there is nothing to resolve against.
@@ -76,12 +76,12 @@ export function buildLauncher(
     if (!target.file && !target.action) continue;
 
     const tile = root.createEl("a", {
-      cls: "jlx-tile",
+      cls: "ca-jlx-tile",
       href: "#",
       attr: { "aria-label": target.label },
     });
-    setIcon(tile.createSpan({ cls: "jlx-icon" }), target.icon);
-    tile.createSpan({ cls: "jlx-label", text: target.label });
+    setIcon(tile.createSpan({ cls: "ca-jlx-icon" }), target.icon);
+    tile.createSpan({ cls: "ca-jlx-label", text: target.label });
     tile.addEventListener("click", (evt) => {
       evt.preventDefault();
       if (target.action) target.action();

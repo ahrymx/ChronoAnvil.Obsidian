@@ -12,7 +12,7 @@
 //
 // ── WHAT THIS IS FOR ─────────────────────────────────────────────────────
 //
-// The vault a stranger downloads to find out what Almanac is. Every widget in
+// The vault a stranger downloads to find out what ChronoAnvil is. Every widget in
 // the plugin renders somebody's notes, and on an empty vault every one of them
 // renders its empty state — which is an honest picture of nothing and a useless
 // picture of the plugin. This writes the notes.
@@ -58,7 +58,7 @@
 // readings and not a single chart drawn from them.
 //
 // A patch fills a chart fence that holds no charts, a logbook region that holds
-// no items, an `almanac-events: []` that holds no events — and declines any of
+// no items, a `chronoanvil-events: []` that holds no events — and declines any of
 // them that is already answered, which is the same rule as above with the same
 // `--force` escape. See `buildPatches` for why each refusal is where it is.
 //
@@ -299,7 +299,7 @@ export function entryFolder(paths, grain, dateIso) {
 export function setGraphLinks(text, links) {
   const list = Array.isArray(links) ? links : links ? [links] : [];
   const validLinks = list.filter((l) => typeof l === "string" && l.trim() !== "");
-  const GRAPH_BLOCK_RE = /%% almanac-graph %%\n%%[^\n]*%%/;
+  const GRAPH_BLOCK_RE = /%% chronoanvil-graph %%\n%%[^\n]*%%/;
   if (validLinks.length === 0) {
     return GRAPH_BLOCK_RE.test(text)
       ? text
@@ -309,7 +309,7 @@ export function setGraphLinks(text, links) {
       : text;
   }
   const wikilinks = validLinks.map((l) => `[[${l}|\u200B]]`).join(" ");
-  const block = `\n\n%% almanac-graph %%\n%% ${wikilinks} %%\n`;
+  const block = `\n\n%% chronoanvil-graph %%\n%% ${wikilinks} %%\n`;
   return GRAPH_BLOCK_RE.test(text)
     ? text.replace(GRAPH_BLOCK_RE, () => block.trim())
     : text.replace(/\s*$/, "") + block;
@@ -356,7 +356,7 @@ export function setFrontmatter(body, key, value, { add = false } = {}) {
 // say there.
 //
 // STOPS AT A FENCE AS WELL AS AT A HEADING, because the Study lesson template
-// puts ```almanac blocks between prose sections and swallowing one would delete
+// puts ```chronoanvil blocks between prose sections and swallowing one would delete
 // a widget from the note.
 // AN ARRAY IS A LIST AND A STRING IS A PARAGRAPH, which is the whole of the
 // corpus's markup vocabulary — and it has to be, because the template's own
@@ -396,14 +396,14 @@ export function fillSection(body, heading, lines) {
   return `${body.slice(0, from)}\n${text}\n\n${rest.slice(take).join("\n")}`;
 }
 
-// Put content inside an `<!--almanac:id … -->` region.
+// Put content inside an `<!--chronoanvil:id … -->` region.
 //
-// The regions are how Almanac stores a note's tasks, recall cards and
+// The regions are how ChronoAnvil stores a note's tasks, recall cards and
 // attachments — the widget reads the comment, not the prose — so a seeded task
 // that went in as a plain markdown checkbox would render nowhere and count for
 // nothing. `- ( )` is the marker `parseTaskLine` reads; a native `- [ ]` is not.
 export function fillRegion(body, id, lines) {
-  const open = `<!--almanac:${id}`;
+  const open = `<!--chronoanvil:${id}`;
   const at = body.indexOf(open);
   if (at === -1) return null;
   const close = body.indexOf("-->", at);
@@ -427,7 +427,7 @@ export const taskLine = (t) => {
 // A recall card. `question :: answer`, spaced, which is `recall.ts`'s format and
 // NOT the task format one line above it.
 //
-// Both live in `<!--almanac:… -->` regions and they look alike from a distance,
+// Both live in `<!--chronoanvil:… -->` regions and they look alike from a distance,
 // which is exactly how an earlier version of this file came to write recall cards
 // as `- ( ) question`. Nothing failed: the region existed, the write succeeded,
 // and the example vault's flashcards came out with `- ( ) ` printed inside the
@@ -492,10 +492,10 @@ export const logBlock = (items) =>
 // widget the first time it renders. A seeder that only ever filled existing
 // regions could therefore fill every daily entry and no logbook at all.
 export function ensureRegion(body, id) {
-  if (body.includes(`<!--almanac:${id}`)) return body;
+  if (body.includes(`<!--chronoanvil:${id}`)) return body;
   const trimmed = body.replace(/\s*$/, "");
   const sep = trimmed.length === 0 ? "" : "\n\n";
-  return `${trimmed}${sep}<!--almanac:${id}\n-->\n`;
+  return `${trimmed}${sep}<!--chronoanvil:${id}\n-->\n`;
 }
 
 // ── Charts (4.62) ────────────────────────────────────────────────────────
@@ -514,7 +514,7 @@ export function chartLine(spec) {
   return `chart:${spec.key}:${spec.tracker}:${spec.type}:${spec.range}${scope}${y}${avg}${size}${title}`;
 }
 
-// Put chart directives inside a note's ```almanac-charts fence.
+// Put chart directives inside a note's ```chronoanvil-charts fence.
 //
 // AND REFUSE ONE THAT ALREADY HAS SOME. The fence is a MANAGED region — the
 // chart editor rewrites it — so a seeder that appended to a populated one would
@@ -526,7 +526,7 @@ export function chartLine(spec) {
 // both its own section title and its charts, so the directives go after
 // whatever is already in it rather than replacing the body.
 export function fillChartsFence(body, lines) {
-  const open = body.indexOf("```almanac-charts");
+  const open = body.indexOf("```chronoanvil-charts");
   if (open === -1) return null;
   const bodyStart = body.indexOf("\n", open);
   if (bodyStart === -1) return null;
@@ -588,7 +588,7 @@ export function resolveEvents(list, today) {
 // a leading digit each mean something to a YAML parser and none of them means it
 // in "One-to-one". Numbers stay bare so `month: 4` reads as a number, which is
 // what `asInt` expects to find.
-export function eventsYaml(events, key = "almanac-events") {
+export function eventsYaml(events, key = "chronoanvil-events") {
   const out = [`${key}:`];
   for (const e of events) {
     const rows = Object.entries(e).map(([k, v]) =>
@@ -600,17 +600,17 @@ export function eventsYaml(events, key = "almanac-events") {
   return out.join("\n");
 }
 
-// Replace an EMPTY `almanac-events: []` with a list, and refuse a note that
+// Replace an EMPTY `chronoanvil-events: []` with a list, and refuse a note that
 // already holds events — somebody's own birthdays are not this tool's to
 // overwrite, and `[]` is the scaffold's own way of saying "none yet".
-export function fillEvents(body, events, key = "almanac-events") {
+export function fillEvents(body, events, key = "chronoanvil-events") {
   const end = body.indexOf("\n---", 4);
   if (!body.startsWith("---\n") || end === -1) return null;
   const head = body.slice(0, end).split("\n");
   const at = head.findIndex((l) => l.startsWith(`${key}:`));
   if (at === -1) return null;
   // EMPTY MEANS TWO THINGS AND NEITHER OF THEM IS "the key line looks short".
-  // `almanac-events:` with nothing after it is also the FIRST LINE of a filled
+  // `chronoanvil-events:` with nothing after it is also the FIRST LINE of a filled
   // list — the events are the indented lines beneath it — so the next line has
   // to be checked as well. A regex that only read the key line matched both and
   // quietly re-seeded a note that already had a year of events in it.
@@ -807,9 +807,9 @@ export function dailyTrackerDefs(settings) {
 }
 
 // The keys the Daily template writes into every entry's frontmatter — the
-// `# almanac:trackers:start` block, which is the plugin's own managed region.
+// `# chronoanvil:trackers:start` block, which is the plugin's own managed region.
 export function templateTrackerKeys(dailyTemplate) {
-  const front = /# almanac:trackers:start\n([\s\S]*?)\n# almanac:trackers:end/.exec(dailyTemplate ?? "");
+  const front = /# chronoanvil:trackers:start\n([\s\S]*?)\n# chronoanvil:trackers:end/.exec(dailyTemplate ?? "");
   if (!front) return new Set();
   return new Set(
     front[1]
@@ -856,8 +856,8 @@ export function perEntryPlan(defs, dates, rng) {
 // alone would give the entry a value with no control to change it.
 //
 // THE FRONTMATTER'S MARKERS ARE NOT THE BODY'S. A daily note carries
-// `# almanac:trackers:start` TWICE: once in the frontmatter, listing keys, and
-// once inside an ```almanac fence, listing widgets. `locateTrackerRegion` only
+// `# chronoanvil:trackers:start` TWICE: once in the frontmatter, listing keys, and
+// once inside a ```chronoanvil fence, listing widgets. `locateTrackerRegion` only
 // ever looks inside fences, so this does too — matching on the fence and not on
 // the marker is the difference between adding a widget and corrupting the
 // frontmatter.
@@ -873,7 +873,7 @@ export function addTrackerDirective(body, directive) {
   for (let i = 0; i < lines.length; i++) {
     const t = lines[i].trim();
     if (open === -1) {
-      if (t === "```almanac") open = i;
+      if (t === "```chronoanvil") open = i;
       continue;
     }
     if (t === "```") {
@@ -882,7 +882,7 @@ export function addTrackerDirective(body, directive) {
     }
     // The LAST directive's line is where a new one goes, so the insert lands
     // above the closing marker and below whatever is already logged.
-    if (t === "# almanac:trackers:end") {
+    if (t === "# chronoanvil:trackers:end") {
       lines.splice(i, 0, directive);
       return lines.join("\n");
     }
@@ -1269,10 +1269,10 @@ export function buildPlan({
       // THE PROSE GOES IN THE REGIONS, NOT UNDER THEM. The daily template's
       // directive block declares `note:focus`, `list:highlights`,
       // `list:challenges`, `note:log` and `tasks:todo`, and each is backed by an
-      // `<!--almanac:… -->` comment that the widget reads. An earlier version of
+      // `<!--chronoanvil:… -->` comment that the widget reads. An earlier version of
       // this loop appended `## Title` + a line to the end of the file: the widgets
       // then rendered a column of empty prompts with a stray heading below them,
-      // which taught a reader opening the example vault that Almanac's daily note
+      // which taught a reader opening the example vault that ChronoAnvil's daily note
       // does not work. Filling the regions is the difference between a vault that
       // demonstrates the plugin and one that sits beside it.
       //
@@ -1520,7 +1520,7 @@ export function buildPlan({
 
 // A region's current contents, or null when the note has no such region.
 export function readRegion(body, id) {
-  const open = `<!--almanac:${id}`;
+  const open = `<!--chronoanvil:${id}`;
   const at = body.indexOf(open);
   if (at === -1) return null;
   const from = body.indexOf("\n", at);
@@ -1532,7 +1532,7 @@ export function readRegion(body, id) {
 // Strip the `chart:` lines from a fence, leaving its `header:` and anything else
 // a reader put there — the `--force` half of `fillChartsFence`.
 export function clearChartsFence(body) {
-  const open = body.indexOf("```almanac-charts");
+  const open = body.indexOf("```chronoanvil-charts");
   if (open === -1) return body;
   const bodyStart = body.indexOf("\n", open);
   const close = body.indexOf("\n```", bodyStart);
@@ -1546,10 +1546,10 @@ export function clearChartsFence(body) {
   return `${body.slice(0, bodyStart + 1)}${kept ? `${kept}\n` : ""}${body.slice(close + 1)}`;
 }
 
-// Drop an `almanac-events:` block — the key line and the indented list under it
+// Drop a `chronoanvil-events:` block — the key line and the indented list under it
 // — so a forced run can write a fresh one. Bounded by the next unindented key,
 // which is how a YAML block ends.
-export function clearEvents(body, key = "almanac-events") {
+export function clearEvents(body, key = "chronoanvil-events") {
   const end = body.indexOf("\n---", 4);
   if (!body.startsWith("---\n") || end === -1) return body;
   const head = body.slice(0, end).split("\n");
@@ -1571,7 +1571,7 @@ export const folderNote = (folder) => `${folder}/${folder.split("/").pop()}.md`;
 //
 // TWO LISTS HAVE TO AGREE and only their intersection is safe. `settings.trackers`
 // is what the plugin will offer in the chart editor; the Daily template's
-// `# almanac:trackers:start` block is what actually gets WRITTEN into an entry's
+// `# chronoanvil:trackers:start` block is what actually gets WRITTEN into an entry's
 // frontmatter. A tracker in the first but not the second — Energy and Focus, in
 // the vault this was built against — is declared, chartable, and has no readings
 // at all, so a chart naming it is a permanently empty tile. That is precisely the
@@ -1670,7 +1670,7 @@ export function logbookItems({ lines, mins = false, perDay = 0, spread = false, 
 // afterwards — a section with content in it is not removed by reconciliation.
 export const journalChartLine = (spec) => `jchart:${spec.key}:${spec.shape}:${spec.tracker}`;
 
-const JOURNAL_CHARTS_FENCE = "```almanac-journal-charts";
+const JOURNAL_CHARTS_FENCE = "```chronoanvil-journal-charts";
 
 // Fill a journal-charts fence, appending the whole fence when the note has none
 // — and refusing one that already holds specs, which is `fillChartsFence`'s rule
@@ -1689,11 +1689,11 @@ export function fillJournalChartsFence(body, lines, { title = "📊 Trends and s
     return `${body.slice(0, bodyStart + 1)}${kept ? `${kept}\n` : ""}${lines.join("\n")}${body.slice(close)}`;
   }
   const fence = [JOURNAL_CHARTS_FENCE, `header:${title}`, ...lines, "```"].join("\n");
-  // ABOVE THE GRAPH BLOCK, NOT AFTER IT. The hidden `%% almanac-graph %%` pair
+  // ABOVE THE GRAPH BLOCK, NOT AFTER IT. The hidden `%% chronoanvil-graph %%` pair
   // is the last thing in every scaffolded note and `setGraphLinks` finds it by
   // matching to the end of the file; a fence written under it would be read as
   // part of nothing and would move the block off the end.
-  const at = body.indexOf("%% almanac-graph %%");
+  const at = body.indexOf("%% chronoanvil-graph %%");
   if (at === -1) return `${body.replace(/\s*$/, "")}\n\n${fence}\n`;
   return `${body.slice(0, at).replace(/\s*$/, "")}\n\n${fence}\n\n${body.slice(at)}`;
 }
@@ -1876,10 +1876,10 @@ export function buildPatches({
 // ── The run ──────────────────────────────────────────────────────────────
 
 function readSettings(vault) {
-  const path = join(vault, ".obsidian/plugins/ahrymx.almanac/data.json");
+  const path = join(vault, ".obsidian/plugins/chronoanvil/data.json");
   if (!existsSync(path)) {
     throw new Error(
-      `No Almanac settings at ${path}.\n` +
+      `No ChronoAnvil settings at ${path}.\n` +
         "Open the vault in Obsidian with the plugin enabled and run " +
         "'Set up / repair vault' first — this tool fills a scaffolded vault, " +
         "it does not create one."

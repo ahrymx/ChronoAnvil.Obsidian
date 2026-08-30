@@ -29,7 +29,7 @@
 
 import { App, Notice, TFile } from "obsidian";
 import { EditorModal } from "../ui/editor-modal";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { CAPTURE_NOTE_KEY, LOGBOOK_NOTE_KEY, type LogbookDef } from "../core/constants";
 import {
   appendToNoteRegion,
@@ -56,7 +56,7 @@ import { whenEditor, type WhenValue } from "../ui/when-editor";
 // same grammar — `serializeLogItem` writes both — differing only in which
 // region they are appended to and whether the stamp carries a day.
 async function appendCapture(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   block: string,
   regionKey: string = CAPTURE_NOTE_KEY
@@ -86,7 +86,7 @@ async function appendCapture(
 // every other body write uses, so a capture can't interleave with a `note:`
 // field's write and lose either side.
 export async function captureTo(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   text: string,
   target: CaptureTarget,
   when?: WhenValue
@@ -135,7 +135,7 @@ export async function captureTo(
 // has no usable text or the tracker id can't be tagged, so the caller knows
 // nothing was written.
 export async function captureScaleNote(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   note: ScaleNote
 ): Promise<boolean> {
@@ -234,7 +234,7 @@ export function logbookTargets(books: LogbookDef[]): CaptureTargetSpec[] {
 //
 // It is also what ties this to the Diary entries settings table: ticking
 // `Captured` for weekly there is what adds "This week" here.
-export function grainsShowingCapture(plugin: AlmanacPlugin): TrackerClass[] {
+export function grainsShowingCapture(plugin: ChronoAnvilPlugin): TrackerClass[] {
   return TRACKER_CLASSES.filter((grain) =>
     sectionsForEntry({
       grain,
@@ -258,7 +258,7 @@ export function grainsShowingCapture(plugin: AlmanacPlugin): TrackerClass[] {
 // when its own date key differs from its grain's current one. Two rows writing
 // to one note is a choice that is not a choice.
 export async function captureDestinations(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   host: TFile | null
 ): Promise<CaptureTarget[]> {
   const out: CaptureTarget[] = grainsShowingCapture(plugin).map((grain) => {
@@ -355,7 +355,7 @@ export function offersHostEntry(facts: {
 // Three openers rather than one because the diary has three, split by how a
 // grain names its period; this is the only place that needs all of them at once.
 async function resolveGrainEntry(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   grain: TrackerClass,
   key: string
 ): Promise<TFile | null> {
@@ -429,7 +429,7 @@ export class CaptureModal extends EditorModal {
   private saved = false;
   private readonly opts: Required<CaptureModalOptions>;
 
-  constructor(app: App, plugin: AlmanacPlugin, options: CaptureModalOptions = {}) {
+  constructor(app: App, plugin: ChronoAnvilPlugin, options: CaptureModalOptions = {}) {
     // The hint becomes the frame's subtitle. It was a div of its own with its
     // own class, saying what this window writes and where — which is the job
     // the subtitle already has in every other editor.
@@ -456,7 +456,7 @@ export class CaptureModal extends EditorModal {
 
   override onOpen(): void {
     super.onOpen();
-    this.contentEl.addClass("almanac-capture-modal");
+    this.contentEl.addClass("ca-capture-modal");
   }
 
   protected renderBody(): void {
@@ -470,8 +470,8 @@ export class CaptureModal extends EditorModal {
     // make: one destination is not a decision, and a select with a single
     // option is a control that cannot do its job.
     if (this.opts.destinations.length > 1) {
-      const row = contentEl.createDiv({ cls: "almanac-capture-dest" });
-      row.createSpan({ cls: "almanac-capture-dest-label", text: "Capture to" });
+      const row = contentEl.createDiv({ cls: "ca-capture-dest" });
+      row.createSpan({ cls: "ca-capture-dest-label", text: "Capture to" });
       const select = row.createEl("select", { cls: "dropdown" });
       for (const target of this.opts.destinations) {
         select.createEl("option", { value: target.id, text: target.label });
@@ -491,7 +491,7 @@ export class CaptureModal extends EditorModal {
     this.chosen = this.opts.destinations[0] ?? null;
 
     if (this.opts.askWhen) {
-      this.whenHost = contentEl.createDiv({ cls: "almanac-capture-when" });
+      this.whenHost = contentEl.createDiv({ cls: "ca-capture-when" });
       this.drawWhen();
     }
 
@@ -502,7 +502,7 @@ export class CaptureModal extends EditorModal {
       : this.opts.initialValue;
 
     const area = contentEl.createEl("textarea", {
-      cls: "almanac-capture-input",
+      cls: "ca-capture-input",
       attr: { placeholder: this.opts.placeholder, rows: "5" },
     });
     area.value = this.value;
@@ -543,22 +543,22 @@ export class CaptureModal extends EditorModal {
     if (!dated) this.when.date = null;
     else if (!this.when.date) this.when.date = today();
 
-    const row = host.createDiv({ cls: "almanac-capture-when-row" });
-    row.createSpan({ cls: "almanac-capture-dest-label", text: "When" });
+    const row = host.createDiv({ cls: "ca-capture-when-row" });
+    row.createSpan({ cls: "ca-capture-dest-label", text: "When" });
     const stamp = [this.when.date, this.when.time].filter((p) => !!p).join(" ");
     const btn = row.createEl("button", {
-      cls: "journal-capture-time",
+      cls: "ca-journal-capture-time",
       text: stamp || "no time",
       attr: { type: "button", "aria-label": "Change when this happened" },
     });
     if (this.when.mins) {
       row.createSpan({
-        cls: "journal-capture-mins",
+        cls: "ca-journal-capture-mins",
         text: `${this.when.mins} min`,
       });
     }
     btn.addEventListener("click", () => {
-      if (host.querySelector(".journal-capture-when")) {
+      if (host.querySelector(".ca-journal-capture-when")) {
         // Pressing it again closes the fields and keeps what they said — the
         // stamp on the button is the record of that, so nothing is lost by
         // folding them away.
@@ -627,7 +627,7 @@ export class CaptureModal extends EditorModal {
 //
 // Resolved BEFORE the modal opens, because opening one takes focus and a later
 // read of the workspace would answer about the modal.
-export function openCapture(plugin: AlmanacPlugin, host?: TFile | null): void {
+export function openCapture(plugin: ChronoAnvilPlugin, host?: TFile | null): void {
   void captureDestinations(plugin, host ?? null).then((destinations) => {
     // ONE RESOLVED TARGET FEEDS THE SENTENCE, THE WRITE AND THE TOAST, so the
     // box cannot name one entry and write to another.
@@ -676,7 +676,7 @@ export function scaleNoteCaptureHint(
 // doesn't touch the global quick-capture draft, and seeds itself with the
 // reading's label + value so the box says what it's for.
 export function openScaleNoteCapture(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   note: { trackerId: string; value: number; label: string; initialText?: string }
 ): void {

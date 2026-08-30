@@ -7,11 +7,11 @@
 
 // Body-backed storage for `note:` and `tasks:` widgets.
 //
-// A widget renders its controls up top (where its ```almanac fence sits) but
+// A widget renders its controls up top (where its ```chronoanvil fence sits) but
 // persists its content into the note *body*, wrapped inside a single HTML
 // comment:
 //
-//   <!--almanac:focus
+//   <!--chronoanvil:focus
 //   whatever the user typed
 //   -->
 //
@@ -55,8 +55,22 @@ export function noteKeyOf(rest: string): string {
   return (hash === -1 ? head : head.slice(0, hash)).trim();
 }
 
+// THE MARKER THIS MODULE WRITES, and the one it still has to read.
+//
+// The plugin was called Almanac before the rename, and every region it wrote
+// opens `<!--almanac:`. Renaming the product does not rename the notes people
+// already have, and a region this module cannot find is not a cosmetic problem:
+// `readNoteRegion` would return "", the widget would render empty, and the
+// first save would write a *second* region beside the first — silently orphaning
+// whatever the reader had typed. So writing moved to the new prefix and reading
+// accepts both, permanently. `tools/migrate-vault.mjs` rewrites a vault in
+// place; this fallback is what makes running it optional rather than urgent.
+const OPEN_PREFIX = "<!--chronoanvil:";
+const LEGACY_OPEN_PREFIX = "<!--almanac:";
+const OPEN_PREFIXES = [OPEN_PREFIX, LEGACY_OPEN_PREFIX];
+
 function openMarker(key: string): string {
-  return `<!--almanac:${key}`;
+  return `${OPEN_PREFIX}${key}`;
 }
 
 const CLOSE_MARKER = "-->";
@@ -74,7 +88,7 @@ function unescapeContent(value: string): string {
 }
 
 // Locate the region for `key`: returns the [start, end) slice covering the whole
-// comment (from `<!--almanac:key` through its closing `-->`), plus the inner
+// comment (from `<!--chronoanvil:key` through its closing `-->`), plus the inner
 // content offsets, or null if absent/unterminated.
 interface RegionMatch {
   blockStart: number;
@@ -83,22 +97,28 @@ interface RegionMatch {
   contentEnd: number;
 }
 function findRegion(fileText: string, key: string): RegionMatch | null {
-  const open = openMarker(key);
-  const start = fileText.indexOf(open);
-  if (start === -1) return null;
-  // The opener must be followed by end-of-string, whitespace, or a newline —
-  // so `almanac:todo` doesn't match a key like `almanac:todo2`.
-  const afterKey = fileText.charAt(start + open.length);
-  if (afterKey !== "" && !/\s/.test(afterKey)) return null;
-  const contentStart = start + open.length;
-  const end = fileText.indexOf(CLOSE_MARKER, contentStart);
-  if (end === -1) return null;
-  return {
-    blockStart: start,
-    blockEnd: end + CLOSE_MARKER.length,
-    contentStart,
-    contentEnd: end,
-  };
+  // Current prefix first, so a half-migrated note — one this module has already
+  // rewritten once, next to a legacy region it hasn't touched — resolves to the
+  // region that is being kept up to date rather than the stale one beside it.
+  for (const prefix of OPEN_PREFIXES) {
+    const open = `${prefix}${key}`;
+    const start = fileText.indexOf(open);
+    if (start === -1) continue;
+    // The opener must be followed by end-of-string, whitespace, or a newline —
+    // so `chronoanvil:todo` doesn't match a key like `chronoanvil:todo2`.
+    const afterKey = fileText.charAt(start + open.length);
+    if (afterKey !== "" && !/\s/.test(afterKey)) continue;
+    const contentStart = start + open.length;
+    const end = fileText.indexOf(CLOSE_MARKER, contentStart);
+    if (end === -1) continue;
+    return {
+      blockStart: start,
+      blockEnd: end + CLOSE_MARKER.length,
+      contentStart,
+      contentEnd: end,
+    };
+  }
+  return null;
 }
 
 // Read the content stored for `key`. Returns "" when the region is absent or
@@ -130,7 +150,7 @@ export function regionHasContent(fileText: string, key: string): boolean {
   return readNoteRegion(fileText, key).trim() !== "";
 }
 
-// Every Almanac body region in a file, in document order, as `{key, content}`
+// Every ChronoAnvil body region in a file, in document order, as `{key, content}`
 // pairs. Where `readNoteRegion` looks up one *known* key, this discovers keys —
 // needed by the folder-scoped tasks-table, which aggregates task regions across
 // notes it didn't author and so can't name the keys ahead of time. Content is
@@ -140,10 +160,20 @@ export function allNoteRegions(
   fileText: string
 ): { key: string; content: string }[] {
   const out: { key: string; content: string }[] = [];
-  const OPEN = "<!--almanac:";
   let from = 0;
   for (;;) {
-    const start = fileText.indexOf(OPEN, from);
+    // Whichever prefix comes first from here, so a vault holding both spellings
+    // still yields its regions in document order — the order the tasks-table
+    // aggregates them in.
+    let start = -1;
+    let OPEN = OPEN_PREFIX;
+    for (const prefix of OPEN_PREFIXES) {
+      const at = fileText.indexOf(prefix, from);
+      if (at !== -1 && (start === -1 || at < start)) {
+        start = at;
+        OPEN = prefix;
+      }
+    }
     if (start === -1) break;
     // Read the key: word chars after the prefix, bounded by the same charset
     // isValidNoteKey enforces on write.
@@ -154,7 +184,7 @@ export function allNoteRegions(
       i++;
     }
     // The key must be non-empty and immediately followed by end/whitespace, so
-    // `<!--almanac:` with no key, or a stray colon, doesn't match.
+    // `<!--chronoanvil:` with no key, or a stray colon, doesn't match.
     const after = fileText.charAt(i);
     if (key === "" || (after !== "" && !/\s/.test(after))) {
       from = start + OPEN.length;
@@ -178,13 +208,13 @@ export function allNoteRegions(
 // "comments are dropped natively" — true of a comment Obsidian parses as one
 // block. `value` of "" used to produce
 //
-//   <!--almanac:path
+//   <!--chronoanvil:path
 //   ⟨blank⟩
 //   -->
 //
 // and the blank line ends the HTML block early, so the opener and the closer
 // both render as paragraphs of literal text. It showed up under an untouched
-// Learning Path as two lines of `<!--almanac:path` and `-->` on the page —
+// Learning Path as two lines of `<!--chronoanvil:path` and `-->` on the page —
 // which is EVERY region on first use, since a region is created empty and the
 // module's whole design is that no plugin-side hiding is needed.
 function buildBlock(key: string, value: string): string {
@@ -337,7 +367,7 @@ export function ensureNoteRegions(
     }
     // REPAIR, not just create.
     //
-    // The anchors this function writes were `<!--almanac:path\n\n-->` until
+    // The anchors this function writes were `<!--chronoanvil:path\n\n-->` until
     // 2.56.7 — a blank line between the markers, which ends the HTML block
     // early, so Obsidian printed both markers as literal paragraphs on the
     // page. Fixing `buildBlock` fixed what gets WRITTEN and did nothing for the

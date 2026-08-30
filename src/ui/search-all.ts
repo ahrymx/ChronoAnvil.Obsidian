@@ -5,7 +5,7 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// One search over everything Almanac knows about. 4.51.
+// One search over everything ChronoAnvil knows about. 4.51.
 //
 // ── THE FOURTH VIEW, AND THE FIRST WITH NO SURFACE FILTER ────────────────
 //
@@ -31,7 +31,7 @@
 // as the scan takes.
 
 import { App, Modal, TFile, setIcon } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   DiaryQuery,
   IndexedEntry,
@@ -59,7 +59,7 @@ export function __resetSessionSort(): void {
   sessionSort = "relevance";
 }
 
-export function openVaultSearch(plugin: AlmanacPlugin): void {
+export function openVaultSearch(plugin: ChronoAnvilPlugin): void {
   new VaultSearchModal(plugin.app, plugin).open();
 }
 
@@ -93,7 +93,7 @@ function highlightFragment(parent: HTMLElement, text: string, query?: string): v
       parent.createSpan({ text: text.slice(start, idx) });
     }
     parent.createEl("mark", {
-      cls: "jdr-highlight",
+      cls: "ca-jdr-highlight",
       text: text.slice(idx, idx + target.length),
     });
     start = idx + target.length;
@@ -122,45 +122,45 @@ class VaultSearchModal extends Modal {
   private inputEl!: HTMLInputElement;
   private clearEl!: HTMLElement;
 
-  constructor(app: App, private plugin: AlmanacPlugin) {
+  constructor(app: App, private plugin: ChronoAnvilPlugin) {
     super(app);
   }
 
   onOpen(): void {
     const { contentEl, modalEl } = this;
-    modalEl.addClass("am-search-modal");
+    modalEl.addClass("ca-search-modal");
     contentEl.empty();
 
-    const box = contentEl.createDiv({ cls: "ams-query" });
-    setIcon(box.createSpan({ cls: "ams-query-icon" }), "search");
+    const box = contentEl.createDiv({ cls: "ca-ams-query" });
+    setIcon(box.createSpan({ cls: "ca-ams-query-icon" }), "search");
     this.inputEl = box.createEl("input", {
       type: "text",
-      cls: "ams-input",
+      cls: "ca-ams-input",
       attr: { placeholder: "Search by text, #tag, [mood>=5], has:task...", spellcheck: "false" },
     });
 
     this.clearEl = box.createEl("button", {
-      cls: "ams-clear",
+      cls: "ca-ams-clear",
       text: "✕",
       attr: { type: "button", "aria-label": "Clear search" },
     });
     this.clearEl.style.display = "none";
 
-    const bar = contentEl.createDiv({ cls: "ams-bar" });
-    this.chipsEl = bar.createDiv({ cls: "ams-chips" });
-    this.countEl = bar.createDiv({ cls: "ams-count" });
+    const bar = contentEl.createDiv({ cls: "ca-ams-bar" });
+    this.chipsEl = bar.createDiv({ cls: "ca-ams-chips" });
+    this.countEl = bar.createDiv({ cls: "ca-ams-count" });
 
-    this.resultsEl = contentEl.createDiv({ cls: "ams-results" });
+    this.resultsEl = contentEl.createDiv({ cls: "ca-ams-results" });
 
-    const foot = contentEl.createDiv({ cls: "ams-foot" });
+    const foot = contentEl.createDiv({ cls: "ca-ams-foot" });
     for (const [key, what] of [
       ["↑↓", "move"],
       ["↵", "open"],
       ["Tab", "cycle sort"],
       ["Esc", "close"],
     ]) {
-      const item = foot.createSpan({ cls: "ams-foot-item" });
-      item.createSpan({ cls: "ams-kbd", text: key });
+      const item = foot.createSpan({ cls: "ca-ams-foot-item" });
+      item.createSpan({ cls: "ca-ams-kbd", text: key });
       item.createSpan({ text: what });
     }
 
@@ -219,7 +219,7 @@ class VaultSearchModal extends Modal {
     this.resultsEl.empty();
     if (this.entries === null) {
       this.countEl.setText("");
-      this.resultsEl.createDiv({ cls: "ams-note", text: "Reading your vault…" });
+      this.resultsEl.createDiv({ cls: "ca-ams-note", text: "Reading your vault…" });
       return;
     }
 
@@ -233,7 +233,7 @@ class VaultSearchModal extends Modal {
     if (!isFiltering) {
       this.countEl.setText(`${this.entries.length} notes`);
       this.resultsEl.createDiv({
-        cls: "ams-note",
+        cls: "ca-ams-note",
         text: "Type to search. Supports #tag, [mood>=5], has:task, from:30d...",
       });
       return;
@@ -255,7 +255,7 @@ class VaultSearchModal extends Modal {
       this.hits.length === 1 ? "1 result" : `${this.hits.length} results`
     );
     if (this.hits.length === 0) {
-      this.resultsEl.createDiv({ cls: "ams-note", text: "Nothing matches." });
+      this.resultsEl.createDiv({ cls: "ca-ams-note", text: "Nothing matches." });
       return;
     }
     this.hits.forEach((hit, i) => this.renderRow(hit, i, q));
@@ -275,10 +275,10 @@ class VaultSearchModal extends Modal {
       ).sort().reverse();
 
       if (years.length > 1) {
-        const yearPills = this.chipsEl.createDiv({ cls: "ams-year-pills" });
+        const yearPills = this.chipsEl.createDiv({ cls: "ca-ams-year-pills" });
         for (const y of ["all", ...years.slice(0, 3)]) {
           const pill = yearPills.createEl("button", {
-            cls: `ams-year-pill${this.selectedYear === y ? " is-active" : ""}`,
+            cls: `ca-ams-year-pill${this.selectedYear === y ? " is-active" : ""}`,
             text: y === "all" ? "All" : y,
             attr: { type: "button" },
           });
@@ -293,10 +293,10 @@ class VaultSearchModal extends Modal {
     // Quick filter chips
     const addQuickChip = (label: string, iconName: string, active: boolean, toggle: () => void) => {
       const chip = this.chipsEl.createEl("button", {
-        cls: `ams-filter-chip${active ? " is-active" : ""}`,
+        cls: `ca-ams-filter-chip${active ? " is-active" : ""}`,
         attr: { type: "button" },
       });
-      const icon = chip.createSpan({ cls: "ams-chip-icon" });
+      const icon = chip.createSpan({ cls: "ca-ams-chip-icon" });
       setIcon(icon, iconName);
       chip.createSpan({ text: label });
       chip.addEventListener("click", () => {
@@ -310,12 +310,12 @@ class VaultSearchModal extends Modal {
     addQuickChip("Monthly", "calendar", this.filterMonthly, () => { this.filterMonthly = !this.filterMonthly; });
 
     // Divider
-    this.chipsEl.createDiv({ cls: "ams-divider" });
+    this.chipsEl.createDiv({ cls: "ca-ams-divider" });
 
     // Sort chips
     for (const field of SORT_FIELDS) {
       const chip = this.chipsEl.createDiv({
-        cls: "ams-chip" + (field.id === sessionSort ? " is-on" : ""),
+        cls: "ca-ams-chip" + (field.id === sessionSort ? " is-on" : ""),
         text: field.label,
         attr: { role: "button", tabindex: "-1" },
       });
@@ -327,10 +327,10 @@ class VaultSearchModal extends Modal {
 
     // Compact mode button
     const compactBtn = this.chipsEl.createEl("button", {
-      cls: `ams-compact-btn${this.isCompact ? " is-active" : ""}`,
+      cls: `ca-ams-compact-btn${this.isCompact ? " is-active" : ""}`,
       attr: { type: "button", title: "Toggle compact view" },
     });
-    const compactIcon = compactBtn.createSpan({ cls: "ams-chip-icon" });
+    const compactIcon = compactBtn.createSpan({ cls: "ca-ams-chip-icon" });
     setIcon(compactIcon, "list");
     compactBtn.createSpan({ text: "Compact" });
     compactBtn.addEventListener("click", () => {
@@ -342,7 +342,7 @@ class VaultSearchModal extends Modal {
     const narrowed = queryNarrowsTo(q, diaryKinds());
     if (narrowed) {
       this.chipsEl.createDiv({
-        cls: "ams-narrowed",
+        cls: "ca-ams-narrowed",
         text: narrowed === "diary" ? "diary only" : "journals only",
       });
     }
@@ -351,29 +351,29 @@ class VaultSearchModal extends Modal {
   private renderRow(hit: SearchHit, i: number, q?: DiaryQuery): void {
     const { entry } = hit;
     const row = this.resultsEl.createDiv({
-      cls: "ams-row" + (i === this.cursor ? " is-sel" : ""),
+      cls: "ca-ams-row" + (i === this.cursor ? " is-sel" : ""),
     });
     const mark = row.createDiv({
-      cls: "ams-mark" + (entry.surface === "journal" ? " is-journal" : ""),
+      cls: "ca-ams-mark" + (entry.surface === "journal" ? " is-journal" : ""),
     });
     setIcon(mark, entry.surface === "journal" ? "library" : "calendar-days");
 
-    const main = row.createDiv({ cls: "ams-main" });
-    const titleEl = main.createDiv({ cls: "ams-title" });
+    const main = row.createDiv({ cls: "ca-ams-main" });
+    const titleEl = main.createDiv({ cls: "ca-ams-title" });
     highlightFragment(titleEl, entry.title, q?.terms.length ? q.terms.join(" ") : undefined);
 
     const where = [...entry.crumbs, entry.kind].filter(Boolean).join(" · ");
-    if (where) main.createDiv({ cls: "ams-where", text: where });
+    if (where) main.createDiv({ cls: "ca-ams-where", text: where });
     if (hit.snippet) {
-      const snip = main.createDiv({ cls: "ams-snip" });
+      const snip = main.createDiv({ cls: "ca-ams-snip" });
       if (hit.snippetKey) {
-        snip.createSpan({ cls: "ams-field", text: hit.snippetKey });
+        snip.createSpan({ cls: "ca-ams-field", text: hit.snippetKey });
       }
       const snipText = snip.createSpan();
       highlightFragment(snipText, hit.snippet, q?.terms.length ? q.terms.join(" ") : undefined);
     }
 
-    row.createDiv({ cls: "ams-date", text: entry.iso ?? "—" });
+    row.createDiv({ cls: "ca-ams-date", text: entry.iso ?? "—" });
     row.addEventListener("click", () => this.openHit(entry));
   }
 
@@ -402,7 +402,7 @@ class VaultSearchModal extends Modal {
 
   private paintCursor(): void {
     const rows = Array.from(
-      this.resultsEl.querySelectorAll<HTMLElement>(".ams-row")
+      this.resultsEl.querySelectorAll<HTMLElement>(".ca-ams-row")
     );
     rows.forEach((el, i) => el.toggleClass("is-sel", i === this.cursor));
     rows[this.cursor]?.scrollIntoView({ block: "nearest" });

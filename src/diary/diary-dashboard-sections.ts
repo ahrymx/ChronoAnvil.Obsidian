@@ -75,7 +75,7 @@
 // THIS PAGE SHIPPED WITHOUT THE MODIFIER FIRST, and the first look at it in a
 // real vault is what built the modifier. Composing the cards bare avoided the
 // doubling and produced the other half of §3.1's argument instead: withholding
-// the card leaves `.journal-widget-block` and nothing else, so `Today` and
+// the card leaves `.ca-journal-widget-block` and nothing else, so `Today` and
 // `This month` were loose content in the note's flow — no title, no fold, and
 // visibly not the same kind of thing as the three sections under them. §3.1
 // predicted exactly that ("in a markdown note nothing replaces it"), which is
@@ -197,7 +197,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // note: standing bare, it was the one block here that could not be folded
     // and did not look like its siblings.
     render: (opts) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
         `diary:${DASHBOARD_AGENDA}`,
@@ -230,7 +230,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // label promises.
     locked: false,
     render: (opts) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
         "month-summary",
@@ -242,7 +242,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
   {
     id: "open-tasks",
     label: "Open tasks",
-    blurb: "Still-open Almanac tasks from every entry under the diary.",
+    blurb: "Still-open ChronoAnvil tasks from every entry under the diary.",
     icon: "⏳",
     // The tasks live in the entries this aggregates, not here, so removing the
     // section costs nothing but the view — `diary-sections.ts` makes the same
@@ -269,7 +269,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // rather than "Open tasks", because it is drawn over the tag cloud beside
     // it as well. See the note above the catalogue, which owns this argument.
     render: (options) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(options?.form === WIDGET_FORM ? [] : [INDEXES_BAR]),
         "tasks-table",
@@ -310,7 +310,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
         hostFolder: spec.hostFolder ?? null,
       },
     ],
-    render: () => ({ fence: "almanac", lines: ["tag-index"] }),
+    render: () => ({ fence: "chronoanvil", lines: ["tag-index"] }),
     // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who repoints the cloud
     // at their own folder still has a section the editor can find.
     locate: (text) => probe(text, /^tag-index\b/m),
@@ -336,7 +336,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     locked: false,
     row: LOOKING_BACK,
     render: (options) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(options?.form === WIDGET_FORM ? [] : [LOOKING_BACK_BAR]),
         "on-this-day:always",
@@ -379,7 +379,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     row: LOOKING_BACK,
     // SECOND CELL, SO NO BAR AND NO TOGGLE FOR ONE — On this day composes the
     // row's, and it says "Looking back" because it is drawn over this too.
-    render: () => ({ fence: "almanac", lines: ["sleep-summary"] }),
+    render: () => ({ fence: "chronoanvil", lines: ["sleep-summary"] }),
     locate: (text) => probe(text, /^sleep-summary\b/m),
   },
   {
@@ -394,10 +394,10 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     locked: false,
     holds: (text) => chartLinesIn(text),
     render: () => ({
-      fence: "almanac-charts",
+      fence: "chronoanvil-charts",
       lines: [`${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`],
     }),
-    locate: (text) => probe(text, /^```almanac-charts/m),
+    locate: (text) => probe(text, /^```chronoanvil-charts/m),
   },
 ];
 

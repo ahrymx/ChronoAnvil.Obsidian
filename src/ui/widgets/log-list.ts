@@ -186,7 +186,7 @@ function highlightMatches(el: HTMLElement, text: string, query: string): void {
       el.appendText(text.slice(start, idx));
     }
     el.createEl("mark", {
-      cls: "jcl-highlight",
+      cls: "ca-jcl-highlight",
       text: text.slice(idx, idx + q.length),
     });
     start = idx + q.length;
@@ -207,13 +207,13 @@ function formatLogText(el: HTMLElement, text: string, query: string): void {
   const appendSegment = (segmentText: string, kind?: "tag" | "code"): void => {
     if (!segmentText) return;
     if (kind === "tag") {
-      const tagSpan = el.createSpan({ cls: "jcl-text-tag", text: segmentText });
+      const tagSpan = el.createSpan({ cls: "ca-jcl-text-tag", text: segmentText });
       if (q && segmentText.toLowerCase().includes(q)) {
         highlightMatches(tagSpan, segmentText, q);
       }
     } else if (kind === "code") {
       const codeSpan = el.createEl("code", {
-        cls: "jcl-text-code",
+        cls: "ca-jcl-text-code",
         text: segmentText.slice(1, -1),
       });
       if (q && segmentText.toLowerCase().includes(q)) {
@@ -250,8 +250,8 @@ export function buildLogList(
   // `note:` field uses, and a second set would drift the first time either
   // moved. The list joins that rule's hidden-children selector.
   const wrap = createDiv({
-    cls: `journal-capture-log journal-note ${opts.modifier}${
-      opts.collapsible ? " journal-note--collapsible" : ""
+    cls: `ca-journal-capture-log ca-journal-note ${opts.modifier}${
+      opts.collapsible ? " ca-journal-note--collapsible" : ""
     }`,
   });
 
@@ -259,9 +259,9 @@ export function buildLogList(
   // section folds where it always folded, remembers what it always remembered,
   // and the `captureCollapsedByDefault` setting still means what it says.
   if (opts.collapsible && opts.label) {
-    const bar = wrap.createDiv({ cls: "journal-note-collapse-bar" });
-    setIcon(bar.createDiv({ cls: "journal-note-chevron" }), "chevron-down");
-    bar.createDiv({ cls: "journal-note-label", text: opts.label });
+    const bar = wrap.createDiv({ cls: "ca-journal-note-collapse-bar" });
+    setIcon(bar.createDiv({ cls: "ca-journal-note-chevron" }), "chevron-down");
+    bar.createDiv({ cls: "ca-journal-note-label", text: opts.label });
     const apply = (v: boolean): void => wrap.toggleClass("is-collapsed", v);
     apply(opts.startCollapsed());
     bar.addEventListener("click", (evt) => {
@@ -271,11 +271,11 @@ export function buildLogList(
       opts.onFold(next);
     });
   } else if (opts.label && (!opts.types || opts.types.length <= 1)) {
-    wrap.createDiv({ cls: "journal-note-label", text: opts.label });
+    wrap.createDiv({ cls: "ca-journal-note-label", text: opts.label });
   }
 
   // ── CONTROLS DECK (Dropdown Type Selector, Collapsible Search, Status Segment) ───
-  const deck = wrap.createDiv({ cls: "journal-logbook-deck" });
+  const deck = wrap.createDiv({ cls: "ca-journal-logbook-deck" });
 
   let searchQuery = "";
   let activeTypeFilter = opts.activeType ?? "all";
@@ -285,7 +285,7 @@ export function buildLogList(
   let searchOpen = false;
 
   // Top row: Leading type filter dropdown on left (replaces title), Action buttons on right
-  const topBar = deck.createDiv({ cls: "jcl-top-bar" });
+  const topBar = deck.createDiv({ cls: "ca-jcl-top-bar" });
 
   const pillCountMap = new Map<string, HTMLElement>();
   let typeIconEl: HTMLElement | null = null;
@@ -293,28 +293,56 @@ export function buildLogList(
   let dropdownMenuEl: HTMLElement | null = null;
   let typeDropdownBtn: HTMLButtonElement | null = null;
 
+  // THE DISMISSAL LISTENER LIVES AS LONG AS THE MENU IS OPEN, AND NO LONGER.
+  //
+  // This used to be one `document.addEventListener("click", …)` wired once when
+  // the list was built, with an anonymous handler and no removal — so it could
+  // not be taken off, and it outlived the dropdown, the note it was drawn on,
+  // and the plugin being disabled. Every re-render of every logbook widget
+  // added another. `buildLogList` returns an element and has no render child to
+  // register a teardown on, so the fix is not `registerDomEvent`: it is to hold
+  // the listener only while there is something for it to close.
+  //
+  // THE SHAPE `periodnav.ts` AND `entryheader.ts` ALREADY USE — attach on open,
+  // remove in the close path — so the three menus in this plugin now dismiss
+  // the same way rather than two ways.
+  //
+  // BUBBLE PHASE, NOT CAPTURE, and unlike those two this needs no deferred
+  // attach. The trigger calls `stopPropagation`, which keeps the opening click
+  // from reaching document — and would NOT keep it from a capture-phase
+  // listener, since capture runs document-first. That is the whole reason the
+  // other two defer with a `setTimeout` and this one does not.
+  const onDocClick = (): void => setDropdownOpen(false);
+
+  const setDropdownOpen = (next: boolean): void => {
+    dropdownMenuEl?.toggleClass("is-open", next);
+    typeDropdownBtn?.toggleClass("is-open", next);
+    if (next) document.addEventListener("click", onDocClick);
+    else document.removeEventListener("click", onDocClick);
+  };
+
   if (opts.types && opts.types.length > 1) {
-    const dropdownWrap = topBar.createDiv({ cls: "jcl-dropdown-wrap" });
+    const dropdownWrap = topBar.createDiv({ cls: "ca-jcl-dropdown-wrap" });
     typeDropdownBtn = dropdownWrap.createEl("button", {
-      cls: "jcl-type-dropdown-btn",
+      cls: "ca-jcl-type-dropdown-btn",
       attr: { type: "button", "aria-label": "Select logbook type" },
     });
-    typeIconEl = typeDropdownBtn.createSpan({ cls: "jcl-type-icon", text: "📚" });
-    typeLabelEl = typeDropdownBtn.createSpan({ cls: "jcl-type-label", text: "All Logbooks" });
-    const caret = typeDropdownBtn.createSpan({ cls: "jcl-dropdown-caret" });
+    typeIconEl = typeDropdownBtn.createSpan({ cls: "ca-jcl-type-icon", text: "📚" });
+    typeLabelEl = typeDropdownBtn.createSpan({ cls: "ca-jcl-type-label", text: "All Logbooks" });
+    const caret = typeDropdownBtn.createSpan({ cls: "ca-jcl-dropdown-caret" });
     setIcon(caret, "chevron-down");
 
-    dropdownMenuEl = dropdownWrap.createDiv({ cls: "jcl-dropdown-menu" });
+    dropdownMenuEl = dropdownWrap.createDiv({ cls: "ca-jcl-dropdown-menu" });
 
     // "All" option
     const allItem = dropdownMenuEl.createEl("button", {
-      cls: `jcl-dropdown-item${activeTypeFilter === "all" ? " is-selected" : ""}`,
+      cls: `ca-jcl-dropdown-item${activeTypeFilter === "all" ? " is-selected" : ""}`,
       attr: { type: "button" },
     });
-    const allLeft = allItem.createDiv({ cls: "jcl-dropdown-item-left" });
-    allLeft.createSpan({ cls: "jcl-item-icon", text: "📚" });
-    allLeft.createSpan({ cls: "jcl-item-label", text: "All Logbooks" });
-    const allCount = allItem.createSpan({ cls: "jcl-dropdown-badge", text: "0" });
+    const allLeft = allItem.createDiv({ cls: "ca-jcl-dropdown-item-left" });
+    allLeft.createSpan({ cls: "ca-jcl-item-icon", text: "📚" });
+    allLeft.createSpan({ cls: "ca-jcl-item-label", text: "All Logbooks" });
+    const allCount = allItem.createSpan({ cls: "ca-jcl-dropdown-badge", text: "0" });
     pillCountMap.set("all", allCount);
 
     allItem.addEventListener("click", (e) => {
@@ -326,13 +354,13 @@ export function buildLogList(
 
     for (const t of opts.types) {
       const item = dropdownMenuEl.createEl("button", {
-        cls: `jcl-dropdown-item${activeTypeFilter === t.id ? " is-selected" : ""}`,
+        cls: `ca-jcl-dropdown-item${activeTypeFilter === t.id ? " is-selected" : ""}`,
         attr: { type: "button" },
       });
-      const itemLeft = item.createDiv({ cls: "jcl-dropdown-item-left" });
-      if (t.icon) itemLeft.createSpan({ cls: "jcl-item-icon", text: t.icon });
-      itemLeft.createSpan({ cls: "jcl-item-label", text: t.label });
-      const c = item.createSpan({ cls: "jcl-dropdown-badge", text: "0" });
+      const itemLeft = item.createDiv({ cls: "ca-jcl-dropdown-item-left" });
+      if (t.icon) itemLeft.createSpan({ cls: "ca-jcl-item-icon", text: t.icon });
+      itemLeft.createSpan({ cls: "ca-jcl-item-label", text: t.label });
+      const c = item.createSpan({ cls: "ca-jcl-dropdown-badge", text: "0" });
       pillCountMap.set(t.id, c);
 
       item.addEventListener("click", (e) => {
@@ -345,23 +373,18 @@ export function buildLogList(
 
     typeDropdownBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      const open = dropdownMenuEl?.hasClass("is-open");
-      dropdownMenuEl?.toggleClass("is-open", !open);
-      typeDropdownBtn?.toggleClass("is-open", !open);
-    });
-
-    document.addEventListener("click", () => {
-      dropdownMenuEl?.removeClass("is-open");
-      typeDropdownBtn?.removeClass("is-open");
+      setDropdownOpen(!dropdownMenuEl?.hasClass("is-open"));
     });
   }
 
   const updateDropdownSelection = (): void => {
     if (!dropdownMenuEl || !typeDropdownBtn || !typeIconEl || !typeLabelEl) return;
-    dropdownMenuEl.removeClass("is-open");
-    typeDropdownBtn.removeClass("is-open");
+    // Through the same door as every other close, so the dismissal listener
+    // comes off here too. Picking an item used to clear the class directly and
+    // leave the listener attached, which is how one open menu could leave two.
+    setDropdownOpen(false);
     const items = Array.from(
-      dropdownMenuEl.querySelectorAll<HTMLButtonElement>(".jcl-dropdown-item")
+      dropdownMenuEl.querySelectorAll<HTMLButtonElement>(".ca-jcl-dropdown-item")
     );
     if (items[0]) items[0].toggleClass("is-selected", activeTypeFilter === "all");
     if (opts.types) {
@@ -384,23 +407,23 @@ export function buildLogList(
   };
 
   // Top right actions
-  const actionsGroup = topBar.createDiv({ cls: "jcl-actions-group" });
+  const actionsGroup = topBar.createDiv({ cls: "ca-jcl-actions-group" });
 
   const searchToggle = actionsGroup.createEl("button", {
-    cls: "jcl-action-chip jcl-search-toggle",
+    cls: "ca-jcl-action-chip ca-jcl-search-toggle",
     attr: { type: "button", title: "Toggle search bar", "aria-label": "Toggle search bar" },
   });
-  const searchToggleIcon = searchToggle.createSpan({ cls: "jcl-action-icon" });
+  const searchToggleIcon = searchToggle.createSpan({ cls: "ca-jcl-action-icon" });
   setIcon(searchToggleIcon, "search");
-  searchToggle.createSpan({ cls: "jcl-action-label", text: "Search" });
+  searchToggle.createSpan({ cls: "ca-jcl-action-label", text: "Search" });
 
   const sortBtn = actionsGroup.createEl("button", {
-    cls: "jcl-action-chip",
+    cls: "ca-jcl-action-chip",
     attr: { type: "button", title: "Toggle sort order", "aria-label": "Toggle sort order" },
   });
-  const sortIcon = sortBtn.createSpan({ cls: "jcl-action-icon" });
+  const sortIcon = sortBtn.createSpan({ cls: "ca-jcl-action-icon" });
   setIcon(sortIcon, "arrow-down-up");
-  const sortLabel = sortBtn.createSpan({ cls: "jcl-action-label", text: "Newest" });
+  const sortLabel = sortBtn.createSpan({ cls: "ca-jcl-action-label", text: "Newest" });
   sortBtn.addEventListener("click", () => {
     sortOrder = sortOrder === "desc" ? "asc" : "desc";
     sortLabel.setText(sortOrder === "desc" ? "Newest" : "Oldest");
@@ -408,12 +431,12 @@ export function buildLogList(
   });
 
   const compactBtn = actionsGroup.createEl("button", {
-    cls: "jcl-action-chip",
+    cls: "ca-jcl-action-chip",
     attr: { type: "button", title: "Toggle compact view", "aria-label": "Toggle compact view" },
   });
-  const compactIcon = compactBtn.createSpan({ cls: "jcl-action-icon" });
+  const compactIcon = compactBtn.createSpan({ cls: "ca-jcl-action-icon" });
   setIcon(compactIcon, "list");
-  compactBtn.createSpan({ cls: "jcl-action-label", text: "Compact" });
+  compactBtn.createSpan({ cls: "ca-jcl-action-label", text: "Compact" });
   compactBtn.addEventListener("click", () => {
     isCompact = !isCompact;
     compactBtn.toggleClass("is-active", isCompact);
@@ -421,16 +444,16 @@ export function buildLogList(
   });
 
   // Collapsible Search Strip
-  const searchStrip = deck.createDiv({ cls: "jcl-search-strip" });
-  const searchWrap = searchStrip.createDiv({ cls: "jcl-search-wrap" });
-  const searchIcon = searchWrap.createSpan({ cls: "jcl-search-icon" });
+  const searchStrip = deck.createDiv({ cls: "ca-jcl-search-strip" });
+  const searchWrap = searchStrip.createDiv({ cls: "ca-jcl-search-wrap" });
+  const searchIcon = searchWrap.createSpan({ cls: "ca-jcl-search-icon" });
   setIcon(searchIcon, "search");
   const searchInput = searchWrap.createEl("input", {
-    cls: "jcl-search-input",
+    cls: "ca-jcl-search-input",
     attr: { type: "text", placeholder: "Filter log items by text, time, #tag…" },
   });
   const searchClear = searchWrap.createEl("button", {
-    cls: "jcl-search-clear",
+    cls: "ca-jcl-search-clear",
     text: "✕",
     attr: { type: "button", "aria-label": "Clear search", style: "display: none;" },
   });
@@ -463,8 +486,8 @@ export function buildLogList(
   });
 
   // Status Segment Row
-  const statusRow = deck.createDiv({ cls: "jcl-status-row" });
-  const statusSegment = statusRow.createDiv({ cls: "jcl-status-segment" });
+  const statusRow = deck.createDiv({ cls: "ca-jcl-status-row" });
+  const statusSegment = statusRow.createDiv({ cls: "ca-jcl-status-segment" });
   const statusPills: { id: "all" | "open" | "done" | "timed"; label: string; btn: HTMLButtonElement }[] = [];
   for (const s of [
     { id: "all" as const, label: "All" },
@@ -473,7 +496,7 @@ export function buildLogList(
     { id: "timed" as const, label: "Timed" },
   ]) {
     const btn = statusSegment.createEl("button", {
-      cls: `jcl-status-segment-btn${activeStatusFilter === s.id ? " is-active" : ""}`,
+      cls: `ca-jcl-status-segment-btn${activeStatusFilter === s.id ? " is-active" : ""}`,
       text: s.label,
       attr: { type: "button" },
     });
@@ -486,13 +509,13 @@ export function buildLogList(
   }
 
   // ── CONTAINED SCROLL VIEWPORT ─────────────────────────────────────────
-  const scrollContainer = wrap.createDiv({ cls: "journal-capture-scroll" });
-  const list = scrollContainer.createDiv({ cls: "journal-capture-list" });
+  const scrollContainer = wrap.createDiv({ cls: "ca-journal-capture-scroll" });
+  const list = scrollContainer.createDiv({ cls: "ca-journal-capture-list" });
 
   // ── FOOTER STATUS ─────────────────────────────────────────────────────
-  const footer = wrap.createDiv({ cls: "journal-logbook-footer" });
-  const footerCount = footer.createSpan({ cls: "jcl-footer-count" });
-  footer.createSpan({ cls: "jcl-footer-cap", text: "Scrollable viewport" });
+  const footer = wrap.createDiv({ cls: "ca-journal-logbook-footer" });
+  const footerCount = footer.createSpan({ cls: "ca-jcl-footer-count" });
+  footer.createSpan({ cls: "ca-jcl-footer-cap", text: "Scrollable viewport" });
 
   let file = opts.file;
   let items: LogItem[] = [];
@@ -530,7 +553,7 @@ export function buildLogList(
     }
 
     if (items.length === 0) {
-      list.createDiv({ cls: "journal-capture-empty", text: opts.emptyText });
+      list.createDiv({ cls: "ca-journal-capture-empty", text: opts.emptyText });
       footerCount.setText("0 items");
       return;
     }
@@ -571,7 +594,7 @@ export function buildLogList(
 
     if (filtered.length === 0) {
       list.createDiv({
-        cls: "journal-capture-empty",
+        cls: "ca-journal-capture-empty",
         text: "No log items match the current filter.",
       });
       return;
@@ -672,13 +695,13 @@ export function buildLogList(
 
   if (opts.add) {
     const add = opts.add;
-    const row = wrap.createDiv({ cls: "journal-capture-add" });
-    const box = row.createDiv({ cls: "journal-capture-add-box" });
-    const controls = box.createDiv({ cls: "journal-capture-add-controls" });
+    const row = wrap.createDiv({ cls: "ca-journal-capture-add" });
+    const box = row.createDiv({ cls: "ca-journal-capture-add-box" });
+    const controls = box.createDiv({ cls: "ca-journal-capture-add-controls" });
 
     let chosenType = opts.types && opts.types.length > 0 ? opts.types[0].id : undefined;
     if (opts.types && opts.types.length > 1) {
-      const typeSelect = controls.createEl("select", { cls: "jcl-add-type-select" });
+      const typeSelect = controls.createEl("select", { cls: "ca-jcl-add-type-select" });
       for (const t of opts.types) {
         const opt = typeSelect.createEl("option", { value: t.id, text: `${t.icon ? t.icon + " " : ""}${t.label}` });
         if (t.id === chosenType) opt.selected = true;
@@ -692,11 +715,11 @@ export function buildLogList(
     let when: HTMLElement | null = null;
 
     const reveal = controls.createEl("button", {
-      cls: "journal-capture-when-btn",
+      cls: "ca-journal-capture-when-btn",
       attr: { type: "button", "aria-label": "Say when this happened", title: "Say when this happened" },
     });
     setIcon(reveal, "clock");
-    const revealLabel = reveal.createSpan({ cls: "journal-capture-when-label", text: "Now" });
+    const revealLabel = reveal.createSpan({ cls: "ca-journal-capture-when-label", text: "Now" });
 
     reveal.addEventListener("click", () => {
       if (when) {
@@ -729,7 +752,7 @@ export function buildLogList(
     };
 
     const input = box.createEl("textarea", {
-      cls: "journal-capture-add-input",
+      cls: "ca-journal-capture-add-input",
       attr: { placeholder: add.placeholder, rows: "1" },
     });
 
@@ -839,18 +862,18 @@ function renderLogItemCard(
   }
 ): void {
   const card = list.createDiv({
-    cls: `journal-capture-card${item.done ? " is-done" : ""}`,
+    cls: `ca-journal-capture-card${item.done ? " is-done" : ""}`,
   });
   if (typeTag?.color) {
     card.style.borderLeftColor = typeTag.color;
   }
 
-  const head = card.createDiv({ cls: "journal-capture-head" });
+  const head = card.createDiv({ cls: "ca-journal-capture-head" });
 
   if (typeTag) {
-    const tagEl = head.createSpan({ cls: "journal-capture-type-tag" });
-    if (typeTag.icon) tagEl.createSpan({ cls: "jcl-tag-icon", text: `${typeTag.icon} ` });
-    tagEl.createSpan({ cls: "jcl-tag-label", text: typeTag.label });
+    const tagEl = head.createSpan({ cls: "ca-journal-capture-type-tag" });
+    if (typeTag.icon) tagEl.createSpan({ cls: "ca-jcl-tag-icon", text: `${typeTag.icon} ` });
+    tagEl.createSpan({ cls: "ca-jcl-tag-label", text: typeTag.label });
   }
 
   // An item with no stamp is one somebody typed into the region by hand. It is
@@ -866,7 +889,7 @@ function renderLogItemCard(
   // way to give a length to the months of items a work log already holds, which
   // is what the time grid needs to draw them as anything but a moment.
   const clock = head.createEl("button", {
-    cls: `journal-capture-time${stamp ? "" : " is-empty"}`,
+    cls: `ca-journal-capture-time${stamp ? "" : " is-empty"}`,
     text: stamp || "no time",
     attr: {
       type: "button",
@@ -876,12 +899,12 @@ function renderLogItemCard(
   });
   if (item.mins) {
     head.createSpan({
-      cls: "journal-capture-mins",
+      cls: "ca-journal-capture-mins",
       text: `${item.mins} min`,
     });
   }
   clock.addEventListener("click", () => {
-    const existing = card.querySelector(".journal-capture-when");
+    const existing = card.querySelector(".ca-journal-capture-when");
     if (existing) {
       existing.remove();
       cb.onWhenCancel();
@@ -895,10 +918,10 @@ function renderLogItemCard(
     );
   });
 
-  const actions = head.createDiv({ cls: "journal-capture-actions" });
+  const actions = head.createDiv({ cls: "ca-journal-capture-actions" });
   const button = (icon: string, aria: string, on: () => void): void => {
     const b = actions.createEl("button", {
-      cls: "journal-capture-btn",
+      cls: "ca-journal-capture-btn",
       attr: { "aria-label": aria, type: "button" },
     });
     setIcon(b, icon);
@@ -916,12 +939,12 @@ function renderLogItemCard(
     // Text, not markdown. The region is plain text by contract — see the
     // `note:` field this replaces — and rendering it would make an item
     // beginning with `#` into a heading inside a card.
-    const textEl = card.createDiv({ cls: "journal-capture-text" });
+    const textEl = card.createDiv({ cls: "ca-journal-capture-text" });
     formatLogText(textEl, item.text, searchQuery);
     return;
   }
 
-  const area = card.createEl("textarea", { cls: "journal-capture-edit" });
+  const area = card.createEl("textarea", { cls: "ca-journal-capture-edit" });
   area.value = item.text;
   area.rows = Math.max(1, item.text.split("\n").length);
   // Cmd/Ctrl+Enter commits and plain Enter is a newline, which is the capture

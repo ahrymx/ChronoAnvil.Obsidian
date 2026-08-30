@@ -41,8 +41,8 @@
 // where it can be checked against the code.
 //
 // WHAT IS LEFT IS A STRIP, and it is drawn as one: right-aligned, at the section
-// bar's scale, with a hairline under it. `.journal-sec-l1`'s actions strip and
-// `.journal-group-foot` are the same object at two scales (4.11), and this is
+// bar's scale, with a hairline under it. `.ca-journal-sec-l1`'s actions strip and
+// `.ca-journal-group-foot` are the same object at two scales (4.11), and this is
 // the third — on a dashboard it sits directly under the section's own bar and
 // reads as its strip; on the homepage, where the block wears a block head and
 // has no strip, it reads as the same band under that head.
@@ -53,12 +53,12 @@
 // with the button that needed it, **no vault read at all**.
 
 import { MarkdownPostProcessorContext, setIcon } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { openCapture } from "./capture";
 import { buildBannerLinks } from "../core/links";
 import { getFile } from "../core/util";
 
-// A button in the strip. There is one, and it is a `.journal-btn` rather than a
+// A button in the strip. There is one, and it is a `.ca-journal-btn` rather than a
 // `mod-cta`: 4.13.1 §1 flattened the primary tier out of the plugin.
 //
 // KEPT AS A FUNCTION FOR ONE CALLER, deliberately. It is the shape of a control
@@ -71,9 +71,9 @@ function addAction(
   icon: string,
   onClick: () => void
 ): void {
-  const btn = parent.createEl("button", { cls: "journal-btn" });
-  setIcon(btn.createSpan({ cls: "journal-btn-icon" }), icon);
-  btn.createSpan({ cls: "journal-btn-label", text: label });
+  const btn = parent.createEl("button", { cls: "ca-journal-btn" });
+  setIcon(btn.createSpan({ cls: "ca-journal-btn-icon" }), icon);
+  btn.createSpan({ cls: "ca-journal-btn-label", text: label });
   btn.addEventListener("click", (e) => {
     e.preventDefault();
     onClick();
@@ -87,10 +87,10 @@ function addAction(
 // host note, and the only caller (calendar.ts, on `opts.header`) already had to
 // have one to draw the band at all.
 export function buildDiaryActions(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
-  const root = createDiv({ cls: "jc-actions" });
+  const root = createDiv({ cls: "ca-jc-actions" });
 
   // ── WHAT WENT, AND THE RULE BEHIND IT (4.13.2 §1) ──────────────────────
   //

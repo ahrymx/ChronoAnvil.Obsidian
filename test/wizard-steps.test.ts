@@ -11,7 +11,7 @@ import { ChartEditModal } from "../src/charts/chart-ui";
 import type { ChartSpec } from "../src/charts/charts";
 import type { TrackerDef, TrackerType } from "../src/trackers/trackers";
 import { diarySurface } from "../src/trackers/trackers";
-import type AlmanacPlugin from "../src/main";
+import type ChronoAnvilPlugin from "../src/main";
 
 import { readCss, readSrc } from "./sources";
 // ── The two editors that became wizards (2.55.5) ──────────────────────────
@@ -50,7 +50,7 @@ const plugin = (trackers: TrackerDef[] = [], moodTrackerId = "Mood") =>
       studyEnabled: true,
       paths: { journalsRoot: "03 - Journals", templates: "05 - Templates" },
     },
-  }) as unknown as AlmanacPlugin;
+  }) as unknown as ChronoAnvilPlugin;
 
 class TrackerProbe extends TrackerEditModal {
   titles(): string[] {
@@ -471,7 +471,7 @@ describe("where the step machinery lives", () => {
       "export abstract class SteppedEditorModal"
     );
     const others = ["settings-editors.ts", "chart-ui.ts"].filter((f) =>
-      src(f).includes("almanac-wizard-rail")
+      src(f).includes("ca-wizard-rail")
     );
     expect(others).toEqual([]);
   });
@@ -526,11 +526,11 @@ describe("where the step machinery lives", () => {
     expect(src("chart-ui.ts")).toContain("renderTileSchematic");
     const css = readCss();
     for (const cls of [
-      ".almanac-wizard-block.is-off",
-      ".almanac-wizard-grid",
-      ".almanac-wizard-tile.is-w2",
-      ".almanac-wizard-tile.is-h2",
-      ".almanac-wizard-ghost",
+      ".ca-wizard-block.is-off",
+      ".ca-wizard-grid",
+      ".ca-wizard-tile.is-w2",
+      ".ca-wizard-tile.is-h2",
+      ".ca-wizard-ghost",
     ]) {
       expect(css, cls).toContain(cls);
     }

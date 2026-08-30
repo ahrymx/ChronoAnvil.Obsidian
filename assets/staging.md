@@ -1,6 +1,6 @@
 # 📥 Staging
 
-```almanac
+```chronoanvil
 links:home
 ```
 
@@ -10,9 +10,9 @@ half-formed thought, a link, a note from a call — then file it into **Diary**,
 
 ## ⏳ Open Tasks
 
-```almanac
+```chronoanvil
 tasks-table:01 - Material/Staging
 ```
 
-%% almanac-graph %%
+%% chronoanvil-graph %%
 %% [[Homepage|​]] %%

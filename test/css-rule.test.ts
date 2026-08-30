@@ -18,34 +18,34 @@ import { cssRule, cssRules, readCss } from "./sources";
 
 describe("cssRule finds the rule it was asked for", () => {
   it("returns the declarations of a real rule", () => {
-    const rule = cssRule(".jjs-card");
-    expect(rule).toContain("var(--am-border-inner)");
+    const rule = cssRule(".ca-jjs-card");
+    expect(rule).toContain("var(--ca-border-inner)");
     expect(rule).toContain("border-radius");
   });
 
   it("stops at the rule's own closing brace", () => {
     // The bound. An unbounded slice runs on into whatever follows.
-    expect(cssRule(".jjs-card")).not.toContain("{");
+    expect(cssRule(".ca-jjs-card")).not.toContain("{");
   });
 });
 
 describe("cssRule is anchored, which indexOf is not", () => {
   it("does not match a selector that merely ENDS with the name", () => {
-    // THE 4.35.1 CASE. `.almanac-section-head-fold .almanac-section-title {`
-    // contains `.almanac-section-title {` as a substring, so a plain indexOf
+    // THE 4.35.1 CASE. `.ca-section-head-fold .ca-section-title {`
+    // contains `.ca-section-title {` as a substring, so a plain indexOf
     // reads the descendant override — which states the opposite value.
-    const bare = cssRule(".almanac-section-title");
+    const bare = cssRule(".ca-section-title");
     expect(bare).toContain("flex: 1 1 auto");
-    const nested = cssRule(".almanac-section-head-fold .almanac-section-title");
+    const nested = cssRule(".ca-section-head-fold .ca-section-title");
     expect(nested).toContain("flex: 0 0 auto");
     expect(bare).not.toBe(nested);
   });
 
   it("matches a name inside a comma-separated selector list", () => {
-    // `.jjs-card-when, .jjs-card-open { … }` is one rule naming two things, and
+    // `.ca-jjs-card-when, .ca-jjs-card-open { … }` is one rule naming two things, and
     // asking for either must find it.
-    expect(cssRule(".jjs-card-when")).toContain("font-size");
-    expect(cssRule(".jjs-card-open")).toBeTruthy();
+    expect(cssRule(".ca-jjs-card-when")).toContain("font-size");
+    expect(cssRule(".ca-jjs-card-open")).toBeTruthy();
   });
 });
 
@@ -54,30 +54,30 @@ describe("cssRule throws rather than handing back nothing", () => {
     // THE FAILURE THAT LOOKS LIKE A PASS. `indexOf` returns -1, the slice comes
     // back empty, and every `not.toContain` on it succeeds while asserting
     // nothing at all. A rename must break the test that guards it.
-    expect(() => cssRule(".almanac-not-a-real-selector")).toThrow(
+    expect(() => cssRule(".ca-not-a-real-selector")).toThrow(
       /No CSS rule/
     );
   });
 
   it("names the selector in the error, so the failure says what to fix", () => {
-    expect(() => cssRule(".almanac-not-a-real-selector")).toThrow(
-      /almanac-not-a-real-selector/
+    expect(() => cssRule(".ca-not-a-real-selector")).toThrow(
+      /ca-not-a-real-selector/
     );
   });
 });
 
 describe("cssRules reaches inside at-rules", () => {
   it("finds a rule that appears both bare and in a container query", () => {
-    // `.am-stats[data-cols="4"]` is declared at the top level and again inside
+    // `.ca-stats[data-cols="4"]` is declared at the top level and again inside
     // `@container (max-width: 480px)`. A helper that stopped at the top level
     // would silently miss the half that does the collapsing.
-    const all = cssRules('.am-stats[data-cols="4"]');
+    const all = cssRules('.ca-stats[data-cols="4"]');
     expect(all.length).toBeGreaterThan(1);
   });
 
   it("agrees with the raw stylesheet about what exists", () => {
     // A floor, so a scanner bug that returned nothing cannot pass the file.
-    expect(readCss()).toContain(".jjs-card");
-    expect(cssRules(".jjs-card").length).toBe(1);
+    expect(readCss()).toContain(".ca-jjs-card");
+    expect(cssRules(".ca-jjs-card").length).toBe(1);
   });
 });

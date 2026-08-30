@@ -100,7 +100,7 @@ describe("the section catalogue", () => {
       // a gamble with somebody's note.
       //
       // Reachable only because 2.54 made the note tables native — a ```base
-      // block cannot live inside an ```almanac one, so while `children`
+      // block cannot live inside a ```chronoanvil one, so while `children`
       // emitted Bases tables this was impossible rather than merely unmet.
       everyRender((s, ctx) => {
         const fences = s.render(ctx).filter((b) => b.kind === "fence");
@@ -189,7 +189,7 @@ describe("the section catalogue", () => {
       // frontmatter handling is written around the pairing, so the adjacency
       // is asserted rather than assumed.
       const out = renderSection(findSection("banner")!, indexCtx(cooking, 0));
-      expect(out.startsWith("`almanac:spacer`\n```almanac")).toBe(true);
+      expect(out.startsWith("`chronoanvil:spacer`\n```chronoanvil")).toBe(true);
     });
   });
 
@@ -376,13 +376,13 @@ describe("the section catalogue", () => {
 
     it("writes the whole notes section as one fence", () => {
       // The three lines per kind — header, create button, table — go in ONE
-      // ```almanac fence, and every kind shares it. Obsidian renders each
+      // ```chronoanvil fence, and every kind shares it. Obsidian renders each
       // markdown block as its own sibling element, so a header in one fence
       // and its table in the next are two boxes with a gap no styling can
       // close; welding them is the same fix 2.13.9 made to the Journals card.
       //
       // This is also what `kind-table` exists for: a ```base block cannot live
-      // inside an almanac fence, so while the tables were Bases tables the
+      // inside a chronoanvil fence, so while the tables were Bases tables the
       // rule was unreachable and a two-kind index shipped four separate blocks.
       const twoKind = buildJournalType({
         ...freshCustomJournal(new Set()),
@@ -395,12 +395,12 @@ describe("the section catalogue", () => {
       });
       const section = findSection("children")!;
       const rendered = renderSection(section, indexCtx(twoKind, 0));
-      expect(rendered.match(/```almanac/g)?.length).toBe(1);
+      expect(rendered.match(/```chronoanvil/g)?.length).toBe(1);
       expect(rendered).not.toContain("```base");
       // Order within the fence is header → button → table, per kind, so the
       // importer can pair each button with the header above it.
       expect(rendered.split("\n").filter((l) => l.trim())).toEqual([
-        "```almanac",
+        "```chronoanvil",
         "header:🍽️ Recipes",
         "button:cooking:new-recipe",
         "kind-table:recipe",
@@ -417,7 +417,7 @@ describe("the section catalogue", () => {
       // than either.
       const section = findSection("children")!;
       const rendered = renderSection(section, indexCtx(cooking, 0));
-      expect(rendered.match(/```almanac/g)?.length).toBe(1);
+      expect(rendered.match(/```chronoanvil/g)?.length).toBe(1);
       // `level-index` SINCE 4.16 §1, and the word is the only thing that
       // changed here: the catalogue writes the widget that asks what is below
       // rather than the one that assumed folders.
@@ -431,7 +431,7 @@ describe("the section catalogue", () => {
       // offer to add a second copy of what is already there.
       const section = findSection("children")!;
       const ctx = indexCtx(cooking, 0);
-      const old = "```almanac\nheader:🗂️ Dishes\nbutton:cooking:new-container\ntopics-table\n```\n";
+      const old = "```chronoanvil\nheader:🗂️ Dishes\nbutton:cooking:new-container\ntopics-table\n```\n";
       expect(section.locate(old, ctx)).toBeGreaterThanOrEqual(0);
       expect(section.locate(renderSection(section, ctx), ctx)).toBeGreaterThanOrEqual(0);
     });
@@ -452,7 +452,7 @@ describe("the section catalogue", () => {
         kinds: [{ id: "entry", emoji: "📝", label: "Entry" }],
       });
       const top = composeTemplate(indexCtx(unrated, 0));
-      expect(top).toContain("```almanac-journal-charts");
+      expect(top).toContain("```chronoanvil-journal-charts");
       expect(top).toContain("header:📊 Charts");
       expect(top).not.toContain("jchart:");
     });
@@ -501,7 +501,7 @@ describe("the section catalogue", () => {
 
     it("gives every content field the body region it writes into", () => {
       // `note:`, `tasks:`, `attach:`, `path:` and `recall:` all persist into
-      // `<!--almanac:key-->`. A section that emits the directive without the
+      // `<!--chronoanvil:key-->`. A section that emits the directive without the
       // region leaves the field nowhere to save.
       for (const s of JOURNAL_SECTIONS) {
         for (const ctx of [
@@ -512,7 +512,7 @@ describe("the section catalogue", () => {
           const out = renderSection(s, ctx);
           const keys = [...out.matchAll(/^(?:note|list|tasks|attach|path|recall):([\w-]+)/gm)];
           for (const [, key] of keys) {
-            expect(out, `${s.id}/${key}`).toContain(`<!--almanac:${key}`);
+            expect(out, `${s.id}/${key}`).toContain(`<!--chronoanvil:${key}`);
           }
         }
       }
@@ -561,7 +561,7 @@ describe("the section catalogue", () => {
       // parts as peers.
       const out = composeTemplate(sectionContext(paged, { page: paged.kinds[0] }));
       expect(out).toContain("journal-header");
-      expect(out).not.toContain("almanac:trackers:start");
+      expect(out).not.toContain("chronoanvil:trackers:start");
       expect(out).not.toContain("tracker:");
     });
 
@@ -628,7 +628,7 @@ describe("the section catalogue", () => {
       });
       expect(out).toContain("header:🧭 Learning Path");
       expect(out).toContain("path:path");
-      expect(out).toContain("<!--almanac:path");
+      expect(out).toContain("<!--chronoanvil:path");
     });
 
     it("emits one attach field and one region per declared resource shelf", () => {
@@ -644,8 +644,8 @@ describe("the section catalogue", () => {
       });
       expect(out).toContain("attach:res-docs|Docs");
       expect(out).toContain("attach:res-practice|Practice");
-      expect(out).toContain("<!--almanac:res-docs");
-      expect(out).toContain("<!--almanac:res-practice");
+      expect(out).toContain("<!--chronoanvil:res-docs");
+      expect(out).toContain("<!--chronoanvil:res-practice");
       expect(out).not.toContain("attach:resources");
     });
 
@@ -673,7 +673,7 @@ describe("the section catalogue", () => {
         STUDY_JOURNAL.layout?.["index:1"]
       );
       for (const key of ["path", "res-docs", "res-tutorials", "res-practice"]) {
-        expect(topic, key).toContain(`<!--almanac:${key}`);
+        expect(topic, key).toContain(`<!--chronoanvil:${key}`);
       }
       expect(topic).not.toContain("learning-path");
     });
@@ -730,7 +730,7 @@ describe("the section catalogue", () => {
 
     const directivesIn = (text: string): string[] => {
       const out: string[] = [];
-      const fences = [...text.matchAll(/^```almanac[\w-]*\n([\s\S]*?)^```/gm)];
+      const fences = [...text.matchAll(/^```chronoanvil[\w-]*\n([\s\S]*?)^```/gm)];
       for (const [, body] of fences) {
         for (const line of body.split("\n")) {
           const trimmed = line.trim();
@@ -857,11 +857,11 @@ describe("the section catalogue", () => {
       // `tasks:` and `tasks-table` share a prefix and are different sections.
       // A naive indexOf would have found the rollup in every leaf note.
       const subject = indexCtx(STUDY_JOURNAL, 0);
-      expect(detectSections("```almanac\ntasks-table\n```", subject)).toContain(
+      expect(detectSections("```chronoanvil\ntasks-table\n```", subject)).toContain(
         "tasks"
       );
       expect(
-        detectSections("```almanac\ntasks:todo|Tasks\n```", lesson)
+        detectSections("```chronoanvil\ntasks:todo|Tasks\n```", lesson)
       ).toEqual(["checklist"]);
     });
 
@@ -885,7 +885,7 @@ describe("the section catalogue", () => {
       // A leaf note holding a hand-written `review-queue` is legal — nothing
       // refuses it — but the picker offering to append a second one is not the
       // question this function answers.
-      const text = "```almanac\nreview-queue\n```";
+      const text = "```chronoanvil\nreview-queue\n```";
       expect(detectSections(text, lesson)).toEqual([]);
       expect(detectSections(text, indexCtx(STUDY_JOURNAL, 0))).toEqual([
         "review",

@@ -21,7 +21,7 @@
 // and RESUME carried it as an open item for five releases. The argument, now
 // that it has been had:
 //
-// A NUMBER HAS TO SAY WHAT IT COUNTED. Almanac's stat strip does — it sits in
+// A NUMBER HAS TO SAY WHAT IT COUNTED. ChronoAnvil's stat strip does — it sits in
 // the page body beside the thing it is measuring, with room for a caption and a
 // scope. A masthead tile has room for a digit and a word, so it can only be
 // read against the page it is on: "12" on a weekly dashboard is twelve of
@@ -83,7 +83,7 @@
 //
 // `resolveTarget` is reused wholesale — it is the one table that answers "where
 // does `diary` go", and a second would be the one nobody updates. `renderTarget`
-// is NOT, and that is the deliberate half: it draws `.jn-pill`, and a pill row
+// is NOT, and that is the deliberate half: it draws `.ca-jn-pill`, and a pill row
 // inside this card would make the head read as one more card with one more pill
 // row in it. The head is the page; the way it says so is a face and a ground
 // nothing else in the plugin uses, and small-caps links rather than pills.
@@ -94,7 +94,7 @@
 import { setIcon, TFile } from "obsidian";
 import type { Menu, MarkdownPostProcessorContext } from "obsidian";
 
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import { getFile, noExt, openFile } from "../../core/util";
 import { resolveTarget } from "../../core/links";
 import { setPageWide } from "../../core/note-sections";
@@ -120,7 +120,7 @@ import { settingsButton } from "../section-frame";
 // answer.* A callback is what lets each caller name its own marker without this
 // function learning about either.
 export function sectionsMenuFor(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   isWide: () => boolean
 ): ((menu: Menu) => void) | null {
@@ -184,7 +184,7 @@ export function sectionsMenuFor(
 // What this still does is answer the menu, which is a question about the card
 // in front of the reader and not about the page — see `menu` above, which
 // argues for reading it here rather than reading the file a second time.
-export const WIDE_CLASS = "jtc-wide";
+export const WIDE_CLASS = "ca-jtc-wide";
 
 // Write the page's width into the note that asked for it.
 //
@@ -198,7 +198,7 @@ export const WIDE_CLASS = "jtc-wide";
 // identical still moves its modified time, which is a lie about the reader's
 // vault that sync then propagates.
 async function setWide(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   on: boolean
 ): Promise<void> {
@@ -218,7 +218,7 @@ async function setWide(
 // is drawn` means a Journals link on a vault with no journals root is not drawn
 // at all, and that decision is made by the caller so this function has one job.
 function renderLink(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   wrap: HTMLElement,
   id: string,
   sourcePath: string,
@@ -236,17 +236,17 @@ function renderLink(
   // position you can read at a glance.
   if (target.file?.path === sourcePath) {
     const here = wrap.createSpan({
-      cls: "jtc-link is-here",
+      cls: "ca-jtc-link is-here",
       attr: { "aria-current": "page" },
     });
-    setIcon(here.createSpan({ cls: "jtc-link-icon" }), target.icon);
+    setIcon(here.createSpan({ cls: "ca-jtc-link-icon" }), target.icon);
     here.createSpan({ text: target.label });
     return;
   }
 
   if (target.action) {
-    const a = wrap.createEl("a", { cls: "jtc-link", href: "#" });
-    setIcon(a.createSpan({ cls: "jtc-link-icon" }), target.icon);
+    const a = wrap.createEl("a", { cls: "ca-jtc-link", href: "#" });
+    setIcon(a.createSpan({ cls: "ca-jtc-link-icon" }), target.icon);
     a.createSpan({ text: target.label });
     a.addEventListener("click", (evt) => {
       evt.preventDefault();
@@ -259,11 +259,11 @@ function renderLink(
   if (!dest) return;
   const href = noExt(dest.path);
   const a = wrap.createEl("a", {
-    cls: "internal-link jtc-link",
+    cls: "internal-link ca-jtc-link",
     href,
     attr: { "data-href": href },
   });
-  setIcon(a.createSpan({ cls: "jtc-link-icon" }), target.icon);
+  setIcon(a.createSpan({ cls: "ca-jtc-link-icon" }), target.icon);
   a.createSpan({ text: target.label });
   a.addEventListener("click", (evt) => {
     evt.preventDefault();
@@ -273,7 +273,7 @@ function renderLink(
   a.addEventListener("mouseover", (evt) => {
     plugin.app.workspace.trigger("hover-link", {
       event: evt,
-      source: "almanac-page-title",
+      source: "ca-page-title",
       hoverParent: wrap,
       targetEl: a,
       linktext: href,
@@ -288,17 +288,17 @@ function renderLink(
 // CONTENT in a cell, and a second copy as chrome would be the same four
 // destinations twice on one page.
 export function buildPageTitle(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   ids: readonly string[] = []
 ): HTMLElement {
-  const root = createDiv({ cls: "jtc-card" });
+  const root = createDiv({ cls: "ca-jtc-card" });
   const file = getFile(plugin.app, ctx.sourcePath);
   if (!(file instanceof TFile)) return root;
 
-  const row = root.createDiv({ cls: "jtc-row" });
-  const titleRow = row.createDiv({ cls: "jtc-titlerow" });
-  attachNoteRename(plugin.app, titleRow, file, "jtc-title");
+  const row = root.createDiv({ cls: "ca-jtc-row" });
+  const titleRow = row.createDiv({ cls: "ca-jtc-titlerow" });
+  attachNoteRename(plugin.app, titleRow, file, "ca-jtc-title");
 
   const build = sectionsMenuFor(plugin, ctx.sourcePath, () =>
     root.hasClass(WIDE_CLASS)
@@ -309,7 +309,7 @@ export function buildPageTitle(
     // changed since it was drawn. The cog rather than a ⋯ because the control
     // acts on the PAGE — its name, its sections — and as of 4.20 it is the same
     // control on all three banners rather than this one's alone.
-    settingsButton(row, "jtc-cog", build);
+    settingsButton(row, "ca-jtc-cog", build);
   }
 
   // THE SECOND ROW, AND ONLY WHERE THERE IS SOMETHING IN IT. An empty strip
@@ -322,7 +322,7 @@ export function buildPageTitle(
   // have to reconcile source order with screen order.
   const wanted = ids.map((s) => s.trim()).filter((s) => s.length > 0);
   if (!wanted.length) return root;
-  const nav = createDiv({ cls: "jtc-nav" });
+  const nav = createDiv({ cls: "ca-jtc-nav" });
   for (const id of wanted) renderLink(plugin, nav, id, ctx.sourcePath, file);
   // AND AN EMPTY ROW IS NOT DRAWN EITHER. Every id can decline — a vault with no
   // journals root and no diary root leaves nothing to show — and the check is

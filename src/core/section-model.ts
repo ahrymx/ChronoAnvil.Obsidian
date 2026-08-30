@@ -469,7 +469,7 @@ export interface TitleQuestion extends SectionQuestionCommon {
 //
 // NOT A `frame:` MODIFIER, though the neighbourhood is the same. `frame:
 // section` withholds the block's card and wraps the children in a fold of their
-// own; the period summary's card IS the summary — `.journal-overview-card`
+// own; the period summary's card IS the summary — `.ca-journal-overview-card`
 // carries its background, its border and the inset every band inside it bleeds
 // against — so the section form has to keep the card and add a bar to it. The
 // modifier cannot express that, and widening it to would make a value that

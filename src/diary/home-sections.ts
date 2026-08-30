@@ -17,7 +17,7 @@
 // The consequence was not subtle. `surfaceOfNote` in section-insert.ts asks
 // three questions — journal surface, diary dashboard, diary entry — and returns
 // null otherwise, so both **"Edit this note's sections…"** and **"Add a section
-// to this note…"** answered "this note isn't one Almanac recognises" on
+// to this note…"** answered "this note isn't one ChronoAnvil recognises" on
 // `Homepage.md`. The machinery to rearrange it has existed since 3.0 and
 // reached every note but this one.
 //
@@ -82,13 +82,13 @@ const HOME_AGENDA = 3;
 // about 345px, which is under the 520px at which every widget in this plugin
 // collapses to its narrow layout. The page would then be a row of two columns,
 // and whether it was would depend on a checkbox in someone's appearance
-// settings. A page Almanac composes should not be shaped by that.
+// settings. A page ChronoAnvil composes should not be shaped by that.
 //
 // NOT THE PROSE WIDTH, AND NOT UNBOUNDED. `--file-line-width` is a number about
 // TEXT — how many characters read comfortably in a line — and this page has
 // almost no text in it. Unbounded is the other failure: on a wide monitor the
 // month grid stretches to a cell per hand-span with nothing to stop it. So the
-// homepage takes a width of its own, and `--am-page-width` says where the
+// homepage takes a width of its own, and `--ca-page-width` says where the
 // number comes from.
 //
 // `cssclasses` IN THE NOTE, WHICH IS THE MECHANISM AND NOT AN IMPLEMENTATION
@@ -102,7 +102,7 @@ const HOME_AGENDA = 3;
 // that tab is exactly that bug with a new symptom.
 //
 // It also keeps the decision the reader's. The line is in their note; deleting
-// it gives them their setting back, and no part of Almanac writes it again.
+// it gives them their setting back, and no part of ChronoAnvil writes it again.
 //
 // ── AND AS OF 4.11 IT IS NOT WHAT A NEW HOMEPAGE USES ─────────────────────
 //
@@ -116,14 +116,14 @@ const HOME_AGENDA = 3;
 // KEEPING EXISTING HOMEPAGES WIDE. Repair does not edit frontmatter and never has,
 // so a homepage composed before this release keeps its `cssclasses` key and keeps
 // its width from this class — and a homepage composed after it has neither and
-// gets the same width from `.jtc-wide`. Both selectors live in one rule with one
+// gets the same width from `.ca-jtc-wide`. Both selectors live in one rule with one
 // `max-width`, so there is nothing to keep in step.
 //
 // The property this buys, which is the one `cssclasses` was chosen for in the
 // first place: the reader can see the setting, and deleting it gives them their
 // width back. A line in the block they are looking at is more of that than a key
 // in a collapsed frontmatter panel, not less.
-export const HOME_CSS_CLASS = "almanac-wide";
+export const HOME_CSS_CLASS = "ca-wide";
 
 // The homepage's sections, given the vault's configured diary root.
 //
@@ -149,7 +149,7 @@ export function homeSections(diaryRoot: string): FlatSection[] {
       ? {
           ...s,
           render: () => ({
-            fence: "almanac",
+            fence: "chronoanvil",
             lines: ["header:🏷️ Tags", `tag-index:${diaryRoot}`],
           }),
         }
@@ -271,7 +271,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // The first cell of the top row. 4.2 §2.
     row: HOME_TOP_ROW,
     render: (options) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(options?.form === SECTION_FORM ? ["header:📆 Today"] : []),
         `diary:${HOME_AGENDA}`,
@@ -306,7 +306,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // BARE, so the note carries no list to keep in step with the destinations
     // the plugin knows about. `launcher` alone draws the default four, and a
     // reader who wants their own writes them after it.
-    render: () => ({ fence: "almanac", lines: ["launcher"] }),
+    render: () => ({ fence: "chronoanvil", lines: ["launcher"] }),
     locate: (text) => probe(text, /^launcher\b/m),
   },
   {
@@ -329,7 +329,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
       },
     ],
     render: (options) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(options?.form === SECTION_FORM ? ["header:⏳ Open tasks"] : []),
         options?.folder && options.folder !== ""
@@ -348,7 +348,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     row: HOME_TOP_ROW,
     tab: true,
     render: (options) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(options?.form === SECTION_FORM ? ["header:🗒️ Logbook"] : []),
         widgetLine("logbook", options),
@@ -368,7 +368,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     locked: false,
     optIn: true,
     render: (options) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(options?.form === SECTION_FORM ? ["header:⏭️ Coming up"] : []),
         widgetLine("upcoming", options),
@@ -471,7 +471,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // block that draws nothing at all for a year is a worse answer to that than
     // one saying what it is waiting for.
     optIn: true,
-    render: () => ({ fence: "almanac", lines: ["on-this-day:always"] }),
+    render: () => ({ fence: "chronoanvil", lines: ["on-this-day:always"] }),
     locate: (text) => probe(text, /^on-this-day\b/m),
   },
   {
@@ -522,7 +522,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // additive and reorders nothing. That is stated in the changelog because it
     // is what an existing vault will actually see.
     render: (options) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         // `WIDGET_FORM`, AS IT HAS BEEN SINCE 4.59. A full-width block above a
         // full-width `journals:cards` needs the bar to say where one ends; the
@@ -573,7 +573,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // still the right answer on a page about journals; the journals dashboard
     // composes it for that reason.
     render: (options) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(options?.form === WIDGET_FORM ? [] : ["frame: section"]),
         "journals:cards",
@@ -601,10 +601,10 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     locked: false,
     holds: (text) => chartLinesIn(text),
     render: () => ({
-      fence: "almanac-charts",
+      fence: "chronoanvil-charts",
       lines: [`${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`],
     }),
-    locate: (text) => probe(text, /^```almanac-charts/m),
+    locate: (text) => probe(text, /^```chronoanvil-charts/m),
   },
   {
     id: "tags",
@@ -640,7 +640,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // the bare form and is never the one composed; it exists so the shape of
     // the section is readable here beside its siblings.
     render: () => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: ["header:🏷️ Tags", "tag-index"],
     }),
     // AND NOW THE DIALOG CAN REPOINT IT (3.15). The folder is written into the
@@ -690,7 +690,7 @@ const specFor = (
 // What is left is the homepage as a place to START: the diary card, the
 // journals card, and the vault's charts.
 // AND IT HAS NO FRONTMATTER, AS OF 4.11. It had four lines of it — a `cssclasses`
-// key carrying `almanac-wide` — and the note now says the same thing in the head's
+// key carrying `ca-wide` — and the note now says the same thing in the head's
 // own fence, which is where every other dashboard says it and where the cog can
 // write it. See `HOME_CSS_CLASS` for what that key still does for pages composed
 // before this release.
@@ -726,7 +726,7 @@ export function homeSectionModel(
 // ── WHAT THIS REPLACES, AND THE BUG IT IS THE FIX FOR (4.38.2) ────────────
 //
 // 4.37 shipped `retargetJournalsCards`, which rewrote a bare `journals` line to
-// `journals:cards` inside any `almanac` fence. Its comment claimed *"it only
+// `journals:cards` inside any `chronoanvil` fence. Its comment claimed *"it only
 // ever matches one page in the vault, which is why it can sit in this loop
 // rather than needing a walk of its own."*
 //
@@ -769,7 +769,7 @@ export function homeSectionModel(
 // window's dry run *be* the migration with the write taken off rather than a
 // summary of one — stated for `mergeBannerFences` and inherited here.
 //
-// ONLY INSIDE AN `almanac` FENCE, because "journals" is an ordinary English word
+// ONLY INSIDE A `chronoanvil` FENCE, because "journals" is an ordinary English word
 // and a reader's own prose or heading must not be rewritten. The fence state is
 // tracked rather than assumed from position: a page may hold several fences and
 // the reader may have moved this one.
@@ -784,7 +784,7 @@ export function collapseJournalsBlocks(
 ): string | null {
   const lines = text.split("\n");
 
-  // Every `almanac` fence that holds a journals directive, as [start, end] line
+  // Every `chronoanvil` fence that holds a journals directive, as [start, end] line
   // indices of the fence including its two ``` lines, plus where the directive
   // sits inside it.
   const found: { start: number; end: number; at: number }[] = [];
@@ -794,10 +794,10 @@ export function collapseJournalsBlocks(
     const line = lines[i];
     // The opening fence carries the language; the closing one is bare. Matching
     // ``` at a line's start is how every other reader in this project walks
-    // fences, and the `almanac` check is what keeps a code sample out of scope.
+    // fences, and the `chronoanvil` check is what keeps a code sample out of scope.
     if (/^```/.test(line)) {
       if (start === -1) {
-        if (/^```almanac\s*$/.test(line.trim())) {
+        if (/^```chronoanvil\s*$/.test(line.trim())) {
           start = i;
           at = -1;
         }

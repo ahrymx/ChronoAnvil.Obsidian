@@ -7,7 +7,7 @@
 
 // Every page widget, as a section — 4.12 §C.
 //
-// THE QUESTION THIS ANSWERS, AND THE ONE IT REFUSES TO ASK. Almanac draws 48
+// THE QUESTION THIS ANSWERS, AND THE ONE IT REFUSES TO ASK. ChronoAnvil draws 48
 // directives and a reader could add about six of them, because a section is
 // something a catalogue declares and a widget is a word you have to already
 // know. The obvious fix is a second kind of row in the section window — a
@@ -264,12 +264,12 @@ const VAULT_SOURCES: Record<
   journals: {
     of: (v) => v.journals ?? [],
     empty:
-      "No journals yet — turn on Study or add one in Settings → Almanac → Journals, and it can be shown here.",
+      "No journals yet — turn on Study or add one in Settings → ChronoAnvil → Journals, and it can be shown here.",
   },
   logbooks: {
     of: (v) => v.logbooks ?? [],
     empty:
-      "No logbooks yet — add one in Settings → Almanac → Logbooks, and it can be shown here.",
+      "No logbooks yet — add one in Settings → ChronoAnvil → Logbooks, and it can be shown here.",
   },
   trackers: {
     of: (v) => v.trackers ?? [],
@@ -279,7 +279,7 @@ const VAULT_SOURCES: Record<
     // both. A sentence saying only "add one" would send a reader who has six to
     // add a seventh and watch it not appear either.
     empty:
-      "No trackers with numbers to summarise — add a scale, quantity or habit in Settings → Almanac → Trackers, and it can be shown here.",
+      "No trackers with numbers to summarise — add a scale, quantity or habit in Settings → ChronoAnvil → Trackers, and it can be shown here.",
   },
 };
 
@@ -454,7 +454,7 @@ const widgetSection = (
     locked: false,
     optIn: true,
     render: (options) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(isLogbook && options?.form !== WIDGET_FORM ? [bar] : []),
         renderLine(keyword, spec, options),

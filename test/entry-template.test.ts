@@ -33,7 +33,7 @@ import { fillDailyTemplate } from "../src/core/util";
 import { App, TFile } from "obsidian";
 import { EntryTemplates } from "../src/diary/entry-template-manager";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
-import type { AlmanacSettings } from "../src/core/settings";
+import type { ChronoAnvilSettings } from "../src/core/settings";
 
 // The shared band, in file order.
 //
@@ -81,7 +81,7 @@ describe("the shared band's order", () => {
     expect(out).toEqual(["capture", "log"]);
     // …and the regions follow it, or the widgets would read each other's text.
     const text = composeEntryTemplate("daily", [], ["capture", "log"]);
-    expect([...text.matchAll(/<!--almanac:([a-z-]+)/g)].map((m) => m[1])).toEqual([
+    expect([...text.matchAll(/<!--chronoanvil:([a-z-]+)/g)].map((m) => m[1])).toEqual([
       "capture",
       "log",
     ]);
@@ -211,7 +211,7 @@ describe("the shared band's order", () => {
     // directives and not the regions the two would stop lining up, which is a
     // note whose widgets read each other's text.
     const text = composeEntryTemplate("daily", [], ["capture", "todo"]);
-    const regions = [...text.matchAll(/<!--almanac:([a-z-]+)/g)].map((m) => m[1]);
+    const regions = [...text.matchAll(/<!--chronoanvil:([a-z-]+)/g)].map((m) => m[1]);
     expect(regions).toEqual(sharedBand(text));
   });
 });
@@ -263,12 +263,12 @@ describe("what a reload would destroy", () => {
   });
 
   it("does not mistake the frontmatter's tracker block for the body's", () => {
-    // Both carry `# almanac:trackers:start`, and the frontmatter one holds
+    // Both carry `# chronoanvil:trackers:start`, and the frontmatter one holds
     // property names rather than directives. Reading the first pair in the file
     // would report every entry's `Mood:` line as a lost tracker.
     const tpl = composeEntryTemplate("daily");
-    expect(tpl.indexOf("# almanac:trackers:start")).toBeLessThan(
-      tpl.indexOf("`almanac:spacer`")
+    expect(tpl.indexOf("# chronoanvil:trackers:start")).toBeLessThan(
+      tpl.indexOf("`chronoanvil:spacer`")
     );
     expect(entryReloadLoss(tpl, tpl, ctxFor("daily"))).toEqual([]);
   });
@@ -284,8 +284,8 @@ describe("what a reload would destroy", () => {
   it("reports prose written outside every section", () => {
     const tpl = composeEntryTemplate("daily");
     const withProse = tpl.replace(
-      "<!--almanac:focus",
-      "I wrote this here by hand.\n\n<!--almanac:focus"
+      "<!--chronoanvil:focus",
+      "I wrote this here by hand.\n\n<!--chronoanvil:focus"
     );
     const loss = entryReloadLoss(withProse, tpl, ctxFor("daily"));
     expect(loss.map((l) => l.kind)).toEqual(["prose"]);
@@ -298,7 +298,7 @@ describe("what a reload would destroy", () => {
     // walk, which is what stops this going wrong the next time the composer
     // emits something new.
     const tpl = composeEntryTemplate("daily");
-    expect(tpl).toContain("`almanac:spacer`");
+    expect(tpl).toContain("`chronoanvil:spacer`");
     expect(tpl.split("\n").filter((l) => l.trim() === "---")).toHaveLength(3);
     expect(entryReloadLoss(tpl, tpl, ctxFor("daily"))).toEqual([]);
   });
@@ -387,7 +387,7 @@ describe("writing a template back over a page", () => {
     // entry to its period. Recomposing the frontmatter would destroy both.
     const tpl = composeEntryTemplate("daily");
     const page = fillDailyTemplate(tpl, "2026-08-15")
-      .replace('journal: Daily Notes', 'journal: Daily Notes\ntitle: A good day\nalmanac-events:\n  - birthday-sam');
+      .replace('journal: Daily Notes', 'journal: Daily Notes\ntitle: A good day\nchronoanvil-events:\n  - birthday-sam');
     const next = reloadEntryBody(page, composeEntryTemplate("daily", [], ["capture"]));
     expect(next).not.toBeNull();
     const head = (t: string): string => t.slice(0, t.indexOf("\n---\n", 4) + 5);
@@ -431,7 +431,7 @@ describe("writing a template back over a page", () => {
 // a vault call these cases never reach.
 const stubPlugin = (): {
   plugin: ConstructorParameters<typeof EntryTemplates>[1];
-  settings: AlmanacSettings;
+  settings: ChronoAnvilSettings;
 } => {
   const settings = {
     ...DEFAULT_SETTINGS,
@@ -439,7 +439,7 @@ const stubPlugin = (): {
     entrySectionBand: {},
     entryLayouts: [],
     customJournals: [],
-  } as AlmanacSettings;
+  } as ChronoAnvilSettings;
   const plugin = {
     settings,
     saveSettings: async (): Promise<void> => {},
@@ -568,7 +568,7 @@ describe("the reload refuses rather than trusting the window", () => {
 describe("saving a page as the grain's default", () => {
   const withScaffold = (): {
     plugin: ConstructorParameters<typeof EntryTemplates>[1];
-    settings: AlmanacSettings;
+    settings: ChronoAnvilSettings;
     refreshed: () => number;
   } => {
     const { plugin, settings } = stubPlugin();

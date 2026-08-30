@@ -6,7 +6,7 @@
 # attribution and naming terms under its section 7. See LICENSE and
 # LICENSING.md.
 
-# One-shot build for the Almanac plugin.
+# One-shot build for the ChronoAnvil plugin.
 #
 # The sandbox this was refactored in had no network access, so dependencies
 # (obsidian types, esbuild, typescript) could not be installed there. Run this
@@ -14,7 +14,7 @@
 #
 #   ./build.sh          # typecheck + production bundle -> main.js
 #   ./build.sh dev      # watch/dev build
-#   ./build.sh package  # build, then assemble dist/almanac/ for installation
+#   ./build.sh package  # build, then assemble dist/chronoanvil/ for installation
 set -euo pipefail
 cd "$(dirname "$0")"
 

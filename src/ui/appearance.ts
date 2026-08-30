@@ -5,7 +5,7 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   PAGE_GROUND_CLASSES,
   PAGE_GROUND_MARKER,
@@ -14,9 +14,9 @@ import {
 } from "../core/page-grounds";
 
 export class AppearanceManager {
-  private readonly plugin: AlmanacPlugin;
+  private readonly plugin: ChronoAnvilPlugin;
 
-  constructor(plugin: AlmanacPlugin) {
+  constructor(plugin: ChronoAnvilPlugin) {
     this.plugin = plugin;
   }
 
@@ -35,25 +35,25 @@ export class AppearanceManager {
     const body = document.body;
 
     // Clear previous preset classes
-    body.removeClass("am-preset-modern", "am-preset-editorial", "am-preset-technical");
-    body.removeClass("am-grain-vibrant", "am-grain-subtle", "am-grain-monochrome");
+    body.removeClass("ca-preset-modern", "ca-preset-editorial", "ca-preset-technical");
+    body.removeClass("ca-grain-vibrant", "ca-grain-subtle", "ca-grain-monochrome");
 
     // Apply active preset (editorial is the default)
     if (s.aestheticPreset === "modern") {
-      body.addClass("am-preset-modern");
+      body.addClass("ca-preset-modern");
     } else if (s.aestheticPreset === "technical") {
-      body.addClass("am-preset-technical");
+      body.addClass("ca-preset-technical");
     } else {
-      body.addClass("am-preset-editorial");
+      body.addClass("ca-preset-editorial");
     }
 
     // Apply grain intensity
     if (s.grainAesthetics === "subtle") {
-      body.addClass("am-grain-subtle");
+      body.addClass("ca-grain-subtle");
     } else if (s.grainAesthetics === "monochrome") {
-      body.addClass("am-grain-monochrome");
+      body.addClass("ca-grain-monochrome");
     } else {
-      body.addClass("am-grain-vibrant");
+      body.addClass("ca-grain-vibrant");
     }
 
     // ── The page ground (4.80) ────────────────────────────────────────────
@@ -69,12 +69,12 @@ export class AppearanceManager {
 
   unload(): void {
     document.body.removeClass(
-      "am-preset-modern",
-      "am-preset-editorial",
-      "am-preset-technical",
-      "am-grain-vibrant",
-      "am-grain-subtle",
-      "am-grain-monochrome"
+      "ca-preset-modern",
+      "ca-preset-editorial",
+      "ca-preset-technical",
+      "ca-grain-vibrant",
+      "ca-grain-subtle",
+      "ca-grain-monochrome"
     );
     document.body.removeClasses(PAGE_GROUND_CLASSES);
   }

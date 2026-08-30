@@ -582,17 +582,17 @@ describe("resizing a block", () => {
 describe("mobile controls and horizontal scrolling", () => {
   it("keeps the rail, corner and lane label sticky on horizontal scroll", () => {
     const css = readCss();
-    const cornerIdx = css.indexOf(".am-tg-corner {");
+    const cornerIdx = css.indexOf(".ca-tg-corner {");
     expect(cornerIdx).toBeGreaterThan(-1);
     expect(css.slice(cornerIdx, css.indexOf("}", cornerIdx))).toContain("position: sticky;");
     expect(css.slice(cornerIdx, css.indexOf("}", cornerIdx))).toContain("left: 0;");
 
-    const railIdx = css.indexOf(".am-tg-rail {");
+    const railIdx = css.indexOf(".ca-tg-rail {");
     expect(railIdx).toBeGreaterThan(-1);
     expect(css.slice(railIdx, css.indexOf("}", railIdx))).toContain("position: sticky;");
     expect(css.slice(railIdx, css.indexOf("}", railIdx))).toContain("left: 0;");
 
-    const laneIdx = css.indexOf(".am-tg-lane-label {");
+    const laneIdx = css.indexOf(".ca-tg-lane-label {");
     expect(laneIdx).toBeGreaterThan(-1);
     expect(css.slice(laneIdx, css.indexOf("}", laneIdx))).toContain("position: sticky;");
     expect(css.slice(laneIdx, css.indexOf("}", laneIdx))).toContain("left: 0;");

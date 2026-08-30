@@ -15,7 +15,7 @@
 
 import { setIcon } from "obsidian";
 import { emptyLine } from "../ui/empty";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   EventDef,
   describeEventDate,
@@ -39,16 +39,16 @@ const DEFAULT_UPCOMING = 5;
 // cell, at list size, so an event is recognisable in both places.
 function eventChip(parent: HTMLElement, def: EventDef): HTMLElement {
   const chip = parent.createSpan({
-    cls: `am-ev-chip am-ev-chip-${eventColor(def)}`,
+    cls: `ca-ev-chip ca-ev-chip-${eventColor(def)}`,
   });
   setIcon(chip, eventIcon(def));
   return chip;
 }
 
-// Keeps the `am-ev-empty` class its own stylesheet targets; the shape and the
+// Keeps the `ca-ev-empty` class its own stylesheet targets; the shape and the
 // rule for what to say now come from empty.ts.
 function emptyState(parent: HTMLElement, text: string): void {
-  emptyLine(parent, text, "am-ev-empty");
+  emptyLine(parent, text, "ca-ev-empty");
 }
 
 // ── events ────────────────────────────────────────────────────────────
@@ -77,12 +77,12 @@ function emptyState(parent: HTMLElement, text: string): void {
 // nothing is worse than no toggle.
 const FILTER_FROM = 8;
 
-export function buildEventsList(plugin: AlmanacPlugin): HTMLElement {
-  const root = createDiv({ cls: "am-ev-manager" });
+export function buildEventsList(plugin: ChronoAnvilPlugin): HTMLElement {
+  const root = createDiv({ cls: "ca-ev-manager" });
   let query = "";
   // Kept across a redraw so deleting the third of four matches does not empty
   // the box the reader is still typing in.
-  const body = createDiv({ cls: "am-ev-body" });
+  const body = createDiv({ cls: "ca-ev-body" });
 
   const redraw = (): void => {
     body.empty();
@@ -90,16 +90,16 @@ export function buildEventsList(plugin: AlmanacPlugin): HTMLElement {
   };
 
   const defs = readEvents(plugin.app, plugin);
-  const toolbar = root.createDiv({ cls: "am-ev-toolbar" });
+  const toolbar = root.createDiv({ cls: "ca-ev-toolbar" });
   const addBtn = toolbar.createEl("button", {
-    cls: "am-ev-add mod-cta",
+    cls: "ca-ev-add mod-cta",
     text: "Add event",
   });
   addBtn.addEventListener("click", () =>
     openEventEditor(plugin.app, plugin, draftEvent(), redraw)
   );
   toolbar.createSpan({
-    cls: "am-ev-count",
+    cls: "ca-ev-count",
     text: defs.length === 1 ? "1 event" : `${defs.length} events`,
   });
 
@@ -108,7 +108,7 @@ export function buildEventsList(plugin: AlmanacPlugin): HTMLElement {
   // picker follows, applied to the number at which scanning stops working.
   if (defs.length >= FILTER_FROM) {
     const search = toolbar.createEl("input", {
-      cls: "am-ev-filter",
+      cls: "ca-ev-filter",
       attr: { type: "search", placeholder: "Filter events…", "aria-label": "Filter events" },
     });
     search.addEventListener("input", () => {
@@ -130,7 +130,7 @@ export function buildEventsList(plugin: AlmanacPlugin): HTMLElement {
 }
 
 function drawList(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   root: HTMLElement,
   query: string,
   redraw: () => void
@@ -166,16 +166,16 @@ function drawList(
     // something up, not one you read — and a count in the heading is what makes
     // the fold honest about what it is hiding.
     if (opts.folded) {
-      const details = root.createEl("details", { cls: "am-ev-past" });
+      const details = root.createEl("details", { cls: "ca-ev-past" });
       details.createEl("summary", {
-        cls: "am-ev-section",
+        cls: "ca-ev-section",
         text: `${title} · ${list.length}`,
       });
-      rows(plugin, details.createDiv({ cls: "am-ev-list" }), list, redraw);
+      rows(plugin, details.createDiv({ cls: "ca-ev-list" }), list, redraw);
       return;
     }
-    root.createEl("h4", { cls: "am-ev-section", text: title });
-    rows(plugin, root.createDiv({ cls: "am-ev-list" }), list, redraw);
+    root.createEl("h4", { cls: "ca-ev-section", text: title });
+    rows(plugin, root.createDiv({ cls: "ca-ev-list" }), list, redraw);
   };
 
   section("Recurring", recurring);
@@ -185,27 +185,27 @@ function drawList(
 
 // One row per event, with the three actions that do not need a form.
 function rows(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ul: HTMLElement,
   list: EventDef[],
   redraw: () => void
 ): void {
   for (const def of list) {
-    const row = ul.createDiv({ cls: "am-ev-row" });
+    const row = ul.createDiv({ cls: "ca-ev-row" });
     if (def.enabled === false) row.addClass("is-disabled");
     eventChip(row, def);
-    const text = row.createDiv({ cls: "am-ev-text" });
-    text.createDiv({ cls: "am-ev-title", text: def.title });
+    const text = row.createDiv({ cls: "ca-ev-text" });
+    text.createDiv({ cls: "ca-ev-title", text: def.title });
     // THE HOUR AND THE LENGTH WHERE THERE ARE ANY, and the note last, because
     // the note is the part that runs long.
     text.createDiv({
-      cls: "am-ev-meta",
+      cls: "ca-ev-meta",
       text: [describeEventWhen(def), describeLength(def.duration), def.note]
         .filter((part) => !!part)
         .join(" · "),
     });
 
-    const act = row.createDiv({ cls: "am-ev-actions" });
+    const act = row.createDiv({ cls: "ca-ev-actions" });
 
     const on = def.enabled !== false;
     action(act, on ? "eye" : "eye-off", on ? "Turn off" : "Turn on", async () => {
@@ -256,7 +256,7 @@ function action(
   run: () => void | Promise<void>
 ): void {
   const btn = parent.createEl("button", {
-    cls: "am-ev-edit",
+    cls: "ca-ev-edit",
     attr: { "aria-label": label, title: label, type: "button" },
   });
   setIcon(btn, icon);
@@ -268,10 +268,10 @@ function action(
 // and says which day of it you're on, which is the one thing this list can tell
 // you that the calendar can't.
 export function buildUpcomingEvents(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   count: number
 ): HTMLElement {
-  const root = createDiv({ cls: "am-ev-upcoming" });
+  const root = createDiv({ cls: "ca-ev-upcoming" });
   if (!plugin.settings.eventsEnabled) {
     emptyState(
       root,
@@ -291,13 +291,13 @@ export function buildUpcomingEvents(
   }
 
   for (const item of items) {
-    const row = root.createDiv({ cls: "am-ev-row am-ev-upcoming-row" });
+    const row = root.createDiv({ cls: "ca-ev-row ca-ev-upcoming-row" });
     if (item.ongoing) row.addClass("is-ongoing");
     eventChip(row, item.def);
-    const text = row.createDiv({ cls: "am-ev-text" });
-    text.createDiv({ cls: "am-ev-title", text: item.def.title });
-    text.createDiv({ cls: "am-ev-meta", text: describeEventDate(item.def) });
-    row.createSpan({ cls: "am-ev-when", text: describeRelative(item) });
+    const text = row.createDiv({ cls: "ca-ev-text" });
+    text.createDiv({ cls: "ca-ev-title", text: item.def.title });
+    text.createDiv({ cls: "ca-ev-meta", text: describeEventDate(item.def) });
+    row.createSpan({ cls: "ca-ev-when", text: describeRelative(item) });
   }
   return root;
 }

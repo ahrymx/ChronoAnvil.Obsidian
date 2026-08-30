@@ -10,7 +10,7 @@ import {
   MarkdownPostProcessorContext,
   TFile,
 } from "obsidian";
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import { buildYearSummary } from "../../review/year-view";
 import { buildQuarterSummary } from "../../review/quarter-view";
 import { buildPeriodRecap } from "../../review/recap-view";
@@ -198,10 +198,10 @@ export const JOURNAL_BANNER_KINDS = new Set(["journal-header"]);
 // ── WHY THIS EXISTS, AND WHY `hasOwnBar` COULD NOT ANSWER IT ──────────
 //
 // 4.19.1 fixed a dashboard drawing a head reading "🔗 Links" above the page's
-// own name, by adding `.jtc-card` to `hasOwnBar`'s list of bands. That was the
+// own name, by adding `.ca-jtc-card` to `hasOwnBar`'s list of bands. That was the
 // right fix for the surface it was tested on and the wrong mechanism, and the
 // next render found out: an ENTRY's banner fence opens with the links row, so
-// the block's first child is `.journal-links-card` — and `hasOwnBar` asks only
+// the block's first child is `.ca-journal-links-card` — and `hasOwnBar` asks only
 // about the FIRST CHILD, deliberately, because "a band deeper inside belongs to
 // something further in".
 //
@@ -330,8 +330,8 @@ export interface BlockComposites {
   // A page banner: the fence holds this page's own name (4.19).
   //
   // THE FOURTH OF A FAMILY, and the reason it had to join it is the reason the
-  // other three exist. `title` draws `.jtc-card` — its own border, radius,
-  // background and figure — and `links:` draws `.journal-links-card` with a
+  // other three exist. `title` draws `.ca-jtc-card` — its own border, radius,
+  // background and figure — and `links:` draws `.ca-journal-links-card` with a
   // border and radius of its own. Welded into one fence by 4.19's banner, and
   // left alone, they render as TWO cards stacked with no gap: the exact
   // "resemblance instead of a card" this file's `isEntryBanner` comment
@@ -339,8 +339,8 @@ export interface BlockComposites {
   // halves in two blocks.
   //
   // So the block draws the box and the children go flat, which is what
-  // `.journal-entry-banner > .journal-links-card` and
-  // `.journal-overview-card > .journal-links-card` already do for the two
+  // `.ca-journal-entry-banner > .ca-journal-links-card` and
+  // `.ca-journal-overview-card > .ca-journal-links-card` already do for the two
   // surfaces that got here first.
   pageBanner: boolean;
 }
@@ -354,7 +354,7 @@ export interface BlockComposites {
 // change of frame is likely to quietly break, and "the card came back" is the
 // one a screenshot would catch late.
 //
-// `.journal-widget-block` IS NOT IN ANY OF THESE LISTS, and must not be: it
+// `.ca-journal-widget-block` IS NOT IN ANY OF THESE LISTS, and must not be: it
 // carries `container-type: inline-size`, the query container every `@container`
 // rule in styles/ depends on. It is applied when the block is created and no
 // frame removes it.
@@ -368,16 +368,16 @@ export function chromeClasses(
     return ["is-unframed"];
   }
   const out: string[] = [];
-  if (drew.entryBanner) out.push("journal-entry-banner");
-  if (drew.overviewCard) out.push("journal-overview-card");
-  if (drew.studyBanner) out.push("journal-study-banner");
+  if (drew.entryBanner) out.push("ca-journal-entry-banner");
+  if (drew.overviewCard) out.push("ca-journal-overview-card");
+  if (drew.studyBanner) out.push("ca-journal-study-banner");
   // ── TWO BANNERS, NOT FOUR (4.21.1) ─────────────────────────────────
   //
   // THE COUNT WAS THE DEFECT. 4.19 settled that every page gets ONE banner and
   // 4.20 settled what a banner holds, and neither asked how many banners the
-  // plugin DRAWS. The answer was three — `.journal-page-banner` for the eight
-  // dashboard-shaped surfaces, `.journal-entry-banner` for the five entry
-  // grains, `.journal-study-banner` for journal notes — plus the overview band,
+  // plugin DRAWS. The answer was three — `.ca-journal-page-banner` for the eight
+  // dashboard-shaped surfaces, `.ca-journal-entry-banner` for the five entry
+  // grains, `.ca-journal-study-banner` for journal notes — plus the overview band,
   // which is not one and is named as if it were. Three implementations of one
   // idea is three places a change has to be made and two places it will be
   // forgotten, which is exactly what the "🔗 LINKS" head was: a fix applied to
@@ -395,19 +395,19 @@ export function chromeClasses(
   // grid inside whichever of the two its fence is. A rename would have touched
   // eight files for no rendered change, which 4.19 declined for the overview
   // band and declines again here.
-  if (drew.entryBanner || drew.studyBanner) out.push("journal-slim-banner");
+  if (drew.entryBanner || drew.studyBanner) out.push("ca-journal-slim-banner");
   // LAST, AND IT NEVER SHARES A BLOCK WITH THE OTHER THREE. A page's own name
   // and a note's identity strip are two answers to "which note is this", and a
   // fence holding both would be the doubling 4.19 exists to remove — the entry
   // and journal catalogues compose no `title:` line for exactly that reason.
   // The order still matters for a hand-written fence that does it anyway: the
   // page banner's box is the outer one, so it is applied after.
-  if (drew.pageBanner) out.push("journal-page-banner");
+  if (drew.pageBanner) out.push("ca-journal-page-banner");
   // AFTER THE BANNERS, AND NEVER WITH ONE. A fence is a banner or it is the
   // tracker section; the flag below is computed from "has markers AND is not a
   // banner", so the two cannot both be set — this order is what a reader of the
   // class list sees rather than a tie being broken.
-  if (drew.trackerSection) out.push("journal-tracker-section");
+  if (drew.trackerSection) out.push("ca-journal-tracker-section");
   return out;
 }
 
@@ -599,7 +599,7 @@ export class Widgets implements
   // nothing outside reassigns it — while letting the interface be satisfied.
   constructor(
     readonly app: App,
-    readonly plugin: AlmanacPlugin
+    readonly plugin: ChronoAnvilPlugin
   ) {}
 
   // Where a `frame: section` remembers whether it is folded.
@@ -628,7 +628,7 @@ export class Widgets implements
     };
   }
 
-  // Every fenced Almanac language goes through here rather than through
+  // Every fenced ChronoAnvil language goes through here rather than through
   // `registerMarkdownCodeBlockProcessor` directly, so that each rendered block
   // keeps the arguments it was drawn with and can draw itself again later. That
   // is what lets `repaintOpenNotes` reach a block rendered outside a markdown
@@ -636,18 +636,29 @@ export class Widgets implements
   // `MarkdownRenderer.render` — where there is no note to re-render. See
   // ui/livewidget.ts for the registry and why each drawing is scoped to its own
   // component.
+  //
+  // EVERY LANGUAGE IS REGISTERED TWICE, under its current name and under the
+  // `almanac` name the plugin used before the rename. An info string is matched
+  // literally by Obsidian: an unregistered one renders as a plain code block,
+  // so without this every dashboard and entry in a vault written before the
+  // rename would show its directives as literal text. Writing only ever emits
+  // the current spelling (FENCE_OPEN), so a note re-saved by the plugin
+  // upgrades itself, and `tools/migrate-vault.mjs` does the rest in one pass.
   private registerBlock(lang: string, render: BlockRenderer): void {
-    this.plugin.registerMarkdownCodeBlockProcessor(lang, (source, el, ctx) =>
-      mountBlock(source, el, ctx, render)
-    );
+    const legacy = lang.replace(/^chronoanvil/, "almanac");
+    for (const info of legacy === lang ? [lang] : [lang, legacy]) {
+      this.plugin.registerMarkdownCodeBlockProcessor(info, (source, el, ctx) =>
+        mountBlock(source, el, ctx, render)
+      );
+    }
   }
 
   register(): void {
-    // Legacy single-widget syntax: `almanac:kind:...` written as inline
+    // Legacy single-widget syntax: `chronoanvil:kind:...` written as inline
     // code. Still needed for spots that must stay on one line — e.g. the
     // per-topic buttons the plugin writes into the homepage's study table,
     // where a table cell can't contain a fenced block. New notes should
-    // prefer the ```almanac block below.
+    // prefer the ```chronoanvil block below.
     //
     // `mountInline` does the replacement that used to be written out here, for
     // the same reason `registerBlock` exists: a widget that swapped itself in
@@ -658,17 +669,21 @@ export class Widgets implements
       for (const code of codes) {
         if (code.closest("pre")) continue; // skip fenced code blocks
         const text = code.textContent ?? "";
-        if (!text.startsWith("almanac:")) continue;
+        // Both spellings, for the same reason `registerBlock` takes both: these
+        // spans are written into table cells the plugin itself authored, and a
+        // vault predating the rename is full of them.
+        if (!text.startsWith("chronoanvil:") && !text.startsWith("almanac:"))
+          continue;
         mountInline(code, ctx, (scoped) => this.build(text, scoped));
       }
     });
 
-    // Preferred syntax: a fenced ```almanac block, one directive per line.
+    // Preferred syntax: a fenced ```chronoanvil block, one directive per line.
     // Keeps a note's own content free of scattered inline call-outs — all
     // of a section's plugin-rendered controls collapse into a single call
     // site, and it reads cleanly in source/edit mode the same way a
     // `dataviewjs` or `tracker` block does.
-    this.registerBlock("almanac", (source, el, ctx) => {
+    this.registerBlock("chronoanvil", (source, el, ctx) => {
       const rawLines = source.split("\n").map((l) => l.trim());
       // The managed region's markers are comments, so they are filtered out of
       // `lines` below with every other `#` line. They are still worth knowing
@@ -756,7 +771,7 @@ export class Widgets implements
       // 4.51.1, and it is the second attempt. 4.51 suppressed a banner by
       // returning `null` from the widget's case, and `null` from a case is how
       // this loop is told a directive is UNKNOWN — so every suppressed banner
-      // rendered a red *"Unknown Almanac widget: journal-header"* where the
+      // rendered a red *"Unknown ChronoAnvil widget: journal-header"* where the
       // banner had been. Trading one wrong block for a worse one.
       //
       // A SUPPRESSED BANNER IS NOT A DIRECTIVE THAT FAILED. It is a line with
@@ -833,7 +848,7 @@ export class Widgets implements
         rawLines.filter((l) => l.length > 0 && !l.startsWith("#"))
       );
 
-      const container = el.createDiv({ cls: "journal-widget-block" });
+      const container = el.createDiv({ cls: "ca-journal-widget-block" });
 
       // A CONTRADICTION IS SHOWN, NOT RESOLVED (§3.3). `header:` and
       // `frame: section` both title the block, so a fence with both asked twice
@@ -842,8 +857,8 @@ export class Widgets implements
       // which is the whole argument against a silent precedence rule.
       if (frameSpec.error) {
         container.createDiv({
-          cls: "journal-frame-error",
-          text: `Almanac: ${frameSpec.error}`,
+          cls: "ca-journal-frame-error",
+          text: `ChronoAnvil: ${frameSpec.error}`,
         });
       }
       // The row modifier's refusals, drawn the same way and in the same class.
@@ -852,20 +867,20 @@ export class Widgets implements
       // styled identically is the doubling this project keeps removing.
       if (rowSpec.error) {
         container.createDiv({
-          cls: "journal-frame-error",
-          text: `Almanac: ${rowSpec.error}`,
+          cls: "ca-journal-frame-error",
+          text: `ChronoAnvil: ${rowSpec.error}`,
         });
       }
       if (cellSpec.error) {
         container.createDiv({
-          cls: "journal-frame-error",
-          text: `Almanac: ${cellSpec.error}`,
+          cls: "ca-journal-frame-error",
+          text: `ChronoAnvil: ${cellSpec.error}`,
         });
       }
       if (tabSpec.error) {
         container.createDiv({
-          cls: "journal-frame-error",
-          text: `Almanac: ${tabSpec.error}`,
+          cls: "ca-journal-frame-error",
+          text: `ChronoAnvil: ${tabSpec.error}`,
         });
       }
       // And the height modifier's. This is the one a reader meets by ACCIDENT —
@@ -875,16 +890,16 @@ export class Widgets implements
       // itself and a line that quietly does nothing.
       if (heightSpec.error) {
         container.createDiv({
-          cls: "journal-frame-error",
-          text: `Almanac: ${heightSpec.error}`,
+          cls: "ca-journal-frame-error",
+          text: `ChronoAnvil: ${heightSpec.error}`,
         });
       }
       // And the width modifier's, in the same class for the same reason — a
       // modifier that could not be honoured, said where the reader is looking.
       if (wideSpec.error) {
         container.createDiv({
-          cls: "journal-frame-error",
-          text: `Almanac: ${wideSpec.error}`,
+          cls: "ca-journal-frame-error",
+          text: `ChronoAnvil: ${wideSpec.error}`,
         });
       }
       // `bar` is the row simple widgets accumulate into. When a `header:`
@@ -944,9 +959,9 @@ export class Widgets implements
       // the postprocessor owns, and only their POSITION is borrowed.
       const openActionsBar = (): HTMLElement => {
         const parent = overviewHost ?? container;
-        const created = parent.createDiv({ cls: "journal-widget-bar" });
+        const created = parent.createDiv({ cls: "ca-journal-widget-bar" });
         if (!isOverviewCard) return created;
-        created.addClass("journal-overview-actions");
+        created.addClass("ca-journal-overview-actions");
         // FIRST CHILD, so it takes the row's left edge. 3.6 patch 7 moved it
         // out of the band, where it was the heaviest thing in the masthead and
         // the least important control in it. The footer is where a control that
@@ -1174,7 +1189,7 @@ export class Widgets implements
             if (!bar) {
             bar = openActionsBar();
           }
-            bar.addClass("journal-tracker-bar");
+            bar.addClass("ca-journal-tracker-bar");
             trackerBar = bar;
             if (!habitsCell || habitsCell.parentElement !== bar) {
               habitsCell = this.habitsCell();
@@ -1199,15 +1214,15 @@ export class Widgets implements
           headerGroup = null;
           // A directive this plugin used to ship is not a typo and the note is
           // not broken — it is old. `year-nav` was retired into the Yearly
-          // Overview banner in 2.52, and a red "Unknown Almanac widget" with no
+          // Overview banner in 2.52, and a red "Unknown ChronoAnvil widget" with no
           // hint of what replaced it is the worst of both readings. Say what
           // happened and name the command that fixes it.
           const retired = RETIRED_WIDGETS[keywordOf(line)];
           container.createSpan({
-            cls: retired ? "journal-widget-retired" : "journal-widget-error",
+            cls: retired ? "ca-journal-widget-retired" : "ca-journal-widget-error",
             text: retired
               ? `${keywordOf(line)} was retired in ${retired.since} — ${retired.note}. Run "Set up / repair vault" to update this note.`
-              : `Unknown Almanac widget: ${line}`,
+              : `Unknown ChronoAnvil widget: ${line}`,
           });
           continue;
         }
@@ -1225,7 +1240,7 @@ export class Widgets implements
         // — the titlebar-capped bar up under the spacer — not a passenger in a
         // widget bar. Detect it by the card class buildLinks sets for the
         // area-titled form and append it straight to the container.
-        if (kind === "links" && widget.hasClass("journal-links-card")) {
+        if (kind === "links" && widget.hasClass("ca-journal-links-card")) {
           bar = null;
           headerGroup = null;
           container.appendChild(widget);
@@ -1244,7 +1259,7 @@ export class Widgets implements
           // ── A HEAD IS NOT A BANNER, AND TAKES NONE OF ITS CHROME (4.51.6) ──
           //
           // These three flags choose the block's CARD — the accent wash of
-          // `.journal-page-banner`, the slim band of the other two. While the
+          // `.ca-journal-page-banner`, the slim band of the other two. While the
           // bar is on, the same three directives draw the page head instead,
           // and a head in a banner's card is the furniture this release was
           // asked to remove: *"the old Banner Sections need to be completely
@@ -1266,7 +1281,7 @@ export class Widgets implements
             overviewGrain = kind.replace(/-summary$/, "") as PeriodGrain;
             if (rowSpec.row && kind !== "level-cards") {
               overviewHost = container.createDiv({
-                cls: "journal-card journal-overview-card",
+                cls: "ca-journal-card ca-journal-overview-card",
               });
               overviewHost.appendChild(widget);
               if (SECTION_TITLES[kind]) {
@@ -1296,8 +1311,8 @@ export class Widgets implements
           // disturbing header/dashboard bars, which carry buttons/links rather
           // than logging widgets.
           if (kind === "tracker" || kind === "sleep") {
-            widget.addClass("journal-tracker-cell");
-            bar.addClass("journal-tracker-bar");
+            widget.addClass("ca-journal-tracker-cell");
+            bar.addClass("ca-journal-tracker-bar");
             attachTrackerRemove(this, widget, line, ctx);
             trackerBar = bar;
           }
@@ -1317,7 +1332,7 @@ export class Widgets implements
       // it, and an empty region with no way to add to it is a dead end.
       if (!trackerBar && hasTrackerRegion && !isManagedTemplate(this.plugin, ctx.sourcePath)) {
         trackerBar = container.createDiv({
-          cls: "journal-widget-bar journal-tracker-bar",
+          cls: "ca-journal-widget-bar ca-journal-tracker-bar",
         });
       }
       if (trackerBar && !isManagedTemplate(this.plugin, ctx.sourcePath)) {
@@ -1419,7 +1434,7 @@ export class Widgets implements
       // AND EVERY SIZED CARD IS TOLD ITS HEIGHT (4.22 §3.1), between the two,
       // and the order is load-bearing in both directions. AFTER the cards,
       // because the height belongs to the CARD — `cardWidget` copies the
-      // widget's `data-am-line` onto the wrapper it builds, so by now the card is
+      // widget's `data-ca-line` onto the wrapper it builds, so by now the card is
       // the stamped thing and there is nothing to look up. BEFORE the row,
       // because after it the children have been moved into cells and the walk
       // would have to find them again — the same sentence the comment above
@@ -1502,7 +1517,7 @@ export class Widgets implements
       // the card that was drawn, which is the question the menu is asking, and
       // it is one read rather than a second trip to the file.
       if (wideSpec.wide) {
-        container.querySelector<HTMLElement>(".jtc-card")?.addClass("jtc-wide");
+        container.querySelector<HTMLElement>(".ca-jtc-card")?.addClass("ca-jtc-wide");
       }
 
       if (frameSpec.frame === "section") {
@@ -1535,8 +1550,8 @@ export class Widgets implements
             // at a `frame: section` line that did nothing, with no way to tell
             // whether the modifier or the widget was at fault.
             container.createDiv({
-              cls: "journal-frame-error",
-              text: "Almanac: nothing in this block can title its own section, so frame: section has no title to use. Add a header: bar instead, or use frame: none.",
+              cls: "ca-journal-frame-error",
+              text: "ChronoAnvil: nothing in this block can title its own section, so frame: section has no title to use. Add a header: bar instead, or use frame: none.",
             });
           }
         }
@@ -1573,18 +1588,18 @@ export class Widgets implements
       );
     });
 
-    // The Trends & Statistics section: a single ```almanac-charts fence. Its
+    // The Trends & Statistics section: a single ```chronoanvil-charts fence. Its
     // `chart:` directive lines drive a 2-per-row grid of chart tiles; an
     // optional leading `header:` directive turns the whole section into one
     // self-titled block — the title on the left, the Add / Edit… / Remove…
     // toolbar anchored on the right, in the same header bar the Journals'
     // Study section uses. Without that directive (older vaults whose Trends
-    // title is still a separate ```almanac header block above this one) the
+    // title is still a separate ```chronoanvil header block above this one) the
     // toolbar renders on its own so the title isn't duplicated. Each chart is
     // drawn straight into its cell by chart-render.ts (Chart.js for line/bar,
     // plain DOM for the summary + calendar heatmap) — no Tracker plugin.
     this.registerBlock(
-      "almanac-charts",
+      "chronoanvil-charts",
       (source, el, ctx) => {
         const lines = source.split("\n");
         const specs = parseChartDirectives(lines);
@@ -1594,7 +1609,7 @@ export class Widgets implements
         const header = headerLine
           ? parseHeaderDirective(headerLine.slice(HEADER_PREFIX.length))
           : null;
-        const container = el.createDiv({ cls: "journal-widget-block" });
+        const container = el.createDiv({ cls: "ca-journal-widget-block" });
         buildChartGrid(this, container, specs, ctx, el, header);
         // A CHARTS FENCE IS A BLOCK LIKE ANY OTHER (4.7). It was the only one
         // on the homepage without a grip, and being last that also meant
@@ -1606,12 +1621,12 @@ export class Widgets implements
     );
 
     // A journal note's own charts section: a single
-    // ```almanac-journal-charts fence whose `jchart:` lines drive a stack of
+    // ```chronoanvil-journal-charts fence whose `jchart:` lines drive a stack of
     // trend / breakdown widgets under an Add / Edit… / Remove… toolbar. The
     // diary's section above and this one are deliberately parallel rather than
     // merged — see journal-charts.ts for why the two spec shapes stay apart.
     this.registerBlock(
-      "almanac-journal-charts",
+      "chronoanvil-journal-charts",
       (source, el, ctx) => {
         const lines = source.split("\n");
         const specs = parseJournalChartDirectives(lines);
@@ -1621,7 +1636,7 @@ export class Widgets implements
         const header = headerLine
           ? parseHeaderDirective(headerLine.slice(HEADER_PREFIX.length))
           : null;
-        const container = el.createDiv({ cls: "journal-widget-block" });
+        const container = el.createDiv({ cls: "ca-journal-widget-block" });
         this.buildJournalChartStack(container, specs, ctx, el, header);
         attachBlockHead(this.plugin, container, ctx);
       }
@@ -1675,13 +1690,13 @@ export class Widgets implements
         )
       );
     } else {
-      const toolbar = container.createDiv({ cls: "journal-chart-toolbar" });
+      const toolbar = container.createDiv({ cls: "ca-journal-chart-toolbar" });
       for (const btn of buttons) toolbar.appendChild(btn);
     }
 
     if (specs.length === 0) {
       container.createDiv({
-        cls: "journal-chart-empty",
+        cls: "ca-journal-chart-empty",
         text: CHART_GRID_EMPTY,
       });
       return;
@@ -1693,7 +1708,7 @@ export class Widgets implements
     // hand are the same object, take the same refusal, and are live-scoped by
     // the same code — so there is no second implementation to drift, and no
     // way for the region to draw something a hand-written line could not.
-    const stack = container.createDiv({ cls: "journal-jchart-stack" });
+    const stack = container.createDiv({ cls: "ca-journal-jchart-stack" });
     for (const spec of specs) {
       const widget = this.buildFromSpec(journalChartDirective(spec), ctx);
       if (widget) stack.appendChild(widget);
@@ -1835,16 +1850,19 @@ export class Widgets implements
     });
   }
 
-  // Entry point for the legacy inline-code syntax: `almanac:kind:...`.
+  // Entry point for the legacy inline-code syntax: `chronoanvil:kind:...`.
   private build(
     text: string,
     ctx: MarkdownPostProcessorContext
   ): HTMLElement | null {
-    return this.buildFromSpec(text.slice("almanac:".length), ctx);
+    // Strip whichever prefix the span actually carries — the legacy `almanac:`
+    // is four characters shorter, so slicing a fixed width would eat the first
+    // four characters of the directive itself.
+    return this.buildFromSpec(text.slice(text.indexOf(":") + 1), ctx);
   }
 
-  // Entry point for the ```almanac block syntax: one directive per line,
-  // no "almanac:" prefix needed since the fence already scopes it. Shared
+  // Entry point for the ```chronoanvil block syntax: one directive per line,
+  // no "chronoanvil:" prefix needed since the fence already scopes it. Shared
   // with the legacy path above. Grammar: `kind:rest[|Label]`. The label is
   // optional and only meaningful for slider/time/date/select — buttons and
   // the composite widgets (nav/calendar/month-summary) carry
@@ -1892,7 +1910,7 @@ export class Widgets implements
         // labelled refusal reads as a control that failed rather than a
         // widget that shouldn't be here.
         return createSpan({
-          cls: "journal-widget-error journal-tracker-misplaced",
+          cls: "ca-journal-widget-error ca-journal-tracker-misplaced",
           text: describeSurfaceMismatch(
             trackers,
             body,
@@ -1910,9 +1928,9 @@ export class Widgets implements
         break;
       case "spacer":
         // A deliberately inert top-of-note element. Written inline as
-        // `almanac:spacer` on line 0 so that when a note opens (or is clicked
+        // `chronoanvil:spacer` on line 0 so that when a note opens (or is clicked
         // from the navigator) the cursor spawns *here* rather than inside the
-        // first ```almanac fence — which would render that fence as raw source
+        // first ```chronoanvil fence — which would render that fence as raw source
         // ("expand" it). Inline (not a fenced block) so the cursor resting on
         // its own line only ever reveals a short code span, never a wall of
         // directives.
@@ -1922,7 +1940,7 @@ export class Widgets implements
         // that is a second one — the first vault render shows both, stacked.
         //
         // BUT THE ELEMENT STAYS, because its primary job is not decoration: it
-        // is *"where the cursor lands on open, so the first real ```almanac
+        // is *"where the cursor lands on open, so the first real ```chronoanvil
         // block below it isn't rendered raw"*. Deleting it would trade a
         // duplicate rule for a fence that expands into source the moment a note
         // is opened, which is the failure it was written to prevent.
@@ -1944,7 +1962,7 @@ export class Widgets implements
         // clicking places a cursor in the document and reveals/selects the
         // callout's own markup — this is a self-contained control: focusing it
         // selects nothing but the field. Its text persists to the note *body*
-        // inside `<!--almanac:key-->` markers (see notestore.ts), not
+        // inside `<!--chronoanvil:key-->` markers (see notestore.ts), not
         // frontmatter, so long prose stays readable in the raw file. Not
         // live-wrapped: the box is the edit surface, so we don't rebuild it out
         // from under the cursor on every write. Full-width (a COMPOSITE_KIND).
@@ -1976,8 +1994,8 @@ export class Widgets implements
             : buildNote(this, rest, ctx, label);
         break;
       case "tasks":
-        // Almanac's own task manager. Reads/writes real task lines stored in the
-        // note body's `<!--almanac:<key>-->` region (see tasks.ts for the line
+        // ChronoAnvil's own task manager. Reads/writes real task lines stored in the
+        // note body's `<!--chronoanvil:<key>-->` region (see tasks.ts for the line
         // format), rendered as an interactive list: checkbox, editable text,
         // priority + due controls, delete, and an add-input. Not the Tasks
         // plugin — self-contained, no external dependency.
@@ -1986,8 +2004,8 @@ export class Widgets implements
       case "path":
         // A re-orderable checklist rendered as a table: each step has a
         // checkbox, editable text, up/down move buttons, and a delete. Shares
-        // the Almanac task line format and body region with `tasks:` (so a step
-        // is just an Almanac task), but presents order as meaningful and gives
+        // the ChronoAnvil task line format and body region with `tasks:` (so a step
+        // is just a ChronoAnvil task), but presents order as meaningful and gives
         // explicit reorder controls instead of priority/due. Used for a Topic's
         // Learning Path, where sequence is the point.
         widget = buildPath(this, rest, ctx, label);
@@ -2007,7 +2025,7 @@ export class Widgets implements
         break;
       case "attach":
         // The multi-purpose attachments field: an image gallery plus a row of
-        // link/file chips, over the same `<!--almanac:<key>-->` body region the
+        // link/file chips, over the same `<!--chronoanvil:<key>-->` body region the
         // other body-backed widgets use. Accepts dropped/pasted files, pasted
         // URLs, and links dragged in from the vault itself.
         widget = buildAttachments(this, rest, ctx, label);
@@ -2052,7 +2070,7 @@ export class Widgets implements
       //
       // THE SUPPRESSION IS NOT HERE, AND 4.51.1 IS WHY. Returning `null` from a
       // case is how this switch says *unknown directive*, so the first cut drew
-      // a red "Unknown Almanac widget: journal-header" where each banner had
+      // a red "Unknown ChronoAnvil widget: journal-header" where each banner had
       // been. A line with nothing to draw is a fact about the fence.
       case "entry-header":
       case "journal-header":
@@ -2281,7 +2299,7 @@ export class Widgets implements
         // ever typed it, which is not something anybody asked for.
         if (rest === "card") {
           return createDiv({
-            cls: "journal-widget-error",
+            cls: "ca-journal-widget-error",
             text: "journals:card isn't a directive. For every journal as one card use `journals`, for a grid of them use `journals:cards`, and for one named journal use `journal-card:<journal>`.",
           });
         }
@@ -2321,22 +2339,22 @@ export class Widgets implements
     // this was still a hand-maintained `kind === … ||` chain.
     if (!widget || !effectiveLabel || SELF_LABELLED_KINDS.has(kind))
       return widget;
-    const labeled = createSpan({ cls: "journal-widget-labeled" });
-    labeled.createSpan({ cls: "journal-widget-label", text: effectiveLabel });
+    const labeled = createSpan({ cls: "ca-journal-widget-labeled" });
+    labeled.createSpan({ cls: "ca-journal-widget-label", text: effectiveLabel });
     labeled.appendChild(widget);
     return labeled;
   }
 
-  // almanac:slider:Prop[:min:max:step]
+  // chronoanvil:slider:Prop[:min:max:step]
 
-  // almanac:time:Prop  /  almanac:date:Prop
+  // chronoanvil:time:Prop  /  chronoanvil:date:Prop
 
-  // almanac:spacer — a full-width branded line, used inline on line 0 of a
-  // note so the cursor lands here on open instead of inside the first ```almanac
+  // chronoanvil:spacer — a full-width branded line, used inline on line 0 of a
+  // note so the cursor lands here on open instead of inside the first ```chronoanvil
   // fence. Doubles as a light top boundary above the header block. The wordmark
   // is set via a data attr so it can be themed/overridden in CSS.
 
-  // almanac:note:Prop[:placeholder][|Label]
+  // chronoanvil:note:Prop[:placeholder][|Label]
   //
   // A free-text field bound to frontmatter `Prop`. Meant to replace editable
   // callouts like `>[!focus]` for user-entered prose: focusing it selects the
@@ -2423,9 +2441,9 @@ export class Widgets implements
   // reading — move Mood 4→5 and the 4's note no longer counts as "this
   // reading's note" (it stays in the log as the record it is).
 
-  // almanac:list:<key>[:placeholder][|Label]
+  // chronoanvil:list:<key>[:placeholder][|Label]
   //
-  // A list of prose entries — one per line in the `<!--almanac:<key>-->` region
+  // A list of prose entries — one per line in the `<!--chronoanvil:<key>-->` region
   // (see entries.ts). Sits between `note:` and `tasks:`: `note:` is one blob of
   // free text, `tasks:` is a list of things with state, and this is a list of
   // things without any.
@@ -2447,10 +2465,10 @@ export class Widgets implements
   // intercepted so it never actually inserts the newline that would split the
   // entry in two.
 
-  // almanac:tasks:<key>[|Label]
+  // chronoanvil:tasks:<key>[|Label]
   //
-  // Almanac's self-contained task manager. Task lines live in the note body's
-  // `<!--almanac:<key>-->` region (hidden by the region-hider, so this widget is
+  // ChronoAnvil's self-contained task manager. Task lines live in the note body's
+  // `<!--chronoanvil:<key>-->` region (hidden by the region-hider, so this widget is
   // the only way to see/edit them). The whole list is re-serialized and written
   // back on every mutation via vault.process (atomic), so concurrent field
   // writes can't clobber each other. The current model is held in a closure and
@@ -2461,11 +2479,11 @@ export class Widgets implements
   // this stays a pure view-builder. Priority is a 3-way cycle button; due is a
   // native date input; text is an inline editable field.
 
-  // almanac:path:<key>[|Label]
+  // chronoanvil:path:<key>[|Label]
   //
   // A re-orderable checklist, for a Topic's Learning Path where the order of
-  // steps is the content. Stored exactly like `tasks:` — Almanac task lines in
-  // the note body's `<!--almanac:<key>-->` region — so a step is a task and the
+  // steps is the content. Stored exactly like `tasks:` — ChronoAnvil task lines in
+  // the note body's `<!--chronoanvil:<key>-->` region — so a step is a task and the
   // region round-trips through the same parse/serialize. The difference is
   // presentation: rows render as a table with explicit up/down move buttons
   // (order matters here, so it's a first-class control) and a delete, plus the
@@ -2477,7 +2495,7 @@ export class Widgets implements
   // up, last can't go down) so the control communicates the boundary rather than
   // silently no-opping.
 
-  // ── almanac:recall:<key>[|Label] ────────────────────────────────────────
+  // ── chronoanvil:recall:<key>[|Label] ────────────────────────────────────────
   //
   // Question/answer cards over a body region, with the answer hidden behind a
   // reveal. Grading a card writes Confidence and stamps Last reviewed on the
@@ -2520,9 +2538,9 @@ export class Widgets implements
   // neither. `ratingPropertyOf` falls back to Confidence for any kind that
   // declares nothing, so a journal written before this is unchanged.
 
-  // almanac:attach:<key>[|Label]
+  // chronoanvil:attach:<key>[|Label]
   //
-  // The multi-purpose attachments field. One body region (`<!--almanac:<key>-->`,
+  // The multi-purpose attachments field. One body region (`<!--chronoanvil:<key>-->`,
   // the same store `note:` and `tasks:` use) holds a plain-markdown list of
   // links; this renders it as two zones — a thumbnail gallery for images and a
   // chip row for everything else — and accepts content four ways:
@@ -2557,7 +2575,7 @@ export class Widgets implements
   // without extension) to a file, relative to the host note.
 
   // Write a dropped/pasted/picked file into the vault and return it. The
-  // destination follows Settings → Attachments: Almanac's own folder tree, the
+  // destination follows Settings → Attachments: ChronoAnvil's own folder tree, the
   // vault's own attachment setting, or beside the note.
 
   // Pick (and create) the folder a new attachment goes in, then resolve a
@@ -2572,7 +2590,7 @@ export class Widgets implements
   // the key handler is bound to the overlay, which holds focus, so nothing
   // outlives it.
 
-  // almanac:select:Prop:opt1=Label 1,opt2=Label 2
+  // chronoanvil:select:Prop:opt1=Label 1,opt2=Label 2
 
   // The trailing cell of a logging grid: a dashed, empty-looking tile that
   // opens the picker of trackers this entry doesn't yet show. It reads as
@@ -2648,14 +2666,14 @@ export class Widgets implements
   //
   // Nothing about the note changes: this is a rendering of the same
   // `tracker:<id>` lines, each chip still carries its own remove ×, and a
-  // boolean rendered anywhere but a logging grid (an inline `almanac:tracker:`,
+  // boolean rendered anywhere but a logging grid (an inline `chronoanvil:tracker:`,
   // say) still gets the standalone checkbox above.
   private habitsCell(): HTMLElement {
     const cell = createSpan({
-      cls: "journal-widget journal-tracker-cell journal-habits-cell",
+      cls: "ca-journal-widget ca-journal-tracker-cell ca-journal-habits-cell",
     });
-    cell.createSpan({ cls: "journal-widget-label", text: "Habits" });
-    cell.createSpan({ cls: "journal-habits-row" });
+    cell.createSpan({ cls: "ca-journal-widget-label", text: "Habits" });
+    cell.createSpan({ cls: "ca-journal-habits-row" });
     return cell;
   }
 
@@ -2695,7 +2713,7 @@ export class Widgets implements
   // the Sleep property (via write()). Reads the pair's ids/labels from the
   // built-in registry so a relabelled Wake-Up/Bedtime still works.
 
-  // almanac:button:<action>[:arg]
+  // chronoanvil:button:<action>[:arg]
   // `button:log:<trackerId>:<delta>` is handled separately since its label
   // is generated from the tracker + delta rather than a fixed lookup.
 

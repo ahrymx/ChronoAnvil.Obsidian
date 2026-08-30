@@ -37,7 +37,7 @@
 // is opened rather than after a reload — which is what a menu built from live
 // config should do and what the hand-written table could never have done.
 
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { GROUP_ID_PREFIX } from "./actions";
 import type { Action } from "./actions";
 import { registeredJournalTypes } from "../journals/journal";
@@ -61,10 +61,10 @@ const idFor = (type: JournalType, leaf: string): string =>
 // is the same order of work as the `studyOn` check it replaces.
 const stillThere =
   (typeId: string) =>
-  (p: AlmanacPlugin): boolean =>
+  (p: ChronoAnvilPlugin): boolean =>
     (p.settings.customJournals ?? []).some((j) => j.id === typeId);
 
-export function journalActions(plugin: AlmanacPlugin): Action[] {
+export function journalActions(plugin: ChronoAnvilPlugin): Action[] {
   const out: Action[] = [];
 
   for (const type of registeredJournalTypes(plugin)) {

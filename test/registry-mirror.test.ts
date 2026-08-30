@@ -16,8 +16,8 @@ import {
   mirroredPart,
 } from "../src/core/registry-mirror";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
-import type { AlmanacSettings } from "../src/core/settings";
-import AlmanacPlugin from "../src/main";
+import type { ChronoAnvilSettings } from "../src/core/settings";
+import ChronoAnvilPlugin from "../src/main";
 import type { TrackerDef } from "../src/trackers/trackers";
 
 // A custom DIARY tracker: the thing no journal folder carries, and the whole
@@ -36,7 +36,7 @@ const KM: TrackerDef = {
   showInBase: true,
 };
 
-function settings(over: Partial<AlmanacSettings> = {}): AlmanacSettings {
+function settings(over: Partial<ChronoAnvilSettings> = {}): ChronoAnvilSettings {
   return {
     ...structuredClone(DEFAULT_SETTINGS),
     ...over,
@@ -58,12 +58,12 @@ class FakeAdapter {
   };
 }
 
-function harness(over: Partial<AlmanacSettings> = {}) {
+function harness(over: Partial<ChronoAnvilSettings> = {}) {
   const adapter = new FakeAdapter();
   const plugin = {
     settings: settings(over),
     manifest: { version: "2.50.0" },
-  } as unknown as AlmanacPlugin;
+  } as unknown as ChronoAnvilPlugin;
   const registry = new Registry(
     { vault: { adapter } } as never,
     plugin
@@ -96,7 +96,7 @@ describe("what the mirror carries", () => {
     // some later release and forgotten about must still be backed up, because
     // the other default fails silently and nothing would ever report it.
     const part = mirroredPart(
-      settings({ somethingAddedIn252: true } as unknown as AlmanacSettings)
+      settings({ somethingAddedIn252: true } as unknown as ChronoAnvilSettings)
     );
     expect(part).toHaveProperty("somethingAddedIn252");
   });
@@ -105,26 +105,26 @@ describe("what the mirror carries", () => {
     const raw = encodeRegistryMirror(settings({ trackers: [KM] }), "2.50.0");
     const back = decodeRegistryMirror(raw);
     expect(back?.settings.trackers).toEqual([KM]);
-    expect(back?.writtenBy).toBe("Almanac 2.50.0");
+    expect(back?.writtenBy).toBe("ChronoAnvil 2.50.0");
   });
 
   it("refuses anything that isn't a mirror", () => {
     expect(decodeRegistryMirror("not json")).toBeNull();
     expect(decodeRegistryMirror("{}")).toBeNull();
-    expect(decodeRegistryMirror('{"almanacRegistry":1}')).toBeNull();
+    expect(decodeRegistryMirror('{"chronoanvilRegistry":1}')).toBeNull();
   });
 
   it("refuses an empty one, which is not a restore point", () => {
     // Treating `{}` as a restore would replace a fresh install's defaults with
     // nothing at all.
     expect(
-      decodeRegistryMirror('{"almanacRegistry":1,"settings":{}}')
+      decodeRegistryMirror('{"chronoanvilRegistry":1,"settings":{}}')
     ).toBeNull();
   });
 
   it("refuses one from a later release", () => {
     expect(
-      decodeRegistryMirror('{"almanacRegistry":99,"settings":{"trackers":[]}}')
+      decodeRegistryMirror('{"chronoanvilRegistry":99,"settings":{"trackers":[]}}')
     ).toBeNull();
   });
 });
@@ -278,11 +278,11 @@ describe("surviving a full reinstall", () => {
     let data: unknown = null;
 
     async function session(
-      act: (p: AlmanacPlugin) => void | Promise<void> = () => {}
-    ): Promise<AlmanacPlugin> {
-      const plugin = new AlmanacPlugin(
+      act: (p: ChronoAnvilPlugin) => void | Promise<void> = () => {}
+    ): Promise<ChronoAnvilPlugin> {
+      const plugin = new ChronoAnvilPlugin(
         { vault: { adapter } } as never,
-        { id: "almanac", version: "2.50.0" } as never
+        { id: "chronoanvil", version: "2.50.0" } as never
       );
       (plugin as unknown as { _data: unknown })._data = data;
 
@@ -423,9 +423,9 @@ describe("the link between saving settings and the mirror", () => {
     vi.useFakeTimers();
     try {
       const adapter = new FakeAdapter();
-      const plugin = new AlmanacPlugin(
+      const plugin = new ChronoAnvilPlugin(
         { vault: { adapter } } as never,
-        { id: "almanac", version: "2.50.0" } as never
+        { id: "chronoanvil", version: "2.50.0" } as never
       );
       plugin.registry = new Registry({ vault: { adapter } } as never, plugin);
       await plugin.loadSettings();

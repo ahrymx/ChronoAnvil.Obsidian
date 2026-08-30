@@ -124,7 +124,7 @@ describe("the tag table", () => {
     const body = src.slice(at, src.indexOf("\n}", src.indexOf("return root;", at)));
     expect(body).toContain("for (const [tag, files] of sorted)");
     expect(body.match(/createEl\("details"/g) ?? []).toHaveLength(1);
-    expect(body).toContain('createEl("ul", { cls: "jt-tag-list" })');
+    expect(body).toContain('createEl("ul", { cls: "ca-jt-tag-list" })');
   });
 
   it("retired the three size tiers with the cloud", () => {
@@ -201,8 +201,8 @@ describe("Tags on a diary dashboard", () => {
 
   it("matches the directive rather than the header it retitled", () => {
     const section = tags()!;
-    expect(section.locate("```almanac\nheader:🐈 Whatever\ntag-index:x\n```")).toBeGreaterThanOrEqual(0);
-    expect(section.locate("```almanac\nheader:🏷️ Tags\n```")).toBe(-1);
+    expect(section.locate("```chronoanvil\nheader:🐈 Whatever\ntag-index:x\n```")).toBeGreaterThanOrEqual(0);
+    expect(section.locate("```chronoanvil\nheader:🏷️ Tags\n```")).toBe(-1);
   });
 
   it("shares its id and icon with the homepage's entry", () => {

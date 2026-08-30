@@ -662,7 +662,7 @@ export function tidyHeights(body: readonly string[]): string[] {
 // typed by hand, so it is only ever removed when what it described has gone: the
 // row that drew the cards, or the widget on the line under it.
 function pruned(body: readonly string[]): string[] | null {
-  // AN EMPTIED FENCE GOES. An `almanac` fence with no directives left renders
+  // AN EMPTIED FENCE GOES. A `chronoanvil` fence with no directives left renders
   // as an empty card — `applyLayout` drops one for the same reason, in the same
   // words.
   if (!body.some(isWidget)) return null;
@@ -818,8 +818,8 @@ export function moveCell(
     if (dst.at < 0 || dst.at > at.length) return null;
   } else {
     if (dst.block < 0 || dst.block >= at.length) return null;
-    // A FENCE KIND IS NOT A DETAIL. `almanac-charts` holds chart specs and
-    // `almanac` holds directives; a line that crosses between them is a widget
+    // A FENCE KIND IS NOT A DETAIL. `chronoanvil-charts` holds chart specs and
+    // `chronoanvil` holds directives; a line that crosses between them is a widget
     // the block cannot render, and the reader would see a broken card rather
     // than a refusal. `composeFlatNote` refuses the same crossing when it
     // builds a row, and in the same terms.

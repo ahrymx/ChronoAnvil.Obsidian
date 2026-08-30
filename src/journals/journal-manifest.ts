@@ -36,13 +36,26 @@ import type { TrackerDef } from "../trackers/trackers";
 // dot-prefixed paths — so every read and write here goes through
 // `vault.adapter`, which does not. That is the whole reason this file talks to
 // the adapter while the rest of the plugin talks to the vault.
-export const JOURNAL_MANIFEST = ".almanac-journal.json";
+export const JOURNAL_MANIFEST = ".chronoanvil-journal.json";
+// The pre-rename filename. A journal whose manifest cannot be found is not
+// discovered at all — its section vanishes from every dashboard — so reads
+// fall back to this. Never written.
+export const LEGACY_JOURNAL_MANIFEST = ".almanac-journal.json";
 
 // Bumped only if the stored shape changes in a way a reader must branch on.
 export const MANIFEST_VERSION = 1;
 
 export function manifestPathFor(root: string): string {
   return normalizePath(`${root}/${JOURNAL_MANIFEST}`);
+}
+
+// Both spellings, current first, for callers that are locating an existing
+// manifest rather than deciding where to write one.
+export function manifestPathsFor(root: string): string[] {
+  return [
+    normalizePath(`${root}/${JOURNAL_MANIFEST}`),
+    normalizePath(`${root}/${LEGACY_JOURNAL_MANIFEST}`),
+  ];
 }
 
 // The parts of a JournalConfig worth storing.
@@ -57,7 +70,7 @@ export function manifestPathFor(root: string): string {
 export type StoredJournalConfig = Omit<JournalConfig, "root" | "templatesFolder">;
 
 export interface JournalManifest {
-  almanacJournal: number;
+  chronoanvilJournal: number;
   config: StoredJournalConfig;
   // The journal-scoped trackers its notes actually use. Without these an
   // imported journal renders "Unknown tracker: difficulty" on every note that
@@ -71,7 +84,7 @@ export function encodeJournalManifest(
 ): string {
   const { root: _root, templatesFolder: _templates, ...stored } = cfg;
   const manifest: JournalManifest = {
-    almanacJournal: MANIFEST_VERSION,
+    chronoanvilJournal: MANIFEST_VERSION,
     config: stored,
     trackers,
   };
@@ -91,17 +104,23 @@ export function decodeJournalManifest(raw: string): JournalManifest | null {
     return null;
   }
   if (!parsed || typeof parsed !== "object") return null;
-  const m = parsed as Partial<JournalManifest>;
-  if (typeof m.almanacJournal !== "number") return null;
+  const m = parsed as Partial<JournalManifest> & { almanacJournal?: number };
+  // Renamed from `almanacJournal` with the plugin; a manifest written before
+  // still a valid manifest, and rejecting it would send journal discovery back
+  // to inference for every journal in an unmigrated vault.
+  if (typeof m.chronoanvilJournal !== "number") {
+    if (typeof m.almanacJournal !== "number") return null;
+    m.chronoanvilJournal = m.almanacJournal;
+  }
   // A manifest from a LATER release may mean something different by the same
   // field names, so reading it under today's assumptions is worse than not
   // reading it: the caller falls back to inference, which reads the notes
   // rather than a shape it doesn't understand. Older versions stay readable —
   // that is what a version number is for — and gain the current shape the next
   // time the journal is saved or the vault repaired.
-  if (m.almanacJournal > MANIFEST_VERSION) {
+  if (m.chronoanvilJournal > MANIFEST_VERSION) {
     console.warn(
-      `[Almanac] journal manifest is version ${m.almanacJournal}; this release understands ${MANIFEST_VERSION}. Reading the folder instead.`
+      `[ChronoAnvil] journal manifest is version ${m.chronoanvilJournal}; this release understands ${MANIFEST_VERSION}. Reading the folder instead.`
     );
     return null;
   }
@@ -111,7 +130,7 @@ export function decodeJournalManifest(raw: string): JournalManifest | null {
   if (!Array.isArray(cfg.levels) || cfg.levels.length === 0) return null;
   if (!Array.isArray(cfg.kinds) || cfg.kinds.length === 0) return null;
   return {
-    almanacJournal: m.almanacJournal,
+    chronoanvilJournal: m.chronoanvilJournal,
     config: {
       ...cfg,
       id: cfg.id,

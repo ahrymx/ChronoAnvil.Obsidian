@@ -34,10 +34,10 @@ const DASHBOARD_GRAINS: DashboardGrain[] = [
   "yearly",
 ];
 
-// The first almanac fence of a composed note — the masthead, as of 3.2.
+// The first chronoanvil fence of a composed note — the masthead, as of 3.2.
 // The masthead's own fence, found by WHAT IT HOLDS rather than by where it sits.
 //
-// It was `the first ```almanac block`, which was the same thing until 4.10 put
+// It was `the first ```chronoanvil block`, which was the same thing until 4.10 put
 // the page head above it. Position was never what these tests were about — the
 // masthead is the fence carrying navigation, and saying so is both more honest
 // and immune to the next thing that arrives above it.
@@ -55,7 +55,7 @@ const fenceHolding = (text: string, probe: (l: string) => boolean): string[] => 
   const lines = text.split("\n");
   let open = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim() === "```almanac") open = i;
+    if (lines[i].trim() === "```chronoanvil") open = i;
     if (open >= 0 && probe(lines[i])) break;
   }
   const close = lines.indexOf("```", open + 1);
@@ -180,7 +180,7 @@ describe("below the rule they diverge, and nothing forces them together", () => 
 describe("the card belongs to the fence, not to a widget in it", () => {
   it("a period summary flags its block as the masthead card", () => {
     // ASSERTED THROUGH THE RULE AS OF 4.1 §3. This read the literal line
-    // `container.addClass("journal-overview-card")` out of the source, which
+    // `container.addClass("ca-journal-overview-card")` out of the source, which
     // was the only handle available while the decision was three `if`s inline
     // in the processor. The `frame:` modifier gave that decision a name and a
     // signature, so the property this test is actually about — a fence holding
@@ -196,7 +196,7 @@ describe("the card belongs to the fence, not to a widget in it", () => {
         overviewCard: true,
         studyBanner: false,
       })
-    ).toContain("journal-overview-card");
+    ).toContain("ca-journal-overview-card");
   });
 
   it("and only the fence's default frame draws it", () => {
@@ -211,7 +211,7 @@ describe("the card belongs to the fence, not to a widget in it", () => {
           studyBanner: false,
         }),
         frame
-      ).not.toContain("journal-overview-card");
+      ).not.toContain("ca-journal-overview-card");
     }
   });
 
@@ -225,38 +225,38 @@ describe("the card belongs to the fence, not to a widget in it", () => {
 
   it("and the summary widget gives up the frame it used to draw", () => {
     const css = readCss();
-    expect(css).toContain(".journal-widget-block.journal-overview-card");
-    expect(css).toContain(".journal-overview-card .journal-overview-summary");
+    expect(css).toContain(".ca-journal-widget-block.ca-journal-overview-card");
+    expect(css).toContain(".ca-journal-overview-card .ca-journal-overview-summary");
     // DESCENDANT, NOT CHILD, and the test says so because the first cut of this
     // release used `>` and matched nothing: all four summaries are wrapped in a
-    // `.journal-live-widget` host, so the summary is a grandchild of the block.
-    expect(css).not.toContain(".journal-overview-card > .journal-overview-summary");
+    // `.ca-journal-live-widget` host, so the summary is a grandchild of the block.
+    expect(css).not.toContain(".ca-journal-overview-card > .ca-journal-overview-summary");
   });
 
   it("while the entry card keeps the one it has and grows a band", () => {
     const css = readCss();
-    expect(css).toContain(".journal-entry-banner > .journal-links-card");
+    expect(css).toContain(".ca-journal-entry-banner > .ca-journal-links-card");
     // ── AND THE BAND IS NOT THE TOP EDGE ANY MORE (4.21.1) ──────────
     //
     // It was, from 3.2 patch 5 until then, and the rule that put it there —
-    // `> .journal-links-card + .journal-entry-header` — is deliberately GONE
+    // `> .ca-journal-links-card + .ca-journal-entry-header` — is deliberately GONE
     // rather than adjusted: the name leads on every banner now, so the links
     // card is band 2 and nothing about where it sits is an entry's private
     // arrangement. Asserted as an absence because the adjacency selector is
     // what a re-flip would reach for first, and it would put the arrangement
     // back on one surface only.
     expect(css).not.toContain(
-      ".journal-entry-banner > .journal-links-card + .journal-entry-header"
+      ".ca-journal-entry-banner > .ca-journal-links-card + .ca-journal-entry-header"
     );
     // The inset, the rule and the bottom-edge handoff belong to the shared band
     // class, which is what makes an entry's row and a leaf's one object.
-    expect(css).toContain(".journal-slim-banner .journal-banner-nav");
+    expect(css).toContain(".ca-journal-slim-banner .ca-journal-banner-nav");
   });
 
   it("and the two links bands are styled the same, because they are the same", () => {
     const css = readCss();
-    for (const owner of [".journal-entry-banner", ".journal-overview-card"]) {
-      expect(css, owner).toContain(`${owner} > .journal-links-card > .journal-links-bar`);
+    for (const owner of [".ca-journal-entry-banner", ".ca-journal-overview-card"]) {
+      expect(css, owner).toContain(`${owner} > .ca-journal-links-card > .ca-journal-links-bar`);
     }
   });
 });
@@ -264,18 +264,18 @@ describe("the card belongs to the fence, not to a widget in it", () => {
 describe("the species marker", () => {
   it("is an accent edge on the overview and nothing on the entry", () => {
     const css = readCss();
-    const at = css.indexOf(".journal-overview-card .journal-overview-banner");
+    const at = css.indexOf(".ca-journal-overview-card .ca-journal-overview-banner");
     expect(at).toBeGreaterThan(0);
     expect(css.slice(at, at + 400)).toContain("border-left");
     // An entry is a note you write in, and an accent wash there would compete
     // with the entry itself.
-    const entry = css.indexOf(".journal-entry-banner > .journal-links-card");
+    const entry = css.indexOf(".ca-journal-entry-banner > .ca-journal-links-card");
     expect(css.slice(entry, entry + 300)).not.toContain("border-left");
   });
 
   it("and the token it is drawn in is declared where the theme's own is", () => {
     // 3.6 PATCH 1. The rule above shipped in 3.2 and the edge never painted,
-    // because `--am-area-diary: var(--interactive-accent)` was declared in
+    // because `--ca-area-diary: var(--interactive-accent)` was declared in
     // `:root` and Obsidian declares `--interactive-accent` on `body`. A custom
     // property is substituted at its DECLARATION site, so the lookup ran one
     // element above the value it needed, resolved to guaranteed-invalid, and
@@ -287,11 +287,11 @@ describe("the species marker", () => {
     // difference; this one can.
     const css = readCss();
     const root = css.slice(css.indexOf(":root {"), css.indexOf("}", css.indexOf(":root {")));
-    for (const token of ["--am-area-diary:", "--am-area-diary-rgb:"]) {
+    for (const token of ["--ca-area-diary:", "--ca-area-diary-rgb:"]) {
       expect(root, token).not.toContain(token);
     }
     const body = css.slice(css.indexOf("body {"), css.indexOf("}", css.indexOf("body {")));
-    expect(body).toContain("--am-area-diary: var(--interactive-accent)");
+    expect(body).toContain("--ca-area-diary: var(--interactive-accent)");
   });
 });
 
@@ -304,7 +304,7 @@ describe("the period button is welded, not moved", () => {
     // of patch 6 did exactly that.
     const w = readCode("widgets");
     expect(w).not.toContain("navStack");
-    expect(w).toContain('addClass("journal-overview-actions")');
+    expect(w).toContain('addClass("ca-journal-overview-actions")');
   });
 
   it("and so does the jump-to-now button, which joined it in 3.6", () => {
@@ -328,25 +328,25 @@ describe("the period button is welded, not moved", () => {
     // that a bare `period-nav` elsewhere reaches nothing.
     //
     // RETARGETED IN 4.1.2, NOT WEAKENED. This asserted
-    // `closest(".journal-overview-card")` — the containment property, pinned
+    // `closest(".ca-journal-overview-card")` — the containment property, pinned
     // through whichever class happened to provide it. `frame: section` withholds
     // that class, so on the diary dashboard the walk found nothing and the cue
     // silently stopped working while this test went on passing: it was pinning
     // the mechanism, and the mechanism was the bug.
     //
-    // `.journal-widget-block` is the fence's own container under every frame
+    // `.ca-journal-widget-block` is the fence's own container under every frame
     // value (4.1 §4 names keeping it as the rule all three honour), so the
     // search reaches exactly as far as it did — which is what the sentence
     // above was ever about.
     const p = readCode("periodnav");
-    expect(p).toContain('closest(".journal-widget-block")');
-    expect(p).not.toContain('closest(".journal-overview-card")');
+    expect(p).toContain('closest(".ca-journal-widget-block")');
+    expect(p).not.toContain('closest(".ca-journal-overview-card")');
     expect(p).toContain("syncNowButton(outer,");
   });
 
   it("and borrows the banner's ground rather than its parent", () => {
     const css = readCss();
-    const at = css.indexOf(".journal-overview-actions");
+    const at = css.indexOf(".ca-journal-overview-actions");
     expect(at).toBeGreaterThan(0);
     const rule = css.slice(css.indexOf("journal-overview-actions {", at));
     expect(rule.slice(0, 600)).toContain("border-left");
@@ -363,20 +363,20 @@ describe("the period button is welded, not moved", () => {
     const w = readCode("widgets");
     expect(w).toContain("const openActionsBar =");
     expect(w).toContain("if (!isOverviewCard) return created;");
-    expect(w.match(/addClass\("journal-overview-actions"\)/g)).toHaveLength(1);
+    expect(w.match(/addClass\("ca-journal-overview-actions"\)/g)).toHaveLength(1);
   });
 
   it("and the footer, not the band, is where the now-button sits", () => {
     // §4.2: the least important control in the band was the heaviest thing in
     // it. The footer already holds the card's one other whole-card action.
     const css = readCss();
-    expect(css).toContain(".journal-overview-actions > .jpn-now-btn");
+    expect(css).toContain(".ca-journal-overview-actions > .ca-jpn-now-btn");
     // It takes the row's left edge by pushing, not by re-aligning the bar — a
     // footer holding only "Keep this month" must keep it on the right.
-    const at = css.indexOf(".journal-overview-actions > .jpn-now-btn");
+    const at = css.indexOf(".ca-journal-overview-actions > .ca-jpn-now-btn");
     expect(css.slice(at, css.indexOf("}", at))).toContain("margin-right: auto");
     // And it is gone from the band's row.
-    const stack = css.indexOf(".journal-overview-banner .journal-period-nav-stack {");
+    const stack = css.indexOf(".ca-journal-overview-banner .ca-journal-period-nav-stack {");
     expect(css.slice(stack, stack + 400)).not.toContain("jpn-now-btn");
   });
 });
@@ -450,8 +450,8 @@ describe("3.5: the span above, the value as a control", () => {
 
   it("prints the span, and never a title of its own", () => {
     const c = readCode("calendar");
-    expect(c).toContain('cls: "job-span"');
-    expect(c).not.toContain('cls: "job-title"');
+    expect(c).toContain('cls: "ca-job-span"');
+    expect(c).not.toContain('cls: "ca-job-title"');
     expect(c).not.toContain("job-eyebrow");
   });
 
@@ -461,7 +461,7 @@ describe("3.5: the span above, the value as a control", () => {
     // with the element instead of having to be added to a div.
     const p = readCode("periodnav");
     expect(p).toContain("valueLabel(unit, cur)");
-    expect(p).toContain('cls: "jpn-value-label"');
+    expect(p).toContain('cls: "ca-jpn-value-label"');
     expect(p).toContain('createEl("button"');
   });
 
@@ -475,8 +475,8 @@ describe("3.5: the span above, the value as a control", () => {
   it("lays the strip and the now-button on one row", () => {
     // It was a vertical stack, which is what broke the nav row in 3.4.
     const css = readCss();
-    expect(css).toContain(".journal-overview-banner .journal-period-nav-stack");
-    expect(css).toContain(".journal-overview-banner .jpn-value-label");
+    expect(css).toContain(".ca-journal-overview-banner .ca-journal-period-nav-stack");
+    expect(css).toContain(".ca-journal-overview-banner .ca-jpn-value-label");
   });
 
   it("so the page's own head is what names the page type", () => {
@@ -582,7 +582,7 @@ describe("3.6 patches 5 and 8: what the band stopped saying", () => {
   const css = readCss();
   // The band's own rule, from its opening brace to its closing one.
   const bandRule = (): string => {
-    const at = css.indexOf(".journal-overview-banner {");
+    const at = css.indexOf(".ca-journal-overview-banner {");
     return css.slice(at, css.indexOf("}", at));
   };
 
@@ -602,20 +602,20 @@ describe("3.6 patches 5 and 8: what the band stopped saying", () => {
     // because a lid is supposed to read as one" — true of a lid, and the whole
     // question was whether the card needed one. It does not: the block's head
     // sits above it saying the same thing without the wash.
-    expect(css).not.toContain(".am-titlebar");
+    expect(css).not.toContain(".ca-titlebar");
   });
 
   it("and the trigger's affordance is the control, not a text decoration", () => {
-    // The dashed underline sat about two pixels above `.jeh-nav.jeh-seg`'s own
+    // The dashed underline sat about two pixels above `.ca-jeh-nav.ca-jeh-seg`'s own
     // capsule border, which already meant the same thing — a decoration that
     // had failed rather than a boundary. What replaces it is a ground the whole
     // trigger owns, caret included.
-    const at = css.indexOf(".journal-overview-banner .jeh-datenav-trigger.jpn-value {");
+    const at = css.indexOf(".ca-journal-overview-banner .ca-jeh-datenav-trigger.ca-jpn-value {");
     const rule = css.slice(at, css.indexOf("}", at));
     expect(rule).not.toContain("dashed");
     // A button that keyboard could always reach could not show that it had
     // been reached: the underline never changed on focus.
-    expect(css).toContain(".journal-overview-banner .jeh-datenav-trigger.jpn-value:focus-visible");
+    expect(css).toContain(".ca-journal-overview-banner .ca-jeh-datenav-trigger.ca-jpn-value:focus-visible");
   });
 
   it("and its three parts measure from one number", () => {
@@ -623,12 +623,12 @@ describe("3.6 patches 5 and 8: what the band stopped saying", () => {
     // the chevrons are not inside the trigger — declaring it one level down is
     // what left them sized for the 12px segmented control they used to be part
     // of. Every part that has to agree with the headline reads it.
-    const at = css.indexOf(".journal-overview-banner .journal-period-nav.jeh-seg {");
+    const at = css.indexOf(".ca-journal-overview-banner .ca-journal-period-nav.ca-jeh-seg {");
     expect(css.slice(at, css.indexOf("}", at))).toContain("--jpn-headline:");
     for (const consumer of [
-      ".journal-overview-banner .jeh-navpill svg",
-      ".journal-overview-banner .jpn-value-label",
-      ".journal-overview-banner .jpn-value .jeh-datenav-caret svg",
+      ".ca-journal-overview-banner .ca-jeh-navpill svg",
+      ".ca-journal-overview-banner .ca-jpn-value-label",
+      ".ca-journal-overview-banner .ca-jpn-value .ca-jeh-datenav-caret svg",
     ]) {
       const i = css.indexOf(consumer);
       expect(i, consumer).toBeGreaterThan(0);
@@ -645,7 +645,7 @@ describe("3.6 patch 6 (enabling half): one source for the period's figures", () 
     // `renderPeriodStats` rather than recompute beside it, and until 3.6 that
     // was not possible: it opened a `<p>`, appended to it, and returned the
     // element. There was no way to ask it for figures, so a card strip would
-    // have called `periodCoverage` and `sumAlmanacTasks` again and become the
+    // have called `periodCoverage` and `sumChronoAnvilTasks` again and become the
     // second place a dashboard's numbers are decided.
     expect(src).toContain("export function periodStats(");
     expect(src).toContain("export interface PeriodStats");
@@ -659,7 +659,7 @@ describe("3.6 patch 6 (enabling half): one source for the period's figures", () 
     const at = src.indexOf("export function renderPeriodStats(");
     const body = src.slice(at, src.indexOf("\n}", at));
     expect(body).toContain("periodStats(files, span, app, todayIso)");
-    for (const recompute of ["periodCoverage(", "sumAlmanacTasks(", "files.length"]) {
+    for (const recompute of ["periodCoverage(", "sumChronoAnvilTasks(", "files.length"]) {
       expect(body, recompute).not.toContain(recompute);
     }
   });
@@ -672,10 +672,10 @@ describe("3.6 patch 6 (enabling half): one source for the period's figures", () 
     // beside it share ONE walk over the entries and cannot disagree.
     const at = src.indexOf("export function periodStats(");
     const body = src.slice(at, src.indexOf("\n}", at));
-    expect(body).toContain("tasks: sumAlmanacTasks(app, files)");
+    expect(body).toContain("tasks: sumChronoAnvilTasks(app, files)");
     // Called from exactly one place in this file. A second call site is the
     // second walk, and the second answer.
-    expect(src.match(/sumAlmanacTasks\(/g) ?? []).toHaveLength(1);
+    expect(src.match(/sumChronoAnvilTasks\(/g) ?? []).toHaveLength(1);
   });
 });
 
@@ -685,7 +685,7 @@ describe("3.6 patch 6: the stat strip", () => {
 
   it("takes its column count as data, not as an inline style", () => {
     // THE ONE THAT WOULD HAVE CAUGHT THE BUG. The first cut set
-    // `--am-stats-cols` with `style.setProperty`, which reads perfectly and
+    // `--ca-stats-cols` with `style.setProperty`, which reads perfectly and
     // cannot work: an inline declaration is the one thing a stylesheet cannot
     // override, so the container query was silently beaten by the element it
     // was laying out. The strip stayed four across at every width and nothing
@@ -701,10 +701,10 @@ describe("3.6 patch 6: the stat strip", () => {
 
   it("collapses on the pane's width, not the window's", () => {
     // The year's strip collapsed at `@media (max-width: 480px)`, which measures
-    // the WINDOW. Almanac renders in a note pane, and a 400px pane in a 1600px
+    // the WINDOW. ChronoAnvil renders in a note pane, and a 400px pane in a 1600px
     // window is the ordinary way anyone reads a dashboard beside something
     // else — so a four-up strip in a narrow pane never collapsed unless the
-    // whole of Obsidian was phone-width. `.journal-widget-block` has carried
+    // whole of Obsidian was phone-width. `.ca-journal-widget-block` has carried
     // `container-type: inline-size` since 2.51 and twelve rules already query
     // it; that one was written before that was true and never revisited.
     //
@@ -720,8 +720,8 @@ describe("3.6 patch 6: the stat strip", () => {
     const query = sheet.slice(at, sheet.indexOf("}\n}", at));
     // Four and three collapse to two; one and two are already narrow enough
     // and are deliberately not listed.
-    expect(query).toContain('.am-stats[data-cols="4"]');
-    expect(query).toContain('.am-stats[data-cols="3"]');
+    expect(query).toContain('.ca-stats[data-cols="4"]');
+    expect(query).toContain('.ca-stats[data-cols="3"]');
     expect(query).not.toContain('data-cols="1"');
     expect(query).not.toContain('data-cols="2"');
   });
@@ -767,7 +767,7 @@ describe("3.6 patch 6: the stat strip", () => {
     expect(body).toContain('label: "Tasks done"');
     expect(readCode("year-view")).toContain('"Tasks done"');
     // And it still computes nothing of its own — patch 6's enabling half.
-    for (const recompute of ["periodCoverage(", "sumAlmanacTasks(", "files.length"]) {
+    for (const recompute of ["periodCoverage(", "sumChronoAnvilTasks(", "files.length"]) {
       expect(body, recompute).not.toContain(recompute);
     }
   });
@@ -777,14 +777,14 @@ describe("the overview card inside rows and groups", () => {
   it("wraps overview summary and actions into a single overview card container", () => {
     const w = readCode("widgets");
     expect(w).toContain('overviewHost = container.createDiv({');
-    expect(w).toContain('"journal-card journal-overview-card"');
+    expect(w).toContain('"ca-journal-card ca-journal-overview-card"');
     expect(w).toContain('overviewHost ?? container');
   });
 
-  it("styles .journal-card.journal-overview-card with full overview card chrome", () => {
+  it("styles .ca-journal-card.ca-journal-overview-card with full overview card chrome", () => {
     const css = readCss();
-    expect(css).toContain(".journal-card.journal-overview-card");
-    expect(css).toContain(".journal-block-cell > .journal-overview-card");
+    expect(css).toContain(".ca-journal-card.ca-journal-overview-card");
+    expect(css).toContain(".ca-journal-block-cell > .ca-journal-overview-card");
   });
 });
 

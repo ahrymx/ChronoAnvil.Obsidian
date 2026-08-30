@@ -69,7 +69,7 @@ import type { PluginNoteRegionHost } from "./note-regions";
 // MIME type used by the attachments widget's own drag-to-reorder, so its drop
 // handler can tell an internal tile move apart from a file arriving from
 // outside. Lowercase: the DataTransfer type list is normalised to lowercase.
-const ATTACH_DRAG_TYPE = "application/x-almanac-attachment";
+const ATTACH_DRAG_TYPE = "application/x-ca-attachment";
 
 // Callbacks a tile/chip fires back to the widget that owns the list.
 export interface AttachmentHandlers {
@@ -110,7 +110,7 @@ export function openAttachment(
   deps: PluginNoteRegionHost,item: Attachment, ctx: MarkdownPostProcessorContext): void {
   if (isExternalUrl(item.target)) {
     if (!isSafeUrl(item.target)) {
-      new Notice("That link uses a scheme Almanac won't open.");
+      new Notice("That link uses a scheme ChronoAnvil won't open.");
       return;
     }
     window.open(item.target, "_blank");
@@ -242,12 +242,12 @@ export function openAttachmentLightbox(
   let at = Math.max(0, images.indexOf(items[index]));
 
   const overlay = document.body.createDiv({
-    cls: "journal-attach-lightbox",
+    cls: "ca-journal-attach-lightbox",
     attr: { tabindex: "-1" },
   });
-  const stage = overlay.createDiv({ cls: "journal-attach-lightbox-stage" });
+  const stage = overlay.createDiv({ cls: "ca-journal-attach-lightbox-stage" });
   const img = stage.createEl("img");
-  const caption = stage.createDiv({ cls: "journal-attach-lightbox-caption" });
+  const caption = stage.createDiv({ cls: "ca-journal-attach-lightbox-caption" });
 
   const close = (): void => {
     overlay.remove();
@@ -272,7 +272,7 @@ export function openAttachmentLightbox(
 
   if (images.length > 1) {
     const prev = overlay.createEl("button", {
-      cls: "journal-attach-lightbox-nav is-prev",
+      cls: "ca-journal-attach-lightbox-nav is-prev",
       attr: { type: "button", "aria-label": "Previous" },
     });
     setIcon(prev, "chevron-left");
@@ -281,7 +281,7 @@ export function openAttachmentLightbox(
       step(-1);
     });
     const next = overlay.createEl("button", {
-      cls: "journal-attach-lightbox-nav is-next",
+      cls: "ca-journal-attach-lightbox-nav is-next",
       attr: { type: "button", "aria-label": "Next" },
     });
     setIcon(next, "chevron-right");
@@ -292,7 +292,7 @@ export function openAttachmentLightbox(
   }
 
   const closeBtn = overlay.createEl("button", {
-    cls: "journal-attach-lightbox-close",
+    cls: "ca-journal-attach-lightbox-close",
     attr: { type: "button", "aria-label": "Close" },
   });
   setIcon(closeBtn, "x");
@@ -321,20 +321,20 @@ export function renderAttachmentChip(
   cb: AttachmentHandlers
 ): void {
   const chip = chips.createDiv({
-    cls: `journal-attach-chip journal-attach-chip--${item.kind}`,
+    cls: `ca-journal-attach-chip ca-journal-attach-chip--${item.kind}`,
   });
   chip.draggable = true;
 
-  const icon = chip.createSpan({ cls: "journal-attach-chip-icon" });
+  const icon = chip.createSpan({ cls: "ca-journal-attach-chip-icon" });
   if (item.kind === "link") setIcon(icon, "external-link");
   else if (item.kind === "text") setIcon(icon, "text-cursor-input");
   else setIcon(icon, attachmentFileIcon(item.target));
 
-  const body = chip.createDiv({ cls: "journal-attach-chip-body" });
-  body.createSpan({ cls: "journal-attach-chip-title", text: displayTitle(item) });
+  const body = chip.createDiv({ cls: "ca-journal-attach-chip-body" });
+  body.createSpan({ cls: "ca-journal-attach-chip-title", text: displayTitle(item) });
   if (item.kind === "link" && item.title.trim()) {
     body.createSpan({
-      cls: "journal-attach-chip-sub",
+      cls: "ca-journal-attach-chip-sub",
       text: hostLabel(item.target),
     });
   }
@@ -347,7 +347,7 @@ export function renderAttachmentChip(
   }
 
   const menuBtn = chip.createEl("button", {
-    cls: "journal-attach-menu",
+    cls: "ca-journal-attach-menu",
     attr: { type: "button", "aria-label": "Attachment options" },
   });
   setIcon(menuBtn, "more-horizontal");
@@ -371,10 +371,10 @@ export function renderAttachmentTile(
   ctx: MarkdownPostProcessorContext,
   cb: AttachmentHandlers
 ): void {
-  const tile = gallery.createDiv({ cls: "journal-attach-tile" });
+  const tile = gallery.createDiv({ cls: "ca-journal-attach-tile" });
   tile.draggable = true;
 
-  const frame = tile.createDiv({ cls: "journal-attach-thumb" });
+  const frame = tile.createDiv({ cls: "ca-journal-attach-thumb" });
   const external = isExternalUrl(item.target);
   const target = external ? item.target : resolveAttachmentFile(deps, item.target, ctx);
 
@@ -385,8 +385,8 @@ export function renderAttachmentTile(
     img.addEventListener("error", () => {
       frame.empty();
       frame.addClass("is-missing");
-      setIcon(frame.createDiv({ cls: "journal-attach-missing-icon" }), "unlink");
-      frame.createDiv({ cls: "journal-attach-missing-text", text: "Unavailable" });
+      setIcon(frame.createDiv({ cls: "ca-journal-attach-missing-icon" }), "unlink");
+      frame.createDiv({ cls: "ca-journal-attach-missing-text", text: "Unavailable" });
     });
   } else if (target instanceof TFile) {
     const img = frame.createEl("img", { attr: { alt: displayTitle(item) } });
@@ -394,21 +394,21 @@ export function renderAttachmentTile(
     img.loading = "lazy";
   } else {
     frame.addClass("is-missing");
-    setIcon(frame.createDiv({ cls: "journal-attach-missing-icon" }), "image-off");
-    frame.createDiv({ cls: "journal-attach-missing-text", text: "File not found" });
+    setIcon(frame.createDiv({ cls: "ca-journal-attach-missing-icon" }), "image-off");
+    frame.createDiv({ cls: "ca-journal-attach-missing-text", text: "File not found" });
   }
 
   frame.addEventListener("click", () => cb.onLightbox(index));
 
   const caption = tile.createDiv({
-    cls: "journal-attach-caption",
+    cls: "ca-journal-attach-caption",
     text: displayTitle(item),
   });
   caption.addEventListener("click", () => cb.onCaption(index));
   caption.setAttribute("aria-label", "Click to edit the caption");
 
   const menuBtn = tile.createEl("button", {
-    cls: "journal-attach-menu",
+    cls: "ca-journal-attach-menu",
     attr: { type: "button", "aria-label": "Attachment options" },
   });
   setIcon(menuBtn, "more-horizontal");
@@ -448,7 +448,7 @@ export async function deleteAttachmentFile(
   //
   // 4.50 lifted this probe into `util.ts` because a title row's *Move to bin*
   // had become a second caller. It should never have been one: a journal note
-  // goes to `00 - Infrastructure/Bin/` by a rename, which is Almanac's own bin
+  // goes to `00 - Infrastructure/Bin/` by a rename, which is ChronoAnvil's own bin
   // and the thing `journal-removal.ts` had already decided. With that caller
   // gone this is a shared helper with one user, which is `recordList`'s round
   // trip in 4.13.3 for the same reason — **a component is worth sharing when two
@@ -469,7 +469,7 @@ export async function deleteAttachmentFile(
     if (typeof fm.trashFile === "function") await fm.trashFile(file);
     else await deps.app.vault.trash(file, true);
   } catch (e) {
-    console.error("[Almanac] could not trash attachment", e);
+    console.error("[ChronoAnvil] could not trash attachment", e);
     new Notice(`Couldn't delete ${file.path}.`);
     return false;
   }
@@ -504,7 +504,7 @@ export async function attachmentPathFor(
   }
 
   let folder: string;
-  if (opts.location === "almanac") {
+  if (opts.location === "chronoanvil") {
     const sub = sanitizeFolderPath(applyTokens(opts.subfolder ?? "", tokens));
     folder = [deps.plugin.settings.paths.attachments, sub]
       .filter((part) => part && part.length > 0)
@@ -556,7 +556,7 @@ export async function storeAttachmentFile(
   try {
     data = await blob.arrayBuffer();
   } catch (e) {
-    console.error("[Almanac] could not read dropped file", e);
+    console.error("[ChronoAnvil] could not read dropped file", e);
     new Notice(`Couldn't read ${original || "that file"}.`);
     return null;
   }
@@ -565,7 +565,7 @@ export async function storeAttachmentFile(
     const path = await attachmentPathFor(deps, fileName, host, tokens);
     return await deps.app.vault.createBinary(path, data);
   } catch (e) {
-    console.error("[Almanac] could not save attachment", e);
+    console.error("[ChronoAnvil] could not save attachment", e);
     new Notice(`Couldn't save ${fileName}.`);
     return null;
   }
@@ -575,7 +575,7 @@ export async function storeAttachmentFile(
 // Append a shelf to the Resources section of `notePath`. 3.18 §4.2.
 //
 // TWO WRITES THAT MUST BOTH LAND: an `attach:<key>|<Label>` line inside the
-// fence, and a `<!--almanac:key -->` region below it for the shelf's contents.
+// fence, and a `<!--chronoanvil:key -->` region below it for the shelf's contents.
 // A line with no region is a widget with nowhere to store what is dropped on
 // it, so they are written in one `modify` rather than two.
 //
@@ -631,7 +631,7 @@ async function addAttachCategory(
   const out = [...lines];
   // The region goes after the fence close, ahead of anything else that follows
   // it, so the shelves and their regions stay in the same order.
-  out.splice(close + 1, 0, "", `<!--almanac:${key}`, "-->");
+  out.splice(close + 1, 0, "", `<!--chronoanvil:${key}`, "-->");
   out.splice(last + 1, 0, `attach:${key}|${label}`);
   await deps.app.vault.modify(file, out.join("\n"));
 }
@@ -641,7 +641,7 @@ async function addAttachCategory(
 // ONLY WHEN IT IS EMPTY, enforced by the caller and again here.
 //
 // A shelf owns two things in the file: its `attach:<key>|<label>` line inside
-// the fence, and its `<!--almanac:<key> ... -->` region below it. The region is
+// the fence, and its `<!--chronoanvil:<key> ... -->` region below it. The region is
 // where the reader's files and links live. Deleting a shelf that had any would
 // be deleting their attachments — and unlike removing a note kind, which leaves
 // the reader's markdown alone and merely stops recognising it, there is nothing
@@ -662,7 +662,7 @@ async function removeAttachCategory(
   if (!(file instanceof TFile)) return;
   const lines = (await deps.app.vault.read(file)).split("\n");
 
-  const open = lines.findIndex((l) => l.trim() === `<!--almanac:${key}`);
+  const open = lines.findIndex((l) => l.trim() === `<!--chronoanvil:${key}`);
   const close =
     open === -1
       ? -1
@@ -729,17 +729,17 @@ async function removeAttachCategory(
 // only thing standing between this and being an ordinary `button:` directive.
 //
 // STYLED AS A HEADER BUTTON, NOT AS AN ATTACH BUTTON. It has moved into a row
-// whose other members are `journal-btn`s, and keeping `.journal-attach-btn`
+// whose other members are `journal-btn`s, and keeping `.ca-journal-attach-btn`
 // here would have carried the toolbar's look into a strip it no longer belongs
 // to — the visual half of the same category error the move corrects.
 export function buildAddCategoryButton(
   deps: PluginNoteRegionHost,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
-  const wrap = createSpan({ cls: "journal-widget journal-button" });
-  const btn = wrap.createEl("button", { cls: "journal-btn journal-btn-subtle" });
-  setIcon(btn.createSpan({ cls: "journal-btn-icon" }), "folder-plus");
-  btn.createSpan({ cls: "journal-btn-label", text: "Add category" });
+  const wrap = createSpan({ cls: "ca-journal-widget ca-journal-button" });
+  const btn = wrap.createEl("button", { cls: "ca-journal-btn ca-journal-btn-subtle" });
+  setIcon(btn.createSpan({ cls: "ca-journal-btn-icon" }), "folder-plus");
+  btn.createSpan({ cls: "ca-journal-btn-label", text: "Add category" });
   btn.setAttr("aria-label", "Add a category to this section");
   btn.setAttr("title", "Add a category to this section");
   btn.addEventListener("click", (evt) => {
@@ -764,17 +764,17 @@ export function buildAttachments(
   label: string | null
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
-  const wrap = createDiv({ cls: `journal-attach journal-attach--${key}` });
+  const wrap = createDiv({ cls: `ca-journal-attach ca-journal-attach--${key}` });
   // The shelf's own subtitle row, and its remove control (3.19.2). Built here
   // rather than in `render` so the button is not torn down and rebuilt on every
   // model change; `refreshRemove` below updates only what changes, which is
   // whether it is offered at all.
   let refreshRemove = (): void => {};
   if (label) {
-    const head = wrap.createDiv({ cls: "journal-attach-label" });
-    head.createSpan({ cls: "journal-attach-label-text", text: label });
+    const head = wrap.createDiv({ cls: "ca-journal-attach-label" });
+    head.createSpan({ cls: "ca-journal-attach-label-text", text: label });
     const drop = head.createEl("button", {
-      cls: "journal-attach-remove",
+      cls: "ca-journal-attach-remove",
       attr: { type: "button" },
     });
     setIcon(drop, "x");
@@ -809,19 +809,19 @@ export function buildAttachments(
 
   if (!isValidNoteKey(key)) {
     wrap.createDiv({
-      cls: "journal-widget-error",
+      cls: "ca-journal-widget-error",
       text: `Invalid attachments key: "${key}"`,
     });
     return wrap;
   }
 
   const zone = wrap.createDiv({
-    cls: "journal-attach-zone",
+    cls: "ca-journal-attach-zone",
     attr: { tabindex: "0" },
   });
-  const gallery = zone.createDiv({ cls: "journal-attach-gallery" });
-  const chips = zone.createDiv({ cls: "journal-attach-chips" });
-  const bar = zone.createDiv({ cls: "journal-attach-actions" });
+  const gallery = zone.createDiv({ cls: "ca-journal-attach-gallery" });
+  const chips = zone.createDiv({ cls: "ca-journal-attach-chips" });
+  const bar = zone.createDiv({ cls: "ca-journal-attach-actions" });
 
   // In-memory model, exactly like buildTasks: the region is the source of
   // truth on load, this array is the model while the widget is mounted.
@@ -846,13 +846,13 @@ export function buildAttachments(
 
     if (items.length === 0 && busy === 0) {
       chips.createDiv({
-        cls: "journal-attach-empty",
+        cls: "ca-journal-attach-empty",
         text: "Drop or paste images, files and links here.",
       });
     }
     if (busy > 0) {
       chips.createDiv({
-        cls: "journal-attach-busy",
+        cls: "ca-journal-attach-busy",
         text: busy === 1 ? "Adding 1 file…" : `Adding ${busy} files…`,
       });
     }
@@ -956,7 +956,7 @@ export function buildAttachments(
   // ── Toolbar ──────────────────────────────────────────────────────────
   const picker = bar.createEl("input", {
     type: "file",
-    cls: "journal-attach-file-input",
+    cls: "ca-journal-attach-file-input",
   });
   picker.multiple = true;
   picker.addEventListener("change", () => {
@@ -966,25 +966,25 @@ export function buildAttachments(
   });
 
   const addFileBtn = bar.createEl("button", {
-    cls: "journal-attach-btn",
+    cls: "ca-journal-attach-btn",
     attr: { type: "button" },
   });
-  setIcon(addFileBtn.createSpan({ cls: "journal-attach-btn-icon" }), "image-plus");
+  setIcon(addFileBtn.createSpan({ cls: "ca-journal-attach-btn-icon" }), "image-plus");
   addFileBtn.createSpan({ text: "Add file" });
   addFileBtn.addEventListener("click", () => picker.click());
 
   const addLinkBtn = bar.createEl("button", {
-    cls: "journal-attach-btn",
+    cls: "ca-journal-attach-btn",
     attr: { type: "button" },
   });
-  setIcon(addLinkBtn.createSpan({ cls: "journal-attach-btn-icon" }), "link");
+  setIcon(addLinkBtn.createSpan({ cls: "ca-journal-attach-btn-icon" }), "link");
   addLinkBtn.createSpan({ text: "Add link" });
   addLinkBtn.addEventListener("click", () => {
     void promptText(deps.app, "Add a link", "https://example.com").then((v) => {
       if (!v) return;
       const url = coerceUrl(v);
       if (!url) {
-        new Notice("That doesn't look like a link Almanac can open.");
+        new Notice("That doesn't look like a link ChronoAnvil can open.");
         return;
       }
       if (!add(newAttachment(url))) {
@@ -1012,7 +1012,7 @@ export function buildAttachments(
   // button, and the duplication goes with it.
 
   bar.createSpan({
-    cls: "journal-attach-hint",
+    cls: "ca-journal-attach-hint",
     text: "…or drop files here, or paste with the field focused.",
   });
 

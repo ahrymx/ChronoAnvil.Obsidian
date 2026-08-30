@@ -39,7 +39,7 @@
 import { App, Notice, Setting } from "obsidian";
 import { SteppedEditorModal } from "../ui/editor-modal";
 import type { WizardStep } from "../ui/editor-modal";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import type { ChartSpec, PeriodBounds } from "./charts";
 import { chartTitle, defaultSpan, isChartable, rangeDays, scopesFor } from "./charts";
 export { scopesFor };
@@ -166,7 +166,7 @@ export class ChartEditModal extends SteppedEditorModal {
 
   constructor(
     app: App,
-    plugin: AlmanacPlugin,
+    plugin: ChronoAnvilPlugin,
     private opts: ChartEditorOptions
   ) {
     const isNew = !opts.spec;
@@ -317,7 +317,7 @@ export class ChartEditModal extends SteppedEditorModal {
           subtitle: this.baseSubtitle,
           render: (h) => {
             h.createDiv({
-              cls: "almanac-editor-note setting-item-description",
+              cls: "ca-editor-note setting-item-description",
               text: "No chartable trackers yet. Add a number, time, scale or habit tracker in Settings → Trackers, then come back — a select's values aren't magnitudes, so there is nothing to plot.",
             });
           },
@@ -654,16 +654,16 @@ export class ChartEditModal extends SteppedEditorModal {
   // teaches nothing about proportion.
   private renderTileSchematic(host: HTMLElement, auto: ChartSpan): void {
     const span = this.draft.size ?? auto;
-    const box = host.createDiv({ cls: "almanac-wizard-schematic" });
+    const box = host.createDiv({ cls: "ca-wizard-schematic" });
     box.createDiv({
-      cls: "almanac-wizard-schematic-title",
+      cls: "ca-wizard-schematic-title",
       text: `${SPAN_LABELS[span]} — how it will sit on the dashboard`,
     });
-    const grid = box.createDiv({ cls: "almanac-wizard-grid" });
+    const grid = box.createDiv({ cls: "ca-wizard-grid" });
     const wide = span === "wide" || span === "large";
     const tall = span === "tall" || span === "large";
     const tile = grid.createDiv({
-      cls: `almanac-wizard-tile${wide ? " is-w2" : ""}${tall ? " is-h2" : ""}`,
+      cls: `ca-wizard-tile${wide ? " is-w2" : ""}${tall ? " is-h2" : ""}`,
     });
     // The name the tile will actually carry, not the tracker's — a reader who
     // has just typed a title should see it in the picture of their tile.
@@ -673,10 +673,10 @@ export class ChartEditModal extends SteppedEditorModal {
     // wraps, which is why "large" fills the drawing exactly.
     const taken = (wide ? 2 : 1) * (tall ? 2 : 1);
     for (let i = taken; i < 4; i++) {
-      grid.createDiv({ cls: "almanac-wizard-ghost" });
+      grid.createDiv({ cls: "ca-wizard-ghost" });
     }
     box.createDiv({
-      cls: "almanac-wizard-schematic-note",
+      cls: "ca-wizard-schematic-note",
       text: this.draft.size
         ? "Set by hand. Choose Auto above to let the chart type and the range decide instead."
         : `Auto: a ${this.typeWord()} over ${RANGE_LABELS[
@@ -781,7 +781,7 @@ export class ChartEditModal extends SteppedEditorModal {
 
 export function openChartEditor(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   opts: ChartEditorOptions
 ): void {
   new ChartEditModal(app, plugin, opts).open();

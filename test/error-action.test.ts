@@ -49,8 +49,8 @@ describe("a validation problem may carry its own fix", () => {
 
   it("draws the message as its own element, with the button under it", () => {
     const src = editor();
-    expect(src).toContain('cls: "almanac-editor-error-text"');
-    expect(src).toContain('cls: "almanac-editor-error-action"');
+    expect(src).toContain('cls: "ca-editor-error-text"');
+    expect(src).toContain('cls: "ca-editor-error-action"');
     // NO BUTTON WITHOUT AN ACTION. Every refusal in the plugin but one has no
     // fix to offer, and an empty control on a red panel is worse than none.
     expect(src).toContain("if (!action) return;");
@@ -89,12 +89,12 @@ describe("a validation problem may carry its own fix", () => {
 
   it("styles the button as ordinary, not as a second alarm or a second CTA", () => {
     const css = readCss();
-    expect(css).toContain("\n.almanac-editor-error-action {");
+    expect(css).toContain("\n.ca-editor-error-action {");
     // NOT `mod-cta` — that reads as the thing the reader came to press, which
     // is Save — and NOT `mod-warning` on a panel that is already red.
     const src = editor();
-    expect(src).not.toContain('cls: "almanac-editor-error-action mod-cta"');
-    expect(src).not.toContain('cls: "almanac-editor-error-action mod-warning"');
+    expect(src).not.toContain('cls: "ca-editor-error-action mod-cta"');
+    expect(src).not.toContain('cls: "ca-editor-error-action mod-warning"');
   });
 });
 
@@ -123,7 +123,7 @@ describe("the root-collision refusal", () => {
     // a journal somebody is still using is not the quick way past a wizard
     // step. It returns a bare string, which is what "no action" IS.
     expect(src).toContain(
-      "Give this one a different name, or delete ${cfg.name} from Settings → Almanac → Journals first."
+      "Give this one a different name, or delete ${cfg.name} from Settings → ChronoAnvil → Journals first."
     );
     // The stale branch: the only one that gets an action.
     expect(src).toContain('label: `Delete “${cfg.name}” and continue`');

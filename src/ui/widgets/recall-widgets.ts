@@ -111,22 +111,22 @@ export function buildRecall(
   label: string | null
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
-  const wrap = createDiv({ cls: "journal-recall" });
+  const wrap = createDiv({ cls: "ca-journal-recall" });
 
-  const head = wrap.createDiv({ cls: "journal-recall-head" });
-  if (label) head.createDiv({ cls: "journal-recall-label", text: label });
-  const tools = head.createDiv({ cls: "jrc-tools" });
+  const head = wrap.createDiv({ cls: "ca-journal-recall-head" });
+  if (label) head.createDiv({ cls: "ca-journal-recall-label", text: label });
+  const tools = head.createDiv({ cls: "ca-jrc-tools" });
 
   if (!isValidNoteKey(key)) {
     wrap.createDiv({
-      cls: "journal-widget-error",
+      cls: "ca-journal-widget-error",
       text: `Invalid recall key: "${key}"`,
     });
     return wrap;
   }
 
-  const body = wrap.createDiv({ cls: "jrc-body" });
-  const foot = wrap.createDiv({ cls: "jrc-foot" });
+  const body = wrap.createDiv({ cls: "ca-jrc-body" });
+  const foot = wrap.createDiv({ cls: "ca-jrc-foot" });
 
   // The region is the source of truth on load; this is the source of truth
   // while the widget is open — the same contract buildTasks and buildList use.
@@ -160,7 +160,7 @@ export function buildRecall(
     try {
       await writeRecallGrade(deps, target.file, conf);
     } catch (e) {
-      console.error("[Almanac] could not write recall grade", e);
+      console.error("[ChronoAnvil] could not write recall grade", e);
       new Notice("Couldn't record that grade — see the console.");
     }
   };
@@ -168,20 +168,20 @@ export function buildRecall(
   const renderCards = (): void => {
     if (pairs.length === 0) {
       body.createDiv({
-        cls: "jrc-empty",
+        cls: "ca-jrc-empty",
         text: "No cards yet — press the pencil to add some.",
       });
       return;
     }
     pairs.forEach((pair, i) => {
       const card = body.createDiv({
-        cls: `jrc-card${grades[i] ? ` is-${grades[i]}` : ""}`,
+        cls: `ca-jrc-card${grades[i] ? ` is-${grades[i]}` : ""}`,
       });
-      card.createDiv({ cls: "jrc-q", text: pair.question || "(no question)" });
+      card.createDiv({ cls: "ca-jrc-q", text: pair.question || "(no question)" });
 
       if (!revealed[i]) {
         const show = card.createEl("button", {
-          cls: "jrc-reveal",
+          cls: "ca-jrc-reveal",
           text: "Show answer",
           attr: { type: "button" },
         });
@@ -193,7 +193,7 @@ export function buildRecall(
       }
 
       card.createDiv({
-        cls: "jrc-a",
+        cls: "ca-jrc-a",
         text: pair.answer || "(no answer written yet)",
       });
 
@@ -203,20 +203,20 @@ export function buildRecall(
       // the one way a self-graded scale reliably lies.
       if (grades[i]) {
         card.createDiv({
-          cls: "jrc-verdict",
+          cls: "ca-jrc-verdict",
           text: grades[i] === "got" ? "Got it" : "Not yet",
         });
         return;
       }
-      const row = card.createDiv({ cls: "jrc-grade" });
+      const row = card.createDiv({ cls: "ca-jrc-grade" });
       const got = row.createEl("button", {
-        cls: "jrc-got",
+        cls: "ca-jrc-got",
         text: "Got it",
         attr: { type: "button" },
       });
       got.addEventListener("click", () => void grade(i, "got"));
       const missed = row.createEl("button", {
-        cls: "jrc-missed",
+        cls: "ca-jrc-missed",
         text: "Not yet",
         attr: { type: "button" },
       });
@@ -226,10 +226,10 @@ export function buildRecall(
 
   const renderEditor = (): void => {
     pairs.forEach((pair, i) => {
-      const row = body.createDiv({ cls: "jrc-edit-row" });
+      const row = body.createDiv({ cls: "ca-jrc-edit-row" });
       const q = row.createEl("input", {
         type: "text",
-        cls: "jrc-edit-q",
+        cls: "ca-jrc-edit-q",
         attr: { placeholder: "Question" },
       });
       q.value = pair.question;
@@ -242,7 +242,7 @@ export function buildRecall(
 
       const a = row.createEl("input", {
         type: "text",
-        cls: "jrc-edit-a",
+        cls: "ca-jrc-edit-a",
         attr: { placeholder: "Answer" },
       });
       a.value = pair.answer;
@@ -254,7 +254,7 @@ export function buildRecall(
       });
 
       const del = row.createEl("button", {
-        cls: "jrc-edit-del",
+        cls: "ca-jrc-edit-del",
         attr: { "aria-label": "Delete card", type: "button" },
       });
       setIcon(del, "x");
@@ -267,15 +267,15 @@ export function buildRecall(
       });
     });
 
-    const addRow = body.createDiv({ cls: "jrc-edit-row jrc-edit-add" });
+    const addRow = body.createDiv({ cls: "ca-jrc-edit-row ca-jrc-edit-add" });
     const addQ = addRow.createEl("input", {
       type: "text",
-      cls: "jrc-edit-q",
+      cls: "ca-jrc-edit-q",
       attr: { placeholder: "New question" },
     });
     const addA = addRow.createEl("input", {
       type: "text",
-      cls: "jrc-edit-a",
+      cls: "ca-jrc-edit-a",
       attr: { placeholder: "Answer" },
     });
     const commitNew = (): void => {
@@ -290,7 +290,7 @@ export function buildRecall(
       render();
       // Focus the fresh add row, which render() has just rebuilt.
       const next = body.querySelector<HTMLInputElement>(
-        ".jrc-edit-add .jrc-edit-q"
+        ".ca-jrc-edit-add .ca-jrc-edit-q"
       );
       next?.focus();
     };
@@ -313,23 +313,23 @@ export function buildRecall(
     foot.empty();
     if (editing || pairs.length === 0) return;
     const t = tally(grades, pairs.length);
-    foot.createSpan({ cls: "jrc-tally", text: describeSession(t) });
+    foot.createSpan({ cls: "ca-jrc-tally", text: describeSession(t) });
 
     // Only say where the grades land when it isn't this note — on an
     // unpromoted lesson the answer is "here", and saying so every time is
     // chrome. On a page it is the one thing worth stating, because a page
     // carries no rating of its own.
     if ("file" in target && !target.isOwner) {
-      foot.createSpan({ cls: "jrc-target", text: `→ ${target.name}` });
+      foot.createSpan({ cls: "ca-jrc-target", text: `→ ${target.name}` });
     } else if ("reason" in target) {
-      foot.createSpan({ cls: "jrc-target jrc-inert", text: target.reason });
+      foot.createSpan({ cls: "ca-jrc-target ca-jrc-inert", text: target.reason });
     }
   };
 
   const renderTools = (): void => {
     tools.empty();
     const edit = tools.createEl("button", {
-      cls: `jrc-tool${editing ? " is-active" : ""}`,
+      cls: `ca-jrc-tool${editing ? " is-active" : ""}`,
       attr: {
         "aria-label": editing ? "Done editing" : "Edit cards",
         title: editing ? "Done editing" : "Edit cards",
@@ -344,7 +344,7 @@ export function buildRecall(
 
     if (editing || !grades.some(Boolean)) return;
     const again = tools.createEl("button", {
-      cls: "jrc-tool",
+      cls: "ca-jrc-tool",
       attr: {
         "aria-label": "Start over",
         title: "Hide the answers and clear this sitting's grades",

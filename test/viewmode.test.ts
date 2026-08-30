@@ -23,7 +23,7 @@ import {
 import { readCode, readSrc } from "./sources";
 
 describe("what opens in reading mode", () => {
-  it("puts a page Almanac recognises into reading mode", () => {
+  it("puts a page ChronoAnvil recognises into reading mode", () => {
     // A journal note, a diary entry, a period dashboard, the homepage, Search,
     // the two folder-note dashboards, a managed template — `surfaceOfNote`
     // answers for all of them, and this is what that answer is used for.
@@ -35,7 +35,7 @@ describe("what opens in reading mode", () => {
   });
 
   it("lets the reader opt out in their own note, and that wins", () => {
-    // THE CASE THAT MAKES THIS THE READER'S DECISION. A note Almanac composed
+    // THE CASE THAT MAKES THIS THE READER'S DECISION. A note ChronoAnvil composed
     // and recognises is still left alone when it says so.
     expect(opensInReadingMode(EDITING_MODE, true)).toBe(false);
   });
@@ -93,7 +93,7 @@ describe("the hook is narrow on purpose", () => {
     expect(main).toContain("view.file?.path !== file.path");
   });
 
-  it("asks the rule rather than re-deciding which notes are Almanac's", () => {
+  it("asks the rule rather than re-deciding which notes are ChronoAnvil's", () => {
     expect(main).toContain("wantsReadingMode(this, file)");
     // And the recognition is `surfaceOfNote`'s, through the one-line predicate
     // — not a second list of paths.

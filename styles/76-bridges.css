@@ -18,25 +18,25 @@
    block, so the muted colours here resolve against a surface that has already
    been painted. */
 
-.am-bridge {
+.ca-bridge {
   display: flex;
   flex-direction: column;
   min-height: 0;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   padding: 10px 12px;
   margin: 0 0 0.9em;
   transition: border-color 0.15s ease;
 }
 
-.am-bridge:focus-within {
+.ca-bridge:focus-within {
   border-color: var(--interactive-accent);
 }
 
 /* Withhold surface when already inside a section card/block surface */
-.journal-sec-block .am-bridge,
-.journal-sec-fold .am-bridge {
+.ca-journal-sec-block .ca-bridge,
+.ca-journal-sec-fold .ca-bridge {
   background: none;
   border: none;
   border-radius: 0;
@@ -44,12 +44,12 @@
   margin: 0;
 }
 
-.am-bridge .journal-sec {
+.ca-bridge .ca-journal-sec {
   padding: 2px 0;
-  margin-bottom: var(--am-space-2);
+  margin-bottom: var(--ca-space-2);
 }
 
-.am-bridge-chevron {
+.ca-bridge-chevron {
   display: flex;
   align-items: center;
   color: var(--text-faint);
@@ -59,45 +59,45 @@
   margin-right: 4px;
 }
 
-.am-bridge-chevron .svg-icon {
+.ca-bridge-chevron .svg-icon {
   width: 14px;
   height: 14px;
 }
 
-.am-bridge.is-collapsed .am-bridge-chevron {
+.ca-bridge.is-collapsed .ca-bridge-chevron {
   transform: rotate(-90deg);
 }
 
-.am-bridge.is-collapsed > .am-bridge-body {
+.ca-bridge.is-collapsed > .ca-bridge-body {
   display: none;
 }
 
-.am-bridge.is-collapsed .journal-sec {
+.ca-bridge.is-collapsed .ca-journal-sec {
   margin-bottom: 0;
 }
 
-.am-bridge .journal-sec.is-foldable {
+.ca-bridge .ca-journal-sec.is-foldable {
   cursor: pointer;
   user-select: none;
 }
 
-.am-bridge .journal-sec.is-foldable:hover .journal-header-title {
+.ca-bridge .ca-journal-sec.is-foldable:hover .ca-journal-header-title {
   color: var(--text-normal);
 }
 
-.am-bridge-body {
+.ca-bridge-body {
   display: flex;
   flex-direction: column;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
 }
 
-.am-bridge-list {
+.ca-bridge-list {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.am-bridge-row {
+.ca-bridge-row {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -105,21 +105,21 @@
   padding: var(--size-2-1) 0;
 }
 
-.am-bridge-row + .am-bridge-row {
+.ca-bridge-row + .ca-bridge-row {
   border-top: 1px solid var(--background-modifier-border);
 }
 
-.am-bridge-cards {
+.ca-bridge-cards {
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
   margin-top: 2px;
 }
 
-.am-bridge-card {
+.ca-bridge-card {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   padding: 10px 14px;
   display: flex;
   align-items: center;
@@ -130,61 +130,61 @@
   text-decoration: none;
 }
 
-.am-bridge-card:hover {
+.ca-bridge-card:hover {
   background: var(--background-modifier-hover);
   border-color: var(--interactive-accent);
 }
 
-.am-bridge-card-main {
+.ca-bridge-card-main {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
-.am-bridge-card-title {
+.ca-bridge-card-title {
   font-weight: 600;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-normal);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.am-bridge-card-meta {
+.ca-bridge-card-meta {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
 }
 
-.am-bridge-card-meta .tag {
-  font-size: var(--am-text-2xs);
+.ca-bridge-card-meta .tag {
+  font-size: var(--ca-text-2xs);
   padding: 1px 5px;
   background: var(--background-primary);
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   color: var(--text-muted);
 }
 
-.am-bridge-card-right {
+.ca-bridge-card-right {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
 }
 
-.am-bridge-badge {
-  font-size: var(--am-text-2xs);
+.ca-bridge-badge {
+  font-size: var(--ca-text-2xs);
   color: var(--text-muted);
   background: var(--background-primary);
   padding: 2px 6px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   border: 1px solid var(--background-modifier-border);
 }
 
-.am-bridge-date,
-.am-bridge-value {
+.ca-bridge-date,
+.ca-bridge-value {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   white-space: nowrap;
@@ -193,7 +193,7 @@
 
 /* The value is the answer on a readings bridge, so it keeps the normal text
    colour where the date beside it stays muted. */
-.am-bridge-value {
+.ca-bridge-value {
   color: var(--text-normal);
 }
 
@@ -202,7 +202,7 @@
    tiles draw, over the window the host note declares.
 
    IT NEEDS AN EXPLICIT HEIGHT AND A CHART TILE DOES NOT. A tile is a grid cell
-   whose height comes from the grid; `.journal-chart-canvas-wrap` is `flex: 1 1
+   whose height comes from the grid; `.ca-journal-chart-canvas-wrap` is `flex: 1 1
    auto; min-height: 0` and fills whatever it is given. A bridge sits in the
    ordinary flow of a note, so there is nothing above it deciding how tall it
    is — and a Chart.js canvas in a zero-height box draws nothing at all and
@@ -211,13 +211,13 @@
    `flex` rather than `display: block`, because that is the shape the wrap
    expects to be a child of. The height is the tile's small span, so a trend on
    a journal note and a trend on a dashboard read at the same scale. */
-.am-bridge-trend {
+.ca-bridge-trend {
   display: flex;
   align-items: stretch;
   height: 180px;
   margin-top: var(--size-4-2);
 }
-.am-bridge-trend > .journal-chart-canvas-wrap {
+.ca-bridge-trend > .ca-journal-chart-canvas-wrap {
   flex: 1 1 auto;
   min-height: 0;
 }

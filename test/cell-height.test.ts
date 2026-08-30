@@ -131,7 +131,7 @@ describe("which widget a height sizes", () => {
     //
     // A height located by that count would size the NEXT widget instead. Located
     // by the line above it cannot: the sized widget is found through the
-    // `data-am-line` stamp, and a directive that drew nothing left no stamp — so
+    // `data-ca-line` stamp, and a directive that drew nothing left no stamp — so
     // `applyCardHeights` never asks about that line and the widget after it is
     // asked about its OWN line, which has no height over it.
     const body = ["row", "height: 240", "on-this-day:always", "diary:3"];
@@ -232,13 +232,13 @@ describe("the same, asked of a whole note", () => {
   const NOTE = [
     "# Home",
     "",
-    "```almanac",
+    "```chronoanvil",
     ...PLAIN,
     "```",
     "",
     "Some prose the reader wrote.",
     "",
-    "```almanac",
+    "```chronoanvil",
     "title: Home",
     "wide",
     "```",
@@ -356,8 +356,8 @@ describe("the drawing", () => {
   it("states a height, so the card can be scrolled inside it", () => {
     // A BOX SIZED BY ITS CONTENT CANNOT BE SCROLLED INSIDE, which is the first of
     // the three declarations 4.13.4 proved on the subject cards.
-    const sized = ruleFor(rules, ".journal-widget-card.is-sized");
-    expect(sized).toContain("height: var(--am-card-h)");
+    const sized = ruleFor(rules, ".ca-journal-widget-card.is-sized");
+    expect(sized).toContain("height: var(--ca-card-h)");
     // And it does not divide that height with its siblings.
     expect(sized).toContain("flex: 0 0 auto");
   });
@@ -367,11 +367,11 @@ describe("the drawing", () => {
     // card's title strip is squeezed to nothing, which is the failure of the
     // three that looks like a rendering glitch rather than a layout choice.
     expect(
-      ruleFor(rules, ".journal-widget-card.is-sized > .journal-block-head")
+      ruleFor(rules, ".ca-journal-widget-card.is-sized > .ca-journal-block-head")
     ).toContain("flex: 0 0 auto");
     const body = ruleFor(
       rules,
-      ".journal-widget-card.is-sized > :not(.journal-block-head)"
+      ".ca-journal-widget-card.is-sized > :not(.ca-journal-block-head)"
     );
     expect(body).toContain("overflow-y: auto");
     expect(body).toContain("min-height: 0");
@@ -382,15 +382,15 @@ describe("the drawing", () => {
     // DERIVED RATHER THAN REPEATED — `pxToken`'s rule, so there is no second
     // place for the two to disagree. The fallback in the source is only for a
     // render with no computed style to read.
-    expect(rules).toMatch(/--am-card-h-min:\s*\d+px/);
-    const floor = rules.match(/--am-card-h-min:\s*(\d+)px/);
+    expect(rules).toMatch(/--ca-card-h-min:\s*\d+px/);
+    const floor = rules.match(/--ca-card-h-min:\s*(\d+)px/);
     const px = Number(floor?.[1]);
     expect(px % HEIGHT_STEP, "a floor the drag can reach and return to").toBe(0);
-    expect(readSrc("block-drag")).toContain('pxToken(card, "--am-card-h-min"');
+    expect(readSrc("block-drag")).toContain('pxToken(card, "--ca-card-h-min"');
   });
 
   it("leaves no mark in the DOM for a card with no stated height", () => {
-    // `row.ts`'s idiom for `--am-cell-weight`, and the reason the common case is
+    // `row.ts`'s idiom for `--ca-cell-weight`, and the reason the common case is
     // the one with no inline style at all.
     const fn = readSrc("block-drag");
     const at = fn.indexOf("export function applyCardHeights(");

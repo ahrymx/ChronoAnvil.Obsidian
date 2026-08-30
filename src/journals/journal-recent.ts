@@ -37,7 +37,7 @@
 // touched by the plugin itself every time a note is added underneath it.
 
 import { MarkdownPostProcessorContext, setIcon } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { emptyCallout } from "../ui/empty";
 import { PageInfo, pagesUnder, recencyMs, relativeActivity } from "../core/query";
 import { openFile } from "../core/util";
@@ -114,7 +114,7 @@ export function recentLimit(rest: string): number {
 }
 
 export function recentRows(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   folders: readonly string[]
 ): RecentRow[] {
   const types = registeredJournalTypes(plugin);
@@ -136,7 +136,7 @@ export function recentRows(
 }
 
 function rowFor(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   p: PageInfo,
   kindId: string
 ): RecentRow {
@@ -164,12 +164,12 @@ function rowFor(
 }
 
 export function buildJournalRecent(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext,
   hostFolder: string | null
 ): HTMLElement {
-  const root = createDiv({ cls: "journal-table journal-recent" });
+  const root = createDiv({ cls: "ca-journal-table ca-journal-recent" });
   const arg = rest.split("|")[0].trim();
   const folders = journalFolderScope(plugin, arg, hostFolder);
 
@@ -204,16 +204,16 @@ export function buildJournalRecent(
 
 function drawRow(
   root: HTMLElement,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   row: RecentRow,
   sourcePath: string
 ): void {
   const app = plugin.app;
-  const el = root.createDiv({ cls: "jrn-row" });
+  const el = root.createDiv({ cls: "ca-jrn-row" });
   const file = app.vault.getFileByPath(row.path);
 
   const link = el.createEl("a", {
-    cls: "internal-link jrn-title",
+    cls: "internal-link ca-jrn-title",
     text: row.title,
     href: row.path,
     attr: { "data-href": row.path },
@@ -225,7 +225,7 @@ function drawRow(
   link.addEventListener("mouseover", (evt) => {
     app.workspace.trigger("hover-link", {
       event: evt,
-      source: "almanac-journal-recent",
+      source: "ca-journal-recent",
       hoverParent: el,
       targetEl: link,
       linktext: row.path,
@@ -236,16 +236,16 @@ function drawRow(
   // Each fact omitted when it has nothing to say rather than drawn as a dash —
   // `journal-search`'s rule for the same kind of line, and the reason a page
   // (no date, no rating) still reads as a complete row.
-  const meta = el.createDiv({ cls: "jrn-meta" });
+  const meta = el.createDiv({ cls: "ca-jrn-meta" });
   for (const bit of row.where) {
-    meta.createSpan({ cls: "jrn-fact jrn-where", text: bit });
+    meta.createSpan({ cls: "ca-jrn-fact ca-jrn-where", text: bit });
   }
   if (row.iso) {
-    meta.createSpan({ cls: "jrn-fact", text: relativeActivity(row.iso) });
+    meta.createSpan({ cls: "ca-jrn-fact", text: relativeActivity(row.iso) });
   }
   if (row.rating != null) {
-    const f = meta.createSpan({ cls: "jrn-fact" });
-    setIcon(f.createSpan({ cls: "jrn-fact-icon" }), "star");
+    const f = meta.createSpan({ cls: "ca-jrn-fact" });
+    setIcon(f.createSpan({ cls: "ca-jrn-fact-icon" }), "star");
     f.createSpan({ text: `${row.rating}/5` });
   }
 }

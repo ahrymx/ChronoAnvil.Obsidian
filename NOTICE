@@ -1,24 +1,25 @@
-Almanac
+ChronoAnvil
 A self-contained journaling and study-journal system for Obsidian.
 
 Originally developed by AhryMX.
 Copyright (c) 2026 AhryMX <contact@ahrymx.dev>
 
-https://github.com/AhryMX/Almanac.Obsidian
+https://github.com/AhryMX/ChronoAnvil.Obsidian
 
 
 ===========================================================================
 LICENSING
 ===========================================================================
 
-Almanac is licensed under the GNU Affero General Public License, version 3 or
+ChronoAnvil is licensed under the GNU Affero General Public License, version 3 or
 later (AGPL-3.0-or-later), with additional attribution and naming terms under
 its section 7. The full text of both is in LICENSE.
 
 SPDX-License-Identifier: AGPL-3.0-or-later
 
 Fork freely, but pick your own name: section 7 of the LICENSE bars use of
-"Almanac" or "AhryMX" for publicity or in a way implying endorsement. See
+"ChronoAnvil", "Almanac" or "AhryMX" for publicity or in a way implying
+endorsement. See
 LICENSING.md for a plain-English explanation of what you may do.
 
 
@@ -32,7 +33,7 @@ Under the licence you must:
     distribute;
   - preserve every copyright, attribution and licence notice, in the source,
     in the compiled main.js, and in the user interface;
-  - credit "Almanac, originally developed by AhryMX" in the documentation or
+  - credit "ChronoAnvil, originally developed by AhryMX" in the documentation or
     about information of the distributed copy;
   - preserve the third-party notices reproduced below.
 
@@ -50,20 +51,20 @@ Under the AGPL-3.0 you must additionally:
     including to users who interact with it remotely over a network.
 
 
-The name "Almanac" and the name "AhryMX" are not licensed for use as the name
-of your product, nor in any way suggesting endorsement. Factual attribution of
-origin is expected and permitted.
+The names "ChronoAnvil", "Almanac" and "AhryMX" are not licensed for use as the
+name of your product, nor in any way suggesting endorsement. Factual
+attribution of origin is expected and permitted.
 
 
 ===========================================================================
 THIRD-PARTY COMPONENTS
 ===========================================================================
 
-The distributed main.js is a bundle. It contains, in addition to Almanac's own
-code, the following third-party components. Each is used under the MIT licence,
-which is compatible with both of Almanac's licensing tracks. Their notices are
-preserved inside main.js and are reproduced here. Almanac's licences do not
-extend to this code; your rights in it come from its own licence.
+The distributed main.js is a bundle. It contains, in addition to ChronoAnvil's
+own code, the following third-party components. Each is used under the MIT licence,
+which is compatible with ChronoAnvil's licence. Their notices are preserved
+inside main.js and are reproduced here. ChronoAnvil's licence does not extend to
+this code; your rights in it come from its own licence.
 
 ---------------------------------------------------------------------------
 Chart.js v4.5.1
@@ -74,11 +75,6 @@ Licensed under the MIT licence.
 @kurkle/color v0.3.4
 https://github.com/kurkle/color
 Copyright (c) 2018-2024 Jukka Kurkela
-Licensed under the MIT licence.
----------------------------------------------------------------------------
-js-yaml v5.2.1
-https://github.com/nodeca/js-yaml
-Copyright (c) 2011-2015 Vitaly Puzrin
 Licensed under the MIT licence.
 ---------------------------------------------------------------------------
 
@@ -102,7 +98,7 @@ The MIT licence, applying to each of the above:
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
     DEALINGS IN THE SOFTWARE.
 
-Obsidian itself is not bundled and is not covered by this notice. Almanac
+Obsidian itself is not bundled and is not covered by this notice. ChronoAnvil
 compiles against the `obsidian` API types, which are supplied by Obsidian and
 are external to the build.
 
@@ -111,9 +107,10 @@ are external to the build.
 LICENSING HISTORY
 ===========================================================================
 
-Almanac's licensing has changed over its life. Rights already granted under an
-earlier licence, for the versions distributed under it, are not withdrawn by a
-later change.
+This project's licensing, and its name, have both changed over its life. Rights
+already granted under an earlier licence, for the versions distributed under it,
+are not withdrawn by a later change. Releases through 4.84 were distributed as
+**Almanac**; 5.0.0 is the first under the name ChronoAnvil.
 
   - Early releases            MIT License
   - Interim releases          Almanac.Obsidian Personal Use License, Version 1.0

@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { App, Notice, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   HEADER_PREFIX,
   TRENDS_HEADING,
@@ -376,7 +376,7 @@ export function periodPropertyFor(unit: PeriodBounds["unit"]): string {
 // about what that period *is*.
 //
 // A second copy would drift exactly the way `util.ts::taskCounts` and
-// `countAlmanacTasks` did: two answers to "which days are in this week", one of
+// `countChronoAnvilTasks` did: two answers to "which days are in this week", one of
 // them quietly off by a day at the year boundary, and nothing to catch it
 // because each looks right in isolation. Pure and total over the union, so a
 // fifth unit fails to compile here rather than resolving to a plausible wrong
@@ -454,13 +454,13 @@ const PERIOD_TREND_TRAILING_DAYS: Record<PeriodBounds["unit"], number> = {
 };
 
 // The inclusive "YYYY-MM-DD" bounds a chart draws over. `start`/`end` null means
-// unbounded that direction ("all time" has both null). Almanac reads the daily
+// unbounded that direction ("all time" has both null). ChronoAnvil reads the daily
 // notes itself and filters points against these bounds with a plain string
 // compare (see pointInWindow) — there is no external date parser in the loop, so
 // there's no timezone/locale-dependent way for a bounded range to silently drop
 // the newest day or an edge-clustered point. That was the entire "ranges show no
 // data, only all-time works" bug: it lived in the Tracker plugin's own filename
-// date parsing, which Almanac no longer depends on for charts.
+// date parsing, which ChronoAnvil no longer depends on for charts.
 export interface ChartWindow {
   start: string | null;
   end: string | null;
@@ -923,7 +923,7 @@ export function summarize(values: number[]): ChartSummary | null {
 
 // ── Per-note chart region ───────────────────────────────────────────────
 // Charts are no longer synced from Settings onto a Stats page. Each dashboard
-// owns its own charts inside a single ```almanac-charts fence, managed live by
+// owns its own charts inside a single ```chronoanvil-charts fence, managed live by
 // the "➕ Add chart" / edit / remove buttons. The `chart:` directive lines in
 // that fence are the source of truth — chart-render.ts reads the daily-note
 // frontmatter and draws each chart directly from these specs, so nothing here
@@ -1125,7 +1125,7 @@ export function spanOf(
   return spec.size ?? defaultSpan(spec.type, rangeDays(spec.range, periodUnit));
 }
 
-// A chart's metadata + controls live in a fenced ```almanac block as a single
+// A chart's metadata + controls live in a fenced ```chronoanvil block as a single
 // directive: `chart:<key>:<tracker>:<type>:<range>`. That renders the Edit /
 // Remove buttons (in Live Preview *and* Reading mode, unlike inline code) and
 // doubles as the machine-readable record — so there's no separate HTML comment
@@ -1226,7 +1226,7 @@ function parseChartFlags(suffix: string): {
 
 // The Trends & Statistics section is bounded at its start by either the
 // classic `## 📊 Trends and Statistics` markdown heading (vaults scaffolded
-// before 1.6.x) or, since 1.6.2, an ```almanac fence whose first directive is
+// before 1.6.x) or, since 1.6.2, a ```chronoanvil fence whose first directive is
 // `header:📊 Trends and Statistics` (the header-bar layout — there is no
 // markdown heading in that case). `anchorEnd` is the index of the last line
 // that belongs to the *anchor itself* (the heading line, or the closing ``` of
@@ -1258,14 +1258,14 @@ function sectionBounds(
   return { start: loc.titleStart, anchorEnd: loc.titleEnd, end: loc.end };
 }
 
-// Locate the single ```almanac-charts fence in a note (open/close line indices).
+// Locate the single ```chronoanvil-charts fence in a note (open/close line indices).
 // In the merged layout this fence is the whole Trends section — it carries both
 // the section's `header:` title line and its `chart:` directives — so there's no
 // separate heading/header block for locateSection to anchor on.
 function findChartsFence(
   lines: string[]
 ): { open: number; close: number } | null {
-  const open = lines.findIndex((l) => l.trim() === "```almanac-charts");
+  const open = lines.findIndex((l) => l.trim() === "```chronoanvil-charts");
   if (open === -1) return null;
   for (let i = open + 1; i < lines.length; i++) {
     if (lines[i].trim() === "```") return { open, close: i };
@@ -1276,10 +1276,10 @@ function findChartsFence(
 // Read the section's `chart:` directives back into specs.
 //
 // Two layouts are supported. In the legacy/2.0 layout the Trends title is its
-// own `## …` heading or ```almanac header block, and the charts live in a
-// separate ```almanac-charts fence below it — so we read the section body after
+// own `## …` heading or ```chronoanvil header block, and the charts live in a
+// separate ```chronoanvil-charts fence below it — so we read the section body after
 // that anchor. In the merged layout there's no separate anchor: one self-titled
-// ```almanac-charts fence owns the whole section, so we read the fence's own
+// ```chronoanvil-charts fence owns the whole section, so we read the fence's own
 // body (its `header:` line is ignored by parseChartDirectives). Scanning for the
 // tag rather than requiring exact positions keeps both tolerant of blank lines.
 export function parseChartRegion(lines: string[]): ChartSpec[] {
@@ -1292,7 +1292,7 @@ export function parseChartRegion(lines: string[]): ChartSpec[] {
   return [];
 }
 
-// Parse `chart:` directive lines (the body of an ```almanac-charts block) into
+// Parse `chart:` directive lines (the body of a ```chronoanvil-charts block) into
 // specs. Shared with the widget processor, which hands it the raw fence source.
 export function parseChartDirectives(lines: string[]): ChartSpec[] {
   const specs: ChartSpec[] = [];
@@ -1360,7 +1360,7 @@ export function parseChartDirectives(lines: string[]): ChartSpec[] {
 // LOWERCASE, because a MIME type is compared case-sensitively by
 // `DataTransfer.types` in practice and the one bug this cost elsewhere in the
 // plugin was exactly that.
-export const CHART_DRAG_TYPE = "application/x-almanac-chart";
+export const CHART_DRAG_TYPE = "application/x-ca-chart";
 
 export function encodeChartDrag(notePath: string, key: string): string {
   return JSON.stringify({ path: notePath, key });
@@ -1406,7 +1406,7 @@ export function nextChartKey(existing: ChartSpec[]): string {
   return `c${n}`;
 }
 
-// The whole Trends & Statistics body is a single ```almanac-charts fence. Its
+// The whole Trends & Statistics body is a single ```chronoanvil-charts fence. Its
 // lines are the chart directives (the source of truth) — one per chart — which
 // the widget processor turns into a shared toolbar (Add / Edit… / Remove…) over
 // a 2-per-row grid of equal chart cells. Keeping every chart in one fence is
@@ -1437,7 +1437,7 @@ export function serializeChartSpec(s: ChartSpec): string {
 }
 
 function buildChartRegionBody(specs: ChartSpec[]): string[] {
-  const out = ["```almanac-charts"];
+  const out = ["```chronoanvil-charts"];
   for (const s of specs) {
     out.push(serializeChartSpec(s));
   }
@@ -1458,8 +1458,8 @@ export async function writeChartRegion(
   const original = await app.vault.read(file);
   const lines = original.split("\n");
 
-  // Legacy/2.0 layout: a separate title (```almanac header block or `## …`
-  // heading) with the ```almanac-charts fence as the section body below it.
+  // Legacy/2.0 layout: a separate title (```chronoanvil header block or `## …`
+  // heading) with the ```chronoanvil-charts fence as the section body below it.
   // Rewrite that body as a fresh fence.
   const bounds = sectionBounds(lines);
   if (bounds) {
@@ -1471,7 +1471,7 @@ export async function writeChartRegion(
     return;
   }
 
-  // Merged layout: one self-titled ```almanac-charts fence owns the whole
+  // Merged layout: one self-titled ```chronoanvil-charts fence owns the whole
   // section. Rewrite just its `chart:` lines, preserving its `header:` title
   // line (and anything else the user keeps) so the section stays self-titled.
   const fence = findChartsFence(lines);
@@ -1483,7 +1483,7 @@ export async function writeChartRegion(
     .slice(fence.open + 1, fence.close)
     .filter((l) => l.trim().startsWith(HEADER_PREFIX));
   const body = [
-    "```almanac-charts",
+    "```chronoanvil-charts",
     ...preserved,
     ...specs.map(serializeChartSpec),
     "```",
@@ -1498,8 +1498,8 @@ export async function writeChartRegion(
 
 // ── Trends layout migration (2.0 → 2.1) ─────────────────────────────────────
 // Fold the old two-block Trends section (a standalone `## …` heading or
-// ```almanac header block, followed by a separate ```almanac-charts fence) into
-// one self-titled ```almanac-charts fence, so the chart toolbar renders inside
+// ```chronoanvil header block, followed by a separate ```chronoanvil-charts fence) into
+// one self-titled ```chronoanvil-charts fence, so the chart toolbar renders inside
 // the section header. Idempotent: returns the input unchanged (null) once a note
 // is already merged or has no legacy Trends anchor. Pure — see migrateTrends.
 export function mergeTrendsSection(lines: string[]): string[] | null {
@@ -1507,7 +1507,7 @@ export function mergeTrendsSection(lines: string[]): string[] | null {
   if (!bounds) return null; // already merged, or no legacy Trends anchor
   const specs = parseChartDirectives(lines.slice(bounds.anchorEnd + 1, bounds.end));
   const merged = [
-    "```almanac-charts",
+    "```chronoanvil-charts",
     `${HEADER_PREFIX}${TRENDS_HEADER_TITLE}`,
     ...specs.map(serializeChartSpec),
     "```",
@@ -1543,10 +1543,10 @@ export async function migrateTrends(
 // Give a self-titled charts fence its title, when it has none and never had.
 //
 // A SECOND MIGRATION RATHER THAN A CHANGE TO THE FIRST. `mergeTrendsSection`
-// folds a legacy TWO-BLOCK section into one — a separate heading or `almanac`
+// folds a legacy TWO-BLOCK section into one — a separate heading or `chronoanvil`
 // header block, plus a fence below it — and it is anchored on finding that
 // block. The Year dashboard has no such block and never had one: its asset
-// shipped a bare ```almanac-charts fence with nothing inside, so there is
+// shipped a bare ```chronoanvil-charts fence with nothing inside, so there is
 // nothing for the merge to anchor on and it correctly returns null.
 //
 // So the two are different states with different repairs, and the untitled one
@@ -1566,7 +1566,7 @@ export async function migrateTrends(
 // IDEMPOTENT AND CONSERVATIVE. Returns null — meaning "nothing to do" — unless
 // all three hold:
 //
-//   - there is an ```almanac-charts fence,
+//   - there is a ```chronoanvil-charts fence,
 //   - it has no `header:` line of its own, and
 //   - there is no legacy Trends anchor above it.
 //
@@ -1611,7 +1611,7 @@ export function ensureTrendsHeader(lines: string[]): string[] | null {
 //
 // ONLY OUR OWN OLD WORDS. The rewrite fires when the title is one of
 // `TRENDS_HEADINGS_PAST` and never otherwise. A reader who retitled their own
-// Trends bar — which `header:` exists to let them do — has a title Almanac has
+// Trends bar — which `header:` exists to let them do — has a title ChronoAnvil has
 // never written, so it is not on the list, so it is left exactly alone. This is
 // the reason the history is a list of exact strings rather than a
 // case-insensitive compare, which would have "corrected" a reader's
@@ -1679,7 +1679,7 @@ export async function migrateTrendsHeader(
 // of this — they're mutated per-note through the chart manager.
 export async function syncTrackerConfig(
   app: App,
-  plugin: AlmanacPlugin
+  plugin: ChronoAnvilPlugin
 ): Promise<void> {
   await syncTrackersIntoVault(app, plugin);
 }

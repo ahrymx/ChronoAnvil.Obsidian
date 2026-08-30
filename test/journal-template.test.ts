@@ -32,7 +32,7 @@ import { presetConfig } from "../src/journals/custom-journal";
 import type { JournalConfig } from "../src/journals/custom-journal";
 import { STUDY_PRESET } from "../src/journals/journal";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
-import type { AlmanacSettings } from "../src/core/settings";
+import type { ChronoAnvilSettings } from "../src/core/settings";
 import { readCode } from "./sources";
 import { looseLines, fenceLines } from "../src/core/reload-loss";
 
@@ -100,7 +100,7 @@ describe("what a reload would destroy", () => {
     const ctx = lesson();
     const clean = composedFor(ctx);
     const written = clean.replace(
-      /(<!--almanac:tasks\n)/,
+      /(<!--chronoanvil:tasks\n)/,
       "$1- [ ] finish the proof\n"
     );
     expect(written).not.toBe(clean);
@@ -116,7 +116,7 @@ describe("what a reload would destroy", () => {
     const ctx = lesson();
     const clean = composedFor(ctx);
     const withTracker = clean.replace(
-      /(# almanac:trackers:start\n)/,
+      /(# chronoanvil:trackers:start\n)/,
       "$1tracker:Mood\n"
     );
     expect(withTracker).not.toBe(clean);
@@ -146,7 +146,7 @@ describe("what a reload would destroy", () => {
   });
 
   it("reports a chart the reader added, which the planner calls unchanged", () => {
-    // THE FIFTH LOSS, AND THE SHARPEST. `almanac-journal-charts` is an OPAQUE
+    // THE FIFTH LOSS, AND THE SHARPEST. `chronoanvil-journal-charts` is an OPAQUE
     // fence kind, so `ownerOf` attributes the fence to `charts` whatever is
     // inside it — a plan over this note reports "Charts — unchanged" while a
     // rewrite would delete every spec in it.
@@ -168,7 +168,7 @@ describe("what a reload would destroy", () => {
     const ctx = lesson();
     const clean = composedFor(ctx);
     const withOwn = clean.replace(
-      /(```almanac\n)/,
+      /(```chronoanvil\n)/,
       "$1tasks-table:mine\n"
     );
     expect(withOwn).not.toBe(clean);
@@ -200,14 +200,14 @@ describe("what a reload would destroy", () => {
 
 describe("the fence walk the diary never needed", () => {
   it("steps over a journal charts fence rather than reading it as prose", () => {
-    // `looseLines` tested `line === "```almanac"` until 4.33. An index note's
-    // fence is ```almanac-journal-charts, which failed that equality — so the
+    // `looseLines` tested `line === "```chronoanvil"` until 4.33. An index note's
+    // fence is ```chronoanvil-journal-charts, which failed that equality — so the
     // walk never entered fence mode and collected every spec as the reader's
     // prose. It hid itself, because on a freshly composed page the stray lines
     // appear on both sides of the diff and cancel.
     const ctx = sectionContext(STUDY_JOURNAL, { depth: 1 });
     const text = composedFor(ctx);
-    expect(text).toContain("```almanac-journal-charts");
+    expect(text).toContain("```chronoanvil-journal-charts");
     expect(looseLines(text).some((l) => l.startsWith("jchart:"))).toBe(false);
     expect(fenceLines(text).some((l) => l.startsWith("jchart:"))).toBe(true);
   });
@@ -298,7 +298,7 @@ describe("what this page says", () => {
   it("reports a line it cannot carry rather than dropping it in silence", () => {
     const ctx = lesson();
     const withOwn = composedFor(ctx).replace(
-      /(```almanac\n)/,
+      /(```chronoanvil\n)/,
       "$1tasks-table:mine\n"
     );
     const { drops } = wantFromJournalNote(withOwn, ctx);
@@ -379,7 +379,7 @@ const stubPlugin = (): {
   const settings = {
     ...DEFAULT_SETTINGS,
     customJournals: [cfg],
-  } as AlmanacSettings;
+  } as ChronoAnvilSettings;
   const plugin = {
     settings,
     saveSettings: async (): Promise<void> => {},

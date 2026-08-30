@@ -79,8 +79,8 @@ describe("the composer is what scaffold writes", () => {
     ] as const) {
       const out = composeDiaryDashboard(g);
       expect(out.startsWith(`---\n${prop}`), g).toBe(true);
-      expect(out, g).toContain("`almanac:spacer`");
-      expect(out, g).toContain("%% almanac-graph %%");
+      expect(out, g).toContain("`chronoanvil:spacer`");
+      expect(out, g).toContain("%% chronoanvil-graph %%");
       expect(out.endsWith("\n"), g).toBe(true);
     }
   });
@@ -141,7 +141,7 @@ describe("what the catalogue made visible", () => {
     // release in which the quarter quietly lost its own.
     for (const g of ["weekly", "monthly", "quarterly", "yearly"] as const) {
       expect(composeDiaryDashboard(g), g).toContain(
-        `\`\`\`almanac-charts\n${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`
+        `\`\`\`chronoanvil-charts\n${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`
       );
     }
   });
@@ -466,7 +466,7 @@ describe("what a dashboard already has, and what it could gain", () => {
       // that opens it — see `BODY_ROW` in the catalogue. Added back on its own,
       // `joinRowChunk` puts this line into that fence rather than composing it
       // as a block, so what a reader sees is the row filling in again.
-    ).toBe("```almanac\ntasks-table:,period\n```");
+    ).toBe("```chronoanvil\ntasks-table:,period\n```");
   });
 
   it("offers nothing for a grain that has no dashboard", () => {
@@ -678,7 +678,7 @@ describe("a dashboard holds page widgets", () => {
     }
 
     const next = applyDiarySections(text, ctx, want)!;
-    expect(next).toContain("```almanac\nevents\n```");
+    expect(next).toContain("```chronoanvil\nevents\n```");
     expect(detectDiarySections(next, ctx)).toEqual(want);
   });
 
@@ -921,7 +921,7 @@ describe("the time grid is a section on the week and a widget elsewhere", () => 
     // is on every weekly dashboard a repaired vault composes — which is a
     // stronger assertion of the same fact.
     expect(composeDiaryDashboard("weekly")).toContain(
-      "```almanac\nheader:⏱️ The week by the hour\ntime-grid\n```"
+      "```chronoanvil\nheader:⏱️ The week by the hour\ntime-grid\n```"
     );
   });
 
@@ -1166,7 +1166,7 @@ describe("the period summary is a section and wears a section's bar", () => {
     // a self-titling fence as cell content, so titling this would drop the bar
     // below the group it appeared to title and break the layout they built.
     expect(
-      titleSummaryFence(older.replace("```almanac\nweek-summary", "```almanac\nrow\nweek-summary"))
+      titleSummaryFence(older.replace("```chronoanvil\nweek-summary", "```chronoanvil\nrow\nweek-summary"))
     ).toBeNull();
     // AND A BAR THEY RENAMED IS STILL A BAR. Ours must not land above theirs.
     expect(
@@ -1198,7 +1198,7 @@ describe("the period summary is a section and wears a section's bar", () => {
     // In widget mode (no header), summary has week-summary + button
     const widgetMode =
       shipped.replace(`${HEADER_PREFIX}📅 This week\n`, "") +
-      "\n```almanac\nevents\n```\n";
+      "\n```chronoanvil\nevents\n```\n";
     const blocksWidget = model.blocks!(widgetMode);
     const summaryWidgetBlock = blocksWidget.find((b) => b.ids.includes("summary"));
     expect(summaryWidgetBlock?.column).toEqual(["summary"]);

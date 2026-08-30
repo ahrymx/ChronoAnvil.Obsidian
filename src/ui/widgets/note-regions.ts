@@ -30,7 +30,7 @@
 
 import { MarkdownPostProcessorContext, TFile, setIcon } from "obsidian";
 import type { App } from "obsidian";
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import {
   EntryEdit,
   applyEntryBackspace,
@@ -42,7 +42,7 @@ import {
 } from "../../diary/entries";
 import { isValidNoteKey, readNoteRegion } from "../../core/notestore";
 import {
-  AlmanacTask,
+  ChronoAnvilTask,
   TaskPriority,
   moveTask,
   newTask,
@@ -95,7 +95,7 @@ export interface NoteRegionHost {
  * — as NoteFieldHost does with its scheduler — rather than restate it.
  */
 export interface PluginNoteRegionHost extends NoteRegionHost {
-  readonly plugin: AlmanacPlugin;
+  readonly plugin: ChronoAnvilPlugin;
 }
 
 export function renderEntryRow(
@@ -109,11 +109,11 @@ export function renderEntryRow(
   }
 ): void {
   const row = list.createDiv({
-    cls: `journal-list-row${text ? "" : " is-empty"}`,
+    cls: `ca-journal-list-row${text ? "" : " is-empty"}`,
   });
-  row.createSpan({ cls: "journal-list-bullet" });
+  row.createSpan({ cls: "ca-journal-list-bullet" });
 
-  const input = row.createEl("textarea", { cls: "journal-list-input" });
+  const input = row.createEl("textarea", { cls: "ca-journal-list-input" });
   input.rows = 1;
   input.value = text;
   if (placeholder) input.placeholder = placeholder;
@@ -155,7 +155,7 @@ export function renderEntryRow(
 
 export function renderPathRow(
   table: HTMLElement,
-  step: AlmanacTask,
+  step: ChronoAnvilTask,
   index: number,
   count: number,
   cb: {
@@ -167,18 +167,18 @@ export function renderPathRow(
   }
 ): void {
   const row = table.createDiv({
-    cls: `journal-path-row${step.done ? " is-done" : ""}`,
+    cls: `ca-journal-path-row${step.done ? " is-done" : ""}`,
   });
 
-  const main = row.createDiv({ cls: "journal-path-main" });
+  const main = row.createDiv({ cls: "ca-journal-path-main" });
 
   // Step number badge
-  const num = main.createDiv({ cls: "journal-path-num", text: String(index + 1) });
+  const num = main.createDiv({ cls: "ca-journal-path-num", text: String(index + 1) });
   num.setAttr("title", `Step ${index + 1}`);
 
   const box = main.createEl("input", {
     type: "checkbox",
-    cls: "journal-path-check",
+    cls: "ca-journal-path-check",
     attr: {
       "aria-label": step.done ? `Mark step ${index + 1} incomplete` : `Mark step ${index + 1} complete`,
     },
@@ -188,7 +188,7 @@ export function renderPathRow(
 
   const text = main.createEl("input", {
     type: "text",
-    cls: "journal-path-text",
+    cls: "ca-journal-path-text",
     attr: { "aria-label": `Step ${index + 1} description` },
   });
   text.value = step.text;
@@ -204,10 +204,10 @@ export function renderPathRow(
     }
   });
 
-  const actions = row.createDiv({ cls: "journal-path-actions" });
-  const moves = actions.createDiv({ cls: "journal-path-moves" });
+  const actions = row.createDiv({ cls: "ca-journal-path-actions" });
+  const moves = actions.createDiv({ cls: "ca-journal-path-moves" });
   const up = moves.createEl("button", {
-    cls: "journal-path-move",
+    cls: "ca-journal-path-move",
     attr: { "aria-label": "Move step up", title: "Move up", type: "button" },
   });
   setIcon(up, "chevron-up");
@@ -215,7 +215,7 @@ export function renderPathRow(
   up.addEventListener("click", () => cb.onMoveUp());
 
   const down = moves.createEl("button", {
-    cls: "journal-path-move",
+    cls: "ca-journal-path-move",
     attr: { "aria-label": "Move step down", title: "Move down", type: "button" },
   });
   setIcon(down, "chevron-down");
@@ -223,7 +223,7 @@ export function renderPathRow(
   down.addEventListener("click", () => cb.onMoveDown());
 
   const del = actions.createEl("button", {
-    cls: "journal-path-del",
+    cls: "ca-journal-path-del",
     attr: { "aria-label": "Delete step", title: "Delete step", type: "button" },
   });
   setIcon(del, "x");
@@ -233,7 +233,7 @@ export function renderPathRow(
 
 export function renderTaskRow(
   list: HTMLElement,
-  task: AlmanacTask,
+  task: ChronoAnvilTask,
   cb: {
     onToggle: () => void;
     onText: (value: string) => void;
@@ -244,17 +244,17 @@ export function renderTaskRow(
   }
 ): void {
   const row = list.createDiv({
-    cls: `journal-task-row journal-task-${task.priority}${
+    cls: `ca-journal-task-row ca-journal-task-${task.priority}${
       task.done ? " is-done" : ""
     }`,
   });
 
   // Top line: Checkbox + Editable Task Text
-  const main = row.createDiv({ cls: "journal-task-main" });
+  const main = row.createDiv({ cls: "ca-journal-task-main" });
 
   const box = main.createEl("input", {
     type: "checkbox",
-    cls: "journal-task-check",
+    cls: "ca-journal-task-check",
     attr: { "aria-label": task.done ? "Mark task incomplete" : "Mark task complete" },
   });
   box.checked = task.done;
@@ -262,7 +262,7 @@ export function renderTaskRow(
 
   const text = main.createEl("input", {
     type: "text",
-    cls: "journal-task-text",
+    cls: "ca-journal-task-text",
     attr: { "aria-label": "Task description" },
   });
   text.value = task.text;
@@ -279,12 +279,12 @@ export function renderTaskRow(
   });
 
   // Bottom line: Metadata chips & actions
-  const meta = row.createDiv({ cls: "journal-task-meta" });
-  const chips = meta.createDiv({ cls: "journal-task-chips" });
+  const meta = row.createDiv({ cls: "ca-journal-task-meta" });
+  const chips = meta.createDiv({ cls: "ca-journal-task-chips" });
 
   // Priority cycle pill: normal → high → low → normal
   const prioBtn = chips.createEl("button", {
-    cls: "journal-task-prio",
+    cls: "ca-journal-task-prio",
     attr: {
       "aria-label": `Cycle priority (currently ${task.priority})`,
       title: `Priority: ${task.priority}`,
@@ -302,8 +302,8 @@ export function renderTaskRow(
     normal: "Normal",
     low: "Low",
   };
-  setIcon(prioBtn.createSpan({ cls: "journal-task-prio-icon" }), PRIO_ICON[task.priority]);
-  prioBtn.createSpan({ cls: "journal-task-prio-label", text: PRIO_LABEL[task.priority] });
+  setIcon(prioBtn.createSpan({ cls: "ca-journal-task-prio-icon" }), PRIO_ICON[task.priority]);
+  prioBtn.createSpan({ cls: "ca-journal-task-prio-label", text: PRIO_LABEL[task.priority] });
   prioBtn.addEventListener("click", () => {
     const next =
       PRIO_ORDER[(PRIO_ORDER.indexOf(task.priority) + 1) % PRIO_ORDER.length];
@@ -312,12 +312,12 @@ export function renderTaskRow(
 
   // Due date pill
   const dueWrap = chips.createDiv({
-    cls: `journal-task-due-wrap${task.due ? " has-due" : ""}`,
+    cls: `ca-journal-task-due-wrap${task.due ? " has-due" : ""}`,
   });
-  setIcon(dueWrap.createSpan({ cls: "journal-task-due-icon" }), "calendar");
+  setIcon(dueWrap.createSpan({ cls: "ca-journal-task-due-icon" }), "calendar");
   const due = dueWrap.createEl("input", {
     type: "date",
-    cls: "journal-task-due",
+    cls: "ca-journal-task-due",
     attr: {
       "aria-label": "Due date",
       title: task.due ? `Due: ${task.due}` : "Set due date",
@@ -327,12 +327,12 @@ export function renderTaskRow(
 
   // Time pill (beside due date)
   const atWrap = chips.createDiv({
-    cls: `journal-task-at-wrap${task.at ? " has-at" : ""}`,
+    cls: `ca-journal-task-at-wrap${task.at ? " has-at" : ""}`,
   });
-  setIcon(atWrap.createSpan({ cls: "journal-task-at-icon" }), "clock");
+  setIcon(atWrap.createSpan({ cls: "ca-journal-task-at-icon" }), "clock");
   const at = atWrap.createEl("input", {
     type: "time",
-    cls: "journal-task-at",
+    cls: "ca-journal-task-at",
     attr: {
       "aria-label": "Time it is due",
       title: task.at ? `Time: ${task.at}` : "Set due time",
@@ -360,7 +360,7 @@ export function renderTaskRow(
 
   // Delete action button
   const del = meta.createEl("button", {
-    cls: "journal-task-del",
+    cls: "ca-journal-task-del",
     attr: { "aria-label": "Delete task", title: "Delete task", type: "button" },
   });
   setIcon(del, "x");
@@ -380,18 +380,18 @@ export function buildList(
   const key = (colon === -1 ? rest : rest.slice(0, colon)).trim();
   const placeholder = colon === -1 ? "" : rest.slice(colon + 1).trim();
 
-  const wrap = createDiv({ cls: `journal-list journal-list--${key}` });
-  if (label) wrap.createDiv({ cls: "journal-list-label", text: label });
+  const wrap = createDiv({ cls: `ca-journal-list ca-journal-list--${key}` });
+  if (label) wrap.createDiv({ cls: "ca-journal-list-label", text: label });
 
   if (!isValidNoteKey(key)) {
     wrap.createDiv({
-      cls: "journal-widget-error",
+      cls: "ca-journal-widget-error",
       text: `Invalid list key: "${key}"`,
     });
     return wrap;
   }
 
-  const list = wrap.createDiv({ cls: "journal-list-rows" });
+  const list = wrap.createDiv({ cls: "ca-journal-list-rows" });
 
   // In-memory model, same contract as buildTasks: the region is the source of
   // truth on load, this is the source of truth while the widget is open. All
@@ -486,30 +486,30 @@ export function buildPath(
   label: string | null
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
-  const wrap = createDiv({ cls: "journal-path" });
-  if (label) wrap.createDiv({ cls: "journal-path-label", text: label });
+  const wrap = createDiv({ cls: "ca-journal-path" });
+  if (label) wrap.createDiv({ cls: "ca-journal-path-label", text: label });
 
   if (!isValidNoteKey(key)) {
     wrap.createDiv({
-      cls: "journal-widget-error",
+      cls: "ca-journal-widget-error",
       text: `Invalid path key: "${key}"`,
     });
     return wrap;
   }
 
-  const addRow = wrap.createDiv({ cls: "journal-path-add" });
-  const addIcon = addRow.createSpan({ cls: "journal-path-add-icon" });
+  const addRow = wrap.createDiv({ cls: "ca-journal-path-add" });
+  const addIcon = addRow.createSpan({ cls: "ca-journal-path-add-icon" });
   setIcon(addIcon, "circle-plus");
   const addInput = addRow.createEl("input", {
     type: "text",
-    cls: "journal-path-add-input",
+    cls: "ca-journal-path-add-input",
   });
   addInput.placeholder = "Add a step…";
-  const table = wrap.createDiv({ cls: "journal-path-list" });
+  const table = wrap.createDiv({ cls: "ca-journal-path-list" });
 
   // In-memory model; the region is the source of truth on load, this array
-  // thereafter. Steps are Almanac tasks (order = array order = on-disk order).
-  let steps: AlmanacTask[] = [];
+  // thereafter. Steps are ChronoAnvil tasks (order = array order = on-disk order).
+  let steps: ChronoAnvilTask[] = [];
 
   const persist = (): void => {
     void host.writeNoteRegionToFile(ctx, key, serializeTasks(steps));
@@ -529,7 +529,7 @@ export function buildPath(
   const render = (): void => {
     table.empty();
     if (steps.length === 0) {
-      table.createDiv({ cls: "journal-path-empty", text: "No steps yet." });
+      table.createDiv({ cls: "ca-journal-path-empty", text: "No steps yet." });
     }
     steps.forEach((step, index) => {
       renderPathRow(table, step, index, steps.length, {
@@ -595,7 +595,7 @@ export function buildTasks(
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
   const wrap = createDiv({
-    cls: "journal-tasks journal-note--collapsible",
+    cls: "ca-journal-tasks ca-journal-note--collapsible",
   });
 
   const isCollapsed = (): boolean =>
@@ -615,30 +615,30 @@ export function buildTasks(
   };
 
   const head = wrap.createDiv({
-    cls: "journal-tasks-head journal-note-collapse-bar",
+    cls: "ca-journal-tasks-head ca-journal-note-collapse-bar",
   });
-  const titleLeft = head.createDiv({ cls: "journal-tasks-title-left" });
+  const titleLeft = head.createDiv({ cls: "ca-journal-tasks-title-left" });
   const chevron = titleLeft.createDiv({
-    cls: "journal-note-chevron journal-tasks-chevron",
+    cls: "ca-journal-note-chevron ca-journal-tasks-chevron",
   });
   setIcon(chevron, "chevron-down");
   const titleEl = titleLeft.createDiv({
-    cls: "journal-note-label journal-tasks-label",
+    cls: "ca-journal-note-label ca-journal-tasks-label",
   });
   titleEl.setText(label ?? "Tasks");
 
-  const headRight = head.createDiv({ cls: "journal-tasks-head-right" });
+  const headRight = head.createDiv({ cls: "ca-journal-tasks-head-right" });
 
   let isCompact = false;
   const compactBtn = headRight.createEl("button", {
-    cls: "journal-tasks-compact-toggle",
+    cls: "ca-journal-tasks-compact-toggle",
     attr: {
       type: "button",
       title: "Toggle compact view",
       "aria-label": "Toggle compact view",
     },
   });
-  const compactIcon = compactBtn.createSpan({ cls: "journal-tasks-compact-icon" });
+  const compactIcon = compactBtn.createSpan({ cls: "ca-journal-tasks-compact-icon" });
   setIcon(compactIcon, "list");
   compactBtn.createSpan({ text: "Compact" });
 
@@ -650,7 +650,7 @@ export function buildTasks(
     compactBtn.toggleClass("is-active", isCompact);
   });
 
-  const progressEl = headRight.createDiv({ cls: "journal-tasks-progress" });
+  const progressEl = headRight.createDiv({ cls: "ca-journal-tasks-progress" });
 
   const applyFold = (collapsed: boolean): void => {
     wrap.toggleClass("is-collapsed", collapsed);
@@ -666,25 +666,25 @@ export function buildTasks(
 
   if (!isValidNoteKey(key)) {
     wrap.createDiv({
-      cls: "journal-widget-error",
+      cls: "ca-journal-widget-error",
       text: `Invalid tasks key: "${key}"`,
     });
     return wrap;
   }
 
-  const addRow = wrap.createDiv({ cls: "journal-tasks-add" });
-  const addIcon = addRow.createSpan({ cls: "journal-tasks-add-icon" });
+  const addRow = wrap.createDiv({ cls: "ca-journal-tasks-add" });
+  const addIcon = addRow.createSpan({ cls: "ca-journal-tasks-add-icon" });
   setIcon(addIcon, "circle-plus");
   const addInput = addRow.createEl("input", {
     type: "text",
-    cls: "journal-tasks-add-input",
+    cls: "ca-journal-tasks-add-input",
   });
   addInput.placeholder = "Add a task…";
-  const list = wrap.createDiv({ cls: "journal-tasks-list" });
+  const list = wrap.createDiv({ cls: "ca-journal-tasks-list" });
 
   // In-memory model. Populated from the body region on load; thereafter the
   // widget mutates this and persists + re-renders.
-  let tasks: AlmanacTask[] = [];
+  let tasks: ChronoAnvilTask[] = [];
 
   const updateProgress = (): void => {
     if (tasks.length === 0) {
@@ -704,8 +704,8 @@ export function buildTasks(
     list.empty();
     updateProgress();
     if (tasks.length === 0) {
-      const empty = list.createDiv({ cls: "journal-tasks-empty" });
-      setIcon(empty.createSpan({ cls: "journal-tasks-empty-icon" }), "check-check");
+      const empty = list.createDiv({ cls: "ca-journal-tasks-empty" });
+      setIcon(empty.createSpan({ cls: "ca-journal-tasks-empty-icon" }), "check-check");
       empty.createSpan({ text: "No tasks yet — add one above." });
     }
     tasks.forEach((task, index) => {

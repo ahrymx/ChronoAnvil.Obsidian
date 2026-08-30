@@ -19,13 +19,13 @@ import { moveCell, widgetCount, widgetRun } from "../src/core/cell-move";
 import { readCode, readCss, readSrc } from "./sources";
 
 // The head class, spelled once so the assertion below cannot drift from it.
-const HEAD = "journal-block-head";
+const HEAD = "ca-journal-block-head";
 
 // The homepage's shape: a divided row of three, then a titled block, with the
 // composer's own spacing throughout.
 const PAGE = [
-  "`almanac:spacer`",
-  "```almanac",
+  "`chronoanvil:spacer`",
+  "```chronoanvil",
   "row",
   "diary:3",
   "cell",
@@ -34,7 +34,7 @@ const PAGE = [
   "journals",
   "```",
   "",
-  "```almanac",
+  "```chronoanvil",
   "header:⏳ Open tasks",
   "tasks-table:,period",
   "```",
@@ -43,13 +43,13 @@ const PAGE = [
 
 // A row that never divided itself: 4.2's markup, one cell per directive.
 const PLAIN = [
-  "```almanac",
+  "```chronoanvil",
   "row",
   "diary:3",
   "journals",
   "```",
   "",
-  "```almanac",
+  "```chronoanvil",
   "links:home",
   "```",
   "",
@@ -157,7 +157,7 @@ describe("putting a widget into a row", () => {
       "tasks-table:,period",
     ]);
     // One block left, and no run of blank lines where the other one was.
-    expect(out!.filter((l) => l.startsWith("```almanac"))).toHaveLength(1);
+    expect(out!.filter((l) => l.startsWith("```chronoanvil"))).toHaveLength(1);
     expect(out!.join("\n")).not.toContain("\n\n\n");
   });
 
@@ -172,13 +172,13 @@ describe("putting a widget into a row", () => {
 
   it("refuses to move a line between fences of different kinds", () => {
     const mixed = [
-      "```almanac",
+      "```chronoanvil",
       "row",
       "diary:3",
       "journals",
       "```",
       "",
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "chart: mood",
       "```",
       "",
@@ -204,7 +204,7 @@ describe("what it will not do", () => {
 
   it("leaves every line it did not move exactly as it read it", () => {
     const out = moveCell(PAGE, { block: 0, from: 5, to: 6 }, { kind: "block", at: 2 })!;
-    expect(out[0]).toBe("`almanac:spacer`");
+    expect(out[0]).toBe("`chronoanvil:spacer`");
     expect(out).toContain("header:⏳ Open tasks");
     expect(out).toContain("tasks-table:,period");
   });
@@ -220,19 +220,19 @@ describe("what it will not do", () => {
 describe("the page head is not a source and not a destination", () => {
   // A page as 4.10 composes one: the head first, then a row, then a titled block.
   const HEADED = [
-    "`almanac:spacer`",
-    "```almanac",
+    "`chronoanvil:spacer`",
+    "```chronoanvil",
     "title:home,diary,journals",
     "```",
     "",
-    "```almanac",
+    "```chronoanvil",
     "row",
     "diary:3",
     "cell",
     "journals",
     "```",
     "",
-    "```almanac",
+    "```chronoanvil",
     "header:⏳ Open tasks",
     "tasks-table:,period",
     "```",
@@ -285,7 +285,7 @@ describe("the page head is not a source and not a destination", () => {
     expect(out).not.toBeNull();
     expect(out!.join("\n")).toContain("title:home,diary,journals");
     // And the head is still the first fence.
-    expect(out!.filter((l) => l.startsWith("```"))[0]).toBe("```almanac");
+    expect(out!.filter((l) => l.startsWith("```"))[0]).toBe("```chronoanvil");
     expect(out!.indexOf("title:home,diary,journals")).toBeLessThan(
       out!.indexOf("header:⏳ Open tasks")
     );
@@ -350,7 +350,7 @@ describe("stacking a widget into a column that already has one", () => {
       "cell",
       "journals",
     ]);
-    expect(out!.filter((l) => l.startsWith("```almanac"))).toHaveLength(1);
+    expect(out!.filter((l) => l.startsWith("```chronoanvil"))).toHaveLength(1);
   });
 
   it("refuses a widget dropped on its own two halves", () => {
@@ -458,7 +458,7 @@ describe("what a block keeps when a widget leaves it (4.22 §5.4)", () => {
   // `pruned` is not exported — it is reached through `moveCell`, which is where
   // the property actually matters: what the reader is left looking at.
   const GROUP = [
-    "```almanac",
+    "```chronoanvil",
     "row",
     "diary:3",
     "cell",
@@ -505,8 +505,8 @@ describe("the gesture that reaches this", () => {
     // offers one, the other or both. The type is what a slot reads during
     // `dragover` — it cannot read the data — so a slot declines before the
     // reader has committed rather than on drop.
-    expect(src).toContain('const CELL_TYPE = "text/almanac-cell"');
-    expect(src).toContain('const BLOCK_TYPE = "text/almanac-block"');
+    expect(src).toContain('const CELL_TYPE = "text/ca-cell"');
+    expect(src).toContain('const BLOCK_TYPE = "text/ca-block"');
     // ONE `dragstart`, because there is one way to pick something up. Two
     // sources feed it — a widget in a cell, and a block — and they differ in
     // which types they set rather than in how they start.
@@ -525,8 +525,8 @@ describe("the gesture that reaches this", () => {
     expect(src).toContain("whole: { from: number; to: number }");
     expect(src).toContain("cell?: { from: number; to: number }");
     // The slot that accepted the drag is the one that picks.
-    expect(src).toContain("slot(container, `jbd-slot-above${edge}`, BLOCK_TYPE, (p) => p.whole");
-    expect(src).toContain('slot(child, "jbd-slot-before", CELL_TYPE, (p) => p.cell');
+    expect(src).toContain("slot(container, `ca-jbd-slot-above${edge}`, BLOCK_TYPE, (p) => p.whole");
+    expect(src).toContain('slot(child, "ca-jbd-slot-before", CELL_TYPE, (p) => p.cell');
     // A block holding two widgets has no cell range, which is what withholds
     // `CELL_TYPE` and with it every column slot on the page.
     expect(src).toContain("cell: widgetRun(body) ?? undefined");
@@ -539,13 +539,13 @@ describe("the gesture that reaches this", () => {
     // on every card are untouched: above, below and the swap in the middle do
     // not open a column, and they are how a third widget joins a full row.
     expect(src).toContain("cells.length < MAX_COLUMNS");
-    expect(src).toContain('slot(child, "jbd-slot-before", CELL_TYPE, (p) => p.cell, () => {');
+    expect(src).toContain('slot(child, "ca-jbd-slot-before", CELL_TYPE, (p) => p.cell, () => {');
     expect(src).toContain("}, hasRoom);");
-    expect(src).toContain('slot(child, "jbd-slot-after", CELL_TYPE, (p) => p.cell, after, hasRoom);');
+    expect(src).toContain('slot(child, "ca-jbd-slot-after", CELL_TYPE, (p) => p.cell, after, hasRoom);');
     // AND NOT ON THE THREE THAT STACK OR SWAP, which is the half that would be
     // silent if it were wrong: the reader would find a full group refusing every
     // drop rather than refusing the two it must.
-    for (const cls of ["jbd-slot-over", "jbd-slot-under", "jbd-slot-swap"]) {
+    for (const cls of ["ca-jbd-slot-over", "ca-jbd-slot-under", "ca-jbd-slot-swap"]) {
       const at = src.indexOf(`slot(child, "${cls}"`);
       expect(at, cls).toBeGreaterThan(-1);
       expect(src.slice(at, src.indexOf("});", at))).not.toContain("hasRoom");
@@ -586,7 +586,7 @@ describe("the gesture that reaches this", () => {
   it("asks where a slot points at the drop rather than at the render", () => {
     // `indexNow`'s lesson, one level down: a block's index and its body length
     // are both facts about a file that every drop rewrites.
-    const at = src.indexOf("slot(container, `jbd-slot-above${edge}`");
+    const at = src.indexOf("slot(container, `ca-jbd-slot-above${edge}`");
     expect(at).toBeGreaterThan(-1);
     expect(src.slice(at, at + 400)).toContain("indexNow()");
     expect(src).toContain("const dst = where();");
@@ -653,7 +653,7 @@ describe("the landing places, as drawn", () => {
   };
 
   it("takes no space, so nothing moves under the pointer", () => {
-    const rule = ruleFor(".jbd-slot {");
+    const rule = ruleFor(".ca-jbd-slot {");
     expect(rule).toContain("position: absolute");
     // Drawn only while something is in the air — the rule the grip follows.
     expect(rule).toContain("display: none");
@@ -669,36 +669,36 @@ describe("the landing places, as drawn", () => {
     // `::after`. Generosity in the target, precision in the drawing.
     // A block's two halves, and a widget's five parts — each a share of what it
     // is drawn on rather than a number of pixels.
-    expect(ruleFor(".jbd-slot-above,")).toMatch(/height: 50%/);
-    for (const sel of [".jbd-slot-before,", ".jbd-slot-over,", ".jbd-slot-swap {"]) {
+    expect(ruleFor(".ca-jbd-slot-above,")).toMatch(/height: 50%/);
+    for (const sel of [".ca-jbd-slot-before,", ".ca-jbd-slot-over,", ".ca-jbd-slot-swap {"]) {
       expect(ruleFor(sel), sel).toMatch(/\d+%/);
     }
-    expect(rules).toContain(".jbd-slot::after {");
+    expect(rules).toContain(".ca-jbd-slot::after {");
     // And no fixed pixel size is left on either — that was the fault. (The row
-    // block's edge bands are the one deliberate exception; see `jbd-slot-edge`.)
-    expect(ruleFor(".jbd-slot-above,")).not.toMatch(/height: \d+px/);
-    expect(ruleFor(".jbd-slot-before,")).not.toMatch(/width: \d+px/);
+    // block's edge bands are the one deliberate exception; see `ca-jbd-slot-edge`.)
+    expect(ruleFor(".ca-jbd-slot-above,")).not.toMatch(/height: \d+px/);
+    expect(ruleFor(".ca-jbd-slot-before,")).not.toMatch(/width: \d+px/);
   });
 
   it("tiles what it covers, so no point on a block means nothing", () => {
     // Above and below halve the block; before and after halve each column and
     // sit above them, which is what makes the middle of a row mean "this
     // column" while its top and bottom edges still mean "out of the row".
-    expect(ruleFor(".jbd-slot-above {")).toContain("top: 0");
-    // Anchored on the previous rule's brace: `.jbd-slot-below` also appears as
+    expect(ruleFor(".ca-jbd-slot-above {")).toContain("top: 0");
+    // Anchored on the previous rule's brace: `.ca-jbd-slot-below` also appears as
     // the second selector of the pair's shared rule, and that one carries the
     // height rather than the offset.
-    expect(ruleFor("}\n.jbd-slot-below {")).toContain("top: 50%");
-    expect(ruleFor("}\n.jbd-slot-before {")).toContain("left: 0");
-    expect(ruleFor("}\n.jbd-slot-after {")).toContain("right: 0");
+    expect(ruleFor("}\n.ca-jbd-slot-below {")).toContain("top: 50%");
+    expect(ruleFor("}\n.ca-jbd-slot-before {")).toContain("left: 0");
+    expect(ruleFor("}\n.ca-jbd-slot-after {")).toContain("right: 0");
     // TWO PER CELL, not one at each end of the row: a cell's right half names
     // the boundary after it, which is the gap the first version left open.
     const src = readSrc("block-drag");
     const at = src.indexOf("cells.forEach((cell, n)");
     expect(at, "the row is not tiled").toBeGreaterThan(-1);
     const body = src.slice(at, src.indexOf("── WHAT CAN BE PICKED UP", at));
-    expect(body).toContain("jbd-slot-before");
-    expect(body).toContain("jbd-slot-after");
+    expect(body).toContain("ca-jbd-slot-before");
+    expect(body).toContain("ca-jbd-slot-after");
     expect(body).toContain("opens[n + 1]");
   });
 
@@ -718,12 +718,12 @@ describe("the landing places, as drawn", () => {
     // On a row block the block's own slots become 16px bands along its edges —
     // the block's padding, which is the strip visibly outside the row — and the
     // cells tile everything between them.
-    expect(src).toContain('const edge = row ? " jbd-slot-edge" : ""');
+    expect(src).toContain('const edge = row ? " ca-jbd-slot-edge" : ""');
     // A share of the block with a floor — it was a flat 16px, which is the
     // block's own padding and about a fingertip.
-    expect(ruleFor(".jbd-slot-edge {")).toContain("clamp(");
-    expect(ruleFor(".jbd-slot-before,")).toContain("top: 0");
-    expect(ruleFor(".jbd-slot-before,")).toContain("bottom: 0");
+    expect(ruleFor(".ca-jbd-slot-edge {")).toContain("clamp(");
+    expect(ruleFor(".ca-jbd-slot-before,")).toContain("top: 0");
+    expect(ruleFor(".ca-jbd-slot-before,")).toContain("bottom: 0");
   });
 
   it("puts the columns OVER the block's own bands, not under them (4.54 §1)", () => {
@@ -742,11 +742,11 @@ describe("the landing places, as drawn", () => {
     // left above the cells hides the five places; a cell lifted over a band that
     // still owns the whole top of the block leaves nothing to drop OUT of the
     // group with.
-    const band = Number(/z-index: (\d+)/.exec(ruleFor(".jbd-slot-edge {"))?.[1]);
+    const band = Number(/z-index: (\d+)/.exec(ruleFor(".ca-jbd-slot-edge {"))?.[1]);
     const cell = Number(
       /z-index: (\d+)/.exec(
         ruleFor(
-          ".journal-widget-block.is-slotting .journal-block-row > .journal-block-cell {"
+          ".ca-journal-widget-block.is-slotting .ca-journal-block-row > .ca-journal-block-cell {"
         )
       )?.[1]
     );
@@ -755,20 +755,20 @@ describe("the landing places, as drawn", () => {
     // AND THE CEILING WENT WITH THE OVERLAP IT WAS RATIONING. What is left of a
     // band is the group's padding and the reach outside the block, so the space
     // it lost is paid back from the margin rather than from the columns.
-    expect(ruleFor(".jbd-slot-edge {")).toContain("var(--am-slot-reach)");
-    expect(ruleFor(".jbd-slot-above.jbd-slot-edge {")).toContain(
-      "calc(-1 * var(--am-slot-reach))"
+    expect(ruleFor(".ca-jbd-slot-edge {")).toContain("var(--ca-slot-reach)");
+    expect(ruleFor(".ca-jbd-slot-above.ca-jbd-slot-edge {")).toContain(
+      "calc(-1 * var(--ca-slot-reach))"
     );
-    expect(ruleFor(".jbd-slot-below.jbd-slot-edge {")).toContain(
-      "calc(-1 * var(--am-slot-reach))"
+    expect(ruleFor(".ca-jbd-slot-below.ca-jbd-slot-edge {")).toContain(
+      "calc(-1 * var(--ca-slot-reach))"
     );
     // The mark is put back on the block's own edge, or it floats in the margin
     // and says the arrival lands in the gap between two blocks.
-    expect(ruleFor(".jbd-slot-above.jbd-slot-edge::after {")).toContain(
-      "var(--am-slot-reach)"
+    expect(ruleFor(".ca-jbd-slot-above.ca-jbd-slot-edge::after {")).toContain(
+      "var(--ca-slot-reach)"
     );
-    expect(ruleFor(".jbd-slot-below.jbd-slot-edge::after {")).toContain(
-      "var(--am-slot-reach)"
+    expect(ruleFor(".ca-jbd-slot-below.ca-jbd-slot-edge::after {")).toContain(
+      "var(--ca-slot-reach)"
     );
   });
 
@@ -780,19 +780,19 @@ describe("the landing places, as drawn", () => {
     // — because reaching upwards instead would take the strip the top band is
     // now living on.
     //
-    // MATCHED WHOLE, not through `ruleFor`. `.jbd-slot-under` shares a rule with
-    // `.jbd-slot-over` above it, so `indexOf` on the bare selector finds the
+    // MATCHED WHOLE, not through `ruleFor`. `.ca-jbd-slot-under` shares a rule with
+    // `.ca-jbd-slot-over` above it, so `indexOf` on the bare selector finds the
     // pair rather than the override — the reason the older assertions here
     // anchor on a preceding brace. An exact rule is the anchor that cannot pick
     // the wrong one.
     expect(rules).toContain(
-      ".jbd-slot-under {\n  bottom: calc(-1 * var(--am-widget-gap));\n" +
-        "  height: calc(20% + var(--am-widget-gap));\n}"
+      ".ca-jbd-slot-under {\n  bottom: calc(-1 * var(--ca-widget-gap));\n" +
+        "  height: calc(20% + var(--ca-widget-gap));\n}"
     );
     // And the bar stays on the card's own bottom edge rather than being carried
     // down against the top of the next card.
     expect(rules).toContain(
-      ".jbd-slot-under::after {\n  bottom: var(--am-widget-gap);\n}"
+      ".ca-jbd-slot-under::after {\n  bottom: var(--ca-widget-gap);\n}"
     );
   });
 
@@ -805,21 +805,21 @@ describe("the landing places, as drawn", () => {
     //
     // THE OVERHANG IS ADDED BACK AS A SUM rather than as the 8px it comes to, so
     // the mark and the box that carries it cannot drift apart again.
-    const back = "var(--am-widget-gap) / 2 + 9px - var(--am-widget-gap) / 2 - 1px";
+    const back = "var(--ca-widget-gap) / 2 + 9px - var(--ca-widget-gap) / 2 - 1px";
     expect(rules).toContain(
-      `.jbd-slot-before::after {\n  left: calc(${back});\n}`
+      `.ca-jbd-slot-before::after {\n  left: calc(${back});\n}`
     );
     expect(rules).toContain(
-      `.jbd-slot-after::after {\n  right: calc(${back});\n}`
+      `.ca-jbd-slot-after::after {\n  right: calc(${back});\n}`
     );
     // The box's own inset, which is the half the sum above is compensating for.
     // If this ever changes, the two `9px` stop agreeing and the bar drifts off
     // the seam again — which is the whole of the defect.
     expect(rules).toContain(
-      ".jbd-slot-before {\n  left: calc(var(--am-widget-gap) / -2 - 9px);\n}"
+      ".ca-jbd-slot-before {\n  left: calc(var(--ca-widget-gap) / -2 - 9px);\n}"
     );
     expect(rules).toContain(
-      ".jbd-slot-after {\n  right: calc(var(--am-widget-gap) / -2 - 9px);\n}"
+      ".ca-jbd-slot-after {\n  right: calc(var(--ca-widget-gap) / -2 - 9px);\n}"
     );
   });
 
@@ -833,7 +833,7 @@ describe("the landing places, as drawn", () => {
     const fn = src.slice(at, src.indexOf("\n}", at));
     expect(fn).not.toContain(HEAD);
     expect(fn).toContain("host.createDiv(");
-    expect(fn).toContain('host.addClass("jbd-host")');
+    expect(fn).toContain('host.addClass("ca-jbd-host")');
   });
 
   it("puts one grip on a thing however many times it is asked", () => {
@@ -856,7 +856,7 @@ describe("the landing places, as drawn", () => {
     const src = readSrc("block-drag");
     expect(src).toContain("const foot = box?.querySelector<HTMLElement>");
     expect(src).toContain('foot ? "Drag to move this group" : "Drag to move this block"');
-    expect(ruleFor(".journal-group-foot > .jbd-handle {")).toContain("left: 0");
+    expect(ruleFor(".ca-journal-group-foot > .ca-jbd-handle {")).toContain("left: 0");
     // AND THE EXCEPTION IS GONE FROM BOTH SIDES. A rule kept "just in case"
     // after the thing it worked around has been removed is the kind nobody can
     // re-derive and nobody dares delete.
@@ -885,15 +885,15 @@ describe("the landing places, as drawn", () => {
     // arrival opened a column. The five read outward — edges are the row, the
     // middle is the widget.
     for (const sel of ["before", "after", "over", "under", "swap"]) {
-      expect(readSrc("block-drag"), sel).toContain(`"jbd-slot-${sel}"`);
+      expect(readSrc("block-drag"), sel).toContain(`"ca-jbd-slot-${sel}"`);
     }
     // The middle is the largest of the five, because a swap is the one drop
     // that needs no aim.
-    expect(ruleFor(".jbd-slot-before,")).toContain("width: 20%");
-    expect(ruleFor(".jbd-slot-over,")).toContain("height: 20%");
+    expect(ruleFor(".ca-jbd-slot-before,")).toContain("width: 20%");
+    expect(ruleFor(".ca-jbd-slot-over,")).toContain("height: 20%");
     // And its mark is a ring rather than a bar: a bar says which side of a line
     // the arrival goes, and a swap has no side.
-    expect(ruleFor(".jbd-slot-swap::after {")).toContain("border");
+    expect(ruleFor(".ca-jbd-slot-swap::after {")).toContain("border");
   });
 
   it("refuses the two places a block is already in", () => {
@@ -975,11 +975,11 @@ describe("making a group out of two blocks", () => {
   // a refusal, which is the honest place for it: the shape is still what a
   // dashboard writes, and it is still not a group.
   const TWO = [
-    "```almanac",
+    "```chronoanvil",
     "tag-index",
     "```",
     "",
-    "```almanac",
+    "```chronoanvil",
     "tasks-table:,period",
     "```",
     "",
@@ -1005,7 +1005,7 @@ describe("making a group out of two blocks", () => {
     // AND THE SOURCE FENCE IS GONE, with the blank line that separated it —
     // `pruned` returns null for a body with nothing left in it, which is
     // `applyLayout`'s manners and the reason a page's rhythm survives a drag.
-    expect(out?.filter((l) => l === "```almanac").length).toBe(1);
+    expect(out?.filter((l) => l === "```chronoanvil").length).toBe(1);
   });
 
   it("puts it on the other side when the other side is asked for", () => {
@@ -1028,12 +1028,12 @@ describe("making a group out of two blocks", () => {
     // where `docs/reference.md` shows it, not wherever a splice happened to put
     // it. A `row` line buried under a directive is a fence nobody can scan.
     const framed = [
-      "```almanac",
+      "```chronoanvil",
       "frame: none",
       "tag-index",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "tasks-table",
       "```",
       "",
@@ -1061,12 +1061,12 @@ describe("making a group out of two blocks", () => {
 
   it("refuses a destination that titles itself, which is the other end of §A", () => {
     const titled = [
-      "```almanac",
+      "```chronoanvil",
       "header:🏷️ Tags",
       "tag-index",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "tasks-table:,period",
       "```",
       "",
@@ -1075,12 +1075,12 @@ describe("making a group out of two blocks", () => {
       moveCell(titled, { block: 1, from: 0, to: 1 }, { kind: "group", block: 0, side: "right" })
     ).toBeNull();
     const framed = [
-      "```almanac",
+      "```chronoanvil",
       "frame: section",
       "journals",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "tasks-table:,period",
       "```",
       "",
@@ -1091,15 +1091,15 @@ describe("making a group out of two blocks", () => {
   });
 
   it("refuses to cross fence kinds", () => {
-    // `almanac-charts` holds chart specs and `almanac` holds directives; a line
+    // `chronoanvil-charts` holds chart specs and `chronoanvil` holds directives; a line
     // that crosses between them is a widget the block cannot render, and the
     // reader would see a broken card rather than a refusal.
     const mixed = [
-      "```almanac",
+      "```chronoanvil",
       "tag-index",
       "```",
       "",
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "activity",
       "```",
       "",
@@ -1110,7 +1110,7 @@ describe("making a group out of two blocks", () => {
   });
 
   it("declines a block that has nothing to show", () => {
-    const hollow = ["```almanac", "frame: none", "```", "", "```almanac", "tag-index", "```", ""];
+    const hollow = ["```chronoanvil", "frame: none", "```", "", "```chronoanvil", "tag-index", "```", ""];
     expect(
       moveCell(hollow, { block: 1, from: 0, to: 1 }, { kind: "group", block: 0, side: "right" })
     ).toBeNull();
@@ -1126,7 +1126,7 @@ describe("a leading delimiter, which is the one that carries a width", () => {
     // that looked only at what was immediately after it would take the width off
     // the first column on the next unrelated move.
     const wide = [
-      "```almanac",
+      "```chronoanvil",
       "row",
       "cell: 2",
       "diary:3",
@@ -1150,7 +1150,7 @@ describe("a leading delimiter, which is the one that carries a width", () => {
     // still looking for its cell. A next-line reading gives the same answer on
     // every fixture without a bar in it, which is why this one has two.
     const barred = [
-      "```almanac",
+      "```chronoanvil",
       "row",
       "cell: 3",
       "header:🏷️ Tags",

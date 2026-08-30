@@ -20,7 +20,7 @@
 
 import { App, Notice, TFile, normalizePath } from "obsidian";
 
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { toPlainMarkdown } from "./plain-markdown";
 import {
   exportPathFor,
@@ -38,7 +38,7 @@ import type { SectionModel } from "./section-model";
 export class VaultExport {
   constructor(
     private app: App,
-    private plugin: AlmanacPlugin
+    private plugin: ChronoAnvilPlugin
   ) {}
 
   private root(): string {
@@ -99,7 +99,7 @@ export class VaultExport {
     const items = await this.plan();
     if (items.length === 0) {
       notify.info(
-        "Almanac: nothing to export — no diary entries or journal notes were found."
+        "ChronoAnvil: nothing to export — no diary entries or journal notes were found."
       );
       return;
     }
@@ -128,7 +128,7 @@ export class VaultExport {
         await this.writeOne(item.path, item.content);
         written++;
       } catch (e) {
-        console.error("[Almanac] could not export", item.source, e);
+        console.error("[ChronoAnvil] could not export", item.source, e);
       }
     }
 
@@ -146,7 +146,7 @@ export class VaultExport {
       return;
     }
     // EVERY ANCESTOR, IN ORDER. The export mirrors a note's whole vault path, so
-    // a first run has to make `Almanac Export`, then the diary root inside it,
+    // a first run has to make `ChronoAnvil Export`, then the diary root inside it,
     // then the grain folder, then the year — and `createFolder` is not promised
     // to be recursive. Creating only the immediate parent works on a flat vault
     // and fails on every real one.
@@ -167,11 +167,11 @@ export class VaultExport {
 
 // The command's one line, kept beside the class so a caller needs no notice
 // text of its own.
-export async function runVaultExport(plugin: AlmanacPlugin): Promise<void> {
+export async function runVaultExport(plugin: ChronoAnvilPlugin): Promise<void> {
   try {
     await new VaultExport(plugin.app, plugin).run();
   } catch (e) {
-    console.error("[Almanac] export failed", e);
-    new Notice("Almanac: the export could not finish. See the console for why.");
+    console.error("[ChronoAnvil] export failed", e);
+    new Notice("ChronoAnvil: the export could not finish. See the console for why.");
   }
 }

@@ -1,22 +1,23 @@
 {
-  "name": "obsidian-almanac-plugin",
-  "version": "4.84.0",
+  "name": "obsidian-chronoanvil-plugin",
+  "version": "5.0.0",
   "description": "Keep a daily diary and your own journal types with one shared tracker registry, and render calendars, charts, tables and period dashboards natively. Includes quick capture, full-text search, an entry navigator and vault scaffolding.",
   "main": "main.js",
   "type": "module",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "build": "node tools/build-assets.mjs && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "package": "npm run build && node tools/package.mjs",
     "install:vault": "node tools/install.mjs",
     "archive": "node tools/archive.mjs",
     "release": "npm run package && node tools/archive.mjs && node tools/install.mjs",
-    "typecheck": "tsc -noEmit -skipLibCheck",
+    "typecheck": "node tools/build-assets.mjs && tsc -noEmit -skipLibCheck",
     "lint": "eslint src test",
     "check:versions": "node tools/check-version-agreement.mjs",
     "measure:css": "node tools/measure-css.mjs",
     "seed": "node tools/seed-vault.mjs",
-    "pretest": "node tools/build-css.mjs",
+    "migrate:vault": "node tools/migrate-vault.mjs",
+    "pretest": "node tools/build-css.mjs && node tools/build-assets.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -28,13 +29,13 @@
   ],
   "license": "AGPL-3.0-or-later",
   "author": "AhryMX <contact@ahrymx.dev>",
-  "homepage": "https://github.com/AhryMX/Almanac.Obsidian#readme",
+  "homepage": "https://github.com/AhryMX/ChronoAnvil.Obsidian#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AhryMX/Almanac.Obsidian.git"
+    "url": "git+https://github.com/AhryMX/ChronoAnvil.Obsidian.git"
   },
   "bugs": {
-    "url": "https://github.com/AhryMX/Almanac.Obsidian/issues",
+    "url": "https://github.com/AhryMX/ChronoAnvil.Obsidian/issues",
     "email": "contact@ahrymx.dev"
   },
   "devDependencies": {
@@ -43,13 +44,13 @@
     "builtin-modules": "^3.3.0",
     "esbuild": "^0.20.0",
     "eslint": "^9.39.5",
+    "js-yaml": "^5.2.1",
     "obsidian": "^1.5.7-1",
     "typescript": "^5.4.0",
     "typescript-eslint": "^8.65.0",
     "vitest": "^2.1.9"
   },
   "dependencies": {
-    "chart.js": "^4.5.1",
-    "js-yaml": "^5.2.1"
+    "chart.js": "^4.5.1"
   }
 }

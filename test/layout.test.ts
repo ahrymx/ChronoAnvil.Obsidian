@@ -45,7 +45,7 @@ const L = (s: string): string[] => s.split("\n");
 //
 // ITS TITLES ARE 2.51'S AND STAY THAT WAY. 4.25 §1 put every shipped section
 // title into sentence case, and a sweep over this file would have rewritten
-// "Open Tasks" here too — which would make the fixture agree with what Almanac
+// "Open Tasks" here too — which would make the fixture agree with what ChronoAnvil
 // composes TODAY and stop being what it is for. The whole point of the note is
 // that it is what a vault created before the rename actually contains, so the
 // assertions about carrying an old header fence along are testing the migration
@@ -53,24 +53,24 @@ const L = (s: string): string[] => s.split("\n");
 const OLD_MONTHLY = `---
 month-start:
 ---
-\`almanac:spacer\`
-\`\`\`almanac
+\`chronoanvil:spacer\`
+\`\`\`chronoanvil
 links:home,week,all#diary
 \`\`\`
 
-\`\`\`almanac
+\`\`\`chronoanvil
 month-summary
 \`\`\`
 
-\`\`\`almanac
+\`\`\`chronoanvil
 header:⏳ Open Tasks
 \`\`\`
 
-\`\`\`almanac
+\`\`\`chronoanvil
 tasks-table:,period
 \`\`\`
 
-\`\`\`almanac-charts
+\`\`\`chronoanvil-charts
 header:📊 Trends and Statistics
 chart:Mood|line|period|daily|wide
 \`\`\`
@@ -80,20 +80,20 @@ chart:Mood|line|period|daily|wide
 const OLD_YEAR = `---
 year-start: ""
 ---
-\`almanac:spacer\`
-\`\`\`almanac
+\`chronoanvil:spacer\`
+\`\`\`chronoanvil
 links:home,month,search#diary
 \`\`\`
 
-\`\`\`almanac
+\`\`\`chronoanvil
 year-nav
 \`\`\`
 
-\`\`\`almanac
+\`\`\`chronoanvil
 year-summary
 \`\`\`
 
-\`\`\`almanac-charts
+\`\`\`chronoanvil-charts
 \`\`\`
 `;
 
@@ -114,13 +114,13 @@ describe("segment", () => {
   it("gives a chart fence no keywords, so no rule can reach its specs", () => {
     // Chart specs are user data. migrateTrends owns that fence.
     const charts = segment(L(OLD_MONTHLY)).find(
-      (s) => s.fenceKind === "almanac-charts"
+      (s) => s.fenceKind === "chronoanvil-charts"
     );
     expect(charts?.keywords).toEqual([]);
   });
 
   it("leaves an unterminated fence as raw text rather than guessing", () => {
-    const segs = segment(["```almanac", "month-summary", "no closing fence"]);
+    const segs = segment(["```chronoanvil", "month-summary", "no closing fence"]);
     expect(segs.every((s) => s.kind === "raw")).toBe(true);
   });
 });
@@ -222,7 +222,7 @@ describe("planLayout", () => {
     // The load-bearing rule. Unknown and not retired means the user's.
     const note = OLD_MONTHLY.replace(
       "month-summary",
-      "month-summary\n```\n\n```almanac\ntag-index:03 - Journals"
+      "month-summary\n```\n\n```chronoanvil\ntag-index:03 - Journals"
     );
     const ops = planLayout(L(note), L(asset("monthly-overview.md")));
     expect(ops.some((o) => o.keyword === "tag-index")).toBe(false);
@@ -298,9 +298,9 @@ describe("applyLayout", () => {
     const out = applyLayout(L(OLD_YEAR), year) as string[];
     const text = out.join("\n");
     expect(text).not.toContain("year-nav");
-    // The fence that held it goes too — an empty ```almanac renders as an
+    // The fence that held it goes too — an empty ```chronoanvil renders as an
     // empty block, which is what the first cut of this left behind.
-    expect(text).not.toMatch(/```almanac\n```/);
+    expect(text).not.toMatch(/```chronoanvil\n```/);
   });
 
   it("preserves user charts verbatim", () => {
@@ -312,8 +312,8 @@ describe("applyLayout", () => {
 
   it("preserves user prose between blocks", () => {
     const note = OLD_MONTHLY.replace(
-      "```almanac\nmonth-summary",
-      "Some notes I keep here.\n\n```almanac\nmonth-summary"
+      "```chronoanvil\nmonth-summary",
+      "Some notes I keep here.\n\n```chronoanvil\nmonth-summary"
     );
     const out = applyLayout(L(note), monthly) as string[];
     expect(out.join("\n")).toContain("Some notes I keep here.");
@@ -321,8 +321,8 @@ describe("applyLayout", () => {
 
   it("preserves a widget the user added", () => {
     const note = OLD_MONTHLY.replace(
-      "```almanac-charts",
-      "```almanac\ntag-index:03 - Journals\n```\n\n```almanac-charts"
+      "```chronoanvil-charts",
+      "```chronoanvil\ntag-index:03 - Journals\n```\n\n```chronoanvil-charts"
     );
     const out = applyLayout(L(note), monthly) as string[];
     expect(out.join("\n")).toContain("tag-index:03 - Journals");
@@ -346,11 +346,11 @@ describe("applyLayout", () => {
     const note = `---
 month-start:
 ---
-\`\`\`almanac
+\`\`\`chronoanvil
 tasks-table:,period
 \`\`\`
 
-\`\`\`almanac
+\`\`\`chronoanvil
 month-summary
 \`\`\`
 `;
@@ -369,7 +369,7 @@ month-summary
     const note = `---
 year-start: ""
 ---
-\`\`\`almanac
+\`\`\`chronoanvil
 year-nav
 year-summary
 \`\`\`
@@ -455,7 +455,7 @@ describe("the shipped assets agree with each other", () => {
     // day home.md left and failing only because `[]` is not `[the row]`.
     //
     // A folder is not the population any more. The population is "every note
-    // Almanac authors", which is what `shippedNotes` knows and what
+    // ChronoAnvil authors", which is what `shippedNotes` knows and what
     // scope-properties.test.ts learned to enumerate two releases ago. Same
     // list, assembled the same way.
     const authored: { name: string; text: string }[] = [

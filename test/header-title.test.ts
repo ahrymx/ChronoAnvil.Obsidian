@@ -104,7 +104,7 @@ describe("the rule stated generally, not as a special case for titles", () => {
     // THE HALF A BLANKET REFUSAL WOULD HAVE LOST. "Title questions are
     // unreadable" would also have been green against the test above, and would
     // have given up on every note where the answer is perfectly unambiguous.
-    const lines = ["```almanac", "header:📚 Resources", "attach:res|Docs", "```"];
+    const lines = ["```chronoanvil", "header:📚 Resources", "attach:res|Docs", "```"];
     const span = soleArgSpanIn(lines, "header");
     expect(span).not.toBeNull();
     expect(readArg(lines, span!)).toBe("📚 Resources");
@@ -328,6 +328,6 @@ describe("the two gestures on one bar", () => {
   it("shows the title as editable on hover", () => {
     // The original report was "hover does not show the field as editable".
     const css = readCss();
-    expect(css).toContain(".journal-header-title-editable:hover");
+    expect(css).toContain(".ca-journal-header-title-editable:hover");
   });
 });

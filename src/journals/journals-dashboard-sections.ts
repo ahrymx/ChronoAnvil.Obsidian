@@ -142,7 +142,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // lock costs an empty vault nothing but a heading.
     locked: true,
     render: (opts) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
         "journals",
@@ -199,7 +199,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
       },
     ],
     render: (opts) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(opts?.form === WIDGET_FORM ? [] : [DUE_BAR]),
         `review-queue:${SCOPE_ALL}`,
@@ -210,7 +210,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
   {
     id: "open-tasks",
     label: "Open tasks",
-    blurb: "Still-open Almanac tasks from every note under the journals root.",
+    blurb: "Still-open ChronoAnvil tasks from every note under the journals root.",
     icon: "⏳",
     // BARE, unlike the queue above it, and the two are not inconsistent.
     // `tasks-table` defaults to the host note's own folder, which on this
@@ -244,7 +244,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // SECOND CELL OF THE DUE-AND-OPEN ROW (4.70), SO NO BAR AND NO TOGGLE FOR
     // ONE — the queue beside it composes the single title this fence gets.
     row: DUE_ROW,
-    render: () => ({ fence: "almanac", lines: ["tasks-table"] }),
+    render: () => ({ fence: "chronoanvil", lines: ["tasks-table"] }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },
   {
@@ -283,7 +283,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
       },
     ],
     render: (opts) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(opts?.form === WIDGET_FORM ? [] : ["header:🕒 Recently written"]),
         `journal-recent:${SCOPE_ALL}`,
@@ -300,17 +300,17 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // catalogue makes for this section: an untick must not take nine
     // configured charts with it.
     //
-    // The diary's chart fence, not a journal dashboard's. `almanac-charts` is
-    // the vault-side manager; `almanac-journal-charts` belongs to a journal's
+    // The diary's chart fence, not a journal dashboard's. `chronoanvil-charts` is
+    // the vault-side manager; `chronoanvil-journal-charts` belongs to a journal's
     // own index notes and reads a different store. This page sits above every
     // journal rather than inside one, so it takes the former.
     locked: false,
     holds: (text) => chartLinesIn(text),
     render: () => ({
-      fence: "almanac-charts",
+      fence: "chronoanvil-charts",
       lines: [`${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`],
     }),
-    locate: (text) => probe(text, /^```almanac-charts/m),
+    locate: (text) => probe(text, /^```chronoanvil-charts/m),
   },
 ];
 

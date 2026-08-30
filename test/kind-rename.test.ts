@@ -312,12 +312,12 @@ describe("the repaint reaches blocks outside a markdown view", () => {
     // A fence registered straight on Obsidian would render once and never be
     // heard from again, which is the whole defect.
     const w = readCode("widgets");
-    expect(w).toContain('this.registerBlock("almanac", ');
-    expect(w).toContain('this.registerBlock(\n      "almanac-charts"');
-    expect(w).toContain('this.registerBlock(\n      "almanac-journal-charts"');
+    expect(w).toContain('this.registerBlock("chronoanvil", ');
+    expect(w).toContain('this.registerBlock(\n      "chronoanvil-charts"');
+    expect(w).toContain('this.registerBlock(\n      "chronoanvil-journal-charts"');
     // And nothing bypasses it.
     expect(w).not.toContain("this.plugin.registerMarkdownCodeBlockProcessor(\n");
-    expect(w).not.toContain('this.plugin.registerMarkdownCodeBlockProcessor("almanac"');
+    expect(w).not.toContain('this.plugin.registerMarkdownCodeBlockProcessor("chronoanvil"');
   });
 
   it("mounts the inline widget through the wrapper too", () => {

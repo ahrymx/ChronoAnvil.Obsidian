@@ -89,8 +89,8 @@ describe("every id names its group", () => {
 describe("every name names its owner", () => {
   it("prefixes every name with an owner and a colon", () => {
     // The palette is a SEARCH BOX, not a menu: there are no headings, so the
-    // group has to be in the string or filtering on `almanac diary` cannot
-    // work. Rendered, that is `Almanac: Diary: open today` — the two colons
+    // group has to be in the string or filtering on `chronoanvil diary` cannot
+    // work. Rendered, that is `ChronoAnvil: Diary: open today` — the two colons
     // §14 accepted.
     for (const a of ACTIONS) {
       expect(a.name, a.id).toMatch(/^[A-Z][A-Za-z ]*: \S/);

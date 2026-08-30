@@ -16,7 +16,7 @@ import { parseFrontmatter } from "../src/journals/journal-infer";
 import { buildJournalType, journalTemplateFiles } from "../src/journals/custom-journal";
 import type { JournalConfig } from "../src/journals/custom-journal";
 import { DEFAULT_PATHS } from "../src/core/constants";
-import type AlmanacPlugin from "../src/main";
+import type ChronoAnvilPlugin from "../src/main";
 import { presetAsNewJournal } from "../src/journals/custom-journal";
 import { STUDY_PRESET } from "../src/journals/journal";
 
@@ -129,18 +129,18 @@ function populate(vault: FakeVault, cfg = COOKING): void {
   vault.add(
     `${r}/Italian/Pasta/Carbonara.md`,
     "---\ntype: recipe\ncuisine: Italian\ndish: Pasta\ndifficulty: 4\nstatus: completed\n---\n" +
-      "```almanac\njournal-header\ntracker:difficulty\ntracker:status\n```\n"
+      "```chronoanvil\njournal-header\ntracker:difficulty\ntracker:status\n```\n"
   );
   vault.add(
     `${r}/Italian/Pasta/Carbonara for four.md`,
     "---\ntype: attempt\ncuisine: Italian\ndish: Pasta\ndifficulty: 3\nstatus: in-progress\n---\n" +
-      "```almanac\njournal-header\ntracker:difficulty\ntracker:status\n```\n"
+      "```chronoanvil\njournal-header\ntracker:difficulty\ntracker:status\n```\n"
   );
 }
 
 interface Harness {
   vault: FakeVault;
-  plugin: AlmanacPlugin;
+  plugin: ChronoAnvilPlugin;
   importer: JournalImporter;
   rebuilds: number;
   saves: number;
@@ -194,7 +194,7 @@ function harness(withStudy = false): Harness {
       },
     },
     notifyJournalTypesChanged: () => {},
-  } as unknown as AlmanacPlugin;
+  } as unknown as ChronoAnvilPlugin;
 
   const app = {
     vault,
@@ -310,7 +310,7 @@ describe("a folder that arrived with its manifest", () => {
     // A future manifest may mean something different by the same field names,
     // so reading it under today's assumptions is worse than reading the notes.
     const raw = JSON.parse(h.vault.hidden.get(manifestPathFor(COOKING.root))!);
-    raw.almanacJournal = 99;
+    raw.chronoanvilJournal = 99;
     h.vault.hidden.set(manifestPathFor(COOKING.root), JSON.stringify(raw));
     expect(await h.importer.adoptManifested()).toEqual([]);
     // ...and falls through to the offer, rather than vanishing.
@@ -419,17 +419,17 @@ describe("what discovery must not touch", () => {
     const r = "03 - Journals/Study";
     vault.add(
       `${r}/mathematics/mathematics.md`,
-      "---\ntype: subject\n---\n```almanac\nheader:🗂️ Topics\nbutton:study:new-container\n```\n"
+      "---\ntype: subject\n---\n```chronoanvil\nheader:🗂️ Topics\nbutton:study:new-container\n```\n"
     );
     vault.add(
       `${r}/mathematics/algebra/algebra.md`,
       "---\ntype: topic\nsubject: mathematics\n---\n" +
-        "```almanac\nheader:📓 Lessons\nbutton:study:new-lesson\n```\n"
+        "```chronoanvil\nheader:📓 Lessons\nbutton:study:new-lesson\n```\n"
     );
     vault.add(
       `${r}/mathematics/algebra/Inequalities.md`,
       "---\ntype: lesson\nsubject: mathematics\ntopic: algebra\nconfidence: 3\n---\n" +
-        "```almanac\njournal-header\ntracker:confidence\n```\n"
+        "```chronoanvil\njournal-header\ntracker:confidence\n```\n"
     );
   }
 

@@ -9,7 +9,7 @@
 // managed area of a note rather than as directives written by hand.
 //
 // This is charts.ts's chart region, copied deliberately. A note owns its
-// journal charts inside a single ```almanac-journal-charts fence whose
+// journal charts inside a single ```chronoanvil-journal-charts fence whose
 // `jchart:` lines are the source of truth, and the Add / Edit… / Remove…
 // toolbar in that fence's header bar splices them. Everything down to the
 // key allocation and the "preserve the header line, rewrite the rest" write
@@ -49,7 +49,7 @@ export interface JournalChartSpec {
   label?: string;
 }
 
-export const JOURNAL_CHARTS_FENCE = "```almanac-journal-charts";
+export const JOURNAL_CHARTS_FENCE = "```chronoanvil-journal-charts";
 
 // `jchart:<key>:<shape>:<tracker>[|Label]`.
 //
@@ -87,7 +87,7 @@ export function serializeJournalChartSpec(s: JournalChartSpec): string {
   return `jchart:${s.key}:${s.shape}:${s.tracker}${label ? `|${label}` : ""}`;
 }
 
-// Parse `jchart:` lines (the body of an ```almanac-journal-charts fence) into
+// Parse `jchart:` lines (the body of a ```chronoanvil-journal-charts fence) into
 // specs. Shared with the widget processor, which hands it the raw fence source.
 // Anything else in the fence — the `header:` title line, blank lines, a
 // comment — is skipped rather than rejected, so the fence stays a place the

@@ -77,7 +77,7 @@ describe("the registry matches the shipped templates", () => {
   });
 
   it("declares a region for every field, and no field without a region", () => {
-    // The template carries `<!--almanac:key-->` anchors alongside the
+    // The template carries `<!--chronoanvil:key-->` anchors alongside the
     // directives; a directive with no anchor still works (the widget appends
     // one on first render) but ships a note whose raw body is missing a field
     // until it's touched.
@@ -137,7 +137,7 @@ describe("registry shape", () => {
   });
 
   it("returns undefined for an unregistered region rather than throwing", () => {
-    // A hand-added `<!--almanac:dreams-->` is legitimate. The registry says
+    // A hand-added `<!--chronoanvil:dreams-->` is legitimate. The registry says
     // what rolls up, not what exists.
     expect(getField("dreams", "daily")).toBeUndefined();
   });

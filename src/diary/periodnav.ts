@@ -9,8 +9,8 @@
 //
 // It is the dashboard counterpart to a diary entry's `entry-header` nav — the
 // same visual family (a left-divided strip of a prev pill, a date-picker pill,
-// and a next pill) reusing the very same `.jeh-nav` / `.jeh-navpill` /
-// `.jeh-datenav` chrome — so the overviews and the entries read as one system.
+// and a next pill) reusing the very same `.ca-jeh-nav` / `.ca-jeh-navpill` /
+// `.ca-jeh-datenav` chrome — so the overviews and the entries read as one system.
 // Below the strip sits one more thing an entry has no need for: a standalone
 // "This Week" / "This Month" button that jumps straight back to the current
 // period (2.23; previously this lived as a pinned row inside the dropdown —
@@ -25,14 +25,14 @@
 // entries, plus any month with a review note — always including the current
 // and currently-selected period so there's a row that lines up with "now".
 //
-//   ```almanac
+//   ```chronoanvil
 //   period-nav:week      (on the Weekly Overview — drives `week-start`)
 //   period-nav:month     (on the Monthly Overview — drives `month-start`)
 //   period-nav:quarter   (on the Quarterly Overview — drives `quarter-start`)
 //   ```
 
 import { App, MarkdownPostProcessorContext, setIcon, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   frontmatterOf,
   isoDate,
@@ -202,7 +202,7 @@ interface PeriodOption {
 // every month that has a review note, and always the current + selected period
 // so the user can jump back to "now". Newest first.
 function periodOptions(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   unit: Unit,
   selKey: string
 ): PeriodOption[] {
@@ -258,9 +258,9 @@ function navPill(
   side: "left" | "right",
   onClick: () => void
 ): void {
-  const sideCls = side === "left" ? "jeh-seg-start" : "jeh-seg-end";
+  const sideCls = side === "left" ? "ca-jeh-seg-start" : "ca-jeh-seg-end";
   const pill = parent.createEl("a", {
-    cls: `jeh-navpill ${sideCls}`,
+    cls: `ca-jeh-navpill ${sideCls}`,
     attr: { "aria-label": label, title: label },
   });
   setIcon(pill, icon);
@@ -278,7 +278,7 @@ function navPill(
 // into the page. The search still never leaves the fence, which is the property
 // this scoping is for.
 //
-// NOT `.journal-overview-card`, WHICH IS A FRAME AND NOT A CONTAINER (4.1 §4).
+// NOT `.ca-journal-overview-card`, WHICH IS A FRAME AND NOT A CONTAINER (4.1 §4).
 // That class is the composite card, and `frame: section` withholds it — so on
 // the diary dashboard's `This month` the walk found nothing and the button
 // never lit up. The button itself is drawn either way, because `openActionsBar`
@@ -286,11 +286,11 @@ function navPill(
 // set from `OVERVIEW_KINDS` regardless of frame. Two conditions that used to
 // agree by accident, told apart by the modifier — the same mistake as the two
 // CSS rules 4.1.1 fixed, and the reason to reach for the class that survives
-// all three frames. `.journal-widget-block` is that class: §4 names keeping it
+// all three frames. `.ca-journal-widget-block` is that class: §4 names keeping it
 // as the one rule every frame value has to honour.
 function syncNowButton(from: HTMLElement, browsing: boolean): void {
-  const block = from.closest(".journal-widget-block");
-  const btn = block?.querySelector(".jpn-now-btn");
+  const block = from.closest(".ca-journal-widget-block");
+  const btn = block?.querySelector(".ca-jpn-now-btn");
   if (btn instanceof HTMLElement) btn.toggleClass("is-browsing", browsing);
 }
 
@@ -314,13 +314,13 @@ function syncNowButton(from: HTMLElement, browsing: boolean): void {
 // live on their own note, so the strip is rebuilt and `render()` syncs this
 // button on its way through.
 export function buildNowButton(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   unit: Unit
 ): HTMLElement {
   const { prop, momentUnit } = metaFor(unit);
   const btn = createEl("button", {
-    cls: "journal-btn-subtle jpn-now-btn",
+    cls: "ca-journal-btn-subtle ca-jpn-now-btn",
     text: NOW_LABEL[unit],
     attr: { type: "button", "aria-label": `Show the current ${NOUN[unit]}` },
   });
@@ -370,7 +370,7 @@ export function periodAnchor(
 }
 
 export function buildPeriodNav(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   unit: Unit
 ): HTMLElement {
@@ -380,8 +380,8 @@ export function buildPeriodNav(
   // Week"/"This Month" button beneath it are two separate controls now, not
   // one — stacked in their own wrapper so the button reads as a distinct
   // affordance under the navigator rather than a fourth segment welded to it.
-  const outer = createDiv({ cls: "journal-period-nav-stack" });
-  const wrap = outer.createDiv({ cls: "journal-period-nav jeh-nav jeh-seg" });
+  const outer = createDiv({ cls: "ca-journal-period-nav-stack" });
+  const wrap = outer.createDiv({ cls: "ca-journal-period-nav ca-jeh-nav ca-jeh-seg" });
 
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (!(file instanceof TFile)) return outer;
@@ -446,11 +446,11 @@ export function buildPeriodNav(
     nowKey: string,
     onPick: (key: string) => Promise<void>
   ): void => {
-    const nav = parent.createDiv({ cls: "jeh-datenav" });
+    const nav = parent.createDiv({ cls: "ca-jeh-datenav" });
 
     // THE TRIGGER IS THE HEADLINE NOW, and the comment this replaces is the
     // argument for it read backwards. It said the trigger was icon-only because
-    // "the banner's `.job-title` right above this already carries the period,
+    // "the banner's `.ca-job-title` right above this already carries the period,
     // so echoing it again here was redundant" — which was true, and the fix for
     // a label printed twice is to keep the copy that can be pressed. The band
     // no longer prints a title; this is it.
@@ -463,11 +463,11 @@ export function buildPeriodNav(
     // Rebuilt on every `render()`, so the label tracks `cur` with no separate
     // update path to forget.
     const trigger = nav.createEl("button", {
-      cls: "jeh-datenav-trigger jeh-seg-mid jpn-value",
+      cls: "ca-jeh-datenav-trigger ca-jeh-seg-mid ca-jpn-value",
       attr: { "aria-label": "Select period", title: "Select period", type: "button" },
     });
-    trigger.createSpan({ cls: "jpn-value-label", text: valueLabel(unit, cur) });
-    setIcon(trigger.createSpan({ cls: "jeh-datenav-caret" }), "chevrons-up-down");
+    trigger.createSpan({ cls: "ca-jpn-value-label", text: valueLabel(unit, cur) });
+    setIcon(trigger.createSpan({ cls: "ca-jeh-datenav-caret" }), "chevrons-up-down");
 
     let menu: HTMLElement | null = null;
     const closeMenu = (): void => {
@@ -494,27 +494,27 @@ export function buildPeriodNav(
     };
 
     const openMenu = (): void => {
-      menu = nav.createDiv({ cls: "jeh-datenav-menu" });
+      menu = nav.createDiv({ cls: "ca-jeh-datenav-menu" });
       trigger.addClass("is-open");
-      const list = menu.createDiv({ cls: "jeh-datenav-list" });
+      const list = menu.createDiv({ cls: "ca-jeh-datenav-list" });
 
       const options = periodOptions(plugin, unit, selKey);
       let currentRow: HTMLElement | null = null;
       for (const opt of options) {
         const isCurrent = opt.key === selKey;
         const row = list.createEl("button", {
-          cls: "jeh-datenav-row" + (isCurrent ? " is-current" : ""),
+          cls: "ca-jeh-datenav-row" + (isCurrent ? " is-current" : ""),
           attr: { type: "button", title: rowLabel(unit, opt.key) },
         });
-        const text = row.createDiv({ cls: "jeh-datenav-row-text" });
-        text.createSpan({ cls: "jeh-datenav-row-label", text: rowLabel(unit, opt.key) });
+        const text = row.createDiv({ cls: "ca-jeh-datenav-row-text" });
+        text.createSpan({ cls: "ca-jeh-datenav-row-label", text: rowLabel(unit, opt.key) });
         const bits: string[] = [];
         if (opt.count > 0) bits.push(`${opt.count} ${opt.count === 1 ? "day" : "days"} logged`);
         if (opt.key === nowKey) bits.push("now");
-        if (bits.length) row.createDiv({ cls: "jeh-datenav-row-sub", text: bits.join(" · ") });
+        if (bits.length) row.createDiv({ cls: "ca-jeh-datenav-row-sub", text: bits.join(" · ") });
         if (isCurrent) {
           currentRow = row;
-          setIcon(row.createSpan({ cls: "jeh-datenav-row-mark" }), "check");
+          setIcon(row.createSpan({ cls: "ca-jeh-datenav-row-mark" }), "check");
         }
         row.addEventListener("click", () => void pick(opt.key));
       }

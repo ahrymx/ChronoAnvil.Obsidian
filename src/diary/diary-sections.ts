@@ -387,7 +387,7 @@ const summaryBar = (ctx: DiaryDashboardContext): string =>
 // (`row.ts`), so it titles the BAND; the old wording would have been a sentence
 // about the left column printed over the right one as well.
 //
-// TWO CELLS AT `--am-row-cell-min` PLUS THE GAP IS 660px, AND A PERIOD
+// TWO CELLS AT `--ca-row-cell-min` PLUS THE GAP IS 660px, AND A PERIOD
 // DASHBOARD IS NOT `wide`. That is deliberate and it fits: `MAX_COLUMNS` is two
 // precisely because two is the count that survives a default note column, and
 // the wrap below it is the phone collapse rather than a layout coming apart. No
@@ -448,7 +448,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
     band: "head",
     applies: always,
     render: () => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         PAGE_TITLE_LINE,
       ],
@@ -512,16 +512,16 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // draws chrome, so the missing bar read as a design rather than an omission.
     //
     // THE BAR GOES INSIDE THE CARD, which is the part that needed CSS rather
-    // than a line. `.journal-overview-card` is a real card — background, border,
+    // than a line. `.ca-journal-overview-card` is a real card — background, border,
     // inset — and a bar dropped into it would be a second border arguing with
     // the first. It becomes the card's TOP BAND instead, bleeding the padding
     // and carrying the rule beneath it, which is the manoeuvre
-    // `.journal-slim-banner .journal-banner-name` makes one card over and the
+    // `.ca-journal-slim-banner .ca-journal-banner-name` makes one card over and the
     // reason that rule's comment says every band in this plugin makes it.
     //
     // THE QUESTION BELOW IS WHAT KEEPS THE OTHER FORM AVAILABLE. See it.
     render: (ctx, opts) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         // THE ANSWER READ HERE IS THE ADD PATH'S ONLY. A section already in the
         // file is re-formed by `withAnswers`, which writes the bar line in or
@@ -616,7 +616,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // change — an existing dashboard gains the section by reconciliation and
     // keeps whatever its banner had.
     render: (ctx, opts) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(opts?.form === WIDGET_FORM ? [] : ["header:📝 Recap"]),
         `period-recap:${noun(ctx)}`,
@@ -693,7 +693,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // whose subject is the whole week. Narrowing it here would be answering a
     // question the page does not have.
     render: (_ctx, opts) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(opts?.form === WIDGET_FORM
           ? []
@@ -771,7 +771,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
     render: (ctx, opts) =>
       ctx.grain === "quarterly"
         ? {
-            fence: "almanac",
+            fence: "chronoanvil",
             lines: [
               ...(opts?.form === WIDGET_FORM ? [] : [rollupBar(ctx)]),
               // `:month`, singular, matching `month-start` and
@@ -780,7 +780,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
             ],
           }
         : {
-            fence: "almanac",
+            fence: "chronoanvil",
             lines: [
               ...(opts?.form === WIDGET_FORM ? [] : [rollupBar(ctx)]),
               "entry-rollup",
@@ -805,7 +805,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
     ],
     id: "open-tasks",
     label: "Open tasks",
-    blurb: "Still-open Almanac tasks from entries inside this period.",
+    blurb: "Still-open ChronoAnvil tasks from entries inside this period.",
     icon: "⏳",
     // The tasks live in the entries this aggregates, not here. Removing the
     // table removes a view of them and touches not one task.
@@ -824,7 +824,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // the `row` line from a run of one, so a grain where only the rollup applies
     // composes exactly the block it composed before rows existed.
     row: BODY_ROW,
-    render: () => ({ fence: "almanac", lines: ["tasks-table:,period"] }),
+    render: () => ({ fence: "chronoanvil", lines: ["tasks-table:,period"] }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },
   {
@@ -846,7 +846,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
     band: "body",
     applies: always,
     render: () => ({
-      fence: "almanac-charts",
+      fence: "chronoanvil-charts",
       // EVERY GRAIN, AS OF 3.9. The yearly dashboard's charts block carried no
       // header, and this line read `ctx.grain === "yearly" ? [] : [...]` with a
       // comment saying "preserved, not corrected".
@@ -870,7 +870,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
       // same manager, same specs. The absence was age, not argument.
       lines: [`${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`],
     }),
-    locate: (text) => probe(text, /^```almanac-charts/m),
+    locate: (text) => probe(text, /^```chronoanvil-charts/m),
   },
   {
     // TAGS ON A DASHBOARD — 3.14 §3. The section already existed on the
@@ -927,7 +927,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
     applies: always,
     optIn: true,
     render: (ctx) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         "header:🏷️ Tags",
         `tag-index:${ctx.diaryRoot ?? DEFAULT_PATHS.diaryRoot}`,
@@ -1246,7 +1246,7 @@ export function composeDiaryDashboard(grain: DashboardGrain): string {
 
   // ONE FENCE PER BAND-AND-FENCE-KIND RUN, not one per section (3.2 patch 3).
   //
-  // The masthead's two sections write into a single ```almanac block, because
+  // The masthead's two sections write into a single ```chronoanvil block, because
   // Obsidian renders each fence as its own block and two blocks cannot be made
   // into one card no matter how they are styled — the limit 2.18.4 already hit
   // on an entry, and the whole of §1. The body's sections are independent
@@ -1254,7 +1254,7 @@ export function composeDiaryDashboard(grain: DashboardGrain): string {
   //
   // ONLY THE MASTHEAD MERGES. The first attempt merged any consecutive
   // same-fence sections in one band, which is wrong in a way that is invisible
-  // until you read the output: every body section renders into an `almanac`
+  // until you read the output: every body section renders into a `chronoanvil`
   // fence too, so the whole page below the card collapsed into a single block —
   // Open Tasks welded to the rollup, and `assetUnits` seeing one unit where the
   // repair path needs three.
@@ -1264,7 +1264,7 @@ export function composeDiaryDashboard(grain: DashboardGrain): string {
   // and independent blocks are exactly what they already were.
   //
   // The `fence` agreement is still required on top: `charts` renders into an
-  // `almanac-charts` fence, so a rule keyed on the band alone would fuse chart
+  // `chronoanvil-charts` fence, so a rule keyed on the band alone would fuse chart
   // specs into a directive block the day a chart section joined the masthead.
   //
   // ── AND IT IS EMPTY AS OF 4.58.0, WHICH IS NOT THE SAME AS GONE ──────
@@ -1309,7 +1309,7 @@ export function composeDiaryDashboard(grain: DashboardGrain): string {
     blocks.push(["```" + run.fence, ...run.lines, "```"].join("\n"));
   }
   return (
-    [...frontmatter(ctx), "`almanac:spacer`"].join("\n") +
+    [...frontmatter(ctx), "`chronoanvil:spacer`"].join("\n") +
     "\n" +
     blocks.join("\n\n") +
     // The parent, and only the parent — see `graphLinksSection`. A period
@@ -1481,7 +1481,7 @@ export function parseDiarySections(
           seg.lines.every(
             (l) =>
               l.trim() === "" ||
-              l.trim() === "`almanac:spacer`" ||
+              l.trim() === "`chronoanvil:spacer`" ||
               l.trim().startsWith("%%") ||
               l.trim().startsWith("[[")
           )),
@@ -1612,7 +1612,7 @@ export function titleSummaryFence(text: string): string | null {
     // carrying `frame: section` draws its own section chrome, and that is what
     // `composeDiaryDashboard` writes:
     //
-    //     ```almanac
+    //     ```chronoanvil
     //     frame: section
     //     month-summary
     //     ```
@@ -2068,7 +2068,7 @@ export function applyDiarySections(
   const next = chunks
     .flatMap((c) => c.lines)
     .join("\n")
-    .replace(/\n{3,}%% almanac-graph %%/g, "\n\n%% almanac-graph %%");
+    .replace(/\n{3,}%% chronoanvil-graph %%/g, "\n\n%% chronoanvil-graph %%");
   return next === text ? null : next;
 }
 

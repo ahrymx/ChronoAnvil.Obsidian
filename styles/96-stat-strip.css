@@ -23,10 +23,10 @@
    shave half a pixel off the width to make room. A gap over a coloured ground
    divides any number of cells in any number of rows with no per-cell
    arithmetic, and it takes the release's rule weight without being told. */
-.am-stats {
+.ca-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--am-rule);
+  gap: var(--ca-rule);
   background: var(--background-modifier-border);
 }
 /* Written out per count rather than as `repeat(var(--n), …)`, because the
@@ -35,19 +35,19 @@
    property would have to come from the element to be dynamic, and an inline
    declaration is the one thing a stylesheet cannot beat. Four rules is the
    price of the query working. */
-.am-stats[data-cols="1"] {
+.ca-stats[data-cols="1"] {
   grid-template-columns: minmax(0, 1fr);
 }
-.am-stats[data-cols="2"] {
+.ca-stats[data-cols="2"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.am-stats[data-cols="3"] {
+.ca-stats[data-cols="3"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-.am-stats[data-cols="4"] {
+.ca-stats[data-cols="4"] {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
-.am-stat {
+.ca-stat {
   /* Opaque, because it is what hides the ground the gaps show through. */
   background: var(--background-secondary);
   /* Obsidian sets border-box per component and this grid does not size by
@@ -62,7 +62,7 @@
   min-width: 0;
   min-height: 38px;
 }
-.am-stat-ring-wrap {
+.ca-stat-ring-wrap {
   position: relative;
   width: 24px;
   height: 24px;
@@ -71,24 +71,24 @@
   align-items: center;
   justify-content: center;
 }
-.am-stat-ring-svg {
+.ca-stat-ring-svg {
   transform: rotate(-90deg);
   width: 24px;
   height: 24px;
 }
-.am-stat-ring-bg {
+.ca-stat-ring-bg {
   stroke: var(--background-modifier-border);
   stroke-width: 3;
   fill: transparent;
 }
-.am-stat-ring-val {
+.ca-stat-ring-val {
   stroke: var(--interactive-accent);
   stroke-width: 3;
   fill: transparent;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.3s ease;
 }
-.am-stat-ring-icon {
+.ca-stat-ring-icon {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -96,20 +96,20 @@
   font-size: 11px;
   line-height: 1;
 }
-.am-stat-data {
+.ca-stat-data {
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-width: 0;
   flex: 1;
 }
-.am-stat-val-row {
+.ca-stat-val-row {
   display: flex;
   align-items: baseline;
   gap: 5px;
 }
-.am-stat-label {
-  font-size: var(--am-text-2xs);
+.ca-stat-label {
+  font-size: var(--ca-text-2xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -118,7 +118,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.am-stat-value {
+.ca-stat-value {
   font-size: 1.15em;
   font-weight: 800;
   line-height: 1.15;
@@ -126,54 +126,54 @@
   color: var(--text-normal);
   white-space: nowrap;
 }
-.am-stat-sub {
-  font-size: var(--am-text-2xs);
+.ca-stat-sub {
+  font-size: var(--ca-text-2xs);
   color: var(--text-muted);
   font-weight: 600;
   white-space: nowrap;
 }
-.am-stat-sub:empty {
+.ca-stat-sub:empty {
   display: none;
 }
 
 /* Four across becomes two by two.
 
    `@container`, NOT `@media`, AND THE OLD RULE WAS THE BUG. The year's strip
-   collapsed at `@media (max-width: 480px)`, which measures the WINDOW. Almanac
+   collapsed at `@media (max-width: 480px)`, which measures the WINDOW. ChronoAnvil
    renders inside a note pane, and a 400px pane in a 1600px window is the
    normal way anyone reads a dashboard beside something else — so the fallback
    fired only when the whole Obsidian window was phone-width, which on a
    desktop is never. Four cells at 100px each, with a label like LESSONS
    COMPLETED in them, was the actual rendering.
 
-   `.journal-widget-block` has carried `container-type: inline-size` since
+   `.ca-journal-widget-block` has carried `container-type: inline-size` since
    2.51, and twelve rules in this sheet already query it. This one was written
    before that was true and never revisited.
 
    AND THE BLOCK IS NOT ALWAYS WHAT IT MEASURES. `@container` resolves against
    the NEAREST container, so a caller that puts a strip inside a smaller one
-   gets the collapse against that instead — which is what `.jld-card` does since
+   gets the collapse against that instead — which is what `.ca-jld-card` does since
    4.36.3, for exactly the reason above one level down: a 330px card in a
    700px section had four cells at 80px in it. That is the query working rather
    than a special case, and it is the reason this rule names no ancestor. */
 @container (max-width: 480px) {
   /* Same specificity as the rules above and later in the file, which is what
      makes it win — and why the selectors are spelled out rather than left as
-     `.am-stats`. A one- or two-card strip is already narrow enough and is left
+     `.ca-stats`. A one- or two-card strip is already narrow enough and is left
      alone. */
-  .am-stats[data-cols="3"],
-  .am-stats[data-cols="4"] {
+  .ca-stats[data-cols="3"],
+  .ca-stats[data-cols="4"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 /* In a masthead the strip is the band's third row rather than a block in a
-   body, so it brings its own frame — the year's comes from `.jyr-stats-wrap`,
+   body, so it brings its own frame — the year's comes from `.ca-jyr-stats-wrap`,
    which it shares with the density strip below it. */
-.journal-overview-banner .am-stats {
+.ca-journal-overview-banner .ca-stats {
   margin-top: 8px;
-  border: var(--am-rule) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
   /* The cells are square and the frame is not; without this the corner cells
      paint over the radius. */
   overflow: hidden;

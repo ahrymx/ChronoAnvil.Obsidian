@@ -12,14 +12,14 @@
 // broke them. They now delegate to Diary.openOrCreateDay/openOrCreateMonth,
 // so path settings and template lookups stay in one place.
 //
-// Call sites (inside an ```almanac block):
+// Call sites (inside a ```chronoanvil block):
 //   calendar        full month calendar with prev/next + jump-to-date  (homepage)
 //   month-summary   stats line + day grid + year grid, all driven by
 //                   `month-start`                                       (monthly review)
 
 import { App, MarkdownPostProcessorContext, setIcon, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
-import { countAlmanacTasks, sumAlmanacTasks } from "../ui/tables";
+import type ChronoAnvilPlugin from "../main";
+import { countChronoAnvilTasks, sumChronoAnvilTasks } from "../ui/tables";
 import {
   describeDay,
   describeEventDate,
@@ -179,7 +179,7 @@ type MoodRange = { min?: number; max?: number } | undefined;
 
 // Resolve the min/max of the configured heat-map tracker, if it declares one,
 // so moodBucket can normalise across the tracker's own scale.
-function moodRange(plugin: AlmanacPlugin): MoodRange {
+function moodRange(plugin: ChronoAnvilPlugin): MoodRange {
   const def = plugin.settings.trackers.find(
     (t) => t.id === plugin.settings.moodTrackerId
   );
@@ -188,7 +188,7 @@ function moodRange(plugin: AlmanacPlugin): MoodRange {
 
 function moodClass(mood: number | null, range: MoodRange): string {
   const bucket = moodBucket(mood, range);
-  return bucket == null ? "" : ` cal-mood-${bucket}`;
+  return bucket == null ? "" : ` ca-cal-mood-${bucket}`;
 }
 
 // How many of a day's events get drawn before the cell gives up and defers to
@@ -234,7 +234,7 @@ interface DayGridOptions {
 // only real estate colliding with nothing. Bottom-right is also where a marker
 // is hardest to see, so 2.51 trades the collision back: the badge moves up and
 // is drawn over the bars, with a disc of page background behind it (see
-// .cal-badge). Nothing about the bars changes, which is the point — the
+// .ca-cal-badge). Nothing about the bars changes, which is the point — the
 // alternative was making their vertical position depend on whether the day
 // also carried a solo event, and a trip whose bar steps down for one day in
 // the middle is worse than any overlap.
@@ -250,35 +250,35 @@ function decorateCell(
   const spans = occurrences.filter((o) => o.pos !== "solo");
   const solos = occurrences.filter((o) => o.pos === "solo");
 
-  cell.addClass("cal-cell-has-event");
+  cell.addClass("ca-cal-cell-has-event");
 
   const drawnSpans = spans.slice(0, MAX_BARS);
   if (drawnSpans.length) {
     // Tint from the first span only. Layering two translucent washes produces a
     // muddy third colour that belongs to neither event, so overlapping trips
     // are told apart by their bars, not their backgrounds.
-    cell.addClass(`cal-tint-${eventColor(drawnSpans[0].def)}`);
-    const bars = cell.createDiv({ cls: "cal-bars" });
+    cell.addClass(`ca-cal-tint-${eventColor(drawnSpans[0].def)}`);
+    const bars = cell.createDiv({ cls: "ca-cal-bars" });
     for (const occ of drawnSpans) {
       const classes = [
-        "cal-bar",
-        `cal-bar-${eventColor(occ.def)}`,
-        `cal-bar-${occ.pos}`,
+        "ca-cal-bar",
+        `ca-cal-bar-${eventColor(occ.def)}`,
+        `ca-cal-bar-${occ.pos}`,
       ];
       // A bar bleeds into the grid gap to meet its neighbour, which is wrong at
       // a row boundary: Friday's bar would run off the right edge and Monday's
       // would start in mid-air. Clip at the ends of the week and cap the bar
       // there instead, so a span that crosses a weekend reads as continuing
       // rather than as broken.
-      if (col === 0) classes.push("cal-bar-clip-left");
-      if (col === 6) classes.push("cal-bar-clip-right");
+      if (col === 0) classes.push("ca-cal-bar-clip-left");
+      if (col === 6) classes.push("ca-cal-bar-clip-right");
       bars.createDiv({ cls: classes.join(" ") });
     }
   }
 
   for (const occ of solos.slice(0, MAX_BADGES)) {
     const badge = cell.createSpan({
-      cls: `cal-badge cal-badge-${eventColor(occ.def)}`,
+      cls: `ca-cal-badge ca-cal-badge-${eventColor(occ.def)}`,
     });
     setIcon(badge, eventIcon(occ.def));
   }
@@ -286,7 +286,7 @@ function decorateCell(
   const hidden =
     spans.length - drawnSpans.length + Math.max(0, solos.length - MAX_BADGES);
   if (hidden > 0) {
-    cell.createSpan({ cls: "cal-more", text: `+${hidden}` });
+    cell.createSpan({ cls: "ca-cal-more", text: `+${hidden}` });
   }
 }
 
@@ -299,7 +299,7 @@ function renderDayGrid(gridEl: HTMLElement, opts: DayGridOptions): void {
   gridEl.empty();
   // Eight columns (week gutter + seven days) only when weeks are navigable;
   // otherwise the embedded grids keep their seven-column layout untouched.
-  gridEl.toggleClass("jc-grid-weeks", !!onOpenWeek);
+  gridEl.toggleClass("ca-jc-grid-weeks", !!onOpenWeek);
   // Align the grid to the locale's week-start (shared with the chart heatmap)
   // instead of a hard-coded Monday: back up from the 1st to the week-start, and
   // extend past month-end to complete the final week.
@@ -332,21 +332,21 @@ function renderDayGrid(gridEl: HTMLElement, opts: DayGridOptions): void {
       // that advertisement.
       const hasEntry = weekEntries?.has(rowWeekKey(d)) ?? false;
       const weekCell = gridEl.createEl("button", {
-        cls: "cal-week" + (hasEntry ? " has-review" : ""),
+        cls: "ca-cal-week" + (hasEntry ? " has-review" : ""),
         attr: {
           type: "button",
           title: `Open week ${wk} — Weekly Overview${entryTip("week", hasEntry)}`,
           "aria-label": `Open week ${wk}`,
         },
       });
-      // The week today falls in is tinted, for the reason .jc-mcell.is-now
+      // The week today falls in is tinted, for the reason .ca-jc-mcell.is-now
       // exists in the rail above: once you have navigated away from the current
       // period, the way back has to stay findable. The day cell's ring answers
       // that for the day; nothing answered it for the row.
       if (todayIso >= weekStartIso && todayIso < d.clone().add(7, "days").format("YYYY-MM-DD")) {
         weekCell.addClass("is-now");
       }
-      weekCell.createSpan({ cls: "cal-weeknum", text: String(wk) });
+      weekCell.createSpan({ cls: "ca-cal-weeknum", text: String(wk) });
       weekCell.addEventListener("click", () => onOpenWeek(weekStartIso));
     }
 
@@ -354,14 +354,14 @@ function renderDayGrid(gridEl: HTMLElement, opts: DayGridOptions): void {
     const entry = dayMap.get(iso);
     const occurrences = events.get(iso) ?? [];
 
-    const classes = ["cal-cell"];
-    if (!inMonth) classes.push("cal-cell-outside");
-    if (iso === todayIso) classes.push("cal-cell-today");
+    const classes = ["ca-cal-cell"];
+    if (!inMonth) classes.push("ca-cal-cell-outside");
+    if (iso === todayIso) classes.push("ca-cal-cell-today");
     // Note what this class does *not* key off: an event never sets it. A day
     // decorated with a birthday but never written up is still a day with no
     // entry, and has to keep looking like one — otherwise the calendar starts
     // claiming you journalled on days you didn't.
-    if (entry) classes.push("cal-cell-has-entry");
+    if (entry) classes.push("ca-cal-cell-has-entry");
 
     // Tooltip: the click action first (it's what the cell does), then the
     // day's events underneath.
@@ -375,8 +375,8 @@ function renderDayGrid(gridEl: HTMLElement, opts: DayGridOptions): void {
       attr: { title: tip },
     });
     decorateCell(cell, occurrences, i % 7);
-    cell.createSpan({ cls: "cal-daynum", text: String(d.date()) });
-    if (entry) cell.createSpan({ cls: "cal-dot" });
+    cell.createSpan({ cls: "ca-cal-daynum", text: String(d.date()) });
+    if (entry) cell.createSpan({ cls: "ca-cal-dot" });
     cell.addEventListener("click", () => onOpen(iso));
     if (onContext) {
       cell.addEventListener("contextmenu", (evt) => {
@@ -391,7 +391,7 @@ function renderDayGrid(gridEl: HTMLElement, opts: DayGridOptions): void {
 // including the padding days from the months either side, so a trip that starts
 // on the 30th of the previous month still shows its bar running in.
 function gridEvents(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   monthStart: MomentLike
 ): Map<string, EventOccurrence[]> {
   if (!plugin.settings.eventsEnabled) return new Map();
@@ -407,13 +407,13 @@ function gridEvents(
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 function renderWeekdayHeader(parent: HTMLElement, weeks = false): void {
-  const row = parent.createDiv({ cls: "jc-weekdays" });
+  const row = parent.createDiv({ cls: "ca-jc-weekdays" });
   // Leading header for the week gutter, so the "Wk" label sits above the
   // week-number column and the seven weekday labels stay aligned with the day
   // cells below them.
   if (weeks) {
-    row.addClass("jc-weekdays-weeks");
-    row.createSpan({ cls: "jc-weeknum-head", text: "Wk" });
+    row.addClass("ca-jc-weekdays-weeks");
+    row.createSpan({ cls: "ca-jc-weeknum-head", text: "Wk" });
   }
   const ws = weekStartDay();
   for (let k = 0; k < 7; k++) {
@@ -481,16 +481,16 @@ function isSoon(item: UpcomingEvent): boolean {
 
 function renderAgenda(
   parent: HTMLElement,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   count: number,
   onOpenDay: (iso: string) => void
 ): void {
-  const panel = parent.createDiv({ cls: "jc-agenda" });
+  const panel = parent.createDiv({ cls: "ca-jc-agenda" });
 
-  const head = panel.createDiv({ cls: "jc-agenda-head" });
-  head.createSpan({ cls: "jc-agenda-label", text: "Coming up" });
+  const head = panel.createDiv({ cls: "ca-jc-agenda-head" });
+  head.createSpan({ cls: "ca-jc-agenda-label", text: "Coming up" });
   const manage = head.createEl("a", {
-    cls: "jc-agenda-manage",
+    cls: "ca-jc-agenda-manage",
     text: "Manage",
     attr: { href: "#", title: "Open the events note" },
   });
@@ -502,7 +502,7 @@ function renderAgenda(
 
   if (!plugin.settings.eventsEnabled) {
     panel.createDiv({
-      cls: "jc-agenda-empty",
+      cls: "ca-jc-agenda-empty",
       text: "Special events are turned off in Settings → Special events.",
     });
     return;
@@ -511,41 +511,41 @@ function renderAgenda(
   const items = upcomingEvents(readEvents(plugin.app, plugin), today(), count);
   if (!items.length) {
     panel.createDiv({
-      cls: "jc-agenda-empty",
+      cls: "ca-jc-agenda-empty",
       text: "No events yet — add a birthday and it'll show on every calendar.",
     });
     return;
   }
 
   for (const item of items) {
-    const row = panel.createDiv({ cls: "jc-agenda-row" });
+    const row = panel.createDiv({ cls: "ca-jc-agenda-row" });
     if (isSoon(item)) row.addClass("is-soon");
     if (item.ongoing) row.addClass("is-ongoing");
 
     // Date gutter: big day number over a month abbreviation, matching the
     // weight and tabular figures of a calendar cell.
     const iso = agendaGutterIso(item);
-    const gutter = row.createDiv({ cls: "jc-agenda-date" });
-    gutter.createDiv({ cls: "jc-agenda-day", text: String(Number(iso.slice(8, 10))) });
+    const gutter = row.createDiv({ cls: "ca-jc-agenda-date" });
+    gutter.createDiv({ cls: "ca-jc-agenda-day", text: String(Number(iso.slice(8, 10))) });
     gutter.createDiv({
-      cls: "jc-agenda-month",
+      cls: "ca-jc-agenda-month",
       text: MONTH_ABBR[Number(iso.slice(5, 7)) - 1],
     });
 
     const chip = row.createSpan({
-      cls: `am-ev-chip am-ev-chip-${eventColor(item.def)}`,
+      cls: `ca-ev-chip ca-ev-chip-${eventColor(item.def)}`,
     });
     setIcon(chip, eventIcon(item.def));
 
-    const text = row.createDiv({ cls: "am-ev-text" });
-    text.createDiv({ cls: "am-ev-title", text: item.def.title });
+    const text = row.createDiv({ cls: "ca-ev-text" });
+    text.createDiv({ cls: "ca-ev-title", text: item.def.title });
     const meta = describeEventDate(item.def);
     text.createDiv({
-      cls: "am-ev-meta",
+      cls: "ca-ev-meta",
       text: item.def.note ? `${meta} · ${item.def.note}` : meta,
     });
 
-    row.createSpan({ cls: "jc-agenda-when", text: describeRelative(item) });
+    row.createSpan({ cls: "ca-jc-agenda-when", text: describeRelative(item) });
 
     // The whole row opens that day's entry — the list is a way into the diary,
     // not just a readout. Editing an event is still the calendar's context
@@ -555,7 +555,7 @@ function renderAgenda(
 }
 
 export function buildCalendar(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   opts: CalendarOptions = {}
 ): HTMLElement {
   const app = plugin.app;
@@ -594,7 +594,7 @@ export function buildCalendar(
     yearKeyOf
   );
 
-  const root = createDiv({ cls: "journal-calendar jc-has-weeks" });
+  const root = createDiv({ cls: "ca-journal-calendar ca-jc-has-weeks" });
 
   // The diary actions, when this calendar is a Diary SECTION rather than a bare
   // grid: what you can do to today, on a strip above the month navigator.
@@ -615,38 +615,38 @@ export function buildCalendar(
   // processor and not by the table it belongs to. The strip reads as the
   // section's because it takes the same four values — a hairline, 4px of air,
   // right-aligned, at the bar's scale — not because it shares its element.
-  const header = root.createDiv({ cls: "jc-header" });
+  const header = root.createDiv({ cls: "ca-jc-header" });
 
-  const navHead = header.createDiv({ cls: "jc-navhead" });
+  const navHead = header.createDiv({ cls: "ca-jc-navhead" });
   const yearPrevEl = navHead.createEl("button", {
-    cls: "jc-year-step jc-year-prev",
+    cls: "ca-jc-year-step ca-jc-year-prev",
     attr: { type: "button", "aria-label": "Previous year" },
   });
   setIcon(yearPrevEl, "chevron-left");
 
   const yearCurEl = navHead.createEl("button", {
-    cls: "jc-year-cur",
+    cls: "ca-jc-year-cur",
     attr: { type: "button", title: "Open the year overview" },
   });
-  const yearCurCalIcon = yearCurEl.createSpan({ cls: "jc-year-cur-cal-icon" });
+  const yearCurCalIcon = yearCurEl.createSpan({ cls: "ca-jc-year-cur-cal-icon" });
   setIcon(yearCurCalIcon, "calendar");
-  const yearCurLabel = yearCurEl.createSpan({ cls: "jc-year-cur-label" });
-  const yearCurExtIcon = yearCurEl.createSpan({ cls: "jc-year-cur-icon" });
+  const yearCurLabel = yearCurEl.createSpan({ cls: "ca-jc-year-cur-label" });
+  const yearCurExtIcon = yearCurEl.createSpan({ cls: "ca-jc-year-cur-icon" });
   setIcon(yearCurExtIcon, "arrow-up-right");
 
-  const rightCluster = navHead.createDiv({ cls: "jc-navhead-right" });
+  const rightCluster = navHead.createDiv({ cls: "ca-jc-navhead-right" });
   const yearNextEl = rightCluster.createEl("button", {
-    cls: "jc-year-step jc-year-next",
+    cls: "ca-jc-year-step ca-jc-year-next",
     attr: { type: "button", "aria-label": "Next year" },
   });
   setIcon(yearNextEl, "chevron-right");
 
   const todayBtn = rightCluster.createEl("button", {
-    cls: "jc-today-btn",
+    cls: "ca-jc-today-btn",
     attr: { type: "button", title: "Jump to today" },
   });
-  todayBtn.createSpan({ cls: "jc-today-dot" });
-  todayBtn.createSpan({ cls: "jc-today-label", text: "Today" });
+  todayBtn.createSpan({ cls: "ca-jc-today-dot" });
+  todayBtn.createSpan({ cls: "ca-jc-today-label", text: "Today" });
 
   // Month abbreviations are read off a fixed year so they follow the locale
   // without moment's day-clamping (setting month on the 31st would skid).
@@ -654,7 +654,7 @@ export function buildCalendar(
     moment(`2001-${String(i + 1).padStart(2, "0")}-01`).format("MMM")
   );
 
-  const qrail = header.createDiv({ cls: "jc-qrail" });
+  const qrail = header.createDiv({ cls: "ca-jc-qrail" });
   const monthCells: HTMLElement[] = [];
   const quarterLabels: HTMLElement[] = [];
   // THE GROUPS ARE NOT COLLECTED ANY MORE (4.13.1 §3b). A `quarterGroups` array
@@ -663,23 +663,23 @@ export function buildCalendar(
   // gone with the rail's frame; the accent text is what is left, and the labels
   // are already collected.
   for (let q = 0; q < 4; q++) {
-    const group = qrail.createDiv({ cls: "jc-qgroup" });
+    const group = qrail.createDiv({ cls: "ca-jc-qgroup" });
     // The `Q` is inside a span rather than being the button's own text (3.17
-    // §2), for the reason .jc-mcell-label is: `text-decoration` set on a flex
+    // §2), for the reason .ca-jc-mcell-label is: `text-decoration` set on a flex
     // container is not reliably inherited by its anonymous text, and the
     // underline that says "this quarter has an entry" has to land on the word.
     // Same construction on all four scopes — month label, week number, quarter
     // letter, year figure — so one rule can describe them.
     const qlabel = group.createEl("button", {
-      cls: "jc-qlabel",
+      cls: "ca-jc-qlabel",
       attr: { type: "button" },
     });
-    qlabel.createSpan({ cls: "jc-qlabel-text", text: `Q${q + 1}` });
+    qlabel.createSpan({ cls: "ca-jc-qlabel-text", text: `Q${q + 1}` });
     quarterLabels.push(qlabel);
-    const months = group.createDiv({ cls: "jc-qmonths" });
+    const months = group.createDiv({ cls: "ca-jc-qmonths" });
     for (let i = 0; i < 3; i++) {
       const cell = months.createEl("button", {
-        cls: "jc-mcell",
+        cls: "ca-jc-mcell",
         attr: { type: "button" },
       });
       // THE LABEL CARRIES IT, as of 3.9 §1. There used to be a lucide
@@ -699,32 +699,32 @@ export function buildCalendar(
       // keyboard and screen-reader user already had. Removing the icon did not
       // take an affordance away from them; it took away a second one only mouse
       // users ever got.
-      cell.createSpan({ cls: "jc-mcell-label", text: MONTH_ABBR[q * 3 + i] });
+      cell.createSpan({ cls: "ca-jc-mcell-label", text: MONTH_ABBR[q * 3 + i] });
       monthCells.push(cell);
     }
   }
 
   // The navigator is a bounded band now (hairlines top and bottom, see
-  // .jc-header in styles.css), so the two rows read as one deliberate control
+  // .ca-jc-header in styles.css), so the two rows read as one deliberate control
   // strip between the stats and the grid rather than floating over the days.
   // The band's own borders replace the standalone closing rule that used to
   // sit here.
 
   renderWeekdayHeader(root, true);
-  const gridEl = root.createDiv({ cls: "jc-grid" });
+  const gridEl = root.createDiv({ cls: "ca-jc-grid" });
 
   // The footer's right half used to be an empty slot that only ever filled in
   // for the half-second a "Creating…" message was up. It now carries the
   // visible month's entry count by default and borrows the slot for status.
-  const footer = root.createDiv({ cls: "jc-footer" });
-  const jumpToggle = footer.createSpan({ cls: "jc-jump-toggle", text: "Jump to a date…" });
-  const statusEl = footer.createSpan({ cls: "jc-status" });
+  const footer = root.createDiv({ cls: "ca-jc-footer" });
+  const jumpToggle = footer.createSpan({ cls: "ca-jc-jump-toggle", text: "Jump to a date…" });
+  const statusEl = footer.createSpan({ cls: "ca-jc-status" });
 
-  const jumpRow = root.createDiv({ cls: "jc-jump-row" });
-  const jumpDay = jumpRow.createEl("input", { type: "date", cls: "jc-jump-day" });
-  const jumpDayBtn = jumpRow.createEl("button", { cls: "jc-jump-day-btn", text: "Open Day" });
-  const jumpMonth = jumpRow.createEl("input", { type: "month", cls: "jc-jump-month" });
-  const jumpMonthBtn = jumpRow.createEl("button", { cls: "jc-jump-month-btn", text: "Open Month" });
+  const jumpRow = root.createDiv({ cls: "ca-jc-jump-row" });
+  const jumpDay = jumpRow.createEl("input", { type: "date", cls: "ca-jc-jump-day" });
+  const jumpDayBtn = jumpRow.createEl("button", { cls: "ca-jc-jump-day-btn", text: "Open Day" });
+  const jumpMonth = jumpRow.createEl("input", { type: "month", cls: "ca-jc-jump-month" });
+  const jumpMonthBtn = jumpRow.createEl("button", { cls: "ca-jc-jump-month-btn", text: "Open Month" });
   jumpDay.value = today();
   jumpMonth.value = thisMonth();
 
@@ -965,7 +965,7 @@ export function buildCalendar(
   // Last, so the agenda sits below the jump row rather than between the grid
   // and its own footer.
   if (opts.agenda && opts.agenda > 0) {
-    root.addClass("jc-has-agenda");
+    root.addClass("ca-jc-has-agenda");
     renderAgenda(root, plugin, opts.agenda, openDay);
   }
 
@@ -996,7 +996,7 @@ export function buildCalendar(
 // meaning, on both surfaces.
 function renderYearGrid(
   gridEl: HTMLElement,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   year: number,
   selectedMonthKey: string,
   dayMap: Map<string, DayEntry>,
@@ -1031,10 +1031,10 @@ function renderYearGrid(
     const moods = moodByMonth.get(mk) ?? [];
     const avg = moods.length ? moods.reduce((a, b) => a + b, 0) / moods.length : null;
 
-    const classes = ["cal-cell", "cal-cell-month"];
-    if (mk === selectedMonthKey) classes.push("cal-cell-selected");
-    if (mk === todayMonthKey) classes.push("cal-cell-today");
-    if (has) classes.push("cal-cell-has-entry");
+    const classes = ["ca-cal-cell", "ca-cal-cell-month"];
+    if (mk === selectedMonthKey) classes.push("ca-cal-cell-selected");
+    if (mk === todayMonthKey) classes.push("ca-cal-cell-today");
+    if (has) classes.push("ca-cal-cell-has-entry");
 
     // The tooltip has to say which of the two things a click will do, or the
     // staging is invisible and the grid reads as inconsistent.
@@ -1048,7 +1048,7 @@ function renderYearGrid(
       cls:
         classes.join(" ") +
         moodClass(avg, moodRange(plugin)) +
-        (selects ? " cal-cell-selects" : ""),
+        (selects ? " ca-cal-cell-selects" : ""),
       attr: {
         title:
           (selects
@@ -1058,8 +1058,8 @@ function renderYearGrid(
               : "Create review") + ` — ${tally}`,
       },
     });
-    cell.createSpan({ cls: "cal-daynum", text: moment(mk + "-01").format("MMM") });
-    if (has) cell.createSpan({ cls: "cal-dot" });
+    cell.createSpan({ cls: "ca-cal-daynum", text: moment(mk + "-01").format("MMM") });
+    if (has) cell.createSpan({ cls: "ca-cal-dot" });
 
     // THE TILE REPORTS (4.14 §3). Twelve tiles at 157x97px — the largest
     // objects on the month view — carried one word each, so a month with forty
@@ -1072,7 +1072,7 @@ function renderYearGrid(
     // year is a scorecard nobody asked for. The dash says the slot is empty,
     // which is the same thing the bar says by not being drawn.
     cell.createSpan({
-      cls: "cal-month-count",
+      cls: "ca-cal-month-count",
       text: logged > 0 ? String(logged) : "—",
     });
     if (logged > 0) {
@@ -1080,7 +1080,7 @@ function renderYearGrid(
       // bar answers "how much of this month did I write up", and a scale set by
       // the fullest month would redraw all twelve every time one of them grew.
       const days = moment(mk + "-01").daysInMonth();
-      const bar = cell.createSpan({ cls: "cal-month-bar" });
+      const bar = cell.createSpan({ cls: "ca-cal-month-bar" });
       bar.style.width = `${Math.round((logged / days) * 100)}%`;
     }
     cell.addEventListener("click", () => {
@@ -1112,7 +1112,7 @@ function renderYearGrid(
 // thing the diary card was made to look like, rather than the other way round.
 //
 // Before 2.22 this was a plain `header:📆 Monthly Overview` bar (a hairline-
-// ruled flex row) rendered as its own ```almanac fence, separate from the
+// ruled flex row) rendered as its own ```chronoanvil fence, separate from the
 // summary's title + stats below it. Folding the navigator into the summary
 // widget makes the band and the grid one card — the same construction the
 // calendar card uses on the homepage, and the entry banner uses on a note.
@@ -1133,13 +1133,13 @@ export const OVERVIEW_LABELS: Record<OverviewUnit, string> = {
 };
 
 export function buildOverviewBanner(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   unit: OverviewUnit,
   icon: string,
   title: string
 ): { band: HTMLElement; textCol: HTMLElement } {
-  const band = createDiv({ cls: `journal-overview-banner job-${unit}` });
+  const band = createDiv({ cls: `ca-journal-overview-banner ca-job-${unit}` });
 
   // ── THE HEADLINE IS UPSTAIRS NOW (4.51.7) ─────────────────────────────
   //
@@ -1161,10 +1161,10 @@ export function buildOverviewBanner(
   // being drawn.
   const noteFile = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (noteFile instanceof TFile && bannerSuppressed(plugin, ctx.sourcePath)) {
-    band.addClass("job-head-elsewhere");
+    band.addClass("ca-job-head-elsewhere");
   }
 
-  const head = band.createDiv({ cls: "job-head" });
+  const head = band.createDiv({ cls: "ca-job-head" });
 
   // NO EYEBROW AND NO NAVIGATOR AS OF 3.4. Both moved out of the band, and the
   // band is what is left when they go: the period's name, as large as it can
@@ -1181,7 +1181,7 @@ export function buildOverviewBanner(
   // `icon` is still taken and still unused here — the crumb draws its own, and
   // dropping the parameter would touch four call sites for nothing.
   void icon;
-  const textCol = head.createDiv({ cls: "job-text" });
+  const textCol = head.createDiv({ cls: "ca-job-text" });
 
   // TWO LINES, ANSWERING TWO QUESTIONS. `title` is the SPAN — the stretch of
   // days this page covers — and it is printed small, above. The headline is the
@@ -1194,7 +1194,7 @@ export function buildOverviewBanner(
   // so far"). Splitting them fixes both: the span carries the sentence and the
   // "so far", and the headline reads the same on the first day of a period as
   // on the last.
-  textCol.createDiv({ cls: "job-span", text: title });
+  textCol.createDiv({ cls: "ca-job-span", text: title });
 
   // THE NAVIGATOR IS IN THE BAND, and 3.4's `period-nav:` directive is
   // withdrawn. Moving it to the nav row was right about the redundancy it was
@@ -1216,7 +1216,7 @@ export function buildOverviewBanner(
 // `N/M days logged · D ✓ / O ◻ tasks`, used by both period dashboards. Shared
 // for the numbers, not just the styling: the week and month summaries
 // previously counted tasks by different routes, and only one of them could
-// actually see an Almanac `- ( )` task (see sumAlmanacTasks). One function is
+// actually see a ChronoAnvil `- ( )` task (see sumChronoAnvilTasks). One function is
 // the cheapest guarantee they can't drift apart again.
 //
 // 2.23 dropped the "avg mood X" segment from both dashboards — per-day mood
@@ -1239,12 +1239,12 @@ export function buildOverviewBanner(
 // which they could not, because it was a renderer: it opened a `<p>`, appended
 // text to it, and handed back the element. There was no way to ask it for the
 // numbers, so a card strip would have called `periodCoverage` and
-// `sumAlmanacTasks` again and become the second place the dashboard's figures
+// `sumChronoAnvilTasks` again and become the second place the dashboard's figures
 // are decided. That is the failure this function exists to prevent, and it is
 // the reason `renderPeriodStats` was made shared in the first place.
 //
 // THE TASK COUNT IS A PROMISE, DELIBERATELY, and it is one promise rather than
-// one per consumer. Counting Almanac tasks means reading every entry's body,
+// one per consumer. Counting ChronoAnvil tasks means reading every entry's body,
 // so it cannot be synchronous — but a promise can be awaited any number of
 // times, so the prose line and a card strip beside it share ONE pass over the
 // files and cannot disagree about the answer. Handing back a number would have
@@ -1279,7 +1279,7 @@ export function periodStats(
     elapsed: cov.elapsed,
     total: cov.total,
     partial: cov.partial,
-    tasks: sumAlmanacTasks(app, files),
+    tasks: sumChronoAnvilTasks(app, files),
   };
 }
 
@@ -1345,12 +1345,12 @@ export function renderPeriodStats(
 }
 
 export function buildWeekSummary(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   const app = plugin.app;
   const paths = plugin.settings.paths;
-  const root = createDiv({ cls: "journal-week-summary journal-overview-summary" });
+  const root = createDiv({ cls: "ca-journal-week-summary ca-journal-overview-summary" });
 
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (!(file instanceof TFile)) return root;
@@ -1410,8 +1410,8 @@ export function buildWeekSummary(
   // dot (logged / empty), then the weekday split from the date, then the entry
   // and its task rollup. The old version was three plain text columns — the
   // extra structure here is what brings it up to the calendar's own weight.
-  const body = root.createDiv({ cls: "journal-overview-body" });
-  const table = body.createEl("table", { cls: "journal-week-table" });
+  const body = root.createDiv({ cls: "ca-journal-overview-body" });
+  const table = body.createEl("table", { cls: "ca-journal-week-table" });
   const headRow = table.createEl("thead").createEl("tr");
   for (const h of ["Day", "Entry", "Tasks"]) headRow.createEl("th", { text: h });
   const tbody = table.createEl("tbody");
@@ -1439,12 +1439,12 @@ export function buildWeekSummary(
     const isWeekend = dow === 0 || dow === 6;
     const isFuture = iso > todayIso;
 
-    const row = tbody.createEl("tr", { cls: "jw-row" });
-    if (iso === todayIso) row.addClass("jw-today");
-    if (f) row.addClass("jw-logged");
-    else row.addClass("jw-empty");
-    if (isWeekend) row.addClass("jw-weekend");
-    if (isFuture) row.addClass("jw-future");
+    const row = tbody.createEl("tr", { cls: "ca-jw-row" });
+    if (iso === todayIso) row.addClass("ca-jw-today");
+    if (f) row.addClass("ca-jw-logged");
+    else row.addClass("ca-jw-empty");
+    if (isWeekend) row.addClass("ca-jw-weekend");
+    if (isFuture) row.addClass("ca-jw-future");
 
     // Day: the date over its weekday, so the column reads as a run of dates
     // rather than a list of labels (2.53). The number leads and the three-letter
@@ -1460,37 +1460,37 @@ export function buildWeekSummary(
     // the Entry cell beside it already says in words — "Journal entry" against
     // a muted "＋ Add entry" — so it was a second mark for a fact already on the
     // row, and it was competing with the date for the eye.
-    const dayCell = row.createEl("td", { cls: "jw-day" });
+    const dayCell = row.createEl("td", { cls: "ca-jw-day" });
     const occurrences = weekEvents.get(iso) ?? [];
     if (occurrences.length) {
-      dayCell.addClass("jw-day-event");
-      dayCell.addClass(`cal-tint-${eventColor(occurrences[0].def)}`);
+      dayCell.addClass("ca-jw-day-event");
+      dayCell.addClass(`ca-cal-tint-${eventColor(occurrences[0].def)}`);
       dayCell.setAttr(
         "title",
         occurrences.map((o) => o.def.title).join(" · ")
       );
     }
-    const label = dayCell.createSpan({ cls: "jw-daylabel" });
-    label.createSpan({ cls: "jw-date", text: d.format("D") });
-    label.createSpan({ cls: "jw-dow", text: d.format("ddd") });
+    const label = dayCell.createSpan({ cls: "ca-jw-daylabel" });
+    label.createSpan({ cls: "ca-jw-date", text: d.format("D") });
+    label.createSpan({ cls: "ca-jw-dow", text: d.format("ddd") });
 
     // Entry: a titled link when the day is logged (its own title if it has one,
     // else a muted "Journal entry"), with a mood heat dot when that day carries
     // one; otherwise a quiet "＋ Add entry" that creates the note, matching the
     // calendar cells' create-on-click.
-    const entryCell = row.createEl("td", { cls: "jw-entry" });
+    const entryCell = row.createEl("td", { cls: "ca-jw-entry" });
     if (f) {
       const titleRaw = frontmatterOf(app, f)["title"];
       const title = typeof titleRaw === "string" ? titleRaw.trim() : "";
       const href = noExt(f.path);
       const link = entryCell.createEl("a", {
-        cls: "internal-link jw-entry-link",
+        cls: "internal-link ca-jw-entry-link",
         href,
         attr: { "data-href": href, title: title || f.basename },
       });
-      setIcon(link.createSpan({ cls: "jw-entry-icon" }), title ? "notebook" : "calendar");
+      setIcon(link.createSpan({ cls: "ca-jw-entry-icon" }), title ? "notebook" : "calendar");
       link.createSpan({
-        cls: "jw-entry-title" + (title ? "" : " jw-entry-untitled"),
+        cls: "ca-jw-entry-title" + (title ? "" : " ca-jw-entry-untitled"),
         text: title || "Journal entry",
       });
       link.addEventListener("click", (evt) => {
@@ -1500,14 +1500,14 @@ export function buildWeekSummary(
       const mood = moodByDate.get(iso);
       if (mood != null) {
         entryCell.createSpan({
-          cls: "jw-mood" + moodClass(mood, range),
+          cls: "ca-jw-mood" + moodClass(mood, range),
           attr: { title: `Mood ${mood}` },
         });
       }
       link.addEventListener("mouseover", (evt) => {
         app.workspace.trigger("hover-link", {
           event: evt,
-          source: "almanac-week",
+          source: "ca-week",
           hoverParent: entryCell,
           targetEl: link,
           linktext: href,
@@ -1516,10 +1516,10 @@ export function buildWeekSummary(
       });
     } else {
       const create = entryCell.createEl("a", {
-        cls: "jw-create",
+        cls: "ca-jw-create",
         attr: { title: "Create entry" },
       });
-      setIcon(create.createSpan({ cls: "jw-create-icon" }), "plus");
+      setIcon(create.createSpan({ cls: "ca-jw-create-icon" }), "plus");
       create.createSpan({ text: "Add entry" });
       create.addEventListener("click", (evt) => {
         evt.preventDefault();
@@ -1529,11 +1529,11 @@ export function buildWeekSummary(
 
     // Tasks: a compact pill carrying the day's task count, tinted when any are
     // still open and quiet when they're all done. Empty days stay blank rather
-    // than showing a zero. The count needs the note body (Almanac tasks live in
-    // `<!--almanac:KEY-->` regions the metadata cache doesn't expose), so it
+    // than showing a zero. The count needs the note body (ChronoAnvil tasks live in
+    // `<!--chronoanvil:KEY-->` regions the metadata cache doesn't expose), so it
     // fills a beat after first paint — the same deferred read the stats strip
     // and the open-tasks table use.
-    const taskCell = row.createEl("td", { cls: "jw-tasks" });
+    const taskCell = row.createEl("td", { cls: "ca-jw-tasks" });
     if (f) {
       void app.vault.cachedRead(f).then((text) => {
         // Focus: the line written at the top of that day's entry. Until 2.52
@@ -1543,7 +1543,7 @@ export function buildWeekSummary(
         //
         // It sits *under the entry title*, not in a column of its own. A
         // fourth column was the first attempt and it was wrong twice over:
-        // `.jw-entry` already carries `width: 100%`, so the new column could
+        // `.ca-jw-entry` already carries `width: 100%`, so the new column could
         // only take its width by fighting it (it lost, and truncated to three
         // characters) — and a column header advertises a field that is empty
         // on every unlogged day, which on a Wednesday is most of the week. A
@@ -1551,32 +1551,32 @@ export function buildWeekSummary(
         // withholds it.
         //
         // Under the title it is the construction the timeline already uses —
-        // date, title, then an opening line of your own prose (`.jdr-snippet`)
+        // date, title, then an opening line of your own prose (`.ca-jdr-snippet`)
         // — so this borrows a shape rather than inventing one, and a day with
         // nothing written is simply a one-line cell instead of a blank column.
         const focus = lineOf(readRollup(allNoteRegions(text), "daily"), "focus");
         if (focus) {
           entryCell.createDiv({
-            cls: "jw-entry-focus",
+            cls: "ca-jw-entry-focus",
             text: focus,
             attr: { title: focus },
           });
         }
 
-        const { open, done } = countAlmanacTasks(text);
+        const { open, done } = countChronoAnvilTasks(text);
         const total = open + done;
         if (!total) return;
         const pill = taskCell.createSpan({
-          cls: "jw-taskpill" + (open > 0 ? " has-open" : " all-done"),
+          cls: "ca-jw-taskpill" + (open > 0 ? " has-open" : " ca-all-done"),
           attr: {
             title: `${done} done · ${open} open`,
           },
         });
         setIcon(
-          pill.createSpan({ cls: "jw-taskpill-icon" }),
+          pill.createSpan({ cls: "ca-jw-taskpill-icon" }),
           open > 0 ? "square" : "check-square"
         );
-        pill.createSpan({ cls: "jw-taskpill-count", text: String(total) });
+        pill.createSpan({ cls: "ca-jw-taskpill-count", text: String(total) });
       });
     }
   }
@@ -1589,12 +1589,12 @@ export function buildWeekSummary(
 // `month-start` frontmatter property (which the month-prev/this/next
 // buttons above it write to).
 export function buildMonthSummary(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   const app = plugin.app;
   const paths = plugin.settings.paths;
-  const root = createDiv({ cls: "journal-month-summary journal-overview-summary" });
+  const root = createDiv({ cls: "ca-journal-month-summary ca-journal-overview-summary" });
 
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (!(file instanceof TFile)) return root;
@@ -1618,7 +1618,7 @@ export function buildMonthSummary(
     const p = byDate.get(iso);
     if (!p) continue;
     // Task counts can't be taken from the metadata cache here (util.ts::
-    // taskCounts only sees Obsidian's `- [ ]`, never Almanac's `- ( )`), so
+    // taskCounts only sees Obsidian's `- [ ]`, never ChronoAnvil's `- ( )`), so
     // the files are collected and counted from their bodies below.
     monthFiles.push(p.file);
   }
@@ -1650,11 +1650,11 @@ export function buildMonthSummary(
   );
 
   // The month grid + year grid live in the card body, below the band.
-  const body = root.createDiv({ cls: "journal-overview-body" });
+  const body = root.createDiv({ cls: "ca-journal-overview-body" });
 
-  const gridWrap = body.createDiv({ cls: "journal-calendar jc-embedded" });
+  const gridWrap = body.createDiv({ cls: "ca-journal-calendar ca-jc-embedded" });
   renderWeekdayHeader(gridWrap);
-  const gridEl = gridWrap.createDiv({ cls: "jc-grid" });
+  const gridEl = gridWrap.createDiv({ cls: "ca-jc-grid" });
   renderDayGrid(gridEl, {
     monthStart: ms,
     dayMap,
@@ -1666,9 +1666,9 @@ export function buildMonthSummary(
   // The year of Monthly Entries, scoped to the selected month's year and with
   // that month highlighted. Folded in here (rather than a separate widget with
   // its own year navigator) so the whole overview is driven by `month-start`.
-  body.createEl("h4", { cls: "jms-year-heading", text: `${ms.format("YYYY")} entries` });
-  const yearWrap = body.createDiv({ cls: "journal-calendar journal-year-calendar jc-embedded" });
-  const yearGridEl = yearWrap.createDiv({ cls: "jc-year-grid" });
+  body.createEl("h4", { cls: "ca-jms-year-heading", text: `${ms.format("YYYY")} entries` });
+  const yearWrap = body.createDiv({ cls: "ca-journal-calendar ca-journal-year-calendar ca-jc-embedded" });
+  const yearGridEl = yearWrap.createDiv({ cls: "ca-jc-year-grid" });
   const monthMap = buildMonthMap(app, paths);
   // Re-scoping writes this note's `month-start`; the widget is live over the
   // host note (liveScopedWidget's shouldRefresh includes ctx.sourcePath), so

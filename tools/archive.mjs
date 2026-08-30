@@ -18,7 +18,7 @@
 //
 // An archive is opened for the first time on the day it is the only copy of
 // something. This repo has no git — `RESUME.md` itself was once restored from
-// `almanac-source-4.21.3.zip`, and its own header says so — which makes a hollow
+// `chronoanvil-source-4.21.3.zip`, and its own header says so — which makes a hollow
 // archive not an inconvenience but the loss it was written to prevent.
 //
 // ── THE THREE THINGS IT DOES THAT A COMMAND LINE DOES NOT ────────────────
@@ -49,11 +49,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // Where the two records live, beside the working tree rather than inside it —
 // an archive of a tree cannot live in the tree it archives.
-const BUILDS = path.resolve(ROOT, "..", "almanac-builds");
-const SOURCES = path.resolve(ROOT, "..", "almanac-source");
+const BUILDS = path.resolve(ROOT, "..", "chronoanvil-builds");
+const SOURCES = path.resolve(ROOT, "..", "chronoanvil-source");
 
 // The built plugin folder `npm run package` assembles.
-const DIST = path.join(ROOT, "dist", "ahrymx.almanac");
+const DIST = path.join(ROOT, "dist", "chronoanvil");
 
 // What never goes into the source archive.
 //
@@ -77,10 +77,10 @@ const SOURCE_SKIP = new Set(["node_modules", "dist", ".git", "docs"]);
 // What each archive must contain to be worth keeping. Read back OUT of the file
 // on disk, not asserted about the directory that went in.
 const PLUGIN_MUST_HOLD = [
-  "ahrymx.almanac/manifest.json",
-  "ahrymx.almanac/main.js",
-  "ahrymx.almanac/styles.css",
-  "ahrymx.almanac/assets/",
+  "chronoanvil/manifest.json",
+  "chronoanvil/main.js",
+  "chronoanvil/styles.css",
+  "chronoanvil/assets/",
 ];
 const SOURCE_MUST_HOLD = ["/src/", "/test/", "/package.json", "/manifest.json"];
 
@@ -176,24 +176,24 @@ async function main() {
   await mkdir(SOURCES, { recursive: true });
 
   // ── the plugin ────────────────────────────────────────────────────────
-  const pluginZip = path.join(BUILDS, `ahrymx.almanac-${version}-plugin.zip`);
+  const pluginZip = path.join(BUILDS, `chronoanvil-${version}-plugin.zip`);
   await claim(pluginZip, force);
   // TOLD WHERE TO RUN. `dist` is the cwd so the archive opens onto
-  // `ahrymx.almanac/`, which is the folder a reader drops into their vault.
-  await run("zip", ["-rq", pluginZip, "ahrymx.almanac"], path.join(ROOT, "dist"));
+  // `chronoanvil/`, which is the folder a reader drops into their vault.
+  await run("zip", ["-rq", pluginZip, "chronoanvil"], path.join(ROOT, "dist"));
   const pluginFiles = await verify(pluginZip, PLUGIN_MUST_HOLD, 5);
 
   // ── the source ────────────────────────────────────────────────────────
   //
   // STAGED, BECAUSE THE ARCHIVE HAS A NAMED FOLDER AT ITS ROOT and every one
   // since 4.10 has had one. `zip` writes the paths it is given, so the only way
-  // to a top-level `almanac-source-<version>/` is for one to exist — which is
+  // to a top-level `chronoanvil-source-<version>/` is for one to exist — which is
   // also what makes `SOURCE_SKIP` a filter on a copy rather than a list of
   // `-x` patterns nobody can read.
-  const name = `almanac-source-${version}`;
+  const name = `chronoanvil-source-${version}`;
   const sourceZip = path.join(SOURCES, `${name}.zip`);
   await claim(sourceZip, force);
-  const staging = await mkdtemp(path.join(tmpdir(), "almanac-archive-"));
+  const staging = await mkdtemp(path.join(tmpdir(), "ca-archive-"));
   try {
     await cp(ROOT, path.join(staging, name), {
       recursive: true,

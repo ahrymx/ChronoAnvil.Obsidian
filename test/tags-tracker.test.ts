@@ -278,7 +278,7 @@ describe("the Tags built-in", () => {
     const body = src.slice(at, src.indexOf("\nexport function buildTracker", at));
     expect(body).not.toContain("None yet");
     expect(body).toContain("Add tags");
-    expect(body).toContain('cls: "journal-tags-chips"');
+    expect(body).toContain('cls: "ca-journal-tags-chips"');
   });
 
   it("draws a list cell rather than one of the value controls", () => {

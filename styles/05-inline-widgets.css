@@ -1,24 +1,24 @@
 /* ── 1. Inline widgets ─────────────────────────────────────── */
-.journal-widget {
+.ca-journal-widget {
   display: inline-flex;
   align-items: center;
   vertical-align: middle;
   gap: 6px;
 }
 
-/* A ```almanac block: composite widgets (nav/calendar/etc.) stack full
+/* A ```chronoanvil block: composite widgets (nav/calendar/etc.) stack full
    width; simple widgets (slider/time/date/select/button) on consecutive
    lines are grouped into a single wrapping row by journal-widget-bar. */
-.journal-widget-block {
+.ca-journal-widget-block {
   display: flex;
   flex-direction: column;
-  gap: var(--am-widget-gap);
+  gap: var(--ca-widget-gap);
   margin: 0.5em 0 1em;
   /* Establish an inline-size query container so the tracker grid below can
      collapse to one column based on the pane width, not the viewport. */
   container-type: inline-size;
 }
-.journal-widget-bar {
+.ca-journal-widget-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -36,13 +36,13 @@
  *
  * `frame: section` NEEDS NO CLASS OF ITS OWN. It withholds the composite
  * modifier and adds `is-unframed` exactly as `frame: none` does, then puts the
- * block's content inside a `.journal-sec-fold` body. The section's look is
+ * block's content inside a `.ca-journal-sec-fold` body. The section's look is
  * 70-section-surface.css's already and does not change here.
  *
  * `frame: card` — the default — touches nothing. A fence with no `frame:` line
  * renders exactly as it did before the modifier existed, which is what makes
  * this a minor rather than a breaking change. */
-.journal-widget-block.is-unframed {
+.ca-journal-widget-block.is-unframed {
   /* The four things the composite cards paint, given up. `background: none`
      rather than a colour, so the block takes whatever it has landed on — a
      canvas node, a third-party tile, or the section surface above it. */
@@ -57,14 +57,14 @@
    fixed width is how a widget stops fitting a tile.
  *
  * AND `container-type` IS NOT TOUCHED, which is the one rule that has to
- * survive all three frames: `.journal-widget-block` establishes the
+ * survive all three frames: `.ca-journal-widget-block` establishes the
  * inline-size query container every `@container` rule in styles/ depends on,
  * and it is the easiest thing to lose when the card rules are stripped. It
  * lives on the base class above and no rule here overrides it. */
 
 /* The summary, entry and journals widgets give up the frames they drew for
-   themselves, exactly as they do inside a card — `.journal-overview-card
-   .journal-overview-summary` two files over makes the same move for the same
+   themselves, exactly as they do inside a card — `.ca-journal-overview-card
+   .ca-journal-overview-summary` two files over makes the same move for the same
    reason. Without this an unframed block still shows the widget's own box.
 
    THIS LIST IS THE ONE THING HERE THAT HAS TO BE KEPT IN STEP, and it is worth
@@ -80,7 +80,7 @@
 
    WRITTEN OUT TWICE RATHER THAN AS `:is(.is-unframed, .has-head)`, which was
    the first shape and is the tidier one. Three tests in two files read these
-   selectors BY NAME — `.journal-widget-block.is-unframed .journals-card` is
+   selectors BY NAME — `.ca-journal-widget-block.is-unframed .ca-journals-card` is
    asserted as a literal, because this list is the thing most likely to go stale
    and those tests are what says so. Collapsing the condition takes the literal
    with it and the tests stop watching. The halves are adjacent, share one set of
@@ -90,14 +90,14 @@
    buys: `has-head` is worn by a block that drew its own head AND by the card
    `cardWidget` puts around a widget inside a row. One condition, both scales,
    and nothing to add here when a third thing grows a head. */
-.journal-widget-block.is-unframed .journal-overview-summary,
-.journal-widget-block.is-unframed .journal-entry-card,
-.journal-widget-block.is-unframed .journals-card,
-.journal-widget-block.is-unframed .jtc-card,
-.has-head .journal-overview-summary,
-.has-head .journal-entry-card,
-.has-head .journals-card,
-.has-head .jtc-card {
+.ca-journal-widget-block.is-unframed .ca-journal-overview-summary,
+.ca-journal-widget-block.is-unframed .ca-journal-entry-card,
+.ca-journal-widget-block.is-unframed .ca-journals-card,
+.ca-journal-widget-block.is-unframed .ca-jtc-card,
+.has-head .ca-journal-overview-summary,
+.has-head .ca-journal-entry-card,
+.has-head .ca-journals-card,
+.has-head .ca-jtc-card {
   margin: 0;
   padding: 0;
   border: none;
@@ -105,33 +105,33 @@
   background: none;
 }
 /* AND THE BANDS STOP BLEEDING, because there is nothing left to bleed through.
-   `.journal-overview-banner` carries `margin: -12px -14px 0` to cancel the
-   padding of the card it sits in and run to that card's edges, and `.jjs-hero`
+   `.ca-journal-overview-banner` carries `margin: -12px -14px 0` to cancel the
+   padding of the card it sits in and run to that card's edges, and `.ca-jjs-hero`
    carries the same two lines for the same reason — 60-heroes-and-banners.css
    says so where it defines them. The rule above takes that padding away, so the
    negative margin has nothing to cancel and the band hangs 14px outside the
    section on each side and pulls 12px up into its own header bar.
    A margin that exists to cancel a padding has to go with it. */
-.journal-widget-block.is-unframed .journal-overview-banner,
-.journal-widget-block.is-unframed .jjs-hero {
+.ca-journal-widget-block.is-unframed .ca-journal-overview-banner,
+.ca-journal-widget-block.is-unframed .ca-jjs-hero {
   margin: 0;
   border-radius: 0;
 }
 
 /* AND THE ACTIVITY BAND SHEDS ITS OWN SHELL (4.36).
    `journals-header` standing alone draws a bordered, padded card — the rule at
-   `.jjs-hero .jjh-root` in 60-heroes-and-banners.css cancels exactly that when
+   `.ca-jjs-hero .ca-jjh-root` in 60-heroes-and-banners.css cancels exactly that when
    the band sits inside the journals card, and says in the same breath that the
    directive "still renders the bordered card version wherever it's used on its
    own". A journal dashboard composes it standalone under `frame: section`, so
    without this the page draws a section bar around a bordered box: 4.1 §3.1's
    two borders arguing, arrived at from the other direction.
-   THE SAME FOUR LINES AS `.jjs-hero .jjh-root`, and deliberately not a shared
+   THE SAME FOUR LINES AS `.ca-jjs-hero .ca-jjh-root`, and deliberately not a shared
    class between them. The two cancellations are triggered by different things —
    one by being inside the card, one by the fence's own modifier — and a class
    both had to carry would have to be applied by the JS in one case and by the
    markdown in the other. */
-.journal-widget-block.is-unframed .jjh-root {
+.ca-journal-widget-block.is-unframed .ca-jjh-root {
   margin: 0;
   padding: 0;
   border: none;
@@ -145,7 +145,7 @@
  *
  * `emptyLine` ANNOTATES content: `empty.ts` says it is for a region inside a
  * widget that "still drew its card, its header and its controls", which is why
- * `.am-empty-line` carries `padding: 6px 0` and takes its left inset from that
+ * `.ca-empty-line` carries `padding: 6px 0` and takes its left inset from that
  * card. The rule above sets that card's padding to zero, so in a canvas node
  * the sentence sits flush against the node's own border — which is §4's
  * "reads as a rendering bug" exactly.
@@ -158,7 +158,7 @@
  * `emptyCallout` needs nothing here: it builds Obsidian's own `.callout`, which
  * brings its own box and is themed by the host. That split is `empty.ts`'s
  * "TWO SHAPES, AND THE DIFFERENCE IS STRUCTURAL", and it pays off here. */
-.journal-widget-block.is-unframed .am-empty-line {
+.ca-journal-widget-block.is-unframed .ca-empty-line {
   padding: 10px 12px;
   text-align: center;
 }
@@ -168,32 +168,32 @@
    `is-unframed` is on the block under BOTH values (§5: section needs no class
    of its own), so the two are told apart by the wrapper the section value
    actually builds. Restoring the default rather than adding a third look. */
-.journal-widget-block.is-unframed .journal-sec-fold-body .am-empty-line {
+.ca-journal-widget-block.is-unframed .ca-journal-sec-fold-body .ca-empty-line {
   padding: 6px 0;
   text-align: left;
 }
 
 /* ── The self-titled section a `frame: section` block wraps itself in ── */
-.journal-sec-fold-body {
+.ca-journal-sec-fold-body {
   display: flex;
   flex-direction: column;
-  gap: var(--am-widget-gap);
+  gap: var(--ca-widget-gap);
 }
-.journal-sec-fold.is-collapsed > .journal-sec-fold-body {
+.ca-journal-sec-fold.is-collapsed > .ca-journal-sec-fold-body {
   display: none;
 }
 /* The chevron rotates rather than swapping glyph, so the fold reads as one
    control changing state instead of two icons alternating. */
-/* The `frame: section` twin of `.journal-header-toggle`, and it now says the
+/* The `frame: section` twin of `.ca-journal-header-toggle`, and it now says the
    same things that one says (4.13 §1b): right-hand end via `margin-left: auto`,
    sized against the bar's own scale rather than inheriting Obsidian's
    `--icon-size` — this rule had no width, height or `svg` size at all, so it fell
    back to ~18px and dominated an 11.2px title. */
-.journal-sec-fold-toggle {
+.ca-journal-sec-fold-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--am-bar-glyph);
+  font-size: var(--ca-bar-glyph);
   width: 1.4em;
   height: 1.4em;
   flex: 0 0 auto;
@@ -201,16 +201,16 @@
   color: var(--text-muted);
   transition: transform 120ms ease;
 }
-.journal-sec-fold-toggle .svg-icon {
+.ca-journal-sec-fold-toggle .svg-icon {
   width: 1.1em;
   height: 1.1em;
 }
-/* Down means closed, up means open — see `.journal-header-toggle` for why the
+/* Down means closed, up means open — see `.ca-journal-header-toggle` for why the
    direction was re-chosen when the control moved to the right. */
-.journal-sec-fold:not(.is-collapsed) > .journal-sec > .journal-sec-fold-toggle {
+.ca-journal-sec-fold:not(.is-collapsed) > .ca-journal-sec > .ca-journal-sec-fold-toggle {
   transform: rotate(180deg);
 }
-.journal-sec-fold > .journal-sec.is-foldable {
+.ca-journal-sec-fold > .ca-journal-sec.is-foldable {
   cursor: pointer;
 }
 
@@ -218,11 +218,11 @@
    than resolving it silently, and the refusal has to be visible where the
    fence is — a reader who has just written two lines that disagree is looking
    at this spot. */
-.journal-frame-error {
+.ca-journal-frame-error {
   padding: 8px 10px;
   border: 1px solid var(--background-modifier-border);
   border-left: 3px solid var(--text-error);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   background: var(--background-secondary);
   color: var(--text-muted);
   font-size: var(--font-ui-small);
@@ -230,7 +230,7 @@
 
 /* ── The row modifier: this block's widgets, side by side (4.2 §2) ─────
  *
- * `.journal-widget-block` is a flex COLUMN and every page Almanac composes is
+ * `.ca-journal-widget-block` is a flex COLUMN and every page ChronoAnvil composes is
  * that column repeated. This is the one place it becomes a row, and it is a
  * wrapper the processor puts around what a fence drew rather than a mode of the
  * block itself — a block still holds a `header:` bar full width above its row,
@@ -238,16 +238,16 @@
  *
  * THE GAP IS THE BLOCK'S OWN, so a row of widgets is spaced like the column it
  * replaced and a page with both does not read as two rhythms.  */
-.journal-block-row {
+.ca-journal-block-row {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  gap: var(--am-widget-gap);
+  gap: var(--ca-widget-gap);
 }
 
 /* Equal cells, and the declarations that make them behave.
  *
- * `flex: 1 1 var(--am-row-cell-min)` — the cells share the row rather than
+ * `flex: 1 1 var(--ca-row-cell-min)` — the cells share the row rather than
  * sizing to their content, so three widgets of very different heaviness read as
  * three columns. The BASIS is a floor rather than `0`, and that is what makes
  * the wrap below work: a cell asks for the floor, and cells that cannot all
@@ -260,14 +260,14 @@
  * `container-type: inline-size` — THE CELL IS THE QUERY CONTAINER, and this is
  * the rule the whole primitive rests on. Every `@container (max-width: …)` rule
  * in styles/ resolves against the nearest inline-size ancestor, which until this
- * existed was always `.journal-widget-block` — the pane. A widget in a third of
+ * existed was always `.ca-journal-widget-block` — the pane. A widget in a third of
  * a pane is narrow while the block is wide, so without this the tracker grid,
  * the header bars and the calendar would all go on measuring the pane and stay
  * in their wide layout at a third of the width. 4.1 §4 names the block's own
  * `container-type` as the rule every frame value must keep; a row extends it
  * rather than moving it: the block is still a container, and each cell is one
  * too. */
-.journal-block-row > .journal-block-cell {
+.ca-journal-block-row > .ca-journal-block-cell {
   /* SHARES, AND WHY BOTH HALVES CARRY THE WEIGHT (4.4 §2). A cell may ask for
      `cell: 2`, and an exact 2:1 needs the weight on the BASIS as well as on the
      grow: width = N x floor + N/total x leftover, which is proportional to N
@@ -276,12 +276,12 @@
      the kind of nearly-right that reads as a rendering fault.
      AND THE WRAP SURVIVES IT: a two-share cell asks for two floors, so a row
      that cannot give it that wraps instead of squeezing, exactly as before.
-     `var(--am-cell-weight, 1)` — set per cell from row.ts, absent on an
+     `var(--ca-cell-weight, 1)` — set per cell from row.ts, absent on an
      ordinary one, so the fallback is the common case rather than a shadow of a
      token (see test/tokens.test.ts's two rules about fallbacks). */
-  flex-grow: var(--am-cell-weight, 1);
+  flex-grow: var(--ca-cell-weight, 1);
   flex-shrink: 1;
-  flex-basis: calc(var(--am-row-cell-min) * var(--am-cell-weight, 1));
+  flex-basis: calc(var(--ca-row-cell-min) * var(--ca-cell-weight, 1));
   min-width: 0;
   container-type: inline-size;
   /* A CELL IS A COLUMN, because 4.4 §1 lets it hold more than one widget. The
@@ -294,7 +294,7 @@
      lays out exactly where a block item did. */
   display: flex;
   flex-direction: column;
-  gap: var(--am-widget-gap);
+  gap: var(--ca-widget-gap);
   /* AND IT IS THE GROUND ITS SLOTS STAND ON (4.8 §1.2). The landing places at
      either side of a column are absolute, so they take no width, move nothing
      and exist only while something is in the air. Without this they would
@@ -304,7 +304,7 @@
 }
 /* THE SHORT COLUMN DOES NOT FILL, AND 4.13 §4 IS RETIRED HERE (4.13.5).
  *
- * It read `.journal-block-cell > :last-child { flex: 1 1 auto }`, and its
+ * It read `.ca-journal-block-cell > :last-child { flex: 1 1 auto }`, and its
  * argument was that a column with less in it ended early and left a band of
  * nothing between its last card and the group's foot. That argument was made
  * from a screenshot of the hole and never from a screenshot of the fix.
@@ -340,7 +340,7 @@
  * what matters is what a CELL gets, and no container query can know how many
  * cells are sharing the block.
  *
- * `flex-wrap` NEEDS NO COUNT. Each cell asks for `--am-row-cell-min`; as many
+ * `flex-wrap` NEEDS NO COUNT. Each cell asks for `--ca-row-cell-min`; as many
  * as fit take a line and the rest go to the next one. A three-cell row is three
  * across on a wide page, two and one at 720px, and a plain column on a phone —
  * and the last of those is the collapse the old rule was written for, reached
@@ -369,7 +369,7 @@
  * never the bug, and because a `cell: 5` a reader types by hand can still ask
  * for a basis no pane can hold. The cap counts columns; it does not cap a
  * weight, and `cellWeightOf` says at length why it must not. */
-.journal-block-row {
+.ca-journal-block-row {
   flex-wrap: wrap;
 }
 
@@ -395,8 +395,8 @@
  *   cards stand off it, which is the relationship a container and its contents
  *   should have and the opposite of what two boxes of the same colour show.
  *
- *   A THINNER LINE THAN THE THINGS INSIDE IT. `--am-rule-hair` rather than the
- *   `--am-rule` every card in this file uses. The roadmap asked for `--am-rule`
+ *   A THINNER LINE THAN THE THINGS INSIDE IT. `--ca-rule-hair` rather than the
+ *   `--ca-rule` every card in this file uses. The roadmap asked for `--ca-rule`
  *   and the reason for departing is its own sentence: an outer border as heavy
  *   as the inner ones makes the box compete with its contents, and the whole
  *   argument for drawing it at all is that it must not.
@@ -408,16 +408,16 @@
  * THE PADDING IS THE WIDGET GAP, so the space between the box's edge and the
  * cards is the space between the cards — one rhythm rather than a border with
  * its own idea of breathing room. */
-.journal-group {
+.ca-journal-group {
   background: var(--background-primary-alt);
-  border: var(--am-rule-hair) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
-  padding: var(--am-widget-gap);
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  padding: var(--ca-widget-gap);
   /* The foot sits under the row, and the grip in the foot resolves against the
-     box — see `.journal-group-foot`. */
+     box — see `.ca-journal-group-foot`. */
   display: flex;
   flex-direction: column;
-  gap: var(--am-widget-gap);
+  gap: var(--ca-widget-gap);
   touch-action: pan-y;
 }
 
@@ -432,8 +432,8 @@
    GROUND, BORDER AND PADDING ONLY. The flex column stays — it is what puts the
    foot under the row rather than beside it, and that is true wherever the box is
    drawn. */
-.journal-widget-block.is-unframed .journal-group,
-.journal-sec-block .journal-group {
+.ca-journal-widget-block.is-unframed .ca-journal-group,
+.ca-journal-sec-block .ca-journal-group {
   background: none;
   border: none;
   border-radius: 0;
@@ -452,7 +452,7 @@
  * IT IS ALSO THE GRIP'S HOST, which is what retired `.jbd-aside`: a block's grip
  * used to be shoved off the centre line to avoid landing on the middle widget's,
  * and a strip that belongs to the box has no such collision to avoid. */
-.journal-group-foot {
+.ca-journal-group-foot {
   position: relative;
   display: flex;
   align-items: center;
@@ -464,7 +464,7 @@
      together or it stops being one. This band holds a word and did not need the
      extra four pixels; the other holds controls with edges and did. */
   padding-top: 8px;
-  border-top: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-top: var(--ca-rule-hair) solid var(--background-modifier-border);
 }
 /* `.journal-group-foot-count` WAS HERE AND IS GONE (4.34.2).
    The foot said `2 COLUMNS` from 4.9 until the strip arrived, and the label
@@ -473,7 +473,7 @@
    needed content to be a bar at all, and the foot now carries the grip, the `+`
    and — where there are pages — the numbers. */
 /* The grip itself is dressed with the other grip rules below, after the
-   `.jbd-handle` base it overrides. */
+   `.ca-jbd-handle` base it overrides. */
 
 /* ── The pages of a group (4.34) ────────────────────────────────────────
  *
@@ -485,15 +485,15 @@
  * the group itself, whose height includes the foot: transitioning that would
  * slide the strip out from under the pointer that is pressing it, which is the
  * bug the pin exists to prevent. */
-.journal-group-pages {
+.ca-journal-group-pages {
   position: relative;
   display: flex;
   flex-direction: column;
   touch-action: pan-y;
 }
 /* Edge swipe hint overlays */
-.journal-group-pages::before,
-.journal-group-pages::after {
+.ca-journal-group-pages::before,
+.ca-journal-group-pages::after {
   content: "";
   position: absolute;
   top: 0;
@@ -501,18 +501,18 @@
   width: 36px;
   pointer-events: none;
   z-index: 5;
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   transition: opacity 80ms ease;
 }
-.journal-group-pages::before {
+.ca-journal-group-pages::before {
   left: 0;
   background: linear-gradient(to right, color-mix(in srgb, var(--interactive-accent) 26%, transparent), transparent);
-  opacity: var(--am-swipe-tint-left);
+  opacity: var(--ca-swipe-tint-left);
 }
-.journal-group-pages::after {
+.ca-journal-group-pages::after {
   right: 0;
   background: linear-gradient(to left, color-mix(in srgb, var(--interactive-accent) 26%, transparent), transparent);
-  opacity: var(--am-swipe-tint-right);
+  opacity: var(--ca-swipe-tint-right);
 }
 /* CLIPPED ONLY WHILE IT IS MOVING, and this rule was `overflow: hidden` at rest
    for one draft — which put a clipping and containment context around EVERY
@@ -526,22 +526,22 @@
    During a swap it is exactly right: the outgoing page is still in the box while
    the height is between two values, and clipping is what stops it spilling past
    the foot. */
-.journal-group-pages.is-swapping,
-.journal-group-pages.is-measuring {
+.ca-journal-group-pages.is-swapping,
+.ca-journal-group-pages.is-measuring {
   overflow: hidden;
 }
-.journal-group-pages.is-swapping {
+.ca-journal-group-pages.is-swapping {
   transition: height 120ms ease;
 }
 
 /* A page that is not the open one.
  *
- * `display: none` IS WHAT THE FOLD ALREADY DOES — `.journal-sec-fold.is-collapsed
- * > .journal-sec-fold-body`, shipped in every vault — and a closed page is the
+ * `display: none` IS WHAT THE FOLD ALREADY DOES — `.ca-journal-sec-fold.is-collapsed
+ * > .ca-journal-sec-fold-body`, shipped in every vault — and a closed page is the
  * same statement about the same kind of content. It is also the point: a page
  * that stayed laid out would keep every widget in it measured, which is the cost
  * pages exist to remove. */
-.journal-block-row.is-closed {
+.ca-journal-block-row.is-closed {
   display: none;
 }
 
@@ -555,7 +555,7 @@
  *
  * OUT OF FLOW rather than merely transparent, so the group's height for that
  * frame is the OPEN page's and not the sum of all of them. */
-.journal-group-pages.is-measuring > .journal-block-row.is-closed {
+.ca-journal-group-pages.is-measuring > .ca-journal-block-row.is-closed {
   display: flex;
   position: absolute;
   left: 0;
@@ -567,57 +567,57 @@
 
 /* The page arriving. One frame at 8px and transparent, then released — so a
    swap reads as a movement rather than a substitution. */
-.journal-block-row.is-entering {
+.ca-journal-block-row.is-entering {
   opacity: 0;
   transform: translateX(8px);
 }
-.journal-group-pages.is-swapping > .journal-block-row {
+.ca-journal-group-pages.is-swapping > .ca-journal-block-row {
   transition: opacity 120ms ease, transform 120ms ease;
 }
 
 /* ── The strip (4.34 §3, 4.66 §Style A) ──────────────────────────────────
  *
  * Floating segmented pill container holding the page numbers and the + button. */
-.journal-group-tabs {
+.ca-journal-group-tabs {
   display: flex;
   align-items: center;
   gap: 2px;
   background: color-mix(in srgb, var(--background-secondary) 85%, transparent);
-  border: var(--am-rule-hair) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill);
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-pill);
   padding: 2px 3px;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
 }
-.journal-group-tab {
+.ca-journal-group-tab {
   /* The foot's own voice, which every label in this strip shares — see
      `.journal-group-foot-count`. A page number is a label that can be pressed,
      not a button that happens to be small. */
-  font-size: var(--am-bar-text);
+  font-size: var(--ca-bar-text);
   font-weight: 600;
-  letter-spacing: var(--am-bar-track);
-  color: var(--am-bar-ink);
+  letter-spacing: var(--ca-bar-track);
+  color: var(--ca-bar-ink);
   line-height: 1;
   padding: 3px 8px;
   min-width: 0;
   height: auto;
-  border: var(--am-rule-hair) solid transparent;
-  border-radius: var(--am-radius-pill);
+  border: var(--ca-rule-hair) solid transparent;
+  border-radius: var(--ca-radius-pill);
   background: none;
   box-shadow: none;
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
-.journal-group-tab:hover {
+.ca-journal-group-tab:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.journal-group-tab.is-open {
+.ca-journal-group-tab.is-open {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
-  box-shadow: var(--am-elev-1);
+  box-shadow: var(--ca-elev-1);
 }
-.journal-group-tab:focus-visible {
-  outline: 2px solid var(--am-border-focus);
+.ca-journal-group-tab:focus-visible {
+  outline: 2px solid var(--ca-border-focus);
   outline-offset: 1px;
 }
 
@@ -633,11 +633,11 @@
  * did before this release, which is the compatibility claim the whole feature
  * rests on — and the reader who is looking for something finds it in the strip
  * where the group already talks about itself. */
-.journal-group-add {
+.ca-journal-group-add {
   font-size: 13px;
   font-weight: 600;
   line-height: 1;
-  color: var(--am-bar-ink);
+  color: var(--ca-bar-ink);
   margin-left: 2px;
   padding: 2px 6px;
   min-width: 18px;
@@ -645,30 +645,30 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: var(--am-rule-hair) solid transparent;
-  border-radius: var(--am-radius-pill);
+  border: var(--ca-rule-hair) solid transparent;
+  border-radius: var(--ca-radius-pill);
   background: none;
   box-shadow: none;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
-.journal-group:hover .journal-group-add,
-.journal-group-add:focus-visible {
+.ca-journal-group:hover .ca-journal-group-add,
+.ca-journal-group-add:focus-visible {
   opacity: 1;
 }
-.journal-group-add:hover {
+.ca-journal-group-add:hover {
   background: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
   color: var(--interactive-accent);
 }
-.journal-group-add:focus-visible {
-  outline: 2px solid var(--am-border-focus);
+.ca-journal-group-add:focus-visible {
+  outline: 2px solid var(--ca-border-focus);
   outline-offset: 1px;
 }
 /* The count sits at the right on a group with no pages, so the `+` needs the
    strip's place rather than the count's — pushed to the end, where the numbers
    are on a group that has them. */
-.journal-group-foot > .journal-group-add:last-child {
+.ca-journal-group-foot > .ca-journal-group-add:last-child {
   margin-left: 6px;
 }
 /* A HOVER-REVEALED CONTROL NEEDS A RESTING STATE ON TOUCH, which is the rule
@@ -678,7 +678,7 @@
    card seam both sit at 0.3 for exactly this reason, and the `+` is the same
    kind of thing. */
 @media (hover: none) {
-  .journal-group-add {
+  .ca-journal-group-add {
     opacity: 0.4;
   }
 }
@@ -693,7 +693,7 @@
  * ONLY WHERE THERE IS A CHOICE TO MAKE. A page with one group needs no mark —
  * the command falls back to it, nothing else can be meant, and a permanent
  * outline on the only group on screen is noise. */
-.journal-group.is-focused .journal-group-foot {
+.ca-journal-group.is-focused .ca-journal-group-foot {
   border-top-color: color-mix(
     in srgb,
     var(--interactive-accent) 45%,
@@ -714,12 +714,12 @@
  * release is on a timer rather than on `transitionend` precisely because there is
  * no transition to end here. */
 @media (prefers-reduced-motion: reduce) {
-  .journal-group-pages.is-swapping,
-  .journal-group-pages.is-swapping > .journal-block-row,
-  .journal-block-row.is-entering {
+  .ca-journal-group-pages.is-swapping,
+  .ca-journal-group-pages.is-swapping > .ca-journal-block-row,
+  .ca-journal-block-row.is-entering {
     transition: none;
   }
-  .journal-block-row.is-entering {
+  .ca-journal-block-row.is-entering {
     opacity: 1;
     transform: none;
   }
@@ -732,7 +732,7 @@
  * that sets one: the edge between two columns, dragged.
  *
  * A CHILD OF THE CELL ON ITS RIGHT, positioned back into the gap — the same
- * trick `.jbd-slot-before` uses a few rules down. Being sealed inside a cell is
+ * trick `.ca-jbd-slot-before` uses a few rules down. Being sealed inside a cell is
  * the SAFE side of 4.8 §8.3's rule: a cell is an inline-size query container,
  * containment makes it a stacking context, and a `z-index` cannot lift anything
  * out of one. That cost the drop slots a release; it costs this nothing, because
@@ -751,11 +751,11 @@
  * air adds, and a pointer drag and an HTML5 drag are different event families
  * that cannot both be in progress. The rule below is belt and braces on top of
  * both. */
-.journal-group-divider {
+.ca-journal-group-divider {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(var(--am-widget-gap) / -2 - 6px);
+  left: calc(var(--ca-widget-gap) / -2 - 6px);
   width: 12px;
   z-index: 3;
   cursor: col-resize;
@@ -765,7 +765,7 @@
   opacity: 0;
   transition: opacity 120ms ease;
 }
-.journal-group-divider::after {
+.ca-journal-group-divider::after {
   content: "";
   width: 2px;
   height: 28px;
@@ -776,28 +776,28 @@
    before it appears is a control that is only discoverable by accident; the
    group is the object it belongs to and hovering that is what says "this thing
    has edges you can move". */
-.journal-group:hover .journal-group-divider,
-.journal-group-divider.is-resizing {
+.ca-journal-group:hover .ca-journal-group-divider,
+.ca-journal-group-divider.is-resizing {
   opacity: 1;
 }
-.journal-group-divider:hover::after,
-.journal-group-divider.is-resizing::after {
+.ca-journal-group-divider:hover::after,
+.ca-journal-group-divider.is-resizing::after {
   background: var(--interactive-accent);
 }
 /* WHILE THE COLUMNS ARE MOVING, the pointer keeps its meaning everywhere and
    nothing highlights as text. A resize that selects the diary card's prose on
    the way past is a gesture fighting the page. */
-.journal-block-row.is-resizing {
+.ca-journal-block-row.is-resizing {
   cursor: col-resize;
   user-select: none;
 }
-.journal-widget-block.is-slotting .journal-group-divider {
+.ca-journal-widget-block.is-slotting .ca-journal-group-divider {
   pointer-events: none;
 }
-/* Touch has no hover to reveal it with — the policy `.jbd-handle` follows, at
+/* Touch has no hover to reveal it with — the policy `.ca-jbd-handle` follows, at
    the resting opacity every hover-revealed affordance in this file takes. */
 @media (hover: none) {
-  .journal-group-divider {
+  .ca-journal-group-divider {
     opacity: 0.3;
   }
 }
@@ -846,7 +846,7 @@
  * which is `snapHeight`'s generosity and the reason the drawing can afford to be
  * a hairline. Only `bottom` moves — from the middle of the gap to the edge
  * itself. */
-.journal-card-divider {
+.ca-journal-card-divider {
   position: absolute;
   left: 0;
   right: 0;
@@ -861,36 +861,36 @@
   opacity: 0;
   transition: opacity 120ms ease;
 }
-.journal-card-divider::after {
+.ca-journal-card-divider::after {
   content: "";
   width: 100%;
-  height: var(--am-rule);
+  height: var(--ca-rule);
   border-radius: 0;
   background: var(--background-modifier-border);
 }
 /* ON HOVER OF THE GROUP, not of the 12px strip — the divider's rule, and for its
    reason: a control a reader has to find before it appears is not an
    affordance. */
-.journal-group:hover .journal-card-divider,
-.journal-card-divider.is-resizing {
+.ca-journal-group:hover .ca-journal-card-divider,
+.ca-journal-card-divider.is-resizing {
   opacity: 1;
 }
-.journal-card-divider:hover::after,
-.journal-card-divider.is-resizing::after {
+.ca-journal-card-divider:hover::after,
+.ca-journal-card-divider.is-resizing::after {
   background: var(--interactive-accent);
 }
-.journal-widget-card.is-resizing {
+.ca-journal-widget-card.is-resizing {
   cursor: row-resize;
   user-select: none;
 }
 /* Belt and braces, as for the column divider: a mark under a drag is inert. */
-.journal-widget-block.is-slotting .journal-card-divider {
+.ca-journal-widget-block.is-slotting .ca-journal-card-divider {
   pointer-events: none;
 }
-/* Touch has no hover to reveal it with — the policy `.jbd-handle` follows, at
+/* Touch has no hover to reveal it with — the policy `.ca-jbd-handle` follows, at
    the resting opacity every hover-revealed affordance in this file takes. */
 @media (hover: none) {
-  .journal-card-divider {
+  .ca-journal-card-divider {
     opacity: 0.3;
   }
 }
@@ -919,14 +919,14 @@
  *
  * NOTHING ABOUT THE CARD'S STRUCTURE CHANGES: it is already a positioned flex
  * column, and its head is already `order: -1` while being appended last. */
-.journal-widget-card.is-sized {
-  height: var(--am-card-h);
+.ca-journal-widget-card.is-sized {
+  height: var(--ca-card-h);
   flex: 0 0 auto;
 }
-.journal-widget-card.is-sized > .journal-block-head {
+.ca-journal-widget-card.is-sized > .ca-journal-block-head {
   flex: 0 0 auto;
 }
-.journal-widget-card.is-sized > :not(.journal-block-head) {
+.ca-journal-widget-card.is-sized > :not(.ca-journal-block-head) {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -944,8 +944,8 @@
  * file already carries one such list and says what it costs; a second copy, kept
  * in step so that a `height` could pin six different widgets' own titles, would
  * go stale the first time a widget grew a band and nothing would say so. */
-.journal-block-cell > .is-sized:not(.journal-widget-card) {
-  height: var(--am-card-h);
+.ca-journal-block-cell > .is-sized:not(.ca-journal-widget-card) {
+  height: var(--ca-card-h);
   flex: 0 0 auto;
   overflow-y: auto;
 }
@@ -989,7 +989,7 @@
  * NO FLEX PROPERTY DECIDES WHERE IT SITS, which is not a preference. The strip
  * used `order: -1` to draw first while staying attached last (attached before
  * `layOutRow` it would be collected into a cell, and 20-charts.css reads the
- * block's first child) — and `.journal-sec-block` sets `display: flow-root`,
+ * block's first child) — and `.ca-journal-sec-block` sets `display: flow-root`,
  * winning over this file's `display: flex` on file order at equal specificity.
  * Inside a section the order was therefore inert and the grip drew at the FOOT
  * of its block; a run is one continuous surface, so that foot is the next
@@ -1000,18 +1000,18 @@
  * A block with a `header:` bar has somewhere for a grip to sit and a name for
  * what it is holding. A block without one had neither, so the grip was dots
  * floating over a card — which works, and says nothing. A block now draws its
- * own `.journal-block-head`: a slim bar with the block's name in it, where
+ * own `.ca-journal-block-head`: a slim bar with the block's name in it, where
  * `blockTitle` can name the block.
  *
  * ── THE BAR OUTLIVED THE BLOCK GRIP (4.8.1) ────────────────────────────
  *
  * The block drag is gone — a block is moved from the section editor, which
- * plans and previews where a drag could only write — so no `.jbd-handle` is
+ * plans and previews where a drag could only write — so no `.ca-jbd-handle` is
  * built into a block's head any more. The head stayed, because it was never
  * only a handle rail: the labels are the ones the section editor uses, so what
  * a reader rearranges in that window is named the same as what they see here.
  *
- * WHAT STILL HAS A GRIP is a `.journal-widget-card` — a widget inside a row —
+ * WHAT STILL HAS A GRIP is a `.ca-journal-widget-card` — a widget inside a row —
  * because there the gesture is the only way to say which column something is
  * in. The rules below therefore dress two heads with one class and only one of
  * them has anything to grab.
@@ -1022,7 +1022,7 @@
  * could not name the block. The other two are this file's, because the classes
  * that decide them are added after the render:
  *
- *   `.journal-sec-block` — a block inside a section RUN, under someone else's
+ *   `.ca-journal-sec-block` — a block inside a section RUN, under someone else's
  *   bar. `SectionPass` adds that class AFTER the render, so only CSS can see it,
  *   and the head the block was built with is hidden here rather than never
  *   drawn.
@@ -1034,7 +1034,7 @@
  * Those two are `display: none` as of 4.8.1. They used to keep the grip and
  * give up the bar, laid over the block's own first 10px; with no grip left to
  * keep, what remains is a bar that must not be drawn. */
-.journal-widget-block {
+.ca-journal-widget-block {
   /* THE GRIP IS POSITIONED AGAINST THE BLOCK AND NOTHING ELSE, and this line is
      load-bearing rather than tidy. It was lost for one build to a comment that
      closed early, and an absolute strip with no positioned ancestor anchors to
@@ -1055,10 +1055,10 @@
    not a blank background."*
  *
  * THE SAME FOUR LINES THE THREE COMPOSITE CARDS USE, and the same two numbers:
- * `12px 14px` of padding, `--am-rule` on `--background-modifier-border`,
- * `--am-radius-md`. That is not a coincidence to be tidied — the head bleeds
- * those exact numbers below, the way `.journal-entry-header` and
- * `.journal-study-header` bleed their own cards' padding, so one set of numbers
+ * `12px 14px` of padding, `--ca-rule` on `--background-modifier-border`,
+ * `--ca-radius-md`. That is not a coincidence to be tidied — the head bleeds
+ * those exact numbers below, the way `.ca-journal-entry-header` and
+ * `.ca-journal-study-header` bleed their own cards' padding, so one set of numbers
  * covers a head on any of them.
  *
  * AND ONLY WHERE THE BLOCK HAS NO CHROME ALREADY. The three composite cards
@@ -1067,42 +1067,42 @@
  * someone else's surface. All four also take their heads down to a grip below,
  * so the exclusions are the same set said twice — once about the card, once
  * about the bar. */
-.journal-widget-block.has-head:not(
+.ca-journal-widget-block.has-head:not(
     .is-unframed,
-    .journal-sec-block,
-    .journal-overview-card,
-    .journal-entry-banner,
-    .journal-study-banner
+    .ca-journal-sec-block,
+    .ca-journal-overview-card,
+    .ca-journal-entry-banner,
+    .ca-journal-study-banner
   ),
 /* And a widget's own card inside a row, which is the same object one level down
    and needs no exclusions: `cardWidget` builds it, so it is never anything
    else. */
-.journal-widget-card {
+.ca-journal-widget-card {
   padding: 12px 14px;
   background: var(--background-secondary);
-  border: var(--am-rule) solid var(--am-border-subtle);
-  border-radius: var(--am-radius-md);
-  box-shadow: inset 0 1px 0 var(--am-edge-highlight);
+  border: var(--ca-rule) solid var(--ca-border-subtle);
+  border-radius: var(--ca-radius-md);
+  box-shadow: inset 0 1px 0 var(--ca-edge-highlight);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.journal-widget-card:hover {
-  border-color: var(--am-border-hover);
+.ca-journal-widget-card:hover {
+  border-color: var(--ca-border-hover);
 }
 /* A CARD IS A COLUMN, so a widget that fills its cell fills this too — without
    it a stack of cards in one cell is a stack of shrink-wrapped boxes of
    different widths.
    AND IT IS THE GROUND ITS SEAM STANDS ON (4.13.1 §4), the same sentence
-   `.journal-block-cell` already carries about its drop slots: the seam is drawn
+   `.ca-journal-block-cell` already carries about its drop slots: the seam is drawn
    into the gap ABOVE the card, so with nothing positioned here it would resolve
    against the cell and every seam in a column would land at the same height. */
-.journal-widget-card {
+.ca-journal-widget-card {
   display: flex;
   flex-direction: column;
   position: relative;
 }
 /* AND THE HEAD GIVES BACK THE PADDING IT CANCELLED (4.13.6 §1).
  *
- * `.journal-block-head` bleeds `margin: -12px -14px 0` so its rule meets the
+ * `.ca-journal-block-head` bleeds `margin: -12px -14px 0` so its rule meets the
  * card's edges — and the top `-12px` eats the card's `padding-top` outright,
  * with nothing put back below the rule. Whatever the card holds therefore starts
  * on the hairline. Measured on the Go-to launcher: card border at y=1, head rule
@@ -1115,9 +1115,9 @@
  * the rule and 12px above the bottom edge, and the head's bleed is paid back
  * exactly where it was taken.
  *
- * SCOPED TO THE CARD, NOT PUT ON THE HEAD. `.journal-widget-block.has-head` is
+ * SCOPED TO THE CARD, NOT PUT ON THE HEAD. `.ca-journal-widget-block.has-head` is
  * the same head one level up, and that block is a flex column with
- * `gap: var(--am-widget-gap)` — so it has always had air under its head and a
+ * `gap: var(--ca-widget-gap)` — so it has always had air under its head and a
  * margin here would add a second helping. The card is the one container with no
  * gap, which is exactly why it is the one that showed the defect.
  *
@@ -1148,7 +1148,7 @@
  * So the trigger is the 44px the dots already occupy — one box, one meaning.
  * The head names what the grip picks up, so the two appear together or not at
  * all, and a pointer travelling over a dashboard opens nothing it was not aimed
- * at. `.jbd-host:hover` still brings the DOTS back on a hover of the widget,
+ * at. `.ca-jbd-host:hover` still brings the DOTS back on a hover of the widget,
  * which is the invitation; the band is what answers it.
  *
  * NO HIT AREA OF ITS OWN AT REST, which is the whole of the minimisation:
@@ -1157,9 +1157,9 @@
  * open as the pointer moves down off the dots and into the band.
  *
  * THE CARD'S OWN GROUND, because an overlay over content has to be opaque:
- * `--background-primary-alt` is what `.journal-widget-card` paints, and reading
+ * `--background-primary-alt` is what `.ca-journal-widget-card` paints, and reading
  * a title through a table is worse than either. */
-.journal-widget-card > .journal-block-head {
+.ca-journal-widget-card > .ca-journal-block-head {
   position: absolute;
   top: 0;
   left: 0;
@@ -1172,7 +1172,7 @@
   height: 10px;
   padding: 0;
   border-bottom: 0 solid transparent;
-  border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
+  border-radius: var(--ca-radius-md) var(--ca-radius-md) 0 0;
   background: var(--background-primary-alt);
   opacity: 0;
   overflow: hidden;
@@ -1182,14 +1182,14 @@
   pointer-events: none;
   transition: opacity 120ms ease;
 }
-.journal-widget-card > .journal-block-head:hover,
-.journal-widget-card > .journal-block-head:focus-within,
-.journal-widget-card.is-resizing > .journal-block-head,
-.journal-widget-card.is-dragging > .journal-block-head,
-.journal-widget-block.is-slotting .journal-widget-card > .journal-block-head {
+.ca-journal-widget-card > .ca-journal-block-head:hover,
+.ca-journal-widget-card > .ca-journal-block-head:focus-within,
+.ca-journal-widget-card.is-resizing > .ca-journal-block-head,
+.ca-journal-widget-card.is-dragging > .ca-journal-block-head,
+.ca-journal-widget-block.is-slotting .ca-journal-widget-card > .ca-journal-block-head {
   height: auto;
   padding: 6px 14px 5px;
-  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
   opacity: 1;
   overflow: visible;
   /* Taken back only now, so the band keeps itself open under the pointer that
@@ -1201,10 +1201,10 @@
    `:has()` sitting in the list above would take ordinary hover down with it on
    any renderer that does not know the word — which is the rule
    `pure-logic.test.ts` enforces across this stylesheet. */
-.journal-widget-card:has(> .jbd-handle:hover) > .journal-block-head {
+.ca-journal-widget-card:has(> .ca-jbd-handle:hover) > .ca-journal-block-head {
   height: auto;
   padding: 6px 14px 5px;
-  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
   opacity: 1;
   overflow: visible;
   /* Taken back only now, so the band keeps itself open under the pointer that
@@ -1218,7 +1218,7 @@
    to move a widget by its head there — so the head is simply the card's top
    band, which is what it has always been. */
 @media (hover: none) {
-  .journal-widget-card > .journal-block-head {
+  .ca-journal-widget-card > .ca-journal-block-head {
     position: static;
     height: auto;
     z-index: auto;
@@ -1226,7 +1226,7 @@
     border-radius: 0;
     margin: -12px -14px 12px;
     padding: 6px 14px 5px;
-    border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+    border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
     opacity: 1;
     overflow: visible;
   }
@@ -1235,9 +1235,9 @@
    attached last, which is what keeps `layOutRow` from collecting it into a cell
    and keeps 20-charts.css's `:first-child` reading the toolbar it was written
    about. The grip-only forms below are absolute and do not depend on it — which
-   matters, because `.journal-sec-block` is not a flex container and an order
+   matters, because `.ca-journal-sec-block` is not a flex container and an order
    there is inert. */
-.journal-block-head {
+.ca-journal-block-head {
   order: -1;
   align-self: stretch;
   /* The grip centres against the head, in every one of its forms. */
@@ -1249,26 +1249,26 @@
      card above is 12/14 rather than a set of numbers of its own. */
   margin: -12px -14px 0;
   padding: 6px 14px 5px;
-  /* THE HAIRLINE, AS OF 4.13 §1. This drew `--am-rule` (2px) while the section
-     bar drew `--am-rule-hair` (1px) — so the quieter of the two bars divided
+  /* THE HAIRLINE, AS OF 4.13 §1. This drew `--ca-rule` (2px) while the section
+     bar drew `--ca-rule-hair` (1px) — so the quieter of the two bars divided
      itself with the heavier line, which is an inversion nobody would defend once
      the two are one object. */
-  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
   gap: 8px;
 }
 /* THE SAME BAND ON A BLOCK THAT WEARS NO CARD, and the same three rules — it
    is one head with two hosts, and 4.34.3's argument is about the head.
 
-   THE HOST IS POSITIONED HERE RATHER THAN LEFT TO `.jbd-host`. That class is
+   THE HOST IS POSITIONED HERE RATHER THAN LEFT TO `.ca-jbd-host`. That class is
    added by the script, and only to a block that has a GRIP — so a block with a
    head and no grip would have resolved this overlay against whatever ancestor
    happened to be positioned, which on a note is the whole pane. A card needs no
-   such line because `.journal-widget-card` has been `position: relative` since
+   such line because `.ca-journal-widget-card` has been `position: relative` since
    its seam was drawn. */
-.journal-widget-block.has-head:not(.journal-widget-card) {
+.ca-journal-widget-block.has-head:not(.ca-journal-widget-card) {
   position: relative;
 }
-.journal-widget-block.has-head:not(.journal-widget-card) > .journal-block-head {
+.ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head {
   position: absolute;
   top: 0;
   left: 0;
@@ -1278,7 +1278,7 @@
   height: 10px;
   padding: 0;
   border-bottom: 0 solid transparent;
-  border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
+  border-radius: var(--ca-radius-md) var(--ca-radius-md) 0 0;
   background: var(--background-primary-alt);
   opacity: 0;
   overflow: hidden;
@@ -1291,12 +1291,12 @@
   pointer-events: none;
   transition: opacity 120ms ease;
 }
-.journal-widget-block.has-head:not(.journal-widget-card) > .journal-block-head:hover,
-.journal-widget-block.has-head:not(.journal-widget-card) > .journal-block-head:focus-within,
-.journal-widget-block.is-slotting .journal-block-head {
+.ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head:hover,
+.ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head:focus-within,
+.ca-journal-widget-block.is-slotting .ca-journal-block-head {
   height: auto;
   padding: 6px 14px 5px;
-  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
   opacity: 1;
   overflow: visible;
   /* Taken back only now, so the band keeps itself open under the pointer that
@@ -1304,11 +1304,11 @@
   pointer-events: auto;
 }
 /* Its own rule, for the reason given at the card's. */
-.journal-widget-block.has-head:not(.journal-widget-card):has(> .jbd-handle:hover)
-  > .journal-block-head {
+.ca-journal-widget-block.has-head:not(.ca-journal-widget-card):has(> .ca-jbd-handle:hover)
+  > .ca-journal-block-head {
   height: auto;
   padding: 6px 14px 5px;
-  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
   opacity: 1;
   overflow: visible;
   /* Taken back only now, so the band keeps itself open under the pointer that
@@ -1316,7 +1316,7 @@
   pointer-events: auto;
 }
 @media (hover: none) {
-  .journal-widget-block.has-head:not(.journal-widget-card) > .journal-block-head {
+  .ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head {
     position: static;
     height: auto;
     z-index: auto;
@@ -1324,50 +1324,50 @@
     border-radius: 0;
     margin: -12px -14px 0;
     padding: 6px 14px 5px;
-    border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+    border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
     opacity: 1;
     overflow: visible;
   }
 }
-/* The label idiom `.am-ev-section` already uses, and for the same reason: a
+/* The label idiom `.ca-ev-section` already uses, and for the same reason: a
    title that has to sit in 18px says what the block is without competing with
    the titles inside it. */
-.journal-block-head-title {
-  /* THE SAME FOUR VALUES `.journal-header-title` READS (4.13 §1). This bar's
+.ca-journal-block-head-title {
+  /* THE SAME FOUR VALUES `.ca-journal-header-title` READS (4.13 §1). This bar's
      look did not change; the OTHER one came to meet it. What did change is the
-     ink — `--text-faint` to `--am-bar-ink` — because two bars that are one
+     ink — `--text-faint` to `--ca-bar-ink` — because two bars that are one
      object cannot sit two steps of contrast apart. */
-  font-size: var(--am-bar-text);
+  font-size: var(--ca-bar-text);
   font-weight: 600;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--am-bar-ink);
+  color: var(--ca-bar-ink);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* The glyph's slot, matching `.journal-header-glyph` (4.13 §1). It could not
+/* The glyph's slot, matching `.ca-journal-header-glyph` (4.13 §1). It could not
    BE that class: `test/section-frame.test.ts` asserts that no module but
    `section-frame.ts` emits that literal, and that ownership is worth more than
    sharing a name. The values are the same because they read the same tokens. */
-.journal-block-head-glyph {
+.ca-journal-block-head-glyph {
   flex: 0 0 auto;
-  width: var(--am-sec-glyph);
+  width: var(--ca-sec-glyph);
   text-align: center;
-  font-size: var(--am-bar-glyph);
+  font-size: var(--ca-bar-glyph);
   line-height: 1.35;
 }
 /* THE TWO CASES ONLY CSS CAN SEE. A block inside a section run is already under
    a bar, and an unframed block has given up its chrome; either way the head was
    built before the class arrived, so it is hidden rather than never drawn. */
-.journal-widget-block.journal-sec-block > .journal-block-head,
-.journal-widget-block.is-unframed > .journal-block-head {
+.ca-journal-widget-block.ca-journal-sec-block > .ca-journal-block-head,
+.ca-journal-widget-block.is-unframed > .ca-journal-block-head {
   display: none;
 }
 
 /* The grip, which now belongs to a widget's card and to nothing else. */
-.jbd-handle {
+.ca-jbd-handle {
   position: absolute;
   /* THE TOP EDGE, not the whole height of the host: the host is now the card or
      the block itself rather than an 18px head, and a full-height drag target
@@ -1392,7 +1392,7 @@
 /* The dots stay a grip rather than becoming a texture: a rail of them the width
    of a dashboard is a pattern, not a thing to grab. A patch in the middle is
    where a hand expects one, and one row is what 10px holds. */
-.jbd-handle::before {
+.ca-jbd-handle::before {
   content: "";
   width: 32px;
   height: 5px;
@@ -1409,13 +1409,13 @@
    rules may hide is a shared fate they have no reason to have. `jbd-host` is
    added by the script, which is the only thing that knows which element drew the
    thing being dragged. */
-.jbd-host {
+.ca-jbd-host {
   position: relative;
 }
 /* EACH GRIP ANSWERS TO ITS OWN HOST. Unscoped, hovering anywhere in a row lit
    every grip in it at once, which is the "form under construction" this
    affordance is built to avoid. A grip appears where the hand already is. */
-.jbd-host:hover > .jbd-handle {
+.ca-jbd-host:hover > .ca-jbd-handle {
   opacity: 1;
 }
 /* A GROUP'S GRIP LIVES IN ITS FOOT (4.9 §2.2), AND `.jbd-aside` IS GONE WITH THE
@@ -1437,7 +1437,7 @@
    there the height is small because everything under it is a widget with
    controls of its own, and here the foot IS the target, with nothing beneath it
    for a taller hit area to swallow. */
-.journal-group-foot > .jbd-handle {
+.ca-journal-group-foot > .ca-jbd-handle {
   top: 0;
   bottom: 0;
   height: auto;
@@ -1445,20 +1445,20 @@
   transform: none;
   justify-content: flex-start;
 }
-/* AND IT ANSWERS TO THE WHOLE BOX. `.jbd-host:hover` reveals a grip when the
+/* AND IT ANSWERS TO THE WHOLE BOX. `.ca-jbd-host:hover` reveals a grip when the
    thing it drags is hovered, and the thing this one drags is the group — where
    that rule alone would ask a reader to find a 14px strip before it showed them
    what the strip was for. */
-.journal-group:hover .journal-group-foot > .jbd-handle {
+.ca-journal-group:hover .ca-journal-group-foot > .ca-jbd-handle {
   opacity: 1;
 }
-.jbd-handle:active {
+.ca-jbd-handle:active {
   cursor: grabbing;
 }
 /* Touch has no hover to reveal it with — 3.9 §3.3's policy, at the resting
    opacity every hover-revealed affordance takes. */
 @media (hover: none) {
-  .jbd-handle {
+  .ca-jbd-handle {
     opacity: 0.3;
   }
 }
@@ -1472,7 +1472,7 @@
    of them; 4.8.1 removed that gesture, and a highlight for a drop that cannot
    happen is worse than none — the next reader believes it. What is in the air
    points at a slot now, and the slot lights itself. */
-.jbd-host.is-dragging {
+.ca-jbd-host.is-dragging {
   opacity: 0.5;
 }
 
@@ -1504,44 +1504,44 @@
  * AND ONLY WHILE SOMETHING IS IN THE AIR. `is-slotting` is put on the block by a
  * drag arriving over it, so a page at rest has no landing places drawn on it and
  * nothing is covered by an invisible target. */
-.jbd-slot {
+.ca-jbd-slot {
   position: absolute;
   display: none;
   background: transparent;
 }
-.journal-widget-block.is-slotting .jbd-slot {
+.ca-journal-widget-block.is-slotting .ca-jbd-slot {
   display: block;
 }
 /* THE BAR IS THE SLOT'S WHOLE APPEARANCE, drawn on the edge the arrival would
    sit against. The slot itself stays transparent until the pointer is in it,
    because a page of tinted rectangles during a drag hides the thing being
    arranged. */
-.jbd-slot::after {
+.ca-jbd-slot::after {
   content: "";
   position: absolute;
   background: var(--background-modifier-border);
   border-radius: 2px;
 }
-.jbd-slot.is-live {
+.ca-jbd-slot.is-live {
   background: var(--background-modifier-hover);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
 }
-.jbd-slot.is-live::after {
+.ca-jbd-slot.is-live::after {
   background: var(--interactive-accent);
 }
 /* Out of the row, into a block of its own — the half a swap could not say. The
    two of them tile the block, so there is nowhere on it that means nothing. */
-.jbd-slot-above,
-.jbd-slot-below {
+.ca-jbd-slot-above,
+.ca-jbd-slot-below {
   left: 0;
   right: 0;
   height: 50%;
   z-index: 3;
 }
-.jbd-slot-above {
+.ca-jbd-slot-above {
   top: 0;
 }
-.jbd-slot-below {
+.ca-jbd-slot-below {
   top: 50%;
 }
 /* ON A ROW BLOCK THEY ARE BANDS ALONG ITS EDGES, not halves (4.8.5). The cells
@@ -1576,63 +1576,63 @@
    themselves are the ceiling. A widget's own five places are unreachable from
    nowhere.
 
-   AND `--am-slot-reach` IS WHAT PAYS FOR IT. Losing the overlap would leave a
+   AND `--ca-slot-reach` IS WHAT PAYS FOR IT. Losing the overlap would leave a
    band the height of the group's padding, which is 16px again and the thing
    4.8.7 was right to refuse; the token says why the space outside the block is
    the right place to find it back. */
-.jbd-slot-edge {
+.ca-jbd-slot-edge {
   /* A SHARE OF THE BLOCK WITH A FLOOR, PLUS THE REACH. The ceiling that used to
      be here (72px) went with the overlap it was rationing: nothing this band
      covers belongs to a column any more, so there is nothing for it to eat. The
      floor is what a short group in a section run gets, where the box paints no
      padding at all and the reach is the whole of it. */
-  height: calc(clamp(24px, 25%, 72px) + var(--am-slot-reach));
+  height: calc(clamp(24px, 25%, 72px) + var(--ca-slot-reach));
   z-index: 2;
 }
-.jbd-slot-above.jbd-slot-edge {
-  top: calc(-1 * var(--am-slot-reach));
+.ca-jbd-slot-above.ca-jbd-slot-edge {
+  top: calc(-1 * var(--ca-slot-reach));
 }
-.jbd-slot-below.jbd-slot-edge {
+.ca-jbd-slot-below.ca-jbd-slot-edge {
   top: auto;
-  bottom: calc(-1 * var(--am-slot-reach));
+  bottom: calc(-1 * var(--ca-slot-reach));
 }
 /* THE COLUMNS, LIFTED OVER THE BANDS — the other half of the swap above, and
    the whole of the fix in one declaration.
 
    `position: relative` IS ALREADY ON THE CELL for its own slots to stand on, so
-   this is a number and nothing else. `.journal-group-pages` is positioned at
-   `z-index: auto` and `.journal-group` is not positioned at all, so neither
+   this is a number and nothing else. `.ca-journal-group-pages` is positioned at
+   `z-index: auto` and `.ca-journal-group` is not positioned at all, so neither
    seals the cell in: the number resolves in the BLOCK's stacking context, which
    is where the bands are, which is the only place the two can be compared.
 
    ONLY WHILE SOMETHING IS IN THE AIR. A page at rest has no drop targets on it
    and no reason to have its columns re-stacked; keying this on `is-slotting`
    means the change cannot reach a render the gesture is not part of. */
-.journal-widget-block.is-slotting .journal-block-row > .journal-block-cell {
+.ca-journal-widget-block.is-slotting .ca-journal-block-row > .ca-journal-block-cell {
   z-index: 5;
 }
-.jbd-slot-above::after,
-.jbd-slot-below::after {
+.ca-jbd-slot-above::after,
+.ca-jbd-slot-below::after {
   left: 0;
   right: 0;
   height: 3px;
 }
-.jbd-slot-above::after {
+.ca-jbd-slot-above::after {
   top: -2px;
 }
-.jbd-slot-below::after {
+.ca-jbd-slot-below::after {
   bottom: -2px;
 }
 /* AND THE MARK STAYS ON THE BLOCK'S OWN EDGE, which the reach would otherwise
    carry out into the margin — a bar floating in the gap between two blocks says
-   the arrival lands in the gap. The band starts `--am-slot-reach` above the
+   the arrival lands in the gap. The band starts `--ca-slot-reach` above the
    block; the bar is put back down by exactly that, and lands where it did
    before any of this moved. */
-.jbd-slot-above.jbd-slot-edge::after {
-  top: calc(var(--am-slot-reach) - 2px);
+.ca-jbd-slot-above.ca-jbd-slot-edge::after {
+  top: calc(var(--ca-slot-reach) - 2px);
 }
-.jbd-slot-below.jbd-slot-edge::after {
-  bottom: calc(var(--am-slot-reach) - 2px);
+.ca-jbd-slot-below.ca-jbd-slot-edge::after {
+  bottom: calc(var(--ca-slot-reach) - 2px);
 }
 /* FIVE PLACES ON EVERY WIDGET IN A ROW (4.8.6), reading outward: the widget's
    edges are the row, and its middle is the widget itself.
@@ -1651,21 +1651,21 @@
    and "above this one" is not a fact about the column. That is also what makes
    the arithmetic exact: each slot closes over the line that drew the widget it
    is drawn on. */
-.jbd-slot-before,
-.jbd-slot-after {
+.ca-jbd-slot-before,
+.ca-jbd-slot-after {
   top: 0;
   bottom: 0;
   width: 20%;
   z-index: 4;
 }
-.jbd-slot-before {
+.ca-jbd-slot-before {
   left: 0;
 }
-.jbd-slot-after {
+.ca-jbd-slot-after {
   right: 0;
 }
-.jbd-slot-before::after,
-.jbd-slot-after::after {
+.ca-jbd-slot-before::after,
+.ca-jbd-slot-after::after {
   top: 0;
   bottom: 0;
   width: 3px;
@@ -1673,10 +1673,10 @@
 /* IN THE MIDDLE OF THE GUTTER, MEASURED BACK FROM THE SLOT (4.54 §2).
 
    THE BUG THIS FIXES was arithmetic left behind by a hit area. These two read
-   `calc(var(--am-widget-gap) / -2 - 1px)` — half a gutter and half a bar out
+   `calc(var(--ca-widget-gap) / -2 - 1px)` — half a gutter and half a bar out
    from the CARD's edge, which is exactly right and was exactly right when the
    slot's own box started at the card's edge. 4.8.3 then moved the box out to
-   `calc(var(--am-widget-gap) / -2 - 9px)` to widen the target, and the mark, an
+   `calc(var(--ca-widget-gap) / -2 - 9px)` to widen the target, and the mark, an
    `::after` inside the box, went with it: a bar meant for the middle of a 10px
    gutter was being drawn 14px further out, which puts it clear of the gutter and
    over the neighbouring column. The two slots that name ONE boundary — this
@@ -1686,26 +1686,26 @@
    SO THE OVERHANG IS ADDED BACK, and it is written as the sum rather than as
    the 8px it comes to, because the two halves are the two rules that have to
    stay in step: change the box's inset below and this follows it. */
-.jbd-slot-before::after {
-  left: calc(var(--am-widget-gap) / 2 + 9px - var(--am-widget-gap) / 2 - 1px);
+.ca-jbd-slot-before::after {
+  left: calc(var(--ca-widget-gap) / 2 + 9px - var(--ca-widget-gap) / 2 - 1px);
 }
-.jbd-slot-after::after {
-  right: calc(var(--am-widget-gap) / 2 + 9px - var(--am-widget-gap) / 2 - 1px);
+.ca-jbd-slot-after::after {
+  right: calc(var(--ca-widget-gap) / 2 + 9px - var(--ca-widget-gap) / 2 - 1px);
 }
 /* The two that stack, between the edges. */
-.jbd-slot-over,
-.jbd-slot-under {
+.ca-jbd-slot-over,
+.ca-jbd-slot-under {
   left: 20%;
   right: 20%;
   height: 20%;
   z-index: 4;
 }
-.jbd-slot-over {
+.ca-jbd-slot-over {
   top: 0;
 }
 /* AND THE GAP BETWEEN TWO CARDS BELONGS TO THE ONE ABOVE IT (4.54 §1).
 
-   A column is a flex column with `var(--am-widget-gap)` between its cards, and
+   A column is a flex column with `var(--ca-widget-gap)` between its cards, and
    until the bands sank under the columns that 10px strip was covered by
    whichever block band happened to reach it. Nothing covers it now, so it would
    be the one place inside a group that means nothing — a dead line between two
@@ -1717,50 +1717,50 @@
    the card ABOVE because the alternative eats upwards — the first card in a
    column would reach into the group's padding and take the strip the band above
    it is now living on, which is the space this release just finished buying. */
-.jbd-slot-under {
-  bottom: calc(-1 * var(--am-widget-gap));
-  height: calc(20% + var(--am-widget-gap));
+.ca-jbd-slot-under {
+  bottom: calc(-1 * var(--ca-widget-gap));
+  height: calc(20% + var(--ca-widget-gap));
 }
-.jbd-slot-over::after,
-.jbd-slot-under::after {
+.ca-jbd-slot-over::after,
+.ca-jbd-slot-under::after {
   left: 0;
   right: 0;
   height: 3px;
 }
-.jbd-slot-over::after {
+.ca-jbd-slot-over::after {
   top: 0;
 }
 /* ON THE CARD'S OWN EDGE, not on the slot's. The slot now hangs a gap's worth
    below the card, and a bar carried down with it would be drawn against the
    TOP of the next card — naming the boundary from the wrong side. */
-.jbd-slot-under::after {
-  bottom: var(--am-widget-gap);
+.ca-jbd-slot-under::after {
+  bottom: var(--ca-widget-gap);
 }
 /* And the middle, which is a swap. Its mark is a ring rather than a bar: a bar
    says "the arrival goes on this side of that line" and a swap has no side. */
-.jbd-slot-swap {
+.ca-jbd-slot-swap {
   left: 20%;
   right: 20%;
   top: 20%;
   bottom: 20%;
   z-index: 4;
 }
-.jbd-slot-swap::after {
+.ca-jbd-slot-swap::after {
   inset: 0;
   background: none;
   border: 2px dashed var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
 }
-.jbd-slot-swap.is-live::after {
+.ca-jbd-slot-swap.is-live::after {
   background: none;
   border-color: var(--interactive-accent);
   border-style: solid;
 }
-.jbd-slot-before {
-  left: calc(var(--am-widget-gap) / -2 - 9px);
+.ca-jbd-slot-before {
+  left: calc(var(--ca-widget-gap) / -2 - 9px);
 }
-.jbd-slot-after {
-  right: calc(var(--am-widget-gap) / -2 - 9px);
+.ca-jbd-slot-after {
+  right: calc(var(--ca-widget-gap) / -2 - 9px);
 }
 
 /* ── Making a group on the page (4.9 §4) ────────────────────────────────
@@ -1777,7 +1777,7 @@
  *
  * ── DRAWN ONLY WHERE THERE IS ROOM TO SPLIT ────────────────────────────
  *
- * 660px is two cells at the `--am-row-cell-min` floor plus the gap between them,
+ * 660px is two cells at the `--ca-row-cell-min` floor plus the gap between them,
  * which is the narrowest a two-column group can be without wrapping straight
  * back into a stack. A quarter offering a group that would collapse the instant
  * it was made is a control that cannot do its job, and `empty.ts`'s rule is that
@@ -1785,42 +1785,42 @@
  *
  * ASKED OF THE BLOCK, NOT OF THE PANE, and that is 4.3.1's lesson honoured
  * rather than repeated: a query resolves against the nearest inline-size
- * ancestor, `.journal-widget-block` establishes one, and the block is exactly
+ * ancestor, `.ca-journal-widget-block` establishes one, and the block is exactly
  * the thing that has to hold two columns. The one thing a container query still
  * cannot know is how many cells will share the result — which is why this
  * governs whether the quarters exist at all and not what they do.
  *
- * THE OVERRIDE IS SCOPED, not a bare `display: none`. `.is-slotting .jbd-slot`
+ * THE OVERRIDE IS SCOPED, not a bare `display: none`. `.is-slotting .ca-jbd-slot`
  * turns every slot on at three classes of specificity, so the rule that holds
  * these back has to match it and win on order. */
-.jbd-slot-side {
+.ca-jbd-slot-side {
   top: 0;
   bottom: 0;
   width: 25%;
   z-index: 3;
 }
-.jbd-slot-side-left {
+.ca-jbd-slot-side-left {
   left: 0;
 }
-.jbd-slot-side-right {
+.ca-jbd-slot-side-right {
   right: 0;
 }
-.jbd-slot-side::after {
+.ca-jbd-slot-side::after {
   top: 0;
   bottom: 0;
   width: 3px;
 }
-.jbd-slot-side-left::after {
+.ca-jbd-slot-side-left::after {
   left: -2px;
 }
-.jbd-slot-side-right::after {
+.ca-jbd-slot-side-right::after {
   right: -2px;
 }
-.journal-widget-block.is-slotting .jbd-slot-side {
+.ca-journal-widget-block.is-slotting .ca-jbd-slot-side {
   display: none;
 }
 @container (min-width: 660px) {
-  .journal-widget-block.is-slotting .jbd-slot-side {
+  .ca-journal-widget-block.is-slotting .ca-jbd-slot-side {
     display: block;
   }
   /* AND THE HALVES STAND BACK. Without this the block's own above/below slots
@@ -1829,24 +1829,24 @@
      given different GROUND rather than different numbers, which is that
      release's own conclusion.
 
-     `:not(.jbd-slot-edge)` because a ROW block's halves are already bands along
+     `:not(.ca-jbd-slot-edge)` because a ROW block's halves are already bands along
      its top and bottom, it has no side quarters, and narrowing them would take
      away the only place a widget can be dropped to leave the group. */
-  .journal-widget-block.is-slotting .jbd-slot-above:not(.jbd-slot-edge),
-  .journal-widget-block.is-slotting .jbd-slot-below:not(.jbd-slot-edge) {
+  .ca-journal-widget-block.is-slotting .ca-jbd-slot-above:not(.ca-jbd-slot-edge),
+  .ca-journal-widget-block.is-slotting .ca-jbd-slot-below:not(.ca-jbd-slot-edge) {
     left: 25%;
     right: 25%;
   }
 }
 
 /* ── Focus visible rings (4.24 §4.1) ────────────────────────────────── */
-.almanac-repair-toggle-btn:focus-visible,
-.journal-widget-block button:focus-visible,
-.journal-widget-block select:focus-visible,
-.journal-widget-block input:focus-visible,
-.almanac-editor-modal button:focus-visible,
-.almanac-editor-modal select:focus-visible,
-.almanac-editor-modal input:focus-visible {
+.ca-repair-toggle-btn:focus-visible,
+.ca-journal-widget-block button:focus-visible,
+.ca-journal-widget-block select:focus-visible,
+.ca-journal-widget-block input:focus-visible,
+.ca-editor-modal button:focus-visible,
+.ca-editor-modal select:focus-visible,
+.ca-editor-modal input:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
 }

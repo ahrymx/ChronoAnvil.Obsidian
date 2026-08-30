@@ -11,7 +11,7 @@
 //
 // Obsidian draws the property editor between the note's title and its first
 // block — six rows of key and value on a diary entry, above everything the
-// reader opened the note to write in. On an Almanac note most of what is in it
+// reader opened the note to write in. On a ChronoAnvil note most of what is in it
 // is already on screen: Mood, Sleep, Wake-Up and Bedtime are the tracker grid,
 // drawn as controls rather than as rows; `journal-date` and `journal` are what
 // the bar's trail and the head's eyebrow are derived from.
@@ -76,7 +76,7 @@ export function textToList(text: string): string[] {
     .filter(Boolean);
 }
 
-/** Keys in the order a reader should meet them: Almanac's first, then the rest. */
+/** Keys in the order a reader should meet them: ChronoAnvil's first, then the rest. */
 export function orderedKeys(
   fm: Record<string, unknown>,
   first: readonly string[]
@@ -117,9 +117,9 @@ export function openProperties(app: App, file: TFile): void {
   new PropertiesModal(app, file).open();
 }
 
-// The properties Almanac writes, in the order it writes them — so the window
+// The properties ChronoAnvil writes, in the order it writes them — so the window
 // opens on what the plugin put there rather than on whatever sorts first.
-const ALMANAC_FIRST = [
+const CHRONOANVIL_FIRST = [
   "title",
   "journal-date",
   "week-start",
@@ -139,7 +139,7 @@ class PropertiesModal extends Modal {
 
   onOpen(): void {
     const { contentEl, modalEl } = this;
-    modalEl.addClass("am-props-modal");
+    modalEl.addClass("ca-props-modal");
     contentEl.empty();
     this.render();
   }
@@ -159,24 +159,24 @@ class PropertiesModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    const head = contentEl.createDiv({ cls: "amp-head" });
-    setIcon(head.createSpan({ cls: "amp-head-icon" }), "list");
-    head.createDiv({ cls: "amp-head-text", text: "Properties" });
-    head.createDiv({ cls: "amp-head-note", text: this.file.basename });
+    const head = contentEl.createDiv({ cls: "ca-amp-head" });
+    setIcon(head.createSpan({ cls: "ca-amp-head-icon" }), "list");
+    head.createDiv({ cls: "ca-amp-head-text", text: "Properties" });
+    head.createDiv({ cls: "ca-amp-head-note", text: this.file.basename });
 
     const fm = this.frontmatter();
-    const keys = orderedKeys(fm, ALMANAC_FIRST);
-    const body = contentEl.createDiv({ cls: "amp-body" });
+    const keys = orderedKeys(fm, CHRONOANVIL_FIRST);
+    const body = contentEl.createDiv({ cls: "ca-amp-body" });
 
     if (keys.length === 0) {
       body.createDiv({
-        cls: "amp-empty",
+        cls: "ca-amp-empty",
         text: "This note has no properties yet.",
       });
     }
     for (const key of keys) this.renderRow(body, key, fm[key]);
 
-    new Setting(contentEl.createDiv({ cls: "amp-foot" }))
+    new Setting(contentEl.createDiv({ cls: "ca-amp-foot" }))
       // WORDS, NOT A GLYPH. This shipped as `.setButtonText(…).setIcon("plus")`
       // and rendered as a bare `+`: Obsidian's `setIcon` REPLACES the button's
       // content, so the second call threw the first one away. A `+` alone in a
@@ -191,20 +191,20 @@ class PropertiesModal extends Modal {
   private renderRow(body: HTMLElement, key: string, value: unknown): void {
     const shape = shapeOf(value);
     const row = new Setting(body);
-    row.settingEl.addClass("amp-row");
+    row.settingEl.addClass("ca-amp-row");
 
     const nameEl = row.nameEl;
     nameEl.empty();
-    const iconSpan = nameEl.createSpan({ cls: "amp-prop-icon" });
+    const iconSpan = nameEl.createSpan({ cls: "ca-amp-prop-icon" });
     setIcon(iconSpan, propertyIconOf(key, value, shape));
-    nameEl.createSpan({ cls: "amp-prop-key", text: key });
+    nameEl.createSpan({ cls: "ca-amp-prop-key", text: key });
 
     if (shape === "opaque") {
       // SHOWN AND NOT TOUCHED. See the module head: flattening a nested value
       // to a string is the one operation here that would destroy data, and it
       // would do it silently.
       row.setDesc("A list or object — edit this one in the note itself.");
-      row.settingEl.addClass("amp-row-opaque");
+      row.settingEl.addClass("ca-amp-row-opaque");
       return;
     }
 
@@ -303,7 +303,7 @@ function promptForName(app: App): Promise<string | null> {
       type: "text",
       attr: { placeholder: "Property name" },
     });
-    input.addClass("amp-name-input");
+    input.addClass("ca-amp-name-input");
     input.addEventListener("keydown", (evt) => {
       if (evt.key === "Enter") {
         evt.preventDefault();

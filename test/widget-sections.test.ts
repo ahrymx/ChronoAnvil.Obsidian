@@ -120,7 +120,7 @@ describe("what the generator makes", () => {
         ? s.render({ form: "widget" })
         : s.render();
       expect(rendered.lines, s.id).toHaveLength(1);
-      expect(rendered.fence, s.id).toBe("almanac");
+      expect(rendered.fence, s.id).toBe("chronoanvil");
     }
   });
 
@@ -236,7 +236,7 @@ describe("locating a widget, which must be the directive and not a word inside o
   });
 
   it("returns the start of the line, which is what a line number is counted from", () => {
-    const text = "`almanac:spacer`\n```almanac\nevents\n```\n";
+    const text = "`chronoanvil:spacer`\n```chronoanvil\nevents\n```\n";
     const at = locateKeyword("events")(text);
     expect(at).toBeGreaterThan(0);
     // `cellLineIn` turns this into a line number by counting the newlines before
@@ -292,7 +292,7 @@ describe("the de-dup probe, which runs both ways", () => {
         blurb: "Matches an events fence it no longer writes.",
         icon: "📦",
         locked: false,
-        render: () => ({ fence: "almanac", lines: ["header:📦 Legacy"] }),
+        render: () => ({ fence: "chronoanvil", lines: ["header:📦 Legacy"] }),
         locate: (text) => text.search(/^events\b/m),
       },
     ];
@@ -328,9 +328,9 @@ describe("a widget added from the window behaves like any other section", () => 
   it("lands in one fence at the end, after everything the page has an opinion about", () => {
     expect(withEvents).not.toBeNull();
     expect(withEvents.trimEnd().endsWith("```")).toBe(true);
-    const fences = withEvents.split("\n").filter((l) => l.startsWith("```almanac"));
+    const fences = withEvents.split("\n").filter((l) => l.startsWith("```chronoanvil"));
     expect(fences).toHaveLength(
-      home().split("\n").filter((l) => l.startsWith("```almanac")).length + 1
+      home().split("\n").filter((l) => l.startsWith("```chronoanvil")).length + 1
     );
     // `insertionPoint` ranks by catalogue position and the tail is last, so this
     // costs no rule of its own.
@@ -356,7 +356,7 @@ describe("a widget added from the window behaves like any other section", () => 
 
   it("and a SECTION is withheld once the page has it, which is the other half", () => {
     // THE CONTRAST THAT MAKES THE RULE A RULE. A catalogue section persists its
-    // content into a `<!--almanac:key-->` region keyed by name, so a second copy
+    // content into a `<!--chronoanvil:key-->` region keyed by name, so a second copy
     // would claim the first one's region and overwrite it on Save. A widget
     // renders and remembers nothing, so a second copy is a second view.
     const offered = model.addable(withEvents).map((s) => s.id);
@@ -411,7 +411,7 @@ describe("a widget added from the window behaves like any other section", () => 
 });
 
 describe("a widget fence somebody wrote by hand", () => {
-  const byHand = home() + "\n```almanac\nevents\n```\n";
+  const byHand = home() + "\n```chronoanvil\nevents\n```\n";
 
   it("stops being reported as a block nobody owns", () => {
     // THE COMPLAINT ANSWERED FROM THE OTHER SIDE. Before 4.12 this fence was a
@@ -423,7 +423,7 @@ describe("a widget fence somebody wrote by hand", () => {
   });
 
   it("and a titled one is listed, removable, and not offered a group", () => {
-    const titled = home() + "\n```almanac\nheader:🎉 Events\nevents\n```\n";
+    const titled = home() + "\n```chronoanvil\nheader:🎉 Events\nevents\n```\n";
     expect(model.present(titled)).toContain("w:events#1");
     const block = flatBlocks(titled, WITH_WIDGETS).find((b) =>
       b.ids.includes("w:events#1")
@@ -441,7 +441,7 @@ describe("a widget fence somebody wrote by hand", () => {
     //
     // Every occurrence has an id now, so the reader's second copy is a row like
     // any other. The one-anchor rule is untouched: two ids, two runs.
-    const twice = byHand + "\n```almanac\nevents:upcoming:9\n```\n";
+    const twice = byHand + "\n```chronoanvil\nevents:upcoming:9\n```\n";
     const present = model.present(twice);
     expect(present.filter((id) => id.startsWith("w:events"))).toEqual([
       "w:events#1",
@@ -471,7 +471,7 @@ describe("as many copies of a widget as a page wants", () => {
   const cards = (n: number): string =>
     Array.from(
       { length: n },
-      (_, i) => "```almanac\njournal-card:j" + (i + 1) + "\n```"
+      (_, i) => "```chronoanvil\njournal-card:j" + (i + 1) + "\n```"
     ).join("\n\n") + "\n";
 
   it("spells an instance id so it can be read back without a list", () => {
@@ -609,7 +609,7 @@ describe("as many copies of a widget as a page wants", () => {
     // card's line and removing the second would have deleted the first.
     const row =
       home() +
-      "\n```almanac\nrow:cards\njournal-card:study\njournal-card:cooking\n```\n";
+      "\n```chronoanvil\nrow:cards\njournal-card:study\njournal-card:cooking\n```\n";
     expect(model.present(row).filter((id) => id.includes("journal-card"))).toEqual([
       "w:journal-card#1",
       "w:journal-card#2",
@@ -642,7 +642,7 @@ describe("as many copies of a widget as a page wants", () => {
     const m = homeSectionModel(ROOT, "", vault);
     const text =
       home() +
-      "\n```almanac\njournal-card:study\n```\n\n```almanac\njournal-card:cooking\n```\n";
+      "\n```chronoanvil\njournal-card:study\n```\n\n```chronoanvil\njournal-card:cooking\n```\n";
     const cards = m.sections(text).filter((s) => s.id.includes("journal-card"));
     expect(cards.map((s) => s.answered?.arg)).toEqual([
       "study",
@@ -689,7 +689,7 @@ describe("as many copies of a widget as a page wants", () => {
 
     const line = (text: string | null): string =>
       (text ?? "").split("\n").find((l) => l.startsWith("level-index")) ?? "";
-    const blank = "`almanac:spacer`\n";
+    const blank = "`chronoanvil:spacer`\n";
     expect(
       line(m.apply(blank, [{ id: "w:level-index#1", options: { arg: "study", arg2: "Maths" } }]))
     ).toBe("level-index:study/Maths");
@@ -761,7 +761,7 @@ describe("as many copies of a widget as a page wants", () => {
   it("reads each piece back into its own box, remainder and all", () => {
     const vault = { journals: [{ value: "study", label: "Study" }] };
     const m = homeSectionModel(ROOT, "", vault);
-    const text = "`almanac:spacer`\n\n```almanac\nlevel-index:study/Maths/Algebra\n```\n";
+    const text = "`chronoanvil:spacer`\n\n```chronoanvil\nlevel-index:study/Maths/Algebra\n```\n";
     const view = m.sections(text).find((x) => x.id === "w:level-index#1");
     // THE LAST PIECE TAKES THE REMAINDER, which is what lets a nested folder be
     // the second half of a two-piece argument — split as a list it would be
@@ -786,7 +786,7 @@ describe("as many copies of a widget as a page wants", () => {
     // lines are the FIRST and the SECOND, not one section found twice.
     const text =
       home() +
-      "\n```almanac\njournal-card:study\n```\n\n```almanac\njournal-card:study\n```\n";
+      "\n```chronoanvil\njournal-card:study\n```\n\n```chronoanvil\njournal-card:study\n```\n";
     const present = model.present(text).filter((id) => id.includes("journal-card"));
     expect(present).toEqual(["w:journal-card#1", "w:journal-card#2"]);
     expect(model.plan(text, model.present(text)).filter((o) => o.kind === "foreign"))

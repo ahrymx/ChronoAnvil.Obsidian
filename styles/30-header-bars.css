@@ -1,28 +1,28 @@
 /* ── Header bars (home / review / journal dashboards) ─────────
-   `header:<emoji + title>` in a ```almanac block renders one of these:
+   `header:<emoji + title>` in a ```chronoanvil block renders one of these:
    the section title on the left, the section's own controls anchored on
    the right. It replaces the old "markdown heading + loose button row"
    pairing so a section reads as a single unified header. The bar sits at
-   the top of its .journal-widget-block; anything after it (calendars,
+   the top of its .ca-journal-widget-block; anything after it (calendars,
    summaries, tables) flows below as usual. */
-/* THE LOOK. `.journal-header-bar` below is now only the fold walk's marker —
+/* THE LOOK. `.ca-journal-header-bar` below is now only the fold walk's marker —
    see section-frame.ts for why a section that owns its own children must not
    carry it, and why both variants must nonetheless look identical. */
 /* THE RULE IS THE HAIRLINE TOKEN AS OF 4.11, which changes nothing on screen and
    is the point: it was a raw `1px`, and the strip this bar now grows for its own
-   controls is `--am-rule-hair` because `.journal-group-foot` is. A bar with two
+   controls is `--ca-rule-hair` because `.ca-journal-group-foot` is. A bar with two
    divisions in it that named the same number two ways is one retune away from
    drawing two different lines. The weight itself is 2.56's decision and is
-   unchanged — `--am-rule` (2px) is what a CARD divides itself with, and a rule that
+   unchanged — `--ca-rule` (2px) is what a CARD divides itself with, and a rule that
    heavy under every title was the thing that release deleted. */
-.journal-sec {
+.ca-journal-sec {
   display: flex;
   align-items: center;
-  gap: var(--am-sec-gap) 10px;
+  gap: var(--ca-sec-gap) 10px;
   flex-wrap: wrap;
-  padding: var(--am-sec-pad) 2px;
-  margin: 2px 0 var(--am-sec-gap);
-  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  padding: var(--ca-sec-pad) 2px;
+  margin: 2px 0 var(--ca-sec-gap);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
 }
 /* The glyph, in a fixed slot.
    It used to be the first characters of the title string, so "🎓 Study" and
@@ -30,25 +30,25 @@
    of section headers read as ragged. Splitting it out (section-frame.ts) is
    what buys the alignment; a section with no glyph gets no slot, because
    indenting every title to align the ones that have one is a worse trade. */
-.journal-header-glyph {
+.ca-journal-header-glyph {
   flex: 0 0 auto;
-  width: var(--am-sec-glyph);
+  width: var(--ca-sec-glyph);
   text-align: center;
   /* LARGER THAN THE TITLE, ON PURPOSE (4.13 §1). Every other part of this bar
-     came down to `--am-bar-text`; the glyph did not, because an emoji at 11.2px
-     is a smudge and a slot full of smudges aligns nothing. `--am-sec-glyph` was
+     came down to `--ca-bar-text`; the glyph did not, because an emoji at 11.2px
+     is a smudge and a slot full of smudges aligns nothing. `--ca-sec-glyph` was
      re-tuned in the same release so the slot's PIXEL width is unchanged. */
-  font-size: var(--am-bar-glyph);
+  font-size: var(--ca-bar-glyph);
   line-height: 1.35;
 }
-.journal-header-note {
+.ca-journal-header-note {
   flex: 0 0 auto;
-  font-size: var(--am-bar-text);
+  font-size: var(--ca-bar-text);
   color: var(--text-faint);
   line-height: 1.6;
 }
 /* THE ONE BAR SPEC, READ FROM TOKENS (4.13 §1). This was 0.95em mixed-case in
-   `--text-normal` — a heading — while `.journal-block-head-title` was a 0.7em
+   `--text-normal` — a heading — while `.ca-journal-block-head-title` was a 0.7em
    uppercase micro-label, and the first render of the three dashboards showed the
    same widget wearing one or the other depending only on whether its fence
    carried a modifier. The bar is one object now and this is the smaller of the
@@ -56,12 +56,12 @@
    on a band, not a heading competing with the page's own name.
    Everything else in the bar — the count pill, the action pills — was already at
    this size, so the band is now uniform. */
-.journal-header-title {
-  font-size: var(--am-sec-title-size);
+.ca-journal-header-title {
+  font-size: var(--ca-sec-title-size);
   font-weight: 600;
   text-transform: none;
   line-height: 1.35;
-  color: var(--am-sec-title-ink);
+  color: var(--ca-sec-title-ink);
   letter-spacing: normal;
   /* Shrinks before the actions do: a long section title should ellipsise on a
      phone rather than push the section's one button onto a second row. That
@@ -79,44 +79,44 @@
    separates the two gestures visually, the same way stopPropagation separates
    them behaviourally.
 
-   `cursor: text` rather than `pointer`, matching .jsh-title: the bar's own
+   `cursor: text` rather than `pointer`, matching .ca-jsh-title: the bar's own
    cursor says "this folds", and a pointer over the title would say the same
    thing about a control that does something else entirely. */
-.journal-header-title-editable {
+.ca-journal-header-title-editable {
   cursor: text;
   padding: 1px 5px;
   margin-left: -5px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   transition: background 0.12s;
 }
-.journal-header-title-editable:hover {
+.ca-journal-header-title-editable:hover {
   background: var(--background-modifier-hover);
 }
 /* Inherits the slot's ellipsis; the span exists so the input can replace it
    without the frame losing the rules that keep a long title from pushing the
    section's buttons onto a second row. */
-.journal-header-title-text {
+.ca-journal-header-title-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 /* THE FIELD MUST NOT RESIZE THE BAR IT IS IN (4.13 §1). This was
-   `--am-text-base` while the title beside it was too; after §1 brought the title
-   down to `--am-bar-text`, clicking a section's name to rename it jumped from
+   `--ca-text-base` while the title beside it was too; after §1 brought the title
+   down to `--ca-bar-text`, clicking a section's name to rename it jumped from
    11.2px to 15.2px and reflowed the bar under the reader's cursor.
    AND IT IS NOT UPPERCASED, deliberately, where the title it replaces is. The
    caps are a rendering of a stored string; an input that shouted them back would
    be showing the reader something other than what is in their file, and what they
    type would come out cased differently from what they saw. Showing the true
    value on click is also what teaches that the caps were a style. */
-.journal-header-title-input {
-  font-size: var(--am-bar-text);
+.ca-journal-header-title-input {
+  font-size: var(--ca-bar-text);
   font-weight: 600;
   line-height: 1.35;
-  letter-spacing: var(--am-bar-track);
-  padding: var(--am-space-1) var(--am-space-3);
+  letter-spacing: var(--ca-bar-track);
+  padding: var(--ca-space-1) var(--ca-space-3);
   border: 1px solid var(--interactive-accent);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--background-primary);
   color: var(--text-normal);
   width: 100%;
@@ -126,16 +126,16 @@
 /* How many things the body holds — the one piece of information a folded
    section did not previously carry. Never rendered as 0; see the `count`
    option in section-frame.ts for why that is the caller's decision. */
-.journal-header-count {
+.ca-journal-header-count {
   flex: 0 0 auto;
   /* The bar's own scale, not a second spelling of the same number (4.13 §1):
      these resolve identically today and would part company the moment
-     `--am-bar-text` was retuned, which is the only reason it is a token. */
-  font-size: var(--am-bar-text);
+     `--ca-bar-text` was retuned, which is the only reason it is a token. */
+  font-size: var(--ca-bar-text);
   font-weight: 600;
   line-height: 1.6;
   padding: 0 7px;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-modifier-hover);
   color: var(--text-muted);
 }
@@ -144,7 +144,7 @@
 /* Anchored right. `margin-left: auto` rather than `margin-right: auto` on the
    title, because the title is no longer the last thing before the actions —
    the count sits between them and would have been pushed right with it. */
-.journal-header-widgets.journal-widget-bar {
+.ca-journal-header-widgets.ca-journal-widget-bar {
   flex: 0 1 auto;
   margin-left: auto;
   justify-content: flex-end;
@@ -165,31 +165,31 @@
  * the one that owns the most is the one furthest out. Both levels therefore end
  * with the chevron at the right-hand edge, which is the whole point of moving it.
  */
-.journal-sec-l2 > .journal-header-toggle {
+.ca-journal-sec-l2 > .ca-journal-header-toggle {
   margin-left: 0;
   order: 1;
 }
 /* ── AND AT LEVEL 1 THE CONTROLS GET A STRIP OF THEIR OWN (4.11) ────
  *
  * WHAT WENT WRONG, FROM A VAULT RENDER. On one homepage: five widget blocks each
- * wearing `.journal-block-head` — a slim band, a micro-label, a hairline — and
+ * wearing `.ca-journal-block-head` — a slim band, a micro-label, a hairline — and
  * directly under them *📊 Trends and Statistics [0] [+ Add chart]*, a bar of a
  * visibly different kind, with its button crowded onto the title's line. Two
  * idioms for one job on one screen.
  *
  * So a level-1 title line carries the title and what NUMBERS it — glyph, count,
- * note — and everything that ACTS goes below, on the `.journal-group-foot` idiom:
- * a hairline, 4px of air, right-aligned, at the `--am-text-2xs` scale. The two
+ * note — and everything that ACTS goes below, on the `.ca-journal-group-foot` idiom:
+ * a hairline, 4px of air, right-aligned, at the `--ca-text-2xs` scale. The two
  * strips are then the same object at two scales, which is the whole of the
  * unification.
  *
  * NO NEW ELEMENT, WHICH IS WHY THIS IS FOUR DECLARATIONS AND NOT A REFACTOR.
- * `.journal-sec` is already `flex-wrap: wrap` with a row gap, so `flex: 1 0 100%`
+ * `.ca-journal-sec` is already `flex-wrap: wrap` with a row gap, so `flex: 1 0 100%`
  * on the slot that already exists IS a second row. `frame.actions` keeps its
  * element, its class and its position, so all eleven `sectionFrame` callers are
  * untouched — including `header:`, where every following `button:`, `links:` and
  * inline control already flows into this slot — and so do the two places that
- * hard-code `.journal-header-widgets` to keep a click on a control from folding
+ * hard-code `.ca-journal-header-widgets` to keep a click on a control from folding
  * the section (`foldableSection`, `HeaderBar`). A wrapper would have had to be
  * added to both, and a button that folded its own section is the bug that would
  * have shipped.
@@ -214,7 +214,7 @@
  * rule above nothing.
  *
  * NOT FULL-BLEED, unlike the bar's own `border-bottom` inside a section card
- * (70-section-surface.css). `.journal-group-foot` does not bleed either, and two
+ * (70-section-surface.css). `.ca-journal-group-foot` does not bleed either, and two
  * edge-to-edge hairlines 22px apart read as a banded table — this one divides the
  * header, so it stops where the text does. */
 /* AND THE AIR IS 8px, NOT 4px, AS OF 4.13.8 §36 — which is the third and last
@@ -229,7 +229,7 @@
  * control from 32px to 21px and removed the actual overlap.
  *
  * 4px WAS RIGHT FOR WHAT THIS STRIP HELD IN 4.11 and is not right for what it
- * holds now. The note below still describes it as the `.journal-group-foot`
+ * holds now. The note below still describes it as the `.ca-journal-group-foot`
  * idiom — "a hairline, 4px of air, right-aligned" — and that band holds a WORD.
  * This one holds controls with their own edges and fills, and an edge needs
  * clearance from a rule that a word does not.
@@ -238,38 +238,38 @@
  * of strip again — which is the whole argument the two share. The foot gains 4px
  * it does not need and loses nothing by having.
  *
- * A LITERAL, NOT `--am-space-4`. 00-tokens.css §4.3 keeps layout paddings on
+ * A LITERAL, NOT `--ca-space-4`. 00-tokens.css §4.3 keeps layout paddings on
  * literals and reserves the spacing scale for controls, with a test pinning that
  * readership. This is a layout padding. */
-.journal-sec-l1:not(.journal-header-bar-untitled)
-  > .journal-header-widgets.journal-widget-bar {
+.ca-journal-sec-l1:not(.ca-journal-header-bar-untitled)
+  > .ca-journal-header-widgets.ca-journal-widget-bar {
   flex: 1 0 100%;
   margin-left: 0;
   padding-top: 8px;
-  border-top: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-top: var(--ca-rule-hair) solid var(--background-modifier-border);
 }
 /* Nothing in it, nothing drawn — or every section without a control would carry a
    hairline over 4px of empty space. */
-.journal-sec-l1 > .journal-header-widgets.journal-widget-bar:empty {
+.ca-journal-sec-l1 > .ca-journal-header-widgets.ca-journal-widget-bar:empty {
   display: none;
 }
 /* THE STRIP'S SCALE, WHICH IS LEVEL 2'S AND IS NOW BOTH LEVELS'. 50-entry-
-   header.css sized a nested bar's buttons down to `--am-text-2xs` and argued it as
+   header.css sized a nested bar's buttons down to `--ca-text-2xs` and argued it as
    a fact about level 2; the argument turns out to be about a PLACE — chrome under
    or beside a title, as against an action on the thing itself — and the strip is
    that same place. So the rule moved here and grew one selector rather than being
    copied, which is what makes the two levels one decision. It is also what buys
    back the line the strip costs: a strip at ~22px against a title line at ~25px. */
-.journal-sec-l1 > .journal-header-widgets .journal-btn,
-.journal-sec-l2 .journal-header-widgets .journal-btn {
-  font-size: var(--am-text-2xs);
-  padding: var(--am-space-1) var(--am-space-5);
+.ca-journal-sec-l1 > .ca-journal-header-widgets .ca-journal-btn,
+.ca-journal-sec-l2 .ca-journal-header-widgets .ca-journal-btn {
+  font-size: var(--ca-text-2xs);
+  padding: var(--ca-space-1) var(--ca-space-5);
   gap: 4px;
 }
 /* A links row tucked into a header sheds the standalone navigator's
    full-width border strip and bottom margin — inside the bar it's just a
    pill group sitting beside the title. */
-.journal-header-widgets .journal-nav.journal-links {
+.ca-journal-header-widgets .ca-journal-nav.ca-journal-links {
   border: none;
   padding: 0;
   margin: 0;
@@ -279,9 +279,9 @@
  * this strip that was never brought to it.
  *
  * THE ARITHMETIC, WHICH IS THE WHOLE REPORT. A links pill drew at
- * `--am-text-sm` (0.85em) with `--am-space-3` (6px) of vertical padding: about
- * **32px**. Everything else in this strip draws at `--am-text-2xs` (0.7em) with
- * `--am-space-1` (2px): about **21px**. A flex row centres what it holds, so the
+ * `--ca-text-sm` (0.85em) with `--ca-space-3` (6px) of vertical padding: about
+ * **32px**. Everything else in this strip draws at `--ca-text-2xs` (0.7em) with
+ * `--ca-space-1` (2px): about **21px**. A flex row centres what it holds, so the
  * 11px difference is split — and the pill hangs about **5.5px above** the line
  * everything else sits on.
  *
@@ -290,7 +290,7 @@
  * straight through the chip. It is not a spacing bug; it is one control in a
  * band being half again the height of the band.
  *
- * WHY 4.13.6 DID NOT FIX IT. That release made `.jn-right` a flex row, which was
+ * WHY 4.13.6 DID NOT FIX IT. That release made `.ca-jn-right` a flex row, which was
  * a real defect in the same element — the slot held its child on a text baseline
  * where its two siblings held theirs in a row. But it was the wrong defect for
  * this symptom: `Today` is a direct child of the row and was never in that slot,
@@ -298,28 +298,28 @@
  * the two fixes are independent.
  *
  * THIS IS THE THIRD TIME THE SAME SENTENCE HAS BEEN WRITTEN. 4.11 brought this
- * strip's `.journal-btn`s down to `--am-text-2xs` (see the rule below, and its
+ * strip's `.ca-journal-btn`s down to `--ca-text-2xs` (see the rule below, and its
  * note that the argument is about a PLACE rather than about a level). 4.13.1 §3
- * brought `.jc-actions`' links down for the diary card's strip, in the words this
+ * brought `.ca-jc-actions`' links down for the diary card's strip, in the words this
  * rule is named after: *"one strip is one size, or it is two strips that happen
- * to touch."* `.jdh-nav.journal-links a.jn-pill` in 60-heroes-and-banners.css is
+ * to touch."* `.ca-jdh-nav.ca-journal-links a.ca-jn-pill` in 60-heroes-and-banners.css is
  * that fix, applied to one row and not to this one.
  *
  * ALL THREE SHAPES, because `renderTarget` builds three: an `<a class="jn-pill">`
- * for a destination, `.jn-flat.jn-muted` for one that does not exist yet, and
- * `.jn-here` for the page you are on. A row where two of the three came down is
+ * for a destination, `.ca-jn-flat.ca-jn-muted` for one that does not exist yet, and
+ * `.ca-jn-here` for the page you are on. A row where two of the three came down is
  * the same defect with a smaller audience. */
-.journal-header-widgets .journal-nav.journal-links a.jn-pill,
-.journal-header-widgets .journal-nav.journal-links .jn-flat,
-.journal-header-widgets .journal-nav.journal-links .jn-here {
-  font-size: var(--am-text-2xs);
-  padding: var(--am-space-1) var(--am-space-5);
+.ca-journal-header-widgets .ca-journal-nav.ca-journal-links a.ca-jn-pill,
+.ca-journal-header-widgets .ca-journal-nav.ca-journal-links .ca-jn-flat,
+.ca-journal-header-widgets .ca-journal-nav.ca-journal-links .ca-jn-here {
+  font-size: var(--ca-text-2xs);
+  padding: var(--ca-space-1) var(--ca-space-5);
   gap: 4px;
 }
 /* The caret is the one glyph in the row with a pixel size rather than an `em`
    one, so it does not come down with the text and would set the pill's height on
    its own. Sized against the label it sits beside, like every other icon here. */
-.journal-header-widgets .journal-nav.journal-links .jn-scopes .jn-caret svg {
+.ca-journal-header-widgets .ca-journal-nav.ca-journal-links .ca-jn-scopes .ca-jn-caret svg {
   width: 0.9em;
   height: 0.9em;
 }
@@ -329,13 +329,13 @@
    boundary) stays as the visible title. The bar carries no title of its
    own; it just anchors that section's buttons to the right, pulled up
    snug under the heading. No bottom rule — the heading already separates. */
-.journal-header-bar-untitled {
+.ca-journal-header-bar-untitled {
   padding: 0 4px 2px;
   margin: -0.35em 0 0.35em; /* close the gap Obsidian leaves under the heading */
   border-bottom: none;
   justify-content: flex-end;
 }
-.journal-header-bar-untitled .journal-header-widgets.journal-widget-bar {
+.ca-journal-header-bar-untitled .ca-journal-header-widgets.ca-journal-widget-bar {
   margin-left: auto;
 }
 
@@ -344,7 +344,7 @@
    — holding the note's name, the row that says where it can go, and, on notes
    composed before 4.20, the logging grid welded beneath them.
 
-   Before 2.18.4 the bands were separate ```almanac fences, so Obsidian rendered
+   Before 2.18.4 the bands were separate ```chronoanvil fences, so Obsidian rendered
    them as sibling blocks with the note's own spacing between — the same limit
    journals-section.ts documents, where CSS can make a run of siblings resemble
    one card only until the run changes length or something in it is hidden.
@@ -375,7 +375,7 @@
    year summary, where a row of detached bordered cards read as floating pieces
    and one bordered surface with dividers read as an instrument. A logging grid
    is one instrument: the cells are read together, in one glance, every day. */
-.journal-widget-block.journal-slim-banner {
+.ca-journal-widget-block.ca-journal-slim-banner {
   /* The block's usual inter-widget gap is what kept the bands apart; inside the
      card each band's own rule is the divider. */
   position: relative;
@@ -383,9 +383,9 @@
   gap: 0;
   padding: 12px 14px;
   background: var(--background-secondary);
-  border: var(--am-rule) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
-  box-shadow: inset 0 1px 0 var(--am-edge-highlight);
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  box-shadow: inset 0 1px 0 var(--ca-edge-highlight);
 }
 /* ── BAND 1: THE NOTE'S NAME, AND THE COG (4.21.1) ─────────────────────
  *
@@ -397,8 +397,8 @@
  * deliberately, and the row that says where else they could be is a second
  * fact about it.
  *
- * A FLEX ROW, WHICH IS ALSO A DEFECT FIX. `.journal-entry-header` was a plain
- * block: `.jeh-title-wrap` and the cog are both `display: flex`, so they
+ * A FLEX ROW, WHICH IS ALSO A DEFECT FIX. `.ca-journal-entry-header` was a plain
+ * block: `.ca-jeh-title-wrap` and the cog are both `display: flex`, so they
  * stacked, and 4.21's "the cog comes up beside the name it acts on" rendered as
  * a cog on a line of its own under the name. `margin-left: auto` cannot push
  * anything in a block container, which is why the rule meant to place it did
@@ -406,22 +406,22 @@
  *
  * IT BLEEDS THE CARD'S PADDING and re-applies it inside, so its rule spans the
  * full width — the manoeuvre every band in this plugin makes. The bleed travels
- * out through `.journal-live-widget` (and, on a leaf, `.journal-study-header`),
+ * out through `.ca-journal-live-widget` (and, on a leaf, `.ca-journal-study-header`),
  * both of which carry no padding or border of their own for exactly this
- * reason; `.journal-overview-card > .journal-live-widget` states the same
+ * reason; `.ca-journal-overview-card > .ca-journal-live-widget` states the same
  * requirement one card over.
  *
  * THE AIR IS EVEN TOP AND BOTTOM, which is 3.7's rule for this band kept rather
  * than dropped: nothing in it is anchored to either edge, so an asymmetric
  * inset would read as the title having slipped rather than as emphasis. */
-.journal-slim-banner .journal-banner-name {
+.ca-journal-slim-banner .ca-journal-banner-name {
   position: relative;
   display: flex;
   align-items: center;
   gap: 6px 12px;
   margin: -12px -14px 0;
   padding: 13px 14px 12px;
-  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+  border-bottom: var(--ca-rule) solid var(--background-modifier-border);
 }
 /* ── BAND 2: WHERE THE NOTE CAN GO ─────────────────────────────────────
  *
@@ -430,12 +430,12 @@
  * card gives up its own frame — the banner supplies that — and keeps only the
  * inset, which is 3.2 patch 5's handoff pointed the other way round now that
  * the band is the card's LOWER edge rather than its upper one. */
-.journal-slim-banner .journal-banner-nav {
+.ca-journal-slim-banner .ca-journal-banner-nav {
   position: relative;
   margin: 0 -14px;
   padding: 7px 14px 8px;
   border: none;
-  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+  border-bottom: var(--ca-rule) solid var(--background-modifier-border);
   border-radius: 0;
   background: none;
 }
@@ -444,16 +444,16 @@
    nothing left to divide. One rule where the two banners had one each, and the
    `:has()` tests are theirs: a grid, or the page-context strip an entry drew as
    a footer before 4.21. */
-.journal-slim-banner:not(:has(.journal-tracker-bar)):not(:has(.journal-entry-context))
-  .journal-banner-nav {
+.ca-journal-slim-banner:not(:has(.ca-journal-tracker-bar)):not(:has(.ca-journal-entry-context))
+  .ca-journal-banner-nav {
   margin-bottom: -12px;
   padding-bottom: 9px;
   border-bottom: none;
-  border-radius: 0 0 var(--am-radius-md) var(--am-radius-md);
+  border-radius: 0 0 var(--ca-radius-md) var(--ca-radius-md);
 }
 
 /* The grid, welded to the card's lower edge. */
-.journal-slim-banner .journal-tracker-bar {
+.ca-journal-slim-banner .ca-journal-tracker-bar {
   margin: 0 -14px -12px;
   gap: 0;
 }
@@ -461,7 +461,7 @@
    the grid stops at the rule between them. The study banner keeps the weld —
    it has no footer — which is why this is scoped rather than folded into the
    rule above. */
-.journal-entry-banner:has(> .journal-entry-context) .journal-tracker-bar {
+.ca-journal-entry-banner:has(> .ca-journal-entry-context) .ca-journal-tracker-bar {
   margin-bottom: 0;
 }
 /* Cells lose their own shell — the card provides it — and gain rules between
@@ -470,7 +470,7 @@
    Widths are zeroed through the shorthand rather than `border: none`, which
    would leave the width at `medium` and hand any side a 3px rule the moment
    something downstream re-declared its style. */
-.journal-slim-banner .journal-tracker-bar .journal-tracker-cell {
+.ca-journal-slim-banner .ca-journal-tracker-bar .ca-journal-tracker-cell {
   border: 0 solid var(--background-modifier-border);
   border-radius: 0;
   background: transparent;
@@ -479,19 +479,19 @@
      shorthand's `0 solid` above, so a side that should have no rule keeps
      none — zeroing with `border: none` would leave the width at `medium` and
      hand any side a 3px rule the moment something re-declared its style. */
-  border-top-width: var(--am-rule);
-  border-left-width: var(--am-rule);
+  border-top-width: var(--ca-rule);
+  border-left-width: var(--ca-rule);
 }
-.journal-slim-banner .journal-tracker-bar .journal-tracker-cell:nth-child(odd) {
+.ca-journal-slim-banner .ca-journal-tracker-bar .ca-journal-tracker-cell:nth-child(odd) {
   border-left-width: 0;
 }
-.journal-slim-banner .journal-tracker-bar .journal-tracker-cell:nth-child(-n + 2) {
+.ca-journal-slim-banner .ca-journal-tracker-bar .ca-journal-tracker-cell:nth-child(-n + 2) {
   border-top-width: 0;
 }
 /* The add tile gives up its dashed outline here. Dashed reads as "an empty slot"
    against the note background, but inside a panel of solid rules it reads as a
    broken cell — and the tile is already legible as an action from its button. */
-.journal-slim-banner .journal-tracker-bar .journal-tracker-cell.journal-tracker-add {
+.ca-journal-slim-banner .ca-journal-tracker-bar .ca-journal-tracker-cell.ca-journal-tracker-add {
   border-style: solid;
   min-height: 44px;
 }
@@ -499,20 +499,20 @@
    half — the one place an even grid of cells cannot stay even. It spans instead,
    which also makes the note's one *action* read as a footer to the grid rather
    than as another reading of it. */
-.journal-slim-banner
-  .journal-tracker-bar
-  .journal-tracker-cell.journal-tracker-add:nth-child(odd):last-child {
+.ca-journal-slim-banner
+  .ca-journal-tracker-bar
+  .ca-journal-tracker-cell.ca-journal-tracker-add:nth-child(odd):last-child {
   grid-column: 1 / -1;
 }
 
 /* One column (narrow panes, matching the grid's own breakpoint): every cell is
    in column 1, so the odd/even rules above no longer describe the layout. */
 @container (max-width: 520px) {
-  .journal-slim-banner .journal-tracker-bar .journal-tracker-cell {
+  .ca-journal-slim-banner .ca-journal-tracker-bar .ca-journal-tracker-cell {
     border-left-width: 0;
-    border-top-width: var(--am-rule);
+    border-top-width: var(--ca-rule);
   }
-  .journal-slim-banner .journal-tracker-bar .journal-tracker-cell:first-child {
+  .ca-journal-slim-banner .ca-journal-tracker-bar .ca-journal-tracker-cell:first-child {
     border-top-width: 0;
   }
 }
@@ -532,7 +532,7 @@
  * makes it read as a strip rather than as a band.
  *
  * AND IT NEVER HAD THE FIGURE, which is worth writing down because it looks like
- * an omission next to `.journal-page-banner`. The wash and the hatch are how a
+ * an omission next to `.ca-journal-page-banner`. The wash and the hatch are how a
  * page announces itself; a note you are writing in does not announce itself. The
  * page banner is the loud one on purpose and this is the quiet one on purpose.
  *
@@ -547,7 +547,7 @@
  * note above said this banner keeps "the crumb-above-name arrangement this
  * header already had", and 4.21.1 is the release that stopped keeping it. See
  * `buildStudyHeader`. */
-.journal-study-banner .journal-study-header {
+.ca-journal-study-banner .ca-journal-study-header {
   margin: 0;
   padding: 0;
   border: none;
@@ -555,54 +555,54 @@
 /* The name, at the size the minimal banner settled on.
  *
  * 1.15em WAS ALREADY THIS HEADER'S, and it is now the entry's too — that one was
- * inheriting `--am-bar-text` (0.7em), the size of a SECTION bar's label, which
+ * inheriting `--ca-bar-text` (0.7em), the size of a SECTION bar's label, which
  * is the right size for "🔎 Search" and the wrong one for the note's own name.
  * The weight goes to 700 so it holds its own against a crumb row that is now
- * uppercase, and the tracking comes in a hair for the same reason `.jtc-title`
+ * uppercase, and the tracking comes in a hair for the same reason `.ca-jtc-title`
  * carries some: a name set larger than its surroundings needs it. */
-.journal-study-header .jsh-title-text,
-.journal-study-header .jsh-title-input {
-  font-size: var(--am-text-lg);
+.ca-journal-study-header .ca-jsh-title-text,
+.ca-journal-study-header .ca-jsh-title-input {
+  font-size: var(--ca-text-lg);
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-/* The crumb trail, as the context line — the same treatment `.jtc-link` gives
+/* The crumb trail, as the context line — the same treatment `.ca-jtc-link` gives
  * the page banner's destination row.
  *
  * ONE LINE ABOVE THE NAME, DRAWN ONE WAY. The page banner puts its destinations
  * in small caps above its title; this puts its crumbs there; and until now they
  * were an accent-coloured row at reading size, which made the trail the loudest
  * thing on a note whose subject is the title beneath it. Faint until hovered,
- * for `.jtc-link`'s stated reason: a row you read at a glance to know where you
+ * for `.ca-jtc-link`'s stated reason: a row you read at a glance to know where you
  * are, rather than a menu you read every time.
  *
  * THE PADDING STAYS. It was doing the work the removed border used to do — the
  * hit area — and shrinking a link's target to tidy its appearance is the trade
  * this file already refused once when the pills became links. */
-.jsh-crumbs a.jn-pill {
-  font-size: var(--am-text-2xs);
-  font-weight: var(--am-caps-weight);
-  letter-spacing: var(--am-caps-tracking);
+.ca-jsh-crumbs a.ca-jn-pill {
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
   text-transform: uppercase;
   color: var(--text-faint) !important;
 }
-.jsh-crumbs a.jn-pill:hover {
+.ca-jsh-crumbs a.ca-jn-pill:hover {
   color: var(--text-normal) !important;
 }
-.jsh-sep {
-  font-size: var(--am-text-2xs);
+.ca-jsh-sep {
+  font-size: var(--ca-text-2xs);
 }
 /* Band 2 on a leaf: the trail on the left, the note's date right-aligned. The
-   inset, the rule and the bottom-edge handoff are `.journal-banner-nav`'s and
+   inset, the rule and the bottom-edge handoff are `.ca-journal-banner-nav`'s and
    are not repeated here — this is only what is a TRAIL rather than a band. */
-.jsh-nav {
+.ca-jsh-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px 16px;
   flex-wrap: wrap;
 }
-.jsh-crumbs {
+.ca-jsh-crumbs {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -620,13 +620,13 @@
    through the same `renderCrumb`, so it gets the same treatment here rather
    than a near-copy in its own file. Restating these eight declarations one
    stylesheet later is how the two trails come to disagree about a hover. */
-.jsh-crumbs a.jn-pill,
-.am-vault-banner .avb-trail a.jn-pill {
+.ca-jsh-crumbs a.ca-jn-pill,
+.ca-vault-banner .ca-avb-trail a.ca-jn-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: var(--am-space-1) var(--am-space-2);
-  border-radius: var(--am-radius-sm);
+  padding: var(--ca-space-1) var(--ca-space-2);
+  border-radius: var(--ca-radius-sm);
   background: none;
   border: none;
   color: var(--text-accent) !important;
@@ -634,61 +634,61 @@
   white-space: nowrap;
   transition: background 0.15s, color 0.15s;
 }
-.jsh-crumbs a.jn-pill:hover,
-.am-vault-banner .avb-trail a.jn-pill:hover {
+.ca-jsh-crumbs a.ca-jn-pill:hover,
+.ca-vault-banner .ca-avb-trail a.ca-jn-pill:hover {
   background: var(--background-modifier-hover);
   color: var(--text-accent) !important;
 }
 /* The crumb for a level this note has not got — dashed, because it is a gap in
    the trail rather than a place. Kept as an outline for exactly that reason;
    without it a missing level would read as absent rather than as empty. */
-.jsh-crumbs .jn-flat.jn-muted,
-.am-vault-banner .avb-trail .jn-flat.jn-muted {
+.ca-jsh-crumbs .ca-jn-flat.ca-jn-muted,
+.ca-vault-banner .ca-avb-trail .ca-jn-flat.ca-jn-muted {
   display: inline-flex;
   align-items: center;
-  padding: var(--am-space-1) var(--am-space-4);
-  border-radius: var(--am-radius-sm);
+  padding: var(--ca-space-1) var(--ca-space-4);
+  border-radius: var(--ca-radius-sm);
   color: var(--text-faint);
   border: 1px dashed var(--background-modifier-border);
   white-space: nowrap;
 }
-.jsh-sep {
+.ca-jsh-sep {
   color: var(--text-faint);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
 }
-.jsh-date {
-  font-size: var(--am-text-sm);
+.ca-jsh-date {
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
   white-space: nowrap;
 }
 /* Home: icon-only, so the trail reads as this note's own position rather
    than leading with a word every note in the vault repeats. Squared padding
    keeps it circular instead of stretching into a stadium. */
-.jsh-crumbs a.jn-pill.jsh-crumb-icon,
-.jsh-crumbs .jn-flat.jn-muted.jsh-crumb-icon,
-.am-vault-banner .avb-trail .jsh-crumb-icon {
-  padding: var(--am-space-2) var(--am-space-4);
+.ca-jsh-crumbs a.ca-jn-pill.ca-jsh-crumb-icon,
+.ca-jsh-crumbs .ca-jn-flat.ca-jn-muted.ca-jsh-crumb-icon,
+.ca-vault-banner .ca-avb-trail .ca-jsh-crumb-icon {
+  padding: var(--ca-space-2) var(--ca-space-4);
 }
-.jsh-crumb-icon .svg-icon {
+.ca-jsh-crumb-icon .svg-icon {
   width: 14px;
   height: 14px;
 }
 /* The banner's trail is one line of small type, so its crumbs take the row's
    size rather than the study header's. Everything else about them is shared. */
-.am-vault-banner .avb-trail a.jn-pill,
-.am-vault-banner .avb-trail .jn-flat.jn-muted {
+.ca-vault-banner .ca-avb-trail a.ca-jn-pill,
+.ca-vault-banner .ca-avb-trail .ca-jn-flat.ca-jn-muted {
   font-size: inherit;
   flex: 0 0 auto;
 }
 
 /* Row 2: the note's title, click-to-edit. Same affordance as a diary
-   entry's (.jeh-title): a hover wash over the whole hit area and a pencil
+   entry's (.ca-jeh-title): a hover wash over the whole hit area and a pencil
    that only appears on hover, so the control is discoverable without adding
    a permanent button to a strip that is otherwise all navigation. */
-/* The name band's own row. `.journal-banner-name` supplies the flex, the inset
+/* The name band's own row. `.ca-journal-banner-name` supplies the flex, the inset
    and the rule; the 6px of top margin went with the flip, because the band is
    the card's top edge now and its air is the inset's. */
-.jsh-titlerow {
+.ca-jsh-titlerow {
   min-width: 0;
 }
 /* THE NAME'S WRAPPER, ON BOTH SLIM BANNERS. It exists for a reason written in
@@ -698,16 +698,16 @@
    `margin-right: auto` rather than `justify-content: space-between` on the band:
    an entry drawn from a managed template has no cog at all, and a
    space-between would strand the name in the middle of the band. */
-.journal-banner-name > .journal-banner-title {
+.ca-journal-banner-name > .ca-journal-banner-title {
   min-width: 0;
   margin-right: auto;
 }
-.jsh-title-wrap {
+.ca-jsh-title-wrap {
   display: flex;
   align-items: center;
   min-width: 0;
 }
-.jsh-title {
+.ca-jsh-title {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -715,13 +715,13 @@
   cursor: text;
   padding: 1px 6px;
   margin-left: -6px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   transition: background 0.12s;
 }
-.jsh-title:hover {
+.ca-jsh-title:hover {
   background: var(--background-modifier-hover);
 }
-.jsh-title-text {
+.ca-jsh-title-text {
   font-size: 1.15em;
   font-weight: 600;
   color: var(--text-normal);
@@ -729,26 +729,26 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.jsh-title-edit {
+.ca-jsh-title-edit {
   display: inline-flex;
   flex-shrink: 0;
   color: var(--text-faint);
   opacity: 0;
   transition: opacity 0.12s;
 }
-.jsh-title-edit svg {
+.ca-jsh-title-edit svg {
   width: 0.72em;
   height: 0.72em;
 }
-.jsh-title:hover .jsh-title-edit {
+.ca-jsh-title:hover .ca-jsh-title-edit {
   opacity: 1;
 }
-.jsh-title-input {
+.ca-jsh-title-input {
   font-size: 1.15em;
   font-weight: 600;
-  padding: var(--am-space-1) var(--am-space-4);
+  padding: var(--ca-space-1) var(--ca-space-4);
   border: 1px solid var(--interactive-accent);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--background-primary);
   color: var(--text-normal);
   min-width: 12em;
@@ -765,30 +765,30 @@
    slot. The ordinal is the reading position, not the `order` property: a page
    whose order is missing or duplicated still gets a sensible place, and the
    number a reader sees always counts 1..n. */
-.almanac-list-row.is-dense .almanac-list-token:not(:empty) {
+.ca-list-row.is-dense .ca-list-token:not(:empty) {
   min-width: 1.6em;
   width: auto;
   height: auto;
   padding: 0;
   border: none;
   background: none;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   font-variant-numeric: tabular-nums;
   color: var(--text-faint);
 }
-.almanac-list-row.is-dense .almanac-list-title {
+.ca-list-row.is-dense .ca-list-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* `.almanac-list-pills` is created on every row whether or not it has any, so a
+/* `.ca-list-pills` is created on every row whether or not it has any, so a
    caller filling it after an async read does not have to know whether it
    exists. Harmless in a flex row; in a COLUMNED row it is a grid item, and an
    empty one still holds a track open — which pushed every value one column
    right and dropped the last off the end onto a second line. `display: none`
    rather than a caller-side count: the callers should not have to know the
    component's private children either. It reappears the moment it is filled. */
-.almanac-list-main.is-columned > .almanac-list-pills:empty {
+.ca-list-main.is-columned > .ca-list-pills:empty {
   display: none;
 }
 
@@ -801,7 +801,7 @@
    IT IS BAND 2 AS OF 4.21.1, WHERE IT WAS BAND 1. The card sat on the banner's
    TOP edge from 3.2 patch 5 until then, and the rule that put it there is gone
    rather than adjusted: everything about how the band is inset, ruled and
-   rounded is `.journal-banner-nav`'s now, applied to whichever row a page kind
+   rounded is `.ca-journal-banner-nav`'s now, applied to whichever row a page kind
    uses for its destinations. This block keeps only what is a LINKS CARD's — the
    frame it gives up, and the rhythm its pills are set to.
 
@@ -811,13 +811,13 @@
    This is 2.18.4's merge one row further up: that one welded the nav strip to
    the tracker grid and left the links row outside. One fence is one container,
    so the card is real rather than a resemblance. */
-.journal-entry-banner > .journal-links-card {
+.ca-journal-entry-banner > .ca-journal-links-card {
   border: none;
   background: none;
 }
 /* The pill row is a band of the banner rather than the bottom of a small card,
    so it breathes to the same rhythm as the name above it. */
-.journal-entry-banner > .journal-links-card > .journal-links-bar {
+.ca-journal-entry-banner > .ca-journal-links-card > .ca-journal-links-bar {
   padding: 0;
 }
 
@@ -830,8 +830,8 @@
    row inside the TITLE band, which put the card's chrome in the middle of the
    thing it acts on.
 
-   NOT `.journal-overview-actions` REUSED, though the shape is deliberately the
-   same. That class carries `border-left: var(--am-rule-edge)` — the species
+   NOT `.ca-journal-overview-actions` REUSED, though the shape is deliberately the
+   same. That class carries `border-left: var(--ca-rule-edge)` — the species
    marker 3.2 gave the overview and 3.6 patch 1 finally made paint. An entry is
    not a page that summarises the ones below it, and the whole point of the
    marker is that the entry does not wear it. Two bands that look alike and mean
@@ -839,23 +839,23 @@
 
    The ground and the top rule are shared, because those are what make it a
    footer rather than a stray row. */
-.journal-entry-banner > .journal-widget-bar.journal-entry-context {
+.ca-journal-entry-banner > .ca-journal-widget-bar.ca-journal-entry-context {
   margin: 0 -14px -12px;
   padding: 8px 14px;
-  border-top: var(--am-rule) solid var(--background-modifier-border);
-  border-radius: 0 0 var(--am-radius-md) var(--am-radius-md);
+  border-top: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: 0 0 var(--ca-radius-md) var(--ca-radius-md);
   background: var(--background-secondary-alt);
   gap: 6px 10px;
 }
 /* WHERE THE COG'S `margin-left: auto` WENT (4.21.1).
  *
- * It was here, on `.journal-entry-context > .jeh-more` and — after 4.21 moved
- * the control up into the banner — on `.journal-entry-header > .jeh-more` too.
- * The push is now `.journal-banner-title`'s `margin-right: auto`, one element
+ * It was here, on `.ca-journal-entry-context > .ca-jeh-more` and — after 4.21 moved
+ * the control up into the banner — on `.ca-journal-entry-header > .ca-jeh-more` too.
+ * The push is now `.ca-journal-banner-title`'s `margin-right: auto`, one element
  * to the left, and it had to become one or the other rather than both: two auto
  * margins in one flex line do not compete, they SPLIT the free space equally,
  * which would have parked the cog half way along the band. This file already
- * records that failure at `.journal-sec-l2`, in the same words.
+ * records that failure at `.ca-journal-sec-l2`, in the same words.
  *
  * THE NAME'S SIDE IS THE RIGHT SIDE OF THE PAIR TO KEEP, because an entry drawn
  * from a managed template has no cog at all (see attachEntryMenu: a control that
@@ -867,7 +867,7 @@
    noticed one at a time — see test/hover-reveal.test.ts, which fails the build
    for a hover-revealed affordance that arrives without one of these. */
 @media (hover: none) {
-  .jsh-title-edit {
+  .ca-jsh-title-edit {
     opacity: 0.45;
   }
 }
@@ -891,22 +891,22 @@
    (button-widgets.ts), so the accessible name and the tooltip are already
    carried independently of the visible text. That is what makes hiding it
    safe, and it is why this is a stylesheet change and not a renderer one. */
-body.is-mobile .journal-header-widgets .journal-btn .journal-btn-label {
+body.is-mobile .ca-journal-header-widgets .ca-journal-btn .ca-journal-btn-label {
   display: none;
 }
 /* With the label gone the button is an icon in a box padded for text, which
    reads as lopsided. Square it against the same floor everything else on a
    phone is sized by. */
-body.is-mobile .journal-header-widgets .journal-btn {
-  min-width: var(--am-control-min);
+body.is-mobile .ca-journal-header-widgets .ca-journal-btn {
+  min-width: var(--ca-control-min);
   justify-content: center;
-  padding-left: var(--am-space-2);
-  padding-right: var(--am-space-2);
+  padding-left: var(--ca-space-2);
+  padding-right: var(--ca-space-2);
 }
 
 /* ── The launcher: places to go, as tiles (4.5 §3) ─────────────────────
  *
- * BESIDE `.jn-pill`, which is the same destination drawn small. A pill is
+ * BESIDE `.ca-jn-pill`, which is the same destination drawn small. A pill is
  * navigation chrome welded to a header band; a tile is content in a cell,
  * because getting somewhere is what that part of the page is for. They share
  * `resolveTarget` and nothing else, which is why they share a file and not a
@@ -916,7 +916,7 @@ body.is-mobile .journal-header-widgets .journal-btn {
  * with a floor is the obvious rule and it has a bad case in the middle: at a
  * width that fits three, three go across and the fourth drops underneath on a
  * line of its own. A ragged 3 + 1 is the one arrangement of four things that
- * reads as a mistake, and the homepage's cell — `--am-row-cell-min` is 320px —
+ * reads as a mistake, and the homepage's cell — `--ca-row-cell-min` is 320px —
  * sits squarely in the band that produces it.
  *
  * So the count is declared rather than fitted: four across where there is room
@@ -926,28 +926,28 @@ body.is-mobile .journal-header-widgets .journal-btn {
  * lets the answer skip three.
  *
  * MEASURED AGAINST THE CELL, not the block: `container-type: inline-size` sits
- * on `.journal-block-cell` as well as on the block, so a launcher in a third of
+ * on `.ca-journal-block-cell` as well as on the block, so a launcher in a third of
  * a row asks about that third. 4.2 §2 put it there for exactly this. */
-.jlx-grid {
+.ca-jlx-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
 }
 @container (min-width: 440px) {
-  .jlx-grid {
+  .ca-jlx-grid {
     grid-template-columns: repeat(4, 1fr);
   }
 }
 @container (max-width: 230px) {
-  .jlx-grid {
+  .ca-jlx-grid {
     grid-template-columns: 1fr;
   }
 }
-.jlx-grid.is-empty {
+.ca-jlx-grid.is-empty {
   display: block;
 }
 
-.jlx-tile {
+.ca-jlx-tile {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -955,29 +955,29 @@ body.is-mobile .journal-header-widgets .journal-btn {
   gap: 6px;
   padding: 14px 8px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   background: var(--background-secondary);
   color: var(--text-normal);
   text-decoration: none;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
-.jlx-tile:hover {
+.ca-jlx-tile:hover {
   border-color: var(--interactive-accent);
   background: var(--background-modifier-hover);
   text-decoration: none;
 }
-.jlx-icon {
+.ca-jlx-icon {
   display: inline-flex;
   color: var(--text-muted);
 }
-.jlx-tile:hover .jlx-icon {
+.ca-jlx-tile:hover .ca-jlx-icon {
   color: var(--interactive-accent);
 }
 /* The label is the destination's own, from `resolveTarget` — small caps like
-   every other key label in the plugin, which is `--am-caps`'s whole job. */
-.jlx-label {
-  font-size: var(--am-text-xs);
+   every other key label in the plugin, which is `--ca-caps`'s whole job. */
+.ca-jlx-label {
+  font-size: var(--ca-text-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -986,17 +986,17 @@ body.is-mobile .journal-header-widgets .journal-btn {
 }
 
 /* ── Mobile Overlay Controls Toggle ────────────────────────────────────── */
-.am-mobile-toggle-btn {
+.ca-mobile-toggle-btn {
   position: fixed;
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   z-index: 1000;
   width: 38px;
   height: 38px;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-secondary);
-  border: var(--am-rule-hair) solid var(--background-modifier-border);
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
   color: var(--text-muted);
-  box-shadow: var(--am-shadow-md);
+  box-shadow: var(--ca-shadow-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1007,41 +1007,41 @@ body.is-mobile .journal-header-widgets .journal-btn {
   -webkit-user-select: none;
 }
 
-.am-mobile-toggle-btn:hover,
-.am-mobile-toggle-btn:active {
+.ca-mobile-toggle-btn:hover,
+.ca-mobile-toggle-btn:active {
   opacity: 1;
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.am-mobile-toggle-btn svg {
+.ca-mobile-toggle-btn svg {
   width: 18px;
   height: 18px;
 }
 
-.am-mobile-toggle-btn.am-mobile-toggle-left {
+.ca-mobile-toggle-btn.ca-mobile-toggle-left {
   left: calc(16px + env(safe-area-inset-left, 0px));
 }
 
-.am-mobile-toggle-btn.am-mobile-toggle-right {
+.ca-mobile-toggle-btn.ca-mobile-toggle-right {
   right: calc(16px + env(safe-area-inset-right, 0px));
 }
 
-body.am-hide-mobile-overlays .mobile-navbar,
-body.am-hide-mobile-overlays .mobile-toolbar,
-body.am-hide-mobile-overlays .view-header,
-body.am-hide-mobile-overlays .mobile-header,
-body.am-hide-mobile-overlays .workspace-mobile-header,
-body.am-hide-mobile-overlays .app-header,
-body.am-hide-mobile-overlays .status-bar {
+body.ca-hide-mobile-overlays .mobile-navbar,
+body.ca-hide-mobile-overlays .mobile-toolbar,
+body.ca-hide-mobile-overlays .view-header,
+body.ca-hide-mobile-overlays .mobile-header,
+body.ca-hide-mobile-overlays .workspace-mobile-header,
+body.ca-hide-mobile-overlays .app-header,
+body.ca-hide-mobile-overlays .status-bar {
   display: none !important;
 }
 
-body.am-hide-mobile-overlays .am-vault-banner {
-  padding-top: calc(var(--am-space-3) + max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px), 24px));
+body.ca-hide-mobile-overlays .ca-vault-banner {
+  padding-top: calc(var(--ca-space-3) + max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px), 24px));
 }
 
-body.am-hide-mobile-overlays.is-mobile .workspace-leaf:not(:has(.am-vault-banner)) .view-content {
+body.ca-hide-mobile-overlays.is-mobile .workspace-leaf:not(:has(.ca-vault-banner)) .view-content {
   padding-top: max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px), 24px);
 }
 

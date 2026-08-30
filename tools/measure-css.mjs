@@ -63,32 +63,32 @@ const ENUMERATED = [
   // `is-${span}` ChartSpan, `is-${p.tone}` list-row tone, `is-${grade}` RecallGrade
   { prefix: "is-", suffixes: ["wide", "tall", "large", "on", "off", "muted", "got", "missed"] },
 
-  // `am-act-${activityBucket(...)}` — src/core/util.ts, clamped to 1..4
-  { prefix: "am-act-", suffixes: range(4) },
-  // `am-heat-${moodBucket(...)}` and `cal-mood-${bucket}` — clamped to 1..5
-  { prefix: "am-heat-", suffixes: range(5) },
+  // `ca-act-${activityBucket(...)}` — src/core/util.ts, clamped to 1..4
+  { prefix: "ca-act-", suffixes: range(4) },
+  // `ca-heat-${moodBucket(...)}` and `cal-mood-${bucket}` — clamped to 1..5
+  { prefix: "ca-heat-", suffixes: range(5) },
   { prefix: "cal-mood-", suffixes: range(5) },
   // `journal-sec-l${opts.level}` — src/ui/section-frame.ts
   { prefix: "journal-sec-l", suffixes: range(2) },
 
   // `${...}-${eventColor(def)}` — src/events/events.ts, COLOR_SET
-  { prefix: "almanac-color-", suffixes: EVENT_COLORS },
-  { prefix: "am-ev-chip-", suffixes: EVENT_COLORS },
+  { prefix: "ca-color-", suffixes: EVENT_COLORS },
+  { prefix: "ca-ev-chip-", suffixes: EVENT_COLORS },
   { prefix: "cal-badge-", suffixes: EVENT_COLORS },
   { prefix: "cal-tint-", suffixes: EVENT_COLORS },
   // cal-bar- takes a colour AND a span position — src/diary/calendar.ts
   { prefix: "cal-bar-", suffixes: [...EVENT_COLORS, "solo", "start", "mid", "end"] },
 
-  // `almanac-tpl-op-${op.kind}` — src/ui/section-editor.ts
-  { prefix: "almanac-tpl-op-", suffixes: ["add", "remove", "keep", "move", "extend", "foreign"] },
-  // `almanac-kind-${tone}` — src/journals/kind-change.ts, called with two values
-  { prefix: "almanac-kind-", suffixes: ["add", "remove"] },
+  // `ca-tpl-op-${op.kind}` — src/ui/section-editor.ts
+  { prefix: "ca-tpl-op-", suffixes: ["add", "remove", "keep", "move", "extend", "foreign"] },
+  // `ca-kind-${tone}` — src/journals/kind-change.ts, called with two values
+  { prefix: "ca-kind-", suffixes: ["add", "remove"] },
   // `journal-task-${row.task.priority}` — src/ui/tasks.ts, TaskPriority
   { prefix: "journal-task-", suffixes: ["high", "normal", "low"] },
   // `journal-attach-chip--${item.kind}` — src/ui/widgets/attachment-widgets.ts
   { prefix: "journal-attach-chip--", suffixes: ["text", "link", "image"] },
-  // `am-titlebar-${area}` and `journal-links-card-${area}` — VaultArea
-  { prefix: "am-titlebar-", suffixes: ["diary", "journals"] },
+  // `ca-titlebar-${area}` and `journal-links-card-${area}` — VaultArea
+  { prefix: "ca-titlebar-", suffixes: ["diary", "journals"] },
   { prefix: "journal-links-card-", suffixes: ["diary", "journals"] },
 ];
 

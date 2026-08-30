@@ -5,15 +5,15 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// The Almanac list format — one entry per line, stored in a note's
-// `<!--almanac:KEY-->` body region (see notestore.ts).
+// The ChronoAnvil list format — one entry per line, stored in a note's
+// `<!--chronoanvil:KEY-->` body region (see notestore.ts).
 //
 // This is the third thing that lives in those regions, alongside tasks
 // (tasks.ts) and attachments (attachments.ts), and it is deliberately the
 // dumbest of the three: an entry is a line of prose with no metadata, no
 // marker, and no syntax of its own.
 //
-//   <!--almanac:highlights
+//   <!--chronoanvil:highlights
 //   Financial adviser said my credit is healthy enough for the business loan.
 //   My brother's birthday. We went out for dinner at a local restaurant.
 //   -->

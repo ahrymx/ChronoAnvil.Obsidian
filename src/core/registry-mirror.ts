@@ -6,8 +6,8 @@
 // LICENSING.md.
 
 import { App, Notice, normalizePath } from "obsidian";
-import type AlmanacPlugin from "../main";
-import type { AlmanacSettings } from "./settings";
+import type ChronoAnvilPlugin from "../main";
+import type { ChronoAnvilSettings } from "./settings";
 
 // ── The registry mirror: settings that survive the plugin folder ──────────
 //
@@ -48,7 +48,10 @@ import type { AlmanacSettings } from "./settings";
 // isn't. Restoring from the mirror leaves nothing unclaimed, so the manifest
 // pass that follows finds nothing to do and the two never both fire.
 
-export const REGISTRY_MIRROR = ".almanac-registry.json";
+export const REGISTRY_MIRROR = ".chronoanvil-registry.json";
+// The pre-rename filename, read as a fallback so a rename cannot strand a
+// reader's settings. Never written.
+export const LEGACY_REGISTRY_MIRROR = ".almanac-registry.json";
 
 export const REGISTRY_VERSION = 1;
 
@@ -72,19 +75,19 @@ export const NOT_MIRRORED = [
 ] as const;
 
 export type MirroredSettings = Omit<
-  AlmanacSettings,
+  ChronoAnvilSettings,
   (typeof NOT_MIRRORED)[number]
 >;
 
 export interface RegistryMirror {
-  almanacRegistry: number;
+  chronoanvilRegistry: number;
   // Free-text, for whoever opens the file wondering what wrote it.
   writtenBy: string;
   settings: Partial<MirroredSettings>;
 }
 
 export function mirroredPart(
-  settings: AlmanacSettings
+  settings: ChronoAnvilSettings
 ): Partial<MirroredSettings> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(settings)) {
@@ -95,12 +98,12 @@ export function mirroredPart(
 }
 
 export function encodeRegistryMirror(
-  settings: AlmanacSettings,
+  settings: ChronoAnvilSettings,
   version: string
 ): string {
   const mirror: RegistryMirror = {
-    almanacRegistry: REGISTRY_VERSION,
-    writtenBy: `Almanac ${version}`,
+    chronoanvilRegistry: REGISTRY_VERSION,
+    writtenBy: `ChronoAnvil ${version}`,
     settings: mirroredPart(settings),
   };
   return `${JSON.stringify(mirror, null, 2)}\n`;
@@ -121,11 +124,18 @@ export function decodeRegistryMirror(raw: string): RegistryMirror | null {
     return null;
   }
   if (!parsed || typeof parsed !== "object") return null;
-  const m = parsed as Partial<RegistryMirror>;
-  if (typeof m.almanacRegistry !== "number") return null;
-  if (m.almanacRegistry > REGISTRY_VERSION) {
+  const m = parsed as Partial<RegistryMirror> & { almanacRegistry?: number };
+  // The version field was named `almanacRegistry` before the rename. A mirror
+  // ever read when data.json is missing, which is precisely the state the
+  // rename creates, so refusing the old key would make the fallback useless in
+  // the one case it exists for.
+  if (typeof m.chronoanvilRegistry !== "number") {
+    if (typeof m.almanacRegistry !== "number") return null;
+    m.chronoanvilRegistry = m.almanacRegistry;
+  }
+  if (m.chronoanvilRegistry > REGISTRY_VERSION) {
     console.warn(
-      `[Almanac] settings mirror is version ${m.almanacRegistry}; this release understands ${REGISTRY_VERSION}. Starting from defaults instead.`
+      `[ChronoAnvil] settings mirror is version ${m.chronoanvilRegistry}; this release understands ${REGISTRY_VERSION}. Starting from defaults instead.`
     );
     return null;
   }
@@ -134,8 +144,8 @@ export function decodeRegistryMirror(raw: string): RegistryMirror | null {
   // would replace a fresh install's defaults with an empty object.
   if (Object.keys(m.settings).length === 0) return null;
   return {
-    almanacRegistry: m.almanacRegistry,
-    writtenBy: typeof m.writtenBy === "string" ? m.writtenBy : "Almanac",
+    chronoanvilRegistry: m.chronoanvilRegistry,
+    writtenBy: typeof m.writtenBy === "string" ? m.writtenBy : "ChronoAnvil",
     settings: m.settings,
   };
 }
@@ -170,7 +180,7 @@ export class Registry {
   // settings change and overwrite the very mirror being restored from.
   private armed = false;
 
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   private get path(): string {
     return normalizePath(REGISTRY_MIRROR);
@@ -181,12 +191,22 @@ export class Registry {
   }
 
   // Read the mirror. Only ever called when data.json is absent.
+  //
+  // WHICH IS EXACTLY WHAT THE CHRONOANVIL RENAME CAUSES. Settings live in
+  // `.obsidian/plugins/<id>/data.json`, and the id changed from
+  // `ahrymx.almanac` to `chronoanvil`, so the first load after upgrading finds
+  // no data.json and would start from defaults — losing every tracker, journal
+  // and path the reader had configured. This mirror is the recovery path, so it
+  // reads the legacy filename too. Writing only ever emits REGISTRY_MIRROR.
   async read(): Promise<RegistryMirror | null> {
     try {
-      if (!(await this.app.vault.adapter.exists(this.path))) return null;
-      return decodeRegistryMirror(await this.app.vault.adapter.read(this.path));
+      const path = (await this.app.vault.adapter.exists(this.path))
+        ? this.path
+        : normalizePath(LEGACY_REGISTRY_MIRROR);
+      if (!(await this.app.vault.adapter.exists(path))) return null;
+      return decodeRegistryMirror(await this.app.vault.adapter.read(path));
     } catch (e) {
-      console.error("[Almanac] could not read the settings mirror", e);
+      console.error("[ChronoAnvil] could not read the settings mirror", e);
       return null;
     }
   }
@@ -201,7 +221,7 @@ export class Registry {
         this.plugin.manifest.version
       );
     } catch (e) {
-      console.error("[Almanac] could not encode the settings mirror", e);
+      console.error("[ChronoAnvil] could not encode the settings mirror", e);
       return;
     }
     if (next === this.lastWritten) return;
@@ -217,7 +237,7 @@ export class Registry {
       await this.app.vault.adapter.write(this.path, next);
       this.lastWritten = next;
     } catch (e) {
-      console.error("[Almanac] could not write the settings mirror", e);
+      console.error("[ChronoAnvil] could not write the settings mirror", e);
     }
   }
 
@@ -265,7 +285,7 @@ export class Registry {
   // whole remedy: delete it too, and the next load really is a fresh start.
   announceRestore(mirror: RegistryMirror): void {
     new Notice(
-      `Almanac: no plugin settings found, so ${describeMirror(mirror)} ` +
+      `ChronoAnvil: no plugin settings found, so ${describeMirror(mirror)} ` +
         `${describeMirror(mirror) === "your settings" ? "was" : "were"} ` +
         `restored from ${REGISTRY_MIRROR} in this vault. ` +
         `To start from scratch instead, delete that file and reload.`,

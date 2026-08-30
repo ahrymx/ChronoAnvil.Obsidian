@@ -28,7 +28,7 @@
 
 import { setIcon, TFile } from "obsidian";
 import { emptyLine } from "../ui/empty";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { formatPeriodLabel, type PeriodBounds } from "../charts/charts";
 import { IndexedEntry, readIndex } from "./diary-index";
 import { FieldValue, readRollup } from "../trackers/fields";
@@ -126,11 +126,11 @@ export function loggedDays(
 }
 
 export function buildEntryRollup(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   period: PeriodBounds | null,
   grain: RollupGrain = "daily"
 ): HTMLElement {
-  const root = createDiv({ cls: "journal-table jer-rollup" });
+  const root = createDiv({ cls: "ca-journal-table ca-jer-rollup" });
 
   if (!period) {
     // No period property on the host note. Refusing with a reason beats
@@ -141,12 +141,12 @@ export function buildEntryRollup(
     emptyLine(
       root,
       "entry-rollup needs a dashboard period \u2014 put it on a note carrying week-start, month-start, quarter-start or year-start.",
-      "jer-empty"
+      "ca-jer-empty"
     );
     return root;
   }
 
-  root.createDiv({ cls: "jer-loading", text: "Reading your entries…" });
+  root.createDiv({ cls: "ca-jer-loading", text: "Reading your entries…" });
 
   void readIndex(plugin).then((entries) => {
     const days = rollupDays(entries, period.start, period.end, grain);
@@ -167,7 +167,7 @@ export function buildEntryRollup(
 
 function render(
   root: HTMLElement,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   days: DayLine[],
   logged: number,
   periodLabel: string,
@@ -182,13 +182,13 @@ function render(
   // showing March is indistinguishable from a widget that has quietly lost
   // most of its rows; naming the period is what stops a scoped widget reading
   // as a broken unscoped one.
-  const head = root.createDiv({ cls: "jer-head" });
-  const title = head.createDiv({ cls: "jer-title" });
-  setIcon(title.createSpan({ cls: "jer-title-icon" }), "pen-line");
+  const head = root.createDiv({ cls: "ca-jer-head" });
+  const title = head.createDiv({ cls: "ca-jer-title" });
+  setIcon(title.createSpan({ cls: "ca-jer-title-icon" }), "pen-line");
   title.createSpan({ text: `Entries · ${periodLabel}` });
   if (logged) {
     head.createSpan({
-      cls: "jer-pill",
+      cls: "ca-jer-pill",
       text: `${days.length} of ${logged} ${logged === 1 ? "entry" : "entries"}`,
     });
   }
@@ -203,7 +203,7 @@ function render(
         : `No entries in this period yet \u2014 each ${
             grain === "monthly" ? "month" : "day"
           } you log adds its focus to this list.`,
-      "jer-empty"
+      "ca-jer-empty"
     );
     return;
   }
@@ -225,16 +225,16 @@ function render(
   for (const d of days) for (const v of d.values) fieldIds.add(v.field.id);
   const label = fieldIds.size > 1;
 
-  const list = root.createDiv({ cls: "jer-days" });
+  const list = root.createDiv({ cls: "ca-jer-days" });
   for (const day of days) {
-    const row = list.createDiv({ cls: "jer-day" });
+    const row = list.createDiv({ cls: "ca-jer-day" });
 
     // The date is the link. A rollup is a reading surface that sends you to
     // the entry to change it — the same outward write direction the quarter's
     // month cards have, and the reason a derived page stays derived.
     const m = moment(day.iso);
     const date = row.createEl("a", {
-      cls: "jer-date",
+      cls: "ca-jer-date",
       attr: {
         title:
           day.title ||
@@ -248,11 +248,11 @@ function render(
     // errored; the widget would simply have been unreadable, which is the
     // failure a grain argument added without touching the view would produce.
     if (grain === "monthly") {
-      date.createSpan({ cls: "jer-date-day", text: m.format("MMM") });
-      date.createSpan({ cls: "jer-date-dow", text: m.format("YYYY") });
+      date.createSpan({ cls: "ca-jer-date-day", text: m.format("MMM") });
+      date.createSpan({ cls: "ca-jer-date-dow", text: m.format("YYYY") });
     } else {
-      date.createSpan({ cls: "jer-date-day", text: m.format("D") });
-      date.createSpan({ cls: "jer-date-dow", text: m.format("ddd") });
+      date.createSpan({ cls: "ca-jer-date-day", text: m.format("D") });
+      date.createSpan({ cls: "ca-jer-date-dow", text: m.format("ddd") });
     }
     date.addEventListener("click", (evt) => {
       evt.preventDefault();
@@ -260,27 +260,27 @@ function render(
       if (file instanceof TFile) void openFile(plugin.app, file);
     });
 
-    const lines = row.createDiv({ cls: "jer-lines" });
+    const lines = row.createDiv({ cls: "ca-jer-lines" });
     for (const v of day.values) {
       for (const item of v.items) {
-        const line = lines.createDiv({ cls: "jer-line" });
+        const line = lines.createDiv({ cls: "ca-jer-line" });
         if (label) {
           line.createSpan({
-            cls: "jer-line-key",
+            cls: "ca-jer-line-key",
             text: v.field.rollupNoun ?? v.field.label,
           });
         }
-        line.createSpan({ cls: "jer-line-text", text: item });
+        line.createSpan({ cls: "ca-jer-line-text", text: item });
       }
       for (const g of v.goals) {
         const line = lines.createDiv({
-          cls: "jer-line jer-goal" + (g.done ? " is-done" : ""),
+          cls: "ca-jer-line ca-jer-goal" + (g.done ? " is-done" : ""),
         });
         setIcon(
-          line.createSpan({ cls: "jer-goal-icon" }),
+          line.createSpan({ cls: "ca-jer-goal-icon" }),
           g.done ? "check-square" : "square"
         );
-        line.createSpan({ cls: "jer-line-text", text: g.text });
+        line.createSpan({ cls: "ca-jer-line-text", text: g.text });
       }
     }
   }

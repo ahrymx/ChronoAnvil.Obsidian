@@ -21,7 +21,7 @@ import { formatLogItem } from "../src/diary/log-items";
 import { currentEntryKey, labelForGrain } from "../src/diary/nav";
 import { moment } from "../src/core/util";
 import { TRACKER_CLASSES } from "../src/trackers/trackers";
-import type AlmanacPlugin from "../src/main";
+import type ChronoAnvilPlugin from "../src/main";
 import {
   appendToNoteRegion,
   appendedSince,
@@ -98,11 +98,11 @@ describe("capturing into an older entry", () => {
     "journal-date: 2026-07-20",
     "---",
     "",
-    "<!--almanac:log",
+    "<!--chronoanvil:log",
     "my prose",
     "-->",
     "",
-    "<!--almanac:todo",
+    "<!--chronoanvil:todo",
     "- ( ) task",
     "-->",
     "",
@@ -124,8 +124,8 @@ describe("capturing into an older entry", () => {
 
   it("places the new region after the existing ones", () => {
     const seeded = seed(oldEntry);
-    expect(seeded.indexOf("almanac:capture")).toBeGreaterThan(
-      seeded.indexOf("almanac:todo")
+    expect(seeded.indexOf("chronoanvil:capture")).toBeGreaterThan(
+      seeded.indexOf("chronoanvil:todo")
     );
   });
 });
@@ -388,12 +388,12 @@ describe("the region write merges rather than overwrites", () => {
 // whether the note the reader is on earns a row of its own.
 describe("grainsShowingCapture", () => {
   // Only `settings.entrySections` is read, so a settings shape is a plugin
-  // enough. Cast rather than mocked: pretending to build an AlmanacPlugin here
+  // enough. Cast rather than mocked: pretending to build a ChronoAnvilPlugin here
   // would be a fixture bigger than the thing it tests.
   const withSections = (
     entrySections: Record<string, { id: string }[]>
-  ): AlmanacPlugin =>
-    ({ settings: { entrySections } }) as unknown as AlmanacPlugin;
+  ): ChronoAnvilPlugin =>
+    ({ settings: { entrySections } }) as unknown as ChronoAnvilPlugin;
 
   it("offers daily out of the box, because the daily template ships it", () => {
     expect(grainsShowingCapture(withSections({}))).toEqual(["daily"]);
@@ -546,15 +546,15 @@ describe("which logbooks a capture may go to", () => {
 });
 
 describe("the capture dialogue visuals", () => {
-  it("tags the modal with almanac-capture-modal class", () => {
+  it("tags the modal with ca-capture-modal class", () => {
     const code = readCode("capture");
-    expect(code).toContain('addClass("almanac-capture-modal")');
+    expect(code).toContain('addClass("ca-capture-modal")');
   });
 
   it("squares off the edges of the time field and inputs", () => {
     const css = readCss();
-    expect(css).toContain(".almanac-capture-when-row .journal-capture-time");
-    expect(css).toContain("border-radius: var(--am-radius-xs)");
+    expect(css).toContain(".ca-capture-when-row .ca-journal-capture-time");
+    expect(css).toContain("border-radius: var(--ca-radius-xs)");
   });
 });
 

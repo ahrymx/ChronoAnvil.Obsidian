@@ -6,7 +6,8 @@
 // LICENSING.md.
 
 import { App, Notice, TFile, normalizePath } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
+import { BUNDLED_ASSETS } from "../../generated/bundled-assets";
 import {
   basename,
   createFileEnsuringFolders,
@@ -271,12 +272,12 @@ export function retargetDiaryBase(
 }
 
 // `extras` is the vault's own additions to each grain's entry template —
-// `AlmanacSettings.entrySections`. Defaulted to none rather than made required,
+// `ChronoAnvilSettings.entrySections`. Defaulted to none rather than made required,
 // because the three call sites in this file all have it and the shape of the
 // list is a fact about a configured vault, not about what the plugin ships.
 //
 // `orders` is the other half of the same fact as of 4.29 —
-// `AlmanacSettings.entrySectionBand`, which decides the shared band's ORDER
+// `ChronoAnvilSettings.entrySectionBand`, which decides the shared band's ORDER
 // where `extras` decides its membership. Defaulted for the same reason, and it
 // must travel with `extras` everywhere: a caller that passed one and not the
 // other would compose a template that differs from the one on disk by a
@@ -391,7 +392,7 @@ export function shippedNotes(
     // that has never existed. One spec now serves both; see canvas-builder §1.
     {
       content: JSON.stringify(initialVaultCanvas(p, types, books), null, 2),
-      dest: `${p.infrastructureRoot}/Almanac.canvas`,
+      dest: `${p.infrastructureRoot}/ChronoAnvil.canvas`,
     },
     { asset: "diary.base", dest: `${p.infrastructureRoot}/Diary.base` },
     { asset: "documentation.md", dest: `${p.documentation}/README.md` },
@@ -405,7 +406,7 @@ export function shippedNotes(
     //
     // A VAULT SET UP BEFORE 4.80 STILL HAS THE FOLDER, and repair leaves it
     // alone rather than deleting it: the reader may have put their own files
-    // in there, and this list only ever states what Almanac writes.
+    // in there, and this list only ever states what ChronoAnvil writes.
     // ONE FOLDER-NOTE DASHBOARD PER REGISTERED JOURNAL, 4.36 §0.2.
     //
     // The gap 4.1 §2 closed at `02 - Diary/` and `03 - Journals/` exists again
@@ -509,23 +510,51 @@ const journalsArgumentFor = (
   normalizePath(dest) === normalizePath(paths.home) ? "journals:cards" : "journals";
 
 export class Scaffold {
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   private get paths() {
     return this.plugin.settings.paths;
   }
 
-  // Read one of the plugin's bundled asset files (relative to the plugin dir).
+  // One of the plugin's shipped notes, by its filename under assets/.
+  //
+  // FROM THE BUNDLE, NOT FROM THE PLUGIN FOLDER. This read
+  // `manifest.dir + "/assets/<name>"` through the vault adapter until 5.0.1,
+  // and that was a total failure for every install that did not come from a
+  // zip. Obsidian's community installer writes `manifest.json`, `main.js` and
+  // `styles.css` into the plugin folder and nothing else — no subdirectories,
+  // no fourth file — so `assets/` simply did not exist for anyone who installed
+  // ChronoAnvil the ordinary way. The plugin loaded, enabled, and rendered; then
+  // "Set up / repair vault" built the folder tree, silently skipped Diary.base,
+  // Staging.md and the documentation README, and ended on a notice about three
+  // missing assets. tools/package.mjs had guarded the zip against exactly this
+  // since 2.10, which is why it never showed up in testing: every build anyone
+  // here ever installed was a zip.
+  //
+  // `generated/bundled-assets.ts` is compiled from assets/ at build time, so the
+  // notes now travel inside main.js — the one file every install route carries.
+  // See tools/build-assets.mjs for why the markdown stays markdown.
+  //
+  // AND THE ADAPTER READ IS GONE RATHER THAN KEPT AS A FALLBACK. Keeping it in
+  // front of the bundle would let a stale assets/ folder — left behind by an
+  // upgrade that replaced main.js and nothing else — silently win over the notes
+  // the running build actually ships, which is a quieter version of the bug this
+  // change exists to fix. Keeping it behind the bundle would make it unreachable,
+  // because `bundled-assets.test.ts` asserts every name scaffold.ts asks for is
+  // in the map. There is no third arrangement that is worth a branch.
+  //
+  // SYNCHRONOUS IN EVERYTHING BUT SIGNATURE. It stays `async` because both call
+  // sites await it inside `note.content ?? await this.readAsset(asset)`, in loops
+  // that are async for other reasons. Narrowing the return type would rewrite
+  // those two expressions to say the same thing.
   private async readAsset(name: string): Promise<string | null> {
-    const dir = this.plugin.manifest.dir;
-    if (!dir) return null;
-    const path = normalizePath(`${dir}/assets/${name}`);
-    try {
-      return await this.app.vault.adapter.read(path);
-    } catch (e) {
-      console.error(`[Almanac] missing bundled asset: ${name}`, e);
-      return null;
-    }
+    const bundled = BUNDLED_ASSETS[name];
+    if (bundled !== undefined) return bundled;
+    console.error(
+      `[ChronoAnvil] no such shipped asset: ${name} — scaffold.ts asks for it, ` +
+        `but it is not in assets/, so the build had nothing to bundle.`
+    );
+    return null;
   }
 
   // Move a pre-2.51 homepage onto its new name. Deletable once no vault of
@@ -561,7 +590,7 @@ export class Scaffold {
           const split = splitEntryFences(original);
           if (split != null) await this.app.vault.modify(file, split);
         } catch (e) {
-          console.error(`[Almanac] entry banner migration failed for ${file.path}`, e);
+          console.error(`[ChronoAnvil] entry banner migration failed for ${file.path}`, e);
         }
       }
     }
@@ -580,7 +609,7 @@ export class Scaffold {
         await this.app.vault.modify(file, aimed);
       }
     } catch (e) {
-      console.error("[Almanac] Diary.base migration failed", e);
+      console.error("[ChronoAnvil] Diary.base migration failed", e);
     }
   }
 
@@ -613,7 +642,7 @@ export class Scaffold {
         await ensureFolder(this.app, this.paths.diaryDashboards);
         await this.app.fileManager.renameFile(file, move.to);
       } catch (e) {
-        console.error(`[Almanac] could not move ${move.from}`, e);
+        console.error(`[ChronoAnvil] could not move ${move.from}`, e);
       }
     }
   }
@@ -755,7 +784,7 @@ export class Scaffold {
   // custom-journal templates) and it names each file it replaced in the notice.
   //
   // The overviews are excluded: they hold user chart definitions in their
-  // `almanac-charts` regions, so blowing them away costs real work. Templates
+  // `chronoanvil-charts` regions, so blowing them away costs real work. Templates
   // are the ones under active development and are cheap to lose.
   // The diary equivalent of describeSectionDrift: what would change in an
   // entry template, said in sections rather than in bytes.
@@ -859,7 +888,7 @@ export class Scaffold {
   async refreshTemplates(): Promise<void> {
     const { items, files } = await this.surveyDiaryTemplatesDrift();
     if (items.length === 0) {
-      notify.ok("Almanac: diary templates are already current");
+      notify.ok("ChronoAnvil: diary templates are already current");
       return;
     }
 
@@ -888,7 +917,7 @@ export class Scaffold {
         updated++;
       }
     }
-    notify.ok(`Almanac: refreshed ${updated} diary template${updated === 1 ? "" : "s"} ✅`);
+    notify.ok(`ChronoAnvil: refreshed ${updated} diary template${updated === 1 ? "" : "s"} ✅`);
   }
 
   // Safely refresh a single diary template file if it exists in the vault.
@@ -1102,10 +1131,10 @@ export class Scaffold {
     // arrangement in the place it will actually be read.
     const note = new Notice(
       skipped
-        ? `Almanac: ${cfg.name} created — ${written} template${
+        ? `ChronoAnvil: ${cfg.name} created — ${written} template${
             written === 1 ? "" : "s"
           } written, ${skipped} already existed ✅`
-        : `Almanac: ${cfg.name} created with ${written} template${
+        : `ChronoAnvil: ${cfg.name} created with ${written} template${
             written === 1 ? "" : "s"
           } ✅ — click to open the first one`,
       8000
@@ -1118,7 +1147,7 @@ export class Scaffold {
     }
   }
 
-  // ── Build and write Almanac.canvas map (4.67, merged since 4.68) ──────
+  // ── Build and write ChronoAnvil.canvas map (4.67, merged since 4.68) ──────
   //
   // REBUILDING IS NOT OVERWRITING. Until 4.68 this was one `vault.modify` of
   // the whole file, so a reader who spent ten minutes arranging the map lost it
@@ -1135,14 +1164,14 @@ export class Scaffold {
   // and, the first time it says "placed 18", that it did not.
   async generateVaultCanvas(): Promise<TFile | null> {
     const p = this.plugin.settings.paths;
-    const dest = `${p.infrastructureRoot}/Almanac.canvas`;
+    const dest = `${p.infrastructureRoot}/ChronoAnvil.canvas`;
     const rebuilt = buildVaultCanvas(this.app, this.plugin);
     const existing = getFile(this.app, dest);
 
     if (!existing) {
       const content = JSON.stringify(rebuilt, null, 2);
       const file = await createFileEnsuringFolders(this.app, dest, content);
-      notify.ok(`Almanac: Created ${dest} — ${rebuilt.nodes.length} nodes`);
+      notify.ok(`ChronoAnvil: Created ${dest} — ${rebuilt.nodes.length} nodes`);
       return file;
     }
 
@@ -1162,7 +1191,7 @@ export class Scaffold {
     const { doc, kept, placed, foreign } = mergeCanvas(disk, rebuilt);
     await this.app.vault.modify(existing, JSON.stringify(doc, null, 2));
     notify.ok(
-      `Almanac: Updated ${dest} — ${kept} kept where you put ${
+      `ChronoAnvil: Updated ${dest} — ${kept} kept where you put ${
         kept === 1 ? "it" : "them"
       }, ${placed} placed` + (foreign ? `, ${foreign} of your own untouched` : "")
     );
@@ -1173,9 +1202,9 @@ export class Scaffold {
   async configureGraphGroups(): Promise<boolean> {
     const ok = await configureGraphGroups(this.app, this.plugin.settings.paths);
     if (ok) {
-      notify.ok("Almanac: Graph view color groups configured");
+      notify.ok("ChronoAnvil: Graph view color groups configured");
     } else {
-      notify.fail("Almanac: Could not write graph view color groups");
+      notify.fail("ChronoAnvil: Could not write graph view color groups");
     }
     return ok;
   }
@@ -1240,7 +1269,7 @@ export class Scaffold {
   async previewJournalTemplates(): Promise<void> {
     const files = await this.journalTemplateFiles();
     if (files.length === 0) {
-      new Notice("Almanac: no journals are enabled.");
+      new Notice("ChronoAnvil: no journals are enabled.");
       return;
     }
 
@@ -1259,12 +1288,12 @@ export class Scaffold {
     }
 
     if (!lines.length) {
-      notify.ok("Almanac: journal templates are already current");
+      notify.ok("ChronoAnvil: journal templates are already current");
       return;
     }
-    console.info(`[Almanac] journal templates differ:\n  ${lines.join("\n  ")}`);
+    console.info(`[ChronoAnvil] journal templates differ:\n  ${lines.join("\n  ")}`);
     new Notice(
-      `Almanac: ${lines.length} journal template(s) differ —\n${lines.join("\n")}`,
+      `ChronoAnvil: ${lines.length} journal template(s) differ —\n${lines.join("\n")}`,
       15000
     );
   }
@@ -1272,13 +1301,13 @@ export class Scaffold {
   async refreshJournalTemplates(): Promise<void> {
     const journalFiles = await this.journalTemplateFiles();
     if (journalFiles.length === 0) {
-      new Notice("Almanac: no journals are enabled.");
+      new Notice("ChronoAnvil: no journals are enabled.");
       return;
     }
 
     const { items, files } = await this.surveyJournalTemplatesDrift();
     if (items.length === 0) {
-      notify.ok("Almanac: journal templates are already current");
+      notify.ok("ChronoAnvil: journal templates are already current");
       return;
     }
 
@@ -1310,7 +1339,7 @@ export class Scaffold {
         updated++;
       }
     }
-    notify.ok(`Almanac: refreshed ${updated} journal template${updated === 1 ? "" : "s"} ✅`);
+    notify.ok(`ChronoAnvil: refreshed ${updated} journal template${updated === 1 ? "" : "s"} ✅`);
   }
 
   // Create all folders + any missing files. Never overwrites existing notes,
@@ -1374,7 +1403,7 @@ export class Scaffold {
         });
         if (dryRun) continue;
         if (next == null) {
-          console.error(`[Almanac] repair plan/apply disagreed for ${dest}`);
+          console.error(`[ChronoAnvil] repair plan/apply disagreed for ${dest}`);
           continue;
         }
         await this.app.vault.modify(file, next);
@@ -1398,7 +1427,7 @@ export class Scaffold {
       // Null here would mean plan and apply disagreed, which is a bug rather
       // than a no-op — planLayout found work and applyLayout found none.
       if (next == null) {
-        console.error(`[Almanac] layout plan/apply disagreed for ${dest}`);
+        console.error(`[ChronoAnvil] layout plan/apply disagreed for ${dest}`);
         continue;
       }
       await this.app.vault.modify(file, next.join("\n"));
@@ -1421,7 +1450,7 @@ export class Scaffold {
       } catch (e) {
         // One unreadable journal should not abort a repair, which is the rule
         // `mergeEntryBanners` and the Trends walk both already follow.
-        console.error(`[Almanac] catch-up scan failed for ${type.name}`, e);
+        console.error(`[ChronoAnvil] catch-up scan failed for ${type.name}`, e);
       }
     }
     return out;
@@ -1575,7 +1604,7 @@ export class Scaffold {
       //
       //   • Every manifest was listed as "create this file" on every repair,
       //     forever, because the drift check below could never run. A vault with
-      //     four journals showed four identical `.almanac-journal.json` rows in
+      //     four journals showed four identical `.chronoanvil-journal.json` rows in
       //     the window each time it was opened.
       //   • And applying it THREW. `createFileEnsuringFolders` also asks the
       //     vault, also gets null, and calls `vault.create` on a path that is
@@ -1593,7 +1622,7 @@ export class Scaffold {
           if ((await adapter.read(dest)) === content) continue;
         } catch (e) {
           // Unreadable is not "unchanged": fall through and offer to rewrite it.
-          console.error(`[Almanac] could not read the manifest at ${dest}`, e);
+          console.error(`[ChronoAnvil] could not read the manifest at ${dest}`, e);
         }
       }
       files.push({ dest, content, hidden: true });
@@ -1660,7 +1689,7 @@ export class Scaffold {
           });
         }
       } catch (e) {
-        console.error("[Almanac] Diary.base scan failed", e);
+        console.error("[ChronoAnvil] Diary.base scan failed", e);
       }
     }
 
@@ -1677,7 +1706,7 @@ export class Scaffold {
             diff: diffText(original, split),
           });
         } catch (e) {
-          console.error(`[Almanac] entry banner scan failed for ${file.path}`, e);
+          console.error(`[ChronoAnvil] entry banner scan failed for ${file.path}`, e);
         }
       }
     }
@@ -1799,7 +1828,7 @@ export class Scaffold {
           diff: diffText(original, regrouped),
         });
       } catch (e) {
-        console.error(`[Almanac] Trends scan failed for ${dash}`, e);
+        console.error(`[ChronoAnvil] Trends scan failed for ${dash}`, e);
       }
     }
 
@@ -2002,7 +2031,7 @@ export class Scaffold {
           created++;
         } catch (e) {
           failed++;
-          console.error(`[Almanac] could not write ${dest}`, e);
+          console.error(`[ChronoAnvil] could not write ${dest}`, e);
         }
       }
       if (created > 0) parts.push(`created ${created} file(s)`);
@@ -2021,7 +2050,7 @@ export class Scaffold {
       if (reconciled.length > 0) {
         parts.push(`updated ${reconciled.length} page(s)`);
         console.info(
-          `[Almanac] repair updated:\n  ` +
+          `[ChronoAnvil] repair updated:\n  ` +
             reconciled
               .map(
                 (c) =>
@@ -2052,7 +2081,7 @@ export class Scaffold {
             pending.map((c) => c.file)
           );
         } catch (e) {
-          console.error(`[Almanac] catch-up failed for ${type.name}`, e);
+          console.error(`[ChronoAnvil] catch-up failed for ${type.name}`, e);
         }
       }
       if (caughtUp > 0) {
@@ -2168,7 +2197,7 @@ export class Scaffold {
           // is never asked — and a reader who has not still gets to decline.
           if (note.content != null) await this.regroupPage(dash, note.content);
         } catch (e) {
-          console.error(`[Almanac] Trends migration failed for ${dash}`, e);
+          console.error(`[ChronoAnvil] Trends migration failed for ${dash}`, e);
         }
       }
       const migrated = survey.groups.find((g) => g.id === "migrations")?.items.length ?? 0;
@@ -2182,12 +2211,12 @@ export class Scaffold {
     // said "everything already in place", which on a stale vault was a lie.
     if (create.missingAssets > 0 && chosen.has("create")) {
       new Notice(
-        `Almanac setup finished with ${create.missingAssets} bundled asset(s) missing — check the console.`
+        `ChronoAnvil setup finished with ${create.missingAssets} bundled asset(s) missing — check the console.`
       );
     } else if (parts.length === 0) {
-      notify.ok("Almanac: nothing to do");
+      notify.ok("ChronoAnvil: nothing to do");
     } else {
-      new Notice(`Almanac: ${parts.join(", ")} ✅`);
+      new Notice(`ChronoAnvil: ${parts.join(", ")} ✅`);
     }
   }
 }

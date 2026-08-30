@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { App, Notice, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { promptText } from "../ui/modals";
 import { CLASS_DEFS } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
@@ -70,7 +70,7 @@ export type PeriodProp =
 export type PeriodUnit = "isoWeek" | "month" | "quarter" | "year";
 
 export class Diary {
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   private get paths() {
     return this.plugin.settings.paths;
@@ -144,7 +144,7 @@ export class Diary {
       });
     } catch (e) {
       // A failed stamp must not cost the user the entry they asked for.
-      console.error("[Almanac] could not stamp events onto the new entry", e);
+      console.error("[ChronoAnvil] could not stamp events onto the new entry", e);
     }
   }
 

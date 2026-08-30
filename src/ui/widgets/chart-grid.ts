@@ -98,13 +98,13 @@ export function buildChartGrid(
       )
     );
   } else {
-    const toolbar = container.createDiv({ cls: "journal-chart-toolbar" });
+    const toolbar = container.createDiv({ cls: "ca-journal-chart-toolbar" });
     for (const btn of buttons) toolbar.appendChild(btn);
   }
 
   if (specs.length === 0) {
     container.createDiv({
-      cls: "journal-chart-empty",
+      cls: "ca-journal-chart-empty",
       text: CHART_GRID_EMPTY,
     });
     return;
@@ -121,17 +121,17 @@ export function buildChartGrid(
   // `journal-chart-host` carries `container-type: inline-size` so the grid can
   // respond to the *pane* width rather than the window's — an Obsidian
   // sidebar is routinely 300px inside a 1600px display. Its own class rather
-  // than putting containment on every `.journal-live-widget`: container-type
+  // than putting containment on every `.ca-journal-live-widget`: container-type
   // implies `contain: layout style inline-size`, and applying that to the
   // half-dozen unrelated widgets that share the live-widget host would be a
   // large blast radius for a rule only the chart grid needs.
   const host = container.createDiv({
-    cls: "journal-live-widget journal-chart-host",
+    cls: "ca-journal-live-widget ca-journal-chart-host",
   });
   ctx.addChild(
     new LiveWidget(deps.plugin.app, host, {
       build: () => {
-        const grid = createDiv({ cls: "journal-chart-grid" });
+        const grid = createDiv({ cls: "ca-journal-chart-grid" });
         // Resolved once for the whole grid rather than per cell. It is a
         // property of the host note, so every cell was reading the same
         // frontmatter and computing the same answer — and the automatic tile

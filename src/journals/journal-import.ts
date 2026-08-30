@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { App, Notice, TFile, TFolder, normalizePath } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { JournalConfig, deriveJournalFolders } from "./custom-journal";
 import { registeredJournalTypes } from "./journal";
 import {
@@ -20,6 +20,7 @@ import {
   decodeJournalManifest,
   encodeJournalManifest,
   manifestPathFor,
+  manifestPathsFor,
 } from "./journal-manifest";
 import {
   JournalScan,
@@ -74,7 +75,7 @@ export interface AdoptedJournal {
 // subject is a folder under the journals root too, and Study's own notes are
 // not an unregistered journal waiting to be adopted.
 export function unclaimedFolders(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   root: TFolder | null
 ): TFolder[] {
   const claimed = registeredJournalTypes(plugin).map((t) =>
@@ -122,7 +123,7 @@ export function manifestCarriesTracker(
 }
 
 export class JournalImporter {
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   private get paths() {
     return this.plugin.settings.paths;
@@ -131,14 +132,17 @@ export class JournalImporter {
   // ── Manifest IO ─────────────────────────────────────────────────────────
 
   async readManifest(root: string): Promise<JournalManifest | null> {
-    const path = manifestPathFor(root);
-    try {
-      if (!(await this.app.vault.adapter.exists(path))) return null;
-      return decodeJournalManifest(await this.app.vault.adapter.read(path));
-    } catch (e) {
-      console.error(`[Almanac] could not read journal manifest at ${path}`, e);
-      return null;
+    // Current filename first, legacy second — see manifestPathsFor. Writing
+    // still goes to manifestPathFor alone, so a journal saved once is migrated.
+    for (const path of manifestPathsFor(root)) {
+      try {
+        if (!(await this.app.vault.adapter.exists(path))) continue;
+        return decodeJournalManifest(await this.app.vault.adapter.read(path));
+      } catch (e) {
+        console.error(`[ChronoAnvil] could not read journal manifest at ${path}`, e);
+      }
     }
+    return null;
   }
 
   // Write (or refresh) a journal's manifest.
@@ -167,7 +171,7 @@ export class JournalImporter {
       }
       await this.app.vault.adapter.write(path, next);
     } catch (e) {
-      console.error(`[Almanac] could not write journal manifest at ${path}`, e);
+      console.error(`[ChronoAnvil] could not write journal manifest at ${path}`, e);
     }
   }
 
@@ -250,7 +254,7 @@ export class JournalImporter {
       try {
         notes.push(scanFile(segments, await this.app.vault.cachedRead(file)));
       } catch (e) {
-        console.error(`[Almanac] could not read ${file.path} while scanning`, e);
+        console.error(`[ChronoAnvil] could not read ${file.path} while scanning`, e);
       }
     }
 
@@ -280,7 +284,7 @@ export class JournalImporter {
             file: scanFile([child.name], await this.app.vault.cachedRead(child)),
           });
         } catch (e) {
-          console.error(`[Almanac] could not read template ${child.path}`, e);
+          console.error(`[ChronoAnvil] could not read template ${child.path}`, e);
         }
       }
     }
@@ -410,7 +414,7 @@ export class JournalImporter {
     if (found.length === 0) return [];
     await this.register(found);
     new Notice(
-      `Almanac: restored ${found.length} journal${
+      `ChronoAnvil: restored ${found.length} journal${
         found.length === 1 ? "" : "s"
       } from the vault — ${found.map((f) => f.config.name).join(", ")}.`,
       8000

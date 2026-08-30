@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { App, Notice, TFile, TFolder, normalizePath } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import type { TemplateLayout , SectionOverrides } from "./journal-sections";
 import { only, promptText, promptSuggester, promptNewNote } from "../ui/modals";
 import {
@@ -74,7 +74,7 @@ import {
 // cheaper than rediscovering which side a new feature falls on:
 //
 //   THE DIARY'S TEMPLATES ARE THE PLUGIN'S. A daily/monthly template carries a
-//   managed `# almanac:trackers:start/end` region, and trackers.ts::syncTemplates
+//   managed `# chronoanvil:trackers:start/end` region, and trackers.ts::syncTemplates
 //   rewrites it whenever the registry changes. That is what `showInTemplate`
 //   means: seed this onto every new entry of its class.
 //
@@ -393,7 +393,7 @@ export function hueOf(id: string): number {
 // folder reads as 📚 and an unknown sub-folder as 📂 — and it is one character
 // stored beside the level that needs it rather than a second lookup table.
 export function folderEmoji(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   name: string,
   fallback: string
 ): string {
@@ -1041,12 +1041,12 @@ export const JOURNAL_PRESETS: JournalPreset[] = [
 // a settings toggle said so, which is why Study was the one journal that could
 // not be edited, deleted or reordered. There is no branch left: a vault has the
 // journals it has.
-export function registeredJournalTypes(plugin: AlmanacPlugin): JournalType[] {
+export function registeredJournalTypes(plugin: ChronoAnvilPlugin): JournalType[] {
   return (plugin.settings.customJournals ?? []).map(buildJournalType);
 }
 
 export function getJournalType(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   id: string
 ): JournalType | undefined {
   return registeredJournalTypes(plugin).find((t) => t.id === id);
@@ -1097,7 +1097,7 @@ export function getJournalType(
 // with: on a vault where Study is off, or its root moved, that spared a root
 // that was not the host's and was not Study's either.
 export function journalChildFolders(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   type: JournalType | null,
   folder: TFolder | null
 ): TFolder[] {
@@ -1153,7 +1153,7 @@ export function recognisedTypeValues(type: JournalType): Set<string> {
 // is consulted, which is the existing rule for a homepage or a scratch file.
 // So the guard can only ever remove a wrong refusal; it cannot add one.
 export function journalTypeOfNote(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string
 ): JournalType | undefined {
   const types = registeredJournalTypes(plugin);
@@ -1190,7 +1190,7 @@ export function journalTypeOfNote(
 // LABELS ASK THIS ONE; REFUSALS ASK THE OTHER. Written down here because the
 // two names are one word apart.
 export function journalTypeAtPath(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string
 ): JournalType | undefined {
   const types = registeredJournalTypes(plugin);
@@ -1222,7 +1222,7 @@ export function typeRecognised(type: JournalType, raw: unknown): boolean {
 // and the two must agree — a queue and a search over "the same" subject that
 // disagreed about what that meant would be a genuinely confusing pair.
 export function journalFolderScope(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   arg: string,
   hostFolder: string | null
 ): string[] {
@@ -1344,7 +1344,7 @@ export function ratingTrackerFor(
   return type.kinds.find((k) => k.id === kindId)?.rating ?? null;
 }
 
-export function pageTypeIds(plugin: AlmanacPlugin): Set<string> {
+export function pageTypeIds(plugin: ChronoAnvilPlugin): Set<string> {
   const out = new Set<string>();
   for (const type of registeredJournalTypes(plugin)) {
     for (const kind of type.kinds) {
@@ -1498,7 +1498,7 @@ export function ensureJournalsBlock(source: string): string {
 }
 
 export class JournalManager {
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   // ── What this journal's card shows in its fourth cell (4.47) ───────────
   //
@@ -2173,7 +2173,7 @@ export class JournalManager {
       // SAID, NOT SWALLOWED. The old spelling was a bare `return` on an
       // unrecognised kind, which a reader cannot tell from a save that worked.
       new Notice(
-        "Almanac: pick at least one note type or surface to offer this layout on."
+        "ChronoAnvil: pick at least one note type or surface to offer this layout on."
       );
       return;
     }
@@ -2211,8 +2211,8 @@ export class JournalManager {
     const written = await this.plugin.scaffold.ensureJournalTemplates(cfg);
     new Notice(
       written.length
-        ? `Almanac: saved “${label}” — wrote ${written.join(", ")} ✅`
-        : `Almanac: saved “${label}” ✅`
+        ? `ChronoAnvil: saved “${label}” — wrote ${written.join(", ")} ✅`
+        : `ChronoAnvil: saved “${label}” ✅`
     );
   }
 
@@ -2241,7 +2241,7 @@ export class JournalManager {
   private studyMissingNotice(): boolean {
     if (this.studyJournal()) return false;
     new Notice(
-      "🎓 There's no Study journal in this vault — add one from Settings → Almanac → Journals → Add journal → Start from Study."
+      "🎓 There's no Study journal in this vault — add one from Settings → ChronoAnvil → Journals → Add journal → Start from Study."
     );
     return true;
   }

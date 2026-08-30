@@ -40,7 +40,7 @@ import {
   TFile,
   setIcon,
 } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   CAPTURE_NOTE_KEY,
   LOGBOOK_NOTE_KEY,
@@ -119,7 +119,7 @@ const CAPTURE_COLOR = "grey";
 // builds the same path from the same two fields and would make the note — which
 // is exactly wrong here: a grid is a view, and reading a week must not leave
 // seven entries behind in a vault that had none.
-function dayNoteOf(plugin: AlmanacPlugin, iso: string): TFile | null {
+function dayNoteOf(plugin: ChronoAnvilPlugin, iso: string): TFile | null {
   return locateEntry(plugin.app, plugin.settings.paths, "daily", iso);
 }
 
@@ -132,7 +132,7 @@ function dayNoteOf(plugin: AlmanacPlugin, iso: string): TFile | null {
 // SNAPPED, NOT TRUSTED. `week-start` is written by the navigator and by hand,
 // and a hand-written Wednesday would draw a Wednesday-to-Tuesday week whose
 // column heads disagreed with every other calendar in the plugin.
-function weekStartOf(plugin: AlmanacPlugin, ctx: MarkdownPostProcessorContext): string {
+function weekStartOf(plugin: ChronoAnvilPlugin, ctx: MarkdownPostProcessorContext): string {
   const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
   const declared =
     file instanceof TFile
@@ -147,11 +147,11 @@ function weekStartOf(plugin: AlmanacPlugin, ctx: MarkdownPostProcessorContext): 
 }
 
 export function buildTimeGrid(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
-  const root = createDiv({ cls: "am-tg" });
+  const root = createDiv({ cls: "ca-tg" });
   // ONE ARGUMENT IN TWO PIECES, read with the registry's own splitter — the
   // sources and then how many days of the week to show.
   const [sourceArg, dayArg] = partsOf(rest, 2, "|");
@@ -160,7 +160,7 @@ export function buildTimeGrid(
 
   if (unknown.length) {
     root.createDiv({
-      cls: "journal-widget-error",
+      cls: "ca-journal-widget-error",
       text: `time-grid: no source called ${unknown
         .map((w) => `"${w}"`)
         .join(", ")}. Name any of: ${GRID_SOURCES.join(", ")}.`,
@@ -170,7 +170,7 @@ export function buildTimeGrid(
 
   if (badDays) {
     root.createDiv({
-      cls: "journal-widget-error",
+      cls: "ca-journal-widget-error",
       text: `time-grid: cannot draw "${badDays}" days. Name any of: ${DAY_COUNTS.join(
         ", "
       )}.`,
@@ -181,12 +181,12 @@ export function buildTimeGrid(
   const start = weekStartOf(plugin, ctx);
   const dates = weekDates(start);
 
-  const bar = root.createDiv({ cls: "am-tg-bar" });
-  const span = bar.createSpan({ cls: "am-tg-span" });
+  const bar = root.createDiv({ cls: "ca-tg-bar" });
+  const span = bar.createSpan({ cls: "ca-tg-span" });
 
-  const scroll = root.createDiv({ cls: "am-tg-scroll" });
-  const grid = scroll.createDiv({ cls: "am-tg-grid" });
-  const status = root.createDiv({ cls: "am-tg-status", text: "Reading the week…" });
+  const scroll = root.createDiv({ cls: "ca-tg-scroll" });
+  const grid = scroll.createDiv({ cls: "ca-tg-grid" });
+  const status = root.createDiv({ cls: "ca-tg-status", text: "Reading the week…" });
 
   // WHAT THE GRID IS SHOWING RIGHT NOW, which is not what the directive says
   // and must not be written back into it. The sources a reader has folded away
@@ -265,13 +265,13 @@ function sourceChips(
   render: () => void
 ): void {
   if (sources.length < 2) {
-    bar.createSpan({ cls: "am-tg-sources", text: sources.join(" · ") });
+    bar.createSpan({ cls: "ca-tg-sources", text: sources.join(" · ") });
     return;
   }
-  const row = bar.createDiv({ cls: "am-tg-sources" });
+  const row = bar.createDiv({ cls: "ca-tg-sources" });
   for (const source of sources) {
     const chip = row.createEl("button", {
-      cls: `am-tg-src am-tg-src-${source} is-on`,
+      cls: `ca-tg-src ca-tg-src-${source} is-on`,
       text: source,
       attr: { type: "button", "aria-pressed": "true" },
     });
@@ -330,16 +330,16 @@ class NowTicker extends MarkdownRenderChild {
 
   private move(): void {
     const at = nowOffset(this.win, nowMinutes());
-    const line = this.body.querySelector(".am-tg-now");
-    const dot = this.col?.querySelector(".am-tg-now-dot") ?? null;
+    const line = this.body.querySelector(".ca-tg-now");
+    const dot = this.col?.querySelector(".ca-tg-now-dot") ?? null;
     if (at == null) {
       line?.remove();
       dot?.remove();
       return;
     }
-    this.body.style.setProperty("--am-tg-at", String(at));
-    if (!line) this.body.createDiv({ cls: "am-tg-now" });
-    if (!dot && this.col) this.col.createDiv({ cls: "am-tg-now-dot" });
+    this.body.style.setProperty("--ca-tg-at", String(at));
+    if (!line) this.body.createDiv({ cls: "ca-tg-now" });
+    if (!dot && this.col) this.col.createDiv({ cls: "ca-tg-now-dot" });
   }
 }
 
@@ -351,7 +351,7 @@ interface Collected {
 }
 
 async function collect(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   sources: GridSource[],
   start: string,
   dates: string[]
@@ -370,7 +370,7 @@ async function collect(
 // Events falling within the week. Timed events go into the hourly grid;
 // events without a specific time (all-day / one-off events) go into the all-day lane.
 function fromEvents(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   dates: string[],
   out: GridItem[],
   lane: AllDayItem[]
@@ -409,7 +409,7 @@ function fromEvents(
 // they are already on the grid from `fromEvents`. Drawing it would put every
 // meeting on the week twice.
 async function fromLogbooks(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   start: string,
   out: GridItem[]
 ): Promise<void> {
@@ -446,7 +446,7 @@ async function fromLogbooks(
 // Open tasks due inside the week. With an hour they are blocks; without one
 // they are facts about a day and go in the lane.
 async function fromTasks(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   dates: string[],
   out: GridItem[],
   lane: AllDayItem[]
@@ -489,7 +489,7 @@ async function fromTasks(
 // AN ENTRY THAT DOES NOT EXIST IS A DAY WITH NO CAPTURES, and it stays that
 // way: nothing here creates a note. A week viewed is a week read.
 async function fromCaptures(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   dates: string[],
   out: GridItem[]
 ): Promise<void> {
@@ -537,7 +537,7 @@ interface PaintOpts {
 }
 
 function paint(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   grid: HTMLElement,
   weekDatesAll: string[],
   cols: number[],
@@ -561,36 +561,36 @@ function paint(
   const win = FULL_DAY_WINDOW;
   // How many day columns the three grid rows have. One number, set once, so the
   // heads, the lane and the body cannot disagree about how wide the grid is.
-  grid.style.setProperty("--am-tg-cols", String(cols.length));
+  grid.style.setProperty("--ca-tg-cols", String(cols.length));
 
   // The heads.
-  const head = grid.createDiv({ cls: "am-tg-head" });
-  // NOT A TIMEZONE, WHICH IS WHAT SITS HERE ON EVERY OTHER WEEK GRID. Almanac
+  const head = grid.createDiv({ cls: "ca-tg-head" });
+  // NOT A TIMEZONE, WHICH IS WHAT SITS HERE ON EVERY OTHER WEEK GRID. ChronoAnvil
   // stores wall-clock strings — `EventDef.time` is `"14:00"`, not an instant —
   // so there is no zone to name and printing one would be drawing a feature the
   // plugin does not have. The week number is a fact it already computes.
-  head.createDiv({ cls: "am-tg-corner", text: `W${moment(dates[0]).isoWeek()}` });
+  head.createDiv({ cls: "ca-tg-corner", text: `W${moment(dates[0]).isoWeek()}` });
   dates.forEach((iso) => {
     const cell = head.createDiv({
-      cls: `am-tg-day${iso === todayIso ? " is-today" : ""}`,
+      cls: `ca-tg-day${iso === todayIso ? " is-today" : ""}`,
     });
     // A ONE-DAY GRID HAS ROOM TO SAY WEDNESDAY, and a seven-day one does not.
     cell.createDiv({
-      cls: "am-tg-dow",
+      cls: "ca-tg-dow",
       text: moment(iso).format(cols.length === 1 ? "dddd" : "ddd"),
     });
-    cell.createDiv({ cls: "am-tg-dnum", text: moment(iso).format("D") });
+    cell.createDiv({ cls: "ca-tg-dnum", text: moment(iso).format("D") });
   });
 
   // The all-day lane. DRAWN EVEN WHEN EMPTY, so a task acquiring a due date
   // does not shift the whole grid down by a row the moment it arrives.
-  const lane = grid.createDiv({ cls: "am-tg-lane" });
-  lane.createDiv({ cls: "am-tg-lane-label", text: "all day" });
+  const lane = grid.createDiv({ cls: "ca-tg-lane" });
+  lane.createDiv({ cls: "ca-tg-lane-label", text: "all day" });
   cols.forEach((day) => {
-    const cell = lane.createDiv({ cls: "am-tg-lane-cell" });
+    const cell = lane.createDiv({ cls: "ca-tg-lane-cell" });
     for (const item of shownAllDay.filter((a) => a.day === day)) {
       const chip = cell.createDiv({
-        cls: `am-tg-chip am-tg-fill-${item.color}`,
+        cls: `ca-tg-chip ca-tg-fill-${item.color}`,
         text: item.title,
       });
       chip.setAttribute(
@@ -604,18 +604,18 @@ function paint(
   });
 
   // The rail and the columns.
-  const body = grid.createDiv({ cls: "am-tg-body" });
-  const rail = body.createDiv({ cls: "am-tg-rail" });
+  const body = grid.createDiv({ cls: "ca-tg-body" });
+  const rail = body.createDiv({ cls: "ca-tg-rail" });
   const hours = win.endHour - win.startHour;
   // SET ONCE, ON THE BODY, AND INHERITED BY THE COLUMNS. The body's height is
-  // `--am-tg-row * --am-tg-hours` and each column's hour lines are
-  // `100% / --am-tg-hours`, so the two now read one number rather than two
+  // `--ca-tg-row * --ca-tg-hours` and each column's hour lines are
+  // `100% / --ca-tg-hours`, so the two now read one number rather than two
   // copies of it — which is the failure the stylesheet's own header warns
   // about ("a grid comes to draw its lines an hour out from its blocks").
-  body.style.setProperty("--am-tg-hours", String(hours));
+  body.style.setProperty("--ca-tg-hours", String(hours));
   for (let h = win.startHour; h <= win.endHour; h++) {
     const mark = rail.createDiv({
-      cls: "am-tg-hour",
+      cls: "ca-tg-hour",
       text: moment().startOf("day").add(h, "hours").format("h A"),
     });
     mark.style.top = `${((h - win.startHour) / hours) * 100}%`;
@@ -630,7 +630,7 @@ function paint(
   cols.forEach((day) => {
     const iso = weekDatesAll[day];
     const col = body.createDiv({
-      cls: `am-tg-col${iso === todayIso ? " is-today" : ""}`,
+      cls: `ca-tg-col${iso === todayIso ? " is-today" : ""}`,
     });
     columns.push({ el: col, day, iso });
     if (iso === todayIso) todayCol = col;
@@ -640,7 +640,7 @@ function paint(
       const moment_ = placed.mins == null;
       const block = col.createDiv({
         cls:
-          `am-tg-blk am-tg-fill-${placed.color}` +
+          `ca-tg-blk ca-tg-fill-${placed.color}` +
           (moment_ ? " is-moment" : ""),
       });
       block.style.top = `${top * 100}%`;
@@ -648,9 +648,9 @@ function paint(
       const width = 100 / placed.cols;
       block.style.left = `calc(${placed.col * width}% + 2px)`;
       block.style.width = `calc(${width}% - 4px)`;
-      block.createSpan({ cls: "am-tg-blk-title", text: placed.title });
+      block.createSpan({ cls: "ca-tg-blk-title", text: placed.title });
       if (!moment_) {
-        block.createSpan({ cls: "am-tg-blk-when", text: describeWhen(placed) });
+        block.createSpan({ cls: "ca-tg-blk-when", text: describeWhen(placed) });
       }
       // A TASK IS DRAWN AND NOT DRAGGED, and the tooltip says why on the spot.
       // Its hour lives on a checkbox line in whatever note it belongs to, and a
@@ -670,7 +670,7 @@ function paint(
         // no length to pull on. Drawn as an element rather than as a hit zone
         // on the block so `closest` can tell the two gestures apart without
         // measuring anything.
-        if (!moment_) block.createDiv({ cls: "am-tg-grip" });
+        if (!moment_) block.createDiv({ cls: "ca-tg-grip" });
       }
       wire(plugin, block, placed.key);
     }
@@ -681,7 +681,7 @@ function paint(
     // source folded away, "nothing scheduled" would be a claim about the week
     // that the reader's own chip has made untrue.
     grid.parentElement?.parentElement?.createDiv({
-      cls: "am-tg-empty",
+      cls: "ca-tg-empty",
       text: opts.filtered
         ? "Nothing here from the sources you have switched on."
         : "Nothing scheduled this week. An event with a time, a logbook item, or a task with a due date shows here.",
@@ -704,7 +704,7 @@ function paint(
   // its own edit caused.
   if (pendingFocus) {
     const back = grid.querySelector(
-      `.am-tg-blk[data-focus="${CSS.escape(pendingFocus)}"]`
+      `.ca-tg-blk[data-focus="${CSS.escape(pendingFocus)}"]`
     );
     pendingFocus = null;
     if (back instanceof HTMLElement) back.focus();
@@ -765,7 +765,7 @@ function openOn(
 
 // ── the grid as somewhere to write (4.62) ────────────────────────────
 //
-// WHY THIS IS A GRID AND NOT A PICTURE OF ONE. Every other calendar in Almanac
+// WHY THIS IS A GRID AND NOT A PICTURE OF ONE. Every other calendar in ChronoAnvil
 // is a report: the month grid draws what the notes say and sends you to a note
 // to change it. That is the right shape for a month, where the unit is a day
 // and the day already has a page. It is the wrong shape for an hour. Moving a
@@ -797,7 +797,7 @@ interface GridColumn {
 }
 
 interface EditCtx {
-  plugin: AlmanacPlugin;
+  plugin: ChronoAnvilPlugin;
   win: GridWindow;
   body: HTMLElement;
   columns: GridColumn[];
@@ -891,25 +891,25 @@ function wireGestures(edit: EditCtx): void {
     const target = evt.target as HTMLElement | null;
     if (!target) return;
 
-    const blockEl = target.closest(".am-tg-blk") as HTMLElement | null;
+    const blockEl = target.closest(".ca-tg-blk") as HTMLElement | null;
     const item = blockEl ? edit.blocks.get(blockEl) ?? null : null;
     // A block this pane will not move — a task. Its click still opens the note.
     if (blockEl && !item) return;
     const mode: DragMode = !item
       ? "draw"
-      : target.closest(".am-tg-grip")
+      : target.closest(".ca-tg-grip")
         ? "resize"
         : "move";
     // A DRAW STARTS IN A COLUMN. The hour rail is inside the body and is not a
     // day; a press on "2 PM" is a reader reading the rail, not booking it.
-    if (mode === "draw" && (!edit.canDraw || !target.closest(".am-tg-col"))) return;
+    if (mode === "draw" && (!edit.canDraw || !target.closest(".ca-tg-col"))) return;
 
     const startCol = columnAt(edit, evt.clientX);
     if (!startCol) return;
     const from = minuteAt(edit.win, fractionAt(edit, evt.clientY));
     const downX = evt.clientX;
     const downY = evt.clientY;
-    const scrollEl = body.closest(".am-tg-scroll") as HTMLElement | null;
+    const scrollEl = body.closest(".ca-tg-scroll") as HTMLElement | null;
 
     let ghost: HTMLElement | null = null;
     let started = false;
@@ -935,7 +935,7 @@ function wireGestures(edit: EditCtx): void {
       }
       body.addClass("is-dragging");
       blockEl?.addClass("is-moving");
-      ghost = createDiv({ cls: `am-tg-ghost is-${mode}` });
+      ghost = createDiv({ cls: `ca-tg-ghost is-${mode}` });
       const initialTo = minuteAt(edit.win, fractionAt(edit, initialClientY));
       if (mode === "draw") {
         const span = spanFromDrag(from, initialTo);
@@ -1372,7 +1372,7 @@ async function rewriteStamp(
 // section above is for. Opening is still the whole of what a CLICK means: it is
 // the way to reach every field a drag cannot say, and the only way at all to
 // reach a task, whose hour is not this pane's to write.
-function wire(plugin: AlmanacPlugin, el: HTMLElement, key: string): void {
+function wire(plugin: ChronoAnvilPlugin, el: HTMLElement, key: string): void {
   el.addClass("is-clickable");
   el.addEventListener("click", () => {
     const [kind, ...rest] = key.split(":");
@@ -1404,5 +1404,5 @@ function wire(plugin: AlmanacPlugin, el: HTMLElement, key: string): void {
       if (note) void openFile(plugin.app, note);
     }
   });
-  setIcon(el.createSpan({ cls: "am-tg-blk-open" }), "arrow-up-right");
+  setIcon(el.createSpan({ cls: "ca-tg-blk-open" }), "arrow-up-right");
 }

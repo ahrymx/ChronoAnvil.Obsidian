@@ -5,12 +5,13 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-import { App, Notice } from "obsidian";
-import * as yaml from "js-yaml";
-import type AlmanacPlugin from "../main";
+import { App, Notice, parseYaml, stringifyYaml } from "obsidian";
+import type ChronoAnvilPlugin from "../main";
 import {
   TRACKER_MARK_START,
+  isTrackerMarkStart,
   TRACKER_MARK_END,
+  isTrackerMarkEnd,
   FENCE_OPEN,
   FENCE_CLOSE,
   BUILTIN_ORDER,
@@ -675,7 +676,7 @@ export type ChartReduce = "mean" | "sum";
 // How much of the chart grid one chart occupies (2.46).
 //
 // Named rather than dimensional ("2x1"), for two reasons. The grid's column
-// count is a variable (`--am-chart-cols`, styles.css), so a span is stored as
+// count is a variable (`--ca-chart-cols`, styles.css), so a span is stored as
 // "wider than one column" rather than "two columns" and survives the grid being
 // widened to three or four without every directive on disk meaning something
 // different. And they read in the editor dropdown without a legend — "Wide" is
@@ -686,7 +687,7 @@ export type ChartReduce = "mean" | "sum";
 export type ChartSpan = "small" | "wide" | "tall" | "large";
 
 export function getTracker(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   id: string
 ): TrackerDef | undefined {
   return plugin.settings.trackers.find((t) => t.id === id);
@@ -700,7 +701,7 @@ export function isBuiltin(t: TrackerDef): boolean {
 // not-here) id — so the sleep coupling and heat-map code never hard-code the
 // literal "Mood"/"Wake-Up"/"Bedtime" strings.
 export function getBuiltinTracker(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   kind: BuiltinKind
 ): TrackerDef | undefined {
   return plugin.settings.trackers.find((t) => t.builtin === kind);
@@ -917,7 +918,7 @@ export function normalizeTrackers(
 // Bedtime write, so the stored hours-asleep never drifts from the two times it
 // depends on. No-op when Sleep is disabled or either time is missing.
 export function recomputeSleepInFrontmatter(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   fm: Record<string, unknown>
 ): void {
   const wake = getBuiltinTracker(plugin, "wake");
@@ -998,14 +999,14 @@ export function parseSelectOptions(
 
 // ── Sync into vault ───────────────────────────────────────────────────
 // Pushes the current tracker list into the live daily template (frontmatter
-// keys + the ```almanac widget block) and Diary.base (columns), so defining
+// keys + the ```chronoanvil widget block) and Diary.base (columns), so defining
 // a tracker once in Settings is enough — no hand-editing template files.
 // Idempotent and safe to call after every structural settings change: it
 // only ever touches the plugin-managed region (bounded by TRACKER_MARK_*
 // comments) or, in Diary.base, the columns it remembers creating itself.
 export async function syncTrackersIntoVault(
   app: App,
-  plugin: AlmanacPlugin
+  plugin: ChronoAnvilPlugin
 ): Promise<void> {
   const parts: string[] = [];
   for (const cls of TRACKER_CLASSES) {
@@ -1017,8 +1018,8 @@ export async function syncTrackersIntoVault(
 
   new Notice(
     parts.length === 0
-      ? "Almanac: trackers already in sync ✅"
-      : `Almanac: synced trackers into ${parts.join(" + ")} ✅`
+      ? "ChronoAnvil: trackers already in sync ✅"
+      : `ChronoAnvil: synced trackers into ${parts.join(" + ")} ✅`
   );
 }
 
@@ -1035,7 +1036,7 @@ export type EntryScope = TrackerClass;
 // conjunction the class system exists to enforce: right class AND opted into
 // the template. Before 2.19 only the second half existed, which is how a daily
 // module could reach the monthly review.
-function templatePath(plugin: AlmanacPlugin, cls: TrackerClass): string {
+function templatePath(plugin: ChronoAnvilPlugin, cls: TrackerClass): string {
   return `${plugin.settings.paths.templatesDiary}/${CLASS_DEFS[cls].templateFile}`;
 }
 
@@ -1296,7 +1297,7 @@ export function surfaceFolders(
   return hit?.root ? [hit.root] : [];
 }
 
-function diaryBasePath(plugin: AlmanacPlugin): string {
+function diaryBasePath(plugin: ChronoAnvilPlugin): string {
   return `${plugin.settings.paths.infrastructureRoot}/Diary.base`;
 }
 
@@ -1310,8 +1311,8 @@ function spliceMarkedRegion(
   body: string[],
   fallbackInsertAt: number
 ): { lines: string[]; changed: boolean } {
-  const startIdx = lines.findIndex((l) => l.trim() === TRACKER_MARK_START);
-  const endIdx = lines.findIndex((l) => l.trim() === TRACKER_MARK_END);
+  const startIdx = lines.findIndex((l) => isTrackerMarkStart(l));
+  const endIdx = lines.findIndex((l) => isTrackerMarkEnd(l));
 
   if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
     const before = lines.slice(0, startIdx + 1);
@@ -1330,15 +1331,15 @@ function spliceMarkedRegion(
   };
 }
 
-// A fenced code block: `open` is the index of its opening ```almanac line,
+// A fenced code block: `open` is the index of its opening ```chronoanvil line,
 // `close` the index of its closing ``` line.
 interface FencedBlock {
   open: number;
   close: number;
 }
 
-// Every ```almanac fenced block occurring after line index `after`.
-function findAlmanacBlocks(lines: string[], after: number): FencedBlock[] {
+// Every ```chronoanvil fenced block occurring after line index `after`.
+function findChronoAnvilBlocks(lines: string[], after: number): FencedBlock[] {
   const blocks: FencedBlock[] = [];
   let i = after + 1;
   while (i < lines.length) {
@@ -1366,7 +1367,7 @@ function blockIsNav(lines: string[], block: FencedBlock): boolean {
 }
 
 function blockHasTrackerRegion(lines: string[], block: FencedBlock): boolean {
-  return blockInner(lines, block).some((l) => l.trim() === TRACKER_MARK_START);
+  return blockInner(lines, block).some((l) => isTrackerMarkStart(l));
 }
 
 // Drop the marker-bounded tracker region (markers included) from a block's
@@ -1375,8 +1376,8 @@ function blockHasTrackerRegion(lines: string[], block: FencedBlock): boolean {
 function removeTrackerRegion(
   inner: string[]
 ): { lines: string[]; changed: boolean } {
-  const s = inner.findIndex((l) => l.trim() === TRACKER_MARK_START);
-  const e = inner.findIndex((l) => l.trim() === TRACKER_MARK_END);
+  const s = inner.findIndex((l) => isTrackerMarkStart(l));
+  const e = inner.findIndex((l) => isTrackerMarkEnd(l));
   if (s !== -1 && e !== -1 && e >= s) {
     return {
       lines: [...inner.slice(0, s), ...inner.slice(e + 1)],
@@ -1391,7 +1392,7 @@ function removeTrackerRegion(
 // computed from (so the property is declared even though it's auto-written,
 // never hand-entered). Only the daily scope ever does — see normalizeTrackers.
 function scopeFrontmatterKeys(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   scope: EntryScope
 ): string[] {
   const shows = showsIn(scope);
@@ -1412,7 +1413,7 @@ function scopeFrontmatterKeys(
 // the derived Sleep exists both times are shown and always couple. Everything
 // else is a plain `tracker:<id>`.
 function scopeWidgetLines(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   scope: EntryScope
 ): string[] {
   const shows = showsIn(scope);
@@ -1440,7 +1441,7 @@ function scopeWidgetLines(
 
 async function syncEntryTemplate(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   scope: EntryScope
 ): Promise<boolean> {
   const file = getFile(app, templatePath(plugin, scope));
@@ -1464,10 +1465,10 @@ async function syncEntryTemplate(
   }
 
   // 2. Widget block: one `tracker:<id>` directive per daily tracker, inside
-  //    the dedicated ```almanac block that hosts the tracker region.
+  //    the dedicated ```chronoanvil block that hosts the tracker region.
   //
-  //    The template ships with *two* almanac blocks — a `nav` block and a
-  //    separate trackers block — so "the first almanac block after
+  //    The template ships with *two* chronoanvil blocks — a `nav` block and a
+  //    separate trackers block — so "the first chronoanvil block after
   //    frontmatter" is the wrong target: it's the nav block. Dropping a
   //    fresh tracker region there duplicated the whole section, since the
   //    real region already lived (correctly) in the second block. We instead
@@ -1477,7 +1478,7 @@ async function syncEntryTemplate(
   let finalLines = afterFm;
   let widgetChanged = false;
 
-  const blocks = findAlmanacBlocks(afterFm, fmEndAdjusted);
+  const blocks = findChronoAnvilBlocks(afterFm, fmEndAdjusted);
 
   // Self-heal a vault already corrupted by the old logic: if a real trackers
   // block exists elsewhere, strip any tracker region that leaked into a nav
@@ -1508,10 +1509,10 @@ async function syncEntryTemplate(
   //   3. otherwise a nav block that already holds the region — safe, since
   //      splicing only touches the marker-bounded span, leaving `nav` intact
   //      (covers a deliberate hand-merged block).
-  // If none qualifies (e.g. only a bare nav block, or no almanac block at
+  // If none qualifies (e.g. only a bare nav block, or no chronoanvil block at
   // all), widget placement is left to the user; frontmatter keys are still
   // synced above.
-  const current = findAlmanacBlocks(afterFm, fmEndAdjusted);
+  const current = findChronoAnvilBlocks(afterFm, fmEndAdjusted);
   const nonNav = current.filter((b) => !blockIsNav(afterFm, b));
   const target =
     nonNav.find((b) => blockHasTrackerRegion(afterFm, b)) ??
@@ -1569,7 +1570,7 @@ export function viewAcceptsClass(
 
 async function syncDiaryBase(
   app: App,
-  plugin: AlmanacPlugin
+  plugin: ChronoAnvilPlugin
 ): Promise<boolean> {
   const file = getFile(app, diaryBasePath(plugin));
   if (!file) return false; // Diary.base not scaffolded yet
@@ -1582,9 +1583,9 @@ async function syncDiaryBase(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let doc: any;
   try {
-    doc = yaml.load(original) ?? {};
+    doc = parseYaml(original) ?? {};
   } catch (e) {
-    console.error("[Almanac] could not parse Diary.base, skipping sync", e);
+    console.error("[ChronoAnvil] could not parse Diary.base, skipping sync", e);
     return false;
   }
   if (typeof doc !== "object" || doc === null) doc = {};
@@ -1685,7 +1686,19 @@ async function syncDiaryBase(
   await plugin.saveSettings();
 
   if (!changed) return false;
-  const out = yaml.dump(doc, { lineWidth: -1 });
+  // OBSIDIAN'S YAML, NOT js-yaml. Both are the same library underneath —
+  // Obsidian bundles it — but reaching it through the host means the plugin
+  // ships no YAML parser of its own, which is a smaller bundle and one less
+  // third-party advisory to answer for on a public listing.
+  //
+  // `stringifyYaml` takes no options, so the `{ lineWidth: -1 }` this used to
+  // pass is no longer ours to set. THAT IS NOT LOAD-BEARING, and the test
+  // beside it says so rather than leaving it to be assumed: a folded emission
+  // reparses to the same document, because YAML folding of a quoted scalar
+  // reads back as the single space it replaced. What line width changes is how
+  // the file LOOKS after a sync, not what Bases reads out of it — and Bases
+  // reads it with this same parser.
+  const out = stringifyYaml(doc);
   await app.vault.modify(file, out);
   return true;
 }

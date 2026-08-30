@@ -22,7 +22,7 @@ const widgets = (): string => readCode("widgets");
 
 describe("where the button is", () => {
   it("is no longer built into the shelf toolbar", () => {
-    // The toolbar builds `.journal-attach-btn`s. "Add category" is not one of
+    // The toolbar builds `.ca-journal-attach-btn`s. "Add category" is not one of
     // them any more; *Add file* and *Add link* still are, because those really
     // are shelf actions.
     const src = attach();

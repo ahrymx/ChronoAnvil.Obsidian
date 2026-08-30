@@ -35,7 +35,7 @@ describe("a month says it once, on its own name", () => {
     // noticing the first was sometimes dimmer.
     const t = readSrc("calendar");
     expect(t).not.toContain("jc-mcell-icon");
-    expect(t).toContain('cls: "jc-mcell-label"');
+    expect(t).toContain('cls: "ca-jc-mcell-label"');
   });
 
   it("keeps the fact, on the label", () => {
@@ -44,13 +44,13 @@ describe("a month says it once, on its own name", () => {
     // "monthly entry" and it outlives this too.
     //
     // The selector is matched loosely as of 3.17: the declaration is shared
-    // with the quarter and year marks now, so `.jc-mcell-label` is followed by
+    // with the quarter and year marks now, so `.ca-jc-mcell-label` is followed by
     // a comma rather than a brace. Pinning the exact rule text would make the
     // test assert that the month's mark is the month's ALONE, which is the
     // opposite of what 3.17 §2 decided.
     expect(readSrc("calendar")).toContain('toggleClass("has-review"');
     expect(readCss()).toMatch(
-      /\.jc-mcell\.has-review \.jc-mcell-label[^{]*\{[^}]*text-decoration: underline/
+      /\.ca-jc-mcell\.has-review \.ca-jc-mcell-label[^{]*\{[^}]*text-decoration: underline/
     );
   });
 
@@ -156,15 +156,15 @@ describe("§2: four scopes, one mark", () => {
 
   it("gives every marked control a span to underline", () => {
     // `text-decoration` on a flex container is not reliably inherited by its
-    // anonymous text, which is why the month has had `.jc-mcell-label` since
+    // anonymous text, which is why the month has had `.ca-jc-mcell-label` since
     // 3.9 and why the quarter letter gained one here.
     const t = readSrc("calendar");
-    expect(t).toContain('cls: "jc-qlabel-text"');
+    expect(t).toContain('cls: "ca-jc-qlabel-text"');
     const css = readCss();
     for (const sel of [
-      ".jc-qlabel.has-review .jc-qlabel-text",
-      ".jc-year-cur.has-review .jc-year-cur-label",
-      ".cal-week.has-review .cal-weeknum",
+      ".ca-jc-qlabel.has-review .ca-jc-qlabel-text",
+      ".ca-jc-year-cur.has-review .ca-jc-year-cur-label",
+      ".ca-cal-week.has-review .ca-cal-weeknum",
     ]) {
       expect(css, sel).toContain(sel);
     }
@@ -228,7 +228,7 @@ describe("the rollup is a section, and a composed one as of 4.70", () => {
         out.indexOf("period-recap")
       );
       expect(out.indexOf("period-recap")).toBeLessThan(
-        out.indexOf("```almanac-charts")
+        out.indexOf("```chronoanvil-charts")
       );
     }
   });

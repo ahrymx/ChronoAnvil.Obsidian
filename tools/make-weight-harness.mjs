@@ -10,13 +10,13 @@
 // WHY THIS EXISTS. §6 of the 3.6 plan names "how much heavier is slightly" as
 // one of two items with no defensible answer in advance, and the reason it
 // gives is correct: 1px against a hairline is a doubling on some themes and
-// invisible on others, and Almanac renders inside whatever theme the reader
+// invisible on others, and ChronoAnvil renders inside whatever theme the reader
 // has. That is an argument for not deciding it from a stylesheet — it is not an
 // argument for deciding it from one screenshot of one vault either, which is
 // the only alternative the plan had.
 //
 // So this holds the weight still and varies everything else. Each candidate
-// value of `--am-rule` is rendered against BOTH a quiet theme border and a loud
+// value of `--ca-rule` is rendered against BOTH a quiet theme border and a loud
 // one, because those are the two ends of the range the number has to survive,
 // and no single vault can show both.
 //
@@ -62,27 +62,27 @@ const patch5 = `
 .journal-overview-banner,
 .journal-overview-card > .journal-links-card,
 .journal-entry-banner .journal-entry-header {
-  border-bottom-width: var(--am-rule);
+  border-bottom-width: var(--ca-rule);
 }
 .journal-overview-card > .journal-widget-bar.journal-overview-actions {
-  border-top-width: var(--am-rule);
+  border-top-width: var(--ca-rule);
 }
 .jq-section,
 .jq-coverage {
-  border-top-width: var(--am-rule);
-  border-bottom-width: var(--am-rule);
+  border-top-width: var(--ca-rule);
+  border-bottom-width: var(--ca-rule);
 }
 /* §4.4 — cells. The ring family, not the border family. */
 .cal-cell {
-  box-shadow: inset 0 0 0 var(--am-rule)
-    color-mix(in srgb, var(--text-normal) var(--am-ring-alpha), transparent);
+  box-shadow: inset 0 0 0 var(--ca-rule)
+    color-mix(in srgb, var(--text-normal) var(--ca-ring-alpha), transparent);
 }
 .journal-week-table td {
-  border-bottom-width: var(--am-rule);
+  border-bottom-width: var(--ca-rule);
 }
 .jq-month,
 .jyr-stat {
-  border-width: var(--am-rule);
+  border-width: var(--ca-rule);
 }
 `;
 
@@ -130,9 +130,9 @@ const tiles = () =>
 const bands = () => `
 <div class="journal-widget-block journal-overview-card">
   <div class="journal-links-card journal-links-card-diary">
-    <div class="am-titlebar am-titlebar-diary">
-      <span class="am-titlebar-icon">${notebook}</span>
-      <span class="am-titlebar-name">Diary</span>
+    <div class="ca-titlebar ca-titlebar-diary">
+      <span class="ca-titlebar-icon">${notebook}</span>
+      <span class="ca-titlebar-name">Diary</span>
     </div>
     <div class="journal-nav journal-links journal-links-bar">
       <a class="jn-pill" href="#"><span>Home</span></a><a class="jn-pill" href="#"><span>Today</span></a>
@@ -160,8 +160,8 @@ const panels = THEMES.map(
 <h2>${t.label}</h2>
 <div class="row">
 ${WEIGHTS.map(
-  (w) => `<div class="col" style="--am-rule:${w};--am-ring-alpha:${t.ring};--background-modifier-border:${t.border}">
-  <h3>--am-rule: ${w}${w === "1px" ? " (today)" : ""}</h3>
+  (w) => `<div class="col" style="--ca-rule:${w};--ca-ring-alpha:${t.ring};--background-modifier-border:${t.border}">
+  <h3>--ca-rule: ${w}${w === "1px" ? " (today)" : ""}</h3>
   ${bands()}
 </div>`
 ).join("")}
@@ -172,7 +172,7 @@ const html = `<!doctype html>
 <html lang="en" class="theme-dark">
 <head>
 <meta charset="utf-8">
-<title>Almanac ${manifest.version} — rule-weight scale</title>
+<title>ChronoAnvil ${manifest.version} — rule-weight scale</title>
 <style>
 body{
   --background-primary:#1a1820; --background-secondary:#1e1c26;
@@ -184,7 +184,7 @@ body{
   --interactive-normal:#2a2733; --interactive-hover:#332f3d;
   --font-interface:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   --input-height:30px;
-  --am-ring-alpha:5%;
+  --ca-ring-alpha:5%;
   margin:0;padding:24px;background:#141219;color:#dcd9e6;
   font-family:var(--font-interface);font-size:15px;
 }
@@ -204,7 +204,7 @@ h3{font:600 12px/1 ui-monospace,Menlo,monospace;color:#9a96a8;margin:0 0 8px}
 <style>/* what patch 5 would write */${patch5}</style>
 </head>
 <body>
-<h1>Almanac ${manifest.version} — the rule-weight scale, three candidates against two themes</h1>
+<h1>ChronoAnvil ${manifest.version} — the rule-weight scale, three candidates against two themes</h1>
 <p class="note">Left column is today. The cells are inset rings, not borders, so the ring alpha
 moves with the theme as it does in a real one — a weight decision on the day grid is partly a
 contrast decision, and separating them here would flatter every candidate equally.</p>

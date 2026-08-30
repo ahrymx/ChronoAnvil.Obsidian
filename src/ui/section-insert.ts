@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { App, Notice, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   addableDiarySections,
   diarySectionModel,
@@ -178,7 +178,7 @@ export function appendSectionMarkdown(existing: string, block: string): string {
 //
 // Already-present sections are withheld rather than offered and refused, and
 // that is a correctness rule rather than tidiness. Every content field
-// persists into a `<!--almanac:key-->` region keyed by name, so a second
+// persists into a `<!--chronoanvil:key-->` region keyed by name, so a second
 // `recall:recall` would give two widgets one region and they would overwrite
 // each other. Wanting two of something means two keys, which is a hand edit.
 export function addableSections(
@@ -349,13 +349,13 @@ export function modelForSurface(
 // They were duplicated between the two, and a message that exists twice is a
 // message that gets improved once.
 const UNRECOGNISED =
-  "Almanac: this note isn't one a journal recognises. Open a journal note or one of its templates — the section list is built from that type's own levels and kinds.";
+  "ChronoAnvil: this note isn't one a journal recognises. Open a journal note or one of its templates — the section list is built from that type's own levels and kinds.";
 
 const MANAGED_TEMPLATE =
-  "Almanac: this is an entry template — its sections are generated, so an edit here would be overwritten by the next refresh. Edit an entry instead.";
+  "ChronoAnvil: this is an entry template — its sections are generated, so an edit here would be overwritten by the next refresh. Edit an entry instead.";
 
 export class SectionInserter {
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   // What this vault can answer a widget's argument with. 4.15 §4.
   //
@@ -938,7 +938,7 @@ export class SectionInserter {
     const options = model.addable(text);
     if (options.length === 0) {
       new Notice(
-        `Almanac: this ${noun} already has every section the catalogue offers.`
+        `ChronoAnvil: this ${noun} already has every section the catalogue offers.`
       );
       return;
     }
@@ -1029,7 +1029,7 @@ export class SectionInserter {
       // in the editor, beside the arrows that would move it there.
       if (q.kind === "form") continue;
       if (!q.values.length) {
-        new Notice(`Almanac: ${q.empty}`);
+        new Notice(`ChronoAnvil: ${q.empty}`);
         return;
       }
       // `promptChoice` rather than the suggester above it, because two
@@ -1059,13 +1059,13 @@ export class SectionInserter {
       // Null means the plan found nothing to do — the section arrived from
       // sync while the picker was open, or the note has no fence to write into.
       // Either way the honest answer is that nothing was written.
-      new Notice("Almanac: nothing to add — this note already has that section.");
+      new Notice("ChronoAnvil: nothing to add — this note already has that section.");
       return;
     }
     await this.app.vault.modify(file, next);
 
     const label = options.find((s) => s.id === chosen)?.label ?? chosen;
-    notify.ok(`Almanac: ${label} added to this note`);
+    notify.ok(`ChronoAnvil: ${label} added to this note`);
     await openFile(this.app, file as TFile);
   }
 
@@ -1106,11 +1106,11 @@ export class SectionInserter {
 
     const next = model.apply(current, [...model.present(current), sectionId]);
     if (next === null) {
-      new Notice("Almanac: nothing to add — this note already has that section.");
+      new Notice("ChronoAnvil: nothing to add — this note already has that section.");
       return;
     }
     await this.app.vault.modify(file, next);
-    notify.ok("Almanac: Recap added to this note");
+    notify.ok("ChronoAnvil: Recap added to this note");
   }
 
 }

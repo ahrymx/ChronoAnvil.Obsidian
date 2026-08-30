@@ -139,13 +139,13 @@ describe("repairNote — the case the keyword reconciler could not reach", () =>
 // and some prose of the reader's in the middle, and one retired directive. This
 // is the shape every vault created before 4.2 still has.
 const OLD_HOME = [
-  "`almanac:spacer`",
+  "`chronoanvil:spacer`",
   "",
-  "```almanac",
+  "```chronoanvil",
   "title",
   "```",
   "",
-  "```almanac",
+  "```chronoanvil",
   "diary:3",
   "```",
   "",
@@ -153,7 +153,7 @@ const OLD_HOME = [
   "",
   "Some prose I wrote.",
   "",
-  "```almanac",
+  "```chronoanvil",
   "year-nav",
   "journals",
   "```",
@@ -249,7 +249,7 @@ describe("repairNote — what it must not do", () => {
 
   it("keeps a block the catalogue never wrote, in place", () => {
     const shipped = home();
-    const mine = "```almanac\nactivity-chart\n```";
+    const mine = "```chronoanvil\nactivity-chart\n```";
     const text = `${withoutLine(shipped, "tasks-table")}\n\n${mine}\n`;
     const { next } = repairNote(homeModel(), text, shipped);
     expect(next ?? "").toContain(mine);
@@ -300,24 +300,24 @@ describe("retired directives", () => {
   it("keeps a retired word the shipped composition still writes", () => {
     // The `keep` predicate, which is what stops a word retired in one release
     // and re-shipped in the next from being cut out the moment it arrives.
-    expect(retiredIn(["```almanac", "year-nav", "```"], (k) => k === "year-nav")).toEqual([]);
-    expect(stripRetired(["```almanac", "year-nav", "```"], () => true)).toBeNull();
+    expect(retiredIn(["```chronoanvil", "year-nav", "```"], (k) => k === "year-nav")).toEqual([]);
+    expect(stripRetired(["```chronoanvil", "year-nav", "```"], () => true)).toBeNull();
   });
 
   it("drops a fence the removal emptied, and keeps one it did not", () => {
     expect(
-      stripRetired(["```almanac", "year-nav", "```"], () => false)?.join("\n")
+      stripRetired(["```chronoanvil", "year-nav", "```"], () => false)?.join("\n")
     ).toBe("");
     expect(
-      stripRetired(["```almanac", "year-nav", "launcher", "```"], () => false)?.join("\n")
-    ).toBe("```almanac\nlauncher\n```");
+      stripRetired(["```chronoanvil", "year-nav", "launcher", "```"], () => false)?.join("\n")
+    ).toBe("```chronoanvil\nlauncher\n```");
   });
 
   it("never reads a chart fence for directives", () => {
     // Chart specs are the reader's data. `noteLineFor` read every fence for as
     // long as it existed, so a spec line whose first word was a keyword put an
     // op in the plan that the write would never perform.
-    const charts = ["```almanac-charts", "year-nav", "```"];
+    const charts = ["```chronoanvil-charts", "year-nav", "```"];
     expect(retiredIn(charts, () => false)).toEqual([]);
     expect(stripRetired(charts, () => false)).toBeNull();
   });
@@ -379,8 +379,8 @@ describe("managed flags", () => {
     // page it is compared against no longer carries the flag to copy.
     const shipped = home();
     const text = shipped.replace(
-      "```almanac\nframe: section",
-      "```almanac\non-this-day\n```\n\n```almanac\nframe: section"
+      "```chronoanvil\nframe: section",
+      "```chronoanvil\non-this-day\n```\n\n```chronoanvil\nframe: section"
     );
     expect(text, "fixture matched nothing").not.toBe(shipped);
     expect(planFlags(L(text), L(shipped))).toEqual([]);
@@ -405,7 +405,7 @@ describe("managed flags", () => {
 // migrations" and applying it did nothing at all — no writes, no toast. The
 // migration was innocent. What happened is in the group ABOVE it:
 //
-// A journal manifest is `.almanac-journal.json`, a DOTFILE, and Obsidian keeps
+// A journal manifest is `.chronoanvil-journal.json`, a DOTFILE, and Obsidian keeps
 // dotfiles out of the vault index. `planCreate` asked the vault whether one
 // existed, was told no whatever the truth, and listed all four of them as
 // missing on every run — the window in the report shows four identical rows.
@@ -478,7 +478,7 @@ describe("a manifest is a dotfile, and the vault cannot see it", () => {
     );
     // And the notice at the end is unconditional — it is the only thing that
     // tells a reader the command finished at all.
-    expect(src).toContain('notify.ok("Almanac: nothing to do")');
+    expect(src).toContain('notify.ok("ChronoAnvil: nothing to do")');
   });
 });
 
@@ -495,7 +495,7 @@ describe("a manifest is a dotfile, and the vault cannot see it", () => {
 //      written. It converged after one apply, which is the only reason this was
 //      a wart rather than 4.38.2's loop.
 //
-//   2. `segment()` matched a three-backtick ```almanac opener anywhere,
+//   2. `segment()` matched a three-backtick ```chronoanvil opener anywhere,
 //      including inside the FOUR-backtick fence `assets/documentation.md` uses
 //      to print an example rather than render it. The docs' illustration of a
 //      bare directive was read as a live widget block.
@@ -562,7 +562,7 @@ describe("format migrations, against what this release writes", () => {
   it("never rewrites the documentation, whose fences are illustrations", () => {
     const doc = shipped().find((n) => n.dest.endsWith("README.md"));
     expect(doc, "the documentation is in the reconcilable walk").toBeDefined();
-    expect(doc!.text).toContain("```almanac");
+    expect(doc!.text).toContain("```chronoanvil");
     expect(migrated(doc!.dest, doc!.text, doc!.composed)).toBe(doc!.text);
   });
 });
@@ -575,20 +575,20 @@ describe("format migrations, against what this release writes", () => {
 // the three refusals. These are the four properties that make it safe to tick.
 describe("regrouping a page onto this release's rows", () => {
   const SHIPPED = [
-    "`almanac:spacer`",
-    "```almanac",
+    "`chronoanvil:spacer`",
+    "```chronoanvil",
     "frame: section",
     "diary:3",
     "```",
     "",
-    "```almanac",
+    "```chronoanvil",
     "row",
     "header:🗂️ Across the diary",
     "tasks-table",
     "tag-index",
     "```",
     "",
-    "%% almanac-graph %%",
+    "%% chronoanvil-graph %%",
   ].join("\n");
 
   // What the release before it wrote for the same page: the same two widgets,
@@ -596,42 +596,42 @@ describe("regrouping a page onto this release's rows", () => {
   // blocks in between — which is the case the first draft of this could not
   // handle and the reason it matches by widget rather than by adjacency.
   const BEFORE = [
-    "`almanac:spacer`",
-    "```almanac",
+    "`chronoanvil:spacer`",
+    "```chronoanvil",
     "frame: section",
     "diary:3",
     "```",
     "",
-    "```almanac",
+    "```chronoanvil",
     "header:⏳ Open tasks",
     "tasks-table",
     "```",
     "",
-    "```almanac-charts",
+    "```chronoanvil-charts",
     "header:📊 Trends",
     "jchart:mood",
     "```",
     "",
-    "```almanac",
+    "```chronoanvil",
     "header:🏷️ Tags",
     "tag-index",
     "```",
     "",
-    "%% almanac-graph %%",
+    "%% chronoanvil-graph %%",
   ].join("\n");
 
   it("welds two stacked cells into the row, at the first of them", () => {
     const out = regroupShippedPages(BEFORE, SHIPPED);
     expect(out).not.toBeNull();
     expect(out).toContain(
-      ["```almanac", "row", "header:🗂️ Across the diary", "tasks-table", "tag-index", "```"].join(
+      ["```chronoanvil", "row", "header:🗂️ Across the diary", "tasks-table", "tag-index", "```"].join(
         "\n"
       )
     );
     // AT THE TOPMOST CELL, not at the last and not at the composed position: the
     // band stays where the reader has been looking for it. The charts fence,
     // which sat between the two, keeps its place and its contents.
-    expect(out!.indexOf("row")).toBeLessThan(out!.indexOf("almanac-charts"));
+    expect(out!.indexOf("row")).toBeLessThan(out!.indexOf("chronoanvil-charts"));
     expect(out).toContain("jchart:mood");
     // AND THE SEPARATOR GOES WITH THE CELL THAT MOVED. Two fences became one, so
     // the page loses a block and its blank line — not a blank line on its own,
@@ -667,8 +667,8 @@ describe("regrouping a page onto this release's rows", () => {
     // Refusal 2. With `tasks-table` in two fences there is no answer to which
     // one is the cell, and picking one would silently orphan the other.
     const twice = BEFORE.replace(
-      "%% almanac-graph %%",
-      "```almanac\ntasks-table\n```\n\n%% almanac-graph %%"
+      "%% chronoanvil-graph %%",
+      "```chronoanvil\ntasks-table\n```\n\n%% chronoanvil-graph %%"
     );
     expect(regroupShippedPages(twice, SHIPPED)).toBeNull();
   });

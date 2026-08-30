@@ -404,7 +404,7 @@ describe("a page may hold logbook widgets and sections", () => {
   it("removes the one that was asked for and leaves the rest alone", () => {
     const text =
       note() +
-      "\n```almanac\nlogbook\n```\n\n```almanac\nlogbook\n```\n\n```almanac\nlogbook\n```\n";
+      "\n```chronoanvil\nlogbook\n```\n\n```chronoanvil\nlogbook\n```\n\n```chronoanvil\nlogbook\n```\n";
     const gone = `w:${LOGBOOK_KEYWORD}#2`;
     const next = model.apply(
       text,

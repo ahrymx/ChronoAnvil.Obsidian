@@ -167,7 +167,7 @@ describe("patch 3: the trend is a flag on the directive that already exists", ()
     // sits in the ordinary flow of a note, and a Chart.js canvas in a
     // zero-height box draws nothing and reports no error.
     const css = readCss();
-    const at = css.indexOf(".am-bridge-trend {");
+    const at = css.indexOf(".ca-bridge-trend {");
     expect(at).toBeGreaterThan(0);
     expect(css.slice(at, css.indexOf("}", at))).toContain("height:");
   });

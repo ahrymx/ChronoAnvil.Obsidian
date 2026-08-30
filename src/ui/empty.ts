@@ -9,7 +9,7 @@
 //
 // WHY THIS FILE EXISTS
 //
-// Almanac had three separate mechanisms for this and no shared statement about
+// ChronoAnvil had three separate mechanisms for this and no shared statement about
 // what an empty state is for:
 //
 //   `emptyCallout` in tables.ts — icon, title, body. Fourteen uses, and where
@@ -80,7 +80,7 @@ export function emptyCallout(
 export function emptyLine(
   parent: HTMLElement,
   text: string,
-  cls = "am-empty-line"
+  cls = "ca-empty-line"
 ): HTMLElement {
   return parent.createDiv({ cls, text });
 }

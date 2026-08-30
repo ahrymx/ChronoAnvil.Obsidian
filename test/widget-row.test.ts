@@ -43,7 +43,7 @@ import { readCss, readSrc } from "./sources";
 
 // A boundary rather than `indexOf`, for the reason frame.test.ts records: a
 // class matched as a substring is a class that cannot be told from a longer one
-// with the same prefix, and `.journal-block-row` is a prefix of
+// with the same prefix, and `.ca-journal-block-row` is a prefix of
 // `.journal-block-row-X`.
 const ruleAt = (rules: string, sel: string): number =>
   rules.search(
@@ -102,7 +102,7 @@ describe("what a fence can say about being a row", () => {
     expect(row).toBe(false);
     expect(error).toContain("2 row lines");
     // Names the way out, so the reader does not have to work it out.
-    expect(error).toContain("almanac");
+    expect(error).toContain("chronoanvil");
     expect(error).toContain("frame:");
   });
 
@@ -147,23 +147,23 @@ describe("what goes into a cell", () => {
     // last bullet, and a bug found weeks later.
     //
     // All three shapes `sectionFrame` builds, because the marker classes differ
-    // and only `journal-sec` is on all of them: a titled block-owning bar, an
+    // and only `ca-journal-sec` is on all of them: a titled block-owning bar, an
     // untitled one, and an inner `owns: "children"` section with no fold marker
     // at all.
     expect(
-      isCellContent(["journal-sec", "journal-sec-l1", "journal-header-bar", "journal-header-l1"])
+      isCellContent(["ca-journal-sec", "journal-sec-l1", "ca-journal-header-bar", "journal-header-l1"])
     ).toBe(false);
     expect(
-      isCellContent(["journal-sec", "journal-sec-l1", "journal-header-bar-untitled"])
+      isCellContent(["ca-journal-sec", "journal-sec-l1", "journal-header-bar-untitled"])
     ).toBe(false);
-    expect(isCellContent(["journal-sec", "journal-sec-l2"])).toBe(false);
+    expect(isCellContent(["ca-journal-sec", "journal-sec-l2"])).toBe(false);
   });
 
   it("never takes the modifier's own error message", () => {
     // A block can carry a frame error and a good `row` line at once, and the
     // sentence explaining the first is the block talking, not something it is
     // showing.
-    expect(isCellContent(["journal-frame-error"])).toBe(false);
+    expect(isCellContent(["ca-journal-frame-error"])).toBe(false);
   });
 });
 
@@ -424,7 +424,7 @@ describe("a row draws at most two columns (4.52.1)", () => {
 
 describe("the block lays itself out afterwards, knowing nothing", () => {
   const widgets = readSrc("widgets");
-  // The `almanac` fence's processor, bounded — an order assertion over the
+  // The `chronoanvil` fence's processor, bounded — an order assertion over the
   // whole of a SPLIT module compares positions in an alphabetical
   // concatenation, which test/sources.ts warns is not a comparison at all.
   //
@@ -433,9 +433,9 @@ describe("the block lays itself out afterwards, knowing nothing", () => {
   // repaintable outside a markdown view; the bodies these bounds enclose did not
   // move, only the call that introduces them.
   const processor = ((): string => {
-    const at = widgets.indexOf('registerBlock("almanac", ');
-    expect(at, "the almanac fence processor is gone").toBeGreaterThan(-1);
-    const end = widgets.indexOf('registerBlock(\n      "almanac-charts"', at);
+    const at = widgets.indexOf('registerBlock("chronoanvil", ');
+    expect(at, "the chronoanvil fence processor is gone").toBeGreaterThan(-1);
+    const end = widgets.indexOf('registerBlock(\n      "chronoanvil-charts"', at);
     expect(end, "the processor's end is gone").toBeGreaterThan(at);
     return widgets.slice(at, end);
   })();
@@ -501,7 +501,7 @@ describe("a cell is its own query container", () => {
   it("gives every cell an inline-size container", () => {
     // THE RULE THE WHOLE PRIMITIVE RESTS ON. Every `@container (max-width: …)`
     // rule in styles/ resolves against the nearest inline-size ancestor, which
-    // until this existed was always `.journal-widget-block` — the pane. A widget
+    // until this existed was always `.ca-journal-widget-block` — the pane. A widget
     // in a third of a pane is narrow while the block is wide, so without this
     // the tracker grid, the header bars and the calendar all go on measuring
     // the pane and stay in their wide layout at a third of the width.
@@ -527,9 +527,9 @@ describe("a cell is its own query container", () => {
     // leftover is proportional to N only when both carry it. Weight on the grow
     // alone gives about 1.3:1 where 2:1 was asked for, which is the kind of
     // nearly-right that reads as a rendering fault.
-    expect(rule).toContain("flex-grow: var(--am-cell-weight, 1)");
+    expect(rule).toContain("flex-grow: var(--ca-cell-weight, 1)");
     expect(rule).toContain(
-      "flex-basis: calc(var(--am-row-cell-min) * var(--am-cell-weight, 1))"
+      "flex-basis: calc(var(--ca-row-cell-min) * var(--ca-cell-weight, 1))"
     );
   });
 
@@ -565,7 +565,7 @@ describe("a cell is its own query container", () => {
     // widget in a narrow cell is the point of the primitive.
     const at = ruleAt(rules, `.${ROW_CLASS} > .${ROW_CELL_CLASS}`);
     const rule = rules.slice(at, rules.indexOf("}", at));
-    expect(rule).toContain("var(--am-row-cell-min)");
+    expect(rule).toContain("var(--ca-row-cell-min)");
     expect(rule).not.toContain("520px");
 
     // THE VALUE IS THE CLAIM, so it is pinned as the range the evidence
@@ -578,7 +578,7 @@ describe("a cell is its own query container", () => {
     //
     // A range rather than an equality, because 320 is a judgement inside that
     // window and a test asserting it exactly would fail for a better number.
-    const floor = rules.match(/--am-row-cell-min:\s*(\d+)px/);
+    const floor = rules.match(/--ca-row-cell-min:\s*(\d+)px/);
     expect(floor, "the floor is not a token").not.toBeNull();
     const px = Number(floor![1]);
     expect(px, "narrow enough to break the calendar rail").toBeGreaterThan(225);
@@ -586,7 +586,7 @@ describe("a cell is its own query container", () => {
   });
 
   it("does not move the block's own container out from under it", () => {
-    // 4.1 §4 names `container-type` on `.journal-widget-block` as the rule every
+    // 4.1 §4 names `container-type` on `.ca-journal-widget-block` as the rule every
     // frame value has to keep. A row EXTENDS it — the block is still a
     // container and each cell is one too — so nothing here may cancel it.
     const at = ruleAt(rules, `.${ROW_CLASS}`);
@@ -595,7 +595,7 @@ describe("a cell is its own query container", () => {
     expect(rule).not.toContain("container-type");
     // And the block's own is still there, which is the thing that would break.
     expect(rules).toMatch(
-      /\.journal-widget-block\s*\{[^}]*container-type:\s*inline-size/
+      /\.ca-journal-widget-block\s*\{[^}]*container-type:\s*inline-size/
     );
   });
 
@@ -619,13 +619,13 @@ describe("a cell is its own query container", () => {
   });
 
   it("marks a cell only when its width is not the default", () => {
-    // `var(--am-cell-weight, 1)` means an ordinary cell needs no inline style
+    // `var(--ca-cell-weight, 1)` means an ordinary cell needs no inline style
     // at all, so the common case leaves no mark in the DOM — the shape
-    // `--am-row-cols` and `--am-ev-tint` already use. Asserted on the source
+    // `--ca-row-cols` and `--ca-ev-tint` already use. Asserted on the source
     // because the DOM write is what the stylesheet's fallback depends on.
     const src = readSrc("row");
     expect(src).toContain("if (weights[n] !== 1) {");
-    expect(src).toContain('cell.style.setProperty("--am-cell-weight"');
+    expect(src).toContain('cell.style.setProperty("--ca-cell-weight"');
   });
 
   it("stacks what a cell holds, with the block's own rhythm", () => {
@@ -641,12 +641,12 @@ describe("a cell is its own query container", () => {
     // of this assertion is about quietly goes away.
     expect(rule).toContain("display: flex");
     expect(rule).toContain("flex-direction: column");
-    expect(rule).toContain("gap: var(--am-widget-gap)");
+    expect(rule).toContain("gap: var(--ca-widget-gap)");
   });
 
   it("does not spell a row the way a bar is already spelled", () => {
     // TWO IDEAS SHARING A NAME is the same fault as two names for one idea, from
-    // the other side. `.journal-widget-bar` already means "a row" in this
+    // the other side. `.ca-journal-widget-bar` already means "a row" in this
     // stylesheet — the wrapping strip inline controls accumulate into — and it
     // is not this: a bar is controls INSIDE a block, a row is the block's own
     // widgets laid across it.
@@ -664,7 +664,7 @@ describe("the box a group is drawn in — 4.9 §2", () => {
     // untouched — which is what lets `block-drag.ts` go on finding it and
     // reading `row.children` for the cells.
     //
-    // A THIRD LEVEL SINCE 4.34: the rows live in `.journal-group-pages`, which
+    // A THIRD LEVEL SINCE 4.34: the rows live in `.ca-journal-group-pages`, which
     // is what a page swap pins a height on. The group cannot be that box —
     // its height includes the foot, and sliding the strip the reader is
     // pressing is the whole bug the pin exists to prevent.
@@ -693,7 +693,7 @@ describe("the box a group is drawn in — 4.9 §2", () => {
     // 4.9 §1: `journal-block-row` and `journal-block-cell` stay as they are —
     // no reader sees either and every CSS assertion in this suite reads them as
     // literals — and everything added takes the name the documentation uses.
-    expect(GROUP_CLASS).toBe("journal-group");
+    expect(GROUP_CLASS).toBe("ca-journal-group");
     expect(GROUP_FOOT_CLASS.startsWith(`${GROUP_CLASS}-`)).toBe(true);
     expect(GROUP_DIVIDER_CLASS.startsWith(`${GROUP_CLASS}-`)).toBe(true);
     // And the fence keyword is untouched: `row` is how a group is written.

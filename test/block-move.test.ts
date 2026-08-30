@@ -25,17 +25,17 @@ import { readCode, readCss, readSrc } from "./sources";
 // to be right about the LAST block as well as the first, and a two-block note
 // cannot tell a bug that walks one too far from a correct answer.
 const NOTE = [
-  "`almanac:spacer`",
-  "```almanac",
+  "`chronoanvil:spacer`",
+  "```chronoanvil",
   "title",
   "```",
   "",
-  "```almanac",
+  "```chronoanvil",
   "row",
   "diary:3",
   "```",
   "",
-  "```almanac",
+  "```chronoanvil",
   "journals",
   "```",
   "",
@@ -126,7 +126,7 @@ describe("what a block's head calls it", () => {
     // matched and every dashboard drew a bar naming the page after the smaller
     // of the two widgets in it. It shipped, and a render found it.
     //
-    // 4.19.1 FIXED IT IN `hasOwnBar`, BY ADDING `.jtc-card` — right for the
+    // 4.19.1 FIXED IT IN `hasOwnBar`, BY ADDING `.ca-jtc-card` — right for the
     // surface it was tested on and the wrong mechanism. `hasOwnBar` asks only
     // about a block's FIRST CHILD, deliberately; an ENTRY's banner opens with
     // its links row, so the entry banner drew the same wrong head and the next
@@ -176,7 +176,7 @@ describe("the gesture around it", () => {
     // are, and each of them says which place it means. A highlight over the
     // whole block would be claiming an answer none of them gives.
     expect(src).not.toContain("is-drop-target");
-    expect(readCss()).not.toContain(".journal-widget-block.is-drop-target");
+    expect(readCss()).not.toContain(".ca-journal-widget-block.is-drop-target");
     expect(src).toContain('container.addClass("is-slotting")');
   });
 
@@ -256,7 +256,7 @@ describe("the gesture around it", () => {
     // else. In a head it would lay an invisible drag target over the title, so
     // it is a fixed width centred on the dots.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = rules.indexOf(".jbd-handle {");
+    const at = rules.indexOf(".ca-jbd-handle {");
     expect(at, "no grip rule").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain("position: absolute");
@@ -281,11 +281,11 @@ describe("the gesture around it", () => {
     // construction, a page of quiet labels reads as a page.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
     // ANCHORED ON A NEWLINE, and it was not until 4.13.6 — when a legitimate
-    // second rule, `.journal-widget-card > .journal-block-head`, ended in this
+    // second rule, `.ca-journal-widget-card > .ca-journal-block-head`, ended in this
     // exact string and a bare `indexOf` read IT while believing it had read the
     // base rule. Third time in this suite; `section-frame.test.ts` carries the
     // other two and RESUME states the rule.
-    const at = rules.indexOf("\n.journal-block-head {");
+    const at = rules.indexOf("\n.ca-journal-block-head {");
     expect(at, "blocks have no head").toBeGreaterThan(-1);
     const head = rules.slice(at, rules.indexOf("}", at));
     expect(head).toContain("border-bottom");
@@ -295,7 +295,7 @@ describe("the gesture around it", () => {
     // Drawn first though attached last — `layOutRow` would collect an earlier
     // child into a cell, and 20-charts.css reads the block's first child.
     expect(head).toContain("order: -1");
-    expect(rules).toContain(".journal-block-head-title {");
+    expect(rules).toContain(".ca-journal-block-head-title {");
     // A head with nothing to say is not drawn at all — both refusals are made
     // where the answer is known, and 4.8.1 turned "no bar" into "no head" now
     // that there is no grip left to keep.
@@ -311,11 +311,11 @@ describe("the gesture around it", () => {
     // three composite cards use, which is what lets the head bleed those numbers
     // and meet the card's edges.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = rules.indexOf(".journal-widget-block.has-head:not(");
+    const at = rules.indexOf(".ca-journal-widget-block.has-head:not(");
     expect(at, "a titled head draws no card under itself").toBeGreaterThan(-1);
     const rule = rules.slice(rules.indexOf("{", at), rules.indexOf("}", at));
     expect(rule).toContain("background: var(--background-secondary)");
-    expect(rule).toContain("border-radius: var(--am-radius-md)");
+    expect(rule).toContain("border-radius: var(--ca-radius-md)");
     expect(rule).toContain("padding: 12px 14px");
     // AND NOT WHERE THERE IS CHROME ALREADY: the three composite cards paint it
     // themselves, `is-unframed` gave it up on purpose, and a block inside a
@@ -324,9 +324,9 @@ describe("the gesture around it", () => {
     for (const cls of [
       "is-unframed",
       "journal-sec-block",
-      "journal-overview-card",
-      "journal-entry-banner",
-      "journal-study-banner",
+      "ca-journal-overview-card",
+      "ca-journal-entry-banner",
+      "ca-journal-study-banner",
     ]) {
       expect(guard, `${cls} is handed a second card`).toContain(cls);
     }
@@ -338,7 +338,7 @@ describe("the gesture around it", () => {
     // scopes the empty callout two files over, and a search over every line
     // would collect that as one of the cards.
     const resetAt = rules.indexOf(
-      ".journal-widget-block.is-unframed .journal-overview-summary"
+      ".ca-journal-widget-block.is-unframed .ca-journal-overview-summary"
     );
     expect(resetAt, "the unframed reset is gone").toBeGreaterThan(-1);
     const reset = rules.slice(resetAt, rules.indexOf("{", resetAt));
@@ -349,7 +349,7 @@ describe("the gesture around it", () => {
         .map((l) => l.trim().replace(`${cond} `, ""))
         // The last selector of a rule carries the brace, the rest a comma.
         .map((l) => l.replace(/\s*[,{]\s*$/, "").trim());
-    const unframed = widgetsOf(".journal-widget-block.is-unframed");
+    const unframed = widgetsOf(".ca-journal-widget-block.is-unframed");
     // NOT SCOPED TO THE BLOCK: `has-head` is worn by a block that drew its own
     // head and by the card `cardWidget` puts around a widget inside a row, so
     // one condition covers both scales.
@@ -357,14 +357,14 @@ describe("the gesture around it", () => {
     expect(headed.length).toBeGreaterThan(0);
     // Every card the unframed reset names is named by the head's copy too. The
     // unframed list is longer on purpose: it also cancels the bands those cards
-    // carry (`.journal-overview-banner`, `.jjs-hero`), which a headed block must
+    // carry (`.ca-journal-overview-banner`, `.ca-jjs-hero`), which a headed block must
     // NOT cancel — there the card's padding is real, so the bands bleed to the
     // card's edges exactly as they were written to.
     const cards = [
-      ".journal-overview-summary",
-      ".journal-entry-card",
-      ".journals-card",
-      ".jtc-card",
+      ".ca-journal-overview-summary",
+      ".ca-journal-entry-card",
+      ".ca-journals-card",
+      ".ca-jtc-card",
     ];
     for (const card of cards) {
       expect(unframed, `${card} left the unframed reset`).toContain(card);
@@ -403,20 +403,20 @@ describe("the gesture around it", () => {
   it("puts no head on a widget that already has a band", () => {
     // THE SAME RULE THE BLOCK FOLLOWS, ONE LEVEL DOWN. A period dashboard's
     // summary says MONTHLY OVERVIEW across its own top
-    // (`.journal-overview-banner`); "📅 This month" above it in smaller letters
+    // (`.ca-journal-overview-banner`); "📅 This month" above it in smaller letters
     // is the same sentence twice.
     expect(src).toContain("if (hasOwnBar(widget)) return;");
     // A LIST, WITH THE COST THE RESET LIST DECLARES: a band a WIDGET drew has
     // to be named here, because only that widget knows it drew one. Missing an
     // entry shows as two bars stacked.
     for (const band of [
-      "journal-overview-banner",
-      "jjs-hero",
-      "journal-entry-header",
-      "journal-study-header",
-      "journal-sec",
-      "journal-sec-fold",
-      "journal-header-bar",
+      "ca-journal-overview-banner",
+      "ca-jjs-hero",
+      "ca-journal-entry-header",
+      "ca-journal-study-header",
+      "ca-journal-sec",
+      "ca-journal-sec-fold",
+      "ca-journal-header-bar",
     ]) {
       expect(src, `${band} is not counted as a band`).toContain(`"${band}"`);
     }
@@ -455,18 +455,18 @@ describe("the gesture around it", () => {
     // rule. Asserted as a pair rather than as two values, because either one
     // alone is the defect.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = rules.indexOf("\n.journal-widget-card > .journal-block-head {");
+    const at = rules.indexOf("\n.ca-journal-widget-card > .ca-journal-block-head {");
     expect(at, "the card head rule is gone").toBeGreaterThan(-1);
     const desktop = rules.slice(at, rules.indexOf("}", at));
     expect(desktop).toContain("position: absolute");
     expect(desktop).not.toContain("-12px");
     // The touch branch, where the head is a band in flow again.
-    const touch = rules.indexOf("  .journal-widget-card > .journal-block-head {");
+    const touch = rules.indexOf("  .ca-journal-widget-card > .ca-journal-block-head {");
     expect(touch, "touch keeps the head in flow").toBeGreaterThan(-1);
     const flowed = rules.slice(touch, rules.indexOf("}", touch));
     expect(flowed).toContain("margin: -12px -14px 12px");
     // And it is NOT on the head itself, where it would reach the block too.
-    const base = rules.indexOf("\n.journal-block-head {");
+    const base = rules.indexOf("\n.ca-journal-block-head {");
     expect(rules.slice(base, rules.indexOf("}", base))).not.toContain(
       "margin-bottom"
     );
@@ -480,7 +480,7 @@ describe("the gesture around it", () => {
     // `SectionPass`, `is-unframed` from a frame that gave up the block's chrome
     // — so those two are hidden rather than never drawn.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = rules.indexOf(".journal-widget-block.journal-sec-block > .journal-block-head");
+    const at = rules.indexOf(".ca-journal-widget-block.ca-journal-sec-block > .ca-journal-block-head");
     expect(at, "a block inside a section draws a second bar").toBeGreaterThan(-1);
     const sel = rules.slice(at, rules.indexOf("{", at));
     expect(sel).toContain("is-unframed");
@@ -489,13 +489,13 @@ describe("the gesture around it", () => {
     );
 
     // AND THE ONE BLOCK THAT IS NOT A FLEX CONTAINER IS IN THAT LIST, which is
-    // what makes the head's `order: -1` safe. `.journal-sec-block` sets
+    // what makes the head's `order: -1` safe. `.ca-journal-sec-block` sets
     // `display: flow-root` and wins over the block's `display: flex` on file
     // order at equal specificity — an order there is inert, and a head that
     // relied on one would draw at the FOOT of its block, which in a section run
     // is the head of the next one. That was 4.7.1's bug and this is why it
     // cannot come back.
-    const secAt = rules.indexOf(".journal-sec-block {");
+    const secAt = rules.indexOf(".ca-journal-sec-block {");
     expect(
       rules.slice(secAt, rules.indexOf("}", secAt)),
       "the section surface no longer turns the flex context off"
@@ -510,10 +510,10 @@ describe("the gesture around it", () => {
     // does not. It looked perfect in one mode and was gone from every section in
     // the other.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = rules.lastIndexOf(".journal-widget-block {");
+    const at = rules.lastIndexOf(".ca-journal-widget-block {");
     expect(at, "no block rule").toBeGreaterThan(-1);
     const all = rules
-      .split(".journal-widget-block {")
+      .split(".ca-journal-widget-block {")
       .slice(1)
       .map((r) => r.slice(0, r.indexOf("}")));
     expect(
@@ -575,6 +575,6 @@ describe("the gesture around it", () => {
   it("has a resting state on touch, like every other hover affordance", () => {
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
     const at = rules.indexOf("@media (hover: none)");
-    expect(rules.slice(at).includes(".jbd-handle")).toBe(true);
+    expect(rules.slice(at).includes(".ca-jbd-handle")).toBe(true);
   });
 });

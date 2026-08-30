@@ -14,17 +14,17 @@
    holding Open today and Yesterday, a Capture row, and a strip of four numbers.
 
    It is named here rather than removed silently because this file's own history
-   is the argument for the removal, and a reader who finds `.jdh-nav` below with
+   is the argument for the removal, and a reader who finds `.ca-jdh-nav` below with
    no `.jdh-root` above it should not have to guess. The hero was three steps of
    removing a container — a bordered card above a `header:📅 Diary` bar, then the
    section header itself, then inside the calendar card — and this is the fourth
    and last step of the same movement. `src/diary/diary-header.ts` carries the
-   full account; `.jc-actions` in 93-calendars.css is what replaced it.
+   full account; `.ca-jc-actions` in 93-calendars.css is what replaced it.
 
-   `.jdh-nav` STAYS, and it is not a leftover: `core/links.ts` builds the utility
+   `.ca-jdh-nav` STAYS, and it is not a leftover: `core/links.ts` builds the utility
    link row with that class, the row survived the hero, and renaming it would
    move a class out of the module that owns it for no gain. */
-.jdh-nav.journal-links {
+.ca-jdh-nav.ca-journal-links {
   border: none;
   background: none;
   /* Cancel the last link's own 9px right inset so the row ends flush with the
@@ -40,26 +40,26 @@
 /* Ghost links: no border or fill at rest. The icon shrinks a touch so the row
    reads as secondary to the buttons beside it.
    THE SCALE COMES DOWN WITH THE STRIP (4.13.1 §3), AND IT IS THE STRIP'S OWN.
-   At `--am-text-sm` these two links stood a size and a half above the three
-   buttons they now share a row with. `--am-text-2xs` is what `.jc-actions
-   .journal-btn` takes and what a section bar's buttons have taken since 4.11 —
+   At `--ca-text-sm` these two links stood a size and a half above the three
+   buttons they now share a row with. `--ca-text-2xs` is what `.ca-jc-actions
+   .ca-journal-btn` takes and what a section bar's buttons have taken since 4.11 —
    one strip is one size, or it is two strips that happen to touch. */
-.jdh-nav.journal-links a.jn-pill,
-.jdh-nav.journal-links .jn-flat {
+.ca-jdh-nav.ca-journal-links a.ca-jn-pill,
+.ca-jdh-nav.ca-journal-links .ca-jn-flat {
   border: none;
   background: none;
   color: var(--text-muted) !important;
-  border-radius: var(--am-radius-sm);
-  padding: var(--am-space-1) var(--am-space-5);
-  font-size: var(--am-text-2xs);
+  border-radius: var(--ca-radius-sm);
+  padding: var(--ca-space-1) var(--ca-space-5);
+  font-size: var(--ca-text-2xs);
 }
-.jdh-nav.journal-links a.jn-pill .jn-icon {
+.ca-jdh-nav.ca-journal-links a.ca-jn-pill .ca-jn-icon {
   opacity: 0.85;
 }
 /* Monochrome on hover, with 4.13.1 §1's buttons — an accent wash under a link
    sitting between two grey buttons is the colour this release took off the
    controls, put back one element over. */
-.jdh-nav.journal-links a.jn-pill:hover {
+.ca-jdh-nav.ca-journal-links a.ca-jn-pill:hover {
   background: var(--background-modifier-hover);
   border-color: transparent;
   color: var(--text-normal) !important;
@@ -69,11 +69,11 @@
    `.jdh-stats`, `.jdh-stat`, `.jdh-stat-value`, `.jdh-stat-label` and the
    `@container (max-width: 520px)` block that wrapped them two-up: all four cells
    they dressed — entries this month, day streak, open tasks, mood · 7d — are no
-   longer built. The Journals hero's `.jjh-stat*` twin below is NOT affected and
+   longer built. The Journals hero's `.ca-jjh-stat*` twin below is NOT affected and
    is deliberately left as it is: that band is still a hero, and this release did
    not look at it.
 
-   `.jjh-stat-label`'s comment used to point at `.jdh-stat-label` as the rule it
+   `.ca-jjh-stat-label`'s comment used to point at `.jdh-stat-label` as the rule it
    matches. It now names the shape rather than the sibling. */
 
 /* ── The Journals banner (2.13.8) ────────────────────────────────────────
@@ -97,12 +97,12 @@
    these, and a band that answers "have I kept this up?" is the reason this
    widget exists.
 
-   The strip reuses the `--am-act-*` ramp and `activityBucket` maths from the
+   The strip reuses the `--ca-act-*` ramp and `activityBucket` maths from the
    subject Activity chart so the section keeps one colour story. Where it differs
    from that chart is on purpose: no day numbers, no navigation. The chart is a
    browsable quarter you read day by day; this is a fixed glance at a year that
    must not push the journal list below the fold. */
-.jjh-root {
+.ca-jjh-root {
   /* Cell size drives the strip's grid template (set inline in JS as a repeat()
      count) and the legend swatches, so the whole strip rescales from here. */
   --jjh-cell: 10px;
@@ -110,27 +110,27 @@
   margin: 0.35em 0 0.6em;
   padding: 14px 14px 12px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
 }
 /* Empty (no journal types enabled): the renderer returns a bare root and
    journal.ts's own callout explains why, so collapse the band entirely rather
    than leaving a padded empty box. */
-.jjh-root:empty {
+.ca-jjh-root:empty {
   display: none;
 }
 
-.jjh-head {
+.ca-jjh-head {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
 }
-.jjh-left {
+.ca-jjh-left {
   min-width: 0;
 }
-.jjh-eyebrow {
-  font-size: var(--am-text-2xs);
+.ca-jjh-eyebrow {
+  font-size: var(--ca-text-2xs);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -146,14 +146,14 @@
    room rather than as two lines stacked. */
 /* The section's own controls (Refresh), anchored right of the eyebrow against
    the band's top edge rather than centred against a two-line left column. */
-.jjh-actions {
+.ca-jjh-actions {
   display: flex;
   align-items: center;
   gap: 6px;
   flex: 0 1 auto;
 }
-.jjh-status {
-  font-size: var(--am-text-sm);
+.ca-jjh-status {
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
 }
 
@@ -171,9 +171,9 @@
    it puts a third shape between two that already agree. The vertical rules went
    with it — they divided four numbers that each carry their own caption and are
    separated by more whitespace than a hairline is worth. What is left is the
-   move `.jc-header` and `.jc-agenda` were left with: a hairline above, and the
+   move `.ca-jc-header` and `.ca-jc-agenda` were left with: a hairline above, and the
    figures on the card's own ground. */
-.jjh-stats {
+.ca-jjh-stats {
   display: flex;
   flex-wrap: wrap;
   gap: 0 26px;
@@ -181,7 +181,7 @@
   padding-top: 12px;
   border-top: 1px solid var(--background-modifier-border);
 }
-.jjh-stat {
+.ca-jjh-stat {
   /* `0 0 auto`, not `1 1 0`: with the rules gone the cells no longer need to
      tile the full width, and four equal quarters of a wide pane spread the
      numbers so far apart they stop reading as one row. They size to their
@@ -193,7 +193,7 @@
      cells' own padding would push each pair past 100%. */
   box-sizing: border-box;
 }
-.jjh-stat-value {
+.ca-jjh-stat-value {
   font-size: 1.2em;
   font-weight: 800;
   line-height: 1.1;
@@ -201,7 +201,7 @@
   color: var(--text-normal);
   white-space: nowrap;
 }
-/* `.jjh-stat-value.is-accent` STOOD HERE AND IS GONE (4.13.5) — one of four
+/* `.ca-jjh-stat-value.is-accent` STOOD HERE AND IS GONE (4.13.5) — one of four
    figures in the accent colour, marking the cell someone decided led the row.
    journals-header.ts's `addStat` carries the argument, and it is 4.13.1 §1's
    about buttons and 4.13.2 §3's about this band's own wash, one level in. */
@@ -210,10 +210,10 @@
    two shared tokens rather than restating 700 and 0.06em, which is what its
    deleted diary twin also did by the end: two cells that look identical and are
    described twice will drift, and that pair had. */
-.jjh-stat-label {
-  font-size: var(--am-text-2xs);
-  font-weight: var(--am-caps-weight);
-  letter-spacing: var(--am-caps-tracking);
+.ca-jjh-stat-label {
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
   text-transform: uppercase;
   color: var(--text-faint);
   margin-bottom: 3px;
@@ -224,23 +224,23 @@
    falls out of its DOM order and the builder never computes coordinates.
    Horizontally scrollable rather than shrinking — squares below ~8px stop
    being readable as a calendar, so a narrow pane scrolls instead. */
-.jjh-strip-wrap {
+.ca-jjh-strip-wrap {
   margin-top: 14px;
   overflow-x: auto;
   /* Room for the scrollbar on panes that show one, so it never overlaps the
      legend below. */
   padding-bottom: 2px;
 }
-.jjh-strip-loading {
-  font-size: var(--am-text-sm);
+.ca-jjh-strip-loading {
+  font-size: var(--ca-text-sm);
   color: var(--text-faint);
   padding: 6px 0;
 }
-.jjh-strip-months {
+.ca-jjh-strip-months {
   display: grid;
   grid-auto-rows: auto;
   gap: 0 var(--jjh-gap);
-  /* Must match .jjh-strip below — the two share one `grid-template-columns`
+  /* Must match .ca-jjh-strip below — the two share one `grid-template-columns`
      expression, set by `drawStrip`. If they ever disagree about their tracks,
      every caption drifts further from the week it names and by the right-hand
      edge a label points at the wrong month entirely.
@@ -250,14 +250,14 @@
      resolved to their floor and nothing grew. The pair fill the wrap now, and
      the wrap is what a narrow pane scrolls. */
   margin-bottom: 3px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   color: var(--text-faint);
 }
 /* Each caption is placed on the column its month starts in (grid-column-start
    set inline) and spans as far as it needs; without this it would size to its
    own column and clip to ~10px. */
-.jjh-strip-month {
+.ca-jjh-strip-month {
   grid-row: 1;
   white-space: nowrap;
   overflow: visible;
@@ -269,70 +269,70 @@
    DAYS, and a day is a square. `aspect-ratio` on the cell derives the height
    from whatever the column resolved to, so one declaration replaces the second
    half of a pair that could otherwise drift. */
-.jjh-strip {
+.ca-jjh-strip {
   display: grid;
   grid-auto-flow: column;
   grid-template-rows: repeat(7, auto);
   gap: var(--jjh-gap);
 }
-.jjh-cell {
+.ca-jjh-cell {
   width: var(--jjh-cell);
   height: var(--jjh-cell);
   border-radius: 2px;
   background: var(--background-modifier-border);
 }
-/* IN THE GRID ONLY. `.jjh-cell` is also five swatches in the legend under the
+/* IN THE GRID ONLY. `.ca-jjh-cell` is also five swatches in the legend under the
    strip, which sit in a flex row with nothing to stretch to — they keep the
    fixed 10px above, and they should: a legend swatch is a KEY to the sizes in
-   the grid, not one of them. Scoping this to `.jjh-strip` is what lets the two
+   the grid, not one of them. Scoping this to `.ca-jjh-strip` is what lets the two
    readings of one class coexist. */
-.jjh-strip .jjh-cell {
+.ca-jjh-strip .ca-jjh-cell {
   width: auto;
   height: auto;
   aspect-ratio: 1;
 }
 /* A day inside the window with no work: faint but still a cell — the grid has
    to read as a calendar, not as an empty box. */
-.jjh-cell.is-empty {
+.ca-jjh-cell.is-empty {
   opacity: 0.55;
 }
 /* Days after today in the final column: invisible placeholders that hold the
    strip's right edge straight rather than leaving it ragged. */
-.jjh-cell.is-future {
+.ca-jjh-cell.is-future {
   background: transparent;
 }
 /* Today. An inset ring rather than an outline so it doesn't overlap its
    neighbours across a 2.5px gap, and so it survives on a shaded cell. */
-.jjh-cell.is-today {
+.ca-jjh-cell.is-today {
   box-shadow: inset 0 0 0 1.5px var(--text-accent, var(--interactive-accent));
 }
-.jjh-cell.is-link {
+.ca-jjh-cell.is-link {
   cursor: pointer;
 }
-.jjh-cell.is-link:hover {
+.ca-jjh-cell.is-link:hover {
   outline: 1.5px solid var(--interactive-accent);
   outline-offset: 1px;
 }
 /* Activity ramp — the same four stops the subject Activity heatmap uses, so a
    shade means the same amount of work in both places. */
-.jjh-cell.am-act-1 { background: var(--am-act-1); opacity: 1; }
-.jjh-cell.am-act-2 { background: var(--am-act-2); opacity: 1; }
-.jjh-cell.am-act-3 { background: var(--am-act-3); opacity: 1; }
-.jjh-cell.am-act-4 { background: var(--am-act-4); opacity: 1; }
+.ca-jjh-cell.ca-act-1 { background: var(--ca-act-1); opacity: 1; }
+.ca-jjh-cell.ca-act-2 { background: var(--ca-act-2); opacity: 1; }
+.ca-jjh-cell.ca-act-3 { background: var(--ca-act-3); opacity: 1; }
+.ca-jjh-cell.ca-act-4 { background: var(--ca-act-4); opacity: 1; }
 
 /* A SIBLING OF THE SCROLLER AS OF 4.38, not a child of it — see the note in
-   `journals-header.ts`. `.jjh-strip-wrap`'s own `padding-bottom: 2px` exists to keep
+   `journals-header.ts`. `.ca-jjh-strip-wrap`'s own `padding-bottom: 2px` exists to keep
    a scrollbar off this legend, and that still reads correctly: the two are adjacent
    boxes now rather than one inside the other. */
-.jjh-legend {
+.ca-jjh-legend {
   display: flex;
   align-items: center;
   gap: 4px;
   margin-top: 8px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
 }
-.jjh-legend .jjh-cell {
+.ca-jjh-legend .ca-jjh-cell {
   width: 10px;
   height: 10px;
 }
@@ -345,7 +345,7 @@
    `calc(50% - 0.5px)` was accounting for a 1px vertical rule that no longer
    exists. */
 @container (max-width: 520px) {
-  .jjh-stat {
+  .ca-jjh-stat {
     flex: 0 0 50%;
     min-width: 0;
   }
@@ -354,8 +354,8 @@
 /* ── The Journals banner (2.13.9) ────────────────────────────────────────
    One card holding the whole section: the hero band, then a row per journal
    type, then a group per subject, then a row per topic. It is the Diary
-   card's counterpart, and deliberately built the same way — .journals-card is
-   to .jjs-hero what .journal-calendar was to the diary hero, which 4.13.1 §3
+   card's counterpart, and deliberately built the same way — .ca-journals-card is
+   to .ca-jjs-hero what .ca-journal-calendar was to the diary hero, which 4.13.1 §3
    deleted.
 
    The point of the rewrite was structural, not cosmetic. The section used to
@@ -367,16 +367,16 @@
    length or something in it is hidden. Rendering the section from a single
    `journals` directive makes it a single DOM subtree, so the card is real and
    the internal rules below are dividers rather than seams. */
-.journals-card {
+.ca-journals-card {
   margin: 0.5em 0 1.5em;
   padding: 12px 14px;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
 }
 /* No journal types enabled: the card holds one explanatory block, so it needs
    none of the padding a populated card uses to separate its bands. */
-.journals-card.jjs-bare {
+.ca-journals-card.ca-jjs-bare {
   padding: 0;
   background: transparent;
   border: none;
@@ -384,22 +384,22 @@
 
 /* The banner band. Cancels the card's padding so it runs to the card's edges and
    re-applies it inside — the two lines every band in this project uses.
-   NO WASH SINCE 4.13.2 §3, and the rule below `.jjh-root` carries the argument.
+   NO WASH SINCE 4.13.2 §3, and the rule below `.ca-jjh-root` carries the argument.
    The band cancelled the padding so a TINT could reach the card's edges; with no
    tint the cancel still earns its place, because the rule at the band's foot has
    to meet those edges or it reads as an underline on the numbers rather than as
-   the edge of a header. That is the same distinction `.journal-sec-l1`'s bar
+   the edge of a header. That is the same distinction `.ca-journal-sec-l1`'s bar
    makes inside a section card. */
-.jjs-hero {
+.ca-jjs-hero {
   margin: -12px -14px 0;
   padding: 14px 14px 12px;
-  border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
+  border-radius: var(--ca-radius-md) var(--ca-radius-md) 0 0;
   border-bottom: 1px solid var(--background-modifier-border);
 }
 /* Inside the band the header sheds its standalone card shell — it *is* the
    band now. The `journals-header` directive still renders the bordered card
    version wherever it's used on its own. */
-.jjs-hero .jjh-root {
+.ca-jjs-hero .ca-jjh-root {
   margin: 0;
   padding: 0;
   border: none;
@@ -410,25 +410,25 @@
 /* The type list. Folded per type and per subject by their own heads; the hero
    title's fold-everything chevron went in 2.51 (see journals-header.ts), so
    there is no longer a state in which the band is the whole card. */
-.jjs-list {
+.ca-jjs-list {
   display: flex;
   flex-direction: column;
   /* ── AIR, NOT A RULE, NOW THAT EACH JOURNAL IS A CARD (4.41) ──────────
-     `.jjs-type + .jjs-type` drew a 1px line between journals, which is what a
+     `.ca-jjs-type + .ca-jjs-type` drew a 1px line between journals, which is what a
      list of BARS needs to be read as separate sections. A list of cards is
      separated by the gap between the cards; a line as well would be the boundary
-     drawn twice, which is the argument `--am-border-inner` exists for.
+     drawn twice, which is the argument `--ca-border-inner` exists for.
      The top padding is the same gap, so the first card clears the hero's own
      bottom edge by the same amount the second clears the first. */
-  gap: var(--am-widget-gap);
-  padding-top: var(--am-widget-gap);
+  gap: var(--ca-widget-gap);
+  padding-top: var(--ca-widget-gap);
 }
 
 /* ── A journal type (Study, or a custom type) ─────────────────────────── */
 /*
  * ── THE JOURNAL IS A CARD THAT HOLDS ITS OWN (4.41) ────────────────────
  *
- * WHAT STOOD HERE: `.jjs-type + .jjs-type { border-top: 1px }`. The journal's
+ * WHAT STOOD HERE: `.ca-jjs-type + .ca-jjs-type { border-top: 1px }`. The journal's
  * name was a bare bar on the section's ground and its subject cards sat loose
  * underneath, so the only thing binding a journal to its cards was the gap
  * before the next title — **the same gap that separates two cards inside one
@@ -441,18 +441,18 @@
  * the subject cards keep `--background-primary-alt`. That looks like a step
  * missing until you see what carries it — the head does. See below.
  */
-.jjs-type {
+.ca-jjs-type {
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   /* The head's tint is full-bleed to the card's edges, so the corners have to be
-     the card's. Same reason `.jjs-card` and `.jjc-card` state it. */
+     the card's. Same reason `.ca-jjs-card` and `.ca-jjc-card` state it. */
   overflow: hidden;
 }
 /*
  * ── AND ITS HEAD CARRIES ITS HUE, AS ITS CARDS DO (4.41) ───────────────
  *
- * `hueOf(type.id)` is already set on `.jjs-type` by `buildType` and already
+ * `hueOf(type.id)` is already set on `.ca-jjs-type` by `buildType` and already
  * tints every subject card's head one level down — which is why **chem and maths
  * wear the same red**: the hue is the JOURNAL's, and today it is said once per
  * card and never by the journal itself. Putting it on this band is the tint
@@ -476,7 +476,7 @@
  * being a second colour. The parent is the stronger because it is the parent;
  * every journal on the page keeps the same relationship because both numbers are
  * fixed and only the hue varies. */
-.jjs-type > .journal-sec {
+.ca-jjs-type > .ca-journal-sec {
   padding: 8px 12px;
   background: color-mix(
     in srgb,
@@ -488,14 +488,14 @@
 /* ── THE JOURNAL'S NAME IS THE WAY INTO IT (4.42) ──────────────────────
  *
  * UNCHANGED AT REST, AND THAT IS THE DECISION. The band's title already carries
- * its size, its weight and its ink from `.journal-header-title`; an anchor
+ * its size, its weight and its ink from `.ca-journal-header-title`; an anchor
  * inside it that took the theme's link colour would turn every journal's name
  * purple and make the page's four largest words read as four links rather than
  * as four titles.
  *
  * `color: inherit` IS WHAT KEEPS THAT TRUE. Without it Obsidian's
  * `.internal-link` paints `--text-accent`, which is precisely what happened one
- * rank down: `.jjs-group-name` asks for `--am-bar-ink` and on
+ * rank down: `.ca-jjs-group-name` asks for `--ca-bar-ink` and on
  * `20260818_20h59m08s_grim.png` chem and Maths measured **#a68af9** — the
  * theme's link ink, winning because our declaration was invalid. That was the
  * `:root` token fault, fixed in the same release; this rule does not want to
@@ -507,21 +507,21 @@
  * advertise a shortcut, and the journal's cards below it are the obvious way in
  * for anyone who has not found this one. The pointer cursor is the resting
  * affordance. */
-.jjs-type-name {
+.ca-jjs-type-name {
   color: inherit;
   font-weight: inherit;
   text-decoration: none;
   cursor: pointer;
 }
-a.jjs-type-name:hover {
+a.ca-jjs-type-name:hover {
   color: var(--text-accent);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 /* A journal whose folder note is not there — a preset enabled and never used.
-   Shown, but plainly not a link, on `.jjs-group-name.is-orphan`'s rule and for
+   Shown, but plainly not a link, on `.ca-jjs-group-name.is-orphan`'s rule and for
    its reason: better a plain name than a link that goes nowhere. */
-.jjs-type-name.is-orphan {
+.ca-jjs-type-name.is-orphan {
   color: inherit;
   opacity: 0.75;
   cursor: default;
@@ -530,7 +530,7 @@ a.jjs-type-name:hover {
    `display: none` when folded, so the head's bottom border would land one pixel
    inside the card's own — the doubled boundary again, in the one state where it
    is guaranteed rather than possible. */
-.jjs-type.is-collapsed > .journal-sec {
+.ca-jjs-type.is-collapsed > .ca-journal-sec {
   border-bottom: none;
 }
 /* `.jjs-type-head|-name` and `.jjs-group-head` retired in 2.56.3 — both heads
@@ -538,13 +538,13 @@ a.jjs-type-name:hover {
    of the actions are the frame's. The two comments that used to sit here both
    explained how to push the buttons right, once on the count span and once on
    the head, which is the same decision made twice in one file. */
-.jjs-type.is-collapsed .jjs-type-body {
+.ca-jjs-type.is-collapsed .ca-jjs-type-body {
   display: none;
 }
-.jjs-type-body {
+.ca-jjs-type-body {
   /* INSIDE A CARD NOW (4.41), so the sides are stated too: the grid used to run
      to the section card's own padding and now has a box of its own to clear.
-     The 12px matches `.jjs-card-body`'s, so a subject card's rows and the grid
+     The 12px matches `.ca-jjs-card-body`'s, so a subject card's rows and the grid
      that holds them are indented by the same amount from their own edges. */
   padding: 0 12px 8px;
 }
@@ -559,7 +559,7 @@ a.jjs-type-name:hover {
  * cards at the top level, and a grid of them is not a stack — the doubling the
  * rail was avoiding is what a grid is made of.
  *
- * THE GROUND IS `--background-primary-alt`, WHICH IS `.journal-group`'s RULE
+ * THE GROUND IS `--background-primary-alt`, WHICH IS `.ca-journal-group`'s RULE
  * SAID AGAIN. A card inside a card only reads as deliberate if the inner one is
  * the quieter: 4.9 §2.2 settled that for the row group — "the box must be
  * quieter than what it holds" — and this is the same relationship one family
@@ -575,7 +575,7 @@ a.jjs-type-name:hover {
  * empty, and it is the same arrangement the level cards left behind in 4.37 when
  * the card action row became a ＋ on the head.
  *
- * SCOPED TO `.jjs-type` AND NOT FIXED IN THE BASE RULE. Every level-1 section in
+ * SCOPED TO `.ca-jjs-type` AND NOT FIXED IN THE BASE RULE. Every level-1 section in
  * the plugin reads that rule, and the strip's 8px clearance is a measured decision
  * about controls sitting under a hairline (§32, and the four-pixel correction above
  * it). This is one section saying its controls are small enough for the line, not a
@@ -586,43 +586,43 @@ a.jjs-type-name:hover {
  * lands before 60 and this wins. Asserted in `journal-cards.test.ts`, because a tie
  * broken by file naming is exactly the kind of thing a later rename would silently
  * flip. */
-.jjs-type > .journal-sec > .journal-header-widgets.journal-widget-bar {
+.ca-jjs-type > .ca-journal-sec > .ca-journal-header-widgets.ca-journal-widget-bar {
   flex: 0 0 auto;
   margin-left: auto;
   padding-top: 0;
   border-top: none;
 }
 
-.jjs-grid {
+.ca-jjs-grid {
   display: grid;
   /* `auto-fill` with a min track rather than a media query, so the column count
      answers to the WIDGET's width — the pane, the canvas node or the row cell —
      which is what `container-type: inline-size` makes askable and what 4.3.1
      established a breakpoint on the block cannot describe. 260px rather than
-     `.jjc-grid`'s 240: these hold a name and two figures on one line, and 240
+     `.ca-jjc-grid`'s 240: these hold a name and two figures on one line, and 240
      wraps the pair at the common vault font size. */
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--am-widget-gap);
+  gap: var(--ca-widget-gap);
   /* `stretch`, NOT `start` (4.38.1) — the paragraph above has the argument.
-     `.jjc-grid` was corrected the same way in 4.38 and this grid was missed; the
+     `.ca-jjc-grid` was corrected the same way in 4.38 and this grid was missed; the
      render showed a 163px card, a 163px card and a 90px tile on one row.
-     `.jld-add-tile`'s own `align-self: stretch` did not carry it, so the
+     `.ca-jld-add-tile`'s own `align-self: stretch` did not carry it, so the
      container is what states it and what the test pins. */
   align-items: stretch;
   padding: 4px 0 2px;
 }
-.jjs-card {
+.ca-jjs-card {
   display: flex;
   flex-direction: column;
   background: var(--background-primary-alt);
-  /* 1px, matching `.journals-card` and `.jjc-card`. `--am-rule` is 2px and is
+  /* 1px, matching `.ca-journals-card` and `.ca-jjc-card`. `--ca-rule` is 2px and is
      for a RULE — a divider between bands — which is a different job.
-     `--am-border-inner` RATHER THAN THE PLAIN BORDER (4.35.2): this card sits
+     `--ca-border-inner` RATHER THAN THE PLAIN BORDER (4.35.2): this card sits
      inside the section card, whose edge is the same ink, so the two drew one
      boundary twice at 12px apart. See the token for the whole argument.
 
      ── LONGHANDS, AND THE READER'S SCREENSHOT IS WHY (4.40) ──────────────
-     This was the shorthand `border: 1px solid var(--am-border-inner)`, and on
+     This was the shorthand `border: 1px solid var(--ca-border-inner)`, and on
      `20260818_20h01m16s_grim.png` the add card came back with a **3px `#dadada`**
      dashed edge — which is in no rule in this file. Both numbers are CSS INITIAL
      VALUES: `border-width: medium` computes to 3px, and the initial
@@ -635,11 +635,11 @@ a.jjs-type-name:hover {
      revert to their initial values, because a shorthand containing an invalid
      `var()` is invalid at computed-value time as one declaration. Here that
      silently deleted this card's border everywhere (`border-style: none`), and
-     the one place a border-style was stated separately — `.jjs-card-add`'s
+     the one place a border-style was stated separately — `.ca-jjs-card-add`'s
      `dashed` — got the 3px `currentColor` rope, because it was the only survivor
      of the three.
 
-     Whether `--am-border-inner` fails on this reader's setup because `color-mix`
+     Whether `--ca-border-inner` fails on this reader's setup because `color-mix`
      is unsupported or because their theme writes `--background-modifier-border`
      as something the mix rejects, we cannot tell from a screenshot and do not
      need to: **the failure mode is what is unacceptable.** In longhands a colour
@@ -650,10 +650,10 @@ a.jjs-type-name:hover {
      survives being wrong about the diagnosis. */
   border-width: 1px;
   border-style: solid;
-  border-color: var(--am-border-inner);
-  border-radius: var(--am-radius-md);
+  border-color: var(--ca-border-inner);
+  border-radius: var(--ca-radius-md);
   overflow: hidden;
-  /* THE LIST'S BREATHING ROOM, WHICH USED TO BE `.jjs-card-body`'s BOTTOM
+  /* THE LIST'S BREATHING ROOM, WHICH USED TO BE `.ca-jjs-card-body`'s BOTTOM
      PADDING and could not stay there (4.38.2) — inside a scroller it was a 10px
      window onto row five. Here it is what it always meant: space between the last
      row and the card's edge. The head is unaffected; it is the first child and
@@ -665,7 +665,7 @@ a.jjs-type-name:hover {
  * The chosen mockup of three. A subject's head is a slim recessed band rather
  * than a line of bold text, so a card reads as a titled object — and the band is
  * not a new idiom, it is what a level-2 `sectionFrame` bar has drawn since 4.13
- * §1: a glyph in a fixed slot and a name at `--am-bar-text` in small caps. What
+ * §1: a glyph in a fixed slot and a name at `--ca-bar-text` in small caps. What
  * this adds is the GROUND and the edge; every type property is already the
  * frame's and is deliberately not restated.
  *
@@ -680,7 +680,7 @@ a.jjs-type-name:hover {
  *
  * The hue is the same `color-mix` the level cards' heads take, into the same base,
  * so the two card families are one material at one strength. `--jjc-hue` is set on
- * `.jjs-type` by `buildType` — per TYPE, because every card in one of those groups
+ * `.ca-jjs-type` by `buildType` — per TYPE, because every card in one of those groups
  * belongs to one journal and a card reading the hue from an ancestor cannot
  * disagree with its siblings. On a homepage listing four journals that is four
  * tints down the page, and that is the point rather than the cost: the colour is
@@ -689,7 +689,7 @@ a.jjs-type-name:hover {
  * FULL BLEED BY THE CARD'S OWN OVERFLOW. The head is the card's first child and
  * the card clips to its radius, so the band meets three edges with no negative
  * margins — the manoeuvre every other band in this project has to make by hand. */
-.jjs-card > .journal-sec {
+.ca-jjs-card > .ca-journal-sec {
   margin: 0;
   padding: 6px 12px;
   background: color-mix(
@@ -700,16 +700,16 @@ a.jjs-type-name:hover {
   border-bottom: 1px solid var(--background-modifier-border);
 }
 /* THE NAME READS THE BAR'S VOICE, WHICH IS THE WHOLE OF VARIANT B. The slot is
-   `.journal-header-title` and already carries the size, the caps and the
+   `.ca-journal-header-title` and already carries the size, the caps and the
    tracking; this link sat inside it overriding the INK to `--text-normal` and
    the weight to 600, which is what made a subject read as bold text in a bar
    rather than as the bar's own title. It takes the token now. */
-.jjs-group-name {
+.ca-jjs-group-name {
   font-weight: 600;
-  color: var(--am-bar-ink);
+  color: var(--ca-bar-ink);
   text-decoration: none;
 }
-a.jjs-group-name:hover {
+a.ca-jjs-group-name:hover {
   color: var(--text-normal);
   text-decoration: none;
 }
@@ -743,11 +743,11 @@ a.jjs-group-name:hover {
  * cards, so the row ended in a stub with a notch of ground under it. That is the
  * defect this paragraph was written about, arriving from the other direction.
  *
- * `.jld-grid` KEEPS `start` AND IS NOT THE SAME CASE, which is why this is not a
+ * `.ca-jld-grid` KEEPS `start` AND IS NOT THE SAME CASE, which is why this is not a
  * shared edit: its tile spans the full row and sits alone on it, so there is
  * nothing beside it to match and stretching would make it as tall as a card pair.
  *
- * THE ROW HEIGHT IS STATED, NOT DERIVED, and `.cal-week`'s note is the precedent
+ * THE ROW HEIGHT IS STATED, NOT DERIVED, and `.ca-cal-week`'s note is the precedent
  * and the warning: a box whose height comes from its content cannot be counted,
  * and four lines of a font this sheet does not control is not a number. `rem`
  * for the same reason that note gives — it must not resolve against a font size
@@ -756,8 +756,8 @@ a.jjs-group-name:hover {
  * THE ARITHMETIC IS WRITTEN OUT so the four is visible: four rows, the three
  * hairlines between them, and the body's own vertical padding. `border-box` is
  * stated because Obsidian sets it per component rather than globally, which is
- * the same trap `.jjh-stat` records. */
-.jjs-card-body {
+ * the same trap `.ca-jjh-stat` records. */
+.ca-jjs-card-body {
   --jjs-row-h: 1.75rem;
   --jjs-rows: 4;
   display: flex;
@@ -786,7 +786,7 @@ a.jjs-group-name:hover {
   );
   overflow-y: auto;
 }
-.jjs-card-row {
+.ca-jjs-card-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   /* Centred rather than baseline-aligned, because the row is now a box of a
@@ -800,26 +800,26 @@ a.jjs-group-name:hover {
      all for would never happen. */
   height: var(--jjs-row-h);
   flex: 0 0 auto;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
 }
-.jjs-card-row + .jjs-card-row {
+.ca-jjs-card-row + .ca-jjs-card-row {
   border-top: 1px solid var(--background-modifier-border);
 }
-.jjs-card-when,
-.jjs-card-open {
-  font-size: var(--am-text-xs);
+.ca-jjs-card-when,
+.ca-jjs-card-open {
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 /* A right-aligned minimum, so a column of "1 ◻" and "—" shares an edge rather
    than ragging against the card's padding. */
-.jjs-card-open {
+.ca-jjs-card-open {
   min-width: 2.4em;
   text-align: right;
 }
 /* Nothing open recedes; it is the answer a reader scans past. */
-.jjs-card-open.is-zero {
+.ca-jjs-card-open.is-zero {
   color: var(--text-faint);
 }
 /* `.jjs-card-more` AND ITS LINK STOOD HERE AND ARE DELETED (4.13.4). They dressed
@@ -831,7 +831,7 @@ a.jjs-group-name:hover {
    own row past that height and the four-line count would stop being true. The
    first track is already `minmax(0, 1fr)`, which is what lets a grid item shrink
    below its content at all — the two halves only work together. */
-.jjs-card-row .jjs-row-link {
+.ca-jjs-card-row .ca-jjs-row-link {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -839,8 +839,8 @@ a.jjs-group-name:hover {
 }
 /* A folder with no index note — created by hand, or its index deleted. Shown,
    but plainly not a link. */
-.jjs-group-name.is-orphan,
-.jjs-row-link.is-orphan {
+.ca-jjs-group-name.is-orphan,
+.ca-jjs-row-link.is-orphan {
   color: var(--text-muted);
   font-style: italic;
 }
@@ -851,27 +851,27 @@ a.jjs-group-name:hover {
 
 /* ── A topic row is a TABLE row now (4.13.2 §2) ─────────────────────────
  *
- * What stood here dressed `.jjs-row` / `.jjs-row-name`: a flex line with an
+ * What stood here dressed `.ca-jjs-row` / `.jjs-row-name`: a flex line with an
  * emoji, a link, and a hairline above it. A subject's topics are drawn through
  * `recordList` (ui/tables.ts) instead, so the columns, the heading strip, the
- * tabular figures and the 460px collapse are `.almanac-list`'s in
+ * tabular figures and the 460px collapse are `.ca-list`'s in
  * 94-native-tables.css and there is nothing for this section to say.
  *
- * `.jjs-row` ITSELF IS NOT DELETED, AND THAT IS THE TRAP THIS FILE SETS.
+ * `.ca-jjs-row` ITSELF IS NOT DELETED, AND THAT IS THE TRAP THIS FILE SETS.
  * `journal-search.ts::resultRow` builds the same class for a search hit, styled
  * in 40-journal-views.css — two objects that were never related sharing a name.
  * Only the two rules that were about a TOPIC go: `.jjs-row-name`, which nothing
  * builds now, and the row's own box.
  *
- * `.jjs-row-link` STAYS, because the link inside the table row keeps it — the
+ * `.ca-jjs-row-link` STAYS, because the link inside the table row keeps it — the
  * title slot is where `folderLink` draws, and a topic is opened exactly as it
  * was. Its `.is-orphan` twin is a few lines up, with the group's. */
-.jjs-row-link {
+.ca-jjs-row-link {
   font-weight: 500;
   color: var(--text-normal);
   text-decoration: none;
 }
-a.jjs-row-link:hover {
+a.ca-jjs-row-link:hover {
   color: var(--interactive-accent);
   text-decoration: none;
 }
@@ -881,7 +881,7 @@ a.jjs-row-link:hover {
    introduce. */
 
 /* ── Shared bits ──────────────────────────────────────────────────────── */
-.jjs-emoji {
+.ca-jjs-emoji {
   flex: 0 0 auto;
   line-height: 1;
 }
@@ -890,7 +890,7 @@ a.jjs-row-link:hover {
    since the section moved onto `sectionFrame`, whose `note:` slot took the job
    — and §2 has now taken the counts off both bars, so neither spelling of the
    idea has a caller. */
-.jjs-actions {
+.ca-jjs-actions {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -900,37 +900,37 @@ a.jjs-row-link:hover {
    carries two louder button groups (the hero's Refresh, each type's `+ Subject`
    pair), so they stay small — the same size the level-2 header bar's pills
    were.
-   `.jjs-row` LEFT THIS SELECTOR IN 4.13.2 §2. It was kept "despite carrying no
+   `.ca-jjs-row` LEFT THIS SELECTOR IN 4.13.2 §2. It was kept "despite carrying no
    buttons since 2.51" on the grounds that a hand-written directive could still
    put one there and the row was where it would land. There is no topic row any
-   more; the only `.jjs-row` left is a journal-search result, which is built from
+   more; the only `.ca-jjs-row` left is a journal-search result, which is built from
    an index and cannot receive a directive's button at all. */
 /* Sized off the section's level rather than off which file drew it. A level-2
    section's buttons were already the smaller pair in the block-owning bars
-   (see `.journal-sec-l2 .journal-header-widgets .journal-btn`); a subject group
+   (see `.ca-journal-sec-l2 .ca-journal-header-widgets .ca-journal-btn`); a subject group
    is a level-2 section, so it gets the same treatment by being one rather than
    by a rule that names it. */
-.journal-sec-l2 .jjs-actions .journal-btn {
-  font-size: var(--am-text-2xs);
-  padding: var(--am-space-1) var(--am-space-5);
+.ca-journal-sec-l2 .ca-jjs-actions .ca-journal-btn {
+  font-size: var(--ca-text-2xs);
+  padding: var(--ca-space-1) var(--ca-space-5);
   gap: 4px;
 }
-.journal-sec-l1 .jjs-actions .journal-btn {
-  font-size: var(--am-text-xs);
-  padding: var(--am-space-2) var(--am-space-6);
+.ca-journal-sec-l1 .ca-jjs-actions .ca-journal-btn {
+  font-size: var(--ca-text-xs);
+  padding: var(--ca-space-2) var(--ca-space-6);
 }
 
 /* The fold chevron on a section that owns its own children. Same glyph and
    rotation as the header bars' and the hero title's, so every fold in the note
    behaves and looks alike — which used to be a promise four selectors kept by
    agreeing with each other, and is now one selector on the frame. */
-.jjs-toggle {
+.ca-jjs-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   /* Sized and placed like the other two header-bar toggles (4.13 §1b): the bar's
      own scale rather than the note's, and the right-hand end via `margin-left`. */
-  font-size: var(--am-bar-glyph);
+  font-size: var(--ca-bar-glyph);
   width: 1.4em;
   height: 1.4em;
   flex: 0 0 auto;
@@ -938,14 +938,14 @@ a.jjs-row-link:hover {
   color: var(--text-muted);
   transition: transform 0.15s ease, color 0.15s ease;
 }
-.jjs-toggle svg {
+.ca-jjs-toggle svg {
   width: 1.1em;
   height: 1.1em;
 }
-.journal-sec.is-foldable {
+.ca-journal-sec.is-foldable {
   cursor: pointer;
 }
-.journal-sec.is-foldable:hover .jjs-toggle {
+.ca-journal-sec.is-foldable:hover .ca-jjs-toggle {
   color: var(--text-normal);
 }
 /* Down means closed, up means open — the idiom every header bar in the plugin
@@ -954,7 +954,7 @@ a.jjs-row-link:hover {
    ONE SELECTOR SINCE 4.13.3, where there were two: a subject's `.jjs-group` had
    a chevron of its own until it became a card, and a card has no stack under it
    to close. The type's is the only fold this file draws now. */
-.jjs-type:not(.is-collapsed) .jjs-toggle {
+.ca-jjs-type:not(.is-collapsed) .ca-jjs-toggle {
   transform: rotate(180deg);
 }
 
@@ -963,66 +963,66 @@ a.jjs-row-link:hover {
    block inside a populated card, and a hand-rolled box at 1px for the bare card,
    on the argument that a bordered box nested in a bordered card is stacking. The
    argument held and the second rule was the exception that broke it — a box at 1px
-   where every card in the plugin draws `--am-rule`, invented here because the
-   shared box had been withheld. There is one info card now and `.jjs-empty` is
+   where every card in the plugin draws `--ca-rule`, invented here because the
+   shared box had been withheld. There is one info card now and `.ca-jjs-empty` is
    one, so both rules are gone and this file styles only what is INSIDE it.
-   `.jjs-empty-row` is untouched: it is a row of a list, not a card. */
-.jjs-empty-title {
+   `.ca-jjs-empty-row` is untouched: it is a row of a list, not a card. */
+.ca-jjs-empty-title {
   font-weight: 700;
   color: var(--interactive-accent);
   margin-bottom: 3px;
 }
-.jjs-empty-body {
-  font-size: var(--am-text-sm);
+.ca-jjs-empty-body {
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
 }
-.jjs-empty-row {
+.ca-jjs-empty-row {
   padding: 5px 0 6px 8px;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   color: var(--text-faint);
   border-top: 1px solid var(--background-modifier-border);
 }
 
 /* ── One card per journal, as a grid (4.2 §1) ─────────────────────────────
  *
- * THE `journals:cards` ARRANGEMENT, beside `.journals-card`'s one-card-for-
+ * THE `journals:cards` ARRANGEMENT, beside `.ca-journals-card`'s one-card-for-
  * everything. Two presentations of one idea, which is why they share a
  * directive and not a class prefix: `jjs-` is the section, `jjc-` is the grid.
  *
  * NOT IN `is-unframed`'s RESET LIST, and that is deliberate rather than an
- * omission — 4.1.2 added `.journals-card` to that list and the next person to
+ * omission — 4.1.2 added `.ca-journals-card` to that list and the next person to
  * read it will wonder why this is missing. The list is for a card a widget
  * draws as its own FRAME, which the block's frame should replace. Here the
  * cards ARE the content: a grid with its cards flattened is a list, not an
  * unframed grid. `frame: none` on this fence should strip the block's chrome
  * and leave every card standing. */
-.jjc-grid {
+.ca-jjc-grid {
   display: grid;
   /* Two columns when there is room, one when there is not. `auto-fill` with a
      min track rather than a media query, so the grid answers to the WIDGET's
      width — which under `container-type: inline-size` is the pane, the canvas
      node or the tile, not the window. */
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: var(--am-widget-gap);
+  gap: var(--ca-widget-gap);
   /* ONE HEIGHT PER ROW (4.38, was `start`). Measured on the render: Study's
      card was 15px taller than Media's beside it, because Study declares a rating
      and its fourth cell's label wrapped to a second line while Media's did not.
      `start` let each card end where its content did, so a difference in one
      label's length became a ragged row of cards.
      `stretch` is safe here in a way it would not be on an arbitrary grid because
-     `.jjc-card` is a column flexbox whose banner and head are fixed and whose
+     `.ca-jjc-card` is a column flexbox whose banner and head are fixed and whose
      body takes the slack — so a stretched card grows in its body, which is empty
      space, rather than stretching its content. */
   align-items: stretch;
 }
-.jjc-grid.is-empty {
+.ca-jjc-grid.is-empty {
   display: block;
 }
 
-.jjc-card {
+.ca-jjc-card {
   /* A QUERY CONTAINER AS OF 4.37, so the stat strip in its body collapses
      against the CARD rather than against the pane. That is 4.36.3's fix on
-     `.jld-card` — itself 4.3.1's lesson one level down — applied to the family
+     `.ca-jld-card` — itself 4.3.1's lesson one level down — applied to the family
      with the identical problem: a card in a 240px track would otherwise hold
      four cells at ~54px each, because `96-stat-strip.css` measures the nearest
      container and the nearest one was the whole section. */
@@ -1030,11 +1030,11 @@ a.jjs-row-link:hover {
   display: flex;
   flex-direction: column;
   background: var(--background-secondary);
-  /* 1px, matching `.journals-card` forty lines up and every other card in this
-     file. `--am-rule` is 2px and is for a RULE — a divider between bands —
+  /* 1px, matching `.ca-journals-card` forty lines up and every other card in this
+     file. `--ca-rule` is 2px and is for a RULE — a divider between bands —
      which is a different job from a card's outline. */
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   /* The banner's corners are the card's corners. Clipping here rather than
      rounding the banner separately keeps the two from disagreeing when the
      radius token changes. */
@@ -1051,29 +1051,29 @@ a.jjs-row-link:hover {
  * `:active` RATHER THAN A SECOND CLASS FOR THE GRABBING STATE. `is-dragging`
  * lands a frame after the pointer goes down, which is exactly long enough for a
  * reader to notice the cursor did not change when they pressed. */
-.jjc-card[draggable="true"] {
+.ca-jjc-card[draggable="true"] {
   cursor: grab;
 }
-.jjc-card[draggable="true"]:active {
+.ca-jjc-card[draggable="true"]:active {
   cursor: grabbing;
 }
 /* THE CARD BEING CARRIED FADES; the one that would receive it takes an edge.
  * Two different signals for two different roles, which is what stops a grid
  * mid-drag reading as two selected cards.
  *
- * AN INSET SHADOW, NOT A BORDER: `.jjc-card` has `overflow: hidden` and a 1px
+ * AN INSET SHADOW, NOT A BORDER: `.ca-jjc-card` has `overflow: hidden` and a 1px
  * border already, and swapping the border's colour would shift nothing while a
  * second one inside it would move the banner by a pixel as it appeared. The
  * template list's drop target is the same declaration for the same reason. */
-.jjc-card.is-dragging {
+.ca-jjc-card.is-dragging {
   opacity: 0.45;
 }
-.jjc-card.is-drop-target {
+.ca-jjc-card.is-drop-target {
   box-shadow: inset 0 0 0 2px var(--interactive-accent);
 }
 
 /* ── The banner ───────────────────────────────────────────────────────── */
-.jjc-banner {
+.ca-jjc-banner {
   position: relative;
   /* A FIXED HEIGHT, so every card in a row is one height. An aspect-ratio
      would make the banner taller on a wider column and leave the titles in a
@@ -1098,10 +1098,10 @@ a.jjs-row-link:hover {
 /* An image supplies its own ground, so the gradient must not sit on top of it.
    `background-image` is set inline by the builder; this cancels the wash the
    base rule would otherwise composite underneath. */
-.jjc-banner.has-image {
+.ca-jjc-banner.has-image {
   background-color: var(--background-modifier-border);
 }
-.jjc-glyph {
+.ca-jjc-glyph {
   font-size: 2.4em;
   line-height: 1;
   /* The glyph is decoration over a wash that already carries the identity, so
@@ -1112,7 +1112,7 @@ a.jjs-row-link:hover {
 
 /* The overflow control. On the banner, as in the reference, which is why it
    needs its own ground: it sits over an arbitrary image. */
-.jjc-menu {
+.ca-jjc-menu {
   position: absolute;
   top: 8px;
   right: 8px;
@@ -1128,37 +1128,37 @@ a.jjs-row-link:hover {
   opacity: 0.9;
   transition: opacity 120ms ease, background 120ms ease;
 }
-.jjc-menu:hover {
+.ca-jjc-menu:hover {
   opacity: 1;
   background: rgba(0, 0, 0, 0.55);
 }
 
 /* ── The body ─────────────────────────────────────────────────────────── */
-.jjc-body {
+.ca-jjc-body {
   padding: 10px 12px 8px;
   /* TAKES THE SLACK, and what the slack is for changed in 4.38 while the
      declaration did not. It was here so the action row sat on the card's bottom edge
      whatever the title wrapped to; the row is gone, and this is now what makes
-     `.jjc-grid`'s `align-items: stretch` safe — a card stretched to its row's height
+     `.ca-jjc-grid`'s `align-items: stretch` safe — a card stretched to its row's height
      grows HERE, in empty space under the strip, rather than stretching its banner or
      its head. Load-bearing for the second reason as much as it was for the first. */
   flex: 1 1 auto;
 }
-.jjc-title {
+.ca-jjc-title {
   /* `--text-accent`, NOT `--interactive-accent` (4.38). Both are purple; they
      are not the same purple and they do not mean the same thing. Measured off the
      render: `--interactive-accent` is `#8a5cf5`, the fill of a primary BUTTON and
      of a selected day; `--text-accent` is `#a68af9`, what Obsidian itself paints
      an internal link. This title IS an internal link — it opens the journal's
      folder note — and the plugin's own precedent for that exact gesture is
-     `.jsh-crumbs a.jn-pill` in `30-header-bars.css`, the breadcrumb that opens a
+     `.ca-jsh-crumbs a.ca-jn-pill` in `30-header-bars.css`, the breadcrumb that opens a
      container's folder note, which is `--text-accent`. So the card was the one
      place a link to a folder note was pitched as a control.
 
      WHAT IS NOT CLAIMED HERE, because the first draft of this comment claimed it
      and it was false: the journals-SECTION titles do not agree with this. Sampled
-     and then read: `.jjs-group-name` is `--am-bar-ink` (i.e. `--text-muted`) and
-     `.jjs-row-link` is `--text-normal`. Three link treatments across two card
+     and then read: `.ca-jjs-group-name` is `--ca-bar-ink` (i.e. `--text-muted`) and
+     `.ca-jjs-row-link` is `--text-normal`. Three link treatments across two card
      families is a real inconsistency and it is a separate question from which
      purple this one is. */
   color: var(--text-accent);
@@ -1171,7 +1171,7 @@ a.jjs-row-link:hover {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.jjc-title:hover {
+.ca-jjc-title:hover {
   text-decoration: underline;
 }
 /* `.jjc-sub` STOOD HERE AND IS DELETED (4.37) along with `countLabel`, the
@@ -1181,35 +1181,35 @@ a.jjs-row-link:hover {
 
 /* The strip under the title (4.37).
  *
- * QUIETER THAN A STRIP ON A PAGE, and these are `.jld-card-body`'s overrides said
+ * QUIETER THAN A STRIP ON A PAGE, and these are `.ca-jld-card-body`'s overrides said
  * again for the same reason rather than shared by class: a card's numbers are the
  * subtitle of a name, not the section itself, so the values step down and the
  * cells give up their padding and their dividers. The two card families are built
- * by two widgets with two different bodies — the argument at `.jld-card` in full —
+ * by two widgets with two different bodies — the argument at `.ca-jld-card` in full —
  * and a shared class would carry the union of both.
  *
- * THE DIVIDERS COME OFF FOR THE SHARPER REASON HERE. `.am-stats` divides cells by
+ * THE DIVIDERS COME OFF FOR THE SHARPER REASON HERE. `.ca-stats` divides cells by
  * showing a border-coloured ground through its gaps, and this card's ground is
  * `--background-secondary` under a saturated hue banner. Four hairline-boxed cells
  * directly beneath that banner is a table bolted to a photograph. */
-.jjc-stats {
+.ca-jjc-stats {
   margin-top: 6px;
 }
-.jjc-stats .am-stats {
+.ca-jjc-stats .ca-stats {
   gap: 6px 12px;
   background: transparent;
 }
-.jjc-stats .am-stat {
+.ca-jjc-stats .ca-stat {
   background: transparent;
   padding: 2px 0;
 }
-.jjc-stats .am-stat-value {
-  font-size: var(--am-text-lg);
+.ca-jjc-stats .ca-stat-value {
+  font-size: var(--ca-text-lg);
 }
 /* No caller passes a sub-line, and the 1.2em it reserves against a late async
    fill is dead space under every number on four cards. The one cell that fills
    late — open tasks — fills in PLACE. */
-.jjc-stats .am-stat-sub {
+.ca-jjc-stats .ca-stat-sub {
   display: none;
 }
 
@@ -1221,17 +1221,17 @@ a.jjs-row-link:hover {
  * exact deletion on the level cards; the row survived here only because the two card
  * families are built by two widgets. See `journals-cards.ts`.
  *
- * `.jjc-body`'s `flex: 1 1 auto` OUTLIVES IT and its comment has been rewritten
+ * `.ca-jjc-body`'s `flex: 1 1 auto` OUTLIVES IT and its comment has been rewritten
  * rather than left standing: it existed so the action row sat on the card's bottom
  * edge whatever the title wrapped to, and it is now what lets a stretched card grow
- * in its body — which is `.jjc-grid`'s `align-items: stretch`. Same declaration,
+ * in its body — which is `.ca-jjc-grid`'s `align-items: stretch`. Same declaration,
  * different job, and it is load-bearing for the new one. */
 
 /* ── The page title card (4.5 §4) ──────────────────────────────────────
  *
  * The page's own name, large, with the control that acts on the page. It is a
  * title and a control — NOT a band: the reference design's masthead carries
- * stat tiles, Almanac's stat strip is a different object with a different job,
+ * stat tiles, ChronoAnvil's stat strip is a different object with a different job,
  * and putting numbers here would be a release with an argument about which
  * numbers.
  *
@@ -1243,7 +1243,7 @@ a.jjs-row-link:hover {
  * as a heading somebody forgot to finish. It is a CARD, so it is drawn as one.
  *
  * THE SAME SURFACE EVERY OTHER CARD TAKES — `--background-secondary`, one
- * hairline, `--am-radius-md` — from 91-card-surface.css's list rather than a
+ * hairline, `--ca-radius-md` — from 91-card-surface.css's list rather than a
  * fourth opinion about what a card looks like. */
 /* ── AND IN 4.10 IT STOPPED BEING THE SAME SURFACE ─────────────────────
  *
@@ -1266,7 +1266,7 @@ a.jjs-row-link:hover {
  * whatever ancestor is positioned — which in Live Preview is the code-block
  * widget and in reading view is the note's sizer. That is the same fault 4.7.0
  * shipped with the grip, from the same cause.  */
-.jtc-card {
+.ca-jtc-card {
   position: relative;
   overflow: hidden;
   /* MINIMAL, WHICH WAS THE BRIEF. 14px/16px was a card holding one line; this
@@ -1274,10 +1274,10 @@ a.jjs-row-link:hover {
      one-row card, which is the only way a second row pays for itself. */
   padding: 11px 15px 9px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   background: var(--background-secondary);
 }
-.jtc-row {
+.ca-jtc-row {
   position: relative;
   display: flex;
   align-items: flex-start;
@@ -1291,16 +1291,16 @@ a.jjs-row-link:hover {
  * make the head two stacked things; the figure already separates them, and the
  * whole point of the object is that it is ONE thing that happens to say two.
  *
- * AND THESE ARE NOT `.jn-pill`. The pill row is the plugin's navigation chrome
+ * AND THESE ARE NOT `.ca-jn-pill`. The pill row is the plugin's navigation chrome
  * everywhere else and it is right there — but a pill row inside this card would
  * make the head read as one more card with one more pill row in it, which is
  * exactly what the ground and the face are spent on preventing. They take the
- * caps voice instead: the same `--am-caps-*` every key label in the plugin uses,
+ * caps voice instead: the same `--ca-caps-*` every key label in the plugin uses,
  * at the size the block head and the group foot use.
  *
  * The cost, and it is real: an entry's `links:` row and this do not match, and
  * will not until entries are brought along. Written down rather than discovered. */
-.jtc-nav {
+.ca-jtc-nav {
   position: relative;
   display: flex;
   align-items: center;
@@ -1310,32 +1310,32 @@ a.jjs-row-link:hover {
      its glyph in from the title's first letter by exactly that much. */
   margin-left: -7px;
 }
-.jtc-link {
+.ca-jtc-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 3px 7px;
-  border-radius: var(--am-radius-sm);
-  font-size: var(--am-text-2xs);
-  font-weight: var(--am-caps-weight);
-  letter-spacing: var(--am-caps-tracking);
+  border-radius: var(--ca-radius-sm);
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
   text-transform: uppercase;
   color: var(--text-faint) !important;
   text-decoration: none !important;
   white-space: nowrap;
   transition: color 0.15s, background 0.15s;
 }
-.jtc-link:hover {
+.ca-jtc-link:hover {
   color: var(--text-normal) !important;
   background: var(--background-modifier-hover);
 }
-.jtc-link-icon {
+.ca-jtc-link-icon {
   display: inline-flex;
   width: 0.95em;
   height: 0.95em;
   flex-shrink: 0;
 }
-.jtc-link-icon svg {
+.ca-jtc-link-icon svg {
   width: 100%;
   height: 100%;
 }
@@ -1344,11 +1344,11 @@ a.jjs-row-link:hover {
    is a position you can read at a glance, where a row whose contents change is
    a menu you have to read every time. It is not a link and does not offer a
    hover state, because there is nowhere for it to go. */
-.jtc-link.is-here {
+.ca-jtc-link.is-here {
   color: var(--interactive-accent) !important;
   cursor: default;
 }
-.jtc-link.is-here:hover {
+.ca-jtc-link.is-here:hover {
   background: none;
 }
 
@@ -1357,37 +1357,37 @@ a.jjs-row-link:hover {
  * ⋯ is not beside one: "a control next to it would be a control one slip away
  * from renaming the note." `justify-content: space-between` above is what puts
  * the whole width between them. */
-.jtc-cog {
+.ca-jtc-cog {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 4px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   color: var(--text-muted);
   cursor: pointer;
   flex: none;
 }
-.jtc-cog:hover {
+.ca-jtc-cog:hover {
   color: var(--text-normal);
   background: var(--background-modifier-hover);
 }
 
-.jtc-titlerow {
+.ca-jtc-titlerow {
   min-width: 0;
   flex: 1 1 auto;
 }
-.jtc-title {
+.ca-jtc-title {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   cursor: text;
   max-width: 100%;
 }
-.jtc-title-text {
+.ca-jtc-title-text {
   /* THE FACE IS THE HEAD'S, AND IT IS THE ONLY ONE IN THE PLUGIN. See
-     `--am-head-face`: the UI is one sans everywhere else on purpose, and this is
+     `--ca-head-face`: the UI is one sans everywhere else on purpose, and this is
      the one object that is about the page rather than about something on it.
-     A book face is an almanac's own register.
+     A book face is a chronoanvil's own register.
 
      ── AND IT CAME DOWN FROM 2.4em, WHICH IS A TRADE AND NOT A TIDY-UP ──
 
@@ -1405,7 +1405,7 @@ a.jjs-row-link:hover {
      IF THE HEAD READS WEAK ON A REAL PAGE, THIS IS THE FIRST THING TO PUT BACK,
      and the number to put back is 2.4em. That is the whole of the risk in this
      trade and it is worth one sentence rather than being rediscovered. */
-  font-family: var(--am-head-face);
+  font-family: var(--ca-head-face);
   font-size: 2.05em;
   font-weight: 600;
   line-height: 1.06;
@@ -1417,32 +1417,32 @@ a.jjs-row-link:hover {
 /* The pencil appears on hover only. A page title with a permanent edit glyph
    reads as a form field; one that offers itself when the pointer arrives reads
    as a title you can also change — which is what it is. */
-.jtc-title-edit {
+.ca-jtc-title-edit {
   display: inline-flex;
   color: var(--text-faint);
   opacity: 0;
   transition: opacity 120ms ease;
 }
-.jtc-title:hover .jtc-title-edit {
+.ca-jtc-title:hover .ca-jtc-title-edit {
   opacity: 1;
 }
 /* Touch has no hover to reveal it with, so it rests visible-but-quiet instead
-   of at zero — 3.9 §3.3's policy, and the same 0.45 `.jsh-title-edit` takes
+   of at zero — 3.9 §3.3's policy, and the same 0.45 `.ca-jsh-title-edit` takes
    thirty files over. test/hover-reveal.test.ts fails the build for a
    hover-revealed affordance that arrives without one of these, which is how
    this one was caught rather than shipped. */
 @media (hover: none) {
-  .jtc-title-edit {
+  .ca-jtc-title-edit {
     opacity: 0.45;
   }
 }
-.jtc-title-input {
+.ca-jtc-title-input {
   width: 100%;
   /* The same size AND FACE as the text it replaces, or the card jumps as you
      click it. The face is the half that is easy to forget: a serif name
      swapping to a sans input is the same jump as a size change, in a direction
      that reads as the field being a different control. */
-  font-family: var(--am-head-face);
+  font-family: var(--ca-head-face);
   font-size: 2.05em;
   font-weight: 600;
   line-height: 1.06;
@@ -1459,12 +1459,12 @@ a.jjs-row-link:hover {
  * 4.19 made the page's own name and its `links:` row ONE section composed into
  * ONE fence. Obsidian renders a fence as one block, so the container was already
  * right — but the two widgets inside it each draw a card of their own, so left
- * alone the fence renders as `.jtc-card` and `.journal-links-card` stacked, two
+ * alone the fence renders as `.ca-jtc-card` and `.ca-journal-links-card` stacked, two
  * boxes with two borders where the page means one strip.
  *
  * THE MANOEUVRE IS NOT NEW AND IS DELIBERATELY THE SAME ONE. The block takes the
- * box, the children go flat: `.journal-entry-banner > .journal-links-card` in
- * 30-header-bars.css and `.journal-overview-card > .journal-links-card` in
+ * box, the children go flat: `.ca-journal-entry-banner > .ca-journal-links-card` in
+ * 30-header-bars.css and `.ca-journal-overview-card > .ca-journal-links-card` in
  * 93-calendars.css have done exactly this since 3.2, and the comment on the
  * first — *"one fence is one container, so the card is real rather than a
  * resemblance"* — is the whole argument here too.
@@ -1479,15 +1479,15 @@ a.jjs-row-link:hover {
  * `frame: section` and `frame: none`, which take `is-unframed` instead — so a
  * reader who unframes their banner gets two plain widgets and no box, the same
  * answer every other composite gives. */
-.journal-page-banner {
+.ca-journal-page-banner {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   background: var(--background-secondary);
 }
 /* The name card gives up the frame; the block has it now. */
-.journal-page-banner > .jtc-card {
+.ca-journal-page-banner > .ca-jtc-card {
   position: relative;
   border: none;
   border-radius: 0;
@@ -1495,24 +1495,24 @@ a.jjs-row-link:hover {
 }
 /* The pill row, welded under the name.
  *
- * A HAIRLINE INSIDE THE FIGURE RATHER THAN A RULE ACROSS IT. `--am-rule` is 2px
+ * A HAIRLINE INSIDE THE FIGURE RATHER THAN A RULE ACROSS IT. `--ca-rule` is 2px
  * and is what separates two CARDS; this separates two bands of one card, and at
  * full weight it re-drew the seam the figure had just dissolved. Muted with
  * `color-mix` rather than `opacity`, because opacity on a border with a
  * gradient behind it lets the hatch through the line and makes it look broken
  * rather than quiet. */
-.journal-page-banner > .journal-links-card {
+.ca-journal-page-banner > .ca-journal-links-card {
   position: relative;
   margin: 0;
   border: none;
-  border-top: var(--am-rule-hair) solid
+  border-top: var(--ca-rule-hair) solid
     color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
   border-radius: 0;
   background: none;
 }
 /* Band 2 of 2 rather than the whole of a small card, so it breathes to the same
    rhythm the entry banner's row does. */
-.journal-page-banner > .journal-links-card > .journal-links-bar {
+.ca-journal-page-banner > .ca-journal-links-card > .ca-journal-links-bar {
   padding: 7px 8px;
 }
 
@@ -1524,7 +1524,7 @@ a.jjs-row-link:hover {
  *
  * DERIVED FROM THE CARD, NOT DECLARED IN FRONTMATTER, and this is the whole
  * decision. The obvious fix is a second `cssclasses` value beside
- * `almanac-wide` — one line, and it goes stale the moment a reader removes the
+ * `ca-wide` — one line, and it goes stale the moment a reader removes the
  * title block: the class stays, the inline title stays hidden, and the page has
  * no title at all. `:has()` asks the question the note can answer for itself,
  * live: hide Obsidian's title exactly while this card is on the page, and give
@@ -1541,7 +1541,7 @@ a.jjs-row-link:hover {
  *
  * ── AND IT IS THE SLIM BANNER'S TOO, AS OF 4.21.3 ────────────────────
  *
- * This rule shipped in 4.5.1 naming `.jtc-card`, which is the LARGE banner's
+ * This rule shipped in 4.5.1 naming `.ca-jtc-card`, which is the LARGE banner's
  * name card and only ever appears on the eight dashboard-shaped surfaces. So a
  * diary entry and a journal leaf drew Obsidian's inline title AND their own
  * banner's copy of the same name — the exact defect this rule exists to remove,
@@ -1551,23 +1551,23 @@ a.jjs-row-link:hover {
  * had a banner": 4.19's own table lists them as the two that already had the
  * right thing, and what nobody checked was what sat ABOVE it.
  *
- * `.journal-banner-name` IS THE RIGHT ANCHOR AND `.jtc-card` IS NOT A SECOND
+ * `.ca-journal-banner-name` IS THE RIGHT ANCHOR AND `.ca-jtc-card` IS NOT A SECOND
  * ONE. The condition this rule wants is "a block on this page is already drawing
  * the file's name, large, with a rename on it" — which is exactly what that
  * class marks on both slim banners. The large banner's name card carries no such
- * class (its row is `.jtc-titlerow`), so both names stay in the selector; a
+ * class (its row is `.ca-jtc-titlerow`), so both names stay in the selector; a
  * third banner format would join it here rather than being noticed by a render
  * two releases later. */
-.markdown-preview-view:has(.jtc-card) .inline-title,
-.markdown-source-view:has(.jtc-card) .inline-title,
-.markdown-preview-view:has(.journal-banner-name) .inline-title,
-.markdown-source-view:has(.journal-banner-name) .inline-title {
+.markdown-preview-view:has(.ca-jtc-card) .inline-title,
+.markdown-source-view:has(.ca-jtc-card) .inline-title,
+.markdown-preview-view:has(.ca-journal-banner-name) .inline-title,
+.markdown-source-view:has(.ca-journal-banner-name) .inline-title {
   display: none;
 }
 
 /* AND IT STEPS DOWN IN A NARROW BLOCK. A page title on a page is a name; in a
    sidebar it is four words wrapped across three lines. The query is on the
-   BLOCK — `.journal-widget-block` is the container — so it answers to the pane
+   BLOCK — `.ca-journal-widget-block` is the container — so it answers to the pane
    the card is in rather than to the window, which is the rule every other
    collapse in this stylesheet follows.
 
@@ -1575,37 +1575,37 @@ a.jjs-row-link:hover {
    one line and there is nothing to gain by letting them take two — a head whose
    height depends on the pane is a page that reflows as you drag a split. */
 @container (max-width: 460px) {
-  .jtc-title-text,
-  .jtc-title-input {
+  .ca-jtc-title-text,
+  .ca-jtc-title-input {
     font-size: 1.7em;
   }
 }
 
 /* ── `level-cards`: a container and what is inside it, as a pair (4.36) ──
  *
- * THE GRID IS `.jjs-grid`'s SHAPE AND ITS ARGUMENT, one release on and one
+ * THE GRID IS `.ca-jjs-grid`'s SHAPE AND ITS ARGUMENT, one release on and one
  * widget over: `auto-fill` with a min track rather than a media query, so the
  * column count answers to the WIDGET's width — the pane, the canvas node or the
  * row cell, all of which are `container-type: inline-size` — rather than to the
  * window's. A breakpoint on the block cannot describe a cell, which is what
  * 4.3.1 spent a release establishing.
  *
- * WHY NOT JUST REUSE `.jjs-grid`. Its track is 260px, sized for a card holding a
+ * WHY NOT JUST REUSE `.ca-jjs-grid`. Its track is 260px, sized for a card holding a
  * name and two figures on one line. Half the cells here are a PAIR that wants
  * twice that, and the other half are singles; one class would have to be both.
- * So the grid is its own and the CARD is what is shared — see `.jld-card`
- * below, which is `.jjs-card`'s rule and says so. */
-.jld-grid {
+ * So the grid is its own and the CARD is what is shared — see `.ca-jld-card`
+ * below, which is `.ca-jjs-card`'s rule and says so. */
+.ca-jld-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--am-widget-gap);
+  gap: var(--ca-widget-gap);
   align-items: start;
   padding: 4px 0 2px;
 }
 /* The empty state is a callout and the tile that answers it, and a callout is
    not a card — one column, so the two stack instead of the sentence taking a
    260px track with the control alongside it. */
-.jld-grid.is-empty {
+.ca-jld-grid.is-empty {
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -1632,23 +1632,23 @@ a.jjs-row-link:hover {
  * two panes of one box are the same height by definition, which is the same
  * reason `align-items: start` was right when they were two boxes and wrong now.
  */
-.jld-pair {
+.ca-jld-pair {
   grid-column: span 2;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0;
   align-items: stretch;
   background: var(--background-primary-alt);
-  /* LONGHANDS, for the fault `.jjs-card` records in full: a `var()` that does
+  /* LONGHANDS, for the fault `.ca-jjs-card` records in full: a `var()` that does
      not resolve invalidates the whole shorthand, so a colour that fails takes
      the width and the STYLE with it and the border vanishes. */
   border-width: 1px;
   border-style: solid;
-  border-color: var(--am-border-inner);
-  border-radius: var(--am-radius-md);
+  border-color: var(--ca-border-inner);
+  border-radius: var(--ca-radius-md);
   overflow: hidden;
 }
-.jld-pair > .jld-card {
+.ca-jld-pair > .ca-jld-card {
   border: none;
   border-radius: 0;
 }
@@ -1657,23 +1657,23 @@ a.jjs-row-link:hover {
    pane — see `containerHead` — and this single declaration is the whole layout
    cost, because the pair was already a grid. Under 560px the template drops to one
    track and `1 / -1` follows it. */
-.jld-pair > .journal-sec {
+.ca-jld-pair > .ca-journal-sec {
   grid-column: 1 / -1;
 }
 /* THE DIVIDER, and the only edge inside the box. Inline-end while the panes are
    side by side.
 
-   `.jld-container` AND NOT `:first-child` (4.38). The head is the pair's first
+   `.ca-jld-container` AND NOT `:first-child` (4.38). The head is the pair's first
    child now, so `:first-child` stopped matching the left pane and the divider
    vanished — and `:first-of-type` would have been worse than broken, because
    every one of these boxes is a `div` and it would have matched the head. The
    left pane has carried a name for what it is since 4.36; asking for it by that
    name is what makes the rule independent of the DOM's order. */
-.jld-pair > .jld-container {
-  /* Longhands — see `.jjs-card`. */
+.ca-jld-pair > .ca-jld-container {
+  /* Longhands — see `.ca-jjs-card`. */
   border-inline-end-width: 1px;
   border-inline-end-style: solid;
-  border-inline-end-color: var(--am-border-inner);
+  border-inline-end-color: var(--ca-border-inner);
 }
 
 /* AND UNDER THE WIDTH TWO CARDS FIT IN, THE PAIR STACKS. 560px is two 260px
@@ -1686,30 +1686,30 @@ a.jjs-row-link:hover {
    is a line down the left of the lower one, which is worse than no line at all
    — so the edge moves rather than the arrangement being left to imply itself. */
 @container (max-width: 560px) {
-  .jld-pair {
+  .ca-jld-pair {
     grid-template-columns: 1fr;
   }
-  .jld-pair > .jld-container {
+  .ca-jld-pair > .ca-jld-container {
     border-inline-end: none;
-    /* Longhands — see `.jjs-card`. */
+    /* Longhands — see `.ca-jjs-card`. */
     border-block-end-width: 1px;
     border-block-end-style: solid;
-    border-block-end-color: var(--am-border-inner);
+    border-block-end-color: var(--ca-border-inner);
   }
 }
 
-/* THE CARD IS `.jjs-card`'s RULE, SAID ONCE MORE RATHER THAN SHARED BY CLASS.
+/* THE CARD IS `.ca-jjs-card`'s RULE, SAID ONCE MORE RATHER THAN SHARED BY CLASS.
  *
  * The two are the same object — a quiet box on the page's alt ground, inside the
  * section card, with a banded head clipped by its own radius — and 4.13.3's
- * argument for that shape is at `.jjs-card` in full. What stops them being one
+ * argument for that shape is at `.ca-jjs-card` in full. What stops them being one
  * selector is that they are built by two widgets with two different bodies: the
  * journals card fuses head and list into one card, and this splits them across a
  * pair. A shared class would have to be applied by both builders and would then
  * carry the union of both bodies' rules, which is how a card becomes a
  * component with modes.
  *
- * `--am-border-inner` FOR 4.35.2's REASON: this box sits inside the section
+ * `--ca-border-inner` FOR 4.35.2's REASON: this box sits inside the section
  * card, whose edge is the same ink, so the plain border drew one boundary twice
  * about 12px apart. See the token. These declarations are the SINGLE card's —
  * inside a pair the rules above take them off, because there the box is the
@@ -1718,7 +1718,7 @@ a.jjs-row-link:hover {
  * ── `container-type`, AND WHY IT IS ON THE CARD (4.36.3) ────────────────
  *
  * A card is ~330px in a full-width section and the strip inside it collapses at
- * 480px — measured, until now, against `.journal-widget-block`, which is the
+ * 480px — measured, until now, against `.ca-journal-widget-block`, which is the
  * whole section and is never that narrow on a desktop. So the four-cell strip
  * stayed four across inside a 330px card and rendered AVG CONFIDENCE as "AVG
  * CONFIDEN / CE" with its value pushed onto a third line.
@@ -1729,20 +1729,20 @@ a.jjs-row-link:hover {
  * Making the card a query container costs one declaration and needs no new
  * rule — `96-stat-strip.css`'s existing collapse resolves against the nearest
  * container, which is now the box the cells actually have to fit in. */
-.jld-card {
+.ca-jld-card {
   container-type: inline-size;
   display: flex;
   flex-direction: column;
   background: var(--background-primary-alt);
-  /* LONGHANDS, for the fault `.jjs-card` records in full: a `var()` that does
+  /* LONGHANDS, for the fault `.ca-jjs-card` records in full: a `var()` that does
      not resolve invalidates the whole shorthand, so a colour that fails takes
      the width and the STYLE with it and the border vanishes. */
   border-width: 1px;
   border-style: solid;
-  border-color: var(--am-border-inner);
-  border-radius: var(--am-radius-md);
+  border-color: var(--ca-border-inner);
+  border-radius: var(--ca-radius-md);
   overflow: hidden;
-  /* THE LIST'S BREATHING ROOM, WHICH USED TO BE `.jjs-card-body`'s BOTTOM
+  /* THE LIST'S BREATHING ROOM, WHICH USED TO BE `.ca-jjs-card-body`'s BOTTOM
      PADDING and could not stay there (4.38.2) — inside a scroller it was a 10px
      window onto row five. Here it is what it always meant: space between the last
      row and the card's edge. The head is unaffected; it is the first child and
@@ -1752,7 +1752,7 @@ a.jjs-row-link:hover {
 /* ── THE HEAD WEARS THE JOURNAL'S OWN HUE (4.37) ─────────────────────────
  *
  * WHAT WAS WRONG WITH `--background-secondary` HERE. It is the SECTION CARD's
- * ground, used one level in — which `.jjs-card`'s note defends as a figure/ground
+ * ground, used one level in — which `.ca-jjs-card`'s note defends as a figure/ground
  * inversion, and which works there because that head also carries a rule. On this
  * card it measured, in the reader's theme, as `#282828` on a `#232323` body: a
  * 5/255 step, the same colour as the surface outside the card. A head the colour
@@ -1763,7 +1763,7 @@ a.jjs-row-link:hover {
  * -cards.html`, which drew six. A grey step says "this is a head" and nothing
  * else; the hue says WHICH JOURNAL, on a page where every card belongs to one and
  * a reader arrives from a homepage whose cards already wear it. `hueOf` is the
- * plugin's only per-journal identity colour and `.jjc-banner` is the precedent —
+ * plugin's only per-journal identity colour and `.ca-jjc-banner` is the precedent —
  * so this is that material used quietly, not a new idea.
  *
  * `color-mix` OVER A THEME SURFACE, AND THAT IS WHAT MAKES IT ONE DEFINITION.
@@ -1772,10 +1772,10 @@ a.jjs-row-link:hover {
  * `.theme-light` override and a second value to keep in step. Mixing 30% of the
  * hue INTO `--background-primary-alt` resolves per theme with no override at all:
  * the base moves and the tint rides it. `hsl(var(--jjc-hue) 45% 42%)` is
- * `.jjc-banner`'s own base colour, so the head and the homepage card are the same
+ * `.ca-jjc-banner`'s own base colour, so the head and the homepage card are the same
  * material at two strengths rather than two colours that happen to share a hue.
  *
- * THE 260 FALLBACK IS `.jjc-banner`'s, for the same reason: `--jjc-hue` is set by
+ * THE 260 FALLBACK IS `.ca-jjc-banner`'s, for the same reason: `--jjc-hue` is set by
  * the builder, and a `level-cards` block that somehow renders without it should
  * get the house violet rather than `hsl(0 …)`, which is red and looks like an
  * error.
@@ -1785,8 +1785,8 @@ a.jjs-row-link:hover {
    where a container has no level below it and stands alone, and the pair, where it
    has one and the head spans two panes. One list rather than two rules, because
    there is one head — see `containerHead`. */
-.jld-card > .journal-sec,
-.jld-pair > .journal-sec {
+.ca-jld-card > .ca-journal-sec,
+.ca-jld-pair > .ca-journal-sec {
   margin: 0;
   padding: 6px 12px;
   background: color-mix(
@@ -1810,28 +1810,28 @@ a.jjs-row-link:hover {
    * and the single card's does not, and without a floor the two heads on one row
    * of one grid would differ by the same 5px for the same reason.
    *
-   * The number is the TITLE's line box — `1.35` is `.journal-header-title`'s
-   * line-height and `--am-sec-title-size` its size — plus the padding above.
+   * The number is the TITLE's line box — `1.35` is `.ca-journal-header-title`'s
+   * line-height and `--ca-sec-title-size` its size — plus the padding above.
    * Both resolve against the head's own font-size, which is why this calc is
-   * here and not on a descendant: `--am-sec-title-size` is an `em`, and the same
+   * here and not on a descendant: `--ca-sec-title-size` is an `em`, and the same
    * expression on the button would resolve against the button's 0.85em and come
    * out 3px short.
    *
-   * `border-box` FOR THE SAME REASON `.jjs-card-body` STATES IT: Obsidian sets
-   * box-sizing per component rather than globally — the trap `.jjh-stat` records
+   * `border-box` FOR THE SAME REASON `.ca-jjs-card-body` STATES IT: Obsidian sets
+   * box-sizing per component rather than globally — the trap `.ca-jjh-stat` records
    * — and this file resets nothing. Without it the 12px is added ON TOP of the
    * floor and the band lands at 49px, which is taller than the 42px the step was
    * measured at: the fix would have made the thing it fixed worse. */
   box-sizing: border-box;
-  min-height: calc(1.35 * var(--am-sec-title-size) + 12px);
+  min-height: calc(1.35 * var(--ca-sec-title-size) + 12px);
 }
 /* ON A PHONE THE TAP FLOOR IS TALLER THAN THE TITLE, so the band takes the floor
-   instead — on every head, which is the only part that matters. `--am-control-min`
+   instead — on every head, which is the only part that matters. `--ca-control-min`
    is `auto` on the desktop and 40px under `body.is-mobile`, so this cannot be one
    rule with a `max()`: `auto` is not a length. */
-body.is-mobile .jld-card > .journal-sec,
-body.is-mobile .jld-pair > .journal-sec {
-  min-height: calc(var(--am-control-min) + 12px);
+body.is-mobile .ca-jld-card > .ca-journal-sec,
+body.is-mobile .ca-jld-pair > .ca-journal-sec {
+  min-height: calc(var(--ca-control-min) + 12px);
 }
 
 /* ── A PANE'S CAPTION (4.38) ──────────────────────────────────────────
@@ -1840,41 +1840,41 @@ body.is-mobile .jld-pair > .journal-sec {
  * head the right pane used to carry, and the change of TYPE is the whole point:
  * the old one was a title, which is what made it indistinguishable from the
  * container's name beside it even though one is a link to a place and the other is
- * a word for a kind of thing. Caps at `--am-text-2xs` is the plugin's treatment
- * for a thing that names a region — `.jc-qlabel` and the stat strip's own
+ * a word for a kind of thing. Caps at `--ca-text-2xs` is the plugin's treatment
+ * for a thing that names a region — `.ca-jc-qlabel` and the stat strip's own
  * labels — and it cannot be mistaken for a destination. (`.jts-label` was the
  * third name here until 4.46 merged that band into the strip.)
  *
  * A SIBLING OF THE BODY IN BOTH PANES, which is what makes the two halves start on
- * one line. In the list pane it also has to be outside `.jjs-card-body`, because
+ * one line. In the list pane it also has to be outside `.ca-jjs-card-body`, because
  * that box is a stated four rows that scrolls: a label inside would ride away on
  * the first scroll and would spend one of the four rows the card exists to show. */
-.jld-pane-label {
+.ca-jld-pane-label {
   padding: 8px 12px 0;
-  font-size: var(--am-text-2xs);
-  font-weight: var(--am-caps-weight);
-  letter-spacing: var(--am-caps-tracking);
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
   color: var(--text-faint);
 }
 /* AND THE STRIP PANE TAKES THE LIST PANE'S TOP PADDING, which is the second half
    of "the two halves start on one line": equal labels above unequal padding would
    still put the first figure and the first row 8px out of step. 2px is
-   `.jjs-card-body`'s, copied deliberately rather than chosen.
+   `.ca-jjs-card-body`'s, copied deliberately rather than chosen.
 
    ONLY THIS PANE. The list body's own padding is NOT touched, because its height is
    stated and the `+ 12px` in that calc IS its 2px and 10px — changing either end
    would shrink the content box and clip the fourth row the number exists to
    guarantee. */
-.jld-pane-label + .jld-card-body {
+.ca-jld-pane-label + .ca-jld-card-body {
   padding-top: 2px;
 }
 
-/* THE HAIRLINE UNDER THE HEAD IS `.journal-sec`'s, AND 4.36.3 CLAIMED TO HAVE
+/* THE HAIRLINE UNDER THE HEAD IS `.ca-journal-sec`'s, AND 4.36.3 CLAIMED TO HAVE
    REMOVED IT. It did not: that patch deleted the `border-bottom` DECLARATION
    from the rule above, and `30-header-bars.css:25` still paints
-   `var(--am-rule-hair) solid var(--background-modifier-border)` on every
-   `.journal-sec` there is. Nothing cancelled it — the sheet's only
-   `border-bottom: none` rules are scoped to `.journal-header-bar` variants, and a
+   `var(--ca-rule-hair) solid var(--background-modifier-border)` on every
+   `.ca-journal-sec` there is. Nothing cancelled it — the sheet's only
+   `border-bottom: none` rules are scoped to `.ca-journal-header-bar` variants, and a
    card head carries `owns: "children"`, so it is not one.
 
    Measured off the render rather than reasoned about: down a card at x=340 the
@@ -1892,47 +1892,47 @@ body.is-mobile .jld-pair > .journal-sec {
 /* The children card's list takes the slack, so a pane that is shorter than the
    one beside it ends in empty list rather than in a stripe of card under a
    short body. */
-.jld-card > .jjs-card-body {
+.ca-jld-card > .ca-jjs-card-body {
   flex: 1 1 auto;
 }
 
 /* The container card's body: the stat strip, and nothing else.
  *
- * NO STATED HEIGHT, unlike `.jjs-card-body` beside it. That number exists
+ * NO STATED HEIGHT, unlike `.ca-jjs-card-body` beside it. That number exists
  * because a list of unknown length has to be counted; a strip of three or four
  * cells has one height by construction, and stating a second one here would be
  * a box that clips its own contents the day a fifth cell is added. */
-.jld-card-body {
+.ca-jld-card-body {
   padding: 10px 12px;
 }
-/* The strip inside a card is quieter than the strip on a page. `.am-stats` is
+/* The strip inside a card is quieter than the strip on a page. `.ca-stats` is
    built for a dashboard band where the numbers ARE the section; here they are
    the subtitle of a card whose head is the name, so the values step down and the
    cell padding comes off. Nothing about the GRID is touched — the column count
    and its container query are the component's, which is the whole reason the
    band is reused rather than redrawn.
  *
- * THE DIVIDERS COME OFF WITH THEM (4.36.3). `.am-stats` divides its cells by
+ * THE DIVIDERS COME OFF WITH THEM (4.36.3). `.ca-stats` divides its cells by
  * showing a border-coloured ground through the gaps, which is right for a
  * masthead band that is framed and alone on its row. Inside a card, four cells
  * boxed in hairlines is a grid drawn inside a box drawn inside a section, and
  * it was the loudest of the borders on this page. A real gap divides them just
  * as well and adds no ink. */
-.jld-card-body .am-stats {
+.ca-jld-card-body .ca-stats {
   gap: 6px 14px;
   background: transparent;
 }
-.jld-card-body .am-stat {
+.ca-jld-card-body .ca-stat {
   background: transparent;
   padding: 2px 0;
 }
-.jld-card-body .am-stat-value {
+.ca-jld-card-body .ca-stat-value {
   font-size: 1.15em;
 }
 /* No caller here passes a sub-line, and the reserved 1.2em it holds against a
    late async fill is dead space under every value on the page. The cells this
    strip has fill in PLACE — see `containerCard`'s open-tasks read. */
-.jld-card-body .am-stat-sub {
+.ca-jld-card-body .ca-stat-sub {
   display: none;
 }
 /* AND THE FOUR-CELL CASE COLLAPSES EARLIER IN A CARD THAN ON A PAGE. The shared
@@ -1943,7 +1943,7 @@ body.is-mobile .jld-pair > .journal-sec {
    same number the pair stacks at, for the same reason: it is where two things
    stop fitting beside each other. */
 @container (max-width: 560px) {
-  .jld-card-body .am-stats[data-cols="4"] {
+  .ca-jld-card-body .ca-stats[data-cols="4"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1958,7 +1958,7 @@ body.is-mobile .jld-pair > .journal-sec {
  *
  * The two variants are the two surfaces: the grid lists cards so its control is
  * card-shaped, and a card's body lists rows so its control is a row. */
-.jld-add {
+.ca-jld-add {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1970,7 +1970,7 @@ body.is-mobile .jld-pair > .journal-sec {
    * `#333333` with a solid `#3c3c3c` edge — pixel for pixel what the Refresh
    * button beside it renders, which is a button that is SUPPOSED to look like one.
    * The theme paints every `<button>` with its own ground and border, and a plain
-   * `.jld-add` is one class: `.theme-dark button` or `.markdown-preview-view
+   * `.ca-jld-add` is one class: `.theme-dark button` or `.markdown-preview-view
    * button` is (0,1,1) and beats it.
    *
    * So the whole "dashed edge, no ground" vocabulary — the thing that says *empty
@@ -1979,23 +1979,23 @@ body.is-mobile .jld-pair > .journal-sec {
    *
    * WHY `!important` AND NOT MORE SPECIFICITY. Scoping to an ancestor would beat
    * the two selectors above and lose to any theme that writes three classes, and
-   * we cannot enumerate themes. `.jsh-crumbs a.jn-pill` already reaches for the
+   * we cannot enumerate themes. `.ca-jsh-crumbs a.ca-jn-pill` already reaches for the
    * same tool against the same class of problem. Scoped to the three properties
    * that ARE the vocabulary; everything else here stays overridable, which is what
    * keeps a reader's theme able to tune this. */
   /* ── LONGHANDS AND A QUIETER INK (4.40) ────────────────────────────
-   * The shorthand went for `.jjs-card`'s reason — a failing `var()` reverts the
+   * The shorthand went for `.ca-jjs-card`'s reason — a failing `var()` reverts the
    * STYLE too, and a dashed slot that loses its dash is just a word floating on
-   * the ground. `--am-slot-edge` rather than `--am-border-inner` is the reader's
+   * the ground. `--ca-slot-edge` rather than `--ca-border-inner` is the reader's
    * ask: *"tone it down, similar colour to the surface"*. A dash is already the
    * loudest edge in the vocabulary; it does not also need contrast. */
   border-width: 1px !important;
   border-style: dashed !important;
-  border-color: var(--am-slot-edge) !important;
+  border-color: var(--ca-slot-edge) !important;
   background: transparent !important;
   box-shadow: none !important;
   color: var(--text-muted);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   font-weight: 500;
   cursor: pointer;
   transition:
@@ -2005,21 +2005,21 @@ body.is-mobile .jld-pair > .journal-sec {
 }
 /* AND THE HOVER HAS TO SHOUT AS LOUD, or the base rule above wins against it: an
    `!important` declaration is only beaten by another one. */
-.jld-add:hover {
+.ca-jld-add:hover {
   border-color: var(--interactive-accent) !important;
   background: var(--background-modifier-hover) !important;
   color: var(--text-normal);
 }
 /* THE GLYPH, AND THIS RULE IS WHY 4.38's SIZE NEVER LANDED. It was a flat 15px
-   here, and `.jld-add .svg-icon` is two classes against `.jld-add-icon svg`'s one
+   here, and `.ca-jld-add .svg-icon` is two classes against `.ca-jld-add-icon svg`'s one
    class and one element — so the rule written to make a tile's ＋ 20px lost the
    cascade to this one and the glyph never changed. Caught by measuring the render
    rather than by the test, which asked whether the NEW rule said 20px and not
    whether anything else outranked it.
    Reading the same custom property is what makes them one decision instead of two
-   numbers to keep in step; the fallback is the old 15px, so a `.jld-add` that is
+   numbers to keep in step; the fallback is the old 15px, so a `.ca-jld-add` that is
    not a tile is unchanged. */
-.jld-add .svg-icon {
+.ca-jld-add .svg-icon {
   width: var(--jld-add-glyph, 15px);
   height: var(--jld-add-glyph, 15px);
 }
@@ -2028,11 +2028,11 @@ body.is-mobile .jld-pair > .journal-sec {
    the slot a card would occupy, so it is as tall as the cards beside it rather
    than a stub with a notch of ground under it — and on a row of its own, where
    there is nothing to match, the min-height is what it falls back to. */
-.jld-add-tile {
+.ca-jld-add-tile {
   align-self: stretch;
   min-height: 92px;
-  padding: var(--am-space-4) var(--am-space-6);
-  border-radius: var(--am-radius-md);
+  padding: var(--ca-space-4) var(--ca-space-6);
+  border-radius: var(--ca-radius-md);
 }
 
 /* AND IT IS THE FOOTPRINT OF WHAT IT CREATES (4.37).
@@ -2044,7 +2044,7 @@ body.is-mobile .jld-pair > .journal-sec {
  *
  * The tile is an empty slot for the thing it makes, so it is that thing's size:
  * two tracks where the cards are pairs, one where they are singles. `span 2` is
- * `.jld-pair`'s own declaration, which is what makes them line up rather than
+ * `.ca-jld-pair`'s own declaration, which is what makes them line up rather than
  * merely both being wide — and at two tracks it is the full row while one track
  * is half of it, which is where those two arrangements come from.
  *
@@ -2055,8 +2055,8 @@ body.is-mobile .jld-pair > .journal-sec {
  * the width, because a full-row tile as tall as a card is a large empty box.
  *
  * The span is clamped to the tracks that exist, so a one-column grid is safe —
- * `.jld-pair` leans on the same guarantee. */
-.jld-grid.is-paired .jld-add-tile {
+ * `.ca-jld-pair` leans on the same guarantee. */
+.ca-jld-grid.is-paired .ca-jld-add-tile {
   grid-column: span 2;
   min-height: 64px;
 }
@@ -2078,7 +2078,7 @@ body.is-mobile .jld-pair > .journal-sec {
  * so the tile fits — but `--jjs-rows` is a variable and a reader who narrowed it
  * would otherwise get a tile taller than the box, clipped by the body's own
  * `overflow`. */
-.jjs-card-body > .jld-add-tile {
+.ca-jjs-card-body > .ca-jld-add-tile {
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -2087,7 +2087,7 @@ body.is-mobile .jld-pair > .journal-sec {
  *
  * The tile at the end of a subject grid was a naked 135×90px dashed button on the
  * section's ground, standing where a card would go and looking nothing like one.
- * `addCardTile` wraps it in `.jjs-card`, so it wears the same ground, border and
+ * `addCardTile` wraps it in `.ca-jjs-card`, so it wears the same ground, border and
  * radius as its neighbours and the dashed affordance sits inside — which is
  * exactly what an empty subject card already looks like one column over.
  *
@@ -2096,12 +2096,12 @@ body.is-mobile .jld-pair > .journal-sec {
  * one control and has nothing to count. It fills instead, so the card takes its
  * height from the row — which is what makes it match rather than merely resemble.
  *
- * AND A `div` IS WHAT MADE THAT POSSIBLE. `.jjs-grid` has been `align-items:
+ * AND A `div` IS WHAT MADE THAT POSSIBLE. `.ca-jjs-grid` has been `align-items:
  * stretch` since 4.38.1 and the tile still did not stretch: Obsidian gives form
  * controls a definite height, and `align-self: stretch` is ignored on any item
  * whose height is not `auto`, so a `<button>` sat at its 92px minimum beside
  * 160px cards. Wrapping was the fix for the chrome and for the height at once. */
-.jjs-card-add > .jjs-card-body {
+.ca-jjs-card-add > .ca-jjs-card-body {
   height: auto;
   flex: 1 1 auto;
 }
@@ -2110,32 +2110,32 @@ body.is-mobile .jld-pair > .journal-sec {
  *
  * With the tile's own dashed edge restored (see the `!important` note above), an
  * add card drew TWO boundaries about 13px apart — the card's solid border and the
- * tile's dashed one inside it. That is the same over-drawing `--am-border-inner`
+ * tile's dashed one inside it. That is the same over-drawing `--ca-border-inner`
  * was introduced to stop, and here it has an obvious resolution: this card has no
  * head and no content, so the CARD is the empty slot. It takes the dash and the
  * tile becomes the label in the middle of it.
  *
- * A card inside a real subject card keeps its dash — `.jjs-card-body >
- * .jld-add-tile`, the "New topic" slot — because there the card is a real object
+ * A card inside a real subject card keeps its dash — `.ca-jjs-card-body >
+ * .ca-jld-add-tile`, the "New topic" slot — because there the card is a real object
  * with a name and a head, and the dashed box marks the empty part of it. */
-.jjs-card-add {
+.ca-jjs-card-add {
   border-style: dashed;
   /* TONED DOWN WITH THE TILE (4.40), and it has to be said here rather than
-     inherited: `.jjs-card` sets `--am-border-inner`, which is the ink for a card
+     inherited: `.ca-jjs-card` sets `--ca-border-inner`, which is the ink for a card
      that HAS content and a boundary to draw. This card is a slot. Same token as
      the tile inside it, so the two shapes of the same offer are one decision. */
-  border-color: var(--am-slot-edge);
+  border-color: var(--ca-slot-edge);
 }
-.jjs-card-add .jld-add-tile {
+.ca-jjs-card-add .ca-jld-add-tile {
   border: none !important;
   background: transparent !important;
 }
-.jjs-card-add:hover {
+.ca-jjs-card-add:hover {
   border-color: var(--interactive-accent);
   background: var(--background-modifier-hover);
 }
-/* AND IT DOES NOT COLLAPSE WHEN IT IS ALONE (4.39.1). `.jjs-card-body >
-   .jld-add-tile` zeroes the tile's 92px floor so it can shrink inside a body whose
+/* AND IT DOES NOT COLLAPSE WHEN IT IS ALONE (4.39.1). `.ca-jjs-card-body >
+   .ca-jld-add-tile` zeroes the tile's 92px floor so it can shrink inside a body whose
    height is STATED — right there, wrong here, where the body has no stated height
    and the grid has nothing to stretch against. A journal with no containers at all
    rendered its add card as a 29px pill; measured on the same screenshot.
@@ -2174,10 +2174,10 @@ body.is-mobile .jld-pair > .journal-sec {
  * track, with the rest of that row bare. `1 / -1` on every tile would fix that
  * case and break the two above by forcing a row of its own. It needs a track
  * count, and a stylesheet does not have one. */
-.jjs-grid > .jjs-card-add:only-child {
+.ca-jjs-grid > .ca-jjs-card-add:only-child {
   grid-column: 1 / -1;
 }
-/* AND IT DOES NOT COLLAPSE WHEN IT IS ALONE. `.jjs-card-body > .jld-add-tile`
+/* AND IT DOES NOT COLLAPSE WHEN IT IS ALONE. `.ca-jjs-card-body > .ca-jld-add-tile`
    zeroes the tile's floor so it can shrink inside a body whose height is STATED
    — right there, wrong here, where the body has no stated height and the grid
    has nothing to stretch against. A journal with no containers at all rendered
@@ -2185,28 +2185,28 @@ body.is-mobile .jld-pair > .journal-sec {
 
    64px RATHER THAN 92px SINCE 4.42, and the number moved because the shape did:
    alone in the grid the card is now the full width of the section, and 92px of
-   dashed box across a 700px pane is the "large empty box" `.jld-grid.is-paired`
+   dashed box across a 700px pane is the "large empty box" `.ca-jld-grid.is-paired`
    names. 64px is that rule's own number.
 
    `:only-child` IS THE WHOLE CONDITION. With cards beside it the row's height is
    the answer and a floor would fight it — including the flat journal whose card
    is a head and nothing else, where a floor would inflate the row and leave the
    real card sitting in dead ground. */
-.jjs-grid > .jjs-card-add:only-child .jld-add-tile {
+.ca-jjs-grid > .ca-jjs-card-add:only-child .ca-jld-add-tile {
   min-height: 64px;
 }
 /* AND IN A TYPE'S EMPTY STATE it is a tile under the two lines rather than a box
-   filling the section: `.jjs-empty` has no stated height, so a stretched tile
+   filling the section: `.ca-jjs-empty` has no stated height, so a stretched tile
    would be as tall as the widget. The 92px floor is right here — this is the one
    place the tile is the only thing on the surface. */
-.jjs-empty > .jld-add-tile {
+.ca-jjs-empty > .ca-jld-add-tile {
   margin-top: 10px;
 }
 
 /* ── The head ＋ (4.37) ─────────────────────────────────────────────────
  *
  * `.jld-add-row` STOOD HERE AND IS DELETED. The dashed row at the end of a
- * children card's body spent one of the four rows `.jjs-card-body` allows — a
+ * children card's body spent one of the four rows `.ca-jjs-card-body` allows — a
  * card holding two topics showed two topics and a control — on a list whose
  * every other row is a topic. The control moved into the head, where
  * `sectionFrame` has always returned a slot for a section's own controls, and
@@ -2230,7 +2230,7 @@ body.is-mobile .jld-pair > .journal-sec {
  * what it does is the discovery problem, not the answer to it — the whole card is
  * the target, so moving toward the ＋ has already revealed it.
  *
- * AND ON A DEVICE WITH NO HOVER IT IS SIMPLY OPEN. `.jsh-more` resolves the same
+ * AND ON A DEVICE WITH NO HOVER IT IS SIMPLY OPEN. `.ca-jsh-more` resolves the same
  * question with a faint resting state, and that is right for an OVERFLOW control
  * whose job is to stay out of the way. This one is the card's only action, and
  * the plugin's own note applies — *"a control revealed by hover is a control that
@@ -2245,15 +2245,15 @@ body.is-mobile .jld-pair > .journal-sec {
  * `align-self: stretch` gives the hit area back: a stretched flex item is exactly
  * its container's content height, which the head now states above, and a
  * stretched item cannot be the thing that grows it. */
-.jld-head-add {
+.ca-jld-head-add {
   gap: 0;
   padding-block: 0;
   align-self: stretch;
 }
 /* ── AND THE GLYPH'S SIZE IS STATED (4.38) ────────────────────────────
  *
- * It was 12.24px and nothing said so: `.journal-btn-ghost` is `--am-text-sm`
- * (0.85em → 13.6px) and `.journal-btn-ghost .journal-btn-icon` is `0.9em` of that.
+ * It was 12.24px and nothing said so: `.ca-journal-btn-ghost` is `--ca-text-sm`
+ * (0.85em → 13.6px) and `.ca-journal-btn-ghost .ca-journal-btn-icon` is `0.9em` of that.
  * Two inherited multiplications, and the result was the smallest mark on a card
  * while being the tallest thing in its band — the complaint that opened this.
  *
@@ -2262,36 +2262,36 @@ body.is-mobile .jld-pair > .journal-sec {
  * the tile's glyph below is a DIFFERENT size on purpose, and two unexplained
  * numbers in one file is how they end up being "fixed" into agreement.
  *
- * THREE CLASSES, DELIBERATELY. `.journal-btn-ghost .journal-btn-icon` in
+ * THREE CLASSES, DELIBERATELY. `.ca-journal-btn-ghost .ca-journal-btn-icon` in
  * 85-tracker-controls.css is two, and 85 sorts AFTER 60 — so at equal specificity
  * that rule would win and this would silently do nothing. The button genuinely
  * carries both classes, so asking for both is honest as well as sufficient. */
-.jld-head-add.journal-btn-ghost .journal-btn-icon {
+.ca-jld-head-add.ca-journal-btn-ghost .ca-journal-btn-icon {
   --jld-head-glyph: 15px;
   width: var(--jld-head-glyph);
   height: var(--jld-head-glyph);
 }
-/* THE TILE'S GLYPH, WHICH HAD NO RULE AT ALL — `.jld-add-icon` was an unstyled
+/* THE TILE'S GLYPH, WHICH HAD NO RULE AT ALL — `.ca-jld-add-icon` was an unstyled
    span and its size was whatever Obsidian's `setIcon` left in it. It is bigger than
    the head's because it is doing a bigger job: on an empty surface the ＋ IS the
    content, where in a head it is one control beside a title. */
-.jld-add-icon {
+.ca-jld-add-icon {
   --jld-add-glyph: 20px;
   display: inline-flex;
   width: var(--jld-add-glyph);
   height: var(--jld-add-glyph);
 }
-.jld-add-icon svg {
+.ca-jld-add-icon svg {
   width: 100%;
   height: 100%;
 }
-.jld-head-add .journal-btn-label {
+.ca-jld-head-add .ca-journal-btn-label {
   display: inline-block;
   max-width: 0;
   overflow: hidden;
   white-space: nowrap;
   opacity: 0;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   transition:
     max-width 140ms ease,
     opacity 140ms ease,
@@ -2301,15 +2301,15 @@ body.is-mobile .jld-pair > .journal-sec {
    matters in practice — the ＋ lives on the pair's single head, so without this
    selector the label would never open on any card that has a level below it. The
    card selector stays for the single-card case. */
-.jld-card:hover > .journal-sec .jld-head-add .journal-btn-label,
-.jld-pair:hover > .journal-sec .jld-head-add .journal-btn-label,
-.jld-head-add:focus-visible .journal-btn-label {
+.ca-jld-card:hover > .ca-journal-sec .ca-jld-head-add .ca-journal-btn-label,
+.ca-jld-pair:hover > .ca-journal-sec .ca-jld-head-add .ca-journal-btn-label,
+.ca-jld-head-add:focus-visible .ca-journal-btn-label {
   max-width: 12ch;
   margin-left: 4px;
   opacity: 1;
 }
 @media (hover: none) {
-  .jld-head-add .journal-btn-label {
+  .ca-jld-head-add .ca-journal-btn-label {
     max-width: 12ch;
     margin-left: 4px;
     opacity: 1;

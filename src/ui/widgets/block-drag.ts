@@ -72,7 +72,7 @@
 import { TFile } from "obsidian";
 import type { MarkdownPostProcessorContext } from "obsidian";
 
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import { blockIndexAt } from "../../core/block-move";
 import { splitGlyph } from "../section-frame";
 import { moveCell, widgetRun } from "../../core/cell-move";
@@ -102,7 +102,7 @@ import { panDuringDrag } from "../drag-scroll";
 
 // The one drag type this file speaks. There were two until 4.8.1, the other
 // being a whole block; see the header for why that one went.
-const CELL_TYPE = "text/almanac-cell";
+const CELL_TYPE = "text/ca-cell";
 
 // And a second one, which says WHAT THIS DRAG MAY BE — a column, a block, or
 // both. 4.8.5.
@@ -118,14 +118,14 @@ const CELL_TYPE = "text/almanac-cell";
 // had to look inside the payload could only refuse ON DROP, after lighting up
 // and promising the drop would work — which is the "accept it and then explain
 // yourself" failure this project refuses everywhere else.
-const BLOCK_TYPE = "text/almanac-block";
+const BLOCK_TYPE = "text/ca-block";
 
-export const HEAD_CLASS = "journal-block-head";
-export const CARD_CLASS = "journal-widget-card";
+export const HEAD_CLASS = "ca-journal-block-head";
+export const CARD_CLASS = "ca-journal-widget-card";
 
 // Which line of the fence body drew this element, and how many lines that body
 // has. Written by `stampLines`, read by the gesture. 4.8 §1.4.
-const GRIP_CLASS = "jbd-handle";
+const GRIP_CLASS = "ca-jbd-handle";
 
 // What is in the air, for the slots that would be a no-op. 4.8.7.
 //
@@ -148,8 +148,8 @@ let inFlight: { block: number; whole: boolean; frees: boolean } | null = null;
 // Which drag this is, so a block can cache what it worked out for the last one.
 // Bumped once per `dragstart`; see `indexInDrag`.
 let dragSeq = 0;
-const LINE_ATTR = "data-am-line";
-const BODY_ATTR = "data-am-body";
+const LINE_ATTR = "data-ca-line";
+const BODY_ATTR = "data-ca-body";
 
 // The head itself, which a block and a widget build the same way.
 //
@@ -171,7 +171,7 @@ const BODY_ATTR = "data-am-body";
 // the same fix: the emoji is peeled off into a fixed-width slot and the titles
 // line up. A head whose title carries no glyph gets no slot, because indenting
 // every title to align the ones that have one is the worse trade — the rule
-// `.journal-header-glyph` already states and the reason this shares its shape.
+// `.ca-journal-header-glyph` already states and the reason this shares its shape.
 //
 // `journal-block-head-glyph` RATHER THAN `journal-header-glyph`, deliberately:
 // `test/section-frame.test.ts` asserts that no module but `section-frame.ts`
@@ -200,7 +200,7 @@ export function buildHead(host: HTMLElement, title: string): HTMLElement {
 //
 // ONLY INSIDE A ROW. A block that is not a row wears its head itself, and a
 // wrapper there would put a second card inside the block's own. It would also
-// add a level to a subtree that `.journal-overview-card > .journal-live-widget`
+// add a level to a subtree that `.ca-journal-overview-card > .ca-journal-live-widget`
 // and its like reach into with `>` — inside a row those selectors already stop
 // at the cell, which is what makes this scope the safe one as well as the asked
 // for one.
@@ -227,12 +227,12 @@ export function cardWidget(widget: HTMLElement, title: string): void {
 // What a card wears when the note says how tall it is, and where the number
 // goes. 4.22 §3.
 //
-// AN INLINE CUSTOM PROPERTY, WHICH IS `--am-cell-weight`'s IDIOM — the
+// AN INLINE CUSTOM PROPERTY, WHICH IS `--ca-cell-weight`'s IDIOM — the
 // stylesheet holds the three declarations and this holds the one number, so the
 // common case leaves no mark in the DOM at all. A card with no height keeps the
 // markup it had before this release existed.
 export const SIZED_CLASS = "is-sized";
-const CARD_H_VAR = "--am-card-h";
+const CARD_H_VAR = "--ca-card-h";
 
 // Give every child that the note states a height for that height.
 //
@@ -243,7 +243,7 @@ const CARD_H_VAR = "--am-card-h";
 //
 // THE BODY IS THE FENCE'S, UNFILTERED. `heightAbove` reads the line above the
 // widget's own, so it needs the file's numbering — the same numbering
-// `data-am-line` carries — and not the loop's.
+// `data-ca-line` carries — and not the loop's.
 //
 // A DIRECTIVE THAT DREW NOTHING IS WHY THIS IS SAFE. It left no child, so there
 // is nothing here to walk, so a `height:` above it sizes nothing: §2's whole
@@ -325,7 +325,7 @@ function attachGrip(host: HTMLElement, label: string, cls = ""): HTMLElement {
   // asked of the stylesheet, because the host is whatever drew the thing — a
   // card, a block, or a widget with a band of its own — and this file cannot
   // know which class that is.
-  host.addClass("jbd-host");
+  host.addClass("ca-jbd-host");
   return host.createDiv({
     cls: `${GRIP_CLASS} ${cls}`.trim(),
     attr: { "aria-label": label, draggable: "true" },
@@ -384,14 +384,14 @@ function onlyInItsCell(el: HTMLElement): boolean {
 // as a decision protecting something, and the thing it protects does not exist.
 const BANDS = [
   // A section bar, and the wrapper `frame: section` builds around one.
-  "journal-sec",
-  "journal-sec-fold",
-  "journal-header-bar",
+  "ca-journal-sec",
+  "ca-journal-sec-fold",
+  "ca-journal-header-bar",
   // A widget's own.
-  "journal-overview-banner",
-  "jjs-hero",
-  "journal-entry-header",
-  "journal-study-header",
+  "ca-journal-overview-banner",
+  "ca-jjs-hero",
+  "ca-journal-entry-header",
+  "ca-journal-study-header",
   // THE PAGE'S OWN NAME (4.19.1), AND THE OMISSION COST A HEAD READING "LINKS".
   //
   // 4.19 welded `title:` and `links:` into one banner fence. `blockTitle` reads
@@ -405,13 +405,13 @@ const BANDS = [
   // THE FIX BELONGS HERE RATHER THAN IN `blockTitle`, because this list is
   // already the answer to the question being asked. The paragraph at the top of
   // this file states the rule — *a band a WIDGET drew has to be named, because
-  // only that widget knows it drew one* — and `.jtc-card` is exactly that: a
+  // only that widget knows it drew one* — and `.ca-jtc-card` is exactly that: a
   // band that says the page's name across the top of its block. Teaching
   // `blockTitle` to skip a fence holding `title` would be a second mechanism
   // deciding one fact, and the two would drift the first time a banner grew a
   // third line.
-  "jtc-card",
-  "journal-overview-card",
+  "ca-jtc-card",
+  "ca-journal-overview-card",
 ];
 
 // Whether this element already announces itself, in which case a head of ours
@@ -466,7 +466,7 @@ function readPayload(evt: DragEvent, path: string): CellPayload | null {
 }
 
 async function applyMove(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   src: CellSource,
   dst: CellTarget
@@ -485,7 +485,7 @@ async function applyMove(
 //
 // DERIVED RATHER THAN REPEATED, which is this project's oldest rule applied to a
 // number instead of to a path. The column floor and the gap are tokens
-// (`--am-row-cell-min`, `--am-widget-gap`); a copy of either in TypeScript is a
+// (`--ca-row-cell-min`, `--ca-widget-gap`); a copy of either in TypeScript is a
 // second place they have to agree, and the one that goes stale is the one no
 // test is looking at. The fallback is only for a render with no computed style
 // to read — an export, a detached node — where the gesture is not running
@@ -503,7 +503,7 @@ function pxToken(el: HTMLElement, name: string, fallback: number): number {
 // contract — `widenCells` returns null for "nothing would change" exactly as
 // `moveCell` does, and for the same reason.
 async function applyWidths(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   block: number,
   weights: readonly number[],
@@ -540,7 +540,7 @@ async function applyWidths(
 // the wiring between a gesture and a page, and not one in the arithmetic — so
 // the arithmetic gets everything that can possibly be given to it.
 function attachResize(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   divider: HTMLElement,
   row: HTMLElement,
@@ -590,8 +590,8 @@ function attachResize(
     // absolute to avoid. The grammar cannot cap a weight (`cellWeightOf` says
     // why, at length: a cap there could not describe a monitor); a gesture with
     // the row in its hand can measure one.
-    const floorPx = pxToken(row, "--am-row-cell-min", 320);
-    const gapPx = pxToken(row, "--am-widget-gap", 10);
+    const floorPx = pxToken(row, "--ca-row-cell-min", 320);
+    const gapPx = pxToken(row, "--ca-widget-gap", 10);
     const fits = Math.floor(
       (row.clientWidth - gapPx * (cells.length - 1)) / floorPx
     );
@@ -603,8 +603,8 @@ function attachResize(
     // share, so the empty string is a real value here and means "take it off
     // again".
     const was = [
-      left.style.getPropertyValue("--am-cell-weight"),
-      right.style.getPropertyValue("--am-cell-weight"),
+      left.style.getPropertyValue("--ca-cell-weight"),
+      right.style.getPropertyValue("--ca-cell-weight"),
     ];
     let live: [number, number] = [start[n - 1], start[n]];
 
@@ -614,20 +614,20 @@ function attachResize(
         [right, was[1]],
       ];
       for (const [el, value] of pairs) {
-        if (value) el.style.setProperty("--am-cell-weight", value);
-        else el.style.removeProperty("--am-cell-weight");
+        if (value) el.style.setProperty("--ca-cell-weight", value);
+        else el.style.removeProperty("--ca-cell-weight");
       }
     };
 
     // LIVE PREVIEW IS AN INLINE VARIABLE AND NOTHING ELSE. The stylesheet
-    // already reads `var(--am-cell-weight, 1)` on both the grow and the basis
+    // already reads `var(--ca-cell-weight, 1)` on both the grow and the basis
     // (4.4 §2), so the columns follow the pointer through the same declarations
     // the file will produce — what the reader sees during the drag is what the
     // note will render as, rather than a separate preview that can disagree.
     const show = (a: number, b: number): void => {
       live = [a, b];
-      left.style.setProperty("--am-cell-weight", String(a));
-      right.style.setProperty("--am-cell-weight", String(b));
+      left.style.setProperty("--ca-cell-weight", String(a));
+      right.style.setProperty("--ca-cell-weight", String(b));
     };
 
     const track = (e: PointerEvent): void => {
@@ -706,7 +706,7 @@ function attachResize(
 // `applyWidths`' PATH EXACTLY: read the file, rewrite one fence body, write it
 // back once, and do nothing at all when `resizeCell` says nothing would change.
 async function applyHeight(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   block: number,
   line: number,
@@ -726,7 +726,7 @@ async function applyHeight(
 // before, Escape restores and writes nothing, and nothing moved is not a write.
 // Only what differs is argued below.
 function attachCardResize(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   divider: HTMLElement,
   card: HTMLElement,
@@ -758,7 +758,7 @@ function attachCardResize(
     card.addClass("is-resizing");
 
     const start = heightAbove(body, line);
-    const min = pxToken(card, "--am-card-h-min", 120);
+    const min = pxToken(card, "--ca-card-h-min", 120);
 
     // WHAT THE CARD WORE BEFORE, so Escape is a restore rather than a second
     // write — and `row.ts`'s rule again: an unsized card has no inline style at
@@ -873,7 +873,7 @@ function attachCardResize(
 // `stampLines` and `moveCell` all speak. Empty for every block but one: the one
 // holding the page head. 4.11.
 export function attachBlockHead(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   container: HTMLElement,
   ctx: MarkdownPostProcessorContext,
   title: string | null = null,
@@ -911,7 +911,7 @@ export function attachBlockHead(
     // AND THE BLOCK IS TOLD, because a bar needs a card under it. A titled head
     // on the page's own background is a label floating above a card rather than
     // the head of one, so the block draws the card and the head bleeds its
-    // padding — the shape `.journal-entry-header` and `.journal-study-header`
+    // padding — the shape `.ca-journal-entry-header` and `.ca-journal-study-header`
     // already have. The stylesheet withholds it from a block that has chrome
     // already; this class only says the head is there.
     container.addClass("has-head");
@@ -1060,7 +1060,7 @@ export function attachBlockHead(
     // "yes"; only the two block slots ask, and only about a whole block.
     live: () => boolean = () => true
   ): void => {
-    const el = host.createDiv({ cls: `jbd-slot ${cls}` });
+    const el = host.createDiv({ cls: `ca-jbd-slot ${cls}` });
     el.addEventListener("dragover", (evt) => {
       if (!evt.dataTransfer?.types.includes(needs)) return;
       // DECLINED BEFORE IT LIGHTS UP, not on drop. A slot that accepts a drag
@@ -1124,7 +1124,7 @@ export function attachBlockHead(
   // THE STYLESHEET SWAPS THE GROUND RATHER THAN THE NUMBERS, which is this
   // release's own rule turned around: the CELL is lifted over the bands while a
   // drag is in the air, and the bands are given the space OUTSIDE the block to
-  // make up what they lost. See `.jbd-slot-edge` and `--am-slot-reach`. Nothing
+  // make up what they lost. See `.jbd-slot-edge` and `--ca-slot-reach`. Nothing
   // changes on this side, and the reason it is written down here is that the two
   // halves of the fix are in different files and neither reads as deliberate
   // alone.
@@ -1190,12 +1190,12 @@ export function attachBlockHead(
   // must. A refusal computed from a missing answer is how one uncertain block
   // turns into a page where nothing can be dropped at all, which is the failure
   // this whole item exists to end.
-  const edge = row ? " jbd-slot-edge" : "";
-  slot(container, `jbd-slot-above${edge}`, BLOCK_TYPE, (p) => p.whole, () => {
+  const edge = row ? " ca-jbd-slot-edge" : "";
+  slot(container, `ca-jbd-slot-above${edge}`, BLOCK_TYPE, (p) => p.whole, () => {
     const i = indexNow();
     return i === null ? null : { kind: "block", at: i };
   }, () => !noop(indexInDrag()));
-  slot(container, `jbd-slot-below${edge}`, BLOCK_TYPE, (p) => p.whole, () => {
+  slot(container, `ca-jbd-slot-below${edge}`, BLOCK_TYPE, (p) => p.whole, () => {
     const i = indexNow();
     return i === null ? null : { kind: "block", at: i + 1 };
   }, () => {
@@ -1243,8 +1243,8 @@ export function attachBlockHead(
       const i = indexNow();
       return i === null ? null : { kind: "group", block: i, side };
     };
-    slot(container, "jbd-slot-side jbd-slot-side-left", CELL_TYPE, (p) => p.cell, beside("left"), () => !isSelf());
-    slot(container, "jbd-slot-side jbd-slot-side-right", CELL_TYPE, (p) => p.cell, beside("right"), () => !isSelf());
+    slot(container, "ca-jbd-slot-side ca-jbd-slot-side-left", CELL_TYPE, (p) => p.cell, beside("left"), () => !isSelf());
+    slot(container, "ca-jbd-slot-side ca-jbd-slot-side-right", CELL_TYPE, (p) => p.cell, beside("right"), () => !isSelf());
   }
 
   // WHERE EACH COLUMN STARTS, in the file's own numbering. A cell's first
@@ -1312,21 +1312,21 @@ export function attachBlockHead(
       if (line === null) continue;
 
       if (before !== null) {
-        slot(child, "jbd-slot-before", CELL_TYPE, (p) => p.cell, () => {
+        slot(child, "ca-jbd-slot-before", CELL_TYPE, (p) => p.cell, () => {
           const i = indexNow();
           return i === null ? null : { kind: "cell", block: i, at: before };
         }, hasRoom);
       }
-      slot(child, "jbd-slot-after", CELL_TYPE, (p) => p.cell, after, hasRoom);
-      slot(child, "jbd-slot-over", CELL_TYPE, (p) => p.cell, () => {
+      slot(child, "ca-jbd-slot-after", CELL_TYPE, (p) => p.cell, after, hasRoom);
+      slot(child, "ca-jbd-slot-over", CELL_TYPE, (p) => p.cell, () => {
         const i = indexNow();
         return i === null ? null : { kind: "stack", block: i, at: line, after: false };
       });
-      slot(child, "jbd-slot-under", CELL_TYPE, (p) => p.cell, () => {
+      slot(child, "ca-jbd-slot-under", CELL_TYPE, (p) => p.cell, () => {
         const i = indexNow();
         return i === null ? null : { kind: "stack", block: i, at: line, after: true };
       });
-      slot(child, "jbd-slot-swap", CELL_TYPE, (p) => p.cell, () => {
+      slot(child, "ca-jbd-slot-swap", CELL_TYPE, (p) => p.cell, () => {
         const i = indexNow();
         return i === null ? null : { kind: "swap", block: i, at: line };
       });
@@ -1504,7 +1504,7 @@ export function attachBlockHead(
     // stylesheet for the same belt-and-braces reason.
     //
     // ASKED OF THE CARD RATHER THAN OF AN INDEX. A column divider needs to know
-    // which boundary it is on and carries `data-am-divider` to say so; a card
+    // which boundary it is on and carries `data-ca-divider` to say so; a card
     // divider needs only the card it is inside, and the card already knows which
     // line it is. So there is no attribute here and nothing to keep in step.
     for (const divider of Array.from(

@@ -12,40 +12,40 @@ describe("aesthetic presets and grain styling", () => {
   const vaultBannerSrc = readSrc("vault-banner");
 
   it("defines all 5 temporal grain color tokens in 00-tokens.css", () => {
-    expect(tokens).toContain("--am-grain-daily:");
-    expect(tokens).toContain("--am-grain-daily-rgb:");
-    expect(tokens).toContain("--am-grain-weekly:");
-    expect(tokens).toContain("--am-grain-weekly-rgb:");
-    expect(tokens).toContain("--am-grain-monthly:");
-    expect(tokens).toContain("--am-grain-monthly-rgb:");
-    expect(tokens).toContain("--am-grain-quarterly:");
-    expect(tokens).toContain("--am-grain-quarterly-rgb:");
-    expect(tokens).toContain("--am-grain-yearly:");
-    expect(tokens).toContain("--am-grain-yearly-rgb:");
+    expect(tokens).toContain("--ca-grain-daily:");
+    expect(tokens).toContain("--ca-grain-daily-rgb:");
+    expect(tokens).toContain("--ca-grain-weekly:");
+    expect(tokens).toContain("--ca-grain-weekly-rgb:");
+    expect(tokens).toContain("--ca-grain-monthly:");
+    expect(tokens).toContain("--ca-grain-monthly-rgb:");
+    expect(tokens).toContain("--ca-grain-quarterly:");
+    expect(tokens).toContain("--ca-grain-quarterly-rgb:");
+    expect(tokens).toContain("--ca-grain-yearly:");
+    expect(tokens).toContain("--ca-grain-yearly-rgb:");
   });
 
   it("binds grain-specific active accent variables in CSS", () => {
-    expect(css).toContain('[data-am-grain="daily"]');
-    expect(css).toContain('[data-am-grain="weekly"]');
-    expect(css).toContain('[data-am-grain="monthly"]');
-    expect(css).toContain('[data-am-grain="quarterly"]');
-    expect(css).toContain('[data-am-grain="yearly"]');
-    expect(css).toContain('[data-am-journal]');
+    expect(css).toContain('[data-ca-grain="daily"]');
+    expect(css).toContain('[data-ca-grain="weekly"]');
+    expect(css).toContain('[data-ca-grain="monthly"]');
+    expect(css).toContain('[data-ca-grain="quarterly"]');
+    expect(css).toContain('[data-ca-grain="yearly"]');
+    expect(css).toContain('[data-ca-journal]');
   });
 
   it("supports Editorial Monastic and Technical HUD presets in CSS", () => {
-    expect(css).toContain("body.am-preset-editorial");
-    expect(css).toContain("body.am-preset-technical");
-    expect(css).toContain("body.am-grain-monochrome");
-    expect(css).toContain("body.am-grain-subtle");
+    expect(css).toContain("body.ca-preset-editorial");
+    expect(css).toContain("body.ca-preset-technical");
+    expect(css).toContain("body.ca-grain-monochrome");
+    expect(css).toContain("body.ca-grain-subtle");
   });
 
-  it("stamps data-am-grain and data-am-journal in page-head.ts and vault-banner.ts", () => {
-    expect(pageHeadSrc).toContain('root.setAttr("data-am-surface", said.surface)');
-    expect(pageHeadSrc).toContain('root.setAttr("data-am-grain",');
-    expect(pageHeadSrc).toContain('root.setAttr("data-am-journal",');
-    expect(vaultBannerSrc).toContain('root.setAttr("data-am-grain", grain)');
-    expect(vaultBannerSrc).toContain('root.setAttr("data-am-journal", type.id)');
+  it("stamps data-ca-grain and data-ca-journal in page-head.ts and vault-banner.ts", () => {
+    expect(pageHeadSrc).toContain('root.setAttr("data-ca-surface", said.surface)');
+    expect(pageHeadSrc).toContain('root.setAttr("data-ca-grain",');
+    expect(pageHeadSrc).toContain('root.setAttr("data-ca-journal",');
+    expect(vaultBannerSrc).toContain('root.setAttr("data-ca-grain", grain)');
+    expect(vaultBannerSrc).toContain('root.setAttr("data-ca-journal", type.id)');
   });
 
   it("provides default appearance settings in DEFAULT_SETTINGS", () => {

@@ -21,7 +21,7 @@
 // layouts, and reloading one onto the page.
 
 import { App, Modal, Notice, setIcon } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { createListRow } from "./list-row";
 import { confirmAction } from "./modals";
 import { emptyCallout } from "./empty";
@@ -35,7 +35,7 @@ import type { ReloadLoss } from "../core/reload-loss";
 
 export function openJournalTemplateWindow(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   ctx: SectionContext
 ): void {
@@ -50,7 +50,7 @@ class JournalTemplateModal extends Modal {
 
   constructor(
     app: App,
-    private plugin: AlmanacPlugin,
+    private plugin: ChronoAnvilPlugin,
     private notePath: string,
     private ctx: SectionContext
   ) {
@@ -58,7 +58,7 @@ class JournalTemplateModal extends Modal {
   }
 
   onOpen(): void {
-    this.contentEl.addClass("almanac-editor-modal");
+    this.contentEl.addClass("ca-editor-modal");
     void this.refresh();
   }
 
@@ -85,20 +85,20 @@ class JournalTemplateModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    const head = contentEl.createDiv({ cls: "almanac-editor-head" });
+    const head = contentEl.createDiv({ cls: "ca-editor-head" });
     head.createEl("h3", { text: `Template — ${this.noun}` });
     head.createEl("p", {
-      cls: "almanac-editor-subtitle",
+      cls: "ca-editor-subtitle",
       text: `What a new ${this.noun.toLowerCase()} in ${
         this.ctx.type.name
       } is built from — and what this page can do about it.`,
     });
 
-    const body = contentEl.createDiv({ cls: "almanac-editor-body" });
+    const body = contentEl.createDiv({ cls: "ca-editor-body" });
     this.drawDefault(body);
     this.drawLayouts(body);
 
-    const footer = contentEl.createDiv({ cls: "almanac-editor-footer" });
+    const footer = contentEl.createDiv({ cls: "ca-editor-footer" });
     const close = footer.createEl("button", { text: "Close", cls: "mod-cta" });
     close.addEventListener("click", () => this.close());
   }
@@ -107,12 +107,12 @@ class JournalTemplateModal extends Modal {
 
   private drawDefault(host: HTMLElement): void {
     host.createDiv({
-      cls: "almanac-tpl-band",
+      cls: "ca-tpl-band",
       text: `This ${this.noun.toLowerCase()}'s default`,
     });
 
     host.createDiv({
-      cls: "almanac-tpl-note",
+      cls: "ca-tpl-note",
       // Named sections rather than a count: "6 sections" tells a reader nothing
       // they can check against the page in front of them.
       text: `Every new ${this.noun.toLowerCase()} starts with ${listOf(
@@ -120,7 +120,7 @@ class JournalTemplateModal extends Modal {
       )}.`,
     });
 
-    const row = host.createDiv({ cls: "almanac-tpl-actions" });
+    const row = host.createDiv({ cls: "ca-tpl-actions" });
     const save = row.createEl("button", {
       text: "Save this page as the default",
       cls: "mod-cta",
@@ -161,7 +161,7 @@ class JournalTemplateModal extends Modal {
   // ── saved layouts, and reloading from one ────────────────────────────
 
   private drawLayouts(host: HTMLElement): void {
-    host.createDiv({ cls: "almanac-tpl-band", text: "Reload this page" });
+    host.createDiv({ cls: "ca-tpl-band", text: "Reload this page" });
 
     // THE GATE, ASKED ONCE FOR THE WHOLE BAND. Every reload replaces the same
     // body, so what is in the way does not vary by which template is reloaded —
@@ -177,7 +177,7 @@ class JournalTemplateModal extends Modal {
     }
 
     host.createDiv({
-      cls: "almanac-tpl-note",
+      cls: "ca-tpl-note",
       text: "This note holds nothing yet, so it can be rebuilt from a template. Your properties — what it is, where it belongs, any readings on it — are kept.",
     });
 
@@ -228,7 +228,7 @@ class JournalTemplateModal extends Modal {
 
     const reload = actions.createEl("button", {
       text: "Reload",
-      cls: "almanac-tpl-toggle",
+      cls: "ca-tpl-toggle",
     });
     reload.addEventListener("click", () => {
       void (async () => {
@@ -238,7 +238,7 @@ class JournalTemplateModal extends Modal {
           // cannot render here; the reader has to be told which, or a layout
           // would quietly mean something different on each surface.
           new Notice(
-            `Almanac: “${title}” names ${drops.join(
+            `ChronoAnvil: “${title}” names ${drops.join(
               ", "
             )}, which a ${this.noun.toLowerCase()} can't carry — the rest will be written.`
           );
@@ -250,7 +250,7 @@ class JournalTemplateModal extends Modal {
 
     if (!layout) return;
     const del = actions.createEl("button", {
-      cls: "almanac-tpl-toggle",
+      cls: "ca-tpl-toggle",
       text: "Delete",
       attr: { "aria-label": `Delete ${layout.label}` },
     });
@@ -267,7 +267,7 @@ class JournalTemplateModal extends Modal {
         );
         if (!ok) return;
         await this.manager.deleteLayout(this.ctx, layout.id);
-        new Notice(`Almanac: deleted “${layout.label}”`);
+        new Notice(`ChronoAnvil: deleted “${layout.label}”`);
         await this.refresh();
       })();
     });
@@ -275,21 +275,21 @@ class JournalTemplateModal extends Modal {
 
   // What is standing in the way, in the reader's own terms, and what clears it.
   private drawLoss(host: HTMLElement, loss: ReloadLoss[]): void {
-    const box = host.createDiv({ cls: "almanac-tpl-loss" });
-    const head = box.createDiv({ cls: "almanac-tpl-loss-head" });
+    const box = host.createDiv({ cls: "ca-tpl-loss" });
+    const head = box.createDiv({ cls: "ca-tpl-loss-head" });
     setIcon(
-      head.createDiv({ cls: "almanac-tpl-loss-icon" }),
+      head.createDiv({ cls: "ca-tpl-loss-icon" }),
       "pencil-line"
     );
     head.createDiv({
       text: "There's something of yours on this note, so it can't be rebuilt from a template — a rebuild replaces everything below the properties.",
     });
-    const list = box.createEl("ul", { cls: "almanac-tpl-loss-list" });
+    const list = box.createEl("ul", { cls: "ca-tpl-loss-list" });
     for (const l of loss) {
       list.createEl("li", { text: `${l.label} — ${l.detail}` });
     }
     box.createDiv({
-      cls: "almanac-tpl-note",
+      cls: "ca-tpl-note",
       // NAMES THE OTHER DOOR. A refusal that only says no sends a reader
       // looking for a control that does not exist; "Edit sections…" is the
       // non-destructive path and it is one item up the same menu.

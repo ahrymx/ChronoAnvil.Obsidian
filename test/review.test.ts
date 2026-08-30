@@ -355,7 +355,7 @@ describe("an empty scope is an empty state, not an unknown widget", () => {
   //
   // WHAT WENT WRONG, because the shape is worth keeping. `buildReviewQueueRegion`
   // returned `null` when its scope resolved to no folders, and a null from a
-  // builder makes the dispatcher print `Unknown Almanac widget: review-queue:all`
+  // builder makes the dispatcher print `Unknown ChronoAnvil widget: review-queue:all`
   // — false twice over: the widget is known, and the note is fine. It was a
   // vault with no journals in it yet.
   //

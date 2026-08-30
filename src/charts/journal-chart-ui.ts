@@ -28,7 +28,7 @@
 
 import { App, Notice, Setting } from "obsidian";
 import { EditorModal } from "../ui/editor-modal";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { journalChartRefusal } from "./charts";
 import { describeSurface } from "../trackers/trackers";
 import type { TrackerDef, TrackerSurface } from "../trackers/trackers";
@@ -135,7 +135,7 @@ class JournalChartEditModal extends EditorModal {
 
   constructor(
     app: App,
-    plugin: AlmanacPlugin,
+    plugin: ChronoAnvilPlugin,
     private opts: JournalChartEditorOptions
   ) {
     super(
@@ -177,7 +177,7 @@ class JournalChartEditModal extends EditorModal {
     // same move chart-ui makes when no tracker is chartable.
     if (this.chartable.length === 0) {
       contentEl.createEl("p", {
-        cls: "almanac-chart-empty",
+        cls: "ca-chart-empty",
         text: this.type
           ? `${this.type.name} has no numeric tracker to chart yet. 🎯 Confidence ships with every journal — if it has been removed, or you want to plot something of your own, add a number tracker on this journal's surface in Settings → Trackers.`
           : "This note isn't inside a journal, so there are no journal trackers to offer. Charts belong on a journal's index notes.",
@@ -242,7 +242,7 @@ class JournalChartEditModal extends EditorModal {
     // than asked, the same way chart-ui states a tracker's scope when its class
     // gives only one answer.
     this.scopeEl = contentEl.createDiv({
-      cls: "almanac-chart-scope",
+      cls: "ca-chart-scope",
       text: scopeNote(this.type, this.draft.shape),
     });
 
@@ -352,7 +352,7 @@ class JournalChartEditModal extends EditorModal {
 
 export function openJournalChartEditor(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   opts: JournalChartEditorOptions
 ): void {
   new JournalChartEditModal(app, plugin, opts).open();

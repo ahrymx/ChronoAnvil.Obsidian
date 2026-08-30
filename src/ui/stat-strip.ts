@@ -18,7 +18,7 @@
 // So the year keeps its four and the week, month and quarter take the two they
 // can answer honestly, out of one component rather than two that would drift.
 //
-// THE CLASSES ARE `am-`, NOT `jyr-`. The markup was the year view's, private to
+// THE CLASSES ARE `ca-`, NOT `jyr-`. The markup was the year view's, private to
 // it, and the diary band adopting `.jyr-stat` would have made every future
 // reader of that name check whether the year page was involved. The `.jyr-*`
 // rules are retired the way 2.56.2 retired `.jq-section-*`: the callers move
@@ -44,7 +44,7 @@ export interface StatCell {
 //
 // THE COUNT IS AN ATTRIBUTE, NOT AN INLINE CUSTOM PROPERTY, and the first cut
 // of this got it wrong in a way worth recording. Setting
-// `--am-stats-cols` with `style.setProperty` reads well and cannot work: an
+// `--ca-stats-cols` with `style.setProperty` reads well and cannot work: an
 // inline declaration is the one thing a stylesheet cannot override, so the
 // container query below it — the entire point of the component — was being
 // silently beaten by the element it was trying to lay out. The strip stayed
@@ -58,30 +58,30 @@ export function statStrip(
   parent: HTMLElement,
   cards: StatCard[]
 ): { grid: HTMLElement; cells: StatCell[] } {
-  const grid = parent.createDiv({ cls: "am-stats" });
+  const grid = parent.createDiv({ cls: "ca-stats" });
   // Capped at four: past that the cells are too narrow to read a label in, and
   // no caller has five. Set even for one card, so a lone cell fills the row
   // rather than sitting a quarter-width against empty space.
   grid.setAttr("data-cols", String(Math.min(Math.max(cards.length, 1), 4)));
 
   const cells = cards.map((c) => {
-    const root = grid.createDiv({ cls: "am-stat" });
+    const root = grid.createDiv({ cls: "ca-stat" });
     if (c.ratio != null || c.icon) {
-      const ringWrap = root.createDiv({ cls: "am-stat-ring-wrap" });
+      const ringWrap = root.createDiv({ cls: "ca-stat-ring-wrap" });
       if (c.ratio != null) {
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         svg.setAttribute("viewBox", "0 0 36 36");
-        svg.setAttribute("class", "am-stat-ring-svg");
+        svg.setAttribute("class", "ca-stat-ring-svg");
 
         const bgPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        bgPath.setAttribute("class", "am-stat-ring-bg");
+        bgPath.setAttribute("class", "ca-stat-ring-bg");
         bgPath.setAttribute(
           "d",
           "M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
         );
 
         const valPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        valPath.setAttribute("class", "am-stat-ring-val");
+        valPath.setAttribute("class", "ca-stat-ring-val");
         const pct = Math.min(Math.max(Math.round(c.ratio * 100), 0), 100);
         valPath.setAttribute("stroke-dasharray", `${pct}, 100`);
         valPath.setAttribute(
@@ -94,20 +94,20 @@ export function statStrip(
         ringWrap.appendChild(svg);
       }
       if (c.icon) {
-        ringWrap.createSpan({ cls: "am-stat-ring-icon", text: c.icon });
+        ringWrap.createSpan({ cls: "ca-stat-ring-icon", text: c.icon });
       }
     }
 
-    const data = root.createDiv({ cls: "am-stat-data" });
+    const data = root.createDiv({ cls: "ca-stat-data" });
     // Label first in the DOM as well as on screen. It is what the value means,
     // and a screen reader that hit "145" before "Diary entries" would be
     // reading the answer before the question.
-    data.createDiv({ cls: "am-stat-label", text: c.label });
-    const valRow = data.createDiv({ cls: "am-stat-val-row" });
-    const value = valRow.createDiv({ cls: "am-stat-value", text: c.value });
+    data.createDiv({ cls: "ca-stat-label", text: c.label });
+    const valRow = data.createDiv({ cls: "ca-stat-val-row" });
+    const value = valRow.createDiv({ cls: "ca-stat-value", text: c.value });
     // Always created, even when empty: a sub-line that appears when an async
     // read lands would change the cell's height and shift the row under it.
-    const sub = valRow.createDiv({ cls: "am-stat-sub", text: c.sub ?? "" });
+    const sub = valRow.createDiv({ cls: "ca-stat-sub", text: c.sub ?? "" });
     return { root, value, sub };
   });
 

@@ -1,5 +1,5 @@
 /* ── 4. Per-entry navigator ────────────────────────────────── */
-.journal-nav {
+.ca-journal-nav {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -8,16 +8,16 @@
   margin: 0 0 1.5em 0;
   border-top: 1px solid var(--background-modifier-border);
   border-bottom: 1px solid var(--background-modifier-border);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
 }
 /* diary-links: the Diary section's destination row, the last element of the
    header group the greeting opens (2.13.3).
 
    It carries the section's closing rule — the 2px divider the old
    `header:📅 Diary` bar had — because it is the bottom of that group, not
-   because a nav strip wants a border. .journal-nav's own top rule is dropped:
+   because a nav strip wants a border. .ca-journal-nav's own top rule is dropped:
    the greeting sits immediately above with no divider between them, since the
-   two are one header. Declared after .journal-nav rather than beside the hero
+   two are one header. Declared after .ca-journal-nav rather than beside the hero
    styles because the selectors have equal specificity, so source order decides.
 
    The bottom margin is the gap to the section's contents, and is deliberately
@@ -26,11 +26,11 @@
    precedes it on the page. */
 /* diary-links: the destination pills, the last row of the header band inside
    the calendar card (2.13.7). Its parent supplies the tint, so this only has
-   to close the band: .journal-nav's own border strip and margins are dropped
+   to close the band: .ca-journal-nav's own border strip and margins are dropped
    and replaced with the single rule that separates header from grid.
-   Declared after .journal-nav rather than beside the header styles because the
+   Declared after .ca-journal-nav rather than beside the header styles because the
    selectors have equal specificity, so source order decides. */
-.journal-diary-links {
+.ca-journal-diary-links {
   border-top: none;
   border-bottom: 1px solid var(--background-modifier-border);
   padding: 12px 0 10px;
@@ -44,16 +44,16 @@
    until 4.8.1; the block's own head names the block now, and a tinted strip
    naming the FOLDER above it was the same sentence twice with the weaker one on
    top. */
-.journal-links-card {
-  border: var(--am-rule) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+.ca-journal-links-card {
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
   overflow: hidden;
   background: var(--background-secondary);
   margin: 0 0 4px;
 }
 /* The welded pill row: no border strip of its own (the card supplies the
    frame), tight ghost pills that light up on hover. */
-.journal-links.journal-links-bar {
+.ca-journal-links.ca-journal-links-bar {
   border: none;
   margin: 0;
   padding: 6px 7px;
@@ -63,25 +63,25 @@
   gap: 2px;
   flex-wrap: wrap;
 }
-.journal-links.journal-links-bar a.jn-pill,
-.journal-links.journal-links-bar .jn-flat {
+.ca-journal-links.ca-journal-links-bar a.ca-jn-pill,
+.ca-journal-links.ca-journal-links-bar .ca-jn-flat {
   border: none;
   background: none;
-  border-radius: var(--am-radius-sm);
-  padding: var(--am-space-3) var(--am-space-6);
+  border-radius: var(--ca-radius-sm);
+  padding: var(--ca-space-3) var(--ca-space-6);
 }
-.journal-links.journal-links-bar a.jn-pill:hover {
+.ca-journal-links.ca-journal-links-bar a.ca-jn-pill:hover {
   background: var(--background-modifier-hover);
   border-color: transparent;
   color: var(--text-normal) !important;
 }
 
-.journal-nav .jn-side {
+.ca-journal-nav .ca-jn-side {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.journal-nav .jn-center {
+.ca-journal-nav .ca-jn-center {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -93,10 +93,10 @@
 /* THE ONE SLOT OF THE THREE THAT WAS NEVER MADE A ROW (4.13.6 §2), and that
    omission is the whole defect.
 
-   `.jn-side` and `.jn-center` above both declare `display: flex; align-items:
+   `.ca-jn-side` and `.ca-jn-center` above both declare `display: flex; align-items:
    center`. This one declared only its auto margin, so it stayed a BLOCK — and a
    block lays its children out as inline content on a text baseline. What it
-   holds is `.jn-scopes`, an `<a class="jn-pill">` at `display: inline-flex`,
+   holds is `.ca-jn-scopes`, an `<a class="jn-pill">` at `display: inline-flex`,
    which at the scope button's padding is ~32px tall against a line box of ~19px.
    An inline-level box that tall does not grow its parent; it hangs ABOVE the
    baseline and overflows.
@@ -108,22 +108,22 @@
    reads as "the action bars on all overviews" rather than as one page's fault.
 
    The fix is to make the slot what its two siblings already are. Then the pill
-   is a flex ITEM, `.journal-nav`'s `align-items: center` has a real box to
+   is a flex ITEM, `.ca-journal-nav`'s `align-items: center` has a real box to
    centre, and the row's height is the tallest control in it — so nothing can
    reach the rule above, at any font size, rather than clearing it by a number
    that happened to be big enough. */
-.journal-nav .jn-right {
+.ca-journal-nav .ca-jn-right {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-left: auto;
 }
-.journal-nav a.jn-pill {
+.ca-journal-nav a.ca-jn-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: var(--am-space-2) var(--am-space-6);
-  border-radius: var(--am-radius-pill);
+  padding: var(--ca-space-2) var(--ca-space-6);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-normal) !important;
@@ -131,20 +131,20 @@
   white-space: nowrap;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.journal-nav a.jn-pill:hover {
+.ca-journal-nav a.ca-jn-pill:hover {
   background: var(--interactive-accent);
   border-color: var(--interactive-accent);
   color: var(--text-on-accent) !important;
 }
-.journal-nav .jn-flat {
+.ca-journal-nav .ca-jn-flat {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   white-space: nowrap;
 }
-.journal-nav .jn-title {
+.ca-journal-nav .ca-jn-title {
   font-weight: 600;
   color: var(--text-normal);
   padding-inline: 2px;
@@ -153,23 +153,23 @@
    toward the neighbour" and "calendar toward the month review" glyphs
    that used to be plain ◀ / ▶ / 📆 characters concatenated into the
    label text. */
-.journal-nav .jn-icon {
+.ca-journal-nav .ca-jn-icon {
   display: inline-flex;
   width: 0.9em;
   height: 0.9em;
   flex-shrink: 0;
 }
-.journal-nav .jn-icon svg {
+.ca-journal-nav .ca-jn-icon svg {
   width: 100%;
   height: 100%;
 }
-.journal-nav .jn-muted {
+.ca-journal-nav .ca-jn-muted {
   color: var(--text-muted);
   border: 1px dashed var(--background-modifier-border);
   background: transparent;
 }
 @media (max-width: 500px) {
-  .journal-nav .jn-center {
+  .ca-journal-nav .ca-jn-center {
     order: 3;
     flex-basis: 100%;
     justify-content: flex-start;

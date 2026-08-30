@@ -288,7 +288,7 @@ describe("choosing the link an entry carries", () => {
 
 describe("setGraphLinks", () => {
   const linksIn = (text: string): string[] => {
-    const m = /%% almanac-graph %%\n(.*)/.exec(text);
+    const m = /%% chronoanvil-graph %%\n(.*)/.exec(text);
     return m ? [...m[1].matchAll(/\[\[([^\]|]+)\|/g)].map((x) => x[1]) : [];
   };
 
@@ -299,7 +299,7 @@ describe("setGraphLinks", () => {
       ]);
       expect(linksIn(filled), grain).toEqual(["Week-2026-W35"]);
       // One block, not two: the template's own link is replaced, not joined.
-      expect(filled.match(/almanac-graph/g)?.length, grain).toBe(1);
+      expect(filled.match(/chronoanvil-graph/g)?.length, grain).toBe(1);
     }
   });
 

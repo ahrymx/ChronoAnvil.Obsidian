@@ -5,11 +5,11 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// The strip above every Almanac note. 4.51.
+// The strip above every ChronoAnvil note. 4.51.
 //
 // ── WHAT IT REPLACES, AND WHY IT IS NOT A DIRECTIVE ──────────────────────
 //
-// Every Almanac note has carried its banner IN ITS BODY: `journal-header` or
+// Every ChronoAnvil note has carried its banner IN ITS BODY: `journal-header` or
 // `entry-header`, composed into the template, `required: true`, immovable. Three
 // banner families, one per surface, each drawn by a directive the reader could
 // see in the file and could not remove.
@@ -55,15 +55,8 @@
 // `metadataCache` pass, because this banner READS frontmatter (a diary entry's
 // title, a note's date) where `PageWidth` only read the body.
 
-import {
-  App,
-  MarkdownView,
-  Menu,
-  Platform,
-  TFile,
-  setIcon,
-} from "obsidian";
-import type AlmanacPlugin from "../main";
+import { App, MarkdownView, Menu, TFile, setIcon } from "obsidian";
+import type ChronoAnvilPlugin from "../main";
 import {
   BannerScope,
   BannerSurface,
@@ -72,6 +65,7 @@ import {
 } from "../core/banner-scope";
 import { openFile } from "../core/util";
 import { ART_PRESETS } from "../core/constants";
+import { BRAND_ICON_ID } from "./brand-icon";
 import { resolveTarget, reviewScopes } from "../core/links";
 import {
   Crumb,
@@ -90,14 +84,14 @@ import { WIDE_PAGE_CLASS } from "./page-width";
 import { noteKindOf } from "../trackers/trackers";
 
 /** The class the banner's own element carries, spelled once. */
-export const BANNER_CLASS = "am-vault-banner";
+export const BANNER_CLASS = "ca-vault-banner";
 
 /**
  * On the LEAF, not on the banner: what it stands in for — Obsidian's inline
  * title and its property panel — are siblings of the bar rather than children
  * of it. 4.51.5, widened in 4.51.6.
  */
-export const HIDE_TITLE_CLASS = "am-absorb-host-chrome";
+export const HIDE_TITLE_CLASS = "ca-absorb-host-chrome";
 
 // The four destinations, fixed for this release.
 //
@@ -137,7 +131,7 @@ const NAV_ICONS: Record<string, string> = {
 };
 
 export class VaultBanner {
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   register(): void {
     const sweep = (): void => this.sweep();
@@ -204,9 +198,9 @@ export class VaultBanner {
     // it hides the title and properties of whatever note arrives next —
     // including notes this plugin has nothing to do with.
     host.removeClass(HIDE_TITLE_CLASS);
-    host.removeAttribute("data-am-surface");
-    host.removeAttribute("data-am-grain");
-    host.removeAttribute("data-am-journal");
+    host.removeAttribute("data-ca-surface");
+    host.removeAttribute("data-ca-grain");
+    host.removeAttribute("data-ca-journal");
 
     const file = view.file;
     if (!(file instanceof TFile)) return;
@@ -226,8 +220,8 @@ export class VaultBanner {
   ): HTMLElement {
     const root = createDiv({ cls: BANNER_CLASS });
     root.setAttr("data-surface", surface);
-    root.setAttr("data-am-surface", surface);
-    view.setAttr("data-am-surface", surface);
+    root.setAttr("data-ca-surface", surface);
+    view.setAttr("data-ca-surface", surface);
 
     if (surface === "diary") {
       const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
@@ -238,16 +232,16 @@ export class VaultBanner {
         fm["type"]
       );
       const grain = kind?.surface === "diary" ? kind.grain : "daily";
-      root.setAttr("data-am-grain", grain);
-      view.setAttr("data-am-grain", grain);
+      root.setAttr("data-ca-grain", grain);
+      view.setAttr("data-ca-grain", grain);
     } else if (surface === "journal") {
       const type = journalTypeAtPath(this.plugin, file.path);
       if (type) {
-        root.setAttr("data-am-journal", type.id);
-        view.setAttr("data-am-journal", type.id);
+        root.setAttr("data-ca-journal", type.id);
+        view.setAttr("data-ca-journal", type.id);
         const hue = `hsl(${hueOf(type.id)}, 65%, 55%)`;
-        root.style.setProperty("--am-journal-accent", hue);
-        view.style.setProperty("--am-journal-accent", hue);
+        root.style.setProperty("--ca-journal-accent", hue);
+        view.style.setProperty("--ca-journal-accent", hue);
       }
     }
 
@@ -266,23 +260,23 @@ export class VaultBanner {
     // `97-vault-banner.css`, selected by the attribute set below.
     const preset = ART_PRESETS[banner.art ?? "none"];
     if (preset) {
-      root.setAttr("data-am-art", preset.id);
+      root.setAttr("data-ca-art", preset.id);
       // THE ONE VISUAL FACT STILL SET FROM HERE, because it is the one the
       // reader drags a slider for. Everything else about a preset — its
       // geometry, its tiling, its blend mode — is a declaration in the
       // stylesheet, where a stylesheet's facts belong.
       const opacity = banner.artOpacity ?? preset.defaultOpacity;
-      root.style.setProperty("--am-header-art-opacity", String(opacity / 100));
+      root.style.setProperty("--ca-header-art-opacity", String(opacity / 100));
     }
     // NO ATTRIBUTE IS THE OFF STATE, and it needs no branch of its own:
-    // `--am-header-art-pattern` defaults to `none` in `00-tokens.css`, so the
+    // `--ca-header-art-pattern` defaults to `none` in `00-tokens.css`, so the
     // `::after` layer paints nothing until a preset rule gives it something.
 
     if (banner.glowEnabled === false) {
-      root.style.setProperty("--am-header-bg-gradient", "none");
+      root.style.setProperty("--ca-header-bg-gradient", "none");
     } else if (banner.glowEnabled === true) {
       root.style.setProperty(
-        "--am-header-bg-gradient",
+        "--ca-header-bg-gradient",
         "radial-gradient(circle at 85% 20%, rgba(var(--interactive-accent-rgb), 0.15) 0%, transparent 60%)"
       );
     }
@@ -295,7 +289,7 @@ export class VaultBanner {
     file: TFile,
     surface: BannerSurface
   ): void {
-    const row = root.createDiv({ cls: "avb-global" });
+    const row = root.createDiv({ cls: "ca-avb-global" });
 
     // THE TILE IS A LOCKUP, NOT A LONE SQUARE (4.51.2).
     //
@@ -310,13 +304,19 @@ export class VaultBanner {
     // is set (4.51, Q6/Q7) — the thing you press to configure it is the thing
     // it configures.
     const id = row.createDiv({
-      cls: "avb-id",
-      attr: { "aria-label": "Almanac settings", role: "button", tabindex: "0" },
+      cls: "ca-avb-id",
+      attr: { "aria-label": "ChronoAnvil settings", role: "button", tabindex: "0" },
     });
-    id.createDiv({ cls: "avb-tile", text: this.glyph() });
-    const idText = id.createDiv({ cls: "avb-id-text" });
-    idText.createDiv({ cls: "avb-id-name", text: this.app.vault.getName() });
-    idText.createDiv({ cls: "avb-id-sub", text: this.surfaceName(file, surface) });
+    // The tile is the mark unless the reader has put something of their own
+    // there. `setIcon` rather than text, so it inherits the tile's colour the
+    // same way the glyph did.
+    const tile = id.createDiv({ cls: "ca-avb-tile" });
+    const glyph = this.glyph();
+    if (glyph) tile.setText(glyph);
+    else setIcon(tile, BRAND_ICON_ID);
+    const idText = id.createDiv({ cls: "ca-avb-id-text" });
+    idText.createDiv({ cls: "ca-avb-id-name", text: this.app.vault.getName() });
+    idText.createDiv({ cls: "ca-avb-id-sub", text: this.surfaceName(file, surface) });
     const openSettings = (): void => this.openSettings();
     id.addEventListener("click", openSettings);
     id.addEventListener("keydown", (evt) => {
@@ -330,19 +330,21 @@ export class VaultBanner {
     // search to keep in step with the one it opens — see `search-all.ts`, which
     // is the whole of the searching.
     const search = row.createDiv({
-      cls: "avb-search",
-      attr: { role: "button", tabindex: "0", "aria-label": "Search Almanac" },
+      cls: "ca-avb-search",
+      attr: { role: "button", tabindex: "0", "aria-label": "Search ChronoAnvil" },
     });
-    setIcon(search.createSpan({ cls: "avb-search-icon" }), "search");
-    search.createSpan({ cls: "avb-search-text", text: "Search everything…" });
-    // THE DEFAULT BINDING, SPELLED FOR THE PLATFORM. A reader's actual binding
-    // is not on the public API, so this shows what the command asks for — which
-    // is right until they rebind it, and `Cmd` rather than `Ctrl` on a Mac,
-    // where `Ctrl K` is a different key entirely.
-    search.createSpan({
-      cls: "avb-kbd",
-      text: Platform.isMacOS ? "⌘ K" : "Ctrl K",
-    });
+    setIcon(search.createSpan({ cls: "ca-avb-search-icon" }), "search");
+    search.createSpan({ cls: "ca-avb-search-text", text: "Search everything…" });
+    // NO KEY CHIP (5.0.1). A `⌘ K` / `Ctrl K` chip sat here and spelled the
+    // command's default binding for the platform. The command no longer claims
+    // a default — see `main.ts`, and Obsidian's guidance against plugins taking
+    // a shortcut in every vault that installs them — so the chip would now name
+    // a key that does nothing, which is worse than naming none.
+    //
+    // AND IT COULD NOT SIMPLY BE TAUGHT TO READ THE REAL BINDING. A reader's
+    // own hotkeys are not on the public API; the only way to draw a true chip
+    // here is through an internal one, which is its own review finding. The
+    // field is a button, it says what it does, and it opens on click.
     const open = (): void => openVaultSearch(this.plugin);
     search.addEventListener("click", open);
     search.addEventListener("keydown", (evt) => {
@@ -352,7 +354,7 @@ export class VaultBanner {
       }
     });
 
-    const nav = row.createDiv({ cls: "avb-nav" });
+    const nav = row.createDiv({ cls: "ca-avb-nav" });
     // THE DIARY'S FIFTH, AND ONLY THE DIARY'S (4.51.5). A diary note's `links:`
     // row is gone — it was the four destinations beside this one, drawn again
     // in a card — and the scope menu is the one thing it carried that this row
@@ -378,14 +380,14 @@ export class VaultBanner {
       // be sitting on.
       const on = !!dest && dest.path === file.path;
       const btn = nav.createDiv({
-        cls: "avb-btn" + (on ? " is-on" : ""),
+        cls: "ca-avb-btn" + (on ? " is-on" : ""),
         attr: { role: "button", tabindex: "0", "aria-label": target.label },
       });
       setIcon(
-        btn.createSpan({ cls: "avb-btn-icon" }),
+        btn.createSpan({ cls: "ca-avb-btn-icon" }),
         NAV_ICONS[id] ?? target.icon
       );
-      btn.createSpan({ cls: "avb-btn-label", text: target.label });
+      btn.createSpan({ cls: "ca-avb-btn-label", text: target.label });
       // THE ACTION WINS WHERE THERE IS ONE, which is `launcher.ts`'s order and
       // matters for `today`: it OPENS OR CREATES the day's entry, where opening
       // a file could only ever do the first half.
@@ -419,7 +421,7 @@ export class VaultBanner {
     if (targets.length === 0) return;
 
     const btn = nav.createDiv({
-      cls: "avb-btn avb-btn-menu" + (here ? " is-on" : ""),
+      cls: "ca-avb-btn ca-avb-btn-menu" + (here ? " is-on" : ""),
       attr: {
         role: "button",
         tabindex: "0",
@@ -427,9 +429,9 @@ export class VaultBanner {
         "aria-haspopup": "menu",
       },
     });
-    setIcon(btn.createSpan({ cls: "avb-btn-icon" }), here?.icon ?? "calendar");
-    btn.createSpan({ cls: "avb-btn-label", text: here?.label ?? "Overviews" });
-    setIcon(btn.createSpan({ cls: "avb-btn-caret" }), "chevron-down");
+    setIcon(btn.createSpan({ cls: "ca-avb-btn-icon" }), here?.icon ?? "calendar");
+    btn.createSpan({ cls: "ca-avb-btn-label", text: here?.label ?? "Overviews" });
+    setIcon(btn.createSpan({ cls: "ca-avb-btn-caret" }), "chevron-down");
 
     const show = (evt: MouseEvent | KeyboardEvent): void => {
       const menu = new Menu();
@@ -480,12 +482,12 @@ export class VaultBanner {
     surface: BannerSurface,
     view: HTMLElement
   ): void {
-    const trail = root.createDiv({ cls: "avb-trail" });
+    const trail = root.createDiv({ cls: "ca-avb-trail" });
     const isIndex = !!file.parent && file.basename === file.parent.name;
 
     for (const crumb of this.crumbsFor(file, surface, isIndex)) {
       renderCrumb(trail, this.app, crumb, file.path);
-      trail.createSpan({ cls: "avb-sep", text: "›" });
+      trail.createSpan({ cls: "ca-avb-sep", text: "›" });
     }
 
     // TEXT, NOT AN EDITOR (4.51.6). The trail's last step is a breadcrumb — it
@@ -494,15 +496,15 @@ export class VaultBanner {
     // doubling this release has spent five patches removing; the breadcrumb is
     // the copy that gives it up, because a trail is a place and not a control.
     trail
-      .createDiv({ cls: "avb-here" })
-      .createSpan({ cls: "avb-here-text", text: this.hereText(file, surface) });
+      .createDiv({ cls: "ca-avb-here" })
+      .createSpan({ cls: "ca-avb-here-text", text: this.hereText(file, surface) });
 
     const meta = this.metaText(file, surface, isIndex);
-    if (meta) trail.createDiv({ cls: "avb-meta", text: meta });
+    if (meta) trail.createDiv({ cls: "ca-avb-meta", text: meta });
 
     // THE NOTE'S PROPERTIES, BEHIND A BUTTON (4.51.6). Obsidian draws them as
     // six rows between the title and the first block, above everything the
-    // reader opened the note to write in — and on an Almanac note most of what
+    // reader opened the note to write in — and on a ChronoAnvil note most of what
     // is in them is already on screen as a tracker cell or a crumb. What is
     // left is plumbing, so it goes in a window and the note opens with the
     // note. See `properties.ts`.
@@ -514,20 +516,20 @@ export class VaultBanner {
       this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}
     ).length;
     const propsBtn = trail.createDiv({
-      cls: "avb-props",
+      cls: "ca-avb-props",
       attr: {
         role: "button",
         tabindex: "0",
         "aria-label": `Properties (${props})`,
       },
     });
-    setIcon(propsBtn.createSpan({ cls: "avb-props-icon" }), "list");
+    setIcon(propsBtn.createSpan({ cls: "ca-avb-props-icon" }), "list");
     // A COUNT OF NOTHING IS NOT A COUNT (4.51.7). Both dashboards drew `≡ 0`,
     // which is a figure a reader has to read before learning it means there is
     // nothing to read. The button stays — it is still where a property is ADDED
     // — and its label still says the number for anything not looking at it.
     if (props > 0) {
-      propsBtn.createSpan({ cls: "avb-props-count", text: String(props) });
+      propsBtn.createSpan({ cls: "ca-avb-props-count", text: String(props) });
     }
     const openProps = (): void => openProperties(this.app, file);
     propsBtn.addEventListener("click", openProps);
@@ -545,7 +547,7 @@ export class VaultBanner {
     const build = this.menuFor(file, surface, isIndex, view);
     if (build) {
       const cog = trail.createDiv({
-        cls: "avb-cog",
+        cls: "ca-avb-cog",
         attr: { "aria-label": "Page settings", role: "button", tabindex: "0" },
       });
       setIcon(cog, "settings");
@@ -693,12 +695,15 @@ export class VaultBanner {
 
   // ── the tile ───────────────────────────────────────────────────────────
 
-  // What the tile shows: the reader's glyph, or two initials from the vault's
-  // name so a fresh vault has something rather than a blank square.
+  // The reader's own glyph, or "" when they have not set one — in which case
+  // the caller draws the ChronoAnvil mark instead.
+  //
+  // THE VAULT'S INITIALS USED TO BE THE FALLBACK, and they were the wrong
+  // answer twice over: two letters derived from a folder name say nothing about
+  // this plugin, and the square they sat in is the button you press to open
+  // ChronoAnvil's settings. A mark is what that button should carry.
   private glyph(): string {
-    const set = this.plugin.settings.banner.glyph.trim();
-    if (set) return set;
-    return initialsOf(this.app.vault.getName());
+    return this.plugin.settings.banner.glyph.trim();
   }
 
   private openSettings(): void {
@@ -721,17 +726,6 @@ export class VaultBanner {
   }
 }
 
-// Two initials from a vault's name: "Second Brain" → "SB", "notes" → "NO".
-//
-// PURE AND EXPORTED so the fallback is checkable without a vault — it is the
-// thing every reader sees until they set a glyph.
-export function initialsOf(name: string): string {
-  const words = name.trim().split(/[\s_-]+/).filter(Boolean);
-  if (words.length === 0) return "AL";
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return (words[0][0] + words[1][0]).toUpperCase();
-}
-
 // Whether an in-note banner directive should draw nothing.
 //
 // THE FILE IS NOT REWRITTEN AND THAT IS THE POINT (4.51). `journal-header` and
@@ -742,7 +736,7 @@ export function initialsOf(name: string): string {
 //
 // A LATER RELEASE MAKES THESE A SMALLER SECONDARY BANNER rather than deleting
 // them — which is the other reason not to retire the words now.
-export function bannerSuppressed(plugin: AlmanacPlugin, path: string): boolean {
+export function bannerSuppressed(plugin: ChronoAnvilPlugin, path: string): boolean {
   return bannerSurfaceOf(path, bannerScopeOf(plugin)) !== null;
 }
 
@@ -756,7 +750,7 @@ export function bannerSuppressed(plugin: AlmanacPlugin, path: string): boolean {
 //
 // REBUILT PER CALL RATHER THAN CACHED: a journal added in Settings changes this,
 // and a cache would need telling.
-export function bannerScopeOf(plugin: AlmanacPlugin): BannerScope {
+export function bannerScopeOf(plugin: ChronoAnvilPlugin): BannerScope {
   const paths = plugin.settings.paths;
   return {
     flatNotes: [paths.home, paths.search].filter(Boolean),

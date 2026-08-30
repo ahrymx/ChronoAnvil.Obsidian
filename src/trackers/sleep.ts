@@ -14,7 +14,7 @@
 // stored value is absent — so it works even on older entries written before
 // Sleep was enabled.
 
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   frontmatterOf,
   formatDuration,
@@ -26,10 +26,10 @@ import { entriesOfGrain } from "../diary/lineage";
 import { getBuiltinTracker } from "./trackers";
 import { emptyCallout } from "../ui/empty";
 
-export function buildSleepSummary(plugin: AlmanacPlugin): HTMLElement {
+export function buildSleepSummary(plugin: ChronoAnvilPlugin): HTMLElement {
   const app = plugin.app;
   const paths = plugin.settings.paths;
-  const root = createDiv({ cls: "journal-sleep-summary" });
+  const root = createDiv({ cls: "ca-journal-sleep-summary" });
 
   const wake = getBuiltinTracker(plugin, "wake");
   const bed = getBuiltinTracker(plugin, "bed");
@@ -53,7 +53,7 @@ export function buildSleepSummary(plugin: AlmanacPlugin): HTMLElement {
       emptyCallout(
         "moon",
         "Sleep is not being tracked.",
-        "Turn on the Wake-Up and Bedtime built-ins in Settings → Almanac → Trackers."
+        "Turn on the Wake-Up and Bedtime built-ins in Settings → ChronoAnvil → Trackers."
       )
     );
     return root;
@@ -114,11 +114,11 @@ export function buildSleepSummary(plugin: AlmanacPlugin): HTMLElement {
     }
   }
 
-  const stats = root.createDiv({ cls: "journal-sleep-stats" });
+  const stats = root.createDiv({ cls: "ca-journal-sleep-stats" });
   const stat = (label: string, value: string): void => {
-    const cell = stats.createDiv({ cls: "journal-sleep-stat" });
-    cell.createSpan({ cls: "journal-sleep-stat-value", text: value });
-    cell.createSpan({ cls: "journal-sleep-stat-label", text: label });
+    const cell = stats.createDiv({ cls: "ca-journal-sleep-stat" });
+    cell.createSpan({ cls: "ca-journal-sleep-stat-value", text: value });
+    cell.createSpan({ cls: "ca-journal-sleep-stat-label", text: label });
   };
 
   stat("nights logged", String(sleeps.length));

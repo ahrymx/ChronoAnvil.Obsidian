@@ -13,7 +13,7 @@ import {
   Setting,
   setIcon,
 } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   DEFAULT_PATHS,
   DEFAULT_FOLDER_EMOJIS,
@@ -69,7 +69,7 @@ import {
 } from "../events/events";
 import { confirmAction, promptEmoji, promptSuggester } from "../ui/modals";
 import { today } from "./util";
-import { initialsOf } from "../ui/vault-banner";
+import { BRAND_ICON_ID } from "../ui/brand-icon";
 import {
   BIN_FOLDER,
   binJournalFolders,
@@ -94,18 +94,18 @@ import {
   rowButton,
 } from "./settings-editors";
 
-export type AttachmentLocation = "almanac" | "obsidian" | "note";
+export type AttachmentLocation = "chronoanvil" | "obsidian" | "note";
 
 // How the `attach:` widget files anything dropped, pasted or picked into it.
 // Only new files are affected — an attachment already linked from a note is
 // never moved by changing these.
 export interface AttachmentOptions {
-  // Where a new file lands. "almanac" uses paths.attachments + `subfolder`;
+  // Where a new file lands. "chronoanvil" uses paths.attachments + `subfolder`;
   // "obsidian" hands the decision to the vault's own Files & Links attachment
-  // setting (so Almanac matches the rest of the vault); "note" drops it in the
+  // setting (so ChronoAnvil matches the rest of the vault); "note" drops it in the
   // same folder as the note it was added to.
   location: AttachmentLocation;
-  // Token pattern appended below paths.attachments in "almanac" mode.
+  // Token pattern appended below paths.attachments in "chronoanvil" mode.
   // Tokens: {yyyy} {yy} {mm} {dd} {date} {note}. Empty = flat folder.
   subfolder: string;
   // Token pattern for the file name (extension is appended automatically).
@@ -138,7 +138,7 @@ export type MobileOverlayTogglePosition = "off" | "left" | "right";
 export interface MobileOptions {
   // Position of the floating button that toggles hiding Obsidian's mobile overlay controls.
   overlayTogglePosition: MobileOverlayTogglePosition;
-  // Whether mobile overlay controls start hidden when Almanac loads.
+  // Whether mobile overlay controls start hidden when ChronoAnvil loads.
   hideOverlaysDefault: boolean;
 }
 
@@ -150,7 +150,7 @@ export interface AppearanceSettings {
   aestheticPreset: AestheticPreset;
   // Intensity of grain accents and colored spines across notes.
   grainAesthetics: GrainAestheticIntensity;
-  // Background texture drawn behind Almanac notes, from PAGE_GROUNDS. Optional
+  // Background texture drawn behind ChronoAnvil notes, from PAGE_GROUNDS. Optional
   // rather than required, and deliberately: every vault saved before 4.80 has
   // an `appearance` block without these two, and a required field would make
   // the type lie about what is on disk.
@@ -159,7 +159,7 @@ export interface AppearanceSettings {
   pageGroundStrength?: PageGroundStrength;
 }
 
-export interface AlmanacSettings {
+export interface ChronoAnvilSettings {
   appearance?: AppearanceSettings;
   paths: typeof DEFAULT_PATHS;
   attachments: AttachmentOptions;
@@ -172,7 +172,7 @@ export interface AlmanacSettings {
   // render as one control that derives a `Sleep` (hours) property, which is
   // added as a chartable column. Off removes the derived tracker and shows the
   // two times as independent pickers.
-  // The vault banner: the strip of chrome above every Almanac note. 4.51.
+  // The vault banner: the strip of chrome above every ChronoAnvil note. 4.51.
   //
   // OFF IS THE OLD BEHAVIOUR EXACTLY. `journal-header` and `entry-header` draw
   // their in-note banners again and nothing in any file has changed — which is
@@ -229,14 +229,14 @@ export interface AlmanacSettings {
   // toggles are remembered individually in collapsedNoteSections; this is only
   // the starting state for one not yet touched.
   captureCollapsedByDefault: boolean;
-  // Journal folders the reader has told Almanac to stop offering to import.
+  // Journal folders the reader has told ChronoAnvil to stop offering to import.
   // Paths, not ids — an unregistered folder has no id anyone has agreed to.
   // Moving or renaming one offers it again, which is right: to everything else
   // in the plugin that is a different folder.
   dismissedJournalFolders: string[];
   // Collapse state for the settings tab's own <details> groups (Paths /
   // Attachments / Trackers / Journal types), keyed by group id. Absent key =
-  // each group's own default (see AlmanacSettingTab.group).
+  // each group's own default (see ChronoAnvilSettingTab.group).
   collapsedSettingsGroups: Record<string, boolean>;
   // Sections this vault adds to a grain's entry template, beyond what ships.
   //
@@ -292,13 +292,13 @@ export interface AlmanacSettings {
   entryLayouts: EntryLayoutConfig[];
   // Options for mobile layout, gestures, and overlay controls.
   mobile: MobileOptions;
-  // The version of Almanac recorded when settings were last saved / initialized.
+  // The version of ChronoAnvil recorded when settings were last saved / initialized.
   // Used to detect plugin upgrades and prompt the reader when repairs or
   // migrations are pending.
   installedVersion?: string;
 }
 
-export const DEFAULT_SETTINGS: AlmanacSettings = {
+export const DEFAULT_SETTINGS: ChronoAnvilSettings = {
   appearance: {
     aestheticPreset: "editorial",
     grainAesthetics: "vibrant",
@@ -403,11 +403,11 @@ const actionList = (
   a: SectionAction | SectionAction[] | undefined
 ): SectionAction[] => (a ? (Array.isArray(a) ? a : [a]) : []);
 
-export class AlmanacSettingTab extends PluginSettingTab {
-  plugin: AlmanacPlugin;
+export class ChronoAnvilSettingTab extends PluginSettingTab {
+  plugin: ChronoAnvilPlugin;
   private syncTimer: number | null = null;
 
-  constructor(app: App, plugin: AlmanacPlugin) {
+  constructor(app: App, plugin: ChronoAnvilPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
@@ -497,26 +497,26 @@ export class AlmanacSettingTab extends PluginSettingTab {
     const collapsed = collapsedMap[key] ?? !defaultOpen;
 
     const details = containerEl.createEl("details", {
-      cls: "almanac-settings-group",
+      cls: "ca-settings-group",
     });
     details.open = !collapsed;
 
     const summary = details.createEl("summary", {
-      cls: "almanac-settings-summary",
+      cls: "ca-settings-summary",
     });
-    summary.createSpan({ cls: "almanac-settings-icon", text: icon });
-    const text = summary.createDiv({ cls: "almanac-settings-heading" });
-    text.createDiv({ cls: "almanac-settings-title", text: title });
+    summary.createSpan({ cls: "ca-settings-icon", text: icon });
+    const text = summary.createDiv({ cls: "ca-settings-heading" });
+    text.createDiv({ cls: "ca-settings-title", text: title });
     if (subtitle) {
-      text.createDiv({ cls: "almanac-settings-sub", text: subtitle });
+      text.createDiv({ cls: "ca-settings-sub", text: subtitle });
     }
     if (badge) {
-      summary.createSpan({ cls: "almanac-settings-badge", text: badge });
+      summary.createSpan({ cls: "ca-settings-badge", text: badge });
     }
-    const chevron = summary.createSpan({ cls: "almanac-settings-chevron" });
+    const chevron = summary.createSpan({ cls: "ca-settings-chevron" });
     setIcon(chevron, "chevron-down");
 
-    const body = details.createDiv({ cls: "almanac-settings-body" });
+    const body = details.createDiv({ cls: "ca-settings-body" });
 
     details.addEventListener("toggle", () => {
       this.plugin.settings.collapsedSettingsGroups[key] = !details.open;
@@ -553,22 +553,22 @@ export class AlmanacSettingTab extends PluginSettingTab {
     const collapsed = collapsedMap[key] ?? !(opts.defaultOpen ?? true);
 
     const details = containerEl.createEl("details", {
-      cls: "almanac-section-fold",
+      cls: "ca-section-fold",
     });
     details.open = !collapsed;
 
     const head = details.createEl("summary", {
-      cls: "almanac-section-head almanac-section-head-fold",
+      cls: "ca-section-head ca-section-head-fold",
     });
-    const chevron = head.createSpan({ cls: "almanac-section-chevron" });
+    const chevron = head.createSpan({ cls: "ca-section-chevron" });
     setIcon(chevron, "chevron-right");
-    head.createDiv({ cls: "almanac-section-title", text: title });
+    head.createDiv({ cls: "ca-section-title", text: title });
     if (opts.badge) {
-      head.createSpan({ cls: "almanac-section-count", text: opts.badge });
+      head.createSpan({ cls: "ca-section-count", text: opts.badge });
     }
     for (const action of actionList(opts.action)) {
-      const btn = head.createEl("button", { cls: "almanac-section-action" });
-      setIcon(btn.createSpan({ cls: "almanac-section-action-icon" }), action.icon);
+      const btn = head.createEl("button", { cls: "ca-section-action" });
+      setIcon(btn.createSpan({ cls: "ca-section-action-icon" }), action.icon);
       btn.createSpan({ text: action.label });
       btn.addEventListener("click", (evt) => {
         // The button lives in the <summary>, so without this a press would
@@ -585,7 +585,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
       void this.plugin.saveSettings();
     });
 
-    return details.createDiv({ cls: "almanac-section-fold-body" });
+    return details.createDiv({ cls: "ca-section-fold-body" });
   }
 
   // A section heading inside a group body: a small caps label plus an optional
@@ -601,13 +601,13 @@ export class AlmanacSettingTab extends PluginSettingTab {
     // not.
     action?: SectionAction | SectionAction[]
   ): void {
-    const head = containerEl.createDiv({ cls: "almanac-section-head" });
-    head.createDiv({ cls: "almanac-section-title", text: title });
+    const head = containerEl.createDiv({ cls: "ca-section-head" });
+    head.createDiv({ cls: "ca-section-title", text: title });
     // The PRIMARY action is last in the DOM so it sits rightmost, nearest the
     // reader's expectation of where a section's main button lives.
     for (const a of actionList(action)) {
-      const btn = head.createEl("button", { cls: "almanac-section-action" });
-      setIcon(btn.createSpan({ cls: "almanac-section-action-icon" }), a.icon);
+      const btn = head.createEl("button", { cls: "ca-section-action" });
+      setIcon(btn.createSpan({ cls: "ca-section-action-icon" }), a.icon);
       btn.createSpan({ text: a.label });
       btn.addEventListener("click", (evt) => {
         const menu = a.onClick(evt);
@@ -631,7 +631,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
   // multi-paragraph preambles read as a single muted note rather than three
   // free-floating descriptions.
   private note(containerEl: HTMLElement, ...paragraphs: string[]): void {
-    const wrap = containerEl.createDiv({ cls: "almanac-settings-note" });
+    const wrap = containerEl.createDiv({ cls: "ca-settings-note" });
     for (const p of paragraphs) wrap.createEl("p", { text: p });
   }
 
@@ -647,8 +647,8 @@ export class AlmanacSettingTab extends PluginSettingTab {
     icon: string,
     text: string
   ): void {
-    const wrap = containerEl.createDiv({ cls: "almanac-empty-state" });
-    setIcon(wrap.createSpan({ cls: "almanac-empty-icon" }), icon);
+    const wrap = containerEl.createDiv({ cls: "ca-empty-state" });
+    setIcon(wrap.createSpan({ cls: "ca-empty-icon" }), icon);
     wrap.createSpan({ text });
   }
 
@@ -657,8 +657,8 @@ export class AlmanacSettingTab extends PluginSettingTab {
     host: HTMLElement,
     headers: string[]
   ): { wrap: HTMLElement; table: HTMLElement; tbody: HTMLElement } {
-    const wrap = host.createDiv({ cls: "almanac-settings-table-wrap" });
-    const table = wrap.createEl("table", { cls: "almanac-settings-table" });
+    const wrap = host.createDiv({ cls: "ca-settings-table-wrap" });
+    const table = wrap.createEl("table", { cls: "ca-settings-table" });
     const thead = table.createEl("thead");
     const tr = thead.createEl("tr");
     for (const h of headers) {
@@ -671,26 +671,35 @@ export class AlmanacSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.addClass("almanac-settings");
+    containerEl.addClass("ca-settings");
 
     const s = this.plugin.settings;
 
     // ── Header ──────────────────────────────────────────────────────────
-    const hero = containerEl.createDiv({ cls: "almanac-settings-hero" });
-    const heroText = hero.createDiv({ cls: "almanac-hero-text" });
-    heroText.createEl("h2", { text: "Almanac" });
+    //
+    // NO PLUGIN NAME HERE. This drew an `<h2>ChronoAnvil</h2>` above the
+    // tagline until 5.0.1, which put the word the reader is already looking at
+    // — Obsidian renders the plugin's name above the tab body — on the screen
+    // twice. It is a documented item on Obsidian's plugin review checklist, and
+    // it was the kind of thing only a reviewer notices, because the author who
+    // wrote the tab is never looking at the chrome around it.
+    //
+    // THE TAGLINE STAYS. It says what the settings are FOR, which the name does
+    // not, and it is the only line on the screen that does.
+    const hero = containerEl.createDiv({ cls: "ca-settings-hero" });
+    const heroText = hero.createDiv({ cls: "ca-hero-text" });
     heroText.createEl("p", {
       text: "Journaling, trackers and study journals, configured in one place.",
     });
 
     // ── Vault setup / general, above the collapsible groups because they
     // apply everywhere and are the first thing a new vault needs.
-    const general = containerEl.createDiv({ cls: "almanac-settings-general" });
+    const general = containerEl.createDiv({ cls: "ca-settings-general" });
 
     new Setting(general)
       .setName("Set up / repair vault")
       .setDesc(
-        "Audit and repair your Almanac vault: create missing folders, update dashboard layouts, sync journal index notes, refresh templates, and run format migrations. Safe to run anytime with full change preview."
+        "Audit and repair your ChronoAnvil vault: create missing folders, update dashboard layouts, sync journal index notes, refresh templates, and run format migrations. Safe to run anytime with full change preview."
       )
       .addButton((b) =>
         b
@@ -784,7 +793,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
         "banner",
         "🏷️",
         "Vault banner",
-        "The strip above every Almanac note",
+        "The strip above every ChronoAnvil note",
         false
       )
     );
@@ -811,7 +820,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
         "paths",
         "📁",
         "Paths",
-        "The folders Almanac reads and writes",
+        "The folders ChronoAnvil reads and writes",
         false
       )
     );
@@ -822,7 +831,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
     const s = this.plugin.settings;
     this.note(
       containerEl,
-      "Choose a visual design archetype for Almanac notes and customize the intensity of temporal grain accents (Daily, Weekly, Monthly, etc.) and custom journal spines."
+      "Choose a visual design archetype for ChronoAnvil notes and customize the intensity of temporal grain accents (Daily, Weekly, Monthly, etc.) and custom journal spines."
     );
 
     const isDark = document.body.classList.contains("theme-dark");
@@ -860,7 +869,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Aesthetic preset")
-      .setDesc("Design archetype and typography suite applied to Almanac notes and surfaces.")
+      .setDesc("Design archetype and typography suite applied to ChronoAnvil notes and surfaces.")
       .addDropdown((d) => {
         d.addOption("editorial", "1. Editorial Monastic (Default — Serif & Warm Parchment)");
         d.addOption("modern", "2. Modern Fluent (Clean Sans & Glass)");
@@ -898,7 +907,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Page ground")
       .setDesc(
-        "Background texture drawn behind Almanac notes, in reading view and Live Preview. Off paints nothing."
+        "Background texture drawn behind ChronoAnvil notes, in reading view and Live Preview. Off paints nothing."
       )
       .addDropdown((d) => {
         d.addOption("off", "Off (no texture)");
@@ -943,7 +952,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Graph view color groups")
       .setDesc(
-        "Configure Obsidian Graph View color groups to color-code Almanac entries, journals, dashboards, and workbenches based on your current vault paths."
+        "Configure Obsidian Graph View color groups to color-code ChronoAnvil entries, journals, dashboards, and workbenches based on your current vault paths."
       )
       .addButton((b) =>
         b
@@ -970,55 +979,58 @@ export class AlmanacSettingTab extends PluginSettingTab {
 
     // Live interactive banner preview card
     const previewWrap = containerEl.createDiv({
-      cls: "almanac-settings-banner-preview-wrap",
+      cls: "ca-settings-banner-preview-wrap",
     });
     const bannerEl = previewWrap.createDiv({
-      cls: "am-vault-banner almanac-settings-banner-preview",
+      cls: "ca-vault-banner ca-settings-banner-preview",
     });
-    bannerEl.setAttr("data-am-grain", "daily");
+    bannerEl.setAttr("data-ca-grain", "daily");
 
-    const row = bannerEl.createDiv({ cls: "avb-global" });
-    const id = row.createDiv({ cls: "avb-id" });
-    const tileEl = id.createDiv({
-      cls: "avb-tile",
-      text: s.banner.glyph || initialsOf(this.app.vault.getName()),
-    });
-    const idText = id.createDiv({ cls: "avb-id-text" });
-    idText.createDiv({ cls: "avb-id-name", text: this.app.vault.getName() });
-    idText.createDiv({ cls: "avb-id-sub", text: "Daily Entry" });
+    const row = bannerEl.createDiv({ cls: "ca-avb-global" });
+    const id = row.createDiv({ cls: "ca-avb-id" });
+    const tileEl = id.createDiv({ cls: "ca-avb-tile" });
+    const idText = id.createDiv({ cls: "ca-avb-id-text" });
+    idText.createDiv({ cls: "ca-avb-id-name", text: this.app.vault.getName() });
+    idText.createDiv({ cls: "ca-avb-id-sub", text: "Daily Entry" });
 
-    const search = row.createDiv({ cls: "avb-search" });
-    setIcon(search.createSpan({ cls: "avb-search-icon" }), "search");
-    search.createSpan({ cls: "avb-search-text", text: "Search everything…" });
+    const search = row.createDiv({ cls: "ca-avb-search" });
+    setIcon(search.createSpan({ cls: "ca-avb-search-icon" }), "search");
+    search.createSpan({ cls: "ca-avb-search-text", text: "Search everything…" });
 
-    const nav = row.createDiv({ cls: "avb-nav" });
-    const diaryBtn = nav.createDiv({ cls: "avb-btn is-on" });
-    setIcon(diaryBtn.createSpan({ cls: "avb-btn-icon" }), "calendar");
-    diaryBtn.createSpan({ cls: "avb-btn-label", text: "Diary" });
+    const nav = row.createDiv({ cls: "ca-avb-nav" });
+    const diaryBtn = nav.createDiv({ cls: "ca-avb-btn is-on" });
+    setIcon(diaryBtn.createSpan({ cls: "ca-avb-btn-icon" }), "calendar");
+    diaryBtn.createSpan({ cls: "ca-avb-btn-label", text: "Diary" });
 
-    const journalBtn = nav.createDiv({ cls: "avb-btn" });
-    setIcon(journalBtn.createSpan({ cls: "avb-btn-icon" }), "book-open");
-    journalBtn.createSpan({ cls: "avb-btn-label", text: "Journals" });
+    const journalBtn = nav.createDiv({ cls: "ca-avb-btn" });
+    setIcon(journalBtn.createSpan({ cls: "ca-avb-btn-icon" }), "book-open");
+    journalBtn.createSpan({ cls: "ca-avb-btn-label", text: "Journals" });
 
     const updatePreview = () => {
-      tileEl.setText(s.banner.glyph || initialsOf(this.app.vault.getName()));
+      // Mirrors VaultBanner.glyph(): the reader's glyph if they set one, the
+      // ChronoAnvil mark if they did not. The preview has to agree with the
+      // banner or the field teaches the wrong thing.
+      tileEl.empty();
+      const glyph = s.banner.glyph.trim();
+      if (glyph) tileEl.setText(glyph);
+      else setIcon(tileEl, BRAND_ICON_ID);
       if (s.banner.art && s.banner.art !== "none") {
-        bannerEl.setAttribute("data-am-art", s.banner.art);
+        bannerEl.setAttribute("data-ca-art", s.banner.art);
         const opacity = s.banner.artOpacity ?? 18;
         bannerEl.style.setProperty(
-          "--am-header-art-opacity",
+          "--ca-header-art-opacity",
           String(opacity / 100)
         );
       } else {
-        bannerEl.removeAttribute("data-am-art");
-        bannerEl.style.removeProperty("--am-header-art-opacity");
+        bannerEl.removeAttribute("data-ca-art");
+        bannerEl.style.removeProperty("--ca-header-art-opacity");
       }
 
       if (s.banner.glowEnabled === false) {
-        bannerEl.style.setProperty("--am-header-bg-gradient", "none");
+        bannerEl.style.setProperty("--ca-header-bg-gradient", "none");
       } else {
         bannerEl.style.setProperty(
-          "--am-header-bg-gradient",
+          "--ca-header-bg-gradient",
           "radial-gradient(circle at 85% 20%, rgba(var(--interactive-accent-rgb), 0.15) 0%, transparent 60%)"
         );
       }
@@ -1029,11 +1041,11 @@ export class AlmanacSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Tile")
       .setDesc(
-        `What the square in the corner shows — a letter or two, or an emoji. Empty uses your vault's initials (${initialsOf(this.app.vault.getName())}).`
+        "What the square in the corner shows — a letter or two, or an emoji. Leave it empty for the ChronoAnvil mark."
       )
       .addText((c) =>
         c
-          .setPlaceholder(initialsOf(this.app.vault.getName()))
+          .setPlaceholder("ChronoAnvil mark")
           .setValue(s.banner.glyph)
           .onChange(async (v) => {
             // TRIMMED AND CAPPED HERE rather than in the banner, because a
@@ -1051,7 +1063,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
     // SIX BUILT-INS AND NOTHING ELSE. Until 4.80 this list was the six unioned
     // with every image file found in `00 - Infrastructure/Art/`, which is how a
     // scaffolded folder became an invitation to author textures — a thing
-    // Almanac does not ask of anyone, and the folder went with the scan.
+    // ChronoAnvil does not ask of anyone, and the folder went with the scan.
     new Setting(containerEl)
       .setName("Background art pattern")
       .setDesc("A subtle texture layered over the banner behind its contents.")
@@ -1160,7 +1172,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
       // 1. Icon / Emoji Button
       const iconCell = tr.createEl("td");
       const iconBtn = iconCell.createEl("button", {
-        cls: "almanac-emoji-btn",
+        cls: "ca-emoji-btn",
         text: book.icon || "🗒️",
         attr: {
           title: "Click to choose icon",
@@ -1180,7 +1192,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
       // 2. Logbook Name (Clean text input)
       const nameCell = tr.createEl("td");
       const nameInput = nameCell.createEl("input", {
-        cls: "almanac-logbook-name-input",
+        cls: "ca-logbook-name-input",
         type: "text",
         value: book.name,
       });
@@ -1196,7 +1208,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
       // 3. Target note path / source
       const pathCell = tr.createEl("td");
       pathCell.createDiv({
-        cls: "almanac-logbook-path-cell",
+        cls: "ca-logbook-path-cell",
         text:
           book.source === "events"
             ? "Special events (from events note)"
@@ -1227,8 +1239,8 @@ export class AlmanacSettingTab extends PluginSettingTab {
       });
 
       // 5. Actions
-      const actionsCell = tr.createEl("td", { cls: "col-actions-cell" });
-      const actions = actionsCell.createDiv({ cls: "col-actions" });
+      const actionsCell = tr.createEl("td", { cls: "ca-col-actions-cell" });
+      const actions = actionsCell.createDiv({ cls: "ca-col-actions" });
       rowButton(
         actions,
         "trash-2",
@@ -1304,7 +1316,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
   // asking you to retype four paths by hand and get all four right.
   //
   // The file explorer remains the better tool for reorganising, because it
-  // moves the files too. These fields are for the other job: pointing Almanac
+  // moves the files too. These fields are for the other job: pointing ChronoAnvil
   // at folders that already exist — dropping it into a vault whose diary is
   // already at `Daily Notes/`.
   private renderPaths(containerEl: HTMLElement): void {
@@ -1314,8 +1326,8 @@ export class AlmanacSettingTab extends PluginSettingTab {
       text:
         "The four roots the vault is built from, plus the homepage. Everything else is filed under one of them and " +
         "follows it — change a root here and the paths listed under it move with it. " +
-        "Note that these fields only point Almanac at a folder; they don't move anything on disk. " +
-        "To reorganise, rename or drag the folder in the file explorer instead — Almanac follows that too, and it " +
+        "Note that these fields only point ChronoAnvil at a folder; they don't move anything on disk. " +
+        "To reorganise, rename or drag the folder in the file explorer instead — ChronoAnvil follows that too, and it " +
         "moves the files.",
       cls: "setting-item-description",
     });
@@ -1384,7 +1396,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
 
       const children = ROOT_CHILDREN[root.key] ?? [];
       if (children.length === 0) continue;
-      const list = containerEl.createDiv({ cls: "almanac-path-children" });
+      const list = containerEl.createDiv({ cls: "ca-path-children" });
       list.dataset.root = root.key;
       this.renderDerivedPaths(list, children);
     }
@@ -1399,13 +1411,13 @@ export class AlmanacSettingTab extends PluginSettingTab {
   ): void {
     list.empty();
     for (const key of children) {
-      const row = list.createDiv({ cls: "almanac-path-child" });
+      const row = list.createDiv({ cls: "ca-path-child" });
       row.createSpan({
-        cls: "almanac-path-child-label",
+        cls: "ca-path-child-label",
         text: DERIVED_PATH_LABELS[key] ?? key,
       });
       row.createSpan({
-        cls: "almanac-path-child-value",
+        cls: "ca-path-child-value",
         text: this.plugin.settings.paths[key],
       });
     }
@@ -1413,7 +1425,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
 
   private refreshDerivedPaths(): void {
     const lists = this.containerEl.querySelectorAll<HTMLElement>(
-      ".almanac-path-children"
+      ".ca-path-children"
     );
     lists.forEach((list) => {
       const root = list.dataset.root;
@@ -1442,20 +1454,20 @@ export class AlmanacSettingTab extends PluginSettingTab {
 
       const tr = tbody.createEl("tr");
       const nameCell = tr.createEl("td");
-      const name = nameCell.createDiv({ cls: "col-name" });
-      name.createSpan({ cls: "col-name-token", text: captureSection.icon });
+      const name = nameCell.createDiv({ cls: "ca-col-name" });
+      name.createSpan({ cls: "ca-col-name-token", text: captureSection.icon });
       name.createSpan({ text: captureSection.label });
       nameCell.createDiv({
-        cls: "col-name-sub",
+        cls: "ca-col-name-sub",
         text: captureSection.blurb,
       });
 
       for (const grain of matrix.grains) {
-        const td = tr.createEl("td", { cls: "col-grain" });
+        const td = tr.createEl("td", { cls: "ca-col-grain" });
         const state = matrix.cell("capture", grain);
         if (state === "ships") {
           td.createSpan({
-            cls: "almanac-cell-ships",
+            cls: "ca-cell-ships",
             text: "Ships",
             attr: {
               title: `A new ${CLASS_DEFS[grain].adjective} entry already writes ${captureSection.label}.`,
@@ -1465,7 +1477,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
         }
         if (state === "absent") {
           td.createSpan({
-            cls: "almanac-cell-absent",
+            cls: "ca-cell-absent",
             text: "—",
             attr: {
               title: `${captureSection.label} is not offered on ${CLASS_DEFS[grain].adjective} entries.`,
@@ -1567,10 +1579,10 @@ export class AlmanacSettingTab extends PluginSettingTab {
     };
 
     // The cell IS the control, and the name and blurb are the row's — see
-    // `renderEntrySections`. `almanac-list-toggle` inside a `<td>` is the
+    // `renderEntrySections`. `ca-list-toggle` inside a `<td>` is the
     // pattern the trackers table already uses to put an Obsidian `Setting`
     // control in a cell without its two-column flex fighting the column.
-    const row = new Setting(td.createDiv({ cls: "almanac-list-toggle" }));
+    const row = new Setting(td.createDiv({ cls: "ca-list-toggle" }));
 
     if (!questions.length) {
       row.addToggle((t) =>
@@ -1634,13 +1646,13 @@ export class AlmanacSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Location")
       .setDesc(
-        "Almanac folder: the attachments folder below, plus the subfolder pattern. " +
+        "ChronoAnvil folder: the attachments folder below, plus the subfolder pattern. " +
           "Obsidian default: whatever Files & Links is set to, so attachments match the rest of the vault. " +
           "Beside the note: the note's own folder."
       )
       .addDropdown((d) =>
         d
-          .addOption("almanac", "Almanac attachments folder")
+          .addOption("chronoanvil", "ChronoAnvil attachments folder")
           .addOption("obsidian", "Obsidian's default attachment location")
           .addOption("note", "Beside the note")
           .setValue(a.location)
@@ -1651,7 +1663,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
           })
       );
 
-    if (a.location === "almanac") {
+    if (a.location === "chronoanvil") {
       new Setting(containerEl)
         .setName("Attachments folder")
         .setDesc(
@@ -1761,7 +1773,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
           // `scaffold.createJournalType` WRITES THE MANIFEST — which filters
           // `settings.trackers` through `manifestCarriesTracker(t, cfg.id)`.
           // So the preset's trackers land in the journal's own
-          // `.almanac-journal.json` for free, and survive a `data.json` wipe,
+          // `.chronoanvil-journal.json` for free, and survive a `data.json` wipe,
           // a folder copy and re-adoption. That is not a side effect to be
           // discovered later; it is the argument for this hook point over any
           // other.
@@ -1954,7 +1966,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
     try {
       folders = await this.plugin.journalImport.inferrableFolders();
     } catch (e) {
-      console.error("[Almanac] could not look for importable journals", e);
+      console.error("[ChronoAnvil] could not look for importable journals", e);
       return;
     }
     if (folders.length === 0) return;
@@ -1962,9 +1974,9 @@ export class AlmanacSettingTab extends PluginSettingTab {
     this.sectionHeader(containerEl, "Found in the vault");
     this.note(
       containerEl,
-      "These folders look like journals Almanac doesn\u2019t know about \u2014 copied in from elsewhere, or defined before their settings were lost. Reviewing one reads the folder and fills the form in from it; nothing is registered until you save."
+      "These folders look like journals ChronoAnvil doesn\u2019t know about \u2014 copied in from elsewhere, or defined before their settings were lost. Reviewing one reads the folder and fills the form in from it; nothing is registered until you save."
     );
-    const list = containerEl.createDiv({ cls: "almanac-list" });
+    const list = containerEl.createDiv({ cls: "ca-list" });
     for (const folder of folders) {
       const { actions } = createListRow(list, {
         token: "\u{1F4E5}",
@@ -1978,7 +1990,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
           const found = await this.plugin.journalImport.inferFolder(folder);
           if (!found) {
             new Notice(
-              `Almanac: couldn\u2019t read ${folder.name} as a journal. Add it with \u201CAdd journal\u201D instead.`
+              `ChronoAnvil: couldn\u2019t read ${folder.name} as a journal. Add it with \u201CAdd journal\u201D instead.`
             );
             return;
           }
@@ -2020,8 +2032,8 @@ export class AlmanacSettingTab extends PluginSettingTab {
 
     // 1. Journal
     const tdJournal = tr.createEl("td");
-    const nameWrap = tdJournal.createDiv({ cls: "col-name" });
-    nameWrap.createSpan({ cls: "col-name-token", text: cfg.emoji });
+    const nameWrap = tdJournal.createDiv({ cls: "ca-col-name" });
+    nameWrap.createSpan({ cls: "ca-col-name-token", text: cfg.emoji });
     nameWrap.createSpan({ text: cfg.name });
 
     // 2. Identifier
@@ -2034,19 +2046,19 @@ export class AlmanacSettingTab extends PluginSettingTab {
 
     // 4. Structure
     const tdStruct = tr.createEl("td");
-    const structWrap = tdStruct.createDiv({ cls: "almanac-list-pills" });
+    const structWrap = tdStruct.createDiv({ cls: "ca-list-pills" });
     structWrap.createSpan({
-      cls: "almanac-list-pill is-muted",
+      cls: "ca-list-pill is-muted",
       text: cfg.levels.length === 1 ? "Flat" : "Two levels",
     });
     structWrap.createSpan({
-      cls: "almanac-list-pill is-muted",
+      cls: "ca-list-pill is-muted",
       text: kindNames || "No note types",
     });
 
     // 5. Actions
-    const tdActions = tr.createEl("td", { cls: "col-actions-cell" });
-    const actions = tdActions.createDiv({ cls: "col-actions" });
+    const tdActions = tr.createEl("td", { cls: "ca-col-actions-cell" });
+    const actions = tdActions.createDiv({ cls: "ca-col-actions" });
 
     // The third door onto the section editor, after the banner control and the
     // command. A reader looking for configuration comes to Settings, and until
@@ -2101,7 +2113,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
         const ok = await confirmAction(
           this.app,
           `Delete "${cfg.name}"?`,
-          "This removes the journal from Almanac — its section, commands and buttons all disappear. Nothing is deleted from your vault.",
+          "This removes the journal from ChronoAnvil — its section, commands and buttons all disappear. Nothing is deleted from your vault.",
           "Delete",
           true
         );
@@ -2168,9 +2180,9 @@ export class AlmanacSettingTab extends PluginSettingTab {
           try {
             moved = await binJournalFolders(this.app, cfg, today());
           } catch (err) {
-            console.error("Almanac: couldn't move journal folders to the bin", err);
+            console.error("ChronoAnvil: couldn't move journal folders to the bin", err);
             new Notice(
-              `Almanac: couldn't move ${cfg.name}'s folders — nothing was changed.`
+              `ChronoAnvil: couldn't move ${cfg.name}'s folders — nothing was changed.`
             );
             return;
           }
@@ -2179,7 +2191,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
         await removeJournal(this.plugin, index, how);
         if (moved.length) {
           new Notice(
-            `Almanac: deleted “${cfg.name}” — its folders are in ${BIN_FOLDER}/ 🗑️`
+            `ChronoAnvil: deleted “${cfg.name}” — its folders are in ${BIN_FOLDER}/ 🗑️`
           );
         }
         this.display();
@@ -2301,7 +2313,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
       .setDesc(
         "Push the current tracker list into the vault immediately (every entry template + Diary.base), instead of waiting for the debounce. Only the templates and Diary.base are rewritten — entries you have already written are never touched."
       )
-      .setClass("almanac-settings-footer-action")
+      .setClass("ca-settings-footer-action")
       .addButton((b) =>
         b.setButtonText("Sync everything into vault").onClick(async () => {
           await syncTrackerConfig(this.app, this.plugin);
@@ -2319,36 +2331,36 @@ export class AlmanacSettingTab extends PluginSettingTab {
     if (!enabled) tr.addClass("is-locked");
 
     const tdName = tr.createEl("td");
-    const nameWrap = tdName.createDiv({ cls: "col-name" });
-    nameWrap.createSpan({ cls: "col-name-token", text: "🙂" });
+    const nameWrap = tdName.createDiv({ cls: "ca-col-name" });
+    nameWrap.createSpan({ cls: "ca-col-name-token", text: "🙂" });
     nameWrap.createSpan({ text: t.label });
 
     const tdType = tr.createEl("td");
-    const typePills = tdType.createDiv({ cls: "almanac-list-pills" });
-    typePills.createSpan({ cls: "almanac-list-pill is-muted", text: "Scale" });
+    const typePills = tdType.createDiv({ cls: "ca-list-pills" });
+    typePills.createSpan({ cls: "ca-list-pill is-muted", text: "Scale" });
 
     const tdSurface = tr.createEl("td");
-    const surfacePills = tdSurface.createDiv({ cls: "almanac-list-pills" });
+    const surfacePills = tdSurface.createDiv({ cls: "ca-list-pills" });
     const pills = [
       { text: "Daily", tone: "muted" as const },
       ...this.surfacePill(t),
     ];
     for (const p of pills) {
-      surfacePills.createSpan({ cls: `almanac-list-pill is-${p.tone}`, text: p.text });
+      surfacePills.createSpan({ cls: `ca-list-pill is-${p.tone}`, text: p.text });
     }
 
     const tdStatus = tr.createEl("td");
-    const statusPills = tdStatus.createDiv({ cls: "almanac-list-pills" });
+    const statusPills = tdStatus.createDiv({ cls: "ca-list-pills" });
     if (enabled && heat) {
-      statusPills.createSpan({ cls: "almanac-list-pill is-on", text: "Heat map" });
+      statusPills.createSpan({ cls: "ca-list-pill is-on", text: "Heat map" });
     } else if (enabled) {
-      statusPills.createSpan({ cls: "almanac-list-pill is-on", text: "Every entry" });
+      statusPills.createSpan({ cls: "ca-list-pill is-on", text: "Every entry" });
     } else {
-      statusPills.createSpan({ cls: "almanac-list-pill is-off", text: "Disabled" });
+      statusPills.createSpan({ cls: "ca-list-pill is-off", text: "Disabled" });
     }
 
-    const tdActions = tr.createEl("td", { cls: "col-actions-cell" });
-    const actions = tdActions.createDiv({ cls: "col-actions" });
+    const tdActions = tr.createEl("td", { cls: "ca-col-actions-cell" });
+    const actions = tdActions.createDiv({ cls: "ca-col-actions" });
 
     if (enabled) {
       rowButton(actions, "settings-2", `${t.label} settings`, () =>
@@ -2359,7 +2371,7 @@ export class AlmanacSettingTab extends PluginSettingTab {
       );
     }
 
-    const toggleHost = actions.createDiv({ cls: "almanac-list-toggle" });
+    const toggleHost = actions.createDiv({ cls: "ca-list-toggle" });
     new Setting(toggleHost).addToggle((c) =>
       c
         .setTooltip(`Include ${t.label} on every new entry`)
@@ -2387,29 +2399,29 @@ export class AlmanacSettingTab extends PluginSettingTab {
     if (!on) tr.addClass("is-locked");
 
     const tdName = tr.createEl("td");
-    const nameWrap = tdName.createDiv({ cls: "col-name" });
-    nameWrap.createSpan({ cls: "col-name-token", text: "🛌" });
+    const nameWrap = tdName.createDiv({ cls: "ca-col-name" });
+    nameWrap.createSpan({ cls: "ca-col-name-token", text: "🛌" });
     nameWrap.createSpan({ text: name });
 
     const tdType = tr.createEl("td");
-    const typePills = tdType.createDiv({ cls: "almanac-list-pills" });
-    typePills.createSpan({ cls: "almanac-list-pill is-muted", text: "Derived (hours)" });
+    const typePills = tdType.createDiv({ cls: "ca-list-pills" });
+    typePills.createSpan({ cls: "ca-list-pill is-muted", text: "Derived (hours)" });
 
     const tdSurface = tr.createEl("td");
-    const surfacePills = tdSurface.createDiv({ cls: "almanac-list-pills" });
-    surfacePills.createSpan({ cls: "almanac-list-pill is-muted", text: "Daily" });
+    const surfacePills = tdSurface.createDiv({ cls: "ca-list-pills" });
+    surfacePills.createSpan({ cls: "ca-list-pill is-muted", text: "Daily" });
 
     const tdStatus = tr.createEl("td");
-    const statusPills = tdStatus.createDiv({ cls: "almanac-list-pills" });
+    const statusPills = tdStatus.createDiv({ cls: "ca-list-pills" });
     statusPills.createSpan({
-      cls: on ? "almanac-list-pill is-on" : "almanac-list-pill is-off",
+      cls: on ? "ca-list-pill is-on" : "ca-list-pill is-off",
       text: on ? "Every entry" : "Disabled",
     });
 
-    const tdActions = tr.createEl("td", { cls: "col-actions-cell" });
-    const actions = tdActions.createDiv({ cls: "col-actions" });
+    const tdActions = tr.createEl("td", { cls: "ca-col-actions-cell" });
+    const actions = tdActions.createDiv({ cls: "ca-col-actions" });
 
-    const toggleHost = actions.createDiv({ cls: "almanac-list-toggle" });
+    const toggleHost = actions.createDiv({ cls: "ca-list-toggle" });
     new Setting(toggleHost).addToggle((c) =>
       c
         .setTooltip("Turn the Sleep tracker on or off")
@@ -2433,40 +2445,40 @@ export class AlmanacSettingTab extends PluginSettingTab {
     const tr = tbody.createEl("tr");
 
     const tdName = tr.createEl("td");
-    const nameWrap = tdName.createDiv({ cls: "col-name" });
+    const nameWrap = tdName.createDiv({ cls: "ca-col-name" });
     nameWrap.createSpan({
-      cls: "col-name-token",
+      cls: "ca-col-name-token",
       text: t.builtin === "confidence" ? "🎯" : "📌",
     });
     nameWrap.createSpan({ text: t.label });
 
     const tdType = tr.createEl("td");
-    const typePills = tdType.createDiv({ cls: "almanac-list-pills" });
+    const typePills = tdType.createDiv({ cls: "ca-list-pills" });
     typePills.createSpan({
-      cls: "almanac-list-pill is-muted",
+      cls: "ca-list-pill is-muted",
       text: TRACKER_TYPE_LABELS[t.type].split(" ")[0],
     });
 
     const tdSurface = tr.createEl("td");
-    const surfacePills = tdSurface.createDiv({ cls: "almanac-list-pills" });
+    const surfacePills = tdSurface.createDiv({ cls: "ca-list-pills" });
     const pills = [
       ...this.surfacePill(t),
     ];
     for (const p of pills) {
-      surfacePills.createSpan({ cls: `almanac-list-pill is-${p.tone}`, text: p.text });
+      surfacePills.createSpan({ cls: `ca-list-pill is-${p.tone}`, text: p.text });
     }
 
     const tdStatus = tr.createEl("td");
-    const statusPills = tdStatus.createDiv({ cls: "almanac-list-pills" });
+    const statusPills = tdStatus.createDiv({ cls: "ca-list-pills" });
     statusPills.createSpan({
-      cls: "almanac-list-pill is-muted",
+      cls: "ca-list-pill is-muted",
       text: "Per-entry",
     });
 
-    const tdActions = tr.createEl("td", { cls: "col-actions-cell" });
-    const actions = tdActions.createDiv({ cls: "col-actions" });
+    const tdActions = tr.createEl("td", { cls: "ca-col-actions-cell" });
+    const actions = tdActions.createDiv({ cls: "ca-col-actions" });
     actions.createSpan({
-      cls: "almanac-list-pill is-muted",
+      cls: "ca-list-pill is-muted",
       text: "Built-in",
     });
   }
@@ -2494,21 +2506,21 @@ export class AlmanacSettingTab extends PluginSettingTab {
 
     // 1. Tracker
     const tdName = tr.createEl("td");
-    const nameWrap = tdName.createDiv({ cls: "col-name" });
-    nameWrap.createSpan({ cls: "col-name-token", text: "📈" });
+    const nameWrap = tdName.createDiv({ cls: "ca-col-name" });
+    nameWrap.createSpan({ cls: "ca-col-name-token", text: "📈" });
     nameWrap.createSpan({ text: t.label || t.id });
 
     // 2. Type
     const tdType = tr.createEl("td");
-    const typePills = tdType.createDiv({ cls: "almanac-list-pills" });
+    const typePills = tdType.createDiv({ cls: "ca-list-pills" });
     typePills.createSpan({
-      cls: "almanac-list-pill is-muted",
+      cls: "ca-list-pill is-muted",
       text: TRACKER_TYPE_LABELS[t.type].split(" ")[0],
     });
 
     // 3. Surface
     const tdSurface = tr.createEl("td");
-    const surfacePills = tdSurface.createDiv({ cls: "almanac-list-pills" });
+    const surfacePills = tdSurface.createDiv({ cls: "ca-list-pills" });
     const pills = [
       ...(diaryClassOf(t.surface) != null
         ? [
@@ -2524,35 +2536,35 @@ export class AlmanacSettingTab extends PluginSettingTab {
       ...this.surfacePill(t),
     ];
     for (const p of pills) {
-      surfacePills.createSpan({ cls: `almanac-list-pill is-${p.tone}`, text: p.text });
+      surfacePills.createSpan({ cls: `ca-list-pill is-${p.tone}`, text: p.text });
     }
 
     // 4. In Entries
     const tdStatus = tr.createEl("td");
-    const statusPills = tdStatus.createDiv({ cls: "almanac-list-pills" });
+    const statusPills = tdStatus.createDiv({ cls: "ca-list-pills" });
     if (diaryClassOf(t.surface) != null) {
       statusPills.createSpan({
         cls: t.showInTemplate
-          ? "almanac-list-pill is-on"
-          : "almanac-list-pill is-off",
+          ? "ca-list-pill is-on"
+          : "ca-list-pill is-off",
         text: t.showInTemplate ? "Every entry" : "Per-entry only",
       });
       if (t.showInBase) {
         statusPills.createSpan({
-          cls: "almanac-list-pill is-muted",
+          cls: "ca-list-pill is-muted",
           text: "Diary.base",
         });
       }
     } else {
       statusPills.createSpan({
-        cls: "almanac-list-pill is-muted",
+        cls: "ca-list-pill is-muted",
         text: "Per-entry",
       });
     }
 
     // 5. Actions
-    const tdActions = tr.createEl("td", { cls: "col-actions-cell" });
-    const actions = tdActions.createDiv({ cls: "col-actions" });
+    const tdActions = tr.createEl("td", { cls: "ca-col-actions-cell" });
+    const actions = tdActions.createDiv({ cls: "ca-col-actions" });
 
     rowButton(
       actions,

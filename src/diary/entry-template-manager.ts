@@ -22,7 +22,7 @@
 // may have hand-edited.
 
 import { App, Notice } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { CLASS_DEFS, TRACKER_CLASSES } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
 import { composeEntryTemplate, offerableEntrySections } from "./entry-sections";
@@ -44,7 +44,7 @@ import { bridgeCatalogue } from "../ui/widgets/bridge-widgets";
 import { otherSurface } from "../core/bridge";
 
 export class EntryTemplates {
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   // The layouts this grain may be reloaded from.
   layoutsFor(grain: TrackerClass): EntryLayoutConfig[] {
@@ -104,7 +104,7 @@ export class EntryTemplates {
     const text = await this.app.vault.read(file);
     const { want, drops } = wantFromEntry(text, this.ctxFor(grain));
     if (!want.length) {
-      new Notice("Almanac: this page has no sections to save.");
+      new Notice("ChronoAnvil: this page has no sections to save.");
       return;
     }
 
@@ -120,7 +120,7 @@ export class EntryTemplates {
       // id, and `layout-transfer.ts` already settled what to do about that:
       // "drop silently, drop loudly, or refuse — and silence is the wrong one".
       new Notice(
-        `Almanac: kept ${want.length} section${want.length === 1 ? "" : "s"} — ${
+        `ChronoAnvil: kept ${want.length} section${want.length === 1 ? "" : "s"} — ${
           drops.length
         } line${drops.length === 1 ? "" : "s"} of your own weren't carried (${drops.join(
           ", "
@@ -167,7 +167,7 @@ export class EntryTemplates {
       },
     ];
     await this.plugin.saveSettings();
-    notify.ok(`Almanac: saved “${label}” ✅`);
+    notify.ok(`ChronoAnvil: saved “${label}” ✅`);
   }
 
   // The name-and-where prompt, then the save. The two are one decision and so
@@ -179,7 +179,7 @@ export class EntryTemplates {
     const text = await this.app.vault.read(file);
     const { want } = wantFromEntry(text, this.ctxFor(grain));
     if (!want.length) {
-      new Notice("Almanac: this page has no sections to save.");
+      new Notice("ChronoAnvil: this page has no sections to save.");
       return false;
     }
     const details = await promptLayoutSave(
@@ -241,14 +241,14 @@ export class EntryTemplates {
     const loss = this.lossOf(text, composed, grain);
     if (loss.length) {
       new Notice(
-        `Almanac: this entry holds ${loss[0].label} (${loss[0].detail}) — clear it first.`
+        `ChronoAnvil: this entry holds ${loss[0].label} (${loss[0].detail}) — clear it first.`
       );
       return false;
     }
 
     const next = reloadEntryBody(text, composed);
     if (next == null) {
-      new Notice("Almanac: this entry already matches that layout.");
+      new Notice("ChronoAnvil: this entry already matches that layout.");
       return false;
     }
 
@@ -275,7 +275,7 @@ export class EntryTemplates {
     if (!chosen || !chosen.has("entry")) return false;
 
     await this.app.vault.modify(file, next);
-    notify.ok(`Almanac: reloaded this entry from ${label} ✅`);
+    notify.ok(`ChronoAnvil: reloaded this entry from ${label} ✅`);
     return true;
   }
 

@@ -5,15 +5,15 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// The Almanac recall format — question/answer pairs stored in a note's
-// `<!--almanac:KEY-->` body region (see notestore.ts), and the arithmetic that
+// The ChronoAnvil recall format — question/answer pairs stored in a note's
+// `<!--chronoanvil:KEY-->` body region (see notestore.ts), and the arithmetic that
 // turns a session of grades into a confidence rating.
 //
 // This is the fourth thing that lives in those regions, alongside tasks
 // (tasks.ts), attachments (attachments.ts) and list entries (entries.ts). Like
 // entries, a pair is one line; unlike a task, it carries no state of its own:
 //
-//   <!--almanac:recall
+//   <!--chronoanvil:recall
 //   What is a closure? :: A function together with the scope it was defined in.
 //   What does std::vector own? :: Its elements, contiguously, on the heap.
 //   -->

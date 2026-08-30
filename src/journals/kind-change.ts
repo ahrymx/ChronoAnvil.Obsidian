@@ -30,14 +30,14 @@
 //
 // SAY "NOTES", NOT "PAGES"
 //
-// In Almanac's own vocabulary a *page* is a specific thing — the sub-notes a
+// In ChronoAnvil's own vocabulary a *page* is a specific thing — the sub-notes a
 // long note is split across, deliberately excluded from `kinds` so they are
 // never queued, counted or listed. Using "page" here for "a note that gets
 // created" would collide with the narrower meaning the reader has already been
 // taught everywhere else.
 
 import type { App } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { EditorModal } from "../ui/editor-modal";
 import {
   KindChange,
@@ -54,7 +54,7 @@ export interface KindChangeCounts {
 //
 // It is not an editor and has no fields, which is the argument for leaving it
 // alone — and the argument against is that it was already building
-// `.almanac-editor-footer` by hand, so it had decided it was a window of this
+// `.ca-editor-footer` by hand, so it had decided it was a window of this
 // family and was reimplementing the parts. What it takes from the frame is the
 // head, the scrolling body and the footer; what it does not take is Save,
 // because its commit is an answer rather than a write.
@@ -68,7 +68,7 @@ class KindChangeModal extends EditorModal {
 
   constructor(
     app: App,
-    plugin: AlmanacPlugin,
+    plugin: ChronoAnvilPlugin,
     private typeName: string,
     private changes: KindChange[],
     private counts: KindChangeCounts,
@@ -85,7 +85,7 @@ class KindChangeModal extends EditorModal {
 
   protected renderBody(): void {
     const contentEl = this.body;
-    this.contentEl.addClass("almanac-kind-change");
+    this.contentEl.addClass("ca-kind-change");
 
     const added = this.changes.filter((c) => c.kind === "added");
     const removed = this.changes.filter((c) => c.kind === "removed");
@@ -110,7 +110,7 @@ class KindChangeModal extends EditorModal {
     // promising about, and it has to keep promising the part that matters: a
     // reader's own writing is not touched, and nothing at all is written
     // without being shown and accepted first.
-    const promise = contentEl.createDiv({ cls: "almanac-kind-promise" });
+    const promise = contentEl.createDiv({ cls: "ca-kind-promise" });
     promise.createEl("strong", { text: "Nothing you have written changes." });
     promise.createSpan({
       text:
@@ -124,7 +124,7 @@ class KindChangeModal extends EditorModal {
     for (const c of removed) {
       const lines = declassificationCost(this.typeName, this.counts[c.id] ?? 0);
       if (!lines.length) continue;
-      const cost = contentEl.createDiv({ cls: "almanac-kind-cost" });
+      const cost = contentEl.createDiv({ cls: "ca-kind-cost" });
       for (const line of lines) cost.createDiv({ text: line });
     }
 
@@ -154,23 +154,23 @@ class KindChangeModal extends EditorModal {
     withCounts = false
   ): void {
     const wrap = this.body.createDiv({
-      cls: `almanac-kind-group almanac-kind-${tone}`,
+      cls: `ca-kind-group ca-kind-${tone}`,
     });
-    wrap.createDiv({ cls: "almanac-kind-group-title", text: title });
+    wrap.createDiv({ cls: "ca-kind-group-title", text: title });
     for (const c of changes) {
-      const row = wrap.createDiv({ cls: "almanac-kind-row" });
+      const row = wrap.createDiv({ cls: "ca-kind-row" });
       row.createEl("strong", { text: c.label });
       if (withCounts) {
         const n = this.counts[c.id] ?? 0;
         row.createSpan({
-          cls: "almanac-kind-count",
+          cls: "ca-kind-count",
           text:
             n === 0
               ? " — no notes use it"
               : ` — ${n} note${n === 1 ? "" : "s"} on disk carry type: ${c.id}`,
         });
       }
-      row.createDiv({ cls: "almanac-kind-detail", text: c.detail });
+      row.createDiv({ cls: "ca-kind-detail", text: c.detail });
     }
   }
 
@@ -191,7 +191,7 @@ class KindChangeModal extends EditorModal {
 
 export function confirmKindChange(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   typeName: string,
   changes: KindChange[],
   counts: KindChangeCounts

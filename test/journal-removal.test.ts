@@ -111,7 +111,7 @@ describe("where a binned journal's folders go", () => {
   it("moves a single item through the same mover, never a delete", () => {
     // 4.50 shipped a *Move to bin* on a title's row that called
     // `fileManager.trashFile`, which is Obsidian's trash — a second bin behind
-    // the same word, and a DELETE where this module's own header says Almanac
+    // the same word, and a DELETE where this module's own header says ChronoAnvil
     // has never removed a reader's note.
     const src = readCode("journal-removal");
     expect(src).toContain("app.fileManager.renameFile(item, target)");
@@ -142,7 +142,7 @@ describe("where a binned journal's folders go", () => {
     const src = readCode("journal-removal");
     expect(src).toContain("app.fileManager.renameFile(folder, target)");
     expect(src).not.toContain("vault.rename(");
-    // AND NOTHING DELETES. Almanac has never removed a reader's note and the
+    // AND NOTHING DELETES. ChronoAnvil has never removed a reader's note and the
     // bin is not where that starts — if either of these ever appears in this
     // module, a "bin" has become a shredder.
     expect(src).not.toContain("vault.delete(");

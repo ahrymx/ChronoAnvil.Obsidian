@@ -5,8 +5,8 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// The Almanac attachment format — the small line format stored inside a note's
-// `<!--almanac:attachments-->` region (see notestore.ts), rendered by the
+// The ChronoAnvil attachment format — the small line format stored inside a note's
+// `<!--chronoanvil:attachments-->` region (see notestore.ts), rendered by the
 // `attach:` widget as a gallery of image tiles plus a row of link/file chips.
 //
 // Everything here is written in *plain markdown*, deliberately: an attachment

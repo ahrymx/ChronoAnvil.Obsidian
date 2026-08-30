@@ -25,13 +25,13 @@ describe("open tasks table redesign", () => {
   it("extracts inline tags and renders them on the right-hand meta cluster", () => {
     expect(src).toContain("journal-task-tag");
     expect(src).toContain("#[a-zA-Z0-9_\\-/]+");
-    expect(css).toContain(".journal-tasks-table .journal-task-tag");
+    expect(css).toContain(".ca-journal-tasks-table .ca-journal-task-tag");
   });
 
   it("provides collapsible bucket containers with toggleable chevrons", () => {
     expect(src).toContain("jtt-group-chevron");
     expect(src).toContain("is-collapsed");
-    expect(css).toContain(".journal-tasks-table .jtt-bucket.is-collapsed");
+    expect(css).toContain(".ca-journal-tasks-table .ca-jtt-bucket.is-collapsed");
   });
 
   it("scopes bare tasks-table on diary overview notes to the diary root", () => {

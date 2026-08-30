@@ -8,7 +8,7 @@
  */
 
 /* ============================================================
- *  Almanac plugin — bundled styles
+ *  ChronoAnvil plugin — bundled styles
  *  Obsidian loads this automatically; no CSS snippets required.
  *  Sections:
  *    1. Inline widgets (sliders, pickers, selects, buttons)
@@ -24,10 +24,10 @@
 
 :root {
   /* Radius: four tiers — tight square controls, small controls, cards, and pills. */
-  --am-radius-xs: 3px;   /* tight square tags, stamps, badges */
-  --am-radius-sm: 6px;   /* inputs, selects, steppers, ghost icon buttons */
-  --am-radius-md: 10px;  /* cards: callouts, calendar, tracker rows, tag groups */
-  --am-radius-pill: 999px; /* every pill-shaped button, link and badge */
+  --ca-radius-xs: 3px;   /* tight square tags, stamps, badges */
+  --ca-radius-sm: 6px;   /* inputs, selects, steppers, ghost icon buttons */
+  --ca-radius-md: 10px;  /* cards: callouts, calendar, tracker rows, tag groups */
+  --ca-radius-pill: 999px; /* every pill-shaped button, link and badge */
 
   /* Page-ground strength (4.80). How much of a ground's pattern film is let
      through, as the film's own opacity. Three settings pick between three
@@ -37,7 +37,7 @@
      A LITERAL, AND UNCONDITIONAL, so the read carries no fallback. The strength
      classes below override it on `body`, which wins over `:root` for `body` and
      everything under it. */
-  --am-tex-strength: 0.75;
+  --ca-tex-strength: 0.75;
 
   /* THE SURFACE AND BORDER ALIASES MOVED TO `body` IN 4.42 — see the block at
      the foot of this file. Every one of them names an OBSIDIAN variable, and
@@ -59,7 +59,7 @@
 
      ── A PLAIN VALUE, AFTER THREE RELEASES OF IT NOT DRAWING AT ALL (4.42) ─
      It was `color-mix(in srgb, var(--background-modifier-border) 55%,
-     var(--am-surface-inset))`, and on every screenshot from 4.35.2 to 4.41.0 the
+     var(--ca-surface-inset))`, and on every screenshot from 4.35.2 to 4.41.0 the
      cards that read it came back with a **`#dadada`** edge — `currentColor`, the
      initial `border-color`, which is what an element gets when the colour it
      asked for is invalid.
@@ -67,7 +67,7 @@
      4.40 blamed the shorthand (real, fixed, not the cause). 4.40.1 blamed
      `:root` and moved the mix to `body` (right about the placement, still white
      on the next render). At that point the remaining unresolved term was
-     `var(--am-surface-inset)` — itself a `:root` alias of a theme variable — and
+     `var(--ca-surface-inset)` — itself a `:root` alias of a theme variable — and
      the mix could ALSO be failing simply because a `color-mix` over `var()`s
      inside a custom property does not compute here. **A screenshot cannot
      separate those two, and it does not have to: a plain value is immune to
@@ -76,21 +76,21 @@
      WHAT IS GIVEN UP, STATED HONESTLY. The mix adapted to whatever border
      colour a theme declared; a white-alpha hair does not. That was the better
      idea and it has never once drawn — an adaptive value that renders as
-     `currentColor` is not adaptive, it is broken. `--am-edge-highlight` and
-     `--am-slot-edge` are the same decision, and `--am-slot-edge` is the reason
+     `currentColor` is not adaptive, it is broken. `--ca-edge-highlight` and
+     `--ca-slot-edge` are the same decision, and `--ca-slot-edge` is the reason
      to trust this one: measured at `#333333` over `#232323` on
      `20260818_20h59m08s_grim.png`, exactly what the arithmetic says.
 
      0.06 over the card's `#232323` is `#303030` — a step off the surface,
      quieter than the `#333333` boundary outside it, which is the whole point of
      the token. */
-  --am-border-inner: rgba(255, 255, 255, 0.06);
-  --am-edge-highlight: rgba(255, 255, 255, 0.04);
+  --ca-border-inner: rgba(255, 255, 255, 0.06);
+  --ca-edge-highlight: rgba(255, 255, 255, 0.04);
   /* ── THE EDGE OF AN EMPTY SLOT, AND IT MUST NOT MARCH (4.40) ──────────
      MEASURED COMPLAINT: *"the tiles have ant-pattern lines around them now, and
      it is too jarring"*, on `20260818_20h01m16s_grim.png`. The add card's dash
      came back **3px wide in `#dadada`** — a near-white rope around a box whose
-     ground is `#232323`. See the fault note at `.jjs-card` for why it was white
+     ground is `#232323`. See the fault note at `.ca-jjs-card` for why it was white
      and 3px, which is a different bug from this one.
 
      THIS TOKEN IS THE OTHER HALF: what the edge should say. A dashed border is
@@ -99,28 +99,28 @@
      card would go; the tile's label says what pressing it does. So it sits a
      hair above the surface and no more.
 
-     A PLAIN VALUE, NOT A MIX, AND IT STAYS ONE (4.40.1). `--am-border-inner`'s
+     A PLAIN VALUE, NOT A MIX, AND IT STAYS ONE (4.40.1). `--ca-border-inner`'s
      mix is the fault that opened this file, and although the cause turned out to
      be WHERE it was declared rather than the mix itself, the conclusion holds:
      the one edge on the page that is drawn ONLY as an edge should not depend on
-     a computation at all. `--am-edge-highlight` two lines up is the same decision
+     a computation at all. `--ca-edge-highlight` two lines up is the same decision
      for the same reason, and both resolve per theme by having a twin below. */
-  --am-slot-edge: rgba(255, 255, 255, 0.07);
+  --ca-slot-edge: rgba(255, 255, 255, 0.07);
 
   /* Card shadow elevation */
-  --am-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
-  --am-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --ca-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --ca-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
 
   /* Group page swipe tint opacities (0..1) */
-  --am-swipe-tint-left: 0;
-  --am-swipe-tint-right: 0;
+  --ca-swipe-tint-left: 0;
+  --ca-swipe-tint-right: 0;
 
-  /* Vertical rhythm between stacked widgets in one ```almanac block. Named
+  /* Vertical rhythm between stacked widgets in one ```chronoanvil block. Named
      because it is a flex `gap`, not a margin — a widget that wants to butt up
      against its neighbour (the joined highlights/challenges box) has to cancel
      it with a negative margin of exactly this size, and a magic -10px there
      silently breaks the day someone retunes the spacing here. */
-  --am-widget-gap: 10px;
+  --ca-widget-gap: 10px;
 
   /* How far a row block's drop bands reach BEYOND the block, into the margin
      between it and its neighbour (4.54 §1).
@@ -132,23 +132,23 @@
      they cover, so what is left of a band is the strip that is genuinely
      outside the row: the group's own padding, and this.
 
-     16px BECAUSE IT IS THE BLOCK'S OWN BOTTOM MARGIN. `.journal-widget-block`
+     16px BECAUSE IT IS THE BLOCK'S OWN BOTTOM MARGIN. `.ca-journal-widget-block`
      sits in `margin: 0.5em 0 1em`, so a band reaching this far stops on the
      neighbouring block's edge rather than over anything the neighbour drew. Two
      adjacent blocks therefore TILE the space between them — the lower one's
      "above" band and the upper one's "below" band both name the same insertion
      point, so the overlap in the middle is one place with two names rather than
      an ambiguity. */
-  --am-slot-reach: 16px;
+  --ca-slot-reach: 16px;
 
   /* How wide a page of widgets is allowed to get (4.2 §2). Read by the
-     homepage's `almanac-wide` class and by nothing else yet.
+     homepage's `ca-wide` class and by nothing else yet.
 
      THE NUMBER IS DERIVED, not chosen. A row splits the page into equal cells,
      and 520px is the width at which every widget in this plugin collapses to
      its narrow layout — the number the tracker modules, the journal views, the
      header bars and the heroes all already use. Two cells above that threshold
-     is 2 x 520 + one --am-widget-gap = 1050, and this is that rounded up so the
+     is 2 x 520 + one --ca-widget-gap = 1050, and this is that rounded up so the
      cells clear it rather than sit on it.
 
      TWO, because two is what a row of full-size widgets is: the reference
@@ -161,7 +161,7 @@
      read comfortably in one line — and this page is a calendar, a card and a
      grid. Borrowing it would make the dashboard's shape a consequence of a
      prose setting; see HOME_CSS_CLASS in home-sections.ts. */
-  --am-page-width: 1100px;
+  --ca-page-width: 1100px;
 
   /* The narrowest a cell of a `row` may get before the row wraps (4.3.1).
 
@@ -176,7 +176,7 @@
      narrow layout. Below 520 a widget is compact; below roughly 300 it is
      broken, and those are different questions. A row wants the second number:
      a compact widget in a narrow cell is the point of the primitive. */
-  --am-row-cell-min: 320px;
+  --ca-row-cell-min: 320px;
 
   /* The shortest a widget's card may be dragged to (4.22 §3.2).
 
@@ -194,10 +194,10 @@
      rule block-drag.ts states where it defines that function: a length written
      in the stylesheet is derived rather than repeated, so there is no second
      place for the two to disagree. */
-  --am-card-h-min: 120px;
+  --ca-card-h-min: 120px;
 
   /* Type: four sizes. Micro meta -> emphasized numbers/titles. */
-  --am-text-2xs: 0.7em;
+  --ca-text-2xs: 0.7em;
 
   /* ── The page head's own two, and it is the only object with any (4.10) ──
    *
@@ -208,7 +208,7 @@
    * the PAGE rather than about something on it: a different voice is how a
    * reader tells the two apart without being told.
    *
-   * An almanac is a printed annual reference, so a book face is the subject's
+   * A chronoanvil is a printed annual reference, so a book face is the subject's
    * own vernacular rather than a decoration borrowed from somewhere else.
    *
    * A STACK, SO NOTHING IS SHIPPED. Every entry is a face an OS already has and
@@ -216,7 +216,7 @@
    * a plugin that has never had one. A webfont here would be a download on every
    * vault for one line of text.
    */
-  --am-head-face: "Iowan Old Style", "Palatino Linotype", Palatino,
+  --ca-head-face: "Iowan Old Style", "Palatino Linotype", Palatino,
                   "Book Antiqua", Georgia, ui-serif, serif;
 
   /* One small-caps voice for every key label in the plugin: the diary eyebrow,
@@ -227,10 +227,10 @@
      read as assembled from parts. The tracking is the widest of the old values
      because these are 0.7em words: at that size letter-spacing is what makes
      small caps legible rather than merely small. */
-  --am-caps-weight: 700;
-  --am-caps-tracking: 0.12em;
+  --ca-caps-weight: 700;
+  --ca-caps-tracking: 0.12em;
 
-  /* `--am-band-recess` STOOD HERE AND IS DELETED (4.13.1 §3b). It named the
+  /* `--ca-band-recess` STOOD HERE AND IS DELETED (4.13.1 §3b). It named the
      recess every band on the diary card was sunk by — the stats readout, the
      navigator, the agenda — after those three had been written out separately at
      0.13 / 0.13 / 0.12 with three light-theme overrides to match. Naming it was
@@ -240,24 +240,24 @@
      guard in `test/tokens.test.ts` exists to catch, arrived at from the other
      end. The light-theme override below went with it. */
 
-  --am-text-xs: 0.8em;
-  --am-text-sm: 0.85em;
-  --am-text-base: 0.95em;
+  --ca-text-xs: 0.8em;
+  --ca-text-sm: 0.85em;
+  --ca-text-base: 0.95em;
 
   /* ── Header Art & Vault Banner Customization Tokens ────────────────── */
-  --am-header-bg-gradient: none;
-  --am-header-art-pattern: none;
-  --am-header-art-size: auto;
-  --am-header-art-repeat: repeat;
-  --am-header-art-position: center;
-  --am-header-art-opacity: 0.18;
-  --am-header-art-blend: soft-light;
-  --am-cog-opacity: 0.65;
+  --ca-header-bg-gradient: none;
+  --ca-header-art-pattern: none;
+  --ca-header-art-size: auto;
+  --ca-header-art-repeat: repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-opacity: 0.18;
+  --ca-header-art-blend: soft-light;
+  --ca-cog-opacity: 0.65;
 
   /* The section frame (2.56). A section header used to spend about 52px of
      vertical block on a 1.25em/700 title, 16px of padding and a 2px rule —
      five of those on one journal note is a third of a phone viewport spent on
-     chrome. Named here rather than written into .journal-header-bar because
+     chrome. Named here rather than written into .ca-journal-header-bar because
      §1 of the 2.56 plan retires 39 header-shaped components onto one frame,
      and the whole point of one frame is that its rhythm is one number.
 
@@ -266,7 +266,7 @@
      horizontal lines down a page and separates nothing in particular.
 
      THE PADDING CAME DOWN A PIXEL IN 4.11, when the section bar was brought into
-     line with the widget head — the slim band `.journal-block-head` draws over
+     line with the widget head — the slim band `.ca-journal-block-head` draws over
      every widget on a page, which a section bar sat beside looking like a
      different kind of object.
 
@@ -277,26 +277,26 @@
      homepage, which composes a bare directive, and as `⏳ Open Tasks` at 15.2px
      on both dashboards, which compose a `header:` line. One string in
      `SECTION_TITLES`, two objects on screen, and nobody had decided it. So the
-     bar is now ONE thing at ONE scale — the smaller one — and `--am-bar-*` below
+     bar is now ONE thing at ONE scale — the smaller one — and `--ca-bar-*` below
      is where that scale lives. What 4.11 took from the head was its rule weight
      and its padding; 4.13 takes the rest. */
-  --am-sec-gap: 4px;
-  --am-sec-pad: 2px;
-  --am-sec-indent: 1.1em;
+  --ca-sec-gap: 4px;
+  --ca-sec-pad: 2px;
+  --ca-sec-indent: 1.1em;
   /* A WIDTH, ON AN ELEMENT WHOSE OWN FONT-SIZE RESOLVES IT — which is the whole
      reason this number moved in 4.13 rather than staying put. `em` on a `width`
      is relative to the element's own type, so when the glyph came down from
-     `--am-text-base` to `--am-bar-glyph` the slot would have silently shrunk
+     `--ca-text-base` to `--ca-bar-glyph` the slot would have silently shrunk
      from ~19.8px to ~17.7px and taken the title alignment with it. 1.5 × 0.85em
      lands back at ~20px, so the slot is the same on the page and only the
-     spelling changed. See `.journal-header-glyph`. */
-  --am-sec-glyph: 1.5em;
+     spelling changed. See `.ca-journal-header-glyph`. */
+  --ca-sec-glyph: 1.5em;
 
   /* ── ONE HEADER BAR, AT ONE SCALE (4.13 §1) ────────────────────────────
      Two implementations title a block and they must not drift: `sectionFrame`
-     draws `.journal-header-title` for a `header:` or `frame: section` fence, and
-     `buildHead` draws `.journal-block-head-title` for a bare one. They cannot be
-     merged — `NOT_A_CELL` evicts a `.journal-sec` from a row cell by design, so a
+     draws `.ca-journal-header-title` for a `header:` or `frame: section` fence, and
+     `buildHead` draws `.ca-journal-block-head-title` for a bare one. They cannot be
+     merged — `NOT_A_CELL` evicts a `.ca-journal-sec` from a row cell by design, so a
      widget inside a group can only ever be titled by a block head — so instead
      they read one set of tokens and agree by construction rather than by
      inspection.
@@ -307,20 +307,20 @@
      legible. 0.85em is the smallest size at which the shipped glyphs still read.
 
      THIS SAID "NO THEME VARIABLE IS READ HERE, WHICH IS WHY THESE MAY LIVE IN
-     `:root`" AND IT WAS FALSE (4.42) — two lines below it, `--am-bar-ink` read
-     `--text-muted` and `--am-sec-title-ink` read `--text-normal`. The rule the
+     `:root`" AND IT WAS FALSE (4.42) — two lines below it, `--ca-bar-ink` read
+     `--text-muted` and `--ca-sec-title-ink` read `--text-normal`. The rule the
      sentence states is right; the claim that these obeyed it was not. Both have
      moved to `body`, and the guard in `tokens.test.ts` now checks the rule
      rather than trusting a comment to have been kept true. */
-  --am-bar-text: var(--am-text-2xs);
-  --am-bar-track: 0.06em;
-  --am-bar-glyph: var(--am-text-sm);
-  --am-sec-title-size: var(--am-text-lg);
+  --ca-bar-text: var(--ca-text-2xs);
+  --ca-bar-track: 0.06em;
+  --ca-bar-glyph: var(--ca-text-sm);
+  --ca-sec-title-size: var(--ca-text-lg);
   /* Added in 2.53 for the week table's date, the first place in the sheet that
      wanted type *above* body size. Named rather than written as a literal so
      the next one that does agrees with it. It is now the size a NOTE'S NAME is
      set at, on all three banners. */
-  --am-text-lg: 1.15em;
+  --ca-text-lg: 1.15em;
   /* One step further up, added in 4.21.1 for the page-context strip's alias.
      It is the only type in the plugin set larger than a note's own name, and
      that is the decision rather than an oversight: the file's name identifies
@@ -328,7 +328,7 @@
      to the page to read. `2026-08-13` is an address; "Started the new job" is
      the entry. A ratio rather than a size a band happened to need — 1.35 to
      1.15 is the same step 1.15 takes over body text. */
-  --am-text-xl: 1.35em;
+  --ca-text-xl: 1.35em;
 
   /* The rule-weight scale (3.6). Three tiers, and like the radii above,
      nothing in this sheet should type a raw px border width outside them.
@@ -359,7 +359,7 @@
      reason for putting it here rather than at twenty call sites. It is also
      the one value in this file with no defensible answer in advance — 1px
      against a hairline is a doubling on some themes and invisible on others,
-     and Almanac renders inside whatever theme the reader has.
+     and ChronoAnvil renders inside whatever theme the reader has.
 
      `edge` is the species marker and the spine: the accent bar that says "this
      page summarises", the left rail on a quoted block. Already 3px at five
@@ -369,29 +369,29 @@
      THE SCALE HAS NO HALF STEP, AND CANNOT. Chromium — which is what Obsidian
      is — floors border-width to whole CSS pixels: 1.4px, 1.5px and 1.6px all
      compute to 1px, at every device pixel ratio. A box-shadow's spread does
-     not floor. So a `--am-rule` of 1.5px would draw every divider at 1px while
+     not floor. So a `--ca-rule` of 1.5px would draw every divider at 1px while
      drawing every cell ring at 1.5px, and the one number this scale exists to
      keep in step would be out of step by construction. The two borders in this
      sheet that were written at 1.5px had been drawing 1px since the day they
-     were typed; they read `--am-rule-hair` now, which changed nothing on
+     were typed; they read `--ca-rule-hair` now, which changed nothing on
      screen and stopped the file claiming a weight it never had.
 
      Rings may still be 1.5px where a control wants a stroke rather than a
      rule — that is the drawing of a control, not a division between things,
      and folding it in would make the scale mean "every edge", which is how a
      scale stops being able to say anything. */
-  --am-rule-hair: 1px;
-  --am-rule: 2px;
-  --am-rule-edge: 3px;
+  --ca-rule-hair: 1px;
+  --ca-rule: 2px;
+  --ca-rule-edge: 3px;
 
   /* Mood palette — the only hardcoded hues in the sheet, named once so
      the tracker chart's barColor and any future use point at the same
      five values instead of a copy-pasted hex literal. */
-  --am-mood-1: #e0575b;
-  --am-mood-2: #e0925a;
-  --am-mood-3: #d9b64e;
-  --am-mood-4: #8bbf5d;
-  --am-mood-5: #4caf7d;
+  --ca-mood-1: #e0575b;
+  --ca-mood-2: #e0925a;
+  --ca-mood-3: #d9b64e;
+  --ca-mood-4: #8bbf5d;
+  --ca-mood-5: #4caf7d;
 
   /* The second chart series (4.45). A line chart may draw two trackers, and the
      first keeps the theme's own accent — a chart that changed colour the moment
@@ -403,17 +403,17 @@
      blindness, where a second blue or a green would not. Named here rather than
      written into chart-render.ts so a theme whose accent IS orange can move it —
      the one case this default cannot answer for itself. */
-  --am-chart-series-2: #eb6834;
+  --ca-chart-series-2: #eb6834;
 
   /* Activity ramp — the study heatmap's four shades, light to dark. Separate
      from the mood palette on purpose: mood runs red→green because low mood is
      bad, whereas a low task count is simply less work, so it wants a single
      hue at increasing strength. The darkest stop is the green the old activity
      chart used for completed tasks, so the section's colour story is unchanged. */
-  --am-act-1: #c7e3ae;
-  --am-act-2: #94ca7c;
-  --am-act-3: #5aa84c;
-  --am-act-4: #22c55e;
+  --ca-act-1: #c7e3ae;
+  --ca-act-2: #94ca7c;
+  --ca-act-3: #5aa84c;
+  --ca-act-4: #22c55e;
 
   /* Event palette — the eight swatches a special event can be decorated with.
      Named rather than free-form on purpose: a hex picker lets you choose
@@ -421,20 +421,20 @@
      legible as a 3px bar and an 11px icon on both. Mid-tone, roughly equal
      luminance, and distinguishable from the mood ramp above so a red event
      doesn't read as a bad day. */
-  --am-ev-red: #d9534f;
-  --am-ev-amber: #d98b34;
-  --am-ev-green: #58a55c;
-  --am-ev-teal: #3fa3a3;
-  --am-ev-blue: #4a8fd4;
-  --am-ev-purple: #8b6fd1;
-  --am-ev-pink: #cc6699;
-  --am-ev-grey: #8a8f98;
+  --ca-ev-red: #d9534f;
+  --ca-ev-amber: #d98b34;
+  --ca-ev-green: #58a55c;
+  --ca-ev-teal: #3fa3a3;
+  --ca-ev-blue: #4a8fd4;
+  --ca-ev-purple: #8b6fd1;
+  --ca-ev-pink: #cc6699;
+  --ca-ev-grey: #8a8f98;
 
   /* ── the same eight, as a GROUND (4.55) ──────────────────────────────
      The time grid fills a block with a swatch and puts white type on it, and
      the eight above are tuned for the opposite job: a 3px bar and an 11px
      icon, drawn as a foreground on the page's own ground. White on
-     `--am-ev-amber` is about 2.4:1, which is unreadable at the smallest size
+     `--ca-ev-amber` is about 2.4:1, which is unreadable at the smallest size
      in the plugin.
 
      So each fill is the same hue taken down until white clears 4.5:1 on it.
@@ -442,31 +442,31 @@
      in BOTH themes, since the fills stay dark in both, and a rule that read
      `--text-on-accent` would follow the theme away from the only colour that
      works here. */
-  --am-tg-ink: #ffffff;
-  --am-tg-red: #c2403c;
-  --am-tg-amber: #a2661d;
-  --am-tg-green: #3f7f43;
-  --am-tg-teal: #2c7676;
-  --am-tg-blue: #376fa8;
-  --am-tg-purple: #6b53ac;
-  --am-tg-pink: #a84e79;
-  --am-tg-grey: #626973;
+  --ca-tg-ink: #ffffff;
+  --ca-tg-red: #c2403c;
+  --ca-tg-amber: #a2661d;
+  --ca-tg-green: #3f7f43;
+  --ca-tg-teal: #2c7676;
+  --ca-tg-blue: #376fa8;
+  --ca-tg-purple: #6b53ac;
+  --ca-tg-pink: #a84e79;
+  --ca-tg-grey: #626973;
 
   /* ── Semantic Grain Palette & Typography (4.80) ──────────────────────
      Each temporal diary grain and journal has a dedicated signature accent
      and RGB components for adaptive alpha layering and micro-spines. */
-  --am-grain-daily: #e58e26;
-  --am-grain-daily-rgb: 229, 142, 38;
-  --am-grain-weekly: #0fb9b1;
-  --am-grain-weekly-rgb: 15, 185, 177;
-  --am-grain-monthly: #8854d0;
-  --am-grain-monthly-rgb: 136, 84, 208;
-  --am-grain-quarterly: #eb6834;
-  --am-grain-quarterly-rgb: 235, 104, 52;
-  --am-grain-yearly: #f1c40f;
-  --am-grain-yearly-rgb: 241, 196, 15;
-  --am-font-heading: inherit;
-  --am-font-telemetry: inherit;
+  --ca-grain-daily: #e58e26;
+  --ca-grain-daily-rgb: 229, 142, 38;
+  --ca-grain-weekly: #0fb9b1;
+  --ca-grain-weekly-rgb: 15, 185, 177;
+  --ca-grain-monthly: #8854d0;
+  --ca-grain-monthly-rgb: 136, 84, 208;
+  --ca-grain-quarterly: #eb6834;
+  --ca-grain-quarterly-rgb: 235, 104, 52;
+  --ca-grain-yearly: #f1c40f;
+  --ca-grain-yearly-rgb: 241, 196, 15;
+  --ca-font-heading: inherit;
+  --ca-font-telemetry: inherit;
 
   /* ── the grid's own geometry, and the now line (4.62) ────────────────
      THE GUTTER IS ONE NUMBER BECAUSE IT IS ONE COLUMN. The hour rail, the
@@ -483,13 +483,13 @@
      is a shorter grid than a fourteen-hour one, which is also the honest
      drawing of it.
 
-     THE NOW LINE IS RED IN BOTH THEMES, on `--am-tg-ink`'s reasoning one
+     THE NOW LINE IS RED IN BOTH THEMES, on `--ca-tg-ink`'s reasoning one
      block up: it is drawn over fills that stay dark in both, and the one
      thing on this widget that must never be mistaken for a block. It is not
-     `--am-tg-red`, which is a fill a reader may have chosen for an event. */
-  --am-tg-gutter: 52px;
-  --am-tg-row: 50px;
-  --am-tg-now: #e0484d;
+     `--ca-tg-red`, which is a fill a reader may have chosen for an event. */
+  --ca-tg-gutter: 52px;
+  --ca-tg-row: 50px;
+  --ca-tg-now: #e0484d;
 
   /* ── The spacing scale (3.9 §4) ────────────────────────────────────────
      DEFINED HERE AND READ BY NOTHING IN THE PATCH THAT ADDS IT. That is the
@@ -504,7 +504,7 @@
      the rule scale says so out loud ("the three tiers are jobs, not sizes").
      Names are right for a set of jobs.
 
-     This scale is arithmetic. `--am-space-N` is exactly `2N` px, and that
+     This scale is arithmetic. `--ca-space-N` is exactly `2N` px, and that
      property is the whole reason it is a scale rather than a list of seven
      numbers someone liked. Spelling it `sm`/`md`/`lg` would hide the one thing
      worth knowing about it and would make "one step tighter" a lookup instead
@@ -525,18 +525,18 @@
      real argument and it is a DESIGN argument; it should be made on its own,
      against a sheet that already reads from a scale, and not smuggled in by
      the patch that introduces one. */
-  --am-space-1: calc(var(--am-space-unit) * 1);
-  --am-space-2: calc(var(--am-space-unit) * 2);
-  --am-space-3: calc(var(--am-space-unit) * 3);
-  --am-space-4: calc(var(--am-space-unit) * 4);
-  --am-space-5: calc(var(--am-space-unit) * 5);
-  --am-space-6: calc(var(--am-space-unit) * 6);
-  --am-space-7: calc(var(--am-space-unit) * 7);
+  --ca-space-1: calc(var(--ca-space-unit) * 1);
+  --ca-space-2: calc(var(--ca-space-unit) * 2);
+  --ca-space-3: calc(var(--ca-space-unit) * 3);
+  --ca-space-4: calc(var(--ca-space-unit) * 4);
+  --ca-space-5: calc(var(--ca-space-unit) * 5);
+  --ca-space-6: calc(var(--ca-space-unit) * 6);
+  --ca-space-7: calc(var(--ca-space-unit) * 7);
 
   /* THE STEP, AND THE WHOLE OF PATCH 7's RATIO FIX (3.9 §3).
-     `--am-space-N` is N of these, which is what makes the numeric naming
+     `--ca-space-N` is N of these, which is what makes the numeric naming
      honest and what makes the mobile override one line rather than seven. */
-  --am-space-unit: 2px;
+  --ca-space-unit: 2px;
 
   /* ── The control scale (3.9 §3.3 / §4.3) ───────────────────────────────
      What an interactive control is padded by, and how small it may get.
@@ -546,7 +546,7 @@
      on mobile" is not one complaint but two, and neither is about the box
      being too big:
 
-       - Font sizes here are RELATIVE (`--am-text-xs: 0.8em`) and paddings are
+       - Font sizes here are RELATIVE (`--ca-text-xs: 0.8em`) and paddings are
          ABSOLUTE. So a control on a phone renders 16px text inside a box padded
          for 13px text: proportionally LESS padding than the same control on a
          desktop, while looking like more, because the eye reads the ratio.
@@ -559,14 +559,14 @@
      block also changes nothing. The mobile override is patch 7's, and the
      floor is deliberately unset until then — a `min-height` invented here
      would be patch 7 arriving early and unreviewed. */
-  --am-control-pad-y: var(--am-space-1);
-  --am-control-pad-x: var(--am-space-4);
+  --ca-control-pad-y: var(--ca-space-1);
+  --ca-control-pad-x: var(--ca-space-4);
   /* The touch-target floor, off by default. `auto` rather than a number
      because a desktop control's height should stay whatever its content and
      padding make it — asserting 40px on a pointer device would grow every pill
      in the plugin to no purpose. The mobile scope below is the only thing that
      turns this on. */
-  --am-control-min: auto;
+  --ca-control-min: auto;
   /* A floored control's corner. Full capsule by default, which is what a pill
      has always been and what it should stay while controls are short: at a
      desktop control's ~26px height, 999px resolves to a 13px corner and reads
@@ -575,11 +575,11 @@
      a 40px floor and a capsule on a 40×62 button is a lozenge — 3.12 §14.1,
      where the recap notice's two-word "Add it" came out as a blob.
      So the corner is DERIVED FROM THE SAME TOKEN AS THE HEIGHT rather than
-     picked separately: both read `--am-control-min`, so a future change to the
+     picked separately: both read `--ca-control-min`, so a future change to the
      floor moves the corner with it and the two cannot drift into disagreeing
      about what shape a control is. 0.35 rather than 0.5 because 0.5 IS a
      capsule — halving the height is the definition of the shape being fixed. */
-  --am-control-round: var(--am-radius-pill);
+  --ca-control-round: var(--ca-radius-pill);
 
   /* The calendar-heatmap width cap. DEFINED IN 3.12; before that it was
      referenced once, in 20-charts.css, and set by nothing anywhere — the
@@ -591,7 +591,7 @@
      The value is unchanged and the argument for it is at the call site: cells
      are squares sized by their COLUMN, so a wider wrap means bigger cells and
      FEWER week rows in the same tile, not more. */
-  --am-heat-max-w: 260px;
+  --ca-heat-max-w: 260px;
 
   /* ── The elevation scale (3.9 §4.1) ────────────────────────────────────
      Three heights and one direction variant, for the four drop shadows this
@@ -609,13 +609,13 @@
 
      THESE CARRY A DARK-THEME ASSUMPTION AND DO NOT SAY SO — `rgba(0,0,0,…)`
      over a light theme is a heavier shadow than intended. That is the same
-     defect §6 recorded against `--am-band-recess`, which answered it with a
+     defect §6 recorded against `--ca-band-recess`, which answered it with a
      `.theme-light` override and has since been deleted outright; it is not fixed
      here, and naming the values at least moves it from four call sites to one. */
-  --am-elev-1: 0 1px 4px rgba(0, 0, 0, 0.25);
-  --am-elev-2: 0 8px 24px rgba(0, 0, 0, 0.4);
-  --am-elev-2-up: 0 -8px 24px rgba(0, 0, 0, 0.4);
-  --am-elev-3: 0 10px 40px rgba(0, 0, 0, 0.5);
+  --ca-elev-1: 0 1px 4px rgba(0, 0, 0, 0.25);
+  --ca-elev-2: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --ca-elev-2-up: 0 -8px 24px rgba(0, 0, 0, 0.4);
+  --ca-elev-3: 0 10px 40px rgba(0, 0, 0, 0.5);
 
 }
 
@@ -635,7 +635,7 @@
    The complaint was "fine on PC, way too large on mobile", and the box is not
    too large: the RATIO is wrong and the eye reads the ratio.
 
-   Type in this sheet is relative — `--am-text-xs: 0.8em` — and padding was
+   Type in this sheet is relative — `--ca-text-xs: 0.8em` — and padding was
    absolute. So a control that was tuned as 2px of padding around a 13px label
    renders as 2px of padding around a 16px label on a phone: proportionally
    LESS padding than the same control on a desktop, inside a box that grew.
@@ -651,13 +651,13 @@
    Exactly the controls patch 6 converted, because they are the only rules in
    the sheet reading the spacing scale — layout paddings still hold literals by
    §4.3's decision. That is a real dependency and it is stated rather than
-   assumed: the day a layout padding reads `--am-space-N`, this block starts
+   assumed: the day a layout padding reads `--ca-space-N`, this block starts
    moving it too, and that will be a decision to take deliberately rather than
    a surprise. A test pins the scale's readership to controls for now. */
 body.is-mobile {
-  --am-space-unit: 2.5px;
-  --am-control-min: 40px;
-  --am-control-round: calc(var(--am-control-min) * 0.35);
+  --ca-space-unit: 2.5px;
+  --ca-control-min: 40px;
+  --ca-control-round: calc(var(--ca-control-min) * 0.35);
 }
 
 /* The touch-target floor, asserted rather than hoped for (§3.3).
@@ -670,37 +670,37 @@ body.is-mobile {
    growing it to 40px would push a table row half again as tall for nothing.
    The list is what a reader clicks, types into or taps, and it is written out
    so the diff is auditable against it. */
-body.is-mobile .journal-btn,
-body.is-mobile .journal-btn-ghost,
-body.is-mobile .journal-btn-subtle,
-body.is-mobile .jc-today-btn,
-body.is-mobile .jpn-now-btn,
-body.is-mobile a.jn-pill,
-body.is-mobile .almanac-section-action,
-body.is-mobile .almanac-tpl-tab,
-body.is-mobile .almanac-tpl-toggle,
-body.is-mobile .almanac-picker-row,
-body.is-mobile .journal-attach-btn,
-body.is-mobile .journal-tracker-add-btn,
-body.is-mobile .journal-habit-chip-btn,
-body.is-mobile .jq-recap-moved-btn,
-body.is-mobile .jc-jump-row button,
-body.is-mobile .jc-jump-row input,
-body.is-mobile .journal-select select,
-body.is-mobile .jrc-grade button {
-  min-height: var(--am-control-min);
+body.is-mobile .ca-journal-btn,
+body.is-mobile .ca-journal-btn-ghost,
+body.is-mobile .ca-journal-btn-subtle,
+body.is-mobile .ca-jc-today-btn,
+body.is-mobile .ca-jpn-now-btn,
+body.is-mobile a.ca-jn-pill,
+body.is-mobile .ca-section-action,
+body.is-mobile .ca-tpl-tab,
+body.is-mobile .ca-tpl-toggle,
+body.is-mobile .ca-picker-row,
+body.is-mobile .ca-journal-attach-btn,
+body.is-mobile .ca-journal-tracker-add-btn,
+body.is-mobile .ca-journal-habit-chip-btn,
+body.is-mobile .ca-jq-recap-moved-btn,
+body.is-mobile .ca-jc-jump-row button,
+body.is-mobile .ca-jc-jump-row input,
+body.is-mobile .ca-journal-select select,
+body.is-mobile .ca-jrc-grade button {
+  min-height: var(--ca-control-min);
   /* Same list, same token, one rule: a control that got taller here is exactly
      the control whose corner has to stop being a capsule. Splitting these into
      two selector lists is how one of them would gain a member and the other
      would not. */
-  border-radius: var(--am-control-round);
+  border-radius: var(--ca-control-round);
 }
 
 /* Vault-area hues — the one place the two home-page sections are allowed to
    differ (see area-titlebar.ts). Only the titlebars read these; the banners
    below them stay on the theme accent, so the page keeps one colour story.
    Diary follows the theme's own accent because it is the page's default
-   subject; Journals borrows --am-ev-blue rather than introducing a ninth hue,
+   subject; Journals borrows --ca-ev-blue rather than introducing a ninth hue,
    so it is already tuned for legibility against both themes. The -rgb pairs
    exist because the bars tint with rgba() at low alpha.
 
@@ -711,15 +711,15 @@ body.is-mobile .jrc-grade button {
    literal, and a custom property is substituted where it is DECLARED, not
    where it is used. Declared in `:root` — which is `html`, one level ABOVE
    `body` — `var(--interactive-accent)` had nothing to resolve against, so
-   `--am-area-diary` computed to the guaranteed-invalid value and every
+   `--ca-area-diary` computed to the guaranteed-invalid value and every
    descendant inherited that, because custom properties inherit their computed
    value rather than their declaration.
 
    What that looked like is worse than it sounds, and it is why it survived
    four releases: it fails SILENTLY and DIFFERENTLY per property. A
-   `color: var(--am-area-diary)` falls back to the inherited text colour, so
+   `color: var(--ca-area-diary)` falls back to the inherited text colour, so
    the DIARY eyebrow simply looked grey — a styling opinion, not a defect. A
-   `border-left: 3px solid var(--am-area-diary)` is invalid at computed-value
+   `border-left: 3px solid var(--ca-area-diary)` is invalid at computed-value
    time as a whole shorthand, so it unsets to `border-left-style: none` and the
    overview card's accent edge — the species marker 3.2 exists for — did not
    paint at all. Nothing errors; one rule looks like a choice and the other
@@ -749,64 +749,64 @@ body {
      drift back one alias at a time. */
 
   /* Surface depth hierarchy & Frames (4.24 §1) */
-  --am-surface-card: var(--background-secondary);
-  --am-surface-raised: var(--background-secondary-alt);
-  --am-surface-inset: var(--background-primary-alt);
+  --ca-surface-card: var(--background-secondary);
+  --ca-surface-raised: var(--background-secondary-alt);
+  --ca-surface-inset: var(--background-primary-alt);
 
   /* Subtle border & edge */
-  --am-border-subtle: var(--background-modifier-border);
-  --am-border-hover: var(--background-modifier-border-hover);
-  --am-border-focus: var(--interactive-accent);
+  --ca-border-subtle: var(--background-modifier-border);
+  --ca-border-hover: var(--background-modifier-border-hover);
+  --ca-border-focus: var(--interactive-accent);
 
   /* Header-bar and section-title ink */
-  --am-bar-ink: var(--text-muted);
-  --am-sec-title-ink: var(--text-normal);
-  --am-area-diary: var(--interactive-accent);
-  --am-area-diary-rgb: var(--interactive-accent-rgb, 138, 92, 245);
-  --am-area-journals: var(--am-ev-blue);
-  --am-area-journals-rgb: 74, 143, 212;
-  --am-surface-accent-subtle: color-mix(
+  --ca-bar-ink: var(--text-muted);
+  --ca-sec-title-ink: var(--text-normal);
+  --ca-area-diary: var(--interactive-accent);
+  --ca-area-diary-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+  --ca-area-journals: var(--ca-ev-blue);
+  --ca-area-journals-rgb: 74, 143, 212;
+  --ca-surface-accent-subtle: color-mix(
     in srgb,
     var(--interactive-accent) 6%,
     var(--background-secondary)
   );
 
   /* Active Grain and Journal Context Tokens (4.80) */
-  --am-grain-accent: var(--interactive-accent);
-  --am-grain-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
-  --am-grain-tint: rgba(var(--am-grain-accent-rgb), 0.08);
-  --am-grain-spine: var(--am-grain-accent);
-  --am-journal-accent: var(--interactive-accent);
-  --am-journal-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+  --ca-grain-accent: var(--interactive-accent);
+  --ca-grain-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+  --ca-grain-tint: rgba(var(--ca-grain-accent-rgb), 0.08);
+  --ca-grain-spine: var(--ca-grain-accent);
+  --ca-journal-accent: var(--interactive-accent);
+  --ca-journal-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
 
   /* Editorial Monastic Presets */
-  --am-preset-editorial-bg: #1a1815;
-  --am-preset-editorial-card: #24201c;
-  --am-preset-editorial-raised: #2e2a25;
-  --am-preset-editorial-inset: #1e1b18;
-  --am-preset-editorial-border: rgba(214, 188, 153, 0.22);
-  --am-preset-editorial-border-inner: rgba(214, 188, 153, 0.12);
-  --am-preset-editorial-bg-light: #f7f3eb;
-  --am-preset-editorial-card-light: #ffffff;
-  --am-preset-editorial-raised-light: #ede6d8;
-  --am-preset-editorial-inset-light: #f0ebd9;
-  --am-preset-editorial-border-light: rgba(139, 111, 71, 0.25);
-  --am-preset-editorial-border-inner-light: rgba(139, 111, 71, 0.15);
+  --ca-preset-editorial-bg: #1a1815;
+  --ca-preset-editorial-card: #24201c;
+  --ca-preset-editorial-raised: #2e2a25;
+  --ca-preset-editorial-inset: #1e1b18;
+  --ca-preset-editorial-border: rgba(214, 188, 153, 0.22);
+  --ca-preset-editorial-border-inner: rgba(214, 188, 153, 0.12);
+  --ca-preset-editorial-bg-light: #f7f3eb;
+  --ca-preset-editorial-card-light: #ffffff;
+  --ca-preset-editorial-raised-light: #ede6d8;
+  --ca-preset-editorial-inset-light: #f0ebd9;
+  --ca-preset-editorial-border-light: rgba(139, 111, 71, 0.25);
+  --ca-preset-editorial-border-inner-light: rgba(139, 111, 71, 0.15);
 
   /* Technical HUD Presets */
-  --am-preset-technical-bg: #0b0e14;
-  --am-preset-technical-card: #131822;
-  --am-preset-technical-raised: #1a202c;
-  --am-preset-technical-inset: #0f141c;
-  --am-preset-technical-border: #263040;
-  --am-preset-technical-border-inner: rgba(255, 255, 255, 0.1);
-  --am-preset-technical-slot-edge: rgba(88, 166, 255, 0.35);
-  --am-preset-technical-bg-light: #edf2f7;
-  --am-preset-technical-card-light: #ffffff;
-  --am-preset-technical-raised-light: #e2e8f0;
-  --am-preset-technical-inset-light: #e6ecf2;
-  --am-preset-technical-border-light: #94a3b8;
-  --am-preset-technical-border-inner-light: rgba(0, 0, 0, 0.08);
+  --ca-preset-technical-bg: #0b0e14;
+  --ca-preset-technical-card: #131822;
+  --ca-preset-technical-raised: #1a202c;
+  --ca-preset-technical-inset: #0f141c;
+  --ca-preset-technical-border: #263040;
+  --ca-preset-technical-border-inner: rgba(255, 255, 255, 0.1);
+  --ca-preset-technical-slot-edge: rgba(88, 166, 255, 0.35);
+  --ca-preset-technical-bg-light: #edf2f7;
+  --ca-preset-technical-card-light: #ffffff;
+  --ca-preset-technical-raised-light: #e2e8f0;
+  --ca-preset-technical-inset-light: #e6ecf2;
+  --ca-preset-technical-border-light: #94a3b8;
+  --ca-preset-technical-border-inner-light: rgba(0, 0, 0, 0.08);
 
   /* ── PAGE-GROUND INK (4.80) ─────────────────────────────────────────────
      Seven values and two noise fields carry all nineteen grounds in
@@ -822,12 +822,12 @@ body {
 
      THE ACCENT IS A MIX OVER A THEME COLOUR, which is the whole reason this
      block is `body` and not `:root` — see the header of this rule. */
-  --am-tex-ink: rgba(214, 228, 242, 0.075);
-  --am-tex-ink-2: rgba(214, 228, 242, 0.15);
-  --am-tex-fill: rgba(214, 228, 242, 0.05);
-  --am-tex-shade: rgba(0, 0, 0, 0.34);
-  --am-tex-hi: rgba(214, 228, 242, 0.13);
-  --am-tex-accent: color-mix(in srgb, var(--interactive-accent) 26%, transparent);
+  --ca-tex-ink: rgba(214, 228, 242, 0.075);
+  --ca-tex-ink-2: rgba(214, 228, 242, 0.15);
+  --ca-tex-fill: rgba(214, 228, 242, 0.05);
+  --ca-tex-shade: rgba(0, 0, 0, 0.34);
+  --ca-tex-hi: rgba(214, 228, 242, 0.13);
+  --ca-tex-accent: color-mix(in srgb, var(--interactive-accent) 26%, transparent);
 
   /* The grain every ground wears, and the one thing that stops a gradient
      pattern reading as clip art. Theme-independent: it is greyscale noise
@@ -836,11 +836,11 @@ body {
 
      A DATA URI AND NOT A FILE, so nothing ships in `assets/` and neither
      `scaffold.ts` nor `tools/package.mjs` gains an entry for a background. */
-  --am-tex-grain: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='200' height='200' filter='url(%23g)' opacity='0.4'/></svg>");
+  --ca-tex-grain: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='200' height='200' filter='url(%23g)' opacity='0.4'/></svg>");
 }
 
 /* NO TOKEN IN THIS FILE DIFFERS BY THEME ANY MORE (4.13.1 §3b). The one that did
-   was `--am-band-recess`, and it is deleted with the bands it sank.
+   was `--ca-band-recess`, and it is deleted with the bands it sank.
 
    THE RULE IT LEAVES BEHIND IS THE POINT, AND IT IS WHY THIS COMMENT STAYS:
    anything theme-specific goes BELOW this line, after `:root` closes, and never
@@ -851,17 +851,17 @@ body {
    greens, the calendar its mood dots, the events their hues. The next
    theme-specific token goes here. */
 body.theme-light {
-  --am-edge-highlight: rgba(0, 0, 0, 0.03);
+  --ca-edge-highlight: rgba(0, 0, 0, 0.03);
   /* DARKER, AND STRONGER THAN THE DARK TWIN. A 6% white hair over a near-black
      card is a visible step; 6% black over a near-white one is not — the eye's
      response to a light increment on a dark ground is not the response to a dark
      increment on a light one, which is why every pair in this file is two numbers
      rather than one sign flip. */
-  --am-border-inner: rgba(0, 0, 0, 0.09);
+  --ca-border-inner: rgba(0, 0, 0, 0.09);
   /* Darker rather than lighter, and slightly stronger: an 0.07 white hair over a
      near-white card is invisible, and the slot has to be findable to be pressed. */
-  --am-slot-edge: rgba(0, 0, 0, 0.1);
-  --am-surface-accent-subtle: color-mix(
+  --ca-slot-edge: rgba(0, 0, 0, 0.1);
+  --ca-surface-accent-subtle: color-mix(
     in srgb,
     var(--interactive-accent) 5%,
     var(--background-secondary)
@@ -869,12 +869,12 @@ body.theme-light {
 
   /* ── PAGE-GROUND INK, LIGHT (4.80) ──────────────────────────────────────
      Ink goes dark and the highlight goes white, and neither is the dark value
-     negated. `--am-tex-shade` is the pair that moves furthest: on a dark note a
+     negated. `--ca-tex-shade` is the pair that moves furthest: on a dark note a
      weave's shadow side is 34% black over near-black and still reads as a
      shadow, while 34% black over parchment is a stain. */
-  --am-tex-ink: rgba(46, 52, 62, 0.075);
-  --am-tex-ink-2: rgba(46, 52, 62, 0.15);
-  --am-tex-fill: rgba(46, 52, 62, 0.045);
-  --am-tex-shade: rgba(46, 52, 62, 0.07);
-  --am-tex-hi: rgba(255, 255, 255, 0.66);
+  --ca-tex-ink: rgba(46, 52, 62, 0.075);
+  --ca-tex-ink-2: rgba(46, 52, 62, 0.15);
+  --ca-tex-fill: rgba(46, 52, 62, 0.045);
+  --ca-tex-shade: rgba(46, 52, 62, 0.07);
+  --ca-tex-hi: rgba(255, 255, 255, 0.66);
 }

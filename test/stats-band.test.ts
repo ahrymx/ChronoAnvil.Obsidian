@@ -429,7 +429,7 @@ describe("the two old words still reach the band", () => {
       "topic-stats",
       "journal-totals",
     ]) {
-      expect(probe.test(`\`\`\`almanac\n${line}\n\`\`\``), line).toBe(true);
+      expect(probe.test(`\`\`\`chronoanvil\n${line}\n\`\`\``), line).toBe(true);
     }
     // And it does not match a word that merely starts the same way, which is
     // the boundary failure this suite has been bitten by before.
@@ -490,7 +490,7 @@ describe("one band means one markup family", () => {
   const css = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
   it("retired the hand-rolled topic band, rules and all", () => {
-    // Fifty-five declarations that were `.am-stats` spelled again: a grid of
+    // Fifty-five declarations that were `.ca-stats` spelled again: a grid of
     // four, a border, a radius, an overflow clip, per-cell left borders, and a
     // fold with two more rules to unpick those borders on the second row.
     for (const dead of [
@@ -509,9 +509,9 @@ describe("one band means one markup family", () => {
   it("leaves one wrapper and one strip", () => {
     // `cssRule` throws when the selector is gone, so this fails loudly on a
     // rename rather than turning the assertions above into no-ops.
-    expect(cssRule(".stats-band")).toContain("flex-direction: column");
-    expect(cssRule(".sb-title")).toContain("color: var(--text-muted)");
-    expect(cssRules(".am-stats").length).toBeGreaterThan(0);
+    expect(cssRule(".ca-stats-band")).toContain("flex-direction: column");
+    expect(cssRule(".ca-sb-title")).toContain("color: var(--text-muted)");
+    expect(cssRules(".ca-stats").length).toBeGreaterThan(0);
   });
 
   it("folds at one width now, where it used to fold at two", () => {
@@ -520,7 +520,7 @@ describe("one band means one markup family", () => {
     // Media shelf did — had two bands of four cells becoming two-by-two forty
     // pixels apart. Neither number was wrong; there were two of them.
     //
-    // AND IT IS `@container`, NOT `@media`. Almanac renders inside a note pane,
+    // AND IT IS `@container`, NOT `@media`. ChronoAnvil renders inside a note pane,
     // and a 400px pane in a 1600px window is the normal way anyone reads a
     // dashboard beside something else — `96-stat-strip.css` records the release
     // where that was a live bug.
@@ -531,7 +531,7 @@ describe("one band means one markup family", () => {
     for (const [, block] of css.matchAll(
       /@container \(max-width: 520px\)\s*\{([\s\S]*?)\n\}/g
     )) {
-      expect(block).not.toContain(".am-stat");
+      expect(block).not.toContain(".ca-stat");
       expect(block).not.toContain(".jts-");
       expect(block).not.toContain("stats-band");
     }
@@ -540,13 +540,13 @@ describe("one band means one markup family", () => {
 
   it("draws through the strip rather than beside it", () => {
     // The builder calls `statStrip`, which is what brings the container query
-    // with it. A band that built its own `.am-stat` divs would look identical
+    // with it. A band that built its own `.ca-stat` divs would look identical
     // and would drift the first time the component changed.
     const src = readSrc("tables");
     const start = src.indexOf("export function buildStatsBand(");
     const body = src.slice(start, src.indexOf("\n}\n", start));
     expect(body).toContain("statStrip(root, shown)");
-    expect(body).not.toContain('cls: "am-stat"');
+    expect(body).not.toContain('cls: "ca-stat"');
   });
 
   it("skips a kind the journal no longer declares, rather than borrowing one", () => {
@@ -590,7 +590,7 @@ describe("one band means one markup family", () => {
 describe("every cell is configurable, on a note that already has a band", () => {
   const questions = (): SectionQuestion[] =>
     slotQuestions("container", STUDY_JOURNAL);
-  const fence = (line: string): string[] => ["```almanac", line, "```"];
+  const fence = (line: string): string[] => ["```chronoanvil", line, "```"];
   const boxes = (line: string): Record<string, string> =>
     answersInText(fence(line).join("\n"), questions());
 
@@ -877,7 +877,7 @@ describe("the write is the one the section editor used", () => {
   const note = (line: string): string[] => [
     "# A topic",
     "",
-    "```almanac",
+    "```chronoanvil",
     line,
     "```",
     "",
@@ -895,7 +895,7 @@ describe("the write is the one the section editor used", () => {
     );
     expect(out?.[3]).toBe("stats-band:notes,last,open");
     // The fence, the heading and the reader's prose are untouched.
-    expect(out?.slice(0, 3)).toEqual(["# A topic", "", "```almanac"]);
+    expect(out?.slice(0, 3)).toEqual(["# A topic", "", "```chronoanvil"]);
     expect(out?.slice(4)).toEqual(["```", "", "Body text the reader wrote."]);
   });
 
@@ -970,12 +970,12 @@ describe("the cell's menu is flat, and knows which slot it is on", () => {
 
 describe("the cell's control rests where a hover cannot reach it", () => {
   it("is scoped to the band, never to the shared strip", () => {
-    // `.am-stat` is also the year dashboard's body and three period mastheads.
+    // `.ca-stat` is also the year dashboard's body and three period mastheads.
     // A control that edits a directive must not appear on a surface that has no
     // directive to edit.
     const css = readCss();
-    expect(css).toContain(".stats-band .am-stat:hover .sb-cell-menu");
-    expect(css).not.toMatch(/(^|[},])\s*\.am-stat:hover \.sb-cell-menu/);
+    expect(css).toContain(".ca-stats-band .ca-stat:hover .ca-sb-cell-menu");
+    expect(css).not.toMatch(/(^|[},])\s*\.ca-stat:hover \.ca-sb-cell-menu/);
   });
 
   it("is reachable by keyboard and on a touchscreen", () => {
@@ -983,12 +983,12 @@ describe("the cell's control rests where a hover cannot reach it", () => {
     // while focused is a control nobody can see they are on. The touch half is
     // 3.9 §3.3 and `hover-reveal.test.ts` enforces it mechanically.
     const css = readCss();
-    expect(css).toContain(".stats-band .am-stat:focus-within .sb-cell-menu");
+    expect(css).toContain(".ca-stats-band .ca-stat:focus-within .ca-sb-cell-menu");
     // The resting state lives in a `(hover: none)` branch — read by matching
     // the branch rather than by `cssRules`, which walks INTO at-rules and
     // answers about the selectors inside them.
     const touch = readCss().match(/@media\s*\(hover:\s*none\)\s*\{[\s\S]*?\n\}/g) ?? [];
-    expect(touch.join("\n")).toContain(".sb-cell-menu");
+    expect(touch.join("\n")).toContain(".ca-sb-cell-menu");
   });
 });
 
@@ -1026,7 +1026,7 @@ describe("a cell can be dragged onto another cell", () => {
   it("hands the swap to the same write the menu uses", () => {
     // NO SECOND WRITE PATH, which is what keeps the keyword migration and the
     // `|Label` rule working for a gesture that knows nothing about either.
-    const note = ["```almanac", "topic-stats|My band", "```"];
+    const note = ["```chronoanvil", "topic-stats|My band", "```"];
     const out = noteWithBandEdit(
       note,
       { from: 1, to: 2 },
@@ -1079,26 +1079,26 @@ describe("the drag is the journal cards' gesture, on a smaller surface", () => {
     expect(src()).toContain("if (cells.length > 1) attachCellDrag(band, cell, at);");
     // The cursor follows the attribute rather than the class, so the two cannot
     // disagree about whether a band can be reordered.
-    expect(readCss()).toContain('.stats-band .am-stat[draggable="true"]');
+    expect(readCss()).toContain('.ca-stats-band .ca-stat[draggable="true"]');
   });
 
   it("draws its drag states on the band and not on the shared strip", () => {
     const css = readCss();
     for (const rule of [
-      ".stats-band .am-stat.is-dragging",
-      ".stats-band .am-stat.is-drop-target",
+      ".ca-stats-band .ca-stat.is-dragging",
+      ".ca-stats-band .ca-stat.is-drop-target",
     ]) {
       expect(css, rule).toContain(rule);
     }
-    expect(css).not.toMatch(/(^|[},])\s*\.am-stat\.is-(dragging|drop-target)/);
+    expect(css).not.toMatch(/(^|[},])\s*\.ca-stat\.is-(dragging|drop-target)/);
   });
 
   it("declares micro-ring ribbon styling for compact telemetry presentation", () => {
-    expect(cssRule(".am-stat-ring-wrap")).toContain("display: inline-flex");
-    expect(cssRule(".am-stat-ring-svg")).toContain("rotate(-90deg)");
-    expect(cssRule(".am-stat-ring-bg")).toContain("stroke: var(--background-modifier-border)");
-    expect(cssRule(".am-stat-ring-val")).toContain("stroke: var(--interactive-accent)");
-    expect(cssRule(".am-stat-data")).toContain("display: flex");
-    expect(cssRule(".am-stat-val-row")).toContain("display: flex");
+    expect(cssRule(".ca-stat-ring-wrap")).toContain("display: inline-flex");
+    expect(cssRule(".ca-stat-ring-svg")).toContain("rotate(-90deg)");
+    expect(cssRule(".ca-stat-ring-bg")).toContain("stroke: var(--background-modifier-border)");
+    expect(cssRule(".ca-stat-ring-val")).toContain("stroke: var(--interactive-accent)");
+    expect(cssRule(".ca-stat-data")).toContain("display: flex");
+    expect(cssRule(".ca-stat-val-row")).toContain("display: flex");
   });
 });

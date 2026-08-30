@@ -21,7 +21,7 @@ import {
   moveJournalOnto,
 } from "../src/journals/journal-order";
 import { cssRule, readCode, readSrc } from "./sources";
-import type AlmanacPlugin from "../src/main";
+import type ChronoAnvilPlugin from "../src/main";
 
 // The three things the write touches, and nothing else — which is itself worth
 // noticing: reordering journals reads no file, so a stub with no vault in it is
@@ -33,7 +33,7 @@ const stub = (ids: string[]) => {
     settings: { customJournals: ids.map((id) => ({ id, name: id.toUpperCase() })) },
     saveSettings,
     notifyJournalTypesChanged,
-  } as unknown as AlmanacPlugin;
+  } as unknown as ChronoAnvilPlugin;
   return { plugin, saveSettings, notifyJournalTypesChanged };
 };
 
@@ -221,7 +221,7 @@ describe("the journal's name is the way into it (4.42)", () => {
     // object was the only one you could not enter.
     const src = readCode("journals-section");
     expect(src).toMatch(
-      /titleRender: root\s*\?\s*\(slot\) =>\s*folderLink\(plugin, slot, root, ctx\.sourcePath, "jjs-type-name", type\.name\)/
+      /titleRender: root\s*\?\s*\(slot\) =>\s*folderLink\(plugin, slot, root, ctx\.sourcePath, "ca-jjs-type-name", type\.name\)/
     );
     // NO LINK WHERE THERE IS NO FOLDER — `getFolder` returns null for a preset
     // enabled and never used, and `undefined` leaves the title plain text.
@@ -258,13 +258,13 @@ describe("the journal's name is the way into it (4.42)", () => {
     // `.internal-link` paints `--text-accent` — which is exactly what happened
     // one rank down: chem and Maths measured #a68af9 on
     // `20260818_20h59m08s_grim.png`, the theme's link ink winning because
-    // `.jjs-group-name`'s own declaration was invalid.
-    const name = cssRule(".jjs-type-name");
+    // `.ca-jjs-group-name`'s own declaration was invalid.
+    const name = cssRule(".ca-jjs-type-name");
     expect(name).toContain("color: inherit");
     expect(name).toContain("text-decoration: none");
     // The pointer is the resting affordance; the underline arrives on hover.
     expect(name).toContain("cursor: pointer");
-    expect(cssRule("a.jjs-type-name:hover")).toContain("text-decoration: underline");
+    expect(cssRule("a.ca-jjs-type-name:hover")).toContain("text-decoration: underline");
   });
 });
 
@@ -316,16 +316,16 @@ describe("what a card looks like while it is being carried", () => {
   it("fades the card in hand and edges the one that would receive it", () => {
     // TWO SIGNALS FOR TWO ROLES. One treatment on both would make a grid
     // mid-drag read as two selected cards.
-    expect(cssRule(".jjc-card.is-dragging")).toContain("opacity: 0.45");
-    const target = cssRule(".jjc-card.is-drop-target");
+    expect(cssRule(".ca-jjc-card.is-dragging")).toContain("opacity: 0.45");
+    const target = cssRule(".ca-jjc-card.is-drop-target");
     expect(target).toContain("inset 0 0 0 2px var(--interactive-accent)");
-    // INSET, BECAUSE THE CARD CLIPS. `.jjc-card` is `overflow: hidden` with a
+    // INSET, BECAUSE THE CARD CLIPS. `.ca-jjc-card` is `overflow: hidden` with a
     // 1px border; a second border inside it would move the banner by a pixel as
     // it appeared.
     expect(target).not.toMatch(/^\s*border:/m);
   });
 
   it("says the card is liftable before it is lifted", () => {
-    expect(cssRule('.jjc-card[draggable="true"]')).toContain("cursor: grab");
+    expect(cssRule('.ca-jjc-card[draggable="true"]')).toContain("cursor: grab");
   });
 });

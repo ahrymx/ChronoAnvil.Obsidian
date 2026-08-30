@@ -234,7 +234,7 @@ describe("the journal charts region", () => {
   it("keeps everything in the fence that isn't a chart spec", () => {
     const lines = [
       "# Note",
-      "```almanac-journal-charts",
+      "```chronoanvil-journal-charts",
       "header:📊 My Charts",
       "<!-- ranked first on purpose -->",
       "jchart:j1:trend:confidence",

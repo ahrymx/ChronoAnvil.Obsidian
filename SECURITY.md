@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Email **contact@ahrymx.dev** with the subject `Security — Almanac`.
+Email **contact@ahrymx.dev** with the subject `Security — ChronoAnvil`.
 
 Please do not open a public issue. A vulnerability in a plugin that reads and
 writes files in someone's vault is worth a quiet fix before it is a public one.
@@ -22,7 +22,7 @@ The latest release. Fixes go into a new version rather than being backported.
 
 ## Scope
 
-Almanac runs inside Obsidian, with the access Obsidian gives it: your vault's
+ChronoAnvil runs inside Obsidian, with the access Obsidian gives it: your vault's
 files. Things worth reporting:
 
 - reading or writing files outside the configured vault paths
@@ -31,7 +31,7 @@ files. Things worth reporting:
   loss, or that corrupts a file it was not meant to touch
 - exfiltrating vault content anywhere off-device
 
-That last one should never happen. Almanac makes no network requests of its
+That last one should never happen. ChronoAnvil makes no network requests of its
 own, and does not bundle telemetry or analytics. If you find it talking to
 anything, that is a serious finding and worth reporting immediately.
 

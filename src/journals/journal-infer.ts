@@ -58,7 +58,7 @@ export interface ScannedFile {
   // "Italian/Pasta/Carbonara.md" → ["Italian", "Pasta", "Carbonara.md"].
   segments: string[];
   frontmatter: Record<string, string>;
-  // Every `almanac` fence, as its directive lines. Kept fence by fence rather
+  // Every `chronoanvil` fence, as its directive lines. Kept fence by fence rather
   // than flattened because the pairing WITHIN a fence is the information: the
   // catalogue writes a kind's header and its create button into one headerBar,
   // so `header:📋 Recipes` beside `button:cooking:new-recipe` is what says
@@ -95,8 +95,8 @@ export function parseFrontmatter(text: string): Record<string, string> {
   return out;
 }
 
-// Every ```almanac fence's directive lines, fence by fence. The charts fence
-// (```almanac-journal-charts) counts too — it carries a header of its own.
+// Every ```chronoanvil fence's directive lines, fence by fence. The charts fence
+// (```chronoanvil-journal-charts) counts too — it carries a header of its own.
 export function parseFences(text: string): ScannedDirective[][] {
   const out: ScannedDirective[][] = [];
   const lines = text.split(/\r?\n/);
@@ -104,7 +104,7 @@ export function parseFences(text: string): ScannedDirective[][] {
   for (const line of lines) {
     const trimmed = line.trim();
     if (current === null) {
-      if (/^```almanac(-[a-z-]+)?\s*$/.test(trimmed)) current = [];
+      if (/^```chronoanvil(-[a-z-]+)?\s*$/.test(trimmed)) current = [];
       continue;
     }
     if (trimmed === "```") {
@@ -379,7 +379,7 @@ export function inferTracker(
 
 // Reconstruct a journal's config from what its folder contains.
 //
-// Returns null when the folder shows no sign of being an Almanac journal —
+// Returns null when the folder shows no sign of being a ChronoAnvil journal —
 // which is most of the reason this is careful rather than eager. Everything
 // under the journals root is a candidate, so "a folder of ordinary markdown"
 // must come back null rather than become a journal type with one level called

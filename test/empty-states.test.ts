@@ -62,7 +62,7 @@ describe("one home for the shapes", () => {
     // keeps its own shape on purpose and says why — asserted below.
     const t = src("event-widgets.ts");
     expect(t).toContain("emptyLine(parent, text");
-    expect(t).not.toContain('parent.createDiv({ cls: "am-ev-empty", text })');
+    expect(t).not.toContain('parent.createDiv({ cls: "ca-ev-empty", text })');
   });
 
   it("lets settings.ts keep its own shape, with the reason stated", () => {
@@ -254,7 +254,7 @@ describe("the activity months fit a phone", () => {
     // ~600px of vertical scroll to say an empty quarter is empty. Fixed-width
     // children in a too-narrow container is the case a rail exists for.
     const css = readCss();
-    const at = css.indexOf("@media (max-width: 500px) {\n  .journal-act-months");
+    const at = css.indexOf("@media (max-width: 500px) {\n  .ca-journal-act-months");
     expect(at).toBeGreaterThan(0);
     const block = css.slice(at, at + 1400);
     // ONE ROW OF NATURAL-WIDTH PANELS. `flex-wrap: nowrap` said this until 4.38.4
@@ -271,7 +271,7 @@ describe("the activity months fit a phone", () => {
     // section empty. Three tracks fill it; the phone rail above is what handles
     // the width where three do not fit.
     const css = readCss();
-    const at = css.indexOf(".journal-act-months {");
+    const at = css.indexOf(".ca-journal-act-months {");
     const block = css.slice(at, css.indexOf("}", at));
     expect(block).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
     expect(block).not.toContain("flex-wrap");
@@ -305,12 +305,12 @@ describe("an info card is a card, wherever it is drawn (4.11)", () => {
     // WHAT A VAULT RENDER SHOWED, AND THE REASON THIS RULE EXISTS: three widgets
     // with nothing to show, three appearances on one homepage — bare text, a box,
     // and a hand-rolled box at 1px. An empty state stands IN FOR a widget, so it
-    // reads as one with nothing in it; `--am-rule` rather than `1px` is what makes
+    // reads as one with nothing in it; `--ca-rule` rather than `1px` is what makes
     // that the same statement the card beside it is making.
     const rule = infoCard();
-    expect(rule).toContain("border: var(--am-rule) solid");
+    expect(rule).toContain("border: var(--ca-rule) solid");
     expect(rule).toContain("background: var(--background-secondary)");
-    expect(rule).toContain("border-radius: var(--am-radius-md)");
+    expect(rule).toContain("border-radius: var(--ca-radius-md)");
     expect(rule).not.toContain("1px solid");
     expect(rule).not.toContain("dashed");
   });
@@ -319,12 +319,12 @@ describe("an info card is a card, wherever it is drawn (4.11)", () => {
     // The deletions are what make this ONE rule rather than a fourth appearance,
     // so they are asserted as membership rather than as absence.
     const rule = infoCard();
-    expect(rule).toContain(".jjs-empty");
-    expect(rule).toContain(".journal-chart-empty");
+    expect(rule).toContain(".ca-jjs-empty");
+    expect(rule).toContain(".ca-journal-chart-empty");
     // And their own boxes are gone from where they were written.
     const t = css();
-    expect(t).not.toContain(".jjs-bare .jjs-empty {");
-    const chart = t.indexOf(".journal-chart-empty {");
+    expect(t).not.toContain(".ca-jjs-bare .ca-jjs-empty {");
+    const chart = t.indexOf(".ca-journal-chart-empty {");
     expect(chart).toBeGreaterThan(0);
     expect(t.slice(chart, t.indexOf("}", chart))).not.toContain("border:");
   });
@@ -353,7 +353,7 @@ describe("an info card is a card, wherever it is drawn (4.11)", () => {
     // house rules call a test that has never failed. This one locates the rule
     // BODY and reads what it says.
     const t = css();
-    const at = t.indexOf('.journal-sec-block .callout[data-callout="empty"]');
+    const at = t.indexOf('.ca-journal-sec-block .callout[data-callout="empty"]');
     expect(at, "an empty state is still boxed inside a section card").toBeGreaterThan(0);
     const rule = t.slice(t.indexOf("{", at), t.indexOf("}", at));
     expect(rule).toContain("border: none");
@@ -364,11 +364,11 @@ describe("an info card is a card, wherever it is drawn (4.11)", () => {
     // empty state left in the tree.
     const selectors = t.slice(at, t.indexOf("{", at));
     for (const cls of [
-      ".journal-sec-fold-body .callout[data-callout=\"empty\"]",
-      ".journal-sec-block .jjs-empty",
-      ".journal-sec-fold-body .jjs-empty",
-      ".journal-sec-block .journal-chart-empty",
-      ".journal-sec-fold-body .journal-chart-empty",
+      ".ca-journal-sec-fold-body .callout[data-callout=\"empty\"]",
+      ".ca-journal-sec-block .ca-jjs-empty",
+      ".ca-journal-sec-fold-body .ca-jjs-empty",
+      ".ca-journal-sec-block .ca-journal-chart-empty",
+      ".ca-journal-sec-fold-body .ca-journal-chart-empty",
     ]) {
       expect(selectors, cls).toContain(cls);
     }
@@ -377,7 +377,7 @@ describe("an info card is a card, wherever it is drawn (4.11)", () => {
     // `header:` run are two different containers for the same idea, and an empty
     // state that unboxed in one and not the other is the defect this closes,
     // one level down.
-    expect(selectors).toContain(".journal-sec-fold-body");
+    expect(selectors).toContain(".ca-journal-sec-fold-body");
   });
 
   it("draws no box of its own inside a WIDGET card either (4.13.5 §1)", () => {
@@ -385,9 +385,9 @@ describe("an info card is a card, wherever it is drawn (4.11)", () => {
     // 4.13 scoped the unboxing to the two section containers on the premise that
     // a homepage widget has no first edge — so an empty state there drew its own
     // and that was the only one. It is not: `cardWidget` wraps every widget in a
-    // row in a `.journal-widget-card` and `attachBlockHead` turns a headed block
+    // row in a `.ca-journal-widget-card` and `attachBlockHead` turns a headed block
     // into the same object, and both paint `--background-secondary` inside
-    // `--am-rule` — precisely what the info card paints. The homepage rendered
+    // `--ca-rule` — precisely what the info card paints. The homepage rendered
     // Open tasks as a bordered box inside an identically-coloured bordered box,
     // and On this day as three of them.
     //
@@ -395,21 +395,21 @@ describe("an info card is a card, wherever it is drawn (4.11)", () => {
     // here: 05-inline-widgets.css already unboxes four composite cards through
     // that exact class and its comment is where the property is argued.
     const t = css();
-    const at = t.indexOf('.journal-sec-block .callout[data-callout="empty"]');
+    const at = t.indexOf('.ca-journal-sec-block .callout[data-callout="empty"]');
     const selectors = t.slice(at, t.indexOf("{", at));
     for (const cls of [
       '.has-head .callout[data-callout="empty"]',
-      ".has-head .jjs-empty",
-      ".has-head .journal-chart-empty",
-      ".has-head .jrc-empty",
-      ".has-head .jrq-empty",
+      ".has-head .ca-jjs-empty",
+      ".has-head .ca-journal-chart-empty",
+      ".has-head .ca-jrc-empty",
+      ".has-head .ca-jrq-empty",
     ]) {
       expect(selectors, cls).toContain(cls);
     }
   });
 
   it("takes the second edge off On this day's body too (4.13.5 §1)", () => {
-    // THE MIDDLE OF THE THREE. `.jdr-otd-body` draws its own filled, bordered
+    // THE MIDDLE OF THE THREE. `.ca-jdr-otd-body` draws its own filled, bordered
     // rectangle — "tinted so it reads as something offered", which is true of a
     // widget standing on a page and says nothing inside a card that is already
     // both. On the homepage it sat between the widget card and the empty state's
@@ -419,18 +419,18 @@ describe("an info card is a card, wherever it is drawn (4.11)", () => {
     // `on-this-day` is composed by the homepage AND by the diary dashboard and
     // those reach it through different halves of the list.
     const t = css();
-    const at = t.indexOf(".has-head .jdr-otd-body");
+    const at = t.indexOf(".has-head .ca-jdr-otd-body");
     expect(at, "On this day still boxes itself inside a card").toBeGreaterThan(0);
     const selectors = t.slice(at, t.indexOf("{", at));
-    expect(selectors).toContain(".journal-sec-block .jdr-otd-body");
-    expect(selectors).toContain(".journal-sec-fold-body .jdr-otd-body");
+    expect(selectors).toContain(".ca-journal-sec-block .ca-jdr-otd-body");
+    expect(selectors).toContain(".ca-journal-sec-fold-body .ca-jdr-otd-body");
     const rule = t.slice(t.indexOf("{", at), t.indexOf("}", at));
     expect(rule).toContain("border: none");
     expect(rule).toContain("background: none");
 
     // AND IT KEEPS ITS BOX WHERE IT IS THE ONLY ONE — the unscoped rule above it
     // is untouched, the same way the info card is.
-    const bare = t.indexOf("\n.jdr-otd-body {");
+    const bare = t.indexOf("\n.ca-jdr-otd-body {");
     expect(bare).toBeGreaterThan(0);
     expect(t.slice(bare, t.indexOf("}", bare))).toContain(
       "background: var(--background-secondary)"
@@ -450,15 +450,15 @@ describe("an info card is a card, wherever it is drawn (4.11)", () => {
     // `infoCard()` anchors on a NEWLINE before the selector, which is load-bearing
     // now that a scoped rule exists whose first selector ends in the same string.
     const rule = infoCard();
-    expect(rule).toContain("border: var(--am-rule) solid");
+    expect(rule).toContain("border: var(--ca-rule) solid");
     expect(rule).toContain("background: var(--background-secondary)");
   });
 
-  it("paints its heading in Almanac's colour, not the theme's (4.13 §2)", () => {
+  it("paints its heading in ChronoAnvil's colour, not the theme's (4.13 §2)", () => {
     // `empty` IS NOT ONE OF OBSIDIAN'S CALLOUT TYPES. With no `--callout-color`
     // of its own the title fell through to whatever the host theme paints an
     // unknown callout — blue in the vault this was found in, something else on
-    // the next theme — while `.jjs-empty-title` beside it was hand-set to the
+    // the next theme — while `.ca-jjs-empty-title` beside it was hand-set to the
     // accent. Two colours for one object on one screen, neither of them chosen
     // here. `[!study]` had declared its own since 2.8; this is the same line.
     const rule = infoCard();
@@ -502,7 +502,7 @@ describe("an info card is a card, wherever it is drawn (4.11)", () => {
     expect(at).toBeGreaterThan(0);
     const group = t.slice(at, t.indexOf("}", at));
     expect(group).toContain("border: 1px solid");
-    expect(group).toContain(".journal-calendar");
+    expect(group).toContain(".ca-journal-calendar");
     expect(group).not.toContain('data-callout="empty"');
   });
 
@@ -510,16 +510,16 @@ describe("an info card is a card, wherever it is drawn (4.11)", () => {
     // `empty.ts` opens by arguing that its two shapes are a STRUCTURAL difference
     // rather than a style choice: `emptyCallout` REPLACES content and `emptyLine`
     // ANNOTATES it. Boxing thirty one-line annotations would be that argument lost
-    // by accident, so the info card is the first shape only — and `.jrq-empty`, the
+    // by accident, so the info card is the first shape only — and `.ca-jrq-empty`, the
     // one annotation that draws a box of its own, is left exactly as it was.
     const rule = infoCard();
-    expect(rule).not.toContain(".am-empty-line");
-    expect(rule).not.toContain(".jrq-empty");
-    expect(rule).not.toContain(".jjs-empty-row");
+    expect(rule).not.toContain(".ca-empty-line");
+    expect(rule).not.toContain(".ca-jrq-empty");
+    expect(rule).not.toContain(".ca-jjs-empty-row");
     // Nor the settings tab's, which is deliberately unshared and says so.
-    expect(rule).not.toContain(".almanac-empty-state");
+    expect(rule).not.toContain(".ca-empty-state");
     // Nor the block explaining itself, which is not an empty state at all.
-    expect(rule).not.toContain(".journal-frame-error");
+    expect(rule).not.toContain(".ca-journal-frame-error");
   });
 });
 
@@ -571,7 +571,7 @@ describe("every block on the two dashboards says something when empty", () => {
     // all says the other thing, which is why `journal-recent.ts` carries two.
     "journal-recent": { module: "journal-recent", marker: "emptyCallout(" },
     // `emptyLine` — ANNOTATES content that drew itself. Added in 4.1.1, when
-    // this fence showed a red "Unknown Almanac widget" on a vault with no
+    // this fence showed a red "Unknown ChronoAnvil widget" on a vault with no
     // journals rather than an empty list.
     "review-queue": { module: "review-queue", marker: "emptyLine(" },
     // Ad-hoc `*-empty` divs. `empty.ts` names about thirty of these as what it
@@ -583,7 +583,7 @@ describe("every block on the two dashboards says something when empty", () => {
     // The charts fence composes with a `header:` and no `chart:` lines, so
     // BOTH dashboards show this on a new vault. It is the one empty state on
     // either page that a reader can act on from the page itself.
-    "almanac-charts": { module: "chart-grid", marker: "journal-chart-empty" },
+    "chronoanvil-charts": { module: "chart-grid", marker: "journal-chart-empty" },
     // The two period cards. THE EXCEPTION, and it is a real one: their empty
     // state is a stat strip reading zero, not a sentence. `empty.ts` allows
     // this — "If a widget cannot say the second, because there is genuinely
@@ -603,13 +603,13 @@ describe("every block on the two dashboards says something when empty", () => {
     for (const line of note.split("\n")) {
       if (line.startsWith("```")) {
         inFence = line.length > 3;
-        // THE FENCE CAN BE THE WIDGET. `almanac-charts` holds only a `header:`
+        // THE FENCE CAN BE THE WIDGET. `chronoanvil-charts` holds only a `header:`
         // line — the chart grid is the fence itself, driven by whatever
         // `chart:` lines a reader adds. A population read from lines alone
         // missed it, which is exactly the omission this shape is meant to make
         // impossible, caught by the count assertion below.
         const lang = line.slice(3).trim();
-        if (inFence && lang !== "almanac") keywords.add(lang);
+        if (inFence && lang !== "chronoanvil") keywords.add(lang);
         continue;
       }
       if (!inFence || !line.trim()) continue;

@@ -452,7 +452,7 @@ describe("buildEntry", () => {
 
   it("counts open and completed tasks from body regions", () => {
     const body = [
-      "<!--almanac:todo",
+      "<!--chronoanvil:todo",
       "- ( ) water plants",
       "- (x) reply to email",
       "-->",
@@ -463,14 +463,14 @@ describe("buildEntry", () => {
   });
 
   it("makes task text searchable", () => {
-    const body = "<!--almanac:todo\n- ( ) call the dentist\n-->";
+    const body = "<!--chronoanvil:todo\n- ( ) call the dentist\n-->";
     const e = buildEntry(file, { "journal-date": "2026-03-04" }, body, [], "Mood");
     expect(e?.text).toContain("call the dentist");
   });
 
   it("counts attachments in their markdown forms", () => {
     const body = [
-      "<!--almanac:attachments",
+      "<!--chronoanvil:attachments",
       "![[photo.png]]",
       "[[Some note]]",
       "[a link](https://example.com)",
@@ -481,7 +481,7 @@ describe("buildEntry", () => {
   });
 
   it("indexes prose regions as searchable text", () => {
-    const body = "<!--almanac:log\nlong day at the dentist\n-->";
+    const body = "<!--chronoanvil:log\nlong day at the dentist\n-->";
     const e = buildEntry(file, { "journal-date": "2026-03-04" }, body, [], "Mood");
     expect(e?.text).toContain("dentist");
     expect(e?.regions.map((r) => r.key)).toEqual(["log"]);

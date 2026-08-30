@@ -26,7 +26,7 @@ import { DEFAULT_PATHS } from "../src/core/constants";
 // The assumption lives in a comment there and cannot be enforced by the type
 // system, because the properties are strings in a markdown file. So it is
 // enforced here instead, against the shipped assets, which are the only notes
-// Almanac itself authors. This is the same shape as class-table.test.ts: a
+// ChronoAnvil itself authors. This is the same shape as class-table.test.ts: a
 // coupling one file depends on, whose other half lives in a file it does not
 // import.
 
@@ -57,7 +57,7 @@ function keysOf(text: string): string[] {
 }
 
 
-// Every note Almanac itself authors, whatever it is made of.
+// Every note ChronoAnvil itself authors, whatever it is made of.
 //
 // Was `readdirSync(ASSETS)` alone, which quietly checked three fewer files the
 // moment 2.42 composed Study's content templates instead of shipping them — a
@@ -94,7 +94,7 @@ import { composeHomeNote } from "../src/diary/home-sections";
 import { composeSearchNote } from "../src/diary/search-sections";
 import type { DashboardGrain } from "../src/diary/diary-sections";
 
-describe("review scopes ↔ the notes Almanac authors", () => {
+describe("review scopes ↔ the notes ChronoAnvil authors", () => {
   it("finds both the shipped assets and the composed templates", () => {
     expect(readdirSync(ASSETS).filter((f) => f.endsWith(".md")).length)
       .toBeGreaterThan(0);

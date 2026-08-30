@@ -30,7 +30,7 @@
 // write path did not.**
 
 import { MarkdownPostProcessorContext, TFile } from "obsidian";
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import { overflowButton } from "../section-frame";
 import { panDuringDrag } from "../drag-scroll";
 import type { StatCell } from "../stat-strip";
@@ -52,7 +52,7 @@ import { notify } from "../../core/notify";
 
 /** Everything the menu needs that is a fact about the band, not about a cell. */
 export interface BandEditContext {
-  plugin: AlmanacPlugin;
+  plugin: ChronoAnvilPlugin;
   ctx: MarkdownPostProcessorContext;
   file: TFile;
   scope: StatScope;
@@ -103,7 +103,7 @@ export function attachCellMenus(
   cells.forEach((cell, i) => {
     const at = origin[i];
     if (at === undefined) return;
-    const button = overflowButton(cell.root, "sb-cell-menu", (menu) => {
+    const button = overflowButton(cell.root, "ca-sb-cell-menu", (menu) => {
       for (const row of slotChoicesFor(scope, type)) {
         menu.addItem((item) =>
           item
@@ -169,7 +169,7 @@ export function attachCellMenus(
 //
 // A MIME TYPE OF OUR OWN, lowercase because the drag-and-drop spec lowercases
 // every type it stores and a mixed-case constant would never match `types`.
-const SLOT_DRAG_TYPE = "application/x-almanac-stat-slot";
+const SLOT_DRAG_TYPE = "application/x-ca-stat-slot";
 
 interface SlotPayload {
   path: string;
@@ -303,7 +303,7 @@ async function apply(
   if (next.join(",") === measures.join(",")) return;
   const info = ctx.getSectionInfo(cell.root);
   if (!info) {
-    notify.fail("Almanac cannot edit this band here — it is not in an editable note.");
+    notify.fail("ChronoAnvil cannot edit this band here — it is not in an editable note.");
     return;
   }
   const text = await plugin.app.vault.read(file);
@@ -315,7 +315,7 @@ async function apply(
     next
   );
   if (!out) {
-    notify.fail("Almanac could not find this band's line in the note.");
+    notify.fail("ChronoAnvil could not find this band's line in the note.");
     return;
   }
   // No repaint call: the band is inside a live widget scoped to its own note,

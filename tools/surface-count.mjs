@@ -134,7 +134,7 @@ const handBuilt = src.filter(
 row("Files still hand-building a header bar", handBuilt, 0);
 
 const w = Math.max(...rows.map((r) => r.name.length));
-console.log("\nAlmanac 2.56 — surface scoreboard\n");
+console.log("\nChronoAnvil 2.56 — surface scoreboard\n");
 for (const r of rows) {
   console.log(
     `  ${r.name.padEnd(w)}  ${String(r.now).padStart(5)}   -> ${r.target}`

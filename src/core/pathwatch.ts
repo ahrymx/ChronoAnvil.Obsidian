@@ -8,7 +8,7 @@
 // Keeps the configured paths pointing at the right folders when the user
 // renames or moves one in Obsidian.
 //
-// Every path Almanac uses — the diary root, the templates folder, a custom
+// Every path ChronoAnvil uses — the diary root, the templates folder, a custom
 // journal's root — is a plain string in data.json. Obsidian rewrites *links*
 // on a rename, but it has no idea a plugin's settings mention the old path, so
 // before this the plugin would quietly start looking in a folder that no longer
@@ -28,10 +28,10 @@
 // left alone.
 
 import { App, Notice, TAbstractFile, TFile, TFolder } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 
 export class PathWatch {
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   register(): void {
     this.plugin.registerEvent(
@@ -61,8 +61,8 @@ export class PathWatch {
     // months later while wondering why a setting doesn't say what they set.
     new Notice(
       changes.length === 1
-        ? `Almanac: updated the ${changes[0]} path to match.`
-        : `Almanac: updated ${changes.length} paths to match.`
+        ? `ChronoAnvil: updated the ${changes[0]} path to match.`
+        : `ChronoAnvil: updated ${changes.length} paths to match.`
     );
   }
 }

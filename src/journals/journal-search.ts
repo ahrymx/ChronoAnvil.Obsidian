@@ -27,7 +27,7 @@
 // there). A second scanner is exactly the drift that module exists to prevent.
 
 import { MarkdownPostProcessorContext, setIcon } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   IndexedEntry,
   SearchHit,
@@ -45,7 +45,7 @@ import { moment, noExt, openFile } from "../core/util";
 // literal, so a Cooking journal's `is:recipe` works with no code change — and
 // so an unrecognised `is:` still falls through to being a search term, which
 // is the rule the diary's parse already follows.
-export function journalKinds(plugin: AlmanacPlugin): string[] {
+export function journalKinds(plugin: ChronoAnvilPlugin): string[] {
   const out = new Set<string>();
   for (const type of registeredJournalTypes(plugin)) {
     for (const kind of type.kinds) {
@@ -62,16 +62,16 @@ export function journalKinds(plugin: AlmanacPlugin): string[] {
 }
 
 function resultRow(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   entry: IndexedEntry,
   sourcePath: string,
   hit: { snippet: string; snippetKey: string | null }
 ): HTMLElement {
-  const row = createDiv({ cls: "jjs-row" });
+  const row = createDiv({ cls: "ca-jjs-row" });
 
-  const main = row.createDiv({ cls: "jjs-main" });
+  const main = row.createDiv({ cls: "ca-jjs-main" });
   const title = main.createEl("a", {
-    cls: "internal-link jjs-title",
+    cls: "internal-link ca-jjs-title",
     text: entry.title,
     href: noExt(entry.file.path),
   });
@@ -82,7 +82,7 @@ function resultRow(
   title.addEventListener("mouseover", (evt) => {
     plugin.app.workspace.trigger("hover-link", {
       event: evt,
-      source: "almanac-journal-search",
+      source: "ca-journal-search",
       hoverParent: row,
       targetEl: title,
       linktext: entry.file.path,
@@ -95,58 +95,58 @@ function resultRow(
   // the lesson it belongs to, so a hit on page three of a long lesson says
   // which lesson without being opened.
   if (entry.crumbs.length) {
-    main.createDiv({ cls: "jjs-crumbs", text: entry.crumbs.join(" › ") });
+    main.createDiv({ cls: "ca-jjs-crumbs", text: entry.crumbs.join(" › ") });
   }
 
   if (hit.snippet) {
-    const line = main.createDiv({ cls: "jjs-snippet" });
+    const line = main.createDiv({ cls: "ca-jjs-snippet" });
     if (hit.snippetKey) {
-      line.createSpan({ cls: "jjs-snippet-key", text: hit.snippetKey });
+      line.createSpan({ cls: "ca-jjs-snippet-key", text: hit.snippetKey });
     }
     line.createSpan({ text: hit.snippet });
   }
 
   // Facts, each omitted when it has nothing to say rather than shown as a zero.
-  const facts = main.createDiv({ cls: "jjs-facts" });
+  const facts = main.createDiv({ cls: "ca-jjs-facts" });
   if (entry.kind) {
-    facts.createSpan({ cls: "jjs-fact jjs-fact-kind", text: entry.kind });
+    facts.createSpan({ cls: "ca-jjs-fact ca-jjs-fact-kind", text: entry.kind });
   }
   if (entry.iso) {
     facts.createSpan({
-      cls: "jjs-fact",
+      cls: "ca-jjs-fact",
       text: moment(entry.iso).format("D MMM YYYY"),
     });
   }
   if (entry.openTasks > 0) {
-    const f = facts.createSpan({ cls: "jjs-fact" });
-    setIcon(f.createSpan({ cls: "jjs-fact-icon" }), "square");
+    const f = facts.createSpan({ cls: "ca-jjs-fact" });
+    setIcon(f.createSpan({ cls: "ca-jjs-fact-icon" }), "square");
     f.createSpan({ text: String(entry.openTasks) });
   }
   if (entry.attachments > 0) {
-    const f = facts.createSpan({ cls: "jjs-fact" });
-    setIcon(f.createSpan({ cls: "jjs-fact-icon" }), "paperclip");
+    const f = facts.createSpan({ cls: "ca-jjs-fact" });
+    setIcon(f.createSpan({ cls: "ca-jjs-fact-icon" }), "paperclip");
     f.createSpan({ text: String(entry.attachments) });
   }
   for (const tag of entry.tags.slice(0, 3)) {
-    facts.createSpan({ cls: "jjs-fact jjs-fact-tag", text: tag });
+    facts.createSpan({ cls: "ca-jjs-fact ca-jjs-fact-tag", text: tag });
   }
 
   return row;
 }
 
 export function buildJournalSearch(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   arg: string,
   hostFolder: string | null
 ): HTMLElement {
-  const root = createDiv({ cls: "journal-table jjs-search" });
+  const root = createDiv({ cls: "ca-journal-table ca-jjs-search" });
   const folders = journalFolderScope(plugin, arg, hostFolder);
 
-  const bar = root.createDiv({ cls: "jjs-bar" });
-  setIcon(bar.createDiv({ cls: "jjs-icon" }), "search");
+  const bar = root.createDiv({ cls: "ca-jjs-bar" });
+  setIcon(bar.createDiv({ cls: "ca-jjs-icon" }), "search");
   const input = bar.createEl("input", {
-    cls: "jjs-input",
+    cls: "ca-jjs-input",
     attr: {
       type: "text",
       placeholder: "Search your notes…",
@@ -154,15 +154,15 @@ export function buildJournalSearch(
     },
   });
   const clear = bar.createEl("button", {
-    cls: "journal-btn-ghost jjs-clear",
+    cls: "ca-journal-btn-ghost ca-jjs-clear",
     attr: { type: "button", "aria-label": "Clear search" },
   });
-  setIcon(clear.createSpan({ cls: "journal-btn-icon" }), "x");
+  setIcon(clear.createSpan({ cls: "ca-journal-btn-icon" }), "x");
   clear.hide();
 
   const kinds = journalKinds(plugin);
   root.createDiv({
-    cls: "jjs-hint",
+    cls: "ca-jjs-hint",
     text: searchHintLine({
       kind: kinds[0] ?? "lesson",
       tag: "algebra",
@@ -170,8 +170,8 @@ export function buildJournalSearch(
     }),
   });
 
-  const status = root.createDiv({ cls: "jjs-status" });
-  const results = root.createDiv({ cls: "jjs-results" });
+  const status = root.createDiv({ cls: "ca-jjs-status" });
+  const results = root.createDiv({ cls: "ca-jjs-results" });
 
   let notes: IndexedEntry[] | null = null;
   let pending = "";

@@ -48,7 +48,7 @@ describe("where the control appears", () => {
     // whole failure the row above exists to prevent, now available in two
     // places instead of one.
     expect(header()).toContain(
-      "if (build) settingsButton(host, \"jsh-more\", build);"
+      "if (build) settingsButton(host, \"ca-jsh-more\", build);"
     );
     const banner = readSrc("vault-banner");
     expect(banner).toContain(
@@ -91,7 +91,7 @@ describe("where the control appears", () => {
     // 4.20 made it the same control on all three banners rather than the page
     // banner's alone. The ⋯ is still right for a row, a cell or a card inside a
     // page, which is why the wrapper exists instead of a change to the base.
-    expect(header()).toContain('settingsButton(host, "jsh-more"');
+    expect(header()).toContain('settingsButton(host, "ca-jsh-more"');
     expect(readSrc("entryheader")).toContain("settingsButton(");
   });
 
@@ -494,7 +494,7 @@ describe("the diary entry offers its own commands", () => {
   const entry = () => readSrc("entryheader");
 
   it("draws the settings control on the entry banner", () => {
-    expect(entry()).toContain('settingsButton(host, "jeh-more"');
+    expect(entry()).toContain('settingsButton(host, "ca-jeh-more"');
   });
 
   it("offers the two tracker commands that name this entry", () => {

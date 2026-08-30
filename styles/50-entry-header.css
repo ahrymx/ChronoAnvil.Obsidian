@@ -1,12 +1,12 @@
 /* ── Entry header: the name band of a diary entry's slim banner ───────────
    The note's name on the left and the cog at the far edge. It is one of the two
-   bands `.journal-slim-banner` describes, and everything about how it is inset,
-   ruled and laid out is written there against `.journal-banner-name` — this
+   bands `.ca-journal-slim-banner` describes, and everything about how it is inset,
+   ruled and laid out is written there against `.ca-journal-banner-name` — this
    block holds only what is an ENTRY's: the wrapper's baseline alignment, and the
    face the name is set in.
 
    No collapse chevron: it is top-of-note chrome, not a foldable section. */
-.jeh-title-wrap {
+.ca-jeh-title-wrap {
   display: flex;
   align-items: baseline;
   gap: 4px 10px;
@@ -14,71 +14,71 @@
 }
 /* M2 (4.19.1): THE NOTE'S NAME AT THE NOTE'S NAME'S SIZE.
  *
- * This inherited `--am-bar-text` from `.journal-header-title` — 0.7em, the size
+ * This inherited `--ca-bar-text` from `.ca-journal-header-title` — 0.7em, the size
  * of a section bar's LABEL. That was defensible while the entry header was read
  * as a bar with controls on it, and it stopped being defensible the moment 4.19
  * decided this block is the note's banner: the date is what the note IS, and it
  * was set smaller than the words under it.
  *
- * `--am-text-lg` AND 700 ARE THE JOURNAL LEAF'S, spelled again rather than
+ * `--ca-text-lg` AND 700 ARE THE JOURNAL LEAF'S, spelled again rather than
  * shared through a class, because these are two headers built by two builders
  * and a shared class between them would be a third thing to keep in step. The
  * numbers are in one comment in `30-header-bars.css`; if one moves, both move.
  *
  * The padding and the negative margin stay: they are the click-to-edit hit area
  * and its optical correction, not spacing. */
-.journal-entry-header .jeh-title {
+.ca-journal-entry-header .ca-jeh-title {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   margin-right: 0;
   cursor: text;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   padding: 1px 4px;
   margin-left: -4px;
-  font-size: var(--am-text-lg);
+  font-size: var(--ca-text-lg);
   font-weight: 700;
   letter-spacing: -0.01em;
   transition: background 0.12s;
 }
 /* The input a rename opens has to be the same object as the text it replaced, or
    the strip jumps height on the first keystroke. */
-.journal-entry-header .jeh-title-input {
-  font-size: var(--am-text-lg);
+.ca-journal-entry-header .ca-jeh-title-input {
+  font-size: var(--ca-text-lg);
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-.journal-entry-header .jeh-title:hover {
+.ca-journal-entry-header .ca-jeh-title:hover {
   background: var(--background-modifier-hover);
 }
-.jeh-title-icon {
+.ca-jeh-title-icon {
   display: inline-flex;
   color: var(--text-muted);
 }
-.jeh-title-icon svg {
+.ca-jeh-title-icon svg {
   width: 1em;
   height: 1em;
 }
-.jeh-title-edit {
+.ca-jeh-title-edit {
   display: inline-flex;
   color: var(--text-faint);
   opacity: 0;
   transition: opacity 0.12s;
 }
-.jeh-title-edit svg {
+.ca-jeh-title-edit svg {
   width: 0.72em;
   height: 0.72em;
 }
-.journal-entry-header .jeh-title:hover .jeh-title-edit {
+.ca-journal-entry-header .ca-jeh-title:hover .ca-jeh-title-edit {
   opacity: 1;
 }
-.jeh-subtitle {
-  font-size: var(--am-text-sm);
+.ca-jeh-subtitle {
+  font-size: var(--ca-text-sm);
   font-weight: 400;
   color: var(--text-muted);
   letter-spacing: 0;
 }
-.jeh-add-hint {
+.ca-jeh-add-hint {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -86,19 +86,19 @@
   color: var(--text-faint);
   cursor: text;
 }
-.jeh-add-hint svg {
+.ca-jeh-add-hint svg {
   width: 0.85em;
   height: 0.85em;
 }
-.jeh-add-hint:hover {
+.ca-jeh-add-hint:hover {
   color: var(--text-muted);
 }
-.jeh-title-input {
+.ca-jeh-title-input {
   font-size: 1.2em;
   font-weight: 600;
-  padding: var(--am-space-1) var(--am-space-4);
+  padding: var(--ca-space-1) var(--ca-space-4);
   border: 1px solid var(--interactive-accent);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--background-primary);
   color: var(--text-normal);
   min-width: 12em;
@@ -109,14 +109,14 @@
    than three free-floating pills. The group carries the outer rounding; each
    segment shares its inner edges with its neighbour (collapsed borders) so
    there's a single hairline between them, not a double one. */
-.jeh-nav.jeh-seg {
+.ca-jeh-nav.ca-jeh-seg {
   display: inline-flex;
   align-items: stretch;
   gap: 0;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
 }
-.jeh-navpill {
+.ca-jeh-navpill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -127,15 +127,15 @@
   text-decoration: none !important;
   transition: background 0.12s, color 0.12s;
 }
-.jeh-navpill:hover {
+.ca-jeh-navpill:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.jeh-navpill svg {
+.ca-jeh-navpill svg {
   width: 1em;
   height: 1em;
 }
-.jeh-navpill-empty {
+.ca-jeh-navpill-empty {
   opacity: 0.4;
   cursor: default;
   pointer-events: none;
@@ -146,23 +146,23 @@
    descends from the middle segment. Rounding the two end segments to match the
    group's radius gives the same one-pill look while leaving the dropdown free
    to overflow below. */
-.jeh-seg .jeh-seg-start {
+.ca-jeh-seg .ca-jeh-seg-start {
   border-right: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill) 0 0 var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill) 0 0 var(--ca-radius-pill);
 }
-.jeh-seg .jeh-seg-end {
+.ca-jeh-seg .ca-jeh-seg-end {
   border-left: 1px solid var(--background-modifier-border);
-  border-radius: 0 var(--am-radius-pill) var(--am-radius-pill) 0;
+  border-radius: 0 var(--ca-radius-pill) var(--ca-radius-pill) 0;
 }
 
 /* ── "Select Date" navigator (between the arrows) ────────────
    A pill trigger showing the current entry's date; click drops a scrollable
    list of every day/month to jump to. */
-.jeh-datenav {
+.ca-jeh-datenav {
   position: relative;
   display: inline-flex;
 }
-.jeh-datenav-trigger {
+.ca-jeh-datenav-trigger {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -172,47 +172,47 @@
   border-radius: 0;
   background: transparent;
   color: var(--text-normal);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   font-weight: 500;
   line-height: 1;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.12s, color 0.12s;
 }
-.jeh-datenav-label {
-  font-size: var(--am-text-sm);
+.ca-jeh-datenav-label {
+  font-size: var(--ca-text-sm);
   font-weight: 600;
   color: var(--text-normal);
   white-space: nowrap;
 }
-.jeh-datenav-trigger .jeh-datenav-cal svg {
+.ca-jeh-datenav-trigger .ca-jeh-datenav-cal svg {
   width: 1.05em;
   height: 1.05em;
 }
-.jeh-datenav-trigger:hover,
-.jeh-datenav-trigger.is-open {
+.ca-jeh-datenav-trigger:hover,
+.ca-jeh-datenav-trigger.is-open {
   background: var(--background-modifier-hover);
 }
-.jeh-datenav-cal {
+.ca-jeh-datenav-cal {
   display: inline-flex;
   color: var(--text-muted);
 }
-.jeh-datenav-cal svg {
+.ca-jeh-datenav-cal svg {
   width: 0.95em;
   height: 0.95em;
 }
-.jeh-datenav-caret {
+.ca-jeh-datenav-caret {
   display: inline-flex;
   color: var(--text-faint);
 }
-.jeh-datenav-caret svg {
+.ca-jeh-datenav-caret svg {
   width: 0.85em;
   height: 0.85em;
 }
-.jeh-datenav-trigger.is-open .jeh-datenav-caret {
+.ca-jeh-datenav-trigger.is-open .ca-jeh-datenav-caret {
   color: var(--interactive-accent);
 }
-.jeh-datenav-menu {
+.ca-jeh-datenav-menu {
   position: absolute;
   top: calc(100% + 6px);
   left: 50%;
@@ -222,9 +222,9 @@
   max-width: 280px;
   padding: 5px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   background: var(--background-primary);
-  box-shadow: var(--am-elev-2);
+  box-shadow: var(--ca-elev-2);
 }
 /* ── 3.7: the same list, opened from the card's last row ─────────────────
    Centred-and-below is right for a trigger in the middle of a page. In the
@@ -236,14 +236,14 @@
    It drops UP and aligns LEFT — anchored to the control's own edge, over the
    card it belongs to. The shadow flips with it, for the same reason it points
    away from the trigger in the first place. */
-.journal-entry-context .jeh-datenav-menu {
+.ca-journal-entry-context .ca-jeh-datenav-menu {
   top: auto;
   bottom: calc(100% + 6px);
   left: 0;
   transform: none;
-  box-shadow: var(--am-elev-2-up);
+  box-shadow: var(--ca-elev-2-up);
 }
-.jeh-datenav-list {
+.ca-jeh-datenav-list {
   max-height: 300px;
   overflow-y: auto;
   display: flex;
@@ -251,58 +251,58 @@
   gap: 1px;
   scrollbar-width: thin;
 }
-.jeh-datenav-row {
+.ca-jeh-datenav-row {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
   padding: 6px 8px;
   border: none;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: transparent;
   color: var(--text-normal);
   text-align: left;
   cursor: pointer;
   transition: background 0.1s;
 }
-.jeh-datenav-row:hover {
+.ca-jeh-datenav-row:hover {
   background: var(--background-modifier-hover);
 }
-.jeh-datenav-row.is-current {
+.ca-jeh-datenav-row.is-current {
   background: var(--background-secondary);
 }
-.jeh-datenav-row-text {
+.ca-jeh-datenav-row-text {
   display: flex;
   flex-direction: column;
   gap: 1px;
   flex: 1;
   min-width: 0;
 }
-.jeh-datenav-row-label {
-  font-size: var(--am-text-sm);
+.ca-jeh-datenav-row-label {
+  font-size: var(--ca-text-sm);
   font-weight: 500;
 }
-.jeh-datenav-row.is-current .jeh-datenav-row-label {
+.ca-jeh-datenav-row.is-current .ca-jeh-datenav-row-label {
   color: var(--interactive-accent);
 }
-.jeh-datenav-row-sub {
+.ca-jeh-datenav-row-sub {
   font-size: 0.78em;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.jeh-datenav-row-mark {
+.ca-jeh-datenav-row-mark {
   display: inline-flex;
   color: var(--interactive-accent);
 }
-.jeh-datenav-row-mark svg {
+.ca-jeh-datenav-row-mark svg {
   width: 0.9em;
   height: 0.9em;
 }
-.jeh-datenav-empty {
+.ca-jeh-datenav-empty {
   padding: 10px 8px;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-faint);
   text-align: center;
 }
@@ -318,8 +318,8 @@
    nested among the blocks that follow it" — a claim only a bar walking its
    siblings can make. An inner dashboard section is already contained by the
    widget drawing it, so indenting it would bracket a thing off from itself. */
-.journal-sec-l2.journal-header-bar {
-  margin-left: var(--am-sec-indent);
+.ca-journal-sec-l2.ca-journal-header-bar {
+  margin-left: var(--ca-sec-indent);
   padding-left: 12px;
   border-left: 2px solid var(--background-modifier-border);
   /* No bottom rule. The left bracket already says where this section starts
@@ -328,9 +328,9 @@
   border-bottom: none;
 }
 /* LEVEL 2 SETS NO SIZE OF ITS OWN, AS OF 4.13 §1, and it is not an omission.
-   These two rules put the title at `--am-text-sm` and the glyph with it, on the
+   These two rules put the title at `--ca-text-sm` and the glyph with it, on the
    argument written just above — that a smaller title is what says "nested". That
-   argument died with the scale: level 1 is `--am-bar-text` (0.7em) now, and
+   argument died with the scale: level 1 is `--ca-bar-text` (0.7em) now, and
    0.85em under it would make a subject row LARGER than the section containing
    it — a hierarchy inverted by a rule that used to state it.
    So level 2 wears the one bar spec and is held apart by what is structural and
@@ -344,11 +344,11 @@
    4.13 the indent and that bracket are ALL that says it, since level 2 no longer
    carries a smaller title. Halving is now the floor rather than a saving. */
 @media (max-width: 500px) {
-  .journal-sec {
+  .ca-journal-sec {
     gap: 3px 6px;
   }
-  .journal-sec-l2.journal-header-bar {
-    margin-left: calc(var(--am-sec-indent) / 2);
+  .ca-journal-sec-l2.ca-journal-header-bar {
+    margin-left: calc(var(--ca-sec-indent) / 2);
     padding-left: 8px;
   }
 }
@@ -390,20 +390,20 @@
    Container-scoped, so a narrow sidebar on a wide screen collapses too — pane
    width is what the row has to fit into, not the window's. */
 @container (max-width: 460px) {
-  .journal-sec .journal-header-widgets
-    .journal-btn:not(.mod-cta):has(.journal-btn-icon)
-    .journal-btn-label,
-  .journal-sec .journal-header-widgets
-    .journal-btn:not(.mod-cta):has(.journal-btn-emoji)
-    .journal-btn-label {
+  .ca-journal-sec .ca-journal-header-widgets
+    .ca-journal-btn:not(.mod-cta):has(.ca-journal-btn-icon)
+    .ca-journal-btn-label,
+  .ca-journal-sec .ca-journal-header-widgets
+    .ca-journal-btn:not(.mod-cta):has(.ca-journal-btn-emoji)
+    .ca-journal-btn-label {
     display: none;
   }
-  .journal-sec .journal-header-widgets .journal-btn:not(.mod-cta) {
-    padding-left: var(--am-space-4);
-    padding-right: var(--am-space-4);
+  .ca-journal-sec .ca-journal-header-widgets .ca-journal-btn:not(.mod-cta) {
+    padding-left: var(--ca-space-4);
+    padding-right: var(--ca-space-4);
   }
-  .journal-section-l2-body {
-    margin-left: calc(var(--am-sec-indent) / 2);
+  .ca-journal-section-l2-body {
+    margin-left: calc(var(--ca-sec-indent) / 2);
     padding-left: 8px;
   }
 }
@@ -425,8 +425,8 @@
    bracket, so the whole nested section is one inset column under Journals. A
    block is "owned" by the preceding level-2 bar when the plugin tags it; we
    approximate that with an indent on the blocks between a level-2 bar and the
-   next bar via the .journal-section-l2-body class the renderer applies. */
-.journal-section-l2-body {
+   next bar via the .ca-journal-section-l2-body class the renderer applies. */
+.ca-journal-section-l2-body {
   margin-left: 1.1em;
   padding-left: 12px;
   border-left: 2px solid var(--background-modifier-border);
@@ -437,7 +437,7 @@
    wrappers that hold a study card; the card's own accent edge is the section's
    left rail. (Obsidian's Chromium supports :has(); the class sits on the block
    wrapper and the callout is its child.) */
-.journal-section-l2-body:has(> .callout[data-callout="study"]) {
+.ca-journal-section-l2-body:has(> .callout[data-callout="study"]) {
   padding-left: 0;
   border-left: none;
 }
@@ -447,13 +447,13 @@
    bar" and can fold it. The toggle is a custom chevron (Obsidian's native
    fold arrow only exists on real markdown headings); it rotates when the
    section is collapsed, matching the file-explorer/heading fold affordance. */
-.journal-header-collapsible {
+.ca-journal-header-collapsible {
   cursor: pointer;
 }
 /* THE FOLD CONTROL, AT THE RIGHT-HAND END (4.13 §1b).
  *
  * `margin-left: auto` IS WHAT MOVES IT, and it has exactly one owner per row.
- * `.journal-header-widgets` carries the same declaration at the base — two auto
+ * `.ca-journal-header-widgets` carries the same declaration at the base — two auto
  * margins in one flex line means the first eats the free space and the second
  * does nothing — so the actions give theirs up wherever this has it. At level 1
  * that is free: the actions strip is `flex: 1 0 100%` and already sets
@@ -464,11 +464,11 @@
  * is not beside the 11.2px one 4.13 §1 leaves. `em` here resolves against this
  * element, so setting the font-size to the bar's scale makes the box follow the
  * title wherever the title goes. */
-.journal-header-toggle {
+.ca-journal-header-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--am-bar-glyph);
+  font-size: var(--ca-bar-glyph);
   width: 1.4em;
   height: 1.4em;
   flex: 0 0 auto;
@@ -476,11 +476,11 @@
   color: var(--text-muted);
   transition: transform 0.15s ease, color 0.15s ease;
 }
-.journal-header-toggle svg {
+.ca-journal-header-toggle svg {
   width: 1.1em;
   height: 1.1em;
 }
-.journal-header-collapsible:hover .journal-header-toggle {
+.ca-journal-header-collapsible:hover .ca-journal-header-toggle {
   color: var(--text-normal);
 }
 /* WHICH WAY IT POINTS, RE-CHOSEN IN 4.13 §1b. It used to rotate -90° when
@@ -489,35 +489,35 @@
    edge of the card now that it sits on the right. So it is the ordinary
    accordion instead: down means closed, up means open, and the base icon is the
    closed state. */
-.journal-header-bar:not(.is-collapsed) .journal-header-toggle {
+.ca-journal-header-bar:not(.is-collapsed) .ca-journal-header-toggle {
   transform: rotate(180deg);
 }
 /* Blocks the renderer/HeaderBar marks as belonging to a collapsed section. */
-.journal-section-hidden {
+.ca-journal-section-hidden {
   display: none !important;
 }
 
-.journal-widget-labeled {
+.ca-journal-widget-labeled {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-.journal-chart-controls {
+.ca-journal-chart-controls {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-.journal-widget-label {
-  font-size: var(--am-text-base);
+.ca-journal-widget-label {
+  font-size: var(--ca-text-base);
   color: var(--text-normal);
 }
-.journal-widget-error {
-  font-size: var(--am-text-xs);
+.ca-journal-widget-error {
+  font-size: var(--ca-text-xs);
   font-family: var(--font-monospace);
   color: var(--text-error);
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   padding: 2px 8px;
 }
 
@@ -526,21 +526,21 @@
    but not its monospace: this is a sentence addressed to the reader, with the
    fix in it, rather than a malformed directive echoed back. Left to wrap so
    the whole message is readable inside one grid cell. */
-.journal-tracker-misplaced {
+.ca-journal-tracker-misplaced {
   font-family: inherit;
   white-space: normal;
   line-height: 1.35;
   padding: 6px 10px;
 }
 
-.journal-slider input[type="range"] {
+.ca-journal-slider input[type="range"] {
   vertical-align: middle;
   accent-color: var(--interactive-accent);
   cursor: pointer;
   max-width: 160px;
 }
 
-.journal-slider-value {
+.ca-journal-slider-value {
   min-width: 1.4em;
   text-align: center;
   font-weight: 600;
@@ -548,24 +548,24 @@
   color: var(--text-normal);
 }
 
-.journal-time input,
-.journal-date input {
+.ca-journal-time input,
+.ca-journal-date input {
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--background-primary);
   color: var(--text-normal);
-  font-size: var(--am-text-sm);
-  padding: var(--am-space-1) var(--am-space-3);
+  font-size: var(--ca-text-sm);
+  padding: var(--ca-space-1) var(--ca-space-3);
   cursor: pointer;
 }
 
-.journal-select select {
+.ca-journal-select select {
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--background-primary);
   color: var(--text-normal);
-  font-size: var(--am-text-sm);
-  padding: var(--am-space-1) var(--am-space-4);
+  font-size: var(--ca-text-sm);
+  padding: var(--ca-space-1) var(--ca-space-4);
   cursor: pointer;
 }
 
@@ -573,13 +573,13 @@
    entry's title, so this row keeps only the navigator between entries.
    It spans the full width of the tracker card top row with arrows on both
    sides and the date selector centered and enlarged. */
-.journal-entry-context.jec-nav-only {
+.ca-journal-entry-context.ca-jec-nav-only {
   width: 100%;
   min-height: 0;
   padding-top: 0;
   padding-bottom: 0;
 }
-.journal-entry-context.jec-nav-only .jeh-nav.jeh-seg {
+.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-nav.ca-jeh-seg {
   width: 100%;
   display: flex;
   align-items: center;
@@ -587,41 +587,41 @@
   border: none;
   border-radius: 0;
 }
-.journal-entry-context.jec-nav-only .jeh-navpill {
+.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-navpill {
   width: 2.2em;
   height: 2.2em;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
 }
-.journal-entry-context.jec-nav-only .jeh-datenav {
+.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-datenav {
   flex: 1;
   display: flex;
   justify-content: center;
 }
-.journal-entry-context.jec-nav-only .jeh-datenav-trigger {
+.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-datenav-trigger {
   height: 2.2em;
   padding: 0 14px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-primary);
-  font-size: var(--am-text-base);
+  font-size: var(--ca-text-base);
   font-weight: 600;
   gap: 8px;
 }
-.journal-entry-context.jec-nav-only .jeh-datenav-trigger .jeh-datenav-label {
-  font-size: var(--am-text-base);
+.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-datenav-trigger .ca-jeh-datenav-label {
+  font-size: var(--ca-text-base);
 }
-.journal-entry-context.jec-nav-only .jeh-datenav-trigger:hover,
-.journal-entry-context.jec-nav-only .jeh-datenav-trigger.is-open {
+.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-datenav-trigger:hover,
+.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-datenav-trigger.is-open {
   background: var(--background-modifier-hover);
   border-color: var(--background-modifier-border-hover);
 }
 
-/* spacer: a full-width branded line (almanac:spacer, inline on line 0). Its
+/* spacer: a full-width branded line (chronoanvil:spacer, inline on line 0). Its
    primary job is to be where the cursor lands on open, so the first real
-   ```almanac block below it isn't rendered raw/expanded — but it doubles as a
-   light top boundary: the "Almanac" wordmark centered on a hairline rule. */
-.journal-spacer {
+   ```chronoanvil block below it isn't rendered raw/expanded — but it doubles as a
+   light top boundary: the "ChronoAnvil" wordmark centered on a hairline rule. */
+.ca-journal-spacer {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -630,8 +630,8 @@
   color: var(--text-faint);
   user-select: none;
 }
-.journal-spacer::before,
-.journal-spacer::after {
+.ca-journal-spacer::before,
+.ca-journal-spacer::after {
   content: "";
   flex: 1;
   height: 1px;
@@ -640,16 +640,16 @@
 /* QUIET: the vault banner is drawing, and it is already a top boundary. The
    element keeps its line — it is what the cursor lands on when a note opens —
    and gives up the rule and the wordmark that would be a second one. */
-.journal-spacer.is-quiet {
+.ca-journal-spacer.is-quiet {
   margin: 0;
   height: 0;
 }
-.journal-spacer.is-quiet::before,
-.journal-spacer.is-quiet::after {
+.ca-journal-spacer.is-quiet::before,
+.ca-journal-spacer.is-quiet::after {
   background: transparent;
 }
-.journal-spacer-mark {
-  font-size: var(--am-text-2xs);
+.ca-journal-spacer-mark {
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -659,7 +659,7 @@
 
 /* Touch has no hover to reveal this with. See 3.9 §3.3's policy. */
 @media (hover: none) {
-  .jeh-title-edit {
+  .ca-jeh-title-edit {
     opacity: 0.45;
   }
 }
@@ -677,16 +677,16 @@
  * padding. What separates them is the wash — a banner announces the page and
  * this holds its contents — which is the distinction `widget-registry.ts` draws
  * between the two banner formats, one level down. */
-.journal-widget-block.journal-tracker-section {
+.ca-journal-widget-block.ca-journal-tracker-section {
   /* The block's usual inter-widget gap is what would keep the strip and the
      grid apart; inside the card the strip's own rule is the divider. The same
-     three lines `.journal-entry-banner` takes, for the same reason. */
+     three lines `.ca-journal-entry-banner` takes, for the same reason. */
   gap: 0;
   padding: 12px 14px;
   background: var(--background-secondary);
-  border: var(--am-rule) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
-  box-shadow: inset 0 1px 0 var(--am-edge-highlight);
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  box-shadow: inset 0 1px 0 var(--ca-edge-highlight);
 }
 /* ── THE TRACKER SECTION TOP STRIP ──────────────────────────────────────
  *
@@ -694,23 +694,23 @@
  * the full width above the logging grid. The bottom rule is this band's,
  * separating the navigation and metadata from the tracker cells below it.
  */
-.journal-tracker-section > .journal-entry-context,
-.journal-tracker-section > .journal-note-context {
+.ca-journal-tracker-section > .ca-journal-entry-context,
+.ca-journal-tracker-section > .ca-journal-note-context {
   display: flex;
   align-items: center;
   gap: 8px 16px;
   flex-wrap: wrap;
   margin: -12px -14px 12px;
   padding: 8px 14px;
-  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+  border-bottom: var(--ca-rule) solid var(--background-modifier-border);
 }
 /* A managed entry template draws no strip — `isManagedTemplate` withholds it —
    so the grid is the whole card and has nothing above it to be separated from. */
-.journal-tracker-section > .journal-tracker-bar:first-child {
+.ca-journal-tracker-section > .ca-journal-tracker-bar:first-child {
   margin-top: 0;
 }
 /* The alias, on the left, pushing the navigator to the far edge. */
-.jec-title-wrap {
+.ca-jec-title-wrap {
   display: flex;
   align-items: baseline;
   gap: 4px 10px;
@@ -718,23 +718,23 @@
   min-width: 0;
   margin-right: auto;
 }
-.jec-title {
+.ca-jec-title {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   cursor: text;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   padding: 1px 4px;
   margin-left: -4px;
   transition: background 0.12s;
 }
-.jec-title:hover {
+.ca-jec-title:hover {
   background: var(--background-modifier-hover);
 }
 /* ── THE PAGE'S HEADLINE (4.21.1) ──────────────────────────────────────
  *
  * LARGER THAN THE BANNER'S NAME, WHICH REVERSES 4.21. That release moved the
- * alias out of the banner and set it at `--am-text-sm` on the reasoning that
+ * alias out of the banner and set it at `--ca-text-sm` on the reasoning that
  * "the file's name is what the note is called now, and this is a label on it".
  * The first render showed what that costs: a daily entry is called
  * `Day-2026-08-13`, so the largest words on the page were an address, and the
@@ -749,40 +749,40 @@
  * THE EMPTY STATE IS STILL AN OFFER, and at this size it has to work harder not
  * to read as a heading: weight down to 400 and colour to `--text-faint`, which
  * is where every other "there is nothing here yet" line in the plugin sits.
- * `.jec-title-empty` is a state on the same element, so the band does not change
+ * `.ca-jec-title-empty` is a state on the same element, so the band does not change
  * height when a reader fills it in. */
-.jec-title-text {
-  font-size: var(--am-text-xl);
+.ca-jec-title-text {
+  font-size: var(--ca-text-xl);
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text-normal);
 }
-.jec-title.jec-title-empty .jec-title-text {
+.ca-jec-title.ca-jec-title-empty .ca-jec-title-text {
   font-weight: 400;
   letter-spacing: 0;
   color: var(--text-faint);
 }
-.jec-title-icon,
-.jec-title-edit {
+.ca-jec-title-icon,
+.ca-jec-title-edit {
   display: inline-flex;
   color: var(--text-faint);
 }
 /* IN `em`, NOT PIXELS. They were 13px flat, which was a reasonable literal
    beside 0.85em type and is a smudge beside 1.35em. Sized against the word they
    sit next to, like every other icon in a title. */
-.jec-title-icon svg {
+.ca-jec-title-icon svg {
   width: 0.85em;
   height: 0.85em;
 }
-.jec-title-edit svg {
+.ca-jec-title-edit svg {
   width: 0.62em;
   height: 0.62em;
 }
-.jec-title-edit {
+.ca-jec-title-edit {
   opacity: 0;
   transition: opacity 0.12s;
 }
-.jec-title:hover .jec-title-edit {
+.ca-jec-title:hover .ca-jec-title-edit {
   opacity: 1;
 }
 /* WHERE `.jec-subtitle` WENT (4.21.2). It was the formatted date beside the
@@ -791,37 +791,37 @@
    an unused class in a 20-file stylesheet is the next reader's dead end. */
 /* ── The field is the same object as the text it replaces (4.21.2) ────────
    Or the strip jumps on the first click, which is what it did: the title drew
-   at `--am-text-xl` and the input drew at Obsidian's own control size, so
+   at `--ca-text-xl` and the input drew at Obsidian's own control size, so
    clicking a title shrank it by a third and re-wrapped the row under the cursor.
 
-   THE SELECTOR IS WHY, NOT THE VALUE. The value below was already `--am-text-xl`
+   THE SELECTOR IS WHY, NOT THE VALUE. The value below was already `--ca-text-xl`
    and never applied: Obsidian styles `input[type="text"]`, which is specificity
-   (0,1,1), and a bare `.jec-title-input` is (0,1,0) — so the app's rule won on
-   every keystroke. `.journal-entry-context` in front is (0,2,1) and settles it.
+   (0,1,1), and a bare `.ca-jec-title-input` is (0,1,0) — so the app's rule won on
+   every keystroke. `.ca-journal-entry-context` in front is (0,2,1) and settles it.
 
    THE ENTRY BANNER'S OWN INPUT HAD THIS RIGHT BY ACCIDENT: its rule is written
-   `.journal-entry-header .jeh-title-input`, scoped for readability rather than
+   `.ca-journal-entry-header .ca-jeh-title-input`, scoped for readability rather than
    for weight, and the scope is what has been carrying it.
 
    THE WIDTH IS NOT HERE. It comes from the input's `size` attribute, set from
    the value's length — see `beginEdit`. This wrapper is shrink-to-fit, so a CSS
    width would resolve against a box the input is itself sizing. */
-.journal-entry-context input.jec-title-input {
-  font-size: var(--am-text-xl);
+.ca-journal-entry-context input.ca-jec-title-input {
+  font-size: var(--ca-text-xl);
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: inherit;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   padding: 1px 6px;
   min-width: 12ch;
 }
 /* A touch device has no hover, so a control revealed by one has no resting
-   state to be discovered from. The same branch `.jeh-title-edit` takes, and the
+   state to be discovered from. The same branch `.ca-jeh-title-edit` takes, and the
    rule `hover-reveal.test.ts` enforces across the whole stylesheet. */
 @media (hover: none) {
-  .jec-title-edit {
+  .ca-jec-title-edit {
     opacity: 0.45;
   }
 }
@@ -837,7 +837,7 @@
    under its caption. It is a selector on that rule now, and the two page kinds
    cannot drift again. What is left here is what is genuinely a LEVEL AND KIND
    line's rather than a strip's. */
-.jnc-facts {
+.ca-jnc-facts {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -846,25 +846,25 @@
 }
 /* Small caps, faint — the treatment the crumb row above it takes, so the two
    read as one register rather than as two labels of different weights. */
-.jnc-fact {
+.ca-jnc-fact {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: var(--am-text-2xs);
-  font-weight: var(--am-caps-weight);
-  letter-spacing: var(--am-caps-tracking);
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
   text-transform: uppercase;
   color: var(--text-faint);
 }
 /* The kind is the more specific of the two facts, so it is the one that reads
    first — the level is the shelf and the kind is the thing on it. */
-.jnc-fact-kind {
+.ca-jnc-fact-kind {
   color: var(--text-muted);
 }
-.jnc-fact-icon {
+.ca-jnc-fact-icon {
   display: inline-flex;
 }
-.jnc-fact-icon svg {
+.ca-jnc-fact-icon svg {
   width: 12px;
   height: 12px;
 }

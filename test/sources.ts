@@ -226,8 +226,8 @@ export function styleSheets(): { name: string; css: string }[] {
  * `css.slice(css.indexOf(SEL), css.indexOf("}", css.indexOf(SEL)))`, and that
  * shape has two failure modes that both END IN A PASSING TEST:
  *
- *   NOT ANCHORED — `indexOf(".almanac-section-title {")` also matches inside
- *   `.almanac-head-fold .almanac-section-title {`, so the assertion reads a
+ *   NOT ANCHORED — `indexOf(".ca-section-title {")` also matches inside
+ *   `.ca-head-fold .ca-section-title {`, so the assertion reads a
  *   DIFFERENT rule, usually the override that states the opposite. Cost one
  *   debugging round in 4.35.1.
  *

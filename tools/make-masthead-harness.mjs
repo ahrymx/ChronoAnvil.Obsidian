@@ -55,13 +55,13 @@ const checkSquare = svg(`<path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2
 // ── the links band (src/core/links.ts::wrapInCard + buildLinks) ──────────
 const linksCard = (leaf) => `
 <div class="journal-links-card journal-links-card-diary">
-  <div class="am-titlebar am-titlebar-diary">
-    <span class="am-titlebar-icon">${notebook}</span>
-    <span class="am-titlebar-name">Diary</span>
-    <span class="am-titlebar-trail">
-      <a class="am-titlebar-crumb">Diary</a>
-      <span class="am-titlebar-sep">${chevronRight}</span>
-      <a class="am-titlebar-crumb am-titlebar-crumb-leaf">${leaf}</a>
+  <div class="ca-titlebar ca-titlebar-diary">
+    <span class="ca-titlebar-icon">${notebook}</span>
+    <span class="ca-titlebar-name">Diary</span>
+    <span class="ca-titlebar-trail">
+      <a class="ca-titlebar-crumb">Diary</a>
+      <span class="ca-titlebar-sep">${chevronRight}</span>
+      <a class="ca-titlebar-crumb ca-titlebar-crumb-leaf">${leaf}</a>
     </span>
   </div>
   <div class="journal-nav journal-links journal-links-bar">
@@ -95,7 +95,7 @@ const banner = (unit, span, value, stats) => `
 </div>`;
 
 const statsLine = (logged, elapsed, soFar, done, open) =>
-  `<div class="am-stats" data-cols="2">${statCard(
+  `<div class="ca-stats" data-cols="2">${statCard(
     `${logged}/${elapsed}`,
     "Days logged",
     `${Math.round((logged / elapsed) * 100)}% of days${soFar ? " so far" : ""}`
@@ -181,17 +181,17 @@ const quarterBody = `
 </div>`;
 
 const statCard = (value, label, sub) => `
-<div class="am-stat">
-  <div class="am-stat-label">${label}</div>
-  <div class="am-stat-value">${value}</div>
-  <div class="am-stat-sub">${sub || ""}</div>
+<div class="ca-stat">
+  <div class="ca-stat-label">${label}</div>
+  <div class="ca-stat-value">${value}</div>
+  <div class="ca-stat-sub">${sub || ""}</div>
 </div>`;
 
 const MONTH_COUNTS = [18, 14, 22, 19, 25, 21, 24, 2, 0, 0, 0, 0];
 const yearBody = `
 <div class="journal-overview-body">
   <div class="jyr-stats-wrap">
-    <div class="am-stats" data-cols="4">
+    <div class="ca-stats" data-cols="4">
       ${statCard("145", "Diary entries", "68% of days")}
       ${statCard("21", "Longest streak", "3 May – 23 May")}
       ${statCard("37", "Lessons completed", "4 still in progress")}
@@ -313,7 +313,7 @@ const html = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Almanac ${manifest.version} — overview masthead harness</title>
+<title>ChronoAnvil ${manifest.version} — overview masthead harness</title>
 <style>
 /* The handful of Obsidian variables these cards read, on the BODY element — which is
    where Obsidian itself defines them, and the whole point of patch 1. Values
@@ -355,7 +355,7 @@ ${css}
 </head>
 <body>
 <div class="wrap">
-<h1>Almanac ${manifest.version} — overview mastheads, plugin CSS only, no theme, no snippets</h1>
+<h1>ChronoAnvil ${manifest.version} — overview mastheads, plugin CSS only, no theme, no snippets</h1>
 <div class="probe" id="probe">measuring…</div>
 ${cards.map((c, i) => `<h2>${["Weekly", "Monthly", "Quarterly", "Yearly"][i]}</h2>${c}`).join("\n")}
 </div>

@@ -33,7 +33,7 @@
 
 import { App, setIcon } from "obsidian";
 import { EditorModal } from "../ui/editor-modal";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import type { TrackerOption } from "./entry-trackers";
 import { journalTypeNamer } from "./entry-trackers";
 import type { TrackerDef, TrackerSurface } from "./trackers";
@@ -56,10 +56,10 @@ export type PickerResult =
 
 // ON THE FRAME SINCE 2.56.11, and this window is §5.1's exhibit.
 //
-// It extended `Modal` and then rebuilt `.almanac-editor-modal`,
-// `.almanac-editor-head`, `.almanac-editor-subtitle` and
-// `.almanac-editor-footer` by hand — its own stylesheet said so out loud: "it
-// borrows .almanac-editor-modal's frame (head / scrolling body / footer) so the
+// It extended `Modal` and then rebuilt `.ca-editor-modal`,
+// `.ca-editor-head`, `.ca-editor-subtitle` and
+// `.ca-editor-footer` by hand — its own stylesheet said so out loud: "it
+// borrows .ca-editor-modal's frame (head / scrolling body / footer) so the
 // two windows read as the same kind of object". A component that wanted the
 // shared frame so badly it copied the class names instead of extending the
 // class, written by someone who could see the problem and had no cheap way to
@@ -78,7 +78,7 @@ class TrackerPickerModal extends EditorModal {
 
   constructor(
     app: App,
-    plugin: AlmanacPlugin,
+    plugin: ChronoAnvilPlugin,
     private options: TrackerOption[],
     surface: TrackerSurface | null,
     surfaceLabel: string,
@@ -100,10 +100,10 @@ class TrackerPickerModal extends EditorModal {
 
   protected renderBody(): void {
     const contentEl = this.body;
-    this.contentEl.addClass("almanac-tracker-picker");
+    this.contentEl.addClass("ca-tracker-picker");
 
     const search = contentEl.createEl("input", {
-      cls: "almanac-picker-search",
+      cls: "ca-picker-search",
       type: "text",
       attr: { placeholder: "Search trackers…", "aria-label": "Search trackers" },
     });
@@ -113,7 +113,7 @@ class TrackerPickerModal extends EditorModal {
     });
     window.setTimeout(() => search.focus(), 0);
 
-    this.listEl = contentEl.createDiv({ cls: "almanac-picker-list" });
+    this.listEl = contentEl.createDiv({ cls: "ca-picker-list" });
     this.paint();
   }
 
@@ -130,7 +130,7 @@ class TrackerPickerModal extends EditorModal {
     const cancel = footer.createEl("button", { text: "Cancel" });
     cancel.addEventListener("click", () => this.close());
     const create = footer.createEl("button", { cls: "mod-cta" });
-    setIcon(create.createSpan({ cls: "almanac-picker-new-icon" }), "plus");
+    setIcon(create.createSpan({ cls: "ca-picker-new-icon" }), "plus");
     create.createSpan({ text: this.saveLabel });
     create.setAttr(
       "title",
@@ -163,7 +163,7 @@ class TrackerPickerModal extends EditorModal {
     const rows = this.matches();
     if (rows.length === 0) {
       this.listEl.createDiv({
-        cls: "almanac-picker-empty",
+        cls: "ca-picker-empty",
         text: this.options.length === 0
           ? "This note already shows every tracker it can — make another one below."
           : "Nothing matches that.",
@@ -171,9 +171,9 @@ class TrackerPickerModal extends EditorModal {
       return;
     }
     for (const o of rows) {
-      const row = this.listEl.createDiv({ cls: "almanac-picker-row" });
-      row.createDiv({ cls: "almanac-picker-row-label", text: o.label });
-      row.createDiv({ cls: "almanac-picker-row-detail", text: o.detail });
+      const row = this.listEl.createDiv({ cls: "ca-picker-row" });
+      row.createDiv({ cls: "ca-picker-row-label", text: o.label });
+      row.createDiv({ cls: "ca-picker-row-detail", text: o.detail });
       row.addEventListener("click", () =>
         this.choose({ kind: "directive", directive: o.directive })
       );
@@ -195,7 +195,7 @@ class TrackerPickerModal extends EditorModal {
 
 export function promptTrackerPicker(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   options: TrackerOption[],
   surface: TrackerSurface | null
 ): Promise<PickerResult> {
@@ -223,7 +223,7 @@ export function promptTrackerPicker(
 // notice that it happened. The Diary.base column stays on, because an
 // occasional tracker is still worth a column (see TrackerDef.showInBase).
 export function seedTrackerFor(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   surface: TrackerSurface | null
 ): TrackerDef {
   const seedSurface = surface ?? diarySurface("daily");
@@ -250,7 +250,7 @@ export function seedTrackerFor(
 // made" from "tracker made and here it is".
 export function promptNewTracker(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   surface: TrackerSurface | null
 ): Promise<TrackerDef | null> {
   return new Promise((resolve) => {
@@ -273,7 +273,7 @@ export function promptNewTracker(
 // How a newly created tracker describes itself in the confirmation notice —
 // enough to see it landed where it was meant to.
 export function describeNewTracker(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   def: TrackerDef
 ): string {
   return `${def.label || def.id} (${describeSurface(

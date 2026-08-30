@@ -12,7 +12,7 @@
 // 4.11 gave every dashboard a `wide` line in the block that draws its title,
 // and carried it into CSS the only way a post-processor can reach an ancestor:
 // the render put a `jtc-wide` class on the title card, and the stylesheet
-// reached up with `.markdown-preview-view:has(.jtc-wide) .markdown-preview-sizer`.
+// reached up with `.markdown-preview-view:has(.ca-jtc-wide) .markdown-preview-sizer`.
 //
 // A READING VIEW DOES NOT KEEP THE WHOLE NOTE IN THE DOM. Obsidian renders
 // sections as they come near the viewport and drops them again when they go far
@@ -40,28 +40,28 @@
 //
 // The reader-facing half of 4.11 is untouched: the declaration is still one
 // `wide` line in the block they are looking at, deleting it still narrows the
-// page, and no part of Almanac writes it back.
+// page, and no part of ChronoAnvil writes it back.
 //
 // ── AND IT IS STILL ONE MECHANISM ────────────────────────────────────────
 //
 // The `:has()` rules are GONE rather than kept as a belt-and-braces. Two
 // carriers of one decision is two things to disagree — and they would, for
 // exactly as long as it takes a card to be unloaded, which is the interval this
-// whole file is about. `almanac-wide` in frontmatter stays, because it is not a
+// whole file is about. `ca-wide` in frontmatter stays, because it is not a
 // second mechanism for this decision: it is Obsidian's own class on the view,
 // applied by Obsidian from the file, and it is all that keeps a homepage
 // composed before 4.11 wide.
 
 import { App, MarkdownView, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { pageIsWide } from "../core/note-sections";
 
 // The class the stylesheet reaches for. Spelled once, here, and imported by the
 // test that pins the rule to it.
-export const WIDE_PAGE_CLASS = "am-wide-page";
+export const WIDE_PAGE_CLASS = "ca-wide-page";
 
 export class PageWidth {
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   register(): void {
     // FOUR EVENTS AND ONE SWEEP, because there is no event that means "a leaf

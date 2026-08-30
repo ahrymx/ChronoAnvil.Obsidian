@@ -19,7 +19,7 @@
 // was mostly noise, or the tracker was never created at all.
 //
 // A note's tracker list is the run of `tracker:<id>` / `sleep` directive lines
-// inside its ```almanac fence — the same lines the template sync writes, and
+// inside its ```chronoanvil fence — the same lines the template sync writes, and
 // the same lines the widget renderer reads. There is no per-note state
 // anywhere else: what a note shows *is* what its fence says, so a note stays
 // meaningful when read as plain text, survives a plugin uninstall as legible
@@ -30,12 +30,14 @@
 // definition that already exists; nothing here can invent a tracker.
 
 import { App, Notice, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   FENCE_CLOSE,
   FENCE_OPEN,
   TRACKER_MARK_END,
+  isTrackerMarkEnd,
   TRACKER_MARK_START,
+  isTrackerMarkStart,
 } from "../core/constants";
 import type {
   EntryPathConfig,
@@ -126,14 +128,14 @@ export function directiveRawProperty(line: string): string | null {
 // ── Locating the region ──────────────────────────────────────────────────
 
 interface Fence {
-  open: number; // index of the ```almanac line
+  open: number; // index of the ```chronoanvil line
   close: number; // index of its closing ``` line
 }
 
-// Every ```almanac fence in a note, in document order. Unterminated fences end
+// Every ```chronoanvil fence in a note, in document order. Unterminated fences end
 // the scan rather than being guessed at — a half-written block is the user's
 // business, not something to splice into.
-function almanacFences(lines: string[]): Fence[] {
+function chronoanvilFences(lines: string[]): Fence[] {
   const fences: Fence[] = [];
   let i = 0;
   while (i < lines.length) {
@@ -158,7 +160,7 @@ export interface TrackerRegion {
   fenceClose: number;
   bodyStart: number;
   bodyEnd: number;
-  // Whether the span is delimited by the `# almanac:trackers:start/end`
+  // Whether the span is delimited by the `# chronoanvil:trackers:start/end`
   // comments (as the shipped template writes it) or is just a fence that
   // happens to hold tracker directives (a hand-built note).
   marked: boolean;
@@ -178,12 +180,12 @@ function fenceBodyHas(lines: string[], f: Fence, test: (l: string) => boolean): 
 // home, because dropping logging widgets into the navigation strip is exactly
 // the mix-up the template sync guards against.
 export function locateTrackerRegion(lines: string[]): TrackerRegion | null {
-  const fences = almanacFences(lines);
+  const fences = chronoanvilFences(lines);
 
   for (const f of fences) {
     const body = lines.slice(f.open + 1, f.close);
-    const s = body.findIndex((l) => l.trim() === TRACKER_MARK_START);
-    const e = body.findIndex((l) => l.trim() === TRACKER_MARK_END);
+    const s = body.findIndex((l) => isTrackerMarkStart(l));
+    const e = body.findIndex((l) => isTrackerMarkEnd(l));
     if (s !== -1 && e !== -1 && e > s) {
       return {
         fenceOpen: f.open,
@@ -238,7 +240,7 @@ export function regionTrackerDirectives(lines: string[]): string[] {
 // widget a note displays can always be taken off it again.
 export function noteTrackerDirectives(lines: string[]): string[] {
   const out: string[] = [];
-  for (const f of almanacFences(lines)) {
+  for (const f of chronoanvilFences(lines)) {
     for (const line of lines.slice(f.open + 1, f.close)) {
       const t = line.trim();
       if (isTrackerDirective(t)) out.push(t);
@@ -257,7 +259,7 @@ export function noteEditedProperties(
   lines: string[]
 ): string[] {
   const out = new Set<string>();
-  for (const f of almanacFences(lines)) {
+  for (const f of chronoanvilFences(lines)) {
     for (const line of lines.slice(f.open + 1, f.close)) {
       const t = line.trim();
       if (isTrackerDirective(t)) {
@@ -301,7 +303,7 @@ function bannerFence(lines: string[], fences: Fence[]): Fence | null {
 
 // Does this note already carry a directive matching `test`?
 //
-// Scoped to the bodies of its ```almanac fences rather than run over the raw
+// Scoped to the bodies of its ```chronoanvil fences rather than run over the raw
 // text, because a directive named in prose is not a directive — the shipped
 // documentation note quotes half the catalogue, and a plain `includes` would
 // read every one of those mentions as the widget itself being present.
@@ -314,7 +316,7 @@ export function noteHasDirective(
   lines: string[],
   test: (line: string) => boolean
 ): boolean {
-  return almanacFences(lines).some((f) => fenceBodyHas(lines, f, test));
+  return chronoanvilFences(lines).some((f) => fenceBodyHas(lines, f, test));
 }
 
 // Splice a block of lines in just below the note's banner, or at the top of
@@ -332,7 +334,7 @@ export function insertBelowBanner(lines: string[], block: string[]): string[] {
   // pagesSectionBlock) legitimately arrives here with none of it, and a note
   // that already has the section should come back untouched.
   if (block.length === 0) return lines;
-  const fences = almanacFences(lines);
+  const fences = chronoanvilFences(lines);
   const banner = bannerFence(lines, fences);
   if (banner) {
     return [
@@ -362,7 +364,7 @@ export function insertBelowBanner(lines: string[], block: string[]): string[] {
 // the old behaviour stands — a fence of its own after the first block, or
 // after the frontmatter on a note with no blocks.
 export function createTrackerRegion(lines: string[]): string[] {
-  const fences = almanacFences(lines);
+  const fences = chronoanvilFences(lines);
 
   const banner = bannerFence(lines, fences);
   if (banner) {
@@ -393,7 +395,7 @@ export function createTrackerRegion(lines: string[]): string[] {
 
 // ── Migration: fold a note's tracker fence into its entry banner ─────────
 //
-// Entries written before 2.18.4 carry two consecutive ```almanac fences — the
+// Entries written before 2.18.4 carry two consecutive ```chronoanvil fences — the
 // `entry-header` strip, then the trackers. Obsidian renders each as its own
 // block, so the banner cannot enclose the grid no matter how they are styled.
 // This folds the second fence's body into the first, which is the whole of the
@@ -409,12 +411,12 @@ export function createTrackerRegion(lines: string[]): string[] {
 // Returns null when there is nothing to do, so a caller can skip the write.
 export function mergeEntryFences(text: string): string | null {
   const lines = text.split("\n");
-  const fences = almanacFences(lines);
+  const fences = chronoanvilFences(lines);
 
   const banner = bannerFence(lines, fences);
   if (!banner) return null;
   // Already merged.
-  if (fenceBodyHas(lines, banner, (l) => l.trim() === TRACKER_MARK_START)) return null;
+  if (fenceBodyHas(lines, banner, (l) => isTrackerMarkStart(l))) return null;
   if (fenceBodyHas(lines, banner, isTrackerDirective)) return null;
 
   const next = fences.find((f) => f.open > banner.close);
@@ -426,7 +428,7 @@ export function mergeEntryFences(text: string): string | null {
 
   const nextBody = lines.slice(next.open + 1, next.close);
   const isTrackerFence =
-    nextBody.some((l) => l.trim() === TRACKER_MARK_START) ||
+    nextBody.some((l) => isTrackerMarkStart(l)) ||
     nextBody.some(isTrackerDirective);
   if (!isTrackerFence) return null;
 
@@ -451,7 +453,7 @@ export function mergeEntryFences(text: string): string | null {
 // Returns null when already separated or when no combined banner+trackers fence exists.
 export function splitEntryFences(text: string): string | null {
   const lines = text.split("\n");
-  const fences = almanacFences(lines);
+  const fences = chronoanvilFences(lines);
 
   const banner = bannerFence(lines, fences);
   if (!banner) return null;
@@ -484,7 +486,7 @@ export function splitEntryFences(text: string): string | null {
     ...bannerBody,
     "```",
     "",
-    "```almanac",
+    "```chronoanvil",
     ...trackerBody,
     ...lines.slice(banner.close),
   ];
@@ -521,7 +523,7 @@ export function insertTrackerDirective(
 }
 
 // Drop a directive from a note. The marked region is tried first, then any
-// other almanac fence — because the × is drawn on whatever the note renders,
+// other chronoanvil fence — because the × is drawn on whatever the note renders,
 // and the renderer walks fences rather than regions, so a widget outside the
 // region must still be removable by the control sitting on it.
 //
@@ -544,7 +546,7 @@ export function removeTrackerDirective(
       if (lines[i].trim() === target) return drop(i);
     }
   }
-  for (const f of almanacFences(lines)) {
+  for (const f of chronoanvilFences(lines)) {
     for (let i = f.open + 1; i < f.close; i++) {
       if (lines[i].trim() === target) return drop(i);
     }
@@ -557,7 +559,7 @@ export function removeTrackerDirective(
 // Every registered journal type's id and root folder. The roots are settings
 // values resolved through each type's `root(plugin)`, so this is where the
 // live registry meets the pure classifier.
-export function journalRootRefs(plugin: AlmanacPlugin): JournalRootRef[] {
+export function journalRootRefs(plugin: ChronoAnvilPlugin): JournalRootRef[] {
   return registeredJournalTypes(plugin).map((t) => ({
     typeId: t.id,
     root: t.root,
@@ -569,7 +571,7 @@ export function journalRootRefs(plugin: AlmanacPlugin): JournalRootRef[] {
 // surfaceFolders both want. Built fresh per call rather than cached: a journal
 // type can be added, renamed or re-rooted from Settings at any time, and a
 // stale root would silently misclassify every note under it.
-export function surfacePathConfig(plugin: AlmanacPlugin): EntryPathConfig {
+export function surfacePathConfig(plugin: ChronoAnvilPlugin): EntryPathConfig {
   return { ...plugin.settings.paths, journalRoots: journalRootRefs(plugin) };
 }
 
@@ -583,7 +585,7 @@ export function surfacePathConfig(plugin: AlmanacPlugin): EntryPathConfig {
 // repaint and must not do file I/O to answer.
 export function noteSurfaceOf(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string
 ): TrackerSurface | null {
   const file = getFile(app, notePath);
@@ -601,7 +603,7 @@ export function noteSurfaceOf(
 // picker at its type-level answer — the permissive one.
 export function noteKindOf(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string
 ): { type: JournalType; kindId: string | null } | null {
   const file = getFile(app, notePath);
@@ -620,7 +622,7 @@ export function noteKindOf(
 // Resolve a journal type id to its display name, for the prose in a mismatch
 // message or a reclassification prompt.
 export function journalTypeNamer(
-  plugin: AlmanacPlugin
+  plugin: ChronoAnvilPlugin
 ): (typeId: string) => string | undefined {
   const types = registeredJournalTypes(plugin);
   return (id) => types.find((t) => t.id === id)?.name;
@@ -988,7 +990,7 @@ export async function readEntryTrackers(
 // reading the note twice invites them to disagree.
 export async function readEntryState(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string
 ): Promise<{ present: string[]; editedProperties: string[] }> {
   const lines = await readLines(app, notePath);
@@ -1024,7 +1026,7 @@ async function editNote(
 // an existing value.
 async function seedProperties(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   directive: string
 ): Promise<void> {
@@ -1044,7 +1046,7 @@ async function seedProperties(
 // caller surfaces so the user knows the data is still there.
 async function pruneProperties(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   directive: string
 ): Promise<string[]> {
@@ -1067,7 +1069,7 @@ async function pruneProperties(
 // go to disk, so sequencing the awaits keeps them from racing each other.
 export async function addDirectiveToNote(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   directive: string
 ): Promise<boolean> {
@@ -1081,7 +1083,7 @@ export async function addDirectiveToNote(
 
 export async function removeDirectiveFromNote(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   directive: string
 ): Promise<{ removed: boolean; keptProperties: string[] }> {
@@ -1102,7 +1104,7 @@ export async function removeDirectiveFromNote(
 // template has had a managed region since 2.18.5 and was never covered here,
 // so "+ Add tracker" on it wrote a directive the next sync quietly deleted.
 export function isManagedTemplate(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string
 ): boolean {
   const dir = plugin.settings.paths.templatesDiary;

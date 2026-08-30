@@ -65,7 +65,7 @@ export function logbookSections(def: LogbookDef): FlatSection[] {
       // in it — the items are still on disk and nothing can see them.
       locked: true,
       render: (options?: Record<string, unknown>) => ({
-        fence: "almanac",
+        fence: "chronoanvil",
         lines: [
           ...(options?.form === WIDGET_FORM
             ? []
@@ -159,7 +159,7 @@ export function logbooksFolderSections(
       // is a customisation and not a breakage.
       locked: false,
       render: (options?: Record<string, unknown>) => ({
-        fence: "almanac",
+        fence: "chronoanvil",
         lines: [
           ...(options?.form === WIDGET_FORM
             ? []

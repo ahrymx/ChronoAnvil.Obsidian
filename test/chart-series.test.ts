@@ -378,15 +378,15 @@ describe("the grid, once position means something", () => {
     // With `dense`, a reader could drag a tile in front of another, watch the
     // write succeed, and watch the packer pull it back — a gesture that
     // produces no visible change reads as a broken feature.
-    expect(cssRule(".journal-chart-grid")).toContain("grid-auto-flow: row;");
-    expect(cssRule(".journal-chart-grid")).not.toContain("dense");
+    expect(cssRule(".ca-journal-chart-grid")).toContain("grid-auto-flow: row;");
+    expect(cssRule(".ca-journal-chart-grid")).not.toContain("dense");
   });
 
   it("draws the two drag states differently", () => {
-    expect(cssRule(".journal-chart-grid .journal-chart-cell.is-dragging")).toContain(
+    expect(cssRule(".ca-journal-chart-grid .ca-journal-chart-cell.is-dragging")).toContain(
       "opacity: 0.45"
     );
-    const target = cssRule(".journal-chart-grid .journal-chart-cell.is-drop-target");
+    const target = cssRule(".ca-journal-chart-grid .ca-journal-chart-cell.is-drop-target");
     expect(target).toContain("inset 0 0 0 2px var(--interactive-accent)");
     // A second border inside a clipping cell moves the canvas by a pixel as it
     // appears, and a canvas that resizes mid-drag is Chart.js redrawing under
@@ -395,12 +395,12 @@ describe("the grid, once position means something", () => {
   });
 
   it("says a tile can be picked up", () => {
-    expect(cssRule('.journal-chart-grid .journal-chart-cell[draggable="true"]')).toContain(
+    expect(cssRule('.ca-journal-chart-grid .ca-journal-chart-cell[draggable="true"]')).toContain(
       "cursor: grab"
     );
   });
 
   it("defines the second series' colour rather than only reading it", () => {
-    expect(readCss()).toContain("--am-chart-series-2:");
+    expect(readCss()).toContain("--ca-chart-series-2:");
   });
 });

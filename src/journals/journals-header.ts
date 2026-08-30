@@ -35,7 +35,7 @@
 // is browsable — three numbered month grids with quarter chevrons — because on
 // one subject you read individual days. This is a fixed, non-navigable window:
 // no day numbers, no navigation, ~70px tall, so the journal list it heads stays
-// above the fold. The two share the `--am-act-*` ramp and the bucket maths so
+// above the fold. The two share the `--ca-act-*` ramp and the bucket maths so
 // the section has one colour story, but they are different instruments.
 //
 // Scope is every registered journal's root folder, unioned. A vault with
@@ -45,7 +45,7 @@
 // just be noise).
 
 import { setIcon, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { countBodyTasks } from "../ui/tables";
 import { getJournalType, registeredJournalTypes } from "./journal";
 import type { JournalType } from "./journal";
@@ -109,7 +109,7 @@ export interface JournalsHeaderOptions {
 // section window writes `all` because a required choice must have something to
 // choose; a reader typing the bare keyword gets the identical band.
 export function journalsHeaderScope(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   argument: string
 ): JournalType[] | string {
   const id = argument.trim();
@@ -122,7 +122,7 @@ export function journalsHeaderScope(
   const have = all.map((t) => t.id);
   return have.length
     ? `No journal called "${id}". This vault has: ${have.join(", ")}.`
-    : `journals-header names the journal "${id}", and this vault has no journals — turn on Study or add one in Settings → Almanac → Journals.`;
+    : `journals-header names the journal "${id}", and this vault has no journals — turn on Study or add one in Settings → ChronoAnvil → Journals.`;
 }
 
 // A stat cell: value over caption. Returns the value element so an async
@@ -161,16 +161,16 @@ function addStat(
   // sub-line and the other way where it does not is two components wearing one
   // costume. Journals has no sub-line today and follows anyway, because the
   // point is that the reader learns one shape.
-  const cell = parent.createDiv({ cls: "jjh-stat" });
-  cell.createDiv({ cls: "jjh-stat-label", text: label });
-  return cell.createDiv({ cls: "jjh-stat-value", text: value });
+  const cell = parent.createDiv({ cls: "ca-jjh-stat" });
+  cell.createDiv({ cls: "ca-jjh-stat-label", text: label });
+  return cell.createDiv({ cls: "ca-jjh-stat-value", text: value });
 }
 
 // Read every note under every registered type's root, pairing its `date`
 // frontmatter with its open/completed task counts.
 //
 // Task counts come from each note's *body* (countBodyTasks), not the metadata
-// cache: an Almanac `- ( )` checkbox is invisible to the listItems cache
+// cache: a ChronoAnvil `- ( )` checkbox is invisible to the listItems cache
 // wherever it sits, and a reader's tasks may be written in a note's prose as
 // well as inside its `tasks:` widget region. Reading bodies is async, so this
 // returns a promise and the strip paints once it resolves.
@@ -183,7 +183,7 @@ function addStat(
 // a bug in the reader rather than a sentence in the caller — see the status
 // line below.
 async function collectRows(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   roots: string[]
 ): Promise<{ rows: ActivityCount[]; fileByDate: Map<string, TFile> }> {
   const app = plugin.app;
@@ -224,7 +224,7 @@ function cellLabel(c: YearCell): string {
 // above it. Column-major CSS grid (`grid-auto-flow: column`), so a cell's
 // position falls out of its order and no per-cell coordinates are needed.
 function drawStrip(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   wrap: HTMLElement,
   cells: YearCell[],
   max: number,
@@ -239,7 +239,7 @@ function drawStrip(
   // ── THE TRACKS FILL THE PANE, WITH A FLOOR (4.13.3) ────────────────────
   //
   // `repeat(53, var(--jjh-cell))` until now: 53 fixed 10px columns, about 660px,
-  // and `.jjh-strip-wrap` scrolled whatever was left over. That is right on a
+  // and `.ca-jjh-strip-wrap` scrolled whatever was left over. That is right on a
   // phone and wrong on a wide page — the homepage caps itself at 1100px and the
   // journals dashboard is wider still, so the band's own strip sat in the left
   // two-thirds of it with a scrollbar under a year that had room to be shown
@@ -258,19 +258,19 @@ function drawStrip(
   // drifts further from the week it names until one points at the wrong month.
   const tracks = `repeat(${STRIP_WEEKS}, minmax(var(--jjh-cell), 1fr))`;
 
-  const months = wrap.createDiv({ cls: "jjh-strip-months" });
+  const months = wrap.createDiv({ cls: "ca-jjh-strip-months" });
   months.style.gridTemplateColumns = tracks;
   for (const { label, week } of yearStripMonthLabels(cells)) {
-    const el = months.createDiv({ cls: "jjh-strip-month", text: label });
+    const el = months.createDiv({ cls: "ca-jjh-strip-month", text: label });
     // +1: CSS grid lines are 1-based.
     el.style.gridColumnStart = String(week + 1);
   }
 
-  const grid = wrap.createDiv({ cls: "jjh-strip" });
+  const grid = wrap.createDiv({ cls: "ca-jjh-strip" });
   grid.style.gridTemplateColumns = tracks;
 
   for (const c of cells) {
-    const cell = grid.createDiv({ cls: "jjh-cell" });
+    const cell = grid.createDiv({ cls: "ca-jjh-cell" });
     if (c.future) {
       // Days past today in the final column: held as invisible placeholders so
       // the strip's right edge stays straight instead of ragged.
@@ -280,7 +280,7 @@ function drawStrip(
     const total = activityWeight(c);
     const bucket = activityBucket(total, max);
     if (bucket == null) cell.addClass("is-empty");
-    else cell.addClass(`am-act-${bucket}`);
+    else cell.addClass(`ca-act-${bucket}`);
     if (c.iso === todayIso) cell.addClass("is-today");
 
     const label = cellLabel(c);
@@ -328,7 +328,7 @@ export function kindWords(types: readonly JournalType[]): string {
 }
 
 export function buildJournalsHeader(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   opts: JournalsHeaderOptions = {}
 ): HTMLElement {
   // WHAT THE CALLER RESOLVED, OR EVERY JOURNAL. The default is the scope this
@@ -336,7 +336,7 @@ export function buildJournalsHeader(
   // that has an argument to honour resolves it through `journalsHeaderScope`
   // and hands the answer in, which keeps the refusal out of the drawing.
   const types = opts.types ?? registeredJournalTypes(plugin);
-  const root = createDiv({ cls: "jjh-root" });
+  const root = createDiv({ cls: "ca-jjh-root" });
 
   // No journal types enabled: render nothing. journal.ts already writes an
   // explanatory callout into the section body for exactly this case, and a
@@ -367,8 +367,8 @@ export function buildJournalsHeader(
   // not in `SECTION_TITLES` — no block head either. That band now opens with the
   // eyebrow. It is a smaller name than it had; it is also the only one of the two
   // that was ever true about what follows it.
-  const head = root.createDiv({ cls: "jjh-head" });
-  const left = head.createDiv({ cls: "jjh-left" });
+  const head = root.createDiv({ cls: "ca-jjh-head" });
+  const left = head.createDiv({ cls: "ca-jjh-left" });
 
   // ── AND IT NAMES THE PERIOD, NOT THE ROSTER (4.38.4) ──────────────────
   //
@@ -385,16 +385,16 @@ export function buildJournalsHeader(
   // `types` IS STILL THE ARGUMENT it always was — the band's numbers are scoped
   // to it, and a `journals-header:study` on a reader's own note covers one
   // journal. What changed is only what the label says out loud.
-  left.createDiv({ cls: "jjh-eyebrow", text: "Last 12 months" });
+  left.createDiv({ cls: "ca-jjh-eyebrow", text: "Last 12 months" });
 
-  const status = left.createDiv({ cls: "jjh-status", text: "Reading activity…" });
+  const status = left.createDiv({ cls: "ca-jjh-status", text: "Reading activity…" });
 
   if (opts.actions?.length) {
-    const actions = head.createDiv({ cls: "jjh-actions" });
+    const actions = head.createDiv({ cls: "ca-jjh-actions" });
     for (const a of opts.actions) {
-      const btn = actions.createEl("button", { cls: "journal-btn" });
-      setIcon(btn.createSpan({ cls: "journal-btn-icon" }), a.icon);
-      btn.createSpan({ cls: "journal-btn-label", text: a.label });
+      const btn = actions.createEl("button", { cls: "ca-journal-btn" });
+      setIcon(btn.createSpan({ cls: "ca-journal-btn-icon" }), a.icon);
+      btn.createSpan({ cls: "ca-journal-btn-label", text: a.label });
       btn.addEventListener("click", (e) => {
         e.preventDefault();
         a.onClick();
@@ -406,7 +406,7 @@ export function buildJournalsHeader(
   // Placeholders: every number here depends on reading note bodies, which is
   // async. The cells ship with an ellipsis and fill on resolve rather than the
   // band popping into existence a beat after the rest of the section.
-  const stats = root.createDiv({ cls: "jjh-stats" });
+  const stats = root.createDiv({ cls: "ca-jjh-stats" });
   const notesEl = addStat(stats, "…", "notes");
   const streakEl = addStat(stats, "…", "day streak");
   const longestEl = addStat(stats, "…", "longest streak");
@@ -439,9 +439,9 @@ export function buildJournalsHeader(
   // are counts of activity, which do compose across types.
 
   // ── Activity strip ─────────────────────────────────────────────────────
-  const stripWrap = root.createDiv({ cls: "jjh-strip-wrap" });
+  const stripWrap = root.createDiv({ cls: "ca-jjh-strip-wrap" });
   const loading = stripWrap.createDiv({
-    cls: "jjh-strip-loading",
+    cls: "ca-jjh-strip-loading",
     text: "Loading activity…",
   });
 
@@ -456,16 +456,16 @@ export function buildJournalsHeader(
     const s = yearStripStats(cells, todayIso);
 
     notesEl.setText(String(s.activeDays));
-    const notesLabel = notesEl.parentElement?.querySelector(".jjh-stat-label");
+    const notesLabel = notesEl.parentElement?.querySelector(".ca-jjh-stat-label");
     if (notesLabel) {
       notesLabel.setText(s.activeDays === 1 ? "active day" : "active days");
     }
     streakEl.setText(String(s.streak));
-    const streakLabel = streakEl.parentElement?.querySelector(".jjh-stat-label");
+    const streakLabel = streakEl.parentElement?.querySelector(".ca-jjh-stat-label");
     if (streakLabel) streakLabel.setText(s.streak === 1 ? "day streak" : "days streak");
     longestEl.setText(String(s.longest));
     openEl.setText(String(s.open));
-    const openLabel = openEl.parentElement?.querySelector(".jjh-stat-label");
+    const openLabel = openEl.parentElement?.querySelector(".ca-jjh-stat-label");
     if (openLabel) openLabel.setText(s.open === 1 ? "open task" : "open tasks");
 
     // Status line: say something true about the year rather than restating a
@@ -510,7 +510,7 @@ export function buildJournalsHeader(
     // START AT THE RECENT END — 3.12 §14.5.
     //
     // The strip is 53 columns of a 10px cell plus a 2.5px gap, so it is about
-    // 660px wide and a phone is not. `.jjh-strip-wrap` has always scrolled,
+    // 660px wide and a phone is not. `.ca-jjh-strip-wrap` has always scrolled,
     // which is right — a year of days is not legible squeezed into 360px, and
     // shrinking the cell to fit would trade one unreadable strip for another.
     //
@@ -544,13 +544,13 @@ export function buildJournalsHeader(
     // that a legend is not part of the year. It is a caption ABOUT the strip, so it
     // belongs beside the scroller rather than in it, and then no scroll position can
     // take it away.
-    const legend = root.createDiv({ cls: "jjh-legend" });
-    legend.createSpan({ cls: "jjh-legend-text", text: "Less" });
-    legend.createDiv({ cls: "jjh-cell is-empty" });
+    const legend = root.createDiv({ cls: "ca-jjh-legend" });
+    legend.createSpan({ cls: "ca-jjh-legend-text", text: "Less" });
+    legend.createDiv({ cls: "ca-jjh-cell is-empty" });
     for (let b = 1; b <= 4; b++) {
-      legend.createDiv({ cls: `jjh-cell am-act-${b}` });
+      legend.createDiv({ cls: `ca-jjh-cell ca-act-${b}` });
     }
-    legend.createSpan({ cls: "jjh-legend-text", text: "More" });
+    legend.createSpan({ cls: "ca-jjh-legend-text", text: "More" });
   });
 
   return root;

@@ -122,8 +122,8 @@ describe("what Save writes", () => {
     // the same field now says what the reader has to clear before the section
     // can go — the count is still load-bearing, for a different sentence.
     const written = topic().replace(
-      "<!--almanac:path\n-->",
-      "<!--almanac:path\nFirst quadratics.\nThen factorising.\n-->"
+      "<!--chronoanvil:path\n-->",
+      "<!--chronoanvil:path\nFirst quadratics.\nThen factorising.\n-->"
     );
     const want = sectionsPresent(written, ctx).filter((id) => id !== "path");
     const path = planSections(written, ctx, want).find(
@@ -150,7 +150,7 @@ describe("what Save refuses", () => {
     // plan is computed from the text it was given, so a stale text yields a
     // stale plan rather than an obviously wrong one.
     const stale = topic();
-    const moved = stale.replace("```almanac\nstats-band\n```\n\n", "");
+    const moved = stale.replace("```chronoanvil\nstats-band\n```\n\n", "");
     expect(sectionsPresent(stale, ctx)).toContain("stats");
     expect(sectionsPresent(moved, ctx)).not.toContain("stats");
     expect(planSections(stale, ctx, sectionsPresent(moved, ctx))).not.toEqual(
@@ -186,7 +186,7 @@ describe("the Markdown tab", () => {
     // the thing being previewed. A <pre> of the source cannot fire a button.
     const want = sectionsPresent(topic(), ctx).filter((id) => id !== "review");
     const shown = applySections(topic(), ctx, want)!;
-    expect(shown).toContain("```almanac");
+    expect(shown).toContain("```chronoanvil");
     expect(shown).not.toContain("review-queue");
   });
 });

@@ -172,7 +172,7 @@ describe("both catalogues are data, which is the point", () => {
         // first widget. No frontmatter, because unlike a period dashboard
         // neither page is scoped to a period — that is the whole difference
         // between these and the four notes nested under the diary.
-        expect(page.compose().startsWith("`almanac:spacer`\n")).toBe(true);
+        expect(page.compose().startsWith("`chronoanvil:spacer`\n")).toBe(true);
         expect(page.compose().startsWith("---")).toBe(false);
       });
 
@@ -266,7 +266,7 @@ describe("what each page refuses to lose", () => {
         page.name
       ).not.toContain("title");
       const out = page.model().apply(page.compose(), reversed) ?? page.compose();
-      const firstFence = out.split("```").find((c) => c.startsWith("almanac\n"));
+      const firstFence = out.split("```").find((c) => c.startsWith("chronoanvil\n"));
       expect(firstFence, page.name).toContain("title:");
     }
   });
@@ -564,12 +564,12 @@ describe("no card sits under a header bar", () => {
   // what `diary:3` already does on the homepage and what the period summaries
   // already do in a dashboard masthead.
   //
-  // THE LIST IS THE DISPATCHER'S. `entry-header` takes `journal-entry-banner`,
-  // `OVERVIEW_KINDS` take `journal-overview-card`, and `journals` draws its own
+  // THE LIST IS THE DISPATCHER'S. `entry-header` takes `ca-journal-entry-banner`,
+  // `OVERVIEW_KINDS` take `ca-journal-overview-card`, and `journals` draws its own
   // card. If a directive joins them, this test is where the new pairing has to
   // be argued.
   // `title` JOINED THE LIST IN 4.10, which is this comment's own instruction
-  // followed: the page head draws `.jtc-card`, so a `header:` bar over it would
+  // followed: the page head draws `.ca-jtc-card`, so a `header:` bar over it would
   // be the two-borders-arguing pairing described above — and, worse than
   // elsewhere, a title bar over the page's own title.
   // `title` JOINS THE LIST IN 4.19, and it always belonged: the page-title
@@ -578,7 +578,7 @@ describe("no card sits under a header bar", () => {
   // a title bar over the page's own title, which is the pairing this whole
   // describe block exists to refuse.
   // `journals-header` JOINS THE LIST IN 4.36, and it has always belonged —
-  // 60-heroes-and-banners.css says so at `.jjs-hero .jjh-root`, which cancels
+  // 60-heroes-and-banners.css says so at `.ca-jjs-hero .ca-jjh-root`, which cancels
   // the band's shell inside the journals card and states the rule in the same
   // breath: *"The `journals-header` directive still renders the bordered card
   // version wherever it's used on its own."* A `header:` bar over a bordered box
@@ -660,7 +660,7 @@ describe("no card sits under a header bar", () => {
         const { fence, lines } = s.render();
         // The chart fence carries its header INSIDE itself — the charts
         // processor reads it and makes the whole section self-titled.
-        if (fence !== "almanac") continue;
+        if (fence !== "chronoanvil") continue;
         const keywords = lines.map(keywordOf);
         if (keywords.some((k) => CARD_DRAWING.includes(k))) continue;
         const titled =

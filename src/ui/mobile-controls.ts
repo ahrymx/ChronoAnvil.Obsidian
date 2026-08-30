@@ -9,19 +9,19 @@
 //
 // Provides an unobtrusive floating button on mobile to toggle Obsidian's
 // mobile navigation bar and toolbars, giving unobstructed full-height
-// viewing for Almanac notes and dashboards.
+// viewing for ChronoAnvil notes and dashboards.
 
 import { Platform, setIcon } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 
-export const HIDE_MOBILE_OVERLAYS_CLASS = "am-hide-mobile-overlays";
-export const MOBILE_TOGGLE_BTN_CLASS = "am-mobile-toggle-btn";
+export const HIDE_MOBILE_OVERLAYS_CLASS = "ca-hide-mobile-overlays";
+export const MOBILE_TOGGLE_BTN_CLASS = "ca-mobile-toggle-btn";
 
 export class MobileControls {
   private buttonEl: HTMLElement | null = null;
   private overlaysHidden = false;
 
-  constructor(private plugin: AlmanacPlugin) {}
+  constructor(private plugin: ChronoAnvilPlugin) {}
 
   register(): void {
     const isMobile = Platform.isMobile;
@@ -74,8 +74,8 @@ export class MobileControls {
       document.body.appendChild(this.buttonEl);
     }
 
-    this.buttonEl.toggleClass("am-mobile-toggle-left", position === "left");
-    this.buttonEl.toggleClass("am-mobile-toggle-right", position === "right");
+    this.buttonEl.toggleClass("ca-mobile-toggle-left", position === "left");
+    this.buttonEl.toggleClass("ca-mobile-toggle-right", position === "right");
 
     this.buttonEl.empty();
     setIcon(this.buttonEl, this.overlaysHidden ? "eye" : "eye-off");

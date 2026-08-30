@@ -229,7 +229,7 @@ export function bridgeWindow(host: BridgeHostFacts): BridgeResult<BridgeWindow> 
 // What a bridge accepts after its target.
 //
 // CLOSED, and closed the way INLINE_KINDS is closed rather than the way a
-// feature flag is: the set is the promise. Almanac's identity is that it
+// feature flag is: the set is the promise. ChronoAnvil's identity is that it
 // *removed* Dataview, and `bridge:` growing an expression grammar would put it
 // back one operator at a time without anyone deciding to. A bridge that cannot
 // express something is a request for a named selector, argued for once and
@@ -508,7 +508,7 @@ export interface SnapshotRow {
 // `[[path|Lesson [draft]]]`, which is a BROKEN LINK IN OBSIDIAN, not merely one
 // this plugin failed to parse back. That matters more than a rendering bug:
 // §3.2's whole claim for storing plain markdown is that a frozen bridge is a
-// list of links whether or not Almanac is installed, and a malformed wikilink
+// list of links whether or not ChronoAnvil is installed, and a malformed wikilink
 // is exactly the case where that claim fails.
 //
 // Substituted rather than escaped because a wikilink alias has no escape: there
@@ -527,7 +527,7 @@ function linkSafe(text: string): string {
 // Plain markdown, deliberately.
 //
 // Wikilinks rather than the plugin's own markup, so a frozen bridge is a list
-// of links in a note whether or not Almanac is installed — which is the point:
+// of links in a note whether or not ChronoAnvil is installed — which is the point:
 // the reader asked to edit and revisit these, and a block that renders as raw
 // HTML comments once the plugin is gone is not something anyone can revisit.
 export function serializeSnapshot(rows: readonly SnapshotRow[]): string {

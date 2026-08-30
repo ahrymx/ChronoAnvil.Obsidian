@@ -28,8 +28,8 @@ const daily = entrySectionModel({ grain: "daily" });
 
 function fill(text: string): string {
   return text.replace(
-    /<!--almanac:([A-Za-z0-9_-]+)\n-->/g,
-    (_m, key: string) => `<!--almanac:${key}\nwriting-in-${key}\n-->`
+    /<!--chronoanvil:([A-Za-z0-9_-]+)\n-->/g,
+    (_m, key: string) => `<!--chronoanvil:${key}\nwriting-in-${key}\n-->`
   );
 }
 
@@ -67,7 +67,7 @@ describe("an exported copy cannot be mistaken for the note it came from", () => 
       expect(out.startsWith("---")).toBe(false);
       expect(frontmatterOf(out)).toBe("");
       expect(
-        noteKindOf(DEFAULT_PATHS, exportPathFor("Almanac Export", "x.md"), undefined)
+        noteKindOf(DEFAULT_PATHS, exportPathFor("ChronoAnvil Export", "x.md"), undefined)
       ).toBeNull();
     });
   }
@@ -83,11 +83,11 @@ describe("an exported copy cannot be mistaken for the note it came from", () => 
       "Mood: 4",
       "---",
       "",
-      "```almanac",
+      "```chronoanvil",
       "note:log|Notes",
       "```",
       "",
-      "<!--almanac:log",
+      "<!--chronoanvil:log",
       "written",
       "-->",
     ].join("\n");
@@ -110,12 +110,12 @@ describe("an exported copy cannot be mistaken for the note it came from", () => 
 
   it("drops the tracker markers, which are the plugin's and not the reader's", () => {
     const out = toPlainMarkdown(fill(composeEntryTemplate("daily", [])), daily, "demote");
-    expect(out).not.toContain("almanac:trackers:start");
-    expect(out).not.toContain("almanac:trackers:end");
+    expect(out).not.toContain("chronoanvil:trackers:start");
+    expect(out).not.toContain("chronoanvil:trackers:end");
   });
 
   it("writes no block at all for a note with no properties", () => {
-    const text = ["```almanac", "note:log|Notes", "```", "", "<!--almanac:log", "x", "-->"].join(
+    const text = ["```chronoanvil", "note:log|Notes", "```", "", "<!--chronoanvil:log", "x", "-->"].join(
       "\n"
     );
     expect(toPlainMarkdown(text, daily, "demote").startsWith(">")).toBe(false);
@@ -152,26 +152,26 @@ describe("`keep` is still exactly what 4.30 shipped", () => {
 
 describe("where a copy goes", () => {
   it("mirrors the source path under the root", () => {
-    expect(exportPathFor("Almanac Export", "02 - Diary/Daily/2026-08-15.md")).toBe(
-      "Almanac Export/02 - Diary/Daily/2026-08-15.md"
+    expect(exportPathFor("ChronoAnvil Export", "02 - Diary/Daily/2026-08-15.md")).toBe(
+      "ChronoAnvil Export/02 - Diary/Daily/2026-08-15.md"
     );
     // A trailing slash on the root is a reader's typing, not a second rule.
-    expect(exportPathFor("Almanac Export/", "a.md")).toBe("Almanac Export/a.md");
+    expect(exportPathFor("ChronoAnvil Export/", "a.md")).toBe("ChronoAnvil Export/a.md");
   });
 
   // THE LOOP'S TERMINATION, ASSERTED RATHER THAN REASONED ABOUT. An export whose
   // own output is not recognised as its own output exports its exports.
   it("recognises its own output as its own", () => {
-    const root = "Almanac Export";
+    const root = "ChronoAnvil Export";
     expect(isUnderExportRoot(root, exportPathFor(root, "02 - Diary/x.md"))).toBe(true);
   });
 
   it("claims a folder, not a prefix", () => {
-    expect(isUnderExportRoot("Almanac Export", "Almanac Export/a.md")).toBe(true);
-    expect(isUnderExportRoot("Almanac Export", "Almanac Export")).toBe(true);
+    expect(isUnderExportRoot("ChronoAnvil Export", "ChronoAnvil Export/a.md")).toBe(true);
+    expect(isUnderExportRoot("ChronoAnvil Export", "ChronoAnvil Export")).toBe(true);
     // The bug a bare `startsWith` produces, and the reason for the slash.
-    expect(isUnderExportRoot("Almanac Export", "Almanac Exports Old/a.md")).toBe(false);
-    expect(isUnderExportRoot("Almanac Export", "02 - Diary/a.md")).toBe(false);
+    expect(isUnderExportRoot("ChronoAnvil Export", "ChronoAnvil Exports Old/a.md")).toBe(false);
+    expect(isUnderExportRoot("ChronoAnvil Export", "02 - Diary/a.md")).toBe(false);
     // An empty root must claim nothing, or a misconfigured setting would swallow
     // the whole vault.
     expect(isUnderExportRoot("", "anything.md")).toBe(false);
@@ -181,7 +181,7 @@ describe("where a copy goes", () => {
 describe("what the window is shown", () => {
   const item = (over: Partial<ExportPlanItem>): ExportPlanItem => ({
     source: "02 - Diary/Daily/a.md",
-    path: "Almanac Export/02 - Diary/Daily/a.md",
+    path: "ChronoAnvil Export/02 - Diary/Daily/a.md",
     content: "new",
     before: null,
     ...over,
@@ -198,7 +198,7 @@ describe("what the window is shown", () => {
   it("gives a creation no diff, and a rewrite one", () => {
     const survey = exportSurvey([
       item({ source: "new.md", content: "a", before: null }),
-      item({ source: "old.md", path: "Almanac Export/old.md", content: "a\nb", before: "a" }),
+      item({ source: "old.md", path: "ChronoAnvil Export/old.md", content: "a\nb", before: "a" }),
     ]);
     const [created, rewritten] = survey.groups[0].items;
     expect(created.diff).toBeUndefined();
@@ -229,11 +229,11 @@ describe("the writer stays inside the export folder", () => {
   // this file that must not be a source pin that cannot fail (4.29's outcome
   // records two of those). So: the real predicate, given a poisoned path.
   it("refuses a destination outside the root, whatever the plan said", () => {
-    const root = "Almanac Export";
+    const root = "ChronoAnvil Export";
     for (const escape of [
       "02 - Diary/Daily/2026-08-15.md",
       "Homepage.md",
-      "Almanac Exports Old/a.md",
+      "ChronoAnvil Exports Old/a.md",
     ]) {
       expect(isUnderExportRoot(root, escape), escape).toBe(false);
     }

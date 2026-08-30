@@ -5,11 +5,11 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// The Almanac task format — a small, self-owned line format stored inside a
-// note's `<!--almanac:todo-->` region (see notestore.ts). Almanac renders and
+// The ChronoAnvil task format — a small, self-owned line format stored inside a
+// note's `<!--chronoanvil:todo-->` region (see notestore.ts). ChronoAnvil renders and
 // edits these itself; it deliberately does NOT use the Tasks plugin's emoji
 // syntax or Dataview, so there's no external dependency and the raw file stays
-// clean and Almanac-specific.
+// clean and ChronoAnvil-specific.
 //
 // On-disk line grammar (one task per line):
 //
@@ -17,7 +17,7 @@
 //   - ( ) Water plants
 //   - (x) Reply to email [priority:: low]
 //
-// - `- ( )` / `- (x)` is the checkbox — an Almanac-unique marker (not `- [ ]`),
+// - `- ( )` / `- (x)` is the checkbox — a ChronoAnvil-unique marker (not `- [ ]`),
 //   so Obsidian's native task handling never touches these. `(x)` (any case) is
 //   done; `( )` (or empty) is open.
 // - Trailing `[field:: value]` inline fields carry optional metadata. Supported
@@ -32,7 +32,7 @@
 
 export type TaskPriority = "high" | "normal" | "low";
 
-export interface AlmanacTask {
+export interface ChronoAnvilTask {
   done: boolean;
   text: string;
   priority: TaskPriority;
@@ -68,10 +68,10 @@ export function isValidPriority(v: string): v is TaskPriority {
   return v === "high" || v === "normal" || v === "low";
 }
 
-// Parse one line into a task, or null if it isn't an Almanac task line. Blank
+// Parse one line into a task, or null if it isn't a ChronoAnvil task line. Blank
 // lines and anything not starting with the `- ( )` marker return null so the
 // caller can skip them (a region may hold stray whitespace).
-export function parseTaskLine(line: string): AlmanacTask | null {
+export function parseTaskLine(line: string): ChronoAnvilTask | null {
   const m = CHECKBOX_RE.exec(line.trimEnd());
   if (!m) return null;
   const done = m[1].toLowerCase() === "x";
@@ -117,7 +117,7 @@ function padHour(value: string): string {
 // Serialize a task back to its canonical line. Priority is emitted only when
 // not normal; due only when set; unknown fields appended after. Text is
 // trimmed. The result re-parses to an equal task (round-trip stable).
-export function serializeTaskLine(task: AlmanacTask): string {
+export function serializeTaskLine(task: ChronoAnvilTask): string {
   const box = task.done ? "(x)" : "( )";
   const parts = [`- ${box} ${task.text.trim()}`.trimEnd()];
   if (task.priority !== "normal") parts.push(`[priority:: ${task.priority}]`);
@@ -128,8 +128,8 @@ export function serializeTaskLine(task: AlmanacTask): string {
 }
 
 // Parse a region's text block into a task list, skipping non-task lines.
-export function parseTasks(regionText: string): AlmanacTask[] {
-  const out: AlmanacTask[] = [];
+export function parseTasks(regionText: string): ChronoAnvilTask[] {
+  const out: ChronoAnvilTask[] = [];
   for (const line of regionText.split("\n")) {
     const t = parseTaskLine(line);
     if (t) out.push(t);
@@ -138,12 +138,12 @@ export function parseTasks(regionText: string): AlmanacTask[] {
 }
 
 // Serialize a task list back to a region text block (newline-joined lines).
-export function serializeTasks(tasks: AlmanacTask[]): string {
+export function serializeTasks(tasks: ChronoAnvilTask[]): string {
   return tasks.map(serializeTaskLine).join("\n");
 }
 
 // Convenience for the widget: make a fresh normal task from typed text.
-export function newTask(text: string): AlmanacTask {
+export function newTask(text: string): ChronoAnvilTask {
   return {
     done: false,
     text: text.trim(),
@@ -159,10 +159,10 @@ export function newTask(text: string): AlmanacTask {
 // can skip a write/repaint on a no-op — the same contract moveAttachment uses).
 // Used by the Learning Path checklist's up/down reorder buttons.
 export function moveTask(
-  tasks: AlmanacTask[],
+  tasks: ChronoAnvilTask[],
   from: number,
   to: number
-): AlmanacTask[] {
+): ChronoAnvilTask[] {
   if (
     from === to ||
     from < 0 ||

@@ -241,7 +241,7 @@ export function repairNote(
       // something the plan never named — which is the one failure this whole
       // module is arranged to make impossible.
       throw new Error(
-        `[Almanac] repair produced a ${op.kind} op for ${op.sectionId ?? "?"}; ` +
+        `[ChronoAnvil] repair produced a ${op.kind} op for ${op.sectionId ?? "?"}; ` +
           "a repair is additive and this is a bug in how its want was built"
       );
     }
@@ -310,7 +310,7 @@ function wantWith(
 function directiveWords(shipped: string): string[] {
   const out: string[] = [];
   for (const seg of segment(shipped.split("\n"))) {
-    if (seg.kind !== "fence" || seg.fenceKind !== "almanac") continue;
+    if (seg.kind !== "fence" || seg.fenceKind !== "chronoanvil") continue;
     for (const line of seg.lines) {
       if (line.trim().startsWith("```")) continue;
       const word = keywordOf(line);
@@ -411,8 +411,8 @@ export function regroupShippedPages(text: string, shipped: string): string | nul
     });
     const welded: Segment = {
       kind: "fence",
-      fenceKind: "almanac",
-      lines: ["```almanac", ...body, "```"],
+      fenceKind: "chronoanvil",
+      lines: ["```chronoanvil", ...body, "```"],
       keywords: body.map((l) => keywordOf(l)),
     };
     const doomed = new Set(cells.map((c) => c.seg));
@@ -444,7 +444,7 @@ export function regroupShippedPages(text: string, shipped: string): string | nul
 function composedRows(shipped: string): { lines: string[]; words: string[] }[] {
   const out: { lines: string[]; words: string[] }[] = [];
   for (const seg of segment(shipped.split("\n"))) {
-    if (seg.kind !== "fence" || seg.fenceKind !== "almanac") continue;
+    if (seg.kind !== "fence" || seg.fenceKind !== "chronoanvil") continue;
     const body = seg.lines.slice(1, -1).filter((l) => keywordOf(l).length > 0);
     if (!body.some((l) => keywordOf(l) === ROW_KEYWORD)) continue;
     const words = body
@@ -475,7 +475,7 @@ function locateCells(
     let found: { word: string; line: string; seg: number } | null = null;
     for (let i = 0; i < segs.length; i++) {
       const seg = segs[i];
-      if (seg.kind !== "fence" || seg.fenceKind !== "almanac") continue;
+      if (seg.kind !== "fence" || seg.fenceKind !== "chronoanvil") continue;
       const line = widgetLines(seg).find((l) => keywordOf(l) === word);
       if (line == null) continue;
       if (found) return null; // written twice — refusal 2

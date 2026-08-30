@@ -179,7 +179,7 @@ describe("one page per journal, in every walk that reads the list", () => {
     expect(one.slice(0, none.length).map((n) => n.dest)).toEqual(none.map((n) => n.dest));
 
     // NOTHING FIXED IS JOURNAL-SENSITIVE, and that is stronger than it was.
-    // 4.68 allowed one exception here — `Almanac.canvas` is a map OF this vault,
+    // 4.68 allowed one exception here — `ChronoAnvil.canvas` is a map OF this vault,
     // so registering a journal put a node on it — and 4.81's shrink to four
     // cards removed even that: the map draws the journals TREE, not its types,
     // so the baseline is the same bytes either way. Anything appearing here is

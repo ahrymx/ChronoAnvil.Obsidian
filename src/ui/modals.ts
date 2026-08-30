@@ -487,7 +487,7 @@ class KindRenameModal extends Modal {
     const { contentEl } = this;
     contentEl.createEl("h3", { text: "Rename the note type too?" });
 
-    const p = contentEl.createEl("p", { cls: "almanac-modal-note" });
+    const p = contentEl.createEl("p", { cls: "ca-modal-note" });
     p.appendText("“");
     p.createEl("strong", { text: this.heading });
     p.appendText("” is the heading for the ");
@@ -820,7 +820,7 @@ class DetailedChoiceModal extends SuggestModal<DetailedChoice> {
   }
 
   renderSuggestion(value: DetailedChoice, el: HTMLElement): void {
-    el.addClass("almanac-choice-detailed");
+    el.addClass("ca-choice-detailed");
     // The heading goes BESIDE the row, not inside it — 4.16, and this is a bug
     // fix for how 4.15 §3 shipped it.
     //
@@ -843,12 +843,12 @@ class DetailedChoiceModal extends SuggestModal<DetailedChoice> {
     // this replaces, and it is the wrong-looking one rather than the broken one.
     const at = this.shown.indexOf(value);
     if (value.group && (at <= 0 || this.shown[at - 1]?.group !== value.group)) {
-      const head = createDiv({ cls: "almanac-choice-group", text: value.group });
+      const head = createDiv({ cls: "ca-choice-group", text: value.group });
       if (el.parentElement) el.parentElement.insertBefore(head, el);
       else el.prepend(head);
     }
-    el.createDiv({ cls: "almanac-choice-label", text: value.label });
-    el.createDiv({ cls: "almanac-choice-desc", text: value.description });
+    el.createDiv({ cls: "ca-choice-label", text: value.label });
+    el.createDiv({ cls: "ca-choice-desc", text: value.description });
   }
 
   onChooseSuggestion(value: DetailedChoice): void {
@@ -1004,11 +1004,11 @@ class PlanModal extends Modal {
     contentEl.createEl("h3", { text: this.title });
     contentEl.createEl("p", { text: this.lead });
 
-    const list = contentEl.createDiv({ cls: "almanac-plan" });
+    const list = contentEl.createDiv({ cls: "ca-plan" });
     for (const g of this.groups) {
-      const group = list.createDiv({ cls: "almanac-plan-note" });
-      group.createDiv({ cls: "almanac-plan-name", text: g.label });
-      const ul = group.createEl("ul", { cls: "almanac-plan-ops" });
+      const group = list.createDiv({ cls: "ca-plan-note" });
+      group.createDiv({ cls: "ca-plan-name", text: g.label });
+      const ul = group.createEl("ul", { cls: "ca-plan-ops" });
       for (const line of g.lines) ul.createEl("li", { text: line });
     }
 
@@ -1062,7 +1062,7 @@ export class EmojiPickerModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("almanac-emoji-modal");
+    contentEl.addClass("ca-emoji-modal");
 
     contentEl.createEl("h3", { text: "Choose an icon" });
 
@@ -1071,7 +1071,7 @@ export class EmojiPickerModal extends Modal {
       .setDesc("Type or paste any emoji or symbol")
       .addText((t) => {
         t.setValue(this.current);
-        t.inputEl.addClass("almanac-emoji-input");
+        t.inputEl.addClass("ca-emoji-input");
         t.inputEl.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
             const val = t.getValue().trim();
@@ -1082,7 +1082,7 @@ export class EmojiPickerModal extends Modal {
       })
       .addButton((b) =>
         b.setButtonText("Save").setCta().onClick(() => {
-          const input = contentEl.querySelector(".almanac-emoji-input") as HTMLInputElement;
+          const input = contentEl.querySelector(".ca-emoji-input") as HTMLInputElement;
           const val = input?.value?.trim();
           this.resolve(val || this.current);
           this.close();
@@ -1107,11 +1107,11 @@ export class EmojiPickerModal extends Modal {
     ];
 
     for (const cat of categories) {
-      contentEl.createDiv({ cls: "almanac-emoji-cat-title", text: cat.label });
-      const grid = contentEl.createDiv({ cls: "almanac-emoji-grid" });
+      contentEl.createDiv({ cls: "ca-emoji-cat-title", text: cat.label });
+      const grid = contentEl.createDiv({ cls: "ca-emoji-grid" });
       for (const emoji of cat.emojis) {
         const btn = grid.createEl("button", {
-          cls: "almanac-emoji-tile",
+          cls: "ca-emoji-tile",
           text: emoji,
         });
         if (emoji === this.current) btn.addClass("is-selected");

@@ -340,7 +340,7 @@ describe("patch 8: From the journals", () => {
       "bridge"
     );
     // …and no empty region block written for it.
-    expect(text).not.toContain("<!--almanac:bridge");
+    expect(text).not.toContain("<!--chronoanvil:bridge");
     // …and nothing to refuse removal over, since it holds none of the reader's
     // writing. A frozen snapshot lives in a region keyed by the snapshot, not
     // by this id, and has its own thaw control.
@@ -475,7 +475,7 @@ describe("patch 7: an option is set on the way in", () => {
     // behind, which is the exact defect 3.0 patch 1 was built to remove.
     const src = readCode("section-editor");
     expect(src).toContain("if (this.original.includes(id)) return [];");
-    expect(src).toContain("almanac-tpl-choice-fixed");
+    expect(src).toContain("ca-tpl-choice-fixed");
     // And the row names the route that does work, rather than only saying no.
     expect(readSrc("section-editor")).toContain("add it again to change it");
   });
@@ -493,7 +493,7 @@ describe("patch 7: an option is set on the way in", () => {
     // consent to a half-configured block, and a vault with nothing to answer
     // with gets the catalogue's sentence about what is missing.
     expect(add).toContain("if (!answer) return;");
-    expect(add).toContain("new Notice(`Almanac: ${q.empty}`)");
+    expect(add).toContain("new Notice(`ChronoAnvil: ${q.empty}`)");
   });
 
   it("and the answers come from the one list a refusal also prints", () => {
@@ -570,7 +570,7 @@ describe("patch 7 follow-up: the control is sized for the answer", () => {
     // The field label — the half the row could not afford before §2. It is not
     // the pill said twice: "needs a journal to pull from" stops being true when
     // the box is filled and "Journal" does not.
-    expect(readCode("section-editor")).toContain("almanac-tpl-field-label");
+    expect(readCode("section-editor")).toContain("ca-tpl-field-label");
     expect(fieldLabelOf({ kind: "folder", key: "arg", label: "the folder to review" }))
       .toBe("Folder");
     expect(
@@ -603,7 +603,7 @@ describe("patch 7 follow-up: the control is sized for the answer", () => {
     // own actions line, so a ceiling kept past its cause would be a control
     // refusing room it has.
     const css = readCss();
-    const at = css.indexOf(".almanac-tpl-choice {");
+    const at = css.indexOf(".ca-tpl-choice {");
     expect(at).toBeGreaterThan(0);
     const rule = css.slice(at, css.indexOf("}", at));
     expect(rule).toContain("min-width");
@@ -612,7 +612,7 @@ describe("patch 7 follow-up: the control is sized for the answer", () => {
 
   it("gives the actions their own line, which is what paid for all of it", () => {
     const css = readCss();
-    const at = css.indexOf(".almanac-list-row.has-actions-row .almanac-list-actions {");
+    const at = css.indexOf(".ca-list-row.has-actions-row .ca-list-actions {");
     expect(at, "the actions row rule").toBeGreaterThan(0);
     const rule = css.slice(at, css.indexOf("}", at));
     expect(rule).toContain("width: 100%");
@@ -722,9 +722,9 @@ describe("the settings tables are theme-coloured", () => {
     // was doing. Asserted over the rule bodies rather than the file, so an
     // unrelated hex elsewhere in the stylesheet does not fail this.
     const css = readCss();
-    const at = css.indexOf(".almanac-settings-table .almanac-list-pill {");
+    const at = css.indexOf(".ca-settings-table .ca-list-pill {");
     expect(at).toBeGreaterThan(0);
-    const end = css.indexOf(".almanac-settings-table .col-actions-cell", at);
+    const end = css.indexOf(".ca-settings-table .ca-col-actions-cell", at);
     expect(end).toBeGreaterThan(at);
     expect(css.slice(at, end)).not.toContain("#");
   });

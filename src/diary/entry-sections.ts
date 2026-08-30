@@ -9,7 +9,7 @@
 //
 // The companion to diary-sections.ts, and not the same shape. On a dashboard
 // one section is one fence. On an entry the editable things are several
-// directives inside ONE fence, each paired with an `<!--almanac:key-->` body
+// directives inside ONE fence, each paired with an `<!--chronoanvil:key-->` body
 // region holding the reader's writing — so an entry section is a **widget and
 // its region**, and its identity is the region key.
 //
@@ -253,8 +253,8 @@ export interface EntrySection {
   // `probeFor` derives a probe from the directive by taking everything before
   // the first colon, which is the whole grammar for `note:log` and
   // `tasks:todo|Tasks`. The tracker section's "directive" is the marker comment
-  // `# almanac:trackers:start`, whose first token is `# almanac` — and a probe
-  // of `^# almanac\b` matches the END marker too, so the section was found
+  // `# chronoanvil:trackers:start`, whose first token is `# chronoanvil` — and a probe
+  // of `^# chronoanvil\b` matches the END marker too, so the section was found
   // twice in its own fence and reported twice to the editor.
   //
   // AN OVERRIDE RATHER THAN A SMARTER DERIVATION, because the derivation is
@@ -316,7 +316,7 @@ export const ENTRY_SECTIONS: EntrySection[] = [
     icon: "🏷️",
     // LOCKED, and the one that most obviously has to be: without it the note
     // has no date navigation, no trackers and no title editing — it stops being
-    // an Almanac entry rather than losing a feature. The navigation row it
+    // a ChronoAnvil entry rather than losing a feature. The navigation row it
     // absorbed in 4.19 was locked for its own reason, which survives unchanged
     // inside this one: a vault where some entries can get home and others
     // cannot is worse than one with no links at all.
@@ -372,7 +372,7 @@ export const ENTRY_SECTIONS: EntrySection[] = [
     // anything else the diary charts read — every chart on every dashboard is a
     // view over these cells, so removing the section silently empties the pages
     // above it. That is `entry-header`'s argument in a different currency: the
-    // note stops being an Almanac entry rather than losing a feature.
+    // note stops being a ChronoAnvil entry rather than losing a feature.
     //
     // NOT PINNED. It has one neighbour above the rule and nowhere to go, so
     // `isMovable` answers false by arithmetic — the state `entry-header` was in
@@ -591,7 +591,7 @@ export const ENTRY_SECTIONS: EntrySection[] = [
   {
     id: "todo",
     label: "Tasks",
-    blurb: "Almanac tasks belonging to this entry.",
+    blurb: "ChronoAnvil tasks belonging to this entry.",
     icon: "✅",
     locked: false,
     fence: "shared",
@@ -684,7 +684,7 @@ function frontmatter(ctx: EntrySectionContext): string[] {
   return ["---", ...head, ...trackerBlock(ctx, "frontmatter"), "---"];
 }
 
-// The `# almanac:trackers:start` … `:end` pair, and what the shipped template
+// The `# chronoanvil:trackers:start` … `:end` pair, and what the shipped template
 // seeds inside it.
 //
 // MACHINE-OWNED, in both places it appears. The tracker system rewrites between
@@ -723,7 +723,7 @@ function trackerLines(
 // `readNoteRegion` reads what is between them, and a region written as one line
 // leaves nowhere for the reader's first keystroke to go.
 function region(id: string): string {
-  return `<!--almanac:${id}\n-->`;
+  return `<!--chronoanvil:${id}\n-->`;
 }
 
 // A whole entry template.
@@ -769,7 +769,7 @@ export function composeEntryTemplate(
 ): string {
   // WHERE THE SETTING BECOMES A TEMPLATE, as of 3.8 patch 6. `extra` has been
   // documented since 2.60.1 as "a setting the composer reads" and was a
-  // parameter nothing supplied; `AlmanacSettings.entrySections` is now that
+  // parameter nothing supplied; `ChronoAnvilSettings.entrySections` is now that
   // setting, and `shippedNotes` / `refreshTemplates` hand it in here.
   const options: Record<string, Record<string, unknown>> = {};
   for (const want of extra) {
@@ -825,7 +825,7 @@ export function composeEntryTemplate(
   // Built from the catalogue rather than from a hardcoded skeleton as of
   // 2.60.2, and written into ONE fence per band as of 3.2 patch 2.
   //
-  // WHY ONE. Obsidian renders each ```almanac fence as its own block with the
+  // WHY ONE. Obsidian renders each ```chronoanvil fence as its own block with the
   // note's spacing between, so two fences above the rule can be made to
   // resemble one card and cannot be made into one — the limit
   // journals-section.ts documents and 2.18.4 already fixed one fence lower
@@ -878,8 +878,8 @@ export function composeEntryTemplate(
     members: readonly EntrySection[],
     lines: (sec: EntrySection) => string[]
   ): string[] =>
-    rowRuns(members, (sec) => ({ fence: "almanac", lines: lines(sec) }), true)
-      .flatMap((run) => ["```almanac", ...run.lines, "```", ""]);
+    rowRuns(members, (sec) => ({ fence: "chronoanvil", lines: lines(sec) }), true)
+      .flatMap((run) => ["```chronoanvil", ...run.lines, "```", ""]);
 
   // THE TRACKER FENCE, BETWEEN THE BANNER AND THE RULE (4.20).
   //
@@ -890,7 +890,7 @@ export function composeEntryTemplate(
   // the fence.
   //
   // OMITTED ENTIRELY WHEN NOTHING WANTS IT, rather than composed empty. A reader
-  // who removes the section gets no fence, and an empty ```almanac block renders
+  // who removes the section gets no fence, and an empty ```chronoanvil block renders
   // as a bordered gap where a card used to be.
   const trackerFence = trackers.length ? bandFences(trackers, ownLines) : [];
 
@@ -911,7 +911,7 @@ export function composeEntryTemplate(
   return (
     [
       ...frontmatter(ctx),
-      "`almanac:spacer`",
+      "`chronoanvil:spacer`",
       ...bandFences(own, ownLines),
       ...trackerFence,
       "---",
@@ -1078,13 +1078,13 @@ function escapeForLine(v: string): string {
   return v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// The closing ``` of the fence the editable widgets live in: the LAST almanac
+// The closing ``` of the fence the editable widgets live in: the LAST chronoanvil
 // fence in the note, since the structural ones sit above the rule and the body
 // regions below carry no fence at all.
 function lastSharedFenceClose(lines: string[]): number {
   let open = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim() === "```almanac") open = i;
+    if (lines[i].trim() === "```chronoanvil") open = i;
   }
   if (open === -1) return -1;
   for (let i = open + 1; i < lines.length; i++) {
@@ -1250,7 +1250,7 @@ export function parseEntry(
   // Fences, classified by what is in them.
   //
   // WHICH FENCE IS THE WIDGET FENCE. `addSectionToNote` has always taken the
-  // LAST almanac fence in the note, on the reasoning that the structural ones
+  // LAST chronoanvil fence in the note, on the reasoning that the structural ones
   // sit above the rule and the regions below carry no fence at all. That is
   // right for a note the plugin composed and it is the scan §9 of the 3.0 plan
   // names as the release's unmitigated risk — so it is narrowed here, because
@@ -1259,7 +1259,7 @@ export function parseEntry(
   //
   // Narrowed to: the last fence that HOLDS A SHARED DIRECTIVE and holds no
   // structural one. A reader who pasted a fenced example into their notes, or
-  // who keeps a scratch ```almanac block at the bottom of the entry, no longer
+  // who keeps a scratch ```chronoanvil block at the bottom of the entry, no longer
   // has the editor write into it — where "the last one" would have. A fence
   // holding a real `note:log:` line is still indistinguishable from the real
   // one, and that is genuinely ambiguous rather than merely unhandled.
@@ -1268,7 +1268,7 @@ export function parseEntry(
   // an entry whose directives someone deleted by hand still addable to.
   const fences: { open: number; close: number }[] = [];
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim() !== "```almanac") continue;
+    if (lines[i].trim() !== "```chronoanvil") continue;
     let close = -1;
     for (let j = i + 1; j < lines.length; j++) {
       if (lines[j].trim() === "```") {
@@ -1324,7 +1324,7 @@ export function parseEntry(
   // `readNoteRegion` locates one by a whole-file scan and a region a reader
   // moved is still theirs.
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^<!--almanac:([A-Za-z0-9_-]+)\s*$/);
+    const m = lines[i].match(/^<!--chronoanvil:([A-Za-z0-9_-]+)\s*$/);
     if (!m) continue;
     for (let j = i + 1; j < lines.length; j++) {
       if (lines[j].trim() !== "-->") continue;
@@ -1809,7 +1809,7 @@ export function applyEntrySections(
     const fence = shape.shared.findIndex((f) => f.open === i);
     if (fence >= 0) {
       // A FENCE EMPTIED BY THE REMOVALS GOES WITH THEM, and its blank separator
-      // with it. An empty ```almanac block renders as a bordered gap where a
+      // with it. An empty ```chronoanvil block renders as a bordered gap where a
       // card used to be — `trackerFence`'s own reason for composing nothing
       // rather than composing empty, one band up.
       if (bodies[fence].some((l) => l.trim() && !isModifierLine(l))) {

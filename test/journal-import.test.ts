@@ -80,7 +80,7 @@ function notesOf(cfg: JournalConfig, rating = "3"): JournalScan["notes"] {
         ...(kind.rating ? [`${kind.rating}: ${rating}`] : []),
         "status: completed",
         "---",
-        "```almanac",
+        "```chronoanvil",
         "journal-header",
         ...(kind.rating ? [`tracker:${kind.rating}`] : []),
         "tracker:status",
@@ -94,7 +94,7 @@ function notesOf(cfg: JournalConfig, rating = "3"): JournalScan["notes"] {
 describe("manifest encoding", () => {
   it("lives in the journal's own root", () => {
     expect(manifestPathFor("03 - Journals/Cooking")).toBe(
-      "03 - Journals/Cooking/.almanac-journal.json"
+      "03 - Journals/Cooking/.chronoanvil-journal.json"
     );
   });
 
@@ -136,9 +136,9 @@ describe("manifest encoding", () => {
     // bad one has to mean "fall back to inference", never "throw on load".
     expect(decodeJournalManifest("not json")).toBeNull();
     expect(decodeJournalManifest("{}")).toBeNull();
-    expect(decodeJournalManifest('{"almanacJournal":1}')).toBeNull();
+    expect(decodeJournalManifest('{"chronoanvilJournal":1}')).toBeNull();
     expect(
-      decodeJournalManifest('{"almanacJournal":1,"config":{"id":"x","name":"X","levels":[],"kinds":[]}}')
+      decodeJournalManifest('{"chronoanvilJournal":1,"config":{"id":"x","name":"X","levels":[],"kinds":[]}}')
     ).toBeNull();
   });
 });
@@ -152,18 +152,18 @@ describe("parsing a journal note", () => {
     ).toEqual({ type: "recipe", cuisine: "{{subject}}" });
   });
 
-  it("keeps each almanac fence separate", () => {
+  it("keeps each chronoanvil fence separate", () => {
     // The pairing WITHIN a fence is the information — a kind's header sits
     // beside its create button — so flattening would lose the association.
     const fences = parseFences(
-      "```almanac\nheader:📋 Recipes\nbutton:cooking:new-recipe\n```\n\n" +
-        "```almanac\nheader:🔥 Attempts\nbutton:cooking:new-attempt\n```\n"
+      "```chronoanvil\nheader:📋 Recipes\nbutton:cooking:new-recipe\n```\n\n" +
+        "```chronoanvil\nheader:🔥 Attempts\nbutton:cooking:new-attempt\n```\n"
     );
     expect(fences).toHaveLength(2);
     expect(fences[0].map((d) => d.key)).toEqual(["header", "button"]);
   });
 
-  it("ignores fences that aren't almanac's", () => {
+  it("ignores fences that aren't chronoanvil's", () => {
     expect(parseFences("```base\nfilters:\n  and:\n```\n")).toEqual([]);
   });
 });

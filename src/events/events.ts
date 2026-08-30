@@ -15,12 +15,12 @@
 // creating entries, "days logged" stops meaning anything.
 //
 // Storage is one list in the frontmatter of a single vault note (paths.events,
-// `02 - Diary/Events.md` by default) under the `almanac-events` key. Trackers
+// `02 - Diary/Events.md` by default) under the `chronoanvil-events` key. Trackers
 // live in data.json because they're configuration — they define what you log.
 // An event is content: it's a fact about your life, in the same category as the
 // mood score it sits beside on the calendar, and content belongs in the vault
 // in plain text where it survives without the plugin. Frontmatter rather than
-// an `<!--almanac:-->` body region because Obsidian's metadata cache parses
+// an `<!--chronoanvil:-->` body region because Obsidian's metadata cache parses
 // frontmatter for us and hands it back *synchronously* — which is what lets the
 // calendar grid stay a single synchronous paint (see calendar.ts).
 //
@@ -199,7 +199,7 @@ export const EVENT_ICONS: IconGroup[] = [
 const ICON_SET = new Set(EVENT_ICONS.flatMap((g) => g.icons));
 export const DEFAULT_EVENT_ICON = "star";
 
-// Eight named swatches, each backed by a CSS variable (--am-ev-<name>) that
+// Eight named swatches, each backed by a CSS variable (--ca-ev-<name>) that
 // styles.css defines once per theme. The stored value is the *name*, never a
 // colour literal: a hex picker would let a user choose something unreadable in
 // one of the two themes, and would put user-controlled text directly into a

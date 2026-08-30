@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { App, Notice, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { promptChoice } from "../ui/modals";
 import {
   JournalChartSpec,
@@ -30,7 +30,7 @@ import { notify } from "../core/notify";
 // re-read-inside-the-callback rule and the same picker behaviour. If one of
 // them learns something, the other should be able to copy it back.
 export class JournalCharts {
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   private async readSpecs(notePath: string): Promise<JournalChartSpec[]> {
     const file = getFile(this.app, notePath);

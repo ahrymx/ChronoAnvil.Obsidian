@@ -39,7 +39,7 @@ function unwelded(text: string): string {
   expect(at, "fixture must have a title row").toBeGreaterThan(-1);
   const out = [...lines];
   const close = out.findIndex((l, i) => i >= at && l.trim() === "```");
-  out.splice(close + 1, 0, "", "```almanac", "links:today,scopes#diary", "```");
+  out.splice(close + 1, 0, "", "```chronoanvil", "links:today,scopes#diary", "```");
   return out.join("\n");
 }
 
@@ -117,16 +117,16 @@ describe("what it declines to do", () => {
     // its navigation row is a note somebody ARRANGED, and hoisting the row past
     // it would rewrite a page they made rather than one this plugin composed.
     const text = unwelded(composeDiaryDashboard("weekly")).replace(
-      "\n```almanac\nlinks:",
-      "\n```almanac\ntasks-table\n```\n\n```almanac\nlinks:"
+      "\n```chronoanvil\nlinks:",
+      "\n```chronoanvil\ntasks-table\n```\n\n```chronoanvil\nlinks:"
     );
     expect(mergeBannerFences(text)).toBeNull();
   });
 
   it("refuses when the reader wrote prose between them", () => {
     const text = unwelded(composeDiaryDashboard("weekly")).replace(
-      "\n```almanac\nlinks:",
-      "\n## My own heading\n\n```almanac\nlinks:"
+      "\n```chronoanvil\nlinks:",
+      "\n## My own heading\n\n```chronoanvil\nlinks:"
     );
     expect(mergeBannerFences(text)).toBeNull();
   });
@@ -148,16 +148,16 @@ describe("what it declines to do", () => {
     // navigation row. Welding empties it, and an empty fence renders as an empty
     // block — worse than the seam this closes.
     const text = [
-      "`almanac:spacer`",
-      "```almanac",
+      "`chronoanvil:spacer`",
+      "```chronoanvil",
       "title:home,diary,journals",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "links:today,scopes#diary",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "tag-index",
       "```",
       "",
@@ -165,13 +165,13 @@ describe("what it declines to do", () => {
     const out = mergeBannerFences(text)!;
     expect(out).toBe(
       [
-        "`almanac:spacer`",
-        "```almanac",
+        "`chronoanvil:spacer`",
+        "```chronoanvil",
         "title:home,diary,journals",
         "links:today,scopes#diary",
         "```",
         "",
-        "```almanac",
+        "```chronoanvil",
         "tag-index",
         "```",
         "",

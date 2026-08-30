@@ -5,7 +5,11 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-import { TRACKER_MARK_END, TRACKER_MARK_START } from "../core/constants";
+import {
+  LEGACY_TRACKER_MARK_START,
+  TRACKER_MARK_END,
+  TRACKER_MARK_START,
+} from "../core/constants";
 import {
   JournalKind,
   JournalLevel,
@@ -424,7 +428,7 @@ export interface JournalSection {
 //
 //   • AT MOST ONE `fence` PER SECTION. The fence is the section's head. This is
 //     reachable at all only because 2.54 made the note tables native — a
-//     ```base block cannot live inside an ```almanac one, so while `children`
+//     ```base block cannot live inside a ```chronoanvil one, so while `children`
 //     emitted Bases tables the rule was impossible rather than merely unmet.
 //   • A section emitting `markdown` is NOT REMOVABLE, because the plugin cannot
 //     tell markdown it wrote from markdown the reader wrote. See
@@ -444,7 +448,7 @@ export type SectionBlock =
       lines: string[];
     }
   | {
-      // A `<!--almanac:key-->` body region a content field persists into.
+      // A `<!--chronoanvil:key-->` body region a content field persists into.
       // Written immediately after its fence so the section stays one
       // contiguous run — which is what makes cut-and-paste move the whole
       // thing, and a splice well-defined.
@@ -457,7 +461,7 @@ export type SectionBlock =
       kind: "markdown";
       lines: string[];
       // Abut the following block with a single newline instead of a blank
-      // line. True in exactly one place — the banner's `almanac:spacer`, which
+      // line. True in exactly one place — the banner's `chronoanvil:spacer`, which
       // is documented as sitting on line 0 of the body, immediately above the
       // fence it exists to stop the reader clicking into. Serialisation only;
       // it says nothing about extent.
@@ -468,7 +472,7 @@ export type SectionBlock =
 
 const FENCE = "```";
 
-function fence(lines: string[], info = "almanac"): SectionBlock {
+function fence(lines: string[], info = "chronoanvil"): SectionBlock {
   return { kind: "fence", info, lines: lines.filter((l) => l !== "") };
 }
 
@@ -499,7 +503,7 @@ export function renderBlock(block: SectionBlock): string {
   if (block.kind === "fence") {
     return [`${FENCE}${block.info}`, ...block.lines, FENCE].join("\n");
   }
-  if (block.kind === "region") return `<!--almanac:${block.key}\n-->`;
+  if (block.kind === "region") return `<!--chronoanvil:${block.key}\n-->`;
   return block.lines.join("\n");
 }
 
@@ -806,7 +810,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
       // Tight against the fence below it: the spacer is documented as
       // sitting on line 0 of the body, directly above the banner it stops a
       // top-of-note click landing inside.
-      markdown(["`almanac:spacer`"], true),
+      markdown(["`chronoanvil:spacer`"], true),
       fence(["journal-header"]),
     ],
   },
@@ -850,7 +854,8 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     applies: (ctx) => trackerSeeds(ctx).length > 0,
     default: always,
     claims: ["tracker"],
-    locate: (t) => probe(t, new RegExp(`^${TRACKER_MARK_START}\\s*$`, "m")),
+    locate: (t) =>
+      probe(t, new RegExp(`^(?:${TRACKER_MARK_START}|${LEGACY_TRACKER_MARK_START})\\s*$`, "m")),
     render: (ctx, opts) => [
       fence([TRACKER_MARK_START, ...trackerSeeds(ctx, opts), TRACKER_MARK_END]),
     ],
@@ -1014,7 +1019,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     //
     // The deepest branch got there by way of `kind-table` (tables.ts). Its
     // ```base tables could not be folded in at all, because a base block cannot
-    // live inside an almanac fence; making the table native is what made the
+    // live inside a chronoanvil fence; making the table native is what made the
     // rule reachable, and it is why that widget exists.
     // A TITLE ONLY WHERE THERE IS ONE (3.18 §3.2). Above the deepest level this
     // section is a single folder rollup with one header, and `label` names it.
@@ -1722,7 +1727,7 @@ export function sectionsFor(
       // A REQUIRED SECTION LEADS, WHATEVER THE LAYOUT SAYS (3.18 §2).
       //
       // Not taste, and not a second spelling of `required`'s existing job. The
-      // banner's first block is `almanac:spacer`, documented as sitting on LINE
+      // banner's first block is `chronoanvil:spacer`, documented as sitting on LINE
       // 0 OF THE BODY so a click at the top of a note lands on it rather than
       // inside the banner fence — which renders the fence as raw source. A
       // layout that named another section first would compose a template whose

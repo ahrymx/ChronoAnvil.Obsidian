@@ -134,7 +134,7 @@ describe("the page title is the file's name", () => {
     // next to it would be a control one slip away from renaming the note."
     // Here the whole width is between them, which is what space-between does.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = ruleAt(rules, ".jtc-row");
+    const at = ruleAt(rules, ".ca-jtc-row");
     expect(at, "no title row rule").toBeGreaterThan(-1);
     expect(rules.slice(at, rules.indexOf("}", at))).toContain(
       "justify-content: space-between"
@@ -146,21 +146,21 @@ describe("the page title is the file's name", () => {
     // the card below, the plugin's copy the smaller of the two.
     //
     // DERIVED, NOT DECLARED. The obvious fix is a second `cssclasses` value
-    // beside `almanac-wide`, and it goes stale the moment a reader removes the
+    // beside `ca-wide`, and it goes stale the moment a reader removes the
     // title block: the class stays, Obsidian's title stays hidden, and the page
     // has no title at all. `:has()` asks a question the note answers for
     // itself, so the inline title comes back when the card goes.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = rules.indexOf(".markdown-preview-view:has(.jtc-card) .inline-title");
+    const at = rules.indexOf(".markdown-preview-view:has(.ca-jtc-card) .inline-title");
     expect(at, "the inline title is not hidden in reading view").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
     // Both views: a name that appears once when read and twice when edited is
     // the same defect with a smaller audience.
-    expect(rule).toContain(".markdown-source-view:has(.jtc-card) .inline-title");
+    expect(rule).toContain(".markdown-source-view:has(.ca-jtc-card) .inline-title");
     expect(rule).toContain("display: none");
     // ── AND ON EVERY SURFACE THAT DRAWS A NAME, NOT JUST THIS ONE ────
     //
-    // The rule shipped in 4.5.1 naming `.jtc-card`, which is the LARGE banner's
+    // The rule shipped in 4.5.1 naming `.ca-jtc-card`, which is the LARGE banner's
     // name card and appears on the eight dashboard-shaped surfaces only. A diary
     // entry and a journal leaf drew Obsidian's inline title AND their banner's
     // copy of the same name for eleven releases — the exact doubling this rule
@@ -172,12 +172,12 @@ describe("the page title is the file's name", () => {
     // half of this rule that has been forgotten before.
     for (const view of ["markdown-preview-view", "markdown-source-view"]) {
       expect(rule, view).toContain(
-        `.${view}:has(.journal-banner-name) .inline-title`
+        `.${view}:has(.ca-journal-banner-name) .inline-title`
       );
     }
     // And no second frontmatter class was invented for it.
-    expect(readCode("home-sections")).not.toContain("almanac-titled");
-    expect(rules).not.toContain(".almanac-titled");
+    expect(readCode("home-sections")).not.toContain("ca-titled");
+    expect(rules).not.toContain(".ca-titled");
   });
 
   it("is at least as big as the title it replaces", () => {
@@ -186,7 +186,7 @@ describe("the page title is the file's name", () => {
     // title — smaller than what it replaced reads as a lesser copy, which is
     // how the render looked.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = ruleAt(rules, ".jtc-title-text");
+    const at = ruleAt(rules, ".ca-jtc-title-text");
     const rule = rules.slice(at, rules.indexOf("}", at));
     const size = /font-size:\s*([\d.]+)em/.exec(rule);
     expect(size, "no font size on the page title").not.toBeNull();
@@ -194,7 +194,7 @@ describe("the page title is the file's name", () => {
     // And it steps down in a narrow block rather than wrapping across three
     // lines in a sidebar — on the BLOCK's width, not the window's.
     expect(rules).toMatch(
-      /@container \(max-width: \d+px\) \{\s*\.jtc-title-text,\s*\.jtc-title-input \{\s*font-size:/
+      /@container \(max-width: \d+px\) \{\s*\.ca-jtc-title-text,\s*\.ca-jtc-title-input \{\s*font-size:/
     );
   });
 
@@ -209,12 +209,12 @@ describe("the page title is the file's name", () => {
     // two selectors — its own rule and the unframed reset — and the reset sorts
     // earlier in the concatenation, so a substring search finds the rule that
     // takes the surface AWAY and asserts the opposite of what is meant.
-    const at = rules.indexOf("\n.jtc-card {");
+    const at = rules.indexOf("\n.ca-jtc-card {");
     expect(at, "no title card rule of its own").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain("background: var(--background-secondary)");
     expect(rule).toContain("border: 1px solid var(--background-modifier-border)");
-    expect(rule).toContain("border-radius: var(--am-radius-md)");
+    expect(rule).toContain("border-radius: var(--ca-radius-md)");
   });
 
   it("gives that card up in an unframed block", () => {
@@ -224,15 +224,15 @@ describe("the page title is the file's name", () => {
     // the node IS the frame, so a card inside one is the doubling `frame:`
     // exists to remove. Three widgets were on that list; this is the fourth.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = ruleAt(rules, ".journal-widget-block.is-unframed .jtc-card");
-    expect(at, ".jtc-card is not in the unframed reset").toBeGreaterThan(-1);
+    const at = ruleAt(rules, ".ca-journal-widget-block.is-unframed .ca-jtc-card");
+    expect(at, ".ca-jtc-card is not in the unframed reset").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain("background: none");
     expect(rule).toContain("padding: 0");
-    // AND `.jjc-card` STAYS OUT OF IT, which is the distinction: the journals
+    // AND `.ca-jjc-card` STAYS OUT OF IT, which is the distinction: the journals
     // grid's cards ARE the content, and a grid with its cards flattened is a
     // list. This card is the block's own frame.
-    expect(rules).not.toContain(".journal-widget-block.is-unframed .jjc-card");
+    expect(rules).not.toContain(".ca-journal-widget-block.is-unframed .ca-jjc-card");
   });
 
   it("does not reuse the retired page-index family", () => {
@@ -256,9 +256,9 @@ describe("the launcher's grid answers to its cell", () => {
     // by arithmetic — and that arithmetic has a bad middle. At a width that
     // fits three, three go across and the fourth drops onto a line of its own;
     // a ragged 3 + 1 is the one arrangement of four things that reads as a
-    // mistake, and `--am-row-cell-min` puts the homepage's cell in exactly that
+    // mistake, and `--ca-row-cell-min` puts the homepage's cell in exactly that
     // band. A declared count can skip three. A fitted one cannot.
-    const at = ruleAt(rules, ".jlx-grid");
+    const at = ruleAt(rules, ".ca-jlx-grid");
     expect(at, "no launcher grid rule").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain("repeat(2, 1fr)");

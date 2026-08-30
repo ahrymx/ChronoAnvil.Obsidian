@@ -216,15 +216,15 @@ describe("chart tile styling", () => {
     // Both are built by the code-block processor, so the stylesheet is the
     // only thing that puts the button beside the eyebrow instead of under it.
     for (const cls of [
-      ".journal-chart-head",
-      ".journal-chart-range",
-      ".journal-chart-range.is-static",
+      ".ca-journal-chart-head",
+      ".ca-journal-chart-range",
+      ".ca-journal-chart-range.is-static",
     ]) {
       expect(css).toContain(cls);
     }
   });
 
   it("styles the scatter's clustering caption", () => {
-    expect(css).toContain(".journal-chart-note");
+    expect(css).toContain(".ca-journal-chart-note");
   });
 });

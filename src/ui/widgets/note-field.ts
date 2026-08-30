@@ -20,7 +20,7 @@ import {
   setIcon,
 } from "obsidian";
 import type { App } from "obsidian";
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import type { PluginNoteRegionHost } from "./note-regions";
 import type { NoteWriteScheduler } from "./note-write-scheduler";
 import {
@@ -88,7 +88,7 @@ export function noteFoldKey(sourcePath: string, key: string): string {
 // default rather than to a hardcoded one — that is what makes the setting a
 // *default* and not just an initial value for new vaults.
 export function noteFoldState(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   sourcePath: string,
   key: string
 ): boolean {
@@ -103,7 +103,7 @@ export function noteFoldState(
 // Stored explicitly either way: once a field has been toggled by hand in this
 // entry, that choice sticks even if the global default later changes.
 export async function setNoteFold(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   sourcePath: string,
   key: string,
   value: boolean
@@ -133,7 +133,7 @@ export function buildNote(
 ): HTMLElement {
   // `rest` is `key` or `key:placeholder text`. Only the first colon
   // separates them, so a placeholder may itself contain colons. `key` names
-  // the body region (`<!--almanac:key-->`) this field reads/writes.
+  // the body region (`<!--chronoanvil:key-->`) this field reads/writes.
   // `rest` is `key[#variant][:placeholder]`. The optional `#variant` after the
   // key selects a rendering flavour (`line` = single-line input that doesn't
   // grow; default = auto-growing multi-line area). The key still names the
@@ -153,9 +153,9 @@ export function buildNote(
   const collapsible = variant === "collapse";
 
   const wrap = createDiv({
-    cls: `journal-note journal-note--${key}${
-      singleLine ? " journal-note--line" : ""
-    }${collapsible ? " journal-note--collapsible" : ""}`,
+    cls: `ca-journal-note ca-journal-note--${key}${
+      singleLine ? " ca-journal-note--line" : ""
+    }${collapsible ? " ca-journal-note--collapsible" : ""}`,
   });
 
   // Per-(note,key) collapsed state, sharing the store header bars use so
@@ -164,10 +164,10 @@ export function buildNote(
     noteFoldState(deps.plugin, ctx.sourcePath, key);
 
   if (collapsible && label) {
-    const bar = wrap.createDiv({ cls: "journal-note-collapse-bar" });
-    const chevron = bar.createDiv({ cls: "journal-note-chevron" });
+    const bar = wrap.createDiv({ cls: "ca-journal-note-collapse-bar" });
+    const chevron = bar.createDiv({ cls: "ca-journal-note-chevron" });
     setIcon(chevron, "chevron-down");
-    bar.createDiv({ cls: "journal-note-label", text: label });
+    bar.createDiv({ cls: "ca-journal-note-label", text: label });
 
     const apply = (collapsed: boolean): void => {
       wrap.toggleClass("is-collapsed", collapsed);
@@ -181,10 +181,10 @@ export function buildNote(
       void setNoteFold(deps.plugin, ctx.sourcePath, key, next);
     });
   } else if (label) {
-    wrap.createDiv({ cls: "journal-note-label", text: label });
+    wrap.createDiv({ cls: "ca-journal-note-label", text: label });
   }
 
-  const input = wrap.createEl("textarea", { cls: "journal-note-input" });
+  const input = wrap.createEl("textarea", { cls: "ca-journal-note-input" });
   input.rows = 1;
   if (placeholder) input.placeholder = placeholder;
 

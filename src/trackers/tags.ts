@@ -9,7 +9,7 @@
 //
 // WHY A TRACKER AND NOT A DIRECTIVE. An Obsidian tag is only a tag where
 // Obsidian's parser can see it, and it cannot see inside a fenced code block.
-// Almanac puts almost everything a reader touches inside ````almanac` — that
+// ChronoAnvil puts almost everything a reader touches inside ````chronoanvil` — that
 // is what a section IS here — so `#reading` typed into a section is a string,
 // not a tag: no autocomplete, no tag pane, no search, no `tag-index` row. The
 // workaround the vault wants is the one Obsidian itself offers, which is the
@@ -26,7 +26,7 @@ import { pagesUnder, tagsOf } from "../core/query";
 
 // The frontmatter property this tracker writes.
 //
-// `tags` and not `Tags` or `almanac-tags`, because the whole point is that
+// `tags` and not `Tags` or `ca-tags`, because the whole point is that
 // Obsidian reads it: the tag pane, the search index, `tag:` queries and this
 // plugin's own `tag-index` all key off the one property Obsidian defines. A
 // tracker's id is normally the reader's to rename (see `TrackerDef.id`); this

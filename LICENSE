@@ -1,4 +1,4 @@
-Almanac — A self-contained journaling and study-journal system for Obsidian
+ChronoAnvil — A self-contained journaling and study-journal system for Obsidian
 Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
 
 Licensed under the GNU Affero General Public License, version 3 or later,
@@ -31,13 +31,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------
 
 The AGPL-3.0 permits the copyright holder to supplement it with a limited
-set of additional requirements. Almanac uses three of them. They are NOT
+set of additional requirements. ChronoAnvil uses three of them. They are NOT
 further restrictions on your freedoms under the licence: they cost you
 nothing but a credit line and an honest name, and section 7 lists each one
 as expressly permitted.
 
   1. (section 7b) You must preserve the attribution
-     "Almanac, originally developed by AhryMX"
+     "ChronoAnvil, originally developed by AhryMX"
      in the documentation, credits, "about" information, or equivalent
      Appropriate Legal Notices of any work containing this software, and
      in the NOTICE file distributed with it.
@@ -47,9 +47,11 @@ as expressly permitted.
      and prominent way, as different from the original — for example in
      its plugin manifest, its README, and its release notes.
 
-  3. (section 7d) You may not use the names "Almanac" or "AhryMX" for
-     publicity purposes, or in any way suggesting that the copyright
-     holder endorses, sponsors, or supports your version.
+  3. (section 7d) You may not use the names "ChronoAnvil", "Almanac" or
+     "AhryMX" for publicity purposes, or in any way suggesting that the
+     copyright holder endorses, sponsors, or supports your version.
+     "Almanac" is named because copies were distributed under it through
+     4.84; the clause covers the project's names, not only its current one.
 
 WHAT THESE DO AND DO NOT DO
 

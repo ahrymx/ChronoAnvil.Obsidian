@@ -14,7 +14,7 @@
 // current year being partial.
 //
 // The tracker charts on this page are NOT built here. They're the ordinary
-// `almanac-charts` fence with its existing Add/Edit/Remove manager, scoped by
+// `chronoanvil-charts` fence with its existing Add/Edit/Remove manager, scoped by
 // each chart's `period` range. What makes that resolve to the selected year is
 // the `year-start` frontmatter property this view writes — the same mechanism
 // the weekly and monthly dashboards use. So a year's tracker section is
@@ -22,7 +22,7 @@
 // no knowledge of the year view at all.
 
 import { MarkdownPostProcessorContext, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { buildOverviewBanner } from "../diary/calendar";
 import { periodSpan } from "../diary/periodnav";
 import { statStrip } from "../ui/stat-strip";
@@ -60,7 +60,7 @@ const YEAR_PROP = "year-start";
 // view does. The recap is a separate block on the same note and must agree with
 // the banner above it about which year the note is showing — one derivation,
 // not two that drift the first time the property's spelling changes.
-export function selectedYear(plugin: AlmanacPlugin, ctx: MarkdownPostProcessorContext): number {
+export function selectedYear(plugin: ChronoAnvilPlugin, ctx: MarkdownPostProcessorContext): number {
   const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (!(file instanceof TFile)) return Number(today().slice(0, 4));
   const iso = isoDate(frontmatterOf(plugin.app, file)[YEAR_PROP]);
@@ -76,7 +76,7 @@ export function selectedYear(plugin: AlmanacPlugin, ctx: MarkdownPostProcessorCo
 // headline count Study's alone: a vault whose journalling was all Cooking saw
 // a permanent zero. Each type contributes the notes of its own kinds, so a
 // container's folder note and a page are both correctly out.
-function readJournalNotes(plugin: AlmanacPlugin): JournalNoteFact[] {
+function readJournalNotes(plugin: ChronoAnvilPlugin): JournalNoteFact[] {
   const out: JournalNoteFact[] = [];
   // A type's root may sit inside another's (not the default layout since 2.45,
   // but a root is a settings value), so the same file can be walked by two
@@ -110,7 +110,7 @@ function readJournalNotes(plugin: AlmanacPlugin): JournalNoteFact[] {
 // "Lessons completed", which is what it said before this was generalised. With
 // more than one there is no single right noun, so the band says what it is
 // actually counting rather than picking a winner.
-function journalNoteWord(plugin: AlmanacPlugin): string {
+function journalNoteWord(plugin: ChronoAnvilPlugin): string {
   const types = registeredJournalTypes(plugin);
   const primary = types.length === 1 ? types[0].kinds[0] : null;
   return primary ? kindPlural(primary) : "Journal notes";
@@ -133,7 +133,7 @@ function statCard(
 }
 
 export function buildYearSummary(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   // `journal-overview-summary`, not a class of its own: buildOverviewBanner's
@@ -144,9 +144,9 @@ export function buildYearSummary(
   // both sides — the negative margin is a contract with the parent, not a
   // decoration.
   const root = createDiv({
-    cls: "journal-year-summary journal-overview-summary",
+    cls: "ca-journal-year-summary ca-journal-overview-summary",
   });
-  root.createDiv({ cls: "jyr-loading", text: "Reading your year…" });
+  root.createDiv({ cls: "ca-jyr-loading", text: "Reading your year…" });
 
   void readIndex(plugin).then((entries) => {
     const year = selectedYear(plugin, ctx);
@@ -160,7 +160,7 @@ export function buildYearSummary(
 
 function renderSummary(
   root: HTMLElement,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   s: YearStats,
   noteWord: string
@@ -197,14 +197,14 @@ function renderSummary(
   );
   root.appendChild(band);
 
-  const panel = root.createDiv({ cls: "journal-overview-body" });
+  const panel = root.createDiv({ cls: "ca-journal-overview-body" });
 
   // Stats and density share one inset frame. They were flush against the old
   // bordered panel's edges; inside the shared body they need a frame of their
   // own, or the stat cells run to the full text width while every rollup
   // section below them is inset — which is what made the first cut look like
   // two pages stacked.
-  const wrap = panel.createDiv({ cls: "jyr-stats-wrap" });
+  const wrap = panel.createDiv({ cls: "ca-jyr-stats-wrap" });
   const grid: StatCard[] = [];
 
   // "Diary entries", not "Entries" — this page also counts lessons, and an
@@ -250,7 +250,7 @@ function renderSummary(
   statStrip(wrap, grid);
 
   // ── Entry density ───────────────────────────────────────────────────
-  const density = wrap.createDiv({ cls: "jyr-density" });
+  const density = wrap.createDiv({ cls: "ca-jyr-density" });
   sectionFrame(density, {
     title: "Entry density",
     level: 2,
@@ -260,10 +260,10 @@ function renderSummary(
     owns: "children",
   });
 
-  const strip = density.createDiv({ cls: "jyr-months" });
+  const strip = density.createDiv({ cls: "ca-jyr-months" });
   const peak = Math.max(1, ...s.entriesByMonth);
   for (let m = 0; m < 12; m++) {
-    const col = strip.createDiv({ cls: "jyr-month" });
+    const col = strip.createDiv({ cls: "ca-jyr-month" });
     const count = s.entriesByMonth[m];
     const monthName = moment(
       `${s.year}-${String(m + 1).padStart(2, "0")}-01`
@@ -276,12 +276,12 @@ function renderSummary(
     // in its slot rather than a small rectangle adrift on the background. The
     // track is what gives the row a baseline to measure against.
     const track = col.createDiv({
-      cls: `jyr-month-track${future ? " is-future" : ""}${
+      cls: `ca-jyr-month-track${future ? " is-future" : ""}${
         !future && count === 0 ? " is-empty" : ""
       }`,
     });
     if (!future && count > 0) {
-      const bar = track.createDiv({ cls: "jyr-month-bar" });
+      const bar = track.createDiv({ cls: "ca-jyr-month-bar" });
       // Height encodes volume against the year's best month, so the shape of
       // the year is legible without a number on every bar.
       bar.style.height = `${Math.round((count / peak) * 100)}%`;
@@ -292,12 +292,12 @@ function renderSummary(
         future ? "not yet" : `${count} ${count === 1 ? "entry" : "entries"}`
       }`
     );
-    col.createDiv({ cls: "jyr-month-label", text: monthName[0] });
+    col.createDiv({ cls: "ca-jyr-month-label", text: monthName[0] });
   }
 
   if (s.entryCount === 0 && s.daysElapsed > 0) {
     panel.createDiv({
-      cls: "jyr-empty",
+      cls: "ca-jyr-empty",
       text: "No diary entries this year yet.",
     });
   }
@@ -348,10 +348,10 @@ function renderSummary(
 // directly beneath it — so this is the missing rung as much as it is a summary.
 function renderQuarterCards(
   parent: HTMLElement,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   s: YearStats
 ): void {
-  const sec = parent.createDiv({ cls: "jq-section" });
+  const sec = parent.createDiv({ cls: "ca-jq-section" });
   // ON THE FRAME, like every other section on this page. This was the last
   // caller of `.jq-section-head` / `-title` / `-note`, and 2.56.2 RETIRED those
   // three rules when it moved the quarter's and the year's inner sections onto
@@ -375,7 +375,7 @@ function renderQuarterCards(
     owns: "children",
   });
 
-  const row = sec.createDiv({ cls: "jq-months jyr-quarters" });
+  const row = sec.createDiv({ cls: "ca-jq-months ca-jyr-quarters" });
   for (let q = 1; q <= 4; q++) {
     const key = `${s.year}-Q${q}`;
     const months = quarterMonths(key);
@@ -384,20 +384,20 @@ function renderQuarterCards(
     const future = mine.every((m) => m.future);
 
     const card = row.createDiv({
-      cls: "jq-month" + (future ? " is-future" : ""),
+      cls: "ca-jq-month" + (future ? " is-future" : ""),
     });
-    const cardHead = card.createDiv({ cls: "jq-month-head" });
+    const cardHead = card.createDiv({ cls: "ca-jq-month-head" });
     cardHead.createDiv({
-      cls: "jq-month-dot" + (written ? " is-logged" : ""),
+      cls: "ca-jq-month-dot" + (written ? " is-logged" : ""),
     });
-    cardHead.createDiv({ cls: "jq-month-name", text: `Q${q}` });
+    cardHead.createDiv({ cls: "ca-jq-month-name", text: `Q${q}` });
 
     const entries = months.reduce(
       (n, mk) => n + s.entriesByMonth[Number(mk.slice(5, 7)) - 1],
       0
     );
     card.createDiv({
-      cls: "jq-month-meta",
+      cls: "ca-jq-month-meta",
       text: future
         ? "Not yet"
         : `${entries} ${entries === 1 ? "entry" : "entries"} · ${written}/3 written`,

@@ -9,11 +9,11 @@
 //
 // A `header:` directive renders a bar that owns "everything after me until the
 // next header bar of the same or higher level". Obsidian renders each markdown
-// block (our ```almanac fence included) as a separate sibling element in the
+// block (our ```chronoanvil fence included) as a separate sibling element in the
 // preview, so a header bar can't *contain* its section in the DOM — visibility
 // is instead derived by walking the note's block-level siblings.
 //
-// UNLESS ITS OWN FENCE DREW THE BODY (4.57.1), which is how every page Almanac
+// UNLESS ITS OWN FENCE DREW THE BODY (4.57.1), which is how every page ChronoAnvil
 // composes is written now: the bar and its widgets are one fence, so the
 // section is that block and the blocks after it are the reader's. The sentence
 // above is the OTHER shape — a bar alone in its fence — and is why the scope
@@ -43,7 +43,7 @@
 
 import { MarkdownRenderChild, setIcon } from "obsidian";
 import { OBSIDIAN_DOM } from "../core/constants";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 
 // One shared timer rather than one per bar: folding three sections in a row
 // should be one write, not three. Module-level because the bars are separate
@@ -52,7 +52,7 @@ import type AlmanacPlugin from "../main";
 let persistTimer: number | null = null;
 const PERSIST_DELAY_MS = 400;
 
-function schedulePersist(plugin: AlmanacPlugin): void {
+function schedulePersist(plugin: ChronoAnvilPlugin): void {
   if (persistTimer !== null) window.clearTimeout(persistTimer);
   persistTimer = window.setTimeout(() => {
     persistTimer = null;
@@ -154,7 +154,7 @@ export interface SecNode {
   // fold pass — from a comment into a parameter.
   hidden: boolean;
   // Renders something a reader can see. A storage region
-  // (`<!--almanac:path-->`) is a real block that renders nothing.
+  // (`<!--chronoanvil:path-->`) is a real block that renders nothing.
   renders: boolean;
   // The section is complete in this block, so the run ends where the block
   // does. Only meaningful with `opens`.
@@ -162,7 +162,7 @@ export interface SecNode {
   // WHAT THIS IS ABOUT (4.57.1). A bar owns the blocks after it because in 2.x a
   // section was written as two fences — a `header:` fence and a body fence —
   // and Obsidian renders each block separately, so a section could not contain
-  // its own body. Every page Almanac composes today welds the two: `header:⏳
+  // its own body. Every page ChronoAnvil composes today welds the two: `header:⏳
   // Open tasks` and `tasks-table` are one fence, and so is the charts section
   // that ends the homepage. For those, "the blocks after it" is not the
   // section's body — it is whatever the reader put next, and the homepage's
@@ -287,7 +287,7 @@ const EDITOR_HEADING = new RegExp(
 // block with no bar of its own. Spelled here rather than imported, because
 // `block-drag.ts` reaches the plugin and this module is imported by everything;
 // test/headerbar.test.ts pins the two spellings together.
-const BLOCK_FURNITURE = ".jbd-slot, .jbd-handle, .journal-block-head";
+const BLOCK_FURNITURE = ".ca-jbd-slot, .ca-jbd-handle, .ca-journal-block-head";
 
 const QUIET_MS = 500;
 const SETTLE_CAP_MS = 10000;
@@ -394,7 +394,7 @@ class SectionPass {
   // outlives the note that caused it — open a dashboard with sections, then any
   // other note in the same tab, and the footer arrives still wearing
   // `journal-sec-block is-last`, drawing an empty grey band under a note with
-  // no Almanac content in it.
+  // no ChronoAnvil content in it.
   //
   // `computeSectionRuns` already refuses to make the footer a member, which is
   // the first defence and why this is rare rather than routine. But the old
@@ -404,7 +404,7 @@ class SectionPass {
   // classes, and it has a teardown. This is it.
   private clearMarks(): void {
     for (const el of Array.from(this.parent.children)) {
-      el.removeClass("journal-sec-block");
+      el.removeClass("ca-journal-sec-block");
       el.removeClass("is-first");
       el.removeClass("is-last");
     }
@@ -437,10 +437,10 @@ function isSectionParent(p: HTMLElement | null): boolean {
 
 export class HeaderBar extends MarkdownRenderChild {
   constructor(
-    private plugin: AlmanacPlugin,
-    // The header bar element itself (.journal-header-bar).
+    private plugin: ChronoAnvilPlugin,
+    // The header bar element itself (.ca-journal-header-bar).
     private barEl: HTMLElement,
-    // The ```almanac code block's root element (ctx `el`) — its block-level
+    // The ```chronoanvil code block's root element (ctx `el`) — its block-level
     // ancestor is the sibling anchor we walk from.
     private blockEl: HTMLElement,
     private sourcePath: string,
@@ -449,7 +449,7 @@ export class HeaderBar extends MarkdownRenderChild {
     private level: number
   ) {
     super(barEl);
-    this.barEl.addClass("journal-header-collapsible");
+    this.barEl.addClass("ca-journal-header-collapsible");
     this.barEl.dataset.headerKey = this.key;
     this.barEl.dataset.headerLevel = String(this.level);
     this.whenAttached();
@@ -487,7 +487,7 @@ export class HeaderBar extends MarkdownRenderChild {
     // Collapse toggle: a chevron button prepended to the bar. Clicking the bar
     // itself (outside its buttons/links) also toggles, so the whole title strip
     // is a hit target — but clicks on the anchored controls are left alone.
-    this.barEl.addClass("journal-header-collapsible");
+    this.barEl.addClass("ca-journal-header-collapsible");
     // Tag the bar with its own persisted key + level so the holistic recompute
     // can read state straight off the DOM without needing every bar's instance.
     this.barEl.dataset.headerKey = this.key;
@@ -502,9 +502,9 @@ export class HeaderBar extends MarkdownRenderChild {
     // a third. Placing it before the actions and pushing it over with
     // `margin-left: auto` puts it at the end of the FIRST row, which is where it
     // belongs, and leaves the title first in the DOM for a screen reader.
-    const toggle = createDiv({ cls: "journal-header-toggle" });
+    const toggle = createDiv({ cls: "ca-journal-header-toggle" });
     setIcon(toggle, "chevron-down");
-    const actions = this.barEl.querySelector(".journal-header-widgets");
+    const actions = this.barEl.querySelector(".ca-journal-header-widgets");
     if (actions) this.barEl.insertBefore(toggle, actions);
     else this.barEl.appendChild(toggle);
 
@@ -524,7 +524,7 @@ export class HeaderBar extends MarkdownRenderChild {
       // twin did not have to learn about a second bar — a control that folded its
       // own section when clicked is what a new wrapper here would have shipped.
       const target = evt.target as HTMLElement;
-      if (target.closest(".journal-header-widgets")) return;
+      if (target.closest(".ca-journal-header-widgets")) return;
       onToggle(evt);
     });
 
@@ -671,7 +671,7 @@ export class HeaderBar extends MarkdownRenderChild {
     // double surface above.
     if (!isSectionParent(el.parentElement)) return;
 
-    el.addClass("journal-sec-block");
+    el.addClass("ca-journal-sec-block");
     el.addClass("is-first");
   }
 
@@ -711,7 +711,7 @@ export class HeaderBar extends MarkdownRenderChild {
     // `.markdown-rendered` is the note's container in READING view and, in Live
     // Preview, the container of ONE code-block widget inside `.cm-embed-block`.
     // Treating both as the note meant that in Live Preview every fence saw only
-    // itself: a section's scope stopped at its own ```almanac block.
+    // itself: a section's scope stopped at its own ```chronoanvil block.
     //
     // Journals hid this completely, because a journal section is one fence —
     // `header:🧭 Learning Path` and the `path:` under it are the same block, so
@@ -732,7 +732,7 @@ export class HeaderBar extends MarkdownRenderChild {
   //
   // TWO SCOPES, ONE WALK. A bar owns the blocks after it, and it also owns the
   // widgets welded into its own fence — `header:🧭 Learning Path` and the
-  // `path:` beneath it are one ```almanac block, so the field renders as the
+  // `path:` beneath it are one ```chronoanvil block, so the field renders as the
   // bar's SIBLING inside the block rather than as a block of its own. Folding
   // by block alone therefore left those sections looking broken: the chevron
   // turned, the state persisted, and the widget the section is *for* stayed on
@@ -767,7 +767,7 @@ export class HeaderBar extends MarkdownRenderChild {
 
     for (const block of blocks) {
       const inner = Array.from(
-        block.querySelectorAll<HTMLElement>(".journal-header-bar")
+        block.querySelectorAll<HTMLElement>(".ca-journal-header-bar")
       );
 
       if (inner.length === 0) {
@@ -799,7 +799,7 @@ export class HeaderBar extends MarkdownRenderChild {
         seen.add(host);
         for (const child of Array.from(host.children)) {
           if (!(child instanceof HTMLElement)) continue;
-          const isBar = child.hasClass("journal-header-bar");
+          const isBar = child.hasClass("ca-journal-header-bar");
           els.push(child);
           nodes.push({
             level: isBar ? this.levelOf(child) : 0,
@@ -851,7 +851,7 @@ export class HeaderBar extends MarkdownRenderChild {
       const el = els[i];
       if (!el) continue;
       if (el.classList.contains(OBSIDIAN_DOM.editorLine)) continue;
-      el.toggleClass("journal-section-hidden", hidden[i]);
+      el.toggleClass("ca-journal-section-hidden", hidden[i]);
     }
 
     // Chevrons, and the level-2 body indent (idempotent).
@@ -868,7 +868,7 @@ export class HeaderBar extends MarkdownRenderChild {
   //
   //   a section's body is often INSIDE the bar's own block. The comment above
   //   recompute says it plainly — `header:🧭 Learning Path` and the `path:`
-  //   beneath it are one ```almanac fence, and Charts, Resources and Progress
+  //   beneath it are one ```chronoanvil fence, and Charts, Resources and Progress
   //   are all built that way. A walk over sibling blocks alone never reaches
   //   the content of any section on a journal index;
   //   `.journal-widget-block` is a flex column with a gap, so painting its
@@ -897,7 +897,7 @@ export class HeaderBar extends MarkdownRenderChild {
       // note that caused it: open a dashboard with sections, then open any
       // other note in the same tab, and the footer arrives still wearing
       // `journal-sec-block is-last`, drawing a section's background and padding
-      // as an empty grey band under a note with no Almanac content in it. The
+      // as an empty grey band under a note with no ChronoAnvil content in it. The
       // cleanup below cannot help, because a note with no header bar registers
       // no HeaderBar and never runs this pass.
       //
@@ -915,7 +915,7 @@ export class HeaderBar extends MarkdownRenderChild {
         };
       }
 
-      const bar = block.querySelector<HTMLElement>(".journal-header-bar");
+      const bar = block.querySelector<HTMLElement>(".ca-journal-header-bar");
 
       // A real markdown heading or independent section/banner ends a section for the same reason it ends a
       // fold: it is its own structure and must not be swallowed into this section's card.
@@ -961,7 +961,7 @@ export class HeaderBar extends MarkdownRenderChild {
       return {
         opens: level1,
         closes: false,
-        hidden: block.hasClass("journal-section-hidden"),
+        hidden: block.hasClass("ca-journal-section-hidden"),
         renders: this.rendersSomething(block),
         ends: level1 && this.bodyInOwnFence(block),
       };
@@ -975,7 +975,7 @@ export class HeaderBar extends MarkdownRenderChild {
       // no header — the failure that only shows on the second render. Written
       // as a toggle against the computed answer, which clears and re-derives in
       // one step rather than two.
-      block.toggleClass("journal-sec-block", marks[i].member);
+      block.toggleClass("ca-journal-sec-block", marks[i].member);
       block.toggleClass("is-first", marks[i].first);
       block.toggleClass("is-last", marks[i].last);
     });
@@ -1073,7 +1073,7 @@ export class HeaderBar extends MarkdownRenderChild {
   // section at its own bar.
   private bodyInOwnFence(block: HTMLElement): boolean {
     const bars = Array.from(
-      block.querySelectorAll<HTMLElement>(".journal-header-bar")
+      block.querySelectorAll<HTMLElement>(".ca-journal-header-bar")
     );
     const last = bars[bars.length - 1];
     const host = last?.parentElement;
@@ -1091,15 +1091,15 @@ export class HeaderBar extends MarkdownRenderChild {
   private isSectionBoundary(block: HTMLElement): boolean {
     if (this.isHeadingBlock(block)) return true;
     return !!block.querySelector(
-      ":scope .journal-sec-fold, :scope .journal-section-bar, :scope .journal-overview-banner, :scope .journal-entry-banner, :scope .journal-study-banner, :scope .journal-page-head, :scope .journal-tracker-section, :scope .journals-card, :scope .journal-sec-l1"
+      ":scope .ca-journal-sec-fold, :scope .ca-journal-section-bar, :scope .ca-journal-overview-banner, :scope .ca-journal-entry-banner, :scope .ca-journal-study-banner, :scope .ca-journal-page-head, :scope .ca-journal-tracker-section, :scope .ca-journals-card, :scope .ca-journal-sec-l1"
     );
   }
 
   private levelOf(bar: HTMLElement): number {
     const d = Number(bar.dataset.headerLevel);
     if (d === 1 || d === 2) return d;
-    if (bar.classList.contains("journal-header-l1")) return 1;
-    if (bar.classList.contains("journal-header-l2")) return 2;
+    if (bar.classList.contains("ca-journal-header-l1")) return 1;
+    if (bar.classList.contains("ca-journal-header-l2")) return 2;
     return 1;
   }
 
@@ -1117,7 +1117,7 @@ export class HeaderBar extends MarkdownRenderChild {
     if (text !== "") return true;
     if (block.childElementCount === 0) return false;
     return !!block.querySelector(
-      "img, svg, canvas, input, button, select, textarea, iframe, video, audio, .journal-widget-block, .journal-sec, .journal-attach-zone, .journal-tracker-cell, .journal-card, .callout"
+      "img, svg, canvas, input, button, select, textarea, iframe, video, audio, .ca-journal-widget-block, .ca-journal-sec, .ca-journal-attach-zone, .ca-journal-tracker-cell, .ca-journal-card, .callout"
     );
   }
 
@@ -1131,13 +1131,13 @@ export class HeaderBar extends MarkdownRenderChild {
     let sib = barBlock.nextElementSibling as HTMLElement | null;
     while (sib) {
       if (sib.nodeType === 1) {
-        const b = sib.querySelector<HTMLElement>(".journal-header-bar");
+        const b = sib.querySelector<HTMLElement>(".ca-journal-header-bar");
         // Same boundary as recompute's: a heading ends the bar's body, so a
         // level-2 bar doesn't indent prose that isn't its.
         if (!b && this.isSectionBoundary(sib)) break;
         const lvl = b ? this.levelOf(b) : 0;
         if (lvl !== 0 && lvl <= level) break;
-        sib.addClass("journal-section-l2-body");
+        sib.addClass("ca-journal-section-l2-body");
       }
       sib = sib.nextElementSibling as HTMLElement | null;
     }

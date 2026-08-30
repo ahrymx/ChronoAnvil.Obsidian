@@ -1,13 +1,13 @@
 /* ── Trends & Statistics chart grid ──────────────────────────────────────
-   The whole Trends & Statistics section renders from a single ```almanac-charts
+   The whole Trends & Statistics section renders from a single ```chronoanvil-charts
    block, so — unlike the old one-fence-per-chart stack — every chart shares a
    real grid parent and can be laid out as an even set of tiles. This mirrors
-   the daily tracker bar (.journal-tracker-bar) above: bordered cells, exactly
+   the daily tracker bar (.ca-journal-tracker-bar) above: bordered cells, exactly
    two per row, each cell capped at 50% of the row. Each row sizes to its own
    charts (see the cell rule below). The Add / Edit… / Remove… toolbar sits in
    the section header bar when the block is self-titled, or in a plain row
-   (.journal-chart-toolbar) above the grid otherwise. */
-.journal-chart-toolbar {
+   (.ca-journal-chart-toolbar) above the grid otherwise. */
+.ca-journal-chart-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -18,16 +18,16 @@
    from whatever sits above, so the toolbar carries the boundary itself. Used by
    the year note, which deliberately has no header bars: a collapsible bar whose
    section is the whole page can only hide everything. */
-.journal-widget-block > .journal-chart-toolbar:first-child {
+.ca-journal-widget-block > .ca-journal-chart-toolbar:first-child {
   padding-top: 14px;
   border-top: 1px solid var(--background-modifier-border);
 }
 /* Folding a self-titled charts section (its toolbar lives in the header bar)
    used to be done here, with a sibling combinator naming the three classes the
-   section could render: .journal-chart-grid, .journal-chart-empty and the
-   .journal-live-widget host the grid moved into. A list of class names is the
+   section could render: .ca-journal-chart-grid, .ca-journal-chart-empty and the
+   .ca-journal-live-widget host the grid moved into. A list of class names is the
    wrong shape for the rule, and it failed the way lists do — the journal
-   charts region renders a .journal-jchart-stack, which was never added, so a
+   charts region renders a .ca-journal-jchart-stack, which was never added, so a
    subject page's Charts section turned its chevron and kept its charts. The
    same omission hid nothing for Learning Path's `path:` field or Resources'
    `attach:` shelves either.
@@ -36,14 +36,14 @@
    nothing to enumerate and nothing to keep in step with new widgets. */
 /* Empty state — shown under the toolbar when a note has no charts yet.
    ITS BOX IS 91-card-surface.css §3a'S AS OF 4.11: the shared info card, at
-   `--am-rule` and solid rather than 1px and dashed. The dash was this box saying
+   `--ca-rule` and solid rather than 1px and dashed. The dash was this box saying
    "provisional", which is a thing a border cannot say and which the sentence in it
    says perfectly well — and it was the third of three appearances one homepage
    render showed side by side. What stays here is the type and the centring, which
    are about this widget rather than about what an empty state is. */
-.journal-chart-empty {
+.ca-journal-chart-empty {
   color: var(--text-muted);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   text-align: center;
 }
 /* ── The chart grid ────────────────────────────────────────────────────────
@@ -72,7 +72,7 @@
    its own row. An all-time heatmap that used to stretch a row now scrolls
    inside its tile until it is given the room — which the automatic size does
    give it (see defaultSpan in charts.ts), and which is the whole point of the
-   feature. `--am-chart-row-track` is the escape hatch if you disagree: set it
+   feature. `--ca-chart-row-track` is the escape hatch if you disagree: set it
    to `minmax(220px, auto)` in a snippet and rows grow with their content
    again, with the spans still holding as a floor. Note that with an `auto`
    maximum there is no longer a cap above it, so a very long heatmap will grow
@@ -81,17 +81,17 @@
    The column count is a variable so widening to three or four columns is a
    one-line change that no stored size has to be revisited for — a span says
    "wider than one column", not "two columns". */
-.journal-chart-grid {
-  --am-chart-cols: 2;
-  --am-chart-row-h: 220px;
-  --am-chart-gap: 10px;
+.ca-journal-chart-grid {
+  --ca-chart-cols: 2;
+  --ca-chart-row-h: 220px;
+  --ca-chart-gap: 10px;
   display: grid;
   /* minmax(0, 1fr) lets a cell shrink inside its track so a wide chart can
      never blow the column past its share of the row. */
-  grid-template-columns: repeat(var(--am-chart-cols), minmax(0, 1fr));
-  grid-auto-rows: var(--am-chart-row-track, var(--am-chart-row-h));
+  grid-template-columns: repeat(var(--ca-chart-cols), minmax(0, 1fr));
+  grid-auto-rows: var(--ca-chart-row-track, var(--ca-chart-row-h));
   align-items: stretch;
-  gap: var(--am-chart-gap);
+  gap: var(--ca-chart-gap);
   /* Plain row flow, and until 4.45 this said `row dense`.
 
      THE LICENCE THE OLD LINE WROTE FOR ITSELF HAS EXPIRED, and it is worth
@@ -114,9 +114,9 @@
 /* A tile's footprint. Custom properties rather than literal `grid-column`
    values, specifically so the narrow-pane clamp further down can override the
    column span without !important and without fighting specificity. */
-.journal-chart-grid .journal-chart-cell {
-  grid-column: span var(--am-span-c, 1);
-  grid-row: span var(--am-span-r, 1);
+.ca-journal-chart-grid .ca-journal-chart-cell {
+  grid-column: span var(--ca-span-c, 1);
+  grid-row: span var(--ca-span-r, 1);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -128,23 +128,23 @@
   box-sizing: border-box;
   padding: 8px 12px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   background: var(--background-secondary);
   overflow: hidden;
 }
-.journal-chart-grid .journal-chart-cell.is-wide {
-  --am-span-c: 2;
+.ca-journal-chart-grid .ca-journal-chart-cell.is-wide {
+  --ca-span-c: 2;
 }
-.journal-chart-grid .journal-chart-cell.is-tall {
-  --am-span-r: 2;
+.ca-journal-chart-grid .ca-journal-chart-cell.is-tall {
+  --ca-span-r: 2;
 }
-.journal-chart-grid .journal-chart-cell.is-large {
-  --am-span-c: 2;
-  --am-span-r: 2;
+.ca-journal-chart-grid .ca-journal-chart-cell.is-large {
+  --ca-span-c: 2;
+  --ca-span-r: 2;
 }
 
 /* ── Dragging a tile (4.45) ───────────────────────────────────────────────
-   `.jjc-card`'s three rules in shape, because the tile has the two properties
+   `.ca-jjc-card`'s three rules in shape, because the tile has the two properties
    that decided them: `overflow: hidden` and a 1px border of its own.
 
    THE CARD BEING CARRIED FADES; the one that would receive it takes an edge.
@@ -158,16 +158,16 @@
 
    AFTER the span rules and prefixed with the grid, for the cascade reason the
    narrow-pane clamp below documents at length. */
-.journal-chart-grid .journal-chart-cell[draggable="true"] {
+.ca-journal-chart-grid .ca-journal-chart-cell[draggable="true"] {
   cursor: grab;
 }
-.journal-chart-grid .journal-chart-cell[draggable="true"]:active {
+.ca-journal-chart-grid .ca-journal-chart-cell[draggable="true"]:active {
   cursor: grabbing;
 }
-.journal-chart-grid .journal-chart-cell.is-dragging {
+.ca-journal-chart-grid .ca-journal-chart-cell.is-dragging {
   opacity: 0.45;
 }
-.journal-chart-grid .journal-chart-cell.is-drop-target {
+.ca-journal-chart-grid .ca-journal-chart-cell.is-drop-target {
   box-shadow: inset 0 0 0 2px var(--interactive-accent);
 }
 
@@ -184,8 +184,8 @@
 
    SPECIFICITY TRAP, written down because it otherwise costs an afternoon:
    container queries add no specificity of their own. A bare
-   `.journal-chart-grid .journal-chart-cell` (0,2,0) inside the query does not
-   tie with `.journal-chart-grid .journal-chart-cell.is-wide` (0,3,0) — it
+   `.ca-journal-chart-grid .ca-journal-chart-cell` (0,2,0) inside the query does not
+   tie with `.ca-journal-chart-grid .ca-journal-chart-cell.is-wide` (0,3,0) — it
    loses, and the clamp silently does nothing. So the clamp names the modifier
    classes to match their specificity, and sits after them in the sheet. Do not
    reach for !important; the variable indirection exists precisely so this can
@@ -194,16 +194,16 @@
    Row spans are deliberately *not* clamped. A tall tile is still readable, and
    still wanted, in one column — height is not the scarce axis on a narrow
    pane. Only the column span has to give. */
-.journal-chart-host {
+.ca-journal-chart-host {
   container-type: inline-size;
 }
 @container (max-width: 560px) {
-  .journal-chart-grid {
-    --am-chart-cols: 1;
+  .ca-journal-chart-grid {
+    --ca-chart-cols: 1;
   }
-  .journal-chart-grid .journal-chart-cell.is-wide,
-  .journal-chart-grid .journal-chart-cell.is-large {
-    --am-span-c: 1;
+  .ca-journal-chart-grid .ca-journal-chart-cell.is-wide,
+  .ca-journal-chart-grid .ca-journal-chart-cell.is-large {
+    --ca-span-c: 1;
   }
 }
 /* The tile's title bar: the eyebrow label on the left, the range cycle button
@@ -211,7 +211,7 @@
    information the tile never used to carry — two charts of one tracker over
    different windows were indistinguishable — and because the control that
    changes it should sit next to the thing it describes. */
-.journal-chart-grid .journal-chart-cell > .journal-chart-head {
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-head {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -221,8 +221,8 @@
 }
 /* Eyebrow label — small, muted, uppercase, pinned top-left — matching the
    tracker cell's treatment so the chart below is the cell's focus. */
-.journal-chart-grid .journal-chart-head > .journal-chart-label,
-.journal-chart-grid .journal-chart-cell > .journal-chart-label {
+.ca-journal-chart-grid .ca-journal-chart-head > .ca-journal-chart-label,
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-label {
   flex: 1 1 auto;
   align-self: flex-start;
   max-width: 100%;
@@ -230,7 +230,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -241,25 +241,25 @@
    pressable, and a chart tile should read as a chart rather than as a control
    panel — and it lifts to the accent on hover so a reader who wonders whether
    it does anything finds out by pointing at it. */
-.journal-chart-grid .journal-chart-range {
+.ca-journal-chart-grid .ca-journal-chart-range {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   height: auto;
   padding: 1px 7px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: transparent;
   box-shadow: none;
   color: var(--text-faint);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 1.5;
   cursor: pointer;
   transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
-.journal-chart-grid .journal-chart-range:hover {
+.ca-journal-chart-grid .ca-journal-chart-range:hover {
   color: var(--text-normal);
   border-color: var(--interactive-accent);
   background: var(--background-modifier-hover);
@@ -267,11 +267,11 @@
 /* Nowhere to cycle to (one available range). Still shown, because the range is
    worth reading whether or not it can be changed — a control that vanishes on
    some tiles and not others is harder to scan than a quiet one. */
-.journal-chart-grid .journal-chart-range.is-static {
+.ca-journal-chart-grid .ca-journal-chart-range.is-static {
   cursor: default;
   opacity: 0.55;
 }
-.journal-chart-grid .journal-chart-range.is-static:hover {
+.ca-journal-chart-grid .ca-journal-chart-range.is-static:hover {
   color: var(--text-faint);
   border-color: var(--background-modifier-border);
   background: transparent;
@@ -279,12 +279,12 @@
 
 /* The scatter's clustering caption, under the plot. Only rendered when some
    mark actually stands for more than one reading — see renderScatter. */
-.journal-chart-note {
+.ca-journal-chart-note {
   flex: 0 0 auto;
   width: 100%;
   padding-top: 4px;
   color: var(--text-faint);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   line-height: 1.4;
   text-align: center;
 }
@@ -293,7 +293,7 @@
    width to the column and letting height follow (height: auto) scales it down
    proportionally with no cropping. max-height guards the (rare) very tall
    chart against the cell's own max-height cap. */
-.journal-chart-grid .journal-chart-cell > .journal-chart-body {
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body {
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
@@ -302,28 +302,28 @@
   justify-content: center;
   overflow: hidden;
 }
-.journal-chart-grid .journal-chart-cell > .journal-chart-body :is(svg, canvas, img) {
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body :is(svg, canvas, img) {
   max-width: 100%;
   max-height: 100%;
   height: auto;
 }
 /* Tracker wraps its output in its own containers; make them fill the body so
    the chart uses the whole tile rather than sitting in a corner. */
-.journal-chart-grid .journal-chart-cell > .journal-chart-body > * {
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body > * {
   max-width: 100%;
   max-height: 100%;
 }
 /* A cell whose tracker went missing / non-chartable: a compact in-tile notice
    instead of the chart, so the grid stays even. */
-.journal-chart-grid .journal-chart-cell.journal-chart-missing > .journal-chart-body {
+.ca-journal-chart-grid .ca-journal-chart-cell.ca-journal-chart-missing > .ca-journal-chart-body {
   color: var(--text-muted);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   text-align: center;
   padding: 0 8px;
 }
 
 /* ── Self-rendered charts (Chart.js line/bar, DOM summary + heatmap) ──────
-   Almanac now draws each chart itself (see chart-render.ts) rather than
+   ChronoAnvil now draws each chart itself (see chart-render.ts) rather than
    embedding a Tracker ```tracker block, so bounded ranges render as reliably
    as all-time. The three shapes share the tile/label/grid above; only the body
    content differs. */
@@ -334,16 +334,16 @@
    against. The absolute canvas + `!important` here override the generic
    `svg,canvas,img { height:auto }` rule above, which would otherwise fight
    Chart.js's own responsive sizing. */
-.journal-chart-grid .journal-chart-cell > .journal-chart-body.am-chart-canvas {
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body.ca-chart-canvas {
   align-items: stretch;
 }
-.journal-chart-canvas-wrap {
+.ca-journal-chart-canvas-wrap {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
 }
-.journal-chart-canvas-wrap > canvas {
+.ca-journal-chart-canvas-wrap > canvas {
   position: absolute;
   inset: 0;
   width: 100% !important;
@@ -358,32 +358,32 @@
    But the size can be set by hand, and a 2×2 block of cards marooned in the
    middle of a full-width tile looks like a rendering fault rather than a
    choice, so a tile with the width for it lays them out in one row. */
-.journal-chart-summary {
+.ca-journal-chart-summary {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   width: 100%;
 }
-.journal-chart-cell.is-wide .journal-chart-summary,
-.journal-chart-cell.is-large .journal-chart-summary {
+.ca-journal-chart-cell.is-wide .ca-journal-chart-summary,
+.ca-journal-chart-cell.is-large .ca-journal-chart-summary {
   grid-template-columns: repeat(4, 1fr);
 }
-.journal-chart-stat {
+.ca-journal-chart-stat {
   padding: 10px 8px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
   text-align: center;
 }
-.journal-chart-stat-value {
+.ca-journal-chart-stat-value {
   font-size: 1.25em;
   font-weight: 700;
   color: var(--text-normal);
   line-height: 1.2;
 }
-.journal-chart-stat-label {
+.ca-journal-chart-stat-label {
   margin-top: 2px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -395,8 +395,8 @@
    width), so the grid never depends on the tile's computed height; a max-width
    keeps cells from ballooning on wide tiles, and the wrap scrolls if a long
    range makes the calendar taller than the tile. Shades reuse the diary
-   calendar's mood palette (--am-mood-1..5). */
-.journal-chart-grid .journal-chart-cell > .journal-chart-body.am-chart-heatmap-body {
+   calendar's mood palette (--ca-mood-1..5). */
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body.ca-chart-heatmap-body {
   align-items: center;
   justify-content: center;
   overflow: auto;
@@ -417,69 +417,69 @@
    The real fix for a year-long heatmap is to transpose it — weeks as columns,
    weekdays as rows, the shape GitHub's contribution graph uses — which is a
    renderer change rather than a layout one and is deliberately not in 2.46. */
-.journal-chart-heatmap-wrap {
+.ca-journal-chart-heatmap-wrap {
   display: flex;
   flex-direction: column;
   gap: 4px;
   width: 100%;
-  max-width: var(--am-heat-max-w);
+  max-width: var(--ca-heat-max-w);
   max-height: 100%;
   margin: auto;
 }
-.heat-weekdays,
-.journal-chart-heatmap {
+.ca-heat-weekdays,
+.ca-journal-chart-heatmap {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 3px;
   width: 100%;
 }
-.heat-weekday {
+.ca-heat-weekday {
   text-align: center;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   color: var(--text-faint);
   line-height: 1;
 }
-.journal-chart-heatmap {
+.ca-journal-chart-heatmap {
   grid-auto-rows: 1fr;
 }
-.journal-chart-heat-cell {
+.ca-journal-chart-heat-cell {
   aspect-ratio: 1;
   border-radius: 3px;
   background: var(--background-modifier-border);
 }
 /* A day inside the range with no logged value: faint. A grid-padding day that
    falls outside the range (leading/trailing partial week): invisible. */
-.journal-chart-heat-cell.is-empty {
+.ca-journal-chart-heat-cell.is-empty {
   opacity: 0.4;
 }
-.journal-chart-heat-cell.is-out {
+.ca-journal-chart-heat-cell.is-out {
   background: transparent;
 }
 /* Days backed by a daily note are openable. */
-.journal-chart-heat-cell.is-link {
+.ca-journal-chart-heat-cell.is-link {
   cursor: pointer;
 }
-.journal-chart-heat-cell.is-link:hover {
+.ca-journal-chart-heat-cell.is-link:hover {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 1px;
 }
-.journal-chart-heat-cell.am-heat-1 { background: var(--am-mood-1); }
-.journal-chart-heat-cell.am-heat-2 { background: var(--am-mood-2); }
-.journal-chart-heat-cell.am-heat-3 { background: var(--am-mood-3); }
-.journal-chart-heat-cell.am-heat-4 { background: var(--am-mood-4); }
-.journal-chart-heat-cell.am-heat-5 { background: var(--am-mood-5); }
+.ca-journal-chart-heat-cell.ca-heat-1 { background: var(--ca-mood-1); }
+.ca-journal-chart-heat-cell.ca-heat-2 { background: var(--ca-mood-2); }
+.ca-journal-chart-heat-cell.ca-heat-3 { background: var(--ca-mood-3); }
+.ca-journal-chart-heat-cell.ca-heat-4 { background: var(--ca-mood-4); }
+.ca-journal-chart-heat-cell.ca-heat-5 { background: var(--ca-mood-5); }
 
 /* Study Activity heatmap — a navigable calendar month under the subject's
    Progress header. Replaced a 260px stacked bar chart: at year scale the bars
    were unreadable on a sparse subject, and a full-year cell strip renders one
    active day as what looks like a fault. A month grid fits any pane width
    without scrolling, so there's no flex-down floor or horizontal scroll here. */
-.journal-activity-heatmap {
+.ca-journal-activity-heatmap {
   width: 100%;
   margin: 4px 0 8px;
 }
-.journal-act-head {
+.ca-journal-act-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -490,50 +490,50 @@
 /* Per-month totals, recomputed as you navigate. Deliberately not a streak:
    a subject you don't touch for a week isn't failing, and the grid already
    shows consecutive days spatially without asserting a judgement. */
-.journal-act-stats {
+.ca-journal-act-stats {
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
 }
-.journal-act-stat {
+.ca-journal-act-stat {
   display: flex;
   align-items: baseline;
   gap: 5px;
 }
-.journal-act-stat-value {
-  font-size: var(--am-text-base);
+.ca-journal-act-stat-value {
+  font-size: var(--ca-text-base);
   font-weight: 600;
   color: var(--text-normal);
   font-variant-numeric: tabular-nums;
 }
-.journal-act-stat-label {
-  font-size: var(--am-text-xs);
+.ca-journal-act-stat-label {
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
 }
 /* Divider between the lifetime stats (confidence, lessons) and the month-scoped
    ones (active days, open, completed). The two groups sit in one rail at one
    weight, which would otherwise imply the whole row moves with the chevrons. */
-.journal-act-stat-sep {
+.ca-journal-act-stat-sep {
   width: 1px;
   align-self: stretch;
   min-height: 1.1em;
   background: var(--background-modifier-border);
 }
-.journal-act-nav {
+.ca-journal-act-nav {
   display: flex;
   align-items: center;
   gap: 2px;
 }
 /* The navigated period label ("Q3 2026"). A fixed min-width keeps the chevrons
    from sliding as the label changes width between quarters. */
-.journal-act-period {
+.ca-journal-act-period {
   min-width: 6em;
   text-align: center;
-  font-size: var(--am-text-base);
+  font-size: var(--ca-text-base);
   font-weight: 600;
   color: var(--text-normal);
 }
-.journal-act-arrow {
+.ca-journal-act-arrow {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -543,22 +543,22 @@
   border: none;
   background: transparent;
   color: var(--text-muted);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   cursor: pointer;
   box-shadow: none;
   transition: background 0.12s ease, color 0.12s ease;
 }
-.journal-act-arrow:hover:not(:disabled) {
+.ca-journal-act-arrow:hover:not(:disabled) {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 /* Disabled at the range edges — no forward past this month, no back past the
    subject's first dated note, so the chevrons can't walk into empty grids. */
-.journal-act-arrow:disabled {
+.ca-journal-act-arrow:disabled {
   opacity: 0.3;
   cursor: default;
 }
-.journal-act-arrow .svg-icon {
+.ca-journal-act-arrow .svg-icon {
   width: 1em;
   height: 1em;
 }
@@ -598,7 +598,7 @@
  * is the panel's content, so three 172px panels in a 400px pane would overflow
  * rather than shrink. The zero minimum is what lets the track be smaller than
  * what is in it, and the mobile rail below is what handles that case properly. */
-.journal-act-months {
+.ca-journal-act-months {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px 22px;
@@ -609,7 +609,7 @@
   justify-items: center;
 }
 @media (max-width: 500px) {
-  .journal-act-months {
+  .ca-journal-act-months {
     /* ONE ROW OF NATURAL-WIDTH PANELS, which is what `flex-wrap: nowrap` used to
        buy and what `grid-auto-flow: column` buys now. `max-content` keeps a panel
        at its legible width rather than squeezing three into 360px, so the rail is
@@ -626,14 +626,14 @@
        row of pixels from a grid that is already 22px to a cell. */
     scrollbar-width: none;
   }
-  .journal-act-months::-webkit-scrollbar {
+  .ca-journal-act-months::-webkit-scrollbar {
     display: none;
   }
-  .journal-act-panel {
+  .ca-journal-act-panel {
     scroll-snap-align: start;
   }
 }
-.journal-act-panel {
+.ca-journal-act-panel {
   display: flex;
   flex-direction: column;
   /* `flex: 0 0 auto` STOOD HERE and is inert now that the rail is a grid — a grid
@@ -643,19 +643,19 @@
 /* Names the panel's month. The quarter label in the nav says which three these
    are, but not which is which — and with three grids side by side, reading the
    middle one off position alone is a guess. */
-.journal-act-panel-title {
-  font-size: var(--am-text-xs);
+.ca-journal-act-panel-title {
+  font-size: var(--ca-text-xs);
   font-weight: 600;
   color: var(--text-muted);
   margin-bottom: 5px;
   line-height: 1.2;
 }
-.journal-act-panel.is-current .journal-act-panel-title {
+.ca-journal-act-panel.is-current .ca-journal-act-panel-title {
   color: var(--text-normal);
 }
 /* A month later than this one can only be empty, which would otherwise read as
    a gap in the work rather than a part of the calendar that hasn't happened. */
-.journal-act-panel.is-future {
+.ca-journal-act-panel.is-future {
   opacity: 0.55;
 }
 
@@ -671,15 +671,15 @@
  * WHAT MAKES FLEXIBLE COLUMNS SAFE NOW is that the CELL states its own size
  * (`width: 22px; height: 22px`, no `aspect-ratio`), so a wider track is wider
  * SPACING and not a bigger square. That is exactly how the journals heatmap
- * fills: `.jjh-cell` is a fixed `var(--jjh-cell)` inside a `minmax(cell, 1fr)`
+ * fills: `.ca-jjh-cell` is a fixed `var(--jjh-cell)` inside a `minmax(cell, 1fr)`
  * track. The cell is pinned by a test for that reason.
  *
  * AND THE TRACK HAS A CEILING. `1fr` alone would give each column 46px on a
  * 1050px dashboard and the month would read as a scatter of loose squares rather
  * than as a calendar. 34px is where a 22px cell still reads as gridded — a third
  * of the cell in air, no more. */
-.journal-act-weekdays,
-.journal-act-grid {
+.ca-journal-act-weekdays,
+.ca-journal-act-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(22px, 34px));
   gap: 3px;
@@ -691,9 +691,9 @@
      legend and any panel beside them would sit at different heights. */
   align-content: start;
 }
-.journal-act-weekday {
+.ca-journal-act-weekday {
   text-align: center;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   color: var(--text-faint);
   line-height: 1;
@@ -701,12 +701,12 @@
 }
 /* Day cells carry their date number: without it the grid is a texture — you can
    see that something happened on a Thursday but not which Thursday. */
-.journal-act-cell {
+.ca-journal-act-cell {
   width: 22px;
   height: 22px;
   border-radius: 4px;
   background: var(--background-modifier-border);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   line-height: 1;
   color: var(--text-faint);
   display: flex;
@@ -717,12 +717,12 @@
 }
 /* Shaded days need a legible number against the ramp: the two darkest stops
    take light text, the two lightest keep dark. */
-.journal-act-cell.am-act-1,
-.journal-act-cell.am-act-2 {
+.ca-journal-act-cell.ca-act-1,
+.ca-journal-act-cell.ca-act-2 {
   color: #173404;
 }
-.journal-act-cell.am-act-3,
-.journal-act-cell.am-act-4 {
+.ca-journal-act-cell.ca-act-3,
+.ca-journal-act-cell.ca-act-4 {
   color: #f2fbf4;
 }
 /* A day in the month with no tasks: faint. A leading grid-padding day (so the
@@ -730,50 +730,50 @@
 /* An in-month day with no tasks still has to read as a cell — at 0.4 opacity it
    dissolved into the panel and the grid looked like an empty box rather than a
    calendar. A padding day outside the month stays fully invisible. */
-.journal-act-cell.is-empty {
+.ca-journal-act-cell.is-empty {
   background: var(--background-modifier-border);
   opacity: 0.65;
 }
-.journal-act-cell.is-out {
+.ca-journal-act-cell.is-out {
   background: transparent;
   color: transparent;
 }
 /* Today. An inset ring rather than an outline so it doesn't overlap its
    neighbours in a 3px-gap grid, and so it survives on a shaded cell. */
-.journal-act-cell.is-today {
+.ca-journal-act-cell.is-today {
   box-shadow: inset 0 0 0 1.5px var(--text-accent, var(--interactive-accent));
 }
-.journal-act-cell.is-link {
+.ca-journal-act-cell.is-link {
   cursor: pointer;
 }
-.journal-act-cell.is-link:hover {
+.ca-journal-act-cell.is-link:hover {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 1px;
 }
 /* Activity ramp: a single green scale, light to dark. Deliberately NOT the
-   --am-mood-* palette the tracker heatmap uses — that's a red→green mood scale,
+   --ca-mood-* palette the tracker heatmap uses — that's a red→green mood scale,
    and on an activity count low is not "bad", it's just less. Top stop matches
    the green the old chart used for completed tasks. */
-.journal-act-cell.am-act-1 { background: var(--am-act-1); }
-.journal-act-cell.am-act-2 { background: var(--am-act-2); }
-.journal-act-cell.am-act-3 { background: var(--am-act-3); }
-.journal-act-cell.am-act-4 { background: var(--am-act-4); }
+.ca-journal-act-cell.ca-act-1 { background: var(--ca-act-1); }
+.ca-journal-act-cell.ca-act-2 { background: var(--ca-act-2); }
+.ca-journal-act-cell.ca-act-3 { background: var(--ca-act-3); }
+.ca-journal-act-cell.ca-act-4 { background: var(--ca-act-4); }
 /* One legend for the whole quarter, not one per panel: the shade scale is
    shared across the three grids (quarterActivityStats hands them a single max),
    so three legends would imply three independent scales. */
-.journal-act-legend {
+.ca-journal-act-legend {
   display: flex;
   align-items: center;
   gap: 4px;
   margin-top: 12px;
 }
-.journal-act-legend .journal-act-cell {
+.ca-journal-act-legend .ca-journal-act-cell {
   width: 11px;
   height: 11px;
   padding: 0;
   flex: 0 0 auto;
 }
-.journal-act-legend-text {
-  font-size: var(--am-text-2xs);
+.ca-journal-act-legend-text {
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
 }

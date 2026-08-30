@@ -6,7 +6,7 @@
    LICENSING.md. */
 
 /* ── The vault banner ────────────────────────────────────────────────────
-   4.51. The strip above every Almanac note, injected into the note's scroll
+   4.51. The strip above every ChronoAnvil note, injected into the note's scroll
    container by `vault-banner.ts` rather than rendered from a directive.
 
    ── IT IS ON THE LEAF, NOT IN THE NOTE (4.51.3) ────────────────────────
@@ -30,7 +30,7 @@
    above it, and its controls read as content.
 
    So it has a ground, a border and a radius — the shape of a toolbar. What it
-   still does NOT have is `.journal-page-banner`'s 45° hatch and accent wash.
+   still does NOT have is `.ca-journal-page-banner`'s 45° hatch and accent wash.
    Those are for the opening of a page, which is meant to be looked at. This is
    the same on every note, and a reader who notices it twice a day is a reader
    it has failed.
@@ -46,20 +46,20 @@
 
    ── IT IS ITS OWN QUERY CONTAINER ──────────────────────────────────────
    `container-type: inline-size` here, and NOT borrowed from
-   `.journal-widget-block`. That block is what every other `@container` rule
+   `.ca-journal-widget-block`. That block is what every other `@container` rule
    in styles/ measures against, and this banner is not inside one. Declaring
    its own is what makes the 330px collapse measure THE BANNER, which is what
    was asked for (4.51, Q5), rather than the window. A sidebar leaf and a
    narrow split get the collapsed strip; a wide window with a narrow note does
    too. */
-.am-vault-banner {
+.ca-vault-banner {
   container-type: inline-size;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--am-space-3);
-  padding: var(--am-space-3) var(--am-space-5);
-  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  gap: var(--ca-space-3);
+  padding: var(--ca-space-3) var(--ca-space-5);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
   background: var(--background-secondary);
   position: relative;
   overflow: hidden;
@@ -70,26 +70,26 @@
 }
 
 /* Ambient gradient glow layer */
-.am-vault-banner::before {
+.ca-vault-banner::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: var(--am-header-bg-gradient);
+  background-image: var(--ca-header-bg-gradient);
   pointer-events: none;
   z-index: 1;
 }
 
 /* Textured art pattern layer */
-.am-vault-banner::after {
+.ca-vault-banner::after {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: var(--am-header-art-pattern);
-  background-size: var(--am-header-art-size);
-  background-repeat: var(--am-header-art-repeat);
-  background-position: var(--am-header-art-position);
-  opacity: var(--am-header-art-opacity);
-  mix-blend-mode: var(--am-header-art-blend);
+  background-image: var(--ca-header-art-pattern);
+  background-size: var(--ca-header-art-size);
+  background-repeat: var(--ca-header-art-repeat);
+  background-position: var(--ca-header-art-position);
+  opacity: var(--ca-header-art-opacity);
+  mix-blend-mode: var(--ca-header-art-blend);
   pointer-events: none;
   z-index: 2;
 }
@@ -116,66 +116,66 @@
    lets the opacity slider stay a single property set from TypeScript while
    everything else about a preset lives here.
 
-   `vault-banner.ts` puts `data-am-art` on the root and nothing else. An id
+   `vault-banner.ts` puts `data-ca-art` on the root and nothing else. An id
    here with no entry in `ART_PRESETS` is a pattern nothing can select; an id
    there with no rule here is a dropdown entry that paints nothing. Neither is
    visible by reading one file, so `test/vault-banner.test.ts` reads both. */
 
 /* Topography — contour lines */
-.am-vault-banner[data-am-art="topography"] {
-  --am-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200' viewBox='0 0 400 200'%3E%3Cpath d='M0,50 Q100,10 200,60 T400,40 M0,90 Q120,40 220,100 T400,80 M0,130 Q140,80 240,140 T400,120 M0,170 Q160,120 260,180 T400,160 M50,0 Q150,100 250,30 T350,200 M150,0 Q220,80 320,50 T400,180' fill='none' stroke='%23ffffff' stroke-width='1.2' stroke-opacity='0.4'/%3E%3C/svg%3E");
-  --am-header-art-size: 400px 200px;
-  --am-header-art-repeat: repeat;
-  --am-header-art-position: center;
-  --am-header-art-blend: soft-light;
+.ca-vault-banner[data-ca-art="topography"] {
+  --ca-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200' viewBox='0 0 400 200'%3E%3Cpath d='M0,50 Q100,10 200,60 T400,40 M0,90 Q120,40 220,100 T400,80 M0,130 Q140,80 240,140 T400,120 M0,170 Q160,120 260,180 T400,160 M50,0 Q150,100 250,30 T350,200 M150,0 Q220,80 320,50 T400,180' fill='none' stroke='%23ffffff' stroke-width='1.2' stroke-opacity='0.4'/%3E%3C/svg%3E");
+  --ca-header-art-size: 400px 200px;
+  --ca-header-art-repeat: repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-blend: soft-light;
 }
 
 /* Dot Matrix — technical grid */
-.am-vault-banner[data-am-art="dot-grid"] {
-  --am-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23ffffff' fill-opacity='0.5'/%3E%3C/svg%3E");
-  --am-header-art-size: 24px 24px;
-  --am-header-art-repeat: repeat;
-  --am-header-art-position: center;
-  --am-header-art-blend: soft-light;
+.ca-vault-banner[data-ca-art="dot-grid"] {
+  --ca-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23ffffff' fill-opacity='0.5'/%3E%3C/svg%3E");
+  --ca-header-art-size: 24px 24px;
+  --ca-header-art-repeat: repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-blend: soft-light;
 }
 
 /* Constellations — geometric nodes */
-.am-vault-banner[data-am-art="constellations"] {
-  --am-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Ccircle cx='20' cy='30' r='2' fill='%23ffffff' fill-opacity='0.6'/%3E%3Ccircle cx='90' cy='20' r='1.5' fill='%23ffffff' fill-opacity='0.5'/%3E%3Ccircle cx='140' cy='70' r='2' fill='%23ffffff' fill-opacity='0.6'/%3E%3Ccircle cx='70' cy='110' r='2.5' fill='%23ffffff' fill-opacity='0.7'/%3E%3Ccircle cx='30' cy='130' r='1.5' fill='%23ffffff' fill-opacity='0.4'/%3E%3Cpath d='M20,30 L90,20 L140,70 L70,110 L30,130 L20,30 M90,20 L70,110' stroke='%23ffffff' stroke-width='0.75' stroke-opacity='0.25' fill='none'/%3E%3C/svg%3E");
-  --am-header-art-size: 160px 160px;
-  --am-header-art-repeat: repeat;
-  --am-header-art-position: center;
-  --am-header-art-blend: soft-light;
+.ca-vault-banner[data-ca-art="constellations"] {
+  --ca-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Ccircle cx='20' cy='30' r='2' fill='%23ffffff' fill-opacity='0.6'/%3E%3Ccircle cx='90' cy='20' r='1.5' fill='%23ffffff' fill-opacity='0.5'/%3E%3Ccircle cx='140' cy='70' r='2' fill='%23ffffff' fill-opacity='0.6'/%3E%3Ccircle cx='70' cy='110' r='2.5' fill='%23ffffff' fill-opacity='0.7'/%3E%3Ccircle cx='30' cy='130' r='1.5' fill='%23ffffff' fill-opacity='0.4'/%3E%3Cpath d='M20,30 L90,20 L140,70 L70,110 L30,130 L20,30 M90,20 L70,110' stroke='%23ffffff' stroke-width='0.75' stroke-opacity='0.25' fill='none'/%3E%3C/svg%3E");
+  --ca-header-art-size: 160px 160px;
+  --ca-header-art-repeat: repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-blend: soft-light;
 }
 
 /* Aurora Mesh — luminous gradient */
-.am-vault-banner[data-am-art="aurora-mesh"] {
-  --am-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='150' viewBox='0 0 300 150'%3E%3Cdefs%3E%3CradialGradient id='g1' cx='70%25' cy='30%25' r='60%25'%3E%3Cstop offset='0%25' stop-color='%23a855f7' stop-opacity='0.6'/%3E%3Cstop offset='100%25' stop-color='%233b82f6' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='300' height='150' fill='url(%23g1)'/%3E%3C/svg%3E");
-  --am-header-art-size: cover;
-  --am-header-art-repeat: no-repeat;
-  --am-header-art-position: center;
-  --am-header-art-blend: screen;
+.ca-vault-banner[data-ca-art="aurora-mesh"] {
+  --ca-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='150' viewBox='0 0 300 150'%3E%3Cdefs%3E%3CradialGradient id='g1' cx='70%25' cy='30%25' r='60%25'%3E%3Cstop offset='0%25' stop-color='%23a855f7' stop-opacity='0.6'/%3E%3Cstop offset='100%25' stop-color='%233b82f6' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='300' height='150' fill='url(%23g1)'/%3E%3C/svg%3E");
+  --ca-header-art-size: cover;
+  --ca-header-art-repeat: no-repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-blend: screen;
 }
 
 /* Isometric Grid — 3D cube lattice */
-.am-vault-banner[data-am-art="isometric-grid"] {
-  --am-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='69.282' viewBox='0 0 40 69.282'%3E%3Cpath d='M40 34.641L20 23.094 0 34.641 0 57.735l20 11.547 20-11.547zM0 11.547L20 0l20 11.547v23.094L20 46.188 0 34.641z' fill='none' stroke='%23ffffff' stroke-width='0.8' stroke-opacity='0.35'/%3E%3C/svg%3E");
-  --am-header-art-size: 40px 69.3px;
-  --am-header-art-repeat: repeat;
-  --am-header-art-position: center;
-  --am-header-art-blend: overlay;
+.ca-vault-banner[data-ca-art="isometric-grid"] {
+  --ca-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='69.282' viewBox='0 0 40 69.282'%3E%3Cpath d='M40 34.641L20 23.094 0 34.641 0 57.735l20 11.547 20-11.547zM0 11.547L20 0l20 11.547v23.094L20 46.188 0 34.641z' fill='none' stroke='%23ffffff' stroke-width='0.8' stroke-opacity='0.35'/%3E%3C/svg%3E");
+  --ca-header-art-size: 40px 69.3px;
+  --ca-header-art-repeat: repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-blend: overlay;
 }
 
 /* Minimal Waves — ripples */
-.am-vault-banner[data-am-art="subtle-waves"] {
-  --am-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='20' viewBox='0 0 100 20'%3E%3Cpath d='M0 10 Q25 20 50 10 T100 10' fill='none' stroke='%23ffffff' stroke-width='1' stroke-opacity='0.35'/%3E%3C/svg%3E");
-  --am-header-art-size: 100px 20px;
-  --am-header-art-repeat: repeat;
-  --am-header-art-position: center;
-  --am-header-art-blend: soft-light;
+.ca-vault-banner[data-ca-art="subtle-waves"] {
+  --ca-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='20' viewBox='0 0 100 20'%3E%3Cpath d='M0 10 Q25 20 50 10 T100 10' fill='none' stroke='%23ffffff' stroke-width='1' stroke-opacity='0.35'/%3E%3C/svg%3E");
+  --ca-header-art-size: 100px 20px;
+  --ca-header-art-repeat: repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-blend: soft-light;
 }
 
-.am-vault-banner > * {
+.ca-vault-banner > * {
   position: relative;
   z-index: 3;
 }
@@ -183,7 +183,7 @@
 /* OBSIDIAN'S TITLE AND PROPERTY PANEL, STOOD IN FOR (4.51.6). Scoped to the
    leaf the bar drew on — see `HIDE_TITLE_CLASS`, put on and taken off in the
    same two lines as the bar itself — and only with `banner.absorb`, which is on
-   by default because Almanac puts something in each one's place: the page head
+   by default because ChronoAnvil puts something in each one's place: the page head
    names the note, and the bar's Properties button holds the fields.
 
    `visibility` RATHER THAN `display`, and it is not a preference: in Live
@@ -191,8 +191,8 @@
    one from layout mid-session is a class of bug — a stranded cursor, a
    mis-measured scroll — that this feature is nowhere near worth. Hidden, with
    the height collapsed, and still there for anything that reaches for it. */
-.am-absorb-host-chrome .inline-title,
-.am-absorb-host-chrome .metadata-container {
+.ca-absorb-host-chrome .inline-title,
+.ca-absorb-host-chrome .metadata-container {
   visibility: hidden;
   height: 0;
   min-height: 0;
@@ -209,72 +209,82 @@
 
    THE TITLE TEXT ONLY, AND NOT THE HEADER. The back and forward arrows, the
    reading/editing toggle and Obsidian's own ⋯ live in the same bar and none of
-   them is replaced by anything Almanac draws — hiding the bar would take four
+   them is replaced by anything ChronoAnvil draws — hiding the bar would take four
    controls to remove one label. `display: none` is safe here where it is not
    safe on the other two: this is a static label, not an editable region
    CodeMirror measures. */
-.am-absorb-host-chrome .view-header-title-container {
+.ca-absorb-host-chrome .view-header-title-container {
   display: none;
 }
 
 /* ── Row one: who you are, what you are looking for, where you can go ──── */
 
-.am-vault-banner .avb-global {
+.ca-vault-banner .ca-avb-global {
   display: flex;
   align-items: center;
-  gap: var(--am-space-4);
+  gap: var(--ca-space-4);
 }
 
 /* THE LOCKUP: the mark, the vault's name, and which part of it you are in.
-   One button — pressing any of the three opens Almanac's settings, which is
+   One button — pressing any of the three opens ChronoAnvil's settings, which is
    where the mark itself is set. */
-.am-vault-banner .avb-id {
+.ca-vault-banner .ca-avb-id {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: var(--am-space-3);
-  padding: var(--am-space-1) var(--am-space-2);
-  margin: calc(-1 * var(--am-space-1)) calc(-1 * var(--am-space-2));
-  border-radius: var(--am-radius-sm);
+  gap: var(--ca-space-3);
+  padding: var(--ca-space-1) var(--ca-space-2);
+  margin: calc(-1 * var(--ca-space-1)) calc(-1 * var(--ca-space-2));
+  border-radius: var(--ca-radius-sm);
   cursor: pointer;
 }
-.am-vault-banner .avb-id:hover {
+.ca-vault-banner .ca-avb-id:hover {
   background: var(--background-modifier-hover);
 }
 /* A FIXED SQUARE WITH CENTRED CONTENT, because the glyph is the reader's
    (4.51, Q7) and may be an emoji, one letter, or three — and the row must not
    change height for any of them. */
-.am-vault-banner .avb-tile {
+.ca-vault-banner .ca-avb-tile {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--interactive-accent);
   color: var(--text-on-accent);
-  font-size: var(--am-text-sm);
-  font-weight: var(--am-caps-weight);
+  font-size: var(--ca-text-sm);
+  font-weight: var(--ca-caps-weight);
   letter-spacing: 0.02em;
   line-height: 1;
 }
-.am-vault-banner .avb-id-text {
+/* THE TILE HOLDS EITHER A GLYPH OR THE MARK. When it is the mark, the drawing
+   is sized here rather than left to Obsidian's `--icon-size`: that variable is
+   tuned for icons sitting in text, and at its default the mark floats inside a
+   32px square that was measured for two capital letters. The colour comes from
+   the tile's own `color`, so one drawing serves the accent tile and the
+   settings preview without a second copy. */
+.ca-vault-banner .ca-avb-tile .svg-icon {
+  width: 20px;
+  height: 20px;
+}
+.ca-vault-banner .ca-avb-id-text {
   display: flex;
   flex-direction: column;
   min-width: 0;
   line-height: 1.25;
 }
-.am-vault-banner .avb-id-name {
+.ca-vault-banner .ca-avb-id-name {
   color: var(--text-normal);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   font-weight: 650;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.am-vault-banner .avb-id-sub {
+.ca-vault-banner .ca-avb-id-sub {
   color: var(--text-faint);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -299,50 +309,53 @@
    which is a toolbar. `margin-right: auto` goes with the cap; with nothing left
    to push, a rule that only fires when the field is short is a rule waiting to
    be wrong. */
-.am-vault-banner .avb-search {
+.ca-vault-banner .ca-avb-search {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
   height: 34px;
-  padding: 0 var(--am-space-4);
-  border: var(--am-rule-hair) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  padding: 0 var(--ca-space-4);
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
   background: var(--background-primary);
   color: var(--text-muted);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   cursor: text;
 }
-.am-vault-banner .avb-search:hover {
+.ca-vault-banner .ca-avb-search:hover {
   border-color: var(--background-modifier-border-hover);
   background: var(--background-modifier-hover);
 }
-.am-vault-banner .avb-search-icon {
+.ca-vault-banner .ca-avb-search-icon {
   display: flex;
   color: var(--text-faint);
 }
-.am-vault-banner .avb-search-icon .svg-icon {
+.ca-vault-banner .ca-avb-search-icon .svg-icon {
   width: 15px;
   height: 15px;
 }
-.am-vault-banner .avb-search-text {
+.ca-vault-banner .ca-avb-search-text {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.am-vault-banner .avb-kbd,
-.am-search-modal .ams-kbd {
+/* `.avb-kbd` shared this rule until 5.0.1 — the banner's key chip, which went
+   with the command's default binding. The search modal's own chip stays: that
+   one names Enter and the arrow keys, which are bound by the modal itself and
+   are true whatever the reader has done in Settings → Hotkeys. */
+.ca-search-modal .ca-ams-kbd {
   flex: 0 0 auto;
   padding: 1px 5px;
-  border: var(--am-rule-hair) solid var(--background-modifier-border);
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
   border-radius: 4px;
   background: var(--background-secondary);
   color: var(--text-faint);
   font-family: var(--font-monospace);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   line-height: 1.5;
 }
 
@@ -366,35 +379,35 @@
    other, and what says "pressed" is the ground that appears UNDER THE POINTER
    rather than one painted in advance — `94-native-tables.css`'s rule reaching
    the bar, and the reason the trail's cog has always been hover-revealed. */
-.am-vault-banner .avb-nav {
+.ca-vault-banner .ca-avb-nav {
   flex: 0 1 auto;
   display: flex;
   align-items: stretch;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
   flex-wrap: wrap;
 }
-.am-vault-banner .avb-btn {
+.ca-vault-banner .ca-avb-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 3px;
   min-width: 56px;
-  padding: var(--am-space-2) var(--am-space-3);
-  border: var(--am-rule-hair) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  padding: var(--ca-space-2) var(--ca-space-3);
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
   background: none;
   color: var(--text-muted);
   cursor: pointer;
   transition: background-color 120ms ease, color 120ms ease;
 }
-.am-vault-banner .avb-btn:hover {
+.ca-vault-banner .ca-avb-btn:hover {
   border-color: var(--background-modifier-border-hover);
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.am-vault-banner .avb-btn:focus-visible {
-  outline: var(--am-rule) solid var(--interactive-accent);
+.ca-vault-banner .ca-avb-btn:focus-visible {
+  outline: var(--ca-rule) solid var(--interactive-accent);
   outline-offset: -2px;
 }
 /* WHERE YOU ALREADY ARE IS NOT A DESTINATION, and saying so is cheaper than a
@@ -411,50 +424,50 @@
 
    The label thickens too, so the mark survives a theme whose accent sits close
    to its text colour. */
-.am-vault-banner .avb-btn.is-on {
+.ca-vault-banner .ca-avb-btn.is-on {
   border-color: var(--interactive-accent);
   color: var(--text-accent);
 }
-.am-vault-banner .avb-btn.is-on .avb-btn-label {
+.ca-vault-banner .ca-avb-btn.is-on .ca-avb-btn-label {
   font-weight: 700;
 }
-.am-vault-banner .avb-btn.is-on:hover {
+.ca-vault-banner .ca-avb-btn.is-on:hover {
   color: var(--text-accent-hover);
 }
-.am-vault-banner .avb-btn-icon {
+.ca-vault-banner .ca-avb-btn-icon {
   display: flex;
 }
-.am-vault-banner .avb-btn-icon .svg-icon {
+.ca-vault-banner .ca-avb-btn-icon .svg-icon {
   width: 17px;
   height: 17px;
 }
 /* The menu tile's caret. Smaller than the icon and faint, because it is the
    only part of this row that is not a destination — it says "there is a list
    behind this one" and should not read as a fifth glyph. */
-.am-vault-banner .avb-btn-caret {
+.ca-vault-banner .ca-avb-btn-caret {
   display: flex;
   color: var(--text-faint);
 }
-.am-vault-banner .avb-btn-caret .svg-icon {
+.ca-vault-banner .ca-avb-btn-caret .svg-icon {
   width: 11px;
   height: 11px;
 }
 /* A MENU TILE IS WIDER THAN A DESTINATION, because its label is a scope's name
    — "Quarterly Overview" — rather than one word, and eliding it would lose the
    position reading the label is there to give. */
-.am-vault-banner .avb-btn-menu {
+.ca-vault-banner .ca-avb-btn-menu {
   flex-direction: row;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
   min-width: 0;
 }
-.am-vault-banner .avb-btn-menu .avb-btn-label {
+.ca-vault-banner .ca-avb-btn-menu .ca-avb-btn-label {
   max-width: 12ch;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.am-vault-banner .avb-btn-label {
-  font-size: var(--am-text-2xs);
-  font-weight: var(--am-caps-weight);
+.ca-vault-banner .ca-avb-btn-label {
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -462,16 +475,16 @@
 
 /* ── Row two: where this note sits, ending in what it is called ────────── */
 
-.am-vault-banner .avb-trail {
+.ca-vault-banner .ca-avb-trail {
   display: flex;
   align-items: center;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
   flex-wrap: wrap;
   min-width: 0;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
 }
-.am-vault-banner .avb-sep {
+.ca-vault-banner .ca-avb-sep {
   flex: 0 0 auto;
   color: var(--text-faint);
 }
@@ -488,7 +501,7 @@
    the one worth keeping. The head below is the fourth answer and the right one:
    a page names itself in a page's face, and a breadcrumb goes back to saying
    where you are. `98-page-head.css` has the pencil now. */
-.am-vault-banner .avb-here {
+.ca-vault-banner .ca-avb-here {
   flex: 0 1 auto;
   min-width: 0;
   display: flex;
@@ -496,15 +509,15 @@
   color: var(--text-normal);
   font-weight: 650;
 }
-.am-vault-banner .avb-here-text {
+.ca-vault-banner .ca-avb-here-text {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.am-vault-banner .avb-meta {
+.ca-vault-banner .ca-avb-meta {
   flex: 0 0 auto;
-  margin-left: var(--am-space-2);
+  margin-left: var(--ca-space-2);
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
@@ -512,32 +525,32 @@
    `study-header.ts` states it: *"a control next to it would be a control one
    slip away from renaming the note."* The title is click-to-edit; the gap is
    the safety. */
-.am-vault-banner .avb-cog {
+.ca-vault-banner .ca-avb-cog {
   flex: 0 0 auto;
   margin-left: auto;
   display: flex;
   padding: 3px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   color: var(--text-muted);
-  opacity: var(--am-cog-opacity);
+  opacity: var(--ca-cog-opacity);
   transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
   cursor: pointer;
 }
-.am-vault-banner .avb-cog .svg-icon {
+.ca-vault-banner .ca-avb-cog .svg-icon {
   width: 15px;
   height: 15px;
 }
-.am-vault-banner:hover .avb-cog,
-.am-vault-banner .avb-cog:focus-visible,
-.am-vault-banner .avb-cog:hover {
+.ca-vault-banner:hover .ca-avb-cog,
+.ca-vault-banner .ca-avb-cog:focus-visible,
+.ca-vault-banner .ca-avb-cog:hover {
   opacity: 1;
 }
-.am-vault-banner .avb-cog:hover {
+.ca-vault-banner .ca-avb-cog:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 @media (hover: none) {
-  .am-vault-banner .avb-cog {
+  .ca-vault-banner .ca-avb-cog {
     opacity: 0.65;
   }
 }
@@ -557,75 +570,75 @@
    are the two the reader can most afford to lose: they know which vault they
    opened, and the trail below already says which part of it they are in. */
 @container (max-width: 540px) {
-  .am-vault-banner .avb-global {
+  .ca-vault-banner .ca-avb-global {
     flex-wrap: wrap;
-    gap: var(--am-space-2) var(--am-space-3);
+    gap: var(--ca-space-2) var(--ca-space-3);
   }
-  .am-vault-banner .avb-search {
+  .ca-vault-banner .ca-avb-search {
     order: 3;
     flex: 1 0 100%;
   }
-  .am-vault-banner .avb-nav {
+  .ca-vault-banner .ca-avb-nav {
     margin-left: auto;
-    gap: var(--am-space-3);
+    gap: var(--ca-space-3);
   }
-  .am-vault-banner .avb-btn {
-    padding: var(--am-space-2) var(--am-space-3);
+  .ca-vault-banner .ca-avb-btn {
+    padding: var(--ca-space-2) var(--ca-space-3);
   }
-  .am-vault-banner .avb-btn-icon .svg-icon {
+  .ca-vault-banner .ca-avb-btn-icon .svg-icon {
     width: 20px;
     height: 20px;
   }
-  .am-vault-banner .avb-btn-caret .svg-icon {
+  .ca-vault-banner .ca-avb-btn-caret .svg-icon {
     width: 13px;
     height: 13px;
   }
 }
 @container (max-width: 440px) {
-  .am-vault-banner .avb-id-text {
+  .ca-vault-banner .ca-avb-id-text {
     display: none;
   }
-  .am-vault-banner .avb-btn-label {
+  .ca-vault-banner .ca-avb-btn-label {
     display: none;
   }
-  .am-vault-banner .avb-nav {
-    gap: var(--am-space-3);
+  .ca-vault-banner .ca-avb-nav {
+    gap: var(--ca-space-3);
   }
-  .am-vault-banner .avb-btn {
+  .ca-vault-banner .ca-avb-btn {
     min-width: 0;
     padding: 7px 9px;
   }
-  .am-vault-banner .avb-btn-icon .svg-icon {
+  .ca-vault-banner .ca-avb-btn-icon .svg-icon {
     width: 20px;
     height: 20px;
   }
-  .am-vault-banner .avb-btn-caret .svg-icon {
+  .ca-vault-banner .ca-avb-btn-caret .svg-icon {
     width: 13px;
     height: 13px;
   }
-  .am-vault-banner .avb-btn-menu {
-    gap: var(--am-space-1);
+  .ca-vault-banner .ca-avb-btn-menu {
+    gap: var(--ca-space-1);
   }
 }
 @container (max-width: 330px) {
-  .am-vault-banner .avb-global {
+  .ca-vault-banner .ca-avb-global {
     flex-wrap: wrap;
   }
-  .am-vault-banner .avb-id-text {
+  .ca-vault-banner .ca-avb-id-text {
     display: none;
   }
-  .am-vault-banner .avb-btn-label {
+  .ca-vault-banner .ca-avb-btn-label {
     display: none;
   }
-  .am-vault-banner .avb-btn {
+  .ca-vault-banner .ca-avb-btn {
     min-width: 0;
     padding: 7px 9px;
   }
-  .am-vault-banner .avb-btn-icon .svg-icon {
+  .ca-vault-banner .ca-avb-btn-icon .svg-icon {
     width: 20px;
     height: 20px;
   }
-  .am-vault-banner .avb-btn-caret .svg-icon {
+  .ca-vault-banner .ca-avb-btn-caret .svg-icon {
     width: 13px;
     height: 13px;
   }
@@ -633,17 +646,17 @@
      the one control here that is worse for being narrow, and at this width the
      mark and the four tiles have the first row to themselves. There is no cap
      to lift any more — 4.51.9 removed it everywhere. */
-  .am-vault-banner .avb-search {
+  .ca-vault-banner .ca-avb-search {
     order: 3;
     flex: 1 0 100%;
   }
   /* The scope tile keeps its caret and loses its word with the rest. */
-  .am-vault-banner .avb-btn-menu {
-    gap: var(--am-space-1);
+  .ca-vault-banner .ca-avb-btn-menu {
+    gap: var(--ca-space-1);
   }
-  .am-vault-banner .avb-nav {
+  .ca-vault-banner .ca-avb-nav {
     margin-left: auto;
-    gap: var(--am-space-3);
+    gap: var(--ca-space-3);
   }
 }
 
@@ -654,211 +667,211 @@
    IT IS A PALETTE, NOT A DIALOGUE. Fixed height, so the list does not resize
    under the reader's cursor as they type — a window that grows on every
    keystroke is one where the third result is never in the same place twice. */
-.am-search-modal {
+.ca-search-modal {
   --ams-height: 60vh;
   padding: 0;
   width: min(720px, 90vw);
 }
-.am-search-modal .modal-close-button {
+.ca-search-modal .modal-close-button {
   display: none;
 }
-.am-search-modal .ams-query {
+.ca-search-modal .ca-ams-query {
   display: flex;
   align-items: center;
-  gap: var(--am-space-2);
-  padding: var(--am-space-4) var(--am-space-5);
-  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  gap: var(--ca-space-2);
+  padding: var(--ca-space-4) var(--ca-space-5);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
 }
-.am-search-modal .ams-query-icon {
+.ca-search-modal .ca-ams-query-icon {
   display: flex;
   color: var(--text-faint);
 }
-.am-search-modal .ams-input {
+.ca-search-modal .ca-ams-input {
   flex: 1 1 auto;
   min-width: 0;
   padding: 0;
   border: none;
   background: transparent;
-  font-size: var(--am-text-base);
+  font-size: var(--ca-text-base);
   color: var(--text-normal);
 }
-.am-search-modal .ams-input:focus {
+.ca-search-modal .ca-ams-input:focus {
   box-shadow: none;
 }
-.am-search-modal .ams-clear {
+.ca-search-modal .ca-ams-clear {
   background: none;
   border: none;
   color: var(--text-faint);
   cursor: pointer;
   padding: 2px 6px;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   line-height: 1;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   box-shadow: none;
 }
-.am-search-modal .ams-clear:hover {
+.ca-search-modal .ca-ams-clear:hover {
   color: var(--text-normal);
 }
 
-.am-search-modal .ams-bar {
+.ca-search-modal .ca-ams-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: var(--am-space-2);
-  padding: var(--am-space-2) var(--am-space-5);
-  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  gap: var(--ca-space-2);
+  padding: var(--ca-space-2) var(--ca-space-5);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
   background: var(--background-secondary);
 }
-.am-search-modal .ams-chips {
+.ca-search-modal .ca-ams-chips {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--am-space-1);
+  gap: var(--ca-space-1);
 }
 
-.am-search-modal .ams-year-pills {
+.ca-search-modal .ca-ams-year-pills {
   display: flex;
   background: var(--background-secondary-alt);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   padding: 1px;
   gap: 2px;
 }
-.am-search-modal .ams-year-pill {
+.ca-search-modal .ca-ams-year-pill {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   padding: 1px 5px;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   cursor: pointer;
   box-shadow: none;
 }
-.am-search-modal .ams-year-pill:hover {
+.ca-search-modal .ca-ams-year-pill:hover {
   color: var(--text-normal);
 }
-.am-search-modal .ams-year-pill.is-active {
+.ca-search-modal .ca-ams-year-pill.is-active {
   background: var(--background-primary);
   color: var(--text-normal);
-  box-shadow: var(--am-shadow-sm);
+  box-shadow: var(--ca-shadow-sm);
 }
 
-.am-search-modal .ams-filter-chip {
+.ca-search-modal .ca-ams-filter-chip {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   padding: 2px 7px;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   cursor: pointer;
   box-shadow: none;
   display: inline-flex;
   align-items: center;
   gap: 3px;
 }
-.am-search-modal .ams-filter-chip:hover {
+.ca-search-modal .ca-ams-filter-chip:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.am-search-modal .ams-filter-chip.is-active {
+.ca-search-modal .ca-ams-filter-chip.is-active {
   background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
   color: var(--interactive-accent);
   border-color: var(--interactive-accent);
   font-weight: 600;
 }
 
-.am-search-modal .ams-divider {
+.ca-search-modal .ca-ams-divider {
   width: 1px;
   height: 14px;
   background: var(--background-modifier-border);
   margin: 0 2px;
 }
 
-.am-search-modal .ams-compact-btn {
+.ca-search-modal .ca-ams-compact-btn {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   padding: 2px 7px;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   cursor: pointer;
   box-shadow: none;
   display: inline-flex;
   align-items: center;
   gap: 3px;
 }
-.am-search-modal .ams-compact-btn:hover {
+.ca-search-modal .ca-ams-compact-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.am-search-modal .ams-compact-btn.is-active {
+.ca-search-modal .ca-ams-compact-btn.is-active {
   background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
   color: var(--interactive-accent);
   border-color: var(--interactive-accent);
   font-weight: 600;
 }
 
-.am-search-modal .ams-chip-icon {
+.ca-search-modal .ca-ams-chip-icon {
   display: inline-flex;
 }
-.am-search-modal .ams-chip-icon svg {
+.ca-search-modal .ca-ams-chip-icon svg {
   width: 11px;
   height: 11px;
 }
 
-.am-search-modal .ams-chip {
-  padding: 2px var(--am-space-3);
-  border-radius: var(--am-radius-pill);
+.ca-search-modal .ca-ams-chip {
+  padding: 2px var(--ca-space-3);
+  border-radius: var(--ca-radius-pill);
   color: var(--text-muted);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   cursor: pointer;
 }
-.am-search-modal .ams-chip:hover {
+.ca-search-modal .ca-ams-chip:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.am-search-modal .ams-chip.is-on {
+.ca-search-modal .ca-ams-chip.is-on {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
-.am-search-modal .ams-count {
+.ca-search-modal .ca-ams-count {
   color: var(--text-faint);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
 }
-.am-search-modal .ams-narrowed {
-  margin-left: var(--am-space-2);
+.ca-search-modal .ca-ams-narrowed {
+  margin-left: var(--ca-space-2);
   color: var(--text-faint);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
 }
 
-.am-search-modal .ams-results {
+.ca-search-modal .ca-ams-results {
   height: var(--ams-height);
   overflow-y: auto;
-  padding: var(--am-space-2) 0;
+  padding: var(--ca-space-2) 0;
 }
-.am-search-modal .ams-results.is-compact .ams-snip {
+.ca-search-modal .ca-ams-results.is-compact .ca-ams-snip {
   display: none;
 }
-.am-search-modal .ams-results.is-compact .ams-row {
-  padding: var(--am-space-1) var(--am-space-5);
+.ca-search-modal .ca-ams-results.is-compact .ca-ams-row {
+  padding: var(--ca-space-1) var(--ca-space-5);
 }
-.am-search-modal .ams-note {
-  padding: var(--am-space-6) var(--am-space-5);
+.ca-search-modal .ca-ams-note {
+  padding: var(--ca-space-6) var(--ca-space-5);
   color: var(--text-muted);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   text-align: center;
 }
-.am-search-modal .ams-row {
+.ca-search-modal .ca-ams-row {
   display: flex;
   align-items: center;
-  gap: var(--am-space-3);
-  padding: var(--am-space-2) var(--am-space-5);
+  gap: var(--ca-space-3);
+  padding: var(--ca-space-2) var(--ca-space-5);
   cursor: pointer;
 }
-.am-search-modal .ams-row:hover,
-.am-search-modal .ams-row.is-sel {
+.ca-search-modal .ca-ams-row:hover,
+.ca-search-modal .ca-ams-row.is-sel {
   background: var(--background-modifier-hover);
 }
 /* WHICH HALF IT CAME FROM, IN THE LEFT MARGIN. This is the first list in the
@@ -867,88 +880,88 @@
    path. A GLYPH RATHER THAN A WORD, because it repeats on every row and a
    repeated word is noise by the fourth one — and the two glyphs are the nav
    bar's own for the same two places, so the mark is already learnt. */
-.am-search-modal .ams-mark {
+.ca-search-modal .ca-ams-mark {
   flex: 0 0 auto;
   display: flex;
   align-self: center;
-  color: var(--am-chart-series-2);
+  color: var(--ca-chart-series-2);
 }
-.am-search-modal .ams-mark.is-journal {
+.ca-search-modal .ca-ams-mark.is-journal {
   color: var(--interactive-accent);
 }
-.am-search-modal .ams-mark .svg-icon {
+.ca-search-modal .ca-ams-mark .svg-icon {
   width: 15px;
   height: 15px;
 }
-.am-search-modal .ams-main {
+.ca-search-modal .ca-ams-main {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
-.am-search-modal .ams-title {
+.ca-search-modal .ca-ams-title {
   color: var(--text-normal);
-  font-size: var(--am-text-base);
+  font-size: var(--ca-text-base);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.am-search-modal .ams-field {
+.ca-search-modal .ca-ams-field {
   flex: 0 0 auto;
   color: var(--text-faint);
-  font-size: var(--am-text-2xs);
-  font-weight: var(--am-caps-weight);
-  letter-spacing: var(--am-caps-tracking);
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
   text-transform: uppercase;
 }
-.am-search-modal .ams-where {
+.ca-search-modal .ca-ams-where {
   color: var(--text-muted);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 /* The snippet is one line and is allowed to be cut off. It is EVIDENCE that the
    note matched, not the note — a reader who wants the rest presses the row. */
-.am-search-modal .ams-snip {
+.ca-search-modal .ca-ams-snip {
   display: flex;
   align-items: baseline;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
   color: var(--text-muted);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.am-search-modal .ams-snip > span:last-child {
+.ca-search-modal .ca-ams-snip > span:last-child {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.am-search-modal .ams-date {
+.ca-search-modal .ca-ams-date {
   flex: 0 0 auto;
   color: var(--text-faint);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   font-variant-numeric: tabular-nums;
 }
 
-.am-search-modal .ams-foot {
+.ca-search-modal .ca-ams-foot {
   display: flex;
   align-items: center;
-  gap: var(--am-space-4);
-  padding: var(--am-space-2) var(--am-space-5);
-  border-top: var(--am-rule-hair) solid var(--background-modifier-border);
+  gap: var(--ca-space-4);
+  padding: var(--ca-space-2) var(--ca-space-5);
+  border-top: var(--ca-rule-hair) solid var(--background-modifier-border);
   background: var(--background-secondary);
   color: var(--text-faint);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
 }
-.am-search-modal .ams-foot-item {
+.ca-search-modal .ca-ams-foot-item {
   display: flex;
   align-items: center;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
 }
-.am-search-modal .ams-count {
+.ca-search-modal .ca-ams-count {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
 }
@@ -956,15 +969,15 @@
 /* Narrow windows: the palette is a phone-width sheet and the fixed list
    height stops being right when the window is shorter than the list. */
 @media (max-width: 480px) {
-  .am-search-modal {
+  .ca-search-modal {
     --ams-height: 50vh;
   }
-  .am-search-modal .ams-query,
-  .am-search-modal .ams-bar,
-  .am-search-modal .ams-row,
-  .am-search-modal .ams-foot {
-    padding-left: var(--am-space-3);
-    padding-right: var(--am-space-3);
+  .ca-search-modal .ca-ams-query,
+  .ca-search-modal .ca-ams-bar,
+  .ca-search-modal .ca-ams-row,
+  .ca-search-modal .ca-ams-foot {
+    padding-left: var(--ca-space-3);
+    padding-right: var(--ca-space-3);
   }
 }
 
@@ -977,36 +990,36 @@
    menu of things a reader may never need; this is the only place a note's
    property count exists once Obsidian's panel is stood in for, and a control
    that is the sole route to something must not hide. */
-.am-vault-banner .avb-props {
+.ca-vault-banner .ca-avb-props {
   flex: 0 0 auto;
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 2px var(--am-space-2);
-  border-radius: var(--am-radius-sm);
+  padding: 2px var(--ca-space-2);
+  border-radius: var(--ca-radius-sm);
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
-.am-vault-banner .avb-props:hover {
+.ca-vault-banner .ca-avb-props:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.am-vault-banner .avb-props-icon {
+.ca-vault-banner .ca-avb-props-icon {
   display: flex;
 }
-.am-vault-banner .avb-props-icon .svg-icon {
+.ca-vault-banner .ca-avb-props-icon .svg-icon {
   width: 13px;
   height: 13px;
 }
 /* THE COG GIVES UP ITS `margin-left: auto` TO THE BUTTON BESIDE IT. Two
    elements both claiming the slack would put a gap between them. */
-.am-vault-banner .avb-props ~ .avb-cog {
+.ca-vault-banner .ca-avb-props ~ .ca-avb-cog {
   margin-left: 0;
 }
 
-.am-props-modal {
+.ca-props-modal {
   width: min(560px, 92vw);
 }
 /* THE HEAD IS A HEAD, NOT THE FIRST ROW (4.51.7, and again in 4.51.8). Reported
@@ -1022,70 +1035,70 @@
 
    AND ROOM FOR THE CLOSE BUTTON. Obsidian draws its × in the modal's top-right
    corner, over whatever is there — which was the note's name. */
-.am-props-modal .amp-head {
+.ca-props-modal .ca-amp-head {
   display: flex;
   align-items: center;
-  gap: var(--am-space-2);
-  padding-right: var(--am-space-6);
-  padding-bottom: var(--am-space-4);
-  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+  gap: var(--ca-space-2);
+  padding-right: var(--ca-space-6);
+  padding-bottom: var(--ca-space-4);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
 }
-.am-props-modal .amp-head-icon {
+.ca-props-modal .ca-amp-head-icon {
   display: flex;
   color: var(--text-faint);
 }
-.am-props-modal .amp-head-text {
-  font-size: var(--am-text-lg);
+.ca-props-modal .ca-amp-head-text {
+  font-size: var(--ca-text-lg);
   font-weight: 650;
   color: var(--text-normal);
 }
 /* The note's name, so a window opened from the wrong leaf says so. */
-.am-props-modal .amp-head-note {
+.ca-props-modal .ca-amp-head-note {
   margin-left: auto;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--text-faint);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
 }
-.am-props-modal .amp-body {
-  margin-top: var(--am-space-3);
+.ca-props-modal .ca-amp-body {
+  margin-top: var(--ca-space-3);
   max-height: 55vh;
   overflow-y: auto;
   /* The scrollbar's own gutter, so a long list does not put its thumb through
      the trash buttons. */
-  padding-right: var(--am-space-2);
+  padding-right: var(--ca-space-2);
 }
 /* The first row brings no rule of its own — the head's is directly above it and
    two hairlines a few pixels apart read as a mistake. It keeps its PADDING,
    which is the half 4.51.7 got wrong. */
-.am-props-modal .amp-body > .setting-item:first-child {
+.ca-props-modal .ca-amp-body > .setting-item:first-child {
   border-top: none;
 }
-.am-props-modal .amp-empty {
-  padding: var(--am-space-6) 0;
+.ca-props-modal .ca-amp-empty {
+  padding: var(--ca-space-6) 0;
   color: var(--text-muted);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   text-align: center;
 }
 /* A PROPERTY NAME IS DATA, so it is set in the monospace face the rest of the
    plugin gives to keys — and it does not take a whole row's weight the way a
    settings label does. */
-.am-props-modal .amp-row .setting-item-name {
+.ca-props-modal .ca-amp-row .setting-item-name {
   font-family: var(--font-monospace);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
   color: var(--text-muted);
   user-select: none;
 }
-.am-props-modal .amp-row:hover .setting-item-name {
+.ca-props-modal .ca-amp-row:hover .setting-item-name {
   color: var(--text-normal);
 }
-.am-props-modal .amp-prop-icon {
+.ca-props-modal .ca-amp-prop-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1094,99 +1107,99 @@
   height: 16px;
   flex-shrink: 0;
 }
-.am-props-modal .amp-row:hover .amp-prop-icon {
+.ca-props-modal .ca-amp-row:hover .ca-amp-prop-icon {
   color: var(--text-muted);
 }
-.am-props-modal .amp-prop-key {
+.ca-props-modal .ca-amp-prop-key {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.am-props-modal .amp-row {
-  padding: var(--am-space-1) var(--am-space-2);
-  border-bottom: var(--am-rule-hair) solid var(--background-modifier-border);
+.ca-props-modal .ca-amp-row {
+  padding: var(--ca-space-1) var(--ca-space-2);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
   align-items: center;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   transition: background-color 0.12s ease;
 }
-.am-props-modal .amp-row:hover {
+.ca-props-modal .ca-amp-row:hover {
   background-color: var(--background-modifier-hover);
 }
-.am-props-modal .amp-row .setting-item-info {
+.ca-props-modal .ca-amp-row .setting-item-info {
   flex: 0 0 170px;
   width: 170px;
-  margin-right: var(--am-space-2);
+  margin-right: var(--ca-space-2);
 }
 /* A NAME AND ITS VALUE, NOT A SETTING AND ITS DESCRIPTION. Obsidian's own row
    gives the label two thirds of the width because it usually carries a sentence
    under it; a property name is one word and the value is the part being read,
    so the control gets room and the field fills it. */
-.am-props-modal .amp-row .setting-item-control {
+.ca-props-modal .ca-amp-row .setting-item-control {
   flex: 1 1 auto;
   justify-content: flex-start;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
 }
-.am-props-modal .amp-row .setting-item-control input[type="text"],
-.am-props-modal .amp-row .setting-item-control input[type="number"] {
+.ca-props-modal .ca-amp-row .setting-item-control input[type="text"],
+.ca-props-modal .ca-amp-row .setting-item-control input[type="number"] {
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
   max-width: 100%;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   color: var(--text-normal);
-  font-size: var(--am-text-sm);
-  padding: var(--am-space-1) var(--am-space-2);
+  font-size: var(--ca-text-sm);
+  padding: var(--ca-space-1) var(--ca-space-2);
   transition: background-color 0.12s ease, border-color 0.12s ease;
 }
-.am-props-modal .amp-row .setting-item-control input[type="text"]:hover,
-.am-props-modal .amp-row .setting-item-control input[type="number"]:hover {
+.ca-props-modal .ca-amp-row .setting-item-control input[type="text"]:hover,
+.ca-props-modal .ca-amp-row .setting-item-control input[type="number"]:hover {
   background: var(--background-modifier-hover);
 }
-.am-props-modal .amp-row .setting-item-control input[type="text"]:focus,
-.am-props-modal .amp-row .setting-item-control input[type="number"]:focus {
+.ca-props-modal .ca-amp-row .setting-item-control input[type="text"]:focus,
+.ca-props-modal .ca-amp-row .setting-item-control input[type="number"]:focus {
   background: var(--background-primary);
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 1px var(--interactive-accent);
 }
-.am-props-modal .amp-row .setting-item-control input::placeholder {
+.ca-props-modal .ca-amp-row .setting-item-control input::placeholder {
   color: var(--text-faint);
   font-style: italic;
   opacity: 0.75;
 }
-.am-props-modal .amp-row .setting-item-control .clickable-icon {
+.ca-props-modal .ca-amp-row .setting-item-control .clickable-icon {
   opacity: 0;
   color: var(--text-faint);
   transition: opacity 0.15s ease, color 0.15s ease;
 }
-.am-props-modal .amp-row:hover .setting-item-control .clickable-icon {
+.ca-props-modal .ca-amp-row:hover .setting-item-control .clickable-icon {
   opacity: 0.65;
 }
-.am-props-modal .amp-row:hover .setting-item-control .clickable-icon:hover {
+.ca-props-modal .ca-amp-row:hover .setting-item-control .clickable-icon:hover {
   opacity: 1;
   color: var(--text-error);
 }
 @media (hover: none) {
-  .am-props-modal .amp-row .setting-item-control .clickable-icon {
+  .ca-props-modal .ca-amp-row .setting-item-control .clickable-icon {
     opacity: 0.65;
   }
 }
-.am-props-modal .amp-row-opaque {
+.ca-props-modal .ca-amp-row-opaque {
   opacity: 0.65;
 }
 /* THE FOOTER IS BELOW THE LIST, NOT ON IT. The body scrolls; without a rule and
    a margin the last row runs straight into the buttons, which on a six-property
    note put *Add a property…* across `Wake-Up`'s field. */
-.am-props-modal .amp-foot {
-  margin-top: var(--am-space-3);
-  padding-top: var(--am-space-3);
-  border-top: var(--am-rule-hair) solid var(--background-modifier-border);
+.ca-props-modal .ca-amp-foot {
+  margin-top: var(--ca-space-3);
+  padding-top: var(--ca-space-3);
+  border-top: var(--ca-rule-hair) solid var(--background-modifier-border);
 }
-.am-props-modal .amp-foot .setting-item {
+.ca-props-modal .ca-amp-foot .setting-item {
   border-top: none;
   padding: 0;
 }
-.am-props-modal .amp-name-input {
+.ca-props-modal .ca-amp-name-input {
   width: 100%;
 }

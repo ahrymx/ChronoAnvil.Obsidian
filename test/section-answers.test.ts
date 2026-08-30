@@ -300,12 +300,12 @@ describe("§8: the risk, tested rather than intended", () => {
     // return them unchanged.
     const dash = diarySectionModel({ grain: "weekly", hostFolder: "02 - Diary/Weekly" });
     const text = [
-      "```almanac",
+      "```chronoanvil",
       "header:⏳ Open tasks",
       "tasks-table: Reading, Writing ,period",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:🏷️ Tags",
       "tag-index:02 - Diary|My tags",
       "```",
@@ -320,12 +320,12 @@ describe("§8: the risk, tested rather than intended", () => {
   it("and rewrites exactly one span when the window says one changed", () => {
     const dash = diarySectionModel({ grain: "weekly", hostFolder: "02 - Diary/Weekly" });
     const text = [
-      "```almanac",
+      "```chronoanvil",
       "header:🏷️ Tags",
       "tag-index:02 - Diary|My tags",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:⏳ Open tasks",
       "tasks-table: Reading, Writing ,period",
       "```",
@@ -355,7 +355,7 @@ describe("§8: the risk, tested rather than intended", () => {
 
   it("and the plan says reconfigure where Save would rewrite", () => {
     const dash = diarySectionModel({ grain: "weekly", hostFolder: "02 - Diary/Weekly" });
-    const text = ["```almanac", "header:🏷️ Tags", "tag-index:02 - Diary", "```", ""].join(
+    const text = ["```chronoanvil", "header:🏷️ Tags", "tag-index:02 - Diary", "```", ""].join(
       "\n"
     );
     const present = dash.present(text);

@@ -487,10 +487,10 @@ describe("the control on a title's row", () => {
 // to exist."* The symptom is that the *Deleted files* setting can be permanent,
 // or a `.trash` folder the explorer does not show. The fault is that
 // `journal-removal.ts` had already decided where a bin goes and had written down
-// the invariant the trash call broke — **Almanac has never removed a reader's
+// the invariant the trash call broke — **ChronoAnvil has never removed a reader's
 // note and this is not where that starts.**
 
-describe("a journal note goes to Almanac's own bin", () => {
+describe("a journal note goes to ChronoAnvil's own bin", () => {
   const src = () => readCode("kind-row-menu.ts");
 
   it("never reaches Obsidian's trash", () => {
@@ -667,22 +667,22 @@ describe("the actions slot on a record row", () => {
     // `actions` is `flex: 0 0 auto` beside the grid, so without this every
     // value column sits a button's width left of its own heading.
     const css = readCss();
-    expect(css).toContain(".almanac-list.has-row-actions .almanac-list-heads");
-    expect(css).toContain("--am-row-action-w");
+    expect(css).toContain(".ca-list.has-row-actions .ca-list-heads");
+    expect(css).toContain("--ca-row-action-w");
   });
 
   it("reads the reserve from one custom property, so the two cannot drift", () => {
     const css = readCss();
-    const strip = css.slice(css.indexOf(".almanac-list.has-row-actions .almanac-list-heads"));
-    expect(strip.slice(0, 120)).toContain("var(--am-row-action-w)");
-    const menu = css.slice(css.indexOf(".almanac-list-menu {"));
-    expect(menu.slice(0, 220)).toContain("var(--am-row-action-w");
+    const strip = css.slice(css.indexOf(".ca-list.has-row-actions .ca-list-heads"));
+    expect(strip.slice(0, 120)).toContain("var(--ca-row-action-w)");
+    const menu = css.slice(css.indexOf(".ca-list-menu {"));
+    expect(menu.slice(0, 220)).toContain("var(--ca-row-action-w");
   });
 
   it("does not put the reserve on a list that has no actions", () => {
     // The folder rollup's rows carry nothing — a folder has no page default and
     // no pages to bin — so its strip must not shift.
-    expect(readCss()).toContain(".almanac-list.has-row-actions {");
+    expect(readCss()).toContain(".ca-list.has-row-actions {");
   });
 
   it("hangs the title's menu in the slot, not in the value grid", () => {
@@ -709,7 +709,7 @@ describe("the actions slot on a record row", () => {
     // It went in as `.jkt-row-menu` and `appearance.test.ts` caught it: `.jkt-*`
     // is the private family 2.56.9 retired, and a `⋯` in a row's actions slot
     // is what ANY list of records wants.
-    expect(readCss()).toContain(".almanac-list-menu");
+    expect(readCss()).toContain(".ca-list-menu");
     expect(readSrc("kind-row-menu.ts")).not.toContain('"jkt-');
   });
 });

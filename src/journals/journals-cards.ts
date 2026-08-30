@@ -67,7 +67,7 @@
 import { setIcon } from "obsidian";
 import type { MarkdownPostProcessorContext, Menu } from "obsidian";
 
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { getFile, getFolder, openFile } from "../core/util";
 import { folderNotePath } from "../core/util";
 import { panDuringDrag } from "../ui/drag-scroll";
@@ -103,7 +103,7 @@ import type { JournalType } from "./journal";
 // (a folder made by hand) gets the wash, which is the same fallback
 // `folderLink` makes one file over for the same reason: better a deliberate
 // plain thing than a broken reference.
-export function bannerOf(plugin: AlmanacPlugin, type: JournalType): string | null {
+export function bannerOf(plugin: ChronoAnvilPlugin, type: JournalType): string | null {
   const file = getFile(plugin.app, folderNotePath(type.root));
   if (!file) return null;
   const fm = plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
@@ -131,14 +131,14 @@ export function bannerOf(plugin: AlmanacPlugin, type: JournalType): string | nul
 // same object — a card that looked different depending on how many were asked
 // for would be two cards with one name.
 export function buildCard(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   type: JournalType
 ): HTMLElement {
-  const card = createDiv({ cls: "jjc-card" });
+  const card = createDiv({ cls: "ca-jjc-card" });
 
   // ── The banner ─────────────────────────────────────────────────────────
-  const banner = card.createDiv({ cls: "jjc-banner" });
+  const banner = card.createDiv({ cls: "ca-jjc-banner" });
   const src = bannerOf(plugin, type);
   if (src) {
     // `getResourcePath` turns a vault path into something the renderer can
@@ -155,13 +155,13 @@ export function buildCard(
     // row in the Journals card wears — so a vault with no images still reads
     // as four distinct things rather than four grey rectangles.
     banner.style.setProperty("--jjc-hue", String(hueOf(type.id)));
-    banner.createDiv({ cls: "jjc-glyph", text: type.emoji });
+    banner.createDiv({ cls: "ca-jjc-glyph", text: type.emoji });
   }
 
   // The overflow control, on the banner as in the reference. Built ON CLICK,
   // which is `overflowButton`'s own rule: the menu describes the journal as it
   // is when opened rather than as it was when the grid rendered.
-  overflowButton(banner, "jjc-menu", (menu) => {
+  overflowButton(banner, "ca-jjc-menu", (menu) => {
     menu.addItem((i) =>
       i
         .setTitle(`Open ${type.name}`)
@@ -222,9 +222,9 @@ export function buildCard(
   });
 
   // ── The body ───────────────────────────────────────────────────────────
-  const body = card.createDiv({ cls: "jjc-body" });
+  const body = card.createDiv({ cls: "ca-jjc-body" });
   const title = body.createEl("a", {
-    cls: "jjc-title",
+    cls: "ca-jjc-title",
     text: type.name,
     href: folderNotePath(type.root).replace(/\.md$/, ""),
   });
@@ -237,7 +237,7 @@ export function buildCard(
   //
   // WHAT STOOD HERE was a subtitle carrying `countLabel(tops.length, …)` — "4
   // subjects" — chosen because the reference design's course code has no
-  // equivalent in Almanac and the slot wanted the fact a reader glances for.
+  // equivalent in ChronoAnvil and the slot wanted the fact a reader glances for.
   // That was right about the fact and wrong about how much room it deserved: a
   // card 240px wide and 116px of banner tall, on the homepage, saying one thing.
   //
@@ -277,7 +277,7 @@ export function buildCard(
   // of journal cards is read across, so a card with three cells beside cards with
   // four breaks the row — and there is always something honest for the fourth to
   // say, because a journal that rates nothing still has a count of what is in it.
-  // What it costs is the count on a journal that DOES rate: `.jjc-menu` still
+  // What it costs is the count on a journal that DOES rate: `.ca-jjc-menu` still
   // names the level and the dashboard states it in full.
   // AND THE READER MAY CHOOSE IT (4.47). `cardStat` names a measure out of the
   // stats band's own vocabulary — one list of things a number about a journal can
@@ -292,7 +292,7 @@ export function buildCard(
   // get a permanent em dash in the fourth cell of every card in the row.
   cards.push(cardFourth(plugin, type, tops.length, ratingDef));
 
-  const strip = body.createDiv({ cls: "jjc-stats" });
+  const strip = body.createDiv({ cls: "ca-jjc-stats" });
   const { cells } = statStrip(strip, cards);
 
   // Open tasks are `- ( )` lines in note BODIES, invisible to the metadata cache,
@@ -336,7 +336,7 @@ export function buildCard(
 // What is left is the rating, the count of what is below, and the per-kind
 // counts — which is what `cardStatChoices` offers.
 function cardFourth(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   type: JournalType,
   below: number,
   ratingDef: TrackerDef | null
@@ -407,7 +407,7 @@ export function cardStatChoices(
   return rows;
 }
 
-async function openIndex(plugin: AlmanacPlugin, type: JournalType): Promise<void> {
+async function openIndex(plugin: ChronoAnvilPlugin, type: JournalType): Promise<void> {
   const file = getFile(plugin.app, folderNotePath(type.root));
   if (file) await openFile(plugin.app, file);
 }
@@ -443,7 +443,7 @@ async function openIndex(plugin: AlmanacPlugin, type: JournalType): Promise<void
 // visibly move, because `applyJournalOrder` fires the repaint every journals
 // widget already subscribes to.
 function attachCardDrag(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   card: HTMLElement,
   id: string
 ): void {
@@ -495,13 +495,13 @@ function attachCardDrag(
 
 // A MIME TYPE OF OUR OWN, lowercase because the drag-and-drop spec lowercases
 // every type it stores and a mixed-case constant would never match `types`.
-const JOURNAL_DRAG_TYPE = "application/x-almanac-journal";
+const JOURNAL_DRAG_TYPE = "application/x-ca-journal";
 
 export function buildJournalCards(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
-  const root = createDiv({ cls: "jjc-grid" });
+  const root = createDiv({ cls: "ca-jjc-grid" });
   const types = registeredJournalTypes(plugin);
 
   for (const type of types) {
@@ -514,7 +514,7 @@ export function buildJournalCards(
   //
   // Measured on `dev-screenshots/20260817_13h45m16s_grim.png`: two cards in a
   // 1170px section, which `auto-fill` had already divided into four tracks, so half
-  // the grid was ground. As with `.jjs-grid`, the track minimum was NOT narrowed —
+  // the grid was ground. As with `.ca-jjs-grid`, the track minimum was NOT narrowed —
   // it would have made five tracks for two cards — because the gap is a count and
   // the honest thing to put at the end of a list is what adds to it.
   //
@@ -530,11 +530,11 @@ export function buildJournalCards(
   // NO `title` — the tile's own label says it. See `addTile`, which lost the
   // same duplicate in the same release.
   const tile = createEl("button", {
-    cls: "jld-add jld-add-tile jjc-add",
+    cls: "ca-jld-add ca-jld-add-tile ca-jjc-add",
     attr: { type: "button", "aria-label": label },
   });
-  setIcon(tile.createSpan({ cls: "jld-add-icon" }), "plus");
-  tile.createSpan({ cls: "jld-add-label", text: label });
+  setIcon(tile.createSpan({ cls: "ca-jld-add-icon" }), "plus");
+  tile.createSpan({ cls: "ca-jld-add-label", text: label });
   tile.addEventListener("click", (evt) => {
     evt.preventDefault();
     // The section's head folds it on click and the cards open notes; neither

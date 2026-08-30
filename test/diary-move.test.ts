@@ -142,8 +142,8 @@ const restOf = (text: string): string[] =>
 describe("a reorder preserves the reader's own bytes", () => {
   it("keeps writing in a region that moved above another section", () => {
     const text = daily().replace(
-      "<!--almanac:log\n-->",
-      "<!--almanac:log\nI wrote three lines here.\n\nAnd left a blank one.\n-->"
+      "<!--chronoanvil:log\n-->",
+      "<!--chronoanvil:log\nI wrote three lines here.\n\nAnd left a blank one.\n-->"
     );
     const present = detectEntrySections(text, { grain: "daily" });
     const want = [
@@ -157,8 +157,8 @@ describe("a reorder preserves the reader's own bytes", () => {
     // The REGION did not move — only the directive did. A region renders as
     // nothing and the widget draws where its directive is, so moving the
     // reader's text would rewrite their lines to no visible effect.
-    expect(next.indexOf("<!--almanac:focus")).toBeLessThan(
-      next.indexOf("<!--almanac:log")
+    expect(next.indexOf("<!--chronoanvil:focus")).toBeLessThan(
+      next.indexOf("<!--chronoanvil:log")
     );
   });
 
@@ -186,10 +186,10 @@ describe("a reorder preserves the reader's own bytes", () => {
       ...present.slice(2).reverse(),
     ])!;
     // Frontmatter, the spacer, the rule and every region survive untouched.
-    const head = (t: string): string => t.slice(0, t.indexOf("```almanac"));
+    const head = (t: string): string => t.slice(0, t.indexOf("```chronoanvil"));
     expect(head(next)).toBe(head(text));
     for (const key of ["focus", "log", "attachments", "todo", "capture"]) {
-      expect(next).toContain(`<!--almanac:${key}`);
+      expect(next).toContain(`<!--chronoanvil:${key}`);
     }
   });
 });
@@ -213,7 +213,7 @@ describe("a section cannot be reordered across the rule", () => {
     ]);
     const after = next ?? text;
     // `log` is still below the rule.
-    expect(after.indexOf("note:log")).toBeGreaterThan(after.indexOf("\n---\n\n```almanac"));
+    expect(after.indexOf("note:log")).toBeGreaterThan(after.indexOf("\n---\n\n```chronoanvil"));
     // The structural half is still the structural half.
     expect(detectEntrySections(after, { grain: "daily" }).slice(0, 2)).toEqual([
       "banner",
@@ -415,8 +415,8 @@ describe("what a dashboard will not let go of", () => {
     expect(diaryRemovalRefusal(charts, empty)).toBeNull();
 
     const withCharts = empty.replace(
-      "```almanac-charts",
-      "```almanac-charts\nchart:c1:Mood:line:90d\nchart:c2:Sleep:bar:30d"
+      "```chronoanvil-charts",
+      "```chronoanvil-charts\nchart:c1:Mood:line:90d\nchart:c2:Sleep:bar:30d"
     );
     const why = diaryRemovalRefusal(charts, withCharts);
     expect(why).toContain("2 charts");
@@ -426,8 +426,8 @@ describe("what a dashboard will not let go of", () => {
 
   it("keeps a section it refused, and reports the reason as the plan", () => {
     const withCharts = monthly().replace(
-      "```almanac-charts",
-      "```almanac-charts\nchart:c1:Mood:line:90d"
+      "```chronoanvil-charts",
+      "```chronoanvil-charts\nchart:c1:Mood:line:90d"
     );
     const present = detectDiarySections(withCharts, { grain: "monthly" });
     const want = present.filter((id) => id !== "charts");
@@ -470,8 +470,8 @@ describe("what a dashboard will not let go of", () => {
 describe("what an entry will not let go of", () => {
   it("refuses to remove a section holding the reader's writing", () => {
     const text = daily().replace(
-      "<!--almanac:log\n-->",
-      "<!--almanac:log\nMonths of writing.\n-->"
+      "<!--chronoanvil:log\n-->",
+      "<!--chronoanvil:log\nMonths of writing.\n-->"
     );
     const present = detectEntrySections(text, { grain: "daily" });
     const want = present.filter((id) => id !== "log");
@@ -492,11 +492,11 @@ describe("what an entry will not let go of", () => {
     );
     const next = applyEntrySections(text, { grain: "daily" }, want)!;
     expect(next).not.toContain("attach:attachments");
-    expect(next).not.toContain("<!--almanac:attachments");
+    expect(next).not.toContain("<!--chronoanvil:attachments");
     expect(next).not.toMatch(/\n\n\n/);
     // And nothing else went with it.
     for (const key of ["focus", "log", "todo", "capture"]) {
-      expect(next).toContain(`<!--almanac:${key}`);
+      expect(next).toContain(`<!--chronoanvil:${key}`);
     }
   });
 
@@ -513,12 +513,12 @@ describe("what an entry will not let go of", () => {
       "capture",
     ])!;
     expect(next).toContain("note:capture");
-    expect(next).toContain("<!--almanac:capture");
+    expect(next).toContain("<!--chronoanvil:capture");
     expect(detectEntrySections(next, { grain: "weekly" })).toEqual([
       ...present,
       "capture",
     ]);
-    expect(next).not.toMatch(/```almanac\nrow\n/);
+    expect(next).not.toMatch(/```chronoanvil\nrow\n/);
   });
 
   it("does not inject a row line into a daily entry when adding a section", () => {
@@ -529,7 +529,7 @@ describe("what an entry will not let go of", () => {
       { id: "bridge", options: { target: "Workout" } },
     ])!;
     expect(next).toContain("bridge-notes:Workout|From the journals");
-    expect(next).not.toMatch(/```almanac\nrow\n/);
+    expect(next).not.toMatch(/```chronoanvil\nrow\n/);
   });
 
   it("will not add a second copy of something already there", () => {
@@ -552,16 +552,16 @@ describe("parsing an entry that has been rearranged by hand", () => {
     expect(detectEntrySections(text, { grain: "daily" })).toContain("todo");
   });
 
-  it("does not write into an almanac fence the reader pasted as an example", () => {
-    // §9's scan, narrowed. `addSectionToNote` took the LAST almanac fence,
+  it("does not write into a chronoanvil fence the reader pasted as an example", () => {
+    // §9's scan, narrowed. `addSectionToNote` took the LAST chronoanvil fence,
     // which is right for a note the plugin composed and wrong for one where
     // somebody pasted a fenced example into their notes — and 3.0 reaches that
     // scan with removals and reorders where 2.60 reached it only with an
     // append. The widget fence is now the last one holding a SHARED directive
     // and no structural one.
     const text = composeEntryTemplate("weekly").replace(
-      "<!--almanac:log\n-->",
-      "<!--almanac:log\nHere is how a fence looks:\n\n```almanac\nsome example I pasted\n```\n-->"
+      "<!--chronoanvil:log\n-->",
+      "<!--chronoanvil:log\nHere is how a fence looks:\n\n```chronoanvil\nsome example I pasted\n```\n-->"
     );
     const present = detectEntrySections(text, { grain: "weekly" });
     const next = applyEntrySections(text, { grain: "weekly" }, [
@@ -569,10 +569,10 @@ describe("parsing an entry that has been rearranged by hand", () => {
       "capture",
     ])!;
     // The example is untouched...
-    expect(next).toContain("```almanac\nsome example I pasted\n```");
+    expect(next).toContain("```chronoanvil\nsome example I pasted\n```");
     // ...and the directive landed in the real fence, above the regions.
     expect(next.indexOf("note:capture")).toBeLessThan(
-      next.indexOf("<!--almanac:focus")
+      next.indexOf("<!--chronoanvil:focus")
     );
   });
 
@@ -601,9 +601,9 @@ describe("parsing an entry that has been rearranged by hand", () => {
 
   it("finds regions the reader moved away from their directives", () => {
     const text = daily().replace(
-      "<!--almanac:capture\n-->\n",
+      "<!--chronoanvil:capture\n-->\n",
       ""
-    ) + "\n<!--almanac:capture\n-->\n";
+    ) + "\n<!--chronoanvil:capture\n-->\n";
     const shape = parseEntry(text, { grain: "daily" });
     expect(shape.regions.has("capture")).toBe(true);
   });
@@ -806,7 +806,7 @@ describe("the pin restricts the editor without relocating anyone's file", () => 
 
 // The masthead's own fence, found by WHAT IT HOLDS rather than by where it sits.
 //
-// It was `the first ```almanac block`, which was the same thing until 4.10 put
+// It was `the first ```chronoanvil block`, which was the same thing until 4.10 put
 // the page head above it. Position was never what these tests were about, and
 // the thing it holds has now changed twice: it was the fence carrying
 // NAVIGATION until 4.19 welded that row into the banner, and it is the fence
@@ -817,7 +817,7 @@ const mastheadFence = (text: string): string[] => {
   const lines = text.split("\n");
   let open = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim() === "```almanac") open = i;
+    if (lines[i].trim() === "```chronoanvil") open = i;
     if (open >= 0 && /-summary$/.test(lines[i].trim())) break;
   }
   const close = lines.indexOf("```", open + 1);
@@ -863,12 +863,12 @@ describe("the dashboard's masthead is one fence", () => {
 
   it("does not weld the body into one block as well", () => {
     // The band is the reason a fence merges, not the mechanism. Body sections
-    // all render into an `almanac` fence too, so a rule keyed on "consecutive
+    // all render into a `chronoanvil` fence too, so a rule keyed on "consecutive
     // and same fence kind" collapsed the whole page into one block — and it
     // read as plausible output right up until `assetUnits` saw one unit where
     // the repair path needs three.
     const text = composeDiaryDashboard("monthly");
-    const fences = text.match(/```almanac\b/g) ?? [];
+    const fences = text.match(/```chronoanvil\b/g) ?? [];
     expect(fences.length).toBeGreaterThan(2);
     const rollup = mastheadFence(text);
     expect(rollup).not.toContain("entry-rollup");

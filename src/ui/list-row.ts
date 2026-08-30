@@ -111,33 +111,33 @@ export function createListRow(
   host: HTMLElement,
   opts: ListRowOptions
 ): ListRow {
-  const row = host.createDiv({ cls: "almanac-list-row" });
+  const row = host.createDiv({ cls: "ca-list-row" });
   if (opts.locked) row.addClass("is-locked");
   if (opts.dense) row.addClass("is-dense");
   for (const c of opts.cls ?? []) if (c) row.addClass(c);
 
-  const lead = row.createDiv({ cls: "almanac-list-lead" });
+  const lead = row.createDiv({ cls: "ca-list-lead" });
 
-  row.createDiv({ cls: "almanac-list-token", text: opts.token });
+  row.createDiv({ cls: "ca-list-token", text: opts.token });
 
-  const main = row.createDiv({ cls: "almanac-list-main" });
+  const main = row.createDiv({ cls: "ca-list-main" });
   if (opts.columns) {
     main.addClass("is-columned");
-    main.style.setProperty("--am-row-cols", opts.columns);
+    main.style.setProperty("--ca-row-cols", opts.columns);
   }
-  const titleSlot = main.createDiv({ cls: "almanac-list-title" });
+  const titleSlot = main.createDiv({ cls: "ca-list-title" });
   if (opts.titleRender) opts.titleRender(titleSlot);
   else titleSlot.setText(opts.title);
   if (opts.subtitle) {
-    main.createDiv({ cls: "almanac-list-subtitle", text: opts.subtitle });
+    main.createDiv({ cls: "ca-list-subtitle", text: opts.subtitle });
   }
   // Always created, even when empty: a caller that fills it in later — after an
   // async read — should not have to know whether it exists. The rail used to
   // query for it and silently do nothing when the row had started with no
   // pills.
-  const pills = main.createDiv({ cls: "almanac-list-pills" });
+  const pills = main.createDiv({ cls: "ca-list-pills" });
   for (const p of opts.pills ?? []) {
-    const el = pills.createSpan({ cls: "almanac-list-pill", text: p.text });
+    const el = pills.createSpan({ cls: "ca-list-pill", text: p.text });
     if (p.tone) el.addClass(`is-${p.tone}`);
   }
 
@@ -145,9 +145,9 @@ export function createListRow(
   // their place in the DOM and their handlers; what changes is where the row
   // lays them out, which is one `flex-wrap` and two orders in the stylesheet.
   // Building a wrapper instead would give the editor's rows a structure no other
-  // caller has, and every selector that reaches `.almanac-list-actions` today
+  // caller has, and every selector that reaches `.ca-list-actions` today
   // would have to learn about it.
   if (opts.actionsRow) row.addClass("has-actions-row");
-  const actions = row.createDiv({ cls: "almanac-list-actions" });
+  const actions = row.createDiv({ cls: "ca-list-actions" });
   return { row, lead, actions, pills };
 }

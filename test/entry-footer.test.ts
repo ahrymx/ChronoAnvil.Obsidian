@@ -42,7 +42,7 @@ describe("the controls leave the title band", () => {
 
   it("builds the strip as its own element, beside the header", () => {
     expect(entry()).toContain("export function buildEntryContext(");
-    expect(entry()).toContain('cls: "journal-widget-bar journal-entry-context"');
+    expect(entry()).toContain('cls: "ca-journal-widget-bar ca-journal-entry-context"');
   });
 
   it("and the banner keeps the file's name, the cog, and nothing else", () => {
@@ -62,7 +62,7 @@ describe("the controls leave the title band", () => {
     // ── THE NAME IS THE FILE'S (4.21) ───────────────────────────────
     //
     // The banner drew the `title` FRONTMATTER PROPERTY until this release,
-    // falling back to a formatted date — so an entry was the one Almanac page
+    // falling back to a formatted date — so an entry was the one ChronoAnvil page
     // whose banner did not show what the note is called, against a rule
     // `page-title.ts` had already settled for every other surface. The alias is
     // not deleted; it is on the strip, where the entry's other facts are.
@@ -133,9 +133,9 @@ describe("the two slim banners are one banner (4.21.1)", () => {
     // children and their order is source order.
     const leaf = readCode("study-header");
     const head = leaf.slice(leaf.indexOf("export function buildStudyHeader("));
-    expect(head.indexOf('cls: "jsh-titlerow')).toBeGreaterThan(0);
+    expect(head.indexOf('cls: "ca-jsh-titlerow')).toBeGreaterThan(0);
     expect(head.indexOf('cls: "jsh-titlerow')).toBeLessThan(
-      head.indexOf('cls: "jsh-nav')
+      head.indexOf('cls: "ca-jsh-nav')
     );
 
     const w = readCode("widgets");
@@ -146,7 +146,7 @@ describe("the two slim banners are one banner (4.21.1)", () => {
   it("and the date navigator is built with the formatted date label", () => {
     const entry = readCode("entryheader");
     expect(entry).toContain("const dateLabel = entryDateLabel(app, file, grain);");
-    expect(entry).toContain('trigger.createSpan({ cls: "jeh-datenav-label", text: dateLabel });');
+    expect(entry).toContain('trigger.createSpan({ cls: "ca-jeh-datenav-label", text: dateLabel });');
   });
 
   it("and the redundant tracking caption header is removed from the block", () => {
@@ -179,7 +179,7 @@ describe("the two slim banners are one banner (4.21.1)", () => {
     // The state class is CLEARED as well as set: `titleEl` is the same element
     // across renders, so a note that was empty when the strip was built would
     // otherwise draw its first saved title in the "nothing here yet" face.
-    expect(src).toContain('titleEl.removeClass("jec-title-empty")');
+    expect(src).toContain('titleEl.removeClass("ca-jec-title-empty")');
     // AND NOTHING IS WRITTEN WHEN NOTHING WOULD CHANGE: a no-op
     // `processFrontMatter` still moves the file's modified time, which sync then
     // propagates as a change the reader did not make.
@@ -260,7 +260,7 @@ describe("the footer is welded by the block that owns the card", () => {
 describe("the band reads as a footer and not as the overview's", () => {
   const css = readCss();
   const rule = (): string => {
-    const at = css.indexOf(".journal-entry-banner > .journal-widget-bar.journal-entry-context");
+    const at = css.indexOf(".ca-journal-entry-banner > .ca-journal-widget-bar.ca-journal-entry-context");
     expect(at).toBeGreaterThan(0);
     return css.slice(at, css.indexOf("}", at));
   };
@@ -281,7 +281,7 @@ describe("the band reads as a footer and not as the overview's", () => {
     // The grid's own `-12px` bottom margin welds it to the card's edge. With a
     // footer under it that margin pulls it THROUGH the footer's top rule.
     expect(css).toContain(
-      ".journal-entry-banner:has(> .journal-entry-context) .journal-tracker-bar"
+      ".ca-journal-entry-banner:has(> .ca-journal-entry-context) .ca-journal-tracker-bar"
     );
   });
 
@@ -294,11 +294,11 @@ describe("the band reads as a footer and not as the overview's", () => {
     // them — so a second one does not lose, it parks its element half way
     // along the band. 4.21 left one on the alias wrapper and one on the cog,
     // and 4.21.1 took the control's when the control moved to the banner.
-    const push = ".jec-title-wrap";
+    const push = ".ca-jec-title-wrap";
     const at = css.indexOf(`\n${push} {`);
     expect(at, push).toBeGreaterThan(0);
     expect(css.slice(at, css.indexOf("}", at))).toContain("margin-right: auto");
-    expect(css).not.toContain(".journal-entry-context > .jeh-more,");
+    expect(css).not.toContain(".ca-journal-entry-context > .ca-jeh-more,");
   });
 
   it("and the control it holds can still be revealed by hovering the card", () => {
@@ -306,12 +306,12 @@ describe("the band reads as a footer and not as the overview's", () => {
     // rather than a band inside it. That distinction has been got wrong twice —
     // once after 3.7 moved the control to the footer and once after 4.21 moved
     // it to the name band — and both times the control simply never lit.
-    expect(css).toContain(".journal-slim-banner:hover .jeh-more");
-    expect(css).toContain(".journal-slim-banner:hover .jsh-more");
+    expect(css).toContain(".ca-journal-slim-banner:hover .ca-jeh-more");
+    expect(css).toContain(".ca-journal-slim-banner:hover .ca-jsh-more");
   });
 
   it("and the date list opens over the card rather than off its edge", () => {
-    const at = css.indexOf(".journal-entry-context .jeh-datenav-menu");
+    const at = css.indexOf(".ca-journal-entry-context .ca-jeh-datenav-menu");
     expect(at).toBeGreaterThan(0);
     const menu = css.slice(at, css.indexOf("}", at));
     expect(menu).toContain("bottom: calc(100% + 6px)");
@@ -332,7 +332,7 @@ describe("the title band is given room for the title", () => {
     // kind, so it is on the shared class and there is nowhere left for one of
     // them to keep a private copy.
     const css = readCss();
-    const at = css.indexOf(".journal-slim-banner .journal-banner-name {");
+    const at = css.indexOf(".ca-journal-slim-banner .ca-journal-banner-name {");
     expect(at).toBeGreaterThan(0);
     const rule = css.slice(at, css.indexOf("}", at));
     const pad = /padding:\s*(\d+)px\s+\d+px\s+(\d+)px/.exec(rule);
@@ -363,7 +363,7 @@ describe("the breadcrumb trail, and its removal (4.8.1)", () => {
 
   it("took its module with it rather than leaving one nobody calls", () => {
     expect(existsSync(resolve(__dirname, "../src/ui/area-titlebar.ts"))).toBe(false);
-    expect(readCss()).not.toContain(".am-titlebar");
+    expect(readCss()).not.toContain(".ca-titlebar");
   });
 
   it("and every grain still has a label, because the class table is not its", () => {

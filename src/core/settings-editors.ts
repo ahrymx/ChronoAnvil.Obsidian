@@ -51,7 +51,7 @@ import {
   findDashboardCatchups,
 } from "../journals/dashboard-catchup";
 import type { KindChangeCounts } from "../journals/kind-change";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { DEFAULT_MOOD_FACES } from "./constants";
 import {
   CLASS_DEFS,
@@ -180,7 +180,7 @@ export function seedingTemplatePhrase(surface: TrackerSurface): string {
 }
 
 export function surfaceChoices(
-  plugin: AlmanacPlugin
+  plugin: ChronoAnvilPlugin
 ): { key: string; label: string; surface: TrackerSurface }[] {
   // ONE DIARY CHOICE, NOT ONE PER GRAIN (2.57.9).
   //
@@ -290,7 +290,7 @@ export class TrackerEditModal extends SteppedEditorModal {
 
   constructor(
     app: App,
-    plugin: AlmanacPlugin,
+    plugin: ChronoAnvilPlugin,
     def: TrackerDef,
     // Retained (not just consumed by super) because the class field warns
     // about reclassifying an existing tracker, which a new one can't do.
@@ -582,7 +582,7 @@ export class TrackerEditModal extends SteppedEditorModal {
             ? "The numeric range the faces map across, e.g. 1–5. A tap on the nth face writes the value that face lands on."
             : "Leave Min or Max blank for no limit in that direction — a blank Max means the stepper never caps out. Step defaults to 1."
         )
-        .setClass("almanac-editor-inline-fields");
+        .setClass("ca-editor-inline-fields");
 
       // Each numeric field keeps the raw text alongside the parsed value.
       // Number("abc") is NaN, which JSON-serialises to null and quietly
@@ -601,7 +601,7 @@ export class TrackerEditModal extends SteppedEditorModal {
           c.setValue(
             this.rawNums[key] ?? (current == null ? "" : String(current))
           );
-          c.inputEl.addClass("almanac-editor-num");
+          c.inputEl.addClass("ca-editor-num");
           c.inputEl.setAttribute("aria-label", placeholder);
           c.onChange((v) => {
             const trimmed = v.trim();
@@ -783,11 +783,11 @@ export class TrackerEditModal extends SteppedEditorModal {
       // Stacking is a class on the settingEl rather than a bespoke row built
       // outside the Setting, so the name, description and disabled states keep
       // coming from the same place every other setting gets them.
-      grains.settingEl.addClass("almanac-setting-stacked");
-      grains.controlEl.addClass("almanac-grain-row");
+      grains.settingEl.addClass("ca-setting-stacked");
+      grains.controlEl.addClass("ca-grain-row");
       for (const c of TRACKER_CLASSES) {
         const label = grains.controlEl.createEl("label", {
-          cls: "almanac-grain-option",
+          cls: "ca-grain-option",
         });
         const box = label.createEl("input", { type: "checkbox" });
         box.checked = diaryClassesOf(t.surface).includes(c);
@@ -819,7 +819,7 @@ export class TrackerEditModal extends SteppedEditorModal {
     if (t.type === "scale") {
       if (cls == null) {
         host.createDiv({
-          cls: "setting-item-description almanac-editor-note",
+          cls: "setting-item-description ca-editor-note",
           text: "Journal trackers can't colour the diary calendar — the heat map reads your daily entries, which this tracker never writes to.",
         });
       } else {
@@ -855,7 +855,7 @@ export class TrackerEditModal extends SteppedEditorModal {
     // against.
     if (t.surface.kind === "journal") {
       host.createDiv({
-        cls: "setting-item-description almanac-editor-note",
+        cls: "setting-item-description ca-editor-note",
         text: "Journal trackers aren't seeded onto templates or added to Diary.base — put this on a note with “+ Add tracker”, or add a tracker: line to that journal's template yourself.",
       });
       this.renderPlacementSchematic(host);
@@ -900,18 +900,18 @@ export class TrackerEditModal extends SteppedEditorModal {
   private renderPlacementSchematic(host: HTMLElement): void {
     const t = this.draft;
     const cls = diaryClassOf(t.surface);
-    const box = host.createDiv({ cls: "almanac-wizard-schematic" });
+    const box = host.createDiv({ cls: "ca-wizard-schematic" });
     box.createDiv({
-      cls: "almanac-wizard-schematic-title",
+      cls: "ca-wizard-schematic-title",
       text: `${t.label.trim() || "This tracker"} — where it turns up`,
     });
-    const stack = box.createDiv({ cls: "almanac-wizard-blocks" });
+    const stack = box.createDiv({ cls: "ca-wizard-blocks" });
 
     const place = (on: boolean, icon: string, text: string): void => {
       const block = stack.createDiv({
-        cls: `almanac-wizard-block${on ? "" : " is-off"}`,
+        cls: `ca-wizard-block${on ? "" : " is-off"}`,
       });
-      block.createSpan({ cls: "almanac-wizard-block-icon", text: icon });
+      block.createSpan({ cls: "ca-wizard-block-icon", text: icon });
       block.createSpan({ text });
     };
 
@@ -982,7 +982,7 @@ export class TrackerEditModal extends SteppedEditorModal {
 
 export function openTrackerEditor(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   def: TrackerDef,
   // `onClose` fires whichever way the modal goes away — saved, cancelled or
   // dismissed. The per-note "New tracker…" flow needs it: it has to carry on
@@ -1013,7 +1013,7 @@ class MoodEditModal extends EditorModal {
 
   constructor(
     app: App,
-    plugin: AlmanacPlugin,
+    plugin: ChronoAnvilPlugin,
     private tracker: TrackerDef,
     private onSave: () => Promise<void>
   ) {
@@ -1087,7 +1087,7 @@ class MoodEditModal extends EditorModal {
 
 export function openMoodEditor(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   tracker: TrackerDef,
   onSave: () => Promise<void>
 ): void {
@@ -1175,7 +1175,7 @@ export function normaliseKinds(
 // surface. Read off the live registry rather than hardcoded, so a tracker
 // added in Settings → Trackers appears here without a second list to update.
 export function journalTrackerChoices(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   typeId: string
 ): TrackerDef[] {
   return plugin.settings.trackers.filter(
@@ -1189,7 +1189,7 @@ export function journalTrackerChoices(
 // grades into and what the trend chart plots, so it has to be a number — a
 // date tracker like Last reviewed is carried by a note but is not a score.
 export function ratingChoices(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   typeId: string
 ): TrackerDef[] {
   return journalTrackerChoices(plugin, typeId).filter(
@@ -1267,7 +1267,7 @@ const MODE_STRINGS: Record<JournalEditorMode, [string, string, string]> = {
   ],
   import: [
     "Import journal",
-    "This folder looks like a journal Almanac doesn\u2019t know about. The shape below was read back from the notes and templates on disk \u2014 check anything listed as guessed, then import it.",
+    "This folder looks like a journal ChronoAnvil doesn\u2019t know about. The shape below was read back from the notes and templates on disk \u2014 check anything listed as guessed, then import it.",
     "Import journal",
   ],
 };
@@ -1290,7 +1290,7 @@ export class JournalEditModal extends SteppedEditorModal {
 
   constructor(
     app: App,
-    plugin: AlmanacPlugin,
+    plugin: ChronoAnvilPlugin,
     cfg: JournalConfig,
     private mode: JournalEditorMode,
     private selfIndex: number,
@@ -1434,13 +1434,13 @@ export class JournalEditModal extends SteppedEditorModal {
 
     if (!targets.length) {
       host.createDiv({
-        cls: "almanac-editor-note",
+        cls: "ca-editor-note",
         text: "This journal has no templates yet.",
       });
       return;
     }
 
-    const list = host.createDiv({ cls: "almanac-launcher-list" });
+    const list = host.createDiv({ cls: "ca-launcher-list" });
     for (const target of targets) {
       const path = `${this.draft.templatesFolder}/${target.file}`;
       const { actions, pills } = createListRow(list, {
@@ -1498,7 +1498,7 @@ export class JournalEditModal extends SteppedEditorModal {
           // unwritten one.
           pills.empty();
           pills.createSpan({
-            cls: "almanac-list-pill is-muted",
+            cls: "ca-list-pill is-muted",
             text: "not written yet — save to create it",
           });
           return;
@@ -1509,12 +1509,12 @@ export class JournalEditModal extends SteppedEditorModal {
         {
           pills.empty();
           pills.createSpan({
-            cls: "almanac-list-pill",
+            cls: "ca-list-pill",
             text: `${present.length} section${present.length === 1 ? "" : "s"}`,
           });
           if (edited) {
             pills.createSpan({
-              cls: "almanac-list-pill is-muted",
+              cls: "ca-list-pill is-muted",
               text: "edited by hand",
             });
           }
@@ -1579,7 +1579,7 @@ export class JournalEditModal extends SteppedEditorModal {
   ): Promise<void> {
     if (!kinds.length && !surfaces.length) {
       new Notice(
-        "Almanac: pick at least one note type or surface to offer this layout on."
+        "ChronoAnvil: pick at least one note type or surface to offer this layout on."
       );
       return;
     }
@@ -1615,8 +1615,8 @@ export class JournalEditModal extends SteppedEditorModal {
     );
     new Notice(
       written.length
-        ? `Almanac: saved “${label}” — wrote ${written.join(", ")} ✅`
-        : `Almanac: saved “${label}” ✅`
+        ? `ChronoAnvil: saved “${label}” — wrote ${written.join(", ")} ✅`
+        : `ChronoAnvil: saved “${label}” ✅`
     );
     this.refreshBody();
   }
@@ -1771,7 +1771,7 @@ export class JournalEditModal extends SteppedEditorModal {
 
     variant.label = trimmed;
     await this.onSave(this.draft);
-    notify.ok(`Almanac: renamed to “${trimmed}”`);
+    notify.ok(`ChronoAnvil: renamed to “${trimmed}”`);
     this.refreshBody();
   }
 
@@ -1841,8 +1841,8 @@ export class JournalEditModal extends SteppedEditorModal {
     await this.onSave(this.draft);
     notify.ok(
       shared
-        ? `Almanac: “${variant.label}” no longer offered for ${kind.label.toLowerCase()}`
-        : `Almanac: deleted “${variant.label}”`
+        ? `ChronoAnvil: “${variant.label}” no longer offered for ${kind.label.toLowerCase()}`
+        : `ChronoAnvil: deleted “${variant.label}”`
     );
     this.refreshBody();
   }
@@ -1877,22 +1877,22 @@ export class JournalEditModal extends SteppedEditorModal {
   // said what it had guessed in a notice, which meant the reader had to notice
   // the notice, work out which of several values it referred to, and go and
   // undo it. Everything below this block came off the disk; everything named
-  // in it is Almanac's best reading of something nothing wrote down.
+  // in it is ChronoAnvil's best reading of something nothing wrote down.
   private renderGuesses(host: HTMLElement): void {
     if (this.guesses.length === 0) return;
-    const box = host.createDiv({ cls: "almanac-editor-caveats" });
+    const box = host.createDiv({ cls: "ca-editor-caveats" });
     box.createDiv({
-      cls: "almanac-editor-caveats-title",
+      cls: "ca-editor-caveats-title",
       text:
         this.guesses.length === 1
           ? "One detail had to be guessed"
           : `${this.guesses.length} details had to be guessed`,
     });
     box.createDiv({
-      cls: "almanac-editor-caveats-blurb",
+      cls: "ca-editor-caveats-blurb",
       text: "Everything else was read from the notes and templates in the folder. Check these before importing — a tracker's range in particular is only as wide as the readings already on disk.",
     });
-    const list = box.createEl("ul", { cls: "almanac-editor-caveats-list" });
+    const list = box.createEl("ul", { cls: "ca-editor-caveats-list" });
     for (const guess of this.guesses) list.createEl("li", { text: guess });
   }
 
@@ -1952,7 +1952,7 @@ export class JournalEditModal extends SteppedEditorModal {
       .setDesc("Shown on the home-page section heading.")
       .addText((c) => {
         c.setValue(cfg.emoji);
-        c.inputEl.addClass("almanac-editor-emoji");
+        c.inputEl.addClass("ca-editor-emoji");
         c.onChange((v) => {
           cfg.emoji = v.trim() || "📔";
         });
@@ -1973,18 +1973,18 @@ export class JournalEditModal extends SteppedEditorModal {
   private renderFolders(host: HTMLElement): void {
     const folders = this.section(host, "Folders");
 
-    const box = folders.createDiv({ cls: "almanac-derived-paths" });
+    const box = folders.createDiv({ cls: "ca-derived-paths" });
     const row = (label: string): HTMLElement => {
-      const line = box.createDiv({ cls: "almanac-derived-path" });
-      line.createSpan({ cls: "almanac-derived-path-label", text: label });
-      return line.createSpan({ cls: "almanac-derived-path-value" });
+      const line = box.createDiv({ cls: "ca-derived-path" });
+      line.createSpan({ cls: "ca-derived-path-label", text: label });
+      return line.createSpan({ cls: "ca-derived-path-value" });
     };
     this.folderPreview = { root: row("Notes"), templates: row("Templates") };
     box.createDiv({
-      cls: "almanac-derived-path-note",
+      cls: "ca-derived-path-note",
       text: !this.isEstablished
         ? "Both follow the name above, under this vault's journals and templates roots."
-        : "Fixed once a journal exists — renaming it here won't move its notes. To relocate it, move the folder in the file explorer and Almanac will follow.",
+        : "Fixed once a journal exists — renaming it here won't move its notes. To relocate it, move the folder in the file explorer and ChronoAnvil will follow.",
     });
     this.paintFolders();
   }
@@ -2036,7 +2036,7 @@ export class JournalEditModal extends SteppedEditorModal {
             ? 'Singular noun for a top-level folder, e.g. "Subject", "Cuisine".'
             : 'Singular noun for a sub-folder, e.g. "Topic", "Dish".'
         )
-        .setClass("almanac-editor-inline-fields")
+        .setClass("ca-editor-inline-fields")
         .addText((c) =>
           c
             .setPlaceholder(li === 0 ? "Section" : "Item")
@@ -2048,7 +2048,7 @@ export class JournalEditModal extends SteppedEditorModal {
         .addText((c) => {
           c.setPlaceholder("emoji");
           c.setValue(lvl.fallbackEmoji);
-          c.inputEl.addClass("almanac-editor-emoji");
+          c.inputEl.addClass("ca-editor-emoji");
           c.inputEl.setAttribute("aria-label", "fallback emoji");
           c.onChange((v) => {
             lvl.fallbackEmoji = v.trim() || "📂";
@@ -2075,10 +2075,10 @@ export class JournalEditModal extends SteppedEditorModal {
   private renderKinds(host: HTMLElement): void {
     const wrap = this.section(host, "Note types");
     wrap.createDiv({
-      cls: "almanac-editor-hint",
+      cls: "ca-editor-hint",
       text: "The kinds of note this journal holds. Each becomes a create button and a `type:` value in the note's frontmatter.",
     });
-    this.kindsHost = wrap.createDiv({ cls: "almanac-kinds" });
+    this.kindsHost = wrap.createDiv({ cls: "ca-kinds" });
     this.paintKinds();
   }
 
@@ -2109,12 +2109,12 @@ export class JournalEditModal extends SteppedEditorModal {
     );
 
     this.draft.kinds.forEach((kind, i) => {
-      const row = host.createDiv({ cls: "almanac-kind" });
+      const row = host.createDiv({ cls: "ca-kind" });
 
-      const head = row.createDiv({ cls: "almanac-kind-head" });
+      const head = row.createDiv({ cls: "ca-kind-head" });
       const emoji = head.createEl("input", {
         type: "text",
-        cls: "almanac-editor-emoji",
+        cls: "ca-editor-emoji",
         value: kind.emoji,
       });
       emoji.setAttribute("aria-label", "kind emoji");
@@ -2124,7 +2124,7 @@ export class JournalEditModal extends SteppedEditorModal {
 
       const label = head.createEl("input", {
         type: "text",
-        cls: "almanac-kind-label",
+        cls: "ca-kind-label",
         value: kind.label,
       });
       label.placeholder = "Entry";
@@ -2134,7 +2134,7 @@ export class JournalEditModal extends SteppedEditorModal {
       });
 
       // Never the last one: a journal with no kinds has nothing to create in.
-      const del = head.createEl("button", { cls: "almanac-kind-remove" });
+      const del = head.createEl("button", { cls: "ca-kind-remove" });
       setIcon(del, "trash-2");
       del.setAttribute("aria-label", "Remove this kind");
       del.disabled = this.draft.kinds.length <= 1;
@@ -2143,8 +2143,8 @@ export class JournalEditModal extends SteppedEditorModal {
         this.paintKinds();
       });
 
-      const rateRow = row.createDiv({ cls: "almanac-kind-field" });
-      rateRow.createSpan({ cls: "almanac-kind-field-label", text: "Rated on" });
+      const rateRow = row.createDiv({ cls: "ca-kind-field" });
+      rateRow.createSpan({ cls: "ca-kind-field-label", text: "Rated on" });
       const select = rateRow.createEl("select", { cls: "dropdown" });
       select.createEl("option", { value: "", text: "Nothing" });
       for (const t of rateable) {
@@ -2156,14 +2156,14 @@ export class JournalEditModal extends SteppedEditorModal {
         this.paintKinds();
       });
       rateRow.createSpan({
-        cls: "almanac-kind-field-note",
+        cls: "ca-kind-field-note",
         text: kind.rating
           ? "What a Recall sitting grades into, and what this journal's trend charts plot."
           : "Notes of this kind aren't scored.",
       });
 
-      const pagesRow = row.createDiv({ cls: "almanac-kind-field" });
-      pagesRow.createSpan({ cls: "almanac-kind-field-label", text: "Pages" });
+      const pagesRow = row.createDiv({ cls: "ca-kind-field" });
+      pagesRow.createSpan({ cls: "ca-kind-field-label", text: "Pages" });
       const pagesBox = pagesRow.createEl("input", { type: "checkbox" });
       pagesBox.checked = !!kind.pages;
       pagesBox.setAttribute("aria-label", "can be split across pages");
@@ -2172,7 +2172,7 @@ export class JournalEditModal extends SteppedEditorModal {
         this.paintKinds();
       });
       pagesRow.createSpan({
-        cls: "almanac-kind-field-note",
+        cls: "ca-kind-field-note",
         text: kind.pages
           ? "Long notes of this kind can be split into pages, each with its own Recall deck."
           : "Notes of this kind are a single page.",
@@ -2180,7 +2180,7 @@ export class JournalEditModal extends SteppedEditorModal {
 
     });
 
-    const add = host.createEl("button", { cls: "almanac-kind-add" });
+    const add = host.createEl("button", { cls: "ca-kind-add" });
     setIcon(add, "plus");
     add.createSpan({ text: "Add kind" });
     add.addEventListener("click", () => {
@@ -2214,19 +2214,19 @@ export class JournalEditModal extends SteppedEditorModal {
     const active = targets.find((t) => t.key === this.railKey);
     if (!active) return;
 
-    const wrap = host.createDiv({ cls: "almanac-wizard-sections" });
+    const wrap = host.createDiv({ cls: "ca-wizard-sections" });
 
-    const rail = wrap.createDiv({ cls: "almanac-wizard-templates" });
+    const rail = wrap.createDiv({ cls: "ca-wizard-templates" });
     for (const t of targets) {
       const chosen = this.chosen.get(t.key) ?? [];
       const row = rail.createDiv({
-        cls: `almanac-wizard-template${
+        cls: `ca-wizard-template${
           t.key === this.railKey ? " is-active" : ""
         }`,
       });
-      row.createDiv({ cls: "almanac-wizard-template-name", text: t.label });
+      row.createDiv({ cls: "ca-wizard-template-name", text: t.label });
       row.createDiv({
-        cls: "almanac-wizard-template-count",
+        cls: "ca-wizard-template-count",
         text: `${chosen.length} section${chosen.length === 1 ? "" : "s"}`,
       });
       row.addEventListener("click", () => {
@@ -2235,25 +2235,25 @@ export class JournalEditModal extends SteppedEditorModal {
       });
     }
 
-    const pane = wrap.createDiv({ cls: "almanac-wizard-pane" });
+    const pane = wrap.createDiv({ cls: "ca-wizard-pane" });
     const picked = new Set(this.chosen.get(active.key) ?? []);
-    const list = pane.createDiv({ cls: "almanac-wizard-checklist" });
+    const list = pane.createDiv({ cls: "ca-wizard-checklist" });
 
     for (const section of this.displayOrder(active)) {
-      const row = list.createDiv({ cls: "almanac-wizard-check" });
+      const row = list.createDiv({ cls: "ca-wizard-check" });
       const box = row.createEl("input", { type: "checkbox" });
       this.renderMoveArrows(row, active, section.id);
       box.checked = picked.has(section.id) || !!section.required;
       box.disabled = !!section.required;
-      const text = row.createDiv({ cls: "almanac-wizard-check-text" });
+      const text = row.createDiv({ cls: "ca-wizard-check-text" });
       text.createDiv({
-        cls: "almanac-wizard-check-label",
+        cls: "ca-wizard-check-label",
         text: `${section.icon} ${section.label}`,
       });
-      text.createDiv({ cls: "almanac-wizard-check-blurb", text: section.blurb });
+      text.createDiv({ cls: "ca-wizard-check-blurb", text: section.blurb });
       if (section.required) {
         text
-          .createDiv({ cls: "almanac-wizard-check-blurb" })
+          .createDiv({ cls: "ca-wizard-check-blurb" })
           .setText("Always included — it carries the title and tracker grid.");
       }
       box.addEventListener("change", () => {
@@ -2349,7 +2349,7 @@ export class JournalEditModal extends SteppedEditorModal {
     // NOTHING MOVES ABOVE THE BANNER, and this is a correctness rule rather
     // than a convention about where a title looks best.
     //
-    // The banner section's first block is `almanac:spacer`, which is documented
+    // The banner section's first block is `chronoanvil:spacer`, which is documented
     // as sitting on LINE 0 OF THE BODY so that a click at the top of the note
     // lands on it rather than inside the banner fence — which would render the
     // fence as raw source. Ordering that let a reader put Resources first would
@@ -2363,10 +2363,10 @@ export class JournalEditModal extends SteppedEditorModal {
     // rather than misleading (3.2 §4).
     const pinned = ids.filter((x) => byId.get(x)?.required).length;
     const locked = !!byId.get(id)?.required;
-    const wrap = row.createDiv({ cls: "almanac-wizard-arrows" });
+    const wrap = row.createDiv({ cls: "ca-wizard-arrows" });
     const arrow = (dir: -1 | 1, glyph: string, name: string): void => {
       const b = wrap.createEl("button", {
-        cls: "almanac-wizard-arrow",
+        cls: "ca-wizard-arrow",
         text: glyph,
         attr: { type: "button" },
       });
@@ -2400,14 +2400,14 @@ export class JournalEditModal extends SteppedEditorModal {
   // offered, and that one renders against a real note.
   private renderSchematic(host: HTMLElement, target: TemplateTarget): void {
     const chosen = new Set(this.chosen.get(target.key) ?? []);
-    const box = host.createDiv({ cls: "almanac-wizard-schematic" });
+    const box = host.createDiv({ cls: "ca-wizard-schematic" });
     box.createDiv({
-      cls: "almanac-wizard-schematic-title",
+      cls: "ca-wizard-schematic-title",
       text: `${target.file} — how it will be laid out`,
     });
-    const stack = box.createDiv({ cls: "almanac-wizard-blocks" });
+    const stack = box.createDiv({ cls: "ca-wizard-blocks" });
     stack.createDiv({
-      cls: "almanac-wizard-block is-frontmatter",
+      cls: "ca-wizard-block is-frontmatter",
       text: "Properties",
     });
     // Same order as the rows, which is the whole point of the preview: it is
@@ -2416,8 +2416,8 @@ export class JournalEditModal extends SteppedEditorModal {
       (s) => chosen.has(s.id) || s.required
     );
     for (const s of shown) {
-      const block = stack.createDiv({ cls: "almanac-wizard-block" });
-      block.createSpan({ cls: "almanac-wizard-block-icon", text: s.icon });
+      const block = stack.createDiv({ cls: "ca-wizard-block" });
+      block.createSpan({ cls: "ca-wizard-block-icon", text: s.icon });
       block.createSpan({ text: s.label });
     }
   }
@@ -2453,9 +2453,9 @@ export class JournalEditModal extends SteppedEditorModal {
   }
 
   private section(host: HTMLElement, title: string): HTMLElement {
-    const wrap = host.createDiv({ cls: "almanac-editor-section" });
+    const wrap = host.createDiv({ cls: "ca-editor-section" });
     wrap.createEl("h4", {
-      cls: "almanac-editor-section-title",
+      cls: "ca-editor-section-title",
       text: title,
     });
     return wrap;
@@ -2469,7 +2469,7 @@ export class JournalEditModal extends SteppedEditorModal {
     // clause a reader could name a journal "Study" and collide with a type that
     // was invisible to the check. Study is an ordinary stored journal now, so
     // the loop sees it like any other — and the clause had become a rule that
-    // the one journal Almanac ships is the one journal it will not let you
+    // the one journal ChronoAnvil ships is the one journal it will not let you
     // install. Starting from the Study preset failed validation on the Identity
     // step before the reader had touched anything.
     return !this.plugin.settings.customJournals.some(
@@ -2587,7 +2587,7 @@ export class JournalEditModal extends SteppedEditorModal {
       // thing to have standing between a misread sentence and a vanished
       // sidebar section.
       if (onDisk.length > 0) {
-        return `${shared} Give this one a different name, or delete ${cfg.name} from Settings → Almanac → Journals first.`;
+        return `${shared} Give this one a different name, or delete ${cfg.name} from Settings → ChronoAnvil → Journals first.`;
       }
       // FOLDERS GONE: the reported case, and the only one that gets an action.
       // Deleting here is safe in a way nothing else in this file is — there is
@@ -2729,7 +2729,7 @@ export class JournalEditModal extends SteppedEditorModal {
     );
     if (written) {
       new Notice(
-        `Almanac: updated ${written} dashboard${written === 1 ? "" : "s"} ✅`
+        `ChronoAnvil: updated ${written} dashboard${written === 1 ? "" : "s"} ✅`
       );
     }
   }
@@ -2783,7 +2783,7 @@ export class JournalEditModal extends SteppedEditorModal {
         );
         if (written.length) {
           new Notice(
-            `Almanac: wrote ${written.join(", ")} ✅`
+            `ChronoAnvil: wrote ${written.join(", ")} ✅`
           );
         }
         await this.offerDashboardCatchup(changes);
@@ -2842,7 +2842,7 @@ export class JournalEditModal extends SteppedEditorModal {
 
 export function openJournalEditor(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   cfg: JournalConfig,
   opts: {
     mode: JournalEditorMode;
@@ -2889,7 +2889,7 @@ class FolderEmojiModal extends EditorModal {
 
   constructor(
     app: App,
-    plugin: AlmanacPlugin,
+    plugin: ChronoAnvilPlugin,
     private onSave: () => Promise<void>
   ) {
     super(
@@ -2908,11 +2908,11 @@ class FolderEmojiModal extends EditorModal {
       .setDesc(
         "One “Name: emoji” per line. Study falls back to 📚 for a Subject and 📂 for a Topic; a custom journal falls back to whatever its level is set to."
       )
-      .setClass("almanac-editor-textarea")
+      .setClass("ca-editor-textarea")
       .addTextArea((c) => {
         c.setValue(this.text);
         c.inputEl.rows = 12;
-        c.inputEl.addClass("almanac-editor-mono");
+        c.inputEl.addClass("ca-editor-mono");
         c.onChange((v) => {
           this.text = v;
         });
@@ -2931,7 +2931,7 @@ class FolderEmojiModal extends EditorModal {
 
 export function openFolderEmojiEditor(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   onSave: () => Promise<void>
 ): void {
   new FolderEmojiModal(app, plugin, onSave).open();
@@ -2946,7 +2946,7 @@ export function rowButton(
   onClick: () => void,
   opts: { disabled?: boolean; danger?: boolean } = {}
 ): HTMLElement {
-  const btn = host.createEl("button", { cls: "almanac-list-btn" });
+  const btn = host.createEl("button", { cls: "ca-list-btn" });
   setIcon(btn, icon);
   btn.setAttribute("aria-label", tooltip);
   btn.setAttribute("title", tooltip);

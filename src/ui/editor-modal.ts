@@ -7,7 +7,7 @@
 
 // The shared editor-modal chrome.
 //
-// Every list-managed thing in Almanac — a tracker, a journal type, a chart —
+// Every list-managed thing in ChronoAnvil — a tracker, a journal type, a chart —
 // is edited in a window of the same shape: a title, an optional subtitle, a
 // body of fields that some of those fields re-render, an error line, and a
 // Cancel/Save footer where Save is the CTA and Enter submits.
@@ -26,7 +26,7 @@
 // each other, which is the whole argument for the second class being here.
 
 import { App, Modal } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 
 // Why a save was refused, and — where there is one — the thing that would fix it.
 //
@@ -75,7 +75,7 @@ export abstract class EditorModal extends Modal {
   // one cannot recurse; the trap is gone rather than commented.
   constructor(
     app: App,
-    protected plugin: AlmanacPlugin,
+    protected plugin: ChronoAnvilPlugin,
     protected readonly baseHeading: string,
     protected readonly baseSubtitle: string,
     protected readonly saveLabel: string
@@ -85,18 +85,18 @@ export abstract class EditorModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
-    contentEl.addClass("almanac-editor-modal");
+    contentEl.addClass("ca-editor-modal");
 
-    this.headEl = contentEl.createDiv({ cls: "almanac-editor-head" });
+    this.headEl = contentEl.createDiv({ cls: "ca-editor-head" });
     this.renderHead();
 
-    this.body = contentEl.createDiv({ cls: "almanac-editor-body" });
+    this.body = contentEl.createDiv({ cls: "ca-editor-body" });
     this.renderBody();
 
-    this.errorEl = contentEl.createDiv({ cls: "almanac-editor-error" });
+    this.errorEl = contentEl.createDiv({ cls: "ca-editor-error" });
     this.errorEl.hide();
 
-    this.footerEl = contentEl.createDiv({ cls: "almanac-editor-footer" });
+    this.footerEl = contentEl.createDiv({ cls: "ca-editor-footer" });
     this.renderFooter(this.footerEl);
 
     // Enter submits, but only from a single-line text field. Deliberately
@@ -124,7 +124,7 @@ export abstract class EditorModal extends Modal {
     head.createEl("h3", { text: this.headingText() });
     const sub = this.subtitleText();
     if (sub) {
-      head.createEl("p", { cls: "almanac-editor-subtitle", text: sub });
+      head.createEl("p", { cls: "ca-editor-subtitle", text: sub });
     }
     this.decorateHead(head);
   }
@@ -197,7 +197,7 @@ export abstract class EditorModal extends Modal {
     const { message, action } =
       typeof problem === "string" ? { message: problem, action: undefined } : problem;
     this.errorEl.empty();
-    this.errorEl.createDiv({ cls: "almanac-editor-error-text", text: message });
+    this.errorEl.createDiv({ cls: "ca-editor-error-text", text: message });
     this.errorEl.show();
     if (!action) return;
 
@@ -209,7 +209,7 @@ export abstract class EditorModal extends Modal {
     // form working normally rather than a case anybody has to write.
     const btn = this.errorEl.createEl("button", {
       text: action.label,
-      cls: "almanac-editor-error-action",
+      cls: "ca-editor-error-action",
     });
     btn.addEventListener("click", () => {
       void (async () => {
@@ -220,7 +220,7 @@ export abstract class EditorModal extends Modal {
         try {
           await action.run();
         } catch (err) {
-          console.error("Almanac: error action failed", err);
+          console.error("ChronoAnvil: error action failed", err);
           this.showError(this.commitFailureMessage());
           return;
         }
@@ -253,7 +253,7 @@ export abstract class EditorModal extends Modal {
     try {
       await this.commit();
     } catch (err) {
-      console.error("Almanac: save failed", err);
+      console.error("ChronoAnvil: save failed", err);
       this.showError(this.commitFailureMessage());
       return;
     }
@@ -378,14 +378,14 @@ export abstract class SteppedEditorModal extends EditorModal {
   // go back and look without losing the ones after it.
   protected decorateHead(head: HTMLElement): void {
     if (!this.showsSteps) return;
-    const rail = head.createDiv({ cls: "almanac-wizard-rail" });
+    const rail = head.createDiv({ cls: "ca-wizard-rail" });
     this.stepList().forEach((s, i) => {
       const pip = rail.createDiv({
-        cls: `almanac-wizard-pip${i === this.step ? " is-current" : ""}${
+        cls: `ca-wizard-pip${i === this.step ? " is-current" : ""}${
           i < this.step ? " is-done" : ""
         }`,
       });
-      pip.createSpan({ cls: "almanac-wizard-pip-n", text: String(i + 1) });
+      pip.createSpan({ cls: "ca-wizard-pip-n", text: String(i + 1) });
       pip.createSpan({ text: s.title });
       if (i < this.step) pip.addEventListener("click", () => this.goTo(i));
     });

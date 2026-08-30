@@ -21,7 +21,7 @@ import {
   Filler,
 } from "chart.js";
 import type { ChartConfiguration } from "chart.js";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import type { ChartRange, ChartScope, ChartType, TrackerDef } from "../trackers/trackers";
 import { CLASS_DEFS, diaryClassOf } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
@@ -73,7 +73,7 @@ import { countBodyTasks } from "../ui/tables";
 import { pagesUnder } from "../core/query";
 
 // ── Self-contained chart rendering ───────────────────────────────────────
-// Almanac reads its own daily-note frontmatter and draws the chart itself,
+// ChronoAnvil reads its own daily-note frontmatter and draws the chart itself,
 // rather than emitting a ```tracker block for the Tracker plugin to render.
 // The old delegation is why bounded ranges (30/90/365/period) showed nothing:
 // Tracker re-parsed the window date itself and, per timezone/locale, dropped
@@ -181,7 +181,7 @@ function pointDate(grain: TrackerClass, captured: string): string | null {
 
 interface RenderArgs {
   app: App;
-  plugin: AlmanacPlugin;
+  plugin: ChronoAnvilPlugin;
   def: TrackerDef;
   type: Exclude<ChartType, "none">;
   scope: ChartScope;
@@ -203,7 +203,7 @@ export type ChartTeardown = (() => void) | null;
 // Null for anything unparseable, so a blank/garbage entry is simply absent.
 //
 // ── why the boolean branch exists ─────────────────────────────────────────
-// Almanac's own habit checkbox writes 1 and 0, never true/false, and does so
+// ChronoAnvil's own habit checkbox writes 1 and 0, never true/false, and does so
 // deliberately (see widgets.ts::buildCheckbox: a number averages to a
 // completion rate and shows as a tidy column in Diary.base). So on the write
 // path a habit is always a number and this branch is dead.
@@ -267,12 +267,12 @@ export function toValue(def: TrackerDef, raw: unknown): number | null {
 // the user starting a second monthly tracker to get the same twelve points.
 // Exported since 2.57.0 so `bridge-readings:` reads the tracker series through
 // this function rather than walking the diary folders itself. A second reader
-// would be the `taskCounts`/`countAlmanacTasks` split again: two answers to
+// would be the `taskCounts`/`countChronoAnvilTasks` split again: two answers to
 // "what did this tracker read that day", agreeing until one of them learns
 // about `daily-by-month` or a value coercion and the other does not.
 export function collectPoints(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   def: TrackerDef,
   scope: ChartScope = "daily"
 ): ChartPoint[] {
@@ -379,15 +379,15 @@ function renderLineOrBar(
   }
   ensureChartJs();
 
-  body.addClass("am-chart-canvas");
-  const wrap = body.createDiv({ cls: "journal-chart-canvas-wrap" });
+  body.addClass("ca-chart-canvas");
+  const wrap = body.createDiv({ cls: "ca-journal-chart-canvas-wrap" });
   const canvas = wrap.createEl("canvas");
 
   const accent = cssVar(body, "--interactive-accent", "#6c8cff");
   // The second series' colour. A token rather than a hard-coded hue, defined in
   // 00-tokens.css beside the mood and activity palettes, so a theme can move it
   // and so the guard in test/tokens.test.ts can see it is defined at all.
-  const accent2 = cssVar(body, "--am-chart-series-2", "#d99b3f");
+  const accent2 = cssVar(body, "--ca-chart-series-2", "#d99b3f");
   const gridColor = cssVar(body, "--background-modifier-border", "rgba(140,140,160,0.25)");
   const textColor = cssVar(body, "--text-muted", "#9aa0aa");
   const isBar = args.type === "bar";
@@ -614,11 +614,11 @@ function renderSummary(args: RenderArgs, points: ChartPoint[]): ChartTeardown {
   const unit = def.unit ? ` ${def.unit}` : "";
   const fmt = (v: number): string => (isTime ? formatClock(v) : `${round(v)}${unit}`);
 
-  const grid = body.createDiv({ cls: "journal-chart-summary" });
+  const grid = body.createDiv({ cls: "ca-journal-chart-summary" });
   const stat = (label: string, value: string): void => {
-    const cell = grid.createDiv({ cls: "journal-chart-stat" });
-    cell.createDiv({ cls: "journal-chart-stat-value", text: value });
-    cell.createDiv({ cls: "journal-chart-stat-label", text: label });
+    const cell = grid.createDiv({ cls: "ca-journal-chart-stat" });
+    cell.createDiv({ cls: "ca-journal-chart-stat-value", text: value });
+    cell.createDiv({ cls: "ca-journal-chart-stat-label", text: label });
   };
   stat("Average", fmt(stats.avg));
   stat("Min", fmt(stats.min));
@@ -664,8 +664,8 @@ function renderScatter(args: RenderArgs, pairs: ScatterPoint[]): ChartTeardown {
   }
   ensureChartJs();
 
-  body.addClass("am-chart-canvas");
-  const wrap = body.createDiv({ cls: "journal-chart-canvas-wrap" });
+  body.addClass("ca-chart-canvas");
+  const wrap = body.createDiv({ cls: "ca-journal-chart-canvas-wrap" });
   const canvas = wrap.createEl("canvas");
 
   const accent = cssVar(body, "--interactive-accent", "#6c8cff");
@@ -780,7 +780,7 @@ function renderScatter(args: RenderArgs, pairs: ScatterPoint[]): ChartTeardown {
   // rather than under it.
   if (stacked) {
     (body.parentElement ?? body).createDiv({
-      cls: "journal-chart-note",
+      cls: "ca-journal-chart-note",
       text: "Repeated readings merge into one dot — bigger means more entries.",
     });
   }
@@ -807,11 +807,11 @@ function renderStreak(args: RenderArgs, points: ChartPoint[]): ChartTeardown {
   const s = streakStats(points);
   const rate = Math.round((s.total / points.length) * 100);
 
-  const grid = body.createDiv({ cls: "journal-chart-summary" });
+  const grid = body.createDiv({ cls: "ca-journal-chart-summary" });
   const stat = (label: string, value: string): void => {
-    const cell = grid.createDiv({ cls: "journal-chart-stat" });
-    cell.createDiv({ cls: "journal-chart-stat-value", text: value });
-    cell.createDiv({ cls: "journal-chart-stat-label", text: label });
+    const cell = grid.createDiv({ cls: "ca-journal-chart-stat" });
+    cell.createDiv({ cls: "ca-journal-chart-stat-value", text: value });
+    cell.createDiv({ cls: "ca-journal-chart-stat-label", text: label });
   };
   const days = (n: number): string => `${n} day${n === 1 ? "" : "s"}`;
   stat("Current", days(s.current));
@@ -873,22 +873,22 @@ function renderHeatmap(
   const endM = moment(end);
   const totalDays = endM.diff(gridStart, "days");
 
-  body.addClass("am-chart-heatmap-body");
-  const wrap = body.createDiv({ cls: "journal-chart-heatmap-wrap" });
+  body.addClass("ca-chart-heatmap-body");
+  const wrap = body.createDiv({ cls: "ca-journal-chart-heatmap-wrap" });
 
   // Weekday header (single letters), rotated to the week-start and aligned to
   // the same 7 columns.
-  const head = wrap.createDiv({ cls: "heat-weekdays" });
+  const head = wrap.createDiv({ cls: "ca-heat-weekdays" });
   for (let k = 0; k < 7; k++) {
-    head.createDiv({ cls: "heat-weekday", text: WEEKDAY_INITIALS[(ws + k) % 7] });
+    head.createDiv({ cls: "ca-heat-weekday", text: WEEKDAY_INITIALS[(ws + k) % 7] });
   }
 
-  const grid = wrap.createDiv({ cls: "journal-chart-heatmap" });
+  const grid = wrap.createDiv({ cls: "ca-journal-chart-heatmap" });
 
   for (let i = 0; i <= totalDays; i++) {
     const d = gridStart.clone().add(i, "days");
     const iso = d.format("YYYY-MM-DD");
-    const cell = grid.createDiv({ cls: "journal-chart-heat-cell" });
+    const cell = grid.createDiv({ cls: "ca-journal-chart-heat-cell" });
     cell.style.gridColumn = String(daysSinceWeekStart(d.day(), ws) + 1);
     cell.style.gridRow = String(Math.floor(i / 7) + 1);
 
@@ -900,7 +900,7 @@ function renderHeatmap(
     const value = byDate.get(iso);
     if (value == null) cell.addClass("is-empty");
     else {
-      cell.addClass(`am-heat-${moodBucket(value, { min: lo, max: hi }) ?? 1}`);
+      cell.addClass(`ca-heat-${moodBucket(value, { min: lo, max: hi }) ?? 1}`);
     }
 
     // Link the cell to its daily note when one exists — filled days always have
@@ -925,7 +925,7 @@ function renderHeatmap(
 // tests/determinism.
 export interface RenderChartOptions {
   app: App;
-  plugin: AlmanacPlugin;
+  plugin: ChronoAnvilPlugin;
   def: TrackerDef;
   type: ChartType;
   range: ChartRange;
@@ -1007,7 +1007,7 @@ export function collectJournalPoints(
 
 export function renderJournalTrend(args: {
   app: App;
-  plugin: AlmanacPlugin;
+  plugin: ChronoAnvilPlugin;
   def: TrackerDef;
   folder: string;
   kinds: string[];
@@ -1170,7 +1170,7 @@ export interface RenderedChart {
 // open/completed task counts. Aggregation/windowing is the pure aggregateActivity.
 //
 // Task counts come from each note's *body* (countBodyTasks), not the metadata
-// cache: an Almanac `- ( )` checkbox is invisible to the listItems cache
+// cache: a ChronoAnvil `- ( )` checkbox is invisible to the listItems cache
 // wherever it sits, and a reader may write tasks in a note's prose as well as
 // inside its `tasks:` region. Reading bodies is async, so this returns a
 // promise and the grid builds once it resolves.
@@ -1191,7 +1191,7 @@ async function collectActivityRows(
     if (!date) continue;
     const { open, done } = countBodyTasks(await app.vault.cachedRead(f));
     // `notes: 1` — the subject Activity heatmap and the Journals strip share
-    // aggregateActivity and the `--am-act-*` ramp, so they have to agree that a
+    // aggregateActivity and the `--ca-act-*` ramp, so they have to agree that a
     // dated note is activity. One of the two counting it would mean a shade
     // meant different amounts of work in two places (3.12.1).
     rows.push({ date, open, done, notes: 1 });
@@ -1231,17 +1231,17 @@ function drawMonthGrid(
 
   // Leading blanks so day 1 lands in its true weekday column.
   for (let i = 0; i < lead; i++) {
-    grid.createDiv({ cls: "journal-act-cell is-out" });
+    grid.createDiv({ cls: "ca-journal-act-cell is-out" });
   }
 
   for (let d = 1; d <= daysInMonth; d++) {
     const iso = `${month}-${String(d).padStart(2, "0")}`;
-    const cell = grid.createDiv({ cls: "journal-act-cell", text: String(d) });
+    const cell = grid.createDiv({ cls: "ca-journal-act-cell", text: String(d) });
     const row = byDate.get(iso);
     const total = row ? activityWeight(row) : 0;
     const bucket = activityBucket(total, max);
     if (bucket == null) cell.addClass("is-empty");
-    else cell.addClass(`am-act-${bucket}`);
+    else cell.addClass(`ca-act-${bucket}`);
 
     // With three months on screen at once, "which square is now" stops being
     // obvious the way it was on a single current-month grid — the quarter you
@@ -1283,8 +1283,8 @@ export function renderActivityChart(opts: {
   confidence?: { avg: string; count: number } | null;
 }): RenderedChart {
   const { app, scopeFolder, onQuarterChange, confidence } = opts;
-  const host = createDiv({ cls: "journal-activity-heatmap" });
-  const loading = host.createDiv({ cls: "journal-chart-empty", text: "Loading task activity…" });
+  const host = createDiv({ cls: "ca-journal-activity-heatmap" });
+  const loading = host.createDiv({ cls: "ca-journal-chart-empty", text: "Loading task activity…" });
 
   const todayIso = opts.today ?? moment().format("YYYY-MM-DD");
   const currentMonth = todayIso.slice(0, 7);
@@ -1305,17 +1305,17 @@ export function renderActivityChart(opts: {
     if (quarter < bounds.first) quarter = bounds.first;
     if (quarter > bounds.last) quarter = bounds.last;
 
-    const head = host.createDiv({ cls: "journal-act-head" });
-    const stats = head.createDiv({ cls: "journal-act-stats" });
-    const nav = head.createDiv({ cls: "journal-act-nav" });
+    const head = host.createDiv({ cls: "ca-journal-act-head" });
+    const stats = head.createDiv({ cls: "ca-journal-act-stats" });
+    const nav = head.createDiv({ cls: "ca-journal-act-nav" });
     const prev = nav.createEl("button", {
-      cls: "journal-act-arrow",
+      cls: "ca-journal-act-arrow",
       attr: { "aria-label": "Previous quarter", type: "button" },
     });
     setIcon(prev, "chevron-left");
-    const title = nav.createDiv({ cls: "journal-act-period" });
+    const title = nav.createDiv({ cls: "ca-journal-act-period" });
     const next = nav.createEl("button", {
-      cls: "journal-act-arrow",
+      cls: "ca-journal-act-arrow",
       attr: { "aria-label": "Next quarter", type: "button" },
     });
     setIcon(next, "chevron-right");
@@ -1325,37 +1325,37 @@ export function renderActivityChart(opts: {
     // three would only line up while every month began on the same weekday,
     // which is to say almost never.
     const ws = weekStartDay();
-    const months = host.createDiv({ cls: "journal-act-months" });
+    const months = host.createDiv({ cls: "ca-journal-act-months" });
     const panels = [0, 1, 2].map(() => {
-      const panel = months.createDiv({ cls: "journal-act-panel" });
-      const caption = panel.createDiv({ cls: "journal-act-panel-title" });
-      const weekdays = panel.createDiv({ cls: "journal-act-weekdays" });
+      const panel = months.createDiv({ cls: "ca-journal-act-panel" });
+      const caption = panel.createDiv({ cls: "ca-journal-act-panel-title" });
+      const weekdays = panel.createDiv({ cls: "ca-journal-act-weekdays" });
       for (let k = 0; k < 7; k++) {
         weekdays.createDiv({
-          cls: "journal-act-weekday",
+          cls: "ca-journal-act-weekday",
           text: WEEKDAY_INITIALS[(ws + k) % 7],
         });
       }
-      const grid = panel.createDiv({ cls: "journal-act-grid" });
+      const grid = panel.createDiv({ cls: "ca-journal-act-grid" });
       return { panel, caption, grid };
     });
 
-    const legend = host.createDiv({ cls: "journal-act-legend" });
-    legend.createSpan({ cls: "journal-act-legend-text", text: "Less" });
-    legend.createDiv({ cls: "journal-act-cell is-empty" });
+    const legend = host.createDiv({ cls: "ca-journal-act-legend" });
+    legend.createSpan({ cls: "ca-journal-act-legend-text", text: "Less" });
+    legend.createDiv({ cls: "ca-journal-act-cell is-empty" });
     for (let b = 1; b <= 4; b++) {
-      legend.createDiv({ cls: `journal-act-cell am-act-${b}` });
+      legend.createDiv({ cls: `ca-journal-act-cell ca-act-${b}` });
     }
-    legend.createSpan({ cls: "journal-act-legend-text", text: "More" });
+    legend.createSpan({ cls: "ca-journal-act-legend-text", text: "More" });
 
     const paint = (): void => {
       const s = quarterActivityStats(rows, quarter);
       title.setText(`${quarter.slice(5)} ${quarter.slice(0, 4)}`);
       stats.empty();
       const stat = (value: string, label: string): void => {
-        const cell = stats.createDiv({ cls: "journal-act-stat" });
-        cell.createSpan({ cls: "journal-act-stat-value", text: value });
-        cell.createSpan({ cls: "journal-act-stat-label", text: label });
+        const cell = stats.createDiv({ cls: "ca-journal-act-stat" });
+        cell.createSpan({ cls: "ca-journal-act-stat-value", text: value });
+        cell.createSpan({ cls: "ca-journal-act-stat-label", text: label });
       };
       // The rail carries two different scopes: confidence is a lifetime average
       // across the whole subject, while the task counts belong to the quarter on
@@ -1365,7 +1365,7 @@ export function renderActivityChart(opts: {
       if (confidence) {
         stat(`${confidence.avg}/5`, "avg confidence");
         stat(String(confidence.count), confidence.count === 1 ? "lesson" : "lessons");
-        stats.createDiv({ cls: "journal-act-stat-sep" });
+        stats.createDiv({ cls: "ca-journal-act-stat-sep" });
       }
       stat(String(s.activeDays), s.activeDays === 1 ? "active day" : "active days");
       stat(String(s.open), "open");

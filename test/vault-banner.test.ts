@@ -18,8 +18,14 @@ import {
   hasBanner,
   titleTargetFor,
 } from "../src/core/banner-scope";
-import { bannerSuppressed, initialsOf } from "../src/ui/vault-banner";
-import type AlmanacPlugin from "../src/main";
+import { bannerSuppressed } from "../src/ui/vault-banner";
+import {
+  BRAND_ICON_ID,
+  BRAND_ICON_PATHS,
+  BRAND_ICON_STROKE,
+  BRAND_ICON_SVG,
+} from "../src/ui/brand-icon";
+import type ChronoAnvilPlugin from "../src/main";
 
 // ── the vault banner (4.51) ───────────────────────────────────────────────
 //
@@ -40,7 +46,7 @@ const scope = (over: Partial<BannerScope> = {}): BannerScope => ({
 
 describe("bannerSurfaceOf", () => {
   it("gives a note outside everything no banner at all", () => {
-    // ALMANAC NOTES ONLY, which was the decision (4.51, Q10 sibling): chrome on
+    // CHRONOANVIL NOTES ONLY, which was the decision (4.51, Q10 sibling): chrome on
     // a note the plugin has nothing to say about is a plugin behaving like a
     // vault skin.
     expect(bannerSurfaceOf("Inbox/Some thought.md", scope())).toBeNull();
@@ -61,7 +67,7 @@ describe("bannerSurfaceOf", () => {
 
   it("covers the Search note as well as the homepage", () => {
     // TWO FLAT DASHBOARDS, NOT ONE (4.51.3). The field was called `home` and
-    // Search — a page Almanac composes, with Almanac's own banner on it — was
+    // Search — a page ChronoAnvil composes, with ChronoAnvil's own banner on it — was
     // outside the bar entirely.
     expect(bannerSurfaceOf("00 - Infrastructure/Search.md", scope())).toBe("home");
   });
@@ -163,32 +169,97 @@ describe("titleTargetFor", () => {
   });
 });
 
-describe("initialsOf", () => {
-  it("takes two initials from a two-word vault name", () => {
-    expect(initialsOf("Second Brain")).toBe("SB");
+describe("the mark on the tile", () => {
+  // The tile used to show two initials taken from the vault's folder name.
+  // They said nothing about this plugin, on the one square in the interface
+  // whose whole job is to say which plugin this is — and the square is the
+  // button that opens ChronoAnvil's settings. It draws the mark now.
+
+  it("never leaves the tile empty", () => {
+    // The guarantee the initials existed to make, kept by other means: the
+    // tile is a fixed square with an accent background, so nothing in it is a
+    // coloured hole in the corner of every note. Either a glyph or the mark.
+    const src = readSrc("vault-banner");
+    expect(src).toContain("if (glyph) tile.setText(glyph);");
+    expect(src).toContain(`else setIcon(tile, BRAND_ICON_ID);`);
   });
 
-  it("takes the first two letters of a single word", () => {
-    expect(initialsOf("notes")).toBe("NO");
+  it("registers the mark before the ribbon asks for it", () => {
+    // addRibbonIcon with an unregistered id renders nothing at all — no
+    // button, no error. Order is the whole contract.
+    const main = readSrc("main");
+    expect(main.indexOf("registerBrandIcon()")).toBeGreaterThan(-1);
+    expect(main.indexOf("registerBrandIcon()")).toBeLessThan(
+      main.indexOf(`addRibbonIcon(BRAND_ICON_ID`)
+    );
   });
 
-  it("reads underscores and hyphens as word breaks", () => {
-    expect(initialsOf("second_brain")).toBe("SB");
-    expect(initialsOf("second-brain")).toBe("SB");
+  it("draws one mark for the ribbon and the tile, not two", () => {
+    // Two copies drift. If either of these stops pointing at brand-icon.ts,
+    // the ribbon and the banner are free to disagree about what the product
+    // looks like.
+    expect(readSrc("main")).toContain('from "./ui/brand-icon"');
+    expect(readSrc("vault-banner")).toContain('from "./brand-icon"');
+    expect(BRAND_ICON_ID).toBe("chronoanvil-mark");
   });
 
-  it("never returns an empty tile", () => {
-    // The tile is a fixed square with a background. Empty is a coloured hole in
-    // the corner of every note, and it is reachable — a vault whose name is a
-    // single emoji or whitespace.
-    expect(initialsOf("")).toBe("AL");
-    expect(initialsOf("   ")).toBe("AL");
+  it("is stroke-only so it inherits whatever colour it is drawn in", () => {
+    // One drawing serves an accent-filled tile and a ribbon button on the
+    // sidebar's ground. A fill would need two.
+    expect(BRAND_ICON_SVG).toContain('fill="none"');
+    expect(BRAND_ICON_SVG).toContain('stroke="currentColor"');
+    expect(BRAND_ICON_SVG).not.toContain('fill="#');
+  });
+
+  it("carries the stroke weight the mark was drawn for", () => {
+    expect(BRAND_ICON_STROKE).toBe(1.5);
+    expect(BRAND_ICON_SVG).toContain(`stroke-width="1.5"`);
+  });
+
+  it("scales the 24-grid drawing onto the 100 grid addIcon renders on", () => {
+    // Authored at 24 to match the Lucide icons it sits beside; rendered at 100
+    // because that is the box addIcon draws into. Getting this wrong shows up
+    // as a mark that is a quarter of the size of every icon around it.
+    expect(BRAND_ICON_SVG).toContain("transform=\"scale(4.1667)\"");
+  });
+
+  it("sits centred on the grid", () => {
+    // An anvil is bottom-heavy, and drawn naively it hangs low in its box —
+    // invisible on a specimen sheet, obvious in a 32px tile next to text.
+    const ys: number[] = [];
+    for (const d of BRAND_ICON_PATHS) {
+      for (const m of d.matchAll(/-?\d+(?:\.\d+)?/g)) ys.push(Number(m[0]));
+    }
+    // Every coordinate in these paths is absolute and inside the grid.
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(24);
+  });
+
+  it("keeps the drawing inside Lucide's safe area", () => {
+    // 2..22. Outside it the mark crowds the icons above and below it in the
+    // ribbon, which is the one place it cannot be adjusted per-site.
+    const verticals = [4, 6.5, 9, 12.75, 16.5, 20];
+    expect(Math.min(...verticals)).toBeGreaterThanOrEqual(2);
+    expect(Math.max(...verticals)).toBeLessThanOrEqual(22);
+    // ...and centred on it: the mark spans 4..20, whose midpoint is the grid's.
+    expect((Math.min(...verticals) + Math.max(...verticals)) / 2).toBe(12);
+  });
+
+  it("is three parts: slab, hourglass waist, flared base", () => {
+    expect(BRAND_ICON_PATHS).toHaveLength(3);
+    for (const d of BRAND_ICON_PATHS) expect(d.trimEnd().endsWith("Z")).toBe(true);
+  });
+
+  it("no longer offers the vault's initials", () => {
+    const src = readSrc("vault-banner");
+    expect(src).not.toContain("initialsOf");
+    expect(readSrc("settings")).not.toContain("initialsOf");
   });
 });
 
 // ── the in-note banners going quiet ──────────────────────────────────────
 
-const fakePlugin = (enabled: boolean): AlmanacPlugin =>
+const fakePlugin = (enabled: boolean): ChronoAnvilPlugin =>
   ({
     settings: {
       banner: { enabled, glyph: "", absorb: true },
@@ -202,7 +273,7 @@ const fakePlugin = (enabled: boolean): AlmanacPlugin =>
       },
       customJournals: [{ root: "03 - Journals/Study" }],
     },
-  }) as unknown as AlmanacPlugin;
+  }) as unknown as ChronoAnvilPlugin;
 
 describe("bannerSuppressed", () => {
   it("silences the in-note header wherever the vault banner draws one", () => {
@@ -228,7 +299,7 @@ describe("bannerSuppressed", () => {
     // function answers "which folders", and the two callers that must agree
     // both ask it.
     const t = readSrc("vault-banner");
-    expect(t).toContain("export function bannerScopeOf(plugin: AlmanacPlugin)");
+    expect(t).toContain("export function bannerScopeOf(plugin: ChronoAnvilPlugin)");
     expect(t).toContain("bannerSurfaceOf(file.path, bannerScopeOf(this.plugin))");
     expect(t).toContain("bannerSurfaceOf(path, bannerScopeOf(plugin))");
     // And nowhere a second reading of the five diary fields.
@@ -276,7 +347,7 @@ describe("the in-note header defers to the bar", () => {
     // THE FIRST FIX WAS WORSE THAN THE FAULT. 4.51 suppressed by returning
     // `null` from the widget's case — and `null` from a case is how that loop
     // is told a directive is UNKNOWN, so a suppressed banner rendered a red
-    // *"Unknown Almanac widget: journal-header"* where the banner had been.
+    // *"Unknown ChronoAnvil widget: journal-header"* where the banner had been.
     //
     // A suppressed banner is not a directive that failed; it is a line with
     // nothing to draw. So it is answered where the fence's lines are CHOSEN,
@@ -284,7 +355,7 @@ describe("the in-note header defers to the bar", () => {
     //
     // ASSERTED AS A SHAPE, NOT AS TWO POSITIONS. `readSrc` concatenates a split
     // module in filename order, which it warns is *"not meaningful"* — and
-    // "Unknown Almanac widget" is a string this directory holds more than one
+    // "Unknown ChronoAnvil widget" is a string this directory holds more than one
     // copy of, so an `indexOf` pair here compares the wrong two.
     const t = readSrc("widgets");
     // What the fence still drops is what the BAR draws, upstream of any build…
@@ -362,7 +433,7 @@ describe("the in-note header defers to the bar", () => {
     const t = readSrc("entryheader");
     expect(t).toContain("titleElsewhere = false");
     expect(t).toMatch(/if \(titleElsewhere\) \{[\s\S]{0,600}?buildEntryNav\(plugin, bar, file, c\);\s*\n\s*return bar;/);
-    expect(readCss()).toContain(".journal-entry-context.jec-nav-only");
+    expect(readCss()).toContain(".ca-journal-entry-context.ca-jec-nav-only");
   });
 
   it("quietens the spacer without deleting it", () => {
@@ -372,11 +443,11 @@ describe("the in-note header defers to the bar", () => {
     // it rendering as raw source. Removing it trades a doubled rule for that.
     const t = readSrc("controls");
     expect(t).toContain("export function buildSpacer(quiet = false)");
-    expect(t).toContain('if (!quiet) wrap.createSpan({ cls: "journal-spacer-mark"');
+    expect(t).toContain('if (!quiet) wrap.createSpan({ cls: "ca-journal-spacer-mark"');
     expect(readSrc("widgets")).toContain(
       "buildSpacer(bannerSuppressed(this.plugin, ctx.sourcePath))"
     );
-    expect(readCss()).toContain(".journal-spacer.is-quiet");
+    expect(readCss()).toContain(".ca-journal-spacer.is-quiet");
   });
 
   it("keeps the directives in the section catalogues", () => {
@@ -539,10 +610,10 @@ describe("the bar's own anatomy", () => {
     // So the trail's tail is a BREADCRUMB again — it says where you are, in
     // text, and nothing on the bar renames anything.
     const t = banner();
-    expect(t).toContain('const trail = root.createDiv({ cls: "avb-trail" });');
-    expect(t).toContain('.createDiv({ cls: "avb-here" })');
+    expect(t).toContain('const trail = root.createDiv({ cls: "ca-avb-trail" });');
+    expect(t).toContain('.createDiv({ cls: "ca-avb-here" })');
     expect(t).toContain(
-      '.createSpan({ cls: "avb-here-text", text: this.hereText(file, surface) });'
+      '.createSpan({ cls: "ca-avb-here-text", text: this.hereText(file, surface) });'
     );
     expect(t).not.toContain('cls: "avb-titlerow"');
     // The calls, not the words — the comment where the title used to be built
@@ -555,15 +626,15 @@ describe("the bar's own anatomy", () => {
     // NOT TIDINESS, AND THE REASON OUTLIVED THE BAR'S TITLE. `attachNoteRename`
     // EMPTIES the element it is given when the reader clicks to edit — which is
     // why the name could never be the trail itself, and why the head hands it a
-    // `.jph-title` of its own rather than the row holding the eyebrow.
+    // `.ca-jph-title` of its own rather than the row holding the eyebrow.
     const t = readSrc("page-head");
-    expect(t).toContain('const row = root.createDiv({ cls: "jph-titlerow" });');
-    expect(t).toContain('attachNoteRename(app, row, file, "jph-title");');
+    expect(t).toContain('const row = root.createDiv({ cls: "ca-jph-titlerow" });');
+    expect(t).toContain('attachNoteRename(app, row, file, "ca-jph-title");');
     // …and the eyebrow is on the head, ABOVE that row, so an edit that empties
     // the title cannot take "Daily entry" with it.
-    const eyebrow = t.indexOf('cls: "jph-eyebrow"');
+    const eyebrow = t.indexOf('cls: "ca-jph-eyebrow"');
     expect(eyebrow).toBeGreaterThan(0);
-    expect(t.indexOf('cls: "jph-titlerow"')).toBeGreaterThan(eyebrow);
+    expect(t.indexOf('cls: "ca-jph-titlerow"')).toBeGreaterThan(eyebrow);
     expect(readSrc("header-title")).toContain("row.empty();");
   });
 
@@ -597,8 +668,8 @@ describe("the bar's own anatomy", () => {
     // place on the bar that names the surface — and on a journal it names the
     // JOURNAL, not the word.
     const t = banner();
-    expect(t).toContain('idText.createDiv({ cls: "avb-id-name", text: this.app.vault.getName() });');
-    expect(t).toContain('cls: "avb-id-sub", text: this.surfaceName(file, surface)');
+    expect(t).toContain('idText.createDiv({ cls: "ca-avb-id-name", text: this.app.vault.getName() });');
+    expect(t).toContain('cls: "ca-avb-id-sub", text: this.surfaceName(file, surface)');
     expect(t).toContain("if (type) return type.name;");
   });
 
@@ -647,13 +718,13 @@ describe("the settings rows", () => {
     // stranded cursor and a mis-measured scroll, which this feature is nowhere
     // near worth.
     const css = readCss();
-    const at = css.indexOf(".am-absorb-host-chrome .inline-title,");
+    const at = css.indexOf(".ca-absorb-host-chrome .inline-title,");
     expect(at).toBeGreaterThan(0);
     const rule = css.slice(at, css.indexOf("}", at));
     // THE PANEL IS THE 4.51.6 HALF. The title moved to the page head and the
     // properties moved into a window; leaving Obsidian's own panel drawn would
     // give the reader six rows of the thing the button was supposed to absorb.
-    expect(rule).toContain(".am-absorb-host-chrome .metadata-container");
+    expect(rule).toContain(".ca-absorb-host-chrome .metadata-container");
     expect(rule).toContain("visibility: hidden");
     expect(rule).not.toContain("display: none");
   });
@@ -664,15 +735,15 @@ describe("the settings rows", () => {
     // `02 - Diary / Daily / Day-2026-08-20`, and the head says the date again.
     //
     // Only the LABEL goes. The arrows, the mode toggle and Obsidian's own ⋯ are
-    // in that bar too and Almanac replaces none of them — and `display` is
+    // in that bar too and ChronoAnvil replaces none of them — and `display` is
     // allowed here precisely because a static label is not an editable region
     // CodeMirror measures, which is the whole reason the two rules above use
     // `visibility`.
     const css = readCss();
-    const at = css.indexOf(".am-absorb-host-chrome .view-header-title-container {");
+    const at = css.indexOf(".ca-absorb-host-chrome .view-header-title-container {");
     expect(at).toBeGreaterThan(0);
     expect(css.slice(at, css.indexOf("}", at))).toContain("display: none");
-    expect(css).not.toContain(".am-absorb-host-chrome .view-header {");
+    expect(css).not.toContain(".ca-absorb-host-chrome .view-header {");
   });
 
   it("caps the tile where it is typed", () => {
@@ -735,17 +806,17 @@ describe("the search window", () => {
 describe("the banner's stylesheet", () => {
   it("measures itself rather than the window", () => {
     // The collapse is at 330px OF BANNER (4.51, Q5). It is not inside
-    // `.journal-widget-block`, which is what every other `@container` rule in
+    // `.ca-journal-widget-block`, which is what every other `@container` rule in
     // styles/ resolves against, so it declares its own — otherwise the query
     // resolves against the viewport and a narrow split never collapses.
     const css = readCss();
-    const banner = css.slice(css.indexOf(".am-vault-banner {"));
+    const banner = css.slice(css.indexOf(".ca-vault-banner {"));
     expect(banner).toContain("container-type: inline-size");
     expect(banner).toContain("@container (max-width: 330px)");
   });
 
   it("drops the nav's words and keeps its icons", () => {
-    expect(readCss()).toContain(".am-vault-banner .avb-btn-label {\n    display: none;\n  }");
+    expect(readCss()).toContain(".ca-vault-banner .ca-avb-btn-label {\n    display: none;\n  }");
   });
 
   it("lets the search take the room rather than capping it", () => {
@@ -759,7 +830,7 @@ describe("the banner's stylesheet", () => {
     // `margin-right: auto` went with it: with nothing left to push, a rule that
     // only fires when the field is short is a rule waiting to be wrong.
     const css = readCss();
-    const at = css.indexOf(".am-vault-banner .avb-search {");
+    const at = css.indexOf(".ca-vault-banner .ca-avb-search {");
     const rule = css.slice(at, css.indexOf("}", at));
     expect(rule).toContain("flex: 1 1 auto");
     expect(rule).not.toMatch(/max-width/);
@@ -767,7 +838,7 @@ describe("the banner's stylesheet", () => {
     // And at the collapse it takes a row of its own — a field is the one
     // control here that is worse for being narrow.
     expect(css).toMatch(
-      /@container \(max-width: 330px\)[\s\S]*?\.avb-search \{[\s\S]*?flex: 1 0 100%;/
+      /@container \(max-width: 330px\)[\s\S]*?\.ca-avb-search \{[\s\S]*?flex: 1 0 100%;/
     );
   });
 
@@ -776,12 +847,12 @@ describe("the banner's stylesheet", () => {
     // on the argument that chrome should be quiet — and with no ground it read
     // as the note's first paragraph rather than as furniture above it.
     const css = readCss();
-    const bar = css.slice(css.indexOf(".am-vault-banner {"), css.indexOf(".am-vault-banner .avb-global"));
+    const bar = css.slice(css.indexOf(".ca-vault-banner {"), css.indexOf(".ca-vault-banner .ca-avb-global"));
     expect(bar).toContain("background: var(--background-secondary)");
     // A STRIP BETWEEN TWO TOOLBARS SINCE 4.51.3, so a bottom edge rather than a
     // card's four — and `flex: 0 0 auto`, because the leaf is a column flexbox
     // and the view below it is the part that grows.
-    expect(bar).toContain("border-bottom: var(--am-rule-hair) solid");
+    expect(bar).toContain("border-bottom: var(--ca-rule-hair) solid");
     expect(bar).toContain("flex: 0 0 auto");
   });
 
@@ -792,11 +863,11 @@ describe("the banner's stylesheet", () => {
     // margin — and a fixed one overflows the moment a reader turns *readable
     // line length* off, putting a horizontal scrollbar on every note.
     //
-    // ASKED OF THE BAR'S OWN RULE, not of the file: `.avb-id` pulls its hover
+    // ASKED OF THE BAR'S OWN RULE, not of the file: `.ca-avb-id` pulls its hover
     // target out over its own padding with a negative margin, which is inside
     // the bar and is not the thing this row is about.
     const css = readCss();
-    const at = css.indexOf(".am-vault-banner {");
+    const at = css.indexOf(".ca-vault-banner {");
     const bar = css.slice(at, css.indexOf("}", at));
     expect(bar).not.toContain("calc(-");
     expect(bar).not.toMatch(/margin[^;]*:\s*[^;]*\s-\d+px/);
@@ -808,7 +879,7 @@ describe("the banner's stylesheet", () => {
     // declarations one stylesheet later is how the two come to disagree about a
     // hover.
     const css = readCss();
-    expect(css).toContain(".jsh-crumbs a.jn-pill,\n.am-vault-banner .avb-trail a.jn-pill {");
+    expect(css).toContain(".ca-jsh-crumbs a.ca-jn-pill,\n.ca-vault-banner .ca-avb-trail a.ca-jn-pill {");
   });
 
   it("outlines the destinations without filling them", () => {
@@ -819,23 +890,23 @@ describe("the banner's stylesheet", () => {
     // own ground is a button's outline, a hairline around a second ground is a
     // card on a card.
     const css = readCss();
-    const at = css.indexOf(".am-vault-banner .avb-btn {");
+    const at = css.indexOf(".ca-vault-banner .ca-avb-btn {");
     expect(at).toBeGreaterThan(0);
     const rule = css.slice(at, css.indexOf("}", at));
     expect(rule).toContain("background: none");
     expect(rule).toContain(
-      "border: var(--am-rule-hair) solid var(--background-modifier-border)"
+      "border: var(--ca-rule-hair) solid var(--background-modifier-border)"
     );
     // The ground appears under the pointer instead — `94-native-tables.css`'s
     // rule, which the cog on the row below has always followed.
-    const hov = css.indexOf(".am-vault-banner .avb-btn:hover {");
+    const hov = css.indexOf(".ca-vault-banner .ca-avb-btn:hover {");
     expect(css.slice(hov, css.indexOf("}", hov))).toContain(
       "background: var(--background-modifier-hover)"
     );
     // And "you are here" is the ink FIRST — the glyph and the word, where the
     // reader is already looking — with the outline agreeing now that every tile
     // has one to agree with.
-    const on = css.indexOf(".am-vault-banner .avb-btn.is-on {");
+    const on = css.indexOf(".ca-vault-banner .ca-avb-btn.is-on {");
     const onRule = css.slice(on, css.indexOf("}", on));
     expect(onRule).toContain("color: var(--text-accent)");
     expect(onRule).toContain("border-color: var(--interactive-accent)");
@@ -845,13 +916,13 @@ describe("the banner's stylesheet", () => {
     // The cog on the vault banner is always visible for discoverability (with
     // elevated opacity on hover), while the pencil in the page head is hover-revealed.
     const css = readCss();
-    expect(css).toContain(".journal-page-head .jph-title:hover .jph-title-edit");
-    expect(css).toContain(".am-vault-banner:hover .avb-cog");
+    expect(css).toContain(".ca-journal-page-head .ca-jph-title:hover .ca-jph-title-edit");
+    expect(css).toContain(".ca-vault-banner:hover .ca-avb-cog");
     expect(css).toMatch(
-      /@media \(hover: none\) \{\s*\.journal-page-head \.jph-title-edit \{\s*opacity: 0\.55;/
+      /@media \(hover: none\) \{\s*\.ca-journal-page-head \.ca-jph-title-edit \{\s*opacity: 0\.55;/
     );
     expect(css).toMatch(
-      /@media \(hover: none\) \{\s*\.am-vault-banner \.avb-cog \{\s*opacity: 0\.65;/
+      /@media \(hover: none\) \{\s*\.ca-vault-banner \.ca-avb-cog \{\s*opacity: 0\.65;/
     );
     // And nothing is left behind styling a title the bar no longer draws.
     expect(css).not.toContain(".avb-title");
@@ -888,7 +959,7 @@ describe("what the Banner section became", () => {
     // label, and the head is now asked twice more per note by the caption and
     // the context strip.
     const t = head();
-    expect(t).toContain("function grainOf(plugin: AlmanacPlugin, file: TFile)");
+    expect(t).toContain("function grainOf(plugin: ChronoAnvilPlugin, file: TFile)");
     expect(t).toContain("noteKindOf(");
     expect(t).not.toMatch(/entryContext\(plugin, file\)/);
   });
@@ -1002,7 +1073,7 @@ describe("what the Banner section became", () => {
     expect(t).toContain("if (BANNER_KINDS.has(kind)) {");
     expect(t).toContain("pageHead = widget;");
     // And nothing new paints in their place: a block with no chrome class is a
-    // plain flex column, which is what `.journal-widget-block` has always been.
+    // plain flex column, which is what `.ca-journal-widget-block` has always been.
     expect(t).not.toContain('out.push("journal-head-block")');
   });
 
@@ -1021,11 +1092,11 @@ describe("what the Banner section became", () => {
   });
 
   it("takes the page's ground rather than another card", () => {
-    // Every other block on an Almanac note is a bordered surface, and a note
+    // Every other block on a ChronoAnvil note is a bordered surface, and a note
     // that opens with one more of them opens with furniture. This is the note's
     // own head — it sits on the page the way a heading does.
     const css = readCss();
-    const at = css.indexOf(".journal-page-head {");
+    const at = css.indexOf(".ca-journal-page-head {");
     expect(at).toBeGreaterThan(0);
     const rule = css.slice(at, css.indexOf("}", at));
     expect(rule).not.toContain("background:");
@@ -1037,9 +1108,9 @@ describe("what the Banner section became", () => {
     // It STANDS IN for that title, so a reader should not be able to tell that
     // anything moved — except that this one knows what the note is.
     const css = readCss();
-    const at = css.indexOf(".journal-page-head .jph-title {");
+    const at = css.indexOf(".ca-journal-page-head .ca-jph-title {");
     const rule = css.slice(at, css.indexOf("}", at));
-    expect(rule).toContain("font-size: var(--am-text-xl)");
+    expect(rule).toContain("font-size: var(--ca-text-xl)");
     expect(rule).toContain("cursor: text");
   });
 
@@ -1050,11 +1121,11 @@ describe("what the Banner section became", () => {
     // was extracted for, and the class only goes on while the bar is drawing:
     // with it off there is no head, and the trigger is the page's only headline.
     const cal = readSrc("calendar");
-    expect(cal).toContain('band.addClass("job-head-elsewhere");');
+    expect(cal).toContain('band.addClass("ca-job-head-elsewhere");');
     expect(cal).toContain("bannerSuppressed(plugin, ctx.sourcePath)");
     const css = readCss();
     const at = css.indexOf(
-      ".journal-overview-banner.job-head-elsewhere .journal-period-nav.jeh-seg {"
+      ".ca-journal-overview-banner.ca-job-head-elsewhere .ca-journal-period-nav.ca-jeh-seg {"
     );
     expect(at).toBeGreaterThan(0);
     expect(css.slice(at, css.indexOf("}", at))).toContain("--jpn-headline: 1em");
@@ -1065,9 +1136,9 @@ describe("what the Banner section became", () => {
     // thing IN the note. They are related only by what the bar absorbed.
     const sheet = styleSheets().find((s) => s.name === "98-page-head.css");
     expect(sheet).toBeTruthy();
-    expect(sheet!.css).toContain(".journal-page-head {");
+    expect(sheet!.css).toContain(".ca-journal-page-head {");
     const banner = styleSheets().find((s) => s.name === "97-vault-banner.css");
-    expect(banner!.css).not.toContain(".journal-page-head");
+    expect(banner!.css).not.toContain(".ca-journal-page-head");
   });
 });
 
@@ -1089,14 +1160,14 @@ describe("banner art presets", () => {
   const ids = Object.keys(ART_PRESETS);
 
   const styled = new Set(
-    [...css.matchAll(/\.am-vault-banner\[data-am-art="([a-z0-9-]+)"\]/g)].map(
+    [...css.matchAll(/\.ca-vault-banner\[data-ca-art="([a-z0-9-]+)"\]/g)].map(
       (m) => m[1]
     )
   );
 
   it("gives every preset in the table a rule in the stylesheet", () => {
     for (const id of ids) {
-      expect(styled.has(id), `${id} has no [data-am-art] rule`).toBe(true);
+      expect(styled.has(id), `${id} has no [data-ca-art] rule`).toBe(true);
     }
   });
 
@@ -1120,14 +1191,14 @@ describe("banner art presets", () => {
     // the size inherits the *previous* preset's geometry from the token file.
     for (const id of ids) {
       const rule = css.slice(
-        css.indexOf(`.am-vault-banner[data-am-art="${id}"]`),
-        css.indexOf("}", css.indexOf(`.am-vault-banner[data-am-art="${id}"]`))
+        css.indexOf(`.ca-vault-banner[data-ca-art="${id}"]`),
+        css.indexOf("}", css.indexOf(`.ca-vault-banner[data-ca-art="${id}"]`))
       );
       for (const prop of [
-        "--am-header-art-pattern",
-        "--am-header-art-size",
-        "--am-header-art-repeat",
-        "--am-header-art-blend",
+        "--ca-header-art-pattern",
+        "--ca-header-art-size",
+        "--ca-header-art-repeat",
+        "--ca-header-art-blend",
       ]) {
         expect(rule, `${id} does not set ${prop}`).toContain(`${prop}:`);
       }
@@ -1136,14 +1207,14 @@ describe("banner art presets", () => {
 
   it("paints from the stylesheet, not from a file in the vault", () => {
     const t = readSrc("vault-banner");
-    expect(t).toContain('root.setAttr("data-am-art", preset.id)');
+    expect(t).toContain('root.setAttr("data-ca-art", preset.id)');
     // The three reads that made the vault the source of a texture.
     expect(t).not.toContain("getResourcePath");
     expect(t).not.toContain("paths.art");
     // Opacity is the one visual fact still set from TypeScript, because it is
     // the one the reader drags a slider for.
-    expect(t).toContain('root.style.setProperty("--am-header-art-opacity"');
-    expect(t).not.toContain('setProperty("--am-header-art-size"');
+    expect(t).toContain('root.style.setProperty("--ca-header-art-opacity"');
+    expect(t).not.toContain('setProperty("--ca-header-art-size"');
   });
 
   it("no longer offers the reader's own files as patterns", () => {

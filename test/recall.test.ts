@@ -108,8 +108,8 @@ describe("the recall line format", () => {
 
 describe("recall regions are inert to the task machinery", () => {
   // notestore.ts::allNoteRegions is directive-agnostic — it yields every
-  // `<!--almanac:KEY-->` region whichever widget wrote it, and both
-  // countAlmanacTasks and the tasks-table's row parser run parseTasks over all
+  // `<!--chronoanvil:KEY-->` region whichever widget wrote it, and both
+  // countChronoAnvilTasks and the tasks-table's row parser run parseTasks over all
   // of them. A new region type that happened to look task-shaped would quietly
   // inflate every task count in the vault.
   it("does not count cards as tasks", () => {
@@ -233,7 +233,7 @@ describe("recall widget registration", () => {
   const widgets = readSrc("widgets");
 
   it("is registered as a composite kind", () => {
-    // A non-composite widget is appended into a `.journal-widget-bar`, which is
+    // A non-composite widget is appended into a `.ca-journal-widget-bar`, which is
     // a wrap-flex row meant for buttons and pickers. A full-width card stack
     // dropped in there lays out as an inline pill.
     const block = widgets.slice(
@@ -289,7 +289,7 @@ describe("the shipped templates", () => {
   it("gives the Lesson template a Recall section", () => {
     const t = asset("template-lesson.md");
     expect(t).toContain("recall:recall");
-    expect(t).toContain("<!--almanac:recall");
+    expect(t).toContain("<!--chronoanvil:recall");
   });
 
   it("gives the Page template one too", () => {
@@ -297,7 +297,7 @@ describe("the shipped templates", () => {
     // Confidence, so its cards grade the lesson it belongs to.
     const t = asset("template-page.md");
     expect(t).toContain("recall:recall");
-    expect(t).toContain("<!--almanac:recall");
+    expect(t).toContain("<!--chronoanvil:recall");
   });
 
   it("still gives a page no rating of its own", () => {

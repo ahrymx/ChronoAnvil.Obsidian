@@ -16,7 +16,7 @@
 //
 //   09:14 — [scale:Mood=4] rough afternoon, better after a walk
 //
-// This replaces the earlier standalone `<!--almanac:scale-notes-->` region.
+// This replaces the earlier standalone `<!--chronoanvil:scale-notes-->` region.
 // Folding annotations into the capture log means they read chronologically
 // alongside the day's other fragments (a mood note *is* a captured thought),
 // they're searchable for free (captures already are), and there's one prose

@@ -39,7 +39,7 @@
 
 import { App, Modal, Notice, setIcon } from "obsidian";
 
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { createListRow } from "../ui/list-row";
 import { applyJournalOrder } from "./journal-order";
 import { registeredJournalTypes } from "./journal";
@@ -50,7 +50,7 @@ class ReorganiseJournalsModal extends Modal {
   private ids: string[];
   private readonly names = new Map<string, { name: string; emoji: string }>();
 
-  constructor(app: App, private plugin: AlmanacPlugin) {
+  constructor(app: App, private plugin: ChronoAnvilPlugin) {
     super(app);
     const types = registeredJournalTypes(plugin);
     this.ids = types.map((t) => t.id);
@@ -59,10 +59,10 @@ class ReorganiseJournalsModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
-    contentEl.addClass("almanac-reorder-modal");
+    contentEl.addClass("ca-reorder-modal");
     contentEl.createEl("h3", { text: "Reorganise journals" });
     contentEl.createEl("p", {
-      cls: "almanac-modal-note",
+      cls: "ca-modal-note",
       // WHAT IT CHANGES AND WHAT IT DOES NOT, said before the reader moves
       // anything. Reordering a list that also drives a folder tree invites the
       // question "does this move my notes?", and the answer has to be on the
@@ -70,7 +70,7 @@ class ReorganiseJournalsModal extends Modal {
       text: "The order journals appear in, on this page and on the homepage. Nothing moves on disk — no folder is renamed and no note is touched.",
     });
 
-    this.renderList(contentEl.createDiv({ cls: "almanac-reorder-list" }));
+    this.renderList(contentEl.createDiv({ cls: "ca-reorder-list" }));
 
     const btnRow = contentEl.createDiv({ cls: "modal-button-container" });
     const cancel = btnRow.createEl("button", { text: "Cancel" });
@@ -94,7 +94,7 @@ class ReorganiseJournalsModal extends Modal {
       });
       const nudge = (delta: number, label: string, icon: string): void => {
         const b = lead.createEl("button", {
-          cls: "almanac-tpl-arrow",
+          cls: "ca-tpl-arrow",
           attr: { type: "button", "aria-label": label, title: label },
         });
         setIcon(b, icon);
@@ -129,7 +129,7 @@ class ReorganiseJournalsModal extends Modal {
   }
 }
 
-export function openReorganiseJournals(plugin: AlmanacPlugin): void {
+export function openReorganiseJournals(plugin: ChronoAnvilPlugin): void {
   // NO WINDOW FOR A LIST THAT CANNOT BE REORDERED. One journal has one order,
   // and none has no list at all — a window offering to arrange it would be a
   // control that does nothing, which is `empty.ts`' rule applied to a modal.

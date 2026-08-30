@@ -75,7 +75,7 @@ const spell = (indent: string, px: number): string =>
 // Where the pointer's height rounds to, or null when the card should have no
 // stated height at all.
 //
-// `min` is the floor, which the caller reads back from `--am-card-h-min` rather
+// `min` is the floor, which the caller reads back from `--ca-card-h-min` rather
 // than repeating here — `pxToken`'s rule, and the reason the token lives in the
 // stylesheet.
 //
@@ -126,7 +126,7 @@ export function snapHeight(
 // on the page explains.
 //
 // Located by the line above, it cannot. The widget it sizes is found through the
-// `data-am-line` stamp `stampLines` already writes, and a directive that drew
+// `data-ca-line` stamp `stampLines` already writes, and a directive that drew
 // nothing leaves no stamp to find.
 //
 // AND IT IS ASKED OF A WIDGET. A `header:` bar is not a card (row.ts,

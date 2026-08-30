@@ -6,7 +6,7 @@
 /* The coloured icon token. One definition, used by the `events` manager, the
    upcoming list and the settings rows, so an event looks like itself wherever
    it turns up. */
-.am-ev-chip {
+.ca-ev-chip {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -14,95 +14,95 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  color: var(--am-ev-grey);
+  color: var(--ca-ev-grey);
   background: var(--background-modifier-hover);
 }
-.am-ev-chip svg {
+.ca-ev-chip svg {
   width: 14px;
   height: 14px;
 }
-.am-ev-chip-red { color: var(--am-ev-red); }
-.am-ev-chip-amber { color: var(--am-ev-amber); }
-.am-ev-chip-green { color: var(--am-ev-green); }
-.am-ev-chip-teal { color: var(--am-ev-teal); }
-.am-ev-chip-blue { color: var(--am-ev-blue); }
-.am-ev-chip-purple { color: var(--am-ev-purple); }
-.am-ev-chip-pink { color: var(--am-ev-pink); }
-.am-ev-chip-grey { color: var(--am-ev-grey); }
+.ca-ev-chip-red { color: var(--ca-ev-red); }
+.ca-ev-chip-amber { color: var(--ca-ev-amber); }
+.ca-ev-chip-green { color: var(--ca-ev-green); }
+.ca-ev-chip-teal { color: var(--ca-ev-teal); }
+.ca-ev-chip-blue { color: var(--ca-ev-blue); }
+.ca-ev-chip-purple { color: var(--ca-ev-purple); }
+.ca-ev-chip-pink { color: var(--ca-ev-pink); }
+.ca-ev-chip-grey { color: var(--ca-ev-grey); }
 
-/* An event's token in the settings list takes the same am-ev-chip-* colour
+/* An event's token in the settings list takes the same ca-ev-chip-* colour
    class the calendar chips use, so the icon reads the same colour in both
-   places. The token supplies its own box (.almanac-list-token) — only the
+   places. The token supplies its own box (.ca-list-token) — only the
    colour comes from the shared class. */
-.almanac-list-token[class*="am-ev-chip-"] svg {
+.ca-list-token[class*="ca-ev-chip-"] svg {
   width: 17px;
   height: 17px;
 }
 
-.am-ev-toolbar {
+.ca-ev-toolbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 10px;
 }
-.am-ev-count {
-  font-size: var(--am-text-2xs);
+.ca-ev-count {
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
 }
-.am-ev-empty {
+.ca-ev-empty {
   padding: 10px 2px;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
 }
-.am-ev-section {
+.ca-ev-section {
   margin: 14px 0 6px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-faint);
 }
-.am-ev-list {
+.ca-ev-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.am-ev-row {
+.ca-ev-row {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 6px 8px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
 }
-.am-ev-row:hover {
+.ca-ev-row:hover {
   background: var(--background-modifier-hover);
 }
 /* A disabled event stays in the list — it's still defined, just not drawn —
    so it's dimmed rather than hidden. */
-.am-ev-row.is-disabled {
+.ca-ev-row.is-disabled {
   opacity: 0.5;
 }
-.am-ev-text {
+.ca-ev-text {
   flex: 1;
   min-width: 0;
 }
-.am-ev-title {
-  font-size: var(--am-text-sm);
+.ca-ev-title {
+  font-size: var(--ca-text-sm);
   font-weight: 600;
   color: var(--text-normal);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.am-ev-meta {
-  font-size: var(--am-text-2xs);
+.ca-ev-meta {
+  font-size: var(--ca-text-2xs);
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.am-ev-edit {
+.ca-ev-edit {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -112,23 +112,23 @@
   background: transparent;
   color: var(--text-faint);
   cursor: pointer;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   opacity: 0;
 }
-.am-ev-row:hover .am-ev-edit {
+.ca-ev-row:hover .ca-ev-edit {
   opacity: 1;
 }
-.am-ev-edit:hover {
+.ca-ev-edit:hover {
   color: var(--text-normal);
   background: var(--background-modifier-hover);
 }
-.am-ev-edit svg {
+.ca-ev-edit svg {
   width: 14px;
   height: 14px;
 }
 /* Four icon buttons on a row, and the row is only 24px tall — they sit in one
    group so the gap between them is the group's, not four separate margins. */
-.am-ev-actions {
+.ca-ev-actions {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -136,7 +136,7 @@
 }
 /* Hidden until hover is fine for a mouse and useless for a keyboard, so focus
    shows them too — otherwise tabbing lands on a control nobody can see. */
-.am-ev-edit:focus-visible {
+.ca-ev-edit:focus-visible {
   opacity: 1;
   color: var(--text-normal);
   box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
@@ -145,136 +145,136 @@
 /* The filter sits at the far end of the toolbar: the button is what you reach
    for first, the count is a fact about the list, and the box is the thing you
    only use once the list has outgrown a glance. */
-.am-ev-filter {
+.ca-ev-filter {
   margin-left: auto;
   max-width: 190px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
 }
 
 /* "Earlier" folds. The summary keeps the section heading's type, loses the
    default triangle's indent, and takes a pointer so it reads as openable. */
-.am-ev-past > summary.am-ev-section {
+.ca-ev-past > summary.ca-ev-section {
   cursor: pointer;
   list-style-position: inside;
 }
-.am-ev-past > summary.am-ev-section::marker {
+.ca-ev-past > summary.ca-ev-section::marker {
   color: var(--text-faint);
 }
-.am-ev-past[open] > summary.am-ev-section {
+.ca-ev-past[open] > summary.ca-ev-section {
   margin-bottom: 2px;
 }
 
 /* The relative time on the right of an upcoming row — the one thing that list
    says which the calendar can't. */
-.am-ev-when {
+.ca-ev-when {
   flex-shrink: 0;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
   white-space: nowrap;
 }
-.am-ev-upcoming-row.is-ongoing .am-ev-when {
+.ca-ev-upcoming-row.is-ongoing .ca-ev-when {
   color: var(--interactive-accent);
   font-weight: 600;
 }
 
 /* ── Event Modal Chrome & Controls ───────────────────────────── */
 
-.almanac-event-modal {
+.ca-event-modal {
   max-width: 520px;
 }
-.almanac-event-modal .almanac-editor-body {
+.ca-event-modal .ca-editor-body {
   padding: 14px 4px 6px;
   display: flex;
   flex-direction: column;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
 }
 
 /* ── Live Preview Card ── */
-.almanac-event-preview {
+.ca-event-preview {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--am-space-3);
+  gap: var(--ca-space-3);
   padding: 10px 14px;
   background: var(--background-secondary-alt);
-  border: var(--am-rule) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
-  margin-bottom: var(--am-space-2);
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  margin-bottom: var(--ca-space-2);
 }
-.almanac-event-preview-left {
+.ca-event-preview-left {
   display: flex;
   align-items: center;
-  gap: var(--am-space-3);
+  gap: var(--ca-space-3);
   min-width: 0;
 }
-.almanac-event-preview-badge {
+.ca-event-preview-badge {
   width: 36px;
   height: 36px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   border: 1px solid transparent;
-  box-shadow: var(--am-shadow-sm);
+  box-shadow: var(--ca-shadow-sm);
 }
-.almanac-event-preview-badge svg {
+.ca-event-preview-badge svg {
   width: 18px;
   height: 18px;
   stroke-width: 2.2;
 }
-.almanac-event-preview-info {
+.ca-event-preview-info {
   min-width: 0;
 }
-.almanac-event-preview-title {
-  font-size: var(--am-text-sm);
+.ca-event-preview-title {
+  font-size: var(--ca-text-sm);
   font-weight: 600;
   color: var(--text-normal);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.almanac-event-preview-date {
-  font-size: var(--am-text-xs);
+.ca-event-preview-date {
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
 }
-.almanac-event-preview-mockup {
+.ca-event-preview-mockup {
   width: 44px;
   height: 44px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   font-weight: 600;
   color: var(--text-normal);
   flex-shrink: 0;
-  box-shadow: var(--am-shadow-sm);
+  box-shadow: var(--ca-shadow-sm);
 }
-.almanac-event-preview-mockup .cal-badge {
+.ca-event-preview-mockup .ca-cal-badge {
   top: 2px;
   right: 2px;
 }
 
 /* ── Kind Segmented Switcher ── */
-.almanac-event-kind-bar {
+.ca-event-kind-bar {
   display: flex;
   gap: 3px;
   background: var(--background-secondary);
   padding: 3px;
-  border-radius: var(--am-radius-sm);
-  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  border: var(--ca-rule) solid var(--background-modifier-border);
   width: 100%;
 }
-.almanac-event-kind-btn {
+.ca-event-kind-btn {
   flex: 1;
   padding: 5px 10px;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   font-weight: 500;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   background: transparent;
   border: none;
   color: var(--text-muted);
@@ -283,96 +283,96 @@
   text-align: center;
   transition: background 0.12s, color 0.12s;
 }
-.almanac-event-kind-btn:hover {
+.ca-event-kind-btn:hover {
   color: var(--text-normal);
 }
-.almanac-event-kind-btn.is-active {
+.ca-event-kind-btn.is-active {
   background: var(--background-primary);
   color: var(--text-normal);
   font-weight: 600;
-  box-shadow: var(--am-shadow-sm);
+  box-shadow: var(--ca-shadow-sm);
 }
 
 /* ── Tabbed Category Icon Picker ── */
-.almanac-icon-picker {
+.ca-icon-picker {
   margin: 4px 0 8px;
 }
-.almanac-icon-cat-bar {
+.ca-icon-cat-bar {
   display: flex;
   gap: 4px;
   overflow-x: auto;
   padding-bottom: 6px;
   margin-bottom: 6px;
 }
-.almanac-icon-cat-btn {
+.ca-icon-cat-btn {
   padding: 3px 10px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-secondary);
-  border: var(--am-rule) solid var(--background-modifier-border);
+  border: var(--ca-rule) solid var(--background-modifier-border);
   color: var(--text-muted);
   cursor: pointer;
   box-shadow: none;
   white-space: nowrap;
   transition: all 0.12s ease;
 }
-.almanac-icon-cat-btn:hover {
+.ca-icon-cat-btn:hover {
   color: var(--text-normal);
 }
-.almanac-icon-cat-btn.is-active {
+.ca-icon-cat-btn.is-active {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
   border-color: var(--interactive-accent);
 }
-.almanac-icon-grid {
+.ca-icon-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 5px;
   background: var(--background-primary);
-  border: var(--am-rule) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
   padding: 8px;
 }
-.almanac-icon-swatch {
+.ca-icon-swatch {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   aspect-ratio: 1;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   box-shadow: none;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
-.almanac-icon-swatch:hover {
+.ca-icon-swatch:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
   border-color: var(--background-modifier-border);
 }
-.almanac-icon-swatch.is-active {
+.ca-icon-swatch.is-active {
   border-color: var(--interactive-accent);
   color: var(--interactive-accent);
   background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
   box-shadow: 0 0 0 1px var(--interactive-accent);
 }
-.almanac-icon-swatch svg {
+.ca-icon-swatch svg {
   width: 16px;
   height: 16px;
 }
 
 /* ── Color Swatches ── */
-.almanac-color-picker {
+.ca-color-picker {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin: 4px 0 10px;
 }
-.almanac-color-picker button.almanac-color-swatch,
-.almanac-color-swatch {
+.ca-color-picker button.ca-color-swatch,
+.ca-color-swatch {
   width: 26px !important;
   height: 26px !important;
   min-width: 26px !important;
@@ -385,41 +385,41 @@
   background-image: none !important;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.almanac-color-picker button.almanac-color-swatch:hover,
-.almanac-color-swatch:hover {
+.ca-color-picker button.ca-color-swatch:hover,
+.ca-color-swatch:hover {
   transform: scale(1.12);
 }
 /* The selected swatch is ringed rather than ticked: a checkmark drawn on top
    of the colour has to be readable against all eight of them. */
-.almanac-color-picker button.almanac-color-swatch.is-active,
-.almanac-color-swatch.is-active {
+.ca-color-picker button.ca-color-swatch.is-active,
+.ca-color-swatch.is-active {
   transform: scale(1.12);
   border-color: var(--text-normal) !important;
   box-shadow: 0 0 0 2px var(--background-primary) inset, 0 0 0 2px var(--interactive-accent) !important;
 }
-.almanac-color-picker button.almanac-color-red,
-.almanac-color-red { background-color: var(--am-ev-red) !important; background: var(--am-ev-red) !important; }
-.almanac-color-picker button.almanac-color-amber,
-.almanac-color-amber { background-color: var(--am-ev-amber) !important; background: var(--am-ev-amber) !important; }
-.almanac-color-picker button.almanac-color-green,
-.almanac-color-green { background-color: var(--am-ev-green) !important; background: var(--am-ev-green) !important; }
-.almanac-color-picker button.almanac-color-teal,
-.almanac-color-teal { background-color: var(--am-ev-teal) !important; background: var(--am-ev-teal) !important; }
-.almanac-color-picker button.almanac-color-blue,
-.almanac-color-blue { background-color: var(--am-ev-blue) !important; background: var(--am-ev-blue) !important; }
-.almanac-color-picker button.almanac-color-purple,
-.almanac-color-purple { background-color: var(--am-ev-purple) !important; background: var(--am-ev-purple) !important; }
-.almanac-color-picker button.almanac-color-pink,
-.almanac-color-pink { background-color: var(--am-ev-pink) !important; background: var(--am-ev-pink) !important; }
-.almanac-color-picker button.almanac-color-grey,
-.almanac-color-grey { background-color: var(--am-ev-grey) !important; background: var(--am-ev-grey) !important; }
+.ca-color-picker button.ca-color-red,
+.ca-color-red { background-color: var(--ca-ev-red) !important; background: var(--ca-ev-red) !important; }
+.ca-color-picker button.ca-color-amber,
+.ca-color-amber { background-color: var(--ca-ev-amber) !important; background: var(--ca-ev-amber) !important; }
+.ca-color-picker button.ca-color-green,
+.ca-color-green { background-color: var(--ca-ev-green) !important; background: var(--ca-ev-green) !important; }
+.ca-color-picker button.ca-color-teal,
+.ca-color-teal { background-color: var(--ca-ev-teal) !important; background: var(--ca-ev-teal) !important; }
+.ca-color-picker button.ca-color-blue,
+.ca-color-blue { background-color: var(--ca-ev-blue) !important; background: var(--ca-ev-blue) !important; }
+.ca-color-picker button.ca-color-purple,
+.ca-color-purple { background-color: var(--ca-ev-purple) !important; background: var(--ca-ev-purple) !important; }
+.ca-color-picker button.ca-color-pink,
+.ca-color-pink { background-color: var(--ca-ev-pink) !important; background: var(--ca-ev-pink) !important; }
+.ca-color-picker button.ca-color-grey,
+.ca-color-grey { background-color: var(--ca-ev-grey) !important; background: var(--ca-ev-grey) !important; }
 
-.almanac-event-hint {
+.ca-event-hint {
   margin: -4px 0 8px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   color: var(--text-muted);
 }
-/* `.almanac-chart-error` and `.almanac-event-error` retired in 2.56.10 and
+/* `.ca-chart-error` and `.ca-event-error` retired in 2.56.10 and
    2.56.12. Both windows use `EditorModal`'s error line now, which is the one
    these rules were written to avoid drifting from — the comment that used to
    sit here said the chart editor "shares the event editor's error line, same
@@ -430,112 +430,112 @@
 /* The chart editor's empty state stands in for the whole form when the vault
    has no chartable tracker yet: a window of dropdowns with nothing in them
    explains less than one sentence does. */
-.almanac-chart-empty {
+.ca-chart-empty {
   margin: 4px 0 12px;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
 }
 
 /* ── Diary retrieval: search, on-this-day, timeline ──────────────────────
    The three views over the diary index (diary-retrieval.ts). They share one
-   row (.jdr-row) deliberately — an entry should look the same wherever it's
+   row (.ca-jdr-row) deliberately — an entry should look the same wherever it's
    listed, so the row is styled once and the three views only differ in what
    wraps it. */
 
 /* Search box. A single input carries both terms and filters, so it's sized
    like a real search field rather than a form control tucked in a row. */
-.jdr-search-bar {
+.ca-jdr-search-bar {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   background: var(--background-primary);
 }
-.jdr-search-bar:focus-within {
+.ca-jdr-search-bar:focus-within {
   border-color: var(--interactive-accent);
 }
-.jdr-search-icon {
+.ca-jdr-search-icon {
   display: flex;
   color: var(--text-muted);
 }
-.jdr-search-icon .svg-icon {
+.ca-jdr-search-icon .svg-icon {
   width: 16px;
   height: 16px;
 }
-.jdr-search-input {
+.ca-jdr-search-input {
   flex: 1 1 auto;
   min-width: 0;
   border: none;
   background: transparent;
   padding: 4px 0;
-  font-size: var(--am-text-base);
+  font-size: var(--ca-text-base);
   color: var(--text-normal);
 }
 /* Obsidian styles bare inputs with a border and background of their own;
    the wrapper above is the visible field, so the input inside stays flat in
    every state including focus. */
-.jdr-search-input:focus,
-.jdr-search-input:hover {
+.ca-jdr-search-input:focus,
+.ca-jdr-search-input:hover {
   border: none;
   outline: none;
   box-shadow: none;
   background: transparent;
 }
-.jdr-search-hint {
+.ca-jdr-search-hint {
   margin: 6px 2px 0;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
 }
-.jdr-search-status {
+.ca-jdr-search-status {
   margin: 8px 2px 4px;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
 }
 
 /* Result / entry row. A date gutter that lines up down the list, then the
    entry's own content. */
-.jdr-row {
+.ca-jdr-row {
   display: flex;
   gap: 12px;
   padding: 8px 4px;
   border-top: 1px solid var(--background-modifier-border);
 }
-.jdr-row:first-child {
+.ca-jdr-row:first-child {
   border-top: none;
 }
-.jdr-row:hover {
+.ca-jdr-row:hover {
   background: var(--background-modifier-hover);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
 }
-.jdr-gutter {
+.ca-jdr-gutter {
   flex: 0 0 auto;
   width: 86px;
   text-align: right;
   padding-top: 1px;
 }
-.jdr-date {
-  font-size: var(--am-text-xs);
+.ca-jdr-date {
+  font-size: var(--ca-text-xs);
   font-weight: 600;
   color: var(--text-normal);
 }
-.jdr-dow {
-  font-size: var(--am-text-2xs);
+.ca-jdr-dow {
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
 }
-.jdr-main {
+.ca-jdr-main {
   flex: 1 1 auto;
   min-width: 0;
 }
-.jdr-title {
+.ca-jdr-title {
   display: inline-block;
-  font-size: var(--am-text-base);
+  font-size: var(--ca-text-base);
   font-weight: 600;
 }
-.jdr-snippet {
+.ca-jdr-snippet {
   margin-top: 2px;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
   /* Two lines, then clip: a snippet is an identification aid, not the entry. */
   display: -webkit-box;
@@ -545,59 +545,59 @@
 }
 /* Which field the snippet came from ("log", "highlights") — so a fragment
    isn't decontextualised. */
-.jdr-snippet-key {
+.ca-jdr-snippet-key {
   margin-right: 6px;
   padding: 0 5px;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-modifier-border);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-faint);
 }
-.jdr-facts {
+.ca-jdr-facts {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-top: 4px;
 }
-.jdr-fact {
+.ca-jdr-fact {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
 }
-.jdr-fact-icon {
+.ca-jdr-fact-icon {
   display: inline-flex;
 }
-.jdr-fact-icon .svg-icon {
+.ca-jdr-fact-icon .svg-icon {
   width: 12px;
   height: 12px;
 }
-.jdr-fact-tag {
+.ca-jdr-fact-tag {
   color: var(--text-accent);
 }
-.jdr-fact-kind {
+.ca-jdr-fact-kind {
   padding: 0 6px;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-modifier-border);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
-.jdr-loading {
+.ca-jdr-loading {
   padding: 10px 4px;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-faint);
 }
 
 /* On this day. Tinted so it reads as something offered rather than something
    queried — it's the one view here the user didn't ask a question to reach. */
-.jdr-otd-body {
+.ca-jdr-otd-body {
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   padding: 10px 12px;
   background: var(--background-secondary);
 }
@@ -605,7 +605,7 @@
    The tint above is the widget saying "this was offered to you", and it says it
    by being a filled, bordered rectangle. Inside a card it is the same filled,
    bordered rectangle the card already is — `--background-secondary` within
-   `--am-rule`, twice, in the same colour — and on the homepage's On this day it
+   `--ca-rule`, twice, in the same colour — and on the homepage's On this day it
    was the MIDDLE of three: the widget card, this, and the empty state's own info
    card inside it. Three borders, one fill, nothing between them said.
    THE SAME THREE SCOPES AS 91-card-surface.css's §3b, and deliberately the same
@@ -617,69 +617,69 @@
    The head, the year captions and the rows are untouched — what goes is the
    second edge only, which is the whole of 4.13's empty-state argument applied to
    the one body that is not an empty state. */
-.has-head .jdr-otd-body,
-.journal-sec-block .jdr-otd-body,
-.journal-sec-fold-body .jdr-otd-body {
+.has-head .ca-jdr-otd-body,
+.ca-journal-sec-block .ca-jdr-otd-body,
+.ca-journal-sec-fold-body .ca-jdr-otd-body {
   border: none;
   border-radius: 0;
   padding: 0;
   background: none;
 }
-.jdr-otd-head {
+.ca-jdr-otd-head {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 6px;
 }
-.jdr-otd-icon {
+.ca-jdr-otd-icon {
   display: inline-flex;
   color: var(--text-accent);
 }
-.jdr-otd-icon .svg-icon {
+.ca-jdr-otd-icon .svg-icon {
   width: 15px;
   height: 15px;
 }
-.jdr-otd-title {
-  font-size: var(--am-text-sm);
+.ca-jdr-otd-title {
+  font-size: var(--ca-text-sm);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
-.jdr-otd-year {
+.ca-jdr-otd-year {
   margin: 8px 0 2px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-faint);
 }
-.jdr-otd-group .jdr-row {
+.ca-jdr-otd-group .ca-jdr-row {
   border-top: none;
 }
 
 /* ── Timeline: Scrollable & Filterable ───────────────────────── */
-.jdr-timeline {
+.ca-jdr-timeline {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.jdr-timeline-controls {
+.ca-jdr-timeline-controls {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 10px 12px;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
-  box-shadow: var(--am-shadow-sm);
+  border-radius: var(--ca-radius-md);
+  box-shadow: var(--ca-shadow-sm);
 }
 
-.jdr-timeline-search-row {
+.ca-jdr-timeline-search-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.jdr-timeline-search-wrap {
+.ca-jdr-timeline-search-wrap {
   flex: 1;
   display: flex;
   align-items: center;
@@ -687,55 +687,55 @@
   padding: 4px 10px;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   transition: border-color 0.15s ease;
 }
-.jdr-timeline-search-wrap:focus-within {
+.ca-jdr-timeline-search-wrap:focus-within {
   border-color: var(--interactive-accent);
 }
 
-.jdr-timeline-search-icon {
+.ca-jdr-timeline-search-icon {
   display: flex;
   align-items: center;
   color: var(--text-muted);
   flex-shrink: 0;
 }
-.jdr-timeline-search-icon .svg-icon,
-.jdr-timeline-search-icon svg {
+.ca-jdr-timeline-search-icon .svg-icon,
+.ca-jdr-timeline-search-icon svg {
   width: 14px;
   height: 14px;
 }
 
-.jdr-timeline-search-input,
-input.jdr-timeline-search-input[type="text"] {
+.ca-jdr-timeline-search-input,
+input.ca-jdr-timeline-search-input[type="text"] {
   flex: 1 1 auto;
   min-width: 0;
   border: none !important;
   background: transparent !important;
   padding: 4px 0 !important;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   color: var(--text-normal);
   outline: none !important;
   box-shadow: none !important;
 }
 
-.jdr-timeline-search-clear {
+.ca-jdr-timeline-search-clear {
   background: none;
   border: none;
   color: var(--text-faint);
   cursor: pointer;
   padding: 2px 4px;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   line-height: 1;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   box-shadow: none;
   flex-shrink: 0;
 }
-.jdr-timeline-search-clear:hover {
+.ca-jdr-timeline-search-clear:hover {
   color: var(--text-normal);
 }
 
-.jdr-timeline-filters-row {
+.ca-jdr-timeline-filters-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -743,50 +743,50 @@ input.jdr-timeline-search-input[type="text"] {
   gap: 6px;
 }
 
-.jdr-timeline-chips {
+.ca-jdr-timeline-chips {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
 }
 
-.jdr-timeline-year-pills {
+.ca-jdr-timeline-year-pills {
   display: flex;
   background: var(--background-secondary-alt);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   padding: 2px;
   gap: 2px;
 }
 
-.jdr-timeline-year-pill {
+.ca-jdr-timeline-year-pill {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   padding: 2px 6px;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   cursor: pointer;
   box-shadow: none;
 }
-.jdr-timeline-year-pill:hover {
+.ca-jdr-timeline-year-pill:hover {
   color: var(--text-normal);
 }
-.jdr-timeline-year-pill.is-active {
+.ca-jdr-timeline-year-pill.is-active {
   background: var(--background-primary);
   color: var(--text-normal);
-  box-shadow: var(--am-shadow-sm);
+  box-shadow: var(--ca-shadow-sm);
 }
 
-.jdr-timeline-chip {
+.ca-jdr-timeline-chip {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 500;
   padding: 3px 8px;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   cursor: pointer;
   box-shadow: none;
   display: inline-flex;
@@ -794,83 +794,83 @@ input.jdr-timeline-search-input[type="text"] {
   gap: 4px;
   transition: all 0.12s;
 }
-.jdr-timeline-chip:hover {
+.ca-jdr-timeline-chip:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.jdr-timeline-chip.is-active {
+.ca-jdr-timeline-chip.is-active {
   background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
   color: var(--interactive-accent);
   border-color: var(--interactive-accent);
   font-weight: 600;
 }
 
-.jdr-timeline-actions {
+.ca-jdr-timeline-actions {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.jdr-timeline-action-btn {
+.ca-jdr-timeline-action-btn {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   padding: 3px 8px;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   cursor: pointer;
   box-shadow: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
-.jdr-timeline-action-btn:hover {
+.ca-jdr-timeline-action-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.jdr-timeline-action-btn.is-active {
+.ca-jdr-timeline-action-btn.is-active {
   background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
   color: var(--interactive-accent);
   border-color: var(--interactive-accent);
   font-weight: 600;
 }
 
-.jdr-timeline-summary {
+.ca-jdr-timeline-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin: 0 4px;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
 }
-.jdr-timeline-clear-link {
+.ca-jdr-timeline-clear-link {
   color: var(--interactive-accent);
   cursor: pointer;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   text-decoration: underline;
 }
 
-.jdr-timeline-scroll {
+.ca-jdr-timeline-scroll {
   max-height: min(70vh, 640px);
   overflow-y: auto;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   padding: 0 12px 16px;
   background: var(--background-secondary-alt);
-  box-shadow: var(--am-shadow-sm);
+  box-shadow: var(--ca-shadow-sm);
 }
 
-.jdr-timeline-scroll.is-compact .jdr-snippet {
+.ca-jdr-timeline-scroll.is-compact .ca-jdr-snippet {
   display: none;
 }
 
-.jdr-timeline-month {
+.ca-jdr-timeline-month {
   margin-bottom: 14px;
 }
-.jdr-timeline-month:first-child {
+.ca-jdr-timeline-month:first-child {
   margin-top: 0;
 }
-.jdr-timeline-head {
+.ca-jdr-timeline-head {
   position: sticky;
   top: 0;
   z-index: 2;
@@ -884,53 +884,53 @@ input.jdr-timeline-search-input[type="text"] {
   cursor: pointer;
   user-select: none;
 }
-.jdr-timeline-month-name {
+.ca-jdr-timeline-month-name {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   font-weight: 700;
 }
-.jdr-timeline-month-name:hover {
+.ca-jdr-timeline-month-name:hover {
   color: var(--interactive-accent);
 }
-.jdr-timeline-head-icon {
+.ca-jdr-timeline-head-icon {
   display: flex;
   color: var(--text-faint);
 }
-.jdr-timeline-head-icon svg {
+.ca-jdr-timeline-head-icon svg {
   width: 12px;
   height: 12px;
   stroke-width: 2.2;
 }
 
-.jdr-timeline-count {
-  font-size: var(--am-text-2xs);
+.ca-jdr-timeline-count {
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
 }
 
-.jdr-timeline-more {
+.ca-jdr-timeline-more {
   width: 100%;
   justify-content: center;
   margin-top: 6px;
 }
 
-mark.jdr-highlight {
+mark.ca-jdr-highlight {
   background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
   color: var(--interactive-accent);
   padding: 0 2px;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   font-weight: 600;
 }
 
 /* Narrow panes: the date gutter costs more than it gives, so it goes inline
    above the title rather than shrinking to a column of wrapped fragments. */
 @media (max-width: 500px) {
-  .jdr-row {
+  .ca-jdr-row {
     flex-direction: column;
     gap: 2px;
   }
-  .jdr-gutter {
+  .ca-jdr-gutter {
     width: auto;
     display: flex;
     gap: 6px;
@@ -940,32 +940,32 @@ mark.jdr-highlight {
 
 /* ── Quick capture ───────────────────────────────────────────────────── */
 
-.almanac-capture-modal {
+.ca-capture-modal {
   max-width: 520px;
 }
-.almanac-capture-modal .almanac-editor-body {
+.ca-capture-modal .ca-editor-body {
   padding: 14px 4px 6px;
 }
 
-/* `.almanac-capture-hint` retired in 2.56.12 — the hint is the frame's subtitle
+/* `.ca-capture-hint` retired in 2.56.12 — the hint is the frame's subtitle
    now. It said what this window writes and where, which is the job
-   `.almanac-editor-subtitle` already had in every other editor; two rules for
+   `.ca-editor-subtitle` already had in every other editor; two rules for
    one sentence in one kind of window is how they end up at different sizes. */
-.almanac-capture-input {
+.ca-capture-input {
   width: 100%;
   min-height: 8.5em;
   padding: 12px 14px;
   resize: vertical;
-  font-size: var(--am-text-base);
+  font-size: var(--ca-text-base);
   line-height: 1.55;
-  border-radius: var(--am-radius-sm);
-  border: var(--am-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  border: var(--ca-rule) solid var(--background-modifier-border);
   background: var(--background-primary);
   color: var(--text-normal);
-  margin-top: var(--am-space-3);
-  margin-bottom: var(--am-space-1);
+  margin-top: var(--ca-space-3);
+  margin-bottom: var(--ca-space-1);
 }
-.almanac-capture-input:focus {
+.ca-capture-input:focus {
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 1px var(--interactive-accent);
 }
@@ -977,23 +977,23 @@ mark.jdr-highlight {
    The label is small-caps like every other caption in the plugin, and the
    select takes the remaining width so a long period label — a week is
    "27 Jul – 2 Aug 2026" — is not truncated to its first date. */
-.almanac-capture-dest {
+.ca-capture-dest {
   display: flex;
   align-items: center;
-  gap: var(--am-space-3);
-  margin-bottom: var(--am-space-3);
+  gap: var(--ca-space-3);
+  margin-bottom: var(--ca-space-3);
 }
-.almanac-capture-dest-label {
-  font-size: var(--am-text-2xs);
-  font-weight: var(--am-caps-weight);
-  letter-spacing: var(--am-caps-tracking);
+.ca-capture-dest-label {
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
   text-transform: uppercase;
   color: var(--text-muted);
   white-space: nowrap;
   min-width: 82px;
   flex-shrink: 0;
 }
-.almanac-capture-dest select {
+.ca-capture-dest select {
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -1003,22 +1003,22 @@ mark.jdr-highlight {
    the three fields the log card has had since 4.55. The fields drop below,
    inside the same host, so opening them pushes the textarea down instead of
    reflowing the row. */
-.almanac-capture-when {
-  margin-bottom: var(--am-space-3);
+.ca-capture-when {
+  margin-bottom: var(--ca-space-3);
 }
-.almanac-capture-when-row {
+.ca-capture-when-row {
   display: flex;
   align-items: center;
-  gap: var(--am-space-3);
+  gap: var(--ca-space-3);
 }
 
 /* The squared-off time trigger button in quick capture */
-.almanac-capture-when-row .journal-capture-time {
+.ca-capture-when-row .ca-journal-capture-time {
   background: var(--background-secondary-alt);
-  border: var(--am-rule) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-xs);
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-xs);
   padding: 4px 9px;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   font-family: var(--font-monospace);
   font-variant-numeric: tabular-nums;
   color: var(--text-normal);
@@ -1029,26 +1029,26 @@ mark.jdr-highlight {
   align-items: center;
   transition: border-color 0.12s ease, color 0.12s ease;
 }
-.almanac-capture-when-row .journal-capture-time:hover {
+.ca-capture-when-row .ca-journal-capture-time:hover {
   border-color: var(--interactive-accent);
   color: var(--interactive-accent);
   text-decoration: none;
 }
-.almanac-capture-when-row .journal-capture-time:focus-visible {
+.ca-capture-when-row .ca-journal-capture-time:focus-visible {
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 1px var(--interactive-accent);
   outline: none;
 }
 
-.almanac-capture-when .journal-capture-when {
-  margin-left: calc(82px + var(--am-space-3));
-  margin-top: var(--am-space-2);
-  gap: var(--am-space-2);
+.ca-capture-when .ca-journal-capture-when {
+  margin-left: calc(82px + var(--ca-space-3));
+  margin-top: var(--ca-space-2);
+  gap: var(--ca-space-2);
 }
 
 /* Collapsible note field (`note:key#collapse`). The label becomes the fold
    control; the content hides beneath it. */
-.journal-note--collapsible > .journal-note-collapse-bar {
+.ca-journal-note--collapsible > .ca-journal-note-collapse-bar {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1057,29 +1057,29 @@ mark.jdr-highlight {
   /* Padding rather than margin so the whole strip is a hit target. */
   padding: 2px 0;
 }
-.journal-note--collapsible > .journal-note-collapse-bar:hover {
+.ca-journal-note--collapsible > .ca-journal-note-collapse-bar:hover {
   color: var(--text-normal);
 }
-.journal-note--collapsible > .journal-note-collapse-bar .journal-note-label {
+.ca-journal-note--collapsible > .ca-journal-note-collapse-bar .ca-journal-note-label {
   margin: 0;
   cursor: pointer;
 }
-.journal-note-chevron {
+.ca-journal-note-chevron {
   display: flex;
   color: var(--text-faint);
   transition: transform 120ms ease;
 }
-.journal-note-chevron .svg-icon {
+.ca-journal-note-chevron .svg-icon {
   width: 14px;
   height: 14px;
 }
-.journal-note--collapsible.is-collapsed .journal-note-chevron {
+.ca-journal-note--collapsible.is-collapsed .ca-journal-note-chevron {
   transform: rotate(-90deg);
 }
 /* Hide the field itself, not the bar, so the label stays clickable and the
    entry keeps a visible anchor for where captures live.
    All children except the collapse bar hide when folded. */
-.journal-note--collapsible.is-collapsed > :not(.journal-note-collapse-bar) {
+.ca-journal-note--collapsible.is-collapsed > :not(.ca-journal-note-collapse-bar) {
   display: none;
 }
 
@@ -1089,8 +1089,8 @@ mark.jdr-highlight {
    STILL LIVE: the `note:` field renders the capture region on any note whose
    template predates 4.28's card list, and on any region a reader points a
    plain `note:` at. */
-.journal-note--capture .journal-note-input {
-  font-size: var(--am-text-sm);
+.ca-journal-note--capture .ca-journal-note-input {
+  font-size: var(--ca-text-sm);
   line-height: 1.45;
   font-variant-numeric: tabular-nums;
 }
@@ -1099,35 +1099,35 @@ mark.jdr-highlight {
    One card per item, with a filter deck, search bar, multi-category selector,
    status chips, and a contained scrollable viewport so long logs never blow
    out the parent layout. */
-.journal-logbook-deck {
+.ca-journal-logbook-deck {
   display: flex;
   flex-direction: column;
-  gap: var(--am-space-2);
-  margin-top: var(--am-space-1);
-  margin-bottom: var(--am-space-2);
+  gap: var(--ca-space-2);
+  margin-top: var(--ca-space-1);
+  margin-bottom: var(--ca-space-2);
 }
 
-.jcl-top-bar {
+.ca-jcl-top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
   flex-wrap: wrap;
 }
 
 /* Dropdown type selector on the top left (replaces title) */
-.jcl-dropdown-wrap {
+.ca-jcl-dropdown-wrap {
   position: relative;
   display: inline-flex;
 }
 
-.jcl-type-dropdown-btn {
+.ca-jcl-type-dropdown-btn {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-normal);
   padding: 4px 10px;
-  border-radius: var(--am-radius-sm);
-  font-size: var(--am-text-xs);
+  border-radius: var(--ca-radius-sm);
+  font-size: var(--ca-text-xs);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -1137,27 +1137,27 @@ mark.jdr-highlight {
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.jcl-type-dropdown-btn:hover {
+.ca-jcl-type-dropdown-btn:hover {
   background: var(--background-modifier-hover);
   border-color: var(--background-modifier-border-hover);
 }
 
-.jcl-type-dropdown-btn.is-open {
+.ca-jcl-type-dropdown-btn.is-open {
   border-color: var(--interactive-accent);
 }
 
-.jcl-type-icon {
-  font-size: var(--am-text-xs);
+.ca-jcl-type-icon {
+  font-size: var(--ca-text-xs);
   display: inline-flex;
   align-items: center;
 }
 
-.jcl-type-label {
-  font-size: var(--am-text-xs);
+.ca-jcl-type-label {
+  font-size: var(--ca-text-xs);
   font-weight: 600;
 }
 
-.jcl-dropdown-caret {
+.ca-jcl-dropdown-caret {
   display: inline-flex;
   align-items: center;
   color: var(--text-faint);
@@ -1165,24 +1165,24 @@ mark.jdr-highlight {
   transition: transform 0.2s ease;
 }
 
-.jcl-dropdown-caret svg {
+.ca-jcl-dropdown-caret svg {
   width: 11px;
   height: 11px;
 }
 
-.jcl-type-dropdown-btn.is-open .jcl-dropdown-caret {
+.ca-jcl-type-dropdown-btn.is-open .ca-jcl-dropdown-caret {
   transform: rotate(180deg);
 }
 
-.jcl-dropdown-menu {
+.ca-jcl-dropdown-menu {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
   z-index: 100;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
-  box-shadow: var(--am-shadow-md);
+  border-radius: var(--ca-radius-md);
+  box-shadow: var(--ca-shadow-md);
   min-width: 190px;
   padding: 4px;
   display: none;
@@ -1190,17 +1190,17 @@ mark.jdr-highlight {
   gap: 2px;
 }
 
-.jcl-dropdown-menu.is-open {
+.ca-jcl-dropdown-menu.is-open {
   display: flex;
 }
 
-.jcl-dropdown-item {
+.ca-jcl-dropdown-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 5px 8px;
-  border-radius: var(--am-radius-xs);
-  font-size: var(--am-text-xs);
+  border-radius: var(--ca-radius-xs);
+  font-size: var(--ca-text-xs);
   color: var(--text-normal);
   cursor: pointer;
   background: transparent;
@@ -1211,52 +1211,52 @@ mark.jdr-highlight {
   transition: background 0.1s ease;
 }
 
-.jcl-dropdown-item:hover {
+.ca-jcl-dropdown-item:hover {
   background: var(--background-modifier-hover);
 }
 
-.jcl-dropdown-item.is-selected {
+.ca-jcl-dropdown-item.is-selected {
   background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-secondary));
   color: var(--interactive-accent);
   font-weight: 600;
 }
 
-.jcl-dropdown-item-left {
+.ca-jcl-dropdown-item-left {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.jcl-item-icon {
-  font-size: var(--am-text-xs);
+.ca-jcl-item-icon {
+  font-size: var(--ca-text-xs);
 }
 
-.jcl-item-label {
-  font-size: var(--am-text-xs);
+.ca-jcl-item-label {
+  font-size: var(--ca-text-xs);
 }
 
-.jcl-dropdown-badge {
-  font-size: var(--am-text-2xs);
+.ca-jcl-dropdown-badge {
+  font-size: var(--ca-text-2xs);
   font-variant-numeric: tabular-nums;
   padding: 1px 6px;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: color-mix(in srgb, var(--text-normal) 10%, transparent);
   color: var(--text-muted);
 }
 
-.jcl-dropdown-item.is-selected .jcl-dropdown-badge {
+.ca-jcl-dropdown-item.is-selected .ca-jcl-dropdown-badge {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.jcl-static-title {
-  font-size: var(--am-text-sm);
+.ca-jcl-static-title {
+  font-size: var(--ca-text-sm);
   font-weight: 700;
   color: var(--text-normal);
 }
 
 /* Collapsible search strip */
-.jcl-search-strip {
+.ca-jcl-search-strip {
   max-height: 0;
   opacity: 0;
   overflow: hidden;
@@ -1264,128 +1264,128 @@ mark.jdr-highlight {
   margin-top: 0;
 }
 
-.jcl-search-strip.is-open {
+.ca-jcl-search-strip.is-open {
   max-height: 44px;
   opacity: 1;
-  margin-top: var(--am-space-1);
+  margin-top: var(--ca-space-1);
 }
 
-.jcl-search-wrap {
+.ca-jcl-search-wrap {
   display: flex;
   align-items: center;
-  gap: var(--am-space-2);
-  padding: 4px var(--am-space-2);
+  gap: var(--ca-space-2);
+  padding: 4px var(--ca-space-2);
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   transition: border-color 0.15s ease;
 }
 
-.jcl-search-wrap:focus-within {
+.ca-jcl-search-wrap:focus-within {
   border-color: var(--interactive-accent);
 }
 
-.jcl-search-icon {
+.ca-jcl-search-icon {
   display: flex;
   align-items: center;
   color: var(--text-faint);
   flex-shrink: 0;
 }
 
-.jcl-search-icon svg {
+.ca-jcl-search-icon svg {
   width: 14px;
   height: 14px;
 }
 
-.jcl-search-input {
+.ca-jcl-search-input {
   flex: 1;
   min-width: 0;
   border: none;
   background: transparent;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-normal);
   outline: none;
   padding: 0;
   box-shadow: none;
 }
 
-.jcl-search-clear {
+.ca-jcl-search-clear {
   background: none;
   border: none;
   color: var(--text-faint);
   cursor: pointer;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   padding: 2px 4px;
   box-shadow: none;
 }
 
-.jcl-search-clear:hover {
+.ca-jcl-search-clear:hover {
   color: var(--text-normal);
 }
 
 /* Status Segmented Control */
-.jcl-status-row {
+.ca-jcl-status-row {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
   flex-wrap: wrap;
   width: 100%;
 }
 
-.jcl-status-segment {
+.ca-jcl-status-segment {
   display: inline-flex;
   align-items: center;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   padding: 2px;
   gap: 2px;
   width: 100%;
 }
 
-.jcl-status-segment-btn {
+.ca-jcl-status-segment-btn {
   flex: 1 1 0;
   text-align: center;
   justify-content: center;
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   padding: 3px 6px;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
   box-shadow: none;
 }
 
-.jcl-status-segment-btn:hover {
+.ca-jcl-status-segment-btn:hover {
   color: var(--text-normal);
 }
 
-.jcl-status-segment-btn.is-active {
+.ca-jcl-status-segment-btn.is-active {
   background: var(--background-secondary);
   color: var(--text-normal);
-  box-shadow: var(--am-elev-1);
+  box-shadow: var(--ca-elev-1);
 }
 
-.jcl-actions-group {
+.ca-jcl-actions-group {
   display: flex;
   align-items: center;
-  gap: var(--am-space-1);
+  gap: var(--ca-space-1);
   margin-left: auto;
   flex-wrap: wrap;
 }
 
-.jcl-action-chip {
+.ca-jcl-action-chip {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   font-weight: 500;
   padding: 3px 8px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -1394,32 +1394,32 @@ mark.jdr-highlight {
   box-shadow: none;
 }
 
-.jcl-action-chip:hover {
+.ca-jcl-action-chip:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.jcl-action-chip.is-active {
+.ca-jcl-action-chip.is-active {
   background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
   color: var(--interactive-accent);
   border-color: var(--interactive-accent);
 }
 
-.jcl-action-icon {
+.ca-jcl-action-icon {
   display: flex;
   align-items: center;
 }
 
-.jcl-action-icon svg {
+.ca-jcl-action-icon svg {
   width: 12px;
   height: 12px;
 }
 
 @container (max-width: 480px) {
-  .jcl-action-chip .jcl-action-label {
+  .ca-jcl-action-chip .ca-jcl-action-label {
     display: none;
   }
-  .jcl-action-chip {
+  .ca-jcl-action-chip {
     padding: 4px 6px;
     min-width: 28px;
     height: 28px;
@@ -1427,119 +1427,119 @@ mark.jdr-highlight {
   }
 }
 
-body.is-mobile .jcl-action-chip .jcl-action-label {
+body.is-mobile .ca-jcl-action-chip .ca-jcl-action-label {
   display: none;
 }
-body.is-mobile .jcl-action-chip {
+body.is-mobile .ca-jcl-action-chip {
   padding: 4px 6px;
   min-width: 28px;
   height: 28px;
   justify-content: center;
 }
 
-.journal-capture-log {
+.ca-journal-capture-log {
   display: flex;
   flex-direction: column;
   min-height: 0;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   padding: 10px 12px;
   margin: 0 0 0.9em;
   transition: border-color 0.15s ease;
 }
 
-.journal-capture-log:focus-within {
+.ca-journal-capture-log:focus-within {
   border-color: var(--interactive-accent);
 }
 
-.journal-capture-log.journal-note--collapsible > .journal-note-collapse-bar {
-  margin-bottom: var(--am-space-1);
+.ca-journal-capture-log.ca-journal-note--collapsible > .ca-journal-note-collapse-bar {
+  margin-bottom: var(--ca-space-1);
 }
 
-.journal-capture-log.journal-note--collapsible.is-collapsed > .journal-note-collapse-bar {
+.ca-journal-capture-log.ca-journal-note--collapsible.is-collapsed > .ca-journal-note-collapse-bar {
   margin-bottom: 0;
 }
 
-.journal-widget-card.is-sized > .journal-capture-log,
-.journal-block-cell > .is-sized.journal-capture-log,
-.is-sized .journal-capture-log {
+.ca-journal-widget-card.is-sized > .ca-journal-capture-log,
+.ca-journal-block-cell > .is-sized.ca-journal-capture-log,
+.is-sized .ca-journal-capture-log {
   height: 100%;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
 }
 
-.journal-capture-scroll {
+.ca-journal-capture-scroll {
   max-height: 440px;
   overflow-y: auto;
-  padding-right: var(--am-space-1);
+  padding-right: var(--ca-space-1);
   scroll-behavior: smooth;
 }
 
-.is-measuring-natural .journal-capture-scroll,
-.is-measuring-natural.journal-capture-scroll,
-.is-sized .journal-capture-scroll,
-.is-sized.journal-capture-scroll,
-.journal-widget-card.is-sized .journal-capture-scroll,
-.journal-block-cell > .is-sized .journal-capture-scroll {
+.is-measuring-natural .ca-journal-capture-scroll,
+.is-measuring-natural.ca-journal-capture-scroll,
+.is-sized .ca-journal-capture-scroll,
+.is-sized.ca-journal-capture-scroll,
+.ca-journal-widget-card.is-sized .ca-journal-capture-scroll,
+.ca-journal-block-cell > .is-sized .ca-journal-capture-scroll {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
   overflow-y: auto;
 }
 
-.journal-capture-scroll::-webkit-scrollbar {
+.ca-journal-capture-scroll::-webkit-scrollbar {
   width: 6px;
 }
 
-.journal-capture-scroll::-webkit-scrollbar-thumb {
+.ca-journal-capture-scroll::-webkit-scrollbar-thumb {
   background: var(--background-modifier-border);
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
 }
 
-.journal-capture-scroll::-webkit-scrollbar-thumb:hover {
+.ca-journal-capture-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--background-modifier-border-hover);
 }
 
-.journal-capture-list {
+.ca-journal-capture-list {
   display: flex;
   flex-direction: column;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
 }
 
-.journal-capture-empty {
-  padding: var(--am-space-4) var(--am-space-2);
-  font-size: var(--am-text-sm);
+.ca-journal-capture-empty {
+  padding: var(--ca-space-4) var(--ca-space-2);
+  font-size: var(--ca-text-sm);
   color: var(--text-faint);
   text-align: center;
 }
 
-.journal-capture-card {
-  padding: var(--am-space-2) var(--am-space-3);
+.ca-journal-capture-card {
+  padding: var(--ca-space-2) var(--ca-space-3);
   background: color-mix(in srgb, var(--interactive-accent) 5%, var(--background-secondary));
   border: 1px solid color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
   border-left: 3px solid var(--interactive-accent);
-  border-radius: var(--am-radius-md);
-  box-shadow: var(--am-elev-1);
+  border-radius: var(--ca-radius-md);
+  box-shadow: var(--ca-elev-1);
   transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
 }
-.journal-capture-card:hover {
+.ca-journal-capture-card:hover {
   border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border-hover));
-  box-shadow: var(--am-shadow-md);
+  box-shadow: var(--ca-shadow-md);
 }
-.journal-capture-head {
+.ca-journal-capture-head {
   display: flex;
   align-items: center;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
 }
 /* Tabular so a column of stamps lines up, which is what makes the list read as
    a chronology rather than as a stack of paragraphs. */
-.journal-capture-time {
-  font-size: var(--am-text-2xs);
+.ca-journal-capture-time {
+  font-size: var(--ca-text-2xs);
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
-  letter-spacing: var(--am-caps-tracking);
+  letter-spacing: var(--ca-caps-tracking);
   /* A BUTTON THAT LOOKS LIKE THE TEXT IT REPLACED (4.55). The stamp became a
      control so an item logged late can be corrected, and a stamp that suddenly
      looked like a button would put chrome on every card in a list you mostly
@@ -1552,24 +1552,24 @@ body.is-mobile .jcl-action-chip {
   cursor: pointer;
   font-family: inherit;
 }
-.journal-capture-time:hover {
+.ca-journal-capture-time:hover {
   color: var(--text-normal);
   text-decoration: underline dotted;
 }
 /* How long it took, beside when it happened. Faint, because the stamp is the
    fact and the duration is a detail of it. */
-.journal-capture-mins {
-  font-size: var(--am-text-2xs);
+.ca-journal-capture-mins {
+  font-size: var(--ca-text-2xs);
   font-variant-numeric: tabular-nums;
   color: var(--text-faint);
 }
 /* A hand-typed capture has no stamp. The slot is kept so the bodies below
    still align down the column. */
-.journal-capture-time.is-empty::before {
+.ca-journal-capture-time.is-empty::before {
   content: "—";
   color: var(--text-faint);
 }
-.journal-capture-actions {
+.ca-journal-capture-actions {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -1580,19 +1580,19 @@ body.is-mobile .jcl-action-chip {
   opacity: 0;
   transition: opacity 120ms;
 }
-.journal-capture-card:hover .journal-capture-actions,
-.journal-capture-actions:focus-within {
+.ca-journal-capture-card:hover .ca-journal-capture-actions,
+.ca-journal-capture-actions:focus-within {
   opacity: 1;
 }
 /* A phone has no hover, so the three controls would be permanently invisible
    and the card unusable. Faint-but-present, the same resting state the title
    pencil and the tracker cell's remove-× take. */
 @media (hover: none) {
-  .journal-capture-actions {
+  .ca-journal-capture-actions {
     opacity: 0.45;
   }
 }
-.journal-capture-btn {
+.ca-journal-capture-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1601,22 +1601,22 @@ body.is-mobile .jcl-action-chip {
   padding: 0;
   background: none;
   border: none;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   color: var(--text-faint);
   cursor: pointer;
   box-shadow: none;
 }
-.journal-capture-btn:hover {
+.ca-journal-capture-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.journal-capture-btn .svg-icon {
+.ca-journal-capture-btn .svg-icon {
   width: 14px;
   height: 14px;
 }
-.journal-capture-text {
+.ca-journal-capture-text {
   margin-top: 2px;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   line-height: 1.45;
   /* The region is plain text by contract, so a capture keeps the line breaks
      the reader typed rather than being reflowed into one paragraph. */
@@ -1625,19 +1625,19 @@ body.is-mobile .jcl-action-chip {
 }
 /* Crossed off. The whole body, not the stamp: the time it happened is still
    true. */
-.journal-capture-card.is-done {
+.ca-journal-capture-card.is-done {
   border-left-color: var(--background-modifier-border);
   background: var(--background-secondary);
   box-shadow: none;
 }
-.journal-capture-card.is-done .journal-capture-text {
+.ca-journal-capture-card.is-done .ca-journal-capture-text {
   text-decoration: line-through;
   color: var(--text-faint);
 }
-.journal-capture-edit {
+.ca-journal-capture-edit {
   width: 100%;
   margin-top: 2px;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   line-height: 1.45;
   resize: vertical;
 }
@@ -1654,39 +1654,39 @@ body.is-mobile .jcl-action-chip {
    room it needs and a capture's bare `14:32` keeps taking less. Fixing a width
    wide enough for the longer form would indent every capture in the vault to
    make space for a date it does not have. */
-.journal-capture-add {
-  margin-top: var(--am-space-2);
+.ca-journal-capture-add {
+  margin-top: var(--ca-space-2);
 }
 
-.journal-capture-add-box {
+.ca-journal-capture-add-box {
   display: flex;
   flex-direction: column;
   gap: 6px;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   padding: 6px 8px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.journal-capture-add-box:focus-within {
+.ca-journal-capture-add-box:focus-within {
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 1px var(--interactive-accent);
 }
 
-.journal-capture-add-controls {
+.ca-journal-capture-add-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
 }
 
-.journal-capture-when-btn {
+.ca-journal-capture-when-btn {
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   color: var(--text-muted);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   padding: 2px 7px;
   display: inline-flex;
   align-items: center;
@@ -1698,114 +1698,114 @@ body.is-mobile .jcl-action-chip {
   box-shadow: none;
 }
 
-.journal-capture-when-btn:hover,
-.journal-capture-when-btn.is-active {
+.ca-journal-capture-when-btn:hover,
+.ca-journal-capture-when-btn.is-active {
   color: var(--interactive-accent);
   border-color: var(--interactive-accent);
   background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
 }
 
-.journal-capture-when-btn svg {
+.ca-journal-capture-when-btn svg {
   width: 12px;
   height: 12px;
 }
 
-.journal-capture-when-label {
-  font-size: var(--am-text-2xs);
+.ca-journal-capture-when-label {
+  font-size: var(--ca-text-2xs);
   font-weight: 500;
 }
 
 /* WHEN IT HAPPENED, AS THREE FIELDS. Shared by the add row and by the stamp on
    a card, which is why the rule is not scoped to either: one control, one look,
    in the two places most likely to drift apart. */
-.journal-capture-when {
+.ca-journal-capture-when {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--am-space-1);
-  margin-top: var(--am-space-1);
+  gap: var(--ca-space-1);
+  margin-top: var(--ca-space-1);
 }
-.journal-capture-when input {
-  font-size: var(--am-text-2xs);
-  padding: 2px var(--am-space-1);
+.ca-journal-capture-when input {
+  font-size: var(--ca-text-2xs);
+  padding: 2px var(--ca-space-1);
   min-width: 0;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
 }
-.journal-capture-when-mins {
+.ca-journal-capture-when-mins {
   /* Wide enough for three digits and no wider: a minutes box the size of a date
      field reads as somewhere to write a sentence. */
   width: 5.5em;
 }
 
 /* Compact mode */
-.journal-capture-scroll.is-compact .journal-capture-card {
-  padding: var(--am-space-1) var(--am-space-2);
+.ca-journal-capture-scroll.is-compact .ca-journal-capture-card {
+  padding: var(--ca-space-1) var(--ca-space-2);
   gap: 2px;
 }
-.journal-capture-scroll.is-compact .journal-capture-text {
+.ca-journal-capture-scroll.is-compact .ca-journal-capture-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
 }
 
 /* Log type tags on cards */
-.journal-capture-type-tag {
+.ca-journal-capture-type-tag {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   padding: 1px 6px;
-  border-radius: var(--am-radius-xs);
-  font-size: var(--am-text-2xs);
+  border-radius: var(--ca-radius-xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: var(--am-caps-tracking);
+  letter-spacing: var(--ca-caps-tracking);
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
 }
-.jcl-tag-icon {
-  font-size: var(--am-text-2xs);
+.ca-jcl-tag-icon {
+  font-size: var(--ca-text-2xs);
 }
-.jcl-tag-label {
-  font-size: var(--am-text-2xs);
+.ca-jcl-tag-label {
+  font-size: var(--ca-text-2xs);
 }
 
 /* Search match highlighting */
-.jcl-highlight {
+.ca-jcl-highlight {
   background: color-mix(in srgb, var(--interactive-accent) 30%, transparent);
   color: var(--text-normal);
   padding: 0 2px;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
 }
 
 /* Tag and code styling in card text */
-.jcl-text-tag {
+.ca-jcl-text-tag {
   color: var(--interactive-accent);
   background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
   padding: 1px 5px;
-  border-radius: var(--am-radius-xs);
-  font-size: var(--am-text-xs);
+  border-radius: var(--ca-radius-xs);
+  font-size: var(--ca-text-xs);
   font-weight: 500;
 }
 
-.jcl-text-code {
+.ca-jcl-text-code {
   font-family: var(--font-monospace);
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   padding: 1px 4px;
-  border-radius: var(--am-radius-xs);
-  font-size: var(--am-text-2xs);
+  border-radius: var(--ca-radius-xs);
+  font-size: var(--ca-text-2xs);
 }
 
 /* Add select */
-.jcl-add-type-select {
+.ca-jcl-add-type-select {
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-normal);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   font-weight: 500;
   padding: 2px 8px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   outline: none;
   cursor: pointer;
   max-width: 160px;
@@ -1813,34 +1813,34 @@ body.is-mobile .jcl-action-chip {
   box-shadow: none;
 }
 
-.jcl-add-type-select:hover {
+.ca-jcl-add-type-select:hover {
   background: var(--background-modifier-hover);
   border-color: var(--background-modifier-border-hover);
 }
 
 /* Footer count */
-.journal-logbook-footer {
+.ca-journal-logbook-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--am-space-1) var(--am-space-2);
-  font-size: var(--am-text-2xs);
+  padding: var(--ca-space-1) var(--ca-space-2);
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
   border-top: 1px solid var(--background-modifier-border);
-  margin-top: var(--am-space-2);
+  margin-top: var(--ca-space-2);
 }
-.jcl-footer-count {
+.ca-jcl-footer-count {
   font-variant-numeric: tabular-nums;
 }
-.jcl-footer-cap {
+.ca-jcl-footer-cap {
   color: var(--text-faint);
 }
-.journal-capture-add-input {
+.ca-journal-capture-add-input {
   width: 100%;
   background: transparent;
   border: none;
   color: var(--text-normal);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   line-height: 1.45;
   outline: none;
   resize: none;
@@ -1850,7 +1850,7 @@ body.is-mobile .jcl-action-chip {
   font-family: inherit;
 }
 
-.journal-capture-add-input:focus {
+.ca-journal-capture-add-input:focus {
   outline: none;
   box-shadow: none;
   border: none;
@@ -1859,20 +1859,20 @@ body.is-mobile .jcl-action-chip {
 /* The logbook's own wrapper. No card and no ground: the widget sits inside a
    `header:` bar's section on every page that composes it, and a second surface
    inside that one is the doubling `frame:` exists to prevent. */
-.journal-logbook {
+.ca-journal-logbook {
   display: block;
 }
-.journal-logbook-actions {
+.ca-journal-logbook-actions {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: var(--am-space-2);
+  margin-bottom: var(--ca-space-2);
 }
 /* Meetings: the agenda rows are the events list's own, so they are not
    restyled here — only made clickable, which they are not on a dashboard. */
-.journal-logbook--agenda .am-ev-row {
+.ca-journal-logbook--agenda .ca-ev-row {
   cursor: pointer;
 }
-.journal-logbook--agenda .am-ev-row:hover {
+.ca-journal-logbook--agenda .ca-ev-row:hover {
   background: var(--background-modifier-hover);
 }
 
@@ -1884,15 +1884,15 @@ body.is-mobile .jcl-action-chip {
    with only gaps between them is what made the first pass feel unanchored —
    nothing said which pieces belonged together. */
 
-.jyr-loading {
+.ca-jyr-loading {
   padding: 10px 4px;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-faint);
 }
 
 /* 2.52: the bordered panel these rules built is gone — the year is a
    banner-over-body card like the other three scopes now, so the container is
-   `.journal-overview-summary` and the frame comes from it. What remains here
+   `.ca-journal-overview-summary` and the frame comes from it. What remains here
    is the stat band and the density strip, which were always the year's own.
    `.jyr-head` / `.jyr-title` / `.jyr-range` went with the panel: the banner
    carries the title, and the range line is a `.journal-period-stats` inside it,
@@ -1902,9 +1902,9 @@ body.is-mobile .jcl-action-chip {
    under its `overflow: hidden`. Inside the shared body they need their own
    inset frame, or a four-up grid of stat cells runs to the text width while
    every section below it is inset. */
-.jyr-stats-wrap {
-  border: var(--am-rule) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+.ca-jyr-stats-wrap {
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
   overflow: hidden;
   margin-bottom: 10px;
 }
@@ -1912,7 +1912,7 @@ body.is-mobile .jcl-action-chip {
 /* `.jyr-stats`, `.jyr-stat` and their three inner rules retired in 3.6 patch 6.
    The year's stat band was the only stat band in the plugin, so it was written
    here under this page's prefix; §4.1 gives the same object to three more
-   grains, and it moved to `.am-stats` in 96-stat-strip.css rather than three
+   grains, and it moved to `.ca-stats` in 96-stat-strip.css rather than three
    pages reaching across for a name that says "year".
 
    Seven rules became four. Five of the seven existed to make a wrapping flex
@@ -1928,72 +1928,72 @@ body.is-mobile .jcl-action-chip {
 
 /* Density sits in the same frame as the stat cells, below a divider — part of
    the object, not a separate floating block. */
-.jyr-density {
+.ca-jyr-density {
   padding: 10px 14px 12px;
-  border-top: var(--am-rule) solid var(--background-modifier-border);
+  border-top: var(--ca-rule) solid var(--background-modifier-border);
 }
 /* `.jyr-section-*` retired in 2.56.2. See the note on `.jq-section-*`. */
 
-.jyr-months {
+.ca-jyr-months {
   display: flex;
   gap: 3px;
 }
-.jyr-month {
+.ca-jyr-month {
   flex: 1 1 0;
   min-width: 0;
 }
 /* Bars sit in a track, so a low month reads as a low bar in a slot rather than
    a small floating rectangle — the track is what gives the row its baseline. */
-.jyr-month-track {
+.ca-jyr-month-track {
   height: 30px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--background-modifier-border);
   display: flex;
   align-items: flex-end;
   overflow: hidden;
 }
-.jyr-month-bar {
+.ca-jyr-month-bar {
   width: 100%;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--interactive-accent);
   min-height: 2px;
 }
 /* A month that happened with nothing in it: the empty track alone says it. */
-.jyr-month-track.is-empty .jyr-month-bar {
+.ca-jyr-month-track.is-empty .ca-jyr-month-bar {
   display: none;
 }
 /* A month that hasn't happened yet means "not yet", not "you didn't write" —
    so it's an outline rather than a filled trough. */
-.jyr-month-track.is-future {
+.ca-jyr-month-track.is-future {
   background: transparent;
   border: 1px dashed var(--background-modifier-border);
 }
-.jyr-month-label {
+.ca-jyr-month-label {
   margin-top: 4px;
   text-align: center;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
 }
 
-.jyr-empty {
+.ca-jyr-empty {
   padding: 10px 14px 12px;
   border-top: 1px solid var(--background-modifier-border);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
 }
 
 /* ── A journal note's charts region (journal-charts.ts) ──────────────────
    The managed area holding `journal-chart` / `journal-breakdown` widgets, and
    its editor. The section shell — header bar, toolbar, empty state — is the
-   diary's Trends section verbatim (.journal-header-bar, .journal-chart-toolbar,
-   .journal-chart-empty), so the two read as one family and neither can drift
+   diary's Trends section verbatim (.ca-journal-header-bar, .ca-journal-chart-toolbar,
+   .ca-journal-chart-empty), so the two read as one family and neither can drift
    into its own look. Only what genuinely differs is styled here. */
 
 /* A stack, not a grid: a weakest-first ranking is a horizontal bar chart whose
    readability is bar length, and a trend at half width is a trend you squint
    at. The gap matches the grid's so the spacing is shared even though the
    layout isn't. */
-.journal-jchart-stack {
+.ca-journal-jchart-stack {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -2002,11 +2002,11 @@ body.is-mobile .jcl-action-chip {
 /* Where the chart reads from, stated in the editor rather than asked. Sits
    where the chart editor's dependent fields would be, and reads as the same
    kind of quiet explanatory line. */
-.almanac-chart-scope {
+.ca-chart-scope {
   margin: 10px 0 2px;
   padding: 8px 10px;
   border-left: 2px solid var(--background-modifier-border);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
 }
 
@@ -2014,28 +2014,28 @@ body.is-mobile .jcl-action-chip {
 /* Deliberately warm rather than red. This is not an error — the folder was
    read successfully — it is a short list of values worth a second look
    before they are committed. */
-.almanac-editor-caveats {
+.ca-editor-caveats {
   border: 1px solid var(--color-yellow);
   border-radius: var(--radius-m);
   background: rgba(var(--color-yellow-rgb), 0.08);
   padding: 0.75em 0.9em;
   margin-bottom: 1em;
 }
-.almanac-editor-caveats-title {
+.ca-editor-caveats-title {
   font-weight: var(--font-semibold);
   margin-bottom: 0.25em;
 }
-.almanac-editor-caveats-blurb {
+.ca-editor-caveats-blurb {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   margin-bottom: 0.5em;
 }
-.almanac-editor-caveats-list {
+.ca-editor-caveats-list {
   margin: 0;
   padding-left: 1.2em;
   font-size: var(--font-ui-smaller);
 }
-.almanac-editor-caveats-list li {
+.ca-editor-caveats-list li {
   margin: 0.15em 0;
 }
 
@@ -2049,20 +2049,20 @@ body.is-mobile .jcl-action-chip {
    Built as a list of dated lines rather than a table. A table implies columns
    worth comparing across rows, and these rows share only their date — the
    content is one phrase per day and its length is whatever the day's was. */
-.jer-rollup {
+.ca-jer-rollup {
   padding: 2px 0;
 }
-.jer-loading,
-.jer-empty {
+.ca-jer-loading,
+.ca-jer-empty {
   color: var(--text-muted);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   padding: 6px 2px;
 }
 /* A light in-widget line, not a section title: this widget sits under a
    collapsible `header:` bar that already names the section, so a bold heading
-   here would be the same words twice. Mirrors .jtt-head, which states the same
+   here would be the same words twice. Mirrors .ca-jtt-head, which states the same
    rule — a small muted label on the left, a count pill on the right. */
-.jer-head {
+.ca-jer-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2070,25 +2070,25 @@ body.is-mobile .jcl-action-chip {
   gap: 8px;
   margin: 0 0 0.7em;
 }
-.jer-title {
+.ca-jer-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
 }
-.jer-title-icon {
+.ca-jer-title-icon {
   display: inline-flex;
 }
-.jer-title-icon .svg-icon {
+.ca-jer-title-icon .svg-icon {
   width: 0.95em;
   height: 0.95em;
 }
-.jer-pill {
-  font-size: var(--am-text-2xs);
+.ca-jer-pill {
+  font-size: var(--ca-text-2xs);
   line-height: 1.4;
-  padding: var(--am-space-1) var(--am-space-5);
-  border-radius: var(--am-radius-pill);
+  padding: var(--ca-space-1) var(--ca-space-5);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
@@ -2100,7 +2100,7 @@ body.is-mobile .jcl-action-chip {
    Capped and scrolled instead, so the section keeps a size the rest of the
    dashboard can sit beside. The cap is in `em` so it tracks the reader's font
    size rather than fixing a row count. */
-.jer-days {
+.ca-jer-days {
   max-height: 24em;
   overflow-y: auto;
   /* Own scroll context, so a wheel over the list doesn't scroll the note the
@@ -2113,7 +2113,7 @@ body.is-mobile .jcl-action-chip {
   border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
 }
-.jer-day {
+.ca-jer-day {
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -2123,14 +2123,14 @@ body.is-mobile .jcl-action-chip {
    lines while its neighbour is one, so a hairline leaves the eye guessing which
    text belongs to which date; a band is unambiguous at any row height. Very low
    alpha — this is a reading aid, not a table. */
-.jer-day:nth-child(even) {
+.ca-jer-day:nth-child(even) {
   background: color-mix(in srgb, var(--text-normal) 4%, transparent);
 }
 /* The date is the link, and the rollup's only affordance: a derived page sends
    you to the entry to change it, never writes into itself. Fixed width and
    tabular figures so the lines beside it start on one edge — a ragged left
    margin is what stops a list of thirty-one rows scanning. */
-.jer-date {
+.ca-jer-date {
   flex: 0 0 auto;
   width: 42px;
   display: flex;
@@ -2142,63 +2142,63 @@ body.is-mobile .jcl-action-chip {
   text-decoration: none !important;
   cursor: pointer;
 }
-.jer-date:hover .jer-date-day {
-  color: var(--am-area-diary);
+.ca-jer-date:hover .ca-jer-date-day {
+  color: var(--ca-area-diary);
 }
-.jer-date-day {
-  font-size: var(--am-text-xs);
+.ca-jer-date-day {
+  font-size: var(--ca-text-xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.jer-date-dow {
-  font-size: var(--am-text-2xs);
+.ca-jer-date-dow {
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
 }
-.jer-lines {
+.ca-jer-lines {
   flex: 1 1 auto;
   min-width: 0;
 }
-.jer-line {
-  font-size: var(--am-text-sm);
+.ca-jer-line {
+  font-size: var(--ca-text-sm);
   color: var(--text-normal);
   line-height: 1.45;
 }
-.jer-line + .jer-line {
+.ca-jer-line + .ca-jer-line {
   margin-top: 2px;
 }
 /* Which field a line came from. Drawn only when more than one daily field
    rolls up — with the shipped `focus` alone it would be thirty-one repetitions
    of a word the section title already said. */
-.jer-line-key {
+.ca-jer-line-key {
   margin-right: 6px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-faint);
 }
-.jer-goal {
+.ca-jer-goal {
   display: flex;
   align-items: baseline;
   gap: 6px;
 }
-.jer-goal-icon {
+.ca-jer-goal-icon {
   display: inline-flex;
   color: var(--text-faint);
 }
-.jer-goal-icon svg {
+.ca-jer-goal-icon svg {
   width: 13px;
   height: 13px;
 }
-.jer-goal.is-done .jer-line-text {
+.ca-jer-goal.is-done .ca-jer-line-text {
   color: var(--text-muted);
   text-decoration: line-through;
 }
 
 /* The year's quarter cards (2.52). Same card as the quarter's month cards —
-   literally the same `.jq-month` rules — because it is the same object one
+   literally the same `.ca-jq-month` rules — because it is the same object one
    zoom out, and giving the year its own would be how the two drift. Only the
    column count differs. */
-.jyr-quarters {
+.ca-jyr-quarters {
   /* auto-fit rather than a hard repeat(4): four cards at the quarter page's
      three-up card width overflow a narrow pane, and the year is the one scope
      whose card row can legitimately wrap to 2x2. */
@@ -2206,20 +2206,20 @@ body.is-mobile .jcl-action-chip {
 }
 /* The card is a door to that quarter, so it should say so on hover the way the
    quarter's month cards do. */
-.jyr-quarters .jq-month {
+.ca-jyr-quarters .ca-jq-month {
   cursor: pointer;
 }
-.jyr-quarters .jq-month:hover {
-  border-color: var(--am-area-diary);
+.ca-jyr-quarters .ca-jq-month:hover {
+  border-color: var(--ca-area-diary);
 }
 
 /* "You are here" in the scope ladder (2.52). Every period dashboard carries the
    same six pills, so the row is a position indicator rather than a menu — which
    only works if the current page is present and marked. Flat, dimmed and
-   non-clickable, the same treatment .jn-muted gives a destination that doesn't
+   non-clickable, the same treatment .ca-jn-muted gives a destination that doesn't
    exist yet; the difference is that this one is deliberate, so it keeps full
    text contrast and loses only the pill chrome. */
-.journal-nav .jn-here {
+.ca-journal-nav .ca-jn-here {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -2227,33 +2227,33 @@ body.is-mobile .jcl-action-chip {
   font-weight: 600;
   cursor: default;
 }
-.journal-nav .jn-here .jn-icon {
-  color: var(--am-area-diary);
+.ca-journal-nav .ca-jn-here .ca-jn-icon {
+  color: var(--ca-area-diary);
 }
 
 /* A directive this plugin used to ship (2.53). Not an error — the note is old,
    not broken — so it reads as a notice rather than a failure, and names the
    command that fixes it. Muted rather than red for the same reason the
    navigator uses a muted pill for a destination that doesn't exist yet. */
-.journal-widget-retired {
+.ca-journal-widget-retired {
   display: block;
   padding: 6px 10px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   border: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
   color: var(--text-muted);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
 }
 
 /* A month cell that re-scopes the page rather than opening its review (2.53).
    The grid does two things on left click and the difference should be legible
-   before the click, not after. `.cal-cell:hover` already tints the background
+   before the click, not after. `.ca-cal-cell:hover` already tints the background
    for every cell; this adds the diary accent on the edge, so a cell that will
    *select* is marked and a cell that will *open* keeps the plain hover it has
    everywhere else in the plugin. The tooltip carries the rest — "Show August"
    against "Open review". */
-.cal-cell-month.cal-cell-selects:hover {
-  box-shadow: inset 0 0 0 1px var(--am-area-diary);
+.ca-cal-cell-month.ca-cal-cell-selects:hover {
+  box-shadow: inset 0 0 0 1px var(--ca-area-diary);
 }
 
 /* The scope menu button (2.53). Labelled with the scope you are on, so the row
@@ -2261,39 +2261,39 @@ body.is-mobile .jcl-action-chip {
    fitting a phone. Bordered, unlike the plain pills beside it — it opens a
    menu rather than going somewhere, and that difference should be visible
    before the click. */
-.journal-nav .jn-scopes {
+.ca-journal-nav .ca-jn-scopes {
   border: 1px solid var(--background-modifier-border);
   gap: 5px;
 }
-.journal-nav .jn-scopes.is-here {
+.ca-journal-nav .ca-jn-scopes.is-here {
   color: var(--text-normal) !important;
   font-weight: 500;
 }
-.journal-nav .jn-scopes .jn-caret {
+.ca-journal-nav .ca-jn-scopes .ca-jn-caret {
   display: inline-flex;
   margin-left: -1px;
   color: var(--text-faint);
 }
-.journal-nav .jn-scopes .jn-caret svg {
+.ca-journal-nav .ca-jn-scopes .ca-jn-caret svg {
   width: 14px;
   height: 14px;
 }
-.journal-nav .jn-scopes:hover {
-  border-color: var(--am-area-diary);
+.ca-journal-nav .ca-jn-scopes:hover {
+  border-color: var(--ca-area-diary);
 }
 
 
 /* ── Template editor (2.54.3) ─────────────────────────────────────────────
    Two columns: what the file has on the left, what a save would do on the
-   right. Reuses .almanac-editor-mono and .almanac-wizard-block rather than
+   right. Reuses .ca-editor-mono and .ca-wizard-block rather than
    restyling them — the Layout tab IS the wizard's schematic, and a reader who
    has seen one should recognise the other. */
-.almanac-tpl-editor {
+.ca-tpl-editor {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.almanac-tpl-edited {
+.ca-tpl-edited {
   display: flex;
   align-items: flex-start;
   gap: 6px;
@@ -2301,9 +2301,9 @@ body.is-mobile .jcl-action-chip {
   border-radius: 6px;
   background: var(--background-modifier-error-hover);
   color: var(--text-normal);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
 }
-.almanac-tpl-edited-icon {
+.ca-tpl-edited-icon {
   flex: 0 0 auto;
   display: flex;
   margin-top: 1px;
@@ -2318,11 +2318,11 @@ body.is-mobile .jcl-action-chip {
 /* Struck through rather than removed from the list: a reader deciding to take
    a section out should be able to see what they are taking out, and put it
    back without hunting for it in the Add menu. */
-.almanac-tpl-row-removed .almanac-list-title {
+.ca-tpl-row-removed .ca-list-title {
   text-decoration: line-through;
   color: var(--text-faint);
 }
-.almanac-tpl-row-added .almanac-list-title {
+.ca-tpl-row-added .ca-list-title {
   color: var(--text-accent);
 }
 /* ── THE SPINE IS A HOVER, NOT A STATE (4.34.3) ─────────────────────────
@@ -2341,33 +2341,33 @@ body.is-mobile .jcl-action-chip {
  * colour is, so nothing shifts by 3px as the pointer crosses it — and every row
  * in the list gets the same slot, so a widget row and a section row light up
  * identically. */
-.almanac-tpl-list .almanac-list-row {
+.ca-tpl-list .ca-list-row {
   border-left: 3px solid transparent;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
-.almanac-tpl-list .almanac-list-row:hover {
+.ca-tpl-list .ca-list-row:hover {
   border-left-color: var(--interactive-accent);
 }
-.almanac-tpl-row-section {
+.ca-tpl-row-section {
   /* The width the shared rule already reserves; named here so the row keeps its
      slot on any surface that lists sections outside the editor. */
   border-left-width: 3px;
   border-left-style: solid;
 }
-.almanac-tpl-row-section .almanac-list-title {
+.ca-tpl-row-section .ca-list-title {
   font-weight: 600;
   color: var(--text-normal);
 }
-.almanac-tpl-toggle {
-  font-size: var(--am-text-xs);
-  padding: var(--am-space-1) var(--am-space-4);
+.ca-tpl-toggle {
+  font-size: var(--ca-text-xs);
+  padding: var(--ca-space-1) var(--ca-space-4);
 }
 /* A row that has been asked something and not yet answered (3.8 patch 7).
    NOT styled as an addition, because it is not one yet: the "adding" accent
    promises a block that Save would write, and this row contributes no op until
    its dropdown has a value. Faint plus the pill, which is the same pairing the
    removed row uses — visible, in its place, wearing the reason. */
-.almanac-tpl-row-waiting .almanac-list-title {
+.ca-tpl-row-waiting .ca-list-title {
   color: var(--text-muted);
 }
 /* THE CEILING CAME OFF IN 4.15 §2, AND THE FLOOR DID NOT.
@@ -2384,8 +2384,8 @@ body.is-mobile .jcl-action-chip {
 
    The FLOOR stays, and the second half of that sentence is why: this is still a
    flex child, and a <select> with no basis is still happy to shrink to nothing. */
-.almanac-tpl-choice {
-  font-size: var(--am-text-xs);
+.ca-tpl-choice {
+  font-size: var(--ca-text-xs);
   min-width: 7em;
   text-overflow: ellipsis;
 }
@@ -2393,8 +2393,8 @@ body.is-mobile .jcl-action-chip {
    either reads as one row. Its ceiling came off with that one and for the same
    reason; 3.0 §"250px" was about a control given more room than its SLOT had,
    and the slot is now a line. */
-.almanac-tpl-title-input {
-  font-size: var(--am-text-xs);
+.ca-tpl-title-input {
+  font-size: var(--ca-text-xs);
   min-width: 7em;
   flex: 1 1 auto;
   text-overflow: ellipsis;
@@ -2409,7 +2409,7 @@ body.is-mobile .jcl-action-chip {
    COLUMN, so the label sits over its control rather than in front of it: the
    actions line already runs several fields and two buttons across it, and
    label-beside-box would make each field twice as wide for the same box. */
-.almanac-tpl-field {
+.ca-tpl-field {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2417,19 +2417,19 @@ body.is-mobile .jcl-action-chip {
   flex: 1 1 9em;
   max-width: 20em;
 }
-.almanac-tpl-field-label {
-  color: var(--am-bar-ink);
-  font-size: var(--am-bar-text);
+.ca-tpl-field-label {
+  color: var(--ca-bar-ink);
+  font-size: var(--ca-bar-text);
   font-weight: 600;
-  letter-spacing: var(--am-bar-track);
+  letter-spacing: var(--ca-bar-track);
   text-transform: uppercase;
   line-height: 1.2;
 }
 /* The two controls fill the field they are labelled by, rather than sitting at
    their own intrinsic width under a label that is wider or narrower than they
    are. */
-.almanac-tpl-field > select,
-.almanac-tpl-field > input {
+.ca-tpl-field > select,
+.ca-tpl-field > input {
   width: 100%;
   min-width: 0;
 }
@@ -2441,7 +2441,7 @@ body.is-mobile .jcl-action-chip {
  * thing that is on or off, and the label reads as what ticking it DOES rather
  * than naming both sides.
  *
- * A ROW INSIDE A COLUMN. `.almanac-tpl-field` stacks a label over its control,
+ * A ROW INSIDE A COLUMN. `.ca-tpl-field` stacks a label over its control,
  * which is right for a box whose name is a noun; a checkbox's name is a sentence
  * and belongs beside it, so this puts the two back on one line under the field's
  * own label. `flex-start` rather than `center` because the sentence may wrap on
@@ -2451,33 +2451,33 @@ body.is-mobile .jcl-action-chip {
  * controls are capped at 20em so a row of them shares the line; this one's text
  * is the explanation, and truncating it would leave a tick box beside "As a
  * widget, so it can" — a sentence that stops before the reason. */
-.almanac-tpl-form {
+.ca-tpl-form {
   display: flex;
   align-items: flex-start;
   gap: 6px;
   min-width: 0;
 }
-.almanac-tpl-field:has(> .almanac-tpl-form) {
+.ca-tpl-field:has(> .ca-tpl-form) {
   max-width: none;
   flex: 1 1 16em;
 }
-.almanac-tpl-form-box {
+.ca-tpl-form-box {
   flex: 0 0 auto;
   margin: 0;
 }
-.almanac-tpl-form-label {
-  font-size: var(--am-text-xs);
+.ca-tpl-form-label {
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
   line-height: 1.35;
   cursor: pointer;
   min-width: 0;
 }
-.almanac-tpl-form.is-disabled {
+.ca-tpl-form.is-disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.almanac-tpl-form.is-disabled .almanac-tpl-form-label,
-.almanac-tpl-form.is-disabled .almanac-tpl-form-box {
+.ca-tpl-form.is-disabled .ca-tpl-form-label,
+.ca-tpl-form.is-disabled .ca-tpl-form-box {
   cursor: not-allowed;
   color: var(--text-faint);
 }
@@ -2485,121 +2485,121 @@ body.is-mobile .jcl-action-chip {
    the note and this window cannot read it. Styled as text rather than as a
    disabled control, because a greyed dropdown reads as "broken" where a phrase
    reads as "not here" — and the tooltip carries the route that does work. */
-.almanac-tpl-choice-fixed {
-  font-size: var(--am-text-xs);
+.ca-tpl-choice-fixed {
+  font-size: var(--ca-text-xs);
   color: var(--text-faint);
   font-style: italic;
   cursor: help;
 }
 /* Nothing in the vault to answer with. A sentence, not an empty menu. Allowed
    to wrap, since it names what is missing and where to get it. */
-.almanac-tpl-choice-empty {
-  font-size: var(--am-text-xs);
+.ca-tpl-choice-empty {
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
   max-width: 22em;
   text-wrap: pretty;
 }
-.almanac-tpl-add {
+.ca-tpl-add {
   margin-top: 8px;
 }
 /* A BUTTON, NOT A DROPDOWN (4.15 §3). Full width for the reason the `<select>`
    was: it is the one thing under a list of rows and a control that ended
    halfway across would read as belonging to the last row rather than to the
    list. Dashed, because it adds rather than acts — the same distinction
-   `.almanac-list-pill.is-off` draws with the same border-style. */
-.almanac-tpl-add button {
+   `.ca-list-pill.is-off` draws with the same border-style. */
+.ca-tpl-add button {
   width: 100%;
-  padding: var(--am-space-2) var(--am-space-4);
-  border: var(--am-rule-hair) dashed var(--background-modifier-border-hover);
-  border-radius: var(--am-radius-sm);
+  padding: var(--ca-space-2) var(--ca-space-4);
+  border: var(--ca-rule-hair) dashed var(--background-modifier-border-hover);
+  border-radius: var(--ca-radius-sm);
   background: none;
   box-shadow: none;
   color: var(--text-muted);
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
-.almanac-tpl-add button:hover {
+.ca-tpl-add button:hover {
   border-color: var(--interactive-accent);
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.almanac-section-editor {
+.ca-section-editor {
   width: min(760px, 92vw);
   max-width: 92vw;
 }
 
 /* A real tab strip as of 3.0.1: four panes, one at a time, each the full
    width of the window. */
-.almanac-tpl-tabs {
+.ca-tpl-tabs {
   display: flex;
   gap: 2px;
   flex-wrap: wrap;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
   border-bottom: 1px solid var(--background-modifier-border);
   margin-bottom: 10px;
 }
-.almanac-tpl-tab {
-  font-size: var(--am-text-xs);
-  padding: var(--am-space-1) var(--am-space-4);
+.ca-tpl-tab {
+  font-size: var(--ca-text-xs);
+  padding: var(--ca-space-1) var(--ca-space-4);
   background: transparent;
   box-shadow: none;
 }
-.almanac-tpl-tab.is-active {
+.ca-tpl-tab.is-active {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
   box-shadow: inset 0 -2px 0 0 var(--text-accent);
 }
-.almanac-tpl-pane {
+.ca-tpl-pane {
   min-height: 220px;
 }
-.almanac-tpl-md {
+.ca-tpl-md {
   margin: 0;
   white-space: pre;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
 }
-.almanac-tpl-op {
+.ca-tpl-op {
   display: flex;
   gap: 8px;
   align-items: baseline;
   padding: 3px 0;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
 }
-.almanac-tpl-op-mark {
+.ca-tpl-op-mark {
   width: 1em;
   flex: 0 0 auto;
   text-align: center;
 }
-.almanac-tpl-op-label {
+.ca-tpl-op-label {
   flex: 0 0 auto;
   font-weight: 600;
 }
-.almanac-tpl-op-detail {
+.ca-tpl-op-detail {
   color: var(--text-muted);
 }
-.almanac-tpl-op-keep .almanac-tpl-op-label,
-.almanac-tpl-op-keep .almanac-tpl-op-detail {
+.ca-tpl-op-keep .ca-tpl-op-label,
+.ca-tpl-op-keep .ca-tpl-op-detail {
   color: var(--text-faint);
   font-weight: 400;
 }
-.almanac-tpl-op-add .almanac-tpl-op-mark {
+.ca-tpl-op-add .ca-tpl-op-mark {
   color: var(--color-green);
 }
-.almanac-tpl-op-remove .almanac-tpl-op-mark {
+.ca-tpl-op-remove .ca-tpl-op-mark {
   color: var(--color-red);
 }
-.almanac-tpl-op-foreign .almanac-tpl-op-mark {
+.ca-tpl-op-foreign .ca-tpl-op-mark {
   color: var(--color-yellow);
 }
 /* An extension adds without removing, so it reads with add's colour rather
    than a fourth one — the difference from `add` is that the section was
    already there, and that is what the row's words say. (3.18 §1) */
-.almanac-tpl-op-extend .almanac-tpl-op-mark {
+.ca-tpl-op-extend .ca-tpl-op-mark {
   color: var(--color-green);
 }
-.almanac-tpl-empty {
+.ca-tpl-empty {
   color: var(--text-muted);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   padding: 4px 0 8px;
 }
 
@@ -2608,88 +2608,88 @@ body.is-mobile .jcl-action-chip {
    Grouped rather than one paragraph: adding, removing and changing are three
    different questions and a reader answering the destructive one should not
    have to find it in prose. */
-.almanac-kind-group {
+.ca-kind-group {
   margin: 10px 0;
   padding: 8px 10px;
   border-radius: 6px;
   border-left: 3px solid var(--background-modifier-border);
   background: var(--background-secondary);
 }
-.almanac-kind-add {
+.ca-kind-add {
   border-left-color: var(--color-green);
 }
-.almanac-kind-remove {
+.ca-kind-remove {
   border-left-color: var(--color-red);
 }
-.almanac-kind-group-title {
-  font-size: var(--am-text-xs);
+.ca-kind-group-title {
+  font-size: var(--ca-text-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
   margin-bottom: 4px;
 }
-.almanac-kind-row + .almanac-kind-row {
+.ca-kind-row + .ca-kind-row {
   margin-top: 6px;
 }
-.almanac-kind-count {
+.ca-kind-count {
   color: var(--text-muted);
 }
-.almanac-kind-detail {
-  font-size: var(--am-text-sm);
+.ca-kind-detail {
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
 }
 /* The guarantee. The only box in the window about what does NOT change, which
    is why it gets the accent border rather than a tone that means danger. */
-.almanac-kind-promise {
+.ca-kind-promise {
   margin: 12px 0;
   padding: 10px;
   border-radius: 6px;
   border-left: 3px solid var(--interactive-accent);
   background: var(--background-primary-alt);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
 }
-.almanac-kind-cost {
+.ca-kind-cost {
   margin: 8px 0;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
 }
-.almanac-kind-cost div + div {
+.ca-kind-cost div + div {
   margin-top: 2px;
 }
 
 
 /* ── Section launcher rail (2.54.5) ───────────────────────────────────────
-   The Sections step of an existing journal. Reuses .almanac-list-row wholesale
+   The Sections step of an existing journal. Reuses .ca-list-row wholesale
    — it is the same kind of thing as a tracker row or a journal row, and a
    reader who has used those should not have to learn a third list. */
-.almanac-launcher-list {
+.ca-launcher-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.almanac-launcher-list .almanac-list-subtitle {
+.ca-launcher-list .ca-list-subtitle {
   font-family: var(--font-monospace);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
 }
 
 
 /* ── Reorder controls (2.54.6) ────────────────────────────────────────────
    Up/down rather than drag: the list is short, the rows are a fixed height,
    and a button is keyboard-reachable in a way a drag handle is not. */
-.almanac-tpl-arrow {
+.ca-tpl-arrow {
   padding: 0 4px;
   min-height: 0;
   line-height: 1.1;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   background: transparent;
   box-shadow: none;
   color: var(--text-muted);
 }
-.almanac-tpl-arrow:hover:not(:disabled) {
+.ca-tpl-arrow:hover:not(:disabled) {
   color: var(--text-normal);
   background: var(--background-modifier-hover);
 }
-.almanac-tpl-arrow:disabled {
+.ca-tpl-arrow:disabled {
   opacity: 0.3;
 }
 /* Take out of the group (4.53.1) and its opposite, Make a group (4.53.2),
@@ -2698,14 +2698,14 @@ body.is-mobile .jcl-action-chip {
    and the only one of the three that is not a nudge. It is set apart by a
    hairline rather than by a different shape, which would have made the column
    read as two controls and a stray. */
-.almanac-tpl-leave,
-.almanac-tpl-join {
+.ca-tpl-leave,
+.ca-tpl-join {
   margin-top: 2px;
   padding-top: 3px;
   border-top: 1px solid var(--background-modifier-border);
   border-radius: 0;
 }
-.almanac-tpl-op-move .almanac-tpl-op-mark {
+.ca-tpl-op-move .ca-tpl-op-mark {
   color: var(--text-accent);
 }
 
@@ -2715,29 +2715,29 @@ body.is-mobile .jcl-action-chip {
    dragged between them. The heading is drawn only where there is more than
    one, so a journal note and a dashboard render the flat list they always
    did. */
-.almanac-tpl-band {
-  font-size: var(--am-text-xs);
+.ca-tpl-band {
+  font-size: var(--ca-text-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-faint);
   margin: 10px 0 4px;
 }
-.almanac-tpl-band:first-child {
+.ca-tpl-band:first-child {
   margin-top: 0;
 }
 /* A section that cannot go says why in its subtitle rather than on Save.
    Muted rather than red: it is a fact about the section, not an error the
    reader has made. */
-.almanac-tpl-row-locked .almanac-list-subtitle {
+.ca-tpl-row-locked .ca-list-subtitle {
   color: var(--text-faint);
   font-style: italic;
 }
 /* ── The reorganise-journals window (4.40) ──────────────────────────────
    A SHORT LIST AND NOTHING ELSE, so it borrows the template editor's row rather
-   than growing a second one — the arrows are `.almanac-tpl-arrow`, already
+   than growing a second one — the arrows are `.ca-tpl-arrow`, already
    styled above, because "move this up" should look the same in every window
    that offers it. What is added here is only the list's own breathing room. */
-.almanac-reorder-list {
+.ca-reorder-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2747,10 +2747,10 @@ body.is-mobile .jcl-action-chip {
    near-invisible slot a glyph gets elsewhere: tabular figures, so 9 and 10 line
    up under each other, and the faint ink a label wears rather than the normal
    ink a value does — it is a count of rows, not a fact about the journal. */
-.almanac-reorder-list .almanac-list-token {
+.ca-reorder-list .ca-list-token {
   font-variant-numeric: tabular-nums;
   color: var(--text-faint);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
 }
 
 /* Drag reorders the list; nothing is written until Save. The cursor says the
@@ -2758,14 +2758,14 @@ body.is-mobile .jcl-action-chip {
    drop target — a row in the other band is not a target at all, so the
    gesture refuses the way every other drag does rather than accepting the
    drop and then explaining itself. */
-.almanac-tpl-list .almanac-list-row[draggable="true"] {
+.ca-tpl-list .ca-list-row[draggable="true"] {
   cursor: grab;
 }
-.almanac-tpl-list .almanac-list-row.is-dragging {
+.ca-tpl-list .ca-list-row.is-dragging {
   opacity: 0.45;
   cursor: grabbing;
 }
-.almanac-tpl-list .almanac-list-row.is-drop-target {
+.ca-tpl-list .ca-list-row.is-drop-target {
   box-shadow: inset 0 2px 0 0 var(--text-accent);
 }
 
@@ -2782,19 +2782,19 @@ body.is-mobile .jcl-action-chip {
    and below it, so the boundary between "these three are one object" and "this
    one is on its own" was carried by a 2px rule and nothing else. The gap is what
    says a card is a different kind of thing from the rows around it. */
-.almanac-tpl-block {
-  border: var(--am-rule) solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+.ca-tpl-block {
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
   background: var(--background-primary-alt);
   margin: 12px 0;
   overflow: hidden;
 }
-.almanac-tpl-block-bar {
+.ca-tpl-block-bar {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 5px 10px;
-  border-bottom: var(--am-rule) solid var(--background-modifier-border);
+  border-bottom: var(--ca-rule) solid var(--background-modifier-border);
 }
 /* ── The bar is the handle for the whole group (4.53.0) ──────────────────
    A card has drawn a group since 4.8 and there was no way to move one: the
@@ -2803,29 +2803,29 @@ body.is-mobile .jcl-action-chip {
    it come apart. The bar now carries the group's own two arrows and is the
    thing you pick up — one level of the list, one place to reach it, the same
    grab/grabbing cursor the rows have had since 3.0. */
-.almanac-tpl-block-bar[draggable="true"] {
+.ca-tpl-block-bar[draggable="true"] {
   cursor: grab;
 }
-.almanac-tpl-block-bar.is-dragging {
+.ca-tpl-block-bar.is-dragging {
   cursor: grabbing;
 }
 /* The states go on the CARD, not on the bar, because what is being moved is the
    whole block — the same fade and the same inset rule a row wears, drawn round
    the object they are actually describing. */
-.almanac-tpl-block.is-dragging {
+.ca-tpl-block.is-dragging {
   opacity: 0.45;
 }
-.almanac-tpl-block.is-drop-target {
+.ca-tpl-block.is-drop-target {
   box-shadow: inset 0 2px 0 0 var(--text-accent);
 }
-.almanac-tpl-block-title {
+.ca-tpl-block-title {
   flex: 1 1 auto;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-faint);
 }
-.almanac-tpl-block-body {
+.ca-tpl-block-body {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -2837,28 +2837,28 @@ body.is-mobile .jcl-action-chip {
  * group has more than one page — a single page is the group itself, and a band
  * saying `Page 1` over the whole card would name a division that is not there.
  *
- * THE BAND IDIOM THE LIST ALREADY HAS, one level in: `.almanac-tpl-band`
+ * THE BAND IDIOM THE LIST ALREADY HAS, one level in: `.ca-tpl-band`
  * separates the bands of a diary entry in exactly this voice, and a page is the
  * same kind of statement about a smaller thing. Sharing the look is what makes
  * the card read as one list with divisions rather than as two lists. */
-.almanac-tpl-page {
+.ca-tpl-page {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-top: 2px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-faint);
 }
-.almanac-tpl-page::after {
+.ca-tpl-page::after {
   content: "";
   flex: 1 1 auto;
-  border-top: var(--am-rule-hair) solid var(--background-modifier-border);
+  border-top: var(--ca-rule-hair) solid var(--background-modifier-border);
 }
 /* The first band sits directly under the card's own bar, which already draws a
    rule — so it gets no top margin and reads as that bar's second line. */
-.almanac-tpl-block-body > .almanac-tpl-page:first-child {
+.ca-tpl-block-body > .ca-tpl-page:first-child {
   margin-top: 0;
 }
 /* A CLASS OF ITS OWN, NOT THE REMOVE BUTTON'S. These three act on where a
@@ -2867,32 +2867,32 @@ body.is-mobile .jcl-action-chip {
    because the lock is on existence and not on order (2.60.2) — so sharing a
    class would have put the two either side of `if (refusal) return;` and made
    the assertion about that line ambiguous. */
-.almanac-tpl-move {
-  font-size: var(--am-text-2xs);
+.ca-tpl-move {
+  font-size: var(--ca-text-2xs);
   padding: 2px 8px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: transparent;
-  border: var(--am-rule) solid var(--background-modifier-border);
+  border: var(--ca-rule) solid var(--background-modifier-border);
   color: var(--text-muted);
   cursor: pointer;
 }
-.almanac-tpl-move:hover:not(:disabled) {
+.ca-tpl-move:hover:not(:disabled) {
   color: var(--text-normal);
   border-color: var(--background-modifier-border-hover);
 }
-.almanac-tpl-move:disabled {
+.ca-tpl-move:disabled {
   opacity: 0.45;
   cursor: default;
 }
 
 /* And the same block in the Layout pane, where the point is the SHAPE: three
    widgets across the page are drawn across it. */
-.almanac-wizard-row {
+.ca-wizard-row {
   display: flex;
   gap: 4px;
   align-items: stretch;
 }
-.almanac-wizard-row > .almanac-wizard-block {
+.ca-wizard-row > .ca-wizard-block {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -2903,12 +2903,12 @@ body.is-mobile .jcl-action-chip {
    click-to-edit, and a control next to it is a control one slip away from
    renaming the note.
 
-   Faint until hover, on the same reasoning as .jsh-title-edit: it is an
+   Faint until hover, on the same reasoning as .ca-jsh-title-edit: it is an
    affordance for the reader who wants it and clutter for the one who doesn't,
    and it sits on every journal note in the vault. */
 /* Date + overflow control as one trailing group, so the row stays two items
    and `space-between` keeps doing what it did before this control existed. */
-.jsh-nav-end {
+.ca-jsh-nav-end {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2920,8 +2920,8 @@ body.is-mobile .jcl-action-chip {
    is hovered: it is a second door to commands the palette already has, and a
    permanently lit one on every entry in the vault would compete with the
    controls that are the point of the row. */
-.jsh-more,
-.jeh-more {
+.ca-jsh-more,
+.ca-jeh-more {
   display: flex;
   align-items: center;
   padding: 2px 4px;
@@ -2932,17 +2932,17 @@ body.is-mobile .jcl-action-chip {
 }
 /* The hover that reveals it is the BANNER's, not the control's own row. That
    distinction has been got wrong twice — the selector was left pointing at
-   `.journal-entry-header` for one draft after 3.7 moved the control to the
+   `.ca-journal-entry-header` for one draft after 3.7 moved the control to the
    card's footer, and the `⋯` simply never lit on any entry in the vault — and
    both times because the rule named a BAND and the control had moved to another
    one. It names the card now, on both slim banners and in one rule: wherever
    inside it the control is placed next, hovering the card is what reveals it. */
-.journal-slim-banner:hover .jsh-more,
-.journal-slim-banner:hover .jeh-more {
+.ca-journal-slim-banner:hover .ca-jsh-more,
+.ca-journal-slim-banner:hover .ca-jeh-more {
   color: var(--text-muted);
 }
-.jsh-more:hover,
-.jeh-more:hover {
+.ca-jsh-more:hover,
+.ca-jeh-more:hover {
   color: var(--text-normal);
   background: var(--background-modifier-hover);
 }
@@ -2950,8 +2950,8 @@ body.is-mobile .jcl-action-chip {
    colour the others reach only on hover. Same reason the plugin's other
    hover-revealed affordances have a `(hover: none)` branch. */
 @media (hover: none) {
-  .jsh-more,
-  .jeh-more {
+  .ca-jsh-more,
+  .ca-jeh-more {
     color: var(--text-muted);
   }
 }
@@ -2960,9 +2960,9 @@ body.is-mobile .jcl-action-chip {
 /* ── Empty states (2.55.3) ────────────────────────────────────────────────
    The default line shape, for a region inside a card that drew itself. Callers
    with a class their own stylesheet already targets keep it — see empty.ts. */
-.am-empty-line {
+.ca-empty-line {
   color: var(--text-muted);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   padding: 6px 0;
 }
 
@@ -2971,18 +2971,18 @@ body.is-mobile .jcl-action-chip {
    Before the token, for controls that act on the row's POSITION rather than on
    what it describes. Collapsed when empty, so every row written before this
    slot existed is laid out exactly as it was. */
-.almanac-list-lead {
+.ca-list-lead {
   display: flex;
   flex-direction: column;
   flex: 0 0 auto;
 }
-.almanac-list-lead:empty {
+.ca-list-lead:empty {
   display: none;
 }
 
 /* Touch has no hover to reveal this with. See 3.9 §3.3's policy. */
 @media (hover: none) {
-  .am-ev-edit {
+  .ca-ev-edit {
     opacity: 0.45;
   }
 }
@@ -2991,20 +2991,20 @@ body.is-mobile .jcl-action-chip {
    Four groups of work with a tick each, and every file in them openable to the
    literal lines it would gain or lose.
 
-   BUILT ON `.almanac-list-row`, NOT BESIDE IT. A group head is a settings-style
+   BUILT ON `.ca-list-row`, NOT BESIDE IT. A group head is a settings-style
    row — a token, a title, a blurb, a count pill — and a file under it is the
    dense variant, which is what that variant is for: a dozen of them under a
    header without the header becoming the page. Nothing here restyles the row;
    it adds the states the row does not have opinions about (off, open) and the
    diff body, which is a new thing. */
-.modal-content.almanac-repair,
-.almanac-repair {
+.modal-content.ca-repair,
+.ca-repair {
   display: flex;
   flex-direction: column;
   overflow: hidden !important;
   max-height: 75vh;
 }
-.almanac-repair-header {
+.ca-repair-header {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -3012,24 +3012,24 @@ body.is-mobile .jcl-action-chip {
   gap: 12px;
   margin-bottom: 12px;
 }
-.almanac-repair-title-wrap {
+.ca-repair-title-wrap {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.almanac-repair-title-wrap h3 {
+.ca-repair-title-wrap h3 {
   margin: 0;
 }
-.almanac-repair-header-icon {
+.ca-repair-header-icon {
   display: flex;
   align-items: center;
   color: var(--text-accent);
 }
-.almanac-repair-header-icon .svg-icon {
+.ca-repair-header-icon .svg-icon {
   width: 20px;
   height: 20px;
 }
-.almanac-repair-toolbar {
+.ca-repair-toolbar {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -3037,33 +3037,33 @@ body.is-mobile .jcl-action-chip {
   gap: 12px;
   margin-bottom: 12px;
 }
-.almanac-repair-lead {
+.ca-repair-lead {
   color: var(--text-muted);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   margin: 0;
   flex: 1 1 auto;
 }
-.almanac-repair-toggles {
+.ca-repair-toggles {
   display: flex;
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
 }
-.almanac-repair-toggle-btn {
-  font-size: var(--am-text-xs);
+.ca-repair-toggle-btn {
+  font-size: var(--ca-text-xs);
   padding: 2px 8px;
   height: auto;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
   cursor: pointer;
 }
-.almanac-repair-toggle-btn:hover {
+.ca-repair-toggle-btn:hover {
   color: var(--text-normal);
   background: var(--background-modifier-hover);
 }
-.almanac-repair-groups {
+.ca-repair-groups {
   flex: 1 1 auto;
   min-height: 0;
   max-height: 55vh;
@@ -3074,44 +3074,44 @@ body.is-mobile .jcl-action-chip {
   gap: 10px;
   padding-right: 4px;
 }
-.almanac-repair .modal-button-container {
+.ca-repair .modal-button-container {
   flex: 0 0 auto;
   margin-top: 14px;
 }
-.almanac-repair-group {
+.ca-repair-group {
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   background: var(--background-secondary-alt);
   overflow: hidden;
   transition: border-color 0.15s ease, opacity 0.15s ease;
 }
 /* The head row IS the tick target, so it has to read as pressable. Its border
    is the group's, not its own. */
-.almanac-repair-head.almanac-list-row {
+.ca-repair-head.ca-list-row {
   border: none;
   border-radius: 0;
   background: transparent;
   cursor: pointer;
   padding: 8px 12px;
 }
-.almanac-repair-head.almanac-list-row:hover {
+.ca-repair-head.ca-list-row:hover {
   background: var(--background-modifier-hover);
 }
 /* An unticked group stays fully legible — it is still a list of what WOULD
    happen, and the reader may be reading it to decide. Only the certainty
    drops, which is what the strike on the count says and the fade reinforces. */
-.almanac-repair-group.is-off {
+.ca-repair-group.is-off {
   opacity: 0.55;
 }
-.almanac-repair-group.is-off .almanac-repair-items,
-.almanac-repair-group.is-off .almanac-list-subtitle {
+.ca-repair-group.is-off .ca-repair-items,
+.ca-repair-group.is-off .ca-list-subtitle {
   opacity: 0.6;
 }
-.almanac-repair-group.is-off .almanac-list-title {
+.ca-repair-group.is-off .ca-list-title {
   text-decoration: line-through;
   text-decoration-color: var(--text-faint);
 }
-.almanac-repair-items {
+.ca-repair-items {
   padding: 0 12px 6px;
   background: var(--background-primary);
   border-top: 1px solid var(--background-modifier-border-focus);
@@ -3119,61 +3119,61 @@ body.is-mobile .jcl-action-chip {
   overflow-y: auto;
   overflow-x: hidden;
 }
-.almanac-repair-items::-webkit-scrollbar {
+.ca-repair-items::-webkit-scrollbar {
   width: 6px;
 }
-.almanac-repair-items::-webkit-scrollbar-thumb {
+.ca-repair-items::-webkit-scrollbar-thumb {
   background: var(--background-modifier-border-hover);
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
 }
-.almanac-repair-items::-webkit-scrollbar-thumb:hover {
+.ca-repair-items::-webkit-scrollbar-thumb:hover {
   background: var(--text-faint);
 }
 
 /* ── one file ─────────────────────────────────────────────────────────── */
-.almanac-repair-item .almanac-list-row.is-openable {
+.ca-repair-item .ca-list-row.is-openable {
   cursor: pointer;
   padding: 4px 6px;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
 }
-.almanac-repair-item .almanac-list-row.is-openable:hover {
+.ca-repair-item .ca-list-row.is-openable:hover {
   background: var(--background-modifier-hover);
 }
-.almanac-repair-item:last-child .almanac-list-row {
+.ca-repair-item:last-child .ca-list-row {
   border-bottom: none;
 }
-.almanac-repair-caret {
+.ca-repair-caret {
   display: flex;
   align-items: center;
   color: var(--text-faint);
 }
-.almanac-repair-caret .svg-icon {
+.ca-repair-caret .svg-icon {
   width: 14px;
   height: 14px;
 }
 /* The count sits where a row's actions go, which is where the eye already
    looks for a number on these rows. */
-.almanac-repair-count {
+.ca-repair-count {
   font-family: var(--font-monospace);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
   white-space: nowrap;
 }
 
 /* ── the differential ─────────────────────────────────────────────────── */
-.almanac-repair-diff {
+.ca-repair-diff {
   margin: 2px 0 8px 22px;
   padding: 6px 10px;
   border-left: 3px solid var(--text-accent);
-  border-radius: 0 var(--am-radius-sm) var(--am-radius-sm) 0;
+  border-radius: 0 var(--ca-radius-sm) var(--ca-radius-sm) 0;
   background: var(--background-primary-alt);
   font-family: var(--font-monospace);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   /* A directive line is short; a fence a reader hand-wrapped is not. Scroll it
      rather than wrap it — a wrapped diff line reads as two changes. */
   overflow-x: auto;
 }
-.almanac-repair-line {
+.ca-repair-line {
   display: flex;
   gap: 8px;
   white-space: pre;
@@ -3181,7 +3181,7 @@ body.is-mobile .jcl-action-chip {
   border-radius: 3px;
   padding: 1px 4px;
 }
-.almanac-repair-mark {
+.ca-repair-mark {
   flex: 0 0 auto;
   width: 1.2ch;
   font-weight: var(--font-bold, 600);
@@ -3189,79 +3189,79 @@ body.is-mobile .jcl-action-chip {
 /* COLOUR IS NOT THE ONLY SIGNAL — the +/− marker carries it too, so the diff
    is readable where the two greens and reds are not distinguishable. The tones
    are Obsidian's own success/error so a theme moves them together. */
-.almanac-repair-line.is-add {
+.ca-repair-line.is-add {
   color: var(--text-success, var(--color-green));
   background: rgba(var(--color-green-rgb, 74, 189, 137), 0.08);
 }
-.almanac-repair-line.is-remove {
+.ca-repair-line.is-remove {
   color: var(--text-error, var(--color-red));
   background: rgba(var(--color-red-rgb, 233, 94, 94), 0.08);
 }
-.almanac-repair-text {
+.ca-repair-text {
   flex: 1 1 auto;
 }
-.almanac-repair-truncated {
+.ca-repair-truncated {
   margin-top: 4px;
   font-family: var(--font-interface);
   color: var(--text-faint);
 }
 
 /* ── The Template window (4.29) ───────────────────────────────────────────
-   Borrows `.almanac-tpl-band`, `.almanac-tpl-toggle`, `.almanac-list-row` and
+   Borrows `.ca-tpl-band`, `.ca-tpl-toggle`, `.ca-list-row` and
    the editor-modal frame rather than restyling them: this window sits one item
    below "Edit sections…" on the same menu, and a reader who has seen that one
    should recognise this. What is new here is only what that window has no
    equivalent of — a sentence about the grain, a pair of full-width actions, and
    the block that stands in for the reload controls when the page is not empty. */
-/* RENAMED FROM `.almanac-entry-tpl-*` IN 4.33, when the journals grew the same
+/* RENAMED FROM `.ca-entry-tpl-*` IN 4.33, when the journals grew the same
    window. The rules never had a diary thought in them — a note, an actions row
    and a refusal block — and a journal note carrying a class called `entry-tpl`
    is one name for two things, which is the drift `RETIRED_WORDS` exists over
-   one layer up. They sit beside `.almanac-tpl-band` and `.almanac-tpl-toggle`,
+   one layer up. They sit beside `.ca-tpl-band` and `.ca-tpl-toggle`,
    which is where 4.29 borrowed them from and which already had the shorter
    name. */
-.almanac-tpl-note {
-  font-size: var(--am-text-sm);
+.ca-tpl-note {
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
-  margin: 0 0 var(--am-space-2);
+  margin: 0 0 var(--ca-space-2);
 }
-.almanac-tpl-actions {
+.ca-tpl-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--am-space-2);
-  margin-bottom: var(--am-space-3);
+  gap: var(--ca-space-2);
+  margin-bottom: var(--ca-space-3);
 }
 /* NOT AN ERROR TONE. The reader has written in their entry, which is what an
    entry is for — this is the window declining to do something destructive, not
-   the reader having made a mistake. Same reasoning as `.almanac-tpl-row-locked`
+   the reader having made a mistake. Same reasoning as `.ca-tpl-row-locked`
    one screen up, at the weight a whole block needs rather than a subtitle. */
-.almanac-tpl-loss {
+.ca-tpl-loss {
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
-  background: var(--am-surface-inset);
-  padding: var(--am-space-3);
-  font-size: var(--am-text-sm);
+  border-radius: var(--ca-radius-md);
+  background: var(--ca-surface-inset);
+  padding: var(--ca-space-3);
+  font-size: var(--ca-text-sm);
 }
-.almanac-tpl-loss-head {
+.ca-tpl-loss-head {
   display: flex;
   align-items: flex-start;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
   color: var(--text-normal);
 }
-.almanac-tpl-loss-icon {
+.ca-tpl-loss-icon {
   flex: 0 0 auto;
   display: flex;
   margin-top: 2px;
   color: var(--text-muted);
 }
-.almanac-tpl-loss-list {
-  margin: var(--am-space-2) 0 var(--am-space-2) var(--am-space-5);
+.ca-tpl-loss-list {
+  margin: var(--ca-space-2) 0 var(--ca-space-2) var(--ca-space-5);
   padding: 0;
   color: var(--text-muted);
 }
-.almanac-tpl-loss-list li {
+.ca-tpl-loss-list li {
   margin: 2px 0;
 }
-.almanac-tpl-loss .almanac-tpl-note {
+.ca-tpl-loss .ca-tpl-note {
   margin: 0;
 }

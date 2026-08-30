@@ -20,7 +20,7 @@
 // ── AND WHY THE KEY IS A NOTE POSITION ───────────────────────────────────
 //
 // A `LiveWidget` rebuilds its own subtree whenever anything in its scope
-// changes, so the `.journal-group` element the reader clicked can be gone by the
+// changes, so the `.ca-journal-group` element the reader clicked can be gone by the
 // time a key is pressed — which rules out holding the element as the identity of
 // anything. `"<notePath>::<blockIndex>"` survives a rebuild, is what
 // `collapsedNoteSections` already keys on, and is the same number `indexNow`
@@ -28,7 +28,7 @@
 
 import { MarkdownView } from "obsidian";
 import type { MarkdownPostProcessorContext } from "obsidian";
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import { blockIndexAt } from "../../core/block-move";
 import { splitPageIn } from "../../core/cell-move";
 import { getFile } from "../../core/util";
@@ -78,7 +78,7 @@ export function groupKey(
 // knows which pages had anything to show. This is the cheap half of the clamp:
 // it throws out what cannot be a page under any reading.
 export function openTabFor(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   key: string,
   count: number
 ): number {
@@ -96,7 +96,7 @@ export function openTabFor(
 // markdown: a `tab` line rewritten on every click would put an entry in every
 // sync log in the vault.
 export function rememberTab(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   key: string,
   index: number
 ): void {
@@ -156,7 +156,7 @@ function sweep(): void {
 // AND A TOUCH ON ANOTHER NOTE IS NOT A TOUCH ON THIS ONE. The register is keyed
 // by note path, so a group touched on a note that is no longer in front cannot
 // be driven by a key pressed on this one.
-export function focusedGroup(plugin: AlmanacPlugin): TabControl | null {
+export function focusedGroup(plugin: ChronoAnvilPlugin): TabControl | null {
   sweep();
   const path =
     plugin.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path ?? null;
@@ -183,7 +183,7 @@ export function focusedGroup(plugin: AlmanacPlugin): TabControl | null {
 // RETURNS WHETHER IT DID ANYTHING, which is what `checkCallback` needs to keep
 // the command out of the palette on a page with no tabbed group — the rule
 // 3.13 §7 established for every note-scoped command.
-export function stepFocusedGroup(plugin: AlmanacPlugin, step: number): boolean {
+export function stepFocusedGroup(plugin: ChronoAnvilPlugin, step: number): boolean {
   const control = focusedGroup(plugin);
   if (!control || control.count < 2) return false;
   const to = (control.at() + step + control.count) % control.count;
@@ -192,7 +192,7 @@ export function stepFocusedGroup(plugin: AlmanacPlugin, step: number): boolean {
 }
 
 // Whether a command that switches pages has anything to switch.
-export function hasTabbedGroup(plugin: AlmanacPlugin): boolean {
+export function hasTabbedGroup(plugin: ChronoAnvilPlugin): boolean {
   const control = focusedGroup(plugin);
   return control !== null && control.count > 1;
 }
@@ -205,7 +205,7 @@ export function hasTabbedGroup(plugin: AlmanacPlugin): boolean {
 // since been edited. It is also what keeps this free — a page of ordinary groups
 // segments nothing until a button is actually pressed.
 async function splitHere(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   el: HTMLElement
 ): Promise<void> {
@@ -235,7 +235,7 @@ async function splitHere(
 // but it still gets a handle, because it is the one place the FIRST page can be
 // made.
 export function tabHandle(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   el: HTMLElement,
   count: number

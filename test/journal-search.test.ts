@@ -81,7 +81,7 @@ describe("one index, two surfaces", () => {
     const e = buildIndexed(
       file("03 - Journals/Maths/Algebra/Quadratics/Worked examples.md"),
       { type: "page", parent: "Quadratics" },
-      "<!--almanac:notes\nCompleting the square\n-->",
+      "<!--chronoanvil:notes\nCompleting the square\n-->",
       [],
       { ...JOURNAL, crumbs: ["Maths", "Algebra", "Quadratics"] }
     );
@@ -102,7 +102,7 @@ describe("one index, two surfaces", () => {
     const e = buildIndexed(
       file("03 - Journals/Maths/Algebra/Quadratics.md"),
       { type: "lesson", date: "2026-03-04" },
-      "<!--almanac:recall\nWhat is a closure? :: A function plus its scope\n-->",
+      "<!--chronoanvil:recall\nWhat is a closure? :: A function plus its scope\n-->",
       [],
       JOURNAL
     );
@@ -213,7 +213,7 @@ describe("the filters that come free", () => {
     const e = buildIndexed(
       file("03 - Journals/Maths/Algebra/Quadratics.md"),
       { type: "lesson", date: "2026-03-04" },
-      "<!--almanac:review\n- ( ) redo exercise 4\n- (x) reread notes\n-->",
+      "<!--chronoanvil:review\n- ( ) redo exercise 4\n- (x) reread notes\n-->",
       [],
       JOURNAL
     );

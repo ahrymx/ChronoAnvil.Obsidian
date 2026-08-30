@@ -39,7 +39,7 @@
 // the directive-level entry point, not the thing that draws.
 
 import { MarkdownPostProcessorContext, TFile, normalizePath } from "obsidian";
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import { LiveWidget } from "../livewidget";
 import type { VaultArea } from "../../core/links";
 import {
@@ -114,14 +114,14 @@ import {
 // four lines on purpose: charts/ must not import ui/, and sharing one helper is
 // not worth pointing a domain folder at the presentation layer.
 function fileOfCtx(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): TFile | null {
   const f = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
   return f instanceof TFile ? f : null;
 }
 export function buildLinksRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
@@ -145,7 +145,7 @@ export function buildLinksRegion(
 }
 
 export function buildCalendarRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
@@ -170,7 +170,7 @@ export function buildCalendarRegion(
   const agenda = Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_UPCOMING;
   const eventsPath = normalizePath(plugin.settings.paths.events);
   const diaryPrefix = normalizePath(plugin.settings.paths.diaryDaily) + "/";
-  const host = createDiv({ cls: "journal-live-widget" });
+  const host = createDiv({ cls: "ca-journal-live-widget" });
   ctx.addChild(
     new LiveWidget(plugin.app, host, {
       build: () =>
@@ -192,7 +192,7 @@ export function buildCalendarRegion(
 }
 
 export function buildEventsRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
@@ -212,7 +212,7 @@ export function buildEventsRegion(
 }
 
 export function buildOnThisDayRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
@@ -228,7 +228,7 @@ export function buildOnThisDayRegion(
 }
 
 export function buildTimelineRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
@@ -255,7 +255,7 @@ export function buildTimelineRegion(
 // `buildLevelIndex`'s business — here it means the same thing null always meant:
 // nothing to subscribe to.
 function levelIndexScope(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   argument: string
 ): string | null {
@@ -276,7 +276,7 @@ function levelIndexScope(
 // the path predicate is what notices a new subject appearing, exactly as the
 // journal cards' own region spells out.
 export function buildLevelIndexRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   argument: string
 ): HTMLElement | null {
@@ -299,7 +299,7 @@ export function buildLevelIndexRegion(
 // once already, and the test that pinned the two spellings held exactly until
 // the rule grew past one line.
 export function buildLevelCardsRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   argument: string
 ): HTMLElement | null {
@@ -311,7 +311,7 @@ export function buildLevelCardsRegion(
 }
 
 export function buildStatsBandRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   label: string | null,
   ctx: MarkdownPostProcessorContext
@@ -332,7 +332,7 @@ export function buildStatsBandRegion(
 }
 
 export function buildKindTableRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
@@ -352,7 +352,7 @@ export function buildKindTableRegion(
 }
 
 export function buildPagesTableRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
   // Scope = the host note's own folder. A promoted note is a folder note,
@@ -366,7 +366,7 @@ export function buildPagesTableRegion(
 }
 
 export function buildJournalChartRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   kind: string,
   rest: string,
   label: string | null,
@@ -422,7 +422,7 @@ export function buildJournalChartRegion(
   // can't be honoured.
   if (refusal != null) {
     if (preset) return null;
-    return createDiv({ cls: "journal-widget-error", text: refusal });
+    return createDiv({ cls: "ca-journal-widget-error", text: refusal });
   }
 
   // Titled only when there is something to say. The preset keeps its
@@ -439,18 +439,18 @@ export function buildJournalChartRegion(
     () => {
       const host = createDiv({
         cls: preset
-          ? "journal-trend journal-confidence-trend"
-          : "journal-trend",
+          ? "ca-journal-trend ca-journal-confidence-trend"
+          : "ca-journal-trend",
       });
       if (!def) return host;
-      if (title) host.createDiv({ cls: "journal-trend-title", text: title });
+      if (title) host.createDiv({ cls: "ca-journal-trend-title", text: title });
       teardown = renderJournalTrend({
         app: plugin.app,
         plugin: plugin,
         def,
         folder,
         kinds: confidenceKinds(plugin, ctx.sourcePath, def.id),
-        body: host.createDiv({ cls: "journal-chart-body" }),
+        body: host.createDiv({ cls: "ca-journal-chart-body" }),
       });
       return host;
     },
@@ -462,7 +462,7 @@ export function buildJournalChartRegion(
 }
 
 export function buildJournalBreakdownRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   label: string | null,
   ctx: MarkdownPostProcessorContext
@@ -479,7 +479,7 @@ export function buildJournalBreakdownRegion(
 }
 
 export function buildJournalTallyRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   label: string | null,
   ctx: MarkdownPostProcessorContext
@@ -497,7 +497,7 @@ export function buildJournalTallyRegion(
 }
 
 export function buildReviewQueueRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
@@ -511,7 +511,7 @@ export function buildReviewQueueRegion(
 
   // AN EMPTY SCOPE IS AN EMPTY STATE, NOT AN UNKNOWN WIDGET (4.1). This
   // returned null, and a null from a builder makes the dispatcher print
-  // `Unknown Almanac widget: review-queue:all` — which is false twice over: the
+  // `Unknown ChronoAnvil widget: review-queue:all` — which is false twice over: the
   // widget is known, and the note is not broken. It is a vault with no journals
   // in it yet.
   //
@@ -535,7 +535,7 @@ export function buildReviewQueueRegion(
 }
 
 export function buildJournalSearchRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
@@ -554,7 +554,7 @@ export function buildJournalSearchRegion(
 }
 
 export function buildJournalRecentRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
@@ -577,7 +577,7 @@ export function buildJournalRecentRegion(
 }
 
 export function buildTagIndexRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
@@ -628,7 +628,7 @@ export function buildTagIndexRegion(
 // tables would have the first rewritten; that is a limitation the folder
 // control shares and not one this button introduces.
 async function setTasksScope(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   next: string
 ): Promise<void> {
@@ -676,13 +676,13 @@ export function hostIsDiary(
 }
 
 export function buildTasksTableRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext,
   // True when the section's header bar is already showing the scope button.
   hostedControls = false
 ): HTMLElement | null {
-  // `tasks-table:<folder>` — collects open Almanac tasks from every note
+  // `tasks-table:<folder>` — collects open ChronoAnvil tasks from every note
   // under `<folder>`, grouped by note. Replaces the vault's old
   // ```tasks``` (Tasks-plugin) blocks. The folder arg defaults to the
   // host note's own folder, so a plain `tasks-table` on a folder note
@@ -808,7 +808,7 @@ export function buildTasksTableRegion(
 // enough already: a trailing `,period` suffix stripped before the keyword is
 // read, and a folder that may legitimately contain a comma.
 export function tasksScopeFor(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   ctx: MarkdownPostProcessorContext
 ): TasksScope | null {
@@ -845,7 +845,7 @@ export function tasksScopeFor(
 }
 
 export function buildActivityChartRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
   // Study-subject activity: tasks across the host note's own folder,
@@ -896,7 +896,7 @@ export function buildActivityChartRegion(
 }
 
 export function buildJournalsRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
   // The whole Journals section in one card — hero band, per-type header
@@ -916,7 +916,7 @@ export function buildJournalsRegion(
   const prefixes = roots.map((r) => normalizePath(r) + "/");
   const inScope = (path: string) =>
     path === ctx.sourcePath || prefixes.some((p) => path.startsWith(p));
-  const host = createDiv({ cls: "journal-live-widget" });
+  const host = createDiv({ cls: "ca-journal-live-widget" });
   // The Refresh control needs a handle on the widget that owns it, and
   // the widget needs the builder that draws that control — so the two
   // close over each other. Safe: `build` runs on load, after the
@@ -955,7 +955,7 @@ export function buildJournalsRegion(
 // watch each journal's own index note, which the root prefixes already cover,
 // because that note's frontmatter is where a card's banner comes from.
 export function buildJournalCardsRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
   const prefixes = registeredJournalTypes(plugin).map(
@@ -963,7 +963,7 @@ export function buildJournalCardsRegion(
   );
   const inScope = (path: string) =>
     path === ctx.sourcePath || prefixes.some((p) => path.startsWith(p));
-  const host = createDiv({ cls: "journal-live-widget" });
+  const host = createDiv({ cls: "ca-journal-live-widget" });
   const live: LiveWidget = new LiveWidget(plugin.app, host, {
     build: () => buildJournalCards(plugin, ctx),
     shouldRefresh: (f) => inScope(f.path),
@@ -998,7 +998,7 @@ export function buildJournalCardsRegion(
 // is what this vault actually has. A blank card would look like the widget
 // failing.
 export function buildJournalCardRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   id: string
 ): HTMLElement | null {
@@ -1008,9 +1008,9 @@ export function buildJournalCardRegion(
   if (!type) {
     const have = types.map((t) => t.id);
     return createDiv({
-      cls: "journal-widget-error",
+      cls: "ca-journal-widget-error",
       text: !have.length
-        ? "journal-card needs a journal, and this vault has none — turn on Study or add one in Settings → Almanac → Journals."
+        ? "journal-card needs a journal, and this vault has none — turn on Study or add one in Settings → ChronoAnvil → Journals."
         : !wanted
           ? `journal-card needs a journal id — one of: ${have.join(", ")}.`
           : `No journal called "${wanted}". This vault has: ${have.join(", ")}.`,
@@ -1019,7 +1019,7 @@ export function buildJournalCardRegion(
   const prefix = normalizePath(type.root) + "/";
   const inScope = (path: string) =>
     path === ctx.sourcePath || path.startsWith(prefix);
-  const host = createDiv({ cls: "journal-live-widget" });
+  const host = createDiv({ cls: "ca-journal-live-widget" });
   const live: LiveWidget = new LiveWidget(plugin.app, host, {
     // RE-RESOLVED PER BUILD, not captured: renaming a journal in Settings or
     // turning Study off changes what this id means, and the refusal above is
@@ -1029,7 +1029,7 @@ export function buildJournalCardRegion(
       return now
         ? buildCard(plugin, ctx, now)
         : createDiv({
-            cls: "journal-widget-error",
+            cls: "ca-journal-widget-error",
             text: `No journal called "${wanted}" any more — it was renamed or removed in Settings.`,
           });
     },
@@ -1042,7 +1042,7 @@ export function buildJournalCardRegion(
 }
 
 export function buildJournalsHeaderRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   // Which journal the band covers. Empty — or `all` — is every registered one,
   // which is what the keyword has always meant (4.36 §3).
@@ -1061,7 +1061,7 @@ export function buildJournalsHeaderRegion(
     // NAMED OUT LOUD RATHER THAN DRAWN EMPTY. The band renders nothing when it
     // has no journals — right for a vault that has none, and indistinguishable
     // from a typo on a vault that has four. See `journalsHeaderScope`.
-    return createDiv({ cls: "journal-widget-error", text: scope });
+    return createDiv({ cls: "ca-journal-widget-error", text: scope });
   }
   const roots = scope.map((t) => t.root);
   // THE ROOTS ARE THE WATCH AND THE TYPES ARE THE DRAW, and both come off the

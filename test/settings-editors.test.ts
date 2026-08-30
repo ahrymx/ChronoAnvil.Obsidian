@@ -13,7 +13,7 @@ import {
   deriveJournalFolders, freshCustomJournal, journalFolderName,
 } from "../src/journals/custom-journal";
 import type { JournalConfig, JournalKindConfig } from "../src/journals/custom-journal";
-import type AlmanacPlugin from "../src/main";
+import type ChronoAnvilPlugin from "../src/main";
 
 const row = (
   label: string, extra: Partial<JournalKindConfig> = {}
@@ -178,7 +178,7 @@ describe("journal editor head strings", () => {
       studyEnabled: true,
       paths: { journalsRoot: "03 - Journals", templates: "00 - Infrastructure/Templates" },
     },
-  } as unknown as AlmanacPlugin;
+  } as unknown as ChronoAnvilPlugin;
 
   // protected members are in scope for a subclass, so no visibility change is
   // needed to read what renderHead() would read.

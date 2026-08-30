@@ -1,4 +1,4 @@
-# Contributing to Almanac
+# Contributing to ChronoAnvil
 
 Issues and pull requests are welcome.
 
@@ -38,14 +38,14 @@ Other expectations:
   applies, in the test, in a sentence.
 - Comments explain reasoning, not mechanics. The code already says what it
   does.
-- `npm run package` should still produce a working `dist/almanac/`.
+- `npm run package` should still produce a working `dist/chronoanvil/`.
 
 ### Keeping a copy of a version
 
 There is no git repository here, so the archives ARE the history: a version that
 is packaged and not archived is gone the moment the working tree moves on. Two
-of them per version, in the sibling directories `almanac-builds/` (the installable
-plugin folder) and `almanac-source/` (the whole tree, minus `node_modules/` and
+of them per version, in the sibling directories `chronoanvil-builds/` (the installable
+plugin folder) and `chronoanvil-source/` (the whole tree, minus `node_modules/` and
 `dist/`).
 
 ```
@@ -75,12 +75,12 @@ about before you reach for `zip` by hand:
 
 By opening a pull request you confirm that you wrote the contribution, or have
 the right to submit it, and you grant AhryMX the rights needed to publish and
-relicense it as part of Almanac. **You keep your copyright**, and your
+relicense it as part of ChronoAnvil. **You keep your copyright**, and your
 contribution is published under the AGPL-3.0 like the rest of the project.
 
 ### Why this is asked
 
-Almanac is under a single licence — AGPL-3.0 with section 7 attribution terms.
+ChronoAnvil is under a single licence — AGPL-3.0 with section 7 attribution terms.
 Nothing about today's licensing requires this grant, and it would be dishonest
 to imply otherwise.
 
@@ -104,7 +104,7 @@ By submitting a contribution to this project, you agree to the following.
    configuration — through a pull request, patch, issue attachment, or any
    other channel, excluding anything you clearly mark as "Not a Contribution".
    "Project Owner" means AhryMX <contact@ahrymx.dev>, the copyright holder of
-   Almanac.
+   ChronoAnvil.
 
 2. **You keep your copyright.** Nothing here transfers or assigns ownership of
    your Contribution. You remain free to use, publish, license, and relicense
@@ -157,7 +157,7 @@ By submitting a contribution to this project, you agree to the following.
    merge, use, or keep a Contribution, or to compensate you for it.
 
 9. **The public grant is permanent.** Every Contribution accepted into the
-   project is published under the AGPL-3.0 as part of Almanac, and that grant
+   project is published under the AGPL-3.0 as part of ChronoAnvil, and that grant
    to the public is irrevocable in accordance with the AGPL's own terms. A
    future relicence could add terms for future versions; it can never withdraw
    what has already been released.
@@ -180,7 +180,7 @@ flagging matters more than agreeing.
 Add this line to your pull request description, or to a commit message trailer:
 
 ```
-Almanac-CLA-1.0: I agree to the contribution terms in CONTRIBUTING.md.
+ChronoAnvil-CLA-1.0: I agree to the contribution terms in CONTRIBUTING.md.
 Signed-off-by: Your Name <your@email>
 ```
 

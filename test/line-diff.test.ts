@@ -62,7 +62,7 @@ describe("diffLines", () => {
       [["a", "b", "c"], ["a", "x", "c"]],
       [[], ["a", "b"]],
       [["a", "b"], []],
-      [["```almanac", "diary:3", "```"], ["```almanac", "row", "diary:3", "cell", "```"]],
+      [["```chronoanvil", "diary:3", "```"], ["```chronoanvil", "row", "diary:3", "cell", "```"]],
       [["a", "a", "a"], ["a", "a"]],
     ];
     for (const [before, after] of cases) {

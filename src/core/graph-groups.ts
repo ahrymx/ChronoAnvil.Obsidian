@@ -50,9 +50,9 @@ export const GRAIN_GRAPH_HUES = {
 };
 
 /**
- * Build the standard set of Obsidian Graph View color groups for an Almanac vault.
+ * Build the standard set of Obsidian Graph View color groups for a ChronoAnvil vault.
  */
-export function buildAlmanacGraphGroups(
+export function buildChronoAnvilGraphGroups(
   p: typeof DEFAULT_PATHS
 ): ObsidianGraphColorGroup[] {
   const cleanName = (path: string) => basename(path).replace(/\.md$/i, "");
@@ -122,7 +122,7 @@ export function buildAlmanacGraphGroups(
   ];
 }
 
-const ALMANAC_QUERY_PREFIXES = [
+const CHRONOANVIL_QUERY_PREFIXES = [
   "file:Homepage",
   "file:Search",
   "file:Staging",
@@ -138,7 +138,7 @@ const ALMANAC_QUERY_PREFIXES = [
   "file:Day-",
 ];
 
-function isAlmanacQuery(query: string, p: typeof DEFAULT_PATHS): boolean {
+function isChronoAnvilQuery(query: string, p: typeof DEFAULT_PATHS): boolean {
   if (
     query.includes(p.diaryRoot) ||
     query.includes(p.journalsRoot) ||
@@ -151,16 +151,16 @@ function isAlmanacQuery(query: string, p: typeof DEFAULT_PATHS): boolean {
   ) {
     return true;
   }
-  return ALMANAC_QUERY_PREFIXES.some((prefix) => query.includes(prefix));
+  return CHRONOANVIL_QUERY_PREFIXES.some((prefix) => query.includes(prefix));
 }
 
 /**
- * Merge Almanac color groups into an existing Obsidian graph configuration,
- * non-destructively preserving non-Almanac user color groups and graph view settings.
+ * Merge ChronoAnvil color groups into an existing Obsidian graph configuration,
+ * non-destructively preserving non-ChronoAnvil user color groups and graph view settings.
  */
 export function mergeGraphConfig(
   existingRaw: string | null,
-  almanacGroups: ObsidianGraphColorGroup[],
+  chronoanvilGroups: ObsidianGraphColorGroup[],
   p: typeof DEFAULT_PATHS
 ): string {
   let config: ObsidianGraphConfig = {};
@@ -173,17 +173,17 @@ export function mergeGraphConfig(
   }
 
   const existingGroups = Array.isArray(config.colorGroups) ? config.colorGroups : [];
-  // Keep user-defined custom queries that are not Almanac queries
-  const userGroups = existingGroups.filter((g) => !isAlmanacQuery(g.query, p));
+  // Keep user-defined custom queries that are not ChronoAnvil queries
+  const userGroups = existingGroups.filter((g) => !isChronoAnvilQuery(g.query, p));
 
-  config.colorGroups = [...almanacGroups, ...userGroups];
+  config.colorGroups = [...chronoanvilGroups, ...userGroups];
   config["collapse-color-groups"] = false;
 
   return JSON.stringify(config, null, 2) + "\n";
 }
 
 /**
- * Configure or update `.obsidian/graph.json` with Almanac color groups.
+ * Configure or update `.obsidian/graph.json` with ChronoAnvil color groups.
  */
 export async function configureGraphGroups(
   app: App,
@@ -202,14 +202,14 @@ export async function configureGraphGroups(
     }
   }
 
-  const groups = buildAlmanacGraphGroups(paths);
+  const groups = buildChronoAnvilGraphGroups(paths);
   const updated = mergeGraphConfig(existingRaw, groups, paths);
 
   try {
     await adapter.write(graphConfigPath, updated);
     return true;
   } catch (e) {
-    console.error("[Almanac] Failed to write graph view color groups to", graphConfigPath, e);
+    console.error("[ChronoAnvil] Failed to write graph view color groups to", graphConfigPath, e);
     return false;
   }
 }

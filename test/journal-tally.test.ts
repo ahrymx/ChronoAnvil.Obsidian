@@ -30,7 +30,7 @@ import { summableTrackers } from "../src/ui/tables";
 import type { TrackerDef, TrackerSurface } from "../src/trackers/trackers";
 import { buildJournalType } from "../src/journals/journal";
 import { EXERCISE_PRESET } from "../src/journals/journal";
-import type AlmanacPlugin from "../src/main";
+import type ChronoAnvilPlugin from "../src/main";
 
 const surfaceName = (s: TrackerSurface): string =>
   s.kind === "journal" ? (s.typeId ?? "journal") : "diary";
@@ -134,8 +134,8 @@ describe("the split is a refactor, not a rewrite", () => {
 
 describe("the totals predicate", () => {
   const type = buildJournalType(EXERCISE_PRESET.config);
-  const withTrackers = (trackers: TrackerDef[]): AlmanacPlugin =>
-    ({ settings: { trackers } }) as unknown as AlmanacPlugin;
+  const withTrackers = (trackers: TrackerDef[]): ChronoAnvilPlugin =>
+    ({ settings: { trackers } }) as unknown as ChronoAnvilPlugin;
 
   const num = (over: Partial<TrackerDef>): TrackerDef =>
     ({

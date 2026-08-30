@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { App, Notice, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { promptChoice } from "../ui/modals";
 import {
   ChartSpec,
@@ -33,7 +33,7 @@ import { notify } from "../core/notify";
 // the note (their comment tags are the source of truth), not in Settings —
 // this class just drives the add/edit/remove flows and re-splices the region.
 export class Charts {
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   // The period the note is a dashboard for, or null if it isn't one. The editor
   // needs it to resolve the "Auto — …" size label, because the same

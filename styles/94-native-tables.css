@@ -1,8 +1,8 @@
 /* ── 6. Native tables (tag-index / topics-table / confidence-summary) ──
-   Replaces the old dataviewjs tables (v1.5) — reuses the .journal-week-table
+   Replaces the old dataviewjs tables (v1.5) — reuses the .ca-journal-week-table
    look and the existing [!note] callout styling above so it matches on day
    one, without a dedicated design pass. */
-.journal-table {
+.ca-journal-table {
   margin: 0.4em 0 0.8em;
 }
 
@@ -10,32 +10,32 @@
    lists the folders beneath a note, the other the notes. They sit on sibling
    dashboards and a reader moves between them constantly, so they share the
    chrome rather than each getting a pass of their own. That is the same
-   argument the block comment above makes for reusing .journal-week-table. */
-.journal-topics-tbl {
+   argument the block comment above makes for reusing .ca-journal-week-table. */
+.ca-journal-topics-tbl {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--am-text-base);
+  font-size: var(--ca-text-base);
 }
-.journal-topics-tbl th,
-.journal-topics-tbl td {
+.ca-journal-topics-tbl th,
+.ca-journal-topics-tbl td {
   text-align: left;
   padding: 5px 10px;
   border-bottom: 1px solid var(--background-modifier-border);
 }
-.journal-topics-tbl th {
+.ca-journal-topics-tbl th {
   color: var(--text-muted);
   font-weight: 600;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
 }
-.journal-topics-tbl th:not(:first-child),
-.journal-topics-tbl td:not(:first-child) {
+.ca-journal-topics-tbl th:not(:first-child),
+.ca-journal-topics-tbl td:not(:first-child) {
   white-space: nowrap;
 }
-.journal-topics-tbl .jt-topic a.internal-link {
+.ca-journal-topics-tbl .ca-jt-topic a.internal-link {
   font-weight: 600;
   text-decoration: none;
 }
-.journal-topics-tbl .jt-topic a.internal-link:hover {
+.ca-journal-topics-tbl .ca-jt-topic a.internal-link:hover {
   color: var(--interactive-accent);
 }
 
@@ -50,35 +50,35 @@
    the kind table's: the heading strip, the value cell and the bounded-value bar
    are what ANY list of records wants, and naming them after the first caller is
    how the plugin got twenty-seven class-prefix families. */
-.almanac-list {
+.ca-list {
   display: flex;
   flex-direction: column;
 }
-.almanac-list-heads,
-.almanac-list-main.is-columned {
+.ca-list-heads,
+.ca-list-main.is-columned {
   display: grid;
-  grid-template-columns: var(--am-row-cols, 1fr);
+  grid-template-columns: var(--ca-row-cols, 1fr);
   align-items: baseline;
   gap: 4px 12px;
 }
-.almanac-list-heads {
+.ca-list-heads {
   padding: 0 6px 4px;
   border-bottom: 1px solid var(--background-modifier-border);
 }
-.almanac-list-heads-cell {
+.ca-list-heads-cell {
   color: var(--text-muted);
   font-weight: 600;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
 }
-.almanac-list-cell {
+.ca-list-cell {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 /* A cell holding words rather than a number — a status, a label. Slightly
    smaller, because it competes with the title for the eye and the title should
    win. */
-.almanac-list-cell.is-text {
-  font-size: var(--am-text-sm);
+.ca-list-cell.is-text {
+  font-size: var(--ca-text-sm);
 }
 
 /* A finished note recedes rather than disappearing.
@@ -90,19 +90,19 @@
 /* A finished record recedes rather than disappearing. Scoped to
    `.is-done-able` so `is-done` stays a generic row state — the task and path
    widgets already use that class name for their own rows, and a bare
-   `.almanac-list-row.is-done` would have been a third meaning for it. */
-.almanac-list-row.is-done-able.is-done {
+   `.ca-list-row.is-done` would have been a third meaning for it. */
+.ca-list-row.is-done-able.is-done {
   color: var(--text-faint);
 }
-.almanac-list-row.is-done-able.is-done .almanac-list-title a.internal-link {
+.ca-list-row.is-done-able.is-done .ca-list-title a.internal-link {
   color: var(--text-muted);
   font-weight: 500;
 }
-.almanac-list .almanac-list-title a.internal-link {
+.ca-list .ca-list-title a.internal-link {
   font-weight: 600;
   text-decoration: none;
 }
-.almanac-list .almanac-list-title a.internal-link:hover {
+.ca-list .ca-list-title a.internal-link:hover {
   color: var(--interactive-accent);
 }
 
@@ -110,21 +110,21 @@
    — three out of what — and the segments answer that without a second column
    for the maximum. Built from the tracker's declared min/max, never from the
    largest value present. */
-.almanac-list-gauge {
+.ca-list-gauge {
   display: inline-flex;
   gap: 2px;
   vertical-align: -1px;
 }
-.almanac-list-seg {
+.ca-list-seg {
   width: 6px;
   height: 11px;
   border-radius: 2px;
   background: var(--background-modifier-border);
 }
-.almanac-list-seg.is-on {
+.ca-list-seg.is-on {
   background: var(--interactive-accent);
 }
-.almanac-list-row.is-done-able.is-done .almanac-list-seg.is-on {
+.ca-list-row.is-done-able.is-done .ca-list-seg.is-on {
   background: var(--text-faint);
 }
 
@@ -135,49 +135,49 @@
    genuinely needed the header row is sorting, and that belongs in the
    section's overflow rather than in a strip that vanishes at 460px. */
 @container (max-width: 460px) {
-  .almanac-list-heads {
+  .ca-list-heads {
     display: none;
   }
-  .almanac-list-main.is-columned {
+  .ca-list-main.is-columned {
     grid-template-columns: minmax(0, 1fr);
     gap: 1px;
   }
-  .almanac-list-cell {
-    font-size: var(--am-text-sm);
+  .ca-list-cell {
+    font-size: var(--ca-text-sm);
     color: var(--text-muted);
   }
 }
 
 /* confidence-summary */
-.journal-confidence-summary .jt-confidence-line {
+.ca-journal-confidence-summary .ca-jt-confidence-line {
   margin: 0.2em 0;
   color: var(--text-normal);
 }
 
-.journal-tasks-table {
+.ca-journal-tasks-table {
   max-height: 500px;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-.is-measuring-natural .journal-tasks-table,
-.is-measuring-natural.journal-tasks-table,
-.is-sized .journal-tasks-table,
-.is-sized.journal-tasks-table,
-.journal-widget-card.is-sized .journal-tasks-table,
-.journal-block-cell > .is-sized .journal-tasks-table {
+.is-measuring-natural .ca-journal-tasks-table,
+.is-measuring-natural.ca-journal-tasks-table,
+.is-sized .ca-journal-tasks-table,
+.is-sized.ca-journal-tasks-table,
+.ca-journal-widget-card.is-sized .ca-journal-tasks-table,
+.ca-journal-block-cell > .is-sized .ca-journal-tasks-table {
   max-height: none;
 }
 
-.journal-tasks-table .jtt-loading {
+.ca-journal-tasks-table .ca-jtt-loading {
   color: var(--text-faint);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   padding: 4px 2px;
 }
 /* Header line: a lighter, muted title (the collapsible `header:` bar above the
    widget is the section's real heading) on the left, count / overdue pills on
    the right. */
-.journal-tasks-table .jtt-head {
+.ca-journal-tasks-table .ca-jtt-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -185,30 +185,30 @@
   gap: 8px;
   margin: 0 0 0.7em;
 }
-.journal-tasks-table .jtt-title {
+.ca-journal-tasks-table .ca-jtt-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
 }
-.journal-tasks-table .jtt-title-icon {
+.ca-journal-tasks-table .ca-jtt-title-icon {
   display: inline-flex;
 }
-.journal-tasks-table .jtt-title-icon .svg-icon {
+.ca-journal-tasks-table .ca-jtt-title-icon .svg-icon {
   width: 0.95em;
   height: 0.95em;
 }
-.journal-tasks-table .jtt-pills {
+.ca-journal-tasks-table .ca-jtt-pills {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-.journal-tasks-table .jtt-pill {
-  font-size: var(--am-text-2xs);
+.ca-journal-tasks-table .ca-jtt-pill {
+  font-size: var(--ca-text-2xs);
   line-height: 1.4;
-  padding: var(--am-space-1) var(--am-space-5);
-  border-radius: var(--am-radius-pill);
+  padding: var(--ca-space-1) var(--ca-space-5);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
@@ -217,23 +217,23 @@
 /* Danger pill: a low-alpha red tint so the red text stays readable in every
    theme. `--background-modifier-error` resolves to a near-solid red in some
    themes, which hid the text — a controlled rgba tint avoids that. */
-.journal-tasks-table .jtt-pill-danger {
+.ca-journal-tasks-table .ca-jtt-pill-danger {
   background: rgba(var(--color-red-rgb, 224, 85, 97), 0.15);
   border-color: transparent;
   color: var(--text-error, #e05561);
 }
-.journal-tasks-table .jtt-group {
+.ca-journal-tasks-table .ca-jtt-group {
   margin-bottom: 0.85em;
 }
-.journal-tasks-table .jtt-bucket {
+.ca-journal-tasks-table .ca-jtt-bucket {
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   margin-bottom: 0.85em;
   background: var(--background-secondary);
   overflow: hidden;
   transition: border-color 0.15s ease;
 }
-.journal-tasks-table .jtt-bucket-head {
+.ca-journal-tasks-table .ca-jtt-bucket-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -243,40 +243,40 @@
   user-select: none;
   border-bottom: 1px solid var(--background-modifier-border);
 }
-.journal-tasks-table .jtt-bucket-head:hover {
+.ca-journal-tasks-table .ca-jtt-bucket-head:hover {
   background: var(--background-modifier-hover);
 }
-.journal-tasks-table .jtt-bucket-title-wrap {
+.ca-journal-tasks-table .ca-jtt-bucket-title-wrap {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   font-weight: 600;
   color: var(--text-normal);
 }
-.journal-tasks-table .jtt-group-chevron {
+.ca-journal-tasks-table .ca-jtt-group-chevron {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: transform 0.2s ease;
   color: var(--text-muted);
 }
-.journal-tasks-table .jtt-group-chevron .svg-icon {
+.ca-journal-tasks-table .ca-jtt-group-chevron .svg-icon {
   width: 14px;
   height: 14px;
 }
-.journal-tasks-table .jtt-bucket.is-collapsed .jtt-group-chevron {
+.ca-journal-tasks-table .ca-jtt-bucket.is-collapsed .ca-jtt-group-chevron {
   transform: rotate(-90deg);
 }
-.journal-tasks-table .jtt-bucket.is-collapsed .jtt-bucket-body {
+.ca-journal-tasks-table .ca-jtt-bucket.is-collapsed .ca-jtt-bucket-body {
   display: none;
 }
-.journal-tasks-table .jtt-bucket-pills {
+.ca-journal-tasks-table .ca-jtt-bucket-pills {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-.journal-tasks-table .jtt-subgroup-head {
+.ca-journal-tasks-table .ca-jtt-subgroup-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -284,66 +284,66 @@
   background: rgba(0, 0, 0, 0.04);
   border-top: 1px solid var(--background-modifier-border);
   border-bottom: 1px solid var(--background-modifier-border);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   color: var(--text-muted);
 }
-.journal-tasks-table .jtt-subgroup-head:first-child {
+.ca-journal-tasks-table .ca-jtt-subgroup-head:first-child {
   border-top: none;
 }
-.journal-tasks-table .jtt-subgroup-head a.internal-link {
+.ca-journal-tasks-table .ca-jtt-subgroup-head a.internal-link {
   color: var(--text-muted);
   text-decoration: none;
 }
-.journal-tasks-table .jtt-subgroup-head a.internal-link:hover {
+.ca-journal-tasks-table .ca-jtt-subgroup-head a.internal-link:hover {
   color: var(--interactive-accent);
 }
-.journal-tasks-table .jtt-subgroup-count {
-  font-size: var(--am-text-2xs);
+.ca-journal-tasks-table .ca-jtt-subgroup-count {
+  font-size: var(--ca-text-2xs);
   line-height: 1.4;
   padding: 0 6px;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-secondary);
   color: var(--text-faint);
 }
-.journal-tasks-table .journal-task-tag {
-  font-size: var(--am-text-2xs);
+.ca-journal-tasks-table .ca-journal-task-tag {
+  font-size: var(--ca-text-2xs);
   font-family: var(--font-monospace);
   padding: 1px 6px;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
   white-space: nowrap;
 }
-.journal-tasks-table .journal-task-tag:hover {
+.ca-journal-tasks-table .ca-journal-task-tag:hover {
   color: var(--text-accent);
   border-color: var(--text-accent);
 }
-.journal-tasks-table .jtt-group-head {
+.ca-journal-tasks-table .ca-jtt-group-head {
   display: flex;
   align-items: baseline;
   gap: 8px;
   margin-bottom: 6px;
 }
-.journal-tasks-table .jtt-group-head a.internal-link {
+.ca-journal-tasks-table .ca-jtt-group-head a.internal-link {
   font-weight: 600;
   text-decoration: none;
 }
-.journal-tasks-table .jtt-group-head a.internal-link:hover {
+.ca-journal-tasks-table .ca-jtt-group-head a.internal-link:hover {
   color: var(--interactive-accent);
 }
 /* Group count: a small neutral chip matching the header pills. */
-.journal-tasks-table .jtt-group-count {
-  font-size: var(--am-text-2xs);
+.ca-journal-tasks-table .ca-jtt-group-count {
+  font-size: var(--ca-text-2xs);
   line-height: 1.4;
   padding: 1px 7px;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-secondary);
   color: var(--text-muted);
 }
 /* Rows read as a clean single-line list with left priority accent and right metadata. */
-.journal-tasks-table .jtt-row {
+.ca-journal-tasks-table .ca-jtt-row {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -351,18 +351,18 @@
   gap: 10px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--background-modifier-border);
-  border-left: var(--am-rule-edge) solid transparent;
-  border-radius: var(--am-radius-xs);
+  border-left: var(--ca-rule-edge) solid transparent;
+  border-radius: var(--ca-radius-xs);
   transition: background 0.12s ease;
   flex-wrap: nowrap;
 }
-.journal-tasks-table .jtt-row:hover {
+.ca-journal-tasks-table .ca-jtt-row:hover {
   background: var(--background-modifier-hover);
 }
-.journal-tasks-table .jtt-list .jtt-row:last-child {
+.ca-journal-tasks-table .ca-jtt-list .ca-jtt-row:last-child {
   border-bottom: none;
 }
-.journal-tasks-table .jtt-row .journal-task-main {
+.ca-journal-tasks-table .ca-jtt-row .ca-journal-task-main {
   width: auto;
   flex: 1 1 auto;
   min-width: 0;
@@ -370,7 +370,7 @@
   align-items: center;
   gap: 8px;
 }
-.journal-tasks-table .jtt-row .journal-task-meta {
+.ca-journal-tasks-table .ca-jtt-row .ca-journal-task-meta {
   padding-left: 0;
   flex: 0 0 auto;
   display: flex;
@@ -378,81 +378,81 @@
   gap: 6px;
   flex-wrap: nowrap;
 }
-.journal-tasks-table .jtt-row .journal-task-chips {
+.ca-journal-tasks-table .ca-jtt-row .ca-journal-task-chips {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: nowrap;
 }
-.journal-tasks-table .jtt-row .journal-task-prio {
+.ca-journal-tasks-table .ca-jtt-row .ca-journal-task-prio {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 3px;
   padding: 1px 6px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   border: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
   color: var(--text-muted);
   white-space: nowrap;
 }
 /* Priority accent and background tint */
-.journal-tasks-table .jtt-row.journal-task-high {
+.ca-journal-tasks-table .ca-jtt-row.ca-journal-task-high {
   background: color-mix(in srgb, var(--color-red, #e05561) 7%, var(--background-secondary));
   border-left-color: var(--color-red, #e05561);
 }
-.journal-tasks-table .jtt-row.journal-task-high:hover {
+.ca-journal-tasks-table .ca-jtt-row.ca-journal-task-high:hover {
   background: color-mix(in srgb, var(--color-red, #e05561) 12%, var(--background-secondary));
 }
-.journal-tasks-table .jtt-row.journal-task-low {
-  background: color-mix(in srgb, var(--am-ev-teal) 7%, var(--background-secondary));
-  border-left-color: var(--am-ev-teal);
+.ca-journal-tasks-table .ca-jtt-row.ca-journal-task-low {
+  background: color-mix(in srgb, var(--ca-ev-teal) 7%, var(--background-secondary));
+  border-left-color: var(--ca-ev-teal);
   opacity: 0.85;
 }
-.journal-tasks-table .jtt-row.journal-task-low:hover {
-  background: color-mix(in srgb, var(--am-ev-teal) 12%, var(--background-secondary));
+.ca-journal-tasks-table .ca-jtt-row.ca-journal-task-low:hover {
+  background: color-mix(in srgb, var(--ca-ev-teal) 12%, var(--background-secondary));
 }
 /* Read-only text: not an <input>, so drop the field affordances the editable
    per-note widget carries and let it sit as plain flowing text. */
-.journal-tasks-table .jtt-text {
+.ca-journal-tasks-table .ca-jtt-text {
   cursor: default;
   flex: 1;
   line-height: 1.4;
 }
-.journal-tasks-table .jtt-row.is-done .jtt-text {
+.ca-journal-tasks-table .ca-jtt-row.is-done .ca-jtt-text {
   text-decoration: line-through;
   color: var(--text-faint);
 }
-.journal-tasks-table .jtt-row.is-done {
+.ca-journal-tasks-table .ca-jtt-row.is-done {
   opacity: 0.55;
 }
-.journal-tasks-table .jtt-due {
+.ca-journal-tasks-table .ca-jtt-due {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   color: var(--text-muted);
   white-space: nowrap;
-  padding: var(--am-space-1) var(--am-space-3);
-  border-radius: var(--am-radius-pill);
+  padding: var(--ca-space-1) var(--ca-space-3);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
 }
-.journal-tasks-table .jtt-due-icon {
+.ca-journal-tasks-table .ca-jtt-due-icon {
   display: inline-flex;
 }
-.journal-tasks-table .jtt-due-icon .svg-icon {
+.ca-journal-tasks-table .ca-jtt-due-icon .svg-icon {
   width: 0.9em;
   height: 0.9em;
 }
 /* Overdue due date reads as a danger pill; low-alpha red tint keeps the red
-   text readable (see .jtt-pill-danger for why a raw theme error-bg fails). */
-.journal-tasks-table .jtt-due-overdue {
+   text readable (see .ca-jtt-pill-danger for why a raw theme error-bg fails). */
+.ca-journal-tasks-table .ca-jtt-due-overdue {
   padding: 1px 8px;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: rgba(var(--color-red-rgb, 224, 85, 97), 0.15);
   border-color: transparent;
   color: var(--text-error, #e05561);
@@ -461,16 +461,16 @@
 
 /* Mobile layout for tasks-table */
 @media (max-width: 520px) {
-  .journal-tasks-table .jtt-row {
+  .ca-journal-tasks-table .ca-jtt-row {
     padding: 6px 8px;
     gap: 8px;
   }
 }
 
-body.is-mobile .journal-tasks-table .jtt-row {
+body.is-mobile .ca-journal-tasks-table .ca-jtt-row {
   padding: 6px 8px;
 }
-body.is-mobile .journal-tasks-table .jtt-row .journal-task-check {
+body.is-mobile .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-check {
   width: 1.3em;
   height: 1.3em;
 }
@@ -486,52 +486,52 @@ body.is-mobile .journal-tasks-table .jtt-row .journal-task-check {
    no column for a number, and the count was drawn on every pill anyway. The
    source column is what forced the change — two cells have to align down the
    page, and aligned pills are a table. */
-.jt-tag-summary {
-  font-size: var(--am-text-xs);
+.ca-jt-tag-summary {
+  font-size: var(--ca-text-xs);
   color: var(--text-muted);
   margin: 0 0 0.5em;
 }
-.jt-tag-table {
+.ca-jt-tag-table {
   display: flex;
   flex-direction: column;
 }
-.journal-tag-index .jt-tag-group {
+.ca-journal-tag-index .ca-jt-tag-group {
   border-bottom: 1px solid var(--background-modifier-border);
 }
-.journal-tag-index .jt-tag-group:last-child {
+.ca-journal-tag-index .ca-jt-tag-group:last-child {
   border-bottom: none;
 }
 /* Three columns, or four with a source. `minmax(0, …)` on the two text cells
    so a long tag or a deep folder name wraps inside its cell instead of
    pushing the count and the search control off the row. */
-.jt-tag-row {
+.ca-jt-tag-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--am-space-2) var(--am-space-4);
+  gap: var(--ca-space-2) var(--ca-space-4);
   cursor: pointer;
   list-style: none;
-  padding: var(--am-space-3) var(--am-space-2);
+  padding: var(--ca-space-3) var(--ca-space-2);
   color: var(--text-normal);
   transition: background 0.15s;
 }
-.has-source .jt-tag-row {
+.has-source .ca-jt-tag-row {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.1fr) auto;
 }
-.jt-tag-row::-webkit-details-marker { display: none; }
-.jt-tag-row:hover {
+.ca-jt-tag-row::-webkit-details-marker { display: none; }
+.ca-jt-tag-row:hover {
   background: var(--background-modifier-hover);
 }
-.journal-tag-index details[open] > .jt-tag-row {
+.ca-journal-tag-index details[open] > .ca-jt-tag-row {
   color: var(--interactive-accent);
 }
-.jt-tag-name {
-  font-size: var(--am-text-sm);
+.ca-jt-tag-name {
+  font-size: var(--ca-text-sm);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-.jt-tag-count {
-  font-size: var(--am-text-2xs);
+.ca-jt-tag-count {
+  font-size: var(--ca-text-2xs);
   color: var(--text-muted);
   font-weight: 400;
   white-space: nowrap;
@@ -539,39 +539,39 @@ body.is-mobile .journal-tasks-table .jtt-row .journal-task-check {
 /* The sources cell wraps rather than truncating: a tag genuinely used in six
    journals should say six, and a row that grows is honest where an ellipsis
    is a number the reader cannot see. */
-.jt-tag-sources {
+.ca-jt-tag-sources {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--am-space-1) var(--am-space-2);
+  gap: var(--ca-space-1) var(--ca-space-2);
   min-width: 0;
 }
-.jt-tag-source {
-  font-size: var(--am-text-2xs);
+.ca-jt-tag-source {
+  font-size: var(--ca-text-2xs);
   color: var(--text-muted);
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill);
-  padding: 0 var(--am-space-3);
+  border-radius: var(--ca-radius-pill);
+  padding: 0 var(--ca-space-3);
   overflow-wrap: anywhere;
 }
-.jt-tag-list {
+.ca-jt-tag-list {
   margin: 0 0 0.4em 0;
   padding-left: 2em;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
 }
-.jt-tag-list li {
+.ca-jt-tag-list li {
   margin: 0.15em 0;
 }
-.jt-tag-list a.internal-link {
+.ca-jt-tag-list a.internal-link {
   text-decoration: none;
 }
-.jt-tag-list a.internal-link:hover {
+.ca-jt-tag-list a.internal-link:hover {
   color: var(--interactive-accent);
 }
-.jt-tag-search {
+.ca-jt-tag-search {
   flex-shrink: 0;
 }
-.jt-tag-search .journal-btn-icon {
+.ca-jt-tag-search .ca-journal-btn-icon {
   width: 0.85em;
   height: 0.85em;
 }
@@ -584,7 +584,7 @@ body.is-mobile .journal-tasks-table .jtt-row .journal-task-check {
 
    No label rule here: `tracker` is not a self-labelled kind, so the eyebrow
    above this comes from the same wrapper every stepper and picker uses. */
-.journal-tags-field {
+.ca-journal-tags-field {
   display: flex;
   width: 100%;
   min-width: 0;
@@ -592,126 +592,126 @@ body.is-mobile .journal-tasks-table .jtt-row .journal-task-check {
 /* Both states are one control filling the cell's width, so a Tags cell has
    the same silhouette as the stepper beside it rather than a bordered block
    under two lines of prose. */
-.journal-tags-chips,
-.journal-tags-add {
+.ca-journal-tags-chips,
+.ca-journal-tags-add {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
   width: 100%;
   min-width: 0;
-  padding: var(--am-space-2) 0;
+  padding: var(--ca-space-2) 0;
   background: none;
   border: none;
   box-shadow: none;
   cursor: pointer;
   text-align: left;
   color: var(--text-normal);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
 }
-.journal-tags-add {
+.ca-journal-tags-add {
   color: var(--text-muted);
 }
-.journal-tags-add:hover,
-.journal-tags-chips:hover {
+.ca-journal-tags-add:hover,
+.ca-journal-tags-chips:hover {
   color: var(--text-normal);
   background: none;
 }
-.journal-tags-chip {
+.ca-journal-tags-chip {
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill);
-  padding: 0 var(--am-space-3);
+  border-radius: var(--ca-radius-pill);
+  padding: 0 var(--ca-space-3);
   overflow-wrap: anywhere;
 }
-.journal-tags-chips:hover .journal-tags-chip {
+.ca-journal-tags-chips:hover .ca-journal-tags-chip {
   border-color: var(--interactive-accent);
 }
 /* The pencil trails the chips rather than sitting in a corner: it is the same
    target as the chips, so it reads as the end of one control instead of a
    second one competing with it. */
-.journal-tags-pencil {
+.ca-journal-tags-pencil {
   width: 0.8em;
   height: 0.8em;
   opacity: 0;
   flex-shrink: 0;
   color: var(--text-muted);
 }
-.journal-tags-chips:hover .journal-tags-pencil,
-.journal-tags-chips:focus-visible .journal-tags-pencil {
+.ca-journal-tags-chips:hover .ca-journal-tags-pencil,
+.ca-journal-tags-chips:focus-visible .ca-journal-tags-pencil {
   opacity: 1;
 }
 
-.almanac-tags-editor .almanac-tags-section {
-  margin-bottom: var(--am-space-6);
+.ca-tags-editor .ca-tags-section {
+  margin-bottom: var(--ca-space-6);
 }
-.almanac-tags-heading {
-  font-size: var(--am-text-2xs);
+.ca-tags-heading {
+  font-size: var(--ca-text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
-  margin-bottom: var(--am-space-3);
+  margin-bottom: var(--ca-space-3);
 }
-.almanac-tags-empty {
-  font-size: var(--am-text-sm);
+.ca-tags-empty {
+  font-size: var(--ca-text-sm);
   color: var(--text-muted);
 }
-.almanac-tags-list {
+.ca-tags-list {
   display: flex;
   flex-direction: column;
 }
-.almanac-tags-row {
+.ca-tags-row {
   display: flex;
   align-items: center;
-  gap: var(--am-space-3);
-  padding: var(--am-space-2) 0;
+  gap: var(--ca-space-3);
+  padding: var(--ca-space-2) 0;
   border-bottom: 1px solid var(--background-modifier-border);
 }
-.almanac-tags-row:last-child { border-bottom: none; }
-.almanac-tags-name {
+.ca-tags-row:last-child { border-bottom: none; }
+.ca-tags-name {
   flex: 1 1 auto;
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.almanac-tags-remove:hover { color: var(--text-error, #e05561); }
-.almanac-tags-add {
+.ca-tags-remove:hover { color: var(--text-error, #e05561); }
+.ca-tags-add {
   display: flex;
-  gap: var(--am-space-3);
+  gap: var(--ca-space-3);
   align-items: center;
 }
-.almanac-tags-input {
+.ca-tags-input {
   flex: 1 1 auto;
   min-width: 0;
 }
 /* The used-tags list is the directory survey, and a pill TOGGLES: the same
    control adds and removes, so the list doubles as a picture of what this
    note carries. Pressed means on this note. */
-.almanac-tags-used {
+.ca-tags-used {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
   max-height: 40vh;
   overflow-y: auto;
 }
-.almanac-tags-pill {
+.ca-tags-pill {
   display: inline-flex;
   align-items: baseline;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
   cursor: pointer;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill);
-  padding: var(--am-space-2) var(--am-space-4);
+  border-radius: var(--ca-radius-pill);
+  padding: var(--ca-space-2) var(--ca-space-4);
   color: var(--text-normal);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
 }
-.almanac-tags-pill:hover { border-color: var(--interactive-accent); }
-.almanac-tags-pill.is-on {
+.ca-tags-pill:hover { border-color: var(--interactive-accent); }
+.ca-tags-pill.is-on {
   border-color: var(--interactive-accent);
   color: var(--interactive-accent);
 }
-.almanac-tags-count {
-  font-size: var(--am-text-2xs);
+.ca-tags-count {
+  font-size: var(--ca-text-2xs);
   color: var(--text-muted);
 }
 
@@ -720,7 +720,7 @@ body.is-mobile .journal-tasks-table .jtt-row .journal-task-check {
    control they are. It rests visible there instead, which is the same answer
    every other hover-revealed affordance in this sheet gives. */
 @media (hover: none) {
-  .journal-tags-pencil {
+  .ca-journal-tags-pencil {
     opacity: 1;
   }
 }
@@ -734,25 +734,25 @@ body.is-mobile .journal-tasks-table .jtt-row .journal-task-check {
    NAMED FOR THE COMPONENT, NOT FOR THE KIND TABLE. It went in as `.jkt-row-menu`
    and `test/appearance.test.ts` caught it within the hour — `.jkt-*` is the
    private family 2.56.9 retired, and a `⋯` in a row's actions slot is what ANY
-   list of records wants. It is `.almanac-list-menu` for the same reason the
-   heading strip and the value cell are `.almanac-list-*`.
+   list of records wants. It is `.ca-list-menu` for the same reason the
+   heading strip and the value cell are `.ca-list-*`.
 
    THE HEADING STRIP PAYS THE SAME RESERVE AS THE ROWS. The actions slot is
    `flex: 0 0 auto` beside the grid, so without this every value column sits a
    button's width to the left of its own heading — out of true in exactly the way
    nobody can name from looking at it. One custom property, read by both, so the
    two cannot drift when the button is resized. */
-.almanac-list.has-row-actions {
-  --am-row-action-w: 22px;
+.ca-list.has-row-actions {
+  --ca-row-action-w: 22px;
 }
-.almanac-list.has-row-actions .almanac-list-heads {
-  padding-right: calc(6px + var(--am-row-action-w));
+.ca-list.has-row-actions .ca-list-heads {
+  padding-right: calc(6px + var(--ca-row-action-w));
 }
-.almanac-list-menu {
+.ca-list-menu {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--am-row-action-w, 22px);
+  width: var(--ca-row-action-w, 22px);
   height: 20px;
   border-radius: 4px;
   cursor: pointer;
@@ -760,15 +760,15 @@ body.is-mobile .journal-tasks-table .jtt-row .journal-task-check {
   opacity: 0;
   transition: opacity 0.12s ease, color 0.12s ease;
 }
-.almanac-list-menu svg {
+.ca-list-menu svg {
   width: 0.85em;
   height: 0.85em;
 }
-.almanac-list-row:hover .almanac-list-menu,
-.almanac-list-row:focus-within .almanac-list-menu {
+.ca-list-row:hover .ca-list-menu,
+.ca-list-row:focus-within .ca-list-menu {
   opacity: 1;
 }
-.almanac-list-menu:hover {
+.ca-list-menu:hover {
   opacity: 1;
   color: var(--text-normal);
   background: var(--background-modifier-hover);
@@ -776,7 +776,7 @@ body.is-mobile .journal-tasks-table .jtt-row .journal-task-check {
 /* A touchscreen has no hover to reveal it with, so it rests visible and faint —
    3.9 §3.3's rule, checked mechanically rather than remembered. */
 @media (hover: none) {
-  .almanac-list-menu {
+  .ca-list-menu {
     opacity: 0.55;
   }
 }

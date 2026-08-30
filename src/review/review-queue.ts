@@ -32,7 +32,7 @@
 
 import { App, MarkdownPostProcessorContext, Notice, TFile, setIcon } from "obsidian";
 import { emptyLine } from "../ui/empty";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { getBuiltinTracker } from "../trackers/trackers";
 import {
   journalFolderScope,
@@ -65,7 +65,7 @@ interface ReviewProperties {
   reviewed: string;
 }
 
-export function reviewProperties(plugin: AlmanacPlugin): ReviewProperties {
+export function reviewProperties(plugin: ChronoAnvilPlugin): ReviewProperties {
   return {
     confidence: getBuiltinTracker(plugin, "confidence")?.id ?? "confidence",
     status: getBuiltinTracker(plugin, "status")?.id ?? "status",
@@ -82,7 +82,7 @@ export function reviewProperties(plugin: AlmanacPlugin): ReviewProperties {
 // (`scheduleFor` takes a value, `reviewIntervalDays` takes a number), which is
 // why splitting the rating cost the scheduler nothing at all.
 export function ratingPropertyOf(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   fmType: unknown,
   fallback: string
@@ -93,7 +93,7 @@ export function ratingPropertyOf(
 }
 
 function readNote(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   props: ReviewProperties
 ): (p: PageInfo) => ReviewInput {
   return (p) => ({
@@ -110,7 +110,7 @@ function readNote(
 // identical scoping — two copies of "what does a bare directive mean?" is how
 // a queue and a search over the same subject end up covering different notes.
 export function queueScope(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   arg: string,
   hostFolder: string | null
 ): string[] {
@@ -122,7 +122,7 @@ export function queueScope(
 // missing-date rule, so the reason shows up once in a name instead of twice as
 // a side effect: an index holds a current value, a leaf forms the series a
 // schedule needs.
-function leafNotes(plugin: AlmanacPlugin, pages: PageInfo[]): PageInfo[] {
+function leafNotes(plugin: ChronoAnvilPlugin, pages: PageInfo[]): PageInfo[] {
   const kinds = new Set(
     registeredJournalTypes(plugin).flatMap((t) => t.kinds.map((k) => k.id))
   );
@@ -150,11 +150,11 @@ function row(
   props: ReviewProperties,
   sourcePath: string
 ): void {
-  const el = root.createDiv({ cls: "jrq-row" });
+  const el = root.createDiv({ cls: "ca-jrq-row" });
 
-  const main = el.createDiv({ cls: "jrq-main" });
+  const main = el.createDiv({ cls: "ca-jrq-main" });
   const link = main.createEl("a", {
-    cls: "internal-link jrq-title",
+    cls: "internal-link ca-jrq-title",
     text: item.note.file.basename,
     href: item.note.file.path,
     attr: { "data-href": item.note.file.path },
@@ -166,7 +166,7 @@ function row(
   link.addEventListener("mouseover", (evt) => {
     app.workspace.trigger("hover-link", {
       event: evt,
-      source: "almanac-review-queue",
+      source: "ca-review-queue",
       hoverParent: el,
       targetEl: link,
       linktext: item.note.file.path,
@@ -183,14 +183,14 @@ function row(
   bits.push(describeDue(item.schedule));
   if (Number.isFinite(conf)) bits.push(`confidence ${conf}/5`);
   if (!item.schedule.everReviewed) bits.push("never reviewed");
-  main.createDiv({ cls: "jrq-meta", text: bits.join(" · ") });
+  main.createDiv({ cls: "ca-jrq-meta", text: bits.join(" · ") });
 
   // One button, and it is the whole interaction: "I looked at this." It stamps
   // today and the row leaves the queue. Grading (got it / didn't) belongs to
   // the recall widget, which writes confidence as well — this is the honest
   // minimum for a note you reread without being tested on.
   const done = el.createEl("button", {
-    cls: "jrq-done",
+    cls: "ca-jrq-done",
     attr: {
       "aria-label": `Mark ${item.note.file.basename} reviewed today`,
       title: "Mark reviewed today",
@@ -207,7 +207,7 @@ function row(
       // files behind it drift apart.
       await stampReviewed(app, item.note.file, props.reviewed, todayIso());
     } catch (e) {
-      console.error("[Almanac] could not stamp reviewed", e);
+      console.error("[ChronoAnvil] could not stamp reviewed", e);
       new Notice("Couldn't mark that note reviewed — see the console.");
       done.disabled = false;
     }
@@ -215,13 +215,13 @@ function row(
 }
 
 export function buildReviewQueue(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   arg: string,
   ctx: MarkdownPostProcessorContext,
   hostFolder: string | null
 ): HTMLElement {
   const app = plugin.app;
-  const root = createDiv({ cls: "journal-table journal-review-queue" });
+  const root = createDiv({ cls: "ca-journal-table ca-journal-review-queue" });
 
   const folders = queueScope(plugin, arg, hostFolder);
   if (folders.length === 0) {
@@ -234,8 +234,8 @@ export function buildReviewQueue(
     // until a journal is registered. Before that this directive only ever sat
     // on a journal's own index note, where an empty scope meant a hand-written
     // directive pointing nowhere and a blank was as good an answer as any.
-    const line = emptyLine(root, "", "jrq-empty");
-    setIcon(line.createSpan({ cls: "jrq-empty-icon" }), "check-check");
+    const line = emptyLine(root, "", "ca-jrq-empty");
+    setIcon(line.createSpan({ cls: "ca-jrq-empty-icon" }), "check-check");
     line.createSpan({
       text:
         arg.trim() === SCOPE_ALL
@@ -264,8 +264,8 @@ export function buildReviewQueue(
     const next = nextDue(notes, readNote(plugin, props), today);
     // Line-shaped rather than a callout: the queue drew its header and its
     // scope control already, so only this region is empty. See empty.ts.
-    const line = emptyLine(root, "", "jrq-empty");
-    setIcon(line.createSpan({ cls: "jrq-empty-icon" }), "check-check");
+    const line = emptyLine(root, "", "ca-jrq-empty");
+    setIcon(line.createSpan({ cls: "ca-jrq-empty-icon" }), "check-check");
     line.createSpan({
       text: next
         ? `Nothing to review — next ${describeNext(next)}.`
@@ -276,7 +276,7 @@ export function buildReviewQueue(
     return root;
   }
 
-  const list = root.createDiv({ cls: "jrq-list" });
+  const list = root.createDiv({ cls: "ca-jrq-list" });
   for (const item of due) {
     row(list, app, item, props, ctx.sourcePath);
   }
@@ -286,7 +286,7 @@ export function buildReviewQueue(
   const total = dueItems(notes, readNote(plugin, props), today).length;
   if (total > due.length) {
     root.createDiv({
-      cls: "jrq-more",
+      cls: "ca-jrq-more",
       text: `${total - due.length} more waiting — this list shows the ${QUEUE_LIMIT} coldest.`,
     });
   }

@@ -8,7 +8,7 @@
  */
 
 /* ============================================================
- *  Almanac Page Grounds (4.80)
+ *  ChronoAnvil Page Grounds (4.80)
  *  Seventeen background textures, in five families:
  *    Paper           dot grid, graph, ruled, crosshatch, isometric
  *    Weave and tile  checkerboard, argyle, zigzag, carbon fibre
@@ -42,13 +42,13 @@
  * element is a stacking context, and `position: relative` alone is not one.
  * Without the isolation the films sink behind the workspace and vanish, and the
  * grain's `overlay` blends against whatever the window happened to be showing. */
-body.am-ground .workspace-leaf-content[data-type="markdown"] {
+body.ca-ground .workspace-leaf-content[data-type="markdown"] {
   position: relative;
   isolation: isolate;
 }
 
-body.am-ground .workspace-leaf-content[data-type="markdown"]::before,
-body.am-ground .workspace-leaf-content[data-type="markdown"]::after {
+body.ca-ground .workspace-leaf-content[data-type="markdown"]::before,
+body.ca-ground .workspace-leaf-content[data-type="markdown"]::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -60,18 +60,18 @@ body.am-ground .workspace-leaf-content[data-type="markdown"]::after {
    strength needs a layer of its own: scaling nineteen stacks of rgba values
    from one number is not something CSS can do, and scaling one element's
    opacity is. */
-body.am-ground .workspace-leaf-content[data-type="markdown"]::before {
-  opacity: var(--am-tex-strength);
+body.ca-ground .workspace-leaf-content[data-type="markdown"]::before {
+  opacity: var(--ca-tex-strength);
 }
 
 /* The grain film, over every pattern. `overlay` and not `normal`: greyscale
    noise composited in overlay lightens a dark ground and darkens a light one
    from the same bytes, so the token has no theme twin. */
-body.am-ground .workspace-leaf-content[data-type="markdown"]::after {
-  background-image: var(--am-tex-grain);
+body.ca-ground .workspace-leaf-content[data-type="markdown"]::after {
+  background-image: var(--ca-tex-grain);
   background-size: 200px 200px;
   mix-blend-mode: overlay;
-  opacity: calc(0.55 * var(--am-tex-strength));
+  opacity: calc(0.55 * var(--ca-tex-strength));
 }
 
 /* AND THE SURFACES ABOVE IT STOP PAINTING OVER IT. Obsidian gives the reading
@@ -82,11 +82,11 @@ body.am-ground .workspace-leaf-content[data-type="markdown"]::after {
 
    ── EVERY SELECTOR HERE IS SCOPED TO THE LEAF, AND THAT IS THE FIX ──────
 
-   The first cut of this rule read `body.am-ground .markdown-preview-view`, and
+   The first cut of this rule read `body.ca-ground .markdown-preview-view`, and
    grounds appeared on Modern Fluent and on nothing else. The two other presets
    carry
 
-     body.am-preset-editorial .markdown-preview-view { background-color: … }
+     body.ca-preset-editorial .markdown-preview-view { background-color: … }
 
    in `99-aesthetic-presets.css`, and that selector weighs **exactly what the
    clearing rule weighed** — one element and two classes, (0,2,1) against
@@ -100,12 +100,12 @@ body.am-ground .workspace-leaf-content[data-type="markdown"]::after {
    preset can paint the same surfaces, without the grounds silently going out
    again. It is also the truer selector: a ground clears the backgrounds inside
    a markdown leaf it is drawing on, not every reading view in the window. */
-body.am-ground .workspace-leaf-content[data-type="markdown"] > .view-content,
-body.am-ground .workspace-leaf-content[data-type="markdown"] .markdown-reading-view,
-body.am-ground .workspace-leaf-content[data-type="markdown"] .markdown-preview-view,
-body.am-ground .workspace-leaf-content[data-type="markdown"] .markdown-source-view,
-body.am-ground .workspace-leaf-content[data-type="markdown"] .cm-editor,
-body.am-ground .workspace-leaf-content[data-type="markdown"] .cm-scroller {
+body.ca-ground .workspace-leaf-content[data-type="markdown"] > .view-content,
+body.ca-ground .workspace-leaf-content[data-type="markdown"] .markdown-reading-view,
+body.ca-ground .workspace-leaf-content[data-type="markdown"] .markdown-preview-view,
+body.ca-ground .workspace-leaf-content[data-type="markdown"] .markdown-source-view,
+body.ca-ground .workspace-leaf-content[data-type="markdown"] .cm-editor,
+body.ca-ground .workspace-leaf-content[data-type="markdown"] .cm-scroller {
   background-color: transparent;
 }
 
@@ -113,14 +113,14 @@ body.am-ground .workspace-leaf-content[data-type="markdown"] .cm-scroller {
  * Three settings, one token. Standard restates the value `00-tokens.css`
  * already holds so that the three classes are a complete set rather than two
  * overrides and an absence. */
-body.am-ground-faint {
-  --am-tex-strength: 0.45;
+body.ca-ground-faint {
+  --ca-tex-strength: 0.45;
 }
-body.am-ground-standard {
-  --am-tex-strength: 0.75;
+body.ca-ground-standard {
+  --ca-tex-strength: 0.75;
 }
-body.am-ground-full {
-  --am-tex-strength: 1;
+body.ca-ground-full {
+  --ca-tex-strength: 1;
 }
 
 /* ============================================================
@@ -132,48 +132,48 @@ body.am-ground-full {
 
 /* Minor dots every 24px, a heavier one every fifth. The pattern a notebook
    and a design canvas have in common, which is why it is the default. */
-body.am-ground-dotgrid .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-dotgrid .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    radial-gradient(circle at 1px 1px, var(--am-tex-ink-2) 0 1.7px, transparent 1.9px),
-    radial-gradient(circle at 1px 1px, var(--am-tex-ink) 0 1.2px, transparent 1.4px);
+    radial-gradient(circle at 1px 1px, var(--ca-tex-ink-2) 0 1.7px, transparent 1.9px),
+    radial-gradient(circle at 1px 1px, var(--ca-tex-ink) 0 1.2px, transparent 1.4px);
   background-size: 120px 120px, 24px 24px;
 }
 
 /* 16px minor, 96px major — six to one, so the majors land on a reader's count
    rather than near it. */
-body.am-ground-graph .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-graph .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    linear-gradient(var(--am-tex-ink-2) 1px, transparent 1px),
-    linear-gradient(90deg, var(--am-tex-ink-2) 1px, transparent 1px),
-    linear-gradient(var(--am-tex-ink) 1px, transparent 1px),
-    linear-gradient(90deg, var(--am-tex-ink) 1px, transparent 1px);
+    linear-gradient(var(--ca-tex-ink-2) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ca-tex-ink-2) 1px, transparent 1px),
+    linear-gradient(var(--ca-tex-ink) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ca-tex-ink) 1px, transparent 1px);
   background-size: 96px 96px, 96px 96px, 16px 16px, 16px 16px;
 }
 
 /* Baselines at 27px with one margin rule in the theme accent. The rule is the
    only layer in the set sized to the element rather than tiled: notebook paper
    has one margin, not a margin every 72 pixels. */
-body.am-ground-ruled .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-ruled .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    linear-gradient(90deg, transparent 0 71px, var(--am-tex-accent) 71px 72px, transparent 72px),
-    repeating-linear-gradient(180deg, transparent 0 27px, var(--am-tex-ink) 27px 28px, transparent 28px);
+    linear-gradient(90deg, transparent 0 71px, var(--ca-tex-accent) 71px 72px, transparent 72px),
+    repeating-linear-gradient(180deg, transparent 0 27px, var(--ca-tex-ink) 27px 28px, transparent 28px);
   background-size: 100% 100%, auto;
   background-repeat: no-repeat, repeat;
 }
 
 /* Engraving shading, at 7.5%. */
-body.am-ground-hatch .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-hatch .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    repeating-linear-gradient(45deg, transparent 0 11px, var(--am-tex-ink) 11px 12px, transparent 12px),
-    repeating-linear-gradient(-45deg, transparent 0 11px, var(--am-tex-ink) 11px 12px, transparent 12px);
+    repeating-linear-gradient(45deg, transparent 0 11px, var(--ca-tex-ink) 11px 12px, transparent 12px),
+    repeating-linear-gradient(-45deg, transparent 0 11px, var(--ca-tex-ink) 11px 12px, transparent 12px);
 }
 
 /* 30, 150 and vertical — the grid every isometric drawing starts on. */
-body.am-ground-iso .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-iso .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    repeating-linear-gradient(30deg, transparent 0 27px, var(--am-tex-ink) 27px 28px, transparent 28px),
-    repeating-linear-gradient(150deg, transparent 0 27px, var(--am-tex-ink) 27px 28px, transparent 28px),
-    repeating-linear-gradient(90deg, transparent 0 47px, var(--am-tex-ink) 47px 48px, transparent 48px);
+    repeating-linear-gradient(30deg, transparent 0 27px, var(--ca-tex-ink) 27px 28px, transparent 28px),
+    repeating-linear-gradient(150deg, transparent 0 27px, var(--ca-tex-ink) 27px 28px, transparent 28px),
+    repeating-linear-gradient(90deg, transparent 0 47px, var(--ca-tex-ink) 47px 48px, transparent 48px);
 }
 
 /* ============================================================
@@ -183,46 +183,46 @@ body.am-ground-iso .workspace-leaf-content[data-type="markdown"]::before {
  * ============================================================ */
 
 /* Two offset 45deg gradients. Read as a floor, or as "transparent". */
-body.am-ground-check .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-check .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    linear-gradient(45deg, var(--am-tex-fill) 25%, transparent 25% 75%, var(--am-tex-fill) 75%),
-    linear-gradient(45deg, var(--am-tex-fill) 25%, transparent 25% 75%, var(--am-tex-fill) 75%);
+    linear-gradient(45deg, var(--ca-tex-fill) 25%, transparent 25% 75%, var(--ca-tex-fill) 75%),
+    linear-gradient(45deg, var(--ca-tex-fill) 25%, transparent 25% 75%, var(--ca-tex-fill) 75%);
   background-size: 44px 44px;
   background-position: 0 0, 22px 22px;
 }
 
 /* A diamond lattice with the crossing hairlines the knit is named for. */
-body.am-ground-argyle .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-argyle .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    repeating-linear-gradient(45deg, transparent 0 33px, var(--am-tex-ink) 33px 34px, transparent 34px),
-    repeating-linear-gradient(-45deg, transparent 0 33px, var(--am-tex-ink) 33px 34px, transparent 34px),
-    linear-gradient(45deg, var(--am-tex-fill) 25%, transparent 25% 75%, var(--am-tex-fill) 75%),
-    linear-gradient(-45deg, var(--am-tex-fill) 25%, transparent 25% 75%, var(--am-tex-fill) 75%);
+    repeating-linear-gradient(45deg, transparent 0 33px, var(--ca-tex-ink) 33px 34px, transparent 34px),
+    repeating-linear-gradient(-45deg, transparent 0 33px, var(--ca-tex-ink) 33px 34px, transparent 34px),
+    linear-gradient(45deg, var(--ca-tex-fill) 25%, transparent 25% 75%, var(--ca-tex-fill) 75%),
+    linear-gradient(-45deg, var(--ca-tex-fill) 25%, transparent 25% 75%, var(--ca-tex-fill) 75%);
   background-size: auto, auto, 96px 96px, 96px 96px;
 }
 
 /* Four corner gradients per tile — the chevron that has been copied out of
    pattern galleries for a decade. */
-body.am-ground-zigzag .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-zigzag .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    linear-gradient(135deg, var(--am-tex-fill) 25%, transparent 25%),
-    linear-gradient(225deg, var(--am-tex-fill) 25%, transparent 25%),
-    linear-gradient(315deg, var(--am-tex-fill) 25%, transparent 25%),
-    linear-gradient(45deg, var(--am-tex-fill) 25%, transparent 25%);
+    linear-gradient(135deg, var(--ca-tex-fill) 25%, transparent 25%),
+    linear-gradient(225deg, var(--ca-tex-fill) 25%, transparent 25%),
+    linear-gradient(315deg, var(--ca-tex-fill) 25%, transparent 25%),
+    linear-gradient(45deg, var(--ca-tex-fill) 25%, transparent 25%);
   background-size: 44px 44px;
   background-position: -22px 0, -22px 0, 0 0, 0 0;
 }
 
 /* The 27/207 weave, tinted down to a whisper. At full strength it is a
    novelty; at 5% fill it is a surface. */
-body.am-ground-carbon .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-carbon .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    linear-gradient(27deg, var(--am-tex-shade) 5px, transparent 5px),
-    linear-gradient(207deg, var(--am-tex-shade) 5px, transparent 5px),
-    linear-gradient(27deg, var(--am-tex-shade) 5px, transparent 5px),
-    linear-gradient(207deg, var(--am-tex-shade) 5px, transparent 5px),
-    linear-gradient(90deg, var(--am-tex-fill) 10px, transparent 10px),
-    linear-gradient(var(--am-tex-ink) 25%, var(--am-tex-fill) 25% 50%, transparent 50% 75%, var(--am-tex-ink) 75%);
+    linear-gradient(27deg, var(--ca-tex-shade) 5px, transparent 5px),
+    linear-gradient(207deg, var(--ca-tex-shade) 5px, transparent 5px),
+    linear-gradient(27deg, var(--ca-tex-shade) 5px, transparent 5px),
+    linear-gradient(207deg, var(--ca-tex-shade) 5px, transparent 5px),
+    linear-gradient(90deg, var(--ca-tex-fill) 10px, transparent 10px),
+    linear-gradient(var(--ca-tex-ink) 25%, var(--ca-tex-fill) 25% 50%, transparent 50% 75%, var(--ca-tex-ink) 75%);
   background-size: 20px 20px;
   background-position: 0 5px, 10px 0, 0 15px, 10px 10px, 0 0, 0 0;
 }
@@ -234,34 +234,34 @@ body.am-ground-carbon .workspace-leaf-content[data-type="markdown"]::before {
  * ============================================================ */
 
 /* A 45deg dot screen at 20px: newsprint, comics, every risograph poster. */
-body.am-ground-halftone .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-halftone .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    radial-gradient(circle at 50% 50%, var(--am-tex-ink-2) 0 2.3px, transparent 2.6px),
-    radial-gradient(circle at 50% 50%, var(--am-tex-ink-2) 0 2.3px, transparent 2.6px);
+    radial-gradient(circle at 50% 50%, var(--ca-tex-ink-2) 0 2.3px, transparent 2.6px),
+    radial-gradient(circle at 50% 50%, var(--ca-tex-ink-2) 0 2.3px, transparent 2.6px);
   background-size: 20px 20px;
   background-position: 0 0, 10px 10px;
 }
 
 /* 1px in 4, under a CRT falloff top and bottom. */
-body.am-ground-scanline .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-scanline .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    repeating-linear-gradient(0deg, var(--am-tex-ink) 0 1px, transparent 1px 4px),
-    linear-gradient(180deg, var(--am-tex-hi) 0%, transparent 22%, transparent 78%, var(--am-tex-shade) 100%);
+    repeating-linear-gradient(0deg, var(--ca-tex-ink) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, var(--ca-tex-hi) 0%, transparent 22%, transparent 78%, var(--ca-tex-shade) 100%);
   background-size: auto, 100% 100%;
   background-repeat: repeat, no-repeat;
 }
 
 /* One hairline family at 45deg, 14px apart. Suiting, not decoration. */
-body.am-ground-pinstripe .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-pinstripe .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    repeating-linear-gradient(45deg, transparent 0 13px, var(--am-tex-ink) 13px 14px, transparent 14px);
+    repeating-linear-gradient(45deg, transparent 0 13px, var(--ca-tex-ink) 13px 14px, transparent 14px);
 }
 
 /* Barber pole, slowed down: 26px bands with a hairline on the seam. */
-body.am-ground-candy .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-candy .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    repeating-linear-gradient(-45deg, var(--am-tex-fill) 0 26px, transparent 26px 52px),
-    repeating-linear-gradient(-45deg, transparent 0 51px, var(--am-tex-ink) 51px 52px, transparent 52px);
+    repeating-linear-gradient(-45deg, var(--ca-tex-fill) 0 26px, transparent 26px 52px),
+    repeating-linear-gradient(-45deg, transparent 0 51px, var(--ca-tex-ink) 51px 52px, transparent 52px);
 }
 
 /* ============================================================
@@ -273,23 +273,23 @@ body.am-ground-candy .workspace-leaf-content[data-type="markdown"]::before {
 /* Seigaiha — the overlapping fans on every Japanese textile and half the web.
    The second layer is the first offset by half a tile, which is what brickworks
    the rows. */
-body.am-ground-seigaiha .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-seigaiha .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    repeating-radial-gradient(circle at 50% 0, transparent 0 17px, var(--am-tex-ink) 17px 18px, transparent 18px),
-    repeating-radial-gradient(circle at 50% 0, transparent 0 17px, var(--am-tex-ink) 17px 18px, transparent 18px);
+    repeating-radial-gradient(circle at 50% 0, transparent 0 17px, var(--ca-tex-ink) 17px 18px, transparent 18px),
+    repeating-radial-gradient(circle at 50% 0, transparent 0 17px, var(--ca-tex-ink) 17px 18px, transparent 18px);
   background-size: 76px 38px;
   background-position: 0 0, 38px 19px;
 }
 
 /* Four coprime dot grids under a vignette — 91/83, 67/71, 53/59, 43/47 — so no
    two layers ever come back into step and nothing forms a row. */
-body.am-ground-stardust .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-stardust .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    radial-gradient(circle at 27% 34%, var(--am-tex-hi) 0 0.9px, transparent 1.6px),
-    radial-gradient(circle at 71% 19%, var(--am-tex-ink-2) 0 0.7px, transparent 1.3px),
-    radial-gradient(circle at 44% 83%, var(--am-tex-ink-2) 0 0.6px, transparent 1.1px),
-    radial-gradient(circle at 88% 62%, var(--am-tex-hi) 0 0.5px, transparent 1px),
-    radial-gradient(130% 100% at 50% -10%, var(--am-tex-shade) 0%, transparent 70%);
+    radial-gradient(circle at 27% 34%, var(--ca-tex-hi) 0 0.9px, transparent 1.6px),
+    radial-gradient(circle at 71% 19%, var(--ca-tex-ink-2) 0 0.7px, transparent 1.3px),
+    radial-gradient(circle at 44% 83%, var(--ca-tex-ink-2) 0 0.6px, transparent 1.1px),
+    radial-gradient(circle at 88% 62%, var(--ca-tex-hi) 0 0.5px, transparent 1px),
+    radial-gradient(130% 100% at 50% -10%, var(--ca-tex-shade) 0%, transparent 70%);
   background-size: 91px 83px, 67px 71px, 53px 59px, 43px 47px, 100% 100%;
   background-repeat: repeat, repeat, repeat, repeat, no-repeat;
 }
@@ -302,13 +302,13 @@ body.am-ground-stardust .workspace-leaf-content[data-type="markdown"]::before {
 
 /* Facets cut by cleavage hairlines at 63 and -49 degrees, on periods that never
    coincide, with one catch in the upper left. */
-body.am-ground-facet .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-facet .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    radial-gradient(88% 66% at 15% 2%, var(--am-tex-hi) 0%, transparent 64%),
-    conic-gradient(from 194deg at 33% 24%, transparent 0 13%, var(--am-tex-fill) 13% 21%, transparent 21% 46%, var(--am-tex-shade) 46% 53%, transparent 53% 77%, var(--am-tex-fill) 77% 84%, transparent 84%),
-    conic-gradient(from 41deg at 78% 71%, transparent 0 11%, var(--am-tex-shade) 11% 19%, transparent 19% 51%, var(--am-tex-fill) 51% 58%, transparent 58%),
-    repeating-linear-gradient(63deg, transparent 0 118px, var(--am-tex-ink) 118px 119px, transparent 119px 247px),
-    repeating-linear-gradient(-49deg, transparent 0 167px, var(--am-tex-ink) 167px 168px, transparent 168px 293px);
+    radial-gradient(88% 66% at 15% 2%, var(--ca-tex-hi) 0%, transparent 64%),
+    conic-gradient(from 194deg at 33% 24%, transparent 0 13%, var(--ca-tex-fill) 13% 21%, transparent 21% 46%, var(--ca-tex-shade) 46% 53%, transparent 53% 77%, var(--ca-tex-fill) 77% 84%, transparent 84%),
+    conic-gradient(from 41deg at 78% 71%, transparent 0 11%, var(--ca-tex-shade) 11% 19%, transparent 19% 51%, var(--ca-tex-fill) 51% 58%, transparent 58%),
+    repeating-linear-gradient(63deg, transparent 0 118px, var(--ca-tex-ink) 118px 119px, transparent 119px 247px),
+    repeating-linear-gradient(-49deg, transparent 0 167px, var(--ca-tex-ink) 167px 168px, transparent 168px 293px);
   background-size: 100% 100%, 760px 760px, 620px 620px, auto, auto;
   background-repeat: no-repeat, repeat, repeat, repeat, repeat;
 }
@@ -316,12 +316,12 @@ body.am-ground-facet .workspace-leaf-content[data-type="markdown"]::before {
 /* The same at twice the scale with every hairline removed. A facet wider than
    the reading column never resolves into an edge, which is what makes this the
    quiet one. */
-body.am-ground-smoke .workspace-leaf-content[data-type="markdown"]::before {
+body.ca-ground-smoke .workspace-leaf-content[data-type="markdown"]::before {
   background-image:
-    radial-gradient(120% 90% at 78% 4%, var(--am-tex-hi) 0%, transparent 58%),
-    conic-gradient(from 152deg at 22% 38%, transparent 0 18%, var(--am-tex-fill) 18% 34%, transparent 34% 62%, var(--am-tex-shade) 62% 79%, transparent 79%),
-    conic-gradient(from 318deg at 84% 66%, transparent 0 21%, var(--am-tex-shade) 21% 37%, transparent 37% 71%, var(--am-tex-fill) 71% 88%, transparent 88%),
-    radial-gradient(140% 100% at 50% 120%, var(--am-tex-shade) 0%, transparent 62%);
+    radial-gradient(120% 90% at 78% 4%, var(--ca-tex-hi) 0%, transparent 58%),
+    conic-gradient(from 152deg at 22% 38%, transparent 0 18%, var(--ca-tex-fill) 18% 34%, transparent 34% 62%, var(--ca-tex-shade) 62% 79%, transparent 79%),
+    conic-gradient(from 318deg at 84% 66%, transparent 0 21%, var(--ca-tex-shade) 21% 37%, transparent 37% 71%, var(--ca-tex-fill) 71% 88%, transparent 88%),
+    radial-gradient(140% 100% at 50% 120%, var(--ca-tex-shade) 0%, transparent 62%);
   background-size: 100% 100%, 1480px 1480px, 1180px 1180px, 100% 100%;
   background-repeat: no-repeat, repeat, repeat, no-repeat;
 }

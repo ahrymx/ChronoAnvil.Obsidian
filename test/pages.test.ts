@@ -94,7 +94,7 @@ describe("crumbs through a promoted note", () => {
 });
 
 describe("insertBelowBanner", () => {
-  const banner = ["---", "type: lesson", "---", "```almanac", "journal-header", "```"];
+  const banner = ["---", "type: lesson", "---", "```chronoanvil", "journal-header", "```"];
 
   it("puts the block under the banner, not at the end", () => {
     const out = insertBelowBanner([...banner, "", "## Overview", "prose"], ["NEW"]);
@@ -182,7 +182,7 @@ describe("promoting a note that already has a page index", () => {
   });
 
   it("gives a note without one both halves", () => {
-    const bare = ["```almanac", "journal-header", "```", "", "## Overview"].join(
+    const bare = ["```chronoanvil", "journal-header", "```", "", "## Overview"].join(
       "\n"
     );
     const out = promote(bare);
@@ -192,7 +192,7 @@ describe("promoting a note that already has a page index", () => {
   });
 
   it("uses the kind's own page noun in the bar it writes", () => {
-    const bare = ["```almanac", "journal-header", "```"].join("\n");
+    const bare = ["```chronoanvil", "journal-header", "```"].join("\n");
     expect(promote(bare, "Chapter")).toContain("header:📄 Chapters");
   });
 
@@ -200,11 +200,11 @@ describe("promoting a note that already has a page index", () => {
     // Separately losable, so asked about separately: a note hand-edited down
     // to the table alone should get a bar, not a second table.
     const tableOnly = [
-      "```almanac",
+      "```chronoanvil",
       "journal-header",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "pages-table",
       "```",
     ].join("\n");
@@ -213,11 +213,11 @@ describe("promoting a note that already has a page index", () => {
     expect(count(out, "button:study:new-page")).toBe(1);
 
     const barOnly = [
-      "```almanac",
+      "```chronoanvil",
       "journal-header",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:📄 Pages",
       "button:study:new-page",
       "```",
@@ -240,16 +240,16 @@ describe("promoting a note that already has a page index", () => {
 
   it("recognises a page index belonging to another journal type", () => {
     const custom = [
-      "```almanac",
+      "```chronoanvil",
       "journal-header",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:📄 Pages",
       "button:cooking:new-page",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "pages-table",
       "```",
     ].join("\n");
@@ -258,9 +258,9 @@ describe("promoting a note that already has a page index", () => {
 
   it("does not count a directive quoted in prose", () => {
     // The documentation note names half the catalogue in running text. A
-    // mention is not a widget, so the probe stays inside almanac fences.
+    // mention is not a widget, so the probe stays inside chronoanvil fences.
     const prose = [
-      "```almanac",
+      "```chronoanvil",
       "journal-header",
       "```",
       "",
@@ -272,7 +272,7 @@ describe("promoting a note that already has a page index", () => {
 
   it("writes the section below the banner, not on the end", () => {
     const t = asset("template-lesson.md").replace(
-      /```almanac\nheader:📄 Pages\nbutton:study:new-page\n```\n\n```almanac\npages-table\n```\n\n/,
+      /```chronoanvil\nheader:📄 Pages\nbutton:study:new-page\n```\n\n```chronoanvil\npages-table\n```\n\n/,
       ""
     );
     const out = promote(t);

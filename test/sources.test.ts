@@ -56,7 +56,7 @@ describe("source module resolution rules", () => {
   };
 
   beforeAll(() => {
-    root = mkdtempSync(join(tmpdir(), "almanac-srcpaths-"));
+    root = mkdtempSync(join(tmpdir(), "ca-srcpaths-"));
 
     // Unambiguous: one nested file, one nested directory.
     write("core/settings.ts", "export const DEFAULT_SETTINGS = {};\n");

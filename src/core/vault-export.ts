@@ -61,8 +61,8 @@ export interface ExportPlanItem {
 
 // A trailing slash is what makes this a FOLDER test rather than a prefix test.
 //
-// Without it, an export root of `Almanac Export` would also claim
-// `Almanac Exports Old/…` and every note whose path merely begins with those
+// Without it, an export root of `ChronoAnvil Export` would also claim
+// `ChronoAnvil Exports Old/…` and every note whose path merely begins with those
 // letters — which is the whole family of bugs a bare `startsWith` produces.
 export function isUnderExportRoot(root: string, path: string): boolean {
   const clean = root.replace(/\/+$/, "");

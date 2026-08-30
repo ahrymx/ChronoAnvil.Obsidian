@@ -18,6 +18,13 @@ main.js.map
 # time someone edited a part file and did not rebuild.
 styles.css
 
+# Generated from assets/ by tools/build-assets.mjs, and compiled INTO main.js so
+# the shipped notes reach an install that has no assets/ folder — which is every
+# install that came from the community store. Edit the markdown in assets/; this
+# module is overwritten on every build, and a committed copy would be a second
+# spelling of three files that already live in the repository.
+generated/
+
 # Test and tooling artefacts
 coverage/
 .eslintcache

@@ -182,12 +182,12 @@ describe("the surface dropdown stopped listing one option per grain", () => {
     // fits one widget and fights five. Against a three-line description the row
     // was squeezed into whatever the right column had left.
     const src = readSrc("settings-editors");
-    expect(src).toContain('grains.settingEl.addClass("almanac-setting-stacked")');
+    expect(src).toContain('grains.settingEl.addClass("ca-setting-stacked")');
     const css = readFileSync(
       resolve(__dirname, "..", "styles", "85-tracker-controls.css"),
       "utf8"
     );
-    const at = css.indexOf(".almanac-setting-stacked {");
+    const at = css.indexOf(".ca-setting-stacked {");
     expect(css.slice(at, at + 120)).toContain("display: block");
   });
 
@@ -196,7 +196,7 @@ describe("the surface dropdown stopped listing one option per grain", () => {
       resolve(__dirname, "..", "styles", "85-tracker-controls.css"),
       "utf8"
     );
-    const at = css.indexOf(".almanac-grain-row {");
+    const at = css.indexOf(".ca-grain-row {");
     expect(css.slice(at, at + 300)).toContain("justify-content: flex-start");
   });
 
@@ -207,7 +207,7 @@ describe("the surface dropdown stopped listing one option per grain", () => {
       resolve(__dirname, "..", "styles", "85-tracker-controls.css"),
       "utf8"
     );
-    const at = css.indexOf(".almanac-grain-row");
+    const at = css.indexOf(".ca-grain-row");
     expect(css.slice(at, at + 300)).toContain("flex-wrap: wrap");
   });
 

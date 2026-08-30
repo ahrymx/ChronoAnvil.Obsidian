@@ -13,16 +13,16 @@
 // have a different date property, a different notion of "kind", and no mood.
 // That is exactly the split this module exists to avoid: the whole reason it is
 // one file is that two scanners drift, the way util.ts::taskCounts and
-// countAlmanacTasks did in 2.10. So the differences are named once, in an
+// countChronoAnvilTasks did in 2.10. So the differences are named once, in an
 // IndexSpec, and everything downstream — matching, scoring, snippets, the
 // cache, the query grammar — is surface-agnostic.
 //
 // Why one module rather than a scanner per widget. The three retrieval widgets
 // all want the same thing — "give me the entries in this date range, with their
 // facts" — and the vault read behind that is the expensive part (every entry's
-// body, not just its frontmatter, since Almanac's content lives in
-// `<!--almanac:key-->` regions the metadata cache never sees). Two independent
-// scanners would drift the way util.ts::taskCounts and countAlmanacTasks did in
+// body, not just its frontmatter, since ChronoAnvil's content lives in
+// `<!--chronoanvil:key-->` regions the metadata cache never sees). Two independent
+// scanners would drift the way util.ts::taskCounts and countChronoAnvilTasks did in
 // 2.10, where two answers to "how many open tasks" disagreed and one was
 // silently always zero. So: one index, one query surface, three views.
 //
@@ -38,7 +38,7 @@
 // vault. Only `indexEntry` / `readIndex` touch Obsidian.
 
 import { App, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { allNoteRegions } from "../core/notestore";
 import { parseTasks } from "../ui/tasks";
 import { mapWithLimit } from "../ui/tables";
@@ -822,7 +822,7 @@ export async function indexEntry(
   }
   // cachedRead, not read: nothing here writes, so a slightly stale read that
   // the metadataCache change event will correct is fine (same reasoning as
-  // sumAlmanacTasks in tables.ts).
+  // sumChronoAnvilTasks in tables.ts).
   const text = await app.vault.cachedRead(file);
   const entry = buildIndexed(
     file,
@@ -847,7 +847,7 @@ export async function indexEntry(
 // Cache sweeping is scoped to the diary folders only, matching readOpenTasks:
 // an entry for a file outside them belongs to nothing here and can't be swept
 // on our behalf, and sweeping against a subset would evict live entries.
-export async function readIndex(plugin: AlmanacPlugin): Promise<IndexedEntry[]> {
+export async function readIndex(plugin: ChronoAnvilPlugin): Promise<IndexedEntry[]> {
   const paths = plugin.settings.paths;
   // FIVE FOLDERS, NOT TWO, as of 3.8 patch 1. This read `[diaryDaily,
   // diaryMonthly]`, so a weekly, quarterly or yearly entry was not in the diary
@@ -915,7 +915,7 @@ export async function readIndex(plugin: AlmanacPlugin): Promise<IndexedEntry[]> 
 // journal and a Cooking one indexes both in one pass, and each note needs its
 // own type's ancestry.
 export async function readJournalIndex(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   folders: string[]
 ): Promise<IndexedEntry[]> {
   return readFolders(plugin, folders, (file) => {
@@ -942,7 +942,7 @@ export async function readJournalIndex(
 // what keying by surface buys — a journal read can no longer evict a diary
 // entry that happens to sit under a folder it scanned.
 async function readFolders(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   folders: string[],
   specFor: (file: TFile) => IndexSpec
 ): Promise<IndexedEntry[]> {
@@ -966,7 +966,7 @@ async function readFolders(
 // a folder any more — while the sweep still has to name the folders those files
 // can be under, or a cache entry for a deleted note would be kept forever.
 async function readScanned(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   files: TFile[],
   folders: string[],
   specFor: (file: TFile) => IndexSpec

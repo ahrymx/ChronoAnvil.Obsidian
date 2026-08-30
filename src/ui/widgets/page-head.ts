@@ -22,7 +22,7 @@
 // ── AND IT REPLACES OBSIDIAN'S INLINE TITLE, WHICH IS THE POINT ──────────
 //
 // Obsidian draws the filename in a large face at the top of every note. On an
-// Almanac note that is a third name for the same thing, in the plainest of the
+// ChronoAnvil note that is a third name for the same thing, in the plainest of the
 // three. With `banner.absorb` on, the host's title is hidden and this is what
 // stands in its place — a head that knows what KIND of note it is, and whose
 // name is editable where Obsidian's is not.
@@ -42,7 +42,7 @@
 // button, in a window, which is where the reader put it.
 
 import { MarkdownPostProcessorContext, TFile } from "obsidian";
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import { liveFrontmatterWidget } from "./live-widgets";
 import { BannerSurface, bannerSurfaceOf, titleTargetFor } from "../../core/banner-scope";
 import { bannerScopeOf } from "../vault-banner";
@@ -60,7 +60,7 @@ import {
 import { LOGBOOK_TITLE } from "../../core/vocabulary";
 
 /** The class the head carries. Named once — `headerbar.ts` reads it too. */
-export const PAGE_HEAD_CLASS = "journal-page-head";
+export const PAGE_HEAD_CLASS = "ca-journal-page-head";
 
 // The head, repainting on the note's own frontmatter. 4.51.7.
 //
@@ -83,11 +83,11 @@ export const PAGE_HEAD_CLASS = "journal-page-head";
 // It is also what makes the Properties window honest: an edit to `title`,
 // `type` or `journal-date` there now repaints the head under it.
 //
-// THE NULL CASE IS AN UNCLASSED DIV, NOT AN EMPTY HEAD. `.journal-page-head`
+// THE NULL CASE IS AN UNCLASSED DIV, NOT AN EMPTY HEAD. `.ca-journal-page-head`
 // paints a bottom rule, so a head with nothing in it is a line across a note
 // that has no head — which is `nothing dead is drawn` with the sign flipped.
 export function livePageHead(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   return liveFrontmatterWidget(
@@ -171,7 +171,7 @@ const OVERVIEW_UNIT: Partial<Record<TrackerClass, OverviewUnit>> = {
 //
 // `noteKindOf` is the one line inside `entryContext` that answers the question,
 // and asking it directly is what that function does itself.
-function grainOf(plugin: AlmanacPlugin, file: TFile): TrackerClass {
+function grainOf(plugin: ChronoAnvilPlugin, file: TFile): TrackerClass {
   const fm = plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
   const kind = noteKindOf(
     plugin.settings.paths,
@@ -182,7 +182,7 @@ function grainOf(plugin: AlmanacPlugin, file: TFile): TrackerClass {
   return kind?.surface === "diary" ? kind.grain : "daily";
 }
 
-function diaryRoleOf(plugin: AlmanacPlugin, file: TFile): DiaryRole {
+function diaryRoleOf(plugin: ChronoAnvilPlugin, file: TFile): DiaryRole {
   const paths = plugin.settings.paths;
   // FIRST, BEFORE THE GRAIN IS ASKED FOR, because the grain has no answer here
   // and gives one anyway. A logbook is neither an entry nor a period; the
@@ -222,7 +222,7 @@ function diaryRoleOf(plugin: AlmanacPlugin, file: TFile): DiaryRole {
 // they have always said. A predicate that answered only "what would the text
 // be" would strip those notes of facts nothing on the page replaces.
 export function pageHeadText(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile
 ): PageHeadText | null {
   const surface = bannerSurfaceOf(file.path, bannerScopeOf(plugin));
@@ -268,7 +268,7 @@ export function pageHeadText(
 // The caption row's question, and it takes the STRING rather than a date so the
 // caller keeps owning what it was about to print — see `buildTrackerHead`.
 export function pageHeadNames(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   text: string
 ): boolean {
@@ -281,7 +281,7 @@ export function pageHeadNames(
 // `Subject`: a substring test would also swallow a kind called `Ub`, and an
 // equality test would never fire at all.
 export function pageHeadSays(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   fact: string
 ): boolean {
@@ -299,7 +299,7 @@ export function pageHeadSays(
 // dispatcher only asks for a head when the bar is drawing, so this can only
 // return null on a file that vanished between the render and the call.
 export function buildPageHead(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
   const app = plugin.app;
@@ -310,11 +310,11 @@ export function buildPageHead(
 
   const root = createDiv({ cls: PAGE_HEAD_CLASS });
   root.setAttr("data-surface", said.surface);
-  root.setAttr("data-am-surface", said.surface);
+  root.setAttr("data-ca-surface", said.surface);
 
   if (said.surface === "diary") {
     const role = diaryRoleOf(plugin, file);
-    root.setAttr("data-am-role", role.role);
+    root.setAttr("data-ca-role", role.role);
     if (role.role === "overview") {
       const g =
         role.unit === "week"
@@ -324,21 +324,21 @@ export function buildPageHead(
             : role.unit === "quarter"
               ? "quarterly"
               : "yearly";
-      root.setAttr("data-am-grain", g);
+      root.setAttr("data-ca-grain", g);
     } else if (role.role === "entry") {
-      root.setAttr("data-am-grain", grainOf(plugin, file));
+      root.setAttr("data-ca-grain", grainOf(plugin, file));
     }
   } else if (said.surface === "journal") {
     const type = journalTypeAtPath(plugin, file.path);
     if (type) {
-      root.setAttr("data-am-journal", type.id);
-      root.style.setProperty("--am-journal-accent", `hsl(${hueOf(type.id)}, 65%, 55%)`);
+      root.setAttr("data-ca-journal", type.id);
+      root.style.setProperty("--ca-journal-accent", `hsl(${hueOf(type.id)}, 65%, 55%)`);
     }
   }
 
-  if (said.eyebrow) root.createDiv({ cls: "jph-eyebrow", text: said.eyebrow });
+  if (said.eyebrow) root.createDiv({ cls: "ca-jph-eyebrow", text: said.eyebrow });
 
-  const row = root.createDiv({ cls: "jph-titlerow" });
+  const row = root.createDiv({ cls: "ca-jph-titlerow" });
   const date = dateLabel(plugin, file);
   // THE SAME TWO TARGETS THE BAR USES, through the same table. A journal note's
   // filename IS its name; a diary entry's filename is the date the diary finds
@@ -346,15 +346,15 @@ export function buildPageHead(
   // period dashboard's name is neither, so it gets text and no pencil.
   if (said.target === "none") {
     row
-      .createDiv({ cls: "jph-title is-fixed" })
-      .createSpan({ cls: "jph-title-text", text: said.title });
+      .createDiv({ cls: "ca-jph-title is-fixed" })
+      .createSpan({ cls: "ca-jph-title-text", text: said.title });
   } else if (said.target === "filename") {
-    attachNoteRename(app, row, file, "jph-title");
+    attachNoteRename(app, row, file, "ca-jph-title");
   } else {
-    attachPropertyRename(app, row, file, "jph-title", TITLE_PROP, date ?? file.basename);
+    attachPropertyRename(app, row, file, "ca-jph-title", TITLE_PROP, date ?? file.basename);
   }
 
-  if (said.sub) root.createDiv({ cls: "jph-sub", text: said.sub });
+  if (said.sub) root.createDiv({ cls: "ca-jph-sub", text: said.sub });
   return root;
 }
 
@@ -365,7 +365,7 @@ export function buildPageHead(
 // *topic*, a *daily entry* — the word a reader would use for the note in a
 // sentence. It is also the one fact on the head that the bar has nowhere to put.
 function eyebrowFor(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   surface: BannerSurface
 ): string {
@@ -416,13 +416,13 @@ function eyebrowFor(
   return "";
 }
 
-function dateLabel(plugin: AlmanacPlugin, file: TFile): string | null {
+function dateLabel(plugin: ChronoAnvilPlugin, file: TFile): string | null {
   return entryDateLabel(plugin.app, file, grainOf(plugin, file));
 }
 
 // What the title row will read, so the subtitle can decline to repeat it.
 function titleTextOf(
-  app: AlmanacPlugin["app"],
+  app: ChronoAnvilPlugin["app"],
   file: TFile,
   surface: BannerSurface,
   date: string | null

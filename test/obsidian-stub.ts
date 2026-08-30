@@ -9,6 +9,8 @@
 // unit-tested off-platform. Only the surfaces the tested functions actually
 // touch are implemented; anything else is a harmless placeholder.
 
+import { load as loadYaml, dump as dumpYaml } from "js-yaml";
+
 export class TFile {
   path = "";
   name = "";
@@ -77,7 +79,7 @@ export class Plugin {
 
   constructor(app?: unknown, manifest?: { id: string; version: string }) {
     this.app = app;
-    this.manifest = manifest ?? { id: "almanac", version: "0.0.0" };
+    this.manifest = manifest ?? { id: "chronoanvil", version: "0.0.0" };
   }
 
   async loadData(): Promise<unknown> {
@@ -140,6 +142,31 @@ export class AbstractInputSuggest<T> {
 
 export function normalizePath(p: string): string {
   return p.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, "");
+}
+
+// ── parseYaml / stringifyYaml ─────────────────────────────────────────────
+//
+// Backed by js-yaml, which is what Obsidian bundles for these two functions
+// and is therefore the closest stand-in available off-platform. It is a
+// devDependency now — the plugin stopped shipping its own copy in 5.0.1 and
+// reads YAML through the host instead.
+//
+// `lineWidth: -1` MODELS OBSIDIAN, and is the one option here worth arguing
+// about. Obsidian does not fold the long values it writes into frontmatter,
+// so this is the behaviour to mirror; `stringifyYaml` exposes no options, so
+// a plugin cannot ask for it either way.
+//
+// THE STUB IS A GUESS ABOUT A HOST WE CANNOT RUN, so nothing is allowed to
+// depend on the guess being right. `test/obsidian-yaml.test.ts` runs the one
+// document this matters for — Diary.base — through BOTH line widths and
+// asserts the same document comes back. If Obsidian ever folds, the shipped
+// file gets uglier and nothing else changes.
+export function parseYaml(text: string): unknown {
+  return loadYaml(text);
+}
+
+export function stringifyYaml(obj: unknown): string {
+  return dumpYaml(obj, { lineWidth: -1 });
 }
 
 // A small moment shim sufficient for isoDate()/date formatting and the

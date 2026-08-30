@@ -9,17 +9,31 @@
 //
 // This exists because `npm run build` only ever produced main.js. Everything
 // else an installed plugin needs was assumed to be already sitting in the
-// vault's .obsidian/plugins/almanac/ directory — which is true when you develop
+// vault's .obsidian/plugins/chronoanvil/ directory — which is true when you develop
 // in place, and false the moment anyone hands the plugin to someone else.
 //
-// The failure mode was quiet and total: scaffold.ts::readAsset resolves
+// The failure mode was quiet and total: scaffold.ts::readAsset resolved
 // `manifest.dir + "/assets/<name>"` at *runtime*, so a plugin folder without
-// assets/ loads and enables perfectly, then fails on first use — "Set up /
-// repair vault" creates the folder tree and no notes, and "Refresh entry
-// templates" refreshes nothing. Nothing in the build caught it because nothing
+// assets/ loaded and enabled perfectly, then failed on first use — "Set up /
+// repair vault" created the folder tree and no notes, and "Refresh entry
+// templates" refreshed nothing. Nothing in the build caught it because nothing
 // in the build knew the folder had a required shape.
 //
 // So: one script that knows the shape, and fails loudly if a piece is missing.
+//
+// AND THE PLUGIN NO LONGER DEPENDS ON WHAT THIS SCRIPT COPIES (5.0.1). The fix
+// above was right for the zip and solved nothing for the community store, which
+// installs manifest.json, main.js and styles.css and never unpacks a folder —
+// so the one install route this script could not reach was the one every public
+// reader would use. assets/ is now compiled into main.js by
+// tools/build-assets.mjs, and scaffold.ts reads it from there.
+//
+// assets/ STAYS ON THE REQUIRED LIST anyway, and not out of caution: a plugin
+// folder is a conveyed copy, and the three notes are the readable source form of
+// something the bundle now carries minified. The same argument as the licence
+// files below. What has changed is that a missing assets/ is now untidy rather
+// than fatal — so the check here has stopped being the only thing standing
+// between a reader and a vault that will not scaffold.
 
 import { cp, mkdir, rm, readFile, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -39,7 +53,7 @@ process.chdir(ROOT);
 
 const OUT_DIR = "dist";
 
-// Everything an installed Almanac plugin folder must contain. `dir: true`
+// Everything an installed ChronoAnvil plugin folder must contain. `dir: true`
 // entries are copied recursively.
 const REQUIRED = [
   { src: "main.js", dir: false },
@@ -54,7 +68,7 @@ const REQUIRED = [
   // travel with every conveyed copy, and the section 7 attribution terms only
   // bind someone who can read them. A plugin folder is exactly such a conveyed
   // copy — it is what a user installs, and for most users it is the ONLY form
-  // of Almanac they will ever hold.
+  // of ChronoAnvil they will ever hold.
   //
   // TRADEMARK.md was on this list until 3.17.1 and the file no longer exists.
   // What it explained now lives in LICENSE's own section 7 terms, which ship

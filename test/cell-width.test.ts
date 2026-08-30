@@ -33,12 +33,12 @@ import { readCss, readSrc } from "./sources";
 
 // A boundary rather than `indexOf`, for the reason frame.test.ts records: a
 // class matched as a substring cannot be told from a longer one with the same
-// prefix, and `.journal-group` is a prefix of `.journal-group-foot`.
+// prefix, and `.ca-journal-group` is a prefix of `.ca-journal-group-foot`.
 //
 // AND IT IS ANCHORED TO THE START OF A LINE (4.13.1 §4), which is the other half
 // of the same lesson and cost this suite a red run to learn. §4 added
-// `.journal-block-cell > .journal-widget-card + .journal-widget-card::before`
-// EARLIER in the sheet than `.journal-widget-card`'s own rule, and a search for
+// `.ca-journal-block-cell > .ca-journal-widget-card + .ca-journal-widget-card::before`
+// EARLIER in the sheet than `.ca-journal-widget-card`'s own rule, and a search for
 // the bare class with a trailing-boundary match found the seam's declarations
 // and reported the card as having lost its border. Every selector this helper is
 // asked for opens its own rule, so every one of them starts a line; a
@@ -328,16 +328,16 @@ describe("reading the widths back off a body", () => {
 
 describe("the same two, asked of a whole note", () => {
   const note = [
-    "`almanac:spacer`",
+    "`chronoanvil:spacer`",
     "",
-    "```almanac",
+    "```chronoanvil",
     "row",
     "diary:3",
     "cell",
     "tasks-table",
     "```",
     "",
-    "```almanac",
+    "```chronoanvil",
     "journals",
     "```",
     "",
@@ -348,8 +348,8 @@ describe("the same two, asked of a whole note", () => {
     // that lets structure be rewritten in a file somebody else wrote.
     const out = widenCells(note, 0, [2, 1]);
     expect(out).not.toBeNull();
-    expect(out?.slice(0, 3)).toEqual(["`almanac:spacer`", "", "```almanac"]);
-    expect(out?.slice(-5)).toEqual(["", "```almanac", "journals", "```", ""]);
+    expect(out?.slice(0, 3)).toEqual(["`chronoanvil:spacer`", "", "```chronoanvil"]);
+    expect(out?.slice(-5)).toEqual(["", "```chronoanvil", "journals", "```", ""]);
     expect(out?.join("\n")).toContain("row\ncell: 2\ndiary:3\ncell\ntasks-table");
   });
 
@@ -394,7 +394,7 @@ describe("the gesture, where only the source can be read", () => {
     // is `display: none` until `is-slotting`, so at rest there is nothing in the
     // gap to collide with — and while there is, the divider takes no pointer.
     expect(
-      ruleFor(rules, ".journal-widget-block.is-slotting .journal-group-divider")
+      ruleFor(rules, ".ca-journal-widget-block.is-slotting .ca-journal-group-divider")
     ).toContain("pointer-events: none");
   });
 
@@ -411,18 +411,18 @@ describe("the gesture, where only the source can be read", () => {
     // The cap `snapRatio` is asked for. Both lengths are tokens, so a copy of
     // either in TypeScript would be a second place they have to agree — and the
     // one that goes stale is the one no test is looking at.
-    expect(src).toContain('pxToken(row, "--am-row-cell-min"');
-    expect(src).toContain('pxToken(row, "--am-widget-gap"');
+    expect(src).toContain('pxToken(row, "--ca-row-cell-min"');
+    expect(src).toContain('pxToken(row, "--ca-widget-gap"');
     expect(src).toContain("snapRatio(");
   });
 
   it("previews through the same variable the file will produce", () => {
-    // The stylesheet reads `var(--am-cell-weight, 1)` on both the grow and the
+    // The stylesheet reads `var(--ca-cell-weight, 1)` on both the grow and the
     // basis (4.4 §2), so the columns follow the pointer through the exact
     // declarations the written note renders with. A separate preview is a second
     // answer that can disagree with the first.
-    expect(src).toContain('left.style.setProperty("--am-cell-weight"');
-    expect(src).toContain('right.style.setProperty("--am-cell-weight"');
+    expect(src).toContain('left.style.setProperty("--ca-cell-weight"');
+    expect(src).toContain('right.style.setProperty("--ca-cell-weight"');
   });
 
   it("puts it back on Escape and writes nothing", () => {
@@ -456,32 +456,32 @@ describe("the divider and the box, as drawn", () => {
     // inline-size query container, containment makes it a stacking context, and
     // a `z-index` cannot lift anything out of one. That cost the drop slots a
     // release and costs this nothing, because nothing else is drawn in the gap.
-    const rule = ruleFor(rules, ".journal-group-divider");
+    const rule = ruleFor(rules, ".ca-journal-group-divider");
     expect(rule).toContain("position: absolute");
     expect(rule).toContain("cursor: col-resize");
-    expect(rule).toContain("left: calc(var(--am-widget-gap) / -2 - 6px)");
+    expect(rule).toContain("left: calc(var(--ca-widget-gap) / -2 - 6px)");
   });
 
   it("is a wide target with a narrow mark", () => {
     // 4.8.3's lesson about the slots, said again: the generosity belongs in the
     // target and the precision in the drawing. A 2px line that is also a 2px hit
     // area is not something a hand can find.
-    expect(ruleFor(rules, ".journal-group-divider")).toContain("width: 12px");
-    expect(ruleFor(rules, ".journal-group-divider::after")).toContain("width: 2px");
+    expect(ruleFor(rules, ".ca-journal-group-divider")).toContain("width: 12px");
+    expect(ruleFor(rules, ".ca-journal-group-divider::after")).toContain("width: 2px");
   });
 
   it("is quieter than the cards it holds", () => {
     // THE DOUBLING IS THE POINT OF CARE. Cards keep their own boxes, so this is
     // a card inside a card — which reads as intentional only if the box recedes:
     // a ground next to the page's own where the cards take the card colour, and
-    // a thinner line than the `--am-rule` every card in that file uses.
-    const box = ruleFor(rules, ".journal-group");
+    // a thinner line than the `--ca-rule` every card in that file uses.
+    const box = ruleFor(rules, ".ca-journal-group");
     expect(box).toContain("background: var(--background-primary-alt)");
-    expect(box).toContain("border: var(--am-rule-hair) solid");
+    expect(box).toContain("border: var(--ca-rule-hair) solid");
     expect(box).not.toContain("box-shadow");
     // The cards inside are the loud ones, and stay so.
-    expect(ruleFor(rules, ".journal-widget-card")).toContain(
-      "border: var(--am-rule) solid"
+    expect(ruleFor(rules, ".ca-journal-widget-card")).toContain(
+      "border: var(--ca-rule) solid"
     );
   });
 
@@ -496,7 +496,7 @@ describe("the divider and the box, as drawn", () => {
     // you can pull on" drawn two ways is the fault 4.13 §1 found in the title
     // bars, and the way it comes back is a deletion that was made a comment.
     expect(rules).not.toContain(
-      ".journal-block-cell > .journal-widget-card + .journal-widget-card::before"
+      ".ca-journal-block-cell > .ca-journal-widget-card + .ca-journal-widget-card::before"
     );
     // AND THE DRAWING IS THE CARD'S OWN EDGE, AS OF 4.34.3. It was a 28px pill
     // centred in the gap between two cards — punctuation dropped between the
@@ -506,20 +506,20 @@ describe("the divider and the box, as drawn", () => {
     //
     // THE COLUMN DIVIDER IS UNCHANGED and is still the pill: it divides two
     // cells that are side by side, and there is no single edge for it to be.
-    const seam = ruleFor(rules, ".journal-card-divider::after");
-    const mark = ruleFor(rules, ".journal-group-divider::after");
-    for (const decl of ["width: 100%", "height: var(--am-rule)"]) {
+    const seam = ruleFor(rules, ".ca-journal-card-divider::after");
+    const mark = ruleFor(rules, ".ca-journal-group-divider::after");
+    for (const decl of ["width: 100%", "height: var(--ca-rule)"]) {
       expect(seam, decl).toContain(decl);
     }
     expect(seam).not.toContain("width: 28px");
     expect(mark).toContain("height: 28px");
     expect(seam).toContain("background: var(--background-modifier-border)");
-    const strip = ruleFor(rules, ".journal-card-divider");
+    const strip = ruleFor(rules, ".ca-journal-card-divider");
     expect(strip).toContain("opacity: 0");
     expect(strip).toContain("transition: opacity 120ms ease");
     // Revealed by a hover on the GROUP, exactly as the divider is: a boundary a
     // reader has to find before it appears is discoverable only by accident.
-    expect(rules).toContain(".journal-group:hover .journal-card-divider,");
+    expect(rules).toContain(".ca-journal-group:hover .ca-journal-card-divider,");
   });
 
   it("makes it a control, and gives it something to resolve against", () => {
@@ -527,40 +527,40 @@ describe("the divider and the box, as drawn", () => {
     // area against a 2px line, which is what lets the drawing be a hairline on
     // an edge. The old seam took no hit area at all and said
     // `pointer-events: none`, because it set nothing.
-    const strip = ruleFor(rules, ".journal-card-divider");
+    const strip = ruleFor(rules, ".ca-journal-card-divider");
     expect(strip).toContain("height: 12px");
     expect(strip).toContain("cursor: row-resize");
     expect(strip).not.toContain("pointer-events: none");
     // Inert under a drag, which is the belt to the braces the two event families
     // already give (see `attachCardResize`).
     expect(rules).toContain(
-      ".journal-widget-block.is-slotting .journal-card-divider {"
+      ".ca-journal-widget-block.is-slotting .ca-journal-card-divider {"
     );
     // An element positioned into the gap BELOW its card needs the card
     // positioned, or every mark in a column resolves against the cell and lands
     // at the same height.
     //
-    // EVERY `.journal-widget-card {` RULE, NOT THE FIRST. The card is described
+    // EVERY `.ca-journal-widget-card {` RULE, NOT THE FIRST. The card is described
     // by two of them — the surface it shares with a headed block, then the column
     // it is on its own — and `ruleFor` answers with whichever comes first. A
     // test that asked only that one would pass on the day the declaration moved
     // into the other, and fail on the day it moved back.
     const bodies = rules
-      .split("\n.journal-widget-card {")
+      .split("\n.ca-journal-widget-card {")
       .slice(1)
       .map((rest) => rest.slice(0, rest.indexOf("}")));
-    expect(bodies.length, "no .journal-widget-card rule").toBeGreaterThan(0);
+    expect(bodies.length, "no .ca-journal-widget-card rule").toBeGreaterThan(0);
     expect(bodies.some((b) => b.includes("position: relative"))).toBe(true);
   });
 
   it("keys the seam on the card, never on a bare sibling", () => {
-    // The first child of every cell after the first is `.journal-group-divider`,
+    // The first child of every cell after the first is `.ca-journal-group-divider`,
     // so `> * + *` would draw a seam above that cell's FIRST card — the one place
     // in the group where there is no boundary at all. `row.ts` builds the divider
     // first precisely so nothing walking the cell mistakes it for content, and a
     // universal selector would be the one thing that still did.
     expect(readSrc("row")).toContain("cls: GROUP_DIVIDER_CLASS");
-    expect(rules).not.toContain(".journal-block-cell > * + *");
+    expect(rules).not.toContain(".ca-journal-block-cell > * + *");
   });
 
   it("is withheld where the block already paints", () => {
@@ -569,7 +569,7 @@ describe("the divider and the box, as drawn", () => {
     // in either is the doubling this whole design is about, one level out.
     const rule = ruleFor(
       rules,
-      ".journal-widget-block.is-unframed .journal-group,\n.journal-sec-block .journal-group"
+      ".ca-journal-widget-block.is-unframed .ca-journal-group,\n.ca-journal-sec-block .ca-journal-group"
     );
     expect(rule).toContain("background: none");
     expect(rule).toContain("border: none");
@@ -610,7 +610,7 @@ describe("making a group on the page", () => {
     // restyle the group it just made. A block holding two widgets offers no cell
     // range, sets no `CELL_TYPE`, and its drag never lights these up — declined
     // before it lights rather than refused on drop, which is 4.8.7's rule.
-    const at = src.indexOf('"jbd-slot-side jbd-slot-side-left"');
+    const at = src.indexOf('"ca-jbd-slot-side ca-jbd-slot-side-left"');
     expect(at).toBeGreaterThan(-1);
     const call = src.slice(at, at + 200);
     expect(call).toContain("CELL_TYPE");
@@ -647,12 +647,12 @@ describe("making a group on the page", () => {
     const at = rules.indexOf("@container (min-width: 660px)");
     expect(at).toBeGreaterThan(-1);
     const query = rules.slice(at, rules.indexOf("\n}", rules.indexOf("\n  }", at)));
-    expect(query).toContain(".jbd-slot-side");
+    expect(query).toContain(".ca-jbd-slot-side");
     expect(query).toContain("display: block");
-    // Held back everywhere else, at the specificity `.is-slotting .jbd-slot`
+    // Held back everywhere else, at the specificity `.is-slotting .ca-jbd-slot`
     // turns them on with — a bare `display: none` would lose.
     expect(rules).toContain(
-      ".journal-widget-block.is-slotting .jbd-slot-side {\n  display: none;\n}"
+      ".ca-journal-widget-block.is-slotting .ca-jbd-slot-side {\n  display: none;\n}"
     );
   });
 
@@ -663,7 +663,7 @@ describe("making a group on the page", () => {
     // block is that answer for the quarters.
     const at = rules.indexOf("@container (min-width: 660px)");
     const query = rules.slice(at, at + 900);
-    expect(query).toContain(".jbd-slot-above:not(.jbd-slot-edge)");
+    expect(query).toContain(".ca-jbd-slot-above:not(.ca-jbd-slot-edge)");
     expect(query).toContain("left: 25%");
     expect(query).toContain("right: 25%");
   });

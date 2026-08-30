@@ -28,7 +28,7 @@
 // work.
 
 import { MarkdownPostProcessorContext, Menu, setIcon, TFile } from "obsidian";
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import {
   otherSurface,
   planBridge,
@@ -82,7 +82,7 @@ import { liveScopedWidget } from "./live-widgets";
 // ── the vault half of the facts ───────────────────────────────────────
 
 function fileOfCtx(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): TFile | null {
   const f = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
@@ -98,14 +98,14 @@ function fileOfCtx(
 // unclassified dashboard, and the bridge's own refusals will catch anything
 // that matters about it.
 function hostSurface(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   path: string
 ): IndexSurface {
   return journalTypeOfNote(plugin, path) ? "journal" : "diary";
 }
 
 export function bridgeHostFacts(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): BridgeHostFacts {
   const file = fileOfCtx(plugin, ctx);
@@ -131,7 +131,7 @@ export function bridgeHostFacts(
 // stale in the same way `readIndex` was: an edit to a weekly entry did not
 // repaint a bridge that had just listed it. Named once so the two cannot
 // disagree, and read off the class table so a sixth grain needs no edit.
-function diaryFolders(plugin: AlmanacPlugin): string[] {
+function diaryFolders(plugin: ChronoAnvilPlugin): string[] {
   const paths = plugin.settings.paths;
   // AND THE DIARY ROOT (4.81), which is where an entry written under the period
   // tree actually is — in no grain folder at all. The five stay for a vault
@@ -149,7 +149,7 @@ function diaryFolders(plugin: AlmanacPlugin): string[] {
 // What the target surface currently defines, so a refusal can list the
 // alternatives rather than only rejecting what was asked for.
 export function bridgeCatalogue(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   target: IndexSurface
 ): BridgeCatalogue {
   const trackers = plugin.settings.trackers
@@ -227,7 +227,7 @@ export function bridgeCatalogue(
 // vault", which is a different fault with its own message; answering `false`
 // here would hide it behind a bridge refusal that blamed the note type.
 function kindIsDated(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   type: JournalType,
   kind: JournalKind
 ): boolean {
@@ -281,7 +281,7 @@ function kindIsDated(
 // Daily and monthly entries, and the per-week/per-quarter entries added in 2.57,
 // are all fine — their period is part of what the note IS.
 export function isRescopingDashboard(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   path: string
 ): boolean {
   const p = plugin.settings.paths;
@@ -299,7 +299,7 @@ export function isRescopingDashboard(
 // it is the same kind of thing and a second look for the same event would be a
 // second thing to style.
 function refusalEl(message: string): HTMLElement {
-  return createDiv({ cls: "journal-widget-error", text: message });
+  return createDiv({ cls: "ca-journal-widget-error", text: message });
 }
 
 // Every bridge block says which period it covered, always.
@@ -356,7 +356,7 @@ function bridgeHeader(
         : plan.window.label,
   });
 
-  const chevron = createDiv({ cls: "journal-note-chevron am-bridge-chevron" });
+  const chevron = createDiv({ cls: "ca-journal-note-chevron ca-bridge-chevron" });
   setIcon(chevron, "chevron-down");
   frame.root.prepend(chevron);
   frame.root.addClass("is-foldable");
@@ -364,7 +364,7 @@ function bridgeHeader(
   if (actions.toggleFold) {
     frame.root.addEventListener("click", (evt) => {
       const target = evt.target as HTMLElement;
-      if (target.closest(".journal-header-widgets, a, button, input, select")) {
+      if (target.closest(".ca-journal-header-widgets, a, button, input, select")) {
         return;
       }
       evt.preventDefault();
@@ -374,7 +374,7 @@ function bridgeHeader(
 
   if (actions.toggleMode && !snap.frozen) {
     const viewBtn = frame.actions.createEl("button", {
-      cls: "clickable-icon journal-widget-viewmode",
+      cls: "clickable-icon ca-journal-widget-viewmode",
       attr: {
         "aria-label": "Toggle cards / list view",
         title: "Toggle cards / list view",
@@ -462,18 +462,18 @@ export function parseSnapshotLine(line: string): SnapshotRow | null {
 }
 
 function renderFrozen(body: HTMLElement, content: string): void {
-  const list = body.createEl("ul", { cls: "am-bridge-list" });
+  const list = body.createEl("ul", { cls: "ca-bridge-list" });
   for (const line of content.split("\n")) {
     const row = parseSnapshotLine(line);
     if (!row) continue;
-    const el = list.createEl("li", { cls: "am-bridge-row" });
+    const el = list.createEl("li", { cls: "ca-bridge-row" });
     if (row.path) {
       el.createEl("a", { cls: "internal-link", text: row.label, href: row.path });
-      if (row.detail) el.createSpan({ cls: "am-bridge-date", text: row.detail });
+      if (row.detail) el.createSpan({ cls: "ca-bridge-date", text: row.detail });
       continue;
     }
-    el.createSpan({ cls: "am-bridge-date", text: row.label });
-    if (row.detail) el.createSpan({ cls: "am-bridge-value", text: row.detail });
+    el.createSpan({ cls: "ca-bridge-date", text: row.label });
+    if (row.detail) el.createSpan({ cls: "ca-bridge-value", text: row.detail });
   }
 }
 
@@ -485,7 +485,7 @@ function renderFrozen(body: HTMLElement, content: string): void {
 // recorded beside the content when it was written, so "edited" means edited
 // rather than merely different from what a fresh read would produce.
 async function writeSnapshot(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   path: string,
   key: string,
   rows: readonly SnapshotRow[],
@@ -525,7 +525,7 @@ async function writeSnapshot(
 }
 
 async function clearSnapshot(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   path: string,
   key: string
 ): Promise<void> {
@@ -541,7 +541,7 @@ export function bridgeFoldKey(sourcePath: string, key: string): string {
 }
 
 export function bridgeFoldState(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   sourcePath: string,
   key: string
 ): boolean {
@@ -552,7 +552,7 @@ export function bridgeFoldState(
 }
 
 export async function setBridgeFold(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   sourcePath: string,
   key: string,
   value: boolean
@@ -567,7 +567,7 @@ export async function setBridgeFold(
 // Plan, then render, or refuse. The one entry point both directives share, so
 // the guard cannot be present on one and forgotten on the other.
 function buildBridge(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   direction: BridgeDirection,
   rest: string,
@@ -610,8 +610,8 @@ function buildBridge(
   };
 
   return liveScopedWidget(plugin, ctx, scope(plan), () => {
-    const el = createDiv({ cls: "am-bridge" });
-    const body = el.createDiv({ cls: "am-bridge-body" });
+    const el = createDiv({ cls: "ca-bridge" });
+    const body = el.createDiv({ cls: "ca-bridge-body" });
 
     const applyFold = (collapsed: boolean): void => {
       el.toggleClass("is-collapsed", collapsed);
@@ -694,7 +694,7 @@ function buildBridge(
 // ── §4: bridge-notes — reads the index ────────────────────────────────
 
 export function buildBridgeNotesRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   label: string | null,
   ctx: MarkdownPostProcessorContext
@@ -736,48 +736,48 @@ export function buildBridgeNotesRegion(
         const renderContent = () => {
           body.empty();
           if (mode === "cards") {
-            const cards = body.createDiv({ cls: "am-bridge-cards" });
+            const cards = body.createDiv({ cls: "ca-bridge-cards" });
             for (const hit of hits) {
-              const card = cards.createDiv({ cls: "am-bridge-card" });
+              const card = cards.createDiv({ cls: "ca-bridge-card" });
               card.addEventListener("click", (e) => {
                 if (!(e.target instanceof HTMLAnchorElement)) {
                   void plugin.app.workspace.openLinkText(hit.entry.path, "");
                 }
               });
-              const main = card.createDiv({ cls: "am-bridge-card-main" });
+              const main = card.createDiv({ cls: "ca-bridge-card-main" });
               main.createEl("a", {
-                cls: "internal-link am-bridge-card-title",
+                cls: "internal-link ca-bridge-card-title",
                 text: hit.entry.title,
                 href: hit.entry.path,
               });
               if (hit.entry.tags && hit.entry.tags.length > 0) {
-                const meta = main.createDiv({ cls: "am-bridge-card-meta" });
+                const meta = main.createDiv({ cls: "ca-bridge-card-meta" });
                 for (const tag of hit.entry.tags.slice(0, 3)) {
                   meta.createSpan({ cls: "tag", text: tag.startsWith("#") ? tag : `#${tag}` });
                 }
               }
-              const right = card.createDiv({ cls: "am-bridge-card-right" });
+              const right = card.createDiv({ cls: "ca-bridge-card-right" });
               if (hit.entry.openTasks > 0) {
                 right.createSpan({
-                  cls: "am-bridge-badge",
+                  cls: "ca-bridge-badge",
                   text: `✓ ${hit.entry.openTasks}`,
                 });
               }
               if (hit.entry.iso) {
-                right.createSpan({ cls: "am-bridge-date", text: hit.entry.iso });
+                right.createSpan({ cls: "ca-bridge-date", text: hit.entry.iso });
               }
             }
           } else {
-            const list = body.createEl("ul", { cls: "am-bridge-list" });
+            const list = body.createEl("ul", { cls: "ca-bridge-list" });
             for (const hit of hits) {
-              const row = list.createEl("li", { cls: "am-bridge-row" });
+              const row = list.createEl("li", { cls: "ca-bridge-row" });
               row.createEl("a", {
                 cls: "internal-link",
                 text: hit.entry.title,
                 href: hit.entry.path,
               });
               if (hit.entry.iso) {
-                row.createSpan({ cls: "am-bridge-date", text: hit.entry.iso });
+                row.createSpan({ cls: "ca-bridge-date", text: hit.entry.iso });
               }
             }
           }
@@ -842,7 +842,7 @@ function readingsFlags(rest: string): { rest: string; trend: boolean } {
 }
 
 export function buildBridgeReadingsRegion(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   rest: string,
   label: string | null,
   ctx: MarkdownPostProcessorContext
@@ -888,7 +888,7 @@ export function buildBridgeReadingsRegion(
         // could disagree with the one the block says it covers — and there is
         // no `ChartRange` that means "the period this note declares" without
         // the note's own `PeriodBounds`, which a journal leaf does not have.
-        const chart = body.createDiv({ cls: "am-bridge-trend" });
+        const chart = body.createDiv({ cls: "ca-bridge-trend" });
         teardown = renderTrackerChart({
           app: plugin.app,
           plugin,
@@ -901,11 +901,11 @@ export function buildBridgeReadingsRegion(
         });
         return;
       }
-      const list = body.createEl("ul", { cls: "am-bridge-list" });
+      const list = body.createEl("ul", { cls: "ca-bridge-list" });
       for (const p of points) {
-        const row = list.createEl("li", { cls: "am-bridge-row" });
-        row.createSpan({ cls: "am-bridge-date", text: p.date });
-        row.createSpan({ cls: "am-bridge-value", text: String(p.value) });
+        const row = list.createEl("li", { cls: "ca-bridge-row" });
+        row.createSpan({ cls: "ca-bridge-date", text: p.date });
+        row.createSpan({ cls: "ca-bridge-value", text: String(p.value) });
       }
     },
     () => diaryFolders(plugin),

@@ -34,18 +34,18 @@ import {
   sectionsFor,
   templateTargets,
 } from "../src/journals/journal-sections";
-import type AlmanacPlugin from "../src/main";
+import type ChronoAnvilPlugin from "../src/main";
 
 const PATHS = {
   journalsRoot: "03 - Journals",
   templates: "00 - Infrastructure/Templates",
 };
 
-const fakePlugin = (): AlmanacPlugin =>
+const fakePlugin = (): ChronoAnvilPlugin =>
   ({
     settings: { customJournals: [], paths: PATHS, trackers: [] },
     app: { vault: { getAbstractFileByPath: () => null } },
-  }) as unknown as AlmanacPlugin;
+  }) as unknown as ChronoAnvilPlugin;
 
 // Reaches the two private members this claim is about: the seed the rail opens
 // with, and the layout `commit` writes back.

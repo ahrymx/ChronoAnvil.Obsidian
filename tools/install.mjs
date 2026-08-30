@@ -9,7 +9,7 @@
 //
 // THIS EXISTS BECAUSE `dist/` IS NOT A VAULT AND NOTHING SAID SO OUT LOUD.
 // `package.mjs` assembles a complete plugin folder and prints *"Install: copy
-// dist/ahrymx.almanac/ into <vault>/.obsidian/plugins/"*, and that sentence was
+// dist/chronoanvil/ into <vault>/.obsidian/plugins/"*, and that sentence was
 // the entire install step: a hand copy, done from memory, outside the build.
 //
 // The failure mode is the quietest one this project has had. Every check passes
@@ -53,7 +53,7 @@ const PIECES = [
 // from the sibling development vault — which is a default for THIS tree and is
 // announced whenever it is used.
 function vaultPath() {
-  const given = process.argv[2] ?? process.env.ALMANAC_VAULT ?? null;
+  const given = process.argv[2] ?? process.env.CHRONOANVIL_VAULT ?? null;
   if (given) return { dir: path.resolve(given), how: "given" };
   return { dir: path.resolve(ROOT, "..", "obsidian-dev-vault"), how: "default" };
 }
@@ -100,7 +100,7 @@ async function main() {
   console.log(`   ${was ? `was ${was}` : "fresh install"}${how === "default" ? " · default dev vault" : ""}`);
   console.log(`   data.json untouched${kept ? ` (${kept} bytes)` : " (none there)"}`);
   console.log("   OBSIDIAN WILL STILL BE RUNNING THE OLD CODE. Reload it:");
-  console.log("   Settings → Community plugins → toggle Almanac off and on,");
+  console.log("   Settings → Community plugins → toggle ChronoAnvil off and on,");
   console.log("   or Ctrl+P → “Reload app without saving”.");
 }
 

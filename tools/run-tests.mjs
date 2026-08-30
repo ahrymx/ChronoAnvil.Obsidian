@@ -178,7 +178,7 @@ export const vi = {
   spyOn: () => ({ mockImplementation: () => {}, mockRestore: () => {} }),
 };
 
-globalThis.__ALMANAC_RUN = __run;
+globalThis.__CHRONOANVIL_RUN = __run;
 export async function __run() {
   const results = { pass: 0, fail: 0, failures: [] };
   for (const t of state.tests) {
@@ -196,7 +196,7 @@ export async function __run() {
 }
 `;
 
-const tmp = mkdtempSync(resolve(tmpdir(), "almanac-shim-"));
+const tmp = mkdtempSync(resolve(tmpdir(), "ca-shim-"));
 const shimPath = resolve(tmp, "vitest-shim.mjs");
 writeFileSync(shimPath, SHIM);
 
@@ -282,7 +282,7 @@ for (const file of files) {
         // second module instance with an empty test registry — which is
         // exactly the silent 0-passed the first attempt produced.
         js: `
-const __r = await globalThis.__ALMANAC_RUN();
+const __r = await globalThis.__CHRONOANVIL_RUN();
 console.log(JSON.stringify({ __result: __r }));
 `,
       },

@@ -23,8 +23,8 @@ import { dealInto, MAX_COLUMNS } from "../../core/directive-grammar";
 //
 // ── WHAT THIS IS ─────────────────────────────────────────────────────────
 //
-// `.journal-widget-block` has been a flex COLUMN since the first fence, and
-// every page Almanac composes is that column repeated. 4.2 §2.1 counts what a
+// `.ca-journal-widget-block` has been a flex COLUMN since the first fence, and
+// every page ChronoAnvil composes is that column repeated. 4.2 §2.1 counts what a
 // homepage of rows needs and finds three of the four pieces already built — a
 // composed page whose blocks are data, per-block chrome (`frame:`), and widths
 // that answer to the pane rather than the window. The missing one is this: a way
@@ -82,13 +82,13 @@ export interface RowPlan {
 // The row, and one cell per widget in it.
 //
 // NOT `journal-widget-row`, though that is the obvious name, because
-// `.journal-widget-bar` already means "a row" in this stylesheet — the wrapping
+// `.ca-journal-widget-bar` already means "a row" in this stylesheet — the wrapping
 // strip that inline controls accumulate into. Two names for one idea is what
 // this project spends releases removing; two ideas sharing a name is the same
 // fault from the other side. A bar is inline controls INSIDE a block; a row is
 // the block's own widgets laid across it.
-export const ROW_CLASS = "journal-block-row";
-export const ROW_CELL_CLASS = "journal-block-cell";
+export const ROW_CLASS = "ca-journal-block-row";
+export const ROW_CELL_CLASS = "ca-journal-block-cell";
 
 // The surface a group is drawn on, and the strip along its foot. 4.9 §2.
 //
@@ -105,18 +105,18 @@ export const ROW_CELL_CLASS = "journal-block-cell";
 // literals and a reader never sees either, so renaming them would be a large
 // diff for no reader-visible gain. The parts 4.9 adds take `journal-group-*`,
 // which is the noun the documentation now uses.
-export const GROUP_CLASS = "journal-group";
-export const GROUP_FOOT_CLASS = "journal-group-foot";
+export const GROUP_CLASS = "ca-journal-group";
+export const GROUP_FOOT_CLASS = "ca-journal-group-foot";
 
 // ── the pages of a group, and the strip that switches them (4.34) ────────
 //
 // `journal-group-pages` wraps the rows and is what a swap pins a height on; the
 // group itself cannot be, because its height includes the foot and sliding the
 // strip the reader is pressing is the bug the pin exists to prevent.
-export const GROUP_PAGES_CLASS = "journal-group-pages";
-export const GROUP_TABS_CLASS = "journal-group-tabs";
-export const GROUP_TAB_CLASS = "journal-group-tab";
-export const GROUP_ADD_CLASS = "journal-group-add";
+export const GROUP_PAGES_CLASS = "ca-journal-group-pages";
+export const GROUP_TABS_CLASS = "ca-journal-group-tabs";
+export const GROUP_TAB_CLASS = "ca-journal-group-tab";
+export const GROUP_ADD_CLASS = "ca-journal-group-add";
 
 // A page that is not the open one.
 //
@@ -133,7 +133,7 @@ export const ROW_ENTERING_CLASS = "is-entering";
 // Which page of its group a row is, as the delimiter ordinal `TabbedPlan`
 // explains. Read by `block-drag.ts`, which has to tell the width writers which
 // page a divider belongs to.
-export const ROW_PAGE_ATTR = "data-am-page";
+export const ROW_PAGE_ATTR = "data-ca-page";
 
 // How long a swap is given before its pinned height is released.
 //
@@ -179,16 +179,16 @@ export interface TabControl {
 // The edge between two columns, which is where a width is set (4.9 §3).
 //
 // A CHILD OF THE CELL ON ITS RIGHT, absolutely positioned back into the gap —
-// the trick `.jbd-slot-before` already uses. Being sealed inside a cell is the
+// the trick `.ca-jbd-slot-before` already uses. Being sealed inside a cell is the
 // SAFE side of 4.8 §8.3: a cell is a query container, containment makes it a
 // stacking context, and a `z-index` cannot lift anything out of one. Nothing
 // else is drawn in that gap at rest, so there is nothing here to be sealed away
 // from.
-export const GROUP_DIVIDER_CLASS = "journal-group-divider";
+export const GROUP_DIVIDER_CLASS = "ca-journal-group-divider";
 
 // Which boundary a divider sits on: the cell to its right. Read by the gesture,
 // which needs the pair either side of it and gets one of them from the DOM.
-export const DIVIDER_INDEX_ATTR = "data-am-divider";
+export const DIVIDER_INDEX_ATTR = "data-ca-divider";
 
 // The bottom edge of one card, which is where a height is set (4.22 §4).
 //
@@ -203,7 +203,7 @@ export const DIVIDER_INDEX_ATTR = "data-am-divider";
 // between it and the cell every mark in a column would resolve against the cell
 // and land at the same height. The card is positioned; the cell is the wrong
 // ground.
-export const CARD_DIVIDER_CLASS = "journal-card-divider";
+export const CARD_DIVIDER_CLASS = "ca-journal-card-divider";
 
 // What a block can hold that is furniture rather than a widget.
 //
@@ -213,7 +213,7 @@ export const CARD_DIVIDER_CLASS = "journal-card-divider";
 // `journal-frame-error` — the sentence a refused modifier draws. It is the
 // block explaining itself, not something the block is showing, and a fence can
 // carry a frame error and a good `row` line at once.
-const NOT_A_CELL = ["journal-sec", "journal-frame-error"];
+const NOT_A_CELL = ["ca-journal-sec", "ca-journal-frame-error"];
 
 // Whether a child of the block goes into a cell at all.
 //
@@ -421,7 +421,7 @@ export function tabPlan(
 // per child. `cellPlan` owns that case; this function does not know it exists.
 //
 // Does nothing when the block has no cell content — an empty
-// `.journal-block-row` is a wrapper around nothing, and a fence holding only a
+// `.ca-journal-block-row` is a wrapper around nothing, and a fence holding only a
 // `header:` bar and a `row` line has asked for a row of no widgets. Nothing
 // drawn is the honest answer.
 export function layOutRow(
@@ -448,7 +448,7 @@ export function layOutRow(
   //
   // `attachBlockHead` finds the row with an unscoped `querySelector` and reads
   // `row.children` for the cells, and the stylesheet only ever styles
-  // `.journal-block-row` bare; both survive the extra level untouched.
+  // `.ca-journal-block-row` bare; both survive the extra level untouched.
   const box = createDiv({ cls: GROUP_CLASS });
   // THE PAGES GET A BOX OF THEIR OWN, and it is what the height is pinned on
   // during a swap (4.34 §A). The group cannot be that box: its height includes
@@ -460,7 +460,7 @@ export function layOutRow(
   const rows = plans.map(({ cells: groups, weights, page }) => {
     // STAMPED WITH ITS ORDINAL, so a gesture inside it can name the page it is
     // in without counting rows — see `TabbedPlan` for why counting would be
-    // wrong. This is the same shape as `data-am-line`: the DOM carrying the one
+    // wrong. This is the same shape as `data-ca-line`: the DOM carrying the one
     // fact about the file that cannot be re-derived from what is on screen.
     const row = pages.createDiv({
       cls: ROW_CLASS,
@@ -482,12 +482,12 @@ export function layOutRow(
           },
         });
       }
-      // ONLY WHEN IT IS NOT ONE. The stylesheet reads `var(--am-cell-weight, 1)`,
+      // ONLY WHEN IT IS NOT ONE. The stylesheet reads `var(--ca-cell-weight, 1)`,
       // so an ordinary cell needs no inline style at all and the common case
-      // leaves no mark in the DOM — the same shape `--am-row-cols` and
-      // `--am-ev-tint` already use for a value only some instances have.
+      // leaves no mark in the DOM — the same shape `--ca-row-cols` and
+      // `--ca-ev-tint` already use for a value only some instances have.
       if (weights[n] !== 1) {
-        cell.style.setProperty("--am-cell-weight", String(weights[n]));
+        cell.style.setProperty("--ca-cell-weight", String(weights[n]));
       }
       for (const i of group) cell.appendChild(children[i]);
       // ONE HANDLE PER CARD, ON THE CARD, APPENDED LAST (4.22 §4.1).
@@ -803,7 +803,7 @@ function attachGroupSwipe(
   const isStrictDragControl = (target: EventTarget | null): boolean => {
     if (!(target instanceof HTMLElement)) return false;
     return !!target.closest(
-      "input[type='range'], select, textarea, [contenteditable='true'], .jbd-handle, .journal-group-divider, .journal-card-divider, [draggable='true']"
+      "input[type='range'], select, textarea, [contenteditable='true'], .ca-jbd-handle, .ca-journal-group-divider, .ca-journal-card-divider, [draggable='true']"
     );
   };
 
@@ -853,11 +853,11 @@ function attachGroupSwipe(
       const progress = allowed ? Math.min(1, Math.abs(dx) / 75) : 0;
 
       if (dx > 0) {
-        container.style.setProperty("--am-swipe-tint-left", String(progress));
-        container.style.setProperty("--am-swipe-tint-right", "0");
+        container.style.setProperty("--ca-swipe-tint-left", String(progress));
+        container.style.setProperty("--ca-swipe-tint-right", "0");
       } else {
-        container.style.setProperty("--am-swipe-tint-right", String(progress));
-        container.style.setProperty("--am-swipe-tint-left", "0");
+        container.style.setProperty("--ca-swipe-tint-right", String(progress));
+        container.style.setProperty("--ca-swipe-tint-left", "0");
       }
     }
   });
@@ -869,8 +869,8 @@ function attachGroupSwipe(
     const velocity = Math.abs(dx) / dt;
 
     // Reset visual tints
-    container.style.removeProperty("--am-swipe-tint-left");
-    container.style.removeProperty("--am-swipe-tint-right");
+    container.style.removeProperty("--ca-swipe-tint-left");
+    container.style.removeProperty("--ca-swipe-tint-right");
 
     if (isHorizontal) {
       evt.preventDefault();

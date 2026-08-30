@@ -390,7 +390,7 @@ export async function runAction(
         arg || undefined
       );
     default:
-      new Notice(`Unknown Almanac action: ${action}`);
+      new Notice(`Unknown ChronoAnvil action: ${action}`);
   }
 }
 
@@ -409,22 +409,22 @@ export function buildButton(
       ? logButtonSpec(deps, arg)
       : journalButtonSpec(deps, action, arg) ??
         BUTTON_LABELS[action] ?? { label: action };
-  const wrap = createSpan({ cls: "journal-widget journal-button" });
+  const wrap = createSpan({ cls: "ca-journal-widget ca-journal-button" });
   const btn = wrap.createEl("button");
-  btn.addClass("journal-btn");
+  btn.addClass("ca-journal-btn");
   if (spec.primary) btn.addClass("mod-cta");
-  if (spec.subtle) btn.addClass("journal-btn-subtle");
-  if (spec.ghost) btn.addClass("journal-btn-ghost");
+  if (spec.subtle) btn.addClass("ca-journal-btn-subtle");
+  if (spec.ghost) btn.addClass("ca-journal-btn-ghost");
 
   if (spec.icon) {
-    const iconEl = btn.createSpan({ cls: "journal-btn-icon" });
+    const iconEl = btn.createSpan({ cls: "ca-journal-btn-icon" });
     setIcon(iconEl, spec.icon);
   } else if (spec.emoji) {
-    btn.createSpan({ cls: "journal-btn-emoji", text: spec.emoji });
+    btn.createSpan({ cls: "ca-journal-btn-emoji", text: spec.emoji });
   }
   // Ghost buttons are icon-only (matches the calendar's own prev/next
   // arrows) — the label still becomes the tooltip/aria text below.
-  if (!spec.ghost) btn.createSpan({ cls: "journal-btn-label", text: spec.label });
+  if (!spec.ghost) btn.createSpan({ cls: "ca-journal-btn-label", text: spec.label });
   const hover = spec.tooltip ?? spec.label;
   if (hover) {
     btn.setAttr("aria-label", hover);

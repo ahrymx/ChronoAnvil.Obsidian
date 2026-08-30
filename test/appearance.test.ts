@@ -58,9 +58,9 @@ describe("one list row", () => {
     expect(t).toContain("createListRow(host, {");
     // The bespoke classes it used to emit.
     for (const dead of [
-      "almanac-tpl-label",
-      "almanac-tpl-nudge",
-      "almanac-tpl-lock",
+      "ca-tpl-label",
+      "ca-tpl-nudge",
+      "ca-tpl-lock",
     ]) {
       expect(t, dead).not.toContain(dead);
     }
@@ -77,11 +77,11 @@ describe("one list row", () => {
   });
 
   it("hands back a pills handle rather than making callers query for it", () => {
-    // The launcher rail read `row.querySelector(".almanac-list-pills")` and
+    // The launcher rail read `row.querySelector(".ca-list-pills")` and
     // silently did nothing when the row had started with no pills.
     expect(src("list-row.ts")).toContain("pills: HTMLElement");
     expect(src("settings-editors.ts")).not.toContain(
-      'querySelector(".almanac-list-pills")'
+      'querySelector(".ca-list-pills")'
     );
   });
 });
@@ -161,7 +161,7 @@ describe("note surfaces draw rows with the shared component", () => {
     const css = readCss();
     const at = css.indexOf("@container (max-width: 460px)");
     expect(at).toBeGreaterThan(0);
-    expect(css).toContain(".almanac-list-main.is-columned");
+    expect(css).toContain(".ca-list-main.is-columned");
     expect(src("tables.ts")).not.toContain("renderNarrow");
   });
 
@@ -198,9 +198,9 @@ describe("note surfaces draw rows with the shared component", () => {
     // records wants.
     const css = readCss();
     for (const cls of [
-      ".almanac-list-heads",
-      ".almanac-list-cell",
-      ".almanac-list-gauge",
+      ".ca-list-heads",
+      ".ca-list-cell",
+      ".ca-list-gauge",
     ]) {
       expect(css, cls).toContain(cls);
     }
@@ -250,11 +250,11 @@ describe("the record lists share one builder", () => {
 
   it("keeps `is-done` a generic row state", () => {
     // The task and path widgets already use that class name for their own rows.
-    // A bare `.almanac-list-row.is-done` would have been a third meaning for
+    // A bare `.ca-list-row.is-done` would have been a third meaning for
     // it, so the finished-record styling is scoped by `is-done-able`.
     const css = readCss();
-    expect(css).toContain(".almanac-list-row.is-done-able.is-done");
-    expect(css).not.toMatch(/\.almanac-list-row\.is-done \{/);
+    expect(css).toContain(".ca-list-row.is-done-able.is-done");
+    expect(css).not.toMatch(/\.ca-list-row\.is-done \{/);
   });
 });
 
@@ -296,18 +296,18 @@ describe("button glyphs", () => {
     // A pill reads as a tag — something you might remove. These are actions.
     // 2.56 took the pill off and gave them the CARD's corner, which on a 22px
     // box is most of the way back to a capsule; 4.13.1 §1 moved them to the
-    // control tier `--am-radius-sm` names, which is where an input, a select and
+    // control tier `--ca-radius-sm` names, which is where an input, a select and
     // a stepper already sit.
-    // Anchored to the start of a line: `.journal-btn {` also appears inside
-    // `.journal-sec-l2 .journal-header-widgets .journal-btn {`, and a plain
+    // Anchored to the start of a line: `.ca-journal-btn {` also appears inside
+    // `.ca-journal-sec-l2 .ca-journal-header-widgets .ca-journal-btn {`, and a plain
     // indexOf finds the descendant rule first.
     const css = readCss();
-    const at = css.indexOf("\n.journal-btn {");
+    const at = css.indexOf("\n.ca-journal-btn {");
     expect(at).toBeGreaterThan(0);
     const block = css.slice(at, css.indexOf("}", at));
-    expect(block).toContain("border-radius: var(--am-radius-sm)");
-    expect(block).not.toContain("--am-radius-pill");
-    expect(block).not.toContain("--am-radius-md");
+    expect(block).toContain("border-radius: var(--ca-radius-sm)");
+    expect(block).not.toContain("--ca-radius-pill");
+    expect(block).not.toContain("--ca-radius-md");
   });
 
   it("draws no button in the accent, at rest or under the pointer", () => {
@@ -324,10 +324,10 @@ describe("button glyphs", () => {
     // appear is the hue.
     const css = readCss();
     const bodies = [
-      "\n.journal-btn {",
-      "\n.journal-btn:hover {",
-      "\n.journal-btn.mod-cta {",
-      "\n.journal-btn.mod-cta:hover {",
+      "\n.ca-journal-btn {",
+      "\n.ca-journal-btn:hover {",
+      "\n.ca-journal-btn.mod-cta {",
+      "\n.ca-journal-btn.mod-cta:hover {",
     ].map((sel) => {
       const at = css.indexOf(sel);
       expect(at, `no rule for ${sel.trim()}`).toBeGreaterThan(0);
@@ -340,7 +340,7 @@ describe("button glyphs", () => {
     // And the exception it replaced is gone rather than restated: the study
     // table keeps its SIZE rule and nothing else.
     expect(css).not.toContain(
-      '.callout[data-callout="study"] table td .journal-btn.mod-cta'
+      '.callout[data-callout="study"] table td .ca-journal-btn.mod-cta'
     );
   });
 
@@ -348,7 +348,7 @@ describe("button glyphs", () => {
     // `--background-secondary` is what a section card is painted with as of
     // §1.6, so a button filled with it survives on its border alone.
     const css = readCss();
-    const at = css.indexOf("\n.journal-btn {");
+    const at = css.indexOf("\n.ca-journal-btn {");
     expect(at).toBeGreaterThan(0);
     const block = css.slice(at, css.indexOf("}", at));
     expect(block).toContain("background: transparent");
@@ -368,17 +368,17 @@ describe("nothing is painted in its container's colour", () => {
 
   it("fills a tracker cell against the card, not with it", () => {
     const t = css();
-    const at = t.indexOf(".journal-tracker-bar .journal-tracker-cell {");
+    const at = t.indexOf(".ca-journal-tracker-bar .ca-journal-tracker-cell {");
     expect(at).toBeGreaterThan(0);
     const block = t.slice(at, t.indexOf("\n}", at));
-    expect(block).toContain("background: var(--am-surface-inset)");
+    expect(block).toContain("background: var(--ca-surface-inset)");
   });
 
   it("keeps the section card's own fill", () => {
     // The card is the one thing that should be `--background-secondary`; the
     // fix is for the things sitting on it, not the surface itself.
     const t = css();
-    const at = t.indexOf(".journal-sec-block {");
+    const at = t.indexOf(".ca-journal-sec-block {");
     const block = t.slice(at, t.indexOf("\n}", at));
     expect(block).toContain("background: var(--background-secondary)");
   });
@@ -386,7 +386,7 @@ describe("nothing is painted in its container's colour", () => {
 
 // ── an empty slot is not a column (2.56.18) ──────────────────────────────
 //
-// `createListRow` always creates `.almanac-list-pills`, so a caller filling it
+// `createListRow` always creates `.ca-list-pills`, so a caller filling it
 // after an async read need not know whether it exists. Harmless in a flex row.
 // In a COLUMNED row it is a grid item, and an empty grid item still holds its
 // track open — which pushed every value in the Lessons table one column right
@@ -396,7 +396,7 @@ describe("columned rows lay out on the tracks they declare", () => {
   it("collapses an empty pills slot out of the grid", () => {
     const css = readCss();
     expect(css).toContain(
-      ".almanac-list-main.is-columned > .almanac-list-pills:empty"
+      ".ca-list-main.is-columned > .ca-list-pills:empty"
     );
   });
 
@@ -424,7 +424,7 @@ describe("empty states inside a section card", () => {
 
   it("drops the callout's internal rule and its height floor", () => {
     // UNCONDITIONALLY AS OF 4.11, which is where these two selectors lost their
-    // `.journal-sec-block` scope. The divider and the 5em floor come from the
+    // `.ca-journal-sec-block` scope. The divider and the 5em floor come from the
     // WRITABLE callouts and are wrong for a read-only sentence on any surface; the
     // box, which was the other half of the old scoped rule, is the info card's now
     // and is drawn rather than removed. See 91-card-surface.css §3a.
@@ -438,7 +438,7 @@ describe("empty states inside a section card", () => {
   it("unboxes the review queue's line, the only empty line that drew one", () => {
     // `emptyLine` exists precisely because a region inside drawn chrome does
     // not need its own frame; this one had a dashed box anyway.
-    expect(css()).toContain(".journal-sec-block .jrq-empty");
+    expect(css()).toContain(".ca-journal-sec-block .ca-jrq-empty");
   });
 });
 
@@ -460,8 +460,8 @@ describe("the surviving hero's stat cells", () => {
     // is where the original difference lived: both cells are plain block
     // children, so whichever `createDiv` runs first is the one on top.
     const src = readSrc("journals-header");
-    const label = src.indexOf('cls: "jjh-stat-label"');
-    const value = src.indexOf('cls: "jjh-stat-value"');
+    const label = src.indexOf('cls: "ca-jjh-stat-label"');
+    const value = src.indexOf('cls: "ca-jjh-stat-value"');
     expect(label, "label").toBeGreaterThan(-1);
     expect(value, "value").toBeGreaterThan(-1);
     expect(label, "label must be built before value").toBeLessThan(value);
@@ -469,15 +469,15 @@ describe("the surviving hero's stat cells", () => {
 
   it("describes the caps treatment once, in tokens", () => {
     // The Journals label used to restate `font-weight: 700; letter-spacing:
-    // 0.06em` where the diary's read `--am-caps-weight` and `--am-caps-tracking`.
+    // 0.06em` where the diary's read `--ca-caps-weight` and `--ca-caps-tracking`.
     // Two descriptions of one thing is how the two came to differ in the first
     // place, and the tokens are what is left of the pair.
     const css = readCss();
-    const at = css.indexOf(".jjh-stat-label {");
+    const at = css.indexOf(".ca-jjh-stat-label {");
     expect(at).toBeGreaterThan(-1);
     const body = css.slice(at, css.indexOf("}", at));
-    expect(body).toContain("var(--am-caps-weight)");
-    expect(body).toContain("var(--am-caps-tracking)");
+    expect(body).toContain("var(--ca-caps-weight)");
+    expect(body).toContain("var(--ca-caps-tracking)");
   });
 
   it("gives all four figures one colour (4.13.5 §3)", () => {
@@ -494,7 +494,7 @@ describe("the surviving hero's stat cells", () => {
     // was than in a changelog, and a "not present" assertion over raw sheet text
     // would forbid writing it down.
     expect(readSrc("journals-header")).not.toContain("is-accent");
-    expect(cssRules()).not.toContain(".jjh-stat-value.is-accent");
+    expect(cssRules()).not.toContain(".ca-jjh-stat-value.is-accent");
   });
 
   it("does not repeat the section's own name (4.13.5 §4)", () => {
@@ -504,7 +504,7 @@ describe("the surviving hero's stat cells", () => {
     // period and the journals the figures cover, is what titles the band now.
     const src = readSrc("journals-header");
     expect(src).not.toContain("jjh-title");
-    expect(src, "the eyebrow is what names it now").toContain('cls: "jjh-eyebrow"');
+    expect(src, "the eyebrow is what names it now").toContain('cls: "ca-jjh-eyebrow"');
     expect(cssRules()).not.toContain(".jjh-title");
   });
 
@@ -529,7 +529,7 @@ describe("the surviving hero's stat cells", () => {
 // for one thing on one screen, which is 4.13 §1's finding one widget over.
 //
 // The reference is the SURVIVOR, so the day cells are deliberately not asserted
-// here: both grids draw `.cal-cell` from one rule, and that rule is the thing
+// here: both grids draw `.ca-cal-cell` from one rule, and that rule is the thing
 // this release is making everything else look like.
 
 describe("the diary card carries no decorative fill", () => {
@@ -541,17 +541,17 @@ describe("the diary card carries no decorative fill", () => {
   };
 
   it("sinks none of its bands", () => {
-    // Three bands carried `--am-band-recess`: the stats readout (gone with the
+    // Three bands carried `--ca-band-recess`: the stats readout (gone with the
     // hero), the navigator and the agenda. A sunk strip on a card whose
     // neighbour has none is the whole of what made these two read as different
     // materials.
-    for (const sel of [".jc-header", ".jc-agenda"]) {
+    for (const sel of [".ca-jc-header", ".ca-jc-agenda"]) {
       expect(body(sel), sel).not.toContain("background:");
     }
     // And the token itself is gone, not merely unread — a named value nothing
     // reads is the dangling reference `test/tokens.test.ts` exists to catch,
     // arrived at from the other end.
-    expect(readCss()).not.toContain("--am-band-recess:");
+    expect(readCss()).not.toContain("--ca-band-recess:");
   });
 
   it("recesses the week chip, and heads the quarter label (4.14 §1)", () => {
@@ -568,22 +568,22 @@ describe("the diary card carries no decorative fill", () => {
     // change category — it is still a key beside a row — so it keeps its
     // transparent fill, and the two are now pinned apart on purpose rather than
     // drifting apart by neglect.
-    expect(body(".journal-calendar .cal-week")).toContain("background: transparent");
-    const label = body(".journal-calendar .jc-qlabel");
+    expect(body(".ca-journal-calendar .ca-cal-week")).toContain("background: transparent");
+    const label = body(".ca-journal-calendar .ca-jc-qlabel");
     expect(label).not.toContain("background: transparent");
     // 4% OF THE TEXT COLOUR, NOT A LITERAL AND NOT `--background-modifier-hover`.
-    // It has to invert with the theme (the idiom `.cal-cell`'s ring already uses
+    // It has to invert with the theme (the idiom `.ca-cal-cell`'s ring already uses
     // at 10%), and it has to stay under the hover fill or the hover has nothing
     // left to say.
     expect(label).toContain("color-mix(in srgb, var(--text-normal) 4%, transparent)");
-    expect(body(".journal-calendar .jc-qlabel:hover")).toContain(
+    expect(body(".ca-journal-calendar .ca-jc-qlabel:hover")).toContain(
       "background: var(--background-modifier-hover)"
     );
     // Their light-theme overrides went with the fills. A theme-specific
     // override can only ever put one back on one theme, which is what made the
     // pair drift in the first place.
-    expect(readCss()).not.toContain(".theme-light .journal-calendar .jc-qlabel");
-    expect(readCss()).not.toContain(".theme-light .journal-calendar .cal-week");
+    expect(readCss()).not.toContain(".theme-light .ca-journal-calendar .ca-jc-qlabel");
+    expect(readCss()).not.toContain(".theme-light .ca-journal-calendar .ca-cal-week");
   });
 
   it("sizes the quarter header above its own content (4.14 §1)", () => {
@@ -591,39 +591,39 @@ describe("the diary card carries no decorative fill", () => {
     // 12.8px `--text-muted` months — smaller AND fainter than the thing it
     // heads, which is a caption, not a quiet header. Both halves are asserted
     // because fixing either one alone leaves the other saying the opposite.
-    const label = body(".journal-calendar .jc-qlabel");
+    const label = body(".ca-journal-calendar .ca-jc-qlabel");
     expect(label).toContain("font-size: 0.8125rem");
     expect(label).toContain("min-height: 32px");
     expect(label).toContain("color: var(--text-muted)");
-    // One `font-size`, not two. The rule carried `--am-text-2xs` and then the
+    // One `font-size`, not two. The rule carried `--ca-text-2xs` and then the
     // rem floor that overrode it — a leftover the size change had to resolve
     // rather than add a third to.
     expect(label.match(/font-size:/g)).toHaveLength(1);
     // And the months clear the header's floor rather than sitting under it.
-    expect(body(".journal-calendar .jc-mcell")).toContain("min-height: 2.25rem");
+    expect(body(".ca-journal-calendar .ca-jc-mcell")).toContain("min-height: 2.25rem");
   });
 
   it("marks the current quarter with a tick, not with colour alone (4.14 §1)", () => {
     const t = readCss();
     // A pseudo-element, deliberately: the label's one real child is
-    // `.jc-qlabel-text`, and the underline that says "this quarter has an entry"
+    // `.ca-jc-qlabel-text`, and the underline that says "this quarter has an entry"
     // has to land on that word alone (3.17 §2). A second real child is a second
     // thing for that rule to miss.
-    expect(body(".journal-calendar .jc-qlabel::before")).toContain("width: 3px");
-    expect(body(".journal-calendar .jc-qlabel.is-current::before")).toContain(
+    expect(body(".ca-journal-calendar .ca-jc-qlabel::before")).toContain("width: 3px");
+    expect(body(".ca-journal-calendar .ca-jc-qlabel.is-current::before")).toContain(
       "background: var(--interactive-accent)"
     );
     // The word keeps its colour too — the tick reinforces the state, it does not
     // take it over, and a theme that pitches the accent near `--text-muted`
     // leaves the tick carrying it alone.
-    expect(body(".journal-calendar .jc-qlabel.is-current")).toContain(
+    expect(body(".ca-journal-calendar .ca-jc-qlabel.is-current")).toContain(
       "color: var(--interactive-accent)"
     );
     // The door says so on hover, and on a device with no hover it rests visible
     // instead. `test/hover-reveal.test.ts` pins the general rule; this pins that
     // THIS control is the one that took it.
-    expect(t).toContain(".journal-calendar .jc-qlabel:hover::after");
-    expect(t).toContain(".journal-calendar .jc-qlabel::after");
+    expect(t).toContain(".ca-journal-calendar .ca-jc-qlabel:hover::after");
+    expect(t).toContain(".ca-journal-calendar .ca-jc-qlabel::after");
   });
 
   it("keeps the fills that say where you are", () => {
@@ -634,12 +634,12 @@ describe("the diary card carries no decorative fill", () => {
     // wash under the month cell's, on the rail's own "container and the thing
     // selected inside it" argument.
     const t = readCss();
-    expect(body(".cal-cell-today")).toContain("var(--interactive-accent)");
-    expect(t).toContain(".journal-calendar .jc-mcell.is-selected");
-    expect(body(".journal-calendar .cal-week.is-now")).toContain(
+    expect(body(".ca-cal-cell-today")).toContain("var(--interactive-accent)");
+    expect(t).toContain(".ca-journal-calendar .ca-jc-mcell.is-selected");
+    expect(body(".ca-journal-calendar .ca-cal-week.is-now")).toContain(
       "var(--interactive-accent)"
     );
-    expect(t).not.toContain(".jc-qgroup.is-selected");
+    expect(t).not.toContain(".ca-jc-qgroup.is-selected");
     // And the class stops being toggled, rather than being toggled onto nothing:
     // a marker no rule reads is a rule someone writes back. Comments stripped —
     // the paragraph where the array stood explains what it did and why it went.
@@ -666,40 +666,40 @@ describe("the diary card carries no decorative fill", () => {
     // here is four cells in a 2x2, each a header over its content. A table's
     // outer edge is not ornament: without it the outermost months are open on
     // two sides and the cross reads as two stray lines rather than as division.
-    expect(body(".jc-qrail")).toContain("border: 1px solid");
+    expect(body(".ca-jc-qrail")).toContain("border: 1px solid");
     // The group is a column: header over content, which is what makes the rules
     // read as a cell's rather than as a box drawn round a strip.
-    expect(body(".jc-qgroup")).toContain("flex-direction: column");
+    expect(body(".ca-jc-qgroup")).toContain("flex-direction: column");
     // The cross: rows 1|2 horizontally, columns 1|2 vertically.
-    expect(body(".jc-qgroup:nth-child(n + 3)")).toContain("border-top:");
-    expect(body(".jc-qgroup:nth-child(2n)")).toContain("border-left:");
+    expect(body(".ca-jc-qgroup:nth-child(n + 3)")).toContain("border-top:");
+    expect(body(".ca-jc-qgroup:nth-child(2n)")).toContain("border-left:");
     // And the header is divided from its content, or it is a caption floating
     // over three buttons rather than the cell's head.
-    expect(body(".journal-calendar .jc-qlabel")).toContain("border-bottom:");
+    expect(body(".ca-journal-calendar .ca-jc-qlabel")).toContain("border-bottom:");
     // THE GROUP STILL HAS NO BOX OF ITS OWN. This is the half of the 4.13.1
     // argument that did not expire: four bordered boxes inside a bordered rail
     // is the box-in-a-box that release was really about, and the frame going
     // back on the OUTSIDE does not license one per quarter.
-    expect(body(".jc-qgroup")).not.toContain("border:");
+    expect(body(".ca-jc-qgroup")).not.toContain("border:");
     // And the week gutter's vertical hairline is gone with it.
-    expect(readCss()).not.toContain(".jc-grid.jc-grid-weeks::before");
+    expect(readCss()).not.toContain(".ca-jc-grid.ca-jc-grid-weeks::before");
   });
 
   it("rules the rail at the day grid's weight, not the card's (4.14 §1)", () => {
     // THE STRUCTURE WAS IN THE STYLESHEET AND NOT ON THE SCREEN. Measured off
     // the 4.13.8 vault render: the cross was `--background-modifier-border`
     // (#333333) on a #282828 card — a 2.4% step in lightness, which is a line
-    // you can prove and cannot see. `.cal-cell`'s ring one section below already
+    // you can prove and cannot see. `.ca-cal-cell`'s ring one section below already
     // resolves to #3a3a3a, so the two halves of the same card were ruled at two
     // weights for no reason anybody chose.
     //
     // All four edges together: the frame, both arms of the cross, and the
     // header's divide. Any one of them left behind puts the mismatch back.
     for (const sel of [
-      ".jc-qrail",
-      ".jc-qgroup:nth-child(n + 3)",
-      ".jc-qgroup:nth-child(2n)",
-      ".journal-calendar .jc-qlabel",
+      ".ca-jc-qrail",
+      ".ca-jc-qgroup:nth-child(n + 3)",
+      ".ca-jc-qgroup:nth-child(2n)",
+      ".ca-journal-calendar .ca-jc-qlabel",
     ]) {
       expect(body(sel), sel).toContain("var(--background-modifier-border-hover)");
       expect(body(sel), sel).not.toContain("solid var(--background-modifier-border)");
@@ -707,9 +707,9 @@ describe("the diary card carries no decorative fill", () => {
   });
 
   it("draws the links row at the strip's own scale (4.13.7 §32)", () => {
-    // ONE STRIP IS ONE SIZE. A links pill drew at `--am-text-sm` with
-    // `--am-space-3` of vertical padding — about 32px — in a strip whose buttons
-    // are `--am-text-2xs` with `--am-space-1`, about 21px. A flex row centres
+    // ONE STRIP IS ONE SIZE. A links pill drew at `--ca-text-sm` with
+    // `--ca-space-3` of vertical padding — about 32px — in a strip whose buttons
+    // are `--ca-text-2xs` with `--ca-space-1`, about 21px. A flex row centres
     // what it holds, so the 11px difference splits and the pill hangs ~5.5px
     // above the line: measured on the Weekly overview, the `Today` chip paints
     // y=29–60 against a hairline at y=33, and the rule is drawn through it.
@@ -722,17 +722,17 @@ describe("the diary card carries no decorative fill", () => {
     // opposite of what shipped.
     const t = readCss();
     const at = t.indexOf(
-      "\n.journal-header-widgets .journal-nav.journal-links a.jn-pill"
+      "\n.ca-journal-header-widgets .ca-journal-nav.ca-journal-links a.ca-jn-pill"
     );
     expect(at, "the links row keeps its own scale").toBeGreaterThan(0);
     const rule = t.slice(t.indexOf("{", at), t.indexOf("}", at));
-    expect(rule).toContain("font-size: var(--am-text-2xs)");
-    expect(rule).toContain("var(--am-space-1)");
+    expect(rule).toContain("font-size: var(--ca-text-2xs)");
+    expect(rule).toContain("var(--ca-space-1)");
 
     // ALL THREE SHAPES `renderTarget` BUILDS, or the row is fixed for a
     // destination that exists and not for one that does not.
     const selectors = t.slice(at, t.indexOf("{", at));
-    for (const cls of [".jn-flat", ".jn-here"]) {
+    for (const cls of [".ca-jn-flat", ".ca-jn-here"]) {
       expect(selectors, cls).toContain(cls);
     }
 
@@ -740,17 +740,17 @@ describe("the diary card carries no decorative fill", () => {
     // are two kinds of control in one band, not two bands.
     // (Same comma, same reason: this rule pairs level 1 with level 2.)
     const bAt = t.indexOf(
-      "\n.journal-sec-l1 > .journal-header-widgets .journal-btn"
+      "\n.ca-journal-sec-l1 > .ca-journal-header-widgets .ca-journal-btn"
     );
     expect(bAt, "the strip's buttons moved").toBeGreaterThan(0);
     const btn = t.slice(t.indexOf("{", bAt), t.indexOf("}", bAt));
-    expect(btn).toContain("font-size: var(--am-text-2xs)");
-    expect(btn).toContain("var(--am-space-1)");
+    expect(btn).toContain("font-size: var(--ca-text-2xs)");
+    expect(btn).toContain("var(--ca-space-1)");
   });
 
   it("lays every slot of the links row out as a row (4.13.6 §2)", () => {
-    // THE DEFECT WAS AN OMISSION, NOT A VALUE. `.jn-side` and `.jn-center` both
-    // declare `display: flex; align-items: center`; `.jn-right` declared only its
+    // THE DEFECT WAS AN OMISSION, NOT A VALUE. `.ca-jn-side` and `.ca-jn-center` both
+    // declare `display: flex; align-items: center`; `.ca-jn-right` declared only its
     // auto margin, so it stayed a BLOCK and laid its children out as inline
     // content on a text baseline. What it holds is the scope button — an `<a>` at
     // `display: inline-flex`, ~32px tall against a ~19px line box — and an
@@ -766,16 +766,16 @@ describe("the diary card carries no decorative fill", () => {
     // declarations, because the claim is that the three slots are one object: a
     // fourth slot, or a rewrite of these, has to keep them agreeing.
     for (const sel of [
-      ".journal-nav .jn-side",
-      ".journal-nav .jn-center",
-      ".journal-nav .jn-right",
+      ".ca-journal-nav .ca-jn-side",
+      ".ca-journal-nav .ca-jn-center",
+      ".ca-journal-nav .ca-jn-right",
     ]) {
       expect(body(sel), sel).toContain("align-items: center");
       expect(body(sel), sel).toMatch(/display:\s*(inline-)?flex/);
     }
     // And the row it sits in still centres what it holds, which is what turns a
     // real box into a centred one rather than a taller overflow.
-    expect(body(".journal-nav")).toContain("align-items: center");
+    expect(body(".ca-journal-nav")).toContain("align-items: center");
   });
 
   it("stops holding a horizontal budget for the quarter label (4.13.6 §3)", () => {
@@ -795,7 +795,7 @@ describe("the diary card carries no decorative fill", () => {
     // replaced the declaration quotes it, and an "is absent" assertion over raw
     // sheet text would forbid writing down what was removed and why.
     const t = cssRules();
-    const at = t.indexOf("\n.journal-calendar .jc-qlabel {");
+    const at = t.indexOf("\n.ca-journal-calendar .ca-jc-qlabel {");
     expect(at).toBeGreaterThan(0);
     expect(t.slice(at, t.indexOf("}", at))).not.toContain("min-width:");
   });
@@ -835,17 +835,17 @@ describe("the diary card carries no decorative fill", () => {
     // a strip of four actions with one fill in it is the noise that argued for.
     expect(code).not.toContain("mod-cta");
     // The strip is the section bar's object at a third scale, so it carries the
-    // hairline and the 4px of air `.journal-group-foot` does — below rather than
+    // hairline and the 4px of air `.ca-journal-group-foot` does — below rather than
     // above, because it opens a card instead of closing a header.
-    expect(body(".jc-actions")).toContain(
-      "border-bottom: var(--am-rule-hair) solid"
+    expect(body(".ca-jc-actions")).toContain(
+      "border-bottom: var(--ca-rule-hair) solid"
     );
-    expect(body(".jc-actions")).toContain("padding-bottom: 4px");
+    expect(body(".ca-jc-actions")).toContain("padding-bottom: 4px");
     // ONE AT EACH END, AS OF 4.13.3, where the strip was right-aligned like an
     // ordinary actions cluster. It does not hold one: Capture writes and Search
     // navigates, and two kinds of thing pushed together at one end have to be
     // told apart by reading them.
-    expect(body(".jc-actions")).toContain("justify-content: space-between");
+    expect(body(".ca-jc-actions")).toContain("justify-content: space-between");
   });
 });
 
@@ -853,7 +853,7 @@ describe("the diary card carries no decorative fill", () => {
 //
 // The same rule as `createListRow` above, applied to the thing 4.1 §3 refused.
 // The v4 draft proposed `widget: calendar`, dispatched through a new
-// `parseAlmanacDirectives()` in a new file — and §3's objection was not that a
+// `parseChronoAnvilDirectives()` in a new file — and §3's objection was not that a
 // second parser is untidy but that it is a SECOND GRAMMAR, agreeing with the
 // first only for as long as somebody keeps them in step. `directive-grammar.ts`
 // exists because that already happened once: the grammar was written three
@@ -874,7 +874,7 @@ describe("one directive grammar", () => {
     // as. A parser that is not exported is still a second grammar — the point
     // is that no module derives a keyword from a line for itself.
     for (const banned of [
-      "parseAlmanacDirectives",
+      "parseChronoAnvilDirectives",
       "parseDirectives(",
       "parseDirectiveLine(",
     ]) {
@@ -929,7 +929,7 @@ describe("the diary calendar draws the state it claims", () => {
     // into a box, and a reader reporting "the selected month has a violet
     // border" is describing something the stylesheet never drew.
     //
-    // The ring is the construction `.jc-mcell.is-now` already uses one rule
+    // The ring is the construction `.ca-jc-mcell.is-now` already uses one rule
     // above, in the accent instead of the border colour, so the two states read
     // as one idea at two strengths rather than as two inventions.
     // LOCATED BY ITS BODY, NOT BY `body()`. That helper anchors on
@@ -937,12 +937,12 @@ describe("the diary calendar draws the state it claims", () => {
     // same miss 4.13's empty-state assertion made, which passed against the
     // opposite of what shipped, and 4.13.7's links row made again.
     const t = readCss();
-    const at = t.indexOf("\n.journal-calendar .jc-mcell.is-selected,");
+    const at = t.indexOf("\n.ca-journal-calendar .ca-jc-mcell.is-selected,");
     expect(at, "the selected month has a rule").toBeGreaterThan(0);
     const sel = t.slice(t.indexOf("{", at), t.indexOf("}", at));
     expect(sel).toContain("inset 0 0 0 1px var(--interactive-accent)");
     expect(sel).toContain("color-mix(in srgb, var(--interactive-accent) 16%");
-    expect(body(".journal-calendar .jc-mcell.is-now")).toContain(
+    expect(body(".ca-journal-calendar .ca-jc-mcell.is-now")).toContain(
       "inset 0 0 0 1px var(--background-modifier-border-hover)"
     );
   });
@@ -951,9 +951,9 @@ describe("the diary calendar draws the state it claims", () => {
     // It was a 1.5px accent ring and a bold numeral on a cell whose thirty
     // neighbours each carry a ring of their own — so the whole of "today" was
     // one hairline's worth of hue, measured at #8a5cf5 against #3a3a3a.
-    const today = body(".cal-cell-today");
+    const today = body(".ca-cal-cell-today");
     expect(today).toContain("color-mix(in srgb, var(--interactive-accent) 16%");
-    expect(today).toContain("var(--am-rule) var(--interactive-accent)");
+    expect(today).toContain("var(--ca-rule) var(--interactive-accent)");
     // NOT `--text-on-accent`, WHICH WOULD BE THE OBVIOUS WRONG ANSWER. That
     // variable is for a SOLID accent fill; over a 16% wash it puts white on pale
     // lavender for every light-theme reader. The readable colour on a ground
@@ -967,12 +967,12 @@ describe("the diary calendar draws the state it claims", () => {
     // where you are, the row is merely the row it is in. Giving the chip the
     // same 16% tint and nothing else made them one signal drawn twice, so the
     // chip takes a second CHANNEL rather than more of the first.
-    const wk = body(".journal-calendar .cal-week.is-now");
+    const wk = body(".ca-journal-calendar .ca-cal-week.is-now");
     expect(wk).toContain("color-mix(in srgb, var(--interactive-accent) 16%");
-    expect(wk).toContain("inset var(--am-rule) 0 0 0 var(--interactive-accent)");
+    expect(wk).toContain("inset var(--ca-rule) 0 0 0 var(--interactive-accent)");
     // The chip at rest is still unfilled — the edge is what `is-now` adds, not a
     // recess put back on every week (see the 4.14 §1 split above).
-    expect(body(".journal-calendar .cal-week")).toContain("background: transparent");
+    expect(body(".ca-journal-calendar .ca-cal-week")).toContain("background: transparent");
   });
 
   it("counts a month's days off the entries, not off the review note (4.14 §3)", () => {
@@ -982,8 +982,8 @@ describe("the diary calendar draws the state it claims", () => {
     // report 1 for a month with thirty entries.
     const t = readSrc("calendar");
     expect(t).toContain("daysByMonth");
-    expect(t).toContain('cls: "cal-month-count"');
-    expect(t).toContain('cls: "cal-month-bar"');
+    expect(t).toContain('cls: "ca-cal-month-count"');
+    expect(t).toContain('cls: "ca-cal-month-bar"');
     // Off `dayMap`, and NOT off the mood array beside it: a mood is optional and
     // an entry is not, so a vault with the tracker switched off would otherwise
     // read as a year of nothing.
@@ -1011,29 +1011,29 @@ describe("the diary calendar draws the state it claims", () => {
   });
 
   it("draws the tally without letting it outrank the month (4.14 §3)", () => {
-    expect(body(".cal-month-count")).toContain("font-size: var(--am-text-2xs)");
+    expect(body(".ca-cal-month-count")).toContain("font-size: var(--ca-text-2xs)");
     // Tabular figures: 8 and 21 in proportional numerals wander by a couple of
     // pixels, which is visible with twelve of them stacked four across.
-    expect(body(".cal-month-count")).toContain("font-variant-numeric: tabular-nums");
-    expect(body(".cal-month-bar")).toContain("height: 3px");
+    expect(body(".ca-cal-month-count")).toContain("font-variant-numeric: tabular-nums");
+    expect(body(".ca-cal-month-bar")).toContain("height: 3px");
     // The bar runs a rounded box's full width, so the tile has to clip or its
     // square ends sit outside the radius at both bottom corners.
-    expect(body(".cal-cell-month")).toContain("overflow: hidden");
+    expect(body(".ca-cal-cell-month")).toContain("overflow: hidden");
   });
 
   it("repairs the selected tile's fill, which had been dead (4.14 §3)", () => {
-    // THE BUG, NOT A PREFERENCE. `.cal-cell-selected` asked for a solid accent
-    // tile at 0,1,0 while `.cal-cell-month.cal-cell-has-entry` repainted the
+    // THE BUG, NOT A PREFERENCE. `.ca-cal-cell-selected` asked for a solid accent
+    // tile at 0,1,0 while `.ca-cal-cell-month.ca-cal-cell-has-entry` repainted the
     // background at 0,2,0 — so the fill vanished the moment the selected month
     // had a review note, which is most of the time. Measured off the 4.13.8
     // render: the selected tile's interior is #1c1c1c, and the violet edge on it
-    // is `.cal-cell-today`'s ring, not this rule at all.
+    // is `.ca-cal-cell-today`'s ring, not this rule at all.
     const css = readCss();
-    // Specific enough to win now. A bare `.cal-cell-selected {` rule coming back
+    // Specific enough to win now. A bare `.ca-cal-cell-selected {` rule coming back
     // is the defect returning, whatever it declares.
-    expect(css).toContain("\n.cal-cell-month.cal-cell-selected {");
-    expect(cssRules()).not.toContain("\n.cal-cell-selected {");
-    const sel = body(".cal-cell-month.cal-cell-selected");
+    expect(css).toContain("\n.ca-cal-cell-month.ca-cal-cell-selected {");
+    expect(cssRules()).not.toContain("\n.ca-cal-cell-selected {");
+    const sel = body(".ca-cal-cell-month.ca-cal-cell-selected");
     // AND IT IS NOT REPAIRED BY WINNING HARDER. A solid accent tile 157x97px is
     // the loudest object on either diary page, and it is where the count and the
     // bar this release added both stop being legible. Selection is drawn the way
@@ -1062,29 +1062,29 @@ describe("the banner is one material, and the minimal one is quiet", () => {
 
   it("keeps banners clean without pseudo-element art hatches", () => {
     const css = readCss();
-    expect(css).not.toContain(".journal-page-banner::before");
-    expect(css).not.toContain(".journal-slim-banner::before");
-    expect(css).not.toContain(".jtc-card::before");
+    expect(css).not.toContain(".ca-journal-page-banner::before");
+    expect(css).not.toContain(".ca-journal-slim-banner::before");
+    expect(css).not.toContain(".ca-jtc-card::before");
 
     // The children sit above it rather than under it. `inset: 0` needs a
     // positioned ancestor or it resolves against the code-block widget in Live
     // Preview, which is 4.7.0's grip bug.
     for (const sel of [
-      ".journal-page-banner",
-      ".journal-page-banner > .jtc-card",
-      ".journal-page-banner > .journal-links-card",
+      ".ca-journal-page-banner",
+      ".ca-journal-page-banner > .ca-jtc-card",
+      ".ca-journal-page-banner > .ca-journal-links-card",
     ]) {
       expect(body(sel), sel).toContain("position: relative");
     }
   });
 
   it("separates the banner's two bands with a hairline, not a rule", () => {
-    // `--am-rule` is 2px and is what separates two CARDS. This separates two
+    // `--ca-rule` is 2px and is what separates two CARDS. This separates two
     // bands of one card, and at full weight it re-drew the seam the figure had
     // just dissolved.
-    const pills = body(".journal-page-banner > .journal-links-card");
-    expect(pills).toContain("--am-rule-hair");
-    expect(pills).not.toContain("border-top: var(--am-rule) ");
+    const pills = body(".ca-journal-page-banner > .ca-journal-links-card");
+    expect(pills).toContain("--ca-rule-hair");
+    expect(pills).not.toContain("border-top: var(--ca-rule) ");
   });
 
   it("gives the entry and the journal leaf one strip height and one name size (M2)", () => {
@@ -1104,18 +1104,18 @@ describe("the banner is one material, and the minimal one is quiet", () => {
     // there is ONE rule; a padding that reaches one page kind reaches the other
     // by construction, and no later rule can part them without naming the class
     // they share.
-    const band = body(".journal-slim-banner .journal-banner-name");
+    const band = body(".ca-journal-slim-banner .ca-journal-banner-name");
     expect(band).toContain("padding: 13px 14px 12px");
     // AND NEITHER HEADER PADS ITSELF BACK APART. Both of the old per-banner
     // rules are gone: the entry's entirely, and the leaf's down to the zeroing
     // that lets its two bands bleed the card's padding themselves.
-    expect(readCss()).not.toContain(".journal-entry-banner .journal-entry-header {");
-    expect(body(".journal-study-banner .journal-study-header")).toContain(
+    expect(readCss()).not.toContain(".ca-journal-entry-banner .ca-journal-entry-header {");
+    expect(body(".ca-journal-study-banner .ca-journal-study-header")).toContain(
       "padding: 0"
     );
 
     // THE ENTRY'S NAME WAS THE SIZE OF A SECTION BAR'S LABEL. It inherited
-    // `--am-bar-text` (0.7em) from `.journal-header-title`, so the date — which
+    // `--ca-bar-text` (0.7em) from `.ca-journal-header-title`, so the date — which
     // is what the note IS — was set smaller than the words under it.
     // The leaf's rule is a grouped selector — the name and the input it opens on
     // rename have to be one object, or the strip jumps height on the first
@@ -1127,10 +1127,10 @@ describe("the banner is one material, and the minimal one is quiet", () => {
       return t.slice(at, t.indexOf("}", at));
     };
     for (const sel of [
-      ".journal-entry-header .jeh-title",
-      ".journal-study-header .jsh-title-text",
+      ".ca-journal-entry-header .ca-jeh-title",
+      ".ca-journal-study-header .ca-jsh-title-text",
     ]) {
-      expect(rule(sel), sel).toContain("font-size: var(--am-text-lg)");
+      expect(rule(sel), sel).toContain("font-size: var(--ca-text-lg)");
       expect(rule(sel), sel).toContain("font-weight: 700");
     }
   });
@@ -1138,7 +1138,7 @@ describe("the banner is one material, and the minimal one is quiet", () => {
   it("sets the alias above the file's name, and nothing else above either", () => {
     // ── 4.21.1 REVERSES 4.21 ON ONE POINT, DELIBERATELY ─────────────
     //
-    // 4.21 moved the alias out of the banner and set it at `--am-text-sm`,
+    // 4.21 moved the alias out of the banner and set it at `--ca-text-sm`,
     // reasoning that the file's name is what the note is called and this is a
     // label on it. The first render showed the cost: a daily entry is named
     // `Day-2026-08-13`, so the largest words on the page were an ADDRESS, and
@@ -1153,40 +1153,40 @@ describe("the banner is one material, and the minimal one is quiet", () => {
       expect(at, name).toBeGreaterThan(0);
       return Number(/([\d.]+)em/.exec(t.slice(at, at + 60))?.[1]);
     };
-    expect(scale("--am-text-xl")).toBeGreaterThan(scale("--am-text-lg"));
-    expect(body(".jec-title-text")).toContain("font-size: var(--am-text-xl)");
+    expect(scale("--ca-text-xl")).toBeGreaterThan(scale("--ca-text-lg"));
+    expect(body(".ca-jec-title-text")).toContain("font-size: var(--ca-text-xl)");
     for (const sel of [
-      ".journal-entry-header .jeh-title",
-      ".journal-study-header .jsh-title-text",
+      ".ca-journal-entry-header .ca-jeh-title",
+      ".ca-journal-study-header .ca-jsh-title-text",
     ]) {
       const t = readCss();
       const at = Math.max(t.indexOf(`\n${sel} {`), t.indexOf(`\n${sel},`));
       expect(at, sel).toBeGreaterThan(0);
-      expect(t.slice(at, t.indexOf("}", at)), sel).toContain("--am-text-lg");
+      expect(t.slice(at, t.indexOf("}", at)), sel).toContain("--ca-text-lg");
     }
     // AND THE INPUT IS THE SAME OBJECT AS THE TEXT IT REPLACES, or the strip
     // jumps height on the first keystroke of a rename.
     // AND THE SELECTOR IS SPECIFIC ENOUGH TO WIN (4.21.2). Obsidian styles
-    // `input[type="text"]` at (0,1,1) and a bare `.jec-title-input` is (0,1,0),
+    // `input[type="text"]` at (0,1,1) and a bare `.ca-jec-title-input` is (0,1,0),
     // so the size above was written, shipped, and never applied — clicking the
     // title shrank it by a third and re-wrapped the row under the cursor. Pinned
     // as a rule about the SELECTOR, because the declaration was already correct.
-    expect(body(".journal-entry-context input.jec-title-input")).toContain(
-      "font-size: var(--am-text-xl)"
+    expect(body(".ca-journal-entry-context input.ca-jec-title-input")).toContain(
+      "font-size: var(--ca-text-xl)"
     );
-    expect(readCss()).not.toContain("\n.jec-title-input {");
+    expect(readCss()).not.toContain("\n.ca-jec-title-input {");
   });
 
   it("spans the period navigator across the full top row with centered date selector", () => {
     // The period navigator spans the full width of the tracker card's top row,
     // with navigation chevrons on both sides and an enlarged centered date trigger.
-    const nav = body(".journal-entry-context.jec-nav-only .jeh-nav.jeh-seg");
+    const nav = body(".ca-journal-entry-context.ca-jec-nav-only .ca-jeh-nav.ca-jeh-seg");
     expect(nav).toContain("width: 100%");
     expect(nav).toContain("justify-content: space-between");
 
-    const dateTrigger = body(".journal-entry-context.jec-nav-only .jeh-datenav-trigger");
-    expect(dateTrigger).toContain("font-size: var(--am-text-base)");
-    expect(dateTrigger).toContain("border-radius: var(--am-radius-pill)");
+    const dateTrigger = body(".ca-journal-entry-context.ca-jec-nav-only .ca-jeh-datenav-trigger");
+    expect(dateTrigger).toContain("font-size: var(--ca-text-base)");
+    expect(dateTrigger).toContain("border-radius: var(--ca-radius-pill)");
 
     // The redundant "Tracking:" header is removed
     expect(readCss()).not.toContain(".jth-label");
@@ -1196,18 +1196,18 @@ describe("the banner is one material, and the minimal one is quiet", () => {
   it("rules under the top strip, dividing it from the tracker cells", () => {
     // The top strip carries the bottom rule separating navigation from the grid
     const css = readCss();
-    const at = css.indexOf(".journal-tracker-section > .journal-entry-context,");
+    const at = css.indexOf(".ca-journal-tracker-section > .ca-journal-entry-context,");
     expect(at, "the two page-context strips are one rule").toBeGreaterThan(0);
     const strips = css.slice(at, css.indexOf("}", at));
-    expect(strips).toContain(".journal-tracker-section > .journal-note-context");
-    expect(strips).toContain("border-bottom: var(--am-rule)");
+    expect(strips).toContain(".ca-journal-tracker-section > .ca-journal-note-context");
+    expect(strips).toContain("border-bottom: var(--ca-rule)");
   });
 
   it("keeps slim banners clean without pseudo-element art texture", () => {
     const css = readCss();
-    expect(css).not.toContain(".journal-slim-banner::before");
-    expect(css).not.toContain("--am-head-figure");
-    for (const sel of [".journal-entry-banner", ".journal-study-banner"]) {
+    expect(css).not.toContain(".ca-journal-slim-banner::before");
+    expect(css).not.toContain("--ca-head-figure");
+    for (const sel of [".ca-journal-entry-banner", ".ca-journal-study-banner"]) {
       expect(css, sel).not.toContain(`${sel}::before {`);
     }
   });
@@ -1222,7 +1222,7 @@ describe("nothing picks a colour outside the theme (4.35.1)", () => {
   // which is the tell — nothing else in this stylesheet picks a colour without
   // going through a variable."
   //
-  // It missed `.almanac-settings-badge`, in the same file, carrying the same
+  // It missed `.ca-settings-badge`, in the same file, carrying the same
   // three literals it named. Nothing caught that for eight releases, because
   // the sweep was a person reading rules rather than a rule about rules. The
   // Settings section count rendered as a light chip on a dark theme until
@@ -1236,7 +1236,7 @@ describe("nothing picks a colour outside the theme (4.35.1)", () => {
 
   // Text drawn on a ground that is itself fixed, so it cannot follow the theme
   // either. Each one is paired with a colour this stylesheet pins:
-  //   the two chart values sit on `--am-act-*`, a fixed four-stop ramp;
+  //   the two chart values sit on `--ca-act-*`, a fixed four-stop ramp;
   //   the `#fff` sits on `rgba(255,255,255,0.12)`.
   // A pairing like that is the one honest reason to write a literal.
   const ALLOWED = new Set(["#173404", "#f2fbf4", "#fff"]);
@@ -1258,7 +1258,7 @@ describe("nothing picks a colour outside the theme (4.35.1)", () => {
   });
 
   it("has the settings badge on tokens, which is the rule that was missed", () => {
-    const rule = cssRule(".almanac-settings-badge");
+    const rule = cssRule(".ca-settings-badge");
     expect(rule).toContain("var(--background-secondary)");
     expect(rule).toContain("var(--background-modifier-border)");
     expect(rule).toContain("var(--text-normal)");
@@ -1271,18 +1271,18 @@ describe("a section head with two buttons groups them (4.35.1)", () => {
     // `space-between` is right for two children and wrong for three: with a
     // title and two buttons it gave equal gaps, floating "Presets" into the
     // middle of the row rather than beside the button it belongs with.
-    expect(cssRule(".almanac-section-head")).toContain("space-between");
+    expect(cssRule(".ca-section-head")).toContain("space-between");
     // `cssRule` is anchored, so this reads the bare rule and not the
-    // `.almanac-section-head-fold .almanac-section-title` override that
+    // `.ca-section-head-fold .ca-section-title` override that
     // contains it as a substring and states the opposite.
-    expect(cssRule(".almanac-section-title")).toContain("flex: 1 1 auto");
+    expect(cssRule(".ca-section-title")).toContain("flex: 1 1 auto");
   });
 
   it("leaves the fold variant alone, which already solved it its own way", () => {
-    // `.almanac-section-count` grows there instead; the fold's own override is
+    // `.ca-section-count` grows there instead; the fold's own override is
     // more specific, so the rule above cannot reach it.
     expect(
-      cssRule(".almanac-section-head-fold .almanac-section-title")
+      cssRule(".ca-section-head-fold .ca-section-title")
     ).toContain("flex: 0 0 auto");
   });
 
@@ -1299,14 +1299,14 @@ describe("a section head with two buttons groups them (4.35.1)", () => {
 
 describe("a card nested in a card does not repeat its edge (4.35.2)", () => {
   it("gives the inner card a seam, not a second boundary", () => {
-    // `.jjs-card` sits inside the section card, whose border is
+    // `.ca-jjs-card` sits inside the section card, whose border is
     // `--background-modifier-border`. Using the same ink drew one boundary
     // twice, 12px apart — the shape 4.13.5 §23 removed elsewhere. Milder here,
     // because the grounds differ and the inner is the quieter, which is what
-    // `.jjs-card`'s own note says makes the nesting deliberate; but the two
+    // `.ca-jjs-card`'s own note says makes the nesting deliberate; but the two
     // edges were still the same weight.
-    const rule = cssRule(".jjs-card");
-    expect(rule).toContain("var(--am-border-inner)");
+    const rule = cssRule(".ca-jjs-card");
+    expect(rule).toContain("var(--ca-border-inner)");
     expect(rule).not.toContain("var(--background-modifier-border)");
   });
 
@@ -1314,7 +1314,7 @@ describe("a card nested in a card does not repeat its edge (4.35.2)", () => {
     // ── WHAT THIS TEST USED TO REQUIRE, AND WHY IT IS REVERSED ───────────
     //
     // It required `color-mix(in srgb, var(--background-modifier-border) 55%,
-    // var(--am-surface-inset))` — a fraction of the step rather than a repeat of
+    // var(--ca-surface-inset))` — a fraction of the step rather than a repeat of
     // it, every term a variable so one definition served both themes. That was
     // the better idea and it **never once drew**: from 4.35.2 to 4.41.0 every
     // card reading it came back `#dadada`, which is `currentColor`.
@@ -1322,7 +1322,7 @@ describe("a card nested in a card does not repeat its edge (4.35.2)", () => {
     // The cause is in `tokens.test.ts`: a custom property's `var()`s resolve on
     // the element that declares it, and Obsidian's colours are on `body`. Moving
     // the mix to `body` in 4.40.1 was right and not enough, because it was
-    // reading `--am-surface-inset` — a `:root` alias, broken the same way. With
+    // reading `--ca-surface-inset` — a `:root` alias, broken the same way. With
     // the mix now possible in principle, it is still not used, and that is a
     // deliberate retreat: an adaptive value that has rendered as `currentColor`
     // in every build of its life is not adaptive.
@@ -1331,8 +1331,8 @@ describe("a card nested in a card does not repeat its edge (4.35.2)", () => {
     // outside it: 0.06 white over the card's #232323 is #303030, against the
     // #333333 edge of the section card it sits in.
     const css = readCss();
-    expect(css).not.toMatch(/--am-border-inner:\s*color-mix/);
-    const at = css.indexOf("--am-border-inner:");
+    expect(css).not.toMatch(/--ca-border-inner:\s*color-mix/);
+    const at = css.indexOf("--ca-border-inner:");
     expect(at).toBeGreaterThan(0);
     expect(css.slice(at, css.indexOf(";", at))).toMatch(/rgba\(255, 255, 255/);
   });
@@ -1343,7 +1343,7 @@ describe("a card nested in a card does not repeat its edge (4.35.2)", () => {
     // NOT ONE SIGN FLIP: a 6% white hair on a near-black card is a visible step,
     // 6% black on a near-white one is not.
     const light = cssRule("body.theme-light");
-    expect(light).toMatch(/--am-border-inner: rgba\(0, 0, 0, [\d.]+\)/);
+    expect(light).toMatch(/--ca-border-inner: rgba\(0, 0, 0, [\d.]+\)/);
   });
 });
 
@@ -1359,9 +1359,9 @@ describe("a button holding an open menu says so (4.35.3)", () => {
     // with the same declarations passes, and should: that is not drift. What
     // fails is the two saying different things, which is the thing worth
     // preventing. Mutation-checked both ways.
-    const rule = cssRule(".almanac-section-action.is-open");
+    const rule = cssRule(".ca-section-action.is-open");
     expect(rule).toContain("var(--interactive-accent)");
-    expect(cssRule(".almanac-section-action:hover")).toBe(rule);
+    expect(cssRule(".ca-section-action:hover")).toBe(rule);
   });
 
   it("sets the class and the aria state together", () => {

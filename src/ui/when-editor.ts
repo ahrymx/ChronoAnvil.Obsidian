@@ -47,13 +47,13 @@ export function whenEditor(
   dated: boolean,
   onChange: (value: WhenValue) => void
 ): HTMLElement {
-  const row = parent.createDiv({ cls: "journal-capture-when" });
+  const row = parent.createDiv({ cls: "ca-journal-capture-when" });
   const value: WhenValue = { ...initial };
   const emit = (): void => onChange({ ...value });
 
   if (dated) {
     const date = row.createEl("input", {
-      cls: "journal-capture-when-date",
+      cls: "ca-journal-capture-when-date",
       attr: { type: "date", "aria-label": "The day this happened" },
     });
     date.value = value.date ?? "";
@@ -64,7 +64,7 @@ export function whenEditor(
   }
 
   const time = row.createEl("input", {
-    cls: "journal-capture-when-time",
+    cls: "ca-journal-capture-when-time",
     attr: { type: "time", "aria-label": "The time this happened" },
   });
   time.value = value.time ?? "";
@@ -74,7 +74,7 @@ export function whenEditor(
   });
 
   const mins = row.createEl("input", {
-    cls: "journal-capture-when-mins",
+    cls: "ca-journal-capture-when-mins",
     attr: {
       type: "number",
       min: "0",

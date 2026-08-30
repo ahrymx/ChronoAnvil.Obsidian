@@ -23,7 +23,7 @@
 
 import { App, setIcon } from "obsidian";
 import { EditorModal } from "./editor-modal";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   addTag,
   normaliseTag,
@@ -53,7 +53,7 @@ export class TagsEditor extends EditorModal {
 
   constructor(
     app: App,
-    plugin: AlmanacPlugin,
+    plugin: ChronoAnvilPlugin,
     private readonly folder: string,
     tags: readonly string[],
     private readonly onSave: (tags: string[]) => Promise<void>
@@ -74,7 +74,7 @@ export class TagsEditor extends EditorModal {
 
   protected renderBody(): void {
     this.body.empty();
-    this.body.addClass("almanac-tags-editor");
+    this.body.addClass("ca-tags-editor");
     this.renderCurrent();
     this.renderAdd();
     this.renderUsed();
@@ -83,44 +83,44 @@ export class TagsEditor extends EditorModal {
   // ── this note's tags ────────────────────────────────────────────────────
 
   private renderCurrent(): void {
-    const wrap = this.body.createDiv({ cls: "almanac-tags-section" });
-    wrap.createDiv({ cls: "almanac-tags-heading", text: "On this note" });
+    const wrap = this.body.createDiv({ cls: "ca-tags-section" });
+    wrap.createDiv({ cls: "ca-tags-heading", text: "On this note" });
 
     if (this.draft.length === 0) {
       // An empty state rather than an empty box: the window is reached from a
       // section that says "Tags" and showing nothing under that heading reads
       // as broken rather than as empty.
       wrap.createDiv({
-        cls: "almanac-tags-empty",
+        cls: "ca-tags-empty",
         text: "No tags yet — add one below, or pick from what this folder uses.",
       });
       return;
     }
 
-    const list = wrap.createDiv({ cls: "almanac-tags-list" });
+    const list = wrap.createDiv({ cls: "ca-tags-list" });
     for (const tag of this.draft) {
       if (this.editing === tag) {
         this.renderRename(list, tag);
         continue;
       }
-      const row = list.createDiv({ cls: "almanac-tags-row" });
-      row.createSpan({ cls: "almanac-tags-name", text: `#${tag}` });
+      const row = list.createDiv({ cls: "ca-tags-row" });
+      row.createSpan({ cls: "ca-tags-name", text: `#${tag}` });
 
       const edit = row.createEl("button", {
-        cls: "journal-btn-ghost",
+        cls: "ca-journal-btn-ghost",
         attr: { type: "button", "aria-label": `Rename #${tag}` },
       });
-      setIcon(edit.createSpan({ cls: "journal-btn-icon" }), "pencil");
+      setIcon(edit.createSpan({ cls: "ca-journal-btn-icon" }), "pencil");
       edit.addEventListener("click", () => {
         this.editing = tag;
         this.renderBody();
       });
 
       const drop = row.createEl("button", {
-        cls: "journal-btn-ghost almanac-tags-remove",
+        cls: "ca-journal-btn-ghost ca-tags-remove",
         attr: { type: "button", "aria-label": `Remove #${tag}` },
       });
-      setIcon(drop.createSpan({ cls: "journal-btn-icon" }), "x");
+      setIcon(drop.createSpan({ cls: "ca-journal-btn-icon" }), "x");
       drop.addEventListener("click", () => {
         this.draft = removeTag(this.draft, tag);
         this.renderBody();
@@ -129,9 +129,9 @@ export class TagsEditor extends EditorModal {
   }
 
   private renderRename(list: HTMLElement, tag: string): void {
-    const row = list.createDiv({ cls: "almanac-tags-row is-editing" });
+    const row = list.createDiv({ cls: "ca-tags-row is-editing" });
     const input = row.createEl("input", {
-      cls: "almanac-tags-input",
+      cls: "ca-tags-input",
       attr: { type: "text", value: tag, "aria-label": `Rename #${tag}` },
     });
     const finish = (): void => {
@@ -169,22 +169,22 @@ export class TagsEditor extends EditorModal {
   // ── adding ──────────────────────────────────────────────────────────────
 
   private renderAdd(): void {
-    const wrap = this.body.createDiv({ cls: "almanac-tags-section" });
-    const row = wrap.createDiv({ cls: "almanac-tags-add" });
+    const wrap = this.body.createDiv({ cls: "ca-tags-section" });
+    const row = wrap.createDiv({ cls: "ca-tags-add" });
     const input = row.createEl("input", {
-      cls: "almanac-tags-input",
+      cls: "ca-tags-input",
       attr: {
         type: "text",
         placeholder: "New tag…",
         "aria-label": "New tag",
-        list: "almanac-tags-suggest",
+        list: "ca-tags-suggest",
       },
     });
     // A native `<datalist>` rather than a suggestion popover: it filters as
     // you type, it is keyboard-navigable for free, and it does not fight the
     // modal for focus the way a second floating layer inside a window does.
     const suggest = row.createEl("datalist");
-    suggest.id = "almanac-tags-suggest";
+    suggest.id = "ca-tags-suggest";
     for (const { tag } of this.used) suggest.createEl("option", { value: tag });
 
     const commit = (): void => {
@@ -217,7 +217,7 @@ export class TagsEditor extends EditorModal {
     input.value = this.pending;
 
     const btn = row.createEl("button", {
-      cls: "journal-btn",
+      cls: "ca-journal-btn",
       text: "Add",
       attr: { type: "button" },
     });
@@ -228,20 +228,20 @@ export class TagsEditor extends EditorModal {
 
   private renderUsed(): void {
     if (this.used.length === 0) return;
-    const wrap = this.body.createDiv({ cls: "almanac-tags-section" });
+    const wrap = this.body.createDiv({ cls: "ca-tags-section" });
     wrap.createDiv({
-      cls: "almanac-tags-heading",
+      cls: "ca-tags-heading",
       text: `Used in ${this.folder || "this vault"}`,
     });
-    const cloud = wrap.createDiv({ cls: "almanac-tags-used" });
+    const cloud = wrap.createDiv({ cls: "ca-tags-used" });
     for (const { tag, count } of this.used) {
       const has = this.draft.some((t) => t.toLowerCase() === tag.toLowerCase());
       const pill = cloud.createEl("button", {
-        cls: has ? "almanac-tags-pill is-on" : "almanac-tags-pill",
+        cls: has ? "ca-tags-pill is-on" : "ca-tags-pill",
         attr: { type: "button" },
       });
       pill.createSpan({ text: `#${tag}` });
-      pill.createSpan({ cls: "almanac-tags-count", text: String(count) });
+      pill.createSpan({ cls: "ca-tags-count", text: String(count) });
       // A pill TOGGLES, so the same control adds and removes and the list
       // doubles as a picture of what this note carries. One control, one
       // meaning: pressed means on this note.

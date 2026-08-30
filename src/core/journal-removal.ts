@@ -5,7 +5,7 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// Taking a journal out of Almanac, and deciding what happens to its folders.
+// Taking a journal out of ChronoAnvil, and deciding what happens to its folders.
 // 4.17 §2 and §3.
 //
 // WHY THIS LEFT `settings.ts`
@@ -29,7 +29,7 @@
 // button, because in its case there is nothing on disk to ask about.
 
 import { App, normalizePath, TAbstractFile, TFile, TFolder } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import type { JournalConfig } from "../journals/custom-journal";
 import { ROOT_INFRASTRUCTURE } from "./constants";
 import { ensureFolder } from "./util";
@@ -83,7 +83,7 @@ export function binPathFor(
 // Move a journal's folders into the bin. Returns what actually moved.
 //
 // A MOVE, NEVER A DELETE, and the wording everywhere this surfaces says so.
-// Almanac has never removed a reader's note and this is not where that starts:
+// ChronoAnvil has never removed a reader's note and this is not where that starts:
 // the bin is an ordinary folder in the vault, the reader empties it themselves,
 // and until they do the notes are all still there.
 //
@@ -132,7 +132,7 @@ export async function binJournalFolders(
 // where a bin goes, why it goes there, and that **a move is not a delete**:
 //
 //   *A MOVE, NEVER A DELETE, and the wording everywhere this surfaces says so.
-//   Almanac has never removed a reader's note and this is not where that
+//   ChronoAnvil has never removed a reader's note and this is not where that
 //   starts.*
 //
 // A `trashFile` on a reader's journal note is exactly where that starts. It was
@@ -171,7 +171,7 @@ export async function binAway(
     await app.fileManager.renameFile(item, target);
     return target;
   } catch (e) {
-    console.error("[Almanac] could not bin", item.path, e);
+    console.error("[ChronoAnvil] could not bin", item.path, e);
     return null;
   }
 }
@@ -204,7 +204,7 @@ export async function binTogether(
       await app.fileManager.renameFile(item, `${target}/${item.name}`);
       moved += 1;
     } catch (e) {
-      console.error("[Almanac] could not bin", item.path, e);
+      console.error("[ChronoAnvil] could not bin", item.path, e);
     }
   }
   return { target, moved };
@@ -236,7 +236,7 @@ export function journalFoldersOnDisk(app: App, cfg: JournalConfig): string[] {
 // and trackers to resolve, and the refusal has neither — its journal's folders
 // are gone, which is why it is allowed to offer the button in the first place.
 export async function removeJournal(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   index: number,
   how: OrphanResolution
 ): Promise<void> {

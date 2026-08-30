@@ -36,7 +36,7 @@
 // site in year-view.ts, which explains why at length.
 
 import { MarkdownPostProcessorContext, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { readIndex } from "../diary/diary-index";
 import { emptyLine } from "../ui/empty";
 import { quarterStats } from "./quarter-stats";
@@ -69,11 +69,11 @@ interface RecapData {
 }
 
 export function buildPeriodRecap(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   rest: string
 ): HTMLElement {
-  const root = createDiv({ cls: "journal-period-recap" });
+  const root = createDiv({ cls: "ca-journal-period-recap" });
   const grain = parseRecapGrain(rest);
 
   if (!grain) {
@@ -84,18 +84,18 @@ export function buildPeriodRecap(
     emptyLine(
       root,
       "period-recap needs a period \u2014 write `period-recap:year` or `period-recap:quarter`.",
-      "jq-empty"
+      "ca-jq-empty"
     );
     return root;
   }
 
-  root.createDiv({ cls: "jq-loading", text: "Reading your entries\u2026" });
+  root.createDiv({ cls: "ca-jq-loading", text: "Reading your entries\u2026" });
 
   void readIndex(plugin).then((entries) => {
     const data = recapData(plugin, ctx, grain, entries);
     root.empty();
     if (!data) {
-      emptyLine(root, "This note isn't scoped to a period yet.", "jq-empty");
+      emptyLine(root, "This note isn't scoped to a period yet.", "ca-jq-empty");
       return;
     }
     renderRecap(root, data);
@@ -110,7 +110,7 @@ export function buildPeriodRecap(
 // `selectedYear` and `selectedQuarter` — rather than re-read here, so a recap
 // and the banner above it on one note cannot name different periods.
 function recapData(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   grain: RecapGrain,
   entries: Parameters<typeof yearStats>[1]
@@ -151,7 +151,7 @@ function renderRecap(root: HTMLElement, data: RecapData): void {
     emptyLine(
       root,
       "Nothing to roll up yet \u2014 this fills in from the goals, highlights and challenges in your monthly entries.",
-      "jq-empty"
+      "ca-jq-empty"
     );
   }
 }
@@ -180,7 +180,7 @@ function renderRecap(root: HTMLElement, data: RecapData): void {
 // never sees it either. A notice that cannot retire itself is an advert.
 export function renderRecapMoved(
   parent: HTMLElement,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   data: RecapData
 ): void {
@@ -199,13 +199,13 @@ export function renderRecapMoved(
   void plugin.app.vault.cachedRead(file).then((text) => {
     if (/^period-recap\b/m.test(text)) return;
 
-    const row = parent.createDiv({ cls: "jq-recap-moved" });
+    const row = parent.createDiv({ cls: "ca-jq-recap-moved" });
     row.createSpan({
-      cls: "jq-recap-moved-text",
+      cls: "ca-jq-recap-moved-text",
       text: "Goals, highlights and challenges moved into a Recap section you can fold, move or remove.",
     });
     const btn = row.createEl("button", {
-      cls: "jq-recap-moved-btn",
+      cls: "ca-jq-recap-moved-btn",
       text: "Add it",
       attr: { type: "button" },
     });

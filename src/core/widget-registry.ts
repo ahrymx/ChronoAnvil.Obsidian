@@ -5,7 +5,7 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// Every directive Almanac dispatches, named — 4.12 §B.
+// Every directive ChronoAnvil dispatches, named — 4.12 §B.
 //
 // WHY THIS EXISTS. The 48 valid directive keywords existed only as `case`
 // labels in one `switch` (`ui/widgets/index.ts::buildFromSpec`). Nothing
@@ -244,7 +244,7 @@ export interface WidgetSpec {
 // lives and now applies it to every keyword instead of three.
 //
 // SECTIONS ARE STILL ONE PER PAGE, which is the other half of the rule and is
-// unchanged: a catalogue section persists content into a `<!--almanac:key-->`
+// unchanged: a catalogue section persists content into a `<!--chronoanvil:key-->`
 // region keyed by name, so `addableFlatSections` withholds one already present
 // and the picker stops offering it. A widget renders; a section remembers. That
 // difference is what decides which of the two may be added twice.
@@ -259,7 +259,7 @@ export type WidgetExclusionReason =
   // rather than as a block. A page-level `slider:Mood` would write to the
   // dashboard's own frontmatter, which is not where a reading lives.
   | "inline"
-  // Owns a keyed region of the note BODY (`<!--almanac:<key>-->`). Two of one
+  // Owns a keyed region of the note BODY (`<!--chronoanvil:<key>-->`). Two of one
   // kind on one page share the region and overwrite each other — which is
   // `addableSections`' own argument for withholding a section already present,
   // one level down.
@@ -267,7 +267,7 @@ export type WidgetExclusionReason =
   // What a page IS rather than something on it. A second banner is a second
   // answer to "which note is this".
   //
-  // ── AND AS OF 4.20 EVERY ALMANAC PAGE HAS ONE, IN TWO FORMATS ───────
+  // ── AND AS OF 4.20 EVERY CHRONOANVIL PAGE HAS ONE, IN TWO FORMATS ───────
   //
   // A banner is the file's NAME, its NAVIGATION and the CONTROL that edits the
   // page — those three, and nothing else. That last clause is what 4.20 settled
@@ -278,14 +278,14 @@ export type WidgetExclusionReason =
   //   period overviews. Composed from `title:` and `links:` in one fence, drawn
   //   loud: an accent wash and a hatch across the whole block, because these are
   //   pages you land on and a page you land on announces itself.
-  //   `.journal-page-banner`.
+  //   `.ca-journal-page-banner`.
   //
   //   ENTRY BANNER — diary entries and journal notes. Composed from
   //   `entry-header` or `journal-header`, each of which already draws an
   //   editable name, and drawn quiet: a tight card, no wash, no hatch, a
   //   small-caps context line above the name. These are pages you WRITE in, and
   //   a note you are writing in does not announce itself.
-  //   `.journal-entry-banner` and `.journal-study-banner`.
+  //   `.ca-journal-entry-banner` and `.ca-journal-study-banner`.
   //
   // TWO FORMATS AND NOT THREE, which is why the two classes in the second
   // paragraph are one entry: they take the same padding, the same name size and
@@ -781,7 +781,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "tasks-table": {
     label: "Open tasks",
     glyph: "⏳",
-    blurb: "Every still-open Almanac task from the notes under a folder, grouped by note.",
+    blurb: "Every still-open ChronoAnvil task from the notes under a folder, grouped by note.",
     arg: {
       kind: "folder",
       label: "the folder to collect tasks from",

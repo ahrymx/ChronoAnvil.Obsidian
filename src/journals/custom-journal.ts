@@ -582,7 +582,7 @@ export function composeTemplate(
   const parentName = ctx.type.name;
 
   // Frontmatter abuts what follows it with no blank line, matching every
-  // shipped asset. That matters for exactly one line: `almanac:spacer` is
+  // shipped asset. That matters for exactly one line: `chronoanvil:spacer` is
   // documented as sitting on line 0 of the body so a click at the top of the
   // note lands on it rather than inside the banner fence, which would render
   // the fence as raw source.

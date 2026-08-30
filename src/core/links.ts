@@ -16,7 +16,7 @@
 // `nav` widget right below it on most pages, and paths read live from
 // settings (or, for `up`, from the note's own location in the vault).
 //
-//   ```almanac
+//   ```chronoanvil
 //   links:home,week,month,quarter,year,all
 //   ```
 //
@@ -27,7 +27,7 @@
 // prev/next neighbours.
 
 import { Menu, App, MarkdownPostProcessorContext, setIcon, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { openCapture } from "../diary/capture";
 import {
   resolveOverviewPath,
@@ -76,7 +76,7 @@ function resolveUp(app: App, file: TFile): LinkTarget {
 // rather than draw it — `nothing dead is drawn`, which for navigation means a
 // tile that goes nowhere is not a tile.
 export function resolveTarget(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   id: string
 ): LinkTarget | null {
@@ -185,8 +185,8 @@ function renderTarget(
   sourcePath: string
 ): void {
   if (target.action) {
-    const a = wrap.createEl("a", { cls: "jn-pill", href: "#" });
-    setIcon(a.createSpan({ cls: "jn-icon" }), target.icon);
+    const a = wrap.createEl("a", { cls: "ca-jn-pill", href: "#" });
+    setIcon(a.createSpan({ cls: "ca-jn-icon" }), target.icon);
     a.createSpan({ text: target.label });
     a.addEventListener("click", (evt) => {
       evt.preventDefault();
@@ -199,8 +199,8 @@ function renderTarget(
     // Destination doesn't exist yet (e.g. "up" before the parent index
     // note has been created) — same muted, non-clickable treatment the
     // per-entry navigator uses for "no neighbour" instead of a dead link.
-    const muted = wrap.createSpan({ cls: "jn-flat jn-muted" });
-    setIcon(muted.createSpan({ cls: "jn-icon" }), target.icon);
+    const muted = wrap.createSpan({ cls: "ca-jn-flat ca-jn-muted" });
+    setIcon(muted.createSpan({ cls: "ca-jn-icon" }), target.icon);
     muted.createSpan({ text: target.label });
     return;
   }
@@ -219,19 +219,19 @@ function renderTarget(
   // could not reach the quarter, the quarter could not reach the week, and a
   // monthly review had no route to the quarter it feeds.
   if (targetFile.path === sourcePath) {
-    const here = wrap.createSpan({ cls: "jn-flat jn-here", attr: { "aria-current": "page" } });
-    setIcon(here.createSpan({ cls: "jn-icon" }), target.icon);
+    const here = wrap.createSpan({ cls: "ca-jn-flat ca-jn-here", attr: { "aria-current": "page" } });
+    setIcon(here.createSpan({ cls: "ca-jn-icon" }), target.icon);
     here.createSpan({ text: target.label });
     return;
   }
 
   const href = noExt(targetFile.path);
   const a = wrap.createEl("a", {
-    cls: "internal-link jn-pill",
+    cls: "internal-link ca-jn-pill",
     href,
     attr: { "data-href": href },
   });
-  setIcon(a.createSpan({ cls: "jn-icon" }), target.icon);
+  setIcon(a.createSpan({ cls: "ca-jn-icon" }), target.icon);
   a.createSpan({ text: target.label });
   a.addEventListener("click", (evt) => {
     evt.preventDefault();
@@ -240,7 +240,7 @@ function renderTarget(
   a.addEventListener("mouseover", (evt) => {
     app.workspace.trigger("hover-link", {
       event: evt,
-      source: "almanac-links",
+      source: "ca-links",
       hoverParent: wrap,
       targetEl: a,
       linktext: href,
@@ -252,10 +252,10 @@ function renderTarget(
 // links:<id>[,<id>...][#<area>] — ids: home | week | month | quarter | year |
 // all | search | base | up
 //
-// With no `#area`, the pills render bare (`.journal-links`) — the inline form
+// With no `#area`, the pills render bare (`.ca-journal-links`) — the inline form
 // the overview header bars anchor, and the shape callers appended straight into
 // a header group. With `#diary` (or `#journals`), the pills are wrapped in a
-// contained bar capped by that area's titlebar (the same `am-titlebar` the home
+// contained bar capped by that area's titlebar (the same `ca-titlebar` the home
 // page uses on its Diary/Journals cards), forming one standalone card — the
 // block a diary entry carries up under the spacer, distinct from the entry card
 // below it.
@@ -282,7 +282,7 @@ const SCOPES = ["week", "month", "quarter", "year", "all"] as const;
 // four destinations — and the scope menu is the one thing that row had which
 // the bar had not. Moving a control is not a reason to re-derive what it holds.
 export function reviewScopes(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   sourcePath: string
 ): { targets: LinkTarget[]; here: LinkTarget | undefined } {
@@ -299,7 +299,7 @@ export function reviewScopes(
 // where you *are*. Splitting them across the row says which is which without a
 // separator, and matches `up`, the row's other trailing control.
 function renderScopes(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   wrap: HTMLElement,
   file: TFile,
   sourcePath: string
@@ -307,13 +307,13 @@ function renderScopes(
   const { targets: resolved, here } = reviewScopes(plugin, file, sourcePath);
 
   const btn = wrap.createEl("a", {
-    cls: "jn-pill jn-scopes" + (here ? " is-here" : ""),
+    cls: "ca-jn-pill ca-jn-scopes" + (here ? " is-here" : ""),
     href: "#",
     attr: { "aria-label": "Choose a review scope" },
   });
-  setIcon(btn.createSpan({ cls: "jn-icon" }), here?.icon ?? "calendar");
+  setIcon(btn.createSpan({ cls: "ca-jn-icon" }), here?.icon ?? "calendar");
   btn.createSpan({ text: here?.label ?? "Overviews" });
-  setIcon(btn.createSpan({ cls: "jn-caret" }), "chevron-down");
+  setIcon(btn.createSpan({ cls: "ca-jn-caret" }), "chevron-down");
 
   btn.addEventListener("click", (evt) => {
     evt.preventDefault();
@@ -344,14 +344,14 @@ function renderScopes(
 export type VaultArea = "diary" | "journals";
 
 export function buildLinks(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   ids: string[],
   area?: VaultArea
 ): HTMLElement {
   const app = plugin.app;
 
-  const nav = createDiv({ cls: "journal-nav journal-links" });
+  const nav = createDiv({ cls: "ca-journal-nav ca-journal-links" });
 
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (!(file instanceof TFile)) return area ? wrapInCard(nav, area) : nav;
@@ -359,7 +359,7 @@ export function buildLinks(
   // "up" is a step out of the current container, not a fixed jump like Home —
   // it reads better anchored to the row's right edge (the direction "out"
   // points, and where a breadcrumb's own "back up a level" implication sits)
-  // than shoulder-to-shoulder with Home on the left. Reuses `.jn-right`
+  // than shoulder-to-shoulder with Home on the left. Reuses `.ca-jn-right`
   // (margin-left: auto), the same right-anchoring the per-entry navigator
   // already uses for its own trailing control.
   let right: HTMLElement | null = null;
@@ -367,14 +367,14 @@ export function buildLinks(
     const id = raw.trim();
     if (!id) continue;
     if (id === "scopes") {
-      right ??= nav.createSpan({ cls: "jn-right" });
+      right ??= nav.createSpan({ cls: "ca-jn-right" });
       renderScopes(plugin, right, file, ctx.sourcePath);
       continue;
     }
     const target = resolveTarget(plugin, file, id);
     if (!target) continue;
     if (id === "up") {
-      right ??= nav.createSpan({ cls: "jn-right" });
+      right ??= nav.createSpan({ cls: "ca-jn-right" });
       renderTarget(app, right, target, ctx.sourcePath);
     } else {
       renderTarget(app, nav, target, ctx.sourcePath);
@@ -385,8 +385,8 @@ export function buildLinks(
 }
 
 // Wrap a bare links row in a card, so it reads as one contained object rather
-// than a row of pills floating between two rules. Adds `.journal-links-bar` so
-// the pills drop their own `.journal-nav` border strip.
+// than a row of pills floating between two rules. Adds `.ca-journal-links-bar` so
+// the pills drop their own `.ca-journal-nav` border strip.
 //
 // THE TITLEBAR IT WAS BUILT AROUND IS GONE (4.8.1). The card was capped by a
 // tinted strip naming the vault root — `DIARY … Daily entry` — and above it the
@@ -399,8 +399,8 @@ export function buildLinks(
 // unused parameter is a promise that this function still knows something about
 // the note, and it does not.
 function wrapInCard(nav: HTMLElement, area: VaultArea): HTMLElement {
-  const card = createDiv({ cls: `journal-links-card journal-links-card-${area}` });
-  nav.addClass("journal-links-bar");
+  const card = createDiv({ cls: `ca-journal-links-card ca-journal-links-card-${area}` });
+  nav.addClass("ca-journal-links-bar");
   card.appendChild(nav);
   return card;
 }
@@ -438,18 +438,18 @@ const DIARY_LINK_IDS = ["week", "month", "quarter", "year", "all", "search"];
 // the single call site keeps one statement of what the row is, instead of a
 // constant saying one thing and the only caller saying another.
 //
-// Rendered bare with the `.jdh-nav` class so diary-header.ts can place it in the
+// Rendered bare with the `.ca-jdh-nav` class so diary-header.ts can place it in the
 // strip; it reuses the same pill/hover wiring as every other nav row
 // (renderTarget) rather than inventing a parallel look.
 const BANNER_LINK_IDS = ["search"];
 
 export function buildBannerLinks(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   ids?: string[]
 ): HTMLElement {
   const app = plugin.app;
-  const wrap = createDiv({ cls: "journal-nav journal-links jdh-nav" });
+  const wrap = createDiv({ cls: "ca-journal-nav ca-journal-links ca-jdh-nav" });
 
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (!(file instanceof TFile)) return wrap;
@@ -467,12 +467,12 @@ export function buildBannerLinks(
 }
 
 export function buildDiaryLinks(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   ids?: string[]
 ): HTMLElement {
   const app = plugin.app;
-  const wrap = createDiv({ cls: "journal-nav journal-links journal-diary-links" });
+  const wrap = createDiv({ cls: "ca-journal-nav ca-journal-links ca-journal-diary-links" });
 
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (!(file instanceof TFile)) return wrap;

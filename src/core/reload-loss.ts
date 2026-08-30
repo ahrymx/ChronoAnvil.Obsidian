@@ -54,7 +54,7 @@ export function bodyLines(text: string): string[] {
   return lines.slice(frontmatterEnd(lines) + 1);
 }
 
-// The `# almanac:trackers` block's contents, wherever in the body it sits.
+// The `# chronoanvil:trackers` block's contents, wherever in the body it sits.
 //
 // LOCATED BY ITS MARKERS rather than by fence position, for the reason
 // `parseEntry` locates regions by theirs: the block is inside the tracker fence
@@ -76,11 +76,11 @@ export function trackerBlockLines(text: string): string[] {
 
 // Which fence openers this walk steps over.
 //
-// IT WAS `line === "```almanac"` AND THAT WAS A BUG WAITING FOR A SECOND
-// SURFACE (4.33). Diary entries only ever carry the bare `almanac` fence, so the
+// IT WAS `line === "```chronoanvil"` AND THAT WAS A BUG WAITING FOR A SECOND
+// SURFACE (4.33). Diary entries only ever carry the bare `chronoanvil` fence, so the
 // equality was true there and the walk was correct. A journal INDEX note carries
-// `` ```almanac-journal-charts `` (JOURNAL_CHARTS_FENCE) and, on the diary
-// dashboards, `` ```almanac-charts `` — neither of which is that string. The
+// `` ```chronoanvil-journal-charts `` (JOURNAL_CHARTS_FENCE) and, on the diary
+// dashboards, `` ```chronoanvil-charts `` — neither of which is that string. The
 // walk therefore never entered fence mode and collected every `jchart:` spec as
 // though it were the reader's prose.
 //
@@ -94,7 +94,11 @@ export function trackerBlockLines(text: string): string[] {
 // Spelled as one regex rather than a set membership test because the closing
 // fence is always a bare ``` and pairing an opener kind with a closer would be
 // state this walk does not otherwise keep.
-const FENCE_OPEN = /^```almanac(-charts|-journal-charts)?$/;
+// Legacy `almanac` spellings are matched too: this module decides what a
+// reload would LOSE, and a fence it fails to recognise reads as ordinary
+// prose worth preserving — the one misjudgement here that costs a reader
+// their content. Kept in step with notestore.ts and widgets/index.ts.
+const FENCE_OPEN = /^```(?:chronoanvil|almanac)(-charts|-journal-charts)?$/;
 
 // Body lines that sit outside every fence and every region, trimmed, blanks
 // dropped — the composer's own structural furniture on a composed template, and
@@ -122,7 +126,7 @@ export function looseLines(text: string): string[] {
       fence = true;
       continue;
     }
-    if (/^<!--almanac:[A-Za-z0-9_-]+$/.test(line)) {
+    if (/^<!--(?:chronoanvil|almanac):[A-Za-z0-9_-]+$/.test(line)) {
       region = true;
       continue;
     }
@@ -131,7 +135,7 @@ export function looseLines(text: string): string[] {
   return out;
 }
 
-// The mirror of `looseLines`: everything INSIDE an almanac fence, trimmed,
+// The mirror of `looseLines`: everything INSIDE a chronoanvil fence, trimmed,
 // blanks and the fence markers dropped.
 //
 // WHY THE JOURNALS NEED A WALK THE DIARY NEVER DID. An entry keeps its content
@@ -140,7 +144,7 @@ export function looseLines(text: string): string[] {
 // journal note's fences hold content the reader authored: `jchart:` specs
 // written by the chart editor's Add button, and `attach:` shelves named in the
 // resources section. Neither is a region, so check 1 cannot see them; and
-// `parseSections` cannot either, because `almanac-journal-charts` is an OPAQUE
+// `parseSections` cannot either, because `chronoanvil-journal-charts` is an OPAQUE
 // fence kind and `ownerOf` attributes it to `charts` whatever is inside it —
 // which is how a plan can report "Charts — unchanged" over a fence about to be
 // rewritten.
@@ -239,7 +243,7 @@ export function reloadLoss(
   // not a piece of structure the composer itself emits.
   //
   // THE STRUCTURE IS GATHERED FROM `composed`, NOT LISTED HERE. It is `---` and
-  // `` `almanac:spacer` `` on an entry, and the whole prose skeleton on a
+  // `` `chronoanvil:spacer` `` on an entry, and the whole prose skeleton on a
   // journal leaf. A list written into this file would be a second copy of a
   // decision the composers make, and it would go wrong silently — reporting the
   // reader's own page as full of prose — the first time one of them emitted

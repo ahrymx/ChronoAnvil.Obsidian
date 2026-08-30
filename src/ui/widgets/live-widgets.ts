@@ -20,22 +20,22 @@
 // now be extracted one at a time without dragging the class along.
 //
 // They take `plugin` rather than a host interface because that is all they
-// need. AlmanacPlugin extends Obsidian's Plugin, so `plugin.app` covers the
+// need. ChronoAnvilPlugin extends Obsidian's Plugin, so `plugin.app` covers the
 // vault access; nothing here reads or writes a widget value.
 
 import { MarkdownPostProcessorContext, normalizePath } from "obsidian";
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import { folderPrefix } from "../../core/util";
 import { LiveWidget } from "../livewidget";
 
 export function liveScopedWidget(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   scopeFolder: string | string[],
   build: () => HTMLElement,
   onCleanup?: () => void
 ): HTMLElement {
-  const host = createDiv({ cls: "journal-live-widget" });
+  const host = createDiv({ cls: "ca-journal-live-widget" });
   const folders = Array.isArray(scopeFolder) ? scopeFolder : [scopeFolder];
   // `folderPrefix`, NOT `normalizePath(f) + "/"` (4.44.0). A widget scoped to
   // the vault root watched the prefix `"//"` and so never refreshed for any
@@ -86,12 +86,12 @@ export function liveScopedWidget(
 
 
 export function liveFileWidget(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   watchPath: string,
   build: () => HTMLElement
 ): HTMLElement {
-  const host = createDiv({ cls: "journal-live-widget" });
+  const host = createDiv({ cls: "ca-journal-live-widget" });
   const watched = normalizePath(watchPath);
   ctx.addChild(
     new LiveWidget(plugin.app, host, {
@@ -104,11 +104,11 @@ export function liveFileWidget(
 
 
 export function liveFrontmatterWidget(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   build: () => HTMLElement
 ): HTMLElement {
-  const host = createDiv({ cls: "journal-live-widget" });
+  const host = createDiv({ cls: "ca-journal-live-widget" });
   ctx.addChild(
     new LiveWidget(plugin.app, host, {
       build,
@@ -120,7 +120,7 @@ export function liveFrontmatterWidget(
 
 
 export function liveDiaryWidget(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   build: () => HTMLElement,
   alsoHost = false
@@ -134,7 +134,7 @@ export function liveDiaryWidget(
   const prefixes = Array.from(
     new Set([paths.diaryRoot, paths.diaryDaily, paths.diaryMonthly])
   ).map((f) => normalizePath(f) + "/");
-  const host = createDiv({ cls: "journal-live-widget" });
+  const host = createDiv({ cls: "ca-journal-live-widget" });
   ctx.addChild(
     new LiveWidget(plugin.app, host, {
       build,

@@ -55,10 +55,10 @@ const CONTROLS = [
   ".journal-sleep-field input",
   ".journal-btn-quiet",
   ".journal-icon-btn",
-  ".almanac-section-action",
-  ".almanac-list-pill",
-  ".almanac-kind-chip",
-  ".almanac-picker-row",
+  ".ca-section-action",
+  ".ca-list-pill",
+  ".ca-kind-chip",
+  ".ca-picker-row",
   ".jn-pill",
   ".jc-today-btn",
   ".journal-btn-subtle",
@@ -70,21 +70,21 @@ const CONTROLS = [
   ".jtt-pill",
   ".jt-tag-pill",
   ".jer-pill",
-  ".almanac-tpl-toggle",
-  ".almanac-tpl-tab",
+  ".ca-tpl-toggle",
+  ".ca-tpl-tab",
   ".jsh-crumb",
   ".jca-action",
 ];
 
-// The scale, as defined in 00-tokens.css. `--am-space-N` is 2N px.
+// The scale, as defined in 00-tokens.css. `--ca-space-N` is 2N px.
 const SCALE = new Map([
-  [2, "var(--am-space-1)"],
-  [4, "var(--am-space-2)"],
-  [6, "var(--am-space-3)"],
-  [8, "var(--am-space-4)"],
-  [10, "var(--am-space-5)"],
-  [12, "var(--am-space-6)"],
-  [14, "var(--am-space-7)"],
+  [2, "var(--ca-space-1)"],
+  [4, "var(--ca-space-2)"],
+  [6, "var(--ca-space-3)"],
+  [8, "var(--ca-space-4)"],
+  [10, "var(--ca-space-5)"],
+  [12, "var(--ca-space-6)"],
+  [14, "var(--ca-space-7)"],
 ]);
 
 // ODD VALUES ROUND UP, NEVER DOWN. The scale is even and 110 uses in this sheet
@@ -161,7 +161,7 @@ for (const file of globSync("styles/*.css").sort()) {
 const movedRows = [];
 for (const a of audit) {
   const fromPx = (a.from.match(/\d+px/g) ?? []).map(Number.parseFloat);
-  const toTokens = a.to.match(/--am-space-(\d)/g) ?? [];
+  const toTokens = a.to.match(/--ca-space-(\d)/g) ?? [];
   const toPx = toTokens.map((t) => Number(t.slice(-1)) * 2);
   const literalsKept = (a.to.match(/\d+px/g) ?? []).map(Number.parseFloat);
   const before = fromPx.join(",");

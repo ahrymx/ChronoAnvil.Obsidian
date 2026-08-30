@@ -377,27 +377,27 @@ describe("a page can be made without typing one", () => {
 
   it("rewrites one fence and re-emits every other as it read it", () => {
     const lines = [
-      "```almanac",
+      "```chronoanvil",
       "row",
       "diary:3",
       "cell",
       "tasks-table",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "recall",
       "```",
     ];
     const next = splitPageIn(lines, 0);
     expect(next).toEqual([
-      "```almanac",
+      "```chronoanvil",
       "row",
       "diary:3",
       "tab",
       "tasks-table",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "recall",
       "```",
     ]);

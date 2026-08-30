@@ -32,7 +32,7 @@ const one = (id: string, line: string): FlatSection => ({
   blurb: "",
   icon: "•",
   locked: false,
-  render: () => ({ fence: "almanac", lines: [line] }),
+  render: () => ({ fence: "chronoanvil", lines: [line] }),
   locate: (text) => text.split("\n").reduce(
     (at, l, i, all) =>
       at >= 0
@@ -48,7 +48,7 @@ const one = (id: string, line: string): FlatSection => ({
 // guess rather than a fact.
 const two = (id: string, header: string, line: string): FlatSection => ({
   ...one(id, line),
-  render: () => ({ fence: "almanac", lines: [header, line] }),
+  render: () => ({ fence: "chronoanvil", lines: [header, line] }),
 });
 
 const CAT: FlatSection[] = [
@@ -69,8 +69,8 @@ const CAT: FlatSection[] = [
 // The cap's own behaviour is asserted at the bottom of this file, on fences
 // written before it existed.
 const PAGE = [
-  "`almanac:spacer`",
-  "```almanac",
+  "`chronoanvil:spacer`",
+  "```chronoanvil",
   "row",
   "diary:3",
   "cell",
@@ -78,7 +78,7 @@ const PAGE = [
   "journals",
   "```",
   "",
-  "```almanac",
+  "```chronoanvil",
   "header:⏳ Open tasks",
   "tasks-table:,period",
   "```",
@@ -117,8 +117,8 @@ describe("what the editor is shown", () => {
 
   it("refuses a frame: section fence as a column, and a bare header: too", () => {
     const framed = PAGE.replace(
-      "```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```",
-      "```almanac\nframe: section\ntasks-table:,period\n```"
+      "```chronoanvil\nheader:⏳ Open tasks\ntasks-table:,period\n```",
+      "```chronoanvil\nframe: section\ntasks-table:,period\n```"
     );
     expect(flatBlocks(framed, CAT)[1].column).toEqual([]);
     const bare = PAGE.replace("header:⏳ Open tasks", "header:");
@@ -130,8 +130,8 @@ describe("what the editor is shown", () => {
     // holding `title` separately and by name, so the model says it here rather
     // than letting the editor offer a join the write declines.
     const headed = PAGE.replace(
-      "```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```",
-      "```almanac\ntitle\n```"
+      "```chronoanvil\nheader:⏳ Open tasks\ntasks-table:,period\n```",
+      "```chronoanvil\ntitle\n```"
     );
     const head = flatBlocks(headed, [...CAT, one("title", "title")]).find((b) =>
       b.ids.includes("title")
@@ -163,7 +163,7 @@ describe("taking a section out of a row", () => {
 
   it("leaves everything it did not move exactly as it read it", () => {
     expect(out).toContain("header:⏳ Open tasks");
-    expect(out!.startsWith("`almanac:spacer`")).toBe(true);
+    expect(out!.startsWith("`chronoanvil:spacer`")).toBe(true);
   });
 });
 
@@ -193,8 +193,8 @@ describe("putting a widget into a group", () => {
   // So the fixture is now a widget with no title of its own — which is what a
   // column is — and the titled case is asserted one describe down as a refusal.
   const OWN = PAGE.replace(
-    "```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```",
-    "```almanac\nevents\n```"
+    "```chronoanvil\nheader:⏳ Open tasks\ntasks-table:,period\n```",
+    "```chronoanvil\nevents\n```"
   );
   const out = regroupFlatNote(OWN, CAT, [
     ["diary", "launcher", "journals", "events"],
@@ -217,7 +217,7 @@ describe("putting a widget into a group", () => {
   });
 
   it("leaves one block where there were two", () => {
-    expect(out!.split("\n").filter((l) => l.startsWith("```almanac"))).toHaveLength(1);
+    expect(out!.split("\n").filter((l) => l.startsWith("```chronoanvil"))).toHaveLength(1);
   });
 });
 
@@ -230,8 +230,8 @@ describe("a section that titles itself is not a column", () => {
 
   it("declines a frame: section fence for the same reason", () => {
     const framed = PAGE.replace(
-      "```almanac\nheader:⏳ Open tasks\ntasks-table:,period\n```",
-      "```almanac\nframe: section\ntasks-table:,period\n```"
+      "```chronoanvil\nheader:⏳ Open tasks\ntasks-table:,period\n```",
+      "```chronoanvil\nframe: section\ntasks-table:,period\n```"
     );
     expect(
       regroupFlatNote(framed, CAT, [["diary", "launcher", "journals", "tasks"]])
@@ -253,12 +253,12 @@ describe("making a row out of two blocks that were not one", () => {
   // directive with no `row` line and the page stacked them. The suite missed it
   // because every join case above starts from a fence that already had both.
   const FLAT = [
-    "`almanac:spacer`",
-    "```almanac",
+    "`chronoanvil:spacer`",
+    "```chronoanvil",
     "diary:3",
     "```",
     "",
-    "```almanac",
+    "```chronoanvil",
     "launcher",
     "```",
     "",
@@ -283,7 +283,7 @@ describe("making a row out of two blocks that were not one", () => {
   });
 
   it("leaves one block where there were two", () => {
-    expect(out!.split("\n").filter((l) => l.startsWith("```almanac"))).toHaveLength(1);
+    expect(out!.split("\n").filter((l) => l.startsWith("```chronoanvil"))).toHaveLength(1);
   });
 });
 
@@ -360,12 +360,12 @@ describe("the window over it", () => {
     // "move this up" next to "remove this" is one slip from being expensive —
     // so a third mover belongs in the same column and not in the actions row.
     const out = editor.indexOf('"aria-label": "Take out of the group"');
-    const arrows = editor.indexOf('cls: "almanac-tpl-arrow"');
+    const arrows = editor.indexOf('cls: "ca-tpl-arrow"');
     expect(arrows).toBeGreaterThan(-1);
     // Drawn after the two chevrons, so it is under them and not over them.
     expect(arrows).toBeLessThan(out);
     expect(editor.slice(out - 200, out)).toContain(
-      'cls: "almanac-tpl-arrow almanac-tpl-leave"'
+      'cls: "ca-tpl-arrow ca-tpl-leave"'
     );
     // And it is no longer one of the pills on the actions line.
     expect(editor).not.toContain('text: "Take out of the group"');
@@ -376,8 +376,8 @@ describe("the window over it", () => {
     // not, so exactly one of the two icons is ever drawn on a row. Putting the
     // opposites anywhere but the same place would make a reader hunt for the
     // mirror of a control they had just used.
-    const join = editor.indexOf('cls: "almanac-tpl-arrow almanac-tpl-join"');
-    const leave = editor.indexOf('cls: "almanac-tpl-arrow almanac-tpl-leave"');
+    const join = editor.indexOf('cls: "ca-tpl-arrow ca-tpl-join"');
+    const leave = editor.indexOf('cls: "ca-tpl-arrow ca-tpl-leave"');
     expect(join).toBeGreaterThan(-1);
     expect(leave).toBeGreaterThan(-1);
     expect(editor).toContain('setIcon(make, "link")');
@@ -534,16 +534,16 @@ describe("two fences claiming one section", () => {
   ];
 
   const TWICE = [
-    "`almanac:spacer`",
-    "```almanac",
+    "`chronoanvil:spacer`",
+    "```chronoanvil",
     "diary:3",
     "```",
     "",
-    "```almanac",
+    "```chronoanvil",
     "events",
     "```",
     "",
-    "```almanac",
+    "```chronoanvil",
     "events:upcoming:9",
     "```",
     "",
@@ -688,7 +688,7 @@ describe("a group is dealt into two columns", () => {
     const out: string[][] = [[]];
     let inside = false;
     for (const line of text.split("\n")) {
-      if (line.startsWith("```almanac")) { inside = true; continue; }
+      if (line.startsWith("```chronoanvil")) { inside = true; continue; }
       if (line.startsWith("```")) { inside = false; continue; }
       if (!inside || line === "row") continue;
       if (line === "cell") { out.push([]); continue; }
@@ -701,8 +701,8 @@ describe("a group is dealt into two columns", () => {
   // per column after the first.
   const fenceOf = (columns: readonly (readonly string[])[]): string =>
     [
-      "`almanac:spacer`",
-      "```almanac",
+      "`chronoanvil:spacer`",
+      "```chronoanvil",
       "row",
       ...columns.flatMap((column, n) => [...(n > 0 ? ["cell"] : []), ...column]),
       "```",

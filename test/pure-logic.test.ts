@@ -7,6 +7,7 @@
 
 import { composeEntryTemplate } from "../src/diary/entry-sections";
 import { describe, it, expect, beforeEach } from "vitest";
+import { composeCss } from "../tools/build-css.mjs";
 import { studyFile, studyTemplate } from "./study-template";
 import { composeDiaryDashboard } from "../src/diary/diary-sections";
 import { TFile, TFolder } from "./obsidian-stub";
@@ -191,14 +192,14 @@ import {
   moveTask,
   isValidPriority,
 } from "../src/ui/tasks";
-import type { AlmanacTask } from "../src/ui/tasks";
+import type { ChronoAnvilTask } from "../src/ui/tasks";
 import {
   resolveToggleTarget,
   mapWithLimit,
   openTasksInFile,
   dueLabel,
-  countAlmanacTasks,
-  sumAlmanacTasks,
+  countChronoAnvilTasks,
+  sumChronoAnvilTasks,
   countBodyTasks,
   sumBodyTasks,
   inPeriod,
@@ -320,7 +321,7 @@ describe("parseHeaderDirective", () => {
 
 // ── util.ts: headerAtFence ───────────────────────────────────────────────
 describe("headerAtFence", () => {
-  const fence = ["```almanac", "header:📚 Journals", "```"];
+  const fence = ["```chronoanvil", "header:📚 Journals", "```"];
   it("recognises a header fence", () => {
     expect(headerAtFence(fence, 0)).toEqual({ level: 1, title: "📚 Journals" });
   });
@@ -328,7 +329,7 @@ describe("headerAtFence", () => {
     expect(headerAtFence(fence, 1)).toBeNull();
   });
   it("returns null for a fence whose first directive is not a header", () => {
-    expect(headerAtFence(["```almanac", "links:home", "```"], 0)).toBeNull();
+    expect(headerAtFence(["```chronoanvil", "links:home", "```"], 0)).toBeNull();
   });
 });
 
@@ -348,7 +349,7 @@ describe("locateSection", () => {
     const WAS = "📚 JOURNALS";
 
     it("finds a header bar written under an older spelling", () => {
-      const old = ["```almanac", `header:${WAS}`, "```", "body"];
+      const old = ["```chronoanvil", `header:${WAS}`, "```", "body"];
       // Exactly the pre-4.26 behaviour, restated so the fix has something to
       // be a fix OF: the current name alone does not find the old note.
       expect(locateSection(old, NOW, HEADING)).toBeNull();
@@ -368,17 +369,17 @@ describe("locateSection", () => {
     });
 
     it("still refuses a spelling that is on neither list", () => {
-      // The list is a history, not a fuzzy match. A title Almanac never wrote
+      // The list is a history, not a fuzzy match. A title ChronoAnvil never wrote
       // is a reader's own and must stay unfound, or a migration would rewrite
       // it.
-      const mine = ["```almanac", "header:📈 My numbers", "```"];
+      const mine = ["```chronoanvil", "header:📈 My numbers", "```"];
       expect(locateSection(mine, [NOW, WAS], [HEADING])).toBeNull();
     });
 
     it("takes a bare string exactly as it always did", () => {
       // The parameter widened; it did not change meaning. Every existing caller
       // passes a string and must behave identically.
-      const lines = ["```almanac", `header:${NOW}`, "```"];
+      const lines = ["```chronoanvil", `header:${NOW}`, "```"];
       expect(locateSection(lines, NOW, HEADING)).toEqual(
         locateSection(lines, [NOW], [HEADING])
       );
@@ -389,7 +390,7 @@ describe("locateSection", () => {
     const lines = [
       "# Home",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:📚 Journals",
       "```",
       "body line",
@@ -426,10 +427,10 @@ describe("locateSection", () => {
 
   it("treats sibling header bars as inside when the predicate says so", () => {
     const lines = [
-      "```almanac",
+      "```chronoanvil",
       "header:📚 Journals",
       "```",
-      "```almanac",
+      "```chronoanvil",
       "header:2:Study",
       "```",
       "study body",
@@ -444,34 +445,34 @@ describe("locateSection", () => {
   // must not shift where the Journals span is found.
   it("is unaffected by the 2.8 home-hero block above it", () => {
     const lines = [
-      "`almanac:spacer`",
-      "```almanac",
+      "`chronoanvil:spacer`",
+      "```chronoanvil",
       "home-hero",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:📅 Diary",
       "links:home,week,month,all",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "calendar",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:📚 Journals",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:2:Study",
       "```",
       "study body",
       "",
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "header:📊 Trends and Statistics",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:🏷️ Tags",
       "```",
     ];
@@ -479,30 +480,30 @@ describe("locateSection", () => {
     // any other header is a boundary. The point of this test is that adding the
     // hero above Diary does NOT change where the Journals section starts or
     // ends. Its end is the Trends fence, NOT Tags: Trends carries its title in
-    // an ```almanac-charts fence, and until 2.13.8 the boundary scan couldn't
+    // a ```chronoanvil-charts fence, and until 2.13.8 the boundary scan couldn't
     // see that fence, so the Journals span ran straight through Trends and a
     // rebuild deleted the whole chart section. See sectionBoundaryAt.
     const loc = locateSection(lines, TITLE, HEADING, (t) => t !== "🎓 Study" && t !== "Study");
     expect(loc).not.toBeNull();
     expect(loc!.viaHeaderBar).toBe(true);
-    expect(loc!.titleStart).toBe(14); // the "```almanac" opening the Journals bar
+    expect(loc!.titleStart).toBe(14); // the "```chronoanvil" opening the Journals bar
     expect(loc!.titleEnd).toBe(16); // its closing fence
-    expect(loc!.end).toBe(23); // the Trends "```almanac-charts" fence
+    expect(loc!.end).toBe(23); // the Trends "```chronoanvil-charts" fence
   });
 
   it("ends a section at the Trends chart fence, not past it", () => {
     // The regression that motivated sectionBoundaryAt, reduced: on the shipped
     // home note Journals is immediately followed by Trends. A scan that can't
-    // see ```almanac-charts treats Trends as Journals' body, so rewriting the
+    // see ```chronoanvil-charts treats Trends as Journals' body, so rewriting the
     // Journals body destroys the user's charts.
     const lines = [
-      "```almanac",
+      "```chronoanvil",
       "header:📚 Journals",
       "```",
       "",
       "journals body",
       "",
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "header:📊 Trends and Statistics",
       "chart:mood",
       "```",
@@ -1448,7 +1449,7 @@ describe("parseChartRegion (CHART_TAG round-trip)", () => {
   it("parses chart directives inside a header-bar Trends section", () => {
     const lines = [
       "# Home",
-      "```almanac",
+      "```chronoanvil",
       "header:📊 Trends and Statistics",
       "```",
       "chart:c1:Mood:line:90",
@@ -1503,15 +1504,15 @@ describe("parseChartRegion (CHART_TAG round-trip)", () => {
     expect(parseChartRegion(["# Home", "nothing here"])).toEqual([]);
   });
 
-  it("parses the merged self-titled ```almanac-charts fence (2.1 layout)", () => {
+  it("parses the merged self-titled ```chronoanvil-charts fence (2.1 layout)", () => {
     const lines = [
       "# Home",
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "header:📊 Trends and Statistics",
       "chart:c1:Mood:line:90",
       "chart:c2:Sleep:summary:all",
       "```",
-      "```almanac",
+      "```chronoanvil",
       "header:🏷️ Tags",
       "```",
     ];
@@ -1523,7 +1524,7 @@ describe("parseChartRegion (CHART_TAG round-trip)", () => {
 
   it("parses a merged fence with no charts as empty", () => {
     const lines = [
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "header:📊 Trends and Statistics",
       "```",
     ];
@@ -1537,15 +1538,15 @@ describe("mergeTrendsSection", () => {
     const lines = [
       "# Home",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:📊 Trends and Statistics",
       "```",
       "",
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "chart:c1:Mood:line:90",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:🏷️ Tags",
       "```",
     ];
@@ -1560,12 +1561,12 @@ describe("mergeTrendsSection", () => {
       [
         "# Home",
         "",
-        "```almanac-charts",
+        "```chronoanvil-charts",
         "header:📊 Trends and statistics",
         "chart:c1:Mood:line:90",
         "```",
         "",
-        "```almanac",
+        "```chronoanvil",
         "header:🏷️ Tags",
         "```",
       ].join("\n")
@@ -1580,7 +1581,7 @@ describe("mergeTrendsSection", () => {
     const lines = [
       "## 📊 Trends and Statistics",
       "",
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "chart:c1:Mood:bar:365",
       "chart:c2:Sleep:line:30",
       "```",
@@ -1590,7 +1591,7 @@ describe("mergeTrendsSection", () => {
     const out = mergeTrendsSection(lines);
     expect(out!.join("\n")).toBe(
       [
-        "```almanac-charts",
+        "```chronoanvil-charts",
         "header:📊 Trends and statistics",
         "chart:c1:Mood:bar:365",
         "chart:c2:Sleep:line:30",
@@ -1605,7 +1606,7 @@ describe("mergeTrendsSection", () => {
     const merged = [
       "# Home",
       "",
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "header:📊 Trends and Statistics",
       "chart:c1:Mood:line:90",
       "```",
@@ -1629,11 +1630,11 @@ describe("mergeTrendsSection", () => {
 //
 // The migration that made a display string renameable. Everything here is a
 // property of the pair `locateSection` + `retitleTrends`: the old words are
-// still FOUND, and are rewritten to the new words only where Almanac itself
+// still FOUND, and are rewritten to the new words only where ChronoAnvil itself
 // wrote them.
 describe("retitleTrends", () => {
   const merged = (title: string, ...body: string[]): string[] => [
-    "```almanac-charts",
+    "```chronoanvil-charts",
     `header:${title}`,
     ...body,
     "```",
@@ -1660,7 +1661,7 @@ describe("retitleTrends", () => {
     expect(retitleTrends(once)).toBeNull();
   });
 
-  it("leaves a title Almanac never wrote completely alone", () => {
+  it("leaves a title ChronoAnvil never wrote completely alone", () => {
     // THE ASSERTION THE HISTORY LIST EXISTS FOR. A case-insensitive compare
     // would have "corrected" both of these into the house spelling; an exact
     // list of our own past words cannot, because neither is on it.
@@ -1686,11 +1687,11 @@ describe("retitleTrends", () => {
     // about; it is only a test of the guard when there IS something inside the
     // fence for the guard to stop.
     const legacy = [
-      "```almanac",
+      "```chronoanvil",
       "header:📊 Trends and Statistics",
       "```",
       "",
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "header:📊 Trends and Statistics",
       "chart:c1:Mood:line:90",
       "```",
@@ -1715,23 +1716,23 @@ describe("ensureTrendsHeader", () => {
       "---",
       'year-start: ""',
       "---",
-      "```almanac",
+      "```chronoanvil",
       "year-summary",
       "```",
       "",
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "```",
     ];
     const out = ensureTrendsHeader(lines);
     expect(out).not.toBeNull();
     expect(out!.join("\n")).toContain(
-      "```almanac-charts\nheader:📊 Trends and statistics\n```"
+      "```chronoanvil-charts\nheader:📊 Trends and statistics\n```"
     );
   });
 
   it("keeps the reader's charts, and puts the title above them", () => {
     const lines = [
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "chart:c1:Mood:line:90",
       "chart:c2:Sleep:bar:365",
       "```",
@@ -1739,7 +1740,7 @@ describe("ensureTrendsHeader", () => {
     const out = ensureTrendsHeader(lines)!;
     expect(out.join("\n")).toBe(
       [
-        "```almanac-charts",
+        "```chronoanvil-charts",
         "header:📊 Trends and statistics",
         "chart:c1:Mood:line:90",
         "chart:c2:Sleep:bar:365",
@@ -1754,14 +1755,14 @@ describe("ensureTrendsHeader", () => {
 
   it("is idempotent — a titled fence is left alone (null)", () => {
     const titled = [
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "header:📊 Trends and Statistics",
       "chart:c1:Mood:line:90",
       "```",
     ];
     expect(ensureTrendsHeader(titled)).toBeNull();
     // And a second pass over its own output changes nothing.
-    const once = ensureTrendsHeader(["```almanac-charts", "```"])!;
+    const once = ensureTrendsHeader(["```chronoanvil-charts", "```"])!;
     expect(ensureTrendsHeader(once)).toBeNull();
   });
 
@@ -1769,7 +1770,7 @@ describe("ensureTrendsHeader", () => {
     // `header:` is the retitling affordance. A note whose Trends section is
     // called something else has a title, and this only supplies a missing one.
     const renamed = [
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "header:📈 My numbers",
       "```",
     ];
@@ -1781,11 +1782,11 @@ describe("ensureTrendsHeader", () => {
     // would leave the note holding the title twice — once in the block above
     // and once inside. The merge owns this state; this returns null.
     const legacy = [
-      "```almanac",
+      "```chronoanvil",
       "header:📊 Trends and Statistics",
       "```",
       "",
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "chart:c1:Mood:line:90",
       "```",
     ];
@@ -1821,7 +1822,7 @@ describe("nextChartKey", () => {
 });
 
 // ── charts.ts: resolveChartWindow (range → inclusive date bounds) ─────────
-// Almanac computes the window itself and filters its own daily notes against it
+// ChronoAnvil computes the window itself and filters its own daily notes against it
 // with a plain string compare, so every range renders as reliably as "all
 // time" did. These pin `today` for determinism; the bounds are inclusive on
 // both ends (no external date parser to skew the newest day, so no +1-day hack).
@@ -2329,8 +2330,8 @@ describe("hourAxisBounds", () => {
 });
 
 describe("notestore", () => {
-  // New single-comment format: `<!--almanac:key` … content … `-->`.
-  const OPEN = (k: string) => `<!--almanac:${k}`;
+  // New single-comment format: `<!--chronoanvil:key` … content … `-->`.
+  const OPEN = (k: string) => `<!--chronoanvil:${k}`;
   const CLOSE = "-->";
 
   describe("isValidNoteKey", () => {
@@ -2477,11 +2478,11 @@ describe("notestore", () => {
       expect(allNoteRegions(text)).toEqual([{ key: "todo", content: "" }]);
     });
     it("ignores a prefix with no key", () => {
-      expect(allNoteRegions("<!--almanac:\n-->")).toEqual([]);
+      expect(allNoteRegions("<!--chronoanvil:\n-->")).toEqual([]);
     });
     it("skips an unterminated final region and keeps earlier ones", () => {
       const good = writeNoteRegion("", "todo", "- ( ) a");
-      const text = good + "\n<!--almanac:log\nnever closed";
+      const text = good + "\n<!--chronoanvil:log\nnever closed";
       expect(allNoteRegions(text)).toEqual([
         { key: "todo", content: "- ( ) a" },
       ]);
@@ -2512,7 +2513,7 @@ describe("tasks format", () => {
     it("returns null for non-task lines", () => {
       expect(parseTaskLine("")).toBeNull();
       expect(parseTaskLine("just text")).toBeNull();
-      expect(parseTaskLine("- [ ] standard checkbox")).toBeNull(); // not Almanac marker
+      expect(parseTaskLine("- [ ] standard checkbox")).toBeNull(); // not ChronoAnvil marker
       expect(parseTaskLine("# heading")).toBeNull();
     });
 
@@ -2598,29 +2599,29 @@ describe("tasks format", () => {
     });
 
     it("emits priority when not normal", () => {
-      const t: AlmanacTask = { done: false, text: "X", priority: "high", due: null, extraFields: [] };
+      const t: ChronoAnvilTask = { done: false, text: "X", priority: "high", due: null, extraFields: [] };
       expect(serializeTaskLine(t)).toBe("- ( ) X [priority:: high]");
     });
 
     it("emits due when set", () => {
-      const t: AlmanacTask = { done: true, text: "X", priority: "normal", due: "2026-07-25", extraFields: [] };
+      const t: ChronoAnvilTask = { done: true, text: "X", priority: "normal", due: "2026-07-25", extraFields: [] };
       expect(serializeTaskLine(t)).toBe("- (x) X [due:: 2026-07-25]");
     });
 
     it("appends unknown fields", () => {
-      const t: AlmanacTask = { done: false, text: "X", priority: "low", due: null, at: null, extraFields: ["[tag:: work]"] };
+      const t: ChronoAnvilTask = { done: false, text: "X", priority: "low", due: null, at: null, extraFields: ["[tag:: work]"] };
       expect(serializeTaskLine(t)).toBe("- ( ) X [priority:: low] [tag:: work]");
     });
 
     it("emits the hour after the day (4.55)", () => {
-      const t: AlmanacTask = { done: false, text: "X", priority: "normal", due: "2026-08-21", at: "09:05", extraFields: [] };
+      const t: ChronoAnvilTask = { done: false, text: "X", priority: "normal", due: "2026-08-21", at: "09:05", extraFields: [] };
       expect(serializeTaskLine(t)).toBe("- ( ) X [due:: 2026-08-21] [at:: 09:05]");
     });
 
     it("writes no hour for a task with no day", () => {
       // THE COMPATIBILITY CLAIM. Every task already in a vault has no `at`, and
       // a round trip must not start writing the key onto lines that never had it.
-      const t: AlmanacTask = { done: false, text: "X", priority: "normal", due: null, at: "09:05", extraFields: [] };
+      const t: ChronoAnvilTask = { done: false, text: "X", priority: "normal", due: null, at: "09:05", extraFields: [] };
       expect(serializeTaskLine(t)).toBe("- ( ) X");
     });
   });
@@ -2651,7 +2652,7 @@ describe("tasks format", () => {
   });
 
   describe("moveTask", () => {
-    const mk = (texts: string[]): AlmanacTask[] =>
+    const mk = (texts: string[]): ChronoAnvilTask[] =>
       parseTasks(texts.map((t) => `- ( ) ${t}`).join("\n"));
 
     it("moves a step to a new position, preserving the rest of the order", () => {
@@ -2697,7 +2698,7 @@ describe("tasks format", () => {
 
 describe("tasks-table logic", () => {
   // Build a task list from `- ( )` / `- (x)` lines for readable fixtures.
-  const mk = (lines: string[]): AlmanacTask[] =>
+  const mk = (lines: string[]): ChronoAnvilTask[] =>
     parseTasks(lines.join("\n"));
 
   describe("resolveToggleTarget", () => {
@@ -2824,34 +2825,34 @@ describe("tasks-table logic", () => {
     });
   });
 
-  describe("countAlmanacTasks", () => {
+  describe("countChronoAnvilTasks", () => {
     it("counts open and done across a region", () => {
       const text = writeNoteRegion(
         "",
         "todo",
         ["- ( ) a", "- (x) b", "- ( ) c"].join("\n")
       );
-      expect(countAlmanacTasks(text)).toEqual({ open: 2, done: 1 });
+      expect(countChronoAnvilTasks(text)).toEqual({ open: 2, done: 1 });
     });
 
     it("returns zero for a note with no regions", () => {
-      expect(countAlmanacTasks("just some body text, no tasks")).toEqual({
+      expect(countChronoAnvilTasks("just some body text, no tasks")).toEqual({
         open: 0,
         done: 0,
       });
     });
 
-    it("ignores native `- [ ]` checkboxes (only Almanac markers count)", () => {
-      // Native Markdown tasks are invisible to the Almanac format by design;
+    it("ignores native `- [ ]` checkboxes (only ChronoAnvil markers count)", () => {
+      // Native Markdown tasks are invisible to the ChronoAnvil format by design;
       // they must not be counted here.
-      const text = writeNoteRegion("", "todo", ["- [ ] native", "- ( ) almanac"].join("\n"));
-      expect(countAlmanacTasks(text)).toEqual({ open: 1, done: 0 });
+      const text = writeNoteRegion("", "todo", ["- [ ] native", "- ( ) chronoanvil"].join("\n"));
+      expect(countChronoAnvilTasks(text)).toEqual({ open: 1, done: 0 });
     });
 
     it("sums across multiple regions in one note", () => {
       let text = writeNoteRegion("", "todo", ["- ( ) a", "- (x) b"].join("\n"));
       text = writeNoteRegion(text, "later", ["- ( ) c", "- ( ) d"].join("\n"));
-      expect(countAlmanacTasks(text)).toEqual({ open: 3, done: 1 });
+      expect(countChronoAnvilTasks(text)).toEqual({ open: 3, done: 1 });
     });
   });
 
@@ -2928,7 +2929,7 @@ describe("tasks-table logic", () => {
 
     it("reads on a cold cache and returns the open tasks", async () => {
       const texts = new Map([
-        ["a.md", "<!--almanac:todo\n- ( ) one\n- (x) two\n-->"],
+        ["a.md", "<!--chronoanvil:todo\n- ( ) one\n- (x) two\n-->"],
       ]);
       const counter = { reads: 0 };
       const app = makeApp(texts, counter) as never;
@@ -2938,7 +2939,7 @@ describe("tasks-table logic", () => {
     });
 
     it("does not re-read when mtime and size are unchanged", async () => {
-      const texts = new Map([["a.md", "<!--almanac:todo\n- ( ) one\n-->"]]);
+      const texts = new Map([["a.md", "<!--chronoanvil:todo\n- ( ) one\n-->"]]);
       const counter = { reads: 0 };
       const app = makeApp(texts, counter) as never;
       const file = makeFile("a.md", 100, 30);
@@ -2948,7 +2949,7 @@ describe("tasks-table logic", () => {
     });
 
     it("re-reads when mtime changes", async () => {
-      const texts = new Map([["a.md", "<!--almanac:todo\n- ( ) one\n-->"]]);
+      const texts = new Map([["a.md", "<!--chronoanvil:todo\n- ( ) one\n-->"]]);
       const counter = { reads: 0 };
       const app = makeApp(texts, counter) as never;
       await openTasksInFile(app, makeFile("a.md", 100, 30));
@@ -2958,7 +2959,7 @@ describe("tasks-table logic", () => {
 
     it("re-reads when size changes even if mtime is identical", async () => {
       // Guards the same-second-edit case coarse mtime granularity can miss.
-      const texts = new Map([["a.md", "<!--almanac:todo\n- ( ) one\n-->"]]);
+      const texts = new Map([["a.md", "<!--chronoanvil:todo\n- ( ) one\n-->"]]);
       const counter = { reads: 0 };
       const app = makeApp(texts, counter) as never;
       await openTasksInFile(app, makeFile("a.md", 100, 30));
@@ -2967,12 +2968,12 @@ describe("tasks-table logic", () => {
     });
 
     it("reflects updated content after an invalidating read", async () => {
-      const texts = new Map([["a.md", "<!--almanac:todo\n- ( ) one\n-->"]]);
+      const texts = new Map([["a.md", "<!--chronoanvil:todo\n- ( ) one\n-->"]]);
       const counter = { reads: 0 };
       const app = makeApp(texts, counter) as never;
       const first = await openTasksInFile(app, makeFile("a.md", 100, 30));
       expect(first.map((r) => r.task.text)).toEqual(["one"]);
-      texts.set("a.md", "<!--almanac:todo\n- ( ) one\n- ( ) two\n-->");
+      texts.set("a.md", "<!--chronoanvil:todo\n- ( ) one\n- ( ) two\n-->");
       const second = await openTasksInFile(app, makeFile("a.md", 101, 45));
       expect(second.map((r) => r.task.text)).toEqual(["one", "two"]);
     });
@@ -3546,7 +3547,7 @@ describe("the period overviews", () => {
 //   - a period dashboard whose task list ignored the period
 //   - a template whose frontmatter stopped matching the fill regexes
 
-describe("sumAlmanacTasks", () => {
+describe("sumChronoAnvilTasks", () => {
   // Same fake-vault shape the openTasksInFile suite uses, but over cachedRead,
   // which is what the summaries call.
   interface FakeVault {
@@ -3572,7 +3573,7 @@ describe("sumAlmanacTasks", () => {
     ]);
     const app = makeApp(texts) as never;
     const files = ["a.md", "b.md", "c.md"].map(makeFile);
-    expect(await sumAlmanacTasks(app, files)).toEqual({ open: 2, done: 3 });
+    expect(await sumChronoAnvilTasks(app, files)).toEqual({ open: 2, done: 3 });
   });
 
   it("is zero for an empty file list without touching the vault", async () => {
@@ -3585,11 +3586,11 @@ describe("sumAlmanacTasks", () => {
         },
       },
     } as never;
-    expect(await sumAlmanacTasks(app, [])).toEqual({ open: 0, done: 0 });
+    expect(await sumChronoAnvilTasks(app, [])).toEqual({ open: 0, done: 0 });
     expect(reads).toBe(0);
   });
 
-  it("equals the sum of per-note countAlmanacTasks — the summaries' contract", async () => {
+  it("equals the sum of per-note countChronoAnvilTasks — the summaries' contract", async () => {
     // The regression this whole change exists for: month-summary used to route
     // its counts through util.ts::taskCounts, which reads Obsidian's listItems
     // cache and so reported 0 for every `- ( )` task in the vault. Asserting
@@ -3606,22 +3607,22 @@ describe("sumAlmanacTasks", () => {
 
     const expected = bodies.reduce(
       (acc, b) => {
-        const c = countAlmanacTasks(b);
+        const c = countChronoAnvilTasks(b);
         return { open: acc.open + c.open, done: acc.done + c.done };
       },
       { open: 0, done: 0 }
     );
 
-    expect(await sumAlmanacTasks(app, files)).toEqual(expected);
+    expect(await sumChronoAnvilTasks(app, files)).toEqual(expected);
     expect(expected).toEqual({ open: 3, done: 2 });
   });
 });
 
 describe("countBodyTasks / sumBodyTasks", () => {
-  // The study dashboards' counter. Unlike countAlmanacTasks (regions only),
+  // The study dashboards' counter. Unlike countChronoAnvilTasks (regions only),
   // this scans a whole note body, because the Lesson/Practice/Topic templates
   // carry content-level `- ( )` checkboxes that live in the prose, outside any
-  // `<!--almanac:todo-->` region.
+  // `<!--chronoanvil:todo-->` region.
   const makeFile = (path: string): TFile => {
     const f = new TFile();
     f.path = path;
@@ -3633,15 +3634,15 @@ describe("countBodyTasks / sumBodyTasks", () => {
 
   it("counts a content-level checkbox that sits outside any region", () => {
     // Exactly the shape template-lesson.md ships: a `- ( )` line in the body,
-    // no region wrapper. countAlmanacTasks sees nothing here; countBodyTasks
+    // no region wrapper. countChronoAnvilTasks sees nothing here; countBodyTasks
     // must see the one open task.
     const body = "# Title\n\n- ( ) #status/understood Title\n\n## Overview\n";
-    expect(countAlmanacTasks(body)).toEqual({ open: 0, done: 0 });
+    expect(countChronoAnvilTasks(body)).toEqual({ open: 0, done: 0 });
     expect(countBodyTasks(body)).toEqual({ open: 1, done: 0 });
   });
 
   it("counts open and done together, and ignores native `- [ ]`", () => {
-    const body = ["- ( ) open one", "- (x) done one", "- [ ] native, not almanac", "prose"].join("\n");
+    const body = ["- ( ) open one", "- (x) done one", "- [ ] native, not chronoanvil", "prose"].join("\n");
     expect(countBodyTasks(body)).toEqual({ open: 1, done: 1 });
   });
 
@@ -3766,7 +3767,7 @@ describe("shipped daily template", () => {
     const lines = daily.split("\n");
     const fenceAfter = (probe: string): string[] => {
       const open = lines.findIndex(
-        (l, i) => l.trim() === "```almanac" && lines[i + 1]?.trim() === probe
+        (l, i) => l.trim() === "```chronoanvil" && lines[i + 1]?.trim() === probe
       );
       expect(open, probe).toBeGreaterThan(-1);
       const close = lines.findIndex((l, i) => i > open && l.trim() === "```");
@@ -3776,14 +3777,14 @@ describe("shipped daily template", () => {
     // The banner: the strip that names the note, and nothing else.
     const banner = fenceAfter("entry-header");
     expect(banner).toContain("entry-header");
-    expect(banner).not.toContain("# almanac:trackers:start");
+    expect(banner).not.toContain("# chronoanvil:trackers:start");
     expect(banner).not.toContain("tracker:Mood");
 
     // The grid, in a block of its own directly beneath it.
-    const trackers = fenceAfter("# almanac:trackers:start");
+    const trackers = fenceAfter("# chronoanvil:trackers:start");
     expect(trackers).toContain("tracker:Mood");
     expect(trackers).toContain("sleep");
-    expect(trackers).toContain("# almanac:trackers:end");
+    expect(trackers).toContain("# chronoanvil:trackers:end");
     expect(trackers).not.toContain("entry-header");
   });
 
@@ -3834,10 +3835,10 @@ describe("shipped monthly template", () => {
     for (const key of keys) expect(regions).toContain(key);
   });
 
-  it("ships no callouts at all — every field is an Almanac region now", () => {
+  it("ships no callouts at all — every field is a ChronoAnvil region now", () => {
     // 2.11: the last four (`highlights`, `challenges`, `learnings`, `goals`)
     // are gone. A callout can't be typed into from reading view and nothing in
-    // Almanac can read one, so anything meant to be *filled in* is a widget.
+    // ChronoAnvil can read one, so anything meant to be *filled in* is a widget.
     for (const kind of ["highlights", "challenges", "learnings", "goals"]) {
       expect(monthly).not.toContain(`[!${kind}]`);
     }
@@ -3881,8 +3882,8 @@ describe("shipped monthly template", () => {
     // a fresh vault's monthly review looks exactly as it did and no existing
     // vault gains widgets on upgrade. It exists so the sync has a span to
     // write into and the banner has somewhere to put "+ Add tracker".
-    expect(monthly).toContain("# almanac:trackers:start");
-    expect(monthly).toContain("# almanac:trackers:end");
+    expect(monthly).toContain("# chronoanvil:trackers:start");
+    expect(monthly).toContain("# chronoanvil:trackers:end");
     const region = locateTrackerRegion(monthly.split("\n"));
     expect(region).not.toBeNull();
     expect(region!.marked).toBe(true);
@@ -3893,7 +3894,7 @@ describe("shipped monthly template", () => {
     // 4.20 moved it out of the banner — see the daily template's test for the
     // argument. What has to survive the move is that `locateTrackerRegion` still
     // finds it, because every "+ Add tracker" write goes through that function
-    // and it walks ALL almanac fences rather than assuming one.
+    // and it walks ALL chronoanvil fences rather than assuming one.
     const lines = monthly.split("\n");
     const region = locateTrackerRegion(lines)!;
     expect(region.marked).toBe(true);
@@ -3902,9 +3903,9 @@ describe("shipped monthly template", () => {
     expect(fence).not.toContain("entry-header");
   });
 
-  it("picks up a goal written as an Almanac task", () => {
+  it("picks up a goal written as a ChronoAnvil task", () => {
     const withGoal = writeNoteRegion(monthly, "todo", "- ( ) Ship the port");
-    expect(countAlmanacTasks(withGoal)).toEqual({ open: 1, done: 0 });
+    expect(countChronoAnvilTasks(withGoal)).toEqual({ open: 1, done: 0 });
   });
 });
 
@@ -4090,12 +4091,12 @@ describe("subject Progress section", () => {
       "template-practice.md",
     ]) {
       const t = asset(file);
-      expect(t).toContain("# almanac:trackers:start");
-      expect(t).toContain("# almanac:trackers:end");
+      expect(t).toContain("# chronoanvil:trackers:start");
+      expect(t).toContain("# chronoanvil:trackers:end");
       // Inside the banner's fence, so the grid welds beneath the strip rather
       // than becoming a second block.
       expect(t.indexOf("journal-header")).toBeLessThan(
-        t.indexOf("# almanac:trackers:start")
+        t.indexOf("# chronoanvil:trackers:start")
       );
     }
   });
@@ -4191,7 +4192,7 @@ describe("subject Progress section", () => {
     // business inside the span the picker splices into.
     const t = asset("template-practice.md");
     expect(t.indexOf("related-lessons")).toBeLessThan(
-      t.indexOf("# almanac:trackers:start")
+      t.indexOf("# chronoanvil:trackers:start")
     );
   });
 
@@ -4229,10 +4230,10 @@ describe("subject Progress section", () => {
     expect(c).toContain("new Chart(");
   });
 });
-describe("study templates use the Almanac task marker", () => {
+describe("study templates use the ChronoAnvil task marker", () => {
   const asset = studyFile;
   // The Lesson/Practice templates carry content-level checkboxes and must ship
-  // Almanac's `- ( )` (which the study dashboards count from the body via
+  // ChronoAnvil's `- ( )` (which the study dashboards count from the body via
   // countBodyTasks), never Obsidian's `- [ ]` (invisible to that path). The
   // Topic template's checkbox became the `path:learning-path` widget, so it
   // holds no literal task line — but it must still never emit `- [ ]`.
@@ -4257,7 +4258,7 @@ describe("study templates use the Almanac task marker", () => {
       // The widget and its body region ship, so the note has a task list
       // with an add-input from the first render.
       expect(text).toContain(`tasks:${key}`);
-      expect(text).toContain(`<!--almanac:${key}`);
+      expect(text).toContain(`<!--chronoanvil:${key}`);
       // And the region ships *empty*, exactly as the topic template's
       // learning-path does. The lesson and practice templates used to seed a
       // boilerplate `- ( )` line each ("#status/understood <title>",
@@ -4282,11 +4283,11 @@ describe("study templates use the Almanac task marker", () => {
     // bar keeps Study's label; the region key is the catalogue's since 2.41.
     expect(text).toContain("header:🧭 Learning Path");
     expect(text).toContain("path:path");
-    expect(text).toContain("<!--almanac:path");
+    expect(text).toContain("<!--chronoanvil:path");
     // Resources is three joined attachment sections, each with a body region.
     for (const key of ["res-docs", "res-tutorials", "res-practice"]) {
       expect(text).toContain(`attach:${key}|`);
-      expect(text).toContain(`<!--almanac:${key}`);
+      expect(text).toContain(`<!--chronoanvil:${key}`);
     }
     // Related was removed for simplicity (redundant with the subject links).
     expect(text).not.toContain("header:🔗 Related");
@@ -4297,39 +4298,39 @@ describe("study templates use the Almanac task marker", () => {
 describe("summaries do not regress to a cache-based task counter", () => {
   // An architecture guard rather than a behaviour test, because the bug it
   // targets has no observable pure-logic surface: the old util.ts::taskCounts
-  // read Obsidian's listItems cache, which by design cannot see an Almanac
+  // read Obsidian's listItems cache, which by design cannot see a ChronoAnvil
   // `- ( )` line, so any summary calling it reported a confident, silent zero.
   // Nothing threw and nothing looked wrong. That counter has now been deleted;
   // these checks keep any cache-based reader from creeping back onto a surface
-  // that counts Almanac tasks. Every task-counting surface now reads note
-  // bodies (tables.ts::sumAlmanacTasks / sumBodyTasks).
+  // that counts ChronoAnvil tasks. Every task-counting surface now reads note
+  // bodies (tables.ts::sumChronoAnvilTasks / sumBodyTasks).
   const src = (name: string): string =>
     readSrc(name);
 
   it("calendar.ts counts through tables.ts, not a cache counter", () => {
     expect(src("calendar.ts")).not.toMatch(/taskCounts\(/);
-    expect(src("calendar.ts")).toContain("sumAlmanacTasks");
+    expect(src("calendar.ts")).toContain("sumChronoAnvilTasks");
   });
 
   it("diary-header.ts counts nothing at all now", () => {
     // Was home-hero.ts until 2.13.7, when the greeting moved inside the calendar
     // card and took the name of what it actually is — and this asserted that its
-    // open-tasks cell read note BODIES (`sumAlmanacTasks`) rather than the
-    // listItems cache, which cannot see an Almanac `- ( )` line.
+    // open-tasks cell read note BODIES (`sumChronoAnvilTasks`) rather than the
+    // listItems cache, which cannot see a ChronoAnvil `- ( )` line.
     //
     // 4.13.1 §3 deleted the cell, the strip it sat in and the whole hero. The
     // guard is inverted rather than removed: the file counts nothing, so neither
     // counter may appear in it, and the day a number comes back to this surface
     // this fails and asks which one it is reading.
     expect(src("diary-header.ts")).not.toMatch(/^\s*taskCounts,$/m);
-    expect(src("diary-header.ts")).not.toContain("sumAlmanacTasks");
+    expect(src("diary-header.ts")).not.toContain("sumChronoAnvilTasks");
   });
 
-  it("study surfaces count Almanac `- ( )` from bodies, not the cache", () => {
+  it("study surfaces count ChronoAnvil `- ( )` from bodies, not the cache", () => {
     // The study dashboards (topics-table in tables.ts, the Activity chart in
     // chart-render.ts) used to read util.ts::taskCounts because their Lesson,
     // Practice and Topic templates shipped native `- [ ]` checkboxes. Those
-    // templates now ship Almanac `- ( )`, which the listItems cache can't see —
+    // templates now ship ChronoAnvil `- ( )`, which the listItems cache can't see —
     // so both surfaces read note bodies through countBodyTasks instead. Pin
     // that so the cache-based reader can't creep back onto these surfaces.
     // Match imports and calls, not the word in a comment — the history of why
@@ -4358,7 +4359,7 @@ describe("shipped stylesheet", () => {
     // them resolved to nothing. The study heatmap lost its greens, the calendar
     // its mood dots, the events their colours.
     //
-    // The existing `toContain("--am-act-1:")` assertions did not catch it: the
+    // The existing `toContain("--ca-act-1:")` assertions did not catch it: the
     // declarations were all still present in the file, just unreachable. So this
     // checks *location*, not existence, and separately forbids any rule opening
     // inside the block — which is the mistake itself rather than its symptoms,
@@ -4366,30 +4367,30 @@ describe("shipped stylesheet", () => {
     const fromRoot = css.slice(css.indexOf(":root {"));
     const block = fromRoot.slice(0, fromRoot.indexOf("\n}") + 2);
     for (const token of [
-      "--am-radius-sm",
-      "--am-radius-md",
-      "--am-radius-pill",
-      "--am-widget-gap",
-      "--am-text-2xs",
-      "--am-text-xs",
-      "--am-text-sm",
-      "--am-text-base",
-      "--am-caps-weight",
-      "--am-caps-tracking",
-      // `--am-band-recess` was here and is deleted (4.13.1 §3b). It was the
+      "--ca-radius-sm",
+      "--ca-radius-md",
+      "--ca-radius-pill",
+      "--ca-widget-gap",
+      "--ca-text-2xs",
+      "--ca-text-xs",
+      "--ca-text-sm",
+      "--ca-text-base",
+      "--ca-caps-weight",
+      "--ca-caps-tracking",
+      // `--ca-band-recess` was here and is deleted (4.13.1 §3b). It was the
       // token this whole check exists for — the one 2.51.5 opened a
       // `.theme-light {` mid-block to override — and the diary card, its only
       // reader, stopped being made of sunk bands. The list is a SAMPLE of each
       // family rather than a census, so removing an entry costs nothing here;
       // what would cost something is the deleted token going on being asserted,
       // since a token that exists only because a test asks for it is the shape
-      // this file's own `--am-heat-max-w` note describes.
-      "--am-mood-1",
-      "--am-mood-5",
-      "--am-act-1",
-      "--am-act-4",
-      "--am-ev-red",
-      "--am-ev-grey",
+      // this file's own `--ca-heat-max-w` note describes.
+      "--ca-mood-1",
+      "--ca-mood-5",
+      "--ca-act-1",
+      "--ca-act-4",
+      "--ca-ev-red",
+      "--ca-ev-grey",
     ]) {
       expect(block).toContain(`${token}:`);
     }
@@ -4405,7 +4406,7 @@ describe("shipped stylesheet", () => {
     // `--interactive-accent` on `body`, one level BELOW `:root`.
     //
     // A custom property is substituted where it is declared, so from `:root`
-    // the lookup found nothing, `--am-area-diary` computed to the
+    // the lookup found nothing, `--ca-area-diary` computed to the
     // guaranteed-invalid value, and every descendant inherited that. It is the
     // same failure the test above was written for — a token present in the file
     // and unreachable at the element — arrived at from the other direction, and
@@ -4414,10 +4415,10 @@ describe("shipped stylesheet", () => {
     const fromBody = css.slice(css.indexOf("\nbody {"));
     const block = fromBody.slice(0, fromBody.indexOf("\n}") + 2);
     for (const token of [
-      "--am-area-diary",
-      "--am-area-diary-rgb",
-      "--am-area-journals",
-      "--am-area-journals-rgb",
+      "--ca-area-diary",
+      "--ca-area-diary-rgb",
+      "--ca-area-journals",
+      "--ca-area-journals-rgb",
     ]) {
       expect(block, token).toContain(`${token}:`);
     }
@@ -4425,7 +4426,7 @@ describe("shipped stylesheet", () => {
     // them broken, is worse than the bug.
     const fromRoot = css.slice(css.indexOf(":root {"));
     const rootBlock = fromRoot.slice(0, fromRoot.indexOf("\n}") + 2);
-    expect(rootBlock).not.toContain("--am-area-diary:");
+    expect(rootBlock).not.toContain("--ca-area-diary:");
   });
 
   it("styles every note key the monthly template joins into one box", () => {
@@ -4435,7 +4436,7 @@ describe("shipped stylesheet", () => {
     // two plain fields with no error anywhere.
     for (const key of ["highlights", "challenges"]) {
       expect(monthly).toContain(`list:${key}:`);
-      expect(css).toContain(`.journal-list--${key}`);
+      expect(css).toContain(`.ca-journal-list--${key}`);
     }
   });
 
@@ -4446,36 +4447,36 @@ describe("shipped stylesheet", () => {
     // would fall back to the bare attach look with no section styling.
     // The keys come from STUDY_JOURNAL.layout now, not from a hand-written
     // asset — which is exactly why they still have to be these three: existing
-    // Topic notes keep their content in `<!--almanac:res-docs-->` and friends,
+    // Topic notes keep their content in `<!--chronoanvil:res-docs-->` and friends,
     // and a composed template emitting different keys would orphan all of it.
     const topic = studyTemplate("Topic Index.md");
     for (const key of ["res-docs", "res-tutorials", "res-practice"]) {
       expect(topic).toContain(`attach:${key}|`);
-      expect(css).toContain(`.journal-attach--${key}`);
+      expect(css).toContain(`.ca-journal-attach--${key}`);
     }
     // Each section keeps a fully-rounded input bar — the sections are NOT fused
     // into one squared box (that clipped each bar's inner corners), so none of
     // the per-key zone rules zero out a corner or drop a border.
-    expect(css).not.toMatch(/\.journal-attach--res-\w+\s+\.journal-attach-zone\s*\{[^}]*border-radius:\s*0/);
-    expect(css).not.toMatch(/\.journal-attach--res-\w+\s+\.journal-attach-zone\s*\{[^}]*border-bottom:\s*none/);
+    expect(css).not.toMatch(/\.journal-attach--res-\w+\s+\.ca-journal-attach-zone\s*\{[^}]*border-radius:\s*0/);
+    expect(css).not.toMatch(/\.journal-attach--res-\w+\s+\.ca-journal-attach-zone\s*\{[^}]*border-bottom:\s*none/);
   });
 
   it("styles the activity heatmap and its own colour ramp", () => {
     // The heatmap is pure DOM + CSS now (no canvas), so every visual it has
     // comes from these hooks. The ramp is deliberately separate from
-    // --am-mood-*: that one runs red→green because low mood is bad, whereas a
+    // --ca-mood-*: that one runs red→green because low mood is bad, whereas a
     // low task count is just less work and wants one hue at rising strength.
     for (const cls of [
-      ".journal-activity-heatmap",
-      ".journal-act-grid",
-      ".journal-act-cell",
-      ".journal-act-arrow:disabled",
+      ".ca-journal-activity-heatmap",
+      ".ca-journal-act-grid",
+      ".ca-journal-act-cell",
+      ".ca-journal-act-arrow:disabled",
     ]) {
       expect(css).toContain(cls);
     }
     for (let b = 1; b <= 4; b++) {
-      expect(css).toContain(`--am-act-${b}:`);
-      expect(css).toContain(`.journal-act-cell.am-act-${b}`);
+      expect(css).toContain(`--ca-act-${b}:`);
+      expect(css).toContain(`.ca-journal-act-cell.ca-act-${b}`);
     }
   });
 
@@ -4489,22 +4490,22 @@ describe("shipped stylesheet", () => {
     // The columns are flexible again — the rail has to fill its section, which is
     // what the heatmap one widget over already does — so pinning
     // `repeat(7, <n>px)` would now pin the wrong half. **The cell's own stated
-    // size is the mechanism**, exactly as `.jjh-cell` is inside its
+    // size is the mechanism**, exactly as `.ca-jjh-cell` is inside its
     // `minmax(cell, 1fr)` tracks: a wider track is wider SPACING, not a bigger
     // square.
-    expect(css).toMatch(/\.journal-act-cell\s*\{[^}]*width:\s*\d+px/);
-    expect(css).toMatch(/\.journal-act-cell\s*\{[^}]*height:\s*\d+px/);
-    expect(css).not.toMatch(/\.journal-act-cell\s*\{[^}]*aspect-ratio/);
+    expect(css).toMatch(/\.ca-journal-act-cell\s*\{[^}]*width:\s*\d+px/);
+    expect(css).toMatch(/\.ca-journal-act-cell\s*\{[^}]*height:\s*\d+px/);
+    expect(css).not.toMatch(/\.ca-journal-act-cell\s*\{[^}]*aspect-ratio/);
     // AND THE TRACK HAS A CEILING, or a 1050px dashboard gives each column 46px
     // and the month reads as a scatter of loose squares. A bare `1fr` is the shape
     // that fails, so it is the shape that is refused.
     expect(css).toMatch(
-      /\.journal-act-grid\s*\{[^}]*grid-template-columns:\s*repeat\(7,\s*minmax\(\d+px,\s*\d+px\)\)/
+      /\.ca-journal-act-grid\s*\{[^}]*grid-template-columns:\s*repeat\(7,\s*minmax\(\d+px,\s*\d+px\)\)/
     );
-    expect(css).not.toMatch(/\.journal-act-grid\s*\{[^}]*repeat\(7,\s*1fr\)/);
+    expect(css).not.toMatch(/\.ca-journal-act-grid\s*\{[^}]*repeat\(7,\s*1fr\)/);
     // The cell is centred in a track it no longer fills, or the days drift left
     // and stop lining up with the weekday letters above them.
-    expect(css).toMatch(/\.journal-act-grid\s*\{[^}]*justify-items:\s*center/);
+    expect(css).toMatch(/\.ca-journal-act-grid\s*\{[^}]*justify-items:\s*center/);
   });
 
   it("gives the three months the whole section (4.38.4)", () => {
@@ -4512,7 +4513,7 @@ describe("shipped stylesheet", () => {
     // a section running to x=780, so the rail sat in the left two-thirds of a box
     // it was the only occupant of. Three equal tracks is the heatmap's answer one
     // level up — the panels take a third each.
-    const at = css.indexOf(".journal-act-months {");
+    const at = css.indexOf(".ca-journal-act-months {");
     const block = css.slice(at, css.indexOf("}", at));
     expect(block).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
     // `minmax(0, 1fr)` AND NOT `1fr`: a track's default minimum is `auto`, which
@@ -4528,25 +4529,25 @@ describe("shipped stylesheet", () => {
     // The `path:` widget only looks like a checklist table because the stylesheet
     // carries its row/move/number rules. Pin the load-bearing hooks.
     for (const cls of [
-      ".journal-path-row",
-      ".journal-path-num",
-      ".journal-path-move",
-      ".journal-path-move:disabled",
+      ".ca-journal-path-row",
+      ".ca-journal-path-num",
+      ".ca-journal-path-move",
+      ".ca-journal-path-move:disabled",
     ]) {
       expect(css).toContain(cls);
     }
   });
 
   it("cancels the widget gap so the joined box is one box", () => {
-    // The bug this pins: `.journal-widget-block` separates its children with
+    // The bug this pins: `.ca-journal-widget-block` separates its children with
     // flex `gap`, which `margin-bottom: 0` cannot close — the first attempt
     // shipped a 10px trough straight down the middle of a "single" box. The
     // cancel has to reference the same token the gap uses, so retuning the
     // spacing can't reopen the seam.
-    expect(css).toContain("--am-widget-gap");
-    expect(css).toMatch(/gap:\s*var\(--am-widget-gap\)/);
+    expect(css).toContain("--ca-widget-gap");
+    expect(css).toMatch(/gap:\s*var\(--ca-widget-gap\)/);
     expect(css).toMatch(
-      /\.journal-list--challenges\s*\{[^}]*margin-top:\s*calc\(-1 \* var\(--am-widget-gap\)\)/
+      /\.ca-journal-list--challenges\s*\{[^}]*margin-top:\s*calc\(-1 \* var\(--ca-widget-gap\)\)/
     );
   });
 
@@ -4704,15 +4705,27 @@ describe("package manifest", () => {
     //
     // Order is the other half. CSS cascades, 00-tokens.css defines the custom
     // properties every later file reads, and the numeric prefixes are what
-    // encode that. Comparing against a sorted concatenation asserts the
-    // ordering rule as much as the contents.
+    // encode that. Comparing against a sorted rebuild asserts the ordering rule
+    // as much as the contents.
+    //
+    // REBUILT THROUGH composeCss AS OF 5.0.1, not through `parts.join("\n")`.
+    // The build strips comments now — see tools/build-css.mjs — so the plain
+    // concatenation this compared against stopped being what the build produces,
+    // and the choice was between teaching the test the new shape or keeping a
+    // second implementation of it here that would drift. What the assertion is
+    // FOR has not changed: styles.css must be exactly what the build makes of
+    // styles/, so a hand-edit of the generated file fails. That the composition
+    // is itself correct is test/css-build.test.ts's question, not this one's.
     const parts = readdirSync(resolve(__dirname, "..", "styles"))
       .filter((f) => f.endsWith(".css"))
       .sort();
     expect(parts.length).toBeGreaterThan(1);
-    const rebuilt = parts
-      .map((f) => readFileSync(resolve(__dirname, "..", "styles", f), "utf8"))
-      .join("\n");
+    const rebuilt = composeCss(
+      parts.map((name) => ({
+        name,
+        css: readFileSync(resolve(__dirname, "..", "styles", name), "utf8"),
+      }))
+    );
 
     // styles.css is gitignored and generated, so on a fresh clone it does not
     // exist until the `pretest` hook runs it. Reading it directly gave a bare
@@ -4740,8 +4753,14 @@ describe("package manifest", () => {
     // Nothing else could have caught it: the build is a concatenation and does
     // not parse, the suite reads the stylesheet as text, and a browser reports
     // nothing. So the build asserts the one property text alone gets wrong.
+    // NAMED `stripComments` SINCE 5.0.1, when the walk that checks this became
+    // the same walk that removes the comments from the shipped file. One state
+    // machine rather than two that could disagree about where a comment ends —
+    // which would be this bug again, with the check passing on text the strip
+    // then cut in the wrong place. test/css-build.test.ts asserts it still
+    // throws; this asserts the build still calls it.
     const build = read("tools/build-css.mjs");
-    expect(build).toContain("checkComments");
+    expect(build).toContain("stripComments");
     // Every `*/` closes a comment that was open, in every file, before the
     // concatenation is written.
     for (const f of readdirSync(resolve(__dirname, "..", "styles")).filter((n) =>
@@ -4881,7 +4900,7 @@ describe("list widget registration", () => {
 
   it("is registered as a composite kind", () => {
     // Not cosmetic: a non-composite widget is appended into a
-    // `.journal-widget-bar`, which is a wrap-flex *row* meant for buttons and
+    // `.ca-journal-widget-bar`, which is a wrap-flex *row* meant for buttons and
     // pickers. A full-width list dropped in there lays out as an inline pill
     // next to its neighbour. `note`, `tasks` and `attach` are all composite for
     // the same reason.
@@ -4973,8 +4992,8 @@ describe("self-labelled widget kinds", () => {
 
 describe("list regions are inert to the task machinery", () => {
   // notestore.ts::allNoteRegions is directive-agnostic — it yields every
-  // `<!--almanac:KEY-->` region regardless of which widget wrote it. Both
-  // countAlmanacTasks and the tasks-table's row parser walk all regions and
+  // `<!--chronoanvil:KEY-->` region regardless of which widget wrote it. Both
+  // countChronoAnvilTasks and the tasks-table's row parser walk all regions and
   // run parseTasks over each, so a new region type that happened to look
   // task-shaped would quietly inflate every task count in the vault.
   it("does not count prose entries as tasks", () => {
@@ -4986,21 +5005,21 @@ describe("list regions are inert to the task machinery", () => {
         "My brother's birthday. We went out for dinner in Perth.",
       ])
     );
-    expect(countAlmanacTasks(text)).toEqual({ open: 0, done: 0 });
+    expect(countChronoAnvilTasks(text)).toEqual({ open: 0, done: 0 });
   });
 
   it("counts only the task region when both live in one note", () => {
     let text = writeNoteRegion("", "highlights", serializeEntries(["a win", "another"]));
     text = writeNoteRegion(text, "todo", "- ( ) a real task\n- (x) a done one");
-    expect(countAlmanacTasks(text)).toEqual({ open: 1, done: 1 });
+    expect(countChronoAnvilTasks(text)).toEqual({ open: 1, done: 1 });
   });
 
   it("does not treat an entry starting with a dash as a task", () => {
     // A user typing "- see the dentist" into a highlights row is writing prose
-    // that looks like a list item, not an Almanac task: the `- ( )` marker is
+    // that looks like a list item, not a ChronoAnvil task: the `- ( )` marker is
     // what makes a task, deliberately.
     const text = writeNoteRegion("", "highlights", serializeEntries(["- see the dentist"]));
-    expect(countAlmanacTasks(text)).toEqual({ open: 0, done: 0 });
+    expect(countChronoAnvilTasks(text)).toEqual({ open: 0, done: 0 });
   });
 
   it("leaves entries untouched when a task region round-trips", () => {
@@ -5557,7 +5576,7 @@ describe("special events", () => {
 // pieces of arithmetic the band actually reports (streaks).
 //
 // The moment stub has no locale data, so weekStartDay() falls back to Monday
-// (1) — deterministic, and the same default Almanac has always shipped.
+// (1) — deterministic, and the same default ChronoAnvil has always shipped.
 describe("yearStripBounds", () => {
   it("starts on a week boundary and spans whole weeks", () => {
     // 2026-07-23 is a Thursday.
@@ -5737,16 +5756,16 @@ describe("yearStripStats", () => {
 // enough to need a knownTitles set. No note carries that form, so what remains
 // is repair: a home note that has lost its Journals block gets one back.
 describe("ensureJournalsBlock", () => {
-  const NEW_BLOCK = "```almanac\nframe: section\njournals\n```";
+  const NEW_BLOCK = "```chronoanvil\nframe: section\njournals\n```";
 
   it("leaves a note that already has the block alone", () => {
     const src = [
-      "`almanac:spacer`",
-      "```almanac",
+      "`chronoanvil:spacer`",
+      "```chronoanvil",
       "journals",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:🏷️ Tags",
       "```",
     ].join("\n");
@@ -5756,12 +5775,12 @@ describe("ensureJournalsBlock", () => {
   it("counts a hand-added directive inside a longer block", () => {
     // The widget renders wherever it appears, so a second copy above it would
     // be worse than leaving the note alone.
-    const src = ["```almanac", "diary:3", "journals", "```"].join("\n");
+    const src = ["```chronoanvil", "diary:3", "journals", "```"].join("\n");
     expect(ensureJournalsBlock(src)).toBe(src);
   });
 
   it("appends the block to a note that has lost it", () => {
-    const src = ["`almanac:spacer`", "```almanac", "diary:3", "```"].join("\n");
+    const src = ["`chronoanvil:spacer`", "```chronoanvil", "diary:3", "```"].join("\n");
     const out = ensureJournalsBlock(src);
     expect(out).toContain(NEW_BLOCK);
     // Everything that was there is still there, and the block is on the end.
@@ -5787,7 +5806,7 @@ describe("ensureJournalsBlock", () => {
     // The bare fence form too, whatever the argument, because an ARGUMENT is an
     // arrangement of this section rather than a different section.
     for (const line of ["journals", "journals:cards"]) {
-      const src = ["```almanac", "frame: section", line, "```"].join("\n");
+      const src = ["```chronoanvil", "frame: section", line, "```"].join("\n");
       expect(ensureJournalsBlock(src), line).toBe(src);
     }
   });
@@ -5797,7 +5816,7 @@ describe("ensureJournalsBlock", () => {
     // section. The old check would not have matched it either, but the fix must
     // not reach for a loose prefix on the way past — that is the trap the shared
     // predicate in `constants.ts` is written to close.
-    const src = ["```almanac", "journals-header:study", "```"].join("\n");
+    const src = ["```chronoanvil", "journals-header:study", "```"].join("\n");
     expect(ensureJournalsBlock(src)).toContain(NEW_BLOCK);
   });
 
@@ -5805,12 +5824,12 @@ describe("ensureJournalsBlock", () => {
     // The failure mode of the migration this replaced was eating the chart
     // section that follows Journals on the shipped home note.
     const src = [
-      "```almanac-charts",
+      "```chronoanvil-charts",
       "header:📊 Trends and Statistics",
       "chart:mood",
       "```",
       "",
-      "```almanac",
+      "```chronoanvil",
       "header:🏷️ Tags",
       "```",
     ].join("\n");
@@ -5827,10 +5846,10 @@ describe("ensureJournalsBlock", () => {
 // damaging a note: never write outside the tracker region, never touch a `nav`
 // block, never lose a logged value, never double up a widget on one property.
 describe("per-entry trackers", () => {
-  const FENCE = "```almanac";
+  const FENCE = "```chronoanvil";
   const CLOSE = "```";
-  const START = "# almanac:trackers:start";
-  const END = "# almanac:trackers:end";
+  const START = "# chronoanvil:trackers:start";
+  const END = "# chronoanvil:trackers:end";
 
   // A generated daily entry: frontmatter, an entry-header fence, then the
   // marked tracker fence — the exact shape composeEntryTemplate("daily") makes.
@@ -5838,7 +5857,7 @@ describe("per-entry trackers", () => {
     "---",
     "journal-date: 2026-07-23",
     "---",
-    "`almanac:spacer`",
+    "`chronoanvil:spacer`",
     FENCE,
     "entry-header",
     CLOSE,
@@ -5967,7 +5986,7 @@ describe("per-entry trackers", () => {
       expect(locateTrackerRegion(lines)).toBeNull();
     });
 
-    it("returns null for a note with no almanac fence at all", () => {
+    it("returns null for a note with no chronoanvil fence at all", () => {
       expect(locateTrackerRegion(["# Just a note", "", "text"])).toBeNull();
     });
 
@@ -6139,10 +6158,10 @@ describe("per-entry trackers", () => {
       // its notes.
       const t = byName("entry.md");
       expect(t).toContain("journal-header");
-      expect(t).toContain("# almanac:trackers:start");
-      expect(t).toContain("# almanac:trackers:end");
+      expect(t).toContain("# chronoanvil:trackers:start");
+      expect(t).toContain("# chronoanvil:trackers:end");
       expect(t.indexOf("journal-header")).toBeLessThan(
-        t.indexOf("# almanac:trackers:start")
+        t.indexOf("# chronoanvil:trackers:start")
       );
     });
 
@@ -6172,7 +6191,7 @@ describe("per-entry trackers", () => {
       // is out of scope by construction rather than by exception.
       //
       // `kind-table:entry` since 2.54, where it was `type == "entry"` inside a
-      // ```base block. Same statement, made to Almanac instead of to Bases.
+      // ```base block. Same statement, made to ChronoAnvil instead of to Bases.
       const t = byName("section-index.md");
       expect(t).toContain("kind-table:entry");
       expect(t).not.toContain("type != null");
@@ -6190,7 +6209,7 @@ describe("per-entry trackers", () => {
     it("lets the banner own the title rather than a second heading", () => {
       // Same rule the Lesson and Practice templates follow: the banner renders
       // a click-to-edit title, so an H1 above it would be the same name twice.
-      // (`# almanac:trackers:start` is a marker comment, not a heading — hence
+      // (`# chronoanvil:trackers:start` is a marker comment, not a heading — hence
       // matching the token rather than a bare `# `.)
       for (const name of ["entry.md", "section-index.md"]) {
         expect(byName(name)).not.toContain("{{title}}");
@@ -6532,7 +6551,7 @@ describe("per-entry trackers", () => {
       "---",
       "journal-date: 2026-07-23",
       "---",
-      "`almanac:spacer`",
+      "`chronoanvil:spacer`",
       FENCE,
       "entry-header",
       CLOSE,
@@ -6625,7 +6644,7 @@ describe("per-entry trackers", () => {
       "---",
       "journal-date: 2026-07-23",
       "---",
-      "`almanac:spacer`",
+      "`chronoanvil:spacer`",
       FENCE,
       "links:home,today,scopes#diary",
       "entry-header",
@@ -7070,8 +7089,8 @@ describe("per-entry trackers", () => {
       "---",
       "type: lesson",
       "---",
-      "`almanac:spacer`",
-      "```almanac",
+      "`chronoanvil:spacer`",
+      "```chronoanvil",
       "journal-header",
       ...body,
       "```",
@@ -7081,9 +7100,9 @@ describe("per-entry trackers", () => {
 
     it("finds the marked region inside a study banner", () => {
       const lines = banner(
-        "# almanac:trackers:start",
+        "# chronoanvil:trackers:start",
         "tracker:confidence",
-        "# almanac:trackers:end"
+        "# chronoanvil:trackers:end"
       );
       const region = locateTrackerRegion(lines)!;
       expect(region).not.toBeNull();
@@ -7094,27 +7113,27 @@ describe("per-entry trackers", () => {
     it("writes a fresh region INSIDE the banner, not a new fence below it", () => {
       // The bug this fixes. entryHeaderFence matched only `entry-header`, so a
       // study note fell through to the no-banner path and got a whole new
-      // ```almanac block after the first one — putting the note's trackers
+      // ```chronoanvil block after the first one — putting the note's trackers
       // outside the card that exists to hold them.
       const lines = banner();
       const out = createTrackerRegion(lines);
-      expect(out.filter((l) => l.trim() === "```almanac")).toHaveLength(1);
+      expect(out.filter((l) => l.trim() === "```chronoanvil")).toHaveLength(1);
       const region = locateTrackerRegion(out)!;
       expect(region.marked).toBe(true);
       // The region sits between the banner's own directive and its closing
       // fence, so the grid renders welded beneath the strip.
-      expect(out.indexOf("# almanac:trackers:start")).toBeGreaterThan(
+      expect(out.indexOf("# chronoanvil:trackers:start")).toBeGreaterThan(
         out.indexOf("journal-header")
       );
-      expect(out.indexOf("# almanac:trackers:end")).toBeLessThan(
+      expect(out.indexOf("# chronoanvil:trackers:end")).toBeLessThan(
         out.lastIndexOf("```")
       );
     });
 
     it("round-trips add and remove on a study banner", () => {
       let lines = banner(
-        "# almanac:trackers:start",
-        "# almanac:trackers:end"
+        "# chronoanvil:trackers:start",
+        "# chronoanvil:trackers:end"
       );
       lines = insertTrackerDirective(lines, "tracker:confidence")!;
       lines = insertTrackerDirective(lines, "tracker:status")!;
@@ -7138,15 +7157,15 @@ describe("per-entry trackers", () => {
       // splice must never reach it.
       const lines = banner(
         "related-lessons|🔗 Related Lessons",
-        "# almanac:trackers:start",
+        "# chronoanvil:trackers:start",
         "tracker:status",
-        "# almanac:trackers:end"
+        "# chronoanvil:trackers:end"
       );
       expect(noteTrackerDirectives(lines)).toEqual(["tracker:status"]);
       const out = insertTrackerDirective(lines, "tracker:confidence")!;
       expect(out).toContain("related-lessons|🔗 Related Lessons");
       expect(out.indexOf("related-lessons|🔗 Related Lessons")).toBeLessThan(
-        out.indexOf("# almanac:trackers:start")
+        out.indexOf("# chronoanvil:trackers:start")
       );
     });
 
@@ -7155,7 +7174,7 @@ describe("per-entry trackers", () => {
       // was present and unrecognised.
       const lines = ["---", "type: note", "---", "", "## Notes"];
       const out = createTrackerRegion(lines);
-      expect(out.filter((l) => l.trim() === "```almanac")).toHaveLength(1);
+      expect(out.filter((l) => l.trim() === "```chronoanvil")).toHaveLength(1);
       expect(locateTrackerRegion(out)!.marked).toBe(true);
     });
   });
@@ -7365,8 +7384,8 @@ describe("the tracker grid is editable per entry", () => {
     // widget — and it must not eat the click, since the face underneath is
     // what opens the capture.
     for (const cls of [
-      ".journal-scale-note-mark",
-      ".journal-scale-note-mark.has-note",
+      ".ca-journal-scale-note-mark",
+      ".ca-journal-scale-note-mark.has-note",
       "pointer-events: none",
     ]) {
       expect(css).toContain(cls);
@@ -7378,11 +7397,11 @@ describe("the tracker grid is editable per entry", () => {
     // code-block processor rather than written into the note, so a missing
     // rule leaves a row of bare buttons where a set of pills should be.
     for (const cls of [
-      ".journal-habits-cell",
-      ".journal-habits-row",
-      ".journal-habit-chip",
-      ".journal-habit-chip-btn",
-      ".journal-habit-chip-name",
+      ".ca-journal-habits-cell",
+      ".ca-journal-habits-row",
+      ".ca-journal-habit-chip",
+      ".ca-journal-habit-chip-btn",
+      ".ca-journal-habit-chip-name",
     ]) {
       expect(css).toContain(cls);
     }
@@ -7393,9 +7412,9 @@ describe("the tracker grid is editable per entry", () => {
     // which is right for a cell holding one tracker and wrong for this one:
     // hovering anywhere in Habits would light up every × at once. The cell
     // rule is cancelled and re-granted on the chip.
-    expect(css).toContain(".journal-habit-chip:hover");
+    expect(css).toContain(".ca-journal-habit-chip:hover");
     expect(css).toMatch(
-      /\.journal-habits-cell:hover[\s\S]{0,120}\.journal-tracker-remove\s*\{\s*opacity:\s*0;/
+      /\.ca-journal-habits-cell:hover[\s\S]{0,120}\.ca-journal-tracker-remove\s*\{\s*opacity:\s*0;/
     );
   });
 
@@ -7403,12 +7422,12 @@ describe("the tracker grid is editable per entry", () => {
     // The picker is a modal the plugin draws itself, borrowing the editor's
     // frame. Without these it is an unstyled list in a box.
     for (const cls of [
-      ".almanac-tracker-picker",
-      ".almanac-picker-search",
-      ".almanac-picker-list",
-      ".almanac-picker-row",
-      ".almanac-picker-row-detail",
-      ".almanac-picker-empty",
+      ".ca-tracker-picker",
+      ".ca-picker-search",
+      ".ca-picker-list",
+      ".ca-picker-row",
+      ".ca-picker-row-detail",
+      ".ca-picker-empty",
     ]) {
       expect(css).toContain(cls);
     }
@@ -7420,9 +7439,9 @@ describe("the tracker grid is editable per entry", () => {
     // them look like part of the grid. A missing rule leaves a raw button
     // sitting in the middle of the logging cells.
     for (const cls of [
-      ".journal-tracker-add",
-      ".journal-tracker-add-btn",
-      ".journal-tracker-remove",
+      ".ca-journal-tracker-add",
+      ".ca-journal-tracker-add-btn",
+      ".ca-journal-tracker-remove",
     ]) {
       expect(css).toContain(cls);
     }
@@ -7433,7 +7452,7 @@ describe("the tracker grid is editable per entry", () => {
     // a positioning context. Losing that rule sends every × to the corner of
     // the page.
     expect(css).toMatch(
-      /\.journal-tracker-bar \.journal-tracker-cell \{[^}]*position: relative/
+      /\.ca-journal-tracker-bar \.ca-journal-tracker-cell \{[^}]*position: relative/
     );
   });
 
@@ -7931,13 +7950,13 @@ describe("fold scope in the shipped templates", () => {
     let active = false;
     let hidden = 0;
     for (const b of blocksOf(text)) {
-      const isBar = /^```almanac\nheader:/m.test(b);
-      // `# almanac:trackers:start` is a marker comment inside a fence, never a
+      const isBar = /^```chronoanvil\nheader:/m.test(b);
+      // `# chronoanvil:trackers:start` is a marker comment inside a fence, never a
       // heading. The real walk in headerbar.ts can't be fooled by it — it looks
       // at rendered DOM, where a fence's contents are never an <h1> — but a
       // text-level model has to say so.
       const isHeading =
-        /^#{1,6} /.test(b.trim()) && !b.includes("almanac:trackers:");
+        /^#{1,6} /.test(b.trim()) && !b.includes("chronoanvil:trackers:");
       if (isBar || isHeading) {
         if (active) active = false;
         if (isBar) {
@@ -7969,7 +7988,7 @@ describe("fold scope in the shipped templates", () => {
       const text = studyFile(name);
       const headings = text
         .split("\n")
-        .filter((l) => /^#{1,6} /.test(l) && !l.includes("almanac:trackers:"));
+        .filter((l) => /^#{1,6} /.test(l) && !l.includes("chronoanvil:trackers:"));
       expect(headings, name).toEqual([]);
     }
   });
@@ -8301,7 +8320,7 @@ describe("periodUnitOf / periodPropertyFor", () => {
 
 // ── toValue: the habit-boolean gap ─────────────────────────────────────────
 //
-// Almanac's own habit checkbox writes 1 and 0, never true/false, so on that
+// ChronoAnvil's own habit checkbox writes 1 and 0, never true/false, so on that
 // path this is all dead code. It is not the only write path: the property is
 // ordinary frontmatter, and Obsidian's Properties panel will render it as a
 // checkbox and store a real `true`, as will a hand-edit or another plugin.
@@ -8540,13 +8559,13 @@ describe("bucketByMonth", () => {
 // `buildBlock(key, "")` used to emit a BLANK LINE between the markers, which
 // ends the HTML block early: the opener and the closer then render as two
 // paragraphs of literal text. It was visible under an untouched Learning Path
-// as `<!--almanac:path` and `-->` printed on the page — and it was every region
+// as `<!--chronoanvil:path` and `-->` printed on the page — and it was every region
 // on first use, because a region is created empty.
 
 describe("note regions survive being empty", () => {
   it("writes no blank line inside an empty region", () => {
     const out = writeNoteRegion("", "path", "");
-    expect(out).toContain("<!--almanac:path\n-->");
+    expect(out).toContain("<!--chronoanvil:path\n-->");
     expect(out).not.toContain("\n\n-->");
   });
 
@@ -8559,7 +8578,7 @@ describe("note regions survive being empty", () => {
     // The markers sit on their own lines so the stored text starts and ends
     // where a reader would expect in the raw file.
     const out = writeNoteRegion("", "path", "- [ ] step one");
-    expect(out).toContain("<!--almanac:path\n- [ ] step one\n-->");
+    expect(out).toContain("<!--chronoanvil:path\n- [ ] step one\n-->");
     expect(readNoteRegion(out, "path")).toBe("- [ ] step one");
   });
 
@@ -8573,7 +8592,7 @@ describe("note regions survive being empty", () => {
     // step, and the region is rewritten with nothing in it.
     const filled = writeNoteRegion("# Note\n", "path", "- [ ] step one");
     const emptied = writeNoteRegion(filled, "path", "");
-    expect(emptied).toContain("<!--almanac:path\n-->");
+    expect(emptied).toContain("<!--chronoanvil:path\n-->");
     expect(emptied).not.toContain("\n\n-->");
     expect(readNoteRegion(emptied, "path")).toBe("");
   });
@@ -8589,36 +8608,36 @@ describe("note regions survive being empty", () => {
 
 describe("ensureNoteRegions repairs as well as creates", () => {
   it("tightens a region left with a blank line in it", () => {
-    const stale = "# Note\n\n<!--almanac:path\n\n-->\n";
+    const stale = "# Note\n\n<!--chronoanvil:path\n\n-->\n";
     const out = ensureNoteRegions(stale, ["path"]);
     expect(out).not.toBeNull();
-    expect(out).toContain("<!--almanac:path\n-->");
+    expect(out).toContain("<!--chronoanvil:path\n-->");
     expect(out).not.toContain("\n\n-->");
   });
 
   it("reports no change when every region is already tight", () => {
     // Idempotence is what makes a render-time repair acceptable: it fires once
     // per affected note and then never again.
-    const clean = "# Note\n\n<!--almanac:path\n-->\n";
+    const clean = "# Note\n\n<!--chronoanvil:path\n-->\n";
     expect(ensureNoteRegions(clean, ["path"])).toBeNull();
   });
 
   it("never touches a region that holds content", () => {
-    const filled = "# Note\n\n<!--almanac:path\n- [ ] step one\n-->\n";
+    const filled = "# Note\n\n<!--chronoanvil:path\n- [ ] step one\n-->\n";
     expect(ensureNoteRegions(filled, ["path"])).toBeNull();
   });
 
   it("does not mistake real whitespace content for damage", () => {
     // A region holding only spaces is still repaired to the tight form, and
     // reading it back gives "" either way — so nothing a reader typed is lost.
-    const spaces = "# Note\n\n<!--almanac:path\n   \n-->\n";
+    const spaces = "# Note\n\n<!--chronoanvil:path\n   \n-->\n";
     const out = ensureNoteRegions(spaces, ["path"]);
     expect(readNoteRegion(out ?? spaces, "path")).toBe("");
   });
 
   it("still creates a region that is missing entirely", () => {
     const out = ensureNoteRegions("# Note\n", ["path"]);
-    expect(out).toContain("<!--almanac:path\n-->");
+    expect(out).toContain("<!--chronoanvil:path\n-->");
   });
 });
 
@@ -8821,7 +8840,7 @@ describe("3.6 patch 4: the rule-weight scale", () => {
     // evidence that it was WORTH doing is the next test.
     const fromRoot = css.slice(css.indexOf(":root {"));
     const block = fromRoot.slice(0, fromRoot.indexOf("\n}") + 2);
-    for (const token of ["--am-rule-hair:", "--am-rule:", "--am-rule-edge:"]) {
+    for (const token of ["--ca-rule-hair:", "--ca-rule:", "--ca-rule-edge:"]) {
       expect(block, token).toContain(token);
     }
   });
@@ -8833,7 +8852,7 @@ describe("3.6 patch 4: the rule-weight scale", () => {
     // already suspect. This is that grep, standing.
     //
     // 1.5px is on the list and is NOT on the scale: it is
-    // `.journal-habit-box`'s checkbox outline, which is the drawing of a
+    // `.ca-journal-habit-box`'s checkbox outline, which is the drawing of a
     // control rather than a rule between things. It is listed here so that
     // adding a fourth weight fails even though a third already exists — the
     // point is that every weight in the sheet is one somebody argued for.
@@ -8843,12 +8862,12 @@ describe("3.6 patch 4: the rule-weight scale", () => {
     // device pixel ratio. A box-shadow's spread does not floor, and keeps 1.5px.
     //
     // So a border may only be 1, 2 or 3, and 1.5 is available to rings alone.
-    // This is also why `--am-rule` cannot be 1.5: the dividers would silently
+    // This is also why `--ca-rule` cannot be 1.5: the dividers would silently
     // render at 1px while the cell rings rendered at 1.5px, and the one number
     // the scale exists to keep in step would be out of step by construction.
     //
     // Two borders in this sheet were written at 1.5px and drew 1px for their
-    // whole life. They are `--am-rule-hair` now, which changed nothing on
+    // whole life. They are `--ca-rule-hair` now, which changed nothing on
     // screen and made the file honest about it.
     const borderOk = new Set(["1px", "2px", "3px"]);
     const ringOk = new Set(["1px", "1.5px", "2px", "3px"]);

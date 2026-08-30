@@ -8,143 +8,143 @@
  */
 
 /* ============================================================
- *  Almanac Aesthetic Presets & Grain Accents (4.80)
+ *  ChronoAnvil Aesthetic Presets & Grain Accents (4.80)
  *  Presets: Modern Fluent (Default), Editorial Monastic, Technical HUD
  * ============================================================ */
 
 /* --- Grain Context Binding ---------------------------------- */
-[data-am-grain="daily"],
-.journal-page-head[data-am-grain="daily"],
-.am-vault-banner[data-am-grain="daily"] {
-  --am-grain-accent: var(--am-grain-daily);
-  --am-grain-accent-rgb: var(--am-grain-daily-rgb);
-  --am-grain-tint: rgba(var(--am-grain-daily-rgb), 0.08);
-  --am-grain-spine: var(--am-grain-daily);
+[data-ca-grain="daily"],
+.ca-journal-page-head[data-ca-grain="daily"],
+.ca-vault-banner[data-ca-grain="daily"] {
+  --ca-grain-accent: var(--ca-grain-daily);
+  --ca-grain-accent-rgb: var(--ca-grain-daily-rgb);
+  --ca-grain-tint: rgba(var(--ca-grain-daily-rgb), 0.08);
+  --ca-grain-spine: var(--ca-grain-daily);
 }
 
-[data-am-grain="weekly"],
-.journal-page-head[data-am-grain="weekly"],
-.am-vault-banner[data-am-grain="weekly"] {
-  --am-grain-accent: var(--am-grain-weekly);
-  --am-grain-accent-rgb: var(--am-grain-weekly-rgb);
-  --am-grain-tint: rgba(var(--am-grain-weekly-rgb), 0.08);
-  --am-grain-spine: var(--am-grain-weekly);
+[data-ca-grain="weekly"],
+.ca-journal-page-head[data-ca-grain="weekly"],
+.ca-vault-banner[data-ca-grain="weekly"] {
+  --ca-grain-accent: var(--ca-grain-weekly);
+  --ca-grain-accent-rgb: var(--ca-grain-weekly-rgb);
+  --ca-grain-tint: rgba(var(--ca-grain-weekly-rgb), 0.08);
+  --ca-grain-spine: var(--ca-grain-weekly);
 }
 
-[data-am-grain="monthly"],
-.journal-page-head[data-am-grain="monthly"],
-.am-vault-banner[data-am-grain="monthly"] {
-  --am-grain-accent: var(--am-grain-monthly);
-  --am-grain-accent-rgb: var(--am-grain-monthly-rgb);
-  --am-grain-tint: rgba(var(--am-grain-monthly-rgb), 0.08);
-  --am-grain-spine: var(--am-grain-monthly);
+[data-ca-grain="monthly"],
+.ca-journal-page-head[data-ca-grain="monthly"],
+.ca-vault-banner[data-ca-grain="monthly"] {
+  --ca-grain-accent: var(--ca-grain-monthly);
+  --ca-grain-accent-rgb: var(--ca-grain-monthly-rgb);
+  --ca-grain-tint: rgba(var(--ca-grain-monthly-rgb), 0.08);
+  --ca-grain-spine: var(--ca-grain-monthly);
 }
 
-[data-am-quarterly="quarterly"],
-[data-am-grain="quarterly"],
-.journal-page-head[data-am-grain="quarterly"],
-.am-vault-banner[data-am-grain="quarterly"] {
-  --am-grain-accent: var(--am-grain-quarterly);
-  --am-grain-accent-rgb: var(--am-grain-quarterly-rgb);
-  --am-grain-tint: rgba(var(--am-grain-quarterly-rgb), 0.08);
-  --am-grain-spine: var(--am-grain-quarterly);
+[data-ca-quarterly="quarterly"],
+[data-ca-grain="quarterly"],
+.ca-journal-page-head[data-ca-grain="quarterly"],
+.ca-vault-banner[data-ca-grain="quarterly"] {
+  --ca-grain-accent: var(--ca-grain-quarterly);
+  --ca-grain-accent-rgb: var(--ca-grain-quarterly-rgb);
+  --ca-grain-tint: rgba(var(--ca-grain-quarterly-rgb), 0.08);
+  --ca-grain-spine: var(--ca-grain-quarterly);
 }
 
-[data-am-grain="yearly"],
-.journal-page-head[data-am-grain="yearly"],
-.am-vault-banner[data-am-grain="yearly"] {
-  --am-grain-accent: var(--am-grain-yearly);
-  --am-grain-accent-rgb: var(--am-grain-yearly-rgb);
-  --am-grain-tint: rgba(var(--am-grain-yearly-rgb), 0.08);
-  --am-grain-spine: var(--am-grain-yearly);
+[data-ca-grain="yearly"],
+.ca-journal-page-head[data-ca-grain="yearly"],
+.ca-vault-banner[data-ca-grain="yearly"] {
+  --ca-grain-accent: var(--ca-grain-yearly);
+  --ca-grain-accent-rgb: var(--ca-grain-yearly-rgb);
+  --ca-grain-tint: rgba(var(--ca-grain-yearly-rgb), 0.08);
+  --ca-grain-spine: var(--ca-grain-yearly);
 }
 
-[data-am-journal],
-.journal-page-head[data-am-journal],
-.am-vault-banner[data-am-journal] {
-  --am-grain-accent: var(--am-journal-accent);
-  --am-grain-accent-rgb: var(--am-journal-accent-rgb);
-  --am-grain-tint: rgba(var(--am-journal-accent-rgb), 0.08);
-  --am-grain-spine: var(--am-journal-accent);
+[data-ca-journal],
+.ca-journal-page-head[data-ca-journal],
+.ca-vault-banner[data-ca-journal] {
+  --ca-grain-accent: var(--ca-journal-accent);
+  --ca-grain-accent-rgb: var(--ca-journal-accent-rgb);
+  --ca-grain-tint: rgba(var(--ca-journal-accent-rgb), 0.08);
+  --ca-grain-spine: var(--ca-journal-accent);
 }
 
 /* --- Grain Intensity Modifiers ------------------------------- */
-body.am-grain-monochrome {
-  --am-grain-accent: var(--interactive-accent);
-  --am-grain-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
-  --am-grain-tint: rgba(var(--interactive-accent-rgb, 138, 92, 245), 0.05);
-  --am-grain-spine: var(--interactive-accent);
-  --am-journal-accent: var(--interactive-accent);
-  --am-journal-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+body.ca-grain-monochrome {
+  --ca-grain-accent: var(--interactive-accent);
+  --ca-grain-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+  --ca-grain-tint: rgba(var(--interactive-accent-rgb, 138, 92, 245), 0.05);
+  --ca-grain-spine: var(--interactive-accent);
+  --ca-journal-accent: var(--interactive-accent);
+  --ca-journal-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
 }
 
-body.am-grain-subtle {
-  --am-grain-tint: rgba(var(--am-grain-accent-rgb), 0.03);
+body.ca-grain-subtle {
+  --ca-grain-tint: rgba(var(--ca-grain-accent-rgb), 0.03);
 }
 
 /* --- Micro-Spine & Eyebrow Accents on Page Head & Banner ---- */
-.journal-page-head[data-am-grain],
-.journal-page-head[data-am-journal],
-[data-am-grain] .journal-page-head,
-[data-am-journal] .journal-page-head {
-  border-left: 3px solid var(--am-grain-spine);
+.ca-journal-page-head[data-ca-grain],
+.ca-journal-page-head[data-ca-journal],
+[data-ca-grain] .ca-journal-page-head,
+[data-ca-journal] .ca-journal-page-head {
+  border-left: 3px solid var(--ca-grain-spine);
   padding-left: 14px;
-  background: linear-gradient(180deg, var(--am-grain-tint) 0%, transparent 100%);
+  background: linear-gradient(180deg, var(--ca-grain-tint) 0%, transparent 100%);
 }
 
-.journal-page-head[data-am-grain] .jph-eyebrow,
-.journal-page-head[data-am-journal] .jph-eyebrow,
-[data-am-grain] .journal-page-head .jph-eyebrow,
-[data-am-journal] .journal-page-head .jph-eyebrow {
-  color: var(--am-grain-accent);
+.ca-journal-page-head[data-ca-grain] .ca-jph-eyebrow,
+.ca-journal-page-head[data-ca-journal] .ca-jph-eyebrow,
+[data-ca-grain] .ca-journal-page-head .ca-jph-eyebrow,
+[data-ca-journal] .ca-journal-page-head .ca-jph-eyebrow {
+  color: var(--ca-grain-accent);
 }
 
-.am-vault-banner[data-am-grain],
-.am-vault-banner[data-am-journal],
-[data-am-grain] .am-vault-banner,
-[data-am-journal] .am-vault-banner {
-  border-top: 2px solid var(--am-grain-spine);
+.ca-vault-banner[data-ca-grain],
+.ca-vault-banner[data-ca-journal],
+[data-ca-grain] .ca-vault-banner,
+[data-ca-journal] .ca-vault-banner {
+  border-top: 2px solid var(--ca-grain-spine);
 }
 
 /* Accents on Task Buckets and Telemetry */
-[data-am-grain] .jtt-bucket-head,
-[data-am-journal] .jtt-bucket-head {
-  background: var(--am-grain-tint);
-  color: var(--am-grain-accent);
+[data-ca-grain] .ca-jtt-bucket-head,
+[data-ca-journal] .ca-jtt-bucket-head {
+  background: var(--ca-grain-tint);
+  color: var(--ca-grain-accent);
 }
 
-[data-am-grain] .am-stat-ring-val,
-[data-am-journal] .am-stat-ring-val {
-  stroke: var(--am-grain-accent);
+[data-ca-grain] .ca-stat-ring-val,
+[data-ca-journal] .ca-stat-ring-val {
+  stroke: var(--ca-grain-accent);
 }
 
 /* Section Card Surface Propagation */
-.journal-sec-block {
-  background: var(--am-surface-card);
-  border-left-color: var(--am-border-subtle);
-  border-right-color: var(--am-border-subtle);
+.ca-journal-sec-block {
+  background: var(--ca-surface-card);
+  border-left-color: var(--ca-border-subtle);
+  border-right-color: var(--ca-border-subtle);
 }
-.journal-sec-block.is-first {
-  border-top-color: var(--am-border-subtle);
+.ca-journal-sec-block.is-first {
+  border-top-color: var(--ca-border-subtle);
 }
-.journal-sec-block.is-last {
-  border-bottom-color: var(--am-border-subtle);
+.ca-journal-sec-block.is-last {
+  border-bottom-color: var(--ca-border-subtle);
 }
 
-.am-stat {
-  background: var(--am-surface-card);
+.ca-stat {
+  background: var(--ca-surface-card);
 }
-.am-stats {
-  background: var(--am-border-subtle);
+.ca-stats {
+  background: var(--ca-border-subtle);
 }
 
 /* Sunken / Inset Input Surfaces (prevents washed out punchouts) */
-.am-input,
-.am-search-input,
-.journal-tracker-input,
-.journal-scale-note-input {
-  background: var(--am-surface-inset);
-  border: 1px solid var(--am-border-subtle);
+.ca-input,
+.ca-search-input,
+.ca-journal-tracker-input,
+.ca-journal-scale-note-input {
+  background: var(--ca-surface-inset);
+  border: 1px solid var(--ca-border-subtle);
   color: var(--text-normal);
 }
 
@@ -152,174 +152,174 @@ body.am-grain-subtle {
  *  Preset 2: Editorial Monastic (Candidate 2)
  *  Classical serif typography, warm parchment borders, crisp seams
  * ============================================================ */
-body.am-preset-editorial {
-  --am-font-heading: var(--font-serif, "Lora", "Georgia", "Merriweather", "Cambria", serif);
-  --am-radius-xs: 2px;
-  --am-radius-sm: 4px;
-  --am-radius-md: 6px;
-  --am-radius-pill: 4px;
+body.ca-preset-editorial {
+  --ca-font-heading: var(--font-serif, "Lora", "Georgia", "Merriweather", "Cambria", serif);
+  --ca-radius-xs: 2px;
+  --ca-radius-sm: 4px;
+  --ca-radius-md: 6px;
+  --ca-radius-pill: 4px;
 }
 
-body.am-preset-editorial .jph-title,
-body.am-preset-editorial .am-sec-title,
-body.am-preset-editorial .am-bar-title,
-body.am-preset-editorial .callout-title,
-body.am-preset-editorial .am-vb-title,
-body.am-preset-editorial .am-vb-crumb,
-body.am-preset-editorial .jtt-bucket-title,
-body.am-preset-editorial .journal-task-main {
-  font-family: var(--am-font-heading);
+body.ca-preset-editorial .ca-jph-title,
+body.ca-preset-editorial .ca-sec-title,
+body.ca-preset-editorial .ca-bar-title,
+body.ca-preset-editorial .callout-title,
+body.ca-preset-editorial .ca-vb-title,
+body.ca-preset-editorial .ca-vb-crumb,
+body.ca-preset-editorial .ca-jtt-bucket-title,
+body.ca-preset-editorial .ca-journal-task-main {
+  font-family: var(--ca-font-heading);
 }
 
-body.am-preset-editorial .journal-page-head[data-am-grain],
-body.am-preset-editorial .journal-page-head[data-am-journal],
-body.am-preset-editorial [data-am-grain] .journal-page-head,
-body.am-preset-editorial [data-am-journal] .journal-page-head {
+body.ca-preset-editorial .ca-journal-page-head[data-ca-grain],
+body.ca-preset-editorial .ca-journal-page-head[data-ca-journal],
+body.ca-preset-editorial [data-ca-grain] .ca-journal-page-head,
+body.ca-preset-editorial [data-ca-journal] .ca-journal-page-head {
   border-left-width: 2px;
 }
 
-body.theme-dark.am-preset-editorial {
-  --background-primary: var(--am-preset-editorial-bg);
-  --background-primary-alt: var(--am-preset-editorial-inset);
-  --background-secondary: var(--am-preset-editorial-card);
-  --background-secondary-alt: var(--am-preset-editorial-raised);
-  --background-modifier-border: var(--am-preset-editorial-border);
-  --am-surface-card: var(--am-preset-editorial-card);
-  --am-surface-raised: var(--am-preset-editorial-raised);
-  --am-surface-inset: var(--am-preset-editorial-inset);
-  --am-border-subtle: var(--am-preset-editorial-border);
-  --am-border-inner: var(--am-preset-editorial-border-inner);
+body.theme-dark.ca-preset-editorial {
+  --background-primary: var(--ca-preset-editorial-bg);
+  --background-primary-alt: var(--ca-preset-editorial-inset);
+  --background-secondary: var(--ca-preset-editorial-card);
+  --background-secondary-alt: var(--ca-preset-editorial-raised);
+  --background-modifier-border: var(--ca-preset-editorial-border);
+  --ca-surface-card: var(--ca-preset-editorial-card);
+  --ca-surface-raised: var(--ca-preset-editorial-raised);
+  --ca-surface-inset: var(--ca-preset-editorial-inset);
+  --ca-border-subtle: var(--ca-preset-editorial-border);
+  --ca-border-inner: var(--ca-preset-editorial-border-inner);
 }
 
-body.theme-light.am-preset-editorial {
-  --background-primary: var(--am-preset-editorial-bg-light);
-  --background-primary-alt: var(--am-preset-editorial-inset-light);
-  --background-secondary: var(--am-preset-editorial-card-light);
-  --background-secondary-alt: var(--am-preset-editorial-raised-light);
-  --background-modifier-border: var(--am-preset-editorial-border-light);
-  --am-surface-card: var(--am-preset-editorial-card-light);
-  --am-surface-raised: var(--am-preset-editorial-raised-light);
-  --am-surface-inset: var(--am-preset-editorial-inset-light);
-  --am-border-subtle: var(--am-preset-editorial-border-light);
-  --am-border-inner: var(--am-preset-editorial-border-inner-light);
+body.theme-light.ca-preset-editorial {
+  --background-primary: var(--ca-preset-editorial-bg-light);
+  --background-primary-alt: var(--ca-preset-editorial-inset-light);
+  --background-secondary: var(--ca-preset-editorial-card-light);
+  --background-secondary-alt: var(--ca-preset-editorial-raised-light);
+  --background-modifier-border: var(--ca-preset-editorial-border-light);
+  --ca-surface-card: var(--ca-preset-editorial-card-light);
+  --ca-surface-raised: var(--ca-preset-editorial-raised-light);
+  --ca-surface-inset: var(--ca-preset-editorial-inset-light);
+  --ca-border-subtle: var(--ca-preset-editorial-border-light);
+  --ca-border-inner: var(--ca-preset-editorial-border-inner-light);
 }
 
-body.am-preset-editorial .workspace-leaf-content[data-type="markdown"],
-body.am-preset-editorial .markdown-reading-view,
-body.am-preset-editorial .markdown-preview-view {
+body.ca-preset-editorial .workspace-leaf-content[data-type="markdown"],
+body.ca-preset-editorial .markdown-reading-view,
+body.ca-preset-editorial .markdown-preview-view {
   background-color: var(--background-primary);
 }
 
-body.am-preset-editorial .am-vault-banner {
-  background-color: var(--am-surface-card);
-  border-bottom: 1px solid var(--am-border-subtle);
+body.ca-preset-editorial .ca-vault-banner {
+  background-color: var(--ca-surface-card);
+  border-bottom: 1px solid var(--ca-border-subtle);
 }
 
-body.am-preset-editorial .am-vb-tile {
-  background-color: var(--am-surface-raised);
-  border: 1px solid var(--am-border-subtle);
+body.ca-preset-editorial .ca-vb-tile {
+  background-color: var(--ca-surface-raised);
+  border: 1px solid var(--ca-border-subtle);
 }
 
-body.am-preset-editorial .journal-mood-face.is-selected,
-body.am-preset-editorial .journal-scale-face.is-selected {
-  background-color: var(--am-surface-raised);
-  border-color: var(--am-grain-accent);
+body.ca-preset-editorial .ca-journal-mood-face.is-selected,
+body.ca-preset-editorial .ca-journal-scale-face.is-selected {
+  background-color: var(--ca-surface-raised);
+  border-color: var(--ca-grain-accent);
 }
 
 /* ============================================================
  *  Preset 3: Technical HUD (Candidate 3)
  *  High-contrast telemetry, monospace figures, angular corners
  * ============================================================ */
-body.am-preset-technical {
-  --am-font-telemetry: var(--font-monospace, "JetBrains Mono", "Fira Code", monospace);
-  --am-radius-xs: 1px;
-  --am-radius-sm: 2px;
-  --am-radius-md: 4px;
-  --am-radius-pill: 2px;
+body.ca-preset-technical {
+  --ca-font-telemetry: var(--font-monospace, "JetBrains Mono", "Fira Code", monospace);
+  --ca-radius-xs: 1px;
+  --ca-radius-sm: 2px;
+  --ca-radius-md: 4px;
+  --ca-radius-pill: 2px;
 }
 
-body.am-preset-technical .jph-title,
-body.am-preset-technical .am-sec-title,
-body.am-preset-technical .am-bar-title,
-body.am-preset-technical .callout-title,
-body.am-preset-technical .am-stat-val,
-body.am-preset-technical .am-stat-label,
-body.am-preset-technical .journal-task-main,
-body.am-preset-technical .jtt-tag,
-body.am-preset-technical .jtt-prio,
-body.am-preset-technical .jtt-bucket-title,
-body.am-preset-technical .am-vb-title,
-body.am-preset-technical .am-vb-crumb,
-body.am-preset-technical .am-vb-tile,
-body.am-preset-technical .am-btn {
-  font-family: var(--am-font-telemetry);
+body.ca-preset-technical .ca-jph-title,
+body.ca-preset-technical .ca-sec-title,
+body.ca-preset-technical .ca-bar-title,
+body.ca-preset-technical .callout-title,
+body.ca-preset-technical .ca-stat-val,
+body.ca-preset-technical .ca-stat-label,
+body.ca-preset-technical .ca-journal-task-main,
+body.ca-preset-technical .ca-jtt-tag,
+body.ca-preset-technical .ca-jtt-prio,
+body.ca-preset-technical .ca-jtt-bucket-title,
+body.ca-preset-technical .ca-vb-title,
+body.ca-preset-technical .ca-vb-crumb,
+body.ca-preset-technical .ca-vb-tile,
+body.ca-preset-technical .ca-btn {
+  font-family: var(--ca-font-telemetry);
 }
 
-body.am-preset-technical .journal-page-head[data-am-grain],
-body.am-preset-technical .journal-page-head[data-am-journal],
-body.am-preset-technical [data-am-grain] .journal-page-head,
-body.am-preset-technical [data-am-journal] .journal-page-head {
+body.ca-preset-technical .ca-journal-page-head[data-ca-grain],
+body.ca-preset-technical .ca-journal-page-head[data-ca-journal],
+body.ca-preset-technical [data-ca-grain] .ca-journal-page-head,
+body.ca-preset-technical [data-ca-journal] .ca-journal-page-head {
   border-left-width: 3px;
 }
 
-body.theme-dark.am-preset-technical {
-  --background-primary: var(--am-preset-technical-bg);
-  --background-primary-alt: var(--am-preset-technical-inset);
-  --background-secondary: var(--am-preset-technical-card);
-  --background-secondary-alt: var(--am-preset-technical-raised);
-  --background-modifier-border: var(--am-preset-technical-border);
-  --am-surface-card: var(--am-preset-technical-card);
-  --am-surface-raised: var(--am-preset-technical-raised);
-  --am-surface-inset: var(--am-preset-technical-inset);
-  --am-border-subtle: var(--am-preset-technical-border);
-  --am-border-inner: var(--am-preset-technical-border-inner);
-  --am-slot-edge: var(--am-preset-technical-slot-edge);
+body.theme-dark.ca-preset-technical {
+  --background-primary: var(--ca-preset-technical-bg);
+  --background-primary-alt: var(--ca-preset-technical-inset);
+  --background-secondary: var(--ca-preset-technical-card);
+  --background-secondary-alt: var(--ca-preset-technical-raised);
+  --background-modifier-border: var(--ca-preset-technical-border);
+  --ca-surface-card: var(--ca-preset-technical-card);
+  --ca-surface-raised: var(--ca-preset-technical-raised);
+  --ca-surface-inset: var(--ca-preset-technical-inset);
+  --ca-border-subtle: var(--ca-preset-technical-border);
+  --ca-border-inner: var(--ca-preset-technical-border-inner);
+  --ca-slot-edge: var(--ca-preset-technical-slot-edge);
 }
 
-body.theme-light.am-preset-technical {
-  --background-primary: var(--am-preset-technical-bg-light);
-  --background-primary-alt: var(--am-preset-technical-inset-light);
-  --background-secondary: var(--am-preset-technical-card-light);
-  --background-secondary-alt: var(--am-preset-technical-raised-light);
-  --background-modifier-border: var(--am-preset-technical-border-light);
-  --am-surface-card: var(--am-preset-technical-card-light);
-  --am-surface-raised: var(--am-preset-technical-raised-light);
-  --am-surface-inset: var(--am-preset-technical-inset-light);
-  --am-border-subtle: var(--am-preset-technical-border-light);
-  --am-border-inner: var(--am-preset-technical-border-inner-light);
+body.theme-light.ca-preset-technical {
+  --background-primary: var(--ca-preset-technical-bg-light);
+  --background-primary-alt: var(--ca-preset-technical-inset-light);
+  --background-secondary: var(--ca-preset-technical-card-light);
+  --background-secondary-alt: var(--ca-preset-technical-raised-light);
+  --background-modifier-border: var(--ca-preset-technical-border-light);
+  --ca-surface-card: var(--ca-preset-technical-card-light);
+  --ca-surface-raised: var(--ca-preset-technical-raised-light);
+  --ca-surface-inset: var(--ca-preset-technical-inset-light);
+  --ca-border-subtle: var(--ca-preset-technical-border-light);
+  --ca-border-inner: var(--ca-preset-technical-border-inner-light);
 }
 
-body.am-preset-technical .workspace-leaf-content[data-type="markdown"],
-body.am-preset-technical .markdown-reading-view,
-body.am-preset-technical .markdown-preview-view {
+body.ca-preset-technical .workspace-leaf-content[data-type="markdown"],
+body.ca-preset-technical .markdown-reading-view,
+body.ca-preset-technical .markdown-preview-view {
   background-color: var(--background-primary);
 }
 
-body.am-preset-technical .am-vault-banner {
-  background-color: var(--am-surface-card);
-  border-bottom: 1px solid var(--am-border-subtle);
+body.ca-preset-technical .ca-vault-banner {
+  background-color: var(--ca-surface-card);
+  border-bottom: 1px solid var(--ca-border-subtle);
 }
 
-body.am-preset-technical .am-vb-tile {
-  background-color: var(--am-surface-raised);
-  border: 1px solid var(--am-border-subtle);
+body.ca-preset-technical .ca-vb-tile {
+  background-color: var(--ca-surface-raised);
+  border: 1px solid var(--ca-border-subtle);
 }
 
-body.am-preset-technical .journal-sec-block,
-body.am-preset-technical .callout[data-callout="note"],
-body.am-preset-technical .journal-calendar,
-body.am-preset-technical .am-stat {
+body.ca-preset-technical .ca-journal-sec-block,
+body.ca-preset-technical .callout[data-callout="note"],
+body.ca-preset-technical .ca-journal-calendar,
+body.ca-preset-technical .ca-stat {
   border-radius: 4px;
 }
 
-body.am-preset-technical .am-btn,
-body.am-preset-technical .jtt-prio,
-body.am-preset-technical .jtt-tag {
+body.ca-preset-technical .ca-btn,
+body.ca-preset-technical .ca-jtt-prio,
+body.ca-preset-technical .ca-jtt-tag {
   border-radius: 2px;
 }
 
-body.am-preset-technical .journal-mood-face.is-selected,
-body.am-preset-technical .journal-scale-face.is-selected {
-  background-color: var(--am-surface-raised);
-  border-color: var(--am-grain-accent);
+body.ca-preset-technical .ca-journal-mood-face.is-selected,
+body.ca-preset-technical .ca-journal-scale-face.is-selected {
+  background-color: var(--ca-surface-raised);
+  border-color: var(--ca-grain-accent);
 }

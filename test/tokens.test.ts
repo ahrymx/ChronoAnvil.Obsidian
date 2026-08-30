@@ -17,14 +17,14 @@ import { describe, expect, it } from "vitest";
 import { allSrcNames, readCss, readSrc, repoFile } from "./sources";
 import { OBSIDIAN_DOM } from "../src/core/constants";
 
-// Every `--am-…` the sheet defines ANYWHERE, including the single-line rules
+// Every `--ca-…` the sheet defines ANYWHERE, including the single-line rules
 // that set a tint or a span. Deliberately not anchored to the line start: a
 // definition may share its line with a selector, and anchoring is what made an
-// earlier cut of this file report `--am-ev-tint` as undefined when it is
+// earlier cut of this file report `--ca-ev-tint` as undefined when it is
 // defined eight times in 93-calendars.css.
 function definedAnywhere(css: string): Set<string> {
   return new Set(
-    [...css.matchAll(/(?<!var\(\s*)(--am-[a-z0-9-]+)\s*:/g)].map((m) => m[1])
+    [...css.matchAll(/(?<!var\(\s*)(--ca-[a-z0-9-]+)\s*:/g)].map((m) => m[1])
   );
 }
 
@@ -36,11 +36,11 @@ function unconditional(): Set<string> {
   return new Set(
     [
       // COMMENTS OUT FIRST, for the reason the guard below records: prose in this
-      // file names tokens, and a sentence beginning `--am-border-inner: …` at the
+      // file names tokens, and a sentence beginning `--ca-border-inner: …` at the
       // start of a comment line is not a definition.
       ...repoFile("styles/00-tokens.css")
         .replace(/\/\*[\s\S]*?\*\//g, "")
-        .matchAll(/^\s*(--am-[a-z0-9-]+)\s*:/gm),
+        .matchAll(/^\s*(--ca-[a-z0-9-]+)\s*:/gm),
     ].map((m) => m[1])
   );
 }
@@ -49,7 +49,7 @@ function unconditional(): Set<string> {
 //
 // EVERY ENTRY HERE IS AN EXEMPTION FROM THE GUARD BELOW, so the list is the
 // guard's weak point rather than a footnote to it. 3.12 removed
-// `--am-heat-max-w`, which was on it because 3.10 assumed anything referenced
+// `--ca-heat-max-w`, which was on it because 3.10 assumed anything referenced
 // and undefined must be set from TypeScript. Nothing set it: it was a dangling
 // reference living off its own fallback, and the whitelist is what let it.
 //
@@ -59,34 +59,34 @@ const SET_FROM_TS = new Set([
   // 4.4 §2: a cell of a row may ask for a number of shares, set on the element
   // by row.ts. Absent on an ordinary cell, which is why the stylesheet reads it
   // with a fallback.
-  "--am-cell-weight",
+  "--ca-cell-weight",
   // 4.22 §3.1: how tall the note says one widget's card is, set on the card by
   // block-drag.ts. Absent on a card with no stated height, which is every card
   // until somebody drags one — so `is-sized` is what guards the declaration
   // rather than a fallback on the read.
-  "--am-card-h",
-  "--am-row-cols",
-  "--am-tracker-cell-h",
-  "--am-chart-row-track",
+  "--ca-card-h",
+  "--ca-row-cols",
+  "--ca-tracker-cell-h",
+  "--ca-chart-row-track",
   // 4.55: how many hours the time grid's window spans, set on each day column
   // by time-grid-view.ts so the hour lines can be `calc(100% / n)` rather than
   // a pixel step. The number is the week's content, not a design decision, so
   // it has no sensible value in the token file.
-  "--am-tg-hours",
+  "--ca-tg-hours",
   // 4.62: where the current minute falls in that window, as a fraction, set on
   // the grid body by time-grid-view.ts and moved by a minute ticker. Absent
-  // whenever now is outside the window — which is what `.am-tg-now` being
+  // whenever now is outside the window — which is what `.ca-tg-now` being
   // removed from the DOM says, so there is no reading of it to guard.
-  "--am-tg-at",
+  "--ca-tg-at",
   // 4.62: how many day columns the grid is drawing — seven, or three, or one,
   // decided by the directive and narrowed by the pane. Set on the grid by
   // time-grid-view.ts and read by the three rows' templates, so a number that
   // belongs to one week's rendering is not a design constant in the token file.
-  "--am-tg-cols",
+  "--ca-tg-cols",
 ]);
 
 describe("a token reference resolves to a token", () => {
-  it("defines every --am- custom property it reads", () => {
+  it("defines every --ca- custom property it reads", () => {
     // THE ONE THAT EARNS ITS KEEP. A misspelled var() is not an error in CSS,
     // it is an empty string: the declaration is dropped and the element renders
     // with no padding, no radius or no colour at all. Nothing in the build
@@ -96,7 +96,7 @@ describe("a token reference resolves to a token", () => {
     const have = definedAnywhere(css);
     const missing = [
       ...new Set(
-        [...css.matchAll(/var\(\s*(--am-[a-z0-9-]+)/g)].map((m) => m[1])
+        [...css.matchAll(/var\(\s*(--ca-[a-z0-9-]+)/g)].map((m) => m[1])
       ),
     ].filter((t) => !have.has(t) && !SET_FROM_TS.has(t));
     expect(missing).toEqual([]);
@@ -107,7 +107,7 @@ describe("a token that names a theme colour is declared on `body` (4.42)", () =>
   it("reads nothing on :root that :root does not itself define", () => {
     // ── THREE RELEASES OF WHITE CARD BORDERS, AND THIS IS THE RULE ───────
     //
-    // `--am-border-inner` was a `color-mix` over two theme variables on `:root`,
+    // `--ca-border-inner` was a `color-mix` over two theme variables on `:root`,
     // and every card that read it drew a **`#dadada`** edge — `currentColor`,
     // the initial `border-color`, which is what an element gets when the colour
     // it asked for is invalid.
@@ -122,7 +122,7 @@ describe("a token that names a theme colour is declared on `body` (4.42)", () =>
     // the token is invalid for everything that inherits it.
     //
     // 4.40.1 WROTE THIS GUARD FOR `color-mix` ONLY, on the theory that a lone
-    // `var()` was somehow lazier. It is not — `--am-surface-inset:
+    // `var()` was somehow lazier. It is not — `--ca-surface-inset:
     // var(--background-primary-alt)` on `:root` was broken by exactly the same
     // mechanism, and it was still broken after the mix moved to `body`, because
     // the mix was reading IT. Nine tokens were affected; the guard that would
@@ -152,14 +152,14 @@ describe("a token that names a theme colour is declared on `body` (4.42)", () =>
     const css = repoFile("styles/00-tokens.css");
     const body = css.slice(css.indexOf("\nbody {"), css.indexOf("body.theme-light"));
     for (const t of [
-      "--am-surface-card",
-      "--am-surface-raised",
-      "--am-surface-inset",
-      "--am-border-subtle",
-      "--am-border-hover",
-      "--am-border-focus",
-      "--am-bar-ink",
-      "--am-sec-title-ink",
+      "--ca-surface-card",
+      "--ca-surface-raised",
+      "--ca-surface-inset",
+      "--ca-border-subtle",
+      "--ca-border-hover",
+      "--ca-border-focus",
+      "--ca-bar-ink",
+      "--ca-sec-title-ink",
     ]) {
       expect(body, t).toContain(`${t}: var(--`);
     }
@@ -168,30 +168,30 @@ describe("a token that names a theme colour is declared on `body` (4.42)", () =>
   it("gives the seam a value that cannot fail, and a twin for light", () => {
     // WHAT IS GIVEN UP: the mix adapted to whatever border colour a theme
     // declared. It also never once drew. An adaptive value that renders as
-    // `currentColor` is not adaptive, and `--am-slot-edge` is the proof a plain
+    // `currentColor` is not adaptive, and `--ca-slot-edge` is the proof a plain
     // one works — measured at #333333 over #232323 on the same screenshot that
     // showed this token still white.
     const css = repoFile("styles/00-tokens.css").replace(/\/\*[\s\S]*?\*\//g, "");
     const root = css.slice(css.indexOf(":root {"), css.indexOf("\n}"));
-    expect(root).toMatch(/--am-border-inner: rgba\(255, 255, 255, [\d.]+\);/);
+    expect(root).toMatch(/--ca-border-inner: rgba\(255, 255, 255, [\d.]+\);/);
     expect(css).toMatch(
-      /body\.theme-light \{[\s\S]*?--am-border-inner: rgba\(0, 0, 0, [\d.]+\);/
+      /body\.theme-light \{[\s\S]*?--ca-border-inner: rgba\(0, 0, 0, [\d.]+\);/
     );
     // AND NOWHERE IS IT A MIX AGAIN.
-    expect(css).not.toMatch(/--am-border-inner:\s*color-mix/);
+    expect(css).not.toMatch(/--ca-border-inner:\s*color-mix/);
   });
 });
 
 describe("a fallback means the token can be missing", () => {
   it("carries no fallback on a token 00-tokens.css defines", () => {
     // §4.2 recorded this as two harmless spellings of one thing:
-    // `var(--am-radius-pill, 999px)` beside the bare form. It was neither
+    // `var(--ca-radius-pill, 999px)` beside the bare form. It was neither
     // confined to the pill radius nor harmless.
     //
     // SIX tokens carried fallbacks across 164 call sites, and 48 of those named
-    // a value that DISAGREED with the token they shadowed — `--am-radius-md`
-    // fell back to 8px where the token is 10px, `--am-text-sm` to 0.9em where
-    // it is 0.85em, `--am-radius-sm` to 5px, 6px and 7px in different files.
+    // a value that DISAGREED with the token they shadowed — `--ca-radius-md`
+    // fell back to 8px where the token is 10px, `--ca-text-sm` to 0.9em where
+    // it is 0.85em, `--ca-radius-sm` to 5px, 6px and 7px in different files.
     // They are the pre-token literals, left behind when the tokens were
     // introduced and never revisited when the tokens were later retuned.
     //
@@ -203,7 +203,7 @@ describe("a fallback means the token can be missing", () => {
     // ── COMMENTS STRIPPED FIRST, AND 4.40 IS WHY ─────────────────────────
     //
     // This scraped the raw bundle, so a COMMENT explaining why a fallback would
-    // not have helped — *"`var(--am-border-inner, fallback)` does not help
+    // not have helped — *"`var(--ca-border-inner, fallback)` does not help
     // either; the fallback is for a property that is NOT SET"* — reported itself
     // as the offence it was warning about. A file documenting a rule quotes the
     // thing the rule forbids; that is what documenting it means. The house rule
@@ -214,7 +214,7 @@ describe("a fallback means the token can be missing", () => {
     const always = unconditional();
     const offenders = [
       ...new Set(
-        [...css.matchAll(/var\(\s*(--am-[a-z0-9-]+)\s*,/g)].map((m) => m[1])
+        [...css.matchAll(/var\(\s*(--ca-[a-z0-9-]+)\s*,/g)].map((m) => m[1])
       ),
     ].filter((t) => always.has(t));
     expect(offenders).toEqual([]);
@@ -227,7 +227,7 @@ describe("a fallback means the token can be missing", () => {
     // most of the time and a bare var() would render the declaration away.
     const css = readCss();
     const always = unconditional();
-    for (const t of ["--am-ev-tint", "--am-row-cols"]) {
+    for (const t of ["--ca-ev-tint", "--ca-row-cols"]) {
       expect(always.has(t), `${t} must not be in 00-tokens.css`).toBe(false);
       expect(css.includes(`var(${t},`), t).toBe(true);
     }
@@ -245,13 +245,13 @@ describe("the spacing scale (3.9 §4)", () => {
     // override one line instead of seven — and what keeps 2N true on both
     // platforms rather than only on the one the literals were typed for.
     const tokens = repoFile("styles/00-tokens.css");
-    expect(tokens).toMatch(/--am-space-unit:\s*2px;/);
+    expect(tokens).toMatch(/--ca-space-unit:\s*2px;/);
     for (let n = 1; n <= 7; n++) {
-      expect(tokens, `--am-space-${n}`).toMatch(
-        new RegExp(`--am-space-${n}:\\s*calc\\(var\\(--am-space-unit\\) \\* ${n}\\);`)
+      expect(tokens, `--ca-space-${n}`).toMatch(
+        new RegExp(`--ca-space-${n}:\\s*calc\\(var\\(--ca-space-unit\\) \\* ${n}\\);`)
       );
     }
-    expect(tokens).not.toMatch(/--am-space-8:/);
+    expect(tokens).not.toMatch(/--ca-space-8:/);
   });
 
   it("has the controls patch 6 named reading it", () => {
@@ -261,16 +261,16 @@ describe("the spacing scale (3.9 §4)", () => {
     // tidiness — so this asserts the controls moved, not that the sheet did.
     const css = readCss();
     for (const decl of [
-      ".almanac-list-pill {",
-      ".journal-btn-ghost {",
+      ".ca-list-pill {",
+      ".ca-journal-btn-ghost {",
       // `.jt-tag-pill` until 3.14 §4.3, which retired the cloud and its three
       // size tiers with it. The row that replaced it reads the same scale.
-      ".jt-tag-row {",
+      ".ca-jt-tag-row {",
     ]) {
       const at = css.indexOf(decl);
       expect(at, decl).toBeGreaterThan(-1);
       const body = css.slice(at, css.indexOf("}", at));
-      expect(body, decl).toMatch(/padding:[^;]*var\(--am-space-/);
+      expect(body, decl).toMatch(/padding:[^;]*var\(--ca-space-/);
     }
   });
 
@@ -310,35 +310,35 @@ describe("the mobile control shape (3.12 §14.1, §14.2)", () => {
     // controls, and what turned the recap notice's two-word "Add it" into a
     // blob.
     //
-    // Both properties read `--am-control-min`, so the floor and the corner
+    // Both properties read `--ca-control-min`, so the floor and the corner
     // cannot drift into disagreeing about what shape a control is.
     const css = readCss();
     expect(css).toMatch(
-      /--am-control-round:\s*calc\(var\(--am-control-min\) \* 0\.35\)/
+      /--ca-control-round:\s*calc\(var\(--ca-control-min\) \* 0\.35\)/
     );
     // 0.35 and not 0.5: half the height IS a capsule, so deriving it that way
     // would reproduce the bug from the token instead of from a literal.
-    expect(css).not.toMatch(/--am-control-round:\s*calc\(var\(--am-control-min\) \* 0\.5\)/);
+    expect(css).not.toMatch(/--ca-control-round:\s*calc\(var\(--ca-control-min\) \* 0\.5\)/);
   });
 
   it("applies the floor and the corner to one selector list", () => {
     // Two lists is how one gains a member and the other does not.
     const css = readCss();
-    const at = css.indexOf("min-height: var(--am-control-min)");
+    const at = css.indexOf("min-height: var(--ca-control-min)");
     expect(at).toBeGreaterThan(-1);
     const body = css.slice(at, css.indexOf("}", at));
-    expect(body).toContain("border-radius: var(--am-control-round)");
+    expect(body).toContain("border-radius: var(--ca-control-round)");
   });
 
   it("hides only the label, never the button's accessible name", () => {
     // The compaction is safe because buildButton already sets `aria-label` and
-    // `title` from the same string it renders into `.journal-btn-label`. If
+    // `title` from the same string it renders into `.ca-journal-btn-label`. If
     // that ever stops being true, hiding the span starts hiding the name.
     expect(readSrc("button-widgets")).toContain('btn.setAttr("aria-label", hover)');
-    expect(readSrc("button-widgets")).toContain('cls: "journal-btn-label", text: spec.label');
+    expect(readSrc("button-widgets")).toContain('cls: "ca-journal-btn-label", text: spec.label');
     const css = readCss();
     expect(css).toMatch(
-      /body\.is-mobile \.journal-header-widgets \.journal-btn \.journal-btn-label \{\s*display: none;/
+      /body\.is-mobile \.ca-journal-header-widgets \.ca-journal-btn \.ca-journal-btn-label \{\s*display: none;/
     );
   });
 });
@@ -420,10 +420,10 @@ describe("the bar scale (4.13 §1)", () => {
     // and nothing noticed for four releases.
     const root = unconditional();
     for (const token of [
-      "--am-bar-text",
-      "--am-bar-track",
-      "--am-bar-ink",
-      "--am-bar-glyph",
+      "--ca-bar-text",
+      "--ca-bar-track",
+      "--ca-bar-ink",
+      "--ca-bar-glyph",
     ]) {
       expect([...root], token).toContain(token);
     }
@@ -439,12 +439,12 @@ describe("the bar scale (4.13 §1)", () => {
     // Obsidian puts those"* — which is exactly right, and is the fault behind
     // three releases of white card borders.
     //
-    // It then said these four *"read `--am-text-*` and `--text-muted`, which are
+    // It then said these four *"read `--ca-text-*` and `--text-muted`, which are
     // ours and the theme's ordinary inherited ink — so `:root` is right"*.
     // **`--text-muted` is not ordinary inherited ink; it is a theme variable
     // declared on `body`, the same as `--interactive-accent`.** The rule was
     // written down, and then an exemption was invented for the single token it
-    // caught. `--am-bar-ink` has been invalid since it was written.
+    // caught. `--ca-bar-ink` has been invalid since it was written.
     //
     // WHAT THE FAILURE OF THIS ONE TEST IS WORTH RECORDING FOR: a guard that
     // names the offenders it knows about will be talked out of the ones it does
@@ -457,14 +457,14 @@ describe("the bar scale (4.13 §1)", () => {
     expect(bodyAt, "the body block moved").toBeGreaterThan(0);
     const line = (t: string): string =>
       file.split("\n").find((l) => l.trim().startsWith(`${t}:`)) ?? "";
-    // Three read `--am-*`, which `:root` defines for itself.
-    for (const t of ["--am-bar-text", "--am-bar-track", "--am-bar-glyph"]) {
+    // Three read `--ca-*`, which `:root` defines for itself.
+    for (const t of ["--ca-bar-text", "--ca-bar-track", "--ca-bar-glyph"]) {
       expect(line(t), t).toBeTruthy();
       expect(file.indexOf(line(t)), t).toBeLessThan(bodyAt);
     }
     // The fourth reads the theme's, so it lives where the theme's are.
-    expect(line("--am-bar-ink")).toContain("var(--text-muted)");
-    expect(file.indexOf(line("--am-bar-ink"))).toBeGreaterThan(bodyAt);
+    expect(line("--ca-bar-ink")).toContain("var(--text-muted)");
+    expect(file.indexOf(line("--ca-bar-ink"))).toBeGreaterThan(bodyAt);
   });
 
   it("gives none of them a fallback", () => {
@@ -473,7 +473,7 @@ describe("the bar scale (4.13 §1)", () => {
     // whenever the first lookup breaks, which is the same failure with the
     // evidence removed.
     for (const line of repoFile("styles/00-tokens.css").split("\n")) {
-      if (!/^\s*--am-bar-/.test(line)) continue;
+      if (!/^\s*--ca-bar-/.test(line)) continue;
       expect(line, line).not.toMatch(/var\([^)]+,/);
     }
   });
@@ -482,7 +482,7 @@ describe("the bar scale (4.13 §1)", () => {
     // The tokens existing is worth nothing on its own; this is the half that
     // makes them load-bearing. Asserted here as well as in section-frame.test.ts
     // because this file is where somebody comes to delete an unused token.
-    for (const token of ["--am-bar-text", "--am-bar-ink"]) {
+    for (const token of ["--ca-bar-text", "--ca-bar-ink"]) {
       const uses = [...css.matchAll(new RegExp(`var\\(${token}\\)`, "g"))];
       expect(uses.length, token).toBeGreaterThanOrEqual(2);
     }

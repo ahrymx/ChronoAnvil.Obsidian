@@ -81,7 +81,7 @@ export const SEARCH_SECTIONS: FlatSection[] = [
     // losing a feature.
     locked: true,
     render: () => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       // THE NAVIGATION ROW LEFT THIS FENCE IN 4.19 and is the banner's now. What
       // stays is what this section is actually about: a titled bar and the
       // search box under it.
@@ -109,7 +109,7 @@ export const SEARCH_SECTIONS: FlatSection[] = [
     // those. It is two notes each having an opinion, and a catalogue is where
     // a note's opinions go.
     render: (opts) => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         ...(opts?.form === WIDGET_FORM ? [] : ["header:🕘 On this day"]),
         "on-this-day:always",
@@ -129,7 +129,7 @@ export const SEARCH_SECTIONS: FlatSection[] = [
     // the same is true of every unlocked section in every catalogue.
     locked: false,
     render: () => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: ["header:📜 All entries", "timeline"],
     }),
     locate: (text) => probe(text, /^timeline\b/m),

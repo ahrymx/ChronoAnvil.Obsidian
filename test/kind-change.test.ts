@@ -140,7 +140,7 @@ describe("what a removal costs", () => {
 
 describe("vocabulary", () => {
   it("never calls a note a page", () => {
-    // In Almanac a *page* is a specific thing — the sub-notes a long note is
+    // In ChronoAnvil a *page* is a specific thing — the sub-notes a long note is
     // split across, deliberately excluded from `kinds`. Using it here for "a
     // note that gets created" would collide with the narrower meaning the
     // reader has been taught everywhere else.

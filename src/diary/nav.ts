@@ -26,7 +26,7 @@
 // entry sits in time — rather than one widget's leftovers.
 
 import { TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   CLASS_DEFS,
   noteKindOf,
@@ -89,7 +89,7 @@ export function entryDateKey(
 }
 
 export function entryContext(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile
 ): EntryContext {
   const app = plugin.app;

@@ -45,7 +45,7 @@ const fencesOf = (note: string): string[][] => {
       if (open) {
         out.push(open);
         open = null;
-      } else if (line.startsWith("```almanac")) {
+      } else if (line.startsWith("```chronoanvil")) {
         open = [];
       }
       continue;
@@ -141,7 +141,7 @@ describe("what each frame does to the block's classes", () => {
   };
 
   it("card is the default and keeps every composite class", () => {
-    expect(chromeClasses("card", drew)).toEqual(["journal-overview-card"]);
+    expect(chromeClasses("card", drew)).toEqual(["ca-journal-overview-card"]);
     expect(
       chromeClasses("card", {
         entryBanner: true,
@@ -149,15 +149,15 @@ describe("what each frame does to the block's classes", () => {
         studyBanner: true,
       })
     ).toEqual([
-      "journal-entry-banner",
-      "journal-overview-card",
-      "journal-study-banner",
+      "ca-journal-entry-banner",
+      "ca-journal-overview-card",
+      "ca-journal-study-banner",
       // TWO BANNERS, NOT FOUR (4.21.1). The two slim banners share every rule
       // about the card they draw and the two bands in it, so they share the
       // class those rules are written against. The specific classes survive
       // beside it for what genuinely differs — an entry welds a links card into
       // the band, a leaf does not.
-      "journal-slim-banner",
+      "ca-journal-slim-banner",
     ]);
   });
 
@@ -175,12 +175,12 @@ describe("what each frame does to the block's classes", () => {
         trackerSection: false,
         ...drewOne,
       });
-    expect(only({ entryBanner: true })).toContain("journal-slim-banner");
-    expect(only({ studyBanner: true })).toContain("journal-slim-banner");
+    expect(only({ entryBanner: true })).toContain("ca-journal-slim-banner");
+    expect(only({ studyBanner: true })).toContain("ca-journal-slim-banner");
     // AND THE LARGE ONE IS NOT SLIM. A page you navigate to announces itself
     // with the wash and the hatch; a note you write in does not announce itself
     // at all. Sharing the class would give a dashboard the tight card.
-    expect(only({ pageBanner: true })).not.toContain("journal-slim-banner");
+    expect(only({ pageBanner: true })).not.toContain("ca-journal-slim-banner");
   });
 
   it("section and none both withhold every composite class", () => {
@@ -194,9 +194,9 @@ describe("what each frame does to the block's classes", () => {
         overviewCard: true,
         studyBanner: true,
       });
-      expect(out, frame).not.toContain("journal-entry-banner");
-      expect(out, frame).not.toContain("journal-overview-card");
-      expect(out, frame).not.toContain("journal-study-banner");
+      expect(out, frame).not.toContain("ca-journal-entry-banner");
+      expect(out, frame).not.toContain("ca-journal-overview-card");
+      expect(out, frame).not.toContain("ca-journal-study-banner");
     }
   });
 
@@ -209,7 +209,7 @@ describe("what each frame does to the block's classes", () => {
   });
 
   it("never touches the block's own class, whatever the frame", () => {
-    // `container-type: inline-size` lives on `.journal-widget-block`, and it is
+    // `container-type: inline-size` lives on `.ca-journal-widget-block`, and it is
     // the one rule that has to survive all three frames — lose it and every
     // `@container` rule in styles/ stops matching, so the tracker grid stops
     // collapsing. The class is applied at creation and no frame may remove it.
@@ -237,14 +237,14 @@ describe("the CSS is one class, not one per widget", () => {
   });
 
   it("keys the unframed rules off the block", () => {
-    expect(rules).toContain(".journal-widget-block.is-unframed");
+    expect(rules).toContain(".ca-journal-widget-block.is-unframed");
   });
 
   it("does not override container-type in the unframed rule", () => {
     // §4's easiest-to-lose rule, asserted on the text because the rule IS the
     // text: the unframed block must give up its background, border, padding,
     // margin and shadow, and nothing else.
-    const at = rules.indexOf(".journal-widget-block.is-unframed {");
+    const at = rules.indexOf(".ca-journal-widget-block.is-unframed {");
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain("background: none");
     expect(rule).toContain("border: none");
@@ -253,29 +253,29 @@ describe("the CSS is one class, not one per widget", () => {
   });
 
   it("keeps container-type on the block itself", () => {
-    expect(rules).toMatch(/\.journal-widget-block\s*\{[^}]*container-type:\s*inline-size/);
+    expect(rules).toMatch(/\.ca-journal-widget-block\s*\{[^}]*container-type:\s*inline-size/);
   });
 
   it("hides only the body when a self-titled section folds", () => {
     // A section that folded itself away entirely would leave a reader nothing
     // to click to get it back.
-    expect(rules).toContain(".journal-sec-fold.is-collapsed > .journal-sec-fold-body");
+    expect(rules).toContain(".ca-journal-sec-fold.is-collapsed > .ca-journal-sec-fold-body");
   });
 
   it("gives the section a surface, not just a bar", () => {
     // THE REGRESSION THIS PINS. `frame: section` shipped withholding the
     // composite card — correctly — and relying on the block surface to replace
-    // it. It never arrived: `.journal-sec-block` is applied by `claimOwnBlock`
+    // it. It never arrived: `.ca-journal-sec-block` is applied by `claimOwnBlock`
     // and `markSectionBodies`, which run for `HeaderBar` instances only, and a
-    // children-owning section registers none (carrying `.journal-header-bar`
+    // children-owning section registers none (carrying `.ca-journal-header-bar`
     // would make an enclosing dashboard fold the wrong scope).
     //
     // So the widget rendered with a title bar, no background, no border and no
     // padding, wider than every section around it — §3.1's "nothing replaces
     // it" reached by a second route. A frame that supplies a bar and no surface
     // has done half its job, and the half it skipped is the visible one.
-    const at = rules.indexOf(".journal-sec-fold {");
-    expect(at, ".journal-sec-fold has no rule at all").toBeGreaterThan(-1);
+    const at = rules.indexOf(".ca-journal-sec-fold {");
+    expect(at, ".ca-journal-sec-fold has no rule at all").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain("background:");
     expect(rule).toContain("border:");
@@ -283,30 +283,30 @@ describe("the CSS is one class, not one per widget", () => {
   });
 
   it("does not hide the band's layout behind the card class", () => {
-    // THE THIRD REGRESSION, AND THE ONE WITH A GENERAL SHAPE. `.job-head` is a
-    // wrapping flex row, so the `.job-text` inside it is a flex item and
+    // THE THIRD REGRESSION, AND THE ONE WITH A GENERAL SHAPE. `.ca-job-head` is a
+    // wrapping flex row, so the `.ca-job-text` inside it is a flex item and
     // shrink-to-fits; `display: block` is what makes it a full-width column and
     // lets the stat strip — a grid — fill the band. That declaration lived
-    // under `.journal-overview-card`, which was a reliable proxy for "a period
+    // under `.ca-journal-overview-card`, which was a reliable proxy for "a period
     // summary is here" only for as long as a summary always took the card.
     //
     // `frame: section` broke the proxy, and the strip collapsed to about a
     // third of the band on a page where nothing about the frame was meant to
     // touch the layout. A selector scoped to a FRAME class must be about the
     // frame; this one was about the band.
-    expect(rules).toContain(".journal-overview-banner .job-head");
+    expect(rules).toContain(".ca-journal-overview-banner .ca-job-head");
     expect(rules).not.toContain(
-      ".journal-overview-card .journal-overview-banner .job-head"
+      ".ca-journal-overview-card .ca-journal-overview-banner .ca-job-head"
     );
   });
 
   it("cancels the band's bleed when the padding it cancels is gone", () => {
-    // `.journal-overview-banner` carries a negative margin to run to the edges
+    // `.ca-journal-overview-banner` carries a negative margin to run to the edges
     // of the card's padding. `is-unframed` removes that padding, so the margin
     // has nothing to cancel and the band hangs outside the section. A margin
     // that exists to cancel a padding has to go with it.
     const at = rules.indexOf(
-      ".journal-widget-block.is-unframed .journal-overview-banner"
+      ".ca-journal-widget-block.is-unframed .ca-journal-overview-banner"
     );
     expect(at).toBeGreaterThan(-1);
     expect(rules.slice(at, rules.indexOf("}", at))).toContain("margin: 0");
@@ -317,15 +317,15 @@ describe("the CSS is one class, not one per widget", () => {
     // one page must agree about where their content starts, or the whole column
     // reads as ragged. Both name the inset rather than repeating a number.
     const fold = rules.slice(
-      rules.indexOf(".journal-sec-fold {"),
-      rules.indexOf("}", rules.indexOf(".journal-sec-fold {"))
+      rules.indexOf(".ca-journal-sec-fold {"),
+      rules.indexOf("}", rules.indexOf(".ca-journal-sec-fold {"))
     );
     const block = rules.slice(
-      rules.indexOf(".journal-sec-block {"),
-      rules.indexOf("}", rules.indexOf(".journal-sec-block {"))
+      rules.indexOf(".ca-journal-sec-block {"),
+      rules.indexOf("}", rules.indexOf(".ca-journal-sec-block {"))
     );
-    expect(fold).toContain("--am-sec-pad-x: 12px");
-    expect(block).toContain("--am-sec-pad-x: 12px");
+    expect(fold).toContain("--ca-sec-pad-x: 12px");
+    expect(block).toContain("--ca-sec-pad-x: 12px");
   });
 });
 
@@ -340,7 +340,7 @@ describe("the section frame is reused, not rebuilt", () => {
   });
 
   it("passes owns: children, so the fold walk cannot find it", () => {
-    // §3.2 AND §4. Give an inner section the `.journal-header-bar` class and
+    // §3.2 AND §4. Give an inner section the `.ca-journal-header-bar` class and
     // the fold walk finds it as a descendant, reads the block's level off it,
     // and the enclosing dashboard folds the wrong scope. That does not LOOK
     // wrong, which is why it is asserted rather than eyeballed.
@@ -349,13 +349,13 @@ describe("the section frame is reused, not rebuilt", () => {
 
   it("takes a store rather than the plugin, so it stays importable", () => {
     // section-frame.ts is imported by widgets.ts, which imports half the
-    // plugin. Taking `AlmanacPlugin` here would be the import cycle that put
+    // plugin. Taking `ChronoAnvilPlugin` here would be the import cycle that put
     // `makeFoldable` inside journals-section.ts in the first place.
     const imports = frameSrc
       .split("\n")
       .filter((l) => l.startsWith("import "))
       .join("\n");
-    expect(imports).not.toContain("AlmanacPlugin");
+    expect(imports).not.toContain("ChronoAnvilPlugin");
     expect(imports).not.toContain("../main");
     expect(frameSrc).toContain("export interface FoldStore");
   });
@@ -376,7 +376,7 @@ describe("the diary dashboard uses it", () => {
     // The grammar refuses it; this asserts the catalogue does not write the
     // refusal into a shipped page, which would put an error on a new vault's
     // dashboard.
-    for (const block of note.split("```almanac")) {
+    for (const block of note.split("```chronoanvil")) {
       if (!block.includes("frame: section")) continue;
       expect(block).not.toMatch(/^header:\S/m);
     }
@@ -397,7 +397,7 @@ describe("the diary dashboard uses it", () => {
 // The rule was pinned; the sweep it implies was not run. These are what the
 // sweep found, and the last of them is not a selector at all.
 // Where a selector's rule body starts, or -1. A BOUNDARY RATHER THAN
-// `indexOf`, and this was found by mutating: renaming `.journals-card` to
+// `indexOf`, and this was found by mutating: renaming `.ca-journals-card` to
 // `.journals-card-X` in the stylesheet left every assertion below passing,
 // because the mutated selector still CONTAINS the one being searched for. A
 // test that cannot tell a class from a longer class with the same prefix is
@@ -414,7 +414,7 @@ describe("nothing that is not about the frame is scoped to the frame", () => {
   it("does not find the now-button through the card class", () => {
     // THE ONE THAT IS TYPESCRIPT RATHER THAN CSS, and so the one the 4.1.1
     // fixes could not have caught. `syncNowButton` walked up to
-    // `.journal-overview-card` to reach `.jpn-now-btn` — but the button is
+    // `.ca-journal-overview-card` to reach `.ca-jpn-now-btn` — but the button is
     // drawn from `isOverviewCard`, a fact about the fence's CONTENT set off
     // `OVERVIEW_KINDS` and untouched by the modifier, while the class is
     // withheld by `frame: section`.
@@ -425,12 +425,12 @@ describe("nothing that is not about the frame is scoped to the frame", () => {
     // silently not updating, which is the failure mode §4 warns about when it
     // says a frame is a border and changing it is not a read-only mode.
     const nav = readSrc("periodnav");
-    expect(nav).not.toContain('closest(".journal-overview-card")');
-    expect(nav).toContain('closest(".journal-widget-block")');
+    expect(nav).not.toContain('closest(".ca-journal-overview-card")');
+    expect(nav).toContain('closest(".ca-journal-widget-block")');
   });
 
   it("still scopes the now-button lookup to one fence", () => {
-    // The fix must not become "search the page". `.journal-widget-block` is the
+    // The fix must not become "search the page". `.ca-journal-widget-block` is the
     // fence's own container and §4 names keeping it as the rule every frame
     // value honours, so the search reaches exactly as far as it did and no
     // further — a bare `period-nav` in some other note still finds nothing.
@@ -450,41 +450,41 @@ describe("nothing that is not about the frame is scoped to the frame", () => {
     // frame would be §5's shape all over again, and the symptom would be a card
     // that keeps its height on one page and loses it on another.
     for (const sel of [
-      ".journal-widget-card.is-sized",
-      ".journal-widget-card.is-sized > .journal-block-head",
-      ".journal-widget-card.is-sized > :not(.journal-block-head)",
-      ".journal-card-divider",
+      ".ca-journal-widget-card.is-sized",
+      ".ca-journal-widget-card.is-sized > .ca-journal-block-head",
+      ".ca-journal-widget-card.is-sized > :not(.ca-journal-block-head)",
+      ".ca-journal-card-divider",
     ]) {
       const at = ruleAt(rules, sel);
       expect(at, `no rule for ${sel}`).toBeGreaterThan(-1);
     }
-    expect(rules).not.toContain(".is-unframed .journal-card-divider");
-    expect(rules).not.toContain(".is-unframed .journal-widget-card.is-sized");
-    expect(rules).not.toContain(".journal-overview-card .is-sized");
+    expect(rules).not.toContain(".is-unframed .ca-journal-card-divider");
+    expect(rules).not.toContain(".is-unframed .ca-journal-widget-card.is-sized");
+    expect(rules).not.toContain(".ca-journal-overview-card .is-sized");
   });
 
   it("gives up the journals card's own frame too", () => {
-    // `.journals-card` is the third widget that draws a card INSIDE the block,
+    // `.ca-journals-card` is the third widget that draws a card INSIDE the block,
     // and it was missing from the reset list — which is the cost of keying off
     // the block, and the one thing in §5's shape that has to be kept in step.
     // Without it, `frame: section` on the journals dashboard would put that
     // card inside a section: a card in a card, which is the doubling the whole
     // part exists to remove.
-    const at = ruleAt(rules, ".journal-widget-block.is-unframed .journals-card");
-    expect(at, ".journals-card is not in the unframed reset").toBeGreaterThan(-1);
+    const at = ruleAt(rules, ".ca-journal-widget-block.is-unframed .ca-journals-card");
+    expect(at, ".ca-journals-card is not in the unframed reset").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain("padding: 0");
     expect(rule).toContain("background: none");
   });
 
   it("cancels the journals hero's bleed with it", () => {
-    // `.jjs-hero` carries `margin: -12px -14px 0` to cancel `.journals-card`'s
-    // padding, exactly as `.journal-overview-banner` does for the summary —
+    // `.ca-jjs-hero` carries `margin: -12px -14px 0` to cancel `.ca-journals-card`'s
+    // padding, exactly as `.ca-journal-overview-banner` does for the summary —
     // 60-heroes-and-banners.css says so where it defines them. Resetting the
     // card without the band is how 4.1.1's third fault happened; doing it again
     // one widget over would be the same bug with a different name.
-    const at = ruleAt(rules, ".journal-widget-block.is-unframed .jjs-hero");
-    expect(at, ".jjs-hero bleed is not cancelled").toBeGreaterThan(-1);
+    const at = ruleAt(rules, ".ca-journal-widget-block.is-unframed .ca-jjs-hero");
+    expect(at, ".ca-jjs-hero bleed is not cancelled").toBeGreaterThan(-1);
     expect(rules.slice(at, rules.indexOf("}", at))).toContain("margin: 0");
   });
 
@@ -495,12 +495,12 @@ describe("nothing that is not about the frame is scoped to the frame", () => {
     // `is-unframed`, the band must be cancelled there too. Asserted as a
     // correspondence between the two lists rather than as two more literals.
     const pairs: [string, string][] = [
-      [".journal-overview-summary", ".journal-overview-banner"],
-      [".journals-card", ".jjs-hero"],
+      [".ca-journal-overview-summary", ".ca-journal-overview-banner"],
+      [".ca-journals-card", ".ca-jjs-hero"],
     ];
     for (const [card, band] of pairs) {
-      const resets = ruleAt(rules, `.journal-widget-block.is-unframed ${card}`) > -1;
-      const cancels = ruleAt(rules, `.journal-widget-block.is-unframed ${band}`) > -1;
+      const resets = ruleAt(rules, `.ca-journal-widget-block.is-unframed ${card}`) > -1;
+      const cancels = ruleAt(rules, `.ca-journal-widget-block.is-unframed ${band}`) > -1;
       expect(cancels, `${card} is reset but ${band} still bleeds`).toBe(resets);
     }
   });
@@ -510,12 +510,12 @@ describe("the unframed empty state has its own look (§4)", () => {
   const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
   it("insets the annotating line when nothing else does", () => {
-    // §12 calls this the part most likely to be skipped. `.am-empty-line` takes
+    // §12 calls this the part most likely to be skipped. `.ca-empty-line` takes
     // `padding: 6px 0` and its left inset from the card its widget drew;
     // `is-unframed` sets that padding to zero, so in a canvas node the sentence
     // sits flush against the node's own border. §4: "the same markup with no
     // card and no padding reads as a rendering bug."
-    const at = ruleAt(rules, ".journal-widget-block.is-unframed .am-empty-line");
+    const at = ruleAt(rules, ".ca-journal-widget-block.is-unframed .ca-empty-line");
     expect(at, "no unframed empty-state rule").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toMatch(/padding:\s*\d+px\s+\d+px/);
@@ -524,7 +524,7 @@ describe("the unframed empty state has its own look (§4)", () => {
   it("adds no box, because a box is what the node already is", () => {
     // A dashed placeholder would be a border inside the canvas node's border —
     // the doubling Part III exists to remove, reintroduced by the fix for it.
-    const at = ruleAt(rules, ".journal-widget-block.is-unframed .am-empty-line");
+    const at = ruleAt(rules, ".ca-journal-widget-block.is-unframed .ca-empty-line");
     // GUARDED, because `slice(-1, …)` is the empty string and every `not`
     // below would pass on a rule that had been deleted outright — which is how
     // a test goes green for the wrong reason.
@@ -542,7 +542,7 @@ describe("the unframed empty state has its own look (§4)", () => {
     // given a third look of its own.
     const at = ruleAt(
       rules,
-      ".journal-widget-block.is-unframed .journal-sec-fold-body .am-empty-line"
+      ".ca-journal-widget-block.is-unframed .ca-journal-sec-fold-body .ca-empty-line"
     );
     expect(at, "the section case is not restored").toBeGreaterThan(-1);
     expect(rules.slice(at, rules.indexOf("}", at))).toContain("padding: 6px 0");
@@ -585,7 +585,7 @@ describe("a fence that titles itself — 4.12 §A", () => {
 
   it("and `hasSectionBar` is deliberately looser, which is the whole seam", () => {
     // WHAT MATTERS TO A LAYOUT IS THAT THE BAR EXISTS. An untitled `header:`
-    // still renders `.journal-sec`, is still refused as cell content by
+    // still renders `.ca-journal-sec`, is still refused as cell content by
     // `NOT_A_CELL`, and still lands below a group. Nobody having named it makes
     // no difference to any of that.
     expect(hasSectionBar(["header:", "tasks-table"])).toBe(true);

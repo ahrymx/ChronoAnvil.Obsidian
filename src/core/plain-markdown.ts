@@ -9,16 +9,16 @@
 //
 // WHY THIS FILE EXISTS (4.30)
 //
-// Almanac keeps what a reader writes in three places, and two of them are
+// ChronoAnvil keeps what a reader writes in three places, and two of them are
 // invisible without the plugin:
 //
-//   A BODY REGION — `<!--almanac:key … -->`. The prose is already plain text.
+//   A BODY REGION — `<!--chronoanvil:key … -->`. The prose is already plain text.
 //   It is parked inside an HTML comment because Obsidian drops comments
 //   natively in both Reading mode and Live Preview, which is what saves the
 //   plugin a CM6 decoration and a post-processor. It also means the words are
 //   not on the page once the plugin is gone.
 //
-//   AN ```almanac FENCE — the directive lines, each carrying its section's
+//   A ```chronoanvil FENCE — the directive lines, each carrying its section's
 //   LABEL. Without the plugin this is a code block reading `note:focus`.
 //
 //   FRONTMATTER — the readings. Fine: it is YAML, and every editor shows it.
@@ -31,7 +31,7 @@
 //
 // This is not a new value for the project, it is one that has never been asked
 // of a whole note. `bridge.ts` serialises a frozen bridge as wikilinks "so a
-// frozen bridge is a list of links in a note whether or not Almanac is
+// frozen bridge is a list of links in a note whether or not ChronoAnvil is
 // installed". `journal-sections.ts` makes the prose skeleton real `##` headings
 // "because they survive the plugin being uninstalled". `attach:` regions have
 // stored real markdown since 2.7. 2.57 §3.2 states the rule: LINKS AND VALUES,
@@ -88,7 +88,7 @@
 // correct copies of a lookup did not make a third correct, and an entry banner
 // printed "Daily" where a date belongs). The frontmatter is also unrecoverable
 // if dropped: `journal-date` scopes an entry to its period for every
-// period-filtered table, `almanac-events` is stamped once at creation and never
+// period-filtered table, `chronoanvil-events` is stamped once at creation and never
 // re-synced, and `title:` is the reader's own words.
 
 import { segment } from "./layout";
@@ -111,7 +111,7 @@ import { parseRecall } from "../review/recall";
 // that produced nothing from one a reader renamed. This can, because it names
 // the region key the heading was built for.
 export interface PlainSection {
-  // The region key — `<!--almanac:focus-->` — which is what a failure needs to
+  // The region key — `<!--chronoanvil:focus-->` — which is what a failure needs to
   // name, and what a wrong binding gets wrong.
   id: string;
   // What the heading says. Read off the directive's `|label`, falling back to
@@ -157,7 +157,7 @@ function regionKeyFor(keyword: string, argument: string): string {
   return keyword === LOGBOOK_KEYWORD ? LOGBOOK_NOTE_KEY : noteKeyOf(argument);
 }
 
-// GFM, out of Almanac's own checkbox.
+// GFM, out of ChronoAnvil's own checkbox.
 //
 // WALKED LINE BY LINE RATHER THAN THROUGH `parseTasks`, and this is the one
 // place the module declines a ready-made helper. Five of the six region parsers
@@ -288,14 +288,14 @@ export function plainSections(text: string, model: SectionModel): PlainSection[]
 // Everything the plugin wrote to make this page work, and nothing a reader put
 // on it.
 //
-// `<!--almanac:…-->` REGIONS ARE CONSUMED BY THEIR DIRECTIVES above, so what is
+// `<!--chronoanvil:…-->` REGIONS ARE CONSUMED BY THEIR DIRECTIVES above, so what is
 // left of one here is a duplicate; the spacer is an inert strip that exists to
 // give the cursor somewhere to land.
 function stripPluginMarkup(raw: string): string {
   return raw
-    .replace(/<!--almanac:[\s\S]*?-->/g, "")
+    .replace(/<!--chronoanvil:[\s\S]*?-->/g, "")
     .split("\n")
-    .filter((l) => l.trim() !== "`almanac:spacer`")
+    .filter((l) => l.trim() !== "`chronoanvil:spacer`")
     .join("\n");
 }
 
@@ -319,10 +319,10 @@ export type PropertiesMode = "keep" | "demote";
 // The properties as a block a reader can see, for a copy that has to live in
 // this vault without being mistaken for the note it came from.
 //
-// A LINE TRANSFORM, NOT A YAML PARSE. `js-yaml` is a dependency and is
-// deliberately not reached for: the job is to make a block readable rather than
-// to interpret it, and a parser would turn a value it disliked into an
-// exception in the middle of an export of somebody's whole vault.
+// A LINE TRANSFORM, NOT A YAML PARSE. Obsidian's `parseYaml` is one import away
+// and is deliberately not reached for: the job is to make a block readable
+// rather than to interpret it, and a parser would turn a value it disliked into
+// an exception in the middle of an export of somebody's whole vault.
 function demoteProperties(front: string): string {
   const out: string[] = [];
   for (const line of front.split("\n")) {
@@ -405,7 +405,7 @@ export function toPlainMarkdown(
     // tell its headings from writing someone did themselves. Both arrive here
     // and both are theirs.
     const raw = stripPluginMarkup(seg.lines.join("\n")).trim();
-    // A run that is nothing but the band rule is Almanac's own separator
+    // A run that is nothing but the band rule is ChronoAnvil's own separator
     // between an entry's structural fences and its fields. Judged by what the
     // run CONTAINS rather than by where it sits, so a rule a reader typed
     // between two paragraphs is in a run with those paragraphs and survives.

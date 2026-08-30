@@ -38,7 +38,7 @@
 // the surface is reached the same way.
 
 import { App } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { openSectionEditor } from "./section-editor";
 import type {
   SectionContext,
@@ -85,7 +85,7 @@ import { getFile } from "../core/util";
 // does.
 export async function openTemplateEditor(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   path: string,
   ctx: SectionContext,
   onSaved?: () => void,

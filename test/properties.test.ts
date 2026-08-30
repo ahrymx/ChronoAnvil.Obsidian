@@ -8,8 +8,8 @@
 // The properties window — 4.51.6.
 //
 // WHAT IT REPLACED IS WHY IT IS TESTED THIS WAY. Obsidian's property panel is
-// six rows between the note's title and its first block; Almanac now hides it
-// (`am-absorb-host-chrome`) and puts the same fields behind a button on the
+// six rows between the note's title and its first block; ChronoAnvil now hides it
+// (`ca-absorb-host-chrome`) and puts the same fields behind a button on the
 // bar. That means this window is the ONLY route to a note's frontmatter for a
 // reader who never opens the editor — so the rows that matter are the ones
 // about *not losing anything on the way*: which values get an editor, which
@@ -57,7 +57,7 @@ describe("which control a value earns", () => {
     // Hidden would be worse than greyed: a window that silently omits a key is
     // a window that says the note does not have it.
     const t = readSrc("properties");
-    expect(t).toContain('row.settingEl.addClass("amp-row-opaque");');
+    expect(t).toContain('row.settingEl.addClass("ca-amp-row-opaque");');
     expect(t).toContain(
       'row.setDesc("A list or object — edit this one in the note itself.");'
     );
@@ -85,7 +85,7 @@ describe("the round trip through a list", () => {
 });
 
 describe("the order a reader meets the keys in", () => {
-  it("opens on what Almanac wrote, then the rest alphabetically", () => {
+  it("opens on what ChronoAnvil wrote, then the rest alphabetically", () => {
     const fm = { zeta: 1, Mood: 3, created: "x", title: "A day" };
     expect(orderedKeys(fm, ["title", "created"])).toEqual([
       "title",
@@ -164,7 +164,7 @@ describe("what the window writes, and when", () => {
     // `journal-date`, so the window opened with its title welded to a field.
     // The space is on the BODY, so a scrolled list keeps it.
     const css = readCss();
-    const at = css.indexOf(".am-props-modal .amp-body {");
+    const at = css.indexOf(".ca-props-modal .ca-amp-body {");
     expect(at).toBeGreaterThan(0);
     expect(css.slice(at, css.indexOf("}", at))).toContain("margin-top:");
     // AND THE FIRST ROW KEEPS ITS OWN PADDING, which is what 4.51.7 got wrong:
@@ -172,14 +172,14 @@ describe("what the window writes, and when", () => {
     // taller than its label — so the words looked spaced and the INPUT sat on
     // the rule. Reported a second time as still cramped.
     const first = css.indexOf(
-      ".am-props-modal .amp-body > .setting-item:first-child {"
+      ".ca-props-modal .ca-amp-body > .setting-item:first-child {"
     );
     expect(first).toBeGreaterThan(0);
     const firstRule = css.slice(first, css.indexOf("}", first));
     expect(firstRule).toContain("border-top: none");
     expect(firstRule).not.toContain("padding-top: 0");
     // And the buttons sit below the list rather than on its last row.
-    const foot = css.indexOf(".am-props-modal .amp-foot {");
+    const foot = css.indexOf(".ca-props-modal .ca-amp-foot {");
     expect(foot).toBeGreaterThan(0);
     expect(css.slice(foot, css.indexOf("}", foot))).toContain("border-top:");
   });
@@ -192,8 +192,8 @@ describe("the button that opens it", () => {
     // WITH OBSIDIAN'S PANEL HIDDEN THIS COUNT EXISTS NOWHERE ELSE, which is
     // why it is on the face of the control rather than in its tooltip.
     const t = banner();
-    expect(t).toContain('cls: "avb-props"');
-    expect(t).toContain('propsBtn.createSpan({ cls: "avb-props-count", text: String(props) });');
+    expect(t).toContain('cls: "ca-avb-props"');
+    expect(t).toContain('propsBtn.createSpan({ cls: "ca-avb-props-count", text: String(props) });');
     expect(t).toContain('"aria-label": `Properties (${props})`');
     // …AND SAYS NOTHING WHERE THERE IS NOTHING TO COUNT (4.51.7). `≡ 0` is a
     // figure the reader has to read before learning it was not worth reading.
@@ -220,7 +220,7 @@ describe("the button that opens it", () => {
     // Two elements both claiming `margin-left: auto` put a gap between
     // themselves — the button takes it, and the cog beside it gives it up.
     const css = readCss();
-    const at = css.indexOf(".am-vault-banner .avb-props ~ .avb-cog {");
+    const at = css.indexOf(".ca-vault-banner .ca-avb-props ~ .ca-avb-cog {");
     expect(at).toBeGreaterThan(0);
     expect(css.slice(at, css.indexOf("}", at))).toContain("margin-left: 0");
   });

@@ -123,7 +123,7 @@ describe("reading a template back", () => {
 
   it("calls a template with an added widget edited", () => {
     const { ctx, text } = allTemplates()[0];
-    const hacked = text + "\n```almanac\ntag-index\n```\n";
+    const hacked = text + "\n```chronoanvil\ntag-index\n```\n";
     expect(isHandEdited(hacked, ctx)).toBe(true);
   });
 
@@ -158,7 +158,7 @@ describe("reading a template back", () => {
       subject.ctx,
       ids.filter((id) => id !== "review")
     );
-    expect(noReview).toContain("```almanac\ntasks-table\n```");
+    expect(noReview).toContain("```chronoanvil\ntasks-table\n```");
     expect(noReview).not.toContain("review-queue");
     // A ROW OF ONE IS NOT A ROW — the `row` line goes with the second-to-last
     // cell, or the editor draws a group over a section grouped with nothing.
@@ -169,7 +169,7 @@ describe("reading a template back", () => {
       subject.ctx,
       ids.filter((id) => id !== "tasks")
     );
-    expect(noTasks).toContain("```almanac\nheader:🔁 Due and open\nreview-queue\n```");
+    expect(noTasks).toContain("```chronoanvil\nheader:🔁 Due and open\nreview-queue\n```");
     expect(noTasks).not.toContain("tasks-table");
   });
 
@@ -261,7 +261,7 @@ describe("nothing the plugin did not write is touched", () => {
 
   it("leaves a hand-added block exactly where it was", () => {
     const { ctx, text } = topic();
-    const mine = "```almanac\ntag-index\n```";
+    const mine = "```chronoanvil\ntag-index\n```";
     const hacked = `${text}\n${mine}\n`;
     const want = sectionsPresent(hacked, ctx).filter((id) => id !== "review");
     const after = applySections(hacked, ctx, want)!;
@@ -276,7 +276,7 @@ describe("nothing the plugin did not write is touched", () => {
     // assertion is about what happens to a block the catalogue does NOT own,
     // so the fixture has to be a directive no journal section claims: this one
     // is diary-only and there is no plausible journal reading of it.
-    const hacked = `${text}\n\`\`\`almanac\non-this-day\n\`\`\`\n`;
+    const hacked = `${text}\n\`\`\`chronoanvil\non-this-day\n\`\`\`\n`;
     const ops = planSections(hacked, ctx, sectionsPresent(hacked, ctx));
     const foreign = ops.find((o) => o.kind === "foreign");
     expect(foreign?.detail).toContain("left alone");
@@ -294,8 +294,8 @@ describe("nothing the plugin did not write is touched", () => {
     // re-adding the section later silently resurrects the old text.
     const { ctx, text } = topic();
     const written = text.replace(
-      "<!--almanac:path\n-->",
-      "<!--almanac:path\nStart with quadratics, then factorising.\n-->"
+      "<!--chronoanvil:path\n-->",
+      "<!--chronoanvil:path\nStart with quadratics, then factorising.\n-->"
     );
     const want = sectionsPresent(written, ctx).filter((id) => id !== "path");
     const ops = planSections(written, ctx, want);
@@ -321,7 +321,7 @@ describe("nothing the plugin did not write is touched", () => {
     const { ctx, text } = topic();
     const want = sectionsPresent(text, ctx).filter((id) => id !== "path");
     const after = applySections(text, ctx, want)!;
-    expect(after).not.toContain("<!--almanac:path");
+    expect(after).not.toContain("<!--chronoanvil:path");
   });
 
   it("never offers to remove a section that writes ordinary markdown", () => {
@@ -477,7 +477,7 @@ describe("reordering", () => {
     // two sections being swapped has no correct destination, so it keeps its
     // index and the sections trade the slots they had.
     const { ctx, text } = topic();
-    const mine = "```almanac\ntag-index\n```";
+    const mine = "```chronoanvil\ntag-index\n```";
     const hacked = `${text}\n${mine}\n`;
     const present = sectionsPresent(hacked, ctx);
     const want = [...present].reverse();
@@ -493,14 +493,14 @@ describe("reordering", () => {
     // would orphan the reader's text.
     const { ctx, text } = topic();
     const written = text.replace(
-      "<!--almanac:path\n-->",
-      "<!--almanac:path\nQuadratics first.\n-->"
+      "<!--chronoanvil:path\n-->",
+      "<!--chronoanvil:path\nQuadratics first.\n-->"
     );
     const present = sectionsPresent(written, ctx);
     const want = [...present].reverse();
     const after = applySections(written, ctx, want)!;
     const fenceAt = after.indexOf("path:path");
-    const regionAt = after.indexOf("<!--almanac:path");
+    const regionAt = after.indexOf("<!--chronoanvil:path");
     expect(fenceAt).toBeGreaterThanOrEqual(0);
     expect(regionAt).toBeGreaterThan(fenceAt);
     expect(after).toContain("Quadratics first.");
@@ -688,9 +688,9 @@ describe("parts and the extend op", () => {
     )!.content;
     // Practice above Lessons, Lessons retitled by hand, and no Quiz yet.
     const edited = composed.replace(
-      /```almanac\nheader:📖[\s\S]*?```/,
+      /```chronoanvil\nheader:📖[\s\S]*?```/,
       [
-        "```almanac",
+        "```chronoanvil",
         "header:🛠️ Practice",
         "button:s3:new-practice",
         "kind-table:practice",
@@ -822,12 +822,12 @@ describe("a chosen order is composed, and no order is still catalogue order", ()
     expect(at("attach:")).toBeLessThan(at("kind-table:lesson"));
     // AND THE BANNER IS STILL FIRST, even though the order asked for Resources
     // ahead of it. That is not the composer ignoring the reader: the banner's
-    // first block is `almanac:spacer`, which has to be on line 0 of the body or
+    // first block is `chronoanvil:spacer`, which has to be on line 0 of the body or
     // a click at the top of the note renders the fence as raw source. The
     // wizard's arrows cannot express this order; presets and saved variants
     // could, so `sectionsFor` enforces it for every caller.
     expect(at("journal-header")).toBeLessThan(at("attach:"));
-    expect(at("`almanac:spacer`")).toBe(
+    expect(at("`chronoanvil:spacer`")).toBe(
       out.indexOf("\n---\n") + "\n---\n".length
     );
   });

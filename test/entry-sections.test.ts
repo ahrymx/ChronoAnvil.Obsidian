@@ -108,7 +108,7 @@ describe("the composer is what scaffold writes", () => {
     for (const g of TRACKER_CLASSES) {
       const out = composeEntryTemplate(g);
       expect(out.startsWith("---\n"), g).toBe(true);
-      expect(out, g).toContain("`almanac:spacer`");
+      expect(out, g).toContain("`chronoanvil:spacer`");
       expect(out, g).toContain(`journal: ${CLASS_DEFS[g].journalProperty}`);
       expect(out.endsWith("\n"), g).toBe(true);
     }
@@ -150,9 +150,9 @@ describe("a section is a widget and its region", () => {
         (s) => s.fence === "shared"
       );
       for (const s of shared) {
-        expect(out, `${grain}/${s.id}`).toContain(`<!--almanac:${s.id}`);
+        expect(out, `${grain}/${s.id}`).toContain(`<!--chronoanvil:${s.id}`);
       }
-      const regions = [...out.matchAll(/<!--almanac:([a-z-]+)/g)].map(
+      const regions = [...out.matchAll(/<!--chronoanvil:([a-z-]+)/g)].map(
         (m) => m[1]
       );
       expect(regions.sort()).toEqual(shared.map((s) => s.id).sort());
@@ -222,7 +222,7 @@ describe("what the catalogue made visible", () => {
     for (const g of TRACKER_CLASSES) {
       const out = composeEntryTemplate(g);
       expect(
-        (out.match(/# almanac:trackers:start/g) ?? []).length,
+        (out.match(/# chronoanvil:trackers:start/g) ?? []).length,
         g
       ).toBe(2);
     }
@@ -280,7 +280,7 @@ describe("locked means unremovable, not unmovable", () => {
     // the widgets, or a notes field above it.
     for (const g of TRACKER_CLASSES) {
       const out = composeEntryTemplate(g);
-      const rule = out.indexOf("\n---\n", out.indexOf("`almanac:spacer`"));
+      const rule = out.indexOf("\n---\n", out.indexOf("`chronoanvil:spacer`"));
       expect(out.indexOf("entry-header"), g).toBeLessThan(rule);
       expect(out.indexOf("tasks:todo"), g).toBeGreaterThan(rule);
     }
@@ -303,8 +303,8 @@ describe("locked means unremovable, not unmovable", () => {
 describe("removal refuses on the reader's writing", () => {
   const fresh = composeEntryTemplate("daily");
   const written = fresh.replace(
-    "<!--almanac:log\n-->",
-    "<!--almanac:log\nThree paragraphs about March.\n-->"
+    "<!--chronoanvil:log\n-->",
+    "<!--chronoanvil:log\nThree paragraphs about March.\n-->"
   );
   const sec = (id: string) =>
     ENTRY_SECTIONS.find((s) => s.id === id) as EntrySection;
@@ -325,7 +325,7 @@ describe("removal refuses on the reader's writing", () => {
     // Every region ships as a marker, a blank line and a closing marker — that
     // blank line is where the first keystroke goes. A byte test would refuse to
     // remove a section nobody has touched.
-    const spaces = fresh.replace("<!--almanac:log\n-->", "<!--almanac:log\n   \n\n-->");
+    const spaces = fresh.replace("<!--chronoanvil:log\n-->", "<!--chronoanvil:log\n   \n\n-->");
     expect(entryRemovalRefusal(sec("log"), spaces)).toBeNull();
   });
 
@@ -369,9 +369,9 @@ describe("both halves of the vault agree on 'empty'", () => {
   it("agrees with the journal side that blank lines are not content", () => {
     // journal-plan's regionsIn counts only non-blank lines; regionHasContent
     // trims. Same answer, asserted rather than assumed.
-    const region = "<!--almanac:log\n  \n\n-->";
+    const region = "<!--chronoanvil:log\n  \n\n-->";
     expect(regionHasContent(region, "log")).toBe(false);
-    expect(regionHasContent("<!--almanac:log\n x\n-->", "log")).toBe(true);
+    expect(regionHasContent("<!--chronoanvil:log\n x\n-->", "log")).toBe(true);
   });
 });
 
@@ -391,7 +391,7 @@ describe("adding a section to every entry of a grain", () => {
     const withIt = composeEntryTemplate("weekly", ["capture"]);
     expect(plain).not.toContain("capture");
     expect(withIt).toContain("note:capture");
-    expect(withIt).toContain("<!--almanac:capture");
+    expect(withIt).toContain("<!--chronoanvil:capture");
   });
 
   it("borrows the wording from the nearest grain that has one", () => {
@@ -419,7 +419,7 @@ describe("adding a section to every entry of a grain", () => {
   it("ignores an extra the grain already has", () => {
     const twice = composeEntryTemplate("monthly", ["challenges"]);
     expect(twice.match(/list:challenges/g)).toHaveLength(1);
-    expect(twice.match(/<!--almanac:challenges/g)).toHaveLength(1);
+    expect(twice.match(/<!--chronoanvil:challenges/g)).toHaveLength(1);
   });
 });
 
@@ -443,7 +443,7 @@ describe("adding a section to one note", () => {
   it("writes the directive and its region together", () => {
     const out = addSectionToNote(weekly, { grain: "weekly" }, sec("capture"));
     expect(out).toContain("note:capture");
-    expect(out).toContain("<!--almanac:capture");
+    expect(out).toContain("<!--chronoanvil:capture");
   });
 
   it("returns null when the note already has it", () => {
@@ -462,7 +462,7 @@ describe("adding a section to one note", () => {
     ).split("\n");
     // The last widget fence: find its opener, then its closer, and assert the
     // new directive is the line immediately above the closer.
-    const open = lines.lastIndexOf("```almanac");
+    const open = lines.lastIndexOf("```chronoanvil");
     const close = lines.indexOf("```", open + 1);
     // Daily's own wording, borrowed intact — the fallback copies the
     // directive rather than inventing a weekly phrasing for it.
@@ -530,14 +530,14 @@ describe("immovability is derived, not declared", () => {
 // ── 3.2 patch 2: one structural fence ─────────────────────────────────
 //
 // The merge 2.18.4 started and stopped one fence short. Obsidian renders each
-// ```almanac fence as its own block, so two fences above the rule can be made
+// ```chronoanvil fence as its own block, so two fences above the rule can be made
 // to RESEMBLE one card and cannot be made into one. These assert the shape, and
 // then — more importantly — that the parser still reads the shape every entry
 // on disk is currently in.
 
 const structuralFence = (text: string): string[] => {
   const lines = text.split("\n");
-  const open = lines.findIndex((l) => l.trim() === "```almanac");
+  const open = lines.findIndex((l) => l.trim() === "```chronoanvil");
   const close = lines.indexOf("```", open + 1);
   expect(open).toBeGreaterThan(0);
   expect(close).toBeGreaterThan(open);
@@ -551,8 +551,8 @@ const structuralFence = (text: string): string[] => {
 const legacyEntry = (grain: TrackerClass = "daily"): string => {
   const text = composeEntryTemplate(grain);
   return text.replace(
-    "```almanac\nentry-header\n",
-    "```almanac\nlinks:home,today,scopes#diary\n```\n```almanac\nentry-header\n"
+    "```chronoanvil\nentry-header\n",
+    "```chronoanvil\nlinks:home,today,scopes#diary\n```\n```chronoanvil\nentry-header\n"
   );
 };
 
@@ -577,9 +577,9 @@ describe("the structural half is one fence", () => {
     // erode by adding structure a line at a time.
     for (const g of TRACKER_CLASSES) {
       const text = composeEntryTemplate(g);
-      const rule = text.indexOf("\n---\n", text.indexOf("`almanac:spacer`"));
+      const rule = text.indexOf("\n---\n", text.indexOf("`chronoanvil:spacer`"));
       const above = text.slice(0, rule);
-      expect((above.match(/```almanac/g) ?? []).length, g).toBe(2);
+      expect((above.match(/```chronoanvil/g) ?? []).length, g).toBe(2);
     }
   });
 
@@ -590,18 +590,18 @@ describe("the structural half is one fence", () => {
     // `EntrySection.fence` needs them to be structure rather than writing.
     for (const g of TRACKER_CLASSES) {
       const text = composeEntryTemplate(g);
-      expect(structuralFence(text), g).not.toContain("# almanac:trackers:start");
-      const rule = text.indexOf("\n---\n", text.indexOf("`almanac:spacer`"));
+      expect(structuralFence(text), g).not.toContain("# chronoanvil:trackers:start");
+      const rule = text.indexOf("\n---\n", text.indexOf("`chronoanvil:spacer`"));
       const above = text.slice(0, rule);
-      expect(above, g).toContain("# almanac:trackers:start");
-      expect(above, g).toContain("# almanac:trackers:end");
+      expect(above, g).toContain("# chronoanvil:trackers:start");
+      expect(above, g).toContain("# chronoanvil:trackers:end");
     }
   });
 
   it("still puts the reader's own sections below the rule", () => {
     for (const g of TRACKER_CLASSES) {
       const text = composeEntryTemplate(g);
-      const rule = text.indexOf("\n---\n", text.indexOf("`almanac:spacer`"));
+      const rule = text.indexOf("\n---\n", text.indexOf("`chronoanvil:spacer`"));
       expect(text.indexOf("entry-header"), g).toBeLessThan(rule);
       expect(text.indexOf("tasks:todo"), g).toBeGreaterThan(rule);
     }
@@ -695,7 +695,7 @@ describe("splitting the shared band is caused by row ids and nothing else", () =
 
   const bands = (text: string): string[][] =>
     text
-      .split("```almanac\n")
+      .split("```chronoanvil\n")
       .slice(1)
       .map((chunk) => chunk.split("\n```")[0].split("\n"))
       .filter((lines) => lines.some((l) => /^(note|list|tasks|attach):/.test(l)));
@@ -721,7 +721,7 @@ describe("splitting the shared band is caused by row ids and nothing else", () =
       // graph link — is untouched either way, which is the other half of the
       // bound: the split moved a boundary and nothing else on the page.
       const outside = (t: string): string =>
-        t.replace(/```almanac\n[\s\S]*?\n```\n/g, "").replace(/\n{2,}/g, "\n").trimEnd();
+        t.replace(/```chronoanvil\n[\s\S]*?\n```\n/g, "").replace(/\n{2,}/g, "\n").trimEnd();
       expect(outside(rowless)).toBe(outside(shipped));
     });
   }

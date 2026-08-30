@@ -90,7 +90,7 @@ describe("a bar's scope", () => {
 });
 
 describe("a bar and the widgets welded into its own fence", () => {
-  // A `header:` and the directives beneath it in the same ```almanac fence
+  // A `header:` and the directives beneath it in the same ```chronoanvil fence
   // render as one block: the bar, then its widgets as the bar's SIBLINGS. The
   // walk flattens that — the block contributes a node carrying the level of
   // its first bar, then the bar and its siblings follow — so one stack governs
@@ -235,7 +235,7 @@ describe("section bodies are marked for the surface", () => {
     // every pass, so there is no path by which one keeps a class it did not
     // earn.
     const body = method("markSectionBodies");
-    expect(body).toContain('toggleClass("journal-sec-block", marks[i].member)');
+    expect(body).toContain('toggleClass("ca-journal-sec-block", marks[i].member)');
     expect(body).toContain('toggleClass("is-last", marks[i].last)');
     expect(body).toContain("blocks.forEach((block, i) =>");
   });
@@ -283,15 +283,15 @@ describe("section bodies are marked for the surface", () => {
     // drawn from the same fence, which is where a section is open.
     const body = method("isSectionBoundary");
     for (const cls of [
-      "journal-sec-fold",
-      "journal-section-bar",
-      "journal-overview-banner",
-      "journal-entry-banner",
-      "journal-study-banner",
-      "journal-tracker-section",
-      "journal-page-head",
-      "journals-card",
-      "journal-sec-l1",
+      "ca-journal-sec-fold",
+      "ca-journal-section-bar",
+      "ca-journal-overview-banner",
+      "ca-journal-entry-banner",
+      "ca-journal-study-banner",
+      "ca-journal-tracker-section",
+      "ca-journal-page-head",
+      "ca-journals-card",
+      "ca-journal-sec-l1",
     ]) {
       expect(body, cls).toContain(`:scope .${cls}`);
     }
@@ -326,11 +326,11 @@ describe("section bodies are marked for the surface", () => {
     // are empty divs today — so this changes no answer — and an icon in the grip
     // would otherwise end every section at its own bar.
     const drag = readSrc("widgets");
-    expect(drag).toContain('const GRIP_CLASS = "jbd-handle";');
-    expect(drag).toContain('export const HEAD_CLASS = "journal-block-head";');
-    expect(drag).toContain("`jbd-slot ${cls}`");
+    expect(drag).toContain('const GRIP_CLASS = "ca-jbd-handle";');
+    expect(drag).toContain('export const HEAD_CLASS = "ca-journal-block-head";');
+    expect(drag).toContain("`ca-jbd-slot ${cls}`");
     expect(src).toContain(
-      'const BLOCK_FURNITURE = ".jbd-slot, .jbd-handle, .journal-block-head";'
+      'const BLOCK_FURNITURE = ".ca-jbd-slot, .ca-jbd-handle, .ca-journal-block-head";'
     );
     expect(method("bodyInOwnFence")).toContain("sib.matches(BLOCK_FURNITURE)");
   });
@@ -366,7 +366,7 @@ describe("section bodies are marked for the surface", () => {
 
   it("gives the logging grid a class no banner shares", () => {
     const widgets = readSrc("widgets");
-    expect(widgets).toContain('if (drew.trackerSection) out.push("journal-tracker-section");');
+    expect(widgets).toContain('if (drew.trackerSection) out.push("ca-journal-tracker-section");');
     expect(widgets).toContain(
       "trackerSection: hasTrackerRegion && !isOverviewCard,"
     );
@@ -377,7 +377,7 @@ describe("section bodies are marked for the surface", () => {
     // the frame's layout, which is right — and is exactly why the section walk
     // has to ask a question the class name cannot answer.
     const entry = readSrc("entryheader");
-    expect(entry).toContain("journal-header-bar journal-header-l1");
+    expect(entry).toContain("ca-journal-header-bar ca-journal-header-l1");
     expect(entry).not.toContain("dataset.headerKey");
   });
 
@@ -389,7 +389,7 @@ describe("section bodies are marked for the surface", () => {
     // Split in 3.13 §3: the DOM half reads the flag, the arithmetic half lives
     // in computeSectionRuns and is asserted directly below.
     expect(method("markSectionBodies")).toContain(
-      'hasClass("journal-section-hidden")'
+      'hasClass("ca-journal-section-hidden")'
     );
     const at = src.indexOf("export function computeSectionRuns");
     expect(at).toBeGreaterThan(0);
@@ -402,14 +402,14 @@ describe("section bodies are marked for the surface", () => {
     // A card costs horizontal padding twice on a ~360px column, which was the
     // mockups' objection and a real one.
     const css = readCss();
-    const at = css.indexOf(".journal-sec-block {");
+    const at = css.indexOf(".ca-journal-sec-block {");
     expect(at).toBeGreaterThan(0);
     const narrow = css.indexOf("@container (max-width: 460px)", at);
     expect(narrow).toBeGreaterThan(0);
     // One variable, not two paddings: the header rule bleeds to the card's
     // edges by cancelling exactly this inset, so a breakpoint that changed the
     // padding without the rule knowing would leave the rule short at one width.
-    expect(css.slice(narrow, narrow + 300)).toContain("--am-sec-pad-x: 8px");
+    expect(css.slice(narrow, narrow + 300)).toContain("--ca-sec-pad-x: 8px");
   });
 
   it("paints the block, not the bar's siblings inside it", () => {
@@ -418,7 +418,7 @@ describe("section bodies are marked for the surface", () => {
     // children individually paints stripes with the gaps showing through. Both
     // failed attempts are in this one assertion.
     const body = method("markSectionBodies");
-    expect(body).toContain('block.toggleClass("journal-sec-block"');
+    expect(body).toContain('block.toggleClass("ca-journal-sec-block"');
     expect(body).not.toContain("block.children");
   });
 
@@ -426,7 +426,7 @@ describe("section bodies are marked for the surface", () => {
     // Two backgrounds of the same colour with different radii is how a card
     // grows a visible corner.
     const css = readCss();
-    const at = css.indexOf(".journal-sec-l1.journal-header-bar {");
+    const at = css.indexOf(".ca-journal-sec-l1.ca-journal-header-bar {");
     expect(at).toBeGreaterThan(0);
     expect(css.slice(at, css.indexOf("}", at))).toContain("background: none");
   });
@@ -435,10 +435,10 @@ describe("section bodies are marked for the surface", () => {
     // A fence carrying a header and everything under it, or a section
     // collapsed down to its bar.
     const css = readCss();
-    expect(css).toContain(".journal-sec-block.is-first.is-last");
+    expect(css).toContain(".ca-journal-sec-block.is-first.is-last");
   });
   it("rounds the bottom on a block that actually draws something", () => {
-    // A section whose final block is a storage region — `<!--almanac:path-->`
+    // A section whose final block is a storage region — `<!--chronoanvil:path-->`
     // renders nothing — would round an invisible element and leave the visible
     // one square, with an empty band of surface beneath it. That is what the
     // Learning Path drew.
@@ -461,7 +461,7 @@ describe("section bodies are marked for the surface", () => {
     // padding and no border, so a child's margins collapse THROUGH them and the
     // gap lands outside the element painting the background.
     const css = readCss();
-    const at = css.indexOf(".journal-sec-block {");
+    const at = css.indexOf(".ca-journal-sec-block {");
     expect(at).toBeGreaterThan(0);
     const block = css.slice(at, css.indexOf("}", at));
     expect(block).toContain("display: flow-root");
@@ -469,7 +469,7 @@ describe("section bodies are marked for the surface", () => {
 
   it("gives an empty block no padding of its own", () => {
     const css = readCss();
-    expect(css).toContain(".journal-sec-block:empty");
+    expect(css).toContain(".ca-journal-sec-block:empty");
   });
 
   it("rules between the header and the body, edge to edge", () => {
@@ -479,14 +479,14 @@ describe("section bodies are marked for the surface", () => {
     // header from the body, which is the one boundary the card does not draw.
     const css = readCss();
     const at = css.indexOf(
-      ".journal-sec-block .journal-sec-l1.journal-header-bar {"
+      ".ca-journal-sec-block .ca-journal-sec-l1.ca-journal-header-bar {"
     );
     expect(at).toBeGreaterThan(0);
     const block = css.slice(at, css.indexOf("\n}", at));
     expect(block).toContain("border-bottom: 1px solid");
     // Full bleed: cancels the card's inset rather than sitting inside it. A
     // rule that stops short of the edges is an underline on the title.
-    expect(block).toContain("calc(-1 * var(--am-sec-pad-x");
+    expect(block).toContain("calc(-1 * var(--ca-sec-pad-x");
   });
 
   it("draws no rule under a collapsed section", () => {
@@ -494,7 +494,7 @@ describe("section bodies are marked for the surface", () => {
     // that is not there.
     const css = readCss();
     const at = css.indexOf(
-      ".journal-sec-block .journal-sec-l1.journal-header-bar.is-collapsed"
+      ".ca-journal-sec-block .ca-journal-sec-l1.ca-journal-header-bar.is-collapsed"
     );
     expect(at).toBeGreaterThan(0);
     expect(css.slice(at, css.indexOf("\n}", at))).toContain(
@@ -508,7 +508,7 @@ describe("section bodies are marked for the surface", () => {
 // Sections rendered differently in Live Preview than in reading view — but only
 // in the diary. Journals were flawless, and that was the clue rather than a
 // consolation: a journal section is ONE fence (`header:🧭 Learning Path` and
-// the `path:` under it are the same ```almanac block), so "everything I own"
+// the `path:` under it are the same ```chronoanvil block), so "everything I own"
 // and "everything inside my own fence" were the same set. The diary writes a
 // header fence and a body fence, and there the difference is the whole feature.
 
@@ -566,7 +566,7 @@ describe("section scope in Live Preview", () => {
     const guard = body.indexOf(
       "el.classList.contains(OBSIDIAN_DOM.editorLine)"
     );
-    const apply = body.indexOf('toggleClass("journal-section-hidden"');
+    const apply = body.indexOf('toggleClass("ca-journal-section-hidden"');
     expect(guard).toBeGreaterThan(0);
     expect(apply).toBeGreaterThan(guard);
     // The painting pass has no such exemption: the line is still in the run.
@@ -658,7 +658,7 @@ describe("one watcher per note, not one per bar (3.13 §2, §4)", () => {
     const clear = src.indexOf("private clearMarks");
     const cbody = src.slice(clear, src.indexOf("\n  }", clear));
     expect(cbody).toContain("this.parent.children");
-    expect(cbody).toContain('removeClass("journal-sec-block")');
+    expect(cbody).toContain('removeClass("ca-journal-sec-block")');
   });
 
   it("deregisters on the bar's own teardown", () => {
@@ -686,7 +686,7 @@ describe("a titled section owns its own block (3.13)", () => {
     expect(src).toContain("claimOwnBlock");
     const at = src.indexOf("private claimOwnBlock");
     const body = src.slice(at, src.indexOf("\n  }", at));
-    expect(body).toContain('addClass("journal-sec-block")');
+    expect(body).toContain('addClass("ca-journal-sec-block")');
     expect(body).toContain('addClass("is-first")');
   });
 
@@ -723,7 +723,7 @@ describe("a titled section owns its own block (3.13)", () => {
   it("claims the anchor, the same element the pass paints", () => {
     // markSectionBodies walks the children of the anchor's PARENT, so it paints
     // anchor-level elements. In reading view that is a block-level ancestor of
-    // the ```almanac element the post-processor hands us — claiming `blockEl`
+    // the ```chronoanvil element the post-processor hands us — claiming `blockEl`
     // would nest a card inside the card the pass draws.
     //
     // HANDED THE ANCHOR SINCE 3.13.9 rather than resolving it: `whenAttached`
@@ -811,7 +811,7 @@ describe("a titled section owns its own block (3.13)", () => {
     const at = src.indexOf("blocks.forEach((block, i) =>");
     expect(at).toBeGreaterThan(0);
     const head = src.slice(at, at + 700);
-    expect(head).toContain('toggleClass("journal-sec-block", marks[i].member)');
+    expect(head).toContain('toggleClass("ca-journal-sec-block", marks[i].member)');
     expect(head).toContain('toggleClass("is-first", marks[i].first)');
     expect(head).toContain('toggleClass("is-last", marks[i].last)');
   });
@@ -919,7 +919,7 @@ describe("computeSectionRuns", () => {
 
   it("puts the bottom on the last block that renders something", () => {
     // THE FIRST OF THE TWO BUGS. A section ending in a storage region —
-    // `<!--almanac:path-->` is a real block that renders nothing — rounded an
+    // `<!--chronoanvil:path-->` is a real block that renders nothing — rounded an
     // invisible element and left a band of empty surface under the content.
     const m = computeSectionRuns([head(), node(), node({ renders: false })]);
     expect(m[1].last).toBe(true);

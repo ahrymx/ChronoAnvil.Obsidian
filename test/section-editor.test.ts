@@ -131,7 +131,7 @@ describe("what a row offers", () => {
     const body = editor();
     const at = body.indexOf("if (refusal) return;");
     expect(at).toBeGreaterThan(0);
-    expect(at).toBeLessThan(body.indexOf('cls: "almanac-tpl-toggle"'));
+    expect(at).toBeLessThan(body.indexOf('cls: "ca-tpl-toggle"'));
   });
 
   it("the reason in place, not on Save", () => {
@@ -291,8 +291,8 @@ describe("what Save writes", () => {
     // writing in them; a removal that would take any of it is refused by the
     // model before the editor can offer it.
     const text = composeEntryTemplate("daily").replace(
-      "<!--almanac:log\n-->",
-      "<!--almanac:log\nSix months of this.\n-->"
+      "<!--chronoanvil:log\n-->",
+      "<!--chronoanvil:log\nSix months of this.\n-->"
     );
     const model = entrySectionModel({ grain: "daily" });
     const want = model.present(text).filter((id) => id !== "log");
@@ -318,13 +318,13 @@ describe("the window is tabbed, not columned", () => {
     expect(body).toContain('tab("sections", "In this file")');
     expect(body).toContain('tab("markdown", "Markdown")');
     expect(body).toContain('tab("layout", "Layout")');
-    for (const dead of ["almanac-tpl-cols", "almanac-tpl-preview", "almanac-tpl-col-title"]) {
+    for (const dead of ["ca-tpl-cols", "ca-tpl-preview", "ca-tpl-col-title"]) {
       expect(readCode("section-editor"), dead).not.toContain(dead);
     }
   });
 
   it("and the stylesheet no longer lays them side by side", () => {
-    expect(readCss()).not.toContain(".almanac-tpl-cols");
+    expect(readCss()).not.toContain(".ca-tpl-cols");
   });
 
   it("opens on the arranger, not on the summary", () => {
@@ -345,7 +345,7 @@ describe("the window is tabbed, not columned", () => {
     // regardless of how many rows the surface has. A diary entry has nine.
     const body = readCode("section-editor");
     expect(body.indexOf("this.renderTabs(wrap)")).toBeLessThan(
-      body.indexOf('createDiv({ cls: "almanac-tpl-pane" })')
+      body.indexOf('createDiv({ cls: "ca-tpl-pane" })')
     );
   });
 });
@@ -565,7 +565,7 @@ describe("a section may not be added until its question is answered", () => {
     expect(next).toContain("bridge-notes:meal|From the journals");
     // And no empty region beside it: `ownsRegion` is false, so there is
     // nothing of the reader's here to persist.
-    expect(next).not.toContain("<!--almanac:bridge");
+    expect(next).not.toContain("<!--chronoanvil:bridge");
   });
 
   it("and reopening on what was written asks nothing and changes nothing", () => {
@@ -696,8 +696,8 @@ describe("the editor carries the defence the add command left it (3.13 §9.1)", 
     // And the styling no longer descends from the row, or a heading that landed
     // beside one would lose it.
     const css = readCss();
-    expect(css).toContain("\n.almanac-choice-group {");
-    expect(css).not.toContain(".almanac-choice-detailed .almanac-choice-group");
+    expect(css).toContain("\n.ca-choice-group {");
+    expect(css).not.toContain(".ca-choice-detailed .ca-choice-group");
   });
 
   it("draws the empty state the model named, not the one it assumed", () => {
@@ -742,13 +742,13 @@ describe("the list marks where the pointer is, not what a row is", () => {
     // distinction the `Section` pill on the row already makes in words. Emphasis
     // that never varies is texture, and the one thing it could not say was which
     // row the reader is on.
-    expect(css()).toContain(".almanac-tpl-list .almanac-list-row:hover");
+    expect(css()).toContain(".ca-tpl-list .ca-list-row:hover");
     expect(css()).toMatch(
-      /\.almanac-tpl-list \.almanac-list-row \{[^}]*border-left: 3px solid transparent/
+      /\.ca-tpl-list \.ca-list-row \{[^}]*border-left: 3px solid transparent/
     );
     // The section row keeps the SLOT and loses the colour.
     expect(css()).not.toMatch(
-      /\.almanac-tpl-row-section \{[^}]*border-left: 3px solid var\(--interactive-accent\)/
+      /\.ca-tpl-row-section \{[^}]*border-left: 3px solid var\(--interactive-accent\)/
     );
   });
 
@@ -757,7 +757,7 @@ describe("the list marks where the pointer is, not what a row is", () => {
     // width. Held transparent, the pointer crossing a row changes one colour and
     // nothing else.
     const rule = css().slice(
-      css().indexOf(".almanac-tpl-list .almanac-list-row {")
+      css().indexOf(".ca-tpl-list .ca-list-row {")
     );
     expect(rule.slice(0, rule.indexOf("}"))).toContain("transparent");
   });
@@ -766,7 +766,7 @@ describe("the list marks where the pointer is, not what a row is", () => {
     // A group is a CARD in a list of rows, and at 6px its border sat almost
     // against the loose rows either side — so "these three are one object" was
     // carried by a 2px rule and nothing else.
-    const at = css().indexOf(".almanac-tpl-block {");
+    const at = css().indexOf(".ca-tpl-block {");
     expect(at).toBeGreaterThan(-1);
     const block = css().slice(at, css().indexOf("}", at));
     expect(block).toContain("margin: 12px 0");

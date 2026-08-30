@@ -19,7 +19,7 @@
 //
 // The Diary had already solved this by rendering its whole section from one
 // directive: `buildCalendar` puts the greeting band, the month grid, the footer
-// and the agenda inside a single `.journal-calendar` card, and the band merely
+// and the agenda inside a single `.ca-journal-calendar` card, and the band merely
 // cancels the card's padding so its tint reaches the edges. One directive, one
 // DOM subtree, one object. This module is the same move for Journals.
 //
@@ -42,7 +42,7 @@
 // childFolders() walk the markdown builder used. No new persistence.
 
 import { MarkdownPostProcessorContext, setIcon, TFolder } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { buildJournalsHeader } from "./journals-header";
 import { openReorganiseJournals } from "./reorganise-journals";
 import {
@@ -69,12 +69,12 @@ import { sectionFrame } from "../ui/section-frame";
 // and the cost of keeping the shape was that the fold state of a journal was
 // keyed by two strings the wizard can edit.
 
-function isCollapsed(plugin: AlmanacPlugin, key: string): boolean {
+function isCollapsed(plugin: ChronoAnvilPlugin, key: string): boolean {
   return plugin.settings.collapsedNoteSections?.[key] === true;
 }
 
 async function setCollapsed(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   key: string,
   v: boolean
 ): Promise<void> {
@@ -97,20 +97,20 @@ async function setCollapsed(
 // body, a key", and the second caller went for a reason about the SUBJECT rather
 // than a reason about folding.
 function makeFoldable(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   section: HTMLElement,
   head: HTMLElement,
   key: string
 ): void {
   // THE RIGHT-HAND END, WITH EVERY OTHER HEADER BAR'S (4.13 §1b). `head` is a
-  // `.journal-sec` — the same object the dashboards' section bars are — so a
+  // `.ca-journal-sec` — the same object the dashboards' section bars are — so a
   // chevron prepended here put two fold controls on opposite sides of one page:
   // the Journals section's own bar opening from the right and every group head
   // inside its card opening from the left. Inserted before the actions rather
   // than appended, for the reason `headerbar.ts` gives at its own toggle.
-  const chevron = createDiv({ cls: "jjs-toggle" });
+  const chevron = createDiv({ cls: "ca-jjs-toggle" });
   setIcon(chevron, "chevron-down");
-  const actions = head.querySelector(".journal-header-widgets");
+  const actions = head.querySelector(".ca-journal-header-widgets");
   if (actions) head.insertBefore(chevron, actions);
   else head.appendChild(chevron);
   head.addClass("is-foldable");
@@ -124,7 +124,7 @@ function makeFoldable(
     // don't fold. Only the bare strip is a fold target — the same rule the
     // header bars use for their anchored widget group.
     const target = evt.target as HTMLElement;
-    if (target.closest(".jjs-actions, a")) return;
+    if (target.closest(".ca-jjs-actions, a")) return;
     evt.preventDefault();
     const next = !isCollapsed(plugin, key);
     apply(next);
@@ -142,12 +142,12 @@ interface BtnSpec {
 }
 
 function addButtons(parent: HTMLElement, specs: BtnSpec[]): HTMLElement {
-  const group = parent.createDiv({ cls: "jjs-actions" });
+  const group = parent.createDiv({ cls: "ca-jjs-actions" });
   for (const spec of specs) {
-    const btn = group.createEl("button", { cls: "journal-btn" });
+    const btn = group.createEl("button", { cls: "ca-journal-btn" });
     if (spec.primary) btn.addClass("mod-cta");
-    setIcon(btn.createSpan({ cls: "journal-btn-icon" }), spec.icon);
-    btn.createSpan({ cls: "journal-btn-label", text: spec.label });
+    setIcon(btn.createSpan({ cls: "ca-journal-btn-icon" }), spec.icon);
+    btn.createSpan({ cls: "ca-journal-btn-label", text: spec.label });
     btn.addEventListener("click", (evt) => {
       evt.preventDefault();
       evt.stopPropagation();
@@ -211,7 +211,7 @@ function foldKey(sourcePath: string, ...parts: string[]): string {
 // level's own. Two Study constants imported into a type-agnostic renderer to
 // be ignored.
 function levelEmojiFor(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   level: JournalLevel,
   name: string
 ): string {
@@ -229,7 +229,7 @@ function levelEmojiFor(
 //
 // THAT DISTINCTION IS STILL TRUE AND STILL DRAWN; what is gone is the string.
 // The journals card has a stat strip now, and a strip splits the number from the
-// noun — a cell is a `--am-text-2xs` small-caps LABEL over a `1.15em` value, so
+// noun — a cell is a `--ca-text-2xs` small-caps LABEL over a `1.15em` value, so
 // there is nothing for a function returning "4 subjects" to be put into. The
 // reading survives as the strip's fourth cell.
 //
@@ -244,7 +244,7 @@ function levelEmojiFor(
 // air. **A fixed height with a scrolling body is the same answer without the
 // hiding**: every card is its bar plus four lines whatever is in it, the grid is
 // a row rather than a ragged edge, and a long subject is a scroll away rather
-// than a page away. The number four now lives in `.jjs-card-body`, which is the
+// than a page away. The number four now lives in `.ca-jjs-card-body`, which is the
 // only place that can honestly hold it — it is a height, not a count.
 //
 // `topicRow` MOVED TO `tables.ts` AS `childRow` (4.36), and is imported above.
@@ -261,7 +261,7 @@ function levelEmojiFor(
 // ── One subject group (a top-level container folder) ─────────────────────
 
 function buildGroup(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   type: JournalType,
   folder: TFolder
@@ -280,7 +280,7 @@ function buildGroup(
   //
   // THE HEAD IS STILL `sectionFrame`, AND THAT IS THE WHOLE OF WHY THIS IS
   // CHEAP. The chosen mockup's head is a slim recessed band carrying a glyph in
-  // a fixed slot and a name in small caps at `--am-bar-text` — which is what a
+  // a fixed slot and a name in small caps at `--ca-bar-text` — which is what a
   // level-2 section bar already IS since 4.13 §1. The card is a box around it
   // and a ground under it; nothing about the title, its truncation, its glyph
   // slot or its link is re-stated here.
@@ -294,7 +294,7 @@ function buildGroup(
   // rather than migrated — the map is keyed per note and per id, so a stale entry
   // costs nothing and deleting a reader's settings to tidy our own is a worse
   // trade than an unread key.
-  const card = createDiv({ cls: "jjs-card" });
+  const card = createDiv({ cls: "ca-jjs-card" });
   // The one section whose title is a link — see `titleRender` in
   // section-frame.ts. The slot is the frame's, so the size, the truncation and
   // the alignment match every other section; what goes in it is a subject's
@@ -309,7 +309,7 @@ function buildGroup(
     level: 2,
     owns: "children",
     titleRender: (slot) =>
-      folderLink(plugin, slot, folder, ctx.sourcePath, "jjs-group-name"),
+      folderLink(plugin, slot, folder, ctx.sourcePath, "ca-jjs-group-name"),
   });
 
   if (!twoLevel) {
@@ -325,7 +325,7 @@ function buildGroup(
     return card;
   }
 
-  const body = card.createDiv({ cls: "jjs-card-body" });
+  const body = card.createDiv({ cls: "ca-jjs-card-body" });
 
   if (subs.length === 0) {
     // ── THE EMPTY STATE IS THE CONTROL (4.38) ──────────────────────────
@@ -377,7 +377,7 @@ function buildGroup(
   // anything: every card in the grid is the height of its bar plus four lines,
   // whatever is in it, and the rest of a long one is a scroll away rather than a
   // page away. The cap, the `+ N more` link and the branch for a folder with no
-  // index note all go with it — see `.jjs-card-body` in
+  // index note all go with it — see `.ca-jjs-card-body` in
   // 60-heroes-and-banners.css, which is where the four is stated.
   for (const sub of subs) childRow(plugin, ctx, body, sub);
 
@@ -387,7 +387,7 @@ function buildGroup(
 // ── One journal type (Study, or a custom type) ───────────────────────────
 
 function buildType(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   type: JournalType
 ): HTMLElement {
@@ -398,12 +398,12 @@ function buildType(
   // level itself is not gone — `buildGroup` reads it to name a subject's rows and
   // its empty tile — only this function's use of it.
 
-  const section = createDiv({ cls: "jjs-type" });
+  const section = createDiv({ cls: "ca-jjs-type" });
   // THE HUE, ON THE TYPE (4.38). Every card in this group belongs to this
   // journal, so the tint on their heads is set once here and read from an ancestor
   // — a card that resolved its own could not be made to disagree with its
   // siblings, which is the same reason `buildLevelCards` sets it on the grid.
-  // `.jjs-card > .journal-sec` is what reads it.
+  // `.ca-jjs-card > .ca-journal-sec` is what reads it.
   section.style.setProperty("--jjc-hue", String(hueOf(type.id)));
   // `owns: "children"` — the type's body is the `jjs-type-body` div below,
   // inside this widget's own DOM. It folds by toggling a class on itself
@@ -442,7 +442,7 @@ function buildType(
     // own is still a row; it just has nothing to open"*.
     titleRender: root
       ? (slot) =>
-          folderLink(plugin, slot, root, ctx.sourcePath, "jjs-type-name", type.name)
+          folderLink(plugin, slot, root, ctx.sourcePath, "ca-jjs-type-name", type.name)
       : undefined,
   });
   const head = frame.root;
@@ -510,14 +510,14 @@ function buildType(
   // rather than that nobody had got to it.
   //
   // NOTHING DRAWN WHERE THERE IS NOTHING TO DRAW. Most journals now have no head
-  // control at all, and `addButtons` would otherwise leave an empty `.jjs-actions`
+  // control at all, and `addButtons` would otherwise leave an empty `.ca-jjs-actions`
   // div inside the widgets bar, which defeats the `:empty` rule in
   // 30-header-bars.css that hides an unused slot.
   if (specs.length > 0) addButtons(frame.actions, specs);
 
   makeFoldable(plugin, section, head, foldKey(ctx.sourcePath, type.id));
 
-  const body = section.createDiv({ cls: "jjs-type-body" });
+  const body = section.createDiv({ cls: "ca-jjs-type-body" });
 
   if (tops.length === 0) {
     // ── THE TILE IS THE EMPTY STATE (4.39.1) ────────────────────────────
@@ -539,7 +539,7 @@ function buildType(
     // to start.
     if (root) {
       body
-        .createDiv({ cls: "jjs-grid" })
+        .createDiv({ cls: "ca-jjs-grid" })
         .appendChild(addCardTile(plugin, type, root, topLevel.noun));
       return section;
     }
@@ -550,9 +550,9 @@ function buildType(
     // the callout draws it, and where the sentence is the true answer rather than
     // a restatement: the folder, and with it the tile, appears when the journal is
     // first used.
-    const empty = body.createDiv({ cls: "jjs-empty" });
+    const empty = body.createDiv({ cls: "ca-jjs-empty" });
     empty.createDiv({
-      cls: "jjs-empty-title",
+      cls: "ca-jjs-empty-title",
       // IT NAMES WHAT IS MISSING, NOT WHAT IT IS INSIDE (4.38.4). This read
       // `No ${splitGlyph(type.name).text.toLowerCase()} journals yet` and
       // disagreed with the line under it about what was absent. The journal is
@@ -560,7 +560,7 @@ function buildType(
       text: `No ${plural(topLevel.noun).toLowerCase()} yet`,
     });
     empty.createDiv({
-      cls: "jjs-empty-body",
+      cls: "ca-jjs-empty-body",
       text: `${plural(topLevel.noun)} appear here automatically.`,
     });
     return section;
@@ -570,13 +570,13 @@ function buildType(
   // because a bar is full-width by nature; a card is not, and four of them in a
   // column would be four boxes each wasting two-thirds of a wide page.
   //
-  // `auto-fill` WITH A MIN TRACK, which is `.jjc-grid`'s shape and its argument:
+  // `auto-fill` WITH A MIN TRACK, which is `.ca-jjc-grid`'s shape and its argument:
   // the column count answers to the WIDGET's width — the pane, the canvas node
   // or the row cell it was dropped into, all of which are `container-type:
   // inline-size` — rather than to the window's. A media query here would be the
   // fault 4.3.1 spent a release on, where a breakpoint on the block could not
   // describe a cell.
-  const grid = body.createDiv({ cls: "jjs-grid" });
+  const grid = body.createDiv({ cls: "ca-jjs-grid" });
   for (const folder of tops) {
     grid.appendChild(buildGroup(plugin, ctx, type, folder));
   }
@@ -596,29 +596,29 @@ function buildType(
 // ── The section ──────────────────────────────────────────────────────────
 
 export function buildJournalsSection(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   refresh: () => void
 ): HTMLElement {
   const types = registeredJournalTypes(plugin);
-  const root = createDiv({ cls: "journals-card" });
+  const root = createDiv({ cls: "ca-journals-card" });
 
   // No types enabled: no numbers to show and no list to head, so the card is
   // just the explanation. The hero would be a band of zeroes saying the same
   // thing louder — the objection that kept journals-header.ts returning an
   // empty root in this case.
   if (types.length === 0) {
-    root.addClass("jjs-bare");
-    const empty = root.createDiv({ cls: "jjs-empty" });
-    empty.createDiv({ cls: "jjs-empty-title", text: "📚 No journals enabled" });
+    root.addClass("ca-jjs-bare");
+    const empty = root.createDiv({ cls: "ca-jjs-empty" });
+    empty.createDiv({ cls: "ca-jjs-empty-title", text: "📚 No journals enabled" });
     empty.createDiv({
-      cls: "jjs-empty-body",
-      text: "Turn on Study or add a custom journal in Settings → Almanac → Journals.",
+      cls: "ca-jjs-empty-body",
+      text: "Turn on Study or add a custom journal in Settings → ChronoAnvil → Journals.",
     });
     return root;
   }
 
-  const list = createDiv({ cls: "jjs-list" });
+  const list = createDiv({ cls: "ca-jjs-list" });
 
   // The hero band: the same numbers and 53-week strip as before, but as the
   // card's top band rather than a card of its own — the exact relationship the
@@ -629,7 +629,7 @@ export function buildJournalsSection(
   // NO AREA TITLEBAR SINCE 4.8.1 — see the same removal in calendar.ts. The
   // strip named the root this card covers; the block's head names the block,
   // and the hero below already says JOURNALS in the largest type on the card.
-  const band = root.createDiv({ cls: "jjs-hero" });
+  const band = root.createDiv({ cls: "ca-jjs-hero" });
   band.appendChild(
     buildJournalsHeader(plugin, {
       // ── REORGANISE, BESIDE REFRESH (4.40) ──────────────────────────

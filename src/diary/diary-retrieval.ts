@@ -17,12 +17,12 @@
 // is listed, and three near-identical row builders would drift apart the first
 // time one of them gained a field.
 //
-// Reads are async (Almanac's content is in body regions the metadata cache
+// Reads are async (ChronoAnvil's content is in body regions the metadata cache
 // can't see), so each view paints a placeholder and fills in. That's the same
 // shape diary-header.ts uses for its open-tasks cell.
 
 import { MarkdownPostProcessorContext, setIcon, TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   anniversaries,
   buildSnippet,
@@ -44,7 +44,7 @@ import { moment, noExt, openFile, today } from "../core/util";
 // result behaves like any other internal link.
 function wireOpen(
   el: HTMLElement,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   sourcePath: string
 ): void {
@@ -57,7 +57,7 @@ function wireOpen(
   el.addEventListener("mouseover", (evt) => {
     plugin.app.workspace.trigger("hover-link", {
       event: evt,
-      source: "almanac-diary-retrieval",
+      source: "ca-diary-retrieval",
       hoverParent: el,
       targetEl: el,
       linktext: href,
@@ -91,7 +91,7 @@ function highlightFragment(parent: HTMLElement, text: string, query?: string): v
       parent.createSpan({ text: text.slice(start, idx) });
     }
     parent.createEl("mark", {
-      cls: "jdr-highlight",
+      cls: "ca-jdr-highlight",
       text: text.slice(idx, idx + target.length),
     });
     start = idx + target.length;
@@ -108,7 +108,7 @@ function highlightFragment(parent: HTMLElement, text: string, query?: string): v
 // `dateFormat` varies by view — the timeline groups by month so its rows only
 // need the day, while a search result can be from any year and needs the lot.
 function entryRow(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   entry: IndexedEntry,
   sourcePath: string,
   opts: {
@@ -118,19 +118,19 @@ function entryRow(
     highlightQuery?: string;
   } = {}
 ): HTMLElement {
-  const row = createDiv({ cls: "jdr-row" });
+  const row = createDiv({ cls: "ca-jdr-row" });
 
-  const gutter = row.createDiv({ cls: "jdr-gutter" });
+  const gutter = row.createDiv({ cls: "ca-jdr-gutter" });
   const m = moment(entry.iso);
   gutter.createDiv({
-    cls: "jdr-date",
+    cls: "ca-jdr-date",
     text: m.format(opts.dateFormat ?? "D MMM YYYY"),
   });
-  gutter.createDiv({ cls: "jdr-dow", text: m.format("ddd") });
+  gutter.createDiv({ cls: "ca-jdr-dow", text: m.format("ddd") });
 
-  const main = row.createDiv({ cls: "jdr-main" });
+  const main = row.createDiv({ cls: "ca-jdr-main" });
   const titleEl = main.createEl("a", {
-    cls: "internal-link jdr-title",
+    cls: "internal-link ca-jdr-title",
     href: noExt(entry.file.path),
   });
   highlightFragment(titleEl, entry.title, opts.highlightQuery);
@@ -138,9 +138,9 @@ function entryRow(
 
   const snippet = opts.snippet ?? "";
   if (snippet) {
-    const line = main.createDiv({ cls: "jdr-snippet" });
+    const line = main.createDiv({ cls: "ca-jdr-snippet" });
     if (opts.snippetKey) {
-      line.createSpan({ cls: "jdr-snippet-key", text: opts.snippetKey });
+      line.createSpan({ cls: "ca-jdr-snippet-key", text: opts.snippetKey });
     }
     const snippetSpan = line.createSpan();
     highlightFragment(snippetSpan, snippet, opts.highlightQuery);
@@ -149,27 +149,27 @@ function entryRow(
   // Facts worth seeing without opening the note. Each is omitted when it's
   // zero rather than shown as "0", so a quiet day reads as a quiet day rather
   // than a row of empty counters.
-  const facts = main.createDiv({ cls: "jdr-facts" });
+  const facts = main.createDiv({ cls: "ca-jdr-facts" });
   if (entry.kind === "monthly") {
-    facts.createSpan({ cls: "jdr-fact jdr-fact-kind", text: "monthly" });
+    facts.createSpan({ cls: "ca-jdr-fact ca-jdr-fact-kind", text: "monthly" });
   }
   if (entry.mood != null) {
-    const f = facts.createSpan({ cls: "jdr-fact" });
-    setIcon(f.createSpan({ cls: "jdr-fact-icon" }), "sun");
+    const f = facts.createSpan({ cls: "ca-jdr-fact" });
+    setIcon(f.createSpan({ cls: "ca-jdr-fact-icon" }), "sun");
     f.createSpan({ text: String(entry.mood) });
   }
   if (entry.openTasks > 0) {
-    const f = facts.createSpan({ cls: "jdr-fact" });
-    setIcon(f.createSpan({ cls: "jdr-fact-icon" }), "square");
+    const f = facts.createSpan({ cls: "ca-jdr-fact" });
+    setIcon(f.createSpan({ cls: "ca-jdr-fact-icon" }), "square");
     f.createSpan({ text: String(entry.openTasks) });
   }
   if (entry.attachments > 0) {
-    const f = facts.createSpan({ cls: "jdr-fact" });
-    setIcon(f.createSpan({ cls: "jdr-fact-icon" }), "paperclip");
+    const f = facts.createSpan({ cls: "ca-jdr-fact" });
+    setIcon(f.createSpan({ cls: "ca-jdr-fact-icon" }), "paperclip");
     f.createSpan({ text: String(entry.attachments) });
   }
   for (const tag of entry.tags.slice(0, 3)) {
-    facts.createSpan({ cls: "jdr-fact jdr-fact-tag", text: tag });
+    facts.createSpan({ cls: "ca-jdr-fact ca-jdr-fact-tag", text: tag });
   }
 
   return row;
@@ -185,15 +185,15 @@ function entryRow(
 // The index is read once per render and held for the life of this widget, so
 // typing filters in memory rather than re-reading the vault per keystroke.
 export function buildDiarySearch(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
-  const root = createDiv({ cls: "journal-table jdr-search" });
-  const controls = root.createDiv({ cls: "jdr-timeline-controls" });
-  const summaryEl = root.createDiv({ cls: "jdr-timeline-summary" });
-  const scrollViewport = root.createDiv({ cls: "jdr-timeline-scroll" });
-  const results = scrollViewport.createDiv({ cls: "jdr-results" });
-  results.createDiv({ cls: "jdr-loading", text: "Reading your diary…" });
+  const root = createDiv({ cls: "ca-journal-table ca-jdr-search" });
+  const controls = root.createDiv({ cls: "ca-jdr-timeline-controls" });
+  const summaryEl = root.createDiv({ cls: "ca-jdr-timeline-summary" });
+  const scrollViewport = root.createDiv({ cls: "ca-jdr-timeline-scroll" });
+  const results = scrollViewport.createDiv({ cls: "ca-jdr-results" });
+  results.createDiv({ cls: "ca-jdr-loading", text: "Reading your diary…" });
 
   // State
   let entries: IndexedEntry[] | null = null;
@@ -221,13 +221,13 @@ export function buildDiarySearch(
     controls.empty();
 
     // 1. Search Row
-    const searchRow = controls.createDiv({ cls: "jdr-timeline-search-row" });
-    const searchWrap = searchRow.createDiv({ cls: "jdr-timeline-search-wrap" });
-    const searchIcon = searchWrap.createDiv({ cls: "jdr-timeline-search-icon" });
+    const searchRow = controls.createDiv({ cls: "ca-jdr-timeline-search-row" });
+    const searchWrap = searchRow.createDiv({ cls: "ca-jdr-timeline-search-wrap" });
+    const searchIcon = searchWrap.createDiv({ cls: "ca-jdr-timeline-search-icon" });
     setIcon(searchIcon, "search");
 
     const searchInput = searchWrap.createEl("input", {
-      cls: "jdr-timeline-search-input",
+      cls: "ca-jdr-timeline-search-input",
       attr: {
         type: "text",
         placeholder: "Search by text, #tag, [mood>=5], has:task...",
@@ -236,7 +236,7 @@ export function buildDiarySearch(
     });
 
     const searchClear = searchWrap.createEl("button", {
-      cls: "jdr-timeline-search-clear",
+      cls: "ca-jdr-timeline-search-clear",
       text: "✕",
       attr: { type: "button", "aria-label": "Clear search" },
     });
@@ -275,23 +275,23 @@ export function buildDiarySearch(
     });
 
     // 2. Filters & View Actions Row
-    const filterRow = controls.createDiv({ cls: "jdr-timeline-filters-row" });
-    const chipsWrap = filterRow.createDiv({ cls: "jdr-timeline-chips" });
+    const filterRow = controls.createDiv({ cls: "ca-jdr-timeline-filters-row" });
+    const chipsWrap = filterRow.createDiv({ cls: "ca-jdr-timeline-chips" });
 
     // Year Pills
     if (years.length > 1) {
-      const yearPills = chipsWrap.createDiv({ cls: "jdr-timeline-year-pills" });
+      const yearPills = chipsWrap.createDiv({ cls: "ca-jdr-timeline-year-pills" });
       const yearOptions = ["all", ...years];
       for (const y of yearOptions) {
         const pill = yearPills.createEl("button", {
-          cls: `jdr-timeline-year-pill${selectedYear === y ? " is-active" : ""}`,
+          cls: `ca-jdr-timeline-year-pill${selectedYear === y ? " is-active" : ""}`,
           text: y === "all" ? "All" : y,
           attr: { type: "button" },
         });
         pill.addEventListener("click", () => {
           selectedYear = y;
           yearPills
-            .findAll(".jdr-timeline-year-pill")
+            .findAll(".ca-jdr-timeline-year-pill")
             .forEach((p) => p.removeClass("is-active"));
           pill.addClass("is-active");
           render();
@@ -307,10 +307,10 @@ export function buildDiarySearch(
       onToggle: (active: boolean) => void
     ) => {
       const btn = chipsWrap.createEl("button", {
-        cls: `jdr-timeline-chip${isChecked() ? " is-active" : ""}`,
+        cls: `ca-jdr-timeline-chip${isChecked() ? " is-active" : ""}`,
         attr: { type: "button" },
       });
-      const iconSpan = btn.createSpan({ cls: "jdr-timeline-chip-icon" });
+      const iconSpan = btn.createSpan({ cls: "ca-jdr-timeline-chip-icon" });
       setIcon(iconSpan, iconName);
       btn.createSpan({ text: label });
       btn.addEventListener("click", () => {
@@ -327,13 +327,13 @@ export function buildDiarySearch(
     const monthlyBtn = addFilterBtn("Monthly", "calendar", () => filterMonthly, (v) => { filterMonthly = v; });
 
     // View Actions (Sort & Compact)
-    const actionsWrap = filterRow.createDiv({ cls: "jdr-timeline-actions" });
+    const actionsWrap = filterRow.createDiv({ cls: "ca-jdr-timeline-actions" });
 
     const sortBtn = actionsWrap.createEl("button", {
-      cls: "jdr-timeline-action-btn",
+      cls: "ca-jdr-timeline-action-btn",
       attr: { type: "button", title: "Toggle sort mode" },
     });
-    const sortIcon = sortBtn.createSpan({ cls: "jdr-timeline-chip-icon" });
+    const sortIcon = sortBtn.createSpan({ cls: "ca-jdr-timeline-chip-icon" });
     setIcon(sortIcon, "arrow-down-up");
     const sortText = sortBtn.createSpan({ text: "Rank" });
     sortBtn.addEventListener("click", () => {
@@ -345,10 +345,10 @@ export function buildDiarySearch(
     });
 
     const compactBtn = actionsWrap.createEl("button", {
-      cls: "jdr-timeline-action-btn",
+      cls: "ca-jdr-timeline-action-btn",
       attr: { type: "button", title: "Toggle compact view" },
     });
-    const compactIcon = compactBtn.createSpan({ cls: "jdr-timeline-chip-icon" });
+    const compactIcon = compactBtn.createSpan({ cls: "ca-jdr-timeline-chip-icon" });
     setIcon(compactIcon, "list");
     compactBtn.createSpan({ text: "Compact" });
     compactBtn.addEventListener("click", () => {
@@ -359,7 +359,7 @@ export function buildDiarySearch(
 
     // Hint line below controls
     controls.createDiv({
-      cls: "jdr-search-hint",
+      cls: "ca-jdr-search-hint",
       text: searchHintLine({ kind: "monthly", tag: "health", tracker: "Mood" }),
     });
 
@@ -369,7 +369,7 @@ export function buildDiarySearch(
       summaryEl.empty();
 
       if (entries == null) {
-        results.createDiv({ cls: "jdr-loading", text: "Reading your diary…" });
+        results.createDiv({ cls: "ca-jdr-loading", text: "Reading your diary…" });
         return;
       }
 
@@ -429,7 +429,7 @@ export function buildDiarySearch(
       });
 
       const clearLink = summaryEl.createEl("a", {
-        cls: "jdr-timeline-clear-link",
+        cls: "ca-jdr-timeline-clear-link",
         text: "Clear filters",
       });
       clearLink.addEventListener("click", () => {
@@ -438,7 +438,7 @@ export function buildDiarySearch(
         searchClear.style.display = "none";
         selectedYear = "all";
         controls
-          .findAll(".jdr-timeline-year-pill")
+          .findAll(".ca-jdr-timeline-year-pill")
           .forEach((p, idx) => p.toggleClass("is-active", idx === 0));
         filterTasks = false;
         filterAttach = false;
@@ -487,13 +487,13 @@ export function buildDiarySearch(
 // panel on the homepage. `on-this-day:always` opts into the empty state for
 // anyone who'd rather see the placeholder hold its space.
 export function buildOnThisDay(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   opts: { always?: boolean; maxYears?: number } = {}
 ): HTMLElement {
-  const root = createDiv({ cls: "journal-table jdr-otd" });
-  const body = root.createDiv({ cls: "jdr-otd-body" });
-  body.createDiv({ cls: "jdr-loading", text: "Looking back…" });
+  const root = createDiv({ cls: "ca-journal-table ca-jdr-otd" });
+  const body = root.createDiv({ cls: "ca-jdr-otd-body" });
+  body.createDiv({ cls: "ca-jdr-loading", text: "Looking back…" });
 
   void readIndex(plugin).then((entries) => {
     const todayIso = today();
@@ -515,17 +515,17 @@ export function buildOnThisDay(
       return;
     }
 
-    const head = body.createDiv({ cls: "jdr-otd-head" });
-    setIcon(head.createSpan({ cls: "jdr-otd-icon" }), "history");
+    const head = body.createDiv({ cls: "ca-jdr-otd-head" });
+    setIcon(head.createSpan({ cls: "ca-jdr-otd-icon" }), "history");
     head.createSpan({
-      cls: "jdr-otd-title",
+      cls: "ca-jdr-otd-title",
       text: `On this day · ${moment(todayIso).format("D MMMM")}`,
     });
 
     for (const group of groups) {
-      const section = body.createDiv({ cls: "jdr-otd-group" });
+      const section = body.createDiv({ cls: "ca-jdr-otd-group" });
       section.createDiv({
-        cls: "jdr-otd-year",
+        cls: "ca-jdr-otd-year",
         text: group.yearsAgo === 1 ? "1 year ago" : `${group.yearsAgo} years ago`,
       });
       for (const entry of group.entries) {
@@ -564,16 +564,16 @@ function firstProse(entry: IndexedEntry, width = 160): string {
 const TIMELINE_MONTHS = 3;
 
 export function buildTimeline(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   initialMonths = TIMELINE_MONTHS
 ): HTMLElement {
-  const root = createDiv({ cls: "journal-table jdr-timeline" });
-  const controls = root.createDiv({ cls: "jdr-timeline-controls" });
-  const summaryEl = root.createDiv({ cls: "jdr-timeline-summary" });
-  const scrollViewport = root.createDiv({ cls: "jdr-timeline-scroll" });
-  const body = scrollViewport.createDiv({ cls: "jdr-timeline-body" });
-  body.createDiv({ cls: "jdr-loading", text: "Reading your diary…" });
+  const root = createDiv({ cls: "ca-journal-table ca-jdr-timeline" });
+  const controls = root.createDiv({ cls: "ca-jdr-timeline-controls" });
+  const summaryEl = root.createDiv({ cls: "ca-jdr-timeline-summary" });
+  const scrollViewport = root.createDiv({ cls: "ca-jdr-timeline-scroll" });
+  const body = scrollViewport.createDiv({ cls: "ca-jdr-timeline-body" });
+  body.createDiv({ cls: "ca-jdr-loading", text: "Reading your diary…" });
 
   // State held across repaints
   let shown = Math.max(1, initialMonths);
@@ -600,13 +600,13 @@ export function buildTimeline(
     controls.empty();
 
     // 1. Search Row
-    const searchRow = controls.createDiv({ cls: "jdr-timeline-search-row" });
-    const searchWrap = searchRow.createDiv({ cls: "jdr-timeline-search-wrap" });
-    const searchIcon = searchWrap.createDiv({ cls: "jdr-timeline-search-icon" });
+    const searchRow = controls.createDiv({ cls: "ca-jdr-timeline-search-row" });
+    const searchWrap = searchRow.createDiv({ cls: "ca-jdr-timeline-search-wrap" });
+    const searchIcon = searchWrap.createDiv({ cls: "ca-jdr-timeline-search-icon" });
     setIcon(searchIcon, "search");
 
     const searchInput = searchWrap.createEl("input", {
-      cls: "jdr-timeline-search-input",
+      cls: "ca-jdr-timeline-search-input",
       attr: {
         type: "text",
         placeholder: "Filter by text, #tag, [mood>=5], has:task...",
@@ -614,7 +614,7 @@ export function buildTimeline(
     });
 
     const searchClear = searchWrap.createEl("button", {
-      cls: "jdr-timeline-search-clear",
+      cls: "ca-jdr-timeline-search-clear",
       text: "✕",
       attr: { type: "button" },
     });
@@ -635,23 +635,23 @@ export function buildTimeline(
     });
 
     // 2. Filters & View Actions Row
-    const filterRow = controls.createDiv({ cls: "jdr-timeline-filters-row" });
-    const chipsWrap = filterRow.createDiv({ cls: "jdr-timeline-chips" });
+    const filterRow = controls.createDiv({ cls: "ca-jdr-timeline-filters-row" });
+    const chipsWrap = filterRow.createDiv({ cls: "ca-jdr-timeline-chips" });
 
     // Year Pills
     if (years.length > 1) {
-      const yearPills = chipsWrap.createDiv({ cls: "jdr-timeline-year-pills" });
+      const yearPills = chipsWrap.createDiv({ cls: "ca-jdr-timeline-year-pills" });
       const yearOptions = ["all", ...years];
       for (const y of yearOptions) {
         const pill = yearPills.createEl("button", {
-          cls: `jdr-timeline-year-pill${selectedYear === y ? " is-active" : ""}`,
+          cls: `ca-jdr-timeline-year-pill${selectedYear === y ? " is-active" : ""}`,
           text: y === "all" ? "All" : y,
           attr: { type: "button" },
         });
         pill.addEventListener("click", () => {
           selectedYear = y;
           yearPills
-            .findAll(".jdr-timeline-year-pill")
+            .findAll(".ca-jdr-timeline-year-pill")
             .forEach((p) => p.removeClass("is-active"));
           pill.addClass("is-active");
           paint();
@@ -667,10 +667,10 @@ export function buildTimeline(
       onToggle: (active: boolean) => void
     ) => {
       const btn = chipsWrap.createEl("button", {
-        cls: `jdr-timeline-chip${isChecked() ? " is-active" : ""}`,
+        cls: `ca-jdr-timeline-chip${isChecked() ? " is-active" : ""}`,
         attr: { type: "button" },
       });
-      const iconSpan = btn.createSpan({ cls: "jdr-timeline-chip-icon" });
+      const iconSpan = btn.createSpan({ cls: "ca-jdr-timeline-chip-icon" });
       setIcon(iconSpan, iconName);
       btn.createSpan({ text: label });
       btn.addEventListener("click", () => {
@@ -687,13 +687,13 @@ export function buildTimeline(
     const monthlyBtn = addFilterBtn("Monthly", "calendar", () => filterMonthly, (v) => { filterMonthly = v; });
 
     // View Actions (Sort & Compact)
-    const actionsWrap = filterRow.createDiv({ cls: "jdr-timeline-actions" });
+    const actionsWrap = filterRow.createDiv({ cls: "ca-jdr-timeline-actions" });
 
     const sortBtn = actionsWrap.createEl("button", {
-      cls: "jdr-timeline-action-btn",
+      cls: "ca-jdr-timeline-action-btn",
       attr: { type: "button", title: "Toggle sort order" },
     });
-    const sortIcon = sortBtn.createSpan({ cls: "jdr-timeline-chip-icon" });
+    const sortIcon = sortBtn.createSpan({ cls: "ca-jdr-timeline-chip-icon" });
     setIcon(sortIcon, "arrow-down-up");
     const sortText = sortBtn.createSpan({ text: sortOrder === "desc" ? "Newest" : "Oldest" });
     sortBtn.addEventListener("click", () => {
@@ -703,10 +703,10 @@ export function buildTimeline(
     });
 
     const compactBtn = actionsWrap.createEl("button", {
-      cls: "jdr-timeline-action-btn",
+      cls: "ca-jdr-timeline-action-btn",
       attr: { type: "button", title: "Toggle compact view" },
     });
-    const compactIcon = compactBtn.createSpan({ cls: "jdr-timeline-chip-icon" });
+    const compactIcon = compactBtn.createSpan({ cls: "ca-jdr-timeline-chip-icon" });
     setIcon(compactIcon, "list");
     compactBtn.createSpan({ text: "Compact" });
     compactBtn.addEventListener("click", () => {
@@ -768,7 +768,7 @@ export function buildTimeline(
 
       if (isFiltering) {
         const clearLink = summaryEl.createEl("a", {
-          cls: "jdr-timeline-clear-link",
+          cls: "ca-jdr-timeline-clear-link",
           text: "Clear filters",
         });
         clearLink.addEventListener("click", () => {
@@ -777,7 +777,7 @@ export function buildTimeline(
           searchClear.style.display = "none";
           selectedYear = "all";
           controls
-            .findAll(".jdr-timeline-year-pill")
+            .findAll(".ca-jdr-timeline-year-pill")
             .forEach((p, idx) => p.toggleClass("is-active", idx === 0));
           filterTasks = false;
           filterAttach = false;
@@ -806,16 +806,16 @@ export function buildTimeline(
       const monthsToRender = isFiltering ? groups : groups.slice(0, shown);
       for (const group of monthsToRender) {
         const isCollapsed = collapsedMonths.has(group.month);
-        const section = body.createDiv({ cls: "jdr-timeline-month" });
-        const head = section.createDiv({ cls: "jdr-timeline-head" });
+        const section = body.createDiv({ cls: "ca-jdr-timeline-month" });
+        const head = section.createDiv({ cls: "ca-jdr-timeline-head" });
 
-        const nameEl = head.createDiv({ cls: "jdr-timeline-month-name" });
-        const headIcon = nameEl.createSpan({ cls: "jdr-timeline-head-icon" });
+        const nameEl = head.createDiv({ cls: "ca-jdr-timeline-month-name" });
+        const headIcon = nameEl.createSpan({ cls: "ca-jdr-timeline-head-icon" });
         setIcon(headIcon, isCollapsed ? "chevron-right" : "chevron-down");
         nameEl.createSpan({ text: moment(`${group.month}-01`).format("MMMM YYYY") });
 
         head.createSpan({
-          cls: "jdr-timeline-count",
+          cls: "ca-jdr-timeline-count",
           text: `${group.entries.length} ${group.entries.length === 1 ? "entry" : "entries"}`,
         });
 
@@ -846,12 +846,12 @@ export function buildTimeline(
         const remaining = groups.length - shown;
         if (remaining > 0) {
           const more = body.createEl("button", {
-            cls: "journal-btn jdr-timeline-more",
+            cls: "ca-journal-btn ca-jdr-timeline-more",
             attr: { type: "button" },
           });
-          setIcon(more.createSpan({ cls: "journal-btn-icon" }), "chevron-down");
+          setIcon(more.createSpan({ cls: "ca-journal-btn-icon" }), "chevron-down");
           more.createSpan({
-            cls: "journal-btn-label",
+            cls: "ca-journal-btn-label",
             text: `Show earlier — ${remaining} more ${remaining === 1 ? "month" : "months"}`,
           });
           more.addEventListener("click", (evt) => {

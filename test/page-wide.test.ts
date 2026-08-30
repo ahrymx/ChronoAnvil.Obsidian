@@ -9,7 +9,7 @@
 //
 // WHAT THIS RELEASE ACTUALLY CHANGED, so the assertions have something to be
 // about. The homepage has been 1100px wide since 4.2, through `cssclasses:
-// almanac-wide` in its frontmatter, and no other dashboard could ask for the same
+// ca-wide` in its frontmatter, and no other dashboard could ask for the same
 // thing: frontmatter is out of a post-processor's reach and repair deliberately
 // never edits it. So a width was a property of one composed note rather than a
 // setting anybody could change.
@@ -54,12 +54,12 @@ const withoutHead = composedIds.filter((id) => id !== "banner");
 // A page as the three shared catalogues compose one: a head carrying ids, then a
 // block of its own.
 const HEADED = [
-  "`almanac:spacer`",
-  "```almanac",
+  "`chronoanvil:spacer`",
+  "```chronoanvil",
   "title:home,diary,journals",
   "```",
   "",
-  "```almanac",
+  "```chronoanvil",
   "header:⏳ Open tasks",
   "tasks-table:,period",
   "```",
@@ -150,7 +150,7 @@ describe("reading and writing a page's width", () => {
     // content span — which is what keeps it behind when the widget under it
     // leaves.
     const out = setPageWide(HEADED, true)!;
-    expect(out).toContain(`\`\`\`almanac\n${WIDE_KEYWORD}\ntitle:home,diary,journals`);
+    expect(out).toContain(`\`\`\`chronoanvil\n${WIDE_KEYWORD}\ntitle:home,diary,journals`);
   });
 
   it("restores the file byte-for-byte on off-then-on", () => {
@@ -176,7 +176,7 @@ describe("reading and writing a page's width", () => {
     // ONE ANSWER FOR TWO QUESTIONS, deliberately: there is no line to write and
     // no second sentence to invent, and the cog is not drawn there either —
     // `buildPageTitle` IS the head.
-    const headless = "`almanac:spacer`\n\n```almanac\ntasks-table\n```\n";
+    const headless = "`chronoanvil:spacer`\n\n```chronoanvil\ntasks-table\n```\n";
     expect(pageIsWide(headless)).toBe(false);
     expect(setPageWide(headless, true)).toBeNull();
     expect(setPageWide(headless, false)).toBeNull();
@@ -277,40 +277,40 @@ describe("the width itself, which only the stylesheet can give", () => {
     // composed before 4.11 wide; the view class gives every page the same width
     // from its own head. Two rules with the same `max-width` would be two places
     // to retune one number.
-    const at = rules.indexOf(".markdown-preview-view.almanac-wide");
+    const at = rules.indexOf(".markdown-preview-view.ca-wide");
     expect(at, "no width rule").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
-    expect(rule).toContain(".markdown-source-view.almanac-wide .cm-sizer");
+    expect(rule).toContain(".markdown-source-view.ca-wide .cm-sizer");
     expect(rule).toContain(`.${WIDE_PAGE_CLASS} .markdown-preview-view .markdown-preview-sizer`);
     expect(rule).toContain(`.${WIDE_PAGE_CLASS} .markdown-source-view .cm-sizer`);
-    expect(rule).toContain("max-width: var(--am-page-width)");
+    expect(rule).toContain("max-width: var(--ca-page-width)");
     expect(rule).not.toContain("--file-line-width");
   });
 
   it("no longer asks `:has()` for a card a reading view is allowed to unload", () => {
-    // THE 4.45.1 BUG, PINNED. `:has(.jtc-wide)` reached from the view down to
+    // THE 4.45.1 BUG, PINNED. `:has(.ca-jtc-wide)` reached from the view down to
     // the title card — the FIRST block on the page — and Obsidian drops a
     // section from the DOM once it is far enough from the viewport. Scrolling a
     // dashboard to the bottom therefore cancelled its own width. Nothing may
     // reach for that class from the stylesheet again.
-    expect(rules).not.toContain(":has(.jtc-wide)");
+    expect(rules).not.toContain(":has(.ca-jtc-wide)");
     // Over the comment-stripped stylesheet: the rule's own comment names the
     // class it stopped using, and it should — that is the record of why.
-    expect(rules).not.toContain(".jtc-wide");
+    expect(rules).not.toContain(".ca-jtc-wide");
   });
 
   it("weighs exactly what Obsidian's own width rule weighs, so a theme can win", () => {
-    // Three classes a side — `.am-wide-page .markdown-preview-view
+    // Three classes a side — `.ca-wide-page .markdown-preview-view
     // .markdown-preview-sizer` against
     // `.markdown-preview-view.is-readable-line-width .markdown-preview-sizer` —
     // which is the promise the comment above the rule makes and the reason there
     // is no `!important` in it.
-    const at = rules.indexOf(".markdown-preview-view.almanac-wide");
+    const at = rules.indexOf(".markdown-preview-view.ca-wide");
     const rule = rules.slice(at, rules.indexOf("}", at));
     for (const sel of rule.split(",").map((x) => x.trim()).filter(Boolean)) {
       expect(sel.split(".").length - 1, `${sel} is not three classes`).toBe(3);
     }
-    expect(rules).not.toMatch(/max-width: var\(--am-page-width\) !important/);
+    expect(rules).not.toMatch(/max-width: var\(--ca-page-width\) !important/);
   });
 
   it("marks the view from the FILE, on every event that can change the answer", () => {
@@ -337,7 +337,7 @@ describe("the width itself, which only the stylesheet can give", () => {
 
   it("is applied to the head's card by the dispatcher, from the modifier", () => {
     const widgets = readCode("widgets");
-    expect(widgets).toContain('querySelector<HTMLElement>(".jtc-card")?.addClass("jtc-wide")');
+    expect(widgets).toContain('querySelector<HTMLElement>(".ca-jtc-card")?.addClass("ca-jtc-wide")');
     expect(widgets).toContain("if (wideSpec.wide) {");
     // AND THE LINE IS DROPPED FROM THE DISPATCH LOOP, or it would reach
     // `buildFromSpec` as an unknown keyword and draw a notice instead of nothing.
@@ -346,7 +346,7 @@ describe("the width itself, which only the stylesheet can give", () => {
 
   it("draws the refusal where the reader is looking", () => {
     expect(readCode("widgets")).toContain("if (wideSpec.error) {");
-    expect(readCode("widgets")).toContain('cls: "journal-frame-error"');
+    expect(readCode("widgets")).toContain('cls: "ca-journal-frame-error"');
   });
 });
 

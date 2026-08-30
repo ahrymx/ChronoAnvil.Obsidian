@@ -99,7 +99,7 @@ export class ArgSuggest extends AbstractInputSuggest<ArgCandidate> {
     el.setText(item.label);
     // A keyword is not a path and is not drawn as one. The class is the hook
     // for that; the label is what carries it if the theme has no opinion.
-    if (item.keyword) el.addClass("almanac-arg-keyword");
+    if (item.keyword) el.addClass("ca-arg-keyword");
   }
 
   selectSuggestion(item: ArgCandidate): void {

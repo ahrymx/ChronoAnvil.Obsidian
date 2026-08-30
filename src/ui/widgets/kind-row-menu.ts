@@ -36,7 +36,7 @@
 // had already redrawn — see 4.48, where the missing one was the bug.
 
 import { Menu, TAbstractFile, TFile } from "obsidian";
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import { overflowButton } from "../section-frame";
 import { promptAction } from "../modals";
 import { childFiles, getFile, plural, today } from "../../core/util";
@@ -53,7 +53,7 @@ import {
 
 /** Everything the menu needs that is a fact about the table, not about a row. */
 export interface KindRowContext {
-  plugin: AlmanacPlugin;
+  plugin: ChronoAnvilPlugin;
   type: JournalType;
   kind: JournalKind;
 }
@@ -83,7 +83,7 @@ export function attachKindRowMenu(
   // `block-drag.ts`'s rule for the same species of staleness: *asked at the
   // click, never captured at render.*
   const path = file.path;
-  const button = overflowButton(actions, "almanac-list-menu", (menu) => {
+  const button = overflowButton(actions, "ca-list-menu", (menu) => {
     // Resolved when the `⋯` opens, so the tick and the page count describe the
     // note as it is now rather than as the table last drew it.
     const live = getFile(table.plugin.app, path);
@@ -136,7 +136,7 @@ function addPageLayoutRows(
 }
 
 async function setLayout(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   path: string,
   layoutId: string
 ): Promise<void> {
@@ -150,7 +150,7 @@ async function setLayout(
 
 // ── The bin ──────────────────────────────────────────────────────────────
 //
-// ALMANAC'S BIN, NOT OBSIDIAN'S (4.50.1). 4.50 shipped this through
+// CHRONOANVIL'S BIN, NOT OBSIDIAN'S (4.50.1). 4.50 shipped this through
 // `fileManager.trashFile` and was reported from a vault within the day —
 // *"vault's trash doesn't seem to exist"*. The symptom is that Obsidian's
 // *Deleted files* setting can be set to permanent, or to a `.trash` folder the
@@ -158,7 +158,7 @@ async function setLayout(
 // decided where a bin goes and why, in `journal-removal.ts`, and had written
 // down the invariant the trash call broke:
 //
-//   *A MOVE, NEVER A DELETE. Almanac has never removed a reader's note and this
+//   *A MOVE, NEVER A DELETE. ChronoAnvil has never removed a reader's note and this
 //   is not where that starts.*
 //
 // `00 - Infrastructure/Bin/` is an ordinary folder. The reader can open it, look
@@ -229,12 +229,12 @@ async function bin(table: KindRowContext, path: string): Promise<void> {
 }
 
 async function binWhole(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   item: TAbstractFile
 ): Promise<void> {
   const target = await binAway(plugin.app, item, today());
   if (!target) {
-    notify.fail(`Almanac could not move ${item.name} to ${BIN_FOLDER}/.`);
+    notify.fail(`ChronoAnvil could not move ${item.name} to ${BIN_FOLDER}/.`);
     return;
   }
   notify.ok(`Moved to ${target}`);
@@ -247,7 +247,7 @@ async function binWhole(
 // beside another note's *Examples*. The folder is what says which note they came
 // out of — see `binTogether`, which owns that rule.
 async function binPages(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   host: TFile,
   pages: readonly string[],
   many: string
@@ -275,7 +275,7 @@ async function binPages(
   const missed = files.length - moved;
   if (missed > 0) {
     notify.fail(
-      `Almanac moved ${moved} of ${files.length} ${many} to ${target}/ — ${missed} could not be moved.`
+      `ChronoAnvil moved ${moved} of ${files.length} ${many} to ${target}/ — ${missed} could not be moved.`
     );
     return;
   }

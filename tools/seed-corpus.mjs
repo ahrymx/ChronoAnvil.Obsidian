@@ -9,7 +9,7 @@
 //
 // ── WHY THIS IS WRITTEN OUT AND NOT GENERATED ────────────────────────────
 //
-// The vault this fills is the one a stranger downloads to find out what Almanac
+// The vault this fills is the one a stranger downloads to find out what ChronoAnvil
 // is. Lorem ipsum in a Chemistry lesson says the plugin is a demo; "Chirality
 // and R,S notation" with three real takeaways under it says a person used this.
 // Every widget in the plugin renders *someone's notes*, and a corpus of
@@ -385,7 +385,7 @@ export const CORPUS = {
         emoji: "💻",
         children: [
           {
-            name: "Almanac",
+            name: "ChronoAnvil",
             emoji: "📔",
             notes: [
               {
@@ -1214,7 +1214,7 @@ export const SEED_EVENTS = [
 
 // ── The charts (4.62) ────────────────────────────────────────────────────
 //
-// Every scaffolded dashboard ships an EMPTY ```almanac-charts fence, so a
+// Every scaffolded dashboard ships an EMPTY ```chronoanvil-charts fence, so a
 // freshly seeded vault had a year of tracker readings in it and not one chart
 // drawn from them. This is the list that fills them.
 //
@@ -1294,7 +1294,7 @@ export const DIARY_CHARTS = {
   ],
   // ── THE JOURNALS DASHBOARD, WHICH NOTHING FILLED (4.83) ────────────────
   //
-  // `03 - Journals` ships the same empty `almanac-charts` fence the five diary
+  // `03 - Journals` ships the same empty `chronoanvil-charts` fence the five diary
   // pages do — `journals-dashboard-sections.ts` says so in as many words: *"The
   // diary's chart fence, not a journal dashboard's … This page sits above every
   // journal rather than inside one, so it takes the former."* The seeder filled

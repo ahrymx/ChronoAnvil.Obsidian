@@ -22,7 +22,7 @@ import type { ChartPoint } from "../src/charts/charts";
 import { confidenceKinds, confidenceStats } from "../src/ui/tables";
 import { cleanFaceGlyph } from "../src/ui/widgets/tracker-controls";
 import { MEDIA_PRESET } from "../src/journals/journal";
-import type AlmanacPlugin from "../src/main";
+import type ChronoAnvilPlugin from "../src/main";
 
 beforeAll(() => {
   // `window.moment` IS OBSIDIAN'S GLOBAL, not an import, so the shim has to be
@@ -156,7 +156,7 @@ describe("confidenceKinds and confidenceStats on journal containers and roots", 
       ],
       trackers: [],
     },
-  } as unknown as AlmanacPlugin;
+  } as unknown as ChronoAnvilPlugin;
 
   it("resolves kinds for container folder paths, journal roots, and dashboard paths", () => {
     expect(

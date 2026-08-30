@@ -194,7 +194,7 @@ export const PAGE_GROUND_STRENGTHS: { id: PageGroundStrength; name: string }[] =
   ];
 
 /** The marker class every ground shares, which is what the shared film reads. */
-export const PAGE_GROUND_MARKER = "am-ground";
+export const PAGE_GROUND_MARKER = "ca-ground";
 
 /** The class one ground is drawn by. */
 export function groundClass(id: Exclude<PageGroundId, "off">): string {

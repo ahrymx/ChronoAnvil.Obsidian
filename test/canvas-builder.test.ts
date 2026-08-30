@@ -38,7 +38,7 @@ import {
   type VaultSpec,
 } from "../src/core/canvas-builder";
 import { DEFAULT_PATHS, DEFAULT_LOGBOOKS } from "../src/core/constants";
-import type AlmanacPlugin from "../src/main";
+import type ChronoAnvilPlugin from "../src/main";
 import { TFile, normalizePath } from "obsidian";
 import { STUDY_PRESET, buildJournalType } from "../src/journals/journal";
 import { shippedNotes } from "../src/core/scaffold";
@@ -82,7 +82,7 @@ function mockPlugin() {
       customJournals: [STUDY_PRESET.config],
       logbooks: DEFAULT_LOGBOOKS.map((b) => ({ ...b })),
     },
-  } as unknown as AlmanacPlugin;
+  } as unknown as ChronoAnvilPlugin;
 }
 
 const spec = () => vaultSpec(DEFAULT_PATHS, [STUDY], DEFAULT_LOGBOOKS);
@@ -512,7 +512,7 @@ describe("canvas-builder · pruning", () => {
     const app = mockApp([]);
     const plugin = {
       settings: { paths: { ...DEFAULT_PATHS }, customJournals: [], logbooks: [] },
-    } as unknown as AlmanacPlugin;
+    } as unknown as ChronoAnvilPlugin;
 
     let doc: CanvasDocument | null = null;
     expect(() => {
@@ -556,10 +556,10 @@ describe("canvas-builder · entry points", () => {
     expect(live.edges).toEqual(baseline.edges);
   });
 
-  it("registers Almanac.canvas in shippedNotes for automatic vault setup", () => {
+  it("registers ChronoAnvil.canvas in shippedNotes for automatic vault setup", () => {
     const shipped = shippedNotes(DEFAULT_PATHS, [STUDY], DEFAULT_LOGBOOKS);
     const canvasNote = shipped.find(
-      (n) => n.dest === `${DEFAULT_PATHS.infrastructureRoot}/Almanac.canvas`
+      (n) => n.dest === `${DEFAULT_PATHS.infrastructureRoot}/ChronoAnvil.canvas`
     );
     expect(canvasNote).toBeDefined();
     const parsed = JSON.parse(canvasNote?.content ?? "{}");
@@ -669,7 +669,7 @@ describe("canvas-builder · mergeCanvas", () => {
 
 // ── §8. The graph links the map does not draw ─────────────────────────────
 //
-// The canvas and the hidden `almanac-graph` wikilinks are two answers to one
+// The canvas and the hidden `chronoanvil-graph` wikilinks are two answers to one
 // question — how does a reader see the vault's shape — and until 4.68 they gave
 // the same answer twice. A canvas file node IS a link, so a map pointing at
 // eighteen surfaces is an eighteen-spoke star in the graph; every composed note
@@ -681,10 +681,10 @@ describe("canvas-builder · mergeCanvas", () => {
 // draw the DEPTH — entry inside grain inside diary — which is the one thing a
 // group box cannot express. That is what this section pins.
 
-describe("almanac-graph links", () => {
-  // Every name inside an `almanac-graph` block, per note the scaffold writes.
+describe("chronoanvil-graph links", () => {
+  // Every name inside a `chronoanvil-graph` block, per note the scaffold writes.
   const graphLinks = (text: string): string[] => {
-    const m = /%% almanac-graph %%\n(.*)/.exec(text);
+    const m = /%% chronoanvil-graph %%\n(.*)/.exec(text);
     return m
       ? [...m[1].matchAll(/\[\[([^\]|]+)\|/g)].map((x) => x[1])
       : [];

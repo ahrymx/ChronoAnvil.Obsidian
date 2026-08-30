@@ -3,22 +3,22 @@
    presented as an ordered table: a step number, checkbox, editable text, and
    up/down/delete controls. Order is the content, so the move buttons are a
    first-class control rather than the priority/due pair a `tasks:` row carries. */
-.journal-path {
+.ca-journal-path {
   display: block;
   margin: 0;
   background: transparent;
   border: none;
   box-shadow: none;
 }
-.journal-path-label {
-  font-size: var(--am-text-xs);
-  font-weight: var(--am-caps-weight);
-  letter-spacing: var(--am-caps-tracking);
+.ca-journal-path-label {
+  font-size: var(--ca-text-xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 5px;
 }
-.journal-path-add {
+.ca-journal-path-add {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -27,62 +27,62 @@
   border: none;
   padding: 0;
 }
-.journal-path-add-icon {
+.ca-journal-path-add-icon {
   color: var(--text-muted);
   display: inline-flex;
   flex-shrink: 0;
 }
-.journal-path-add-icon .svg-icon {
+.ca-journal-path-add-icon .svg-icon {
   width: 1.1em;
   height: 1.1em;
 }
-.journal-path-add-input {
+.ca-journal-path-add-input {
   flex: 1;
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--background-secondary);
   color: var(--text-normal);
   font-family: inherit;
-  font-size: var(--am-text-base);
-  padding: var(--am-space-2) var(--am-space-4);
+  font-size: var(--ca-text-base);
+  padding: var(--ca-space-2) var(--ca-space-4);
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
-.journal-path-add-input::placeholder {
+.ca-journal-path-add-input::placeholder {
   color: var(--text-faint);
 }
-.journal-path-add-input:focus {
+.ca-journal-path-add-input:focus {
   outline: none;
   border-color: var(--interactive-accent);
   background: var(--background-primary);
   box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 124, 58, 237), 0.15);
 }
-.journal-path-list {
+.ca-journal-path-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.journal-path-empty {
+.ca-journal-path-empty {
   color: var(--text-faint);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   padding: 8px 4px;
 }
-.journal-path-row {
+.ca-journal-path-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding: 4px 8px;
   border: 1px solid transparent;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   transition: background 0.12s ease, border-color 0.12s ease;
 }
-.journal-path-row:hover {
+.ca-journal-path-row:hover {
   background: var(--background-secondary);
   border-color: var(--background-modifier-border);
 }
-.journal-path-main {
+.ca-journal-path-main {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -90,7 +90,7 @@
   min-width: 0;
 }
 /* Step number: a clean, rounded pill badge */
-.journal-path-num {
+.ca-journal-path-num {
   flex: 0 0 auto;
   min-width: 1.6em;
   height: 1.6em;
@@ -99,65 +99,65 @@
   justify-content: center;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   color: var(--text-muted);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.journal-path-check {
+.ca-journal-path-check {
   flex: 0 0 auto;
   cursor: pointer;
   accent-color: var(--interactive-accent);
   width: 18px;
   height: 18px;
   margin: 0;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
 }
-.journal-path-text {
+.ca-journal-path-text {
   flex: 1 1 auto;
   min-width: 0;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-normal);
   font-family: inherit;
-  font-size: var(--am-text-base);
+  font-size: var(--ca-text-base);
   line-height: 1.45;
   padding: 2px 6px;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   transition: background 0.12s ease, border-color 0.12s ease;
 }
-.journal-path-text:hover {
+.ca-journal-path-text:hover {
   background: var(--background-modifier-hover);
 }
-.journal-path-text:focus {
+.ca-journal-path-text:focus {
   outline: none;
   background: var(--background-primary);
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 1px var(--interactive-accent);
 }
-.journal-path-row.is-done {
+.ca-journal-path-row.is-done {
   opacity: 0.55;
 }
-.journal-path-row.is-done .journal-path-text {
+.ca-journal-path-row.is-done .ca-journal-path-text {
   text-decoration: line-through;
   color: var(--text-faint);
 }
-.journal-path-row.is-done .journal-path-num {
+.ca-journal-path-row.is-done .ca-journal-path-num {
   opacity: 0.6;
 }
-.journal-path-actions {
+.ca-journal-path-actions {
   display: flex;
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
 }
-.journal-path-moves {
+.ca-journal-path-moves {
   display: inline-flex;
   gap: 2px;
 }
-.journal-path-move,
-.journal-path-del {
+.ca-journal-path-move,
+.ca-journal-path-del {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -168,56 +168,56 @@
   border: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
   color: var(--text-muted);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   cursor: pointer;
   box-shadow: none;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
-.journal-path-move:hover,
-.journal-path-del:hover {
+.ca-journal-path-move:hover,
+.ca-journal-path-del:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
   border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
 }
-.journal-path-move:disabled {
+.ca-journal-path-move:disabled {
   opacity: 0.3;
   cursor: default;
   background: transparent;
   border-color: transparent;
   color: var(--text-faint);
 }
-.journal-path-del:hover {
+.ca-journal-path-del:hover {
   color: var(--text-error, #e05561);
   background: rgba(var(--color-red-rgb, 224, 85, 97), 0.12);
 }
-.journal-path-move .svg-icon,
-.journal-path-del .svg-icon {
+.ca-journal-path-move .svg-icon,
+.ca-journal-path-del .svg-icon {
   width: 1em;
   height: 1em;
 }
 
 /* Mobile layout & touch metrics */
 @media (max-width: 520px) {
-  .journal-path-row {
+  .ca-journal-path-row {
     padding: 8px 10px;
     gap: 6px;
   }
-  .journal-path-actions {
+  .ca-journal-path-actions {
     gap: 4px;
   }
 }
 
-body.is-mobile .journal-path-row {
+body.is-mobile .ca-journal-path-row {
   padding: 10px 12px;
 }
-body.is-mobile .journal-path-check {
+body.is-mobile .ca-journal-path-check {
   width: 22px;
   height: 22px;
 }
-body.is-mobile .journal-path-move,
-body.is-mobile .journal-path-del {
-  min-height: calc(var(--am-control-min) * 0.75);
-  min-width: calc(var(--am-control-min) * 0.75);
+body.is-mobile .ca-journal-path-move,
+body.is-mobile .ca-journal-path-del {
+  min-height: calc(var(--ca-control-min) * 0.75);
+  min-width: calc(var(--ca-control-min) * 0.75);
 }
 
 /* ── Resources: three attachment sections ─────────────────────────────────
@@ -227,44 +227,44 @@ body.is-mobile .journal-path-del {
    highlights/challenges box — the sections are NOT fused into one squared-off
    box: fusing them clipped each bar's inner corners, which read as a rendering
    fault next to the per-section labels. Storage is three regions on disk. */
-.journal-attach--res-docs .journal-attach-zone,
-.journal-attach--res-tutorials .journal-attach-zone,
-.journal-attach--res-practice .journal-attach-zone {
+.ca-journal-attach--res-docs .ca-journal-attach-zone,
+.ca-journal-attach--res-tutorials .ca-journal-attach-zone,
+.ca-journal-attach--res-practice .ca-journal-attach-zone {
   transition: border-color 0.15s ease;
 }
 /* Section sub-labels (Docs/Tutorials/Practice) use the same uppercase, muted,
    outside-the-box treatment as every other standalone field's label, so the
    three read as siblings under the Resources header. */
-.journal-attach--res-docs .journal-attach-label,
-.journal-attach--res-tutorials .journal-attach-label,
-.journal-attach--res-practice .journal-attach-label {
+.ca-journal-attach--res-docs .ca-journal-attach-label,
+.ca-journal-attach--res-tutorials .ca-journal-attach-label,
+.ca-journal-attach--res-practice .ca-journal-attach-label {
   margin: 2px 0 4px;
 }
 
-.journal-stepper {
+.ca-journal-stepper {
   gap: 2px;
 }
 
-.journal-step-btn {
+.ca-journal-step-btn {
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--background-secondary);
   color: var(--text-normal);
   width: 1.6em;
   height: 1.6em;
   line-height: 1;
-  font-size: var(--am-text-base);
+  font-size: var(--ca-text-base);
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 
-.journal-step-btn:hover {
+.ca-journal-step-btn:hover {
   background: var(--background-modifier-hover);
   border-color: var(--interactive-accent);
 }
 
-.journal-step-value {
+.ca-journal-step-value {
   min-width: 3em;
   text-align: center;
   font-weight: 600;
@@ -293,23 +293,23 @@ body.is-mobile .journal-path-del {
 /* `background: transparent` since 4.13.1 §1. It filled with
    `--background-primary` — the NOTE's colour, under a section card painted
    `--background-secondary` — so the one control on the strip that is not a
-   `.journal-btn` was also the only one with a fill, and read as sunk into the
+   `.ca-journal-btn` was also the only one with a fill, and read as sunk into the
    bar rather than sitting on it. */
-.journal-tasks-scope {
+.ca-journal-tasks-scope {
   flex: 0 0 auto;
-  padding: 2px var(--am-space-3);
-  border-radius: var(--am-radius-sm);
+  padding: 2px var(--ca-space-3);
+  border-radius: var(--ca-radius-sm);
   border: 1px solid var(--background-modifier-border);
   background: transparent;
   box-shadow: none;
   color: var(--text-muted);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   cursor: pointer;
 }
-.journal-tasks-scope:hover {
+.ca-journal-tasks-scope:hover {
   color: var(--text-normal);
 }
-.journal-tasks-scope.is-static {
+.ca-journal-tasks-scope.is-static {
   cursor: default;
   opacity: 0.6;
 }
@@ -319,10 +319,10 @@ body.is-mobile .journal-path-del {
    removed with the absolute rule, because that case is legal and must not lose
    the button — it is the fallback `buildTasksTableRegion` renders when
    `hostedControls` is false. */
-.journal-tasks-table {
+.ca-journal-tasks-table {
   position: relative;
 }
-.journal-tasks-table > .journal-tasks-scope {
+.ca-journal-tasks-table > .ca-journal-tasks-scope {
   position: absolute;
   top: 0;
   right: 0;

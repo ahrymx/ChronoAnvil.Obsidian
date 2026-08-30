@@ -18,7 +18,7 @@
 
 import { SCOPE_JOURNAL } from "../core/directive-grammar";
 import { App, MarkdownPostProcessorContext, normalizePath, setIcon, TFile, TFolder } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { childFiles, filesUnder, folderPrefix, frontmatterOf, getFile, getFolder, isVaultRoot, isoDate, moment, noExt, openFile, openGlobalSearch } from "../core/util";
 import { pagesUnder, recencyMs, relativeActivity, tagsOf } from "../core/query";
 import type { PageInfo } from "../core/query";
@@ -71,7 +71,7 @@ import {
 } from "../trackers/trackers";
 import { journalTypeNamer } from "../trackers/entry-trackers";
 import {
-  AlmanacTask,
+  ChronoAnvilTask,
   parseTasks,
   serializeTaskLine,
   serializeTasks,
@@ -102,7 +102,7 @@ function internalLink(
   a.addEventListener("mouseover", (evt) => {
     app.workspace.trigger("hover-link", {
       event: evt,
-      source: "almanac-tables",
+      source: "ca-tables",
       hoverParent: parent,
       targetEl: a,
       linktext: href,
@@ -128,7 +128,7 @@ function internalLink(
 // only thing genuinely its own is the orphan branch and the class it puts on the
 // anchor. What is left is the difference rather than a restatement.
 export function folderLink(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   parent: HTMLElement,
   folder: TFolder,
   sourcePath: string,
@@ -180,14 +180,14 @@ export function folderLink(
 // that arrives late — and the async fill at the end is the part a second copy
 // would get wrong.
 export function childRow(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   body: HTMLElement,
   sub: TFolder
 ): void {
   const { pages, lastActive } = folderActivity(plugin.app, sub.path);
-  const row = body.createDiv({ cls: "jjs-card-row" });
-  folderLink(plugin, row, sub, ctx.sourcePath, "jjs-row-link");
+  const row = body.createDiv({ cls: "ca-jjs-card-row" });
+  folderLink(plugin, row, sub, ctx.sourcePath, "ca-jjs-row-link");
   // NAMED, BECAUSE THE GLYPHS ONLY EXPLAIN THEMSELVES ONCE THERE IS DATA
   // (4.35.2). Populated, these two read "3d ago" and "2 ◻" and need no header.
   // Empty — which is every row on a journal a reader has just made — they are
@@ -195,10 +195,10 @@ export function childRow(
   // heard "dash dash" in either state, since neither cell carried a name.
   //
   // A `title` rather than a header row: the body's height is stated in ROWS
-  // (see `.jjs-card-body`), so a header would cost one of the four notes a card
+  // (see `.ca-jjs-card-body`), so a header would cost one of the four notes a card
   // can show. This costs nothing and is also the accessible fix.
   const when = row.createSpan({
-    cls: "jjs-card-when",
+    cls: "ca-jjs-card-when",
     text: relativeActivity(lastActive),
   });
   when.setAttr("title", "Last activity");
@@ -208,11 +208,11 @@ export function childRow(
       ? `Last activity: ${relativeActivity(lastActive)}`
       : "Last activity: none yet"
   );
-  // An Almanac `- ( )` line lives in a note's BODY and is invisible to the
+  // A ChronoAnvil `- ( )` line lives in a note's BODY and is invisible to the
   // metadata cache, so this cell cannot be filled synchronously. It ships a
   // placeholder and fills on resolve — the idiom the banner's four numbers and
   // the level index's Open column both use.
-  const openCell = row.createSpan({ cls: "jjs-card-open", text: "…" });
+  const openCell = row.createSpan({ cls: "ca-jjs-card-open", text: "…" });
   openCell.setAttr("title", "Open tasks");
   openCell.setAttr("aria-label", "Open tasks: counting…");
   void sumBodyTasks(
@@ -308,12 +308,12 @@ export function tagSourcesOf(
 // and the note list is still the answer to "which notes", so the sources
 // summarise that list rather than replacing it.
 export function buildTagIndex(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   folder: string
 ): HTMLElement {
   const app = plugin.app;
-  const root = createDiv({ cls: "journal-table journal-tag-index" });
+  const root = createDiv({ cls: "ca-journal-table ca-journal-tag-index" });
 
   const groups = new Map<string, TFile[]>();
   for (const { file } of pagesUnder(app, folder)) {
@@ -357,48 +357,48 @@ export function buildTagIndex(
   const showSource = everySource.size > 1;
 
   root.createDiv({
-    cls: "jt-tag-summary",
+    cls: "ca-jt-tag-summary",
     text: `${sorted.length} tag${sorted.length === 1 ? "" : "s"} across ${noteCount} note${
       noteCount === 1 ? "" : "s"
     } in ${folder}`,
   });
 
   const table = root.createDiv({
-    cls: showSource ? "jt-tag-table has-source" : "jt-tag-table",
+    cls: showSource ? "ca-jt-tag-table has-source" : "ca-jt-tag-table",
   });
 
   for (const [tag, files] of sorted) {
     // The row IS the `<summary>`, so the whole line is the expand target and
     // the cells align down the table. The note list is the `<details>` body
     // and so sits under the row it belongs to at full width.
-    const details = table.createEl("details", { cls: "jt-tag-group" });
-    const summary = details.createEl("summary", { cls: "jt-tag-row" });
-    summary.createSpan({ cls: "jt-tag-name", text: tag });
+    const details = table.createEl("details", { cls: "ca-jt-tag-group" });
+    const summary = details.createEl("summary", { cls: "ca-jt-tag-row" });
+    summary.createSpan({ cls: "ca-jt-tag-name", text: tag });
     summary.createSpan({
-      cls: "jt-tag-count",
+      cls: "ca-jt-tag-count",
       text: `${files.length} note${files.length === 1 ? "" : "s"}`,
     });
     if (showSource) {
-      const cell = summary.createDiv({ cls: "jt-tag-sources" });
+      const cell = summary.createDiv({ cls: "ca-jt-tag-sources" });
       const srcs = sourcesOf.get(tag) ?? [];
       // A tag carried only by notes sitting directly in the scope has no
       // source, and the cell is left empty rather than filled with a dash: the
       // column answers "which of these folders", and "none of them, it is in
       // the scope itself" is not one of the answers it is asking about.
       for (const src of srcs) {
-        cell.createSpan({ cls: "jt-tag-source", text: src });
+        cell.createSpan({ cls: "ca-jt-tag-source", text: src });
       }
     }
 
     const searchBtn = summary.createEl("button", {
-      cls: "journal-btn-ghost jt-tag-search",
+      cls: "ca-journal-btn-ghost ca-jt-tag-search",
       attr: {
         type: "button",
         "aria-label": `Search ${tag} across the whole vault`,
         title: `Search ${tag} across the whole vault`,
       },
     });
-    setIcon(searchBtn.createSpan({ cls: "journal-btn-icon" }), "search");
+    setIcon(searchBtn.createSpan({ cls: "ca-journal-btn-icon" }), "search");
     // `preventDefault` is what keeps the two controls distinct now that the
     // button sits INSIDE the summary: a click there bubbles to the summary,
     // whose default action is the toggle, so without this "search everywhere"
@@ -409,7 +409,7 @@ export function buildTagIndex(
       openGlobalSearch(app, `tag:${tag}`);
     });
 
-    const list = details.createEl("ul", { cls: "jt-tag-list" });
+    const list = details.createEl("ul", { cls: "ca-jt-tag-list" });
     for (const file of files) {
       const li = list.createEl("li");
       internalLink(li, app, file, file.basename, ctx.sourcePath);
@@ -448,7 +448,7 @@ export function buildTagIndex(
 // answer to "what is beneath this folder" when the folder is beneath no
 // journal, and it is an answer these widgets already know how to give.
 function hostType(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string
 ): JournalType | null {
   return journalTypeAtPath(plugin, notePath) ?? null;
@@ -509,7 +509,7 @@ function childNoun(type: JournalType, folderPath: string): string {
 // cells or four, and a journal card always has four because it can fall back to a
 // count of what is in the journal.
 export function ratingDefOf(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   type: JournalType
 ): TrackerDef | null {
   const id = typeRating(type);
@@ -603,18 +603,18 @@ function recordList(
   // because a date that wraps is unreadable and a count is one character.
   const tracks = `minmax(0, 1fr)${" auto".repeat(Math.max(0, headings.length - 1))}`;
 
-  const list = host.createDiv({ cls: "almanac-list" });
+  const list = host.createDiv({ cls: "ca-list" });
   list.setAttr("role", "table");
   if (hasActions) list.addClass("has-row-actions");
 
   // Hidden by the container query rather than removed: it is the accessible
   // name for each column at any width, and at narrow widths the row's own
   // reading order carries the meaning instead.
-  const head = list.createDiv({ cls: "almanac-list-heads" });
+  const head = list.createDiv({ cls: "ca-list-heads" });
   head.setAttr("role", "row");
-  head.style.setProperty("--am-row-cols", tracks);
+  head.style.setProperty("--ca-row-cols", tracks);
   for (const h of headings) {
-    const cell = head.createDiv({ cls: "almanac-list-heads-cell", text: h });
+    const cell = head.createDiv({ cls: "ca-list-heads-cell", text: h });
     cell.setAttr("role", "columnheader");
   }
 
@@ -634,7 +634,7 @@ function recordList(
       // grid tracks line up across the whole row rather than only across the
       // part after the title.
       return {
-        main: row.querySelector<HTMLElement>(".almanac-list-main") ?? row,
+        main: row.querySelector<HTMLElement>(".ca-list-main") ?? row,
         actions,
       };
     },
@@ -647,7 +647,7 @@ function recordCell(
   extra?: string
 ): HTMLElement {
   const cell = main.createDiv({
-    cls: extra ? `almanac-list-cell ${extra}` : "almanac-list-cell",
+    cls: extra ? `ca-list-cell ${extra}` : "ca-list-cell",
     text,
   });
   cell.setAttr("role", "cell");
@@ -705,13 +705,13 @@ export function folderActivity(app: App, folderPath: string): FolderActivity {
 // anywhere. `level-index` resolves a journal and a folder first and hands them
 // in; the arithmetic below is untouched.
 export function folderRollup(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   type: JournalType,
   folder: TFolder
 ): HTMLElement {
   const app = plugin.app;
-  const root = createDiv({ cls: "journal-table journal-topics-table" });
+  const root = createDiv({ cls: "ca-journal-table ca-journal-topics-table" });
   const noun = childNoun(type, folder.path);
   // Excludes another journal type's root, which would otherwise appear as a
   // container of this one — a custom journal's root sits inside the journals
@@ -775,7 +775,7 @@ export function folderRollup(
     }
     recordCell(main, relativeActivity(lastActive), "is-text");
 
-    // Open tasks are Almanac `- ( )` lines in each note's body (the templates'
+    // Open tasks are ChronoAnvil `- ( )` lines in each note's body (the templates'
     // content-level checkboxes), invisible to the metadata cache — so this cell
     // ships a placeholder and fills once the bodies are read (see sumBodyTasks).
     const openCell = recordCell(main, "…");
@@ -808,14 +808,14 @@ export function folderRollup(
 // carries it — and it routes here with no argument, which is exactly what it
 // always meant.
 export function buildLevelIndex(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   argument: string
 ): HTMLElement {
-  const root = createDiv({ cls: "journal-level-index" });
+  const root = createDiv({ cls: "ca-journal-level-index" });
   const scope = levelScope(plugin, ctx, argument);
   if (typeof scope === "string") {
-    root.createDiv({ cls: "journal-widget-error", text: scope });
+    root.createDiv({ cls: "ca-journal-widget-error", text: scope });
     return root;
   }
   const { type, folder } = scope;
@@ -867,7 +867,7 @@ export function buildLevelIndex(
   // note down.
   for (const kind of type.kinds) {
     root.createDiv({
-      cls: "journal-level-index-head",
+      cls: "ca-journal-level-index-head",
       text: `${kind.emoji} ${kindPlural(kind)}`,
     });
     root.appendChild(kindTable(plugin, ctx, type, folder.path, kind.id));
@@ -895,7 +895,7 @@ export function buildLevelIndex(
 // only narrow while the thing it duplicates is small.** The region takes the
 // folder off this and ignores the sentence.
 export function levelScope(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   argument: string
 ): { type: JournalType; folder: TFolder } | string {
@@ -924,7 +924,7 @@ export function levelScope(
     const have = registeredJournalTypes(plugin).map((t) => t.id);
     return have.length
       ? `No journal called "${journalId}". This vault has: ${have.join(", ")}.`
-      : `level-index names the journal "${journalId}", and this vault has no journals — turn on Study or add one in Settings → Almanac → Journals.`;
+      : `level-index names the journal "${journalId}", and this vault has no journals — turn on Study or add one in Settings → ChronoAnvil → Journals.`;
   }
   const root = normalizePath(type.root);
   if (!relative) {
@@ -1022,14 +1022,14 @@ export function levelScope(
 
 // One card per container under `folder`, paired with what is below each.
 export function buildLevelCards(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   argument: string
 ): HTMLElement {
-  const root = createDiv({ cls: "jld-grid" });
+  const root = createDiv({ cls: "ca-jld-grid" });
   const scope = levelScope(plugin, ctx, argument);
   if (typeof scope === "string") {
-    root.createDiv({ cls: "journal-widget-error", text: scope });
+    root.createDiv({ cls: "ca-journal-widget-error", text: scope });
     return root;
   }
   const { type, folder } = scope;
@@ -1114,7 +1114,7 @@ export function buildLevelCards(
       root.appendChild(containerCard(plugin, ctx, type, child, true));
       continue;
     }
-    const pair = root.createDiv({ cls: "jld-pair" });
+    const pair = root.createDiv({ cls: "ca-jld-pair" });
     const below = type.levels[containerDepth(type, child.path) + 1];
     containerHead(plugin, ctx, pair, type, child, below?.noun ?? null);
     pair.appendChild(containerCard(plugin, ctx, type, child, false));
@@ -1145,7 +1145,7 @@ export function buildLevelCards(
   // track is half of it, which is where the two arrangements come from; at four
   // tracks a pair-sized tile still lands beside a pair rather than stranding a
   // gap. The browser clamps a span to the tracks that exist, which is what makes
-  // it safe in a one-column grid — `.jld-pair` relies on the same thing.
+  // it safe in a one-column grid — `.ca-jld-pair` relies on the same thing.
   if (tops.some((child) => hasLevelBelow(type, child.path))) {
     root.addClass("is-paired");
   }
@@ -1200,7 +1200,7 @@ export function buildLevelCards(
 // has its own entry point, because `newContainer` REFUSES `depth <= 0` — it
 // exists to nest under a parent and it says so.
 function addContainer(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   type: JournalType,
   parent: TFolder
 ): void {
@@ -1213,7 +1213,7 @@ function addContainer(
 // common, and the reason they are not two functions with two handlers.
 function onAdd(
   btn: HTMLElement,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   type: JournalType,
   parent: TFolder
 ): void {
@@ -1236,7 +1236,7 @@ function onAdd(
 // would be a second answer to "what does an empty surface look like" the first time
 // either was tuned.
 export function addTile(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   type: JournalType,
   parent: TFolder,
   noun: string
@@ -1258,11 +1258,11 @@ export function addTile(
     // topic" — and that button collapses to icon-only under 460px, where the
     // tooltip is the only text there is.
   const btn = createEl("button", {
-    cls: "jld-add jld-add-tile",
+    cls: "ca-jld-add ca-jld-add-tile",
     attr: { type: "button", "aria-label": label },
   });
-  setIcon(btn.createSpan({ cls: "jld-add-icon" }), "plus");
-  btn.createSpan({ cls: "jld-add-label", text: label });
+  setIcon(btn.createSpan({ cls: "ca-jld-add-icon" }), "plus");
+  btn.createSpan({ cls: "ca-jld-add-label", text: label });
   onAdd(btn, plugin, type, parent);
   return btn;
 }
@@ -1271,13 +1271,13 @@ export function addTile(
 //
 // WHY A WRAPPER AND NOT A STYLED BUTTON. A naked dashed tile beside a run of
 // bordered cards reads as a control that wandered into the grid; the maintainer's
-// note was that it should look like the thing it makes. So it takes `.jjs-card`'s
+// note was that it should look like the thing it makes. So it takes `.ca-jjs-card`'s
 // chrome — the same ground, border and radius its neighbours have — with the
 // dashed affordance inside, which is exactly what an EMPTY subject card already
 // looks like one column over (`buildGroup` puts the same tile in its body).
 //
 // AND THE WRAPPER IS WHAT MAKES IT MATCH IN HEIGHT, which the tile alone could
-// not do. `.jjs-grid` is `align-items: stretch`, but a `<button>` does not
+// not do. `.ca-jjs-grid` is `align-items: stretch`, but a `<button>` does not
 // stretch: Obsidian gives form controls a definite height, and `align-self:
 // stretch` is ignored on any item whose height is not `auto`, so the tile sat at
 // its 92px minimum beside 160px cards. A `div` has no such height and stretches,
@@ -1286,13 +1286,13 @@ export function addTile(
 // NO HEAD, because there is no name yet. That is the one way it differs from its
 // neighbours, and it is the honest difference: a head would have nothing to say.
 export function addCardTile(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   type: JournalType,
   parent: TFolder,
   noun: string
 ): HTMLElement {
-  const card = createDiv({ cls: "jjs-card jjs-card-add" });
-  const body = card.createDiv({ cls: "jjs-card-body" });
+  const card = createDiv({ cls: "ca-jjs-card ca-jjs-card-add" });
+  const body = card.createDiv({ cls: "ca-jjs-card-body" });
   body.appendChild(addTile(plugin, type, parent, noun));
   return card;
 }
@@ -1320,18 +1320,18 @@ export function addCardTile(
 // `aria-label` and `title` independently of the label span"*), met here for the
 // same reason: this control also hides a label it has drawn.
 function addHeadButton(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   type: JournalType,
   parent: TFolder,
   noun: string
 ): HTMLElement {
   const label = `New ${noun.toLowerCase()}`;
   const btn = createEl("button", {
-    cls: "journal-btn-ghost jld-head-add",
+    cls: "ca-journal-btn-ghost ca-jld-head-add",
     attr: { type: "button", "aria-label": label, title: label },
   });
-  setIcon(btn.createSpan({ cls: "journal-btn-icon" }), "plus");
-  btn.createSpan({ cls: "journal-btn-label", text: noun });
+  setIcon(btn.createSpan({ cls: "ca-journal-btn-icon" }), "plus");
+  btn.createSpan({ cls: "ca-journal-btn-label", text: noun });
   onAdd(btn, plugin, type, parent);
   return btn;
 }
@@ -1344,7 +1344,7 @@ function addHeadButton(
 // container at the deepest container level has nothing to create, so it gets a
 // head with a name and no control rather than a disabled one.
 function containerHead(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   host: HTMLElement,
   type: JournalType,
@@ -1362,7 +1362,7 @@ function containerHead(
     level: 2,
     owns: "children",
     titleRender: (slot) =>
-      folderLink(plugin, slot, folder, ctx.sourcePath, "jjs-group-name"),
+      folderLink(plugin, slot, folder, ctx.sourcePath, "ca-jjs-group-name"),
   });
   if (below) {
     frame.actions.appendChild(addHeadButton(plugin, type, folder, below));
@@ -1375,19 +1375,19 @@ function containerHead(
 // take one, which is also what gives them a shared first line to start on; a
 // label on the list alone would put the two halves a line out of step.
 function paneLabel(host: HTMLElement, text: string): void {
-  host.createDiv({ cls: "jld-pane-label", text: text.toUpperCase() });
+  host.createDiv({ cls: "ca-jld-pane-label", text: text.toUpperCase() });
 }
 
 // The left card: one container, summarised. `head` is false inside a pair, where
 // the head belongs to the pair and saying it twice is the thing 4.38 removed.
 function containerCard(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   type: JournalType,
   folder: TFolder,
   head: boolean
 ): HTMLElement {
-  const card = createDiv({ cls: "jld-card jld-container" });
+  const card = createDiv({ cls: "ca-jld-card ca-jld-container" });
   const level = type.levels[containerDepth(type, folder.path)];
 
   if (head) {
@@ -1406,7 +1406,7 @@ function containerCard(
   // together. Finding 15 — *"the panes of a pair keep different vertical
   // rhythms"* — is this, and a label in one pane only would have deepened it.
   if (!head && level) paneLabel(card, level.noun);
-  const body = card.createDiv({ cls: "jld-card-body" });
+  const body = card.createDiv({ cls: "ca-jld-card-body" });
 
   // ── The numbers ────────────────────────────────────────────────────────
   //
@@ -1474,12 +1474,12 @@ function containerCard(
 
 // The right card: what is below this container, one row each.
 function childrenCard(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   type: JournalType,
   folder: TFolder
 ): HTMLElement {
-  const card = createDiv({ cls: "jld-card jld-children" });
+  const card = createDiv({ cls: "ca-jld-card ca-jld-children" });
   const below = type.levels[containerDepth(type, folder.path) + 1];
   const subs = journalChildFolders(plugin, type, folder);
 
@@ -1496,12 +1496,12 @@ function childrenCard(
   // SCROLLS — a label inside it would ride away on the first scroll and would
   // spend one of the four rows the card is built to show.
   paneLabel(card, plural(below.noun));
-  const body = card.createDiv({ cls: "jjs-card-body" });
+  const body = card.createDiv({ cls: "ca-jjs-card-body" });
 
   // EVERY CHILD IS DRAWN AND THE BODY SCROLLS, which is 4.13.4's answer and its
   // number: a card is its bar plus four rows whatever is in it, so the grid is
   // rows rather than a ragged edge and a long list is a scroll away rather than
-  // a page away. `.jjs-card-body` is where the four is stated, and this card
+  // a page away. `.ca-jjs-card-body` is where the four is stated, and this card
   // takes that class rather than restating it.
   if (subs.length === 0) {
     // STATES THE FACT AND NOTHING ELSE. This sentence has now outlived two
@@ -1510,7 +1510,7 @@ function childrenCard(
     // argument for it naming no control at all: prose that quotes a button
     // breaks silently every time the button moves, and it has moved twice.
     body.createDiv({
-      cls: "jjs-empty-row",
+      cls: "ca-jjs-empty-row",
       text: `No ${plural(below.noun).toLowerCase()} yet.`,
     });
   }
@@ -1537,7 +1537,7 @@ function childrenCard(
 // only in which quantities they picked.
 //
 // AND THE TWO BANDS WERE NOT THE SAME OBJECT, WHICH IS THE HALF THAT MATTERED.
-// `journal-totals` drew `.am-stats` — the shared strip, whose collapse is an
+// `journal-totals` drew `.ca-stats` — the shared strip, whose collapse is an
 // `@container` query, so it folds in a narrow PANE. `topic-stats` drew `.jts-*`,
 // a hand-rolled band with its own 520px query, its own borders and its own
 // padding. Two objects that look alike, maintained apart, which is precisely
@@ -1554,13 +1554,13 @@ function childrenCard(
 // gives −1 for a journal's own folder note and 0-up for a container, and a note
 // in no journal at all is the vault. See `statScopeOf`.
 export function buildStatsBand(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   arg: string,
   label: string | null
 ): HTMLElement {
   const app = plugin.app;
-  const root = createDiv({ cls: "stats-band" });
+  const root = createDiv({ cls: "ca-stats-band" });
 
   const file = hostFile(app, ctx);
   if (!file?.parent) return root;
@@ -1748,7 +1748,7 @@ export function buildStatsBand(
   const shown = cells.slice(0, STAT_CELL_CAP);
   const dropped = cells.slice(STAT_CELL_CAP);
 
-  if (label) root.createDiv({ cls: "sb-title", text: label });
+  if (label) root.createDiv({ cls: "ca-sb-title", text: label });
   // THE SHARED STRIP, REUSED RATHER THAN COPIED — and as of this release it is
   // the only band in the journal subsystem, which is the half `journal-totals`
   // got right and `topic-stats` did not. It brings the thing a hand-rolled band
@@ -1818,7 +1818,7 @@ function pagesOver(app: App, roots: readonly string[]): PageInfo[] {
 // copies of "what is under here" is how a page and the card that links to it
 // come to disagree.
 function belowOf(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   type: JournalType | null,
   folderPath: string
 ): { count: number; noun: string } | null {
@@ -1851,7 +1851,7 @@ function belowOf(
 // zero would be a claim that nobody read any pages; absence is the honest answer
 // and the useful one.
 function totalCells(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   type: JournalType,
   notePath: string,
   pages: PageInfo[]
@@ -1893,7 +1893,7 @@ function totalCells(
 // default is the silent one. `confidence` and every other mean-reduced tracker
 // stay out for the same reason.
 export function summableTrackers(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   type: JournalType
 ): TrackerDef[] {
   return plugin.settings.trackers.filter(
@@ -1923,13 +1923,13 @@ export function summableTrackers(
 // currently contains instead is how a page comes to disagree with the section
 // that wrote it.
 export function buildJournalTally(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   trackerId: string,
   label: string | null
 ): HTMLElement {
   const app = plugin.app;
-  const root = createDiv({ cls: "journal-table journal-tally" });
+  const root = createDiv({ cls: "ca-journal-table ca-journal-tally" });
 
   const file = hostFile(app, ctx);
   if (!file?.parent) return root;
@@ -1945,12 +1945,12 @@ export function buildJournalTally(
     type?.name
   );
   if (refusal != null || !def) {
-    root.createDiv({ cls: "journal-widget-error", text: refusal ?? "" });
+    root.createDiv({ cls: "ca-journal-widget-error", text: refusal ?? "" });
     return root;
   }
 
   const title = label ?? `${def.label ?? trackerId} tally`;
-  root.createDiv({ cls: "jtly-title", text: title });
+  root.createDiv({ cls: "ca-jtly-title", text: title });
 
   // IN THE TRACKER'S DECLARED ORDER, NOT BY COUNT. A status vocabulary is a
   // pipeline — Planned, Active, Blocked, Done — and sorting it by size would
@@ -2006,14 +2006,14 @@ export function buildJournalTally(
       .map((v) => ({ label: v, n: counts.get(v) ?? 0 })),
   ];
 
-  const strip = root.createDiv({ cls: "jtly-strip" });
+  const strip = root.createDiv({ cls: "ca-jtly-strip" });
   for (const r of rows) {
-    const pill = strip.createDiv({ cls: "jtly-pill" });
+    const pill = strip.createDiv({ cls: "ca-jtly-pill" });
     // A zero-count option is drawn and dimmed rather than omitted: the row is
     // a pipeline, and a missing stage reads as a stage that does not exist.
-    if (r.n === 0) pill.addClass("jtly-empty");
-    pill.createSpan({ cls: "jtly-count", text: String(r.n) });
-    pill.createSpan({ cls: "jtly-label", text: r.label });
+    if (r.n === 0) pill.addClass("ca-jtly-empty");
+    pill.createSpan({ cls: "ca-jtly-count", text: String(r.n) });
+    pill.createSpan({ cls: "ca-jtly-label", text: r.label });
   }
   return root;
 }
@@ -2025,11 +2025,11 @@ export function buildJournalTally(
 //
 // REPLACES A ```base BLOCK, and that is the point rather than a side effect.
 // The `children` section emitted one Bases table per kind — the last generated
-// dashboard content that was not Almanac's own — and it cost three things:
+// dashboard content that was not ChronoAnvil's own — and it cost three things:
 //
 //   • a dependency on Bases for the most-read page the plugin generates;
 //   • a section that could not be one fence, because a ```base block cannot
-//     live inside an ```almanac one. A deepest index therefore shipped 2N
+//     live inside a ```chronoanvil one. A deepest index therefore shipped 2N
 //     sibling blocks with gaps between them that no styling could close —
 //     the same limit journals-section.ts describes, and the one 2.13.9 and
 //     2.18.4 each spent a release removing somewhere else;
@@ -2120,17 +2120,17 @@ export function sortKindRows<T extends KindRow>(rows: T[]): T[] {
 }
 
 export function buildKindTable(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   kindId: string
 ): HTMLElement {
   const app = plugin.app;
   const file = hostFile(app, ctx);
   if (!file?.parent) {
-    return createDiv({ cls: "journal-table journal-kind-table" });
+    return createDiv({ cls: "ca-journal-table ca-journal-kind-table" });
   }
   const type = hostType(plugin, file.path);
-  if (!type) return createDiv({ cls: "journal-table journal-kind-table" });
+  if (!type) return createDiv({ cls: "ca-journal-table ca-journal-kind-table" });
   return kindTable(plugin, ctx, type, file.parent.path, kindId);
 }
 
@@ -2140,14 +2140,14 @@ export function buildKindTable(
 // in the same release: `level-index` draws one of these per kind at the deepest
 // level, for a folder it resolved rather than the one it happens to sit in.
 export function kindTable(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   type: JournalType,
   folderPath: string,
   kindId: string
 ): HTMLElement {
   const app = plugin.app;
-  const root = createDiv({ cls: "journal-table journal-kind-table" });
+  const root = createDiv({ cls: "ca-journal-table ca-journal-kind-table" });
   const kind = type.kinds.find((k) => k.id === kindId);
   // Named rather than silent, and this is the case that will actually happen:
   // removing a note kind leaves this directive behind in every template and
@@ -2156,7 +2156,7 @@ export function kindTable(
   // the block processor already prints, for the same reason.
   if (!kind) {
     root.createDiv({
-      cls: "journal-widget-error",
+      cls: "ca-journal-widget-error",
       text: `Unknown ${type.name} note type: ${kindId}`,
     });
     return root;
@@ -2289,11 +2289,11 @@ function ratingCell(
   }
   const steps = Math.round(max - min) + 1;
   const filled = Math.round(value - min) + 1;
-  const bar = host.createDiv({ cls: "almanac-list-gauge" });
+  const bar = host.createDiv({ cls: "ca-list-gauge" });
   bar.setAttr("aria-label", `${value} of ${max}`);
   for (let i = 1; i <= steps; i++) {
     bar.createSpan({
-      cls: `almanac-list-seg${i <= filled ? " is-on" : ""}`,
+      cls: `ca-list-seg${i <= filled ? " is-on" : ""}`,
     });
   }
 }
@@ -2313,11 +2313,11 @@ function ratingCell(
 // the file name as the tie-break so a hand-added page (no `order`) still lands
 // somewhere predictable rather than at a random point in the list.
 export function buildPagesTable(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   const app = plugin.app;
-  const root = createDiv({ cls: "journal-table journal-pages-table" });
+  const root = createDiv({ cls: "ca-journal-table ca-journal-pages-table" });
 
   const file = hostFile(app, ctx);
   if (!file?.parent) return root;
@@ -2364,7 +2364,7 @@ export function buildPagesTable(
   // position, so `recordList`'s grid would be one track with a blank header
   // over it. `createListRow` directly, therefore, rather than bending the
   // helper to describe a table with no columns.
-  const list = root.createDiv({ cls: "almanac-list" });
+  const list = root.createDiv({ cls: "ca-list" });
   pages.forEach((page, i) => {
     createListRow(list, {
       token: String(i + 1),
@@ -2410,7 +2410,7 @@ export function buildPagesTable(
 // been split" plus a lump.
 function isContainerFolder(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   folder: TFolder
 ): boolean {
   const note = getFile(app, `${folder.path}/${folder.name}.md`);
@@ -2448,13 +2448,13 @@ export function sortBreakdown(bars: BreakdownBar[]): BreakdownBar[] {
 }
 
 export function buildJournalBreakdown(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   trackerId: string,
   label: string | null
 ): HTMLElement {
   const app = plugin.app;
-  const root = createDiv({ cls: "journal-table journal-breakdown" });
+  const root = createDiv({ cls: "ca-journal-table ca-journal-breakdown" });
 
   const file = hostFile(app, ctx);
   if (!file?.parent) return root;
@@ -2470,7 +2470,7 @@ export function buildJournalBreakdown(
     type?.name
   );
   if (refusal != null || !def) {
-    root.createDiv({ cls: "journal-widget-error", text: refusal ?? "" });
+    root.createDiv({ cls: "ca-journal-widget-error", text: refusal ?? "" });
     return root;
   }
 
@@ -2488,7 +2488,7 @@ export function buildJournalBreakdown(
   // owns and a reader can already have seen. An explicit `|Label` in the
   // directive still wins — the default is what changes, not the override.
   const title = label ?? `${def.label ?? trackerId} breakdown`;
-  root.createDiv({ cls: "jbd-title", text: title });
+  root.createDiv({ cls: "ca-jbd-title", text: title });
 
   const containers = journalChildFolders(
     plugin,
@@ -2565,20 +2565,20 @@ export function buildJournalBreakdown(
     1
   );
 
-  const list = root.createDiv({ cls: "jbd-list" });
+  const list = root.createDiv({ cls: "ca-jbd-list" });
   for (const bar of sortBreakdown(bars)) {
-    const row = list.createDiv({ cls: "jbd-row" });
-    const name = row.createDiv({ cls: "jbd-label" });
+    const row = list.createDiv({ cls: "ca-jbd-row" });
+    const name = row.createDiv({ cls: "ca-jbd-label" });
     if (bar.file) {
       internalLink(name, app, bar.file, bar.label, ctx.sourcePath);
     } else {
       name.createSpan({ text: bar.label });
     }
-    const track = row.createDiv({ cls: "jbd-track" });
-    const fill = track.createDiv({ cls: "jbd-fill" });
+    const track = row.createDiv({ cls: "ca-jbd-track" });
+    const fill = track.createDiv({ cls: "ca-jbd-fill" });
     fill.style.width = `${Math.max(2, (bar.value / max) * 100)}%`;
     row.createDiv({
-      cls: "jbd-value",
+      cls: "ca-jbd-value",
       text: `${bar.value}${bar.count > 1 ? ` · ${bar.count}` : ""}`,
     });
   }
@@ -2608,7 +2608,7 @@ export function buildJournalBreakdown(
 // The frontmatter key the confidence built-in writes. One helper rather than
 // four getBuiltinTracker calls, so the four readers of this number can't drift
 // onto different properties — the same reason confidenceStats itself is shared.
-export function confidenceProperty(plugin: AlmanacPlugin): string {
+export function confidenceProperty(plugin: ChronoAnvilPlugin): string {
   return getBuiltinTracker(plugin, "confidence")?.id ?? "confidence";
 }
 
@@ -2640,7 +2640,7 @@ export function confidenceProperty(plugin: AlmanacPlugin): string {
 export const EVERY_KIND = Symbol("every kind");
 
 export function confidenceKinds(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   trackerId: string | typeof EVERY_KIND
 ): string[] {
@@ -2698,11 +2698,11 @@ export function confidenceStats(
 }
 
 export function buildConfidenceSummary(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   const app = plugin.app;
-  const root = createDiv({ cls: "journal-table journal-confidence-summary" });
+  const root = createDiv({ cls: "ca-journal-table ca-journal-confidence-summary" });
 
   const file = hostFile(app, ctx);
   if (!file?.parent) return root;
@@ -2749,7 +2749,7 @@ export function buildConfidenceSummary(
 
   const outOf = ratingDef?.max != null ? `/${ratingDef.max}` : "";
   const label = named.length === 1 ? named[0].label.toLowerCase() : "note";
-  const p = root.createEl("p", { cls: "jt-confidence-line" });
+  const p = root.createEl("p", { cls: "ca-jt-confidence-line" });
   p.createEl("strong", {
     text: `${ratingDef?.label ?? "Rating"} avg ${stats.avg}${outOf} · latest ${
       stats.latest
@@ -2766,12 +2766,12 @@ export function buildConfidenceSummary(
 // ```tasks``` (Tasks-plugin) blocks on the Weekly / Monthly / Staging
 // overviews and the Subject dashboard. Where the per-note `tasks:` widget
 // (widgets.ts::buildTasks) reads one note's own region, this walks every
-// note under `folder`, reads each body, pulls Almanac task lines out of any
-// `<!--almanac:KEY-->` region, and lists the still-open ones grouped by
+// note under `folder`, reads each body, pulls ChronoAnvil task lines out of any
+// `<!--chronoanvil:KEY-->` region, and lists the still-open ones grouped by
 // source note — the same shape the old `not done` + `group by filename`
 // query produced.
 //
-// Reading bodies is async (the metadata cache doesn't carry Almanac's
+// Reading bodies is async (the metadata cache doesn't carry ChronoAnvil's
 // `- ( )` marker, only Obsidian's `- [ ]`, so `taskCounts` can't see these).
 // The builder returns its root synchronously and fills it once the reads
 // resolve, matching how buildTasks defers its first paint. Toggling a checkbox
@@ -2794,7 +2794,7 @@ interface OpenTaskRow {
   // Used to re-find the task at toggle time without depending on its position,
   // so two toggles racing on the same note can't flip each other's lines.
   line: string;
-  task: AlmanacTask;
+  task: ChronoAnvilTask;
 }
 
 // ── read cache ────────────────────────────────────────────────────────
@@ -2855,7 +2855,7 @@ function parseOpenRows(file: TFile, text: string): OpenTaskRow[] {
 // that kept drawing it would fill a week with work already finished.
 export interface DueTask {
   file: TFile;
-  task: AlmanacTask;
+  task: ChronoAnvilTask;
 }
 
 export async function readDueTasks(
@@ -2877,14 +2877,14 @@ export async function readDueTasks(
   return out;
 }
 
-// Count Almanac tasks (open + done) across every `<!--almanac:KEY-->` region in
+// Count ChronoAnvil tasks (open + done) across every `<!--chronoanvil:KEY-->` region in
 // a note's body. Pure given the text. This is the counterpart the week/month
 // summaries need: util.ts::taskCounts reads Obsidian's listItems cache, which
-// only sees native `- [ ]` checkboxes — Almanac's `- ( )` marker is invisible
-// to it by design, so taskCounts always returns 0 for Almanac tasks. Walking
+// only sees native `- [ ]` checkboxes — ChronoAnvil's `- ( )` marker is invisible
+// to it by design, so taskCounts always returns 0 for ChronoAnvil tasks. Walking
 // the regions (the same source the open-tasks table reads) is the only correct
 // count. Exported for unit testing without a vault.
-export function countAlmanacTasks(text: string): { open: number; done: number } {
+export function countChronoAnvilTasks(text: string): { open: number; done: number } {
   let open = 0;
   let done = 0;
   for (const region of allNoteRegions(text)) {
@@ -2896,11 +2896,11 @@ export function countAlmanacTasks(text: string): { open: number; done: number } 
   return { open, done };
 }
 
-// Sum open/done Almanac tasks across a set of notes. The counterpart every
+// Sum open/done ChronoAnvil tasks across a set of notes. The counterpart every
 // *summary* needs (week-summary, month-summary, the home hero's stat rail):
 // each of those used to call util.ts::taskCounts, which reads the listItems
 // cache and therefore reported a flat 0 for a vault whose tasks are all
-// Almanac's `- ( )` lines — see the note on countAlmanacTasks above.
+// ChronoAnvil's `- ( )` lines — see the note on countChronoAnvilTasks above.
 //
 // Reading bodies is the cost of counting correctly, so this is async and
 // bounded (mapWithLimit, same 12-way limit the tasks-table read uses) rather
@@ -2910,7 +2910,7 @@ export function countAlmanacTasks(text: string): { open: number; done: number } 
 // `cachedRead` (not `read`) because nothing here writes: the counts are a
 // read-through view and a stale-by-milliseconds number on a passive dashboard
 // is fine, whereas the toggle path in openTasksInFile deliberately uses `read`.
-export async function sumAlmanacTasks(
+export async function sumChronoAnvilTasks(
   app: App,
   files: TFile[]
 ): Promise<{ open: number; done: number }> {
@@ -2918,15 +2918,15 @@ export async function sumAlmanacTasks(
   let open = 0;
   let done = 0;
   for (const text of texts) {
-    const c = countAlmanacTasks(text);
+    const c = countChronoAnvilTasks(text);
     open += c.open;
     done += c.done;
   }
   return { open, done };
 }
 
-// Count Almanac tasks (open + done) anywhere in a note's body — not just inside
-// `<!--almanac:KEY-->` regions. This is what the study dashboards need, because
+// Count ChronoAnvil tasks (open + done) anywhere in a note's body — not just inside
+// `<!--chronoanvil:KEY-->` regions. This is what the study dashboards need, because
 // a reader's tasks may sit in a note's prose — beside a Learning-Path bullet,
 // under a heading — as well as inside its `tasks:` widget region.
 //
@@ -2937,7 +2937,7 @@ export async function sumAlmanacTasks(
 // nobody asked for. The stale wording is worth recording rather than deleting,
 // because three call sites repeated it and it is what made a Study root of
 // task-free lessons read as a defect (§14.8).
-// `countAlmanacTasks` (regions only) can't see those, and util.ts::taskCounts
+// `countChronoAnvilTasks` (regions only) can't see those, and util.ts::taskCounts
 // only ever saw the old Obsidian `- [ ]` marker the templates no longer emit —
 // so both would report 0. Scanning the whole body with parseTasks (which skips
 // every non-task line) counts each `- ( )` / `- (x)` line exactly once whether
@@ -2952,11 +2952,11 @@ export function countBodyTasks(text: string): { open: number; done: number } {
   return { open, done };
 }
 
-// Sum open/done Almanac tasks across a set of notes, counting the whole body of
+// Sum open/done ChronoAnvil tasks across a set of notes, counting the whole body of
 // each (see countBodyTasks). The study `topics-table` "Open" column and the
 // study Activity chart both used to lean on util.ts::taskCounts (the listItems
 // cache, native `- [ ]` only) and so reported 0 once the templates moved to
-// Almanac's `- ( )` marker. Async and 12-way bounded, matching sumAlmanacTasks;
+// ChronoAnvil's `- ( )` marker. Async and 12-way bounded, matching sumChronoAnvilTasks;
 // callers build their DOM synchronously with a placeholder and fill on resolve.
 export async function sumBodyTasks(
   app: App,
@@ -3080,7 +3080,7 @@ async function readOpenTasks(
 // trusting the position, which is what makes two toggles racing on one note
 // safe. Exported for unit testing without an App/vault.
 export function resolveToggleTarget(
-  tasks: AlmanacTask[],
+  tasks: ChronoAnvilTask[],
   line: string,
   indexHint: number
 ): number {
@@ -3243,9 +3243,9 @@ export function buildScopeCycle(root: HTMLElement, scope: TasksScope): void {
     0,
     states.findIndex((s) => s.id === current)
   );
-  const btn = root.createEl("button", { cls: "journal-tasks-scope" });
+  const btn = root.createEl("button", { cls: "ca-journal-tasks-scope" });
   btn.createSpan({
-    cls: "journal-tasks-scope-text",
+    cls: "ca-journal-tasks-scope-text",
     text: states[at]?.label ?? "Below",
   });
   if (states.length < 2) {
@@ -3285,14 +3285,14 @@ export interface TasksScope {
 }
 
 export function buildTasksTable(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   folder: string,
   period: PeriodBounds | null = null,
   scope: TasksScope | null = null
 ): HTMLElement {
   const app = plugin.app;
-  const root = createDiv({ cls: "journal-table journal-tasks-table" });
+  const root = createDiv({ cls: "ca-journal-table ca-journal-tasks-table" });
   if (scope) buildScopeCycle(root, scope);
 
   // Was a two-branch conditional over a four-value union, so a quarter-scoped
@@ -3349,8 +3349,8 @@ export function buildTasksTable(
   // whole folder. The LiveWidget wrapper re-invokes this whole builder on any
   // change under `folder`; there's no incremental DOM update path — the DOM is
   // rebuilt from scratch, but the disk reads behind it are mostly cache hits.
-  const body = root.createDiv({ cls: "jtt-body" });
-  body.createDiv({ cls: "jtt-loading", text: "Loading tasks…" });
+  const body = root.createDiv({ cls: "ca-jtt-body" });
+  body.createDiv({ cls: "ca-jtt-loading", text: "Loading tasks…" });
 
   void readOpenTasks(app, folder, files, allFiles).then((perFile) => {
     body.empty();
@@ -3395,23 +3395,23 @@ export function buildTasksTable(
     // Lighter in-widget line: the collapsible `header:` bar above the widget is
     // the section's primary heading, so this row is a small muted label plus the
     // count / overdue pills — not a bold repeat of the bar.
-    const head = body.createDiv({ cls: "jtt-head" });
-    const titleEl = head.createDiv({ cls: "jtt-title" });
-    setIcon(titleEl.createSpan({ cls: "jtt-title-icon" }), "hourglass");
+    const head = body.createDiv({ cls: "ca-jtt-head" });
+    const titleEl = head.createDiv({ cls: "ca-jtt-title" });
+    setIcon(titleEl.createSpan({ cls: "ca-jtt-title-icon" }), "hourglass");
     // Naming the period is what stops a scoped table from reading as a broken
     // unscoped one: without it, "3 open" on a dashboard showing March is
     // indistinguishable from a table that has quietly lost most of its rows.
     titleEl.createSpan({ text: period ? `Open tasks · ${periodLabel}` : "Open tasks" });
 
-    const pills = head.createDiv({ cls: "jtt-pills" });
+    const pills = head.createDiv({ cls: "ca-jtt-pills" });
     if (overdue > 0) {
       pills.createSpan({
-        cls: "jtt-pill jtt-pill-danger",
+        cls: "ca-jtt-pill ca-jtt-pill-danger",
         text: `${overdue} overdue`,
       });
     }
     pills.createSpan({
-      cls: "jtt-pill",
+      cls: "ca-jtt-pill",
       text: `${total} open · ${groups.length} note${groups.length === 1 ? "" : "s"}`,
     });
 
@@ -3518,23 +3518,23 @@ export function buildTasksTable(
         0
       );
 
-      const bucketEl = body.createDiv({ cls: "jtt-group jtt-bucket" });
-      const heading = bucketEl.createDiv({ cls: "jtt-group-head jtt-bucket-head" });
+      const bucketEl = body.createDiv({ cls: "ca-jtt-group ca-jtt-bucket" });
+      const heading = bucketEl.createDiv({ cls: "ca-jtt-group-head ca-jtt-bucket-head" });
 
-      const titleLeft = heading.createDiv({ cls: "jtt-bucket-title-wrap" });
-      const chevron = titleLeft.createSpan({ cls: "jtt-group-chevron" });
+      const titleLeft = heading.createDiv({ cls: "ca-jtt-bucket-title-wrap" });
+      const chevron = titleLeft.createSpan({ cls: "ca-jtt-group-chevron" });
       setIcon(chevron, "chevron-down");
-      titleLeft.createSpan({ cls: "jtt-bucket-title", text: bucket.title });
+      titleLeft.createSpan({ cls: "ca-jtt-bucket-title", text: bucket.title });
 
-      const pillsRight = heading.createDiv({ cls: "jtt-bucket-pills" });
+      const pillsRight = heading.createDiv({ cls: "ca-jtt-bucket-pills" });
       if (bucketOverdue > 0) {
         pillsRight.createSpan({
-          cls: "jtt-pill jtt-pill-danger",
+          cls: "ca-jtt-pill ca-jtt-pill-danger",
           text: `${bucketOverdue} overdue`,
         });
       }
       pillsRight.createSpan({
-        cls: "jtt-group-count",
+        cls: "ca-jtt-group-count",
         text: `${bucketTotal} open`,
       });
 
@@ -3542,21 +3542,21 @@ export function buildTasksTable(
         bucketEl.toggleClass("is-collapsed", !bucketEl.hasClass("is-collapsed"));
       });
 
-      const bucketBody = bucketEl.createDiv({ cls: "jtt-bucket-body" });
+      const bucketBody = bucketEl.createDiv({ cls: "ca-jtt-bucket-body" });
 
       for (const note of bucket.notes) {
         if (bucket.notes.length > 1 || note.sublabel) {
-          const subHead = bucketBody.createDiv({ cls: "jtt-subgroup-head" });
+          const subHead = bucketBody.createDiv({ cls: "ca-jtt-subgroup-head" });
           const linkText = note.sublabel
             ? `${note.sublabel} · ${note.file.basename}`
             : note.file.basename;
           internalLink(subHead, app, note.file, linkText, ctx.sourcePath);
           subHead.createSpan({
-            cls: "jtt-subgroup-count",
+            cls: "ca-jtt-subgroup-count",
             text: String(note.rows.length),
           });
         } else if (bucket.notes.length === 1 && !note.sublabel) {
-          const subHead = bucketBody.createDiv({ cls: "jtt-subgroup-head" });
+          const subHead = bucketBody.createDiv({ cls: "ca-jtt-subgroup-head" });
           internalLink(subHead, app, note.file, note.file.basename, ctx.sourcePath);
         }
 
@@ -3571,17 +3571,17 @@ export function buildTasksTable(
           return ad.localeCompare(bd);
         });
 
-        const list = bucketBody.createDiv({ cls: "jtt-list" });
+        const list = bucketBody.createDiv({ cls: "ca-jtt-list" });
         for (const row of rows) {
           const rowEl = list.createDiv({
-            cls: `journal-task-row jtt-row journal-task-${row.task.priority}`,
+            cls: `ca-journal-task-row ca-jtt-row ca-journal-task-${row.task.priority}`,
           });
 
-          const main = rowEl.createDiv({ cls: "journal-task-main" });
+          const main = rowEl.createDiv({ cls: "ca-journal-task-main" });
 
           const box = main.createEl("input", {
             type: "checkbox",
-            cls: "journal-task-check",
+            cls: "ca-journal-task-check",
             attr: { "aria-label": "Mark task complete" },
           });
           box.checked = false;
@@ -3604,25 +3604,25 @@ export function buildTasksTable(
             })
             .trim();
 
-          main.createSpan({ cls: "journal-task-text jtt-text", text: cleanText || rawText });
+          main.createSpan({ cls: "ca-journal-task-text ca-jtt-text", text: cleanText || rawText });
           rowEl.setAttr("aria-label", `${row.task.priority} priority task`);
 
-          const meta = rowEl.createDiv({ cls: "journal-task-meta" });
-          const chips = meta.createDiv({ cls: "journal-task-chips" });
+          const meta = rowEl.createDiv({ cls: "ca-journal-task-meta" });
+          const chips = meta.createDiv({ cls: "ca-journal-task-chips" });
 
           for (const tag of tags) {
-            chips.createSpan({ cls: "journal-task-tag", text: tag });
+            chips.createSpan({ cls: "ca-journal-task-tag", text: tag });
           }
 
           if (row.task.priority !== "normal") {
             const prio = chips.createSpan({
-              cls: `journal-task-prio journal-task-${row.task.priority}`,
+              cls: `ca-journal-task-prio ca-journal-task-${row.task.priority}`,
               attr: { title: `Priority: ${row.task.priority}` },
             });
             const prioIcon = row.task.priority === "high" ? "chevrons-up" : "chevrons-down";
-            setIcon(prio.createSpan({ cls: "journal-task-prio-icon" }), prioIcon);
+            setIcon(prio.createSpan({ cls: "ca-journal-task-prio-icon" }), prioIcon);
             prio.createSpan({
-              cls: "journal-task-prio-label",
+              cls: "ca-journal-task-prio-label",
               text: row.task.priority === "high" ? "High" : "Low",
             });
           }
@@ -3634,19 +3634,19 @@ export function buildTasksTable(
             if (todayIso !== "") {
               const { text, overdue } = dueLabel(row.task.due, todayIso);
               const due = chips.createSpan({
-                cls: `jtt-due${overdue ? " jtt-due-overdue" : ""}`,
+                cls: `ca-jtt-due${overdue ? " ca-jtt-due-overdue" : ""}`,
                 text,
               });
-              setIcon(due.createSpan({ cls: "jtt-due-icon" }), "calendar");
+              setIcon(due.createSpan({ cls: "ca-jtt-due-icon" }), "calendar");
             }
           }
 
           if (row.task.at) {
             const at = chips.createSpan({
-              cls: "jtt-at journal-task-at-wrap",
+              cls: "ca-jtt-at ca-journal-task-at-wrap",
               text: row.task.at,
             });
-            setIcon(at.createSpan({ cls: "jtt-at-icon" }), "clock");
+            setIcon(at.createSpan({ cls: "ca-jtt-at-icon" }), "clock");
           }
         }
       }

@@ -441,7 +441,7 @@ export function bannerSection(spec: BannerSpec = {}): FlatSection {
     locked: true,
     pinned: true,
     render: () => ({
-      fence: "almanac",
+      fence: "chronoanvil",
       lines: [
         // THE MODIFIER FIRST, where `composeFlatNote` already puts `row` and
         // where `parseWide` reads it from regardless of order. A modifier at the
@@ -587,7 +587,7 @@ export function mergeBannerFences(text: string): string | null {
 // renders each block as its own sibling. A flat note has no masthead: every
 // section is an independent block and always was. Copying the merge rule here
 // would fuse the whole page into one fence — the exact failure 3.2 patch 3 hit
-// on its first attempt, where "every body section renders into an `almanac`
+// on its first attempt, where "every body section renders into a `chronoanvil`
 // fence too, so the whole page below the card collapsed into a single block".
 //
 // The spacer is line 0 for the reason the banner's is: it stops a click at the
@@ -626,8 +626,8 @@ export interface RowMember {
 // ── WHAT IT DECIDES ──────────────────────────────────────────────────────
 //
 // A run continues while the row id holds AND the fence kind holds. The second
-// condition is not hypothetical: a charts section is an `almanac-charts` fence
-// and could never share a block with an `almanac` one, and a catalogue that
+// condition is not hypothetical: a charts section is a `chronoanvil-charts` fence
+// and could never share a block with a `chronoanvil` one, and a catalogue that
 // asked for it would otherwise compose a fence whose kind silently belongs to
 // whichever section came first.
 //
@@ -751,7 +751,7 @@ export function composeFlatNote(sections: readonly FlatSection[]): string {
   const blocks = runs.map((r) =>
     ["```" + r.fence, ...r.lines, "```"].join("\n")
   );
-  return "`almanac:spacer`\n" + blocks.join("\n\n") + "\n";
+  return "`chronoanvil:spacer`\n" + blocks.join("\n\n") + "\n";
 }
 
 export function renderFlatSection(
@@ -1003,7 +1003,7 @@ export function parseFlatSections(
           body.every(
             (l) =>
               l.trim() === "" ||
-              l.trim() === "`almanac:spacer`" ||
+              l.trim() === "`chronoanvil:spacer`" ||
               l.trim().startsWith("%%") ||
               l.trim().startsWith("[[")
           )),
@@ -1325,7 +1325,7 @@ export function planFlatSections(
     //
     // It matters because 4.2 composes a row: the homepage's top block holds
     // three sections, one of them locked. Without this, unticking Open tasks or
-    // On this day on a page Almanac itself wrote would be refused, which is a
+    // On this day on a page ChronoAnvil itself wrote would be refused, which is a
     // page the reader cannot manage.
     if (hasKnownExtent(byId.get(id))) continue;
     going.delete(id);
@@ -1786,7 +1786,7 @@ export function applyFlatSections(
     );
     // WHICH SIDE THE BLANK LINE GOES ON, and it is not always the same side.
     //
-    // A composed note is `almanac:spacer` and then the blocks joined by a blank
+    // A composed note is `chronoanvil:spacer` and then the blocks joined by a blank
     // line — so the separator sits BETWEEN two blocks and there is none between
     // the spacer and the first one. Removal already knows this: it takes the
     // blank that FOLLOWS the section it drops, which is what keeps the note from
@@ -1833,7 +1833,7 @@ export function applyFlatSections(
   const next = chunks
     .flatMap((c) => c.lines)
     .join("\n")
-    .replace(/\n{3,}%% almanac-graph %%/g, "\n\n%% almanac-graph %%");
+    .replace(/\n{3,}%% chronoanvil-graph %%/g, "\n\n%% chronoanvil-graph %%");
   return next === text ? null : next;
 }
 
@@ -2544,11 +2544,11 @@ function specWithWanted(
 
 // ── ONE PARENT, NOT A SPOKE TO THE MIDDLE (4.68) ─────────────────────────
 //
-// Hidden zero-width wikilinks in an `almanac-graph` comment, so Obsidian's
+// Hidden zero-width wikilinks in a `chronoanvil-graph` comment, so Obsidian's
 // Graph View and Local Graph know how the vault's composed notes hang together.
 //
 // UNTIL 4.68 EVERY COMPOSED NOTE NAMED `Homepage` HERE, and the graph had two
-// hubs rather than one. The second was `Almanac.canvas`: a canvas node IS a
+// hubs rather than one. The second was `ChronoAnvil.canvas`: a canvas node IS a
 // link, so a map that points at eighteen surfaces is an eighteen-spoke star in
 // the graph whether anyone wanted one or not. Two mechanisms were drawing the
 // same wheel over the same set of notes, and the reader got both on top of each
@@ -2588,7 +2588,7 @@ function specWithWanted(
 export function graphLinksSection(links: readonly string[]): string {
   if (!links || links.length === 0) return "";
   const wikilinks = links.map((l) => `[[${l}|\u200B]]`).join(" ");
-  return `\n\n%% almanac-graph %%\n%% ${wikilinks} %%\n`;
+  return `\n\n%% chronoanvil-graph %%\n%% ${wikilinks} %%\n`;
 }
 
 // The same block, re-aimed — the half a COMPOSED note never needs.
@@ -2596,7 +2596,7 @@ export function graphLinksSection(links: readonly string[]): string {
 // A shipped note is composed from nothing on every repair, so `graphLinksSection`
 // is all it has ever taken. An ENTRY is not composed: it is a template filled in
 // once and then owned by whoever writes in it, and the one thing about it that
-// stays Almanac's is this comment. `diary.ts` fills the template, then points
+// stays ChronoAnvil's is this comment. `diary.ts` fills the template, then points
 // this line at the period the entry sits inside — see `graphParentName`.
 //
 // APPENDS WHEN THERE IS NO BLOCK, rather than declining. An entry written before
@@ -2626,4 +2626,4 @@ export function setGraphLinks(text: string, links: readonly string[]): string {
 }
 
 // The block as it is written above: the marker line, then the links line.
-const GRAPH_BLOCK_RE = /%% almanac-graph %%\n%%[^\n]*%%/;
+const GRAPH_BLOCK_RE = /%% chronoanvil-graph %%\n%%[^\n]*%%/;

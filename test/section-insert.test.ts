@@ -162,7 +162,7 @@ describe("adding a section to an existing note", () => {
 
     it("withholds a section the note already has", () => {
       // Not offered-and-refused: every content field persists into a
-      // `<!--almanac:key-->` region keyed by name, so a second copy of one
+      // `<!--chronoanvil:key-->` region keyed by name, so a second copy of one
       // would give two widgets one region to fight over.
       const text = composeTemplate(topicCtx);
       const ids = addableSections(topicCtx, text).map((s) => s.id);
@@ -207,7 +207,7 @@ describe("adding a section to an existing note", () => {
       // regenerates them". No reflow, no reordering, no tidying of a
       // hand-indented fence — the previous content is a prefix of the result.
       const messy =
-        "---\ntype: topic\n---\n```almanac\n  journal-header\n```\n\n\n\nOdd   spacing kept.";
+        "---\ntype: topic\n---\n```chronoanvil\n  journal-header\n```\n\n\n\nOdd   spacing kept.";
       const out = appendSectionMarkdown(messy, "BLOCK");
       expect(out.startsWith(messy.replace(/\s+$/, ""))).toBe(true);
       expect(out).toContain("  journal-header");

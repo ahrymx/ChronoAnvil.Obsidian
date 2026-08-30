@@ -99,7 +99,7 @@ describe("the ground table and the stylesheet agree", () => {
     const known = new Set(PAGE_GROUNDS.map((g) => groundClass(g.id)));
     const drawn = [
       ...new Set(
-        [...grounds().matchAll(/body\.(am-ground-[a-z0-9]+) \.workspace-leaf/g)].map(
+        [...grounds().matchAll(/body\.(ca-ground-[a-z0-9]+) \.workspace-leaf/g)].map(
           (m) => m[1]
         )
       ),
@@ -114,7 +114,7 @@ describe("the ground table and the stylesheet agree", () => {
       const at = css.indexOf(`body.${strengthClass(level.id)} {`);
       expect(at, level.id).toBeGreaterThan(-1);
       expect(css.slice(at, css.indexOf("}", at)), level.id).toContain(
-        "--am-tex-strength:"
+        "--ca-tex-strength:"
       );
     }
   });
@@ -143,17 +143,17 @@ describe("the shared film, which is what makes a pattern a surface", () => {
     // about how grainy the plugin is.
     // Anchored on the token and not on the selector: `::after {` also ends the
     // two-selector rule that sets up both films, and indexOf finds that one.
-    const at = css.indexOf("var(--am-tex-grain)");
+    const at = css.indexOf("var(--ca-tex-grain)");
     expect(at).toBeGreaterThan(-1);
     const rule = css.slice(css.lastIndexOf("{", at), css.indexOf("}", at));
     expect(
       css.slice(0, css.lastIndexOf("{", at))
     ).toMatch(
-      /body\.am-ground \.workspace-leaf-content\[data-type="markdown"\]::after\s*$/
+      /body\.ca-ground \.workspace-leaf-content\[data-type="markdown"\]::after\s*$/
     );
     expect(rule).toContain("mix-blend-mode: overlay");
     // No pattern carries its own, which is the half that keeps it shared.
-    const perPattern = [...css.matchAll(/var\(--am-tex-grain\)/g)];
+    const perPattern = [...css.matchAll(/var\(--ca-tex-grain\)/g)];
     expect(perPattern.length).toBe(1);
   });
 
@@ -173,8 +173,8 @@ describe("the shared film, which is what makes a pattern a surface", () => {
     // ── THE BUG THIS GUARD IS MADE OF ────────────────────────────────────
     //
     // Grounds shipped showing on Modern Fluent and on nothing else. The
-    // clearing rule read `body.am-ground .markdown-preview-view`, and both
-    // other presets carry `body.am-preset-editorial .markdown-preview-view`
+    // clearing rule read `body.ca-ground .markdown-preview-view`, and both
+    // other presets carry `body.ca-preset-editorial .markdown-preview-view`
     // with a background on it — the same weight, one element and two classes.
     // At equal specificity the later declaration wins and the bundle
     // concatenates in filename order, so `99-aesthetic-presets.css` repainted
@@ -211,8 +211,8 @@ describe("the shared film, which is what makes a pattern a surface", () => {
   it("reads the strength token bare, since 00-tokens.css defines it", () => {
     // The house rule tokens.test.ts enforces globally, asserted here as well
     // because this is the file where somebody adds a twentieth pattern.
-    expect(css).toContain("opacity: var(--am-tex-strength)");
-    expect(css).not.toMatch(/var\(--am-tex-[a-z0-9-]+\s*,/);
+    expect(css).toContain("opacity: var(--ca-tex-strength)");
+    expect(css).not.toMatch(/var\(--ca-tex-[a-z0-9-]+\s*,/);
   });
 });
 

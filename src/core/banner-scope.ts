@@ -14,7 +14,7 @@
 // the QUESTION it asks first — *is this one of ours, and which kind* — is a
 // string test over paths and is checkable here.
 //
-// ── ALMANAC NOTES ONLY, WHICH IS A DECISION AND NOT A DEFAULT ────────────
+// ── CHRONOANVIL NOTES ONLY, WHICH IS A DECISION AND NOT A DEFAULT ────────────
 //
 // The banner is chrome, and chrome on a note the plugin has nothing to say about
 // is a plugin behaving like a vault skin. A note written outside the diary,
@@ -32,7 +32,7 @@
 import { normalizePath } from "obsidian";
 import { folderPrefix } from "./util";
 
-/** Which kind of Almanac note this is — the banner draws different facts for each. */
+/** Which kind of ChronoAnvil note this is — the banner draws different facts for each. */
 export type BannerSurface = "diary" | "journal" | "home";
 
 /** The folders that decide the answer, taken as data so this needs no plugin. */
@@ -41,7 +41,7 @@ export interface BannerScope {
    * The flat dashboards, by exact path: the homepage and the Search note.
    *
    * A LIST SINCE 4.51.3, and the vault render is why. It was one field called
-   * `home`, and the Search note — a page Almanac composes, with Almanac's own
+   * `home`, and the Search note — a page ChronoAnvil composes, with ChronoAnvil's own
    * banner on it — was outside the bar entirely. Two exact paths is what the
    * plugin actually has; one was a guess.
    */
@@ -50,7 +50,7 @@ export interface BannerScope {
    * The diary's own root, and every grain folder under it.
    *
    * THE ROOT IS IN THE LIST (4.51.3). `02 - Diary/02 - Diary.md` is the diary's
-   * folder note — an Almanac dashboard with an Almanac banner — and it is in
+   * folder note — a ChronoAnvil dashboard with a ChronoAnvil banner — and it is in
    * none of the five grain folders, so the bar skipped it and the note kept its
    * old banner.
    */
@@ -67,7 +67,7 @@ export interface BannerScope {
   journalRoots: readonly string[];
 }
 
-// Which surface a path belongs to, or null for a note that is none of Almanac's
+// Which surface a path belongs to, or null for a note that is none of ChronoAnvil's
 // business.
 //
 // THE HOMEPAGE IS AN EXACT PATH, NOT A PREFIX. It is one file, and a folder that

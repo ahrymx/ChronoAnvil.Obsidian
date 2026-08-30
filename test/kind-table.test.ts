@@ -212,10 +212,10 @@ describe("the section that writes it", () => {
 
   it("keeps the whole section in a single fence", () => {
     // What kind-table exists for. A ```base block cannot live inside an
-    // almanac fence, so while the tables were Bases tables a two-kind index
+    // chronoanvil fence, so while the tables were Bases tables a two-kind index
     // shipped four sibling blocks with gaps no styling could close.
     const rendered = renderSection(findSection("children")!, deepest);
-    expect(rendered.match(/```almanac/g)?.length).toBe(1);
+    expect(rendered.match(/```chronoanvil/g)?.length).toBe(1);
   });
 
   it("claims the directive it emits", () => {

@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   hexToRgbInt,
-  buildAlmanacGraphGroups,
+  buildChronoAnvilGraphGroups,
   mergeGraphConfig,
   configureGraphGroups,
   GRAIN_GRAPH_HUES,
@@ -33,9 +33,9 @@ describe("graph-groups", () => {
     });
   });
 
-  describe("buildAlmanacGraphGroups", () => {
-    it("builds the standard eleven Almanac color groups with green hierarchy", () => {
-      const groups = buildAlmanacGraphGroups(DEFAULT_PATHS);
+  describe("buildChronoAnvilGraphGroups", () => {
+    it("builds the standard eleven ChronoAnvil color groups with green hierarchy", () => {
+      const groups = buildChronoAnvilGraphGroups(DEFAULT_PATHS);
       expect(groups.length).toBe(11);
 
       const [
@@ -101,7 +101,7 @@ describe("graph-groups", () => {
         infrastructureRoot: "System",
       };
 
-      const groups = buildAlmanacGraphGroups(customPaths);
+      const groups = buildChronoAnvilGraphGroups(customPaths);
       expect(groups[0].query).toBe("file:Home OR file:Find OR file:Inbox");
       expect(groups[1].query).toBe('file:"Journal" OR file:"Notebooks" OR path:"Journal/Boards"');
       expect(groups[2].query).toBe('path:"Journal" file:Year-');
@@ -118,7 +118,7 @@ describe("graph-groups", () => {
 
   describe("mergeGraphConfig", () => {
     it("creates a fresh config when raw is null", () => {
-      const groups = buildAlmanacGraphGroups(DEFAULT_PATHS);
+      const groups = buildChronoAnvilGraphGroups(DEFAULT_PATHS);
       const json = mergeGraphConfig(null, groups, DEFAULT_PATHS);
       const parsed = JSON.parse(json);
 
@@ -126,7 +126,7 @@ describe("graph-groups", () => {
       expect(parsed["collapse-color-groups"]).toBe(false);
     });
 
-    it("preserves user settings and non-Almanac custom groups", () => {
+    it("preserves user settings and non-ChronoAnvil custom groups", () => {
       const existing = {
         repulseStrength: 15,
         linkDistance: 300,
@@ -138,7 +138,7 @@ describe("graph-groups", () => {
         ],
       };
 
-      const groups = buildAlmanacGraphGroups(DEFAULT_PATHS);
+      const groups = buildChronoAnvilGraphGroups(DEFAULT_PATHS);
       const json = mergeGraphConfig(JSON.stringify(existing), groups, DEFAULT_PATHS);
       const parsed = JSON.parse(json);
 
@@ -146,7 +146,7 @@ describe("graph-groups", () => {
       expect(parsed.linkDistance).toBe(300);
       expect(parsed.showArrow).toBe(true);
 
-      // 11 fresh Almanac groups + 2 preserved user groups (#project and Archive)
+      // 11 fresh ChronoAnvil groups + 2 preserved user groups (#project and Archive)
       expect(parsed.colorGroups.length).toBe(13);
       expect(parsed.colorGroups.slice(0, 11)).toEqual(groups);
       expect(parsed.colorGroups[11]).toEqual({ query: "tag:#project", color: { a: 1, rgb: 123456 } });

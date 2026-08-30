@@ -9,9 +9,9 @@
 //
 // ── WHY ANY OF THIS ──────────────────────────────────────────────────────
 //
-// An Almanac page is a page of widgets. In Live Preview it also shows the
+// A ChronoAnvil page is a page of widgets. In Live Preview it also shows the
 // Properties block, and a click anywhere near a fence puts a cursor in the raw
-// directive — `` `almanac:spacer` `` exists BECAUSE of that, as a full-width
+// directive — `` `chronoanvil:spacer` `` exists BECAUSE of that, as a full-width
 // line on row 0 whose whole job is to catch a click that would otherwise land
 // inside the first fence and render it as source. In reading mode none of that
 // happens and nothing is lost: every widget is a markdown post-processor, and
@@ -29,7 +29,7 @@
 // updates, which is the difference between a feature and a feature for new
 // vaults.
 //
-// `surfaceOfNote` already answers "is this an Almanac page" for every one of
+// `surfaceOfNote` already answers "is this a ChronoAnvil page" for every one of
 // them — a journal note, a diary entry, a period dashboard, the homepage,
 // Search, the two folder-note dashboards and a managed template — so this adds
 // no second opinion about which notes are the plugin's.
@@ -44,7 +44,7 @@
 // meets it.
 
 import type { TFile } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 
 // The frontmatter key, spelled once.
 export const VIEW_MODE_KEY = "obsidianUIMode";
@@ -66,9 +66,9 @@ export function opensInReadingMode(
   const said = typeof declared === "string" ? declared.trim().toLowerCase() : "";
   // THE OPT-OUT WINS OVER RECOGNITION, which is the case that makes this a
   // reader's decision rather than the plugin's: a note that says `source` is
-  // left alone even though Almanac composed it.
+  // left alone even though ChronoAnvil composed it.
   if (said === EDITING_MODE) return false;
-  // AND AN EXPLICIT ASK WORKS ON ANY NOTE, including one Almanac has never
+  // AND AN EXPLICIT ASK WORKS ON ANY NOTE, including one ChronoAnvil has never
   // heard of. Honouring the convention only on our own pages would be honouring
   // half a convention.
   if (said === READING_MODE) return true;
@@ -76,7 +76,7 @@ export function opensInReadingMode(
 }
 
 // The same rule, asked of a real file.
-export function wantsReadingMode(plugin: AlmanacPlugin, file: TFile): boolean {
+export function wantsReadingMode(plugin: ChronoAnvilPlugin, file: TFile): boolean {
   const fm = plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
   return opensInReadingMode(
     fm[VIEW_MODE_KEY],

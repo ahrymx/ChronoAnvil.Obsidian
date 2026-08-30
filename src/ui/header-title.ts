@@ -64,7 +64,7 @@ import {
   singularGuess,
 } from "../core/util";
 import { splitGlyph } from "./section-frame";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { journalTypeAtPath } from "../journals/journal";
 import type { JournalKind, JournalType } from "../journals/journal";
 import { promptKindRename } from "./modals";
@@ -182,7 +182,7 @@ export function headerTitleRefusal(next: string): string | null {
 // Moving the entry is three lines and is the difference between renaming a
 // heading and resetting its state.
 async function commitHeaderTitle(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   site: HeaderSite,
   next: string
@@ -195,7 +195,7 @@ async function commitHeaderTitle(
   const span = headerTitleSpan(lines, site);
   if (!span) {
     new Notice(
-      "Almanac couldn't tell which heading this is — rename it in the note's source instead."
+      "ChronoAnvil couldn't tell which heading this is — rename it in the note's source instead."
     );
     return false;
   }
@@ -248,7 +248,7 @@ async function commitHeaderTitle(
 // Resources are section headings; renaming one means what it has meant since
 // 3.19.0 and there is nothing to ask.
 async function offerKindRename(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   lines: readonly string[],
   span: ArgSpan,
@@ -302,7 +302,7 @@ async function offerKindRename(
   // confidence strip beside this heading would go on saying "Lesson" while the
   // heading above them said "Seminars": the exact disagreement the rename was
   // for, and no file event would ever mention it.
-  notify.ok(`Almanac: renamed the note type to “${choice.label}”`);
+  notify.ok(`ChronoAnvil: renamed the note type to “${choice.label}”`);
 }
 
 // Which note kind this header is the heading for, if any. 3.20.
@@ -341,7 +341,7 @@ export function kindHeadedBy(
 // what keeps the two separable, and it is why the pencil sits inside the slot:
 // the affordance has to name the smaller target it belongs to.
 export function attachHeaderRename(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   slot: HTMLElement,
   ctx: MarkdownPostProcessorContext,
   site: HeaderSite
@@ -364,14 +364,14 @@ export function attachHeaderRename(
   // it; an input pre-filled with the text half alone would silently drop the
   // glyph on every save.
   const glyphSlot = (): HTMLElement | null =>
-    slot.parentElement?.querySelector(".journal-header-glyph") ?? null;
+    slot.parentElement?.querySelector(".ca-journal-header-glyph") ?? null;
 
   const render = (): void => {
     slot.empty();
-    slot.addClass("journal-header-title-editable");
+    slot.addClass("ca-journal-header-title-editable");
     const shown = splitGlyph(title);
     slot.createSpan({
-      cls: "journal-header-title-text",
+      cls: "ca-journal-header-title-text",
       text: shown.glyph ? shown.text : title,
     });
     slot.setAttribute("aria-label", `Rename “${title}”`);
@@ -384,7 +384,7 @@ export function attachHeaderRename(
     slot.title = "";
     const input = slot.createEl("input", {
       type: "text",
-      cls: "journal-header-title-input",
+      cls: "ca-journal-header-title-input",
     });
     input.value = title;
 

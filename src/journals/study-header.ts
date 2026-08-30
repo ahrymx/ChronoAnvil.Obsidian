@@ -7,9 +7,9 @@
 
 // The `journal-header` widget (spelled `study-header` in notes written before
 // 2.28, still accepted): the strip at the top of a journal note's banner,
-// welded to whichever tracker cells follow it in the same ```almanac fence —
+// welded to whichever tracker cells follow it in the same ```chronoanvil fence —
 // the journal equivalent of entryheader.ts's diary strip, and welded the same
-// way (see .journal-study-banner in styles.css).
+// way (see .ca-journal-study-banner in styles.css).
 //
 // Type-agnostic since 2.28. It was written for Study and hard-coded Study's
 // shape: the journals root as the base of every path, `subject`/`topic` as the
@@ -36,7 +36,7 @@
 // sits on disk, so a note dragged out of its folder still points at the right
 // dashboards.
 //
-//   ```almanac
+//   ```chronoanvil
 //   study-header
 //   ```
 
@@ -52,7 +52,7 @@ import { settingsButton } from "../ui/section-frame";
 import { openJournalTemplateWindow } from "../ui/journal-template-modal";
 import { attachNoteRename } from "../ui/header-title";
 import { pageHeadSays } from "../ui/widgets/page-head";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import {
   folderNotePath,
   getFile,
@@ -160,7 +160,7 @@ export function journalCrumbPath(
 // nowhere.
 export function journalCrumbs(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   file: TFile,
   isIndex: boolean
 ): Crumb[] {
@@ -281,7 +281,7 @@ export function renderCrumb(
   const iconOnly = !!crumb.icon;
   if (!crumb.file) {
     const muted = parent.createSpan({
-      cls: "jn-flat jn-muted" + (iconOnly ? " jsh-crumb-icon" : ""),
+      cls: "ca-jn-flat ca-jn-muted" + (iconOnly ? " ca-jsh-crumb-icon" : ""),
       attr: { "aria-label": crumb.label, title: crumb.label },
     });
     if (crumb.icon) setIcon(muted, crumb.icon);
@@ -291,7 +291,7 @@ export function renderCrumb(
   const file = crumb.file;
   const href = noExt(file.path);
   const a = parent.createEl("a", {
-    cls: "internal-link jn-pill" + (iconOnly ? " jsh-crumb-icon" : ""),
+    cls: "internal-link ca-jn-pill" + (iconOnly ? " ca-jsh-crumb-icon" : ""),
     href,
     attr: { "data-href": href, "aria-label": crumb.label, title: crumb.label },
   });
@@ -304,7 +304,7 @@ export function renderCrumb(
   a.addEventListener("mouseover", (evt) => {
     app.workspace.trigger("hover-link", {
       event: evt,
-      source: "almanac-study-header",
+      source: "ca-study-header",
       hoverParent: parent,
       targetEl: a,
       linktext: href,
@@ -343,13 +343,13 @@ export function renderCrumb(
 // palette is how hotkeys are bound and how anyone who already knows the plugin
 // works.
 function attachBannerMenu(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   host: HTMLElement,
   notePath: string,
   isIndex: boolean
 ): void {
   const build = journalBannerMenu(plugin, notePath, isIndex);
-  if (build) settingsButton(host, "jsh-more", build);
+  if (build) settingsButton(host, "ca-jsh-more", build);
 }
 
 // What the banner's cog offers on a JOURNAL note, as a builder rather than as a
@@ -365,7 +365,7 @@ function attachBannerMenu(
 // `discoverability.test.ts`'s: *a menu that opens and then explains it cannot
 // help is worse than no menu.*
 export function journalBannerMenu(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   isIndex: boolean
 ): ((menu: Menu) => void) | null {
@@ -444,11 +444,11 @@ export function journalBannerMenu(
 }
 
 export function buildStudyHeader(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   const app = plugin.app;
-  const wrap = createDiv({ cls: "journal-study-header" });
+  const wrap = createDiv({ cls: "ca-journal-study-header" });
 
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (!(file instanceof TFile)) return wrap;
@@ -474,7 +474,7 @@ export function buildStudyHeader(
   // reader looks for on a note they opened deliberately, and the trail is a
   // second fact about it. `journal-banner-name` is the class that says so, and
   // it is the same one `buildEntryHeader` puts on its band.
-  const titleRow = wrap.createDiv({ cls: "jsh-titlerow journal-banner-name" });
+  const titleRow = wrap.createDiv({ cls: "ca-jsh-titlerow ca-journal-banner-name" });
   // A WRAPPER OF ITS OWN, WHICH IS LOAD-BEARING AND NOT TIDINESS.
   // `attachNoteRename` calls `row.empty()` to swap the name for an input and
   // `row.empty()` again to swap it back, so anything else parented in that row
@@ -483,9 +483,9 @@ export function buildStudyHeader(
   // and `buildEntryHeader` both take the same precaution, which is why neither
   // has ever lost its control to a rename.
   const titleWrap = titleRow.createDiv({
-    cls: "jsh-title-wrap journal-banner-title",
+    cls: "ca-jsh-title-wrap ca-journal-banner-title",
   });
-  attachNoteRename(app, titleWrap, file, "jsh-title");
+  attachNoteRename(app, titleWrap, file, "ca-jsh-title");
 
   // THE COG SITS BESIDE THE NAME, and this reverses a decision rather than
   // drifting from one. It was in the crumb row on the argument that the title is
@@ -498,12 +498,12 @@ export function buildStudyHeader(
   attachBannerMenu(plugin, titleRow, ctx.sourcePath, isIndex);
 
   // ── Band 2: the trail + this note's date or activity ─────────────────
-  const nav = wrap.createDiv({ cls: "jsh-nav journal-banner-nav" });
-  const crumbs = nav.createDiv({ cls: "jsh-crumbs" });
+  const nav = wrap.createDiv({ cls: "ca-jsh-nav ca-journal-banner-nav" });
+  const crumbs = nav.createDiv({ cls: "ca-jsh-crumbs" });
   const type = journalTypeOfNote(plugin, ctx.sourcePath);
   const trail = journalCrumbs(app, plugin, file, isIndex);
   trail.forEach((crumb, i) => {
-    if (i > 0) crumbs.createSpan({ cls: "jsh-sep", text: "\u203a" });
+    if (i > 0) crumbs.createSpan({ cls: "ca-jsh-sep", text: "\u203a" });
     renderCrumb(crumbs, app, crumb, ctx.sourcePath);
   });
 
@@ -533,8 +533,8 @@ export function buildStudyHeader(
   // child to a `space-between` row — invisible, and one more thing for the trail
   // to be spaced against.
   if (meta) {
-    const navEnd = nav.createDiv({ cls: "jsh-nav-end" });
-    navEnd.createDiv({ cls: "jsh-date", text: meta });
+    const navEnd = nav.createDiv({ cls: "ca-jsh-nav-end" });
+    navEnd.createDiv({ cls: "ca-jsh-date", text: meta });
   }
 
   return wrap;
@@ -565,7 +565,7 @@ export function buildStudyHeader(
 // no level and no kind, and an empty strip is a rule ruled across a card for no
 // reason — `buildEntryContext` returns null on the same grounds.
 export function buildJournalContext(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
   const sctx = plugin.sections.contextFor(ctx.sourcePath);
@@ -597,18 +597,18 @@ export function buildJournalContext(
   // done — the empty case is not new, only newly reachable.
   if (!levelNoun && !kindLabel) return null;
 
-  const bar = createDiv({ cls: "journal-widget-bar journal-note-context" });
-  const facts = bar.createDiv({ cls: "jnc-facts" });
+  const bar = createDiv({ cls: "ca-journal-widget-bar ca-journal-note-context" });
+  const facts = bar.createDiv({ cls: "ca-jnc-facts" });
 
   if (levelNoun) {
-    const el = facts.createSpan({ cls: "jnc-fact" });
-    setIcon(el.createSpan({ cls: "jnc-fact-icon" }), "layers");
-    el.createSpan({ cls: "jnc-fact-text", text: levelNoun });
+    const el = facts.createSpan({ cls: "ca-jnc-fact" });
+    setIcon(el.createSpan({ cls: "ca-jnc-fact-icon" }), "layers");
+    el.createSpan({ cls: "ca-jnc-fact-text", text: levelNoun });
   }
   if (kindLabel) {
-    const el = facts.createSpan({ cls: "jnc-fact jnc-fact-kind" });
-    setIcon(el.createSpan({ cls: "jnc-fact-icon" }), "file-text");
-    el.createSpan({ cls: "jnc-fact-text", text: kindLabel });
+    const el = facts.createSpan({ cls: "ca-jnc-fact ca-jnc-fact-kind" });
+    setIcon(el.createSpan({ cls: "ca-jnc-fact-icon" }), "file-text");
+    el.createSpan({ cls: "ca-jnc-fact-text", text: kindLabel });
   }
 
   return bar;

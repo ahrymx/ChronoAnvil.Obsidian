@@ -34,7 +34,7 @@ export const moment = _moment as unknown as (input?: unknown) => MomentLike;
 // the active moment locale — which Obsidian sets from the app language, so this
 // follows the user's locale rather than a hard-coded choice. Shared by the diary
 // calendar and the chart calendar-heatmap so both start weeks on the same day.
-// Falls back to Monday (1), Almanac's historical default, if locale data is
+// Falls back to Monday (1), ChronoAnvil's historical default, if locale data is
 // somehow unavailable.
 export function weekStartDay(): number {
   const md = (
@@ -1042,12 +1042,12 @@ export function meanClock(minutes: number[]): string | null {
 import { parseHeaderDirective } from "./directive-grammar";
 export { parseHeaderDirective };
 
-// If `lines[i]` opens an ```almanac fence whose first directive is a `header:`,
+// If `lines[i]` opens a ```chronoanvil fence whose first directive is a `header:`,
 // return that header's parsed {level, title}; otherwise null. Used to recognise
 // the header-bar form of a section title on the dashboards.
 //
-// Deliberately narrow: only the plain ```almanac fence counts. The Trends
-// section's ```almanac-charts fence also carries a `header:` title, but in the
+// Deliberately narrow: only the plain ```chronoanvil fence counts. The Trends
+// section's ```chronoanvil-charts fence also carries a `header:` title, but in the
 // merged layout that one fence *is* the whole section, and charts.ts relies on
 // locateSection NOT anchoring on it so parseChartRegion falls through to
 // findChartsFence and reads the fence's own body. Recognising section *titles*
@@ -1065,11 +1065,11 @@ export function headerAtFence(
 
 // Every fence info-string that can open a titled dashboard section: the general
 // widget block, plus the Trends section's own chart processor.
-const SECTION_FENCES = [FENCE_OPEN, "```almanac-charts"];
+const SECTION_FENCES = [FENCE_OPEN, "```chronoanvil-charts"];
 
 // The title of a section *starting* at `lines[i]`, for boundary detection —
 // the same parse as headerAtFence but across every section fence, not just
-// ```almanac.
+// ```chronoanvil.
 //
 // This exists because the two questions genuinely differ. headerAtFence asks
 // "is this the anchor of the section I'm looking for?", and must not match the
@@ -1093,7 +1093,7 @@ function sectionBoundaryAt(
 
 // A located dashboard section.
 //   titleStart / titleEnd — the line span of the section's title. For a
-//     header-bar title that's the ```almanac fence (open..close); for a legacy
+//     header-bar title that's the ```chronoanvil fence (open..close); for a legacy
 //     markdown heading both point at the single heading line.
 //   end — the first line NOT in the section (its body is titleEnd+1 .. end-1).
 //   viaHeaderBar — true if found via the header-bar fence, false if via the
@@ -1107,7 +1107,7 @@ export interface LocatedSection {
 
 // Locate a titled dashboard section (e.g. "📚 Journals", "📊 Trends and
 // statistics") in a note's lines, tolerating both the header-bar form
-// (```almanac / header:[level:]<title> / ```) and the legacy `<heading>`
+// (```chronoanvil / header:[level:]<title> / ```) and the legacy `<heading>`
 // markdown form. This is the single shared implementation behind the Journals
 // rebuild (journal.ts) and the chart region rewrite (charts.ts) — before it,
 // each had its own near-identical copy that could (and did) drift out of sync
@@ -1137,7 +1137,7 @@ export interface LocatedSection {
 // fewer lines and would quietly accept spellings this project never shipped —
 // including a reader's own retitling, which is theirs to keep and must not be
 // treated as a version of ours to rewrite. An explicit history says exactly
-// which strings are Almanac's old words, so a migration can rewrite those and
+// which strings are ChronoAnvil's old words, so a migration can rewrite those and
 // nothing else.
 export function locateSection(
   lines: string[],
@@ -1184,7 +1184,7 @@ export function locateSection(
     }
     // sectionBoundaryAt, not headerAtFence: a *different* section starting here
     // ends this one whichever fence it uses, including the Trends section's
-    // ```almanac-charts.
+    // ```chronoanvil-charts.
     const hdr = sectionBoundaryAt(lines, i);
     if (hdr && hdr.title && isBoundaryTitle(hdr.title)) {
       end = i;

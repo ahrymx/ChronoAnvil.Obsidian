@@ -35,7 +35,7 @@
 // because it is an event.
 
 import { MarkdownPostProcessorContext, Notice, TFile, setIcon } from "obsidian";
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import type { PluginNoteRegionHost } from "./note-regions";
 import { LOGBOOK_NOTE_KEY, type LogbookDef } from "../../core/constants";
 import { findLogbook } from "../../diary/logbooks";
@@ -243,16 +243,16 @@ export function buildAllLogbooks(
 // already do for a mistyped journal: the reader has either renamed something or
 // mistyped it, and in both cases the list they need is the short one this vault
 // actually holds.
-function refusal(plugin: AlmanacPlugin, id: string): HTMLElement {
-  const wrap = createDiv({ cls: "journal-logbook journal-note" });
+function refusal(plugin: ChronoAnvilPlugin, id: string): HTMLElement {
+  const wrap = createDiv({ cls: "ca-journal-logbook ca-journal-note" });
   const known = plugin.settings.logbooks;
   wrap.createDiv({
-    cls: "journal-widget-error",
+    cls: "ca-journal-widget-error",
     text: known.length
       ? `No logbook called "${id}". This vault has: ${known
           .map((book) => book.id)
           .join(", ")}.`
-      : `No logbook called "${id}", and none is registered — add one in Settings → Almanac → Logbooks.`,
+      : `No logbook called "${id}", and none is registered — add one in Settings → ChronoAnvil → Logbooks.`,
   });
   return wrap;
 }
@@ -322,22 +322,22 @@ async function createLogbookNote(
     // A create that fails is a path the vault refused — an illegal filename, a
     // folder that is really a file. Said once, where the reader is looking,
     // rather than swallowed into a list that silently never fills.
-    new Notice(`Almanac: could not create ${def.path}`);
+    new Notice(`ChronoAnvil: could not create ${def.path}`);
     return null;
   }
 }
 
 // The Meetings kind: everything scheduled ahead, from the events note.
-function buildAgenda(plugin: AlmanacPlugin, def: LogbookDef): HTMLElement {
-  const wrap = createDiv({ cls: "journal-logbook journal-logbook--agenda" });
+function buildAgenda(plugin: ChronoAnvilPlugin, def: LogbookDef): HTMLElement {
+  const wrap = createDiv({ cls: "ca-journal-logbook ca-journal-logbook--agenda" });
 
-  const bar = wrap.createDiv({ cls: "journal-logbook-actions" });
+  const bar = wrap.createDiv({ cls: "ca-journal-logbook-actions" });
   const add = bar.createEl("button", {
-    cls: "journal-btn mod-cta",
+    cls: "ca-journal-btn mod-cta",
     text: "Add a meeting",
     attr: { type: "button" },
   });
-  setIcon(add.createSpan({ cls: "journal-btn-icon" }), "calendar-plus");
+  setIcon(add.createSpan({ cls: "ca-journal-btn-icon" }), "calendar-plus");
   add.addEventListener("click", () => {
     // TODAY'S DATE AND AN HOUR, so the editor opens on a meeting rather than on
     // a blank event the reader has to make into one. `draftEvent` seeds the
@@ -361,18 +361,18 @@ function buildAgenda(plugin: AlmanacPlugin, def: LogbookDef): HTMLElement {
       def.blurb
         ? `${def.blurb} Nothing scheduled — an event with a time on it is a meeting, and shows here.`
         : "Nothing scheduled — an event with a time on it is a meeting, and shows here.",
-      "am-ev-empty"
+      "ca-ev-empty"
     );
     return wrap;
   }
 
-  const list = wrap.createDiv({ cls: "am-ev-list" });
+  const list = wrap.createDiv({ cls: "ca-ev-list" });
   for (const item of items.slice(0, AGENDA_COUNT)) {
-    const row = list.createDiv({ cls: "am-ev-row am-ev-upcoming-row" });
-    const text = row.createDiv({ cls: "am-ev-text" });
-    text.createDiv({ cls: "am-ev-title", text: item.def.title });
-    text.createDiv({ cls: "am-ev-meta", text: describeEventWhen(item.def) });
-    row.createSpan({ cls: "am-ev-when", text: describeRelative(item) });
+    const row = list.createDiv({ cls: "ca-ev-row ca-ev-upcoming-row" });
+    const text = row.createDiv({ cls: "ca-ev-text" });
+    text.createDiv({ cls: "ca-ev-title", text: item.def.title });
+    text.createDiv({ cls: "ca-ev-meta", text: describeEventWhen(item.def) });
+    row.createSpan({ cls: "ca-ev-when", text: describeRelative(item) });
     row.addEventListener("click", () =>
       openEventEditor(plugin.app, plugin, item.def)
     );

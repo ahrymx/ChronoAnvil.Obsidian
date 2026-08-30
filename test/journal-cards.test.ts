@@ -88,7 +88,7 @@ describe("nothing dead is drawn", () => {
     // them with the row is the mutation that matters here.
     expect(src).toContain("openIndex(plugin, type)");
     expect(src).toContain("plugin.journals.newTopLevel(type)");
-    expect(src).toContain('overflowButton(banner, "jjc-menu"');
+    expect(src).toContain('overflowButton(banner, "ca-jjc-menu"');
     // And the row's own rules went too, or a class nothing builds keeps its styling.
     const css = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
     expect(css).not.toContain(".jjc-actions");
@@ -106,7 +106,7 @@ describe("nothing dead is drawn", () => {
     // A vault without any journals draws the grid ending in the New journal tile
     // rather than replacing it with an empty callout, so the creation affordance
     // is always available directly on the homepage.
-    expect(src).toContain('cls: "jld-add jld-add-tile jjc-add"');
+    expect(src).toContain('cls: "ca-jld-add ca-jld-add-tile ca-jjc-add"');
     expect(src).toContain("plugin.openJournalSettings();");
   });
 });
@@ -217,12 +217,12 @@ describe("the grid answers to the widget's width", () => {
   const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
   it("sizes its columns off the container, not the viewport", () => {
-    // `.journal-widget-block` establishes `container-type: inline-size`, so an
+    // `.ca-journal-widget-block` establishes `container-type: inline-size`, so an
     // intrinsic track sizes to the PANE, the canvas node or the tile. A media
     // query here would answer to the window, which is the thing 4.1 §1's
     // two-node-width test was built to catch.
-    const at = rules.indexOf(".jjc-grid {");
-    expect(at, "no .jjc-grid rule").toBeGreaterThan(-1);
+    const at = rules.indexOf(".ca-jjc-grid {");
+    expect(at, "no .ca-jjc-grid rule").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain("auto-fill");
     expect(rule).toContain("minmax(");
@@ -232,7 +232,7 @@ describe("the grid answers to the widget's width", () => {
     // A banner with an aspect-ratio grows with the column and leaves the
     // titles in a row at different heights, which is what stops a grid reading
     // as a grid. A fixed height is the whole reason this is stated.
-    const at = rules.indexOf(".jjc-banner {");
+    const at = rules.indexOf(".ca-jjc-banner {");
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toMatch(/height:\s*\d+px/);
     expect(rule).not.toContain("aspect-ratio");
@@ -245,16 +245,16 @@ describe("the grid answers to the widget's width", () => {
     // Study declares a rating, its fourth cell's label wrapped to a second line,
     // and `align-items: start` let the card end there. So one label's length was
     // deciding a row's alignment.
-    const at = rules.indexOf(".jjc-grid {");
+    const at = rules.indexOf(".ca-jjc-grid {");
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain("align-items: stretch");
     // AND THE SLACK HAS SOMEWHERE TO GO, which is what makes `stretch` safe here
     // and would not make it safe on an arbitrary grid: the card is a column
     // flexbox and its BODY takes the growth, so a stretched card gains empty
     // space under its strip rather than stretching its banner or its head.
-    const card = rules.slice(rules.indexOf(".jjc-card {"));
+    const card = rules.slice(rules.indexOf(".ca-jjc-card {"));
     expect(card.slice(0, card.indexOf("}"))).toContain("flex-direction: column");
-    const body = rules.slice(rules.indexOf(".jjc-body {"));
+    const body = rules.slice(rules.indexOf(".ca-jjc-body {"));
     expect(body.slice(0, body.indexOf("}"))).toContain("flex: 1 1 auto");
   });
 
@@ -264,13 +264,13 @@ describe("the grid answers to the widget's width", () => {
     // selected day; `--text-accent` is #a68af9, what Obsidian paints an internal
     // link. This title opens the journal's folder note — it is a link — so the
     // card was the one place that gesture was pitched as a button.
-    const at = rules.indexOf(".jjc-title {");
+    const at = rules.indexOf(".ca-jjc-title {");
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain("color: var(--text-accent)");
     expect(rule).not.toContain("--interactive-accent");
     // THE PRECEDENT IS THE BREADCRUMB, and this assertion is here because the
     // first version of it named the journals-section titles instead and FAILED —
-    // `.jjs-group-name` is `--am-bar-ink` and `.jjs-row-link` is `--text-normal`.
+    // `.ca-jjs-group-name` is `--ca-bar-ink` and `.ca-jjs-row-link` is `--text-normal`.
     // The crumb pill is the plugin's other link to a container's folder note,
     // which is the same gesture rather than merely the same neighbourhood.
     //
@@ -280,7 +280,7 @@ describe("the grid answers to the widget's width", () => {
     // to `--text-accent !important` — so a slice from the first `{` reads the
     // loser. `cssRule` joins every rule with the selector, and the later one wins
     // the cascade because both carry `!important` and both are in one file.
-    expect(cssRule(".jsh-crumbs a.jn-pill")).toContain("var(--text-accent)");
+    expect(cssRule(".ca-jsh-crumbs a.ca-jn-pill")).toContain("var(--text-accent)");
   });
 
   it("is not swept into the unframed reset", () => {
@@ -289,13 +289,13 @@ describe("the grid answers to the widget's width", () => {
     // with its cards flattened is a list, not an unframed grid. Pinned because
     // the list is the one thing in §5's shape that has to be kept in step, and
     // the obvious next edit is to add every card class to it.
-    expect(rules).not.toContain(".journal-widget-block.is-unframed .jjc-card");
+    expect(rules).not.toContain(".ca-journal-widget-block.is-unframed .ca-jjc-card");
   });
 
   it("matches the border weight of the cards beside it", () => {
-    // `--am-rule` is 2px and is for a RULE — a divider between bands. A card's
-    // outline is 1px here, as `.journals-card` forty lines up already is.
-    const at = rules.indexOf(".jjc-card {");
+    // `--ca-rule` is 2px and is for a RULE — a divider between bands. A card's
+    // outline is 1px here, as `.ca-journals-card` forty lines up already is.
+    const at = rules.indexOf(".ca-jjc-card {");
     const rule = rules.slice(at, rules.indexOf("}", at));
     expect(rule).toContain("border: 1px solid");
   });
@@ -314,15 +314,15 @@ describe("the grid answers to the widget's width", () => {
 
 describe("a journal is a card that holds its own (4.41)", () => {
   it("is a box, not a rule between two bars", () => {
-    // WHAT THIS REPLACES: `.jjs-type + .jjs-type { border-top: 1px }`. The
+    // WHAT THIS REPLACES: `.ca-jjs-type + .ca-jjs-type { border-top: 1px }`. The
     // journal's name was a bare bar on the section's ground with its subject
     // cards loose beneath, so the only thing binding a journal to its cards was
     // the gap before the next title — the SAME gap that separates two cards
     // inside one journal.
-    const type = cssRule(".jjs-type");
+    const type = cssRule(".ca-jjs-type");
     expect(type).toContain("background: var(--background-secondary)");
     expect(type).toContain("border: 1px solid var(--background-modifier-border)");
-    expect(type).toContain("border-radius: var(--am-radius-md)");
+    expect(type).toContain("border-radius: var(--ca-radius-md)");
     // The head's tint is full-bleed, so the corners have to be the card's.
     expect(type).toContain("overflow: hidden");
   });
@@ -330,22 +330,22 @@ describe("a journal is a card that holds its own (4.41)", () => {
   it("separates the cards with air rather than a line", () => {
     // A list of BARS needs a rule to be read as separate sections; a list of
     // cards is separated by the gap between them, and a line as well is the
-    // boundary drawn twice — which is what `--am-border-inner` exists for.
+    // boundary drawn twice — which is what `--ca-border-inner` exists for.
     const css = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(css).not.toContain(".jjs-type + .jjs-type");
-    const list = cssRule(".jjs-list");
-    expect(list).toContain("gap: var(--am-widget-gap)");
+    expect(css).not.toContain(".ca-jjs-type + .ca-jjs-type");
+    const list = cssRule(".ca-jjs-list");
+    expect(list).toContain("gap: var(--ca-widget-gap)");
     // The same gap above the first card as between the rest, so it clears the
     // hero's own bottom edge by the amount the second clears the first.
-    expect(list).toContain("padding-top: var(--am-widget-gap)");
+    expect(list).toContain("padding-top: var(--ca-widget-gap)");
   });
 
   it("puts the journal's hue on the journal's own head", () => {
-    // `hueOf(type.id)` is set on `.jjs-type` by `buildType` and already tints
+    // `hueOf(type.id)` is set on `.ca-jjs-type` by `buildType` and already tints
     // every subject card's head one level down — which is why chem and maths
     // wear the same red: the hue is the JOURNAL's, said once per card and never
     // by the journal. This is the tint being drawn by the thing it identifies.
-    const head = cssRule(".jjs-type > .journal-sec");
+    const head = cssRule(".ca-jjs-type > .ca-journal-sec");
     expect(head).toContain("hsl(var(--jjc-hue, 260) 45% 42%)");
     expect(head).toContain("var(--background-secondary)");
   });
@@ -361,10 +361,10 @@ describe("a journal is a card that holds its own (4.41)", () => {
     // #4b2e2e and #472a2b, four units of red apart. The parent is drawn stronger
     // BECAUSE it is the parent.
     const outer = /(\d+)%,\s*\n?\s*var\(--background-secondary\)/.exec(
-      cssRule(".jjs-type > .journal-sec")
+      cssRule(".ca-jjs-type > .ca-journal-sec")
     );
     const inner = /(\d+)%,\s*\n?\s*var\(--background-primary-alt\)/.exec(
-      cssRule(".jjs-card > .journal-sec")
+      cssRule(".ca-jjs-card > .ca-journal-sec")
     );
     expect(outer?.[1], "the journal band states a mix percentage").toBeTruthy();
     expect(inner?.[1], "the card band states a mix percentage").toBeTruthy();
@@ -378,7 +378,7 @@ describe("a journal is a card that holds its own (4.41)", () => {
     // The body is `display: none` when folded, so the head's bottom border would
     // land one pixel inside the card's own — the doubled boundary again, in the
     // one state where it is guaranteed rather than possible.
-    expect(cssRule(".jjs-type.is-collapsed > .journal-sec")).toContain(
+    expect(cssRule(".ca-jjs-type.is-collapsed > .ca-journal-sec")).toContain(
       "border-bottom: none"
     );
   });
@@ -386,9 +386,9 @@ describe("a journal is a card that holds its own (4.41)", () => {
   it("indents the grid from the card's edge by a card body's own margin", () => {
     // So a subject card's rows and the grid that holds them are indented by the
     // same amount from their own edges.
-    const body = cssRule(".jjs-type-body");
+    const body = cssRule(".ca-jjs-type-body");
     expect(body).toContain("padding: 0 12px 8px");
-    expect(cssRule(".jjs-card-body")).toContain("padding: 2px 12px 0");
+    expect(cssRule(".ca-jjs-card-body")).toContain("padding: 2px 12px 0");
   });
 });
 
@@ -403,10 +403,10 @@ describe("a subject is a card", () => {
     // PANE — or the canvas node, or the row cell — which is what
     // `container-type: inline-size` makes askable and what 4.3.1 established a
     // breakpoint on the block cannot describe.
-    expect(code()).toContain('createDiv({ cls: "jjs-grid" })');
+    expect(code()).toContain('createDiv({ cls: "ca-jjs-grid" })');
     const css = readCss();
-    const at = css.indexOf("\n.jjs-grid {");
-    expect(at, "no .jjs-grid rule").toBeGreaterThan(0);
+    const at = css.indexOf("\n.ca-jjs-grid {");
+    expect(at, "no .ca-jjs-grid rule").toBeGreaterThan(0);
     const rule = css.slice(at, css.indexOf("}", at));
     expect(rule).toContain("auto-fill");
     expect(rule).toContain("minmax(");
@@ -416,13 +416,13 @@ describe("a subject is a card", () => {
   it("keeps the section frame for its head, and restates none of it", () => {
     // THE WHOLE REASON THIS IS CHEAP. The chosen mockup's head is a recessed
     // band with a glyph in a fixed slot and a name in small caps at
-    // `--am-bar-text` — which is what a level-2 `sectionFrame` bar has been
+    // `--ca-bar-text` — which is what a level-2 `sectionFrame` bar has been
     // since 4.13 §1. The card adds a ground and an edge; the title, its
     // truncation, its glyph slot and its link are the frame's.
     expect(code()).toContain("sectionFrame(card, {");
     expect(code()).toContain("level: 2");
     const css = readCss();
-    const at = css.indexOf("\n.jjs-card > .journal-sec {");
+    const at = css.indexOf("\n.ca-jjs-card > .ca-journal-sec {");
     expect(at, "no banded head rule").toBeGreaterThan(0);
     const head = css.slice(at, css.indexOf("}", at));
     // THE GROUND IS THE JOURNAL'S HUE AS OF 4.38, and it was
@@ -447,14 +447,14 @@ describe("a subject is a card", () => {
   });
 
   it("lets the name read in the bar's own ink rather than overriding it", () => {
-    // The link sat inside `.journal-header-title` overriding the INK to
+    // The link sat inside `.ca-journal-header-title` overriding the INK to
     // `--text-normal`, which is what made a subject read as bold text in a bar
     // instead of as the bar's title. Variant B is that override removed.
     const css = readCss();
-    const at = css.indexOf("\n.jjs-group-name {");
+    const at = css.indexOf("\n.ca-jjs-group-name {");
     expect(at).toBeGreaterThan(0);
     expect(css.slice(at, css.indexOf("}", at))).toContain(
-      "color: var(--am-bar-ink)"
+      "color: var(--ca-bar-ink)"
     );
   });
 
@@ -463,7 +463,7 @@ describe("a subject is a card", () => {
     // reads as deliberate only if the inner one is the quieter. The section card
     // is `--background-secondary`; these sit on the page's alt ground inside it.
     const css = readCss();
-    const at = css.indexOf("\n.jjs-card {");
+    const at = css.indexOf("\n.ca-jjs-card {");
     expect(at).toBeGreaterThan(0);
     const rule = css.slice(at, css.indexOf("}", at));
     expect(rule).toContain("background: var(--background-primary-alt)");
@@ -533,7 +533,7 @@ describe("a subject is a card", () => {
     // content box, so the body's 10px of bottom padding was a 10px window onto
     // whatever came next. A scroll container whose height is stated in rows cannot
     // have bottom padding: the padding IS a partial row.
-    const body = cssRule(".jjs-card-body");
+    const body = cssRule(".ca-jjs-card-body");
     expect(body).toContain("padding: 2px 12px 0");
     // The height counts the TOP padding only now. Pinned as the expression rather
     // than a number, so the four stays visible and a reader who scales their font
@@ -543,8 +543,8 @@ describe("a subject is a card", () => {
     // AND THE SPACE MOVED RATHER THAN VANISHED, to the place it always meant:
     // between the last row and the card's edge, outside the scroller. Both card
     // families, because both use this body.
-    expect(cssRule(".jjs-card")).toContain("padding-bottom: 10px");
-    expect(cssRule(".jld-card")).toContain("padding-bottom: 10px");
+    expect(cssRule(".ca-jjs-card")).toContain("padding-bottom: 10px");
+    expect(cssRule(".ca-jld-card")).toContain("padding-bottom: 10px");
   });
 
   it("states the height as four rows, and lets the body scroll", () => {
@@ -552,7 +552,7 @@ describe("a subject is a card", () => {
     // out in the rule rather than pre-multiplied, so the four is visible in the
     // place a reader would go looking for it.
     const css = readCss();
-    const at = css.indexOf("\n.jjs-card-body {");
+    const at = css.indexOf("\n.ca-jjs-card-body {");
     expect(at, "no card body rule").toBeGreaterThan(0);
     const body = css.slice(at, css.indexOf("}", at));
     expect(body).toContain("--jjs-rows: 4");
@@ -560,13 +560,13 @@ describe("a subject is a card", () => {
     expect(body).toContain("var(--jjs-row-h) * var(--jjs-rows)");
     expect(body).toContain("overflow-y: auto");
     // `border-box`, because Obsidian sets it per component rather than globally
-    // — the trap `.jjh-stat` already records — and the padding is inside the
+    // — the trap `.ca-jjh-stat` already records — and the padding is inside the
     // stated height.
     expect(body).toContain("box-sizing: border-box");
   });
 
   it("stops a row sizing or shrinking itself, which is what makes four countable", () => {
-    // Two halves of one thing. The row's height is STATED, on `.cal-week`'s
+    // Two halves of one thing. The row's height is STATED, on `.ca-cal-week`'s
     // precedent: a box whose height comes from its content cannot be counted.
     // And it does not shrink — the body is a flex column with a fixed height, so
     // without `flex: 0 0 auto` the rows would divide that height between them
@@ -575,7 +575,7 @@ describe("a subject is a card", () => {
     // explained in place, and one of those explanations contains the word this
     // rule must not declare.
     const css = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = css.indexOf("\n.jjs-card-row {");
+    const at = css.indexOf("\n.ca-jjs-card-row {");
     expect(at).toBeGreaterThan(0);
     const row = css.slice(at, css.indexOf("}", at));
     expect(row).toContain("height: var(--jjs-row-h)");
@@ -583,7 +583,7 @@ describe("a subject is a card", () => {
     expect(row).not.toContain("padding");
     // And a long name ellipses rather than wrapping, or it would push its own
     // row past the stated height and the count would stop being true.
-    const linkAt = css.indexOf(".jjs-card-row .jjs-row-link {");
+    const linkAt = css.indexOf(".ca-jjs-card-row .ca-jjs-row-link {");
     expect(linkAt, "no ellipsis rule").toBeGreaterThan(0);
     const link = css.slice(linkAt, css.indexOf("}", linkAt));
     expect(link).toContain("text-overflow: ellipsis");
@@ -632,7 +632,7 @@ describe("a subject is a card", () => {
     // AND THE TYPE'S EMPTY STATE PUTS ITS TILE IN A CARD, IN A GRID (4.38.4) —
     // the same grid the populated branch draws, with one cell in it, so the two
     // states are one arrangement rather than two.
-    expect(src).toContain('body\n        .createDiv({ cls: "jjs-grid" })');
+    expect(src).toContain('body\n        .createDiv({ cls: "ca-jjs-grid" })');
     expect(src).toContain("addCardTile(plugin, type, root, topLevel.noun)");
     expect(readSrc("tables")).toContain("export function addTile(");
     // AND WHERE THE TILE IS DRAWN, IT IS THE WHOLE EMPTY STATE (4.39.1). The
@@ -645,23 +645,23 @@ describe("a subject is a card", () => {
     // ASSERTED AS AN ORDERING, NOT AN ABSENCE, and deliberately: both strings are
     // still in this function, because the no-folder branch below still uses them.
     // A `not.toContain` would be asserting the opposite of the truth. What is
-    // actually claimed is that the tile branch RETURNS before any `.jjs-empty`
+    // actually claimed is that the tile branch RETURNS before any `.ca-jjs-empty`
     // exists.
     const branch = src.slice(
       src.indexOf("if (tops.length === 0) {"),
       src.indexOf("const grid = body.createDiv")
     );
     expect(branch).toMatch(
-      /if \(root\) \{\s*body\s*\.createDiv\(\{ cls: "jjs-grid" \}\)[\s\S]*?return section;\s*\}/
+      /if \(root\) \{\s*body\s*\.createDiv\(\{ cls: "ca-jjs-grid" \}\)[\s\S]*?return section;\s*\}/
     );
     expect(branch.indexOf("return section;")).toBeLessThan(
-      branch.indexOf('cls: "jjs-empty"')
+      branch.indexOf('cls: "ca-jjs-empty"')
     );
     // A REGISTERED JOURNAL WHOSE ROOT DOES NOT EXIST YET is the one state where
     // nothing is drawn unless the words draw it — `getFolder` returns null there,
     // and the tile's action needs the parent to work out which level it is
     // creating. So both lines survive, on the far side of that return.
-    const noFolder = branch.slice(branch.indexOf('cls: "jjs-empty"'));
+    const noFolder = branch.slice(branch.indexOf('cls: "ca-jjs-empty"'));
     expect(noFolder).toContain("appear here automatically.");
     // AND THE TITLE NAMES WHAT IS MISSING (4.38.4). It read "No study journals
     // yet" over a line reading "Subjects appear here automatically" — the two
@@ -671,7 +671,7 @@ describe("a subject is a card", () => {
     expect(src).not.toContain("splitGlyph(type.name)");
     // In a card the tile takes the whole stated body, so an empty card is the
     // height of the four-row cards beside it in the grid.
-    const fill = cssRule(".jjs-card-body > .jld-add-tile");
+    const fill = cssRule(".ca-jjs-card-body > .ca-jld-add-tile");
     expect(fill).toContain("flex: 1 1 auto");
     // And it may shrink below the 92px floor, because `--jjs-rows` is a variable and
     // a narrower body would otherwise clip the tile against its own overflow.
@@ -686,21 +686,21 @@ describe("a subject is a card", () => {
     // Both shapes of the offer read the same token, which is what stops them
     // being two decisions: the card is the dashed slot in a grid, and the tile is
     // the dashed slot inside a card that has content of its own.
-    expect(cssRule(".jjs-card-add")).toContain(
-      "border-color: var(--am-slot-edge)"
+    expect(cssRule(".ca-jjs-card-add")).toContain(
+      "border-color: var(--ca-slot-edge)"
     );
-    expect(cssRule(".jld-add")).toContain(
-      "border-color: var(--am-slot-edge) !important"
+    expect(cssRule(".ca-jld-add")).toContain(
+      "border-color: var(--ca-slot-edge) !important"
     );
     // A PLAIN VALUE, NOT A MIX. The one edge on the page drawn ONLY as an edge
-    // must not be able to fail the way `--am-border-inner` did — see the
+    // must not be able to fail the way `--ca-border-inner` did — see the
     // shorthand test below, which is the same release and the same fault.
-    const token = readCss().slice(readCss().indexOf("--am-slot-edge:"));
-    expect(token.slice(0, 80)).toMatch(/--am-slot-edge: rgba\(/);
+    const token = readCss().slice(readCss().indexOf("--ca-slot-edge:"));
+    expect(token.slice(0, 80)).toMatch(/--ca-slot-edge: rgba\(/);
     // AND IT RESOLVES PER THEME. A white hair over a near-white card is
     // invisible, so the light theme gets a dark one rather than the same value.
     expect(readCss()).toMatch(
-      /body\.theme-light \{[\s\S]*?--am-slot-edge: rgba\(0, 0, 0/
+      /body\.theme-light \{[\s\S]*?--ca-slot-edge: rgba\(0, 0, 0/
     );
   });
 
@@ -715,9 +715,9 @@ describe("a subject is a card", () => {
     // coincidence.
     //
     // **A `var()` that does not resolve invalidates the WHOLE shorthand**, not
-    // just the colour — width, style and colour all revert. So `.jjs-card` lost
-    // its border entirely wherever `--am-border-inner` failed, and the one place
-    // a style was stated separately (`.jjs-card-add`'s `dashed`) got the rope.
+    // just the colour — width, style and colour all revert. So `.ca-jjs-card` lost
+    // its border entirely wherever `--ca-border-inner` failed, and the one place
+    // a style was stated separately (`.ca-jjs-card-add`'s `dashed`) got the rope.
     //
     // In longhands the same failure costs the colour and nothing else. That is
     // the rule, and it is general: a token that is COMPUTED — a `color-mix`, a
@@ -726,11 +726,11 @@ describe("a subject is a card", () => {
     const css = readCss();
     const shorthands = [
       ...css.matchAll(/^\s*(border(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?):[^;]*;/gm),
-    ].filter((m) => m[0].includes("var(--am-border-inner)"));
+    ].filter((m) => m[0].includes("var(--ca-border-inner)"));
     expect(shorthands.map((m) => m[0].trim())).toEqual([]);
     // The colour is still asked for — this is a change of shape, not a retreat
     // to the plain border the token was introduced to replace.
-    expect(css).toContain("border-color: var(--am-border-inner)");
+    expect(css).toContain("border-color: var(--ca-border-inner)");
   });
 
   it("draws the card's own edge with a value that cannot fail (4.42)", () => {
@@ -738,20 +738,20 @@ describe("a subject is a card", () => {
     // (real, fixed, not the cause). 4.40.1 blamed `:root` and moved the mix to
     // `body` — right about the placement, and the next screenshot still measured
     // `#dadada` on chem, Maths and proj1, because the mix was reading
-    // `--am-surface-inset`, a `:root` alias broken the same way.
+    // `--ca-surface-inset`, a `:root` alias broken the same way.
     //
     // The general rule and its guard are in `tokens.test.ts`. What is checked
     // HERE is the thing the reader sees: the card's edge is a literal, so no
     // resolution can take it away.
-    const edge = cssRule(".jjs-card");
-    expect(edge).toContain("border-color: var(--am-border-inner)");
+    const edge = cssRule(".ca-jjs-card");
+    expect(edge).toContain("border-color: var(--ca-border-inner)");
     const css = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
     const root = css.slice(css.indexOf(":root {"), css.indexOf("\n}"));
-    expect(root).toMatch(/--am-border-inner: rgba\(/);
-    // AND THE PROOF A LITERAL WORKS IS ON THE SAME SCREENSHOT: `--am-slot-edge`
+    expect(root).toMatch(/--ca-border-inner: rgba\(/);
+    // AND THE PROOF A LITERAL WORKS IS ON THE SAME SCREENSHOT: `--ca-slot-edge`
     // measured #333333 over #232323, exactly its arithmetic, in the same render
     // where this token was still white.
-    expect(root).toMatch(/--am-slot-edge: rgba\(/);
+    expect(root).toMatch(/--ca-slot-edge: rgba\(/);
   });
 
   it("does not offer the same create twice per journal (4.38.1)", () => {
@@ -782,7 +782,7 @@ describe("a subject is a card", () => {
     // only when the journal's root folder exists; without this guard a registered
     // journal whose folder was never made would have no create path at all.
     expect(src).toContain("if (root) grid.appendChild(addCardTile(");
-    // Nothing drawn where there is nothing to draw — an empty `.jjs-actions` div
+    // Nothing drawn where there is nothing to draw — an empty `.ca-jjs-actions` div
     // inside the widgets bar defeats the `:empty` rule that hides an unused slot.
     expect(src).toContain("if (specs.length > 0) addButtons(frame.actions, specs);");
   });
@@ -800,16 +800,16 @@ describe("a subject is a card", () => {
     // wandered into the grid. Wrapped, it wears the same ground, border and radius
     // its neighbours have — which is what an EMPTY subject card already looks like
     // one column over, since `buildGroup` puts the same tile in its body.
-    expect(build).toContain('cls: "jjs-card jjs-card-add"');
-    expect(build).toContain('cls: "jjs-card-body"');
+    expect(build).toContain('cls: "ca-jjs-card ca-jjs-card-add"');
+    expect(build).toContain('cls: "ca-jjs-card-body"');
     expect(build).toContain("addTile(plugin, type, parent, noun)");
     // NO STATED HEIGHT ON ITS BODY. Four rows exists to make a LIST countable and
     // this body holds one control; it fills instead, so the card takes its height
     // from the row and MATCHES rather than merely resembling.
-    const add = cssRule(".jjs-card-add > .jjs-card-body");
+    const add = cssRule(".ca-jjs-card-add > .ca-jjs-card-body");
     expect(add).toContain("height: auto");
     expect(add).toContain("flex: 1 1 auto");
-    // AND A `div` IS WHAT MADE THE HEIGHT POSSIBLE. `.jjs-grid` has been
+    // AND A `div` IS WHAT MADE THE HEIGHT POSSIBLE. `.ca-jjs-grid` has been
     // `align-items: stretch` since 4.38.1 and the tile still did not stretch:
     // Obsidian gives form controls a definite height, and `align-self: stretch` is
     // ignored on any item whose height is not `auto`, so a `<button>` sat at its
@@ -824,7 +824,7 @@ describe("a subject is a card", () => {
     // `dev-screenshots/20260818_17h32m11s_grim.png`, the tile's interior is
     // #333333 with a solid #3c3c3c edge — pixel for pixel what the Refresh button
     // beside it renders, which is a button that is MEANT to look like one. A theme
-    // painting `<button>` is (0,1,1) and a bare `.jld-add` is (0,1,0), so the
+    // painting `<button>` is (0,1,1) and a bare `.ca-jld-add` is (0,1,0), so the
     // dashed-edge/no-ground vocabulary was silently not drawing.
     //
     // Nothing in the stylesheet could have caught this: the rule was present and
@@ -840,7 +840,7 @@ describe("a subject is a card", () => {
     // records from 4.39.0: *a test that pins the workaround blocks the fix.*
     // What must hold is that every property carrying the vocabulary is defended
     // — however it is spelled.
-    const add = cssRule(".jld-add");
+    const add = cssRule(".ca-jld-add");
     const declaring = (prop: string): string | undefined => {
       // Either the longhand or the shorthand that governs it — the guarantee is
       // about the property, and which spelling states it is the author's choice.
@@ -851,36 +851,36 @@ describe("a subject is a card", () => {
     };
     for (const prop of ["border-style", "border-color", "background", "box-shadow"]) {
       const line = declaring(prop);
-      expect(line, `no ${prop} on .jld-add`).toBeTruthy();
+      expect(line, `no ${prop} on .ca-jld-add`).toBeTruthy();
       expect(line, `${prop} is undefended`).toContain("!important");
     }
     // AND THE HOVER SHOUTS AS LOUD, or the base rule wins against it — an
     // `!important` declaration is only beaten by another one.
-    const hover = cssRule(".jld-add:hover");
+    const hover = cssRule(".ca-jld-add:hover");
     expect(hover).toContain("border-color: var(--interactive-accent) !important");
     expect(hover).toContain("background: var(--background-modifier-hover) !important");
   });
 
   it("draws one boundary round an empty card, not two (4.39.1)", () => {
     // With the tile's dash restored, an add card drew the card's solid border AND
-    // the tile's dashed one 13px inside it — the over-drawing `--am-border-inner`
+    // the tile's dashed one 13px inside it — the over-drawing `--ca-border-inner`
     // exists to stop. This card has no head and no content, so the CARD is the
     // empty slot: it takes the dash and the tile becomes the label in it.
-    expect(cssRule(".jjs-card-add")).toContain("border-style: dashed");
-    const inner = cssRule(".jjs-card-add .jld-add-tile");
+    expect(cssRule(".ca-jjs-card-add")).toContain("border-style: dashed");
+    const inner = cssRule(".ca-jjs-card-add .ca-jld-add-tile");
     expect(inner).toContain("border: none !important");
     expect(inner).toContain("background: transparent !important");
     // A tile inside a REAL subject card keeps its dash — there the card is a named
     // object with a head and the dashed box marks the empty part of it.
-    expect(cssRule(".jjs-card-body > .jld-add-tile")).not.toContain("border: none");
+    expect(cssRule(".ca-jjs-card-body > .ca-jld-add-tile")).not.toContain("border: none");
   });
 
   it("does not collapse to a pill when it is the only thing there (4.39.1)", () => {
-    // `.jjs-card-body > .jld-add-tile` zeroes the tile's 92px floor so it can
+    // `.ca-jjs-card-body > .ca-jld-add-tile` zeroes the tile's 92px floor so it can
     // shrink inside a body whose height is STATED. Right there, wrong in an add
     // card, where the body has no stated height and the grid has nothing to
     // stretch against: a journal with no containers rendered a 29px pill.
-    expect(cssRule(".jjs-grid > .jjs-card-add:only-child .jld-add-tile")).toContain(
+    expect(cssRule(".ca-jjs-grid > .ca-jjs-card-add:only-child .ca-jld-add-tile")).toContain(
       "min-height: 64px"
     );
     // `:only-child` IS THE WHOLE CONDITION. With cards beside it the row's height
@@ -889,9 +889,9 @@ describe("a subject is a card", () => {
     //
     // 64px AND NOT 92px SINCE 4.42, because the shape changed with it: alone in
     // the grid the card is the full width of the section now, and 92px of dashed
-    // box across a 700px pane is the "large empty box" `.jld-grid.is-paired`
+    // box across a 700px pane is the "large empty box" `.ca-jld-grid.is-paired`
     // named when it made the same trade. Its number, reused rather than picked.
-    expect(cssRule(".jld-grid.is-paired .jld-add-tile")).toContain("min-height: 64px");
+    expect(cssRule(".ca-jld-grid.is-paired .ca-jld-add-tile")).toContain("min-height: 64px");
   });
 
   it("does not repeat its own label in a tooltip (4.42)", () => {
@@ -908,8 +908,8 @@ describe("a subject is a card", () => {
     expect(addTile).not.toContain("title: label");
     // The visible label is what carries it, and nothing hides that label at any
     // width — which is the condition under which dropping the tooltip is safe.
-    expect(addTile).toContain('cls: "jld-add-label", text: label');
-    expect(readCss()).not.toContain(".jld-add-label");
+    expect(addTile).toContain('cls: "ca-jld-add-label", text: label');
+    expect(readCss()).not.toContain(".ca-jld-add-label");
     // The homepage's "New journal" tile is the same shape and lost the same
     // duplicate.
     expect(readCode("journals-cards")).not.toContain("title: label");
@@ -922,11 +922,11 @@ describe("a subject is a card", () => {
     // tooltip is the only text there is.
     const tiles = readCode("tables");
     const head = tiles.slice(
-      tiles.indexOf('cls: "journal-btn-ghost jld-head-add"') - 400,
-      tiles.indexOf('cls: "journal-btn-ghost jld-head-add"') + 400
+      tiles.indexOf('cls: "ca-journal-btn-ghost ca-jld-head-add"') - 400,
+      tiles.indexOf('cls: "ca-journal-btn-ghost ca-jld-head-add"') + 400
     );
     expect(head).toContain("title: label");
-    expect(head).toContain('cls: "journal-btn-label", text: noun');
+    expect(head).toContain('cls: "ca-journal-btn-label", text: noun');
   });
 
   it("fills the row when it is the only thing on it (4.42.1)", () => {
@@ -946,47 +946,47 @@ describe("a subject is a card", () => {
     // (`grid-column: auto / -1`) rather than what the declaration had to achieve,
     // so it could only ever have confirmed that the wrong value was still there.
     // What is asserted now is the two cases, by selector.
-    const alone = cssRule(".jjs-grid > .jjs-card-add:only-child");
+    const alone = cssRule(".ca-jjs-grid > .ca-jjs-card-add:only-child");
     expect(alone).toContain("grid-column: 1 / -1");
     // BESIDE CARDS, NOTHING AT ALL — ordinary auto-placement already fills the
     // next free track, which is the whole of what the broken rule was reaching
     // for and was true before 4.42 touched it.
     const css = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
     expect(css).not.toContain("grid-column: auto / -1");
-    expect(cssRules(".jjs-grid > .jjs-card-add").join("\n")).not.toContain(
+    expect(cssRules(".ca-jjs-grid > .ca-jjs-card-add").join("\n")).not.toContain(
       "grid-column"
     );
   });
 
   it("ends the subject grid's row on one line, tile included (4.38.1)", () => {
-    // `.jjc-grid` was corrected to `stretch` in 4.38 and THIS grid was missed, so
+    // `.ca-jjc-grid` was corrected to `stretch` in 4.38 and THIS grid was missed, so
     // the render showed a 163px card, a 163px card and a 90px tile on one row —
     // the tile falling back to its `min-height` and reading as a small button
-    // rather than as an empty slot. `.jld-add-tile`'s own `align-self: stretch`
+    // rather than as an empty slot. `.ca-jld-add-tile`'s own `align-self: stretch`
     // did not carry it, so the container is what states it.
-    expect(cssRule(".jjs-grid")).toContain("align-items: stretch");
-    expect(cssRule(".jld-add-tile")).toContain("align-self: stretch");
-    // `.jld-grid` KEEPS `start`, and that is not an oversight: its tile spans the
+    expect(cssRule(".ca-jjs-grid")).toContain("align-items: stretch");
+    expect(cssRule(".ca-jld-add-tile")).toContain("align-self: stretch");
+    // `.ca-jld-grid` KEEPS `start`, and that is not an oversight: its tile spans the
     // full row and sits alone on it, so there is nothing beside it to match and
     // stretching would make it as tall as a whole card pair.
-    expect(cssRule(".jld-grid")).toContain("align-items: start");
+    expect(cssRule(".ca-jld-grid")).toContain("align-items: start");
   });
 
   it("lets the tile glyph size actually reach the glyph (4.38.1)", () => {
-    // 4.38 wrote `.jld-add-icon { --jld-add-glyph: 20px; width: … }` and the ＋ did
-    // not change, because `.jld-add .svg-icon` was already sizing the SVG to a flat
-    // 15px — two classes against `.jld-add-icon svg`'s one class and one element,
+    // 4.38 wrote `.ca-jld-add-icon { --jld-add-glyph: 20px; width: … }` and the ＋ did
+    // not change, because `.ca-jld-add .svg-icon` was already sizing the SVG to a flat
+    // 15px — two classes against `.ca-jld-add-icon svg`'s one class and one element,
     // so the older rule outranked the newer one. The 4.38 test asked whether the
     // new rule said 20px, not whether anything else outranked it; the render is
     // what caught it.
     //
     // Both rules read the same custom property now, so they are one decision
     // rather than two numbers to keep in step. The property is declared on
-    // `.jld-add-icon`, which is the svg's parent, so it inherits down.
-    const shared = cssRule(".jld-add .svg-icon");
+    // `.ca-jld-add-icon`, which is the svg's parent, so it inherits down.
+    const shared = cssRule(".ca-jld-add .svg-icon");
     expect(shared).toContain("var(--jld-add-glyph");
     expect(shared).not.toMatch(/width:\s*15px/);
-    expect(cssRule(".jld-add-icon")).toContain("--jld-add-glyph: 20px");
+    expect(cssRule(".ca-jld-add-icon")).toContain("--jld-add-glyph: 20px");
   });
 
   it("folds the journal and no longer folds the subject", () => {
@@ -1004,7 +1004,7 @@ describe("a subject is a card", () => {
     // more than the assertion's convenience.
     const css = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
     expect(css).not.toContain(".jjs-group.is-collapsed");
-    expect(css).toContain(".jjs-type.is-collapsed");
+    expect(css).toContain(".ca-jjs-type.is-collapsed");
   });
 
   it("counts nothing on either bar, and countLabel is gone with its last caller", () => {
@@ -1027,17 +1027,17 @@ describe("a subject is a card", () => {
   });
 
   it("leaves the search result row alone, which shares the class name", () => {
-    // `.jjs-row` is built by TWO modules for two unrelated objects, and only the
+    // `.ca-jjs-row` is built by TWO modules for two unrelated objects, and only the
     // topic row's rules were the journals card's to delete. This is the
     // substring trap this project keeps writing down, in class-name form.
-    expect(readSrc("journal-search")).toContain('cls: "jjs-row"');
-    expect(readCss()).toContain(".jjs-row {");
+    expect(readSrc("journal-search")).toContain('cls: "ca-jjs-row"');
+    expect(readCss()).toContain(".ca-jjs-row {");
     // Comments stripped — the paragraphs that replaced those rules name them.
     const css = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
     expect(css).not.toContain(".jjs-row-name");
     // What stayed: the link, which a card's line still wears — drawn from
     // `tables.ts` since 4.36, along with the rest of the row.
-    expect(readSrc("tables")).toContain('"jjs-row-link"');
+    expect(readSrc("tables")).toContain('"ca-jjs-row-link"');
   });
 });
 
@@ -1052,16 +1052,16 @@ describe("the journals banner is the last band to lose its wash", () => {
   };
 
   it("paints no accent under the band, on either surface it is drawn", () => {
-    // `.jjs-hero` is the band inside the card; `.jjh-root` is the same widget
+    // `.ca-jjs-hero` is the band inside the card; `.ca-jjh-root` is the same widget
     // rendered bare by the `journals-header` directive. They washed at the same
     // 0.07 and must stop together, or the standalone one becomes the last tinted
     // object in the plugin by omission.
-    for (const sel of [".jjs-hero", ".jjh-root"]) {
+    for (const sel of [".ca-jjs-hero", ".ca-jjh-root"]) {
       expect(body(sel), sel).not.toContain("--interactive-accent-rgb");
     }
     // The hairline that divides the band from the list stays: with no fill it is
     // the only thing left saying where the band ends.
-    expect(body(".jjs-hero")).toContain("border-bottom: 1px solid");
+    expect(body(".ca-jjs-hero")).toContain("border-bottom: 1px solid");
   });
 
   it("names the period and not the roster (4.38.4)", () => {
@@ -1074,7 +1074,7 @@ describe("the journals banner is the last band to lose its wash", () => {
     // in it by definition. The PERIOD is what narrows it, and nothing else on the
     // page says it.
     const src = readSrc("journals-header");
-    expect(src).toContain('cls: "jjh-eyebrow", text: "Last 12 months"');
+    expect(src).toContain('cls: "ca-jjh-eyebrow", text: "Last 12 months"');
     expect(src).not.toContain("typeNames");
     // `types` IS STILL THE SCOPE it always was — the band's numbers read it, and a
     // reader's own `journals-header:study` still covers one journal. Only the
@@ -1092,14 +1092,14 @@ describe("the journals banner is the last band to lose its wash", () => {
     // `dev-screenshots/20260817_13h45m10s_grim.png` shows it; the wider dashboard
     // shot does not, because there the strip fits and never scrolls.
     const src = readSrc("journals-header");
-    expect(src).toContain('const legend = root.createDiv({ cls: "jjh-legend" })');
-    expect(src).not.toContain('stripWrap.createDiv({ cls: "jjh-legend" })');
+    expect(src).toContain('const legend = root.createDiv({ cls: "ca-jjh-legend" })');
+    expect(src).not.toContain('stripWrap.createDiv({ cls: "ca-jjh-legend" })');
     // AND THE SCROLL ITSELF IS UNTOUCHED, which is the half that must not be
     // "fixed" along with it: 3.12 §14.5's argument is that a year read from the
     // wrong end is worse than a year that scrolls, and the strip is deliberately
     // scrollable rather than shrunk. A legend simply is not part of the year.
     expect(src).toContain("stripWrap.scrollLeft = stripWrap.scrollWidth;");
-    expect(cssRule(".jjh-strip-wrap")).toContain("overflow-x: auto");
+    expect(cssRule(".ca-jjh-strip-wrap")).toContain("overflow-x: auto");
   });
 
   it("puts a journal's create controls on its title line (4.38)", () => {
@@ -1108,7 +1108,7 @@ describe("the journals banner is the last band to lose its wash", () => {
     // controls fit on the line, not a reversal of the measured decision about
     // controls under a hairline. It bought back ~34px per journal on a band whose
     // right half was empty.
-    const row = cssRule(".jjs-type > .journal-sec > .journal-header-widgets.journal-widget-bar");
+    const row = cssRule(".ca-jjs-type > .ca-journal-sec > .ca-journal-header-widgets.ca-journal-widget-bar");
     expect(row).toContain("flex: 0 0 auto");
     expect(row).toContain("margin-left: auto");
     expect(row).toContain("border-top: none");
@@ -1116,25 +1116,25 @@ describe("the journals banner is the last band to lose its wash", () => {
     // rather than through `cssRule`, because that selector is written across two
     // lines in the source and the helper compares a selector string exactly.
     const css = readCss();
-    const baseAt = css.indexOf(".journal-sec-l1:not(.journal-header-bar-untitled)");
+    const baseAt = css.indexOf(".ca-journal-sec-l1:not(.ca-journal-header-bar-untitled)");
     expect(baseAt, "the level-1 strip rule was renamed").toBeGreaterThan(0);
     expect(css.slice(baseAt, css.indexOf("}", baseAt))).toContain("flex: 1 0 100%");
     // SPECIFICITY IS A TIE AND FILENAME ORDER BREAKS IT — four class selectors
     // each — so the override only works because `build-css` concatenates in sorted
     // order and 30 precedes 60. Asserted because a rename would flip it silently.
-    expect(css.indexOf(".journal-sec-l1:not(.journal-header-bar-untitled)")).toBeLessThan(
-      css.indexOf(".jjs-type > .journal-sec > .journal-header-widgets")
+    expect(css.indexOf(".ca-journal-sec-l1:not(.ca-journal-header-bar-untitled)")).toBeLessThan(
+      css.indexOf(".ca-jjs-type > .ca-journal-sec > .ca-journal-header-widgets")
     );
   });
 
   it("ends both card grids in the slot for the next card, and narrows neither (4.38)", () => {
-    // TWO GRIDS, ONE MEASURED COMPLAINT: `.jjs-grid` drew two 334px tracks for one
-    // subject and `.jjc-grid` four tracks for two journals, so both ran about half
+    // TWO GRIDS, ONE MEASURED COMPLAINT: `.ca-jjs-grid` drew two 334px tracks for one
+    // subject and `.ca-jjc-grid` four tracks for two journals, so both ran about half
     // empty. The obvious fix was a smaller track minimum and it is the wrong one —
     // `auto-fill` had ALREADY made more tracks than there were cards, so a smaller
     // minimum makes more empty tracks. The gap is a count.
-    expect(cssRule(".jjs-grid")).toContain("minmax(260px, 1fr)");
-    expect(cssRule(".jjc-grid")).toContain("minmax(240px, 1fr)");
+    expect(cssRule(".ca-jjs-grid")).toContain("minmax(260px, 1fr)");
+    expect(cssRule(".ca-jjc-grid")).toContain("minmax(240px, 1fr)");
     // The subject grid takes the shared tile, whose action is a folder — wrapped
     // in a card since 4.38.4 so it matches the cards beside it.
     expect(readSrc("journals-section")).toContain(
@@ -1146,7 +1146,7 @@ describe("the journals banner is the last band to lose its wash", () => {
     // this one goes where journals are actually made — the same destination the
     // empty state beside it already names in words.
     const cards = readSrc("journals-cards");
-    expect(cards).toContain('cls: "jld-add jld-add-tile jjc-add"');
+    expect(cards).toContain('cls: "ca-jld-add ca-jld-add-tile ca-jjc-add"');
     expect(cards).toContain("plugin.openJournalSettings();");
     expect(cards).not.toContain("addTile(");
     // The click is swallowed, or the section's head folds and the cards open notes
@@ -1158,12 +1158,12 @@ describe("the journals banner is the last band to lose its wash", () => {
     // A bordered, rounded, filled rectangle with four internally ruled cells is
     // a card inside a card — the argument `.jdh-stats` made in 2.51.2 before it
     // was deleted, applied to the twin that outlived it.
-    const stats = body(".jjh-stats");
+    const stats = body(".ca-jjh-stats");
     expect(stats).not.toContain("border: 1px solid");
     expect(stats).not.toContain("background:");
     expect(stats).toContain("border-top: 1px solid");
     // And the rules between the cells went with the box.
-    expect(readCss()).not.toContain(".jjh-stat + .jjh-stat");
+    expect(readCss()).not.toContain(".ca-jjh-stat + .ca-jjh-stat");
   });
 });
 
@@ -1195,14 +1195,14 @@ describe("the activity strip is sized by its container", () => {
     // With the columns free to grow, a fixed row height makes every cell a
     // landscape rectangle: a year of days has to stay a grid of squares.
     const css = readCss();
-    const at = css.indexOf("\n.jjh-strip {");
+    const at = css.indexOf("\n.ca-jjh-strip {");
     expect(at).toBeGreaterThan(0);
     const strip = css.slice(at, css.indexOf("}", at));
     expect(strip).toContain("grid-template-rows: repeat(7, auto)");
     // `max-content` was what stopped the fractions resolving: a fraction needs a
     // definite width to be a fraction OF.
     expect(strip).not.toContain("width: max-content");
-    const cellAt = css.indexOf("\n.jjh-strip .jjh-cell {");
+    const cellAt = css.indexOf("\n.ca-jjh-strip .ca-jjh-cell {");
     expect(cellAt, "no scoped cell rule").toBeGreaterThan(0);
     expect(css.slice(cellAt, css.indexOf("}", cellAt))).toContain(
       "aspect-ratio: 1"
@@ -1210,17 +1210,17 @@ describe("the activity strip is sized by its container", () => {
   });
 
   it("leaves the legend swatches at a fixed size", () => {
-    // `.jjh-cell` is also five swatches under the strip, in a flex row with
+    // `.ca-jjh-cell` is also five swatches under the strip, in a flex row with
     // nothing to stretch to. A legend swatch is a KEY to the sizes in the grid
     // rather than one of them, which is why the fluid rule is scoped and the
     // bare one still states both dimensions.
     const css = readCss();
-    const at = css.indexOf("\n.jjh-cell {");
+    const at = css.indexOf("\n.ca-jjh-cell {");
     expect(at).toBeGreaterThan(0);
     const bare = css.slice(at, css.indexOf("}", at));
     expect(bare).toContain("width: var(--jjh-cell)");
     expect(bare).toContain("height: var(--jjh-cell)");
-    expect(readSrc("journals-header")).toContain('cls: "jjh-cell is-empty"');
+    expect(readSrc("journals-header")).toContain('cls: "ca-jjh-cell is-empty"');
   });
 });
 
@@ -1241,7 +1241,7 @@ describe("a card row names its columns (4.35.2)", () => {
   });
 
   it("labels the open-tasks cell, and rewrites it when the count lands", () => {
-    // The cell ships a placeholder because Almanac tasks live in note bodies
+    // The cell ships a placeholder because ChronoAnvil tasks live in note bodies
     // and are invisible to the metadata cache. A label written once would
     // describe the placeholder forever.
     expect(src()).toContain('openCell.setAttr("title", "Open tasks")');
@@ -1525,16 +1525,16 @@ describe("a journal's card carries its numbers", () => {
   });
 
   it("collapses its strip against the card, not the pane", () => {
-    // 4.36.3's fix on `.jld-card`, which was 4.3.1's lesson one level down,
+    // 4.36.3's fix on `.ca-jld-card`, which was 4.3.1's lesson one level down,
     // applied to the family with the identical problem: a card in a 240px track
     // would otherwise hold four cells at ~54px each, because the shared rule
     // measures the nearest container and the nearest one was the whole section.
-    expect(cssRule(".jjc-card")).toContain("container-type: inline-size");
-    // Quieter than a strip on a page, for the reason `.jld-card-body` states —
+    expect(cssRule(".ca-jjc-card")).toContain("container-type: inline-size");
+    // Quieter than a strip on a page, for the reason `.ca-jld-card-body` states —
     // and the dividers come off, because four hairline-boxed cells directly under
     // a saturated banner is a table bolted to a photograph.
-    expect(cssRule(".jjc-stats .am-stats")).toContain("background: transparent");
-    expect(cssRule(".jjc-stats .am-stat")).toContain("background: transparent");
+    expect(cssRule(".ca-jjc-stats .ca-stats")).toContain("background: transparent");
+    expect(cssRule(".ca-jjc-stats .ca-stat")).toContain("background: transparent");
   });
 
   it("drops the subtitle the count used to live in", () => {

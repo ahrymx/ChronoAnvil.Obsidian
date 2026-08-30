@@ -13,9 +13,9 @@
 // and every journal note. Three places in widgets.ts built that bar, and all
 // three built it the same way:
 //
-//   const bar = container.createDiv({ cls: `journal-header-bar …l${level}` });
-//   bar.createDiv({ cls: "journal-header-title", text: title });
-//   const group = bar.createDiv({ cls: "journal-widget-bar …-widgets" });
+//   const bar = container.createDiv({ cls: `ca-journal-header-bar …l${level}` });
+//   bar.createDiv({ cls: "ca-journal-header-title", text: title });
+//   const group = bar.createDiv({ cls: "ca-journal-widget-bar …-widgets" });
 //   ctx.addChild(new HeaderBar(plugin, bar, el, ctx.sourcePath, title, level));
 //
 // Four lines, character for character, three times in one file — and that is
@@ -40,7 +40,7 @@
 // A `header:` bar owns the SIBLING BLOCKS after it. Obsidian renders each
 // markdown block as a separate element, so such a section cannot contain its
 // body in the DOM — visibility is derived by walking the note's siblings, and
-// `HeaderBar` does that by finding every `.journal-header-bar` in a block.
+// `HeaderBar` does that by finding every `.ca-journal-header-bar` in a block.
 // (Only while the fence gave it no body of its own — see 4.57.1 in
 // `headerbar.ts`. The two ownership models below are unaffected: this is about
 // where a blocks-owning bar's scope stops, not about which kind it is.)
@@ -53,18 +53,18 @@
 // So they are one widget with two scopes, and nobody had named the difference —
 // which is exactly why three files each solved it privately. It also makes the
 // naive conversion actively harmful: give an inner section the
-// `.journal-header-bar` class and the fold walk finds it as a descendant,
+// `.ca-journal-header-bar` class and the fold walk finds it as a descendant,
 // reads the BLOCK's level off it, and the enclosing dashboard folds wrong.
 //
 // Hence `owns`. Both variants share every visual class, so they look identical
-// and are styled once. Only the blocks variant carries `.journal-header-bar`,
+// and are styled once. Only the blocks variant carries `.ca-journal-header-bar`,
 // which is now purely the fold walk's marker rather than a look.
 //
 // WHAT THIS IS NOT
 //
 // It is not a new element shape. It emits the same classes the bar has always
 // emitted, because `HeaderBar` finds bars with `querySelectorAll(
-// ".journal-header-bar")`, reads their level off `journal-header-l1|2`, and
+// ".ca-journal-header-bar")`, reads their level off `journal-header-l1|2`, and
 // computes fold scope over the result — logic with fifteen tests behind it
 // that has nothing to do with how a section looks. Reparenting without
 // renaming means the fold walk, its tests, and every CSS rule keep working,
@@ -84,7 +84,7 @@ import { Menu, setIcon } from "obsidian";
 //
 // The glyph stays an emoji. 2.55.4 declined converting `JournalSection.icon`
 // to a Lucide id and that decision stands for the reason it gave:
-// `.almanac-list-token` is an emoji slot everywhere else in the plugin, and
+// `.ca-list-token` is an emoji slot everywhere else in the plugin, and
 // the reader chose these.
 // The overflow control: a `⋯` that builds its menu when clicked.
 //
@@ -119,7 +119,7 @@ export function overflowButton(
 }
 
 // The control a BANNER carries: same glyph, same label, same menu position, on
-// every Almanac page. 4.20.
+// every ChronoAnvil page. 4.20.
 //
 // ── WHY THIS IS ONE FUNCTION AND NOT THREE COPIES OF THREE LINES ──────
 //
@@ -131,7 +131,7 @@ export function overflowButton(
 // else — so a reader who learned the cog on a dashboard had to learn the ⋯
 // separately on the two surfaces they spend the most time in.
 //
-// 4.20 settles that every Almanac page has a banner and that a banner is the
+// 4.20 settles that every ChronoAnvil page has a banner and that a banner is the
 // file's name, its navigation, and this. One meaning, one glyph.
 //
 // IT WRAPS `overflowButton` RATHER THAN REPLACING IT, because the ⋯ is still
@@ -196,7 +196,7 @@ export interface SectionFrameOptions {
   // and this needed a capability, which is a thing to argue for once rather
   // than invent halfway through a patch.
   //
-  // The slot is still `.journal-header-title`, so the type, the truncation and
+  // The slot is still `.ca-journal-header-title`, so the type, the truncation and
   // the alignment are the frame's; only what goes inside it is the caller's.
   titleRender?: (slot: HTMLElement) => void;
   // A short muted phrase after the title: "2 of 5 met", "12 of 30 days".
@@ -214,7 +214,7 @@ export interface SectionFrameOptions {
 }
 
 export interface SectionFrame {
-  // `.journal-header-bar` — what HeaderBar folds and what the fold walk finds.
+  // `.ca-journal-header-bar` — what HeaderBar folds and what the fold walk finds.
   root: HTMLElement;
   // Where the section's actions go: at most one accented button, then icons,
   // then the overflow. The rule is not enforced by this type yet — the
@@ -233,24 +233,24 @@ export function sectionFrame(
   host: HTMLElement,
   opts: SectionFrameOptions
 ): SectionFrame {
-  // `journal-sec` is the LOOK; `journal-header-bar` is the fold walk's marker.
-  // Splitting them is what lets an inner section be styled identically without
-  // being mistaken for a block-owning bar by HeaderBar.recompute().
+  // `ca-journal-sec` is the LOOK; `ca-journal-header-bar` is the fold walk's
+  // marker. Splitting them is what lets an inner section be styled identically
+  // without being mistaken for a block-owning bar by HeaderBar.recompute().
   const owns = opts.owns ?? "blocks";
   const marker =
     owns === "blocks"
-      ? ` journal-header-bar journal-header-l${opts.level}`
+      ? ` ca-journal-header-bar ca-journal-header-l${opts.level}`
       : "";
   const root = host.createDiv({
-    cls: `journal-sec journal-sec-l${opts.level}${marker}`,
+    cls: `ca-journal-sec ca-journal-sec-l${opts.level}${marker}`,
   });
 
   if (opts.untitled) {
-    root.addClass("journal-header-bar-untitled");
+    root.addClass("ca-journal-header-bar-untitled");
     return {
       root,
       actions: root.createDiv({
-        cls: "journal-widget-bar journal-header-widgets",
+        cls: "ca-journal-widget-bar ca-journal-header-widgets",
       }),
     };
   }
@@ -264,32 +264,32 @@ export function sectionFrame(
   // an empty 16px box in front of every untitled-glyph section would align the
   // titles by indenting all of them, which is a worse trade than ragged.
   if (glyph) {
-    root.createSpan({ cls: "journal-header-glyph", text: glyph });
+    root.createSpan({ cls: "ca-journal-header-glyph", text: glyph });
   }
 
-  // `.journal-header-title` keeps its class and keeps carrying the full title
+  // `.ca-journal-header-title` keeps its class and keeps carrying the full title
   // in its text content where there is no glyph, so nothing that reads the bar
   // back — the fold key is built from the directive's title, not from the
   // DOM — sees a different string than it did.
-  const titleSlot = root.createDiv({ cls: "journal-header-title" });
+  const titleSlot = root.createDiv({ cls: "ca-journal-header-title" });
   if (opts.titleRender) opts.titleRender(titleSlot);
   else titleSlot.setText(text);
 
   if (opts.count != null) {
     root.createSpan({
-      cls: "journal-header-count",
+      cls: "ca-journal-header-count",
       text: String(opts.count),
     });
   }
 
   if (opts.note) {
-    root.createSpan({ cls: "journal-header-note", text: opts.note });
+    root.createSpan({ cls: "ca-journal-header-note", text: opts.note });
   }
 
   return {
     root,
     actions: root.createDiv({
-      cls: "journal-widget-bar journal-header-widgets",
+      cls: "ca-journal-widget-bar ca-journal-header-widgets",
     }),
   };
 }
@@ -314,7 +314,7 @@ export function sectionFrame(
 // a fourth private copy inside the widget dispatcher.
 //
 // WHY IT IS NOT `HeaderBar`. That class folds SIBLING BLOCKS by walking the
-// note, and carries `.journal-header-bar` so the walk can find it. An inner
+// note, and carries `.ca-journal-header-bar` so the walk can find it. An inner
 // section folds its OWN CHILDREN by toggling a class on itself. Giving this one
 // the marker would make an enclosing dashboard read its fold level off a
 // descendant and fold the wrong scope — which does not look wrong, and is
@@ -333,7 +333,7 @@ export interface FoldableSection {
 //
 // AN INTERFACE RATHER THAN THE PLUGIN, so this module stays importable from
 // anywhere. `section-frame.ts` is imported by widgets.ts, which imports half
-// the plugin; taking `AlmanacPlugin` here would be the import cycle that put
+// the plugin; taking `ChronoAnvilPlugin` here would be the import cycle that put
 // `makeFoldable` inside journals-section.ts in the first place.
 export interface FoldStore {
   isCollapsed(key: string): boolean;
@@ -354,15 +354,15 @@ export function foldableSection(
   // The wrapper is what carries the collapsed state, because the fold has to
   // hide the body while leaving the bar visible — a section that folded itself
   // away entirely would leave a reader nothing to click to get it back.
-  const section = host.createDiv({ cls: "journal-sec-fold" });
+  const section = host.createDiv({ cls: "ca-journal-sec-fold" });
   const frame = sectionFrame(section, { ...opts, owns: "children" });
-  const body = section.createDiv({ cls: "journal-sec-fold-body" });
+  const body = section.createDiv({ cls: "ca-journal-sec-fold-body" });
 
   // THE RIGHT-HAND END, AS OF 4.13 §1b — and before the actions rather than after
   // them, for the reason `headerbar.ts` gives at its own toggle: at level 1 the
   // actions slot is a full-width second row, so appending would wrap the chevron
   // onto a third one. `margin-left: auto` in the stylesheet is what moves it.
-  const chevron = createDiv({ cls: "journal-sec-fold-toggle" });
+  const chevron = createDiv({ cls: "ca-journal-sec-fold-toggle" });
   setIcon(chevron, "chevron-down");
   frame.root.insertBefore(chevron, frame.actions);
   frame.root.addClass("is-foldable");
@@ -377,7 +377,7 @@ export function foldableSection(
     // the header bars use for their anchored widget group, and the reason a
     // scope button in a section's actions strip is not a fold target.
     const target = evt.target as HTMLElement;
-    if (target.closest(".journal-header-widgets, a, button, input, select")) {
+    if (target.closest(".ca-journal-header-widgets, a, button, input, select")) {
       return;
     }
     evt.preventDefault();

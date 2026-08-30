@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { App, normalizePath } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { getFile } from "./util";
 import { registeredJournalTypes } from "../journals/journal";
 import type { JournalType } from "../journals/journal";
@@ -164,7 +164,7 @@ export const SIZE: Record<SizeClass, { w: number; h: number }> = {
 //
 // Canvas `color` also takes a hex string, so this maps the EVENT COLOUR NAMES —
 // the vocabulary a logbook and an event already use — onto the hexes
-// `styles/00-tokens.css` defines as `--am-ev-*`.
+// `styles/00-tokens.css` defines as `--ca-ev-*`.
 //
 // IT IS A SECOND COPY AND THERE IS NO WAY AROUND IT: canvas JSON is not styled
 // by our stylesheet and cannot read a custom property. So it gets the guard
@@ -202,7 +202,7 @@ const BAND_GAP = 120;
 // detached from the homepage, diary root, journals, or any user-facing notes.
 //
 // This keeps the infrastructure machinery in its own cleanly contained graph
-// cluster around `Almanac.canvas`, without cross-linking or cluttering the
+// cluster around `ChronoAnvil.canvas`, without cross-linking or cluttering the
 // user-facing workspace.
 export function vaultSpec(
   p: typeof DEFAULT_PATHS,
@@ -554,7 +554,7 @@ export function initialVaultCanvas(
 // defined rather than that a canvas is.
 export function buildVaultCanvas(
   app: App,
-  plugin: AlmanacPlugin
+  plugin: ChronoAnvilPlugin
 ): CanvasDocument {
   const p = plugin.settings.paths;
   const spec = vaultSpec(
@@ -644,8 +644,8 @@ export function mergeCanvas(
     newX += node.width + GAP;
   }
 
-  const isAlmanacId = (id: string) => id.startsWith("node-") || id.startsWith("group-");
-  const foreign = disk.nodes.filter((n) => n && !rebuiltIds.has(n.id) && !isAlmanacId(n.id));
+  const isChronoAnvilId = (id: string) => id.startsWith("node-") || id.startsWith("group-");
+  const foreign = disk.nodes.filter((n) => n && !rebuiltIds.has(n.id) && !isChronoAnvilId(n.id));
   return {
     doc: { nodes: [...nodes, ...foreign], edges: rebuilt.edges },
     kept,

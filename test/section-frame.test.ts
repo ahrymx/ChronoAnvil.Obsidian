@@ -56,7 +56,7 @@ describe("the section header is built in one place", () => {
       .filter(
         (s) =>
           s.file !== "section-frame.ts" &&
-          s.code.includes('cls: `journal-header-bar')
+          s.code.includes('cls: `ca-journal-header-bar')
       )
       .map((s) => s.file);
     expect(offenders).toEqual([]);
@@ -65,29 +65,29 @@ describe("the section header is built in one place", () => {
   it("is the only thing that emits a header title or a glyph slot", () => {
     for (const { file, code } of sources) {
       if (file === "section-frame.ts") continue;
-      expect(code, file).not.toContain('"journal-header-title"');
-      expect(code, file).not.toContain('"journal-header-glyph"');
-      expect(code, file).not.toContain('"journal-header-count"');
+      expect(code, file).not.toContain('"ca-journal-header-title"');
+      expect(code, file).not.toContain('"ca-journal-header-glyph"');
+      expect(code, file).not.toContain('"ca-journal-header-count"');
     }
   });
 
   it("keeps the classes the fold walk and the stylesheet already know", () => {
     // The frame is a CONSTRUCTOR for the element the bar has always been, not
     // a new element. headerbar.ts finds bars by class, reads their level off
-    // journal-header-l1|2, and computes fold scope over the result — fifteen
+    // ca-journal-header-l1|2, and computes fold scope over the result — fifteen
     // tests of logic that has nothing to do with how a section looks.
     // Reparenting without renaming is what lets the visual change be a
     // stylesheet change.
     const frame = readSrc("section-frame");
-    expect(frame).toContain("journal-header-bar journal-header-l");
-    expect(frame).toContain("journal-header-widgets");
+    expect(frame).toContain("ca-journal-header-bar ca-journal-header-l");
+    expect(frame).toContain("ca-journal-header-widgets");
     const bar = readSrc("headerbar");
-    expect(bar).toContain('".journal-header-bar"');
+    expect(bar).toContain('".ca-journal-header-bar"');
   });
 
   it("keeps the fold-walk marker off a section that owns its own children", () => {
     // The hazard that made the naive conversion worse than no conversion:
-    // HeaderBar.recompute() does block.querySelectorAll(".journal-header-bar")
+    // HeaderBar.recompute() does block.querySelectorAll(".ca-journal-header-bar")
     // and reads the BLOCK's fold level off the first hit. An inner dashboard
     // section carrying that class is a descendant, so the enclosing dashboard
     // would take its level and fold wrong.
@@ -96,9 +96,9 @@ describe("the section header is built in one place", () => {
     expect(at).toBeGreaterThan(0);
     const block = frame.slice(at, at + 220);
     expect(block).toContain('owns === "blocks"');
-    expect(block).toContain("journal-header-bar");
+    expect(block).toContain("ca-journal-header-bar");
     // Both variants share the look.
-    expect(frame).toContain("journal-sec journal-sec-l");
+    expect(frame).toContain("ca-journal-sec ca-journal-sec-l");
   });
 
   it("lets one section put a link in the title slot", () => {
@@ -135,7 +135,7 @@ describe("the section header is built in one place", () => {
     // carry those classes — so leaving them would have shipped an unstyled
     // chevron on every subject row.
     const css = readCss();
-    expect(css).toContain(".journal-sec.is-foldable");
+    expect(css).toContain(".ca-journal-sec.is-foldable");
     expect(css).not.toMatch(/\.jjs-(type|group)-head\.is-foldable/);
   });
 
@@ -175,10 +175,10 @@ describe("the section header is built in one place", () => {
   it("styles the new slots", () => {
     const css = readCss();
     for (const cls of [
-      ".journal-header-glyph",
-      ".journal-header-count",
-      "--am-sec-gap",
-      "--am-sec-indent",
+      ".ca-journal-header-glyph",
+      ".ca-journal-header-count",
+      "--ca-sec-gap",
+      "--ca-sec-indent",
     ]) {
       expect(css, cls).toContain(cls);
     }
@@ -188,20 +188,20 @@ describe("the section header is built in one place", () => {
     // The density claim, asserted rather than eyeballed: five sections on one
     // note each spent ~52px of vertical block, and the rule was the part that
     // separated nothing in particular.
-    // `.journal-sec`, not `.journal-header-bar` — the look and the fold-walk
+    // `.ca-journal-sec`, not `.ca-journal-header-bar` — the look and the fold-walk
     // marker were separated in 2.56.2 so that a section owning its own
     // children can be styled identically without joining the sibling walk.
     const css = readCss();
-    const at = css.indexOf(".journal-sec {");
+    const at = css.indexOf(".ca-journal-sec {");
     const block = css.slice(at, css.indexOf("}", at));
     expect(block).not.toContain("border-bottom: 2px");
-    expect(block).toContain("var(--am-sec-pad)");
+    expect(block).toContain("var(--ca-sec-pad)");
     // AND THE ONE IT DOES DRAW IS THE HAIRLINE TOKEN (4.11), not a raw `1px`. The
     // bar now has two divisions in it — its own bottom rule and the strip its
     // controls sit on — and two ways of naming one number is one retune away from
-    // drawing two different lines. `--am-rule` is what a CARD divides itself with,
+    // drawing two different lines. `--ca-rule` is what a CARD divides itself with,
     // which is the weight 2.56 deleted from here.
-    expect(block).toContain("border-bottom: var(--am-rule-hair)");
+    expect(block).toContain("border-bottom: var(--ca-rule-hair)");
     expect(block).not.toContain("border-bottom: 1px");
   });
 });
@@ -209,20 +209,20 @@ describe("the section header is built in one place", () => {
 // ── the section's actions sit on a strip of their own (4.11) ──────────────
 //
 // WHAT A VAULT RENDER SHOWED. On one homepage, five widget blocks each wearing
-// `.journal-block-head` — a slim band, a micro-label, a hairline — and directly
+// `.ca-journal-block-head` — a slim band, a micro-label, a hairline — and directly
 // under them *📊 Trends and Statistics [0] [+ Add chart]*, a bar of a visibly
 // different kind with its button crowded onto the title's line. Two idioms for one
 // job on one screen.
 //
 // So a level-1 title line carries what NAMES and NUMBERS the section, and
-// everything that ACTS goes below it on `.journal-group-foot`'s idiom. What makes
+// everything that ACTS goes below it on `.ca-journal-group-foot`'s idiom. What makes
 // that four declarations rather than a refactor is that the slot already exists and
-// `.journal-sec` already wraps: `flex: 1 0 100%` on the actions bar IS a second row.
+// `.ca-journal-sec` already wraps: `flex: 1 0 100%` on the actions bar IS a second row.
 
 describe("the section's actions sit on a strip of their own", () => {
   const css = () => readCss();
   const STRIP =
-    ".journal-sec-l1:not(.journal-header-bar-untitled)\n  > .journal-header-widgets.journal-widget-bar {";
+    ".ca-journal-sec-l1:not(.ca-journal-header-bar-untitled)\n  > .ca-journal-header-widgets.ca-journal-widget-bar {";
 
   it("is the slot that was already there, made a full row", () => {
     const t = css();
@@ -236,7 +236,7 @@ describe("the section's actions sit on a strip of their own", () => {
   });
 
   it("divides the header with the group foot's hairline, not the card's rule", () => {
-    // `.journal-group-foot` is the same object one scale out — a hairline, air,
+    // `.ca-journal-group-foot` is the same object one scale out — a hairline, air,
     // right-aligned — and the two must agree or the page has two kinds of strip
     // again.
     //
@@ -251,13 +251,13 @@ describe("the section's actions sit on a strip of their own", () => {
     // pair alone would let both drift back to 4px together.
     const t = css();
     const rule = t.slice(t.indexOf(STRIP), t.indexOf("}", t.indexOf(STRIP)));
-    expect(rule).toContain("border-top: var(--am-rule-hair)");
+    expect(rule).toContain("border-top: var(--ca-rule-hair)");
     expect(rule).toContain("padding-top: 8px");
     const foot = t.slice(
-      t.indexOf(".journal-group-foot {"),
-      t.indexOf("}", t.indexOf(".journal-group-foot {"))
+      t.indexOf(".ca-journal-group-foot {"),
+      t.indexOf("}", t.indexOf(".ca-journal-group-foot {"))
     );
-    expect(foot).toContain("border-top: var(--am-rule-hair)");
+    expect(foot).toContain("border-top: var(--ca-rule-hair)");
     expect(foot).toContain("padding-top: 8px");
   });
 
@@ -267,10 +267,10 @@ describe("the section's actions sit on a strip of their own", () => {
     // this slot AFTER the frame is built, so a decision taken at draw time would be
     // wrong for exactly the sections with the most in them.
     expect(css()).toContain(
-      ".journal-sec-l1 > .journal-header-widgets.journal-widget-bar:empty"
+      ".ca-journal-sec-l1 > .ca-journal-header-widgets.ca-journal-widget-bar:empty"
     );
     const at = css().indexOf(
-      ".journal-sec-l1 > .journal-header-widgets.journal-widget-bar:empty"
+      ".ca-journal-sec-l1 > .ca-journal-header-widgets.ca-journal-widget-bar:empty"
     );
     expect(css().slice(at, css().indexOf("}", at))).toContain("display: none");
     // AFTER the strip rule, so the added pseudo-class is not fighting source order.
@@ -281,7 +281,7 @@ describe("the section's actions sit on a strip of their own", () => {
     // Study and the custom journals anchor their buttons under a real markdown
     // heading. There is no first row there, so a rule above the buttons would be a
     // rule above nothing.
-    expect(STRIP).toContain(":not(.journal-header-bar-untitled)");
+    expect(STRIP).toContain(":not(.ca-journal-header-bar-untitled)");
   });
 
   it("stays at level 1, and level 2 keeps its inline pills", () => {
@@ -290,31 +290,31 @@ describe("the section's actions sit on a strip of their own", () => {
     // opposite of the density this buys.
     const t = css();
     expect(t).not.toContain(
-      ".journal-sec-l2 > .journal-header-widgets.journal-widget-bar {"
+      ".ca-journal-sec-l2 > .ca-journal-header-widgets.ca-journal-widget-bar {"
     );
     // The pill scale is now ONE rule for both places rather than a rule and an
     // exception, because the argument was about a place and not about a level.
-    const at = t.indexOf(".journal-sec-l1 > .journal-header-widgets .journal-btn,");
+    const at = t.indexOf(".ca-journal-sec-l1 > .ca-journal-header-widgets .ca-journal-btn,");
     expect(at, "no shared pill scale").toBeGreaterThan(0);
     const rule = t.slice(at, t.indexOf("}", at));
-    expect(rule).toContain(".journal-sec-l2 .journal-header-widgets .journal-btn");
-    expect(rule).toContain("font-size: var(--am-text-2xs)");
+    expect(rule).toContain(".ca-journal-sec-l2 .ca-journal-header-widgets .ca-journal-btn");
+    expect(rule).toContain("font-size: var(--ca-text-2xs)");
     // And it is not duplicated where it used to live. Counted on the RULE — the
     // selector followed by its brace — because a cross-reference to it in a comment
     // one file over is a third occurrence and is not a second rule.
     expect(
-      t.split(".journal-sec-l2 .journal-header-widgets .journal-btn {")
+      t.split(".ca-journal-sec-l2 .ca-journal-header-widgets .ca-journal-btn {")
     ).toHaveLength(2);
   });
 
   it("does not bleed to the card's edges", () => {
     // The bar's own `border-bottom` does bleed inside a section card
-    // (70-section-surface.css), and `.journal-group-foot` does not. Two
+    // (70-section-surface.css), and `.ca-journal-group-foot` does not. Two
     // edge-to-edge hairlines 22px apart read as a banded table; this one divides
     // the header, so it stops where the text does.
     const t = css();
     const rule = t.slice(t.indexOf(STRIP), t.indexOf("}", t.indexOf(STRIP)));
-    expect(rule).not.toContain("margin: 0 calc(-1 * var(--am-sec-pad-x))");
+    expect(rule).not.toContain("margin: 0 calc(-1 * var(--ca-sec-pad-x))");
   });
 
   it("closes with the section, on both kinds of fold (4.13.1 §2)", () => {
@@ -326,14 +326,14 @@ describe("the section's actions sit on a strip of their own", () => {
     //
     // TWO RULES, BECAUSE THE TWO FOLDS MARK DIFFERENT ELEMENTS. `frame: section`
     // puts `is-collapsed` on the WRAPPER (`foldableSection`, which builds its bar
-    // with `owns: "children"` and therefore no `.journal-header-bar` marker); a
+    // with `owns: "children"` and therefore no `.ca-journal-header-bar` marker); a
     // `header:` bar puts it on the BAR ITSELF (`headerbar.ts`). One selector
     // cannot reach both, and a rule written for the wrong one matches nothing —
     // which is 4.13 §3's `:has(>` fault, and looks exactly like a decision.
     const t = css();
     for (const sel of [
-      ".journal-sec-fold.is-collapsed > .journal-sec > .journal-header-widgets",
-      ".journal-sec-l1.journal-header-bar.is-collapsed > .journal-header-widgets",
+      ".ca-journal-sec-fold.is-collapsed > .ca-journal-sec > .ca-journal-header-widgets",
+      ".ca-journal-sec-l1.ca-journal-header-bar.is-collapsed > .ca-journal-header-widgets",
     ]) {
       const at = t.indexOf(`${sel} {`);
       expect(at, `no rule for ${sel}`).toBeGreaterThan(0);
@@ -342,21 +342,21 @@ describe("the section's actions sit on a strip of their own", () => {
     // AND NOT AT LEVEL 2, where the buttons sit on the title LINE rather than on
     // a strip of their own. There is no second row to close there, and hiding
     // them would take a control off a bar that is still drawn.
-    expect(t).not.toContain(".journal-sec-l2.journal-header-bar.is-collapsed");
+    expect(t).not.toContain(".ca-journal-sec-l2.ca-journal-header-bar.is-collapsed");
     expect(t).not.toContain(
-      ".journal-sec-fold.is-collapsed > .journal-sec-l2"
+      ".ca-journal-sec-fold.is-collapsed > .ca-journal-sec-l2"
     );
   });
 
   it("closes on the Journals card's own fold too (4.13.2 §4)", () => {
     // THERE ARE THREE FOLDS, NOT TWO. `journals-section.ts::makeFoldable` marks
-    // `.jjs-type` and builds its bar with `owns: "children"` — which withholds
-    // `.journal-header-bar` deliberately, so an enclosing dashboard cannot read
+    // `.ca-jjs-type` and builds its bar with `owns: "children"` — which withholds
+    // `.ca-journal-header-bar` deliberately, so an enclosing dashboard cannot read
     // its fold level off a descendant. The consequence is that it matches
     // neither rule above, and a collapsed journal went on showing `+ Subject`
     // and `+ Topic` while every other collapsed section had stopped.
     const t = css();
-    const sel = ".jjs-type.is-collapsed > .journal-sec > .journal-header-widgets";
+    const sel = ".ca-jjs-type.is-collapsed > .ca-journal-sec > .ca-journal-header-widgets";
     const at = t.indexOf(`${sel} {`);
     expect(at, "no rule for the journals fold").toBeGreaterThan(0);
     expect(t.slice(at, t.indexOf("}", at))).toContain("display: none");
@@ -373,7 +373,7 @@ describe("the section's actions sit on a strip of their own", () => {
     //
     // A rule that cannot fire is indistinguishable from a decision that was
     // made, which is the fault 4.13 §3 caught in this same file.
-    expect(css()).not.toContain(".jjs-group.is-collapsed > .journal-sec");
+    expect(css()).not.toContain(".jjs-group.is-collapsed > .ca-journal-sec");
     // ONE FOLD LEFT IN THAT MODULE, and it is the type's. Counted on the CALL,
     // because the function itself and the paragraphs about it still name it.
     const code = readSrc("journals-section").replace(/\/\/.*$/gm, "");
@@ -387,17 +387,17 @@ describe("the section's actions sit on a strip of their own", () => {
   });
 
   it("keeps the class the fold exclusions name, which is why no caller changed", () => {
-    // `foldableSection` and `HeaderBar` both hard-code `.journal-header-widgets` so
+    // `foldableSection` and `HeaderBar` both hard-code `.ca-journal-header-widgets` so
     // a click on a control acts instead of folding the section. A wrapper element
     // would have had to be added to both, and a button that folded its own section
     // is the bug that would have shipped.
     expect(readSrc("section-frame")).toContain(
-      '".journal-header-widgets, a, button, input, select"'
+      '".ca-journal-header-widgets, a, button, input, select"'
     );
-    expect(readSrc("headerbar")).toContain(".journal-header-widgets");
+    expect(readSrc("headerbar")).toContain(".ca-journal-header-widgets");
     // The slot is still built by the frame, in place, with both its classes.
     expect(readSrc("section-frame")).toContain(
-      'cls: "journal-widget-bar journal-header-widgets"'
+      'cls: "ca-journal-widget-bar ca-journal-header-widgets"'
     );
   });
 });
@@ -483,7 +483,7 @@ describe("section actions in a narrow pane", () => {
 
   it("drops the labels rather than the buttons", () => {
     const t = css();
-    const at = t.indexOf(".journal-btn:not(.mod-cta):has(.journal-btn-icon)");
+    const at = t.indexOf(".ca-journal-btn:not(.mod-cta):has(.ca-journal-btn-icon)");
     expect(at).toBeGreaterThan(0);
     // Inside a container query, so a narrow sidebar on a wide screen collapses
     // too — the pane is what the row has to fit into, not the window.
@@ -497,7 +497,7 @@ describe("section actions in a narrow pane", () => {
     // afford to be icons — they are recognisable and their labels survive as
     // tooltips — but the one action a section is telling you to press should
     // say what it is.
-    expect(css()).toContain(".journal-btn:not(.mod-cta)");
+    expect(css()).toContain(".ca-journal-btn:not(.mod-cta)");
   });
 
   it("only hides a label that has an icon to fall back on", () => {
@@ -505,8 +505,8 @@ describe("section actions in a narrow pane", () => {
     // action }` covers a hand-written directive naming an action this build
     // does not know. Hiding that label leaves an empty box that does something.
     const t = css();
-    expect(t).toContain(".journal-btn:not(.mod-cta):has(.journal-btn-icon)");
-    expect(t).toContain(".journal-btn:not(.mod-cta):has(.journal-btn-emoji)");
+    expect(t).toContain(".ca-journal-btn:not(.mod-cta):has(.ca-journal-btn-icon)");
+    expect(t).toContain(".ca-journal-btn:not(.mod-cta):has(.ca-journal-btn-emoji)");
   });
 
   it("keeps the label reachable when it is not drawn", () => {
@@ -619,19 +619,19 @@ describe("the journal chart editor uses the shared frame", () => {
   });
 
   it("retired the error line that existed to not drift", () => {
-    // The old CSS said `.almanac-chart-error` shared the event editor's rule
+    // The old CSS said `.ca-chart-error` shared the event editor's rule
     // "so it should not be a second style that drifts" — while being exactly
     // that: two selectors kept in step by hand rather than one element.
     const css = readCss();
-    expect(css).not.toMatch(/^\.almanac-chart-error \{/m);
-    expect(css).not.toContain(".almanac-chart-error,");
+    expect(css).not.toMatch(/^\.ca-chart-error \{/m);
+    expect(css).not.toContain(".ca-chart-error,");
   });
 });
 
 // ── the windows that were copying the frame (2.56.11) ────────────────────
 //
 // §5.1's exhibit was not a count, it was a sentence already in styles.css: the
-// tracker picker "borrows .almanac-editor-modal's frame (head / scrolling body
+// tracker picker "borrows .ca-editor-modal's frame (head / scrolling body
 // / footer) so the two windows read as the same kind of object". It extended
 // `Modal` and rebuilt those three elements by hand — a component that wanted
 // the shared thing badly enough to reimplement its markup, described accurately
@@ -662,9 +662,9 @@ describe("editors reach the frame instead of copying it", () => {
     // stylesheet change away from looking like a different app.
     for (const f of ["tracker-picker.ts", "kind-change.ts"]) {
       const code = codeOf(f);
-      expect(code, f).not.toContain('"almanac-editor-head"');
-      expect(code, f).not.toContain('"almanac-editor-subtitle"');
-      expect(code, f).not.toContain('"almanac-editor-footer"');
+      expect(code, f).not.toContain('"ca-editor-head"');
+      expect(code, f).not.toContain('"ca-editor-subtitle"');
+      expect(code, f).not.toContain('"ca-editor-footer"');
     }
   });
 
@@ -691,8 +691,8 @@ describe("editors reach the frame instead of copying it", () => {
 
   it("no longer describes the picker as borrowing the frame", () => {
     const css = readCss();
-    expect(css).not.toContain("It borrows .almanac-editor-modal's frame");
-    expect(css).toContain("It USES .almanac-editor-modal's frame");
+    expect(css).not.toContain("It borrows .ca-editor-modal's frame");
+    expect(css).toContain("It USES .ca-editor-modal's frame");
   });
 });
 
@@ -730,9 +730,9 @@ describe("every editor is on the shared frame", () => {
 
   it("has one error line in the plugin, not one per window", () => {
     const css = readCss();
-    expect(css).not.toMatch(/^\.almanac-event-error/m);
-    expect(css).not.toMatch(/^\.almanac-chart-error/m);
-    expect(css).toContain(".almanac-editor-error");
+    expect(css).not.toMatch(/^\.ca-event-error/m);
+    expect(css).not.toMatch(/^\.ca-chart-error/m);
+    expect(css).toContain(".ca-editor-error");
   });
 });
 
@@ -784,7 +784,7 @@ describe("a commit that fails keeps the window open", () => {
 describe("borders are visible at 1x", () => {
   it("draws the section card's edge at a whole pixel", () => {
     const css = readCss();
-    const at = css.indexOf(".journal-sec-block {");
+    const at = css.indexOf(".ca-journal-sec-block {");
     expect(at).toBeGreaterThan(0);
     // Declarations only. The rule's comment records what the value used to be
     // and why it changed, which is the record rather than the value.
@@ -819,14 +819,14 @@ describe("one bar, at one scale (4.13 §1)", () => {
   // HEAVIER rule. Nobody chose any of that; it fell out of which page composed a
   // modifier.
   //
-  // They cannot be merged into one module — `NOT_A_CELL` evicts a `.journal-sec`
+  // They cannot be merged into one module — `NOT_A_CELL` evicts a `.ca-journal-sec`
   // from a row cell, so a widget inside a group can only ever be titled by a
   // block head — so they are held together by tokens instead, and this is what
   // checks that they still are.
   const rules = (): string => readCss().replace(/\/\*[\s\S]*?\*\//g, "");
   // ANCHORED ON A NEWLINE, and this file has now been bitten by the alternative
-  // twice: `indexOf(".journal-header-toggle {")` finds it inside
-  // `.journal-sec-l2 > .journal-header-toggle {` first, and reads the override
+  // twice: `indexOf(".ca-journal-header-toggle {")` finds it inside
+  // `.ca-journal-sec-l2 > .ca-journal-header-toggle {` first, and reads the override
   // while believing it read the base rule.
   const body = (selector: string): string => {
     const t = rules();
@@ -836,19 +836,19 @@ describe("one bar, at one scale (4.13 §1)", () => {
   };
 
   it("gives section and widget block titles their tokens with natural casing", () => {
-    const secRule = body(".journal-header-title {");
-    expect(secRule).toContain("font-size: var(--am-sec-title-size)");
-    expect(secRule).toContain("color: var(--am-sec-title-ink)");
+    const secRule = body(".ca-journal-header-title {");
+    expect(secRule).toContain("font-size: var(--ca-sec-title-size)");
+    expect(secRule).toContain("color: var(--ca-sec-title-ink)");
     expect(secRule).toContain("text-transform: none");
 
-    const blockRule = body(".journal-block-head-title {");
-    expect(blockRule).toContain("font-size: var(--am-bar-text)");
-    expect(blockRule).toContain("color: var(--am-bar-ink)");
+    const blockRule = body(".ca-journal-block-head-title {");
+    expect(blockRule).toContain("font-size: var(--ca-bar-text)");
+    expect(blockRule).toContain("color: var(--ca-bar-ink)");
     expect(blockRule).toContain("text-transform: none");
   });
 
   it("reveals widget block heads on hover while keeping them discrete at rest", () => {
-    const cardHead = body(".journal-widget-card > .journal-block-head {");
+    const cardHead = body(".ca-journal-widget-card > .ca-journal-block-head {");
     expect(cardHead).toContain("opacity: 0");
     // AND IT OVERLAYS RATHER THAN OPENING A GAP (4.34.3). It animated
     // `max-height` from 0, which is height the card did not have a moment
@@ -876,7 +876,7 @@ describe("one bar, at one scale (4.13 §1)", () => {
         ([sel, decls]) =>
           sel !== undefined &&
           decls !== undefined &&
-          / > \.journal-block-head\s*$/.test(sel) &&
+          / > \.ca-journal-block-head\s*$/.test(sel) &&
           decls.includes("opacity: 0")
       );
     expect(rests.length, "the head's rest rules").toBeGreaterThanOrEqual(2);
@@ -886,25 +886,25 @@ describe("one bar, at one scale (4.13 §1)", () => {
     }
     const raw = rules();
     // NOT FROM ANYWHERE IN THE CARD, which is the reveal this replaced.
-    expect(raw).not.toContain(".journal-widget-card:hover > .journal-block-head");
+    expect(raw).not.toContain(".ca-journal-widget-card:hover > .ca-journal-block-head");
     expect(raw).toContain(
-      ".journal-widget-card:has(> .jbd-handle:hover) > .journal-block-head"
+      ".ca-journal-widget-card:has(> .ca-jbd-handle:hover) > .ca-journal-block-head"
     );
     // AND THE BAND KEEPS ITSELF OPEN once it is, which is what lets the pointer
     // walk off the dots and into it — the one thing its own `:hover` is for, and
     // it only works because the open state takes `pointer-events` back.
-    expect(raw).toContain(".journal-widget-card > .journal-block-head:hover");
+    expect(raw).toContain(".ca-journal-widget-card > .ca-journal-block-head:hover");
   });
 
   it("divides both of them with the same rule weight", () => {
-    // The block head drew `--am-rule` (2px) under an 11.2px label while the
-    // section bar drew `--am-rule-hair` (1px) under a 15.2px one. One object
+    // The block head drew `--ca-rule` (2px) under an 11.2px label while the
+    // section bar drew `--ca-rule-hair` (1px) under a 15.2px one. One object
     // cannot divide itself two ways.
-    expect(body(".journal-block-head {")).toContain(
-      "border-bottom: var(--am-rule-hair)"
+    expect(body(".ca-journal-block-head {")).toContain(
+      "border-bottom: var(--ca-rule-hair)"
     );
-    expect(body(".journal-sec {")).toContain(
-      "border-bottom: var(--am-rule-hair)"
+    expect(body(".ca-journal-sec {")).toContain(
+      "border-bottom: var(--ca-rule-hair)"
     );
   });
 
@@ -912,25 +912,25 @@ describe("one bar, at one scale (4.13 §1)", () => {
     // THE ONE PLACE "ONE SCALE" IS NOT LITERAL, and it is deliberate: an emoji at
     // 11.2px is a smudge, and a slot exists to align a column of titles, which it
     // can only do if what sits in it can be seen.
-    for (const sel of [".journal-header-glyph {", ".journal-block-head-glyph {"]) {
+    for (const sel of [".ca-journal-header-glyph {", ".ca-journal-block-head-glyph {"]) {
       const rule = body(sel);
-      expect(rule, sel).toContain("font-size: var(--am-bar-glyph)");
-      expect(rule, sel).toContain("width: var(--am-sec-glyph)");
+      expect(rule, sel).toContain("font-size: var(--ca-bar-glyph)");
+      expect(rule, sel).toContain("width: var(--ca-sec-glyph)");
     }
   });
 
   it("lets no level-2 rule set a font-size", () => {
     // THE HIERARCHY INVERSION THIS RELEASE CLOSED, standing. Level 2 used to take
-    // `--am-text-sm` to say "nested" — which was smaller than level 1 while level
+    // `--ca-text-sm` to say "nested" — which was smaller than level 1 while level
     // 1 was 0.95em, and LARGER than it the moment level 1 became 0.7em. A subject
     // row bigger than the section containing it is the sort of thing a stylesheet
     // states rather than notices, so this is stated instead.
     // THE TITLE AND THE GLYPH, not everything nested under a level-2 bar: the
     // action pills legitimately set their own size, and they set it to the same
-    // `--am-text-2xs` the title now reads — which is the point rather than an
+    // `--ca-text-2xs` the title now reads — which is the point rather than an
     // exception, since the whole bar is one scale.
     const t = rules();
-    for (const m of t.matchAll(/\.journal-sec-l2[^{]*\{([^}]*)\}/g)) {
+    for (const m of t.matchAll(/\.ca-journal-sec-l2[^{]*\{([^}]*)\}/g)) {
       const selector = m[0].slice(0, m[0].indexOf("{"));
       if (!/header-title|header-glyph/.test(selector)) continue;
       expect(m[1], selector).not.toContain("font-size");
@@ -941,16 +941,16 @@ describe("one bar, at one scale (4.13 §1)", () => {
     // 4.13 §1b. `margin-left: auto` is what moves it, and it has one owner per
     // flex line — at level 1 the actions strip is its own row and gives its auto
     // margin up, at level 2 the toggle gives its up and takes `order` instead.
-    for (const sel of [".journal-header-toggle {", ".journal-sec-fold-toggle {"]) {
+    for (const sel of [".ca-journal-header-toggle {", ".ca-journal-sec-fold-toggle {"]) {
       const rule = body(sel);
       expect(rule, sel).toContain("margin-left: auto");
       // Sized against the bar rather than against the note: this one had no
       // width, height or icon size at all and fell back to ~18px beside an
       // 11.2px title.
-      expect(rule, sel).toContain("font-size: var(--am-bar-glyph)");
+      expect(rule, sel).toContain("font-size: var(--ca-bar-glyph)");
       expect(rule, sel).toContain("width:");
     }
-    expect(body(".journal-sec-l2 > .journal-header-toggle {")).toContain("order: 1");
+    expect(body(".ca-journal-sec-l2 > .ca-journal-header-toggle {")).toContain("order: 1");
   });
 
   it("points the chevron down when closed and up when open", () => {
@@ -960,31 +960,31 @@ describe("one bar, at one scale (4.13 §1)", () => {
     // the base icon is now the CLOSED state — so the transform hangs off
     // `:not(.is-collapsed)`.
     const t = rules();
-    expect(t).toContain(".journal-header-bar:not(.is-collapsed) .journal-header-toggle");
+    expect(t).toContain(".ca-journal-header-bar:not(.is-collapsed) .ca-journal-header-toggle");
     expect(t).toContain(
-      ".journal-sec-fold:not(.is-collapsed) > .journal-sec > .journal-sec-fold-toggle"
+      ".ca-journal-sec-fold:not(.is-collapsed) > .ca-journal-sec > .ca-journal-sec-fold-toggle"
     );
     // SCOPED TO THESE TWO. Other chevrons in the sheet still rotate -90° and are
     // right to — `jjs-toggle` and the events list sit on the LEFT of what they
     // fold, where pointing right is what a folded heading does. The direction
     // follows the side, which is the whole reason it was re-chosen here.
     for (const sel of [
-      ".journal-header-bar:not(.is-collapsed) .journal-header-toggle",
-      ".journal-sec-fold:not(.is-collapsed) > .journal-sec > .journal-sec-fold-toggle",
+      ".ca-journal-header-bar:not(.is-collapsed) .ca-journal-header-toggle",
+      ".ca-journal-sec-fold:not(.is-collapsed) > .ca-journal-sec > .ca-journal-sec-fold-toggle",
     ]) {
       const at = t.indexOf(sel);
       expect(t.slice(at, t.indexOf("}", at))).toContain("rotate(180deg)");
     }
-    expect(t).not.toContain(".journal-header-bar.is-collapsed .journal-header-toggle");
+    expect(t).not.toContain(".ca-journal-header-bar.is-collapsed .ca-journal-header-toggle");
   });
 
   it("stands the surface down for a block that is already a card (4.59.0)", () => {
     // ONE CARD, NOT TWO. `claimOwnBlock` marks any block holding a level-1 bar
     // as a section surface, and a surface is a card — so a fence whose widget
     // block ALREADY draws one ends up inside another. It showed up the day the
-    // period summary gained a bar: `.journal-overview-card` has been a card since
+    // period summary gained a bar: `.ca-journal-overview-card` has been a card since
     // 3.2 and had never held a `header:` line, so the two had never met.
-    const rule = body(".journal-sec-block:has(.journal-overview-card),");
+    const rule = body(".ca-journal-sec-block:has(.ca-journal-overview-card),");
     for (const off of ["background: none", "border: none", "padding: 0"]) {
       expect(rule).toContain(off);
     }
@@ -992,19 +992,19 @@ describe("one bar, at one scale (4.13 §1)", () => {
     // selector would lose to `.is-first` and `.is-last` on exactly the blocks a
     // welded section is both of. Listing them is the assertion, not the tidiness.
     for (const at of [".is-first", ".is-last", ".is-first.is-last"]) {
-      expect(rule).toContain(`.journal-sec-block${at}:has(.journal-overview-card)`);
+      expect(rule).toContain(`.ca-journal-sec-block${at}:has(.ca-journal-overview-card)`);
     }
     // A DESCENDANT, NOT A CHILD, for the reason the collapsed rule below states:
     // the surface is claimed on `siblingAnchor()`, which is not always the
     // postprocessor's own element, so the card can sit a level further in.
-    expect(rule).not.toContain(":has(> .journal-overview-card");
+    expect(rule).not.toContain(":has(> .ca-journal-overview-card");
     // AND THE INNER CARD IS THE ONE THAT SURVIVES, which is the half a selector
     // cannot state. 4.1 §3.1 cancels the WIDGET's card inside a framed block;
     // here it is the outer that gives way, because the overview card's bands are
     // measured against its inset and the surface has nothing measured against
     // its own. A rule cancelling the inner one would strand all three.
     expect(rules()).not.toContain(
-      ".journal-sec-block .journal-overview-card {\n  background: none"
+      ".ca-journal-sec-block .ca-journal-overview-card {\n  background: none"
     );
   });
 
@@ -1014,14 +1014,14 @@ describe("one bar, at one scale (4.13 §1)", () => {
     // two rules above it. The `frame: section` twin had fixed this at the foot of
     // the same file; the block variant had no rule at all, which is how a defect
     // survives in a stylesheet that argues with itself in comments.
-    // ASKED FOR BY ITS WHOLE SELECTOR AS OF 4.59.0. `.journal-sec-block.is-last:has(`
+    // ASKED FOR BY ITS WHOLE SELECTOR AS OF 4.59.0. `.ca-journal-sec-block.is-last:has(`
     // stopped being unique that release: the surface also stands down for a block
     // that already draws its own card, which is a second `:has()` on the same two
     // classes. A prefix that matches two rules silently reads whichever comes
     // first in the file, which is a test that passes for the wrong reason the
     // moment anything is inserted above it.
     const rule = body(
-      ".journal-sec-block.is-last:has(.journal-sec-l1.journal-header-bar.is-collapsed)"
+      ".ca-journal-sec-block.is-last:has(.ca-journal-sec-l1.ca-journal-header-bar.is-collapsed)"
     );
     expect(rule).toContain("padding-bottom: 0");
     // A DESCENDANT, NOT A CHILD, and this is the assertion rather than a comment
@@ -1029,18 +1029,18 @@ describe("one bar, at one scale (4.13 §1)", () => {
     // since `claimOwnBlock` marks the note's block element and the bar is built
     // inside the widget block within it. A rule that cannot fire looks exactly
     // like a decision that was made.
-    const head = "\n.journal-sec-block.is-last:has(.journal-sec-l1.journal-header-bar.is-collapsed)";
+    const head = "\n.ca-journal-sec-block.is-last:has(.ca-journal-sec-l1.ca-journal-header-bar.is-collapsed)";
     const selector = rules().slice(
       rules().indexOf(head),
       rules().indexOf("{", rules().indexOf(head))
     );
     expect(selector).not.toContain(":has(>");
-    expect(selector).toContain(".journal-sec-l1.journal-header-bar.is-collapsed");
+    expect(selector).toContain(".ca-journal-sec-l1.ca-journal-header-bar.is-collapsed");
   });
 
   it("does not stretch the short column's last widget (4.13.5 §2)", () => {
     // INVERTED FROM 4.13 §4, AND THE RENDER IS WHY. The rule read
-    // `.journal-block-cell > :last-child { flex: 1 1 auto }`, to close the band
+    // `.ca-journal-block-cell > :last-child { flex: 1 1 auto }`, to close the band
     // of nothing a shorter column left above the group's foot. It closed it in
     // the wrong place: stretching the last CARD does not stretch a month grid, so
     // the homepage's diary card ran to the taller column's bottom with 88px of
@@ -1051,7 +1051,7 @@ describe("one bar, at one scale (4.13 §1)", () => {
     // the rule to exist. The selector is specific enough that a re-introduction
     // anywhere would be caught, and that is what this is watching for — the
     // argument for the rule is intuitive and will be made again.
-    expect(rules()).not.toContain(".journal-block-cell > :last-child");
+    expect(rules()).not.toContain(".ca-journal-block-cell > :last-child");
   });
 
   it("emits the block head's glyph under its own class", () => {

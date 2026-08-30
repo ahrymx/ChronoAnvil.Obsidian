@@ -26,7 +26,7 @@
 // what is in the way. A greyed button is a control that cannot do its job.
 
 import { App, Modal, Notice, setIcon } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { createListRow } from "./list-row";
 import { confirmAction } from "./modals";
 import { CLASS_DEFS } from "../trackers/trackers";
@@ -38,7 +38,7 @@ import { emptyCallout } from "./empty";
 
 export function openEntryTemplateWindow(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   notePath: string,
   grain: TrackerClass
 ): void {
@@ -53,7 +53,7 @@ class EntryTemplateModal extends Modal {
 
   constructor(
     app: App,
-    private plugin: AlmanacPlugin,
+    private plugin: ChronoAnvilPlugin,
     private notePath: string,
     private grain: TrackerClass
   ) {
@@ -61,7 +61,7 @@ class EntryTemplateModal extends Modal {
   }
 
   onOpen(): void {
-    this.contentEl.addClass("almanac-editor-modal");
+    this.contentEl.addClass("ca-editor-modal");
     void this.refresh();
   }
 
@@ -80,21 +80,21 @@ class EntryTemplateModal extends Modal {
     contentEl.empty();
 
     const label = CLASS_DEFS[this.grain].label;
-    const head = contentEl.createDiv({ cls: "almanac-editor-head" });
+    const head = contentEl.createDiv({ cls: "ca-editor-head" });
     head.createEl("h3", { text: `Template — ${label}` });
     head.createEl("p", {
-      cls: "almanac-editor-subtitle",
+      cls: "ca-editor-subtitle",
       // What the window is FOR, in one sentence, because the two halves of it
       // act on different things and a reader who mixes them up either edits
       // every future entry by accident or edits none of them by accident.
       text: `What a new ${label.toLowerCase()} entry is built from — and what this page can do about it.`,
     });
 
-    const body = contentEl.createDiv({ cls: "almanac-editor-body" });
+    const body = contentEl.createDiv({ cls: "ca-editor-body" });
     this.drawDefault(body);
     this.drawLayouts(body);
 
-    const footer = contentEl.createDiv({ cls: "almanac-editor-footer" });
+    const footer = contentEl.createDiv({ cls: "ca-editor-footer" });
     const close = footer.createEl("button", { text: "Close", cls: "mod-cta" });
     close.addEventListener("click", () => this.close());
   }
@@ -102,11 +102,11 @@ class EntryTemplateModal extends Modal {
   // ── this grain's default ─────────────────────────────────────────────
 
   private drawDefault(host: HTMLElement): void {
-    host.createDiv({ cls: "almanac-tpl-band", text: "This grain's default" });
+    host.createDiv({ cls: "ca-tpl-band", text: "This grain's default" });
     const composed = this.manager.composedFor(this.grain);
 
     host.createDiv({
-      cls: "almanac-tpl-note",
+      cls: "ca-tpl-note",
       // Named sections rather than a count: "6 sections" tells a reader
       // nothing they can check against the page they are looking at.
       text: `Every new ${CLASS_DEFS[
@@ -114,7 +114,7 @@ class EntryTemplateModal extends Modal {
       ].label.toLowerCase()} entry starts with ${listOf(bandOf(composed))}.`,
     });
 
-    const row = host.createDiv({ cls: "almanac-tpl-actions" });
+    const row = host.createDiv({ cls: "ca-tpl-actions" });
     const save = row.createEl("button", {
       text: "Save this page as the default",
       cls: "mod-cta",
@@ -151,7 +151,7 @@ class EntryTemplateModal extends Modal {
   // ── saved layouts, and reloading from one ────────────────────────────
 
   private drawLayouts(host: HTMLElement): void {
-    host.createDiv({ cls: "almanac-tpl-band", text: "Reload this page" });
+    host.createDiv({ cls: "ca-tpl-band", text: "Reload this page" });
 
     // THE GATE, ASKED ONCE FOR THE WHOLE BAND. Every reload replaces the same
     // body, so what is in the way does not vary by which template is being
@@ -166,7 +166,7 @@ class EntryTemplateModal extends Modal {
     }
 
     host.createDiv({
-      cls: "almanac-tpl-note",
+      cls: "ca-tpl-note",
       text: "This entry holds nothing yet, so it can be rebuilt from a template. Your properties — the date, the title, any events on this entry — are kept.",
     });
 
@@ -212,7 +212,7 @@ class EntryTemplateModal extends Modal {
 
     const reload = actions.createEl("button", {
       text: "Reload",
-      cls: "almanac-tpl-toggle",
+      cls: "ca-tpl-toggle",
     });
     reload.addEventListener("click", () => {
       void (async () => {
@@ -222,7 +222,7 @@ class EntryTemplateModal extends Modal {
           // a section it cannot render here; the reader has to be told which,
           // or a layout would quietly mean something different on each grain.
           new Notice(
-            `Almanac: “${title}” names ${drops.join(", ")}, which a ${CLASS_DEFS[
+            `ChronoAnvil: “${title}” names ${drops.join(", ")}, which a ${CLASS_DEFS[
               this.grain
             ].label.toLowerCase()} entry can't carry — the rest will be written.`
           );
@@ -234,7 +234,7 @@ class EntryTemplateModal extends Modal {
 
     if (!layout) return;
     const del = actions.createEl("button", {
-      cls: "almanac-tpl-toggle",
+      cls: "ca-tpl-toggle",
       text: "Delete",
       attr: { "aria-label": `Delete ${layout.label}` },
     });
@@ -251,7 +251,7 @@ class EntryTemplateModal extends Modal {
         );
         if (!ok) return;
         await this.manager.deleteLayout(layout.id);
-        new Notice(`Almanac: deleted “${layout.label}”`);
+        new Notice(`ChronoAnvil: deleted “${layout.label}”`);
         await this.refresh();
       })();
     });
@@ -259,18 +259,18 @@ class EntryTemplateModal extends Modal {
 
   // What is standing in the way, in the reader's own terms, and what clears it.
   private drawLoss(host: HTMLElement, loss: EntryLoss[]): void {
-    const box = host.createDiv({ cls: "almanac-tpl-loss" });
-    const head = box.createDiv({ cls: "almanac-tpl-loss-head" });
-    setIcon(head.createDiv({ cls: "almanac-tpl-loss-icon" }), "pencil-line");
+    const box = host.createDiv({ cls: "ca-tpl-loss" });
+    const head = box.createDiv({ cls: "ca-tpl-loss-head" });
+    setIcon(head.createDiv({ cls: "ca-tpl-loss-icon" }), "pencil-line");
     head.createDiv({
       text: "You've written in this entry, so it can't be rebuilt from a template — a rebuild replaces everything below the properties.",
     });
-    const list = box.createEl("ul", { cls: "almanac-tpl-loss-list" });
+    const list = box.createEl("ul", { cls: "ca-tpl-loss-list" });
     for (const l of loss) {
       list.createEl("li", { text: `${l.label} — ${l.detail}` });
     }
     box.createDiv({
-      cls: "almanac-tpl-note",
+      cls: "ca-tpl-note",
       // NAMES THE OTHER DOOR. A refusal that only says no sends a reader
       // looking for a control that does not exist; "Edit sections…" is the
       // non-destructive path and it is one item up the same menu.

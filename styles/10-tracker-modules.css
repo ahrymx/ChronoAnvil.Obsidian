@@ -2,7 +2,7 @@
    A bar made up of `tracker:` directives (Mood, steppers, times, selects)
    is the daily note's logging grid. Laid out exactly 3 per row on desktop,
    and 2 per row on mobile / narrow containers. */
-.journal-widget-bar.journal-tracker-bar {
+.ca-journal-widget-bar.ca-journal-tracker-bar {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   align-items: stretch;
@@ -10,20 +10,20 @@
 }
 /* Mobile & narrow panes: exactly 2 per row */
 @container (max-width: 640px) {
-  .journal-widget-bar.journal-tracker-bar {
+  .ca-journal-widget-bar.ca-journal-tracker-bar {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 @media (max-width: 640px) {
-  .journal-widget-bar.journal-tracker-bar {
+  .ca-journal-widget-bar.ca-journal-tracker-bar {
     grid-template-columns: repeat(2, 1fr);
   }
 }
-body.is-mobile .journal-widget-bar.journal-tracker-bar {
+body.is-mobile .ca-journal-widget-bar.ca-journal-tracker-bar {
   grid-template-columns: repeat(2, 1fr);
 }
 
-.journal-tracker-bar .journal-tracker-cell {
+.ca-journal-tracker-bar .ca-journal-tracker-cell {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -34,37 +34,37 @@ body.is-mobile .journal-widget-bar.journal-tracker-bar {
      rather than given a slot in the flow. */
   position: relative;
   /* Compact cell height: sized to hold metric controls with high space efficiency. */
-  min-height: var(--am-tracker-cell-h, 50px);
+  min-height: var(--ca-tracker-cell-h, 50px);
   min-width: 0; /* let a cell shrink within its grid track instead of overflowing */
   box-sizing: border-box;
   padding: 6px 10px;
-  border: 1px solid var(--am-border-subtle);
-  border-radius: var(--am-radius-md);
-  /* Semantic inset surface (`--am-surface-inset`). */
-  background: var(--am-surface-inset);
+  border: 1px solid var(--ca-border-subtle);
+  border-radius: var(--ca-radius-md);
+  /* Semantic inset surface (`--ca-surface-inset`). */
+  background: var(--ca-surface-inset);
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.journal-tracker-bar .journal-tracker-cell:hover {
-  background: var(--am-surface-raised);
-  border-color: var(--am-border-hover);
+.ca-journal-tracker-bar .ca-journal-tracker-cell:hover {
+  background: var(--ca-surface-raised);
+  border-color: var(--ca-border-hover);
 }
 
-.journal-tracker-bar .journal-tracker-cell:focus-within {
-  border-color: var(--am-grain-accent);
+.ca-journal-tracker-bar .ca-journal-tracker-cell:focus-within {
+  border-color: var(--ca-grain-accent);
 }
 
 /* Eyebrow label: small, muted, uppercase, tucked at the top-left so the
    metric control below is the cell's focus. The emoji/icon that leads each
    label keeps its colour (uppercasing only affects letters). */
-.journal-tracker-bar .journal-tracker-cell > .journal-widget-label {
+.ca-journal-tracker-bar .ca-journal-tracker-cell > .ca-journal-widget-label {
   flex: 0 0 auto;
   align-self: flex-start;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -72,18 +72,18 @@ body.is-mobile .journal-widget-bar.journal-tracker-bar {
 }
 /* The control group beneath the eyebrow spans the cell's full width so the
    input/stepper/picker — the thing being logged — is the visual priority. */
-.journal-tracker-bar .journal-tracker-cell > .journal-widget-label + .journal-widget {
+.ca-journal-tracker-bar .ca-journal-tracker-cell > .ca-journal-widget-label + .ca-journal-widget {
   width: 100%;
 }
 /* Steppers space out their −/value/+ across the freed width; the mood picker
    and other pickers stay left-aligned rather than stretching their glyphs. */
-.journal-tracker-bar .journal-tracker-cell > .journal-widget-label + .journal-stepper {
+.ca-journal-tracker-bar .ca-journal-tracker-cell > .ca-journal-widget-label + .ca-journal-stepper {
   justify-content: space-between;
 }
 /* Time/date/select controls fill the row so the field is easy to hit. */
-.journal-tracker-bar .journal-tracker-cell .journal-time input,
-.journal-tracker-bar .journal-tracker-cell .journal-date input,
-.journal-tracker-bar .journal-tracker-cell .journal-select select {
+.ca-journal-tracker-bar .ca-journal-tracker-cell .ca-journal-time input,
+.ca-journal-tracker-bar .ca-journal-tracker-cell .ca-journal-date input,
+.ca-journal-tracker-bar .ca-journal-tracker-cell .ca-journal-select select {
   width: 100%;
   box-sizing: border-box;
 }
@@ -97,7 +97,7 @@ body.is-mobile .journal-widget-bar.journal-tracker-bar {
 /* The × is chrome, so it stays out of the way until the cell is hovered or
    the button itself is keyboard-focused. It never overlaps the eyebrow label,
    which is why the label above reserves its own line. */
-.journal-tracker-bar .journal-tracker-cell .journal-tracker-remove {
+.ca-journal-tracker-bar .ca-journal-tracker-cell .ca-journal-tracker-remove {
   position: absolute;
   top: 3px;
   right: 3px;
@@ -116,15 +116,15 @@ body.is-mobile .journal-widget-bar.journal-tracker-bar {
   opacity: 0;
   transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
 }
-.journal-tracker-bar .journal-tracker-cell .journal-tracker-remove .svg-icon {
+.ca-journal-tracker-bar .ca-journal-tracker-cell .ca-journal-tracker-remove .svg-icon {
   width: 13px;
   height: 13px;
 }
-.journal-tracker-bar .journal-tracker-cell:hover .journal-tracker-remove,
-.journal-tracker-bar .journal-tracker-cell .journal-tracker-remove:focus-visible {
+.ca-journal-tracker-bar .ca-journal-tracker-cell:hover .ca-journal-tracker-remove,
+.ca-journal-tracker-bar .ca-journal-tracker-cell .ca-journal-tracker-remove:focus-visible {
   opacity: 1;
 }
-.journal-tracker-bar .journal-tracker-cell .journal-tracker-remove:hover {
+.ca-journal-tracker-bar .ca-journal-tracker-cell .ca-journal-tracker-remove:hover {
   color: var(--text-error);
   background: var(--background-modifier-hover);
   opacity: 1;
@@ -132,7 +132,7 @@ body.is-mobile .journal-widget-bar.journal-tracker-bar {
 /* Touch devices have no hover, so a control revealed by it is a control that
    does not exist. Show it faintly instead — still quiet, still reachable. */
 @media (hover: none) {
-  .journal-tracker-bar .journal-tracker-cell .journal-tracker-remove {
+  .ca-journal-tracker-bar .ca-journal-tracker-cell .ca-journal-tracker-remove {
     opacity: 0.45;
   }
 }
@@ -140,7 +140,7 @@ body.is-mobile .journal-widget-bar.journal-tracker-bar {
 /* The add tile reads as an empty slot rather than a filled cell: dashed
    border, no fill, muted text. It sits in the grid as a real cell so it
    inherits the grid rhythm, and it lifts to the accent colour on hover. */
-.journal-tracker-bar .journal-tracker-cell.journal-tracker-add {
+.ca-journal-tracker-bar .ca-journal-tracker-cell.ca-journal-tracker-add {
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -148,32 +148,32 @@ body.is-mobile .journal-widget-bar.journal-tracker-bar {
   background: transparent;
   transition: border-color 120ms ease, background-color 120ms ease;
 }
-.journal-tracker-bar .journal-tracker-cell.journal-tracker-add:hover {
+.ca-journal-tracker-bar .ca-journal-tracker-cell.ca-journal-tracker-add:hover {
   border-color: var(--interactive-accent);
   background: var(--background-modifier-hover);
 }
-.journal-tracker-add .journal-tracker-add-btn {
+.ca-journal-tracker-add .ca-journal-tracker-add-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   width: 100%;
   height: 100%;
-  min-height: var(--am-tracker-cell-h, 50px);
-  padding: var(--am-space-2) var(--am-space-4);
+  min-height: var(--ca-tracker-cell-h, 50px);
+  padding: var(--ca-space-2) var(--ca-space-4);
   border: none;
   border-radius: inherit;
   background: transparent;
   box-shadow: none;
   color: var(--text-muted);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   font-weight: 500;
   cursor: pointer;
 }
-.journal-tracker-add:hover .journal-tracker-add-btn {
+.ca-journal-tracker-add:hover .ca-journal-tracker-add-btn {
   color: var(--text-normal);
 }
-.journal-tracker-add .journal-tracker-add-btn .svg-icon {
+.ca-journal-tracker-add .ca-journal-tracker-add-btn .svg-icon {
   width: 13px;
   height: 13px;
 }
@@ -185,33 +185,33 @@ body.is-mobile .journal-widget-bar.journal-tracker-bar {
    these four are the ones true of any tracker.
 
    TWO NAMES WERE TAKEN, WHICH IS WHY THE PREFIX IS THE THIRD ONE.
-   `.journal-tracker-cell` is defined eight rules above, and `.jts-cell` is
+   `.ca-journal-tracker-cell` is defined eight rules above, and `.jts-cell` is
    RETIRED — it was the hand-rolled topic band that 4.46 folded into
    `stats-band`, and `test/stats-band.test.ts` asserts the stylesheet never
    says it again, so reusing the prefix would have re-broken a merge. The
-   surviving name is the time grid's `am-*` convention.
+   surviving name is the time grid's `ca-*` convention.
 
-   NOT `.journal-tracker-cell`, WHICH THIS FILE ALREADY DEFINES eight rules
+   NOT `.ca-journal-tracker-cell`, WHICH THIS FILE ALREADY DEFINES eight rules
    above as a bordered logging module you type into. A day of history and an
    input control are not the same thing and must not share a selector; every
-   rule up there happens to be scoped under `.journal-tracker-bar`, so the
+   rule up there happens to be scoped under `.ca-journal-tracker-bar`, so the
    collision would have been latent rather than immediate, which is worse.
 
    The numbers come from the shared `.journal-stat-strip`
    (`96-stat-strip.css`), so this file styles only the strip below them. */
-.journal-tracker-stat > h3 {
-  margin: 0 0 var(--am-space-6);
-  font-size: var(--am-text-base);
+.ca-journal-tracker-stat > h3 {
+  margin: 0 0 var(--ca-space-6);
+  font-size: var(--ca-text-base);
 }
 /* One row of thirty, sized to fit rather than scrolled. The cells are the
    only thing that flexes: a strip that scrolled would make "the last month"
    into a thing you have to drag, which is the opposite of a glance. */
-.am-tstat-strip {
+.ca-tstat-strip {
   display: flex;
   gap: 2.5px;
-  margin-top: var(--am-space-6);
+  margin-top: var(--ca-space-6);
 }
-.am-tstat-cell {
+.ca-tstat-cell {
   flex: 1 1 0;
   height: 22px;
   min-width: 3px;
@@ -225,7 +225,7 @@ body.is-mobile .journal-widget-bar.journal-tracker-bar {
    against a maximum, and this scales a reading against the series' own low
    and high, because a mood tracker declared 1–5 whose month sits between 3
    and 4 would otherwise draw thirty cells of one colour. */
-.am-tstat-cell.am-act-1 { background: var(--am-act-1); }
-.am-tstat-cell.am-act-2 { background: var(--am-act-2); }
-.am-tstat-cell.am-act-3 { background: var(--am-act-3); }
-.am-tstat-cell.am-act-4 { background: var(--am-act-4); }
+.ca-tstat-cell.ca-act-1 { background: var(--ca-act-1); }
+.ca-tstat-cell.ca-act-2 { background: var(--ca-act-2); }
+.ca-tstat-cell.ca-act-3 { background: var(--ca-act-3); }
+.ca-tstat-cell.ca-act-4 { background: var(--ca-act-4); }

@@ -394,7 +394,7 @@ describe("both directives are routed and neither skips the guard", () => {
 
   it("refuses in the note rather than throwing or rendering empty", () => {
     const src = bridge();
-    expect(src).toContain("journal-widget-error");
+    expect(src).toContain("ca-journal-widget-error");
     expect(src).toContain("planned.refusal.message");
   });
 });
@@ -409,7 +409,7 @@ describe("two directives, two stores", () => {
   });
 
   it("takes the series from the chart stack rather than walking the folders again", () => {
-    // A second walk of the diary folders is the taskCounts/countAlmanacTasks
+    // A second walk of the diary folders is the taskCounts/countChronoAnvilTasks
     // split one more time: two answers to "what did this tracker read that
     // day", agreeing right up until one of them learns a value coercion.
     const src = readSrc("bridge-widgets");
@@ -474,11 +474,11 @@ describe("every bridge names the period it covered", () => {
       resolve(__dirname, "..", "styles", "76-bridges.css"),
       "utf8"
     );
-    for (const cls of ["am-bridge-header", "am-bridge-window", "am-bridge-more"]) {
+    for (const cls of ["ca-bridge-header", "ca-bridge-window", "ca-bridge-more"]) {
       expect(css).not.toContain(`.${cls}`);
     }
-    expect(css).toContain(".am-bridge-row");
-    expect(css).toContain(".am-bridge-chevron");
+    expect(css).toContain(".ca-bridge-row");
+    expect(css).toContain(".ca-bridge-chevron");
   });
 
   it("persists and reads collapse state", () => {
@@ -597,7 +597,7 @@ describe("a snapshot is plain markdown", () => {
   it("writes wikilinks and values, not the plugin's markup", () => {
     // §3.2. The snapshot has to survive the plugin being uninstalled and stay
     // editable as text — which is the point, since the reader asked to edit and
-    // revisit it. A block that renders as raw HTML comments once Almanac is
+    // revisit it. A block that renders as raw HTML comments once ChronoAnvil is
     // gone is not something anyone can revisit.
     const out = serializeSnapshot([
       { path: "Study/Algebra/Lesson 1.md", label: "Lesson 1", detail: "2026-07-21" },
@@ -804,7 +804,7 @@ describe("the freeze control is reachable on every supported platform", () => {
   });
 
   it("stays a desktop-only plugin nowhere in the manifest", () => {
-    // The assertion above only matters because of this one. If Almanac ever
+    // The assertion above only matters because of this one. If ChronoAnvil ever
     // became desktop-only, the hover gate would be dead weight rather than a
     // fix — so the two are pinned together.
     const manifest = JSON.parse(

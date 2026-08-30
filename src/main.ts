@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { MarkdownView, Menu, Notice, Plugin, TFile } from "obsidian";
-import { DEFAULT_SETTINGS, AlmanacSettings, AlmanacSettingTab } from "./core/settings";
+import { DEFAULT_SETTINGS, ChronoAnvilSettings, ChronoAnvilSettingTab } from "./core/settings";
 import { normalizeBannerArt } from "./core/constants";
 import { normalizeLogbooks } from "./diary/logbooks";
 import { Diary } from "./diary/diary";
@@ -22,6 +22,7 @@ import { VaultBanner } from "./ui/vault-banner";
 import { MobileControls } from "./ui/mobile-controls";
 import { AppearanceManager } from "./ui/appearance";
 import { openVaultSearch } from "./ui/search-all";
+import { BRAND_ICON_ID, registerBrandIcon } from "./ui/brand-icon";
 import {
   resolveOverviewPath,
   getFile,
@@ -41,8 +42,8 @@ import type { RegistryMirror } from "./core/registry-mirror";
 import { ACTIONS, menuTitle, type ActionGroup } from "./core/actions";
 import { journalActions } from "./core/journal-actions";
 
-export default class AlmanacPlugin extends Plugin {
-  settings!: AlmanacSettings;
+export default class ChronoAnvilPlugin extends Plugin {
+  settings!: ChronoAnvilSettings;
   diary!: Diary;
   // The generic journal engine — serves the built-in Study type and every
   // custom journal type. (Named `study` before custom journals existed.)
@@ -144,12 +145,16 @@ export default class AlmanacPlugin extends Plugin {
     this.mobileControls.register();
     this.appearance.register();
 
-    this.addSettingTab(new AlmanacSettingTab(this.app, this));
+    this.addSettingTab(new ChronoAnvilSettingTab(this.app, this));
     this.registerCommands();
 
-    this.addRibbonIcon("book-open", "Almanac", (evt) => this.openMenu(evt));
+    // Before the ribbon asks for it. `book-open` stood here until the mark
+    // existed — a Lucide icon three other plugins also use, on the button that
+    // is supposed to say which plugin this is.
+    registerBrandIcon();
+    this.addRibbonIcon(BRAND_ICON_ID, "ChronoAnvil", (evt) => this.openMenu(evt));
 
-    // AN ALMANAC PAGE OPENS IN READING MODE. 4.6, and the plugin's first
+    // A CHRONOANVIL PAGE OPENS IN READING MODE. 4.6, and the plugin's first
     // `file-open` hook.
     //
     // `file-open` AND NOTHING ELSE. Not `active-leaf-change`, not
@@ -180,7 +185,7 @@ export default class AlmanacPlugin extends Plugin {
     });
   }
 
-  // Check whether Almanac was upgraded from a previous version, and prompt
+  // Check whether ChronoAnvil was upgraded from a previous version, and prompt
   // the reader if layout repairs, format migrations, or template updates
   // are available to review.
   private async checkUpgrade(): Promise<void> {
@@ -189,7 +194,7 @@ export default class AlmanacPlugin extends Plugin {
 
     if (installed === current) return;
 
-    // Check if the vault is initialized with any Almanac folders
+    // Check if the vault is initialized with any ChronoAnvil folders
     const p = this.settings.paths;
     const isInitialized = Boolean(
       this.app.vault.getAbstractFileByPath(p.staging) ||
@@ -205,12 +210,12 @@ export default class AlmanacPlugin extends Plugin {
 
         if (count > 0) {
           new Notice(
-            `Almanac: updated to v${current} — ${count} update(s) available. Run 'Set up / repair vault' to review.`,
+            `ChronoAnvil: updated to v${current} — ${count} update(s) available. Run 'Set up / repair vault' to review.`,
             10000
           );
         }
       } catch (e) {
-        console.error("[Almanac] upgrade repair check failed", e);
+        console.error("[ChronoAnvil] upgrade repair check failed", e);
       }
     }
 
@@ -241,7 +246,7 @@ export default class AlmanacPlugin extends Plugin {
     });
   }
 
-  // Open Settings on Almanac's own tab.
+  // Open Settings on ChronoAnvil's own tab.
   //
   // `app.setting` is not in the published typings — it is a real and stable
   // part of the desktop app that Obsidian has simply never declared — so it is
@@ -261,7 +266,7 @@ export default class AlmanacPlugin extends Plugin {
       setting?.open?.();
       setting?.openTabById?.(this.manifest.id);
     } catch (e) {
-      console.error("[Almanac] could not open the settings tab", e);
+      console.error("[ChronoAnvil] could not open the settings tab", e);
     }
   }
 
@@ -269,7 +274,7 @@ export default class AlmanacPlugin extends Plugin {
   //
   // A journal's notes live in the vault and its definition lived only in
   // data.json — so replacing the plugin folder, or copying a journal folder in
-  // from elsewhere, left a fully populated journal that Almanac no longer knew
+  // from elsewhere, left a fully populated journal that ChronoAnvil no longer knew
   // about. This is where those are picked up, and it does two DIFFERENT things
   // depending on what the folder can prove about itself:
   //
@@ -292,7 +297,7 @@ export default class AlmanacPlugin extends Plugin {
       const offer = await this.journalImport.inferrableFolders();
       if (offer.length > 0) {
         new Notice(
-          `Almanac: ${offer.length} journal folder${
+          `ChronoAnvil: ${offer.length} journal folder${
             offer.length === 1 ? "" : "s"
           } under ${this.settings.paths.journalsRoot} ${
             offer.length === 1 ? "isn't" : "aren't"
@@ -303,7 +308,7 @@ export default class AlmanacPlugin extends Plugin {
         );
       }
     } catch (e) {
-      console.error("[Almanac] journal discovery failed", e);
+      console.error("[ChronoAnvil] journal discovery failed", e);
     }
     this.reportDanglingTypeIds();
   }
@@ -324,7 +329,7 @@ export default class AlmanacPlugin extends Plugin {
     const dangling = danglingTypeIds(this.settings.trackers, registered);
     if (dangling.length === 0) return;
     new Notice(
-      `Almanac: ${dangling.length} tracker scope${dangling.length === 1 ? "" : "s"} name${dangling.length === 1 ? "s" : ""} a journal type that isn't registered (${dangling.join(", ")}). Settings → Trackers to re-scope.`,
+      `ChronoAnvil: ${dangling.length} tracker scope${dangling.length === 1 ? "" : "s"} name${dangling.length === 1 ? "s" : ""} a journal type that isn't registered (${dangling.join(", ")}). Settings → Trackers to re-scope.`,
       10000
     );
   }
@@ -402,7 +407,7 @@ export default class AlmanacPlugin extends Plugin {
     const offer = await this.journalImport.inferrableFolders();
     if (restored.length === 0 && offer.length === 0) {
       new Notice(
-        "Almanac: every journal folder under the journals root is already set up."
+        "ChronoAnvil: every journal folder under the journals root is already set up."
       );
       return;
     }
@@ -422,21 +427,28 @@ export default class AlmanacPlugin extends Plugin {
   }
 
   private registerCommands(): void {
-    // THE SEARCH, AND ITS SHORTCUT (4.51). A command rather than a hotkey bound
-    // here: Obsidian's own settings are where a reader rebinds it, and a plugin
-    // that claims `Ctrl K` outright takes it from whatever they had on it. The
-    // banner's field shows that default rather than reading the reader's
-    // binding, which is not on the public API — see `search-all.ts`.
+    // THE SEARCH, AND NO DEFAULT SHORTCUT (5.0.1).
     //
-    // IT COLLIDES WITH CORE'S *Insert Markdown link*, KNOWINGLY. `Mod K` is a
-    // requested default (4.51, Q10) and Obsidian flags the clash in its own
-    // Hotkeys pane, where either side can be rebound. Declaring it as a
-    // `hotkeys` DEFAULT rather than registering a keymap is what keeps that
-    // true: a reader who wants the link shortcut back clears one row.
+    // This shipped `Mod K` as a `hotkeys` default from 4.51. The reasoning held
+    // up on its own terms — a declared default is rebindable where a registered
+    // keymap is not, Obsidian surfaces the clash with core's *Insert Markdown
+    // link* in its own Hotkeys pane, and either side can be cleared in one row.
+    // What it did not account for is that a reader does not go looking in that
+    // pane until something they use has already stopped working, and `Mod K` is
+    // a binding most people have muscle memory for.
+    //
+    // Obsidian's plugin guidelines ask plugins not to claim a default at all,
+    // for that reason. A public listing is where that stops being a matter of
+    // taste: `Mod K` was a good default for the one vault it was chosen in, and
+    // claiming it in every vault that installs this is a different act. The
+    // command is still here and still called *Search everything* — binding it
+    // is one row in Settings → Hotkeys, and the README says so.
+    //
+    // THE BANNER'S `⌘ K` CHIP WENT WITH IT — see `vault-banner.ts`. A hint
+    // naming a shortcut nothing is bound to is worse than no hint.
     this.addCommand({
-      id: "almanac-search-everything",
+      id: "ca-search-everything",
       name: "Search everything",
-      hotkeys: [{ modifiers: ["Mod"], key: "k" }],
       callback: () => openVaultSearch(this),
     });
 
@@ -666,7 +678,7 @@ export default class AlmanacPlugin extends Plugin {
     let loaded = await this.loadData();
 
     // NO data.json AT ALL is the one unambiguous signal that this plugin
-    // folder has been replaced (or that Almanac has never run here). Anything
+    // folder has been replaced (or that ChronoAnvil has never run here). Anything
     // subtler — a data.json that merely looks sparse, or is older than the
     // mirror — would have this second-guessing a file the user's own session
     // just wrote, and two machines syncing one vault could then trade settings
@@ -696,6 +708,14 @@ export default class AlmanacPlugin extends Plugin {
       DEFAULT_SETTINGS.attachments,
       this.settings.attachments ?? {}
     );
+    // The "keep attachments in the plugin's own folder" choice was spelled
+    // `"almanac"` under the old name. It is a stored enum, so a settings object
+    // written before the rename — including one restored from a pre-rename mirror,
+    // is the usual way settings arrive after it — would carry the old spelling
+    // and silently fall through to Obsidian's default attachment folder.
+    if ((this.settings.attachments.location as string) === "almanac") {
+      this.settings.attachments.location = "chronoanvil";
+    }
 
     // And the banner options, on the same rule (4.51). A data.json written
     // before this release has no `banner` key at all, and a shallow assign would
@@ -716,7 +736,7 @@ export default class AlmanacPlugin extends Plugin {
     // of the six shipped files is a texture the reader added to that folder
     // themselves; it lands on "none", because the vault is no longer read for
     // images and substituting a pattern they never chose would be worse than a
-    // flat banner. Their file is untouched — Almanac has never deleted it.
+    // flat banner. Their file is untouched — ChronoAnvil has never deleted it.
     this.settings.banner.art = normalizeBannerArt(this.settings.banner.art);
 
     // Give every journal level the stable id 2.43 introduced. Done once, here,

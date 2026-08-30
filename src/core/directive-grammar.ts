@@ -98,7 +98,7 @@ export const SCOPE_JOURNAL = "journal";
 // THREE VALUES, BECAUSE THERE ARE THREE HOSTS (§3.1), and this is the part
 // worth arguing rather than assuming. `none` alone would fix the canvas and
 // leave markdown worse than it found it: the card is not a wrapper, it is a
-// modifier class on the block, so withholding it leaves `.journal-widget-block`
+// modifier class on the block, so withholding it leaves `.ca-journal-widget-block`
 // and nothing else. In a canvas node that is exactly right, because the node IS
 // the frame. In a markdown note nothing replaces it and the widget becomes
 // loose content in the note's flow — inconsistent with every section around it,
@@ -173,7 +173,7 @@ export function hasTitledBar(lines: readonly string[]): boolean {
 // Whether any line opens a bar at all, named or not.
 //
 // DELIBERATELY LOOSER THAN `hasTitledBar`, and the looseness is the point. An
-// untitled `header:` still renders a `.journal-sec` element, is still refused as
+// untitled `header:` still renders a `.ca-journal-sec` element, is still refused as
 // cell content by `NOT_A_CELL` (`ui/widgets/row.ts`), and therefore still lands
 // BELOW a group rather than in it. What matters to a layout is that the bar
 // exists, not that somebody named it.
@@ -236,7 +236,7 @@ export function parseFrame(lines: readonly string[]): FrameSpec {
 // ── the row modifier ──────────────────────────────────────────────────
 //
 // WHETHER THIS BLOCK'S WIDGETS SIT SIDE BY SIDE. 4.2 §2, and the gap that
-// section names: Almanac composes a single column and has no way to say *these
+// section names: ChronoAnvil composes a single column and has no way to say *these
 // blocks are one row*. Three of the four pieces a homepage of rows needs
 // already exist — a composed page whose blocks are data, per-block chrome, and
 // widths that answer to the pane. This is the fourth.
@@ -248,7 +248,7 @@ export function parseFrame(lines: readonly string[]): FrameSpec {
 // including the ones not written yet — gets it for free.
 //
 // WHY A ROW IS A FENCE AND NOT A GROUP OF FENCES. The obvious reading of "these
-// blocks are one row" is a marker spanning several ```almanac fences. It cannot
+// blocks are one row" is a marker spanning several ```chronoanvil fences. It cannot
 // work, and the reason is not a preference: in Live Preview each fence is a
 // widget CodeMirror lays out in its own vertical flow, and nothing this plugin
 // can style makes two of them share a line. In reading view they are siblings of
@@ -269,7 +269,7 @@ export const ROW_KEYWORD = "row";
 //
 // *"the groups can be easily broken and don't reflect what is shown in the
 // editor."* Four widgets in one `row` fence, on a note column about 1090px
-// wide. A cell asks for a floor of `--am-row-cell-min` — 320px — so three fit
+// wide. A cell asks for a floor of `--ca-row-cell-min` — 320px — so three fit
 // across (980px with the gaps) and the fourth wrapped to a line of its own,
 // where `flex-grow` stretched it to the full width of the group. The file said
 // four columns, the section editor drew four columns, and the page drew three
@@ -372,7 +372,7 @@ export function parseRow(lines: readonly string[]): RowSpec {
   if (rowLines.length > 1) {
     return {
       row: false,
-      error: `This block has ${rowLines.length} row lines. A block is one row — put the second row in its own \`\`\`almanac block, so each row can carry its own frame:.`,
+      error: `This block has ${rowLines.length} row lines. A block is one row — put the second row in its own \`\`\`chronoanvil block, so each row can carry its own frame:.`,
     };
   }
 
@@ -406,7 +406,7 @@ export const TITLE_KEYWORD = "title";
 // QUESTION. That one searches a WHOLE NOTE, frontmatter included, so it has to
 // tell `title:home,diary,journals` from a reader's `title: My Page` property —
 // hence its *colon with nothing spaced after it* rule. This one is asked of a line
-// already known to be inside an ```almanac fence, where a YAML property cannot
+// already known to be inside a ```chronoanvil fence, where a YAML property cannot
 // occur and where `splitDirective` is the grammar every other keyword is read
 // with. Two questions, two rules, and the looser one is not a weakening: using
 // `locateTitle`'s regex here would make the gesture disagree with the dispatcher
@@ -443,11 +443,11 @@ export function isLinksLine(line: string): boolean {
 // describes a block, and this describes the NOTE.
 //
 // WHY THE PAGE'S WIDTH IS A LINE IN THE PAGE AT ALL. The homepage has been wide
-// since 4.2, through `cssclasses: almanac-wide` in its frontmatter, and no other
+// since 4.2, through `cssclasses: ca-wide` in its frontmatter, and no other
 // dashboard could ask for the same thing: frontmatter is out of a post-processor's
 // reach, and repair deliberately never edits it. So the width was a property of
 // one composed note rather than a thing a reader could want. This is that setting
-// made reachable, and the form it takes is the form every other Almanac setting
+// made reachable, and the form it takes is the form every other ChronoAnvil setting
 // on a page takes — a line in the note, which a reader can see, copy and delete,
 // and deleting it gives them their width back.
 //

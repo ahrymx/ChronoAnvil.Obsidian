@@ -19,7 +19,7 @@
 //
 // ── THE ASSERTION THAT MATTERS MOST IS THE ROUND TRIP ────────────────────
 //
-// The seeder writes four different formats into `<!--almanac:… -->` regions and
+// The seeder writes four different formats into `<!--chronoanvil:… -->` regions and
 // they all look alike: tasks are `- ( ) text`, recall is `q :: a`, list entries
 // are bare lines, attachments are their own thing. Nothing about a region's name
 // says which it holds, and nothing warns when the wrong one goes in — the write
@@ -35,8 +35,11 @@ import { describe, expect, it } from "vitest";
 // The events note stores its events in FRONTMATTER, so what the seeder writes is
 // YAML and what the plugin reads is the value OBSIDIAN parsed out of it —
 // `parseEvents` never sees the text at all. The test therefore takes the same
-// two steps in the same order, and takes the first one with `js-yaml`, which is
-// the plugin's own dependency (see `trackers.ts`) rather than a new one.
+// two steps in the same order, and takes the first one with `js-yaml` — which,
+// since 5.0.1, the plugin no longer bundles (it reads YAML through Obsidian's
+// `parseYaml` now). That makes it an INDEPENDENT parser here rather than the
+// same one the code under test uses, which is the stronger position for an
+// oracle to be in. It is a devDependency for this and for the stub.
 import { load as loadYaml } from "js-yaml";
 
 import { JOURNAL_PRESETS } from "../src/journals/journal";
@@ -93,7 +96,6 @@ import {
   taskLine,
   entryFolder,
   periodHierarchy,
-  seedGraphGroups,
   setGraphLinks,
   uniquePicks,
   // @ts-expect-error — a plain .mjs tool with no declaration file; the point of
@@ -114,14 +116,13 @@ import {
   DIARY_LINES_MIXED,
   DIARY_TASKS,
   LOGBOOK_CORPUS,
-  PERIOD_CORPUS,
   SEED_EVENTS,
   // @ts-expect-error — see above.
 } from "../tools/seed-corpus.mjs";
 
-// The `almanac-events` value, out of a block of frontmatter YAML.
+// The `chronoanvil-events` value, out of a block of frontmatter YAML.
 const yamlList = (text: string): unknown =>
-  (loadYaml(text.replace(/^---\n/, "")) as Record<string, unknown>)["almanac-events"];
+  (loadYaml(text.replace(/^---\n/, "")) as Record<string, unknown>)["chronoanvil-events"];
 
 describe("seed-vault: the generator", () => {
   it("gives the same sequence for the same seed and a different one otherwise", () => {
@@ -256,7 +257,7 @@ describe("seed-vault: sections", () => {
     "",
     "- **Definition:** …",
     "",
-    "```almanac",
+    "```chronoanvil",
     "recall",
     "```",
     "",
@@ -273,7 +274,7 @@ describe("seed-vault: sections", () => {
     expect(out).not.toContain("**Definition:** …");
     // THE FENCE IS A WIDGET. Swallowing it would silently delete the recall
     // block from every lesson in the example vault.
-    expect(out).toContain("```almanac\nrecall\n```");
+    expect(out).toContain("```chronoanvil\nrecall\n```");
     expect(out).toContain("## Next");
   });
 
@@ -307,10 +308,10 @@ describe("seed-vault: sections", () => {
 });
 
 describe("seed-vault: regions round-trip through the plugin's own parsers", () => {
-  const REGION = (id: string): string => `head\n\n<!--almanac:${id}\n-->\n\ntail\n`;
+  const REGION = (id: string): string => `head\n\n<!--chronoanvil:${id}\n-->\n\ntail\n`;
 
   const read = (body: string, id: string): string => {
-    const open = `<!--almanac:${id}`;
+    const open = `<!--chronoanvil:${id}`;
     const at = body.indexOf(open) + open.length;
     return body.slice(at, body.indexOf("-->", at));
   };
@@ -324,7 +325,7 @@ describe("seed-vault: regions round-trip through the plugin's own parsers", () =
       .map(parseTaskLine);
     expect(parsed.map((t) => t && t.text)).toEqual(["Back up the vault", "Groceries"]);
     expect(parsed.map((t) => t && t.done)).toEqual([false, true]);
-    // `- [ ]` IS OBSIDIAN'S CHECKBOX AND `- ( )` IS ALMANAC'S. A seeder that
+    // `- [ ]` IS OBSIDIAN'S CHECKBOX AND `- ( )` IS CHRONOANVIL'S. A seeder that
     // wrote the native one would produce tasks the widgets cannot see.
     expect(parseTaskLine("- [ ] Back up the vault")).toBeNull();
   });
@@ -503,7 +504,7 @@ describe("seed-vault: the log grammar", () => {
   it("appends the region a logbook nobody has opened does not have yet", () => {
     // A logbook note carries its `logbook:` directive from the scaffold and
     // grows the region on first render, so seeding one means creating it.
-    const note = "---\ntitle: Work log\n---\n\n```almanac\nlogbook:work\n```\n";
+    const note = "---\ntitle: Work log\n---\n\n```chronoanvil\nlogbook:work\n```\n";
     const withRegion = ensureRegion(note, "logbook");
     expect(readRegion(withRegion, "logbook")).toBe("");
     // And it is idempotent: a second pass must not stack a second region, which
@@ -558,8 +559,8 @@ describe("seed-vault: the log grammar", () => {
 
   it("fills the capture region of the entries it writes", () => {
     const daily =
-      "---\njournal-date: \"\"\n# almanac:trackers:start\nMood:\n# almanac:trackers:end\n---\n" +
-      "<!--almanac:log\n-->\n\n<!--almanac:capture\n-->\n";
+      "---\njournal-date: \"\"\n# chronoanvil:trackers:start\nMood:\n# chronoanvil:trackers:end\n---\n" +
+      "<!--chronoanvil:log\n-->\n\n<!--chronoanvil:capture\n-->\n";
     const dates = activeDays({ today: "2026-08-23", months: 2, rng: mulberry32(3) });
     const files = buildPlan({
       settings: { paths: { templatesDiary: "T", diaryDaily: "D" }, customJournals: [], trackers: [] },
@@ -622,7 +623,7 @@ describe("seed-vault: charts", () => {
   });
 
   it("fills an empty fence and refuses one that already has charts", () => {
-    const note = "`almanac:spacer`\n\n```almanac-charts\nheader:📊 Trends\n```\n";
+    const note = "`chronoanvil:spacer`\n\n```chronoanvil-charts\nheader:📊 Trends\n```\n";
     const filled = fillChartsFence(note, ["chart:a:Mood:line:90"]);
     // THE HEADER SURVIVES. In the merged layout the fence carries the section
     // title as well as the charts, so a fill that replaced the body would take
@@ -647,7 +648,7 @@ describe("seed-vault: charts", () => {
         { id: "confidence", surface: { kind: "journal" } },
       ],
     };
-    const daily = "---\n# almanac:trackers:start\nMood:\nSleep:\n# almanac:trackers:end\n---\n";
+    const daily = "---\n# chronoanvil:trackers:start\nMood:\nSleep:\n# chronoanvil:trackers:end\n---\n";
     const usable = chartableTrackers({ settings, dailyTemplate: daily });
     expect([...usable]).toEqual(["Mood"]);
   });
@@ -684,7 +685,7 @@ describe("seed-vault: events", () => {
   });
 
   it("fills an empty events list and refuses one somebody has used", () => {
-    const note = "---\nalmanac-events: []\n---\nbody\n";
+    const note = "---\nchronoanvil-events: []\n---\nbody\n";
     const events = resolveEvents(SEED_EVENTS, "2026-08-23");
     const filled = fillEvents(note, events);
     expect(parseEvents(yamlList(filled.split("\n---")[0]))).toHaveLength(events.length);
@@ -718,7 +719,7 @@ describe("seed-vault: the patch pass", () => {
     ],
   };
   const templates = new Map([
-    ["T/Daily.md", "---\n# almanac:trackers:start\nMood:\nSleep:\nWake-Up:\nBedtime:\n# almanac:trackers:end\n---\n"],
+    ["T/Daily.md", "---\n# chronoanvil:trackers:start\nMood:\nSleep:\nWake-Up:\nBedtime:\n# chronoanvil:trackers:end\n---\n"],
   ]);
   const make = () =>
     buildPatches({
@@ -753,7 +754,7 @@ describe("seed-vault: the patch pass", () => {
 
   it("leaves a logbook that already has items alone, and replaces it under --force", () => {
     const patch = make().find((p: { what: string }) => p.what === "logbook");
-    const empty = "```almanac\nlogbook:work\n```\n";
+    const empty = "```chronoanvil\nlogbook:work\n```\n";
     const filled = patch.apply(empty, {});
     expect(parseLogItems(readRegion(filled, "logbook")).length).toBeGreaterThan(0);
     expect(patch.apply(filled, {})).toBeNull();
@@ -766,7 +767,7 @@ describe("seed-vault: the patch pass", () => {
       settings,
       // A template that writes only Mood: every Sleep, Wake-Up and Bedtime chart
       // in the corpus would be an empty tile, so none of them is written.
-      templates: new Map([["T/Daily.md", "---\n# almanac:trackers:start\nMood:\n# almanac:trackers:end\n---\n"]]),
+      templates: new Map([["T/Daily.md", "---\n# chronoanvil:trackers:start\nMood:\n# chronoanvil:trackers:end\n---\n"]]),
       plans: { charts: DIARY_CHARTS, logbooks: {}, events: [] },
       dates: ["2026-08-23"],
       today: "2026-08-23",
@@ -774,7 +775,7 @@ describe("seed-vault: the patch pass", () => {
       warn: (m: string) => warnings.push(m),
     });
     expect(warnings.length).toBeGreaterThan(0);
-    const note = "```almanac-charts\nheader:x\n```\n";
+    const note = "```chronoanvil-charts\nheader:x\n```\n";
     for (const p of patches.filter((p: { what: string }) => p.what === "charts")) {
       for (const spec of parseChartDirectives((p.apply(note, {}) as string).split("\n"))) {
         expect(spec.tracker).toBe("Mood");
@@ -813,25 +814,25 @@ describe("seed-vault: graph links and zero-width spines", () => {
   it("embeds and updates zero-width hidden graph links", () => {
     const original = "# Title\n\nSome body text.\n";
     const linked = setGraphLinks(original, ["Week-2026-W35"]);
-    expect(linked).toContain("%% almanac-graph %%\n%% [[Week-2026-W35|\u200B]] %%");
+    expect(linked).toContain("%% chronoanvil-graph %%\n%% [[Week-2026-W35|\u200B]] %%");
 
     const relinked = setGraphLinks(linked, ["Week-2026-W36"]);
-    expect(relinked).toContain("%% almanac-graph %%\n%% [[Week-2026-W36|\u200B]] %%");
+    expect(relinked).toContain("%% chronoanvil-graph %%\n%% [[Week-2026-W36|\u200B]] %%");
     expect(relinked).not.toContain("Week-2026-W35");
 
     const stripped = setGraphLinks(relinked, []);
-    expect(stripped).not.toContain("%% almanac-graph %%");
+    expect(stripped).not.toContain("%% chronoanvil-graph %%");
   });
 });
 
 describe("seed-vault: period entries generation and corpus", () => {
   it("generates week, month, quarter, and year notes when templates are provided", () => {
     const templates = new Map([
-      ["T/Daily.md", "---\njournal-date: \"\"\n---\n<!--almanac:log\n-->\n"],
-      ["T/Weekly Entry.md", "---\nweek-start: \"\"\n---\n<!--almanac:focus\n-->\n<!--almanac:highlights\n-->\n<!--almanac:todo\n-->\n"],
-      ["T/Monthly Entry.md", "---\nmonth: \"\"\n---\n<!--almanac:focus\n-->\n<!--almanac:highlights\n-->\n<!--almanac:log\n-->\n"],
-      ["T/Quarterly Entry.md", "---\nquarter-start: \"\"\n---\n<!--almanac:focus\n-->\n<!--almanac:highlights\n-->\n"],
-      ["T/Yearly Entry.md", "---\nyear-start: \"\"\n---\n<!--almanac:focus\n-->\n<!--almanac:highlights\n-->\n<!--almanac:log\n-->\n"],
+      ["T/Daily.md", "---\njournal-date: \"\"\n---\n<!--chronoanvil:log\n-->\n"],
+      ["T/Weekly Entry.md", "---\nweek-start: \"\"\n---\n<!--chronoanvil:focus\n-->\n<!--chronoanvil:highlights\n-->\n<!--chronoanvil:todo\n-->\n"],
+      ["T/Monthly Entry.md", "---\nmonth: \"\"\n---\n<!--chronoanvil:focus\n-->\n<!--chronoanvil:highlights\n-->\n<!--chronoanvil:log\n-->\n"],
+      ["T/Quarterly Entry.md", "---\nquarter-start: \"\"\n---\n<!--chronoanvil:focus\n-->\n<!--chronoanvil:highlights\n-->\n"],
+      ["T/Yearly Entry.md", "---\nyear-start: \"\"\n---\n<!--chronoanvil:focus\n-->\n<!--chronoanvil:highlights\n-->\n<!--chronoanvil:log\n-->\n"],
     ]);
 
     const settings = {
@@ -875,7 +876,7 @@ describe("seed-vault: period entries generation and corpus", () => {
     expect(quarterFile.content).toContain("[[Year-2026|\u200B]]");
 
     const yearFile = files.find((f: { path: string }) => f.path.endsWith("Year-2026.md"));
-    expect(yearFile.content).not.toContain("%% almanac-graph %%");
+    expect(yearFile.content).not.toContain("%% chronoanvil-graph %%");
   });
 });
 
@@ -1029,24 +1030,24 @@ describe("seed-vault: the month that bounds the open tasks", () => {
         [
           "---",
           'journal-date: ""',
-          "# almanac:trackers:start",
+          "# chronoanvil:trackers:start",
           "Mood:",
-          "# almanac:trackers:end",
+          "# chronoanvil:trackers:end",
           "---",
-          "```almanac",
-          "# almanac:trackers:start",
+          "```chronoanvil",
+          "# chronoanvil:trackers:start",
           "tracker:Mood",
-          "# almanac:trackers:end",
+          "# chronoanvil:trackers:end",
           "```",
-          "<!--almanac:log",
+          "<!--chronoanvil:log",
           "-->",
-          "<!--almanac:todo",
+          "<!--chronoanvil:todo",
           "-->",
         ].join("\n"),
       ],
       [
         "T/Weekly Entry.md",
-        '---\nweek-start: ""\n---\n<!--almanac:focus\n-->\n<!--almanac:todo\n-->\n',
+        '---\nweek-start: ""\n---\n<!--chronoanvil:focus\n-->\n<!--chronoanvil:todo\n-->\n',
       ],
     ]);
     const settings = {
@@ -1135,12 +1136,12 @@ describe("seed-vault: charts the plugin can read back", () => {
   });
 
   it("adds a journal-charts fence above the graph block, and only once", () => {
-    const note = "```almanac\njournal-header\n```\n\n%% almanac-graph %%\n%% [[Study|​]] %%\n";
+    const note = "```chronoanvil\njournal-header\n```\n\n%% chronoanvil-graph %%\n%% [[Study|​]] %%\n";
     const filled = fillJournalChartsFence(note, ["jchart:js1:trend:confidence"]);
-    expect(filled).toContain("```almanac-journal-charts");
+    expect(filled).toContain("```chronoanvil-journal-charts");
     // The hidden link pair is found by matching to the END of the note, so a
     // fence written under it would take the note's graph edge with it.
-    expect(filled.indexOf("almanac-journal-charts")).toBeLessThan(filled.indexOf("%% almanac-graph %%"));
+    expect(filled.indexOf("chronoanvil-journal-charts")).toBeLessThan(filled.indexOf("%% chronoanvil-graph %%"));
     expect(parseJournalChartDirectives(filled.split("\n"))).toHaveLength(1);
     // A second run is a no-op, which is the rule every patch in this tool
     // follows: it fills what is empty and nothing else.
@@ -1174,19 +1175,19 @@ describe("seed-vault: per-entry trackers", () => {
   const NOTE = [
     "---",
     'journal-date: "2026-08-29"',
-    "# almanac:trackers:start",
+    "# chronoanvil:trackers:start",
     "Mood:",
-    "# almanac:trackers:end",
+    "# chronoanvil:trackers:end",
     "---",
-    "```almanac",
+    "```chronoanvil",
     "entry-header",
     "```",
     "",
-    "```almanac",
-    "# almanac:trackers:start",
+    "```chronoanvil",
+    "# chronoanvil:trackers:start",
     "tracker:Mood",
     "sleep",
-    "# almanac:trackers:end",
+    "# chronoanvil:trackers:end",
     "```",
     "",
   ].join("\n");
@@ -1200,7 +1201,7 @@ describe("seed-vault: per-entry trackers", () => {
     const region = locateTrackerRegion(next.split("\n"));
     expect(region?.marked).toBe(true);
     // The frontmatter block is untouched: still one key, still closed.
-    expect(next.split("---")[1]).toBe('\njournal-date: "2026-08-29"\n# almanac:trackers:start\nMood:\n# almanac:trackers:end\n');
+    expect(next.split("---")[1]).toBe('\njournal-date: "2026-08-29"\n# chronoanvil:trackers:start\nMood:\n# chronoanvil:trackers:end\n');
   });
 
   it("adds it once, and refuses a note with no fence to put it in", () => {
@@ -1217,7 +1218,7 @@ describe("seed-vault: per-entry trackers", () => {
         { id: "Focus", surface: { kind: "diary", classes: ["daily"] } },
       ],
     };
-    const daily = "---\n# almanac:trackers:start\nMood:\n# almanac:trackers:end\n---\n";
+    const daily = "---\n# chronoanvil:trackers:start\nMood:\n# chronoanvil:trackers:end\n---\n";
     // Unseeded, the old answer stands: declared, chartable, and no readings.
     expect([...chartableTrackers({ settings, dailyTemplate: daily })]).toEqual(["Mood"]);
     expect([...chartableTrackers({ settings, dailyTemplate: daily, seeded: ["Energy"] })]).toEqual([

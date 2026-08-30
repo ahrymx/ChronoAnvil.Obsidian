@@ -7,7 +7,7 @@
    THE HOOK MOVED, AND THE OTHER HALF OF THIS BLOCK IS DELETED (4.13.1 §3).
    Both were keyed on `:has(.jc-diary-header)` — the hero band — which no longer
    exists on any page, so both would have gone on being written and matching
-   nothing. `.jc-actions` is the same marker for the same block: the diary card
+   nothing. `.ca-jc-actions` is the same marker for the same block: the diary card
    is the only widget in the plugin that draws one, and it draws one on exactly
    the surfaces the hero did.
 
@@ -16,32 +16,32 @@
    2px default. 4.13 §1 made a hairline the default for every bar in the plugin,
    so the rule had been restating it for a release — and a rule that agrees with
    the default is one nobody can tell has stopped working. */
-.journal-widget-block:has(.jc-actions) ~ .journal-widget-block {
+.ca-journal-widget-block:has(.ca-jc-actions) ~ .ca-journal-widget-block {
   margin-top: 1.1em;
 }
 
 
 /* note: a full-width free-text field whose text persists to the note body
    (see notestore.ts) — the widget-based replacement for editable
-   `>[!focus]`-style callouts. Several stack inside one ```almanac block as a
+   `>[!focus]`-style callouts. Several stack inside one ```chronoanvil block as a
    section of labelled fields; the rhythm below keeps them reading as one
    grouped unit rather than four disconnected cards. */
-.journal-note {
+.ca-journal-note {
   display: block;
   margin: 0 0 0.9em;
 }
-.journal-note:last-child {
+.ca-journal-note:last-child {
   margin-bottom: 0;
 }
-.journal-note-label {
-  font-size: var(--am-text-xs);
+.ca-journal-note-label {
+  font-size: var(--ca-text-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 5px;
 }
-.journal-note-input {
+.ca-journal-note-input {
   display: block;
   width: 100%;
   box-sizing: border-box;
@@ -49,28 +49,28 @@
   resize: none; /* height is managed by auto-grow; no manual handle or scrollbar */
   overflow: hidden;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   background: var(--background-secondary);
   color: var(--text-normal);
   font-family: inherit;
-  font-size: var(--am-text-base);
+  font-size: var(--ca-text-base);
   line-height: 1.5;
-  padding: var(--am-space-4) var(--am-space-6);
+  padding: var(--ca-space-4) var(--ca-space-6);
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
-.journal-note-input::placeholder {
+.ca-journal-note-input::placeholder {
   color: var(--text-faint);
 }
-.journal-note-input:hover {
+.ca-journal-note-input:hover {
   border-color: var(--background-modifier-border-hover, var(--interactive-accent));
 }
-.journal-note-input:focus {
+.ca-journal-note-input:focus {
   outline: none;
   border-color: var(--interactive-accent);
   background: var(--background-primary);
   box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 130, 120, 255), 0.15);
 }
-.journal-note-input:disabled {
+.ca-journal-note-input:disabled {
   color: var(--text-error, var(--text-faint));
   font-style: italic;
   cursor: not-allowed;
@@ -80,7 +80,7 @@
 
 /* Single-line variant (note:key#line): fixed height, no growth, no wrap —
    behaves like a text field. Used for short one-liners like Today's focus. */
-.journal-note--line .journal-note-input {
+.ca-journal-note--line .ca-journal-note-input {
   min-height: 0;
   height: auto;
   white-space: nowrap;
@@ -89,17 +89,17 @@
 
 /* Today's focus: one emphasized intent line. Larger, weightier text — it's the
    day's headline, so it should read like one. */
-.journal-note--focus .journal-note-input {
+.ca-journal-note--focus .ca-journal-note-input {
   font-size: 1.05em;
   font-weight: 500;
   color: var(--text-normal);
-  padding-top: var(--am-space-5);
-  padding-bottom: var(--am-space-5);
+  padding-top: var(--ca-space-5);
+  padding-bottom: var(--ca-space-5);
 }
 
 /* Log: long-form reflections. Generous minimum so it invites paragraphs, and a
    comfortable max before it scrolls rather than pushing the page endlessly. */
-.journal-note--log .journal-note-input {
+.ca-journal-note--log .ca-journal-note-input {
   min-height: 5em;
   max-height: 24em;
   overflow-y: auto;
@@ -110,22 +110,22 @@
    (one blob of free text) and `tasks:` (a list of things with state). The
    markup is a label, then one row per entry, each a bullet plus an
    auto-growing textarea — see widgets.ts::buildList. */
-.journal-list {
+.ca-journal-list {
   display: block;
   margin: 0 0 0.9em;
 }
-.journal-list:last-child {
+.ca-journal-list:last-child {
   margin-bottom: 0;
 }
-.journal-list-label {
-  font-size: var(--am-text-xs);
+.ca-journal-list-label {
+  font-size: var(--ca-text-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 5px;
 }
-.journal-list-row {
+.ca-journal-list-row {
   display: flex;
   align-items: flex-start;
   gap: 9px;
@@ -135,7 +135,7 @@
    character, so a wrapped entry's second line aligns to the text and not under
    the marker. `margin-top` centres it on the first line of a 1.55 line-height
    row; it is not a magic number so much as half a line minus half the dot. */
-.journal-list-bullet {
+.ca-journal-list-bullet {
   flex: 0 0 auto;
   width: 4px;
   height: 4px;
@@ -144,16 +144,16 @@
   background: var(--text-faint);
   transition: background 0.15s ease;
 }
-.journal-list-row:focus-within .journal-list-bullet {
+.ca-journal-list-row:focus-within .ca-journal-list-bullet {
   background: var(--interactive-accent);
 }
 /* The trailing "type here" row: its bullet is hollow until it has content, so
    an empty list doesn't show a dot pointing at nothing. */
-.journal-list-row.is-empty .journal-list-bullet {
+.ca-journal-list-row.is-empty .ca-journal-list-bullet {
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--background-modifier-border);
 }
-.journal-list-input {
+.ca-journal-list-input {
   flex: 1 1 auto;
   display: block;
   width: 100%;
@@ -167,15 +167,15 @@
   overflow: hidden;
   color: var(--text-normal);
   font-family: inherit;
-  font-size: var(--am-text-base);
+  font-size: var(--ca-text-base);
   line-height: 1.55;
   min-height: 1.55em;
 }
-.journal-list-input::placeholder {
+.ca-journal-list-input::placeholder {
   color: var(--text-faint);
 }
-.journal-list-input:hover,
-.journal-list-input:focus {
+.ca-journal-list-input:hover,
+.ca-journal-list-input:focus {
   border: none;
   background: transparent;
   box-shadow: none;
@@ -186,7 +186,7 @@
    ------------------------------------------------------------------------
    These were `>[!highlights]` / `>[!challenges]` callouts until 2.11. As
    callouts they rendered as two near-empty titled boxes that couldn't be typed
-   into from reading view, and nothing else in Almanac could read them. They're
+   into from reading view, and nothing else in ChronoAnvil could read them. They're
    now `list:` fields — but a monthly retrospective is *one* thought ("how did
    the month go"), so they're presented as one box with a divider rather than
    two stacked cards.
@@ -200,37 +200,37 @@
    Two things this got wrong on the way here, worth stating so they aren't
    reintroduced:
 
-   1. The halves are flex items of `.journal-widget-block`, which separates its
+   1. The halves are flex items of `.ca-journal-widget-block`, which separates its
       children with `gap`, not margin. Zeroing `margin-bottom` did nothing and
       the box rendered as two boxes with a 10px trough between them. The gap has
-      to be cancelled explicitly — hence `--am-widget-gap` above.
+      to be cancelled explicitly — hence `--ca-widget-gap` above.
 
    2. Every other field in an entry puts its label *outside* its box, uppercase
       and muted. Sentence-case labels inside the box made this pair read as a
       foreign component rather than one more field. The labels here match the
       page's label typography exactly; the shared border and divider do the
       grouping, without a second competing label style. */
-.journal-list--highlights,
-.journal-list--challenges {
+.ca-journal-list--highlights,
+.ca-journal-list--challenges {
   border: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   padding: 9px 12px 10px;
   transition: border-color 0.15s ease;
 }
-.journal-list--highlights:has(+ .journal-list--challenges) {
-  border-radius: var(--am-radius-md) var(--am-radius-md) 0 0;
+.ca-journal-list--highlights:has(+ .ca-journal-list--challenges) {
+  border-radius: var(--ca-radius-md) var(--ca-radius-md) 0 0;
   border-bottom: none;
   margin-bottom: 0;
 }
 /* Cancels the container's flex gap so the two halves actually touch. The
    divider the user sees is the challenges half's own top border. */
-.journal-list--highlights + .journal-list--challenges {
-  border-radius: 0 0 var(--am-radius-md) var(--am-radius-md);
-  margin-top: calc(-1 * var(--am-widget-gap));
+.ca-journal-list--highlights + .ca-journal-list--challenges {
+  border-radius: 0 0 var(--ca-radius-md) var(--ca-radius-md);
+  margin-top: calc(-1 * var(--ca-widget-gap));
 }
-.journal-list--highlights .journal-list-label,
-.journal-list--challenges .journal-list-label {
+.ca-journal-list--highlights .ca-journal-list-label,
+.ca-journal-list--challenges .ca-journal-list-label {
   margin-bottom: 3px;
 }
 
@@ -239,12 +239,12 @@
    join look like a rendering fault — the opposite of what the join is for.
    Forward propagation (top half active -> bottom half follows) is a plain
    adjacent-sibling selector. */
-.journal-list--highlights:hover,
-.journal-list--highlights:focus-within,
-.journal-list--challenges:hover,
-.journal-list--challenges:focus-within,
-.journal-list--highlights:hover + .journal-list--challenges,
-.journal-list--highlights:focus-within + .journal-list--challenges {
+.ca-journal-list--highlights:hover,
+.ca-journal-list--highlights:focus-within,
+.ca-journal-list--challenges:hover,
+.ca-journal-list--challenges:focus-within,
+.ca-journal-list--highlights:hover + .ca-journal-list--challenges,
+.ca-journal-list--highlights:focus-within + .ca-journal-list--challenges {
   border-color: var(--interactive-accent);
 }
 
@@ -254,8 +254,8 @@
    take ordinary hover down with it on any renderer that lacks `:has()`. Isolated
    like this, the worst case is that the top half doesn't light up — a cosmetic
    asymmetry rather than a dead interaction. */
-.journal-list--highlights:has(+ .journal-list--challenges:hover),
-.journal-list--highlights:has(+ .journal-list--challenges:focus-within) {
+.ca-journal-list--highlights:has(+ .ca-journal-list--challenges:hover),
+.ca-journal-list--highlights:has(+ .ca-journal-list--challenges:focus-within) {
   border-color: var(--interactive-accent);
 }
 
@@ -265,7 +265,7 @@
    so the list reads as "these belong to the field above" rather than as more
    settings. */
 
-.almanac-path-children {
+.ca-path-children {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -273,18 +273,18 @@
   padding-left: 12px;
   border-left: 2px solid var(--background-modifier-border);
 }
-.almanac-path-child {
+.ca-path-child {
   display: flex;
   align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
 }
-.almanac-path-child-label {
+.ca-path-child-label {
   color: var(--text-muted);
   min-width: 11ch;
 }
-.almanac-path-child-value {
+.ca-path-child-value {
   font-family: var(--font-monospace);
   color: var(--text-faint);
   word-break: break-word;
@@ -296,12 +296,12 @@
    is a drop/paste target, so it stays visible (and obviously droppable) even
    when empty. */
 
-.journal-attach {
+.ca-journal-attach {
   display: block;
   margin: 0 0 0.9em;
 }
-.journal-attach-label {
-  font-size: var(--am-text-xs);
+.ca-journal-attach-label {
+  font-size: var(--ca-text-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -312,15 +312,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
 }
 
 /* Remove this category.
 
-   FAINT UNTIL HOVER, on the same reasoning as .jsh-title-edit: it is an
+   FAINT UNTIL HOVER, on the same reasoning as .ca-jsh-title-edit: it is an
    affordance on a row that is mostly a label, and a always-visible ✕ beside
    every shelf would read as three ways to delete something. */
-.journal-attach-remove {
+.ca-journal-attach-remove {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -331,50 +331,50 @@
   color: var(--text-faint);
   cursor: pointer;
   opacity: 0;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   transition: opacity 0.12s, color 0.12s, background 0.12s;
 }
-.journal-attach-remove svg {
+.ca-journal-attach-remove svg {
   width: 13px;
   height: 13px;
 }
-.journal-attach:hover .journal-attach-remove {
+.ca-journal-attach:hover .ca-journal-attach-remove {
   opacity: 1;
 }
-.journal-attach-remove:hover:not(:disabled) {
+.ca-journal-attach-remove:hover:not(:disabled) {
   color: var(--text-error);
   background: var(--background-modifier-hover);
 }
 /* Still shown, still explained by its tooltip, but plainly not available —
    a control that vanished on the shelves with files in them would read as an
    inconsistency rather than as a rule. */
-.journal-attach-remove.is-static {
+.ca-journal-attach-remove.is-static {
   cursor: default;
   opacity: 0.35;
 }
-.journal-attach:hover .journal-attach-remove.is-static {
+.ca-journal-attach:hover .ca-journal-attach-remove.is-static {
   opacity: 0.35;
 }
 
-.journal-attach-zone {
+.ca-journal-attach-zone {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 10px;
   border: 1px dashed var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   background: var(--background-secondary);
   transition: border-color 0.15s ease, background 0.15s ease,
     box-shadow 0.15s ease;
 }
-.journal-attach-zone:focus-visible {
+.ca-journal-attach-zone:focus-visible {
   outline: none;
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 130, 120, 255), 0.15);
 }
 /* Dragging a file over the field: solid accent edge + a faint accent wash, so
    the target is unmistakable without the layout shifting. */
-.journal-attach-zone.is-dragover {
+.ca-journal-attach-zone.is-dragover {
   border-style: solid;
   border-color: var(--interactive-accent);
   background: rgba(var(--interactive-accent-rgb, 130, 120, 255), 0.08);
@@ -382,43 +382,43 @@
 
 /* Gallery: auto-fitting tiles, so a single image doesn't stretch across the
    note and a dozen wrap into neat rows at any pane width. */
-.journal-attach-gallery {
+.ca-journal-attach-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
 }
-.journal-attach-gallery.is-empty {
+.ca-journal-attach-gallery.is-empty {
   display: none;
 }
 @container (max-width: 380px) {
-  .journal-attach-gallery {
+  .ca-journal-attach-gallery {
     grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   }
 }
 
-.journal-attach-tile {
+.ca-journal-attach-tile {
   position: relative;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   overflow: hidden;
   background: var(--background-primary);
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
-.journal-attach-tile:hover {
+.ca-journal-attach-tile:hover {
   border-color: var(--background-modifier-border-hover, var(--interactive-accent));
 }
-.journal-attach-tile.is-dragging {
+.ca-journal-attach-tile.is-dragging {
   opacity: 0.4;
 }
-.journal-attach-tile.is-drop-target,
-.journal-attach-chip.is-drop-target {
+.ca-journal-attach-tile.is-drop-target,
+.ca-journal-attach-chip.is-drop-target {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 1px;
 }
 
-.journal-attach-thumb {
+.ca-journal-attach-thumb {
   position: relative;
   aspect-ratio: 4 / 3;
   display: flex;
@@ -427,29 +427,29 @@
   background: var(--background-secondary-alt, var(--background-secondary));
   cursor: zoom-in;
 }
-.journal-attach-thumb img {
+.ca-journal-attach-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
-.journal-attach-thumb.is-missing {
+.ca-journal-attach-thumb.is-missing {
   flex-direction: column;
   gap: 4px;
   cursor: default;
   color: var(--text-faint);
 }
-.journal-attach-missing-icon svg {
+.ca-journal-attach-missing-icon svg {
   width: 18px;
   height: 18px;
 }
-.journal-attach-missing-text {
-  font-size: var(--am-text-2xs);
+.ca-journal-attach-missing-text {
+  font-size: var(--ca-text-2xs);
 }
 
-.journal-attach-caption {
+.ca-journal-attach-caption {
   padding: 5px 7px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   line-height: 1.35;
   color: var(--text-muted);
   cursor: text;
@@ -461,13 +461,13 @@
   overflow: hidden;
   word-break: break-word;
 }
-.journal-attach-caption:hover {
+.ca-journal-attach-caption:hover {
   color: var(--text-normal);
 }
 
 /* The ⋯ button: hidden until the tile/chip is hovered or keyboard-focused, so
    a wall of thumbnails stays calm. */
-.journal-attach-menu {
+.ca-journal-attach-menu {
   position: absolute;
   top: 4px;
   right: 4px;
@@ -478,81 +478,81 @@
   height: 22px;
   padding: 0;
   border: none;
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   background: var(--background-primary);
   color: var(--text-muted);
   opacity: 0;
   cursor: pointer;
-  box-shadow: var(--am-elev-1);
+  box-shadow: var(--ca-elev-1);
   transition: opacity 0.12s ease, color 0.12s ease;
 }
-.journal-attach-menu svg {
+.ca-journal-attach-menu svg {
   width: 14px;
   height: 14px;
 }
-.journal-attach-tile:hover .journal-attach-menu,
-.journal-attach-chip:hover .journal-attach-menu,
-.journal-attach-menu:focus-visible {
+.ca-journal-attach-tile:hover .ca-journal-attach-menu,
+.ca-journal-attach-chip:hover .ca-journal-attach-menu,
+.ca-journal-attach-menu:focus-visible {
   opacity: 1;
 }
-.journal-attach-menu:hover {
+.ca-journal-attach-menu:hover {
   color: var(--text-normal);
 }
 
 /* Chips: links, vault files, and legacy text lines. */
-.journal-attach-chips {
+.ca-journal-attach-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
-.journal-attach-chip {
+.ca-journal-attach-chip {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 7px;
   max-width: 100%;
-  padding: var(--am-space-3) 26px var(--am-space-3) var(--am-space-5);
+  padding: var(--ca-space-3) 26px var(--ca-space-3) var(--ca-space-5);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-primary);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   color: var(--text-normal);
   transition: border-color 0.15s ease, background 0.15s ease;
 }
-.journal-attach-chip.is-openable {
+.ca-journal-attach-chip.is-openable {
   cursor: pointer;
 }
-.journal-attach-chip:hover {
+.ca-journal-attach-chip:hover {
   border-color: var(--interactive-accent);
 }
-.journal-attach-chip.is-dragging {
+.ca-journal-attach-chip.is-dragging {
   opacity: 0.4;
 }
-.journal-attach-chip-icon {
+.ca-journal-attach-chip-icon {
   display: inline-flex;
   color: var(--text-muted);
 }
-.journal-attach-chip-icon svg {
+.ca-journal-attach-chip-icon svg {
   width: 14px;
   height: 14px;
 }
-.journal-attach-chip--link .journal-attach-chip-icon {
+.ca-journal-attach-chip--link .ca-journal-attach-chip-icon {
   color: var(--interactive-accent);
 }
-.journal-attach-chip-body {
+.ca-journal-attach-chip-body {
   display: flex;
   flex-direction: column;
   min-width: 0;
   line-height: 1.25;
 }
-.journal-attach-chip-title {
+.ca-journal-attach-chip-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 34ch;
 }
-.journal-attach-chip-sub {
-  font-size: var(--am-text-2xs);
+.ca-journal-attach-chip-sub {
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -560,13 +560,13 @@
 }
 /* A free-text line left over from when this field was a plain textarea: shown
    muted and un-pilled so it reads as a leftover to tidy, not an attachment. */
-.journal-attach-chip--text {
-  border-radius: var(--am-radius-sm);
+.ca-journal-attach-chip--text {
+  border-radius: var(--ca-radius-sm);
   border-style: dashed;
   color: var(--text-muted);
   font-style: italic;
 }
-.journal-attach-chip .journal-attach-menu {
+.ca-journal-attach-chip .ca-journal-attach-menu {
   position: absolute;
   top: 50%;
   right: 2px;
@@ -578,46 +578,46 @@
 }
 
 /* Toolbar + empty/busy hints. */
-.journal-attach-actions {
+.ca-journal-attach-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
-.journal-attach-file-input {
+.ca-journal-attach-file-input {
   display: none;
 }
-.journal-attach-btn {
+.ca-journal-attach-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: var(--am-space-2) var(--am-space-5);
+  padding: var(--ca-space-2) var(--ca-space-5);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: var(--background-primary);
   color: var(--text-muted);
-  font-size: var(--am-text-xs);
+  font-size: var(--ca-text-xs);
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
-.journal-attach-btn:hover {
+.ca-journal-attach-btn:hover {
   color: var(--text-normal);
   border-color: var(--interactive-accent);
 }
-.journal-attach-btn-icon {
+.ca-journal-attach-btn-icon {
   display: inline-flex;
 }
-.journal-attach-btn-icon svg {
+.ca-journal-attach-btn-icon svg {
   width: 13px;
   height: 13px;
 }
-.journal-attach-hint {
-  font-size: var(--am-text-2xs);
+.ca-journal-attach-hint {
+  font-size: var(--ca-text-2xs);
   color: var(--text-faint);
 }
-.journal-attach-empty,
-.journal-attach-busy {
-  font-size: var(--am-text-sm);
+.ca-journal-attach-empty,
+.ca-journal-attach-busy {
+  font-size: var(--ca-text-sm);
   color: var(--text-faint);
   font-style: italic;
   padding: 2px;
@@ -625,7 +625,7 @@
 
 /* Lightbox: full-viewport image viewer, appended to <body> so no note-level
    overflow or transform can clip it. Removed from the DOM on close. */
-.journal-attach-lightbox {
+.ca-journal-attach-lightbox {
   position: fixed;
   inset: 0;
   z-index: var(--layer-modal, 100);
@@ -636,10 +636,10 @@
   background: rgba(0, 0, 0, 0.82);
   backdrop-filter: blur(2px);
 }
-.journal-attach-lightbox:focus {
+.ca-journal-attach-lightbox:focus {
   outline: none;
 }
-.journal-attach-lightbox-stage {
+.ca-journal-attach-lightbox-stage {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -647,21 +647,21 @@
   max-width: 100%;
   max-height: 100%;
 }
-.journal-attach-lightbox-stage img {
+.ca-journal-attach-lightbox-stage img {
   max-width: 100%;
   max-height: 82vh;
   object-fit: contain;
-  border-radius: var(--am-radius-md);
-  box-shadow: var(--am-elev-3);
+  border-radius: var(--ca-radius-md);
+  box-shadow: var(--ca-elev-3);
 }
-.journal-attach-lightbox-caption {
+.ca-journal-attach-lightbox-caption {
   color: var(--text-on-accent, #fff);
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   opacity: 0.85;
   text-align: center;
 }
-.journal-attach-lightbox-nav,
-.journal-attach-lightbox-close {
+.ca-journal-attach-lightbox-nav,
+.ca-journal-attach-lightbox-close {
   position: absolute;
   display: flex;
   align-items: center;
@@ -670,48 +670,48 @@
   height: 36px;
   padding: 0;
   border: none;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   cursor: pointer;
   transition: background 0.15s ease;
 }
-.journal-attach-lightbox-nav:hover,
-.journal-attach-lightbox-close:hover {
+.ca-journal-attach-lightbox-nav:hover,
+.ca-journal-attach-lightbox-close:hover {
   background: rgba(255, 255, 255, 0.25);
 }
-.journal-attach-lightbox-nav.is-prev {
+.ca-journal-attach-lightbox-nav.is-prev {
   left: 3vmin;
   top: 50%;
   transform: translateY(-50%);
 }
-.journal-attach-lightbox-nav.is-next {
+.ca-journal-attach-lightbox-nav.is-next {
   right: 3vmin;
   top: 50%;
   transform: translateY(-50%);
 }
-.journal-attach-lightbox-close {
+.ca-journal-attach-lightbox-close {
   top: 3vmin;
   right: 3vmin;
 }
 
 /* --- Tasks manager ------------------------------------------------------- */
 
-.journal-tasks {
+.ca-journal-tasks {
   display: flex;
   flex-direction: column;
   min-height: 0;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   padding: 10px 12px;
   margin: 0 0 0.9em;
   transition: border-color 0.15s ease;
 }
-.journal-tasks:focus-within {
+.ca-journal-tasks:focus-within {
   border-color: var(--interactive-accent);
 }
-.journal-tasks.journal-note--collapsible > .journal-tasks-head {
+.ca-journal-tasks.ca-journal-note--collapsible > .ca-journal-tasks-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -721,137 +721,137 @@
   user-select: none;
   background: transparent;
   border-bottom: none;
-  margin-bottom: var(--am-space-2);
+  margin-bottom: var(--ca-space-2);
 }
-.journal-tasks.journal-note--collapsible.is-collapsed > .journal-tasks-head {
+.ca-journal-tasks.ca-journal-note--collapsible.is-collapsed > .ca-journal-tasks-head {
   margin-bottom: 0;
 }
-.journal-tasks-title-left {
+.ca-journal-tasks-title-left {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
-.journal-tasks.journal-note--collapsible > .journal-tasks-head:hover .journal-tasks-label {
+.ca-journal-tasks.ca-journal-note--collapsible > .ca-journal-tasks-head:hover .ca-journal-tasks-label {
   color: var(--text-normal);
 }
-.journal-tasks-chevron {
+.ca-journal-tasks-chevron {
   display: flex;
   align-items: center;
   color: var(--text-faint);
   transition: transform 120ms ease;
 }
-.journal-tasks-chevron .svg-icon {
+.ca-journal-tasks-chevron .svg-icon {
   width: 14px;
   height: 14px;
 }
-.journal-tasks.is-collapsed .journal-tasks-chevron {
+.ca-journal-tasks.is-collapsed .ca-journal-tasks-chevron {
   transform: rotate(-90deg);
 }
-.journal-tasks.is-collapsed > :not(.journal-tasks-head) {
+.ca-journal-tasks.is-collapsed > :not(.ca-journal-tasks-head) {
   display: none;
 }
-.journal-tasks-label {
-  font-size: var(--am-text-xs);
-  font-weight: var(--am-caps-weight);
-  letter-spacing: var(--am-caps-tracking);
+.ca-journal-tasks-label {
+  font-size: var(--ca-text-xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
   text-transform: uppercase;
   color: var(--text-muted);
   margin: 0;
 }
-.journal-tasks-head-right {
+.ca-journal-tasks-head-right {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.journal-tasks-compact-toggle {
+.ca-journal-tasks-compact-toggle {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 7px;
   background: transparent;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   color: var(--text-muted);
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   cursor: pointer;
   box-shadow: none;
   transition: all 0.15s ease;
 }
-.journal-tasks-compact-toggle:hover {
+.ca-journal-tasks-compact-toggle:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
   border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
 }
-.journal-tasks-compact-toggle.is-active {
+.ca-journal-tasks-compact-toggle.is-active {
   background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
   color: var(--interactive-accent);
   border-color: var(--interactive-accent);
 }
-.journal-tasks-compact-icon {
+.ca-journal-tasks-compact-icon {
   display: inline-flex;
 }
-.journal-tasks-compact-icon .svg-icon {
+.ca-journal-tasks-compact-icon .svg-icon {
   width: 12px;
   height: 12px;
 }
-.journal-tasks-progress {
-  font-size: var(--am-text-2xs);
+.ca-journal-tasks-progress {
+  font-size: var(--ca-text-2xs);
   color: var(--text-muted);
   background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
   padding: 2px 8px;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   border: 1px solid var(--background-modifier-border);
   font-weight: 600;
   white-space: nowrap;
 }
-.journal-tasks-add {
+.ca-journal-tasks-add {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: var(--am-space-2);
+  margin-bottom: var(--ca-space-2);
   background: transparent;
   border: none;
   padding: 0;
 }
-.journal-tasks-add-icon {
+.ca-journal-tasks-add-icon {
   color: var(--text-muted);
   display: inline-flex;
   flex-shrink: 0;
 }
-.journal-tasks-add-icon .svg-icon {
+.ca-journal-tasks-add-icon .svg-icon {
   width: 1.1em;
   height: 1.1em;
 }
-.journal-tasks-add-input {
+.ca-journal-tasks-add-input {
   flex: 1;
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid var(--am-border-subtle);
-  border-radius: var(--am-radius-sm);
-  background: var(--am-surface-inset);
+  border: 1px solid var(--ca-border-subtle);
+  border-radius: var(--ca-radius-sm);
+  background: var(--ca-surface-inset);
   color: var(--text-normal);
   font-family: inherit;
-  font-size: var(--am-text-sm);
-  padding: var(--am-space-2) var(--am-space-4);
+  font-size: var(--ca-text-sm);
+  padding: var(--ca-space-2) var(--ca-space-4);
   transition: border-color 0.15s ease, background 0.15s ease;
 }
-.journal-tasks-add-input::placeholder {
+.ca-journal-tasks-add-input::placeholder {
   color: var(--text-muted);
 }
-.journal-tasks-add-input:focus {
+.ca-journal-tasks-add-input:focus {
   outline: none;
-  border-color: var(--am-grain-accent);
-  background: var(--am-surface-card);
+  border-color: var(--ca-grain-accent);
+  background: var(--ca-surface-card);
 }
-.journal-tasks-list {
+.ca-journal-tasks-list {
   display: flex;
   flex-direction: column;
-  gap: var(--am-space-2);
+  gap: var(--ca-space-2);
 }
-.journal-tasks-empty {
-  font-size: var(--am-text-sm);
+.ca-journal-tasks-empty {
+  font-size: var(--ca-text-sm);
   color: var(--text-faint);
   padding: 12px 6px;
   display: flex;
@@ -859,106 +859,106 @@
   justify-content: center;
   gap: 8px;
 }
-.journal-tasks-empty-icon {
+.ca-journal-tasks-empty-icon {
   display: inline-flex;
   color: var(--text-muted);
 }
-.journal-tasks-empty-icon .svg-icon {
+.ca-journal-tasks-empty-icon .svg-icon {
   width: 1.2em;
   height: 1.2em;
 }
-.journal-task-row {
+.ca-journal-task-row {
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 8px 12px;
   border: 1px solid color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
   border-left: 3px solid color-mix(in srgb, var(--interactive-accent) 60%, var(--background-modifier-border));
-  border-radius: var(--am-radius-md);
+  border-radius: var(--ca-radius-md);
   background: color-mix(in srgb, var(--interactive-accent) 5%, var(--background-secondary));
-  box-shadow: var(--am-elev-1);
+  box-shadow: var(--ca-elev-1);
   transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.journal-task-row:hover {
+.ca-journal-task-row:hover {
   background: color-mix(in srgb, var(--interactive-accent) 9%, var(--background-secondary));
   border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border-hover));
-  box-shadow: var(--am-shadow-md);
+  box-shadow: var(--ca-shadow-md);
 }
 /* Priority-tinted backgrounds & spines */
-.journal-task-row.journal-task-high {
+.ca-journal-task-row.ca-journal-task-high {
   background: color-mix(in srgb, var(--color-red, #e05561) 7%, var(--background-secondary));
   border-color: color-mix(in srgb, var(--color-red, #e05561) 22%, var(--background-modifier-border));
   border-left-color: var(--color-red, #e05561);
 }
-.journal-task-row.journal-task-high:hover {
+.ca-journal-task-row.ca-journal-task-high:hover {
   background: color-mix(in srgb, var(--color-red, #e05561) 11%, var(--background-secondary));
   border-color: color-mix(in srgb, var(--color-red, #e05561) 38%, var(--background-modifier-border-hover));
 }
-.journal-task-row.journal-task-low {
-  background: color-mix(in srgb, var(--am-ev-teal) 7%, var(--background-secondary));
-  border-color: color-mix(in srgb, var(--am-ev-teal) 22%, var(--background-modifier-border));
-  border-left-color: var(--am-ev-teal);
+.ca-journal-task-row.ca-journal-task-low {
+  background: color-mix(in srgb, var(--ca-ev-teal) 7%, var(--background-secondary));
+  border-color: color-mix(in srgb, var(--ca-ev-teal) 22%, var(--background-modifier-border));
+  border-left-color: var(--ca-ev-teal);
 }
-.journal-task-row.journal-task-low:hover {
-  background: color-mix(in srgb, var(--am-ev-teal) 11%, var(--background-secondary));
-  border-color: color-mix(in srgb, var(--am-ev-teal) 38%, var(--background-modifier-border-hover));
+.ca-journal-task-row.ca-journal-task-low:hover {
+  background: color-mix(in srgb, var(--ca-ev-teal) 11%, var(--background-secondary));
+  border-color: color-mix(in srgb, var(--ca-ev-teal) 38%, var(--background-modifier-border-hover));
 }
-.journal-task-row.journal-task-normal {
+.ca-journal-task-row.ca-journal-task-normal {
   background: color-mix(in srgb, var(--interactive-accent) 5%, var(--background-secondary));
   border-color: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
   border-left-color: color-mix(in srgb, var(--interactive-accent) 60%, var(--background-modifier-border));
 }
-.journal-task-row.journal-task-normal:hover {
+.ca-journal-task-row.ca-journal-task-normal:hover {
   background: color-mix(in srgb, var(--interactive-accent) 9%, var(--background-secondary));
   border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border-hover));
 }
 /* Top line: checkbox + full task title */
-.journal-task-main {
+.ca-journal-task-main {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
 }
-.journal-task-check {
+.ca-journal-task-check {
   flex: 0 0 auto;
   cursor: pointer;
   accent-color: var(--interactive-accent);
   width: 18px;
   height: 18px;
   margin: 0;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
 }
-.journal-task-text {
+.ca-journal-task-text {
   flex: 1 1 auto;
   min-width: 0;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-normal);
   font-family: inherit;
-  font-size: var(--am-text-sm);
+  font-size: var(--ca-text-sm);
   line-height: 1.45;
   padding: 2px 4px;
-  border-radius: var(--am-radius-xs);
+  border-radius: var(--ca-radius-xs);
   transition: background 0.12s ease, border-color 0.12s ease;
 }
-.journal-task-text:hover {
+.ca-journal-task-text:hover {
   background: rgba(var(--interactive-accent-rgb, 124, 58, 237), 0.08);
 }
-.journal-task-text:focus {
+.ca-journal-task-text:focus {
   outline: none;
   background: var(--background-secondary);
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 1px var(--interactive-accent);
 }
-.journal-task-row.is-done {
+.ca-journal-task-row.is-done {
   opacity: 0.55;
 }
-.journal-task-row.is-done .journal-task-text {
+.ca-journal-task-row.is-done .ca-journal-task-text {
   text-decoration: line-through;
   color: var(--text-faint);
 }
 /* Bottom line: metadata chips & action buttons */
-.journal-task-meta {
+.ca-journal-task-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -966,14 +966,14 @@
   padding-left: 28px;
   flex-wrap: wrap;
 }
-.journal-task-chips {
+.ca-journal-task-chips {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
 }
 /* Priority chip button */
-.journal-task-prio {
+.ca-journal-task-prio {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -982,66 +982,66 @@
   border: 1px solid color-mix(in srgb, var(--interactive-accent) 15%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
   color: var(--text-muted);
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--ca-radius-pill);
   cursor: pointer;
   box-shadow: none;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
   font-weight: 600;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
-.journal-task-prio:hover {
+.ca-journal-task-prio:hover {
   background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary));
   color: var(--text-normal);
   border-color: var(--interactive-accent);
 }
-.journal-task-prio-icon {
+.ca-journal-task-prio-icon {
   display: inline-flex;
 }
-.journal-task-prio-icon .svg-icon {
+.ca-journal-task-prio-icon .svg-icon {
   width: 0.95em;
   height: 0.95em;
 }
-.journal-task-high .journal-task-prio {
+.ca-journal-task-high .ca-journal-task-prio {
   color: var(--color-red, #e05561);
   background: rgba(var(--color-red-rgb, 224, 85, 97), 0.14);
   border-color: rgba(var(--color-red-rgb, 224, 85, 97), 0.35);
   font-weight: 700;
 }
-.journal-task-low .journal-task-prio {
-  color: var(--am-ev-teal);
+.ca-journal-task-low .ca-journal-task-prio {
+  color: var(--ca-ev-teal);
   background: rgba(63, 163, 163, 0.14);
   border-color: rgba(63, 163, 163, 0.35);
 }
-.journal-task-normal .journal-task-prio {
+.ca-journal-task-normal .ca-journal-task-prio {
   color: var(--text-faint);
   opacity: 0.8;
 }
 /* Due date pill */
-.journal-task-due-wrap {
+.ca-journal-task-due-wrap {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
   background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
   border: 1px solid color-mix(in srgb, var(--interactive-accent) 15%, var(--background-modifier-border));
-  border-radius: var(--am-radius-pill);
-  font-size: var(--am-text-2xs);
+  border-radius: var(--ca-radius-pill);
+  font-size: var(--ca-text-2xs);
   color: var(--text-muted);
   transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
 }
-.journal-task-due-wrap:hover {
+.ca-journal-task-due-wrap:hover {
   background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary));
   border-color: var(--interactive-accent);
   color: var(--text-normal);
 }
-.journal-task-due-icon {
+.ca-journal-task-due-icon {
   display: inline-flex;
 }
-.journal-task-due-icon .svg-icon {
+.ca-journal-task-due-icon .svg-icon {
   width: 0.95em;
   height: 0.95em;
 }
-.journal-task-due {
+.ca-journal-task-due {
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -1051,39 +1051,39 @@
   cursor: pointer;
   outline: none;
 }
-.journal-task-due:not([value=""]) {
+.ca-journal-task-due:not([value=""]) {
   color: var(--text-normal);
   font-weight: 500;
 }
 /* Time pill */
-.journal-task-at-wrap {
+.ca-journal-task-at-wrap {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
   background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
   border: 1px solid color-mix(in srgb, var(--interactive-accent) 15%, var(--background-modifier-border));
-  border-radius: var(--am-radius-pill);
-  font-size: var(--am-text-2xs);
+  border-radius: var(--ca-radius-pill);
+  font-size: var(--ca-text-2xs);
   color: var(--text-muted);
   transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
 }
-.journal-task-at-wrap:hover {
+.ca-journal-task-at-wrap:hover {
   background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary));
   border-color: var(--interactive-accent);
   color: var(--text-normal);
 }
-.journal-task-at-wrap.is-hidden {
+.ca-journal-task-at-wrap.is-hidden {
   display: none;
 }
-.journal-task-at-icon {
+.ca-journal-task-at-icon {
   display: inline-flex;
 }
-.journal-task-at-icon .svg-icon {
+.ca-journal-task-at-icon .svg-icon {
   width: 0.95em;
   height: 0.95em;
 }
-.journal-task-at {
+.ca-journal-task-at {
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -1093,12 +1093,12 @@
   cursor: pointer;
   outline: none;
 }
-.journal-task-at:not([value=""]) {
+.ca-journal-task-at:not([value=""]) {
   color: var(--text-normal);
   font-weight: 500;
 }
 /* Delete button */
-.journal-task-del {
+.ca-journal-task-del {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -1109,29 +1109,29 @@
   border: none;
   background: transparent;
   color: var(--text-muted);
-  border-radius: var(--am-radius-sm);
+  border-radius: var(--ca-radius-sm);
   cursor: pointer;
   box-shadow: none;
   opacity: 0.55;
   transition: opacity 0.15s ease, background 0.12s ease, color 0.12s ease;
 }
-.journal-task-row:hover .journal-task-del {
+.ca-journal-task-row:hover .ca-journal-task-del {
   opacity: 1;
 }
-.journal-task-del:hover {
+.ca-journal-task-del:hover {
   background: var(--background-modifier-hover);
   color: var(--text-error, #e05561);
 }
-.journal-task-del .svg-icon {
+.ca-journal-task-del .svg-icon {
   width: 1em;
   height: 1em;
 }
 
 /* Compact mode: collapses row to single line, inlining meta chips */
-.journal-tasks.is-compact .journal-tasks-list {
+.ca-journal-tasks.is-compact .ca-journal-tasks-list {
   gap: 4px;
 }
-.journal-tasks.is-compact .journal-task-row {
+.ca-journal-tasks.is-compact .ca-journal-task-row {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
@@ -1139,61 +1139,61 @@
   padding: 4px 8px 4px 10px;
   min-height: 32px;
 }
-.journal-tasks.is-compact .journal-task-main {
+.ca-journal-tasks.is-compact .ca-journal-task-main {
   flex: 1 1 auto;
   min-width: 0;
 }
-.journal-tasks.is-compact .journal-task-meta {
+.ca-journal-tasks.is-compact .ca-journal-task-meta {
   padding-left: 0;
   flex-shrink: 0;
   flex-wrap: nowrap;
   gap: 6px;
 }
-.journal-tasks.is-compact .journal-task-chips {
+.ca-journal-tasks.is-compact .ca-journal-task-chips {
   flex-shrink: 0;
   flex-wrap: nowrap;
   gap: 4px;
 }
 /* Priority tag and delete button are hidden in compact mode */
-.journal-tasks.is-compact .journal-task-prio,
-.journal-tasks.is-compact .journal-task-del {
+.ca-journal-tasks.is-compact .ca-journal-task-prio,
+.ca-journal-tasks.is-compact .ca-journal-task-del {
   display: none;
 }
-.journal-tasks.is-compact .journal-task-due-wrap,
-.journal-tasks.is-compact .journal-task-at-wrap {
+.ca-journal-tasks.is-compact .ca-journal-task-due-wrap,
+.ca-journal-tasks.is-compact .ca-journal-task-at-wrap {
   padding: 1px 6px;
-  font-size: var(--am-text-2xs);
+  font-size: var(--ca-text-2xs);
 }
-.journal-tasks.is-compact .journal-task-text {
-  font-size: var(--am-text-sm);
+.ca-journal-tasks.is-compact .ca-journal-task-text {
+  font-size: var(--ca-text-sm);
 }
 
 /* Touch targets & responsive layout for mobile */
 @media (max-width: 520px) {
-  .journal-task-row {
+  .ca-journal-task-row {
     padding: 10px 12px;
     gap: 8px;
   }
-  .journal-task-meta {
+  .ca-journal-task-meta {
     padding-left: 28px;
     gap: 8px;
   }
-  .journal-task-del {
+  .ca-journal-task-del {
     opacity: 0.85;
   }
 
   /* In compact mode on mobile: date & time become icon-only trigger buttons */
-  .journal-tasks.is-compact .journal-task-row {
+  .ca-journal-tasks.is-compact .ca-journal-task-row {
     padding: 4px 6px 4px 8px;
     gap: 6px;
   }
-  .journal-tasks.is-compact .journal-task-due-wrap {
+  .ca-journal-tasks.is-compact .ca-journal-task-due-wrap {
     position: relative;
     padding: 4px 6px;
     min-width: 24px;
     justify-content: center;
   }
-  .journal-tasks.is-compact .journal-task-due {
+  .ca-journal-tasks.is-compact .ca-journal-task-due {
     position: absolute;
     inset: 0;
     opacity: 0;
@@ -1201,18 +1201,18 @@
     height: 100%;
     cursor: pointer;
   }
-  .journal-tasks.is-compact .journal-task-due-wrap.has-due {
+  .ca-journal-tasks.is-compact .ca-journal-task-due-wrap.has-due {
     color: var(--interactive-accent);
     background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
     border-color: var(--interactive-accent);
   }
-  .journal-tasks.is-compact .journal-task-at-wrap {
+  .ca-journal-tasks.is-compact .ca-journal-task-at-wrap {
     position: relative;
     padding: 4px 6px;
     min-width: 24px;
     justify-content: center;
   }
-  .journal-tasks.is-compact .journal-task-at {
+  .ca-journal-tasks.is-compact .ca-journal-task-at {
     position: absolute;
     inset: 0;
     opacity: 0;
@@ -1220,44 +1220,44 @@
     height: 100%;
     cursor: pointer;
   }
-  .journal-tasks.is-compact .journal-task-at-wrap.has-at {
+  .ca-journal-tasks.is-compact .ca-journal-task-at-wrap.has-at {
     color: var(--interactive-accent);
     background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
     border-color: var(--interactive-accent);
   }
 }
 
-body.is-mobile .journal-task-row {
+body.is-mobile .ca-journal-task-row {
   padding: 10px 12px;
 }
-body.is-mobile .journal-task-check {
+body.is-mobile .ca-journal-task-check {
   width: 22px;
   height: 22px;
 }
-body.is-mobile .journal-task-prio,
-body.is-mobile .journal-task-due-wrap,
-body.is-mobile .journal-task-at-wrap {
-  min-height: calc(var(--am-control-min) * 0.75);
+body.is-mobile .ca-journal-task-prio,
+body.is-mobile .ca-journal-task-due-wrap,
+body.is-mobile .ca-journal-task-at-wrap {
+  min-height: calc(var(--ca-control-min) * 0.75);
   padding: 4px 10px;
 }
-body.is-mobile .journal-task-del {
-  min-height: calc(var(--am-control-min) * 0.75);
-  min-width: calc(var(--am-control-min) * 0.75);
+body.is-mobile .ca-journal-task-del {
+  min-height: calc(var(--ca-control-min) * 0.75);
+  min-width: calc(var(--ca-control-min) * 0.75);
   opacity: 0.85;
 }
 
 /* On mobile devices in compact mode */
-body.is-mobile .journal-tasks.is-compact .journal-task-row {
+body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-row {
   padding: 4px 6px 4px 8px;
   gap: 6px;
 }
-body.is-mobile .journal-tasks.is-compact .journal-task-due-wrap {
+body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-due-wrap {
   position: relative;
   padding: 4px 8px;
   min-width: 28px;
   justify-content: center;
 }
-body.is-mobile .journal-tasks.is-compact .journal-task-due {
+body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-due {
   position: absolute;
   inset: 0;
   opacity: 0;
@@ -1265,18 +1265,18 @@ body.is-mobile .journal-tasks.is-compact .journal-task-due {
   height: 100%;
   cursor: pointer;
 }
-body.is-mobile .journal-tasks.is-compact .journal-task-due-wrap.has-due {
+body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-due-wrap.has-due {
   color: var(--interactive-accent);
   background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
   border-color: var(--interactive-accent);
 }
-body.is-mobile .journal-tasks.is-compact .journal-task-at-wrap {
+body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-at-wrap {
   position: relative;
   padding: 4px 8px;
   min-width: 28px;
   justify-content: center;
 }
-body.is-mobile .journal-tasks.is-compact .journal-task-at {
+body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-at {
   position: absolute;
   inset: 0;
   opacity: 0;
@@ -1284,7 +1284,7 @@ body.is-mobile .journal-tasks.is-compact .journal-task-at {
   height: 100%;
   cursor: pointer;
 }
-body.is-mobile .journal-tasks.is-compact .journal-task-at-wrap.has-at {
+body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-at-wrap.has-at {
   color: var(--interactive-accent);
   background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
   border-color: var(--interactive-accent);
@@ -1294,21 +1294,21 @@ body.is-mobile .journal-tasks.is-compact .journal-task-at-wrap.has-at {
    the ONLY route to a chip's menu, so with no branch here the attachment
    actions were unreachable on a phone rather than merely faint. See 3.9 §3.3. */
 @media (hover: none) {
-  .journal-attach-menu {
+  .ca-journal-attach-menu {
     opacity: 0.55;
   }
   /* Same rule, same reason (3.19.2): on a phone there is no hover to reveal
      this, so a shelf's remove control would be invisible rather than faint —
      and unlike the pencils, there is no second route to it anywhere. Kept
      dimmer than the menu because it deletes something and the menu does not. */
-  .journal-attach-remove {
+  .ca-journal-attach-remove {
     opacity: 0.45;
   }
 }
 
 /* ── A page of widgets sets its own width (4.2 §2) ─────────────────────
  *
- * `cssclasses: almanac-wide` in a note's frontmatter, which `composeHomeNote`
+ * `cssclasses: ca-wide` in a note's frontmatter, which `composeHomeNote`
  * writes onto the homepage. The width lives on Obsidian's sizer — an ancestor
  * of every element this plugin renders — so a post-processor cannot reach it
  * and this is the supported way in. See HOME_CSS_CLASS in home-sections.ts for
@@ -1342,8 +1342,8 @@ body.is-mobile .journal-tasks.is-compact .journal-task-at-wrap.has-at {
  *
  * ── AND IT IS NO LONGER READ WITH `:has()` (4.45.1) ───────────────────
  *
- * It was: the render marked the title card `.jtc-wide` and this rule reached up
- * for it with `.markdown-preview-view:has(.jtc-wide)`. THE CARD IS NOT ALWAYS
+ * It was: the render marked the title card `.ca-jtc-wide` and this rule reached up
+ * for it with `.markdown-preview-view:has(.ca-jtc-wide)`. THE CARD IS NOT ALWAYS
  * IN THE DOM. A reading view renders sections as they approach the viewport and
  * drops them again when they leave, and the title card is the first block on the
  * page — so scrolling a dashboard to the bottom unloaded the very element this
@@ -1357,18 +1357,25 @@ body.is-mobile .journal-tasks.is-compact .journal-task-at-wrap.has-at {
  * width still follows the head: delete the line, or the whole title section, and
  * the next pass over that note takes the class away.
  *
- * THE SPECIFICITY IS STILL EXACTLY MATCHED. `.am-wide-page .markdown-preview-view
+ * THE SPECIFICITY IS STILL EXACTLY MATCHED. `.ca-wide-page .markdown-preview-view
  * .markdown-preview-sizer` weighs (0,3,0) — what
  * `.markdown-preview-view.is-readable-line-width .markdown-preview-sizer` weighs,
- * and what the `almanac-wide` half beside it weighs. That is the whole of the
+ * and what the `ca-wide` half beside it weighs. That is the whole of the
  * promise made three paragraphs up, that a theme deliberately setting a width
  * still gets the last word. Do not add a fourth class to either selector.
  *
  * ONE DECLARATION FOR BOTH, because it is one width. Two rules with the same
  * `max-width` would be two places to retune it. */
+/* `.almanac-wide` is the pre-rename spelling of the frontmatter class. It is
+ * matched here and nowhere else: `cssclasses` is written into the reader's own
+ * note and repair has never edited frontmatter, so a homepage composed before
+ * the rename still carries it. Dropping the selector would silently narrow a
+ * page the reader never changed. Nothing writes it any more. */
+.markdown-preview-view.ca-wide .markdown-preview-sizer,
+.markdown-source-view.ca-wide .cm-sizer,
 .markdown-preview-view.almanac-wide .markdown-preview-sizer,
 .markdown-source-view.almanac-wide .cm-sizer,
-.am-wide-page .markdown-preview-view .markdown-preview-sizer,
-.am-wide-page .markdown-source-view .cm-sizer {
-  max-width: var(--am-page-width);
+.ca-wide-page .markdown-preview-view .markdown-preview-sizer,
+.ca-wide-page .markdown-source-view .cm-sizer {
+  max-width: var(--ca-page-width);
 }

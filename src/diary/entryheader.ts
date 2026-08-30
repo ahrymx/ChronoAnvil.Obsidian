@@ -43,7 +43,7 @@
 // subtree is destroyed on that widget's next rebuild. Nothing in the footer
 // reads the note's title, so nothing in it needed the liveness.
 //
-//   ```almanac
+//   ```chronoanvil
 //   entry-header
 //   ```
 
@@ -52,7 +52,7 @@ import { settingsButton } from "../ui/section-frame";
 import { attachNoteRename } from "../ui/header-title";
 import { isManagedTemplate } from "../trackers/entry-trackers";
 import { openEntryTemplateWindow } from "../ui/entry-template-modal";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { CLASS_DEFS } from "../trackers/trackers";
 import { labelForGrain, entryDateKey } from "./nav";
 import type { TrackerClass } from "../trackers/trackers";
@@ -127,17 +127,17 @@ function navPill(
   emptyTip: string,
   side: "left" | "right"
 ): void {
-  const sideCls = side === "left" ? "jeh-seg-start" : "jeh-seg-end";
+  const sideCls = side === "left" ? "ca-jeh-seg-start" : "ca-jeh-seg-end";
   if (!target) {
     const muted = parent.createSpan({
-      cls: `jeh-navpill ${sideCls} jeh-navpill-empty`,
+      cls: `ca-jeh-navpill ${sideCls} ca-jeh-navpill-empty`,
       attr: { "aria-label": emptyTip, title: emptyTip },
     });
     setIcon(muted, icon);
     return;
   }
   const pill = parent.createEl("a", {
-    cls: `jeh-navpill ${sideCls}`,
+    cls: `ca-jeh-navpill ${sideCls}`,
     attr: { "aria-label": target.label, title: target.label },
   });
   setIcon(pill, icon);
@@ -162,7 +162,7 @@ interface DateOption {
 // data behind the scrollable date list. Mirrors entryContext's own filtering
 // so the picker and the prev/next arrows always agree on what counts.
 function dateOptions(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   grain: TrackerClass
 ): DateOption[] {
   const app = plugin.app;
@@ -197,28 +197,28 @@ function dateOptions(
 // redundant label. On click it drops a scrollable list of every entry to jump
 // straight to any day/month. Closes on outside-click or Esc.
 function buildDatePicker(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   parent: HTMLElement,
   file: TFile,
   grain: TrackerClass
 ): void {
   const app = plugin.app;
-  const wrap = parent.createDiv({ cls: "jeh-datenav" });
+  const wrap = parent.createDiv({ cls: "ca-jeh-datenav" });
 
   const trigger = wrap.createEl("button", {
-    cls: "jeh-datenav-trigger jeh-seg-mid",
+    cls: "ca-jeh-datenav-trigger ca-jeh-seg-mid",
     attr: {
       "aria-label": `Jump to ${CLASS_DEFS[grain].periodNoun}`,
       title: `Jump to ${CLASS_DEFS[grain].periodNoun}`,
       type: "button",
     },
   });
-  setIcon(trigger.createSpan({ cls: "jeh-datenav-cal" }), "calendar-search");
+  setIcon(trigger.createSpan({ cls: "ca-jeh-datenav-cal" }), "calendar-search");
   const dateLabel = entryDateLabel(app, file, grain);
   if (dateLabel) {
-    trigger.createSpan({ cls: "jeh-datenav-label", text: dateLabel });
+    trigger.createSpan({ cls: "ca-jeh-datenav-label", text: dateLabel });
   }
-  setIcon(trigger.createSpan({ cls: "jeh-datenav-caret" }), "chevrons-up-down");
+  setIcon(trigger.createSpan({ cls: "ca-jeh-datenav-caret" }), "chevrons-up-down");
 
   let menu: HTMLElement | null = null;
   const closeMenu = (): void => {
@@ -240,28 +240,28 @@ function buildDatePicker(
   };
 
   const openMenu = (): void => {
-    menu = wrap.createDiv({ cls: "jeh-datenav-menu" });
+    menu = wrap.createDiv({ cls: "ca-jeh-datenav-menu" });
     trigger.addClass("is-open");
-    const list = menu.createDiv({ cls: "jeh-datenav-list" });
+    const list = menu.createDiv({ cls: "ca-jeh-datenav-list" });
 
     const options = dateOptions(plugin, grain);
     if (!options.length) {
-      list.createDiv({ cls: "jeh-datenav-empty", text: "No entries yet" });
+      list.createDiv({ cls: "ca-jeh-datenav-empty", text: "No entries yet" });
     }
 
     let currentRow: HTMLElement | null = null;
     for (const opt of options) {
       const isCurrent = opt.file.path === file.path;
       const row = list.createEl("button", {
-        cls: "jeh-datenav-row" + (isCurrent ? " is-current" : ""),
+        cls: "ca-jeh-datenav-row" + (isCurrent ? " is-current" : ""),
         attr: { type: "button", title: opt.label },
       });
-      const text = row.createDiv({ cls: "jeh-datenav-row-text" });
-      text.createSpan({ cls: "jeh-datenav-row-label", text: opt.label });
-      if (opt.sub) row.createDiv({ cls: "jeh-datenav-row-sub", text: opt.sub });
+      const text = row.createDiv({ cls: "ca-jeh-datenav-row-text" });
+      text.createSpan({ cls: "ca-jeh-datenav-row-label", text: opt.label });
+      if (opt.sub) row.createDiv({ cls: "ca-jeh-datenav-row-sub", text: opt.sub });
       if (isCurrent) {
         currentRow = row;
-        setIcon(row.createSpan({ cls: "jeh-datenav-row-mark" }), "check");
+        setIcon(row.createSpan({ cls: "ca-jeh-datenav-row-mark" }), "check");
       }
       row.addEventListener("click", () => {
         closeMenu();
@@ -325,7 +325,7 @@ function buildDatePicker(
 // and the search are destinations, and the banner already carries a date
 // stepper and sits under a `links:` row that goes to them.
 function attachEntryMenu(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   host: HTMLElement,
   notePath: string,
   grain: TrackerClass
@@ -339,7 +339,7 @@ function attachEntryMenu(
   // control.
   if (isManagedTemplate(plugin, notePath)) return;
 
-  settingsButton(host, "jeh-more", (menu: Menu) => {
+  settingsButton(host, "ca-jeh-more", (menu: Menu) => {
     menu.addItem((i: MenuItem) =>
       i
         .setTitle("Edit sections…")
@@ -389,7 +389,7 @@ function attachEntryMenu(
 //
 // THE FILE'S NAME, AND THAT IS THE WHOLE CHANGE. This band used to draw the
 // `title` FRONTMATTER PROPERTY, falling back to a formatted date with an "Add a
-// title…" hint beside it — so an entry was the one Almanac page whose banner did
+// title…" hint beside it — so an entry was the one ChronoAnvil page whose banner did
 // not show what the note is called.
 //
 // AND IT CONTRADICTED A RULE THE PLUGIN HAD ALREADY SETTLED. `page-title.ts`
@@ -408,17 +408,17 @@ function attachEntryMenu(
 // rather than reimplemented — which also means an entry's name is renameable
 // from the note for the first time, and renaming it moves the file.
 export function buildEntryHeader(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   const app = plugin.app;
   // `journal-banner-name` IS THE SHARED CLASS, and it is what makes this band
   // and a journal leaf's one object: 4.21.1 collapsed three banner drawings into
   // two, and every rule about how a slim banner's name band is inset, ruled and
-  // laid out is written once against that class. See `.journal-slim-banner` in
+  // laid out is written once against that class. See `.ca-journal-slim-banner` in
   // `30-header-bars.css`.
   const wrap = createDiv({
-    cls: "journal-header-bar journal-header-l1 journal-entry-header journal-banner-name",
+    cls: "ca-journal-header-bar ca-journal-header-l1 ca-journal-entry-header ca-journal-banner-name",
   });
 
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
@@ -426,9 +426,9 @@ export function buildEntryHeader(
   const c = entryContext(plugin, file);
 
   const titleWrap = wrap.createDiv({
-    cls: "jeh-title-wrap journal-banner-title",
+    cls: "ca-jeh-title-wrap ca-journal-banner-title",
   });
-  attachNoteRename(app, titleWrap, file, "jeh-title");
+  attachNoteRename(app, titleWrap, file, "ca-jeh-title");
 
   // THE COG COMES UP FROM THE FOOTER. A banner carries the control that edits
   // the page — `settingsButton` says so — and until 4.21 an entry's sat under
@@ -464,7 +464,7 @@ export function buildEntryHeader(
 // LEFT AND RIGHT BY PUSHING, NOT BY SPLITTING. `justify-content: space-between`
 // would strand the stepper in the middle on a note with no alias offered.
 export function buildEntryContext(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   // Whether the vault banner is drawing this note's title (4.51.5). When it is,
   // the alias editor below is that same control a second time — same property,
@@ -482,7 +482,7 @@ export function buildEntryContext(
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (!(file instanceof TFile)) return null;
 
-  const bar = createDiv({ cls: "journal-widget-bar journal-entry-context" });
+  const bar = createDiv({ cls: "ca-journal-widget-bar ca-journal-entry-context" });
   const c = entryContext(plugin, file);
 
   // ── the alias, on the left ──────────────────────────────────────────
@@ -499,7 +499,7 @@ export function buildEntryContext(
     //
     // The row is the navigator alone, and says so: `jec-nav-only` tightens it,
     // because a control on its own does not need a row's worth of height.
-    bar.addClass("jec-nav-only");
+    bar.addClass("ca-jec-nav-only");
     buildEntryNav(plugin, bar, file, c);
     return bar;
   }
@@ -517,8 +517,8 @@ export function buildEntryContext(
   // The editor owns the value now: it writes the file AND updates this, so the
   // band it re-renders shows what was just saved without asking anyone.
   let title = typeof fm[TITLE_PROP] === "string" ? (fm[TITLE_PROP] as string).trim() : "";
-  const titleWrap = bar.createDiv({ cls: "jec-title-wrap" });
-  const titleEl = titleWrap.createDiv({ cls: "jec-title" });
+  const titleWrap = bar.createDiv({ cls: "ca-jec-title-wrap" });
+  const titleEl = titleWrap.createDiv({ cls: "ca-jec-title" });
 
   const renderTitle = (): void => {
     titleEl.empty();
@@ -526,20 +526,20 @@ export function buildEntryContext(
     // across every render — the click handler is bound to it — so a note that
     // was empty when the strip was built kept `jec-title-empty` after its first
     // title was saved, and drew that title in the "nothing here yet" face.
-    titleEl.removeClass("jec-title-empty");
+    titleEl.removeClass("ca-jec-title-empty");
     if (title) {
-      setIcon(titleEl.createSpan({ cls: "jec-title-icon" }), "notebook");
-      titleEl.createSpan({ cls: "jec-title-text", text: title });
-      const pencil = titleEl.createSpan({ cls: "jec-title-edit" });
+      setIcon(titleEl.createSpan({ cls: "ca-jec-title-icon" }), "notebook");
+      titleEl.createSpan({ cls: "ca-jec-title-text", text: title });
+      const pencil = titleEl.createSpan({ cls: "ca-jec-title-edit" });
       setIcon(pencil, "pencil");
     } else {
       // NO DATE FALLBACK ANY MORE. The old band printed the formatted date here
       // when the alias was empty, which is why it read as the note's title; the
       // banner above now says what the note is called, so an empty alias is
       // simply an offer.
-      titleEl.addClass("jec-title-empty");
-      setIcon(titleEl.createSpan({ cls: "jec-title-icon" }), "plus");
-      titleEl.createSpan({ cls: "jec-title-text", text: "Add a title…" });
+      titleEl.addClass("ca-jec-title-empty");
+      setIcon(titleEl.createSpan({ cls: "ca-jec-title-icon" }), "plus");
+      titleEl.createSpan({ cls: "ca-jec-title-text", text: "Add a title…" });
     }
   };
 
@@ -547,7 +547,7 @@ export function buildEntryContext(
     titleWrap.empty();
     const input = titleWrap.createEl("input", {
       type: "text",
-      cls: "jec-title-input",
+      cls: "ca-jec-title-input",
       attr: { placeholder: "Title this entry…" },
     });
     input.value = title;
@@ -638,13 +638,13 @@ export function buildEntryContext(
 // this says which one is next — so it is drawn on both paths, and drawing it
 // twice by hand is how one of them loses a chevron.
 function buildEntryNav(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   bar: HTMLElement,
   file: TFile,
   c: EntryContext
 ): void {
   const app = plugin.app;
-  const navGroup = bar.createDiv({ cls: "jeh-nav jeh-seg" });
+  const navGroup = bar.createDiv({ cls: "ca-jeh-nav ca-jeh-seg" });
   navPill(navGroup, app, c.prev, "chevron-left", `Earliest ${CLASS_DEFS[c.grain].periodNoun}`, "left");
   buildDatePicker(plugin, navGroup, file, c.grain);
   navPill(navGroup, app, c.next, "chevron-right", `Latest ${CLASS_DEFS[c.grain].periodNoun}`, "right");

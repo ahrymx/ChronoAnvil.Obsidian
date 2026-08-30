@@ -9,7 +9,7 @@
 //
 // WHY THIS FILE EXISTS
 //
-// Almanac asks a reader to learn nine nouns before they can create one note —
+// ChronoAnvil asks a reader to learn nine nouns before they can create one note —
 // journal, level, kind, layout, section, tracker, scope, event, page — and
 // three of them contradicted each other:
 //

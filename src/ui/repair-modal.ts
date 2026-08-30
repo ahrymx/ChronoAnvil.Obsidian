@@ -97,18 +97,18 @@ class RepairModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
-    contentEl.addClass("almanac-repair");
+    contentEl.addClass("ca-repair");
 
-    const header = contentEl.createDiv({ cls: "almanac-repair-header" });
-    const titleWrap = header.createDiv({ cls: "almanac-repair-title-wrap" });
-    const iconEl = titleWrap.createSpan({ cls: "almanac-repair-header-icon" });
+    const header = contentEl.createDiv({ cls: "ca-repair-header" });
+    const titleWrap = header.createDiv({ cls: "ca-repair-title-wrap" });
+    const iconEl = titleWrap.createSpan({ cls: "ca-repair-header-icon" });
     setIcon(iconEl, "wrench");
     titleWrap.createEl("h3", { text: "Set up / repair vault" });
 
     const total = this.totalPendingItems();
     if (total > 0) {
       header.createSpan({
-        cls: "almanac-pill is-muted",
+        cls: "ca-pill is-muted",
         text: `${total} change${total === 1 ? "" : "s"} to review`,
       });
     }
@@ -127,18 +127,18 @@ class RepairModal extends Modal {
       return;
     }
 
-    const toolbar = contentEl.createDiv({ cls: "almanac-repair-toolbar" });
+    const toolbar = contentEl.createDiv({ cls: "ca-repair-toolbar" });
     toolbar.createEl("p", {
-      cls: "almanac-repair-lead",
+      cls: "ca-repair-lead",
       text:
         "Everything this would change, grouped by what it touches. Untick anything you " +
         "would rather it left alone. Nothing is written until you press the button.",
     });
 
     if (this.pending().length > 1) {
-      const toggleWrap = toolbar.createDiv({ cls: "almanac-repair-toggles" });
+      const toggleWrap = toolbar.createDiv({ cls: "ca-repair-toggles" });
       const selectAll = toggleWrap.createEl("button", {
-        cls: "almanac-repair-toggle-btn",
+        cls: "ca-repair-toggle-btn",
         text: "Select all",
       });
       selectAll.addEventListener("click", () => {
@@ -151,7 +151,7 @@ class RepairModal extends Modal {
       });
 
       const deselectAll = toggleWrap.createEl("button", {
-        cls: "almanac-repair-toggle-btn",
+        cls: "ca-repair-toggle-btn",
         text: "Deselect all",
       });
       deselectAll.addEventListener("click", () => {
@@ -164,7 +164,7 @@ class RepairModal extends Modal {
       });
     }
 
-    const list = contentEl.createDiv({ cls: "almanac-repair-groups" });
+    const list = contentEl.createDiv({ cls: "ca-repair-groups" });
     this.groupControls = [];
     for (const group of this.pending()) this.renderGroup(list, group);
 
@@ -195,14 +195,14 @@ class RepairModal extends Modal {
   private renderNothingToDo(): void {
     const { contentEl } = this;
     contentEl.createEl("p", {
-      cls: "almanac-repair-lead",
+      cls: "ca-repair-lead",
       text: "Nothing here needs repairing.",
     });
-    contentEl.createDiv({ cls: "almanac-repair-groups" }).appendChild(
+    contentEl.createDiv({ cls: "ca-repair-groups" }).appendChild(
       emptyCallout(
         "check",
         "Your vault is up to date",
-        "This window lists anything Almanac would add, bring up to date, catch " +
+        "This window lists anything ChronoAnvil would add, bring up to date, catch " +
           "up or migrate from an older release. None of that is outstanding — " +
           "every file it ships is present and current."
       )
@@ -238,7 +238,7 @@ class RepairModal extends Modal {
   }
 
   private renderGroup(host: HTMLElement, group: RepairGroup): void {
-    const wrap = host.createDiv({ cls: "almanac-repair-group" });
+    const wrap = host.createDiv({ cls: "ca-repair-group" });
 
     const { row, lead } = createListRow(wrap, {
       token: group.glyph,
@@ -253,7 +253,7 @@ class RepairModal extends Modal {
         },
       ],
     });
-    row.addClass("almanac-repair-head");
+    row.addClass("ca-repair-head");
 
     // THE TICK GOES IN THE `lead` SLOT, which is the one `createListRow` keeps
     // in front of the token for exactly this — a row that is a choice rather
@@ -278,14 +278,14 @@ class RepairModal extends Modal {
       sync();
     });
 
-    const items = wrap.createDiv({ cls: "almanac-repair-items" });
+    const items = wrap.createDiv({ cls: "ca-repair-items" });
     for (const item of group.items) {
       this.renderItem(items, item);
     }
   }
 
   private renderItem(host: HTMLElement, item: RepairFileChange): void {
-    const wrap = host.createDiv({ cls: "almanac-repair-item" });
+    const wrap = host.createDiv({ cls: "ca-repair-item" });
     const summary = item.diff ? diffSummary(item.diff) : null;
     // Only a file with a diff has anything to open. A created file has no
     // before to compare against, and "every line is an addition" is not a
@@ -301,20 +301,20 @@ class RepairModal extends Modal {
       cls: canOpen ? ["is-openable"] : [],
     });
     if (summary) {
-      actions.createSpan({ cls: "almanac-repair-count", text: summary });
+      actions.createSpan({ cls: "ca-repair-count", text: summary });
     }
 
     if (!canOpen) return;
 
-    const caret = lead.createSpan({ cls: "almanac-repair-caret" });
+    const caret = lead.createSpan({ cls: "ca-repair-caret" });
     setIcon(caret, "chevron-right");
 
-    const body = wrap.createDiv({ cls: "almanac-repair-diff" });
+    const body = wrap.createDiv({ cls: "ca-repair-diff" });
     body.hide();
     for (const line of changed) this.renderDiffLine(body, line);
     if (item.diff?.truncated) {
       body.createDiv({
-        cls: "almanac-repair-truncated",
+        cls: "ca-repair-truncated",
         text: "This note is too long to diff line by line — the counts are an estimate.",
       });
     }
@@ -331,17 +331,17 @@ class RepairModal extends Modal {
 
   private renderDiffLine(host: HTMLElement, line: DiffLine): void {
     const el = host.createDiv({
-      cls: `almanac-repair-line is-${line.kind}`,
+      cls: `ca-repair-line is-${line.kind}`,
     });
     // A GLYPH IN ITS OWN SPAN rather than prepended to the text, so a reader
     // copying a line out of this window gets the line and not the marker.
     el.createSpan({
-      cls: "almanac-repair-mark",
+      cls: "ca-repair-mark",
       text: line.kind === "add" ? "+" : "−",
     });
     // An empty line still needs to occupy one, or a diff that adds a blank
     // separator shows a gap with no marker beside it.
-    el.createSpan({ cls: "almanac-repair-text", text: line.text || " " });
+    el.createSpan({ cls: "ca-repair-text", text: line.text || " " });
   }
 
   onClose(): void {

@@ -60,7 +60,7 @@
 //   ids   `<group token>-<verb>-<object>`, tested (see GROUP_ID_PREFIX).
 //   names `<Owner>: <what it does>`, so the palette — which is a search box
 //         and not a menu — sorts a group together and filtering on
-//         `almanac diary` returns the diary and nothing else.
+//         `chronoanvil diary` returns the diary and nothing else.
 //
 // The name prefix is the OWNER and the ribbon label is the GROUP: Study's four
 // read `Study: …` under a **Journals** heading, because a label names a group
@@ -84,7 +84,7 @@
 import type { TFile } from "obsidian";
 import type { IconName } from "obsidian";
 import { Notice } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { openCapture } from "../diary/capture";
 import { openEventEditor, draftEvent } from "../events/event-ui";
 import { ensureEventsNote } from "../events/eventstore";
@@ -123,7 +123,7 @@ export interface Action {
   // commands, `typeOfActive()`, routes through `journalTypeOfNote`, which calls
   // `getFile`. `journalTypeOfPath` underneath it is the pure prefix match, and
   // it is what these use.
-  when?: (p: AlmanacPlugin) => boolean;
+  when?: (p: ChronoAnvilPlugin) => boolean;
   // Drawn red on the ribbon (`MenuItem.setWarning`). DATA RATHER THAN AN ID
   // CHECK: `openMenu` used to ask `if (action.id === "setup-vault")`, which
   // made a property of the action a fact about the menu's source and would
@@ -131,7 +131,7 @@ export interface Action {
   // it then did. A second destructive action would have had to know to add
   // itself to a condition in another file.
   warning?: boolean;
-  run: (p: AlmanacPlugin) => void | Promise<void>;
+  run: (p: ChronoAnvilPlugin) => void | Promise<void>;
 }
 
 // The id token each group's actions carry, and the reason the id scheme is a
@@ -166,7 +166,7 @@ export const GROUP_ID_PREFIX: Record<ActionGroup, string> = {
 // What the RIBBON calls an action, given what the PALETTE calls it.
 //
 // THE GROUP APPEARS ONCE PER SURFACE, NEVER TWICE (§10.2). The palette has no
-// headings, so it gets the group as a prefix — `Almanac: Diary: open today`,
+// headings, so it gets the group as a prefix — `ChronoAnvil: Diary: open today`,
 // which is the two colons the decision accepted. The menu has a `setIsLabel`
 // heading, so the item under a **Diary** label must not repeat it: the reader
 // would be told twice in one glance.
@@ -186,20 +186,20 @@ export function menuTitle(name: string): string {
 // The active markdown note, or null. The one piece of workspace state a `when`
 // may read — and, since 4.27, what the capture command hands the destination
 // list as the note it was pressed on.
-function activeMarkdownFile(p: AlmanacPlugin): TFile | null {
+function activeMarkdownFile(p: ChronoAnvilPlugin): TFile | null {
   const file = p.app.workspace.getActiveFile();
   if (!file || file.extension !== "md") return null;
   return file;
 }
 
 // Its path, for the `when` predicates that only need the string.
-function activeNotePath(p: AlmanacPlugin): string | null {
+function activeNotePath(p: ChronoAnvilPlugin): string | null {
   return activeMarkdownFile(p)?.path ?? null;
 }
 
 // Is the active note inside a journal? Prefix matching over configured roots —
 // no vault read. See the cheapness rule above.
-function inJournal(p: AlmanacPlugin): boolean {
+function inJournal(p: ChronoAnvilPlugin): boolean {
   const path = activeNotePath(p);
   if (path == null) return false;
   const refs = registeredJournalTypes(p).map((t) => ({
@@ -209,7 +209,7 @@ function inJournal(p: AlmanacPlugin): boolean {
   return journalTypeOfPath(refs, path) != null;
 }
 
-const hasNote = (p: AlmanacPlugin): boolean => activeNotePath(p) != null;
+const hasNote = (p: ChronoAnvilPlugin): boolean => activeNotePath(p) != null;
 
 export const ACTIONS: Action[] = [
   // ── diary ───────────────────────────────────────────────────────────
@@ -430,7 +430,7 @@ export const ACTIONS: Action[] = [
   {
     // 4.30. What a reader wrote, on the clipboard, as markdown anybody can read
     // — the regions Obsidian hides in comments and the labels that only exist
-    // inside an ```almanac fence.
+    // inside a ```chronoanvil fence.
     //
     // NO ELLIPSIS. It opens nothing and asks nothing; the convention on this
     // table is that `…` promises a window (`Edit sections…`, `Template…`).

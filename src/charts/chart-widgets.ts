@@ -25,7 +25,7 @@
 //
 // NO CONTEXT OBJECT
 //
-// These take `plugin`, not `{ app, plugin }`. AlmanacPlugin extends Obsidian's
+// These take `plugin`, not `{ app, plugin }`. ChronoAnvilPlugin extends Obsidian's
 // Plugin, so `plugin.app` is already there; the pair was redundant every time
 // it was written, and chart-render.ts alone declares it four times over.
 // Passing one argument that carries the other is not a shortcut — it removes a
@@ -38,7 +38,7 @@ import {
   moment,
 } from "../core/util";
 import type { MomentLike } from "../core/util";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { getTracker } from "../trackers/trackers";
 import { panDuringDrag } from "../ui/drag-scroll";
 import { renderTrackerChart } from "./chart-render";
@@ -61,7 +61,7 @@ import {
 } from "./charts";
 
 export function buildRangeCycle(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   head: HTMLElement,
   spec: ChartSpec,
   period: PeriodBounds | null,
@@ -72,9 +72,9 @@ export function buildRangeCycle(
   // draw a trailing 30 days under a label claiming otherwise.
   const available = rangesAvailable(spec.scope ?? "daily", period != null);
   const next = nextChartRange(spec.range, available);
-  const btn = head.createEl("button", { cls: "journal-chart-range" });
+  const btn = head.createEl("button", { cls: "ca-journal-chart-range" });
   btn.createSpan({
-    cls: "journal-chart-range-text",
+    cls: "ca-journal-chart-range-text",
     text: RANGE_SHORT_LABELS[spec.range] ?? spec.range,
   });
   // Nowhere to cycle to — one available range, and the chart is already on
@@ -128,7 +128,7 @@ export function buildRangeCycle(
 // lets this refuse one — without it, a drag between panes would reorder the
 // wrong note using a key that happens to exist there too.
 function attachChartDrag(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   cell: HTMLElement,
   key: string,
   notePath: string
@@ -174,13 +174,13 @@ function attachChartDrag(
 }
 
 export function buildChartCell(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   grid: HTMLElement,
   spec: ChartSpec,
   period: PeriodBounds | null,
   ctx: MarkdownPostProcessorContext
 ): ChartTeardown {
-  const cell = grid.createDiv({ cls: "journal-chart-cell" });
+  const cell = grid.createDiv({ cls: "ca-journal-chart-cell" });
   const span = spanOf(spec, period?.unit ?? null);
   if (span !== "small") cell.addClass(`is-${span}`);
   // BEFORE THE BROKEN-TRACKER RETURN BELOW, so a tile whose tracker is gone can
@@ -190,10 +190,10 @@ export function buildChartCell(
   const def = getTracker(plugin, spec.tracker);
 
   if (!isChartable(def)) {
-    cell.addClass("journal-chart-missing");
-    cell.createDiv({ cls: "journal-chart-label", text: `⚠️ ${spec.tracker}` });
+    cell.addClass("ca-journal-chart-missing");
+    cell.createDiv({ cls: "ca-journal-chart-label", text: `⚠️ ${spec.tracker}` });
     cell.createDiv({
-      cls: "journal-chart-body",
+      cls: "ca-journal-chart-body",
       text: "This chart's tracker no longer exists, or isn't something that can be charted. Open Edit… above to remove it.",
     });
     return null;
@@ -210,12 +210,12 @@ export function buildChartCell(
   // picker's description have to agree with this tile about what the chart is
   // called — three surfaces, one answer.
   const eyebrow = chartTitle(spec, def.label, isChartable(def2) ? def2.label : undefined);
-  const head = cell.createDiv({ cls: "journal-chart-head" });
-  head.createDiv({ cls: "journal-chart-label", text: eyebrow });
+  const head = cell.createDiv({ cls: "ca-journal-chart-head" });
+  head.createDiv({ cls: "ca-journal-chart-label", text: eyebrow });
   buildRangeCycle(plugin, head, spec, period, ctx);
-  const body = cell.createDiv({ cls: "journal-chart-body" });
+  const body = cell.createDiv({ cls: "ca-journal-chart-body" });
 
-  // Almanac draws the chart itself from its own daily-note frontmatter — no
+  // ChronoAnvil draws the chart itself from its own daily-note frontmatter — no
   // ```tracker block, no Tracker plugin. The returned teardown is owned by the
   // grid's LiveWidget, which calls it before each rebuild and on unload.
   return renderTrackerChart({
@@ -246,7 +246,7 @@ export function buildChartCell(
 // and quietly adding a normalise step would be a behaviour change hiding in a
 // refactor.
 function fileOfCtx(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): TFile | null {
   const f = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
@@ -261,7 +261,7 @@ export function periodAnchor(raw: unknown): MomentLike {
 
 
 export function resolvePeriodBounds(
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext
 ): PeriodBounds | null {
   const file = fileOfCtx(plugin, ctx);

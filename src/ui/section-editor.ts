@@ -67,7 +67,7 @@ import {
   promptDetailedSuggester,
   promptLayoutSave,
 } from "./modals";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { getFile } from "../core/util";
 import {
   answerInText,
@@ -280,7 +280,7 @@ export class SectionEditorModal extends EditorModal {
   // each of the places that set the bit.
   private paged = new Set<string>();
 
-  constructor(app: App, plugin: AlmanacPlugin, private spec: SectionEditorSpec) {
+  constructor(app: App, plugin: ChronoAnvilPlugin, private spec: SectionEditorSpec) {
     super(
       app,
       plugin,
@@ -316,7 +316,7 @@ export class SectionEditorModal extends EditorModal {
   // nothing more, which is the case the two-column layout failed hardest.
   onOpen(): void {
     super.onOpen();
-    this.modalEl.addClass("almanac-section-editor");
+    this.modalEl.addClass("ca-section-editor");
   }
 
   private get model(): SectionModel {
@@ -650,14 +650,14 @@ export class SectionEditorModal extends EditorModal {
   // ── body ──────────────────────────────────────────────────────────────
 
   protected renderBody(): void {
-    const wrap = this.body.createDiv({ cls: "almanac-tpl-editor" });
+    const wrap = this.body.createDiv({ cls: "ca-tpl-editor" });
 
     if (this.spec.handEdited) {
       // The single most useful sentence in the window, so it is a line of text
       // and not a tooltip. A reader about to change a file they have been
       // editing for months needs to know the plugin knows that.
-      const warn = wrap.createDiv({ cls: "almanac-tpl-edited" });
-      setIcon(warn.createSpan({ cls: "almanac-tpl-edited-icon" }), "pencil");
+      const warn = wrap.createDiv({ cls: "ca-tpl-edited" });
+      setIcon(warn.createSpan({ cls: "ca-tpl-edited-icon" }), "pencil");
       warn.createSpan({
         text: "You've edited this file since it was written. Only the blocks listed under Changes are touched.",
       });
@@ -665,7 +665,7 @@ export class SectionEditorModal extends EditorModal {
 
     this.renderTabs(wrap);
 
-    const pane = wrap.createDiv({ cls: "almanac-tpl-pane" });
+    const pane = wrap.createDiv({ cls: "ca-tpl-pane" });
     if (this.pane === "sections") this.renderList(pane);
     else if (this.pane === "changes") this.renderChanges(pane);
     else if (this.pane === "markdown") this.renderMarkdown(pane);
@@ -673,12 +673,12 @@ export class SectionEditorModal extends EditorModal {
   }
 
   private renderTabs(host: HTMLElement): void {
-    const tabs = host.createDiv({ cls: "almanac-tpl-tabs" });
+    const tabs = host.createDiv({ cls: "ca-tpl-tabs" });
     const n = this.changeCount();
     const tab = (key: Pane, label: string): void => {
       const b = tabs.createEl("button", {
         text: label,
-        cls: this.pane === key ? "almanac-tpl-tab is-active" : "almanac-tpl-tab",
+        cls: this.pane === key ? "ca-tpl-tab is-active" : "ca-tpl-tab",
       });
       b.addEventListener("click", () => {
         this.pane = key;
@@ -711,7 +711,7 @@ export class SectionEditorModal extends EditorModal {
     // No heading of its own: the tab it sits behind is already called "In this
     // file", and a pane that repeats its own tab as a title is a line of
     // chrome that pushes the first row down for nothing.
-    const host = pane.createDiv({ cls: "almanac-tpl-list" });
+    const host = pane.createDiv({ cls: "ca-tpl-list" });
     const bands: (string | null)[] = [];
     for (const id of this.rows) {
       const g = this.view(id)?.group ?? null;
@@ -720,7 +720,7 @@ export class SectionEditorModal extends EditorModal {
 
     for (const band of bands) {
       if (band !== null && bands.length > 1) {
-        host.createDiv({ cls: "almanac-tpl-band", text: band });
+        host.createDiv({ cls: "ca-tpl-band", text: band });
       }
       // THE ROWS OF THIS BAND, CUT INTO BLOCKS. A block is a run of consecutive
       // rows, so it is grouped after the band filter rather than before it —
@@ -761,9 +761,9 @@ export class SectionEditorModal extends EditorModal {
   // is not looking. The fence keyword stays `row`: that is how a group is
   // written, and the documentation says so in those words.
   private renderBlock(host: HTMLElement, group: readonly string[]): void {
-    const card = host.createDiv({ cls: "almanac-tpl-block" });
+    const card = host.createDiv({ cls: "ca-tpl-block" });
     const pages = this.pagesIn(group);
-    const bar = card.createDiv({ cls: "almanac-tpl-block-bar" });
+    const bar = card.createDiv({ cls: "ca-tpl-block-bar" });
 
     // ── THE GROUP MOVES AS ONE THING, FROM THE CARD (4.53.0) ──────────────
     //
@@ -779,7 +779,7 @@ export class SectionEditorModal extends EditorModal {
     const band = this.bandOf(group[0]);
     const shift = (delta: number, label: string, icon: string): void => {
       const b = bar.createEl("button", {
-        cls: "almanac-tpl-arrow",
+        cls: "ca-tpl-arrow",
         attr: { "aria-label": label, title: label },
       });
       setIcon(b, icon);
@@ -800,7 +800,7 @@ export class SectionEditorModal extends EditorModal {
     this.attachDrop(card, group[0], "block");
 
     bar.createSpan({
-      cls: "almanac-tpl-block-title",
+      cls: "ca-tpl-block-title",
       // WHAT THE BAR SAYS, AND IT NO LONGER COUNTS COLUMNS (4.34.2). `Group — 4
       // columns` was accurate until a group could hold pages and then was
       // exactly wrong: a group of two pages with two columns each is not a group
@@ -813,7 +813,7 @@ export class SectionEditorModal extends EditorModal {
       text: pages.length > 1 ? `Group — ${pages.length} pages` : "Group",
     });
     const split = bar.createEl("button", {
-      cls: "almanac-tpl-move",
+      cls: "ca-tpl-move",
       text: "Break up the group",
     });
     // EVERY MEMBER LEAVES AT ONCE, which is the one operation on a block that
@@ -839,7 +839,7 @@ export class SectionEditorModal extends EditorModal {
       this.settle(breakUp(this.arrangement, band, group[0]));
     });
 
-    const body = card.createDiv({ cls: "almanac-tpl-block-body" });
+    const body = card.createDiv({ cls: "ca-tpl-block-body" });
     // ONE BAND PER PAGE, AND ONLY WHERE THERE IS MORE THAN ONE. A single page is
     // the group itself, and a band saying `Page 1` over the whole card would be
     // naming a division that is not there — the same label-for-nothing the foot's
@@ -847,7 +847,7 @@ export class SectionEditorModal extends EditorModal {
     pages.forEach((page, n) => {
       if (pages.length > 1) {
         body.createDiv({
-          cls: "almanac-tpl-page",
+          cls: "ca-tpl-page",
           text: `Page ${n + 1}`,
         });
       }
@@ -950,12 +950,12 @@ export class SectionEditorModal extends EditorModal {
       subtitle: refusal ?? section.blurb,
       pills: [...typePills, ...statusPills],
       cls: [
-        gone ? "almanac-tpl-row-removed" : "",
-        isNew && !gone && !waiting.length ? "almanac-tpl-row-added" : "",
-        refusal ? "almanac-tpl-row-locked" : "",
-        waiting.length ? "almanac-tpl-row-waiting" : "",
-        isSection ? "almanac-tpl-row-section" : "",
-        isWidget ? "almanac-tpl-row-widget" : "",
+        gone ? "ca-tpl-row-removed" : "",
+        isNew && !gone && !waiting.length ? "ca-tpl-row-added" : "",
+        refusal ? "ca-tpl-row-locked" : "",
+        waiting.length ? "ca-tpl-row-waiting" : "",
+        isSection ? "ca-tpl-row-section" : "",
+        isWidget ? "ca-tpl-row-widget" : "",
       ],
     });
 
@@ -991,7 +991,7 @@ export class SectionEditorModal extends EditorModal {
     const nudge = (delta: number, icon: string): void => {
       const label = this.moveLabel(band, section.id, unit, delta);
       const b = lead.createEl("button", {
-        cls: "almanac-tpl-arrow",
+        cls: "ca-tpl-arrow",
         attr: { "aria-label": label, title: label },
       });
       setIcon(b, icon);
@@ -1047,7 +1047,7 @@ export class SectionEditorModal extends EditorModal {
         // name goes in `aria-label` and the sentence in `title` — the same
         // pairing the arrows use one block up.
         const out = lead.createEl("button", {
-          cls: "almanac-tpl-arrow almanac-tpl-leave",
+          cls: "ca-tpl-arrow ca-tpl-leave",
           attr: {
             "aria-label": "Take out of the group",
             title: "Take out of the group — give this section a block of its own",
@@ -1088,7 +1088,7 @@ export class SectionEditorModal extends EditorModal {
         if (this.joined.has(section.id)) {
           const breaks = this.paged.has(section.id);
           const page = actions.createEl("button", {
-            cls: "almanac-tpl-move",
+            cls: "ca-tpl-move",
             text: breaks ? "Join the page before" : "Start a page here",
             attr: {
               title: breaks
@@ -1162,7 +1162,7 @@ export class SectionEditorModal extends EditorModal {
           // icons is ever drawn. Putting them anywhere but the same place would
           // make a reader hunt for the mirror of a button they just used.
           const make = lead.createEl("button", {
-            cls: "almanac-tpl-arrow almanac-tpl-join",
+            cls: "ca-tpl-arrow ca-tpl-join",
             attr: { "aria-label": label, title },
           });
           setIcon(make, "link");
@@ -1218,7 +1218,7 @@ export class SectionEditorModal extends EditorModal {
     if (refusal) return;
 
     const toggle = actions.createEl("button", {
-      cls: "almanac-tpl-toggle",
+      cls: "ca-tpl-toggle",
       text: gone ? "Keep" : "Remove",
     });
     toggle.addEventListener("click", () => {
@@ -1333,9 +1333,9 @@ export class SectionEditorModal extends EditorModal {
     // string: a second would drift from the first, and this window is the only
     // place both would be read.
     const field = (q: SectionQuestion): HTMLElement => {
-      const wrap = host.createDiv({ cls: "almanac-tpl-field" });
+      const wrap = host.createDiv({ cls: "ca-tpl-field" });
       wrap.createSpan({
-        cls: "almanac-tpl-field-label",
+        cls: "ca-tpl-field-label",
         text: fieldLabelOf(q),
       });
       return wrap;
@@ -1346,7 +1346,7 @@ export class SectionEditorModal extends EditorModal {
       // has had since 3.8. The route it names still works.
       if (settled && !this.readable(section, q)) {
         const note = host.createSpan({
-          cls: "almanac-tpl-choice-fixed",
+          cls: "ca-tpl-choice-fixed",
           text: q.settled?.text ?? "set when added",
         });
         note.title =
@@ -1371,10 +1371,10 @@ export class SectionEditorModal extends EditorModal {
       // wording for this case precisely so the reader is told what is missing
       // and where to get it.
       if (!q.values.length) {
-        host.createSpan({ cls: "almanac-tpl-choice-empty", text: q.empty });
+        host.createSpan({ cls: "ca-tpl-choice-empty", text: q.empty });
         continue;
       }
-      const select = field(q).createEl("select", { cls: "almanac-tpl-choice" });
+      const select = field(q).createEl("select", { cls: "ca-tpl-choice" });
       select.setAttribute("aria-label", `Choose ${q.label}`);
       // THE PLACEHOLDER NAMES ITS QUESTION AGAIN (4.15 §2), and the reason it
       // stopped is worth keeping rather than deleting:
@@ -1451,7 +1451,7 @@ export class SectionEditorModal extends EditorModal {
   ): void {
     const input = host.createEl("input", {
       type: "text",
-      cls: "almanac-tpl-title-input",
+      cls: "ca-tpl-title-input",
     });
     input.placeholder = q.placeholder;
     input.setAttribute("aria-label", `Set ${q.label}`);
@@ -1483,15 +1483,15 @@ export class SectionEditorModal extends EditorModal {
     section: SectionView,
     q: FormQuestion
   ): void {
-    const wrap = host.createDiv({ cls: "almanac-tpl-form" });
+    const wrap = host.createDiv({ cls: "ca-tpl-form" });
     const box = wrap.createEl("input", {
       type: "checkbox",
-      cls: "almanac-tpl-form-box",
+      cls: "ca-tpl-form-box",
     });
-    const id = `almanac-form-${section.id.replace(/[^a-z0-9]+/gi, "-")}`;
+    const id = `ca-form-${section.id.replace(/[^a-z0-9]+/gi, "-")}`;
     box.id = id;
     const label = wrap.createEl("label", {
-      cls: "almanac-tpl-form-label",
+      cls: "ca-tpl-form-label",
       text: q.widget,
     });
     label.htmlFor = id;
@@ -1530,7 +1530,7 @@ export class SectionEditorModal extends EditorModal {
   ): void {
     const current = this.shownAnswer(section, q);
     const input = host.createEl("input", {
-      cls: "almanac-tpl-folder",
+      cls: "ca-tpl-folder",
       type: "text",
     });
     input.value = current;
@@ -1852,7 +1852,7 @@ export class SectionEditorModal extends EditorModal {
     // that a defect rather than a difference: "One command knowing something
     // its neighbour does not is the drift that keeps costing a release." Two
     // routes to one write now use one control.
-    const row = host.createDiv({ cls: "almanac-tpl-add" });
+    const row = host.createDiv({ cls: "ca-tpl-add" });
     const button = row.createEl("button", { text: "Add a section…" });
     button.addEventListener("click", () => {
       void this.promptAdd([...own, ...widgets], widgets.length > 0);
@@ -1919,13 +1919,13 @@ export class SectionEditorModal extends EditorModal {
     const ops = this.ops();
     if (!ops.some((o) => o.kind !== "keep")) {
       pane.createDiv({
-        cls: "almanac-tpl-empty",
+        cls: "ca-tpl-empty",
         text: "No changes — this file already has exactly these sections.",
       });
     }
     for (const op of ops) {
       const row = pane.createDiv({
-        cls: `almanac-tpl-op almanac-tpl-op-${op.kind}`,
+        cls: `ca-tpl-op ca-tpl-op-${op.kind}`,
       });
       const mark =
         op.kind === "add"
@@ -1941,9 +1941,9 @@ export class SectionEditorModal extends EditorModal {
                   : op.kind === "foreign"
                     ? "⚠"
                     : "";
-      row.createSpan({ cls: "almanac-tpl-op-mark", text: mark });
-      row.createSpan({ cls: "almanac-tpl-op-label", text: op.label });
-      row.createSpan({ cls: "almanac-tpl-op-detail", text: op.detail });
+      row.createSpan({ cls: "ca-tpl-op-mark", text: mark });
+      row.createSpan({ cls: "ca-tpl-op-label", text: op.label });
+      row.createSpan({ cls: "ca-tpl-op-detail", text: op.detail });
     }
   }
 
@@ -1954,7 +1954,7 @@ export class SectionEditorModal extends EditorModal {
     // previewed.
     const next = this.model.apply(this.spec.text, this.want);
     pane.createEl("pre", {
-      cls: "almanac-editor-mono almanac-tpl-md",
+      cls: "ca-editor-mono ca-tpl-md",
       text: next ?? this.spec.text,
     });
   }
@@ -1974,18 +1974,18 @@ export class SectionEditorModal extends EditorModal {
       if (!first) continue;
       if (first.group !== undefined && first.group !== band) {
         band = first.group;
-        if (band) pane.createDiv({ cls: "almanac-tpl-band", text: band });
+        if (band) pane.createDiv({ cls: "ca-tpl-band", text: band });
       }
       const host =
         group.length > 1
-          ? pane.createDiv({ cls: "almanac-wizard-row" })
+          ? pane.createDiv({ cls: "ca-wizard-row" })
           : pane;
       for (const id of group) {
         const s = this.view(id);
         if (!s) continue;
-        const block = host.createDiv({ cls: "almanac-wizard-block" });
-        block.createSpan({ cls: "almanac-wizard-block-icon", text: s.icon });
-        block.createSpan({ cls: "almanac-wizard-block-label", text: s.label });
+        const block = host.createDiv({ cls: "ca-wizard-block" });
+        block.createSpan({ cls: "ca-wizard-block-icon", text: s.icon });
+        block.createSpan({ cls: "ca-wizard-block-label", text: s.label });
       }
     }
   }
@@ -2065,7 +2065,7 @@ export class SectionEditorModal extends EditorModal {
     const current = await this.app.vault.read(this.spec.file);
     if (current !== this.spec.text) {
       new Notice(
-        "Almanac: this file changed while the window was open — nothing was written. Reopen it to see the current sections."
+        "ChronoAnvil: this file changed while the window was open — nothing was written. Reopen it to see the current sections."
       );
       return;
     }
@@ -2091,7 +2091,7 @@ export class SectionEditorModal extends EditorModal {
       : null;
     const final = regrouped ?? next;
     if (final === null) {
-      new Notice("Almanac: nothing to change.");
+      new Notice("ChronoAnvil: nothing to change.");
       return;
     }
 
@@ -2101,10 +2101,10 @@ export class SectionEditorModal extends EditorModal {
     const keptLines = kept.reduce((n, k) => n + k.lines, 0);
     new Notice(
       keptLines > 0
-        ? `Almanac: ${this.spec.file.basename} updated — kept ${keptLines} line${
+        ? `ChronoAnvil: ${this.spec.file.basename} updated — kept ${keptLines} line${
             keptLines === 1 ? "" : "s"
           } of your text ✅`
-        : `Almanac: ${this.spec.file.basename} updated ✅`
+        : `ChronoAnvil: ${this.spec.file.basename} updated ✅`
     );
     this.spec.onSaved?.();
   }
@@ -2117,7 +2117,7 @@ export class SectionEditorModal extends EditorModal {
 // settings row does, and neither of them is this function's to write.
 export async function openSectionEditor(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   path: string,
   spec: Omit<SectionEditorSpec, "file" | "text">
 ): Promise<boolean> {

@@ -31,7 +31,7 @@
 
 import { MarkdownPostProcessorContext } from "obsidian";
 import type { TFile } from "obsidian";
-import type AlmanacPlugin from "../../main";
+import type ChronoAnvilPlugin from "../../main";
 import { TrackerDef } from "../../trackers/trackers";
 
 /**
@@ -59,12 +59,12 @@ export interface WidgetHost {
  * settings, and the entry's own file, because what the control does depends on
  * which note it was rendered into.
  *
- * There is deliberately no `app` here. AlmanacPlugin extends Obsidian's Plugin,
+ * There is deliberately no `app` here. ChronoAnvilPlugin extends Obsidian's Plugin,
  * so `plugin.app` is already reachable, and a separate member would be a second
  * way to say the same thing that could drift from the first.
  */
 export interface EntryControlHost extends WidgetHost {
-  readonly plugin: AlmanacPlugin;
+  readonly plugin: ChronoAnvilPlugin;
   fileOf(ctx: MarkdownPostProcessorContext): TFile | null;
 }
 
@@ -80,8 +80,8 @@ export interface EntryControlHost extends WidgetHost {
 // of that bar showed. The element itself stays either way: its primary job is
 // being where the cursor lands on open, and nothing about that changes.
 export function buildSpacer(quiet = false): HTMLElement {
-  const wrap = createDiv({ cls: "journal-spacer" + (quiet ? " is-quiet" : "") });
-  if (!quiet) wrap.createSpan({ cls: "journal-spacer-mark", text: "Almanac" });
+  const wrap = createDiv({ cls: "ca-journal-spacer" + (quiet ? " is-quiet" : "") });
+  if (!quiet) wrap.createSpan({ cls: "ca-journal-spacer-mark", text: "ChronoAnvil" });
   return wrap;
 }
 
@@ -95,7 +95,7 @@ export function buildSlider(
   const max = Number(maxS ?? 5) || 5;
   const step = Number(stepS ?? 1) || 1;
 
-  const wrap = createSpan({ cls: "journal-widget journal-slider" });
+  const wrap = createSpan({ cls: "ca-journal-widget ca-journal-slider" });
   const input = wrap.createEl("input", { type: "range" });
   input.min = String(min);
   input.max = String(max);
@@ -106,7 +106,7 @@ export function buildSlider(
   if (value !== "") input.value = String(value);
   else input.value = String(min);
 
-  const label = wrap.createSpan({ cls: "journal-slider-value" });
+  const label = wrap.createSpan({ cls: "ca-journal-slider-value" });
   label.setText(value === "" ? "—" : `${value}`);
 
   input.addEventListener("input", () => {
@@ -127,7 +127,7 @@ export function buildSelect(
   const prop = firstColon === -1 ? rest : rest.slice(0, firstColon);
   const optionsRaw = firstColon === -1 ? "" : rest.slice(firstColon + 1);
 
-  const wrap = createSpan({ cls: "journal-widget journal-select" });
+  const wrap = createSpan({ cls: "ca-journal-widget ca-journal-select" });
   const select = wrap.createEl("select");
   const options = optionsRaw
     .split(",")
@@ -160,11 +160,11 @@ export function buildStepper(
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
   const step = def.step ?? 1;
-  const wrap = createSpan({ cls: "journal-widget journal-stepper" });
+  const wrap = createSpan({ cls: "ca-journal-widget ca-journal-stepper" });
 
-  const minus = wrap.createEl("button", { text: "−", cls: "journal-step-btn" });
-  const valueEl = wrap.createSpan({ cls: "journal-step-value" });
-  const plus = wrap.createEl("button", { text: "+", cls: "journal-step-btn" });
+  const minus = wrap.createEl("button", { text: "−", cls: "ca-journal-step-btn" });
+  const valueEl = wrap.createSpan({ cls: "ca-journal-step-value" });
+  const plus = wrap.createEl("button", { text: "+", cls: "ca-journal-step-btn" });
 
   const initial = host.currentValue(ctx, def.id);
   // A non-numeric or empty stored value shows as "—" and starts stepping
@@ -209,7 +209,7 @@ export function buildTimeOrDate(
   type: "time" | "date"
 ): HTMLElement {
   const prop = rest.split(":")[0];
-  const wrap = createSpan({ cls: `journal-widget journal-${type}` });
+  const wrap = createSpan({ cls: `ca-journal-widget ca-journal-${type}` });
   const input = wrap.createEl("input", { type });
   const current = host.currentValue(ctx, prop);
   if (current != null && current !== "") {
@@ -233,7 +233,7 @@ export function buildDerivedChip(
   def: TrackerDef,
   ctx: MarkdownPostProcessorContext
 ): HTMLElement {
-  const wrap = createSpan({ cls: "journal-widget journal-derived-chip" });
+  const wrap = createSpan({ cls: "ca-journal-widget ca-journal-derived-chip" });
   const val = host.currentValue(ctx, def.id);
   const num = val == null || val === "" ? NaN : Number(val);
   const shown = Number.isFinite(num) ? `${num}` : "—";

@@ -36,10 +36,10 @@ import { TRACKER_CLASSES } from "../src/trackers/trackers";
 const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
 // A boundary rather than `indexOf`, and ANCHORED TO A LINE START — both halves
-// earned. `.jtc-link` is a prefix of `.jtc-link-icon`, so a bare match reads the
+// earned. `.ca-jtc-link` is a prefix of `.ca-jtc-link-icon`, so a bare match reads the
 // wrong rule; and `readCss` concatenates the folder alphabetically, so
-// `05-inline-widgets.css`'s `is-unframed .jtc-card` reset comes hundreds of
-// lines before the real `.jtc-card` in `60-heroes-and-banners.css`. Anchoring on
+// `05-inline-widgets.css`'s `is-unframed .ca-jtc-card` reset comes hundreds of
+// lines before the real `.ca-jtc-card` in `60-heroes-and-banners.css`. Anchoring on
 // the line the selector OPENS is what tells a rule from a mention of it.
 const ruleFor = (sel: string): string => {
   const at = rules.search(
@@ -87,10 +87,10 @@ describe("every dashboard opens with its own name", () => {
     // predates it.
     for (const [name, text] of HEADED) {
       const head = text.indexOf(PAGE_TITLE_LINE);
-      const firstFence = text.indexOf("```almanac");
+      const firstFence = text.indexOf("```chronoanvil");
       expect(head, name).toBeGreaterThan(firstFence);
       // Nothing else opens a fence before it.
-      expect(text.slice(0, head).match(/```almanac/g), name).toHaveLength(1);
+      expect(text.slice(0, head).match(/```chronoanvil/g), name).toHaveLength(1);
     }
   });
 
@@ -154,7 +154,7 @@ describe("what the head carries", () => {
     const at = src.indexOf("if (target.file?.path === sourcePath) {");
     expect(at).toBeGreaterThan(-1);
     expect(src.slice(at, at + 300)).toContain("is-here");
-    expect(ruleFor(".jtc-link.is-here")).toContain("--interactive-accent");
+    expect(ruleFor(".ca-jtc-link.is-here")).toContain("--interactive-accent");
   });
 });
 
@@ -233,25 +233,25 @@ describe("the head is drawn as the page, not as another card", () => {
     // ancestor is positioned — in Live Preview the code-block widget, in
     // reading view the note's sizer. That is the fault 4.7.0 shipped with the
     // grip, from the same cause.
-    const card = ruleFor(".jtc-card");
+    const card = ruleFor(".ca-jtc-card");
     expect(card).toContain("position: relative");
     expect(card).toContain("overflow: hidden");
   });
 
   it("keeps the title card unfigured without pseudo-element art hatches", () => {
-    expect(rules).not.toContain(".jtc-card::before");
-    expect(rules).not.toContain(".theme-light .jtc-card");
+    expect(rules).not.toContain(".ca-jtc-card::before");
+    expect(rules).not.toContain(".theme-light .ca-jtc-card");
   });
 
   it("sets the page's name in the one face that is not the UI sans", () => {
-    expect(ruleFor(".jtc-title-text")).toContain("var(--am-head-face)");
+    expect(ruleFor(".ca-jtc-title-text")).toContain("var(--ca-head-face)");
     // AND THE INPUT MATCHES IT, or the card jumps as you click to rename.
-    expect(ruleFor(".jtc-title-input")).toContain("var(--am-head-face)");
+    expect(ruleFor(".ca-jtc-title-input")).toContain("var(--ca-head-face)");
   });
 
   it("keeps the family's radius and border, which is what makes it belong", () => {
-    const card = ruleFor(".jtc-card");
-    expect(card).toContain("var(--am-radius-md)");
+    const card = ruleFor(".ca-jtc-card");
+    expect(card).toContain("var(--ca-radius-md)");
     expect(card).toContain("var(--background-modifier-border)");
   });
 
@@ -259,24 +259,24 @@ describe("the head is drawn as the page, not as another card", () => {
     // Asked for, and a decision rather than an omission: a hairline would make
     // the head two stacked things, where the whole point is that it is one
     // thing that says two.
-    expect(ruleFor(".jtc-nav")).not.toContain("border-top");
-    expect(ruleFor(".jtc-nav")).not.toContain("border:");
+    expect(ruleFor(".ca-jtc-nav")).not.toContain("border-top");
+    expect(ruleFor(".ca-jtc-nav")).not.toContain("border:");
   });
 
   it("sets its destinations in the caps voice every key label uses", () => {
-    const link = ruleFor(".jtc-link");
-    expect(link).toContain("var(--am-caps-weight)");
-    expect(link).toContain("var(--am-caps-tracking)");
-    expect(link).toContain("var(--am-text-2xs)");
+    const link = ruleFor(".ca-jtc-link");
+    expect(link).toContain("var(--ca-caps-weight)");
+    expect(link).toContain("var(--ca-caps-tracking)");
+    expect(link).toContain("var(--ca-text-2xs)");
   });
 
   it("still gives its card up where the block paints one", () => {
     // 4.1 §5's list, kept in step. A head inside an unframed block or under a
     // block head is the same box in a box the reset list exists to remove, and
     // 4.10 changed what `.jtc-card` draws without changing that.
-    const reset = rules.indexOf(".has-head .jtc-card");
+    const reset = rules.indexOf(".has-head .ca-jtc-card");
     expect(reset).toBeGreaterThan(-1);
-    expect(rules).toContain(".journal-widget-block.is-unframed .jtc-card");
+    expect(rules).toContain(".ca-journal-widget-block.is-unframed .ca-jtc-card");
   });
 
   it("hides Obsidian's own title wherever it is drawn", () => {
@@ -284,7 +284,7 @@ describe("the head is drawn as the page, not as another card", () => {
     // the block instead of going stale when the block is removed — and it is
     // what makes six more pages stop saying their name twice, with no new
     // selector.
-    expect(rules).toContain(":has(.jtc-card) .inline-title");
+    expect(rules).toContain(":has(.ca-jtc-card) .inline-title");
   });
 });
 
@@ -332,8 +332,8 @@ describe("nothing on the page can pick the head up", () => {
     // The CALL SITES, not the definitions — `attachGrip` and `slot` are declared
     // near the top of the file and would pass this by accident.
     for (const after of [
-      "jbd-slot-above",
-      "jbd-slot-side jbd-slot-side-left",
+      "ca-jbd-slot-above",
+      "ca-jbd-slot-side ca-jbd-slot-side-left",
       "Drag to move this block",
       "const grip = attachGrip(host, label)",
     ]) {
@@ -344,7 +344,7 @@ describe("nothing on the page can pick the head up", () => {
   it("asks the fence body a different question than the note (on purpose)", () => {
     // `locateTitle` searches a WHOLE NOTE, frontmatter included, so it must tell
     // `title:home,diary,journals` from a reader's `title: My Page` property.
-    // `isTitleLine` is asked of a line already inside an ```almanac fence, where
+    // `isTitleLine` is asked of a line already inside a ```chronoanvil fence, where
     // no YAML property can occur, and it has to agree with `splitDirective` —
     // which is how every other keyword in the dispatcher is read.
     expect(isTitleLine("title")).toBe(true);

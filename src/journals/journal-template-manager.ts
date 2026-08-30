@@ -22,7 +22,7 @@
 // may have hand-edited.
 
 import { App, Notice } from "obsidian";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { composeTemplate } from "./custom-journal";
 import type {
   JournalConfig,
@@ -52,7 +52,7 @@ import { promptLayoutSave } from "../ui/modals";
 import { notify } from "../core/notify";
 
 export class JournalTemplates {
-  constructor(private app: App, private plugin: AlmanacPlugin) {}
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
   // The stored config this note's journal is, or null.
   //
@@ -171,7 +171,7 @@ export class JournalTemplates {
     const cfg = this.configFor(ctx);
     if (!cfg) {
       new Notice(
-        "Almanac: templates are stored on a journal you defined, and this journal is not one of them."
+        "ChronoAnvil: templates are stored on a journal you defined, and this journal is not one of them."
       );
       return false;
     }
@@ -180,7 +180,7 @@ export class JournalTemplates {
     const text = await this.app.vault.read(file);
     const { sections, options, drops } = wantFromJournalNote(text, ctx);
     if (!sections.length) {
-      new Notice("Almanac: this page has no sections to save.");
+      new Notice("ChronoAnvil: this page has no sections to save.");
       return false;
     }
 
@@ -199,7 +199,7 @@ export class JournalTemplates {
     if (drops.length) {
       // SAID, NOT SWALLOWED — `layout-transfer.ts`'s rule again.
       new Notice(
-        `Almanac: kept ${sections.length} section${
+        `ChronoAnvil: kept ${sections.length} section${
           sections.length === 1 ? "" : "s"
         } — ${drops.length} line${
           drops.length === 1 ? "" : "s"
@@ -228,7 +228,7 @@ export class JournalTemplates {
     const text = await this.app.vault.read(file);
     const { sections, options } = wantFromJournalNote(text, ctx);
     if (!sections.length) {
-      new Notice("Almanac: this page has no sections to save.");
+      new Notice("ChronoAnvil: this page has no sections to save.");
       return false;
     }
     const details = await promptLayoutSave(
@@ -289,7 +289,7 @@ export class JournalTemplates {
 
     if (!text.startsWith("---\n")) {
       new Notice(
-        "Almanac: this note has no properties block, so there is nothing to keep — open it and add one before reloading."
+        "ChronoAnvil: this note has no properties block, so there is nothing to keep — open it and add one before reloading."
       );
       return false;
     }
@@ -297,14 +297,14 @@ export class JournalTemplates {
     const loss = this.lossOf(text, composed, ctx);
     if (loss.length) {
       new Notice(
-        `Almanac: this note holds ${loss[0].label} (${loss[0].detail}) — clear it first.`
+        `ChronoAnvil: this note holds ${loss[0].label} (${loss[0].detail}) — clear it first.`
       );
       return false;
     }
 
     const next = replaceBody(text, composed);
     if (next == null) {
-      new Notice("Almanac: this note already matches that layout.");
+      new Notice("ChronoAnvil: this note already matches that layout.");
       return false;
     }
 
@@ -331,7 +331,7 @@ export class JournalTemplates {
     if (!chosen || !chosen.has("entry")) return false;
 
     await this.app.vault.modify(file, next);
-    notify.ok(`Almanac: reloaded this note from ${label} ✅`);
+    notify.ok(`ChronoAnvil: reloaded this note from ${label} ✅`);
     return true;
   }
 }

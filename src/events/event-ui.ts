@@ -17,7 +17,7 @@
 
 import { App, Menu, Notice, Setting, setIcon } from "obsidian";
 import { EditorModal } from "../ui/editor-modal";
-import type AlmanacPlugin from "../main";
+import type ChronoAnvilPlugin from "../main";
 import { confirmAction } from "../ui/modals";
 import {
   DEFAULT_EVENT_COLOR,
@@ -69,7 +69,7 @@ class EventEditModal extends EditorModal {
 
   constructor(
     app: App,
-    plugin: AlmanacPlugin,
+    plugin: ChronoAnvilPlugin,
     def: EventDef,
     private onDone: (changed: boolean) => void
   ) {
@@ -90,10 +90,10 @@ class EventEditModal extends EditorModal {
 
   protected renderBody(): void {
     const contentEl = this.body;
-    this.contentEl.addClass("almanac-event-modal");
+    this.contentEl.addClass("ca-event-modal");
 
     // ── Live Preview Card ──
-    this.previewHost = contentEl.createDiv({ cls: "almanac-event-preview" });
+    this.previewHost = contentEl.createDiv({ cls: "ca-event-preview" });
     this.updatePreview();
 
     new Setting(contentEl).setName("Title").addText((t) => {
@@ -113,7 +113,7 @@ class EventEditModal extends EditorModal {
     const kindSetting = new Setting(contentEl)
       .setName("Recurrence")
       .setDesc(this.kindDescription());
-    const kindBar = kindSetting.controlEl.createDiv({ cls: "almanac-event-kind-bar" });
+    const kindBar = kindSetting.controlEl.createDiv({ cls: "ca-event-kind-bar" });
     const kinds: Array<{ id: string; label: string }> = [
       { id: "single", label: "Single (one-off)" },
       { id: "recurring", label: "Yearly (annual)" },
@@ -122,13 +122,13 @@ class EventEditModal extends EditorModal {
     for (const k of kinds) {
       const isCur = this.kindChoice() === k.id;
       const btn = kindBar.createEl("button", {
-        cls: `almanac-event-kind-btn${isCur ? " is-active" : ""}`,
+        cls: `ca-event-kind-btn${isCur ? " is-active" : ""}`,
         text: k.label,
         attr: { type: "button", "aria-pressed": isCur ? "true" : "false" },
       });
       btn.addEventListener("click", () => {
         this.setKindChoice(k.id);
-        kindBar.findAll(".almanac-event-kind-btn").forEach((el) => {
+        kindBar.findAll(".ca-event-kind-btn").forEach((el) => {
           el.removeClass("is-active");
           el.setAttribute("aria-pressed", "false");
         });
@@ -200,24 +200,24 @@ class EventEditModal extends EditorModal {
     if (!this.previewHost) return;
     this.previewHost.empty();
 
-    const left = this.previewHost.createDiv({ cls: "almanac-event-preview-left" });
+    const left = this.previewHost.createDiv({ cls: "ca-event-preview-left" });
     const col = eventColor(this.draft);
     const ico = eventIcon(this.draft);
 
-    const badge = left.createDiv({ cls: `almanac-event-preview-badge cal-badge-${col}` });
+    const badge = left.createDiv({ cls: `ca-event-preview-badge ca-cal-badge-${col}` });
     setIcon(badge, ico);
 
-    const info = left.createDiv({ cls: "almanac-event-preview-info" });
+    const info = left.createDiv({ cls: "ca-event-preview-info" });
     info.createDiv({
-      cls: "almanac-event-preview-title",
+      cls: "ca-event-preview-title",
       text: this.draft.title.trim() || "Untitled event",
     });
 
     const desc = describeEventDate(this.draft) + (this.draft.time ? ` at ${this.draft.time}` : "");
-    info.createDiv({ cls: "almanac-event-preview-date", text: desc });
+    info.createDiv({ cls: "ca-event-preview-date", text: desc });
 
     // Mini day cell mockup
-    const mockup = this.previewHost.createDiv({ cls: "almanac-event-preview-mockup" });
+    const mockup = this.previewHost.createDiv({ cls: "ca-event-preview-mockup" });
     let dayStr = "23";
     if (this.draft.kind === "recurring" && this.draft.day) {
       dayStr = String(this.draft.day);
@@ -225,7 +225,7 @@ class EventEditModal extends EditorModal {
       dayStr = String(Number(this.draft.start.slice(8, 10)));
     }
     mockup.createSpan({ text: dayStr });
-    const cellBadge = mockup.createSpan({ cls: `cal-badge cal-badge-${col}` });
+    const cellBadge = mockup.createSpan({ cls: `ca-cal-badge ca-cal-badge-${col}` });
     setIcon(cellBadge, ico);
   }
 
@@ -384,7 +384,7 @@ class EventEditModal extends EditorModal {
       // 28th in common years), so it's called out here rather than rejected.
       if (this.draft.month === 2 && this.draft.day === 29) {
         host.createDiv({
-          cls: "almanac-event-hint",
+          cls: "ca-event-hint",
           text: "29 February shows on the 28th in non-leap years.",
         });
       }
@@ -451,7 +451,7 @@ class EventEditModal extends EditorModal {
           this.updatePreview();
         });
       });
-    this.durationHost = host.createDiv({ cls: "am-ev-duration" });
+    this.durationHost = host.createDiv({ cls: "ca-ev-duration" });
     this.renderDurationField();
   }
 
@@ -498,16 +498,16 @@ class EventEditModal extends EditorModal {
     const iconDesc = setting.descEl;
     iconDesc.setText(eventIcon(this.draft));
 
-    const wrap = parent.createDiv({ cls: "almanac-icon-picker" });
+    const wrap = parent.createDiv({ cls: "ca-icon-picker" });
 
     // Category Tabs
-    const catBar = wrap.createDiv({ cls: "almanac-icon-cat-bar" });
+    const catBar = wrap.createDiv({ cls: "ca-icon-cat-bar" });
     const allGroups = [
       { key: "all", label: "All" },
       ...EVENT_ICONS.map((g) => ({ key: g.label.toLowerCase(), label: g.label })),
     ];
 
-    const grid = wrap.createDiv({ cls: "almanac-icon-grid" });
+    const grid = wrap.createDiv({ cls: "ca-icon-grid" });
 
     const renderGrid = (catKey: string) => {
       grid.empty();
@@ -519,7 +519,7 @@ class EventEditModal extends EditorModal {
       for (const group of groupsToRender) {
         for (const name of group.icons) {
           const btn = grid.createEl("button", {
-            cls: `almanac-icon-swatch${eventIcon(this.draft) === name ? " is-active" : ""}`,
+            cls: `ca-icon-swatch${eventIcon(this.draft) === name ? " is-active" : ""}`,
             attr: { type: "button", "aria-label": name, title: `${name} (${group.label})` },
           });
           setIcon(btn, name);
@@ -527,7 +527,7 @@ class EventEditModal extends EditorModal {
             this.draft.icon = name;
             iconDesc.setText(name);
             grid
-              .findAll(".almanac-icon-swatch")
+              .findAll(".ca-icon-swatch")
               .forEach((el) => el.removeClass("is-active"));
             btn.addClass("is-active");
             this.updatePreview();
@@ -539,13 +539,13 @@ class EventEditModal extends EditorModal {
     for (const cat of allGroups) {
       const isCur = this.activeCategory === cat.key;
       const catBtn = catBar.createEl("button", {
-        cls: `almanac-icon-cat-btn${isCur ? " is-active" : ""}`,
+        cls: `ca-icon-cat-btn${isCur ? " is-active" : ""}`,
         text: cat.label,
         attr: { type: "button" },
       });
       catBtn.addEventListener("click", () => {
         this.activeCategory = cat.key;
-        catBar.findAll(".almanac-icon-cat-btn").forEach((el) => el.removeClass("is-active"));
+        catBar.findAll(".ca-icon-cat-btn").forEach((el) => el.removeClass("is-active"));
         catBtn.addClass("is-active");
         renderGrid(cat.key);
       });
@@ -556,17 +556,17 @@ class EventEditModal extends EditorModal {
 
   private renderColorPicker(parent: HTMLElement): void {
     new Setting(parent).setName("Colour").setHeading();
-    const row = parent.createDiv({ cls: "almanac-color-picker" });
+    const row = parent.createDiv({ cls: "ca-color-picker" });
     for (const name of EVENT_COLORS) {
       const btn = row.createEl("button", {
-        cls: `almanac-color-swatch almanac-color-${name}${eventColor(this.draft) === name ? " is-active" : ""}`,
+        cls: `ca-color-swatch ca-color-${name}${eventColor(this.draft) === name ? " is-active" : ""}`,
         attr: { type: "button", "aria-label": name, title: name },
       });
-      btn.style.setProperty("background-color", `var(--am-ev-${name})`);
+      btn.style.setProperty("background-color", `var(--ca-ev-${name})`);
       btn.addEventListener("click", () => {
         this.draft.color = name;
         row
-          .findAll(".almanac-color-swatch")
+          .findAll(".ca-color-swatch")
           .forEach((el) => el.removeClass("is-active"));
         btn.addClass("is-active");
         this.updatePreview();
@@ -639,7 +639,7 @@ class EventEditModal extends EditorModal {
     try {
       await this.write();
     } catch (err) {
-      console.error("Almanac: save failed", err);
+      console.error("ChronoAnvil: save failed", err);
       this.showError(this.commitFailureMessage());
       return;
     }
@@ -695,7 +695,7 @@ class EventEditModal extends EditorModal {
 // Open the editor. `def` with an empty id creates; with an id, edits.
 export function openEventEditor(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   def: EventDef,
   onDone: (changed: boolean) => void = () => {}
 ): void {
@@ -710,7 +710,7 @@ export function openEventEditor(
 // the events layer, and the two stay separate.
 export function openDayEventMenu(
   app: App,
-  plugin: AlmanacPlugin,
+  plugin: ChronoAnvilPlugin,
   iso: string,
   evt: MouseEvent,
   onChanged: () => void = () => {}
