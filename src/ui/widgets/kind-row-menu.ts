@@ -39,7 +39,7 @@ import { Menu, TAbstractFile, TFile } from "obsidian";
 import type ChronoAnvilPlugin from "../../main";
 import { overflowButton } from "../section-frame";
 import { promptAction } from "../modals";
-import { childFiles, getFile, plural, today } from "../../core/util";
+import { childFiles, frontmatterOf, getFile, plural, today } from "../../core/util";
 import { BIN_FOLDER, binAway, binTogether } from "../../core/journal-removal";
 import { notify } from "../../core/notify";
 import type { JournalKind, JournalType } from "../../journals/journal";
@@ -112,7 +112,7 @@ function addPageLayoutRows(
 ): void {
   const label = kind.pages?.label ?? "Page";
   const cfg = plugin.journals.configOf(type);
-  const fm = plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+  const fm = frontmatterOf(plugin.app, file);
   // TICKED ON WHAT WOULD BE USED, NOT ON WHAT IS STORED. A note naming a layout
   // that has since been deleted makes its pages from the default, and a menu
   // ticking the missing row would be describing a state the plugin will not

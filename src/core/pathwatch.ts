@@ -131,6 +131,8 @@ export function remapConfiguredPaths(
     // note paths, so a rename invalidates it exactly as it invalidates the rest
     // of this record.
     collapsedNoteSections?: Record<string, boolean>;
+    openGroupTabs?: Record<string, number>;
+    timeGridFilters?: Record<string, string[]>;
   },
   oldPath: string,
   newPath: string,
@@ -192,6 +194,38 @@ export function remapConfiguredPaths(
       moved++;
     }
     if (moved > 0) changed.push("collapsed sections");
+  }
+
+  const tabs = settings.openGroupTabs;
+  if (tabs) {
+    let moved = 0;
+    for (const key of Object.keys(tabs)) {
+      const sep = key.indexOf(SECTION_KEY_SEP);
+      if (sep === -1) continue;
+      const next = remapPath(key.slice(0, sep), oldPath, newPath);
+      if (next === null) continue;
+      const val = tabs[key];
+      delete tabs[key];
+      tabs[`${next}${key.slice(sep)}`] = val;
+      moved++;
+    }
+    if (moved > 0) changed.push("open group tabs");
+  }
+
+  const gridFilters = settings.timeGridFilters;
+  if (gridFilters) {
+    let moved = 0;
+    for (const key of Object.keys(gridFilters)) {
+      const sep = key.indexOf(SECTION_KEY_SEP);
+      if (sep === -1) continue;
+      const next = remapPath(key.slice(0, sep), oldPath, newPath);
+      if (next === null) continue;
+      const val = gridFilters[key];
+      delete gridFilters[key];
+      gridFilters[`${next}${key.slice(sep)}`] = val;
+      moved++;
+    }
+    if (moved > 0) changed.push("time-grid filters");
   }
 
   return changed;

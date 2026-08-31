@@ -93,11 +93,9 @@
 .ca-journal-widget-block.is-unframed .ca-journal-overview-summary,
 .ca-journal-widget-block.is-unframed .ca-journal-entry-card,
 .ca-journal-widget-block.is-unframed .ca-journals-card,
-.ca-journal-widget-block.is-unframed .ca-jtc-card,
 .has-head .ca-journal-overview-summary,
 .has-head .ca-journal-entry-card,
-.has-head .ca-journals-card,
-.has-head .ca-jtc-card {
+.has-head .ca-journals-card {
   margin: 0;
   padding: 0;
   border: none;

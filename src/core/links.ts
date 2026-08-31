@@ -406,16 +406,6 @@ function wrapInCard(nav: HTMLElement, area: VaultArea): HTMLElement {
 }
 
 
-// diary-links[:<id>,...] — the Diary section's own destination row (2.13.3).
-//
-// Split out of `links:` because the homepage's nav is no longer a header
-// bar's passenger: the greeting became the section header, so the pills need
-// to stand as their own block. Defaults to week,month,all — deliberately
-// *without* `home`, which on the homepage points at the note you're already
-// reading. `links:` keeps `home` in its vocabulary for every other page, where
-// it still means something.
-const DIARY_LINK_IDS = ["week", "month", "quarter", "year", "all", "search"];
-
 // The banner's own utility nav (2.21.1) — the destination that doesn't map onto
 // a calendar surface. Since 2.21 the calendar *is* the overview navigator (its
 // month title opens the Monthly Overview, the year opens The Year, and each week
@@ -458,29 +448,6 @@ export function buildBannerLinks(
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
   for (const id of list.length ? list : BANNER_LINK_IDS) {
-    const target = resolveTarget(plugin, file, id);
-    if (!target) continue;
-    renderTarget(app, wrap, target, ctx.sourcePath);
-  }
-
-  return wrap;
-}
-
-export function buildDiaryLinks(
-  plugin: ChronoAnvilPlugin,
-  ctx: MarkdownPostProcessorContext,
-  ids?: string[]
-): HTMLElement {
-  const app = plugin.app;
-  const wrap = createDiv({ cls: "ca-journal-nav ca-journal-links ca-journal-diary-links" });
-
-  const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
-  if (!(file instanceof TFile)) return wrap;
-
-  const list = (ids ?? [])
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  for (const id of list.length ? list : DIARY_LINK_IDS) {
     const target = resolveTarget(plugin, file, id);
     if (!target) continue;
     renderTarget(app, wrap, target, ctx.sourcePath);

@@ -202,10 +202,14 @@ describe("the gesture around it", () => {
     expect(src).toContain("if (!boundsOf(ctx, container)) return;");
     const at = src.indexOf("if (!boundsOf(ctx, container)) return;");
     // Asserted against the place a grip is ATTACHED rather than the class it
-    // wears: `attachGrip` is a module-level helper and sits above everything,
-    // so its definition says nothing about whether the gate ran first. Every
-    // caller is `source`, and `source` is declared inside the gated half.
-    expect(at).toBeLessThan(src.indexOf("const source = ("));
+    // wears: `attachGrip` is a module-level helper and sits above everything, so
+    // its definition says nothing about whether the gate ran first.
+    //
+    // AND SINCE 5.2 SO IS ITS ONLY CALLER. `source` was lifted out to
+    // `makeSource`, so what is below the gate is no longer the grip's
+    // declaration but the one line that MAKES a grip factory for this block —
+    // which is the fact this test was always about.
+    expect(at).toBeLessThan(src.indexOf("const source = makeSource("));
     expect(src.match(/attachGrip\(/g) ?? []).toHaveLength(2);
   });
 
@@ -360,11 +364,12 @@ describe("the gesture around it", () => {
     // carry (`.ca-journal-overview-banner`, `.ca-jjs-hero`), which a headed block must
     // NOT cancel — there the card's padding is real, so the bands bleed to the
     // card's edges exactly as they were written to.
+    // THREE SINCE 5.2. `.ca-jtc-card` was the fourth and left the reset with the
+    // widget that drew it — the 4.5 head, unreachable since 4.10.
     const cards = [
       ".ca-journal-overview-summary",
       ".ca-journal-entry-card",
       ".ca-journals-card",
-      ".ca-jtc-card",
     ];
     for (const card of cards) {
       expect(unframed, `${card} left the unframed reset`).toContain(card);

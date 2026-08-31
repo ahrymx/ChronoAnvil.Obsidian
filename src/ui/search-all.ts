@@ -54,11 +54,6 @@ import { registeredJournalTypes } from "../journals/journal";
 // The sort the reader last chose, for as long as Obsidian is running.
 let sessionSort: SortField = "relevance";
 
-/** Exported for the test that pins the session rule; resets what a reload would. */
-export function __resetSessionSort(): void {
-  sessionSort = "relevance";
-}
-
 export function openVaultSearch(plugin: ChronoAnvilPlugin): void {
   new VaultSearchModal(plugin.app, plugin).open();
 }

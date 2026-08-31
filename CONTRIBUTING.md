@@ -44,9 +44,9 @@ Other expectations:
 
 There is no git repository here, so the archives ARE the history: a version that
 is packaged and not archived is gone the moment the working tree moves on. Two
-of them per version, in the sibling directories `chronoanvil-builds/` (the installable
-plugin folder) and `chronoanvil-source/` (the whole tree, minus `node_modules/` and
-`dist/`).
+of them per version, in `../archives/chronoanvil-builds/` (the installable
+plugin folder) and `../archives/chronoanvil-source/` (the whole tree, minus
+`node_modules/` and `dist/`).
 
 ```
 npm run release      # package, then archive both

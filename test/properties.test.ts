@@ -211,9 +211,12 @@ describe("the button that opens it", () => {
   });
 
   it("counts from the cache the rest of the bar reads", () => {
-    expect(banner()).toContain(
-      "this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}"
-    );
+    // Was the literal `this.app.metadataCache.getFileCache(file)?.frontmatter
+    // ?? {}`. `frontmatterOf` IS that expression as of 5.2 — one function for
+    // the thirty-four sites that had written it out — so the rule this pins is
+    // the same one: the count comes from the cache the rest of the bar reads,
+    // never from a vault read of the file.
+    expect(banner()).toContain("frontmatterOf(this.app, file)");
   });
 
   it("does not fight the cog for the row's slack", () => {

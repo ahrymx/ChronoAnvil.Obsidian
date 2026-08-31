@@ -359,6 +359,15 @@ describe("the editor cannot learn which surface it is on", () => {
       "journal index/path",
       "journal index/resources",
       "journal leaf/resources",
+      // A SIXTH KIND IN 5.6, AND THE FIRST WHOSE ANSWER IS NOT A DIRECTIVE'S
+      // ARGUMENT AT ALL. `lines` asks for the note's opening headings, which
+      // are plain `## ` markdown between two invisible markers, so the read is
+      // `skeletonTitles` and the write is the journal planner's rewrite of that
+      // span. It is on this list because the model hands the answer over —
+      // `SectionView.answered` — and off the `answerInText` path because there
+      // is no directive to put it in. A note written before 5.6 has no markers,
+      // supplies no answer, and draws no box.
+      "journal leaf/headings",
       // A FIFTH KIND IN 4.59.0, AND IT IS THE FIRST THAT IS NOT ABOUT A
       // DIRECTIVE'S ARGUMENT. `form` asks how the section is DRAWN — with its
       // own foldable bar, or bare so it can be a column of a row group, which

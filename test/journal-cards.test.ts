@@ -127,7 +127,12 @@ describe("a card's ground is derived, not configured", () => {
     const body = src.slice(at, src.indexOf("\n}", at));
     expect(body).toContain("folderNotePath(type.root)");
     expect(body).toContain("fm.banner");
-    expect(body).toContain("metadataCache");
+    // THE CACHE, THROUGH THE ONE READER OF IT. This said `metadataCache` when
+    // the expression was written out here by hand; since 5.2 every frontmatter
+    // read goes through `frontmatterOf`, which is that call and nothing else.
+    // What the assertion is about is unchanged: the banner comes from the index
+    // note's cached frontmatter, not from a vault read and not from settings.
+    expect(body).toContain("frontmatterOf(");
     // And §11's refusal of new settings keys survives.
     expect(src).not.toContain("settings.journalBanner");
   });

@@ -33,6 +33,7 @@ import {
 } from "../events/events";
 import { getEventsFile, readEvents } from "../events/eventstore";
 import { buildPeriodNav, periodSpan } from "./periodnav";
+import { buildDiaryActions } from "./diary-header";
 import { bannerSuppressed } from "../ui/vault-banner";
 import { statStrip } from "../ui/stat-strip";
 import { lineOf, readRollup } from "../trackers/fields";
@@ -615,6 +616,21 @@ export function buildCalendar(
   // processor and not by the table it belongs to. The strip reads as the
   // section's because it takes the same four values — a hairline, 4px of air,
   // right-aligned, at the bar's scale — not because it shares its element.
+  //
+  // THIS CALL WENT MISSING AND NOTHING NOTICED, which is the reason the line
+  // below is now covered by a test that RENDERS rather than one that reads the
+  // source. Between 4.13.2 and 5.1 the append was lost while everything around
+  // it stayed: the comment above, `opts.header` and `opts.ctx` on
+  // `CalendarOptions`, `header: true` at the one call site in
+  // directive-regions.ts, `.ca-jc-actions` and its `:has()` rule in the
+  // stylesheet, diary-header.ts itself, and the assertions in appearance.test.ts
+  // that check all of it. Every one of those passed against a card that had not
+  // drawn the strip for two minor versions, because each of them asked what the
+  // source SAYS. Capture and Search were simply gone from the diary card.
+  if (opts.header && opts.ctx) {
+    root.appendChild(buildDiaryActions(plugin, opts.ctx));
+  }
+
   const header = root.createDiv({ cls: "ca-jc-header" });
 
   const navHead = header.createDiv({ cls: "ca-jc-navhead" });

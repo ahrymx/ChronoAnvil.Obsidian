@@ -79,15 +79,25 @@ describe("which rows are locked", () => {
     expect(banner.required).toBe(true);
   });
 
-  it("locks the prose skeleton, and not because it is required", () => {
-    // The distinction the two lock captions draw. `headings` is unremovable
-    // for a different reason from `banner`: it is ordinary markdown, not
-    // mandatory, so the caption has to say "delete it by hand" rather than
-    // "required" or the reader is told something untrue.
+  it("unlocks the prose skeleton, and not by exempting it", () => {
+    // 5.6 REVERSED THIS ROW, AND THE REVERSAL IS THE ASSERTION. It read
+    // `.toBe(false)` on the argument that "`headings` is unremovable for a
+    // different reason from `banner`: it is ordinary markdown". The headings
+    // are still ordinary markdown; they are now bracketed by two HTML comments,
+    // so the plugin can say where they start and stop, and the same derivation
+    // that refused them now allows them.
+    //
+    // `banner` STAYS LOCKED, which is what shows the derivation was not simply
+    // switched off: it is required, and its spacer is a bare `markdown` block
+    // besides.
     const headings = findSection("headings")!;
     expect(headings.required).toBeFalsy();
     expect(
       sectionRemovable(headings, lessonCtx, sectionOverrides(lessonCtx, "headings"))
+    ).toBe(true);
+    const banner = findSection("banner")!;
+    expect(
+      sectionRemovable(banner, lessonCtx, sectionOverrides(lessonCtx, "banner"))
     ).toBe(false);
   });
 
@@ -158,18 +168,69 @@ describe("what Save refuses", () => {
     );
   });
 
-  it("never removes a section that writes plain markdown, even if asked", () => {
+  it("removes a bracketed skeleton and keeps every heading written under", () => {
     const present = sectionsPresent(lesson(), lessonCtx);
     expect(present).toContain("headings");
-    const after = applySections(lesson(), lessonCtx, []);
-    if (after !== null) {
-      expect(sectionsPresent(after, lessonCtx)).toContain("headings");
-    }
+
+    // The composed Lesson ships PROMPT TEXT under four of its five headings —
+    // "What is this lesson about", the `- **Definition:**` bullets — and none
+    // of it is the reader's. A blank-line test would have called all four
+    // written and handed back the whole skeleton to somebody who asked for it
+    // to go; the rule is instead whether the words differ from the ones the
+    // catalogue put there, so an untouched note loses the lot.
     const op = planSections(lesson(), lessonCtx, []).find(
       (o) => o.sectionId === "headings"
     )!;
+    expect(op.kind).toBe("remove");
+    expect(op.keepsContent).toBeUndefined();
+
+    const after = applySections(lesson(), lessonCtx, [])!;
+    expect(after).not.toBeNull();
+    expect(after).not.toContain("## Overview");
+    // One line typed under one heading, and that heading alone survives with
+    // everything under it.
+    const used = lesson().replace(
+      "What is this lesson about, and why does it matter?",
+      "Ohm's law, and why I keep forgetting it"
+    );
+    const op2 = planSections(used, lessonCtx, []).find(
+      (o) => o.sectionId === "headings"
+    )!;
+    expect(op2.keepsContent?.map((k) => k.key)).toEqual(["Overview"]);
+    const after2 = applySections(used, lessonCtx, [])!;
+    expect(after2).toContain("## Overview");
+    expect(after2).toContain("why I keep forgetting it");
+    expect(after2).not.toContain("## Key Concepts");
+    // The markers go, always — a bracket with nothing in it would be a note
+    // carrying an invisible claim about a section it no longer has.
+    for (const text of [after, after2]) {
+      expect(text).not.toContain("chronoanvil-skeleton");
+    }
+  });
+
+  it("still refuses a skeleton that was written before the markers existed", () => {
+    // EVERY NOTE IN EVERY VAULT ON THE DAY 5.6 SHIPS. `sectionRemovable` says
+    // the section may go, and it is right about the catalogue; this file cannot
+    // tell its `## Overview` from one the reader typed, so the plan keeps it and
+    // says why. That split is `SectionView.removable` versus `refusal`, and it
+    // is the reason those are two fields.
+    const bare = lesson()
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("<!--/chronoanvil-skeleton"))
+      .filter((l) => !l.trim().startsWith("<!--chronoanvil-skeleton"))
+      .join("\n");
+    expect(sectionsPresent(bare, lessonCtx)).toContain("headings");
+
+    const op = planSections(bare, lessonCtx, []).find(
+      (o) => o.sectionId === "headings"
+    )!;
     expect(op.kind).toBe("keep");
-    expect(op.detail).toContain("by hand");
+    expect(op.detail).toContain("Reload this page");
+
+    const after = applySections(bare, lessonCtx, []);
+    if (after !== null) {
+      expect(sectionsPresent(after, lessonCtx)).toContain("headings");
+    }
   });
 });
 

@@ -267,7 +267,17 @@ describe("patch 4: seven entries, and the surfaces that cannot answer", () => {
   it("and the editor's rule for drawing one is the model's silence", () => {
     const src = readCode("section-editor");
     // Two ways to answer no, both of them the model's.
-    expect(src).toContain("if (!q.directive) return false;");
+    //
+    // THE DIRECTIVE-LESS RULE GAINED A DOOR IN 5.6, AND IT IS STILL THE
+    // MODEL'S. A `lines` question writes markdown rather than a directive
+    // argument, so "has no directive" stopped being the same sentence as
+    // "cannot be read back"; what makes it drawable is that the model handed
+    // over an answer for it, which is `SectionView.answered` and nothing the
+    // editor worked out for itself. A question no model answers still draws
+    // nothing, which is the original rule intact.
+    expect(src).toContain(
+      "if (!q.directive) return section.answered?.[q.key] !== undefined;"
+    );
     expect(src).toContain('q.kind === "folder" && q.hostFolder == null');
     // And no surface ever named in this window.
     for (const word of ["template", "journal", "dashboard", "diaryRoot"]) {

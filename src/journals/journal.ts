@@ -21,22 +21,7 @@ import {
   FENCE_OPEN,
   FENCE_CLOSE,
 } from "../core/constants";
-import {
-  childFiles,
-  childFolders,
-  createFileEnsuringFolders,
-  ensureFolder,
-  fillTemplate,
-  getFile,
-  getFolder,
-  openFile,
-  normaliseTypeValue,
-  plural,
-  readTemplate,
-  slugify,
-  today,
-  nowTimestamp,
-} from "../core/util";
+import { activeMarkdownFile, childFiles, childFolders, createFileEnsuringFolders, ensureFolder, fillTemplate, frontmatterOf, getFile, getFolder, normaliseTypeValue, noteTypeOf, nowTimestamp, openFile, plural, readTemplate, slugify, today } from "../core/util";
 // TYPE-ONLY, and load-bearing. `buildJournalType` used to be imported from
 // custom-journal.ts as a value and called at module scope (STUDY_JOURNAL,
 // below), while custom-journal.ts imports back from here — so whether that
@@ -1166,7 +1151,7 @@ export function journalTypeOfNote(
   if (!type) return undefined;
   const file = getFile(plugin.app, notePath);
   const raw = file
-    ? plugin.app.metadataCache.getFileCache(file)?.frontmatter?.["type"]
+    ? noteTypeOf(plugin.app, file)
     : undefined;
   return typeRecognised(type, raw) ? type : undefined;
 }
@@ -1707,7 +1692,7 @@ export class JournalManager {
     // No explicit folder (command palette): infer from the active file's
     // folder if it sits under this type's root; otherwise offer a picker.
     if (!folderPath) {
-      const active = this.app.workspace.getActiveFile();
+      const active = activeMarkdownFile(this.app);
       const activeFolder = active?.parent?.path;
       if (activeFolder && activeFolder.startsWith(root + "/")) {
         folderPath = activeFolder;
@@ -1806,7 +1791,7 @@ export class JournalManager {
   // in the other one.
   async setPageLayout(file: TFile, layoutId: string): Promise<void> {
     const id = layoutId.trim();
-    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+    const fm = frontmatterOf(this.app, file);
     if (!id && !(PAGE_LAYOUT_KEY in fm)) return;
     await this.app.fileManager.processFrontMatter(file, (front) => {
       if (id) front[PAGE_LAYOUT_KEY] = id;
@@ -1890,15 +1875,45 @@ export class JournalManager {
   // single file. `notePath` defaults to the active file, so the button on a
   // lesson's own dashboard needs no argument.
   async newPage(type: JournalType, notePath?: string): Promise<void> {
-    const path = notePath ?? this.app.workspace.getActiveFile()?.path;
-    const file = path ? getFile(this.app, path) : null;
+    const path = notePath ?? activeMarkdownFile(this.app)?.path;
+    let file = path ? getFile(this.app, path) : null;
+    if (!file && path) {
+      const base = path.replace(/\.md$/, "");
+      const leafName = path.split("/").pop();
+      if (leafName) {
+        file = getFile(this.app, `${base}/${leafName}`);
+      }
+    }
+    if (!file) {
+      file = activeMarkdownFile(this.app);
+    }
     if (!file) {
       notify.fail("Open a note first.");
       return;
     }
 
-    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-    const kind = this.pageKindOf(type, fm);
+    let fm = frontmatterOf(this.app, file);
+    let kind = this.pageKindOf(type, fm);
+    if (!kind?.pages) {
+      // Fallback: if metadataCache is momentarily behind after a save, parse type from text
+      try {
+        const text = await this.app.vault.read(file);
+        const match = /^type:\s*["']?([^"'\n\r]+)["']?/m.exec(text);
+        if (match && match[1]) {
+          const directType = match[1].trim();
+          const fallbackKind = type.kinds.find(
+            (k) => k.id.toLowerCase() === directType.toLowerCase()
+          );
+          if (fallbackKind?.pages) {
+            kind = fallbackKind;
+            fm = { ...fm, type: directType };
+          }
+        }
+      } catch {
+        // Fall back to empty frontmatter if unreadable
+      }
+    }
+
     if (!kind?.pages) {
       const which = type.kinds
         .filter((k) => k.pages)
@@ -1996,14 +2011,42 @@ export class JournalManager {
   // reason to promote is "this is getting long" rather than "I want to write
   // the next bit now".
   async convertToDashboard(type: JournalType, notePath?: string): Promise<void> {
-    const path = notePath ?? this.app.workspace.getActiveFile()?.path;
-    const file = path ? getFile(this.app, path) : null;
+    const path = notePath ?? activeMarkdownFile(this.app)?.path;
+    let file = path ? getFile(this.app, path) : null;
+    if (!file && path) {
+      const base = path.replace(/\.md$/, "");
+      const leafName = path.split("/").pop();
+      if (leafName) {
+        file = getFile(this.app, `${base}/${leafName}`);
+      }
+    }
+    if (!file) {
+      file = activeMarkdownFile(this.app);
+    }
     if (!file) {
       notify.fail("Open a note first.");
       return;
     }
-    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-    const kind = this.pageKindOf(type, fm);
+    let fm = frontmatterOf(this.app, file);
+    let kind = this.pageKindOf(type, fm);
+    if (!kind) {
+      try {
+        const text = await this.app.vault.read(file);
+        const match = /^type:\s*["']?([^"'\n\r]+)["']?/m.exec(text);
+        if (match && match[1]) {
+          const directType = match[1].trim();
+          const fallbackKind = type.kinds.find(
+            (k) => k.id.toLowerCase() === directType.toLowerCase()
+          );
+          if (fallbackKind?.pages) {
+            kind = fallbackKind;
+            fm = { ...fm, type: directType };
+          }
+        }
+      } catch {
+        // Fall back to empty frontmatter if unreadable
+      }
+    }
     if (!kind) {
       notify.fail("This note isn't a kind that can hold pages.");
       return;
@@ -2093,7 +2136,7 @@ export class JournalManager {
   // commands for every journal type, rather than a pair per type cluttering
   // the palette.
   private typeOfActive(): { type: JournalType; path: string } | null {
-    const file = this.app.workspace.getActiveFile();
+    const file = activeMarkdownFile(this.app);
     if (!file) {
       notify.fail("Open a note first.");
       return null;

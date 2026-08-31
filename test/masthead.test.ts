@@ -16,6 +16,9 @@
 // this file fails first.
 
 import { describe, expect, it } from "vitest";
+
+import { PAGE_TITLE_LINE } from "../src/core/note-sections";
+import { isTitleLine } from "../src/core/directive-grammar";
 import { readCode, readCss, readSrc } from "./sources";
 import { composeDiaryDashboard } from "../src/diary/diary-sections";
 import type { DashboardGrain } from "../src/diary/diary-sections";
@@ -64,7 +67,7 @@ const fenceHolding = (text: string, probe: (l: string) => boolean): string[] => 
 
 // The fence carrying the banner, on every diary surface.
 const banner = (text: string): string[] =>
-  fenceHolding(text, (l) => l.startsWith("title:") || l.startsWith("entry-header") || l.startsWith("links:"));
+  fenceHolding(text, (l) => isTitleLine(l) || l.startsWith("entry-header") || l.startsWith("links:"));
 
 // The fence carrying the period summary. On an entry that is the banner itself
 // (its `entry-header` is what a summary is to a dashboard); on a dashboard it is
@@ -103,17 +106,17 @@ describe("above the rule, an entry and an overview are the same object", () => {
     }
     for (const grain of DASHBOARD_GRAINS) {
       const body = banner(composeDiaryDashboard(grain));
-      expect(body[0], grain).toBe("title:home,diary,journals");
+      expect(body[0], grain).toBe(PAGE_TITLE_LINE);
     }
   });
 
   it("and overview carries title line while entry has entry-header", () => {
     for (const grain of DASHBOARD_GRAINS) {
       const text = composeDiaryDashboard(grain);
-      expect(text, grain).toContain("title:home,diary,journals");
+      expect(text, grain).toMatch(/^title$/m);
     }
     for (const grain of TRACKER_CLASSES) {
-      expect(composeEntryTemplate(grain), grain).not.toContain("title:");
+      expect(composeEntryTemplate(grain), grain).not.toMatch(/^title\b/m);
       expect(composeEntryTemplate(grain), grain).toContain("entry-header");
     }
   });
@@ -131,7 +134,7 @@ describe("above the rule, an entry and an overview are the same object", () => {
       // navigation row never gets a fence of its own — and what it is welded to
       // is now the thing that says which note this is.
       const head = banner(composeDiaryDashboard(grain));
-      expect(head.some((l) => l.startsWith("title:")), grain).toBe(true);
+      expect(head.some((l) => isTitleLine(l)), grain).toBe(true);
     }
   });
 
@@ -173,7 +176,7 @@ describe("below the rule they diverge, and nothing forces them together", () => 
     // is a fact about its body and must not have leaked upward.
     const yearly = composeDiaryDashboard("yearly");
     expect(yearly).not.toContain("tasks-table");
-    expect(banner(yearly)[0]).toBe("title:home,diary,journals");
+    expect(banner(yearly)[0]).toBe(PAGE_TITLE_LINE);
   });
 });
 

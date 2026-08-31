@@ -37,6 +37,7 @@ import {
 } from "../src/journals/journal";
 import { journalTemplateFiles } from "../src/journals/custom-journal";
 import { sectionsFor, templateTargets } from "../src/journals/journal-sections";
+import { STUDY_COMPOSED } from "../src/core/scaffold";
 import { readCode } from "./sources";
 import { studyTemplate } from "./study-template";
 
@@ -59,6 +60,15 @@ describe("a preset is an ordinary journal", () => {
       expect(composed, name).toBeTruthy();
       expect(composed!.content, name).toBe(studyTemplate(name));
     }
+    // AND THE WHOLE SET, NOT JUST THE THREE NAMED ABOVE. `STUDY_COMPOSED`'s
+    // comment in scaffold.ts calls it "the SHAPE Study composes to, which is
+    // what the equivalence suite checks a preset against" — and until 5.2 no
+    // suite checked it against anything: the constant was exported, derived on
+    // every module load, and read by nothing. Three literal filenames cannot
+    // notice a fourth template appearing on one side and not the other, which
+    // is the drift the constant exists to make impossible. This is the claim
+    // its comment already made, finally asserted.
+    expect(from.map((f) => f.name).sort()).toEqual([...STUDY_COMPOSED].sort());
   });
 
   it("carries no field a reader's own journal could not", () => {

@@ -43,7 +43,7 @@ import type { JournalSection } from "../journals/journal-sections";
 import { sectionContext } from "../journals/journal-sections";
 import { resolveLayoutFor } from "../journals/layout-transfer";
 import type { SectionOverrides } from "../journals/journal-sections";
-import { getFile, plural } from "./util";
+import { getFile, noteTypeOf, plural } from "./util";
 import { repaintOpenNotes } from "../ui/livewidget";
 import { confirmKindChange } from "../journals/kind-change";
 import {
@@ -2658,10 +2658,7 @@ export class JournalEditModal extends SteppedEditorModal {
     let n = 0;
     for (const file of this.app.vault.getMarkdownFiles()) {
       if (!file.path.startsWith(`${root}/`)) continue;
-      const raw = this.app.metadataCache.getFileCache(file)?.frontmatter?.[
-        "type"
-      ];
-      if (typeof raw === "string" && raw.trim().toLowerCase() === kindId) n++;
+      if (noteTypeOf(this.app, file) === kindId) n++;
     }
     return n;
   }

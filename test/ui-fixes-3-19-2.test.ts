@@ -92,8 +92,17 @@ describe("an empty resources category can be removed", () => {
 
   it("only when the category is empty", () => {
     // The condition, in the widget's own model.
-    expect(attach()).toContain("const empty = items.length === 0;");
+    //
+    // THROUGH A GETTER SINCE 5.2, when the label row was extracted out of
+    // `buildAttachments` into `buildShelfLabel`. The count is asked for at the
+    // moment the button is refreshed rather than captured when it was built —
+    // which is not a nicety: `items` is REASSIGNED by a reorder and by the
+    // initial load, so a captured reference would answer for a model that has
+    // been replaced.
+    expect(attach()).toContain("const n = count();");
+    expect(attach()).toContain("const empty = n === 0;");
     expect(attach()).toContain("drop.disabled = !empty;");
+    expect(attach()).toContain("() => items.length");
   });
 
   it("and checks again against the file before writing", () => {

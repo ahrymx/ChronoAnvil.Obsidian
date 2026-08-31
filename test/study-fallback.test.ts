@@ -65,9 +65,17 @@ describe("no widget borrows Study's identity any more", () => {
     // count cannot tell that apart from a guard being deleted. What has to hold
     // is that no reader of `hostType` uses its answer without checking it —
     // which is the sentence above, and is what is checked now.
+    //
+    // THE FLOOR DROPPED TO THREE IN 5.2, and the reader that went was not a
+    // guard being deleted: `buildConfidenceSummary` was the builder for a
+    // widget RETIRED IN 3.11 (see RETIRED_WIDGETS in constants.ts — the stats
+    // band states the same numbers), and it had gone on being exported with no
+    // caller ever since. The floor is a canary for the regex still matching
+    // something, not a claim about how many widgets ask; the rule it guards is
+    // the loop below, which is unchanged.
     const src = tables();
     const sites = [...src.matchAll(/const type = hostType\([^)]*\);/g)];
-    expect(sites.length, "readers of hostType").toBeGreaterThanOrEqual(4);
+    expect(sites.length, "readers of hostType").toBeGreaterThanOrEqual(3);
     for (const site of sites) {
       const after = src.slice((site.index ?? 0) + site[0].length);
       // The guard is the next STATEMENT, allowing for the comment paragraphs

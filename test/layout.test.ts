@@ -255,7 +255,7 @@ describe("applyLayout", () => {
   it("converges an old note onto the shipped directive set", () => {
     const out = applyLayout(L(OLD_MONTHLY), monthly) as string[];
     const text = out.join("\n");
-    expect(text).toContain("title:home,diary,journals");
+    expect(text).toMatch(/^title$/m);
     expect(text).toContain("entry-rollup");
     expect(text).toContain("links:home,week,all#diary");
   });
@@ -272,9 +272,9 @@ describe("applyLayout", () => {
     // to mean when the reader may have rearranged everything below it.
     const out = applyLayout(L(OLD_MONTHLY), monthly) as string[];
     const text = out.join("\n");
-    expect(text).toContain("title:home,diary,journals");
+    expect(text).toMatch(/^title$/m);
 
-    const head = text.indexOf("title:home,diary,journals");
+    const head = text.search(/^title$/m);
     const summary = text.indexOf("month-summary");
     expect(head).toBeGreaterThan(-1);
     expect(head).toBeLessThan(summary);
@@ -291,7 +291,7 @@ describe("applyLayout", () => {
     const once = applyLayout(L(OLD_MONTHLY), monthly) as string[];
     const twice = applyLayout(once, monthly);
     expect(twice).toBeNull();
-    expect(once.join("\n").match(/title:/g)).toHaveLength(1);
+    expect(once.join("\n").match(/^title$/gm)).toHaveLength(1);
   });
 
   it("removes a retired directive and the fence it emptied", () => {

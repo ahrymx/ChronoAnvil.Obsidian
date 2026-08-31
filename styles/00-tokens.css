@@ -583,17 +583,75 @@
      capsule — halving the height is the definition of the shape being fixed. */
   --ca-control-round: var(--ca-radius-pill);
 
-  /* The calendar-heatmap width cap. DEFINED IN 3.12; before that it was
-     referenced once, in 20-charts.css, and set by nothing anywhere — the
-     `260px` fallback beside it was the only value it ever had, which made a
-     dangling reference look like a configurable knob.
-     3.10's own token test whitelisted it as "set from TypeScript" on exactly
-     that assumption, so the guard that exists to catch unresolvable tokens was
-     laundering this one. Both fixed together.
-     The value is unchanged and the argument for it is at the call site: cells
-     are squares sized by their COLUMN, so a wider wrap means bigger cells and
-     FEWER week rows in the same tile, not more. */
-  --ca-heat-max-w: 260px;
+  /* How much of a settings row belongs to its control.
+     A number rather than "whatever the control needs" because the control's
+     width is the description's width subtracted from the row, and a
+     description that re-wraps moves every row under it. See the note on
+     `.ca-settings-body > .setting-item > .setting-item-control` in
+     85-tracker-controls.css for what that looked like. 250px holds the longest
+     shipped dropdown label — the aesthetic-preset list — without ellipsis at
+     the tab's usual width, and the narrow-pane stack releases it. */
+  --ca-settings-control-w: 250px;
+
+  /* The calendar-heatmap layout tokens.
+     Year ranges transpose into GitHub-style horizontal strips — weeks as
+     columns, seven fixed weekday rows. Shorter ranges use a seven-column
+     calendar whose row count grows with the window.
+
+     THE CELL SIZE IS NO LONGER ONE OF THESE. Through 5.5 it was: a flat 13px for
+     the year strip and 26px for the short grid, which is why a heatmap and the
+     tile it was drawn in had nothing to do with each other — a 30-day window
+     drew a 182x156 block of squares in the middle of a 1050x450 tile. What is
+     here now is the FLOOR, the CEILING and the chrome the fit has to subtract;
+     20-charts.css measures the rest against the tile with container units and
+     explains the whole mechanism.
+
+     The two counts are placeholders. `renderHeatmap` sets both on the wrap
+     from the window it actually resolved, and a value is kept here because the
+     grid templates read them unconditionally. */
+  --ca-heat-cols: 7;
+  --ca-heat-rows: 5;
+  --ca-heat-strip-cols: 53;
+
+  /* Short grid: gap, the weekday header the fit must leave room for, and the
+     range a cell may take. The floor is a legible square rather than the
+     smallest drawable one — below ~14px a calendar day stops being clickable
+     with any confidence, and scrolling is the better failure. The ceiling
+     stops a six-row month in a 2x2 tile from inflating into loose tiles. */
+  --ca-heat-gap: 4px;
+  --ca-heat-head: 16px;
+  --ca-heat-cell-min: 14px;
+  --ca-heat-cell-max: 64px;
+
+  /* Strip: the weekday-initial gutter on the left, the month-label row on
+     top, and the cell range.
+
+     NO GAP TOKEN. The strip's gap is a fraction of its own cell, because a 3px
+     gutter that reads as a mosaic between 13px cells reads as a hairline
+     between 50px ones. The fraction is not iterated on — seven rows and six
+     gaps is `cell * (7 + 6k)`, so it folds into the fit as a single divisor.
+     Change `k` and change the 7.98 in 20-charts.css with it.
+
+     THE CEILING IS HIGH ON PURPOSE, and it is the number this pass turns on.
+     Seven rows is a constant here, so the only thing a taller tile can buy the
+     strip is bigger cells; stopping at 26px is what left 109px of graph in a
+     411px box and read as a chart zoomed out from its own tile. The floor is
+     low for the opposite reason — a reader scanning a contribution graph is
+     reading density rather than picking a day. */
+  --ca-heat-strip-gap-k: 0.14;
+  --ca-heat-strip-gutter: 18px;
+  --ca-heat-strip-head: 12px;
+  /* Room for the horizontal scrollbar, reserved unconditionally.
+     The strip is the one layout that overflows sideways BY DESIGN, so on any
+     window worth scrolling a bar is always there taking height out of `cqh` —
+     and the fit that ignored it sized seven rows for a box that then had eight
+     rows' worth of content, clipping the last weekday off the bottom. Reserved
+     rather than reacted to: a term that appears only when the bar does is the
+     oscillation this file's own note warns about. Costs 14px on a quarter that
+     happens to fit. */
+  --ca-heat-strip-bar: 14px;
+  --ca-heat-strip-cell-min: 8px;
+  --ca-heat-strip-cell-max: 56px;
 
   /* ── The elevation scale (3.9 §4.1) ────────────────────────────────────
      Three heights and one direction variant, for the four drop shadows this

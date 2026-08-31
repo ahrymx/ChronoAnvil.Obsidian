@@ -242,8 +242,6 @@ export function bridgeWindow(host: BridgeHostFacts): BridgeResult<BridgeWindow> 
 // learn for no new capability.
 export const BRIDGE_SELECTORS = ["is", "tag", "has", "from", "to"] as const;
 
-export type BridgeSelector = (typeof BRIDGE_SELECTORS)[number];
-
 const SELECTOR_RE = /^([A-Za-z]+):(.+)$/;
 
 // Whether a token is a filter at all, versus free search text. Free text is

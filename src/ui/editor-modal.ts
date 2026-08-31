@@ -456,9 +456,35 @@ export abstract class SteppedEditorModal extends EditorModal {
     this.goTo(this.step + 1);
   }
 
+  // THE FRAME DOES NOT SHRINK BETWEEN STEPS.
+  //
+  // Obsidian centres a modal vertically, so a window that is 620px tall on
+  // Identity and 420px tall on Sections does not just get shorter — it moves,
+  // and the footer moves with it. Measured on the journal wizard: Next sat at
+  // y=700 and the Back/Save pair that replaced it at y=588, so the button the
+  // reader had just aimed at was gone from under the pointer before the next
+  // step had finished arriving. Nothing was mis-clicked; it simply read as the
+  // window flinching.
+  //
+  // GROW-ONLY, AND MEASURED RATHER THAN DECLARED. A flat height would give a
+  // two-field step a screenful of nothing, and no number written here could
+  // know how tall a step is on a reader's font and pane. The floor is whatever
+  // the tallest step SEEN SO FAR came to, which means a wizard can still grow
+  // when a later step needs it and can never shrink back — one direction of
+  // movement instead of two, and usually none at all.
+  //
+  // `.ca-editor-body` scrolls under a `max-height` on the frame, so the
+  // measurement is already clamped: this floor cannot push the window past the
+  // height that rule allows.
+  private tallestStep = 0;
+
   protected goTo(index: number): void {
+    this.tallestStep = Math.max(this.tallestStep, this.body?.offsetHeight ?? 0);
     this.step = Math.max(0, Math.min(index, this.stepList().length - 1));
     this.refreshFrame();
+    if (this.tallestStep > 0) {
+      this.body.style.minHeight = `${this.tallestStep}px`;
+    }
   }
 
   // Every step's objection, in order, so Save enforces the whole form however

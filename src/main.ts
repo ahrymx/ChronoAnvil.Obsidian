@@ -24,6 +24,7 @@ import { AppearanceManager } from "./ui/appearance";
 import { openVaultSearch } from "./ui/search-all";
 import { BRAND_ICON_ID, registerBrandIcon } from "./ui/brand-icon";
 import {
+  activeMarkdownFile,
   resolveOverviewPath,
   getFile,
   moment,
@@ -344,11 +345,15 @@ export default class ChronoAnvilPlugin extends Plugin {
   private async pruneNoteState(): Promise<void> {
     const folds = this.settings.collapsedNoteSections;
     const tabs = this.settings.openGroupTabs;
+    const gridFilters = this.settings.timeGridFilters;
     const any =
-      Object.keys(folds ?? {}).length > 0 || Object.keys(tabs ?? {}).length > 0;
+      Object.keys(folds ?? {}).length > 0 ||
+      Object.keys(tabs ?? {}).length > 0 ||
+      Object.keys(gridFilters ?? {}).length > 0;
     if (!any) return;
     const live = new Set(this.app.vault.getMarkdownFiles().map((f) => f.path));
     let dropped = tabs ? pruneCollapsedSections(tabs, live) : 0;
+    dropped += gridFilters ? pruneCollapsedSections(gridFilters, live) : 0;
     if (!folds || Object.keys(folds).length === 0) {
       if (dropped > 0) await this.saveSettings();
       return;
@@ -522,7 +527,7 @@ export default class ChronoAnvilPlugin extends Plugin {
   // widget controls get their path from the render context; a command has to
   // ask the workspace, and has to cope with there being nothing open.
   private withActiveNote(run: (path: string) => Promise<void>): void {
-    const file = this.app.workspace.getActiveFile();
+    const file = activeMarkdownFile(this.app);
     if (!file || file.extension !== "md") {
       new Notice("Open a note first.");
       return;

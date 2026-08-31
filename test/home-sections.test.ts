@@ -392,11 +392,12 @@ describe("what the homepage composes to", () => {
       "`chronoanvil:spacer`",
       "```chronoanvil",
       WIDE_KEYWORD,
-      // AND IT CARRIES THE THREE DESTINATIONS AS OF 4.20, where it was the bare
-      // `title` from 4.5 onward. `home-sections.ts` has the argument: the
-      // banner means the same thing on this page as on the other eight, and the
-      // launcher's tiles are content rather than chrome.
-      "title:home,diary,journals",
+      // AND IT IS BARE AGAIN AS OF 5.2. It was bare from 4.5, took the three
+      // destinations in 4.20 on the argument that the banner means the same
+      // thing here as on the other eight pages, and lost them on all nine when
+      // the head that drew them turned out to have been replaced in 4.10. The
+      // launcher below still draws those tiles, as content.
+      PAGE_TITLE_LINE,
     ]);
   });
 

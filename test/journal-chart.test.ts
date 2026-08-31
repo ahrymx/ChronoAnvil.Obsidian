@@ -149,11 +149,16 @@ describe("the chart-system gate is untouched", () => {
   });
 
   it("does not consult scopesFor", () => {
-    const charts = readSrc("charts");
-    const fn = charts.slice(
-      charts.indexOf("export function journalChartRefusal"),
-      charts.indexOf("// A tracker whose value axis can pair")
-    );
+    // BOUNDED BY THE FUNCTION, NOT BY THE NEXT COMMENT. This used to slice from
+    // the declaration to the literal `// A tracker whose value axis can pair` —
+    // the comment above `scatterableType`, three functions further down. That
+    // made an unrelated helper the end of this assertion's world: deleting
+    // `scatterableType` (which had been exported with no caller since the chart
+    // editor stopped asking) sent `indexOf` to -1, the slice ran to the end of
+    // the module, and a test whose whole job is a NEGATIVE started reading two
+    // thousand lines that legitimately mention `scopesFor`. `fnBody` stops at
+    // the next top-level declaration, which is the boundary that was meant.
+    const fn = fnBody("journalChartRefusal", "charts");
     expect(fn).toContain("chartableType(def)");
     expect(fn).not.toContain("scopesFor");
     expect(fn).not.toContain("isChartable");

@@ -415,6 +415,93 @@ export function tabPlan(
   return out;
 }
 
+// One page's row: the cells inside it, the divider between each pair of them,
+// and the height handle on every card in every one.
+//
+// EXTRACTED FROM `layOutRow` IN 5.2, at the seam where that function changes
+// subject. Everything above the call lays widgets out; everything below it is
+// the foot, the page strip and the gestures that move between pages. Those keep
+// their shared mutable state and stay where they are — a closure that measures
+// one element, hides a second and reveals a third is not made clearer by having
+// the three passed to it.
+//
+// CALLED WHERE ITS CODE STOOD, so the rows are built, and their children
+// re-parented, in exactly the order they were before.
+//
+// TAKES `children` AND MOVES OUT OF IT. The cells are filled by APPENDING the
+// container's existing children — the widgets were drawn by the processor
+// already and this is a re-parent, not a copy. That is why the caller's
+// `insertBefore` has to run first: the anchor it positions the group against is
+// one of these very nodes, and appending it here would leave the group with
+// nowhere to go.
+function buildRowCells(
+  pages: HTMLElement,
+  children: readonly HTMLElement[],
+  { cells: groups, weights, page }: TabbedPlan
+): HTMLElement {
+  // STAMPED WITH ITS ORDINAL, so a gesture inside it can name the page it is
+  // in without counting rows — see `TabbedPlan` for why counting would be
+  // wrong. This is the same shape as `data-ca-line`: the DOM carrying the one
+  // fact about the file that cannot be re-derived from what is on screen.
+  const row = pages.createDiv({
+    cls: ROW_CLASS,
+    attr: { [ROW_PAGE_ATTR]: String(page) },
+  });
+  groups.forEach((group, n) => {
+    const cell = row.createDiv({ cls: ROW_CELL_CLASS });
+    // ONE DIVIDER PER INTERNAL BOUNDARY, and none on the first cell — the left
+    // edge of the group is not between anything. It is added BEFORE the cell's
+    // content so it is not caught by anything walking `cell.children` for
+    // widgets; every such walk reads the line stamp, which a divider has not
+    // got.
+    if (n > 0) {
+      cell.createDiv({
+        cls: GROUP_DIVIDER_CLASS,
+        attr: {
+          [DIVIDER_INDEX_ATTR]: String(n),
+          "aria-label": "Drag to set the width of these columns",
+        },
+      });
+    }
+    // ONLY WHEN IT IS NOT ONE. The stylesheet reads `var(--ca-cell-weight, 1)`,
+    // so an ordinary cell needs no inline style at all and the common case
+    // leaves no mark in the DOM — the same shape `--ca-row-cols` and
+    // `--ca-ev-tint` already use for a value only some instances have.
+    if (weights[n] !== 1) {
+      cell.style.setProperty("--ca-cell-weight", String(weights[n]));
+    }
+    for (const i of group) cell.appendChild(children[i]);
+    // ONE HANDLE PER CARD, ON THE CARD, APPENDED LAST (4.22 §4.1).
+    //
+    // AFTER the append, because it goes INSIDE each child rather than beside
+    // them — so the child has to be here first — and because appending it last
+    // is what keeps it out of the way of everything that reads a card's own
+    // children: `applyCardHeights` and the drag walk both skip it, since it
+    // carries no line stamp, and the `is-sized` scroll rule in the stylesheet
+    // never sees it because an absolutely positioned child of a flex container
+    // is not a flex item.
+    //
+    // AND ON EVERY CHILD OF THE CELL, including the last one in the column and
+    // including a widget that draws its own band and wears no card. Both came
+    // through `isCellContent`, so both are things the reader put in the fence.
+    //
+    // THE ONE CHILD THAT IS NOT is the column divider this loop just built, and
+    // it is skipped by name rather than by asking about the line stamp — the
+    // stamp is block-drag.ts's word and this file has no reason to learn it, and
+    // the divider is the only thing `layOutRow` puts in a cell that the reader
+    // did not.
+    for (const child of Array.from(cell.children)) {
+      if (!(child instanceof HTMLElement)) continue;
+      if (child.hasClass(GROUP_DIVIDER_CLASS)) continue;
+      child.createDiv({
+        cls: CARD_DIVIDER_CLASS,
+        attr: { "aria-label": "Drag to set the height of this widget" },
+      });
+    }
+  });
+  return row;
+}
+
 // Lay this block's widgets out side by side, in the cells it asked for.
 //
 // `boundaries` is empty for a row with no `cell` line — the 4.2 shape, one cell
@@ -457,69 +544,9 @@ export function layOutRow(
   const pages = box.createDiv({ cls: GROUP_PAGES_CLASS });
   container.insertBefore(box, children[plans[0].cells[0][0]]);
 
-  const rows = plans.map(({ cells: groups, weights, page }) => {
-    // STAMPED WITH ITS ORDINAL, so a gesture inside it can name the page it is
-    // in without counting rows — see `TabbedPlan` for why counting would be
-    // wrong. This is the same shape as `data-ca-line`: the DOM carrying the one
-    // fact about the file that cannot be re-derived from what is on screen.
-    const row = pages.createDiv({
-      cls: ROW_CLASS,
-      attr: { [ROW_PAGE_ATTR]: String(page) },
-    });
-    groups.forEach((group, n) => {
-      const cell = row.createDiv({ cls: ROW_CELL_CLASS });
-      // ONE DIVIDER PER INTERNAL BOUNDARY, and none on the first cell — the left
-      // edge of the group is not between anything. It is added BEFORE the cell's
-      // content so it is not caught by anything walking `cell.children` for
-      // widgets; every such walk reads the line stamp, which a divider has not
-      // got.
-      if (n > 0) {
-        cell.createDiv({
-          cls: GROUP_DIVIDER_CLASS,
-          attr: {
-            [DIVIDER_INDEX_ATTR]: String(n),
-            "aria-label": "Drag to set the width of these columns",
-          },
-        });
-      }
-      // ONLY WHEN IT IS NOT ONE. The stylesheet reads `var(--ca-cell-weight, 1)`,
-      // so an ordinary cell needs no inline style at all and the common case
-      // leaves no mark in the DOM — the same shape `--ca-row-cols` and
-      // `--ca-ev-tint` already use for a value only some instances have.
-      if (weights[n] !== 1) {
-        cell.style.setProperty("--ca-cell-weight", String(weights[n]));
-      }
-      for (const i of group) cell.appendChild(children[i]);
-      // ONE HANDLE PER CARD, ON THE CARD, APPENDED LAST (4.22 §4.1).
-      //
-      // AFTER the append, because it goes INSIDE each child rather than beside
-      // them — so the child has to be here first — and because appending it last
-      // is what keeps it out of the way of everything that reads a card's own
-      // children: `applyCardHeights` and the drag walk both skip it, since it
-      // carries no line stamp, and the `is-sized` scroll rule in the stylesheet
-      // never sees it because an absolutely positioned child of a flex container
-      // is not a flex item.
-      //
-      // AND ON EVERY CHILD OF THE CELL, including the last one in the column and
-      // including a widget that draws its own band and wears no card. Both came
-      // through `isCellContent`, so both are things the reader put in the fence.
-      //
-      // THE ONE CHILD THAT IS NOT is the column divider this loop just built, and
-      // it is skipped by name rather than by asking about the line stamp — the
-      // stamp is block-drag.ts's word and this file has no reason to learn it, and
-      // the divider is the only thing `layOutRow` puts in a cell that the reader
-      // did not.
-      for (const child of Array.from(cell.children)) {
-        if (!(child instanceof HTMLElement)) continue;
-        if (child.hasClass(GROUP_DIVIDER_CLASS)) continue;
-        child.createDiv({
-          cls: CARD_DIVIDER_CLASS,
-          attr: { "aria-label": "Drag to set the height of this widget" },
-        });
-      }
-    });
-    return row;
-  });
+  // ONE ROW PER PAGE. What each one is made of is `buildRowCells` (5.2); what
+  // happens to it afterwards is the rest of this function.
+  const rows = plans.map((plan) => buildRowCells(pages, children, plan));
 
   // ── THE FOOT (4.9 §2.2) ─────────────────────────────────────────────
   //

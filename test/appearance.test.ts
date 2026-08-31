@@ -1064,14 +1064,17 @@ describe("the banner is one material, and the minimal one is quiet", () => {
     const css = readCss();
     expect(css).not.toContain(".ca-journal-page-banner::before");
     expect(css).not.toContain(".ca-journal-slim-banner::before");
-    expect(css).not.toContain(".ca-jtc-card::before");
+    // `.ca-jtc-card` WAS THE THIRD NAME HERE AND LEFT IN 5.2 with the widget
+    // that drew it — the 4.5 head, unreachable since 4.10. Its flattening rule
+    // inside the banner went with it: the head the banner holds today is
+    // `.ca-journal-page-head`, which draws no box to flatten.
+    expect(css.replace(/\/\*[\s\S]*?\*\//g, "")).not.toContain(".ca-jtc-");
 
     // The children sit above it rather than under it. `inset: 0` needs a
     // positioned ancestor or it resolves against the code-block widget in Live
     // Preview, which is 4.7.0's grip bug.
     for (const sel of [
       ".ca-journal-page-banner",
-      ".ca-journal-page-banner > .ca-jtc-card",
       ".ca-journal-page-banner > .ca-journal-links-card",
     ]) {
       expect(body(sel), sel).toContain("position: relative");

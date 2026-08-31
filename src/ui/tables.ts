@@ -19,7 +19,7 @@
 import { SCOPE_JOURNAL } from "../core/directive-grammar";
 import { App, MarkdownPostProcessorContext, normalizePath, setIcon, TFile, TFolder } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
-import { childFiles, filesUnder, folderPrefix, frontmatterOf, getFile, getFolder, isVaultRoot, isoDate, moment, noExt, openFile, openGlobalSearch } from "../core/util";
+import { childFiles, filesUnder, folderPrefix, frontmatterOf, getFile, getFolder, isVaultRoot, isoDate, moment, noExt, noteTypeOf, openFile, openGlobalSearch } from "../core/util";
 import { pagesUnder, recencyMs, relativeActivity, tagsOf } from "../core/query";
 import type { PageInfo } from "../core/query";
 import { formatPeriodLabel } from "../charts/charts";
@@ -2323,7 +2323,7 @@ export function buildPagesTable(
   if (!file?.parent) return root;
 
   const type = journalTypeOfNote(plugin, file.path);
-  const fm = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+  const fm = frontmatterOf(app, file);
   const kind = type?.kinds.find((k) => k.id === fm["type"]);
   const pageId = kind?.pages?.id ?? "page";
   const label = kind?.pages?.label ?? "Page";
@@ -2332,7 +2332,7 @@ export function buildPagesTable(
     .filter((f) => f.path !== file.path)
     .map((f) => ({
       file: f,
-      fm: app.metadataCache.getFileCache(f)?.frontmatter ?? {},
+      fm: frontmatterOf(app, f),
     }))
     .filter((p) => p.fm["type"] === pageId)
     .sort((a, b) => {
@@ -2344,13 +2344,10 @@ export function buildPagesTable(
     });
 
   if (pages.length === 0) {
-    root.appendChild(
-      emptyCallout(
-        "files",
-        // `label` is a kind's label, which carries the kind's glyph.
-        `No ${splitGlyph(label).text.toLowerCase()}s yet`,
-        `Press “New ${label}” to split this note across several — the note itself stays where it is and keeps its trackers.`
-      )
+    emptyLine(
+      root,
+      `No ${splitGlyph(label).text.toLowerCase()}s yet — press “New ${label}” to add one.`,
+      "ca-empty-line"
     );
     return root;
   }
@@ -2415,8 +2412,13 @@ function isContainerFolder(
 ): boolean {
   const note = getFile(app, `${folder.path}/${folder.name}.md`);
   if (!note) return true; // no folder note at all — still a container
-  const t = app.metadataCache.getFileCache(note)?.frontmatter?.["type"];
-  const value = typeof t === "string" ? t : "";
+  // NORMALISED SINCE 5.2, WHICH IS A FIX RATHER THAN A TIDY. `leaves` below is
+  // a set of kind ids, which are lowercase; this compared the RAW property
+  // against it, so a folder note written `type: Lesson` missed every leaf and
+  // was reported as a container. `noteTypeOf` is the one reader of this
+  // property now and it normalises, which is what the other seven sites were
+  // already doing by hand.
+  const value = noteTypeOf(app, note);
   const type = journalTypeAtPath(plugin, note.path);
   // No journal, so no leaf kinds to recognise — and the permissive answer is
   // already this function's documented default two lines up: a folder note
@@ -2586,14 +2588,18 @@ export function buildJournalBreakdown(
   return root;
 }
 
-// ── confidence-summary ───────────────────────────────────────────────
-// Avg/latest/count confidence across every lesson in scope. Scope = the
-// host note's own folder, so the same widget works unchanged for both the
-// subject index (aggregates all topics) and a topic index (just itself) —
-// both are folder notes. Owns its own empty/non-empty state; the Tracker
-// Activity chart stays a separate `tracker` block and is left to render on
-// its own (see the v1.5 plan §5 — an empty chart on a brand-new subject is
-// a fine tradeoff for deleting the old DOM-hiding hack).
+// ── confidence numbers ───────────────────────────────────────────────
+// Avg/latest/count confidence across every lesson in scope. Scope = the host
+// note's own folder, so one answer serves both the subject index (aggregates
+// all topics) and a topic index (just itself) — both are folder notes.
+//
+// THE WIDGET THAT USED TO SIT HERE IS GONE, AND ITS BUILDER WENT WITH IT.
+// `confidence-summary` was retired in 3.11 — RETIRED_WIDGETS in constants.ts
+// says so, and says the stats band states the same numbers as a band — but
+// `buildConfidenceSummary` was left behind and went on being exported with no
+// caller for two majors. The numbers below are what the retirement kept: the
+// stats band and the activity heatmap's Progress rail both read them, which is
+// why they are shared rather than computed twice.
 // Average/latest confidence across a set of pages, or null when no lesson
 // carries a rating. Pure given the pages, and shared by the standalone
 // `confidence-summary` widget and the Progress rail in the activity heatmap so
@@ -2695,70 +2701,6 @@ export function confidenceStats(
     sorted.reduce((s, p) => s + Number(p.fm[property]), 0) / sorted.length
   ).toFixed(1);
   return { avg, latest: sorted[0].fm[property], count: sorted.length };
-}
-
-export function buildConfidenceSummary(
-  plugin: ChronoAnvilPlugin,
-  ctx: MarkdownPostProcessorContext
-): HTMLElement {
-  const app = plugin.app;
-  const root = createDiv({ cls: "ca-journal-table ca-journal-confidence-summary" });
-
-  const file = hostFile(app, ctx);
-  if (!file?.parent) return root;
-  const scope = file.parent.path;
-
-  const type = hostType(plugin, file.path);
-  if (!type) return root;
-  const pages = pagesUnder(app, scope);
-  const typed = pages.filter((p) => p.fm["type"]);
-  const ratingDef = ratingDefOf(plugin, type);
-  const ratingId = ratingDef?.id ?? confidenceProperty(plugin);
-  // The kinds this average counts — the ones that carry the rating — which is
-  // also what the empty state should name. Telling a Cooking journal to "add a
-  // lesson" was the most visible of these four leaks.
-  const counted = confidenceKinds(plugin, file.path, ratingId);
-  const named = type.kinds.filter((k) => counted.includes(k.id));
-  const nameList = named.length
-    ? named.map((k) => `${k.emoji} New ${k.label}`).join(" or ")
-    : `New ${type.levels[type.levels.length - 1].noun}`;
-
-  if (typed.length === 0) {
-    root.appendChild(
-      emptyCallout(
-        "graduation-cap",
-        `No ${splitGlyph(type.name).text.toLowerCase()} notes yet`,
-        `Add one with ${nameList} — a summary fills in here automatically.`
-      )
-    );
-    return root;
-  }
-
-  const stats = confidenceStats(typed, ratingId, counted);
-
-  if (!stats) {
-    root.appendChild(
-      emptyCallout(
-        "gauge",
-        `No ${ratingWord(ratingDef)} data yet`,
-        `Set ${ratingDef ? ratingDef.label : "a rating"} on a note here to see a summary.`
-      )
-    );
-    return root;
-  }
-
-  const outOf = ratingDef?.max != null ? `/${ratingDef.max}` : "";
-  const label = named.length === 1 ? named[0].label.toLowerCase() : "note";
-  const p = root.createEl("p", { cls: "ca-jt-confidence-line" });
-  p.createEl("strong", {
-    text: `${ratingDef?.label ?? "Rating"} avg ${stats.avg}${outOf} · latest ${
-      stats.latest
-    }${outOf} · ${stats.count} ${
-      stats.count === 1 ? label : plural(label)
-    } tracked`,
-  });
-
-  return root;
 }
 
 // ── tasks-table ──────────────────────────────────────────────────────
@@ -3284,6 +3226,244 @@ export interface TasksScope {
   cycle: (next: string) => void;
 }
 
+// The table's own label row: what it is, how much of it there is, and how much
+// of that is late.
+//
+// EXTRACTED FROM `buildTasksTable` IN 5.2. `period` is taken as well as
+// `periodLabel` because the label is empty for an unscoped table AND could in
+// principle be empty for a scoped one; the question the line asks is whether
+// there is a scope, not whether it has a name.
+function buildTasksHead(
+  body: HTMLElement,
+  period: PeriodBounds | null,
+  periodLabel: string,
+  total: number,
+  notes: number,
+  overdue: number
+): void {
+  // Lighter in-widget line: the collapsible `header:` bar above the widget is
+  // the section's primary heading, so this row is a small muted label plus the
+  // count / overdue pills — not a bold repeat of the bar.
+  const head = body.createDiv({ cls: "ca-jtt-head" });
+  const titleEl = head.createDiv({ cls: "ca-jtt-title" });
+  setIcon(titleEl.createSpan({ cls: "ca-jtt-title-icon" }), "hourglass");
+  // Naming the period is what stops a scoped table from reading as a broken
+  // unscoped one: without it, "3 open" on a dashboard showing March is
+  // indistinguishable from a table that has quietly lost most of its rows.
+  titleEl.createSpan({ text: period ? `Open tasks · ${periodLabel}` : "Open tasks" });
+
+  const pills = head.createDiv({ cls: "ca-jtt-pills" });
+  if (overdue > 0) {
+    pills.createSpan({
+      cls: "ca-jtt-pill ca-jtt-pill-danger",
+      text: `${overdue} overdue`,
+    });
+  }
+  pills.createSpan({
+    cls: "ca-jtt-pill",
+    text: `${total} open · ${notes} note${notes === 1 ? "" : "s"}`,
+  });
+}
+
+interface TaskSubgroup {
+  file: TFile;
+  sublabel?: string;
+  rows: OpenTaskRow[];
+}
+interface TaskBucket {
+  id: string;
+  title: string;
+  orderKey: number;
+  notes: TaskSubgroup[];
+}
+
+// The three-tier grouping the table reads down the page: ISO weeks for daily
+// notes, newest first; then one bucket per registered journal, in registry
+// order; then a bucket per remaining folder.
+//
+// EXTRACTED FROM `buildTasksTable` IN 5.2, and it is the one piece of that
+// function with no DOM in it at all — every line is about which bucket a note
+// belongs in. That is the seam: what follows the call draws exactly what this
+// returns, in the order it returns it.
+function bucketTasks(
+  plugin: ChronoAnvilPlugin,
+  groups: { file: TFile; rows: OpenTaskRow[] }[]
+): TaskBucket[] {
+  const app = plugin.app;
+  // Form structured buckets:
+  // 1. Weekly buckets for daily notes (congregated into respective ISO week)
+  // 2. Journal buckets for notes in custom journals (with journal emoji and name)
+  // 3. Other/Folder buckets for remaining notes
+  const weekBuckets = new Map<string, TaskBucket>();
+  const journalBuckets = new Map<string, TaskBucket>();
+  const otherBuckets = new Map<string, TaskBucket>();
+
+  const journalTypes = registeredJournalTypes(plugin);
+
+  for (const group of groups) {
+    const fm = frontmatterOf(app, group.file);
+    const jd = typeof fm["journal-date"] === "string" ? fm["journal-date"].trim() : null;
+    const dailyDate =
+      jd && /^\d{4}-\d{2}-\d{2}$/.test(jd)
+        ? jd
+        : /^\d{4}-\d{2}-\d{2}$/.test(group.file.basename)
+          ? group.file.basename
+          : null;
+
+    if (dailyDate) {
+      const m = moment(dailyDate);
+      const ws = m.clone().startOf("isoWeek");
+      const wk = ws.isoWeek();
+      const yr = ws.year();
+      const bucketId = `week-${yr}-${wk}`;
+      const dayLabel = m.format("ddd D MMM");
+
+      let b = weekBuckets.get(bucketId);
+      if (!b) {
+        b = {
+          id: bucketId,
+          title: `🗓️ Week ${wk}`,
+          orderKey: yr * 100 + wk,
+          notes: [],
+        };
+        weekBuckets.set(bucketId, b);
+      }
+      b.notes.push({ file: group.file, sublabel: dayLabel, rows: group.rows });
+      continue;
+    }
+
+    const jType = journalTypes.find((j) => group.file.path.startsWith(j.root));
+    if (jType) {
+      const bucketId = `journal-${jType.id}`;
+      let b = journalBuckets.get(bucketId);
+      if (!b) {
+        b = {
+          id: bucketId,
+          title: `${jType.emoji} ${jType.name} Journal`,
+          orderKey: journalTypes.indexOf(jType),
+          notes: [],
+        };
+        journalBuckets.set(bucketId, b);
+      }
+      b.notes.push({ file: group.file, rows: group.rows });
+      continue;
+    }
+
+    const parentFolder = group.file.parent?.name ?? "Notes";
+    const bucketId = `folder-${group.file.parent?.path ?? "other"}`;
+    let b = otherBuckets.get(bucketId);
+    if (!b) {
+      b = {
+        id: bucketId,
+        title: `📁 ${parentFolder}`,
+        orderKey: 0,
+        notes: [],
+      };
+      otherBuckets.set(bucketId, b);
+    }
+    b.notes.push({ file: group.file, rows: group.rows });
+  }
+
+  return [
+    ...Array.from(weekBuckets.values()).sort((a, b) => b.orderKey - a.orderKey),
+    ...Array.from(journalBuckets.values()).sort((a, b) => a.orderKey - b.orderKey),
+    ...Array.from(otherBuckets.values()),
+  ];
+}
+
+// One open task, as a row in its note's list: the checkbox that closes it, the
+// text with its inline tags lifted out, and the chips that qualify it.
+//
+// EXTRACTED FROM `buildTasksTable` IN 5.2. It is the deepest of four nested
+// loops — table → bucket → note → task — and the only one of them that is about
+// a task rather than about grouping, so it is the level worth naming.
+//
+// `todayIso` IS PASSED, NOT COMPUTED. The caller reads the clock once for the
+// whole table (the header's overdue count needs it too), and a row that asked
+// for itself could disagree with the header across local midnight.
+function buildTaskRow(
+  list: HTMLElement,
+  app: App,
+  row: OpenTaskRow,
+  todayIso: string
+): void {
+  const rowEl = list.createDiv({
+    cls: `ca-journal-task-row ca-jtt-row ca-journal-task-${row.task.priority}`,
+  });
+
+  const main = rowEl.createDiv({ cls: "ca-journal-task-main" });
+
+  const box = main.createEl("input", {
+    type: "checkbox",
+    cls: "ca-journal-task-check",
+    attr: { "aria-label": "Mark task complete" },
+  });
+  box.checked = false;
+  box.addEventListener("change", () => {
+    // Optimistically dim the row; the LiveWidget repaint drops it. Guard
+    // against a double-fire (disabled input can still receive a
+    // programmatic change) by disabling immediately.
+    rowEl.addClass("is-done");
+    box.disabled = true;
+    void toggleTaskDone(app, row.file, row.key, row.line, row.index);
+  });
+
+  // Extract inline tags from task text
+  const rawText = row.task.text;
+  const tags: string[] = [];
+  const cleanText = rawText
+    .replace(/(?:^|\s)(#[a-zA-Z0-9_\-/]+)/g, (_m, t) => {
+      tags.push(t);
+      return "";
+    })
+    .trim();
+
+  main.createSpan({ cls: "ca-journal-task-text ca-jtt-text", text: cleanText || rawText });
+  rowEl.setAttr("aria-label", `${row.task.priority} priority task`);
+
+  const meta = rowEl.createDiv({ cls: "ca-journal-task-meta" });
+  const chips = meta.createDiv({ cls: "ca-journal-task-chips" });
+
+  for (const tag of tags) {
+    chips.createSpan({ cls: "ca-journal-task-tag", text: tag });
+  }
+
+  if (row.task.priority !== "normal") {
+    const prio = chips.createSpan({
+      cls: `ca-journal-task-prio ca-journal-task-${row.task.priority}`,
+      attr: { title: `Priority: ${row.task.priority}` },
+    });
+    const prioIcon = row.task.priority === "high" ? "chevrons-up" : "chevrons-down";
+    setIcon(prio.createSpan({ cls: "ca-journal-task-prio-icon" }), prioIcon);
+    prio.createSpan({
+      cls: "ca-journal-task-prio-label",
+      text: row.task.priority === "high" ? "High" : "Low",
+    });
+  }
+
+  if (row.task.due) {
+    // `todayIso` is hoisted above the group loop; a null (unparseable
+    // clock) yields "" there, and dueLabel treats any real due date as a
+    // valid comparison — when todayIso is "" we skip the label entirely.
+    if (todayIso !== "") {
+      const { text, overdue } = dueLabel(row.task.due, todayIso);
+      const due = chips.createSpan({
+        cls: `ca-jtt-due${overdue ? " ca-jtt-due-overdue" : ""}`,
+        text,
+      });
+      setIcon(due.createSpan({ cls: "ca-jtt-due-icon" }), "calendar");
+    }
+  }
+
+  if (row.task.at) {
+    const at = chips.createSpan({
+      cls: "ca-jtt-at ca-journal-task-at-wrap",
+      text: row.task.at,
+    });
+    setIcon(at.createSpan({ cls: "ca-jtt-at-icon" }), "clock");
+  }
+}
+
 export function buildTasksTable(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
@@ -3392,120 +3572,9 @@ export function buildTasksTable(
       0
     );
 
-    // Lighter in-widget line: the collapsible `header:` bar above the widget is
-    // the section's primary heading, so this row is a small muted label plus the
-    // count / overdue pills — not a bold repeat of the bar.
-    const head = body.createDiv({ cls: "ca-jtt-head" });
-    const titleEl = head.createDiv({ cls: "ca-jtt-title" });
-    setIcon(titleEl.createSpan({ cls: "ca-jtt-title-icon" }), "hourglass");
-    // Naming the period is what stops a scoped table from reading as a broken
-    // unscoped one: without it, "3 open" on a dashboard showing March is
-    // indistinguishable from a table that has quietly lost most of its rows.
-    titleEl.createSpan({ text: period ? `Open tasks · ${periodLabel}` : "Open tasks" });
+    buildTasksHead(body, period, periodLabel, total, groups.length, overdue);
 
-    const pills = head.createDiv({ cls: "ca-jtt-pills" });
-    if (overdue > 0) {
-      pills.createSpan({
-        cls: "ca-jtt-pill ca-jtt-pill-danger",
-        text: `${overdue} overdue`,
-      });
-    }
-    pills.createSpan({
-      cls: "ca-jtt-pill",
-      text: `${total} open · ${groups.length} note${groups.length === 1 ? "" : "s"}`,
-    });
-
-    // Form structured buckets:
-    // 1. Weekly buckets for daily notes (congregated into respective ISO week)
-    // 2. Journal buckets for notes in custom journals (with journal emoji and name)
-    // 3. Other/Folder buckets for remaining notes
-    interface TaskSubgroup {
-      file: TFile;
-      sublabel?: string;
-      rows: OpenTaskRow[];
-    }
-    interface TaskBucket {
-      id: string;
-      title: string;
-      orderKey: number;
-      notes: TaskSubgroup[];
-    }
-
-    const weekBuckets = new Map<string, TaskBucket>();
-    const journalBuckets = new Map<string, TaskBucket>();
-    const otherBuckets = new Map<string, TaskBucket>();
-
-    const journalTypes = registeredJournalTypes(plugin);
-
-    for (const group of groups) {
-      const fm = frontmatterOf(app, group.file);
-      const jd = typeof fm["journal-date"] === "string" ? fm["journal-date"].trim() : null;
-      const dailyDate =
-        jd && /^\d{4}-\d{2}-\d{2}$/.test(jd)
-          ? jd
-          : /^\d{4}-\d{2}-\d{2}$/.test(group.file.basename)
-            ? group.file.basename
-            : null;
-
-      if (dailyDate) {
-        const m = moment(dailyDate);
-        const ws = m.clone().startOf("isoWeek");
-        const wk = ws.isoWeek();
-        const yr = ws.year();
-        const bucketId = `week-${yr}-${wk}`;
-        const dayLabel = m.format("ddd D MMM");
-
-        let b = weekBuckets.get(bucketId);
-        if (!b) {
-          b = {
-            id: bucketId,
-            title: `🗓️ Week ${wk}`,
-            orderKey: yr * 100 + wk,
-            notes: [],
-          };
-          weekBuckets.set(bucketId, b);
-        }
-        b.notes.push({ file: group.file, sublabel: dayLabel, rows: group.rows });
-        continue;
-      }
-
-      const jType = journalTypes.find((j) => group.file.path.startsWith(j.root));
-      if (jType) {
-        const bucketId = `journal-${jType.id}`;
-        let b = journalBuckets.get(bucketId);
-        if (!b) {
-          b = {
-            id: bucketId,
-            title: `${jType.emoji} ${jType.name} Journal`,
-            orderKey: journalTypes.indexOf(jType),
-            notes: [],
-          };
-          journalBuckets.set(bucketId, b);
-        }
-        b.notes.push({ file: group.file, rows: group.rows });
-        continue;
-      }
-
-      const parentFolder = group.file.parent?.name ?? "Notes";
-      const bucketId = `folder-${group.file.parent?.path ?? "other"}`;
-      let b = otherBuckets.get(bucketId);
-      if (!b) {
-        b = {
-          id: bucketId,
-          title: `📁 ${parentFolder}`,
-          orderKey: 0,
-          notes: [],
-        };
-        otherBuckets.set(bucketId, b);
-      }
-      b.notes.push({ file: group.file, rows: group.rows });
-    }
-
-    const sortedBuckets: TaskBucket[] = [
-      ...Array.from(weekBuckets.values()).sort((a, b) => b.orderKey - a.orderKey),
-      ...Array.from(journalBuckets.values()).sort((a, b) => a.orderKey - b.orderKey),
-      ...Array.from(otherBuckets.values()),
-    ];
+    const sortedBuckets = bucketTasks(plugin, groups);
 
     for (const bucket of sortedBuckets) {
       const bucketTotal = bucket.notes.reduce((s, n) => s + n.rows.length, 0);
@@ -3572,83 +3641,7 @@ export function buildTasksTable(
         });
 
         const list = bucketBody.createDiv({ cls: "ca-jtt-list" });
-        for (const row of rows) {
-          const rowEl = list.createDiv({
-            cls: `ca-journal-task-row ca-jtt-row ca-journal-task-${row.task.priority}`,
-          });
-
-          const main = rowEl.createDiv({ cls: "ca-journal-task-main" });
-
-          const box = main.createEl("input", {
-            type: "checkbox",
-            cls: "ca-journal-task-check",
-            attr: { "aria-label": "Mark task complete" },
-          });
-          box.checked = false;
-          box.addEventListener("change", () => {
-            // Optimistically dim the row; the LiveWidget repaint drops it. Guard
-            // against a double-fire (disabled input can still receive a
-            // programmatic change) by disabling immediately.
-            rowEl.addClass("is-done");
-            box.disabled = true;
-            void toggleTaskDone(app, row.file, row.key, row.line, row.index);
-          });
-
-          // Extract inline tags from task text
-          const rawText = row.task.text;
-          const tags: string[] = [];
-          const cleanText = rawText
-            .replace(/(?:^|\s)(#[a-zA-Z0-9_\-/]+)/g, (_m, t) => {
-              tags.push(t);
-              return "";
-            })
-            .trim();
-
-          main.createSpan({ cls: "ca-journal-task-text ca-jtt-text", text: cleanText || rawText });
-          rowEl.setAttr("aria-label", `${row.task.priority} priority task`);
-
-          const meta = rowEl.createDiv({ cls: "ca-journal-task-meta" });
-          const chips = meta.createDiv({ cls: "ca-journal-task-chips" });
-
-          for (const tag of tags) {
-            chips.createSpan({ cls: "ca-journal-task-tag", text: tag });
-          }
-
-          if (row.task.priority !== "normal") {
-            const prio = chips.createSpan({
-              cls: `ca-journal-task-prio ca-journal-task-${row.task.priority}`,
-              attr: { title: `Priority: ${row.task.priority}` },
-            });
-            const prioIcon = row.task.priority === "high" ? "chevrons-up" : "chevrons-down";
-            setIcon(prio.createSpan({ cls: "ca-journal-task-prio-icon" }), prioIcon);
-            prio.createSpan({
-              cls: "ca-journal-task-prio-label",
-              text: row.task.priority === "high" ? "High" : "Low",
-            });
-          }
-
-          if (row.task.due) {
-            // `todayIso` is hoisted above the group loop; a null (unparseable
-            // clock) yields "" there, and dueLabel treats any real due date as a
-            // valid comparison — when todayIso is "" we skip the label entirely.
-            if (todayIso !== "") {
-              const { text, overdue } = dueLabel(row.task.due, todayIso);
-              const due = chips.createSpan({
-                cls: `ca-jtt-due${overdue ? " ca-jtt-due-overdue" : ""}`,
-                text,
-              });
-              setIcon(due.createSpan({ cls: "ca-jtt-due-icon" }), "calendar");
-            }
-          }
-
-          if (row.task.at) {
-            const at = chips.createSpan({
-              cls: "ca-jtt-at ca-journal-task-at-wrap",
-              text: row.task.at,
-            });
-            setIcon(at.createSpan({ cls: "ca-jtt-at-icon" }), "clock");
-          }
-        }
+        for (const row of rows) buildTaskRow(list, app, row, todayIso);
       }
     }
   });

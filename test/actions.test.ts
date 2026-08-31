@@ -270,3 +270,75 @@ describe("the table holds what cannot be derived", () => {
       .toEqual([]);
   });
 });
+
+describe("active markdown note resolution", () => {
+  it("resolves direct active file when present", async () => {
+    const { activeMarkdownFile } = await import("../src/core/util");
+    const fakeFile = { path: "03 - Study/Math/Lesson 1.md", extension: "md" };
+    const fakeApp = {
+      workspace: {
+        getActiveFile: () => fakeFile,
+        getActiveViewOfType: () => null,
+        getLeavesOfType: () => [],
+        getLastOpenFiles: () => [],
+      },
+      vault: {
+        getAbstractFileByPath: () => null,
+      },
+    } as any;
+    expect(activeMarkdownFile(fakeApp)).toBe(fakeFile);
+  });
+
+  it("falls back to active MarkdownView when getActiveFile is null (e.g. after modal closes)", async () => {
+    const { activeMarkdownFile } = await import("../src/core/util");
+    const fakeFile = { path: "03 - Study/Math/Lesson 1.md", extension: "md" };
+    const fakeApp = {
+      workspace: {
+        getActiveFile: () => null,
+        getActiveViewOfType: () => ({ file: fakeFile }),
+        getLeavesOfType: () => [],
+        getLastOpenFiles: () => [],
+      },
+      vault: {
+        getAbstractFileByPath: () => null,
+      },
+    } as any;
+    expect(activeMarkdownFile(fakeApp)).toBe(fakeFile);
+  });
+
+  it("falls back to workspace markdown leaves when both getActiveFile and active view are null", async () => {
+    const { activeMarkdownFile } = await import("../src/core/util");
+    const fakeFile = { path: "03 - Study/Math/Lesson 1.md", extension: "md" };
+    const fakeApp = {
+      workspace: {
+        getActiveFile: () => null,
+        getActiveViewOfType: () => null,
+        getLeavesOfType: (type: string) =>
+          type === "markdown" ? [{ view: { file: fakeFile } }] : [],
+        getLastOpenFiles: () => [],
+      },
+      vault: {
+        getAbstractFileByPath: () => null,
+      },
+    } as any;
+    expect(activeMarkdownFile(fakeApp)).toBe(fakeFile);
+  });
+
+  it("falls back to last open files history when no active view is focused", async () => {
+    const { activeMarkdownFile } = await import("../src/core/util");
+    const fakeFile = { path: "03 - Study/Math/Lesson 1.md", extension: "md" };
+    const fakeApp = {
+      workspace: {
+        getActiveFile: () => null,
+        getActiveViewOfType: () => null,
+        getLeavesOfType: () => [],
+        getLastOpenFiles: () => ["03 - Study/Math/Lesson 1.md"],
+      },
+      vault: {
+        getAbstractFileByPath: (p: string) =>
+          p === "03 - Study/Math/Lesson 1.md" ? fakeFile : null,
+      },
+    } as any;
+    expect(activeMarkdownFile(fakeApp)).toBe(fakeFile);
+  });
+});

@@ -80,10 +80,13 @@ describe("the search catalogue", () => {
     expect(box).not.toContain("links:");
     expect(box).toContain("header:🔎 Search the diary");
 
-    const banner = at("title:");
+    const banner = at("title");
     expect(banner).not.toContain("links:");
-    // `home` is on the head rather than in a links row.
-    expect(search()).toContain("title:home,diary,journals");
+    // THE HEAD IS BARE SINCE 5.2, and `home` is not on it either: the ids the
+    // `title:` line carried rendered nothing after 4.10 and were dropped with the
+    // widget that read them. What this still asserts is the half that was always
+    // the point — the banner is a head line with no links row welded into it.
+    expect(search()).toMatch(/^title$/m);
   });
 
   it("writes one fence per section and does not merge them", () => {

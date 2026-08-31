@@ -110,29 +110,56 @@ describe("the section catalogue", () => {
       });
     });
 
-    it("emits no block kind outside the three the model declares", () => {
+    it("emits no block kind outside the four the model declares", () => {
       // Exhaustiveness the type system can't check at runtime. In particular
       // there is no `base` variant any more, and a section quietly growing one
       // back would be the first block that could not fold into its own fence.
+      //
+      // `bracketed` IS THE FOURTH, AS OF 5.6, and the list grew rather than
+      // `markdown` widening — which is the whole of why the prose skeleton
+      // became removable without `sectionRemovable` being told about it.
       everyRender((s, ctx) => {
         for (const b of s.render(ctx)) {
-          expect(["fence", "region", "markdown"], s.id).toContain(b.kind);
+          expect(
+            ["fence", "region", "markdown", "bracketed"],
+            s.id
+          ).toContain(b.kind);
         }
       });
     });
 
+    it("brackets the only prose it writes, and leaves the spacer bare", () => {
+      // The two markdown-ish block kinds, told apart by whether the plugin can
+      // prove it wrote them. Exactly one section emits each, and a third
+      // emitting either would be a section quietly deciding its own
+      // removability.
+      const bracketed = new Set<string>();
+      const bare = new Set<string>();
+      everyRender((s, ctx) => {
+        for (const b of s.render(ctx)) {
+          if (b.kind === "bracketed") bracketed.add(s.id);
+          if (b.kind === "markdown") bare.add(s.id);
+        }
+      });
+      expect([...bracketed]).toEqual(["headings"]);
+      expect([...bare]).toEqual(["banner"]);
+    });
+
     it("derives removability from the blocks rather than a flag", () => {
       // A section is removable exactly when everything it wrote can be found
-      // again. Two are not, and each for its own stated reason.
+      // again. One is not, for its own stated reason.
       const ctx = indexCtx(STUDY_JOURNAL, 1);
       const leaf = kindCtx(STUDY_JOURNAL, "lesson");
 
       // Required, and its spacer is loose markdown besides.
       expect(sectionRemovable(findSection("banner")!, ctx)).toBe(false);
-      // Ordinary `## ` markdown — the very property that makes it survive the
-      // plugin being uninstalled makes it indistinguishable from the reader's
-      // own prose.
-      expect(sectionRemovable(findSection("headings")!, leaf)).toBe(false);
+      // THE PROSE SKELETON IS THE ONE THAT CHANGED SIDES (5.6), and it changed
+      // sides without this function being touched: its headings are the same
+      // `## ` markdown they always were, and they now sit between two markers,
+      // so "everything it wrote can be found again" is true of it. The claim
+      // this file makes is about the derivation, so the case that proves the
+      // derivation is honest is one that MOVED under it.
+      expect(sectionRemovable(findSection("headings")!, leaf)).toBe(true);
 
       // Everything else is fences and regions, both provable.
       expect(sectionRemovable(findSection("review")!, ctx)).toBe(true);

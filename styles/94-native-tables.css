@@ -148,12 +148,6 @@
   }
 }
 
-/* confidence-summary */
-.ca-journal-confidence-summary .ca-jt-confidence-line {
-  margin: 0.2em 0;
-  color: var(--text-normal);
-}
-
 .ca-journal-tasks-table {
   max-height: 500px;
   overflow-y: auto;
@@ -342,19 +336,21 @@
   background: var(--background-secondary);
   color: var(--text-muted);
 }
-/* Rows read as a clean single-line list with left priority accent and right metadata. */
+/* Rows read as a clean single-line list with left priority accent and right metadata.
+   When horizontal space is constrained, metadata tags wrap onto a new row below the text,
+   allowing the task text to use the full available width. */
 .ca-journal-tasks-table .ca-jtt-row {
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px 12px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--background-modifier-border);
   border-left: var(--ca-rule-edge) solid transparent;
   border-radius: var(--ca-radius-xs);
   transition: background 0.12s ease;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 .ca-journal-tasks-table .ca-jtt-row:hover {
   background: var(--background-modifier-hover);
@@ -364,11 +360,15 @@
 }
 .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-main {
   width: auto;
-  flex: 1 1 auto;
+  flex: 1 1 200px;
   min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+}
+.ca-journal-tasks-table .ca-jtt-row .ca-journal-task-check {
+  margin-top: 3px;
+  flex-shrink: 0;
 }
 .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-meta {
   padding-left: 0;
@@ -376,13 +376,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
 .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-chips {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-prio {
   flex: 0 0 auto;

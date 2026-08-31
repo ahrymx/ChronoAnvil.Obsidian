@@ -45,6 +45,7 @@
 
 import type { TFile } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
+import { frontmatterOf } from "./util";
 
 // The frontmatter key, spelled once.
 export const VIEW_MODE_KEY = "obsidianUIMode";
@@ -77,7 +78,7 @@ export function opensInReadingMode(
 
 // The same rule, asked of a real file.
 export function wantsReadingMode(plugin: ChronoAnvilPlugin, file: TFile): boolean {
-  const fm = plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+  const fm = frontmatterOf(plugin.app, file);
   return opensInReadingMode(
     fm[VIEW_MODE_KEY],
     plugin.sections.canEditSections(file.path)

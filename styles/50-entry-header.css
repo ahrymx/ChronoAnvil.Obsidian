@@ -682,12 +682,71 @@
      grid apart; inside the card the strip's own rule is the divider. The same
      three lines `.ca-journal-entry-banner` takes, for the same reason. */
   gap: 0;
-  padding: 12px 14px;
+  padding: 10px 12px;
+  margin: 0 0 0.9em;
   background: var(--background-secondary);
   border: var(--ca-rule) solid var(--background-modifier-border);
   border-radius: var(--ca-radius-md);
   box-shadow: inset 0 1px 0 var(--ca-edge-highlight);
 }
+
+.ca-journal-tracker-section.ca-journal-note--collapsible > .ca-journal-tracker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+  margin-bottom: 8px;
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  border-bottom: none;
+}
+
+.ca-journal-tracker-section.ca-journal-note--collapsible.is-collapsed > .ca-journal-tracker-head {
+  margin-bottom: 0;
+}
+
+.ca-journal-tracker-title-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ca-journal-tracker-section.ca-journal-note--collapsible > .ca-journal-tracker-head:hover .ca-journal-tracker-label {
+  color: var(--text-normal);
+}
+
+.ca-journal-tracker-chevron {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+  transition: transform 120ms ease;
+}
+
+.ca-journal-tracker-chevron .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.ca-journal-tracker-section.is-collapsed .ca-journal-tracker-chevron {
+  transform: rotate(-90deg);
+}
+
+.ca-journal-tracker-section.is-collapsed > :not(.ca-journal-tracker-head) {
+  display: none;
+}
+
+.ca-journal-tracker-label {
+  font-size: var(--ca-text-xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
 /* ── THE TRACKER SECTION TOP STRIP ──────────────────────────────────────
  *
  * The page-context strip is the card's top band, carrying the navigator across
@@ -700,10 +759,17 @@
   align-items: center;
   gap: 8px 16px;
   flex-wrap: wrap;
-  margin: -12px -14px 12px;
-  padding: 8px 14px;
+  margin: 0 -12px 10px;
+  padding: 6px 12px;
+  border-top: var(--ca-rule) solid var(--background-modifier-border);
   border-bottom: var(--ca-rule) solid var(--background-modifier-border);
 }
+
+.ca-journal-tracker-section > :first-child:is(.ca-journal-entry-context, .ca-journal-note-context) {
+  margin-top: -10px;
+  border-top: none;
+}
+
 /* A managed entry template draws no strip — `isManagedTemplate` withholds it —
    so the grid is the whole card and has nothing above it to be separated from. */
 .ca-journal-tracker-section > .ca-journal-tracker-bar:first-child {

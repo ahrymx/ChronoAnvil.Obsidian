@@ -383,17 +383,64 @@
 .ca-journal-recall {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  padding: 10px 12px;
+  margin: 0 0 0.9em;
   gap: 8px;
+  transition: border-color 0.15s ease;
 }
-.ca-journal-recall-head {
+.ca-journal-recall:focus-within {
+  border-color: var(--interactive-accent);
+}
+.ca-journal-recall.ca-journal-note--collapsible > .ca-journal-recall-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  padding: 2px 0;
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  border-bottom: none;
+}
+.ca-journal-recall.ca-journal-note--collapsible.is-collapsed > .ca-journal-recall-head {
+  margin-bottom: 0;
+}
+.ca-journal-recall-title-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ca-journal-recall.ca-journal-note--collapsible > .ca-journal-recall-head:hover .ca-journal-recall-label {
+  color: var(--text-normal);
+}
+.ca-journal-recall-chevron {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+  transition: transform 120ms ease;
+}
+.ca-journal-recall-chevron .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.ca-journal-recall.is-collapsed .ca-journal-recall-chevron {
+  transform: rotate(-90deg);
+}
+.ca-journal-recall.is-collapsed > :not(.ca-journal-recall-head) {
+  display: none;
 }
 .ca-journal-recall-label {
-  font-size: var(--ca-text-sm);
-  font-weight: 600;
+  font-size: var(--ca-text-xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
+  text-transform: uppercase;
   color: var(--text-muted);
+  margin: 0;
 }
 .ca-jrc-tools {
   display: flex;
@@ -764,3 +811,13 @@
    chips over a body-backed list (see widgets.ts::buildRelatedLessons), plus
    a dashed circular add button matching the tracker grid's add-tile
    language at a scale that fits inside one cell. */
+
+.ca-journal-pages-table {
+  padding: 2px 0;
+}
+.ca-journal-pages-table .ca-list {
+  gap: 2px;
+}
+.ca-journal-pages-table .ca-empty-line {
+  padding: 6px 4px;
+}

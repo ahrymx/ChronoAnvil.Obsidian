@@ -1042,9 +1042,6 @@ describe("what the Banner section became", () => {
     // with no title of its own IS called by its date, so a subtitle repeating
     // it is the same words twice.
     expect(head()).toContain("sub: date && date !== title ? date : null,");
-    expect(readSrc("study-header")).toContain(
-      "if (levelNoun && pageHeadSays(plugin, file, levelNoun)) levelNoun = null;"
-    );
   });
 
   it("carries no properties, and that is the decision", () => {
@@ -1087,7 +1084,7 @@ describe("what the Banner section became", () => {
       'if (pageHead) pageHead.insertAdjacentElement("afterend", strip);'
     );
     expect(t).toContain(
-      'if (pageHead) pageHead.insertAdjacentElement("afterend", facts);'
+      'if (pageHead) pageHead.insertAdjacentElement("afterend", trackerHead);'
     );
   });
 

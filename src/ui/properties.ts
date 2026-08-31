@@ -30,6 +30,7 @@
 
 import { App, Modal, Setting, TFile, setIcon } from "obsidian";
 import { notify } from "../core/notify";
+import { frontmatterOf } from "../core/util";
 
 /** What kind of control a value gets, decided once. */
 type Shape = "text" | "number" | "boolean" | "list" | "opaque";
@@ -149,7 +150,7 @@ class PropertiesModal extends Modal {
   }
 
   private frontmatter(): Record<string, unknown> {
-    return { ...(this.app.metadataCache.getFileCache(this.file)?.frontmatter ?? {}) };
+    return { ...(frontmatterOf(this.app, this.file)) };
   }
 
   // REBUILT AFTER A WRITE RATHER THAN PATCHED. A rename or a removal changes

@@ -2113,6 +2113,31 @@ body.is-mobile .ca-jcl-action-chip {
   border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
 }
+
+.is-measuring-natural .ca-jer-days,
+.is-measuring-natural.ca-jer-days,
+.is-sized .ca-jer-days,
+.is-sized.ca-jer-days,
+.ca-journal-widget-card.is-sized .ca-jer-days,
+.ca-journal-block-cell > .is-sized .ca-jer-days {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.is-measuring-natural .ca-jer-rollup,
+.is-measuring-natural.ca-jer-rollup,
+.is-sized .ca-jer-rollup,
+.is-sized.ca-jer-rollup,
+.ca-journal-widget-card.is-sized .ca-jer-rollup,
+.ca-journal-block-cell > .is-sized .ca-jer-rollup {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+}
 .ca-jer-day {
   display: flex;
   align-items: flex-start;
@@ -2399,6 +2424,33 @@ body.is-mobile .ca-jcl-action-chip {
   flex: 1 1 auto;
   text-overflow: ellipsis;
 }
+/* THE HEADING LIST (5.6). One line per heading, in a box, because that is what
+   the thing being edited looks like — a repeater of single-line inputs would
+   have drawn six controls where the row already carries six, and would have
+   made "swap these two" a drag rather than a keystroke.
+
+   IT GETS THE WHOLE ROW. Every other field on this line holds one short value
+   and shares the width; a stack of prose headings that has to be READ as a list
+   does not, so the field it sits in stops being 20em wide and stops competing
+   for the line. `:has()` rather than a class on the field, so the catalogue
+   declaring a `lines` question is the whole of what makes the row look like
+   this — the editor does not have to remember to mark the wrapper too.
+
+   RESIZE VERTICAL, NOT BOTH: the height is the reader's business, the width is
+   the row's, and a box dragged wider than its row is a horizontal scrollbar on
+   a settings pane. */
+.ca-tpl-field:has(.ca-tpl-lines) {
+  flex: 1 1 100%;
+  max-width: none;
+}
+.ca-tpl-lines {
+  width: 100%;
+  min-width: 0;
+  font-size: var(--ca-text-xs);
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}
 /* A field: what the box is called, over the box (4.15 §2).
 
    THE LABEL IS NOT THE PILL. "needs a journal to pull from" says the row is
@@ -2429,7 +2481,8 @@ body.is-mobile .ca-jcl-action-chip {
    their own intrinsic width under a label that is wider or narrower than they
    are. */
 .ca-tpl-field > select,
-.ca-tpl-field > input {
+.ca-tpl-field > input,
+.ca-tpl-field > textarea {
   width: 100%;
   min-width: 0;
 }

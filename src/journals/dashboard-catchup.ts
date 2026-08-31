@@ -53,6 +53,7 @@ import {
 import { applySections, planSections } from "./journal-plan";
 import type { JournalType } from "./journal";
 import type { SectionOp } from "../core/section-model";
+import { noteTypeOf } from "../core/util";
 
 // One note or template that would gain something, and what.
 export interface DashboardCatchup {
@@ -99,9 +100,7 @@ function indexSurfaces(
   const depthOf = new Map(type.levels.map((lvl, depth) => [lvl.id, depth]));
   for (const file of app.vault.getMarkdownFiles()) {
     if (!type.root || !file.path.startsWith(`${type.root}/`)) continue;
-    const raw = app.metadataCache.getFileCache(file)?.frontmatter?.["type"];
-    if (typeof raw !== "string") continue;
-    const depth = depthOf.get(raw.trim().toLowerCase());
+    const depth = depthOf.get(noteTypeOf(app, file));
     if (depth === undefined) continue;
     out.push({
       file,

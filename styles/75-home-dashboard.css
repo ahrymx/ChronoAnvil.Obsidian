@@ -265,27 +265,36 @@
    so the list reads as "these belong to the field above" rather than as more
    settings. */
 
+/* A GRID, BECAUSE `min-width` IS NOT A COLUMN.
+   These were flex rows with an 11ch floor under the label, which aligns the
+   values of every row whose label is shorter than 11ch and ragged-edges the
+   rest. Under 02 · Diary that is most of them: "Daily entries" cleared the
+   floor, "Quarterly entries" and "Period dashboards" did not, and their paths
+   started 10px right of the other eight — a list of ten paths with three
+   different left edges. A `max-content` first track is the same intent stated
+   in a way that measures the labels it actually has. */
 .ca-path-children {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  row-gap: 2px;
+  column-gap: 10px;
   margin: -6px 0 14px 14px;
   padding-left: 12px;
   border-left: 2px solid var(--background-modifier-border);
 }
+/* The row is the grid's two cells, not a box inside one of them. */
 .ca-path-child {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
+  display: contents;
   font-size: var(--ca-text-xs);
 }
 .ca-path-child-label {
   color: var(--text-muted);
-  min-width: 11ch;
+  font-size: var(--ca-text-xs);
 }
 .ca-path-child-value {
   font-family: var(--font-monospace);
+  font-size: var(--ca-text-xs);
   color: var(--text-faint);
   word-break: break-word;
 }

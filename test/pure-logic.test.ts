@@ -123,6 +123,7 @@ import {
   ROLLING_WINDOW_MIN,
   pairPoints,
   streakStats,
+  HEAT_TRANSPOSE_DAYS,
   SPAN_CELLS,
   isChartSpan,
   rangeDays,
@@ -4647,6 +4648,13 @@ describe("the archive script", () => {
     // first time either is rebuilt.
     expect(src()).toMatch(/SOURCE_SKIP = new Set\(\[[^\]]*"node_modules"/);
     expect(src()).toMatch(/SOURCE_SKIP = new Set\(\[[^\]]*"dist"/);
+    // `coverage/` is the same kind of thing and was missed when the report was
+    // added in this release: the first source archive taken after it went in
+    // carried 200 HTML files and nearly three megabytes of one run's report.
+    // Named here rather than derived from `.gitignore`, because the two lists
+    // are not the same list — `generated/` is ignored and IS archived, since a
+    // reader building from the zip regenerates it and wants to see what it was.
+    expect(src()).toMatch(/SOURCE_SKIP = new Set\(\[[^\]]*"coverage"/);
   });
 
   it("is reachable as a script rather than a command to remember", () => {
@@ -7973,12 +7981,20 @@ describe("fold scope in the shipped templates", () => {
   it("folds only the pages table on a Lesson, not the whole note", () => {
     // The Lesson's one bar is `header:📄 Pages`, and since 2.54 its table is
     // welded into the same fence rather than sitting in the next block — so
-    // the one thing folding hides is that table, and the prose skeleton
-    // beneath it still terminates the scope. Both halves of the claim matter:
-    // measured before the heading rule existed, folding this bar hid 21
-    // blocks and the note vanished.
+    // the things folding hides are that table and the skeleton's opening
+    // marker, and `## Overview` beneath them still terminates the scope. Both
+    // halves of the claim matter: measured before the heading rule existed,
+    // folding this bar hid 21 blocks and the note vanished.
+    //
+    // THE SECOND BLOCK IS THE MARKER, AND IT IS WHY IT GETS ITS OWN LINE (5.6).
+    // `<!--chronoanvil-skeleton-->` is not a heading, so a fold that reaches it
+    // does not stop — and if it were abutted to `## Overview` the two would be
+    // ONE block under this model, which would carry the fold past the heading
+    // and into the prose. Separated, the cost is bounded at one hidden element
+    // that renders as nothing. The count going to 3 is the regression to watch
+    // for; going to 1 would mean the markers had been dropped.
     const lesson = studyFile("template-lesson.md");
-    expect(hiddenAfterFirstBar(lesson)).toBe(1);
+    expect(hiddenAfterFirstBar(lesson)).toBe(2);
   });
 
   it("gives the composed dashboards a bar for every section", () => {
@@ -8051,8 +8067,11 @@ describe("rangeDays", () => {
     expect(rangeDays("all", null)).toBe(ALL_TIME_DAYS);
     // Whatever the sentinel is, it must clear every threshold — a chart over
     // all history is the one most in need of room, and treating an unknown
-    // span as short is the failure that reads as a bug.
-    expect(defaultSpan("month", rangeDays("all", null))).toBe("tall");
+    // span as short is the failure that reads as a bug. They differ because
+    // the shapes differ: the trend wants x-axis room and nothing else, while a
+    // transposed heatmap wants height for a legible day AND width for the
+    // weeks it can show before scrolling.
+    expect(defaultSpan("month", rangeDays("all", null))).toBe("large");
     expect(defaultSpan("line", rangeDays("all", null))).toBe("wide");
   });
 
@@ -8105,34 +8124,71 @@ describe("defaultSpan", () => {
     expect(defaultSpan("line", ALL_TIME_DAYS)).toBe("wide");
   });
 
-  it("gives a long heatmap height and never width", () => {
+  it("gives the calendar height and the strip width", () => {
+    // Two shapes, two scarce axes, one threshold deciding which is which.
     expect(defaultSpan("month", 7)).toBe("small");
     expect(defaultSpan("month", 30)).toBe("small");
     expect(defaultSpan("month", 59)).toBe("small");
     expect(defaultSpan("month", 60)).toBe("tall");
-    expect(defaultSpan("month", 90)).toBe("tall");
-    expect(defaultSpan("month", 365)).toBe("tall");
+    expect(defaultSpan("month", HEAT_TRANSPOSE_DAYS - 1)).toBe("tall");
+    // AND THE SHAPE CHANGES AT THE TRANSPOSE, which is the whole point of
+    // exporting the threshold rather than leaving a literal in the renderer.
+    expect(defaultSpan("month", HEAT_TRANSPOSE_DAYS)).toBe("large");
+    expect(defaultSpan("month", 365)).toBe("large");
   });
 
-  it("never gives a heatmap a wide tile, however long the window", () => {
+  it("never gives an untransposed heatmap a wide tile", () => {
     // Not a stylistic preference — a measured result, and the counter-intuitive
-    // one. Heatmap cells are squares sized by their column, so a wider tile
-    // makes each cell bigger and fits FEWER week rows into the same height.
-    // Rendered against a full year, a 2×2 tile showed about five week rows
-    // where a 1×2 showed eleven. If this ever starts returning "wide" or
-    // "large", the renderer has to have been transposed first.
-    for (const days of [60, 90, 180, 365, ALL_TIME_DAYS]) {
+    // one. Below the transpose the cells are squares sized by their column, so
+    // a wider tile makes each cell bigger and fits FEWER week rows into the
+    // same height. Rendered against a full year, a 2×2 tile showed about five
+    // week rows where a 1×2 showed eleven.
+    //
+    // THE OLD VERSION OF THIS TEST SWEPT 365 AND ALL-TIME TOO, and named its
+    // own exit: "if this ever starts returning wide or large, the renderer has
+    // to have been transposed first." It has been. Past HEAT_TRANSPOSE_DAYS
+    // the grid is weeks-as-columns over seven FIXED rows, so every sentence
+    // above stops being true — height is a constant that shape cannot spend,
+    // and the tall tile it used to get was 450px of box around 109px of cells.
+    // What stays pinned is the range where the reasoning still holds.
+    for (const days of [7, 30, 60, HEAT_TRANSPOSE_DAYS - 1]) {
       const span = defaultSpan("month", days);
       expect(SPAN_CELLS[span].cols).toBe(1);
     }
   });
 
+  it("gives the transposed strip both axes, the only chart type that gets them", () => {
+    // The other half of the same rule, and the one the fix is FOR. The strip
+    // spends the two axes on different things — height on how big a day is
+    // (seven rows is a constant, so nothing else can make one legible), width
+    // on how many weeks are on screen before the reader has to scroll — so it
+    // is the one shape for which a single cell is short in both directions.
+    //
+    // MEASURED, not assumed: on a 1080px dashboard `wide` is 181px tall and
+    // yields a 21px cell, which is SMALLER than the flat 26px this whole pass
+    // replaced. `large` yields 50px.
+    for (const days of [HEAT_TRANSPOSE_DAYS, 180, 365, ALL_TIME_DAYS]) {
+      expect(defaultSpan("month", days)).toBe("large");
+    }
+    for (const type of ["line", "bar", "summary", "streak", "scatter"] as const) {
+      for (const days of [7, 90, 365, ALL_TIME_DAYS]) {
+        expect(defaultSpan(type, days), type).not.toBe("large");
+      }
+    }
+  });
+
   it("sizes a trend and a heatmap of the same window on different axes", () => {
     // The observation the whole span vocabulary exists for: a trend's
-    // readability is width and a heatmap's is height. If these two ever agree,
-    // "make the tiles bigger" would have been the cheaper fix.
+    // readability is width and a calendar heatmap's is height. If these two
+    // ever agree, "make the tiles bigger" would have been the cheaper fix.
+    //
+    // Below the transpose, deliberately: past it the heatmap is no longer a
+    // calendar and the two DO agree, for unrelated reasons — the trend wants
+    // x-axis room and the strip has nowhere else to grow.
+    expect(defaultSpan("line", 89)).toBe("small");
+    expect(defaultSpan("month", 89)).toBe("tall");
     expect(defaultSpan("line", 90)).toBe("wide");
-    expect(defaultSpan("month", 90)).toBe("tall");
+    expect(defaultSpan("month", 90)).toBe("large");
   });
 });
 
@@ -8145,7 +8201,9 @@ describe("spanOf", () => {
   };
 
   it("derives a size when the spec has none", () => {
-    expect(spanOf(base, null)).toBe("tall");
+    // `base` is a 365-day heatmap, so this is the transposed strip: wide.
+    expect(spanOf(base, null)).toBe("large");
+    expect(spanOf({ ...base, range: "30" }, null)).toBe("small");
   });
 
   it("lets an explicit size win over the derivation", () => {
@@ -8158,7 +8216,9 @@ describe("spanOf", () => {
     // overview and the year dashboard — because the window it draws changed.
     const spec: ChartSpec = { ...base, range: "period" };
     expect(spanOf(spec, "week")).toBe("small");
-    expect(spanOf(spec, "year")).toBe("tall");
+    expect(spanOf(spec, "month")).toBe("small");
+    expect(spanOf(spec, "quarter")).toBe("large");
+    expect(spanOf(spec, "year")).toBe("large");
   });
 
   it("does not re-derive when the size was set by hand", () => {

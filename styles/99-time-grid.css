@@ -404,7 +404,14 @@
   color: var(--ca-tg-ink);
   font-size: var(--font-ui-smaller);
   line-height: 1.25;
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  box-shadow: var(--ca-shadow-sm);
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.ca-tg-blk:hover {
+  border-color: rgba(0, 0, 0, 0.38);
+  box-shadow: var(--ca-shadow-md);
 }
 
 .ca-tg-blk-title {
@@ -483,16 +490,54 @@
   cursor: pointer;
 }
 
-/* The handle is the bottom edge and nothing else: a grip that stood proud of
-   the block would eat the last line of its title, and a block only 17px tall
-   has one line. */
+/* The handle on the bottom edge: an expanded target area with a centered grip pill
+   so it is easy to land the cursor or finger on to resize without eating block text. */
 .ca-tg-grip {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
-  height: 6px;
+  bottom: -2px;
+  height: 12px;
   cursor: ns-resize;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 1px;
+}
+
+.ca-tg-grip::after {
+  content: "";
+  display: block;
+  width: 22px;
+  height: 3px;
+  border-radius: var(--ca-radius-pill);
+  background: var(--ca-tg-ink);
+  opacity: 0.3;
+  transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+  pointer-events: none;
+}
+
+.ca-tg-blk:hover .ca-tg-grip::after {
+  opacity: 0.65;
+}
+
+.ca-tg-grip:hover::after {
+  opacity: 0.95;
+  background: var(--interactive-accent);
+  transform: scaleY(1.3);
+}
+
+@media (hover: none) {
+  .ca-tg-grip {
+    height: 18px;
+    bottom: -5px;
+  }
+  .ca-tg-grip::after {
+    opacity: 0.5;
+    width: 28px;
+    height: 4px;
+  }
 }
 
 /* WHILE A DRAG IS LIVE. The moving block stays where the FILE says it is and

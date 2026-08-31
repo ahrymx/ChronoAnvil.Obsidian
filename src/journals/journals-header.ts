@@ -486,10 +486,41 @@ export function buildJournalsHeader(
       status.setText(
         `No dated notes yet — activity appears here as you add ${kindWords(types)}.`
       );
+    } else if (
+      !cells.some((c) => !c.future && activityWeight(c) > 0)
+    ) {
+      // EVERY DATED NOTE IS OLDER THAN THE STRIP, which is a real state and was
+      // being reported as its opposite. The `else` below asks the reversed cells
+      // for the last active one and falls back to a gap of 0 when there is none
+      // — and a gap of 0 reads "today", so a journal whose newest note predates
+      // the window by a day printed *"0 dated notes over 0 active days — last
+      // worked today"*: three numbers saying nothing is here and a fourth
+      // saying it happened this morning.
+      //
+      // FOUND ON A SEEDED VAULT whose Study notes ended 2025-08-24 against a
+      // strip opening 2025-08-31. One day outside, and the sentence contradicted
+      // itself rather than saying what a reader in that position needs to know,
+      // which is that the notes exist and the strip is simply not where they
+      // are.
+      //
+      // COUNTED FROM `collected`, NOT FROM THE CELLS. The cells are the window;
+      // the whole point of this branch is that what the reader has is outside
+      // it, and only the unwindowed rows can say how much and how long ago.
+      const newest = collected.reduce((a, r) => (r.date > a ? r.date : a), "");
+      const gap = newest ? moment(todayIso).diff(moment(newest), "days") : 0;
+      status.setText(
+        `${collected.length} dated ${
+          collected.length === 1 ? "note" : "notes"
+        }, none in the last 12 months — the most recent was ${gap} days ago.`
+      );
     } else {
       const last = [...cells]
         .reverse()
         .find((c) => !c.future && activityWeight(c) > 0);
+      // `last` cannot be undefined here: the branch above is exactly the case
+      // where the same search finds nothing. Asserted with a fallback rather
+      // than a `!` so a future edit to that predicate degrades to a wrong
+      // number instead of a crash — but the two must move together.
       const gap = last ? moment(todayIso).diff(moment(last.iso), "days") : 0;
       const when =
         gap === 0 ? "today" : gap === 1 ? "yesterday" : `${gap} days ago`;

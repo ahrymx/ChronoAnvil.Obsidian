@@ -90,7 +90,7 @@ own terms. The copyright holder can choose different terms for future versions,
 as any copyright holder can.
 
 **What about the plugin's dependencies?**
-ChronoAnvil bundles Chart.js, @kurkle/color and js-yaml, all MIT. Their notices are
+ChronoAnvil bundles Chart.js and @kurkle/color, both MIT. Their notices are
 in [`NOTICE`](./NOTICE) and inside the compiled `main.js`, and must be
 preserved.
 

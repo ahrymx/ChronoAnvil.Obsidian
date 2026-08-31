@@ -68,7 +68,7 @@ import { setIcon } from "obsidian";
 import type { MarkdownPostProcessorContext, Menu } from "obsidian";
 
 import type ChronoAnvilPlugin from "../main";
-import { getFile, getFolder, openFile } from "../core/util";
+import { frontmatterOf, getFile, getFolder, openFile } from "../core/util";
 import { folderNotePath } from "../core/util";
 import { panDuringDrag } from "../ui/drag-scroll";
 import { overflowButton } from "../ui/section-frame";
@@ -106,7 +106,7 @@ import type { JournalType } from "./journal";
 export function bannerOf(plugin: ChronoAnvilPlugin, type: JournalType): string | null {
   const file = getFile(plugin.app, folderNotePath(type.root));
   if (!file) return null;
-  const fm = plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+  const fm = frontmatterOf(plugin.app, file);
   const raw = fm.banner;
   if (typeof raw !== "string" || !raw.trim()) return null;
   return raw.trim();

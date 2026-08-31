@@ -550,12 +550,17 @@ describe("every block on the two dashboards says something when empty", () => {
     // there is no table to draw.
     // THE ONE DIRECTIVE THAT CANNOT BE EMPTY (4.10). Every other entry here
     // names what a widget draws when the vault has nothing for it; the head
-    // draws the note's own name, and a note always has one. What CAN be absent
-    // is a destination — no journals root, no Journals link — and the rule
-    // there is `nothing dead is drawn` rather than an empty state: the link is
-    // not drawn at all, and if none of the three resolve the row is not drawn
-    // either. `renderLink`'s guard is the marker.
-    title: { module: "page-title", marker: "if (!target || (!target.file" },
+    // draws the note's own name, and a note always has one.
+    //
+    // THE DESTINATIONS WERE THE ANSWER HERE AND ARE GONE (5.2). A missing
+    // journals root meant a Journals link that resolved to nothing, and the rule
+    // was `nothing dead is drawn` rather than an empty state — `renderLink`'s
+    // guard was the marker. That row belonged to `buildPageTitle` and had not
+    // rendered since 4.10. What the head can still be missing is the frontmatter
+    // its eyebrow and context strip are built from, and its answer is the same
+    // shape: an unclassed div rather than an empty head, because the head's rule
+    // paints a line and a line across a note with no head is worse than nothing.
+    title: { module: "ui/widgets/page-head", marker: "?? createDiv()" },
     "tasks-table": { module: "tables", marker: "emptyCallout(" },
     "tag-index": { module: "tables", marker: "emptyCallout(" },
     "on-this-day": { module: "diary-retrieval", marker: "emptyCallout(" },
@@ -758,5 +763,33 @@ describe("an empty journal is told to add ITS OWN notes (4.35.1)", () => {
       .filter((l) => !l.trim().startsWith("//"))
       .join("\n");
     expect(code).not.toContain("lessons and entries");
+  });
+
+  it("does not say a journal was worked today when the strip is empty", () => {
+    // 5.3. The status line had two branches: no dated notes at all, and the
+    // rest. The rest read the last active cell and fell back to a gap of ZERO
+    // when there was none — and a gap of zero prints "today", so a journal whose
+    // every note predates the 53-week window printed *"0 dated notes over 0
+    // active days — last worked today"*. Three numbers saying nothing is here
+    // and a fourth saying it happened this morning.
+    //
+    // Found on the seeded dev vault, where Study's newest note was 2025-08-24
+    // against a strip opening 2025-08-31. One day.
+    //
+    // THE THIRD BRANCH IS THE FIX, and it is asserted by its predicate rather
+    // than by its wording: what must exist is a test for "nothing in the window"
+    // that runs BEFORE the branch which assumes there is something.
+    const code = readSrc("journals-header");
+    expect(code).toContain("!cells.some((c) => !c.future && activityWeight(c) > 0)");
+    // And it must say how many notes there are, from the UNWINDOWED rows —
+    // saying "none in the last 12 months" while the section below lists
+    // seventeen is the same failure one step quieter.
+    const at = code.indexOf("none in the last 12 months");
+    expect(at).toBeGreaterThan(-1);
+    expect(code.slice(at - 600, at)).toContain("collected.reduce");
+    // The branch order is the whole of it: an earlier `else` would swallow it.
+    expect(code.indexOf("!cells.some((c) => !c.future")).toBeLessThan(
+      code.indexOf("const last = [...cells]")
+    );
   });
 });

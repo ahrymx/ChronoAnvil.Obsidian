@@ -63,7 +63,7 @@ import {
   bannerSurfaceOf,
   titleTargetFor,
 } from "../core/banner-scope";
-import { openFile } from "../core/util";
+import { frontmatterOf, openFile } from "../core/util";
 import { ART_PRESETS } from "../core/constants";
 import { BRAND_ICON_ID } from "./brand-icon";
 import { resolveTarget, reviewScopes } from "../core/links";
@@ -224,7 +224,7 @@ export class VaultBanner {
     view.setAttr("data-ca-surface", surface);
 
     if (surface === "diary") {
-      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+      const fm = frontmatterOf(this.app, file);
       const kind = noteKindOf(
         this.plugin.settings.paths,
         file.path,
@@ -513,7 +513,7 @@ export class VaultBanner {
     // whether the list has anything in it — and because with Obsidian's own
     // panel hidden this is the only place that count exists.
     const props = Object.keys(
-      this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}
+      frontmatterOf(this.app, file)
     ).length;
     const propsBtn = trail.createDiv({
       cls: "ca-avb-props",
@@ -622,7 +622,7 @@ export class VaultBanner {
     if (titleTargetFor(surface, this.dateLabel(file) !== null) === "filename") {
       return file.basename;
     }
-    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+    const fm = frontmatterOf(this.app, file);
     const v = fm[TITLE_PROP];
     const title = typeof v === "string" ? v.trim() : "";
     return title || this.dateLabel(file) || file.basename;

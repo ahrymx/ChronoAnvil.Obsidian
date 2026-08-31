@@ -327,7 +327,7 @@ export function buildNowButton(
 
   const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (file instanceof TFile) {
-    const fm = plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+    const fm = frontmatterOf(plugin.app, file);
     const seed = moment(isoDate(fm[prop]) ?? undefined);
     const at = (seed.isValid() ? seed : moment()).startOf(momentUnit);
     const nowKey = keyOf(unit, moment().format("YYYY-MM-DD"));
@@ -364,7 +364,7 @@ export function periodAnchor(
   unit: Unit
 ): ReturnType<typeof moment> {
   const { momentUnit } = metaFor(unit);
-  const fm = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+  const fm = frontmatterOf(app, file);
   const seed = moment(isoDate(fm[metaFor(unit).prop]) ?? undefined);
   return (seed.isValid() ? seed : moment()).startOf(momentUnit);
 }

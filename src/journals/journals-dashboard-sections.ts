@@ -88,7 +88,6 @@ import {
   composeFlatNote,
   flatNoteModel,
   bannerSection,
-  PAGE_TITLE_IDS,
   graphLinksSection,
 } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
@@ -126,7 +125,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
   // SO ITS BANNER CARRIES THE VAULT'S THREE AND NO TIME ROW, which is this
   // page's whole navigation in one block rather than in none — the state 4.19
   // was written to reach, arrived at here by the page already being close.
-  bannerSection({ ids: PAGE_TITLE_IDS }),
+  bannerSection(),
   {
     id: "journals",
     label: "Journals",

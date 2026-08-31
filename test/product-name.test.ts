@@ -82,10 +82,29 @@ describe("the product has one name", () => {
     }
     // And the name it was briefly given between the two is gone entirely: it
     // was never released, so no vault, no reader and no licence refers to it.
-    for (const file of ["LICENSE", "NOTICE", "LICENSING.md", "README.md", "manifest.json"]) {
+    //
+    // `tools/migrate-vault.mjs` IS IN THIS SWEEP SINCE 5.3, and it is the entry
+    // that makes the list a rule rather than a tidy-up. The tool carried a
+    // `PRERELEASE_RULES` array, three `FILE_RENAMES` rows and a `chronoforge`
+    // plugin-folder id — read-compatibility for vaults that could not exist,
+    // kept only until the development vaults were migrated. They have been, the
+    // tables are gone, and the migration a real reader needs is Almanac's
+    // alone. What this pins is that nobody adds the dead one back by symmetry
+    // with `RULES`.
+    for (const file of [
+      "LICENSE",
+      "NOTICE",
+      "LICENSING.md",
+      "README.md",
+      "manifest.json",
+      "tools/migrate-vault.mjs",
+    ]) {
       expect(repoFile(file), `${file} still mentions the unreleased name`).not.toContain(
         "ChronoForge"
       );
     }
+    // The lowercase token too, which is the form a plugin-folder id and a
+    // vault marker would wear — and the form the deleted tables were written in.
+    expect(repoFile("tools/migrate-vault.mjs")).not.toContain("chronoforge");
   });
 });

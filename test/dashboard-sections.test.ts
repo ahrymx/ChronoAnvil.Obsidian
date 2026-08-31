@@ -267,7 +267,7 @@ describe("what each page refuses to lose", () => {
       ).not.toContain("title");
       const out = page.model().apply(page.compose(), reversed) ?? page.compose();
       const firstFence = out.split("```").find((c) => c.startsWith("chronoanvil\n"));
-      expect(firstFence, page.name).toContain("title:");
+      expect(firstFence, page.name).toMatch(/^title$/m);
     }
   });
 

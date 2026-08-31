@@ -504,7 +504,7 @@ export function buildEntryContext(
     return bar;
   }
 
-  const fm = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+  const fm = frontmatterOf(app, file);
   // ── MUTABLE, AND THAT IS THE FIX (4.21.3) ───────────────────────────
   //
   // This was a `const` captured when the strip was built, and `renderTitle` read

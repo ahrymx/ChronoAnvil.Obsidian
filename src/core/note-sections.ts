@@ -225,26 +225,51 @@ export interface FlatSection {
   locate: (text: string) => number;
 }
 
-// What the head is composed as, and the ids it carries. 4.10.
+// What the head is composed as. 4.10, and BARE since 5.2.
 //
-// THE THREE DESTINATIONS ARE THE VAULT'S, NOT THE CALENDAR'S. Home, Diary and
-// Journals are the three places a reader goes rather than three points in time —
-// which is what keeps this row and the `links:` row from being two answers to
-// one question. That one keeps Today and the scope ladder; this one keeps the
-// three top-level pages, and `home` leaves the `links:` line because it was the
-// only destination both had.
-export const PAGE_TITLE_IDS = ["home", "diary", "journals"] as const;
-export const PAGE_TITLE_LINE = `title:${PAGE_TITLE_IDS.join(",")}`;
+// ── THE IDS ARE GONE, AND THEY HAD NOT DRAWN ANYTHING FOR A YEAR ─────────
+//
+// `PAGE_TITLE_IDS` was `["home", "diary", "journals"]`, and the line every
+// dashboard carried was `title:home,diary,journals` — three vault destinations
+// rendered as a second row under the page's name by `buildPageTitle`, which was
+// the 4.5 head. 4.10 replaced that head with `livePageHead`, the dispatcher's
+// `case "title"` went with it, and nothing has read the argument since: the
+// renderer takes a context and no ids at all. The grammar went on documenting a
+// list, eight catalogues went on writing one, and the page went on ignoring it.
+//
+// So the directive is what it renders: `title`, with nothing after it.
+//
+// NOTHING IS REWRITTEN IN A READER'S VAULT. `locateTitle` matches both forms —
+// its regex has always allowed the bare one, because the homepage used it — and
+// repair is additive-and-retired-only, so an existing note keeps the line it
+// has and renders exactly as before. New notes are composed without it.
+//
+// AND THE DESTINATIONS THEMSELVES ARE STILL DESTINATIONS. `resolveTarget` is
+// the one table that answers "where does `diary` go" — shared by `links:` and
+// the launcher — and all three ids are still in it, so a reader who wants that
+// row writes `links:home,diary,journals` and gets one.
+//
+// NOT BECAUSE "THE LAUNCHER ALREADY DRAWS THEM", which is what this file, the
+// old head and `home-sections.ts` all claimed and which 5.2 checked: the
+// launcher's default is `["week", "month", "quarter", "year"]`, the four PERIOD
+// dashboards. It has never shipped a Diary or a Journals tile unless a reader
+// named one. The argument that the row was redundant was wrong on the facts;
+// the row goes because nothing drew it, which is a different reason.
+export const PAGE_TITLE_LINE = TITLE_KEYWORD;
 
 // Where a `title` line is in a note, or -1.
 //
 // A COLON WITH NOTHING SPACED AFTER IT, which is the whole of what tells a
-// directive from a YAML key. `title` on its own is the homepage's bare form and
-// `title:home,diary,journals` is every other page's; a reader's frontmatter
-// `title: My Page` is neither, and matching it would report the section present
-// on a note that has no head and then decline to offer one. Every directive this
-// plugin writes is `keyword:value` with no space, so this is the grammar's own
-// shape rather than a guard invented here.
+// directive from a YAML key. `title` on its own is what every page composes
+// since 5.2, and `title:home,diary,journals` is what the notes written before it
+// carry; a reader's frontmatter `title: My Page` is neither, and matching it
+// would report the section present on a note that has no head and then decline
+// to offer one. Every directive this plugin writes is `keyword:value` with no
+// space, so this is the grammar's own shape rather than a guard invented here.
+//
+// BOTH FORMS ARE READ AND ONLY THE BARE ONE IS WRITTEN, which is what makes the
+// 5.2 change invisible in an existing vault: the optional group has always been
+// optional, because the homepage was bare from 4.5.
 export const locateTitle = (text: string): number =>
   text.search(/^title(?::\S*)?\s*$/m);
 
@@ -386,6 +411,10 @@ function fenceHolding(
 // the grammar — `PAGE_TITLE_IDS` is untouched and neither line learns the
 // other's destinations. Obsidian renders a fence as one block, so one fence is
 // one strip, which is the whole of what "the same block" had to mean.
+//
+// (`PAGE_TITLE_IDS` was deleted in 5.2 — `title:` carries no destinations any
+// more, so the split above is now between a line that names the page and a line
+// that navigates time. The `links:` half is unchanged.)
 // The id every catalogue's banner shares.
 //
 // SPELLED ONCE because five catalogues now use it and `repair-plan.ts` matches
@@ -393,16 +422,14 @@ function fenceHolding(
 export const BANNER_ID = "banner";
 
 export interface BannerSpec {
-  // The vault destinations the `title:` line carries, or absent for the BARE
-  // form.
+  // `ids` WAS HERE AND IS NOT COMING BACK (5.2). It carried the vault
+  // destinations for the `title:` line, and the homepage was the one surface
+  // that left it out — on the argument that its launcher already draws those
+  // tiles as content, so ids would be the same destinations twice, six lines
+  // above themselves. That argument turned out to apply everywhere: the head
+  // that drew the row was replaced in 4.10 and the ids have rendered nothing on
+  // any surface since. See `PAGE_TITLE_LINE`.
   //
-  // AND THE HOMEPAGE IS STILL BARE, WHICH 4.19 DELIBERATELY DID NOT "FIX". It
-  // looks like the one surface out of step and it is the one surface with an
-  // argument: the launcher is already on that page, as content in a cell, and it
-  // ships with Diary and Journals among its four tiles. Ids here would draw the
-  // same two destinations a second time as chrome, six lines above themselves.
-  // The other three flat pages have no launcher, so they carry the ids.
-  ids?: readonly string[];
   // The `links:` argument this page's banner composes, or absent for a page
   // whose time navigation is a widget of its own.
   //
@@ -449,7 +476,7 @@ export function bannerSection(spec: BannerSpec = {}): FlatSection {
         // what keeps it behind when the widget under it leaves — and `setPageWide`
         // splices at exactly this position.
         ...(spec.wide ? [WIDE_KEYWORD] : []),
-        spec.ids?.length ? `${TITLE_KEYWORD}:${spec.ids.join(",")}` : TITLE_KEYWORD,
+        TITLE_KEYWORD,
         ...(spec.links ? [`${LINKS_KEYWORD}:${spec.links}`] : []),
       ],
     }),

@@ -489,6 +489,54 @@ export interface FormQuestion extends SectionQuestionCommon {
   widget: string;
 }
 
+// A question answered with a LIST — one item per line — that is written into the
+// note as MARKDOWN rather than into a directive's argument. 5.6.
+//
+// THE FIFTH KIND, AND THE FIRST WHOSE ANSWER IS NOT IN A DIRECTIVE AT ALL.
+// `choice`, `folder` and `title` all answer "what should this section point at"
+// and all three write into `keyword:argument`; `form` answers "what should this
+// section BE" and writes a line in or out of a fence. This one answers "what
+// should this section SAY", and the thing it says is prose — the journal
+// catalogue's `headings`, which emits `## ` markdown and no directive.
+//
+// ── THE INVARIANT THIS SPENDS, STATED RATHER THAN SLIPPED PAST ──────────
+//
+// The header of this file argues at length that a question names a KEYWORD
+// rather than carrying a parser, because "an inverse per catalogue is three
+// parsers to keep equal to three writers, plus a round-trip test whose job is to
+// notice when they stop being equal". That argument is exactly right and it is
+// about directives. A `lines` question has no keyword to name, so it cannot be
+// bought into that scheme — `directive-grammar.ts` finds spans in
+// `keyword:argument` lines and there is no honest way to call `## Overview` one.
+//
+// So this kind's answer is read and written by the CATALOGUE that declared it,
+// and `answerInText` and `withAnswers` skip it explicitly rather than by
+// accidentally falling through their `!q.directive` guards. What keeps that from
+// being the second parser the header warns about is that the reader already
+// exists and is already load-bearing: `journal-template.ts` has read the
+// skeleton's headings off a page since 4.33, because "Save as layout…" has to
+// carry a heading the reader renamed. This kind promotes that read to a control.
+// It is one reader gaining a second caller, not a second reader.
+//
+// A CATALOGUE THAT CANNOT WRITE THE ANSWER MUST NOT OFFER THE BOX, and the
+// editor is told so the way it is told everything else — through the model.
+// `SectionView.answered` is the only route by which a directive-less question
+// can be read at all, so a model that supplies nothing leaves the control
+// undrawn and the question's `settled` wording in its place. The journal
+// catalogue supplies it exactly when the note carries the skeleton's markers.
+export interface LinesQuestion extends SectionQuestionCommon {
+  kind: "lines";
+  // What the list looks like when the reader has not set one — shown in the
+  // placeholder, so the control STATES the default rather than pre-filling it.
+  // The same rule `TitleQuestion.placeholder` follows and for its reason:
+  // pre-filling writes the catalogue's own answer into the note as though the
+  // reader had chosen it, and a change of default could then never reach a file
+  // again.
+  placeholder: string;
+  // How tall the box opens. Absent is the control's own default.
+  rows?: number;
+}
+
 // The two answers a `FormQuestion` takes. Strings rather than a boolean because
 // `SectionChoice.options` is `Record<string, unknown>` read as strings
 // everywhere — a fourth shape through that plumbing would be a fourth thing for
@@ -556,7 +604,8 @@ export type SectionQuestion =
   | ChoiceQuestion
   | FolderQuestion
   | TitleQuestion
-  | FormQuestion;
+  | FormQuestion
+  | LinesQuestion;
 
 // Whether a section may be composed without an answer to this.
 //
@@ -613,6 +662,11 @@ export function answerInText(text: string, q: SectionQuestion): string | null {
   // callers fall back to the model's own `answered`, which is where `formAt`
   // puts the answer — see `answersOn`.
   if (q.kind === "form") return null;
+  // A LIST IS NOT AN ARGUMENT ANYWHERE EITHER (5.6). It is markdown in the note
+  // body, and the catalogue that wrote it is the only thing that can find it —
+  // see `LinesQuestion`. Its callers fall back to the model's own `answered`,
+  // exactly as a form's do.
+  if (q.kind === "lines") return null;
   if (!q.directive) return null;
   const lines = text.split("\n");
   const span = soleArgSpanIn(lines, q.directive, q.part?.join);
@@ -1009,6 +1063,11 @@ export function withAnswers(
     // token "section" into the bar's title — over the reader's own, if they had
     // renamed it — which is what the first cut of 4.59.0 did.
     if (q.kind === "form") continue;
+    // AND A LIST IS WRITTEN BY ITS CATALOGUE, NOT HERE (5.6). Skipped by name
+    // rather than by having no `directive`, so that a `lines` question which
+    // ever gained one — to say which keyword its section is anchored by, say —
+    // could not start having its prose spliced into an argument.
+    if (q.kind === "lines") continue;
     if (!q.directive) continue;
     byDirective.set(q.directive, [...(byDirective.get(q.directive) ?? []), q]);
   }
@@ -1104,6 +1163,18 @@ export function describeAnswers(
       parts.push(
         `${q.label} → ${answer.trim() === WIDGET_FORM ? q.widget : q.section}`
       );
+      continue;
+    }
+    // A LIST READS AS A LIST. The answer is newline-separated because that is
+    // what the reader typed into; a plan line is a sentence, so it is said with
+    // commas. An empty answer means the catalogue's own, which is what the
+    // placeholder holds — the same fallback a title takes.
+    if (q.kind === "lines") {
+      const items = answer
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+      parts.push(`${q.label} → ${items.length ? items.join(", ") : q.placeholder}`);
       continue;
     }
     // A title has no list of answers to name one from, and an empty one is the

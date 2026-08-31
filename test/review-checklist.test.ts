@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { ROOT, readCode, readSrc, repoFile } from "./sources";
@@ -171,5 +171,61 @@ describe("the global app and moment stay out of reach", () => {
     expect(config).toContain("no-restricted-globals");
     expect(config).toMatch(/globals:\s*\{[^}]*app:\s*"readonly"/);
     expect(config).toMatch(/globals:\s*\{[^}]*moment:\s*"readonly"/);
+  });
+});
+
+describe("the README's images are images git will take", () => {
+  // WHAT THIS IS ACTUALLY GUARDING. Five images pointed at `dev-screenshots/`
+  // for two releases: a directory that was never created, never gitignored and
+  // never populated, so the front page of the listing rendered five broken-image
+  // icons while the changelog announced a shipped gallery. Nothing failed,
+  // because nothing read the README's links.
+  //
+  // THE SECOND HALF IS THE SUBTLE ONE. Putting the captures somewhere real is
+  // not enough if git declines to take them, and `docs/` was — and still is —
+  // an ignored directory. The negation that re-includes `docs/screenshots/`
+  // only works because the ignore is written `docs/*`: git cannot re-include a
+  // file whose parent DIRECTORY is excluded, so `docs/` plus a negation is a
+  // rule that looks right and silently ignores the images anyway.
+  //
+  // IT IS AN EXISTENCE CHECK NOW. The captures landed, so the weaker version of
+  // this test — pin the path, trust the file to follow — has done its job and
+  // would from here only hide the exact regression it was written for: a link
+  // edited to a name nothing on disk answers to renders as a broken image on
+  // the listing's front page and fails nothing else.
+  const readme = repoFile("README.md");
+  const linked = [...readme.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((m) => m[1]);
+
+  it("links at least the five captures the tour is built from", () => {
+    expect(linked.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("has every linked capture on disk", () => {
+    for (const src of linked) {
+      expect(existsSync(join(ROOT, src)), `missing README image ${src}`).toBe(true);
+    }
+  });
+
+  it("carries no capture the tour has stopped linking to", () => {
+    // The other direction. An orphan PNG is a megabyte git keeps forever for a
+    // page that no longer shows it.
+    const onDisk = readdirSync(join(ROOT, "docs", "screenshots"))
+      .filter((f) => f.endsWith(".png"))
+      .map((f) => `docs/screenshots/${f}`);
+    expect(onDisk.sort()).toEqual([...linked].sort());
+  });
+
+  it("puts every one of them under docs/screenshots/", () => {
+    for (const src of linked) {
+      expect(src, `README image ${src}`).toMatch(/^docs\/screenshots\/[\w-]+\.png$/);
+    }
+  });
+
+  it("keeps that directory out of the ignore rule that covers docs/", () => {
+    const ignore = repoFile(".gitignore");
+    // The directory's CONTENTS are ignored, not the directory itself.
+    expect(ignore).toMatch(/^docs\/\*$/m);
+    expect(ignore).not.toMatch(/^docs\/$/m);
+    expect(ignore).toMatch(/^!docs\/screenshots\/$/m);
   });
 });

@@ -102,10 +102,18 @@ describe("the controls leave the title band", () => {
     // and the control goes beside the wrapper — and it is asserted here because
     // the natural way to write the flip that put the cog in the leaf's title row
     // is the way that walks into it.
+    // TWO BANNERS SINCE 5.2, NOT THREE. `page-title`'s `titleRow` was the third
+    // and it belonged to `buildPageTitle` — the 4.5 head, deleted along with the
+    // `title:` argument that fed it once 4.10 turned out to have replaced it.
+    //
+    // AND THE HEAD THAT RENDERS NOW IS NOT A FOURTH ENTRY, which is worth
+    // saying rather than leaving as an omission: `page-head.ts` draws no control
+    // beside the name at all — the cog for those pages lives on the vault
+    // banner — so there is nothing for a rename to eat and no wrapper to
+    // separate it from.
     for (const [file, wrapper] of [
       ["entryheader", "titleWrap"],
       ["study-header", "titleWrap"],
-      ["page-title", "titleRow"],
     ] as const) {
       const src = readCode(file);
       expect(src, file).toContain(`attachNoteRename(`);

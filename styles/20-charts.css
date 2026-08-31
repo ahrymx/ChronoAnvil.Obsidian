@@ -390,48 +390,199 @@
   color: var(--text-muted);
 }
 
-/* Heatmap: a compact calendar — seven weekday columns (Sun–Sat), one row per
-   week. Cells are intrinsic squares (aspect-ratio drives height from the column
-   width), so the grid never depends on the tile's computed height; a max-width
-   keeps cells from ballooning on wide tiles, and the wrap scrolls if a long
-   range makes the calendar taller than the tile. Shades reuse the diary
-   calendar's mood palette (--ca-mood-1..5). */
+/* Heatmap: a calendar that fills the tile it was given.
+
+   TWO LAYOUTS, ONE SIZING RULE. A window past HEAT_TRANSPOSE_DAYS (charts.ts)
+   transposes to the GitHub contribution shape: weeks as columns, seven fixed
+   weekday rows, month labels along the top. Anything shorter stays a
+   seven-column calendar whose row count grows with the window. Shades reuse
+   the diary calendar's mood palette.
+
+   -- WHY THE FLAT CELL TOKENS WENT, AND WHY THIS NEEDED A CONTAINER -----
+
+   Both layouts sized their cells off ONE fixed token: 13px for the year strip,
+   26px for the short grid. A tile is 220px per grid row and may be two rows
+   tall, so the graph's surface and the tile's had nothing to do with each
+   other. Measured on a 1050x450 tile: a 30-day window drew a 182x156 block of
+   squares marooned in the middle of it, and a year strip drew 109px of cells
+   in the same box. Both read as a rendering fault rather than as thin data —
+   the reader cannot tell whether the chart failed or the vault is empty.
+
+   A cell that fits has to come from BOTH the free width and the free height,
+   and inside the grid neither is knowable: a percentage resolves against the
+   wrap, and the wrap is auto-sized by the very cells being measured.
+   `container-type: size` on the body is what breaks that circle. The body's
+   height is definite — it is the flex remainder of a fixed-height tile — so
+   `cqw` and `cqh` are exactly the two numbers the fit needs, and NO RESIZE
+   LISTENER IS INVOLVED. A window listener could not see a pane split anyway,
+   which is the argument `.ca-jjh-strip` settled one widget over.
+
+   -- AND THE CLAMP IS WHAT MAKES IT SCROLL -------------------------------
+
+   `clamp(floor, fit, ceiling)` degrades in the one honest direction: past the
+   floor the cells stop shrinking and the body scrolls instead of drawing a
+   grid of 3px specks. The floor is also what keeps the maths STABLE under a
+   scrollbar. A scrollbar steals from `cqw`/`cqh`, so a fit that reacted to one
+   could oscillate — bar appears, cells shrink, content fits, bar goes, repeat.
+   It cannot: an axis only overflows once its cell size is already pinned at
+   the floor, and a pinned cell does not move when the container does. */
 .ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body.ca-chart-heatmap-body {
-  align-items: center;
-  justify-content: center;
+  container-type: size;
+  /* `safe` centring, not plain `center`. In an overflow container a plain
+     `center` pushes the overflowing START edge out of reach, so a year too wide
+     for its tile could be scrolled right but never back to January. */
+  align-items: safe center;
+  justify-content: safe center;
+  width: 100%;
+  height: 100%;
   overflow: auto;
+  overscroll-behavior: contain;
 }
-/* The width cap stays 260px at every tile size, and the reason is worth
-   recording because the obvious change is the wrong one.
-
-   It looks as though a wide tile should get a wider calendar — otherwise the
-   heatmap sits as a small square adrift in a big empty box. But the cells are
-   squares whose size is driven by the *column* width (`aspect-ratio: 1` against
-   a 1fr track), so widening the wrap makes every cell bigger, and a taller
-   stack of bigger cells fits *fewer* week rows in the same tile, not more.
-   Raising this cap to 540px was measured against a full year of weeks and made
-   the chart strictly worse: about five rows visible instead of eleven.
-
-   So a calendar heatmap is given height (`tall`) and never width. See
-   defaultSpan in charts.ts, which caps `month` at `tall` for the same reason.
-   The real fix for a year-long heatmap is to transpose it — weeks as columns,
-   weekdays as rows, the shape GitHub's contribution graph uses — which is a
-   renderer change rather than a layout one and is deliberately not in 2.46. */
+/* The generic body rule caps a child at `max-height: 100%`, which would squash
+   the grid back into the box it is deliberately overflowing. */
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body.ca-chart-heatmap-body > * {
+  flex: 0 0 auto;
+  max-width: none;
+  max-height: none;
+}
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body.ca-chart-heatmap-body.has-drag-scroll {
+  cursor: grab;
+}
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body.ca-chart-heatmap-body.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
 .ca-journal-chart-heatmap-wrap {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  width: 100%;
-  max-width: var(--ca-heat-max-w);
-  max-height: 100%;
-  margin: auto;
+  gap: var(--ca-heat-gap);
+  width: max-content;
 }
-.ca-heat-weekdays,
-.ca-journal-chart-heatmap {
+
+/* -- Strip layout: weeks as columns, seven weekday rows -----------------
+   HEIGHT-LED, AND THE WIDTH IS ALLOWED TO OVERFLOW. This is the half of the
+   fit that a first pass got backwards. Making the cell `min(width, height)`
+   does fill the tile's width — a year stops at 13px and lands flush against
+   both edges — but seven rows of 13px is 109px of graph in a 411px box, and
+   that reads as a chart zoomed out from its own tile rather than as one that
+   fits. It is the same picture the flat token drew, arrived at honestly.
+
+   So the strip sizes itself from the height alone and scrolls sideways for
+   whatever does not fit, which is the trade a contribution graph is built for:
+   the weekday rows are the axis a reader lines days up against and they must
+   be legible, while the weeks are a timeline that has always been longer than
+   the box. Weeks are also the axis with somewhere to go — the body drag-scrolls
+   and renders scrolled to the most recent week.
+
+   `/ 7.98` is `7 rows + 7 gaps` with the gap at 0.14 of a cell (see
+   `--ca-heat-strip-gap-k`) — six gaps between the rows and one between the
+   month labels and the grid. Solving it once here is what lets the gap grow
+   with the cell without the fit chasing its own tail, and it is why
+   `--ca-heat-strip-head` is the label row ALONE rather than the label row plus
+   a guessed gutter.
+
+   `--ca-heat-strip-bar` comes off the same term. The strip overflows sideways
+   by design, so its horizontal scrollbar is not an edge case — it is present on
+   every window worth scrolling, and it takes its height out of `cqh`. Ignoring
+   it sized seven rows for a box that then held eight rows' worth and clipped
+   Saturday off the bottom. */
+.ca-journal-chart-heatmap-wrap.is-strip {
+  --ca-heat-cell: clamp(
+    var(--ca-heat-strip-cell-min),
+    calc((100cqh - var(--ca-heat-strip-head) - var(--ca-heat-strip-bar)) / 7.98),
+    var(--ca-heat-strip-cell-max)
+  );
+  --ca-heat-strip-gap: calc(var(--ca-heat-cell) * var(--ca-heat-strip-gap-k));
+  gap: var(--ca-heat-strip-gap);
+  user-select: none;
+}
+/* The month row and the day column offset by ONE named gutter, and both track
+   the same cell size. Three literals for one distance is how the labels came to
+   sit a pixel off the weeks they name. */
+.ca-heat-months {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 3px;
+  grid-template-columns:
+    var(--ca-heat-strip-gutter)
+    repeat(var(--ca-heat-strip-cols), var(--ca-heat-cell));
+  gap: var(--ca-heat-strip-gap);
+  width: max-content;
+  flex-shrink: 0;
+}
+.ca-heat-month-spacer {
   width: 100%;
+}
+.ca-heat-month {
+  white-space: nowrap;
+  overflow: visible;
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  color: var(--text-faint);
+  line-height: 1;
+}
+.ca-heat-strip-row {
+  display: flex;
+  width: max-content;
+  gap: var(--ca-heat-strip-gap);
+  align-items: center;
+}
+.ca-heat-strip-days {
+  display: grid;
+  grid-template-rows: repeat(7, var(--ca-heat-cell));
+  gap: var(--ca-heat-strip-gap);
+  width: var(--ca-heat-strip-gutter);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 2px;
+}
+.ca-heat-strip-day {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  color: var(--text-faint);
+  line-height: 1;
+  height: var(--ca-heat-cell);
+}
+.ca-journal-chart-heatmap.is-strip {
+  display: grid;
+  grid-template-rows: repeat(7, var(--ca-heat-cell));
+  grid-template-columns: repeat(var(--ca-heat-strip-cols), var(--ca-heat-cell));
+  grid-auto-flow: column;
+  gap: var(--ca-heat-strip-gap);
+  width: max-content;
+}
+
+/* -- Calendar layout: seven weekday columns ----------------------------
+   Under a quarter, so at most about eight rows. NEITHER axis is fixed here —
+   seven columns and a row count that grows with the window — so unlike the
+   strip this is a genuine two-axis `min()`, and it can honestly satisfy both.
+   Past the floor the rows overflow and the body scrolls DOWN them, which is
+   the axis a calendar can be read on while scrolling. */
+.ca-journal-chart-heatmap-wrap:not(.is-strip) {
+  --ca-heat-cell: clamp(
+    var(--ca-heat-cell-min),
+    min(
+      calc(
+        (100cqw - (var(--ca-heat-cols) - 1) * var(--ca-heat-gap))
+        / var(--ca-heat-cols)
+      ),
+      calc(
+        (100cqh - var(--ca-heat-head)
+          - (var(--ca-heat-rows) - 1) * var(--ca-heat-gap))
+        / var(--ca-heat-rows)
+      )
+    ),
+    var(--ca-heat-cell-max)
+  );
+  align-items: center;
+}
+.ca-heat-weekdays {
+  display: grid;
+  grid-template-columns: repeat(var(--ca-heat-cols), var(--ca-heat-cell));
+  gap: var(--ca-heat-gap);
+  width: max-content;
 }
 .ca-heat-weekday {
   text-align: center;
@@ -440,13 +591,23 @@
   color: var(--text-faint);
   line-height: 1;
 }
-.ca-journal-chart-heatmap {
-  grid-auto-rows: 1fr;
+.ca-journal-chart-heatmap:not(.is-strip) {
+  display: grid;
+  grid-template-columns: repeat(var(--ca-heat-cols), var(--ca-heat-cell));
+  grid-auto-rows: var(--ca-heat-cell);
+  gap: var(--ca-heat-gap);
+  width: max-content;
 }
+
+/* The cell fills its track and the track is square by construction, so there
+   is no `aspect-ratio` here any more — one that disagreed with the track would
+   quietly win and put the grid a pixel out of line with its own labels. */
 .ca-journal-chart-heat-cell {
-  aspect-ratio: 1;
-  border-radius: 3px;
+  width: 100%;
+  height: 100%;
+  border-radius: min(var(--ca-radius-sm), 22%);
   background: var(--background-modifier-border);
+  box-sizing: border-box;
 }
 /* A day inside the range with no logged value: faint. A grid-padding day that
    falls outside the range (leading/trailing partial week): invisible. */

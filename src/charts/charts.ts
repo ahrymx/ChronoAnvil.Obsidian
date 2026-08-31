@@ -176,14 +176,6 @@ export function journalTallyRefusal(
   return journalSurfaceRefusal(def, hostTypeId, surfaceName, hostTypeName);
 }
 
-// A tracker whose value axis can pair with another's on a scatter plot. Same
-// set as chartableType today, but named separately because the question is
-// genuinely different ("can this be one axis of a correlation?") and a future
-// non-scatterable-but-chartable type shouldn't silently become a scatter axis.
-export function scatterableType(t: TrackerDef): boolean {
-  return chartableType(t);
-}
-
 // Only a boolean/habit tracker has a streak — a run of consecutive true days.
 // A number has no notion of "the same again", so the streak chart is offered
 // for booleans alone.
@@ -1068,7 +1060,33 @@ export function rangeDays(
 // call made once and pinned by a test, and because the two thresholds are
 // answering different questions on different axes (see defaultSpan).
 const WIDE_AFTER_DAYS = 90; // a trend past a quarter needs x-axis room
-const TALL_AFTER_DAYS = 60; // a heatmap past ~8 week rows needs height
+const TALL_AFTER_DAYS = 60; // a calendar heatmap past ~8 week rows needs height
+
+// Where the heatmap stops being a calendar and becomes a contribution strip.
+//
+// THE ORIENTATION IS A PROPERTY OF THE PERIOD, which is the whole rule in one
+// line: a week or a month is a CALENDAR — seven weekday columns, one row per
+// week, the shape everyone reads a month in — and a quarter or longer is a
+// STRIP, transposed so the weeks run left to right under seven fixed weekday
+// rows. Neither shape is better; they are short of different axes, and picking
+// by the window is what lets each be sized against the tile instead of both
+// being sized the same way and one of them looking abandoned in it.
+//
+// A QUARTER IS THE CROSSOVER, and it is a measurement rather than a taste.
+// Ninety days is thirteen week rows: as a calendar that is thirteen rows of
+// seven squares, which in a 1050x411 tile drew a 210px-wide column of cells
+// with 800px of empty tile beside it. The same window as a strip is fourteen
+// columns of seven, which fills the same tile at twice the cell size. Below a
+// quarter the calendar still wins — six rows is a month, and a month is worth
+// more read as a month than as six anonymous columns.
+//
+// EXPORTED BECAUSE TWO DECISIONS TURN ON IT AND THEY HAVE TO AGREE.
+// `renderHeatmap` reads it to pick the layout; `defaultSpan` reads it to pick
+// the axis that layout is short of. When the renderer alone owned the number
+// the two disagreed on sight: 5.5 transposed the grid at a year and left the
+// tile sized `tall`, so a shape with seven FIXED rows was handed the one axis
+// it cannot spend.
+export const HEAT_TRANSPOSE_DAYS = 90;
 
 // The size a chart gets when it hasn't been given one.
 //
@@ -1092,21 +1110,32 @@ const TALL_AFTER_DAYS = 60; // a heatmap past ~8 week rows needs height
 export function defaultSpan(type: ChartType, days: number): ChartSpan {
   switch (type) {
     case "month":
-      // Height only, and never width — `large` is deliberately unreachable here.
+      // ONE CHART TYPE, TWO SHAPES, AND THEY ARE SHORT OF DIFFERENT AXES.
       //
-      // The intuition says a year-long heatmap wants the biggest tile going,
-      // and that is wrong in a way only measurement catches. The cells are
-      // squares sized by the column they sit in, so a wider tile makes every
-      // cell bigger and therefore fits *fewer* week rows into the same height.
-      // Rendered against a full year, a 2×2 tile showed about five week rows
-      // where a 1×2 tile showed eleven. Width actively costs a heatmap the
-      // thing it is short of.
+      // Below the transpose the heatmap is a seven-column calendar whose rows
+      // grow with the window, so height is what it runs out of. The old note
+      // here is worth keeping for that case: a wider tile makes every square
+      // bigger and therefore fits FEWER week rows into the same height, so
+      // width actively costs this shape the thing it is short of. Measured
+      // against a full year, a 2×2 tile showed about five week rows where a
+      // 1×2 showed eleven. `wide` and `large` stay unreachable for it.
       //
-      // So the ceiling is `tall`. Past roughly a quarter the calendar scrolls
-      // inside its tile, which is the honest degraded state (the body already
-      // has overflow: auto) rather than a bigger box that shows less. Making a
-      // year genuinely fit needs the grid transposed — weeks as columns —
-      // which is a renderer change, not a layout one.
+      // That note also said "making a year genuinely fit needs the grid
+      // transposed — weeks as columns — which is a renderer change, not a
+      // layout one." 5.5 made that renderer change and this rule was not
+      // revisited.
+      //
+      // PAST THE TRANSPOSE IT IS THE ONE SHAPE THAT WANTS BOTH AXES, and that
+      // is why `large` is reachable here and nowhere else in this function.
+      // The strip sizes its cells off the HEIGHT — seven rows is a constant, so
+      // height is the only thing that can make a day legible — and spends the
+      // WIDTH on how many weeks are on screen before the reader has to scroll.
+      // Measured on a 1080px dashboard: `wide` is 181px tall and yields a 21px
+      // cell, SMALLER than the flat 26px it replaced; `large` is 411px and
+      // yields 50px, with a quarter fitting whole and a year scrolling. A
+      // heatmap is the only chart type here for which one cell is not enough
+      // in either direction.
+      if (days >= HEAT_TRANSPOSE_DAYS) return "large";
       return days >= TALL_AFTER_DAYS ? "tall" : "small";
     case "line":
     case "bar":

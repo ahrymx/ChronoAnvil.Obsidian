@@ -107,6 +107,7 @@ import type {
   FormQuestion,
   SectionModel,
   SectionOp,
+  LinesQuestion,
   SectionQuestion,
   SectionView,
   TitleQuestion,
@@ -1366,6 +1367,10 @@ export class SectionEditorModal extends EditorModal {
         this.renderFormQuestion(field(q), section, q);
         continue;
       }
+      if (q.kind === "lines") {
+        this.renderLinesQuestion(field(q), section, q);
+        continue;
+      }
       // NOTHING TO CHOOSE FROM IS A SENTENCE, NOT AN EMPTY MENU. A dropdown
       // with no entries is a control that looks broken; the catalogue supplied
       // wording for this case precisely so the reader is told what is missing
@@ -1459,6 +1464,50 @@ export class SectionEditorModal extends EditorModal {
     input.value = this.shownAnswer(section, q) ?? "";
     input.addEventListener("change", () => {
       this.answer(section.id, q.key, input.value.trim() || undefined);
+      this.refreshFrame();
+    });
+  }
+
+  // A list, one item per line. 5.6.
+  //
+  // A TEXTAREA RATHER THAN A ROW OF FIELDS WITH AN ADD BUTTON, and the argument
+  // is the one this window keeps making about width: a row here already carries
+  // a reorder control, a token, a title, a subtitle, a pill and a Remove button,
+  // and a repeater would put a second list-with-controls inside one entry of a
+  // list-with-controls. What the reader is editing is five short strings in an
+  // order — which is what a text box with one per line IS, in every editor they
+  // have ever used, with their own keyboard doing the reordering.
+  //
+  // AND IT IS THE SHAPE OF THE THING BEING EDITED. The answer is prose: it goes
+  // into the note as `## ` lines, and a box you type lines into is a truer
+  // preview of that than five inputs would be.
+  //
+  // `change` RATHER THAN `input`, like every other control here. `refreshFrame`
+  // redraws the pane, which would take the caret out of the box on every
+  // keystroke; committing on blur is what the title field already does and for
+  // the same reason.
+  private renderLinesQuestion(
+    host: HTMLElement,
+    section: SectionView,
+    q: LinesQuestion
+  ): void {
+    const box = host.createEl("textarea", { cls: "ca-tpl-lines" });
+    box.rows = q.rows ?? 5;
+    box.placeholder = q.placeholder;
+    box.spellcheck = false;
+    box.setAttribute("aria-label", `Set ${q.label}, one per line`);
+    box.title = `Set ${q.label}, one per line. Leave empty for the default.`;
+    box.value = this.shownAnswer(section, q) ?? "";
+    box.addEventListener("change", () => {
+      // NORMALISED ON THE WAY OUT, so a trailing newline or a blank line
+      // between two items is not a heading with no name. The reader's own
+      // spacing in the box is theirs while they are typing; what leaves it is
+      // the list.
+      const lines = box.value
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+      this.answer(section.id, q.key, lines.length ? lines.join("\n") : undefined);
       this.refreshFrame();
     });
   }
@@ -1596,9 +1645,23 @@ export class SectionEditorModal extends EditorModal {
   // there are two, which is correct for this window and wrong for a widget a
   // page may hold several of — every card would lose its selector as soon as a
   // second one existed.
+  //
+  // A THIRD WAY TO ANSWER NO, AND A FIRST WAY TO ANSWER YES WITHOUT A DIRECTIVE
+  // (5.6). `!q.directive` used to be the first line and it read as "nothing can
+  // find this answer". That is still true of every question that names a
+  // keyword and lacks one — but a `lines` question names no keyword by
+  // construction, and its answer is markdown its own catalogue can find. So the
+  // model's read is the whole test for that kind: supplied means the file
+  // carries something this can show and Save can write back; absent means it
+  // does not, and the question's `settled` wording says what to do about it.
+  //
+  // ORDER MATTERS AND IS NOT COSMETIC. The folder check stays ABOVE the model's
+  // answer, because a folder question on a surface with no host must stay inert
+  // even when the model can read the note's line — that is 3.15 §10.9, and
+  // hoisting the model check would quietly undo it.
   private readable(section: SectionView, q: SectionQuestion): boolean {
-    if (!q.directive) return false;
     if (q.kind === "folder" && q.hostFolder == null) return false;
+    if (!q.directive) return section.answered?.[q.key] !== undefined;
     if (section.answered?.[q.key] !== undefined) return true;
     return this.answerIn(q) !== null;
   }

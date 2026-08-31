@@ -254,7 +254,11 @@ describe("the toggle that writes it", () => {
     // for the file.
     const code = readCode("page-title");
     expect(code).toContain("const wide = isWide();");
-    expect(code).toContain("root.hasClass(WIDE_CLASS)");
+    // ONE CALLER SINCE 5.2, AND IT IS THE VAULT BANNER'S. The other was
+    // `buildPageTitle`, which read `root.hasClass(WIDE_CLASS)` off its own card
+    // — a card nothing had drawn since 4.10. The callback shape stays: it is
+    // what let the banner name its own marker, and it is why deleting the other
+    // caller changed nothing here.
     expect(readCode("vault-banner")).toContain("host.hasClass(WIDE_PAGE_CLASS)");
     expect(code).toContain(".setChecked(");
     // AND IT STILL READS NO FRONTMATTER, which page-widgets.test.ts asserts for
@@ -335,13 +339,20 @@ describe("the width itself, which only the stylesheet can give", () => {
     expect(readCode("main")).toContain("this.pageWidth.register()");
   });
 
-  it("is applied to the head's card by the dispatcher, from the modifier", () => {
+  it("is read by the dispatcher and dropped from the dispatch loop", () => {
+    // THE MARK ON THE CARD IS GONE (5.2). The dispatcher used to answer
+    // `wideSpec.wide` by putting `.ca-jtc-wide` on the head's card, which the
+    // cog then read back for its checkbox. 4.45.1 had already taken the WIDTH
+    // off that class, and the card itself belonged to a widget nothing had
+    // rendered since 4.10 — so the query returned null on every render for a
+    // year. Both ends deleted; the width comes from the file, above.
     const widgets = readCode("widgets");
-    expect(widgets).toContain('querySelector<HTMLElement>(".ca-jtc-card")?.addClass("ca-jtc-wide")');
-    expect(widgets).toContain("if (wideSpec.wide) {");
-    // AND THE LINE IS DROPPED FROM THE DISPATCH LOOP, or it would reach
-    // `buildFromSpec` as an unknown keyword and draw a notice instead of nothing.
+    expect(widgets).not.toContain(".ca-jtc-");
+    // WHAT THE DISPATCHER STILL DOES WITH THE MODIFIER. The line is dropped
+    // from the dispatch loop, or it would reach `buildFromSpec` as an unknown
+    // keyword and draw a notice instead of nothing.
     expect(widgets).toContain("!isWideLine(l)");
+    expect(widgets).toContain("parseWide(");
   });
 
   it("draws the refusal where the reader is looking", () => {

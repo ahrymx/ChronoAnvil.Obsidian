@@ -61,22 +61,6 @@ export type TrackerType =
   | "boolean"
   | "tags";
 
-// Types that hold a list rather than a scalar, and therefore cannot chart,
-// cannot be a Diary.base column, and take no min/max/options in the editor.
-// A predicate rather than `=== "tags"` for `isScaleType`'s reason: three
-// places ask, and a literal in each is what leaves one of them behind.
-export function isListType(t: TrackerType): boolean {
-  return t === "tags";
-}
-
-// The types that render a face/word picker and may feed the calendar heat map.
-// A single-element set today, but named because three places ask the question
-// ("is this a scale?") and a literal `=== "scale"` in each is the kind of thing
-// that a second scale-like type later would leave one of them behind.
-export function isScaleType(t: TrackerType): boolean {
-  return t === "scale";
-}
-
 // ── Tracker classes ───────────────────────────────────────────────────
 //
 // A tracker belongs to exactly one *class*, naming the period it measures and
@@ -357,10 +341,6 @@ export function journalSurface(typeId: string | null): TrackerSurface {
 // Everywhere: every diary grain and every journal type, present and future.
 export function anySurface(): TrackerSurface {
   return { kind: "any" };
-}
-
-export function isAnySurface(s: TrackerSurface): boolean {
-  return s.kind === "any";
 }
 
 export function isJournalSurface(s: TrackerSurface): boolean {
@@ -693,10 +673,6 @@ export function getTracker(
   return plugin.settings.trackers.find((t) => t.id === id);
 }
 
-export function isBuiltin(t: TrackerDef): boolean {
-  return t.builtin != null;
-}
-
 // Look up a built-in by its kind rather than its (user-facing, relabelable-but-
 // not-here) id — so the sleep coupling and heat-map code never hard-code the
 // literal "Mood"/"Wake-Up"/"Bedtime" strings.
@@ -705,13 +681,6 @@ export function getBuiltinTracker(
   kind: BuiltinKind
 ): TrackerDef | undefined {
   return plugin.settings.trackers.find((t) => t.builtin === kind);
-}
-
-// Whether an input built-in (mood/wake/bed) is currently turned on — i.e. it
-// shows up somewhere. "Off" leaves the definition in the registry (locked,
-// re-enableable) but contributes nothing to the template or base.
-export function builtinEnabled(t: TrackerDef): boolean {
-  return t.showInTemplate || t.showInBase;
 }
 
 function isTrackerSurface(v: unknown): v is TrackerSurface {
@@ -1042,17 +1011,6 @@ function templatePath(plugin: ChronoAnvilPlugin, cls: TrackerClass): string {
 
 function showsIn(cls: TrackerClass): (t: TrackerDef) => boolean {
   return (t) => diaryClassOf(t.surface) === cls && t.showInTemplate;
-}
-
-// The trackers a given surface may use at all, template-seeded or not. This is
-// what the per-entry picker offers, and it is the only place the rule "a
-// tracker belongs to one surface" turns into "this note may not have that
-// widget".
-export function trackersOnSurface(
-  trackers: TrackerDef[],
-  surface: TrackerSurface
-): TrackerDef[] {
-  return trackers.filter((t) => surfaceAdmits(t.surface, surface));
 }
 
 // ── Which surface a note is ──────────────────────────────────────────────

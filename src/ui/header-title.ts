@@ -56,13 +56,7 @@
 
 import { App, MarkdownPostProcessorContext, Notice, TFile, setIcon } from "obsidian";
 import { ArgSpan, argSpansIn, readArg, spliceArg } from "../core/directive-grammar";
-import {
-  getFile,
-  isFolderNote,
-  parseHeaderDirective,
-  plural,
-  singularGuess,
-} from "../core/util";
+import { frontmatterOf, getFile, isFolderNote, parseHeaderDirective, plural, singularGuess } from "../core/util";
 import { splitGlyph } from "./section-frame";
 import type ChronoAnvilPlugin from "../main";
 import { journalTypeAtPath } from "../journals/journal";
@@ -500,7 +494,7 @@ export function attachPropertyRename(
 ): void {
   const el = row.createDiv({ cls: prefix });
   const read = (): string => {
-    const fm = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+    const fm = frontmatterOf(app, file);
     const v = fm[prop];
     return typeof v === "string" ? v.trim() : "";
   };

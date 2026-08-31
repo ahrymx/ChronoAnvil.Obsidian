@@ -82,7 +82,9 @@ import {
   parseSources,
   placeInWindow,
   resizedTo,
+  resolveOffSources,
   spanFromDrag,
+  timeGridFilterKey,
   visibleDays,
   weekDates,
   type AllDayItem,
@@ -188,12 +190,14 @@ export function buildTimeGrid(
   const grid = scroll.createDiv({ cls: "ca-tg-grid" });
   const status = root.createDiv({ cls: "ca-tg-status", text: "Reading the week…" });
 
-  // WHAT THE GRID IS SHOWING RIGHT NOW, which is not what the directive says
-  // and must not be written back into it. The sources a reader has folded away
-  // and the day count a narrow pane forced are both facts about this pane in
-  // this minute; the note stays the source of truth, so reopening it restores
-  // what it says.
-  const off = new Set<GridSource>();
+  // Load remembered filter toggle state for this note's grid
+  const filterKey = ctx.sourcePath
+    ? timeGridFilterKey(ctx.sourcePath, rest)
+    : null;
+  const off = filterKey
+    ? loadTimeGridFilters(plugin, filterKey, sources)
+    : new Set<GridSource>();
+
   let drawn: Collected = { items: [], allDay: [] };
   let ready = false;
   let showing: DayCount = asked;
@@ -245,11 +249,43 @@ export function buildTimeGrid(
     });
   }
 
-  sourceChips(bar, sources, off, render);
+  sourceChips(bar, sources, off, () => {
+    if (filterKey) {
+      saveTimeGridFilters(plugin, filterKey, off);
+    }
+    render();
+  });
 
   reload();
 
   return root;
+}
+
+export function loadTimeGridFilters(
+  plugin: ChronoAnvilPlugin,
+  key: string,
+  sources: GridSource[]
+): Set<GridSource> {
+  const saved = plugin.settings.timeGridFilters?.[key];
+  return resolveOffSources(saved, sources);
+}
+
+export function saveTimeGridFilters(
+  plugin: ChronoAnvilPlugin,
+  key: string,
+  off: Set<GridSource>
+): void {
+  if (!plugin.settings.timeGridFilters) {
+    plugin.settings.timeGridFilters = {};
+  }
+  const at = plugin.settings.timeGridFilters;
+  if (off.size === 0) {
+    if (!(key in at)) return;
+    delete at[key];
+  } else {
+    at[key] = Array.from(off);
+  }
+  void plugin.saveSettings();
 }
 
 // The source list in the bar, as controls.
@@ -262,7 +298,7 @@ function sourceChips(
   bar: HTMLElement,
   sources: GridSource[],
   off: Set<GridSource>,
-  render: () => void
+  onChange: () => void
 ): void {
   if (sources.length < 2) {
     bar.createSpan({ cls: "ca-tg-sources", text: sources.join(" · ") });
@@ -270,10 +306,11 @@ function sourceChips(
   }
   const row = bar.createDiv({ cls: "ca-tg-sources" });
   for (const source of sources) {
+    const isOff = off.has(source);
     const chip = row.createEl("button", {
-      cls: `ca-tg-src ca-tg-src-${source} is-on`,
+      cls: `ca-tg-src ca-tg-src-${source}${isOff ? "" : " is-on"}`,
       text: source,
-      attr: { type: "button", "aria-pressed": "true" },
+      attr: { type: "button", "aria-pressed": isOff ? "false" : "true" },
     });
     chip.addEventListener("click", () => {
       const on = !off.has(source);
@@ -284,7 +321,7 @@ function sourceChips(
       else off.delete(source);
       chip.toggleClass("is-on", !off.has(source));
       chip.setAttribute("aria-pressed", off.has(source) ? "false" : "true");
-      render();
+      onChange();
     });
   }
 }
@@ -1364,45 +1401,110 @@ async function rewriteStamp(
   edit.reload();
 }
 
-// Clicking a block opens what it came from.
+// Opening a block or chip opens what it came from (event editor or source note).
 //
-// CLICK OPENS, DRAG EDITS, AND THE TWO NEVER RUN TOGETHER. Until 4.62 this was
-// the only gesture a block had, on the grounds that dragging one would have to
-// rewrite a stamp in someone's markdown — which it does, and that is what the
-// section above is for. Opening is still the whole of what a CLICK means: it is
-// the way to reach every field a drag cannot say, and the only way at all to
-// reach a task, whose hour is not this pane's to write.
+// CLICK / RIGHT-CLICK / LONG-TAP OPENS, DRAG EDITS. Right-click or long-tap
+// provides a dedicated, reliable gesture to edit or inspect an item without
+// conflicting with drag-to-move or drag-to-resize.
+function openTimeGridItem(plugin: ChronoAnvilPlugin, key: string): void {
+  const [kind, ...rest] = key.split(":");
+  if (kind === "event") {
+    const def = readEvents(plugin.app, plugin).find(
+      (d: EventDef) => d.id === rest[0]
+    );
+    if (def) openEventEditor(plugin.app, plugin, def);
+    return;
+  }
+  if (kind === "logbook") {
+    const book = plugin.settings.logbooks.find(
+      (b: LogbookDef) => b.id === rest[0]
+    );
+    const note = book ? getFile(plugin.app, book.path) : null;
+    if (note) void openFile(plugin.app, note);
+    return;
+  }
+  if (kind === "capture") {
+    const note = dayNoteOf(plugin, rest[0]);
+    if (note) void openFile(plugin.app, note);
+    return;
+  }
+  if (kind === "task") {
+    // The path is everything up to the last colon-separated piece, because a
+    // task's own text may contain a colon and the path may not contain the
+    // separator this key was built with in any other position.
+    const note = getFile(plugin.app, rest.slice(0, -1).join(":"));
+    if (note) void openFile(plugin.app, note);
+  }
+}
+
 function wire(plugin: ChronoAnvilPlugin, el: HTMLElement, key: string): void {
   el.addClass("is-clickable");
+
+  // Left click opens the item
   el.addEventListener("click", () => {
-    const [kind, ...rest] = key.split(":");
-    if (kind === "event") {
-      const def = readEvents(plugin.app, plugin).find(
-        (d: EventDef) => d.id === rest[0]
-      );
-      if (def) openEventEditor(plugin.app, plugin, def);
-      return;
-    }
-    if (kind === "logbook") {
-      const book = plugin.settings.logbooks.find(
-        (b: LogbookDef) => b.id === rest[0]
-      );
-      const note = book ? getFile(plugin.app, book.path) : null;
-      if (note) void openFile(plugin.app, note);
-      return;
-    }
-    if (kind === "capture") {
-      const note = dayNoteOf(plugin, rest[0]);
-      if (note) void openFile(plugin.app, note);
-      return;
-    }
-    if (kind === "task") {
-      // The path is everything up to the last colon-separated piece, because a
-      // task's own text may contain a colon and the path may not contain the
-      // separator this key was built with in any other position.
-      const note = getFile(plugin.app, rest.slice(0, -1).join(":"));
-      if (note) void openFile(plugin.app, note);
-    }
+    openTimeGridItem(plugin, key);
   });
+
+  // Right-click (contextmenu / secondary click) opens the editor / note immediately
+  el.addEventListener("contextmenu", (evt: MouseEvent) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    openTimeGridItem(plugin, key);
+  });
+
+  // Long-tap on touch screens opens the item
+  let touchTimer: number | null = null;
+  let startX = 0;
+  let startY = 0;
+
+  el.addEventListener(
+    "touchstart",
+    (evt: TouchEvent) => {
+      if (evt.touches.length !== 1) return;
+      startX = evt.touches[0].clientX;
+      startY = evt.touches[0].clientY;
+
+      if (touchTimer !== null) window.clearTimeout(touchTimer);
+      touchTimer = window.setTimeout(() => {
+        touchTimer = null;
+        if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+          try {
+            navigator.vibrate(30);
+          } catch {
+            // ignore vibration error
+          }
+        }
+        openTimeGridItem(plugin, key);
+      }, TOUCH_LONG_PRESS_MS);
+    },
+    { passive: true }
+  );
+
+  el.addEventListener(
+    "touchmove",
+    (evt: TouchEvent) => {
+      if (touchTimer === null) return;
+      if (evt.touches.length > 0) {
+        const dx = Math.abs(evt.touches[0].clientX - startX);
+        const dy = Math.abs(evt.touches[0].clientY - startY);
+        if (dx > TOUCH_SLOP_PX || dy > TOUCH_SLOP_PX) {
+          window.clearTimeout(touchTimer);
+          touchTimer = null;
+        }
+      }
+    },
+    { passive: true }
+  );
+
+  const cancelTouchTimer = (): void => {
+    if (touchTimer !== null) {
+      window.clearTimeout(touchTimer);
+      touchTimer = null;
+    }
+  };
+
+  el.addEventListener("touchend", cancelTouchTimer, { passive: true });
+  el.addEventListener("touchcancel", cancelTouchTimer, { passive: true });
+
   setIcon(el.createSpan({ cls: "ca-tg-blk-open" }), "arrow-up-right");
 }

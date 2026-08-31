@@ -5,20 +5,27 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// The page head — 4.10.
+// The page head — 4.10, and rewritten in 5.2 to describe the head that renders.
 //
-// WHAT THIS RELEASE ACTUALLY FIXED, so the assertions have something to be
-// about: `buildPageTitle` draws the page's name and a cog whose menu opens the
-// section editor, and it is gated on `canEditSections` — which answers yes for
-// the homepage, Search, both folder-note dashboards, the four period
-// dashboards, entries and journal notes. It was DRAWN on one of them, because
-// the cog only appears where a catalogue composes `title`, and only the
-// homepage did. The editor worked on nine surfaces and was clickable on one.
+// ── WHAT THIS FILE GOT WRONG FOR A YEAR, WHICH IS THE POINT OF THE REWRITE ──
 //
-// So the load-bearing assertions here are the composition ones — seven pages
-// compose it — and the repair one, which lives in layout.test.ts because that
-// is where `applyLayout` is tested. Everything else is the look, which this
-// suite can only reach through the stylesheet.
+// It was written about `buildPageTitle`: a card with the page's name, a cog,
+// and a row of small-caps links to Home, Diary and Journals built from the
+// `title:` directive's argument. Nine of its assertions described that card, in
+// detail, down to the `--ca-caps-tracking` on the links — and every one of them
+// passed for a year after 4.10 pointed `case "title"` at `livePageHead`
+// instead, because they all read the SOURCE of a module nothing imported and
+// the CSS of a class nothing drew.
+//
+// That is the documented hazard of a structural suite, arriving: a test that
+// reads what the source says goes on passing after the code stops being called.
+// `test/dead-code.test.ts` is the answer to it, and the import graph is what it
+// asks. This file now asserts the head that is actually on the page:
+// `.ca-journal-page-head`, built by `page-head.ts`, with no card and no links.
+//
+// The load-bearing assertions are still the composition ones — seven pages
+// compose the directive — plus the repair one in layout.test.ts, where
+// `applyLayout` is tested.
 
 import { describe, expect, it } from "vitest";
 import { readCss, readSrc } from "./sources";
@@ -28,9 +35,10 @@ import { composeDiaryDashboardNote } from "../src/diary/diary-dashboard-sections
 import { composeJournalsDashboardNote } from "../src/journals/journals-dashboard-sections";
 import { composeDiaryDashboard } from "../src/diary/diary-sections";
 import { composeEntryTemplate } from "../src/diary/entry-sections";
-import { PAGE_TITLE_IDS, PAGE_TITLE_LINE, locateTitle } from "../src/core/note-sections";
+import { PAGE_TITLE_LINE, locateTitle } from "../src/core/note-sections";
 import { isTitleLine } from "../src/core/directive-grammar";
 import { DEFAULT_PATHS } from "../src/core/constants";
+import { LAUNCHER_DEFAULT } from "../src/ui/widgets/launcher";
 import { TRACKER_CLASSES } from "../src/trackers/trackers";
 
 const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
@@ -96,99 +104,91 @@ describe("every dashboard opens with its own name", () => {
 
   it("draws exactly one, per page", () => {
     for (const [name, text] of HEADED) {
-      expect(text.match(/^title:/gm), name).toHaveLength(1);
+      expect(text.match(/^title$/gm), name).toHaveLength(1);
     }
   });
 });
 
-describe("what the head carries", () => {
-  it("is the vault's three places, not the calendar's", () => {
-    // The head answers "where am I in the VAULT" and the `links:` row answers
-    // "where am I in TIME". That split is why both rows survive this release,
-    // and it is the thing an edit is most likely to lose.
-    expect([...PAGE_TITLE_IDS]).toEqual(["home", "diary", "journals"]);
-    for (const id of PAGE_TITLE_IDS) {
-      expect(PAGE_TITLE_LINE).toContain(id);
-    }
-    // None of the ladder's rungs are here; that row still has them.
-    for (const id of ["week", "month", "quarter", "year", "scopes", "today"]) {
-      expect(PAGE_TITLE_LINE, id).not.toContain(id);
-    }
+describe("what the head carries, and what it stopped carrying", () => {
+  it("is drawn by livePageHead, which is what the directive dispatches to", () => {
+    // THE ASSERTION THAT WOULD HAVE CAUGHT THE WHOLE THING. Everything else in
+    // this file is about a head; this says WHICH head, by reading the one line
+    // that decides it. `case "title"` has pointed here since 4.10.
+    const dispatch = code("ui/widgets/index");
+    const at = dispatch.indexOf('case "title":');
+    expect(at).toBeGreaterThan(-1);
+    expect(dispatch.slice(at, at + 120)).toContain("livePageHead(this.plugin, ctx)");
   });
 
-  it("adds nothing to the destination table", () => {
-    // `resolveTarget` is the one answer to "where does `diary` go", shared with
-    // `links:` and the launcher. A second table would be the one nobody
-    // updates — so the head had to be spellable with ids that already resolve,
-    // and it is.
+  it("takes no argument, in the grammar and in the renderer alike", () => {
+    // THE DIRECTIVE IS BARE SINCE 5.2. It carried `home,diary,journals` for
+    // nine releases after the renderer stopped reading it — the dispatcher
+    // passes `ctx` and nothing else, and `livePageHead` has no parameter to put
+    // ids in even if one were passed.
+    expect(PAGE_TITLE_LINE).toBe("title");
+    expect(PAGE_TITLE_LINE).not.toContain(":");
+    const head = code("ui/widgets/page-head");
+    expect(head).toContain("export function livePageHead(");
+    const sig = head.slice(head.indexOf("export function livePageHead("));
+    expect(sig.slice(0, sig.indexOf(")"))).not.toContain("ids");
+  });
+
+  it("and the three destinations are still destinations, on request", () => {
+    // WHAT DROPPING THE ROW DID AND DID NOT COST. `resolveTarget` is the one
+    // table that answers "where does `diary` go", shared by `links:`, the
+    // launcher and this head, and all three ids are still in it — so a reader
+    // who wants that row writes `links:home,diary,journals` and gets it. What
+    // is gone is a row composed by default, which had not been RENDERED since
+    // 4.10 in any case.
     const links = readSrc("links");
-    for (const id of PAGE_TITLE_IDS) {
+    for (const id of ["home", "diary", "journals"]) {
       expect(links, id).toContain(`case "${id}":`);
     }
+    // AND NOT "THE LAUNCHER ALREADY DRAWS THEM", WHICH IS WHAT THREE COMMENTS
+    // IN THIS TREE CLAIMED AND 5.2 FOUND TO BE FALSE. The launcher's default is
+    // the four PERIOD dashboards; it has never shipped a Diary or a Journals
+    // tile unless a reader named one. The head's row was not redundant with it
+    // — it was simply not drawn.
+    expect([...LAUNCHER_DEFAULT]).toEqual(["week", "month", "quarter", "year"]);
   });
 
-  it("reads that table rather than drawing its own pills", () => {
-    // BOTH HALVES. `resolveTarget` is reused, so there is one answer; the pill
-    // MARKUP is not, because a `.jn-pill` row inside the card would make the
-    // head read as one more card with one more pill row in it.
-    expect(code("page-title")).toContain("resolveTarget(plugin, file, id)");
-    expect(code("page-title")).not.toContain("jn-pill");
-    expect(code("page-title")).toContain("jtc-link");
+  it("draws no card, which is the whole of how it differs from what it replaced", () => {
+    // `buildPageTitle` was a bordered, figured surface — the thing 98-page-head
+    // argues against by name: *a note that opens with one more of them opens
+    // with furniture.* The head takes the page's ground and one hairline under
+    // it.
+    const head = ruleFor(".ca-journal-page-head");
+    expect(head).toContain("border-bottom");
+    expect(head).not.toContain("border-radius");
+    expect(head).not.toContain("background:");
   });
 
-  it("draws nothing dead, and no empty row", () => {
-    // A vault with no journals root has no Journals link — rather than one that
-    // opens nothing, which is `empty.ts`'s rule applied to navigation. And if
-    // every id declines, the row itself is not drawn: an empty strip under the
-    // title is height spent on nothing, on a head whose brief was minimal.
-    const src = readSrc("page-title");
-    expect(src).toContain("if (!target || (!target.file && !target.action)) return;");
-    expect(src).toContain("if (nav.childElementCount) root.appendChild(nav);");
-  });
-
-  it("lights the page you are on instead of linking to it", () => {
-    // `links.ts` argues this at length: a row whose contents change per page is
-    // a menu you have to read every time, where a fixed set with one lit is a
-    // position you can read at a glance.
-    const src = readSrc("page-title");
-    const at = src.indexOf("if (target.file?.path === sourcePath) {");
-    expect(at).toBeGreaterThan(-1);
-    expect(src.slice(at, at + 300)).toContain("is-here");
-    expect(ruleFor(".ca-jtc-link.is-here")).toContain("--interactive-accent");
+  it("leaves no rule behind for the card it replaced", () => {
+    // The stylesheet had thirteen `.ca-jtc-*` rules matching nothing. Deleted in
+    // 5.2 with the module, and asserted here so a revert brings both or neither.
+    expect(rules).not.toContain(".ca-jtc-");
   });
 });
 
-describe("the homepage is unchanged, which is the scope holding", () => {
-  it("carries the same destination row as every other page (4.20)", () => {
-    // ── THE ARGUMENT THIS REVERSES ────────────────────────────────────
+describe("every page composes the same head, the homepage included", () => {
+  it("composes the bare directive there too", () => {
+    // ── THE ARGUMENT, IN THREE MOVES ──────────────────────────────────
     //
-    // From 4.5 to 4.19 the homepage composed the BARE form, and the reason was
-    // real: the launcher is already on this page as CONTENT in a cell, shipping
-    // with Diary and Journals among its four tiles, so ids here draw two of the
-    // same destinations twice on one screen.
+    // 4.5–4.19: the homepage composed the BARE form and the other eight carried
+    // ids, because the launcher is already on this page as content and ids here
+    // would draw two of the same destinations twice on one screen.
     //
-    // 4.20 weighs that against what it cost — the banner meaning something
-    // different on this page than on the other eight. A reader learns the banner
-    // once, and the homepage was the one place its row was missing, which reads
-    // as unfinished rather than as considered. `home-sections.ts` carries the
-    // full argument, including why the two rows are not the same object: this is
-    // chrome you read to know where you are, and the launcher is content you
-    // click.
+    // 4.20: reversed it, so the banner would mean the same thing on all nine
+    // pages — a reader learns the banner once.
+    //
+    // 5.2: the ids went from all nine, because the head that drew them was
+    // replaced in 4.10 and nothing had rendered them since. The banner still
+    // means one thing everywhere, which is what 4.20 was actually after.
     const home = composeHomeNote(DEFAULT_PATHS.diaryRoot);
-    expect(home).toContain(PAGE_TITLE_LINE);
-    // And the bare form is gone from it: `title` on its own line would be a
-    // second head.
-    expect(home).not.toContain("\ntitle\n");
-  });
-
-  it("and a bare title draws no navigation at all", () => {
-    // The property that keeps the homepage byte-identical to what it drew
-    // before this release. Asserted at the default rather than through a DOM:
-    // an empty list is what the dispatcher passes for a bare keyword, and an
-    // empty list has nothing to render.
-    const src = readSrc("page-title");
-    expect(src).toContain("ids: readonly string[] = []");
-    expect(src).toContain("if (!wanted.length) return root;");
+    expect(home).toMatch(/^title$/m);
+    for (const [name, text] of HEADED) {
+      expect(text, name).toMatch(/^title$/m);
+    }
   });
 
   it("finds both spellings, and no frontmatter key", () => {
@@ -226,65 +226,47 @@ describe("entries and journal notes were not touched", () => {
 });
 
 describe("the head is drawn as the page, not as another card", () => {
-  it("clips its figure to its own corners", () => {
-    // BOTH DECLARATIONS ARE LOAD-BEARING. The figure is an absolutely
-    // positioned layer: without `overflow` it paints past the rounded corners
-    // into square ones, and without `position` it resolves against whatever
-    // ancestor is positioned — in Live Preview the code-block widget, in
-    // reading view the note's sizer. That is the fault 4.7.0 shipped with the
-    // grip, from the same cause.
-    const card = ruleFor(".ca-jtc-card");
-    expect(card).toContain("position: relative");
-    expect(card).toContain("overflow: hidden");
+  it("sits on the page's own ground, with one rule under it", () => {
+    // NO CARD IS THE LOOK. Every other block on a note is a bordered surface,
+    // and a note opening with one more of them opens with furniture. The head
+    // takes the page's ground the way a heading does, and the only rule on it is
+    // the one separating it from the first block.
+    const head = ruleFor(".ca-journal-page-head");
+    expect(head).toContain("border-bottom");
+    expect(head).toContain("var(--background-modifier-border)");
   });
 
-  it("keeps the title card unfigured without pseudo-element art hatches", () => {
-    expect(rules).not.toContain(".ca-jtc-card::before");
-    expect(rules).not.toContain(".theme-light .ca-jtc-card");
+  it("keeps the face Obsidian's inline title had", () => {
+    // It stands in that title's place, so a reader should not be able to tell
+    // anything moved — except that this one knows what the note is and can be
+    // clicked.
+    const title = ruleFor(".ca-journal-page-head .ca-jph-title");
+    expect(title).toContain("var(--ca-text-xl)");
+    expect(title).toContain("cursor: text");
   });
 
-  it("sets the page's name in the one face that is not the UI sans", () => {
-    expect(ruleFor(".ca-jtc-title-text")).toContain("var(--ca-head-face)");
-    // AND THE INPUT MATCHES IT, or the card jumps as you click to rename.
-    expect(ruleFor(".ca-jtc-title-input")).toContain("var(--ca-head-face)");
+  it("takes no text cursor on a name the reader did not type", () => {
+    // A period dashboard's head prints *August 2026* — a fact about which
+    // window the page is on, not a name anyone owns.
+    expect(ruleFor(".ca-journal-page-head .ca-jph-title.is-fixed")).toContain(
+      "cursor: default"
+    );
   });
 
-  it("keeps the family's radius and border, which is what makes it belong", () => {
-    const card = ruleFor(".ca-jtc-card");
-    expect(card).toContain("var(--ca-radius-md)");
-    expect(card).toContain("var(--background-modifier-border)");
+  it("sets its eyebrow in the caps voice every key label uses", () => {
+    const eyebrow = ruleFor(".ca-journal-page-head .ca-jph-eyebrow");
+    expect(eyebrow).toContain("var(--ca-caps-weight)");
+    expect(eyebrow).toContain("var(--ca-caps-tracking)");
+    expect(eyebrow).toContain("var(--ca-text-2xs)");
   });
 
-  it("separates its two rows with the figure, not a rule", () => {
-    // Asked for, and a decision rather than an omission: a hairline would make
-    // the head two stacked things, where the whole point is that it is one
-    // thing that says two.
-    expect(ruleFor(".ca-jtc-nav")).not.toContain("border-top");
-    expect(ruleFor(".ca-jtc-nav")).not.toContain("border:");
-  });
-
-  it("sets its destinations in the caps voice every key label uses", () => {
-    const link = ruleFor(".ca-jtc-link");
-    expect(link).toContain("var(--ca-caps-weight)");
-    expect(link).toContain("var(--ca-caps-tracking)");
-    expect(link).toContain("var(--ca-text-2xs)");
-  });
-
-  it("still gives its card up where the block paints one", () => {
-    // 4.1 §5's list, kept in step. A head inside an unframed block or under a
-    // block head is the same box in a box the reset list exists to remove, and
-    // 4.10 changed what `.jtc-card` draws without changing that.
-    const reset = rules.indexOf(".has-head .ca-jtc-card");
-    expect(reset).toBeGreaterThan(-1);
-    expect(rules).toContain(".ca-journal-widget-block.is-unframed .ca-jtc-card");
-  });
-
-  it("hides Obsidian's own title wherever it is drawn", () => {
-    // Derived from the card rather than declared in frontmatter, so it follows
-    // the block instead of going stale when the block is removed — and it is
-    // what makes six more pages stop saying their name twice, with no new
-    // selector.
-    expect(rules).toContain(":has(.ca-jtc-card) .inline-title");
+  it("hides Obsidian's own title wherever a banner already draws the name", () => {
+    // `.ca-journal-banner-name` is the anchor. `.ca-jtc-card` was the other half
+    // of this selector and left in 5.2 with the widget that drew it — it had
+    // been matching nothing since 4.10, so the anchor that was doing the work is
+    // the one that remains.
+    expect(rules).toContain(":has(.ca-journal-banner-name) .inline-title");
+    expect(rules).not.toContain(".ca-jtc-card");
   });
 });
 
@@ -329,13 +311,17 @@ describe("nothing on the page can pick the head up", () => {
     expect(b.indexOf("buildHead(container, title)")).toBeLessThan(gate);
     expect(b.indexOf("if (!boundsOf(ctx, container)) return;")).toBeLessThan(gate);
     // and before every one of them.
-    // The CALL SITES, not the definitions — `attachGrip` and `slot` are declared
-    // near the top of the file and would pass this by accident.
+    // The CALL SITES, not the definitions — `attachGrip`, `makeSlot` and
+    // `makeSource` are all declared near the top of the file and would pass this
+    // by accident. That is why the last entry is where the grip factory is
+    // INSTANTIATED rather than the `attachGrip` line inside it: the line moved
+    // above the gate in 5.2 when `source` was lifted out of this function, and
+    // the fact being asserted — no grip without the gate — did not.
     for (const after of [
       "ca-jbd-slot-above",
       "ca-jbd-slot-side ca-jbd-slot-side-left",
       "Drag to move this block",
-      "const grip = attachGrip(host, label)",
+      "const source = makeSource(",
     ]) {
       expect(b.indexOf(after), after).toBeGreaterThan(gate);
     }

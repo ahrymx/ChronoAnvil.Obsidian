@@ -5,6 +5,364 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [5.8.0] - 2026-08-31
+
+### Added
+
+- **Harmonized note section headers & collapsible tracker section.** Standardized section header styling, typography, and container padding across Trackers, Recall, and Tasks note sections. The Trackers section now includes an interactive chevron fold toggle with persistent per-note fold state.
+
+### Changed
+
+- **Compact Pages section layout.** Replaced the oversized empty callout in the Pages table with a slim, subtle inline empty state and refined list row spacing for a balanced vertical rhythm.
+- **Streamlined tracker card.** Removed the redundant "Subject" / context strip from the trackers card to keep tracker items prominently visible and uncluttered.
+
+## [5.7.0] - 2026-08-31
+
+### Added
+
+- **Recall widget surface framing and collapsible header.** The Recall widget now renders with full surface styling and a collapsible chevron toggle, providing visual consistency across study note widgets.
+
+### Fixed
+
+- **Resilient active note resolution on page creation.** Resolved an issue where creating a new page or converting a note into a dashboard immediately after using the Section Editor could trigger a spurious "Open a note first" notice. The plugin now resolves active markdown files across four tiers (active file, active MarkdownView, open markdown workspace leaves, and last open files) with regex frontmatter parsing fallbacks.
+- **Prose skeleton persistence across section moves.** Resolved a bug where moving the prose skeleton (`headings`) after sections with body-backed region comments (`recall`, `tasks`) or before the banner caused it to be absorbed into adjacent raw segments and disappear when reopening the Section Editor.
+- **Section ordering preservation on Save as Default.** Fixed template default persistence so saving a reordered note as the default properly updates both `order` and `sections` in storage, ensuring custom placements (such as prose skeleton at the bottom of pages) persist reliably across new page and note creation.
+
+## [5.6.0] - 2026-08-31
+
+### Added
+
+- **Time-grid filter toggles state persistence.** The time-grid widget now remembers which source filter chips are active or toggled off across reloads, note navigation, and workspace restarts.
+- **Logbook widget reactive updates on capture.** Capturing thoughts into a logbook via Quick Capture immediately updates and re-renders both single-book and multi-book logbook widgets on screen without requiring a reload.
+- **Dedicated Edit column in Trackers settings.** Replaced the redundant "Surface" column with a clean "Edit" column across Built-in Diary, Built-in Journals, and Custom trackers tables, eliminating action button and toggle switch collisions.
+- **Improved Timegrid resize hit-targets and context actions.** Enlarged the resize drag hit-area with hover affordances and added right-click and long-tap gestures to quickly open/edit blocks and chips.
+- **The prose skeleton can be removed, and removing it keeps what you wrote.**
+  It was the one section a journal note would not let go of, and the reason was
+  honest as far as it went: the skeleton is real `##` markdown, so the plugin
+  could not tell its `## Notes` from one you typed. It says so at the block, and
+  every surface downstream agreed — the row's subtitle read *"delete it by hand"*
+  and the change list refused to plan a removal. What was actually true is
+  narrower: prose with nothing around it cannot be identified. The headings now
+  sit between two HTML comments, invisible in reading view and in any renderer,
+  and everything downstream started answering differently without being told to
+  — `sectionRemovable` derives removability from the block kinds and was not
+  amended, exempted or special-cased.
+
+  Removal is by heading rather than wholesale, because your writing is not in a
+  container of its own — it is under the headings, interleaved with them. A
+  heading with nothing beneath it is scaffolding and goes; a heading with a word
+  beneath it stays, with everything under it, and the change list names each one
+  it is keeping before you press Save. Untick the skeleton on a note you have
+  not written in yet and nothing is left behind — no headings, no markers, no
+  gap where they were. The rule is about emptiness rather than authorship: a
+  heading you retitled and wrote under is kept even though no layout has ever
+  mentioned it, and an untouched `## Overview` goes even though every layout
+  does.
+
+- **You can write the heading list yourself, in the section editor.** The row
+  now carries a box holding the note's headings, one per line. Reorder them,
+  rename one, add one, delete one — the change list previews it and Save writes
+  it, and **Save as layout…** then makes that list the one every note of the
+  kind opens with. Editing the headings in the note itself has written them
+  into the layout since 4.33 and nothing on screen had ever mentioned it; now
+  the gesture is a control, and the section's own line names the layout save
+  beside it.
+
+  The list is applied to the headings you already have rather than composed
+  from scratch, so a heading keeps everything written under it while it moves.
+  A heading you take out of the list but have written under is not deleted — it
+  survives at the end, and the change list says so before you press Save. One
+  taken out that only holds the wording the template shipped does go: the test
+  is whether the words under it differ from the ones ChronoAnvil put there,
+  which is also now the test removal uses, so untick and relist can never
+  disagree about whose paragraph it was.
+
+- **Saving a layout carries the skeleton's headings and no others.** The same
+  markers give that save an extent. A `## Scratch` typed at the bottom of one
+  Lesson, below everything the template wrote, used to be baked into every
+  Lesson made afterwards — there was nothing on the page that said where the
+  skeleton stopped, so the save took every `##` in the file.
+
+### Fixed
+
+- **A note written before this release keeps the old answer, and says why.**
+  Its skeleton has no markers, so the plugin still cannot delimit it — the
+  section is reported as kept, the box is not drawn, and the row says why
+  instead of stopping at *"delete it by hand"*: **Reload this page** composes
+  the skeleton again, this time bracketed, and both come back. Nothing migrates
+  a vault, and no note changes under anybody.
+- **The settings tab no longer throws you back to the top on every change.**
+  Twenty-five handlers end in a full repaint, which is the right shape — a
+  change to one setting can change what another one says — but repainting
+  empties the container, and emptying it collapses the scroll height, so the
+  page snapped back to the masthead. Reordering a custom tracker made the cost
+  plain: the arrow buttons sit three quarters of the way down the Trackers
+  group, so moving a tracker two places meant scrolling back twice. Handlers
+  now go through a repaint that finds the scrolling element, redraws, and puts
+  it back where it was. The scroller is found rather than assumed — walking up
+  while `scrollTop` is zero cannot pick the wrong element, and hard-coding
+  Obsidian's would have made the fix silently do nothing anywhere else.
+- **A repaint keeps your search and your category.** Both lived in locals
+  inside the draw, so any change wiped the search box and put the pill back to
+  All Settings. They are the tab's state now, and the tab is drawn already
+  filtered rather than drawn and then filtered — so a group your query has
+  hidden never flashes in before being taken away again.
+- **Searching no longer leaves groups permanently expanded.** A search opens a
+  group to reveal a match; it does not re-decide whether that group is open,
+  but the fold listener could not tell the two apart, so one search for a word
+  that appears in Paths left Paths — and every other group the word reached —
+  expanded in `data.json` for good. Clearing the search now puts every fold
+  back to your own answer. Implemented as a marker on the element rather than a
+  flag around the loop, because `toggle` on a `<details>` is queued rather than
+  dispatched and a flag would have been lowered before the first event arrived.
+- **Picking a longer value no longer shifts every row below it.** A settings
+  row's control was sized to its own contents, so a longer answer widened the
+  control, narrowed the description beside it, re-wrapped the description and
+  moved everything under it down the page — changing **Aesthetic preset** from
+  "3. Technical HUD (Monospace Telemetry)" to "1. Editorial Monastic (Default —
+  Serif & Warm Parchment)" shifted the four settings below by 9 px. The control
+  column has a fixed width now. Its right edge has not moved; what stopped
+  moving is the left edge, which is the one the description is measured
+  against. Narrow panes, where the description sits above the control rather
+  than beside it, release the width as before.
+- **The three tracker tables share one column grid.** Built-in diary, built-in
+  journal and custom carry the same five headings and stack in the same group,
+  and each sized its own columns from its own rows: "Surface" started at x=1057
+  in the first table and x=1017 in the third, so scanning down the group meant
+  re-finding the grid three times. All three are handed the same set of column
+  widths. Below the width at which the longest shipped content still fits, the
+  wrapper scrolls rather than the columns crushing.
+- **The capture matrix's headings sit over the switches they name.** A `th`
+  inherited the table's left alignment while the cell centred its content, and
+  centring stopped at the outer wrapper — Obsidian's own control justifies to
+  its far end — so every switch but the first sat 9 px left of the column's
+  middle. Both ends of the column are told the same thing now, and the five
+  grains share the width evenly instead of each taking its heading's.
+- **The derived paths under a root line up.** The label column was a minimum
+  width, which aligns the values of every row whose label is shorter than it
+  and ragged-edges the rest: under **02 · Diary**, "Quarterly entries" and
+  "Period dashboards" started their paths 10 px right of the other eight. It is
+  a grid track measured against the labels it actually has.
+- **A wizard's footer stays where you aimed.** Obsidian centres a modal, so a
+  step 200 px shorter than the one before it does not just shrink — the window
+  moves up and takes Back/Next with it. On the journal wizard, Next sat at
+  y=700 and the pair that replaced it at y=588. The body is now floored at the
+  tallest step drawn so far: measured rather than declared, because no number
+  written in a stylesheet knows how tall a step comes out on a reader's font
+  and pane, and grow-only, so the frame can still expand for a later step and
+  can never snap back.
+- **The calendar heatmap now fits the tile it is drawn in.** Both layouts sized
+  their cells from one flat token — 13 px for the year strip, 26 px for the
+  short calendar — so the graph's surface and the tile's had nothing to do with
+  each other. Measured on a 1050x450 tile, a 30-day window drew a 182x156 block
+  of squares marooned in the middle of it and a year strip drew 109 px of cells
+  in the same box; both read as a rendering fault rather than as thin data. The
+  cell size is now solved against the tile on **both** axes with container
+  units (`container-type: size` on the tile body), so a heatmap grows to fill the
+  room it was given and stays a grid of squares while doing it. The calendar
+  fits on both axes at once — neither is fixed, so it can honestly satisfy both;
+  the strip fits on height alone. No resize listener was added — the fit is
+  intrinsic, for the same reason the journals activity strip's is.
+- **A heatmap that cannot fit now scrolls instead of clipping.** The tile body
+  was `overflow-x: auto; overflow-y: hidden`, so a quarter's worth of week rows
+  taller than the tile were cut off with nothing to say so. It is `overflow:
+  auto` on both axes, and the cell size clamps to a legible floor (14 px short,
+  8 px year) rather than shrinking to specks — the floor is what turns "too
+  small" into a scrollbar. Centring is `safe`, so the overflowing start edge
+  stays reachable and a year too wide for its tile can still be scrolled back
+  to January.
+- **The grid's orientation is now chosen by the period.** A week or a month is
+  a *calendar* — seven weekday columns, one row per week, the shape a month is
+  read in. A quarter or longer is a *strip*, transposed so the weeks run left to
+  right beneath seven fixed weekday rows. The crossover is a quarter, and it is
+  a measurement rather than a taste: ninety days as a calendar is thirteen rows
+  of seven squares, which on a 1050x411 tile drew a 210 px column of cells with
+  800 px of empty tile beside it; the same window as a strip is fourteen columns
+  of seven and fills that tile at twice the cell size. The threshold is exported
+  as `HEAT_TRANSPOSE_DAYS` and read by both the renderer and the tile-size rule,
+  so the two cannot disagree again — 5.5.0 transposed at a year while the size
+  rule went on saying `tall`, handing a seven-row shape the one axis it cannot
+  spend.
+- **The strip sizes itself from the height and scrolls sideways.** Fitting it to
+  the *width* — which the first cut of this work did — makes a year land flush
+  against both tile edges at 13 px a cell, and seven 13 px rows is 109 px of
+  graph in a 411 px box: the same zoomed-out picture the flat token drew,
+  arrived at honestly. Seven rows is a constant, so height is the only thing
+  that can make a day legible, and the weeks are a timeline that has always been
+  longer than the box. A quarter now fits whole at a 50 px cell; a year fills the
+  height and scrolls, rendering already scrolled to the most recent week, with
+  drag-to-scroll on the body. Its gap grows with the cell, so the gutter that
+  reads as a mosaic between small cells does not read as a hairline between
+  large ones.
+- **The strip's last weekday row was clipped by its own scrollbar.** The strip
+  overflows sideways by design, so on any window worth scrolling a horizontal
+  bar is always present and takes its height out of the container — the fit
+  sized seven rows for a box that then held eight rows' worth, and Saturday was
+  cut off the bottom of every year. The bar's height is now reserved
+  unconditionally rather than reacted to, since a term that appears only when
+  the bar does is the oscillation the cell floor exists to avoid.
+- **The strip opens on the newest day that has a value.** It scrolled to
+  `scrollWidth`, which on a window running to the end of the calendar year opens
+  on empty autumn cells — and the measurement was taken in a `setTimeout(0)`,
+  before the container query had resolved the cell size, so the grid was often
+  still at its pre-layout width and the scroll silently did nothing. The same
+  chart would land at January or at August depending on timing. It now anchors
+  to the last populated cell, measured in a frame that has been laid out.
+- **The strip's weekday rail read "T / T / S".** It labelled rows 1, 3 and 5,
+  which are Monday, Wednesday and Friday only when the week starts on Sunday; on
+  a Monday-start locale the same indices pick Tuesday, Thursday and Saturday,
+  and two rows sharing an initial looks like broken initials rather than like
+  every other row being labelled. The rows are chosen by weekday now.
+- **A transposed heatmap is the one chart that gets a 2×2 tile by default.** It
+  is the only shape short of both axes at once — height buys a legible day,
+  width buys visible weeks. Measured on a 1080 px dashboard, a `wide` tile is
+  181 px tall and yields a 21 px cell, *smaller* than the flat 26 px it
+  replaced; `large` yields 50 px. On a narrow pane it collapses to one column
+  and keeps its height, which is the axis it cannot give up.
+- **Year month labels sat a column off the weeks they name.** The week count
+  was set on the grid, and the month-label row is the grid's *sibling* — so it
+  fell back to the token's placeholder 53 and laid out 53 tracks under a
+  61-week year. Both now read the count from the wrap.
+- The short grid padded its last row out to a multiple of **14**, adding a
+  whole invisible row to half of all windows. It pads to seven.
+
+### Changed
+
+- 5.5.0's release note claimed shorter windows render "14 days across in wide
+  panes". No rule ever selected that variant — `--ca-heat-cols` was 7
+  everywhere — and the two-axis fit above supersedes the idea: a wide tile now
+  buys bigger squares rather than a fortnight per row.
+
+## [5.5.0] - 2026-08-31
+
+**The calendar heatmap learns to scale.** A year-long heatmap tile in the Trends
+dashboard previously ballooned its 7-column day cells to the full container
+width (reaching ~120 px in wide mode and ~60 px in normal mode), crowding out
+vertical space so only 1–2 weeks fit in the tile before clipping. 5.5.0 introduces
+adaptive layout across all ranges: year windows transpose into GitHub-style
+horizontal contribution graphs (53 week columns × 7 weekday rows with month
+headers) that fit the entire year with zero vertical scrolling, while shorter
+windows render 14 days across in wide panes and 7 days across in normal/mobile
+panes, always scaling to 100% width.
+
+### Added
+
+- **GitHub-Style Transposed Contribution Heatmap (`src/charts/chart-render.ts`, `styles/20-charts.css`):**
+  Year-long heatmap ranges (`1y`, 365 days, and period year dashboards) now render
+  as a 53-week horizontal grid across 7 weekday rows. Month labels (`Jan`..`Dec`)
+  align along the top and weekday initials (`M`, `W`, `F`) sit on the left. The
+  entire year displays cleanly in standard tile height without vertical scrolling.
+- **Responsive 14 / 7-Day Calendar Heatmaps for Shorter Ranges:**
+  Non-year heatmap ranges (90 days, 30 days, 7 days, period quarters/months)
+  automatically render **14 days across (2 weeks per row)** on wide panes (>560px),
+  and collapse to **7 days across (1 week per row)** on normal and mobile panes,
+  scaling to 100% of the tile width.
+- **Heatmap Layout Tokens (`styles/00-tokens.css`):**
+  Added `--ca-heat-cols`, `--ca-heat-year-cols`, `--ca-heat-gap`, and
+  `--ca-heat-year-gap` to govern grid tracks and spacing across the stylesheet.
+- **The Visual Tour Has Its Pictures (`README.md`, `docs/screenshots/`):** The
+  gallery had been announced in two changelogs and rendered as broken-image
+  icons in both, first against a `dev-screenshots/` directory that never
+  existed and then against a `docs/screenshots/` that held only a note saying
+  what was owed. Seven captures now sit there: the homepage as a full-width
+  hero, then the calendar panel, an entry's tracker row, a Trends section, the
+  Study index, a week dashboard, and Obsidian's graph of a seeded vault.
+- **The Same Homepage Under Three Themes (`docs/screenshots/themes.png`):** An
+  eighth capture, composited rather than taken: three screenshots of one page
+  cut on two parallel diagonals, with the boundaries solved so each theme holds
+  exactly a third of the canvas.
+- **`test/review-checklist.test.ts` Opens the Files:** Asserts every linked capture
+  is on disk and every capture on disk is linked.
+
+## [5.4.0] - 2026-08-31
+
+**Two bugs behind one empty heatmap.** A screenshot of the seeded development
+vault showed a journal dashboard reporting no activity at all above a section
+listing seventeen notes — and the two faults behind it were independent. One is
+in the repo's seeding tool and reaches nobody's vault; the other is in shipped
+code, and would have printed a sentence contradicting itself for any reader
+whose notes were all older than a year. Both are the shape this project keeps
+finding: a run reporting success on every number it knew how to check, and a
+state nothing had been asked about.
+
+### Fixed
+
+- **A Journal's Activity Strip Said "Last Worked Today" Over a Year of Empty Cells:** The Journals band's status line had two branches — no dated notes at all, and everything else. The second read the last active cell in the 53-week window and **fell back to a gap of zero when there was none**, and a gap of zero prints "today". So a journal whose every note predates the window printed *"0 dated notes over 0 active days — last worked today"*: three numbers saying nothing is here and a fourth saying it happened this morning. There is now a third branch for the state that actually existed — notes, none of them in the window — and it counts them from the **unwindowed** rows, because saying "none in the last 12 months" above a Contents section listing seventeen is the same failure one step quieter. `test/empty-states.test.ts` pins the predicate and the branch order; an earlier `else` would swallow it.
+- **The Seeded Vault Put Every Journal Note in the Oldest Two Months (`tools/seed-vault.mjs`):** Journal note dates came from one shared cursor, `dates[cursor++ % dates.length]`, so the Nth journal note in the vault took the Nth active day. Forty notes against thirteen months of dates meant every journal note landed in the oldest two months and nothing was written in the eleven since — and the strip covers 53 weeks back from **today**, so Study's newest note fell 2025-08-24 against a window opening 2025-08-31. One day outside, and its dashboard drew a blank year over seventeen listed notes. The run reported *"402 written, 0 warnings"* every time: every note existed, every date was real, every date was an active day, and the only thing wrong with them was which days — which nothing short of opening a dashboard could see. Dates are now dealt by a **stride, per journal**: each journal spans the whole window on its own, first note on the oldest active day and last on the newest. Per journal is the half a single stride would have missed — four journals dealt in sequence from one cursor each get a contiguous quarter and leave every dashboard blank for the other nine months. `test/seed-vault.test.ts` asserts both halves, and both mutations fail it.
+
+## [5.3.0] - 2026-08-31
+
+**What the first public release was still carrying.** 5.2.0 was cut as the
+release that could be handed to a stranger, and then four things were looked at
+that only get looked at once: a directive argument nobody had drawn since 4.10,
+a set of README images pointing at a directory git would never have taken, the
+five functions in this tree that had grown past reading, and the last of a name
+that was never released. None of it changes what the plugin does in a reader's
+vault — the one behaviour change is which form of the `title` line newly
+composed notes are written with, and both forms have always been read.
+
+### Removed
+
+- **The `title:` Directive's Argument, and the Head It Fed:** `title:home,diary,journals` composed a row of links to Home, Diary and Journals under the page's name. It rendered nothing. 4.10 replaced `buildPageTitle` with `livePageHead` and pointed the dispatcher at it; the ids went on being written into eight catalogues' notes for nine releases, and the widget that read them sat in the tree unreferenced by anything. What kept it invisible is the same property this release has been chasing everywhere else: **nine assertions across four suites described that row in detail — its `resolveTarget` call, its `is-here` state, its `--ca-caps-tracking` — and every one of them passed, because they read the source of a module nothing imported and the CSS of a class nothing drew.** Deleted whole: `buildPageTitle`, `renderLink` and `WIDE_CLASS`; thirteen `.ca-jtc-*` rules and the four selectors that named the card in other rules; the dispatcher's mark on that card and the drag list's entry for it; `PAGE_TITLE_IDS` and `BannerSpec.ids`. `page-title.ts` keeps the page cog — the vault banner opens that menu — and is 147 lines instead of 333.
+- **A Claim Three Comments Made That Was Not True:** The argument for a bare `title` on the homepage, made in 4.5 and quoted in `note-sections.ts`, `home-sections.ts` and the old head, was that *the launcher already draws those tiles*. It does not: `LAUNCHER_DEFAULT` is `["week", "month", "quarter", "year"]`, the four period dashboards, and no Diary or Journals tile has ever shipped in it unless a reader named one. The row was not redundant with the launcher — it simply was not drawn. The corrected reason is written where each of the three claims was, and `page-head.test.ts` now pins the launcher's actual default so the claim cannot come back.
+- **The Last of ChronoForge (R5):** The name between Almanac and ChronoAnvil was never released, so no vault, no reader and no licence has ever referred to it — but `tools/migrate-vault.mjs` carried read-compatibility for it anyway: a `PRERELEASE_RULES` array, three `FILE_RENAMES` rows and a `chronoforge` plugin-folder id, all of it kept until the development vaults were migrated. They are, and the last stale artefact — a `.chronoforge-registry.json` sitting beside the live registry in the dev vault, a 4.84.0 snapshot of settings that 5.3.0 had already superseded — is deleted. The only migration the tool now performs is Almanac's, which is the one a real reader needs. `test/product-name.test.ts` sweeps `tools/migrate-vault.mjs` alongside `LICENSE`, `NOTICE`, `LICENSING.md`, `README.md` and `manifest.json` for the capitalised name, and the file on its own for the lowercase token a folder id or vault marker would wear — so the dead tables cannot come back by symmetry with `RULES`. `CLAUDE.md` states the closed position where it used to carry the instruction to close it.
+
+### Changed
+
+- **The Five Longest Builders Are Sub-Builders Now (M7):** `attachBlockHead` (644), `buildLogList` (603), `buildTasksTable` (371), `layOutRow` (354) and `buildAttachments` (332) were the same shape as each other — inline DOM construction interleaved with listener wiring, several screens of it, with no name on any stretch. Fourteen pieces came out: `buildRowCells`; `buildTasksHead`, `bucketTasks` and `buildTaskRow`; `buildLogDeck`, `filterLogItems` and `buildLogAddBox`; `makeSlot`, `makeSource`, `wireCellSlots` and `wireResizeHandles`; and `buildShelfLabel`, `buildAttachToolbar` and `attachIntake`. **Every extraction keeps its order** — each is called exactly where its code stood, so the DOM is built and the listeners registered in the sequence they always were, and no extraction changes what any of these functions does. What did *not* come out is as deliberate: the swap-measure machinery in `row.ts`, the pan-and-drop physics in `block-drag.ts` and `render` in `log-list.ts` share captured mutable state, and threading that through parameters would be the same coupling written twice at more length. Two closures did get a shape to be passed by: `LogFilters`, the four questions the deck sets and `render` reads, and `LogAddIO`, what the add box needs from the list above it — including `file` as a getter/setter pair, because a logbook's note may not exist until the first item creates it. Four structural assertions in `block-move`, `cell-move` and `page-head` were repointed, each carrying a note saying what it used to read; the gate test now asserts the line that *makes* a grip factory rather than the `attachGrip` call inside it, which is the fact it was always about. Non-comment counts: 133, 195, 142, 132, 157.
+- **Nothing in a Reader's Vault Is Rewritten:** `locateTitle` has always matched both forms — the optional group was there because the homepage was bare from 4.5 — and repair is additive-and-retired-only, so a dashboard written by any earlier release keeps the line it has and renders exactly as it did. Only newly composed notes get the bare form. The legacy spelling stays in the migration and cell-move fixtures on purpose: those describe notes that exist.
+- **`test/page-head.test.ts` and `test/page-widgets.test.ts` Describe the Head That Ships:** Both were essays about the deleted card, down to its 2em title and its container query. They now assert `.ca-journal-page-head` — the ground it takes, the face it borrows from Obsidian's inline title, the `is-fixed` cursor on a name the reader did not type — plus the one line that decides which head renders at all: `case "title"` → `livePageHead`. Eight more assertions across `appearance`, `block-move`, `empty-states`, `entry-footer`, `page-wide` and `banner-weld` were repointed the same way, each carrying a note saying what it used to describe.
+- **The README's Visual Tour Is Back, Pointing Somewhere Git Will Follow:** Five captures under `docs/screenshots/`, with `docs/screenshots/README.md` naming each file and what it should show. The ignore rule that covers `docs/` is now written `docs/*` with a negation for that one directory — **git cannot re-include a file whose parent directory is excluded**, so `docs/` plus a negation is a rule that looks right and silently ignores the images anyway. `test/review-checklist.test.ts` asserts all three halves: that the README links at least five images, that every one of them is under that path, and that the ignore rule is written the way that lets them be committed. *The images themselves are still owed — until they land the section renders as five broken icons, which is the state R3 named.*
+
+## [5.2.0] - 2026-08-31
+
+**The first public release.** Everything through 5.1.0 was built and archived
+privately; this is the version that goes to a GitHub release and to the
+community-plugin listing, so the work below is largely the difference between a
+plugin that runs and a plugin that can be handed to a stranger: a release
+pipeline, a README that describes what it ships, documentation that covers what
+is on screen, and a ledger that describes this plugin rather than its
+predecessor. Two of the fixes are ordinary bugs that the maintenance pass found
+because it went looking — one of them had been shipping a diary card with two
+missing buttons since 4.13.2.
+
+### Added
+
+- **`.github/workflows/release.yml`:** CI has run the full gate on every push for a while, and nothing has ever turned a passing tree into a release. Obsidian resolves a plugin version by reading a GitHub release whose **tag is the bare version** — `5.2.0`, never `v5.2.0` — and downloading `main.js`, `manifest.json` and `styles.css` from it as three individual assets; the installer never reads the repository tree, which is why those files are generated rather than committed. The workflow now fires on such a tag and refuses to publish before it has checked the things that are only checkable at release time: that the tag agrees with `manifest.json` *and* `package.json`, and that the version is actually in `versions.json` — the one rule `check:versions` deliberately relaxes, because a build the ledger does not list is a build that has not shipped. It then runs the suite, the typecheck and the linter, builds, verifies all three assets exist and are non-empty, and lifts the release notes out of this file's section for that version.
+- **The Settings Tab Explains Itself in the Vault Documentation:** `assets/documentation.md` gained a **Finding a setting** section covering the search box, the five category pills and the repair button on the toolbar row — all shipped in 5.1.0 and, until now, described nowhere the reader could see them. The same pass corrected three references to a `📖` ribbon icon that stopped being the ribbon icon in 5.0.0.
+- **Thirteen Widgets That Had Never Been Documented:** With the parity check able to run for the first time, it immediately named thirteen keywords a page can be given that the shipped reference did not mention: `launcher`, `links`, `upcoming`, `time-grid`, `logbook`, `quarter-summary`, `year-summary`, `period-recap`, `tracker-stat`, `stats-band`, `level-index`, `journal-card` and `journal-recent`. Each now has a row carrying its arguments and defaults.
+- **An Eighth Assertion in `test/obsidian-yaml.test.ts`:** The bundled-dependency list is now checked in the two places it is written as prose, not only in `NOTICE` and the `main.js` banner. See **Fixed** below for what that caught.
+- **A Focus Ring and a Pressed State on the Settings Category Pills:** The pills said which of them was chosen entirely in CSS, so the selection did not exist for a screen reader, and five keyboard-reachable buttons shared no visible focus indicator. Each now carries `aria-pressed`, kept in step with `.is-active`, and `:focus-visible` draws an accent outline outside the border so it survives the active state recolouring it.
+- **Coverage Tooling, Reported and Not Gated:** `npm run test:coverage` writes an HTML and a summary report from `@vitest/coverage-v8`. It measures `src/` only — `generated/` is compiled and `tools/` is build machinery — and carries **no thresholds**, deliberately: a large part of this suite asserts the *shape* of the source rather than running it, so line coverage understates what is pinned and a threshold would either assert nothing or fail the build for tests doing their job. Today's number is 41.6% of lines, and it is a map of where runtime exercise is thin rather than a target. It is also what found the module below.
+- **Three New Invariants, Each Written From a Bug It Would Have Caught:** `test/dead-code.test.ts` asserts that every module under `src/` is reachable from `src/main.ts` by the import graph esbuild walks, that every `__`-prefixed test-only hook has a caller in `test/`, and that no exported symbol is referenced nowhere at all. `test/frontmatter-reads.test.ts` asserts that `core/util.ts` is the only file that spells out the metadata-cache call. All five assertions were mutation-tested by reverting the fix each was written for.
+- **A Runtime Test for the Note-Write Debounce:** `NoteWriteScheduler` is the timer between a reader typing and their note being rewritten, and its header describes a data-loss bug — a per-file rather than per-field timer makes the second field's edit discard the first's. Nothing checked it. Seven cases now run the class: coalescing, both halves of the key, the pending flag the `note:` field reads to tell its own write from an external one, and that a flush cancels what was queued rather than racing it.
+
+### Changed
+
+- **Searching the Settings No Longer Ignores the Category You Picked:** The filter computed whether a group belonged to the active category and then dropped that answer on every path where a query existed. Choosing **Trackers & Capture** and typing a word that matched something under **Appearance & Banner** opened the Appearance group — expanded — while the Trackers pill went on rendering as active. The interface offers two controls that visibly compose and did not. They compose now, and an empty result inside a category says which category it searched and points at **All Settings**, because "no matches" and "no matches *here*" are different facts and only one of them was being reported.
+- **`versions.json` Describes This Plugin, Not Its Predecessor:** The ledger carried 284 entries reaching back to 1.9.0, of which 206 had no changelog section and 70 changelog versions had no ledger entry — a disagreement in both directions that never mattered because nothing was public. What made the cut obvious is that `versions.json` belongs to a **plugin id**, and the id changed at 5.0.0: every entry below it describes `ahrymx.almanac`, which is not this plugin and was never listed. The ledger now starts where the id does. The full 284-entry file is in the source archives, and `CHANGELOG.md` keeps the whole narrative — this is the ledger Obsidian resolves against, not the history.
+- **One 5.0.0 Instead of Two:** The release landed in two passes on the same day — the rename, then the store-readiness work — and was written up as two separate sections under the same number, each describing "the fold" with a different figure. They are merged, with a note saying so. The two figures were never in conflict: 419 selectors is the rename's pass over `--am-*` and `.almanac-*`, ~910 classes is the sweep afterwards that found forty more ad-hoc prefixes the rename never touched, and the combined result is 1,455.
+- **The README Leads With What the Plugin Is:** The **Visual Tour** section pointed at five files in a `dev-screenshots/` directory that does not exist in this repository and never did, so a gallery announced as shipped in 5.1.0 rendered as five broken-image icons. It is removed until the captures exist. The README gained a link to `assets/documentation.md` — 95 KB of reference that shipped into every vault and could not be read before installing — and a **Support** section naming the Ko-fi link the manifest has declared since 5.1.0 and the page never mentioned.
+- **One Reader for a Note's Frontmatter:** `app.metadataCache.getFileCache(file)?.frontmatter ?? {}` was written out by hand at thirty-four sites across twenty-one files, alongside a `frontmatterOf` helper that already was that expression. They now go through it, and the eight sites that read the `type:` property go through a new `noteTypeOf` beside it. See **Fixed** for the bug the second one closes.
+- **The Widget Reference Is Checked Against a File That Exists:** `test/widget-registry.test.ts` asserted parity between the registry and `docs/reference.md` behind an `existsSync` gate — and `docs/` is gitignored, so in a fresh clone, in CI and on the development machine the file was absent and the whole block reported as skipped. Those were the three skips this suite has carried for releases. The check now reads `assets/documentation.md`, which is the reference that actually ships into a reader's vault. **The suite has no skipped tests.**
+- **The Diary Card's Documentation Describes the Card:** The `diary[:N]` entry still described the accent-washed hero band — greeting, status line, four numbers, five pills — that 4.13.1 removed.
+
+### Fixed
+
+- **The Diary Card Stopped Drawing Its Actions Strip, and Everything Around It Went On Passing:** `buildDiaryActions` draws **Capture** and **Search** above the diary card's month navigator. Somewhere between 4.13.2 and 5.1 the one `appendChild` that put it on the page was lost, and nothing noticed for two minor versions: `opts.header` and `opts.ctx` stayed on `CalendarOptions`, `header: true` stayed at the call site, `.ca-jc-actions` and its `:has()` rule stayed in the stylesheet, `diary-header.ts` stayed in the tree, and the assertions in `appearance.test.ts` that check the module's contents and the rule's declarations all went on passing — because every one of them asks what the source *says*. No file imported `diary-header.ts` at all. The call is restored, and the reachability assertion described above is the thing that would have caught it on the day.
+- **A Folder Note Written `type: Lesson` Was Not the Same Note as `type: lesson`:** `isContainerFolder` compared the raw frontmatter value against a set of lowercase kind ids, so capitalisation decided whether a note was a container or a leaf. Seven other readers of the same property normalised; this one did not, and `entry-trackers.ts` already carried the account of the identical bug the last time it happened one property over. `noteTypeOf` is now the only reader and it normalises.
+- **A Test That Was Reading Two Thousand Lines It Did Not Mean To:** `journal-chart.test.ts` bounded a negative assertion by slicing to a comment three functions further down. Deleting the unused helper that comment belonged to sent `indexOf` to `-1`, the slice ran to the end of the module, and a test whose whole job is a `not.toContain` started reading code that legitimately mentions the term. It is bounded by the function now.
+- **The Source Archive Was Carrying a Coverage Report:** `tools/archive.mjs` skips `node_modules/`, `dist/`, `.git/` and `docs/` when it snapshots the tree, and the coverage reporter added in this release writes a two-hundred-file HTML report the list did not know about. The first 5.2.0 source zip came out at 6.4 MB against 5.1.0's 3.7 MB, nearly all of it one run's report of a tree the zip already contains. `coverage/` is on the list now, and the assertion that pins the list names it.
+
+- **Two Licence Documents Credited a Library That Is Not in the Build:** js-yaml left `main.js` in 5.0.0, and `NOTICE`, the esbuild banner and the lockfile were all corrected together and held there by `test/obsidian-yaml.test.ts`. The same claim is written out twice more in prose — the README's licence paragraph and `LICENSING.md`'s dependency FAQ — and no test read either, so both went on attributing a parser the build does not contain. A sentence naming what is bundled is an attribution statement rather than a description. Both are corrected, and the test now derives the expected list from the lockfile's production closure and checks it against **all four** documents, so the next dependency change breaks in four places at once instead of two.
+
+### Removed
+
+- **Twenty-Six Exports Nothing Referenced, and the Two Stale Test Hooks:** Six predicates in `trackers.ts` whose comments each said "three places ask" with no place asking; `buildConfidenceSummary`, the builder for a widget retired in 3.11, exported with no caller for two majors, and its orphaned CSS rule with it; `scatterableType`, `buildDiaryLinks`, `eventSummary`, `noteRequiredNotice` and the rest. `__resetSessionSort` and `__clearIndexCache` were exported "for the test that pins the session rule" and for cache isolation — and no test called either, which is worse than having neither: the next person to add a case reads the export and believes isolation is handled.
+- **The Pre-Release Migration Rules:** Between Almanac and ChronoAnvil the plugin briefly carried a third name that never left the development machine — no release, no repository, no copy in anyone else's hands. `tools/migrate-vault.mjs` carried a separate `PRERELEASE_RULES` table for it, three `FILE_RENAMES` rows and a second plugin-folder id, kept only until the development vaults had been through one `--write` pass. They have. The tool is down to the one migration a reader can actually need, and the assertion that the name appears in no shipped document stays exactly where it was.
+
 ## [5.1.0] - 2026-08-30
 
 **Redesigned the settings interface with category navigation tabs, real-time keyword search, header links card, and an integrated repair vault toolbar button.**
@@ -25,10 +383,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [5.0.0] - 2026-08-29
 
+**Initial major public release under the ChronoAnvil identity, establishing a unified journaling and study system with native calendars, heat maps, charts, trackers, dashboards, and automated vault scaffolding.**
+
+> **Vault Compatibility:** Builds on the complete 4.x foundation with the new `chronoanvil` plugin id, unified `--ca-*` styling architecture, and updated vault tokens. Vaults created in pre-release versions remain fully compatible via automatic dual-reading and the built-in migration tool (`npm run migrate:vault` or **ChronoAnvil: Maintenance: set up / repair vault**).
+
+> **One number, two passes.** 5.0.0 landed on 2026-08-29 as the rename, then as the
+> store-readiness work that followed it the same day, and the two were written up as
+> separate sections under the same version. This is those two merged. The selector
+> counts they each quoted — 419 and ~910 — were never in conflict: they count the two
+> passes of the same fold, and the combined result is stated below.
+
 ### Changed
 
+- **Product Rename — Almanac is now ChronoAnvil:** The display name, every user-facing string, the documentation and the licence's section 7 attribution now read ChronoAnvil. The plugin id changed from `ahrymx.almanac` to `chronoanvil` — the previous id contained a period, which the community-plugin manifest charset does not allow, so this had to change before any public release regardless of the rename.
+- **Vault Format Tokens Renamed:** Fenced blocks are now ` ```chronoanvil `, ` ```chronoanvil-charts ` and ` ```chronoanvil-journal-charts `; body regions open `<!--chronoanvil:<key>`; the tracker region markers are `# chronoanvil:trackers:start` / `:end`; the graph marker is `%% chronoanvil-graph %%`; the events frontmatter property is `chronoanvil-events`. The settings mirror is `.chronoanvil-registry.json`, per-journal manifests are `.chronoanvil-journal.json`, and the vault map is `ChronoAnvil.canvas`.
+- **A Mark of Its Own:** The ribbon button drew Lucide's `book-open` — an icon three other plugins also use, on the button whose whole job is to say which plugin this is — and the banner tile drew the vault's initials. Both now draw the ChronoAnvil mark, an anvil whose waist is an hourglass — the name and the mark say the same thing — authored on Lucide's 24-unit grid so it sits correctly beside the built-ins. The banner tile's **Tile** setting still takes a letter or an emoji; leaving it empty now gives the mark rather than initials.
+- **A Single CSS Namespace, in Two Passes:** The stylesheet carried two prefixes — `--am-*`/`.am-*` and a second `.almanac-*` family that had grown alongside it — and the rename folded both into `--ca-*` / `.ca-*`, 419 selectors. That turned out to be the smaller half: a sweep afterwards found ~910 more classes under about forty ad-hoc prefixes the rename never touched, the largest being 315 `.journal-*`, none of them namespaced at all. A plugin's stylesheet loads into one flat scope beside the reader's theme, their snippets and every other plugin, so the prefix is the only collision protection there is. Both passes are done: **1,455 selectors and 1,260 applied classes now sit under `ca-`**, the only unprefixed names being Obsidian's own and `almanac-wide`, which is written into readers' frontmatter and cannot be renamed retroactively. `test/css-namespace.test.ts` holds it from both directions — a new unprefixed rule fails, and applying a prefixed class by its old bare name fails. **Any custom CSS snippet targeting `.am-*`, `.almanac-*`, `.journal-*` or `.cal-*` needs updating.**
 - **The Stylesheet No Longer Ships Its Own Commentary:** `tools/build-css.mjs` concatenated `styles/*.css` verbatim, and 58.6% of the 885 KB that produced was comment text — the design arguments, which run to paragraphs and are the most valuable thing in the directory. Every byte of it was parsed by every vault on every launch, phones included, and none of it was legible where it landed: whoever reads a design argument has the repository open, and whoever opens the plugin folder has a generated file they were told not to edit. The sources keep every word; the shipped `styles.css` goes from **882 KB to 358 KB**. This is still not a minifier — selectors, declarations, whitespace inside rules and the order of everything are untouched, so the stylesheet stays readable in devtools and diffable between releases. A comment that must reach the shipped file says so with `/*!`, which is the convention esbuild already applies to `main.js`; one such notice now carries the licence that the twenty-five stripped SPDX headers used to, and each source file leaves a `/*! <filename> */` marker so a rule seen in devtools can be traced back to the file whose comments explain it.
-- **Unified CSS Namespace (`ca-`):** Completed the fold of all remaining selectors and TS class applications under the single `ca-` prefix (~910 classes, including `journal-*`, `cal-*`, `jjs-*`, `jbd-*`, `jtc-*`, etc.), preventing selector collision in the shared global scope. Guarded by `test/css-namespace.test.ts` (3 assertions verifying all stylesheet selectors and TypeScript string literals).
 - **No Default Keyboard Shortcut:** **Search everything** declared `Mod K` as a `hotkeys` default. The argument for it was reasonable on its own terms — a declared default is rebindable, and Obsidian surfaces the clash with core's *Insert Markdown link* in its own Hotkeys pane — but claiming a binding in every vault that installs the plugin is a different act from choosing it in one, and the review guidelines are explicit that a plugin should not. The command is unchanged and one row away in **Settings → Hotkeys**; the README now says so, because nothing in the interface can. The vault banner's search field drew a `⌘ K` / `Ctrl K` chip spelling the old default and no longer does — with no default to spell, that chip would name a key that does nothing, and it cannot be taught to read your actual binding without reaching into Obsidian's internals.
 - **The Settings Tab No Longer Repeats Its Own Name:** Obsidian draws "ChronoAnvil" above the settings body, and the tab drew it again as an `<h2>` immediately underneath — the word you are already looking at, on the screen twice. The tagline stays.
 
@@ -36,13 +407,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The one thing given up is `{ lineWidth: -1 }`: `stringifyYaml` takes no options, so whether a long value is folded across lines is Obsidian's decision rather than the plugin's. Nothing depends on it. `Diary.base` has exactly one value long enough to fold — the 210-character `formulas.Type` expression — and the tests run the file through both line widths and assert the same document comes back, because YAML folds at a space and reads the break back as that space. What line width can change is how the file looks after a sync, not what Bases reads out of it.
 
-### Fixed
-
-- **Bundled Assets Travel Inside `main.js`:** `Scaffold.readAsset` resolved `manifest.dir + "/assets/<name>"` through the vault adapter at runtime. Obsidian's community installer writes `manifest.json`, `main.js` and `styles.css` into the plugin folder and creates no subdirectories, so `assets/` did not exist for anyone who installed the ordinary way — the plugin loaded and rendered perfectly, and then **Maintenance: set up / repair vault** built the folder tree, silently skipped `Diary.base`, `Staging.md` and the in-vault documentation README, and finished on a notice about three missing assets. The three files are now compiled into `main.js` at build time and read from there, so every install route carries them. Hand-installs from the release zip were never affected, which is why this survived the whole of 4.x: every build tested here was a zip.
-- **A Click Listener That Outlived Every Log Widget:** The log list's type filter attached an anonymous `document` click handler to dismiss its dropdown, once per widget render, with no reference kept — so it could not be removed even in principle. It survived the note being closed and the plugin being disabled, and a vault with several log widgets accumulated one per render for the length of the session. The handler is now attached when the menu opens and removed when it closes.
-
 ### Added
 
+- **`tools/migrate-vault.mjs`:** Rewrites a vault written under the old name in a single pass — note tokens, file names, and the plugin folder so `data.json` moves with it. Dry-run by default; `--write` applies, and it takes a full vault backup first unless given `--no-backup`. Idempotent, and it deliberately leaves `.obsidian/` alone apart from the plugin folder.
+- **Read-Compatibility for Pre-Rename Vaults:** The plugin writes only the new spellings but reads both at every point where failing to find a token would cost content rather than merely look wrong: body regions (a region it cannot see renders empty and the next save would append a second one beside it, orphaning what the reader wrote), tracker region markers, journal manifests, the settings mirror, the events property, and all three fence languages. Legacy `` `almanac:` `` inline spans still render.
+- **Settings Survive the Id Change:** Because the plugin id changed, the first launch finds no `data.json`. `Registry.read()` now falls back to the pre-rename mirror filename and version key, so trackers, journals and paths are restored rather than silently reset to defaults.
 - **`tools/build-assets.mjs`:** Compiles `assets/` into `generated/bundled-assets.ts`, on the same footing as `tools/build-css.mjs` — generated, gitignored, and rebuilt by `npm run build`, `npm run typecheck`, `npm test` and `npm run dev`, which also watches `assets/` so an edit to the documentation is picked up without a restart. The markdown stays markdown: `assets/` is still where these notes are written and reviewed.
 - **`test/bundled-assets.test.ts`:** Five assertions holding the fix in place — every asset `scaffold.ts` names is in the bundle, each matches `assets/` byte for byte, nothing in `assets/` is skipped by the extension filter, a `Scaffold` with no app and no plugin folder still serves every note, and `scaffold.ts` does not read assets through the vault adapter again.
 - **`test/css-build.test.ts`:** Six assertions over the comment strip, the first of them written against a deliberately different implementation than the build's — a regex normalisation where the build is a character walk — so that the two agreeing is evidence rather than a function being compared to itself. It also asserts the one thing the stripper assumes: that no string in `styles/` contains a comment delimiter — the inline SVG data URIs being exactly where such a thing would arrive unnoticed.
@@ -51,24 +420,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`test/obsidian-yaml.test.ts`:** Seven assertions around the YAML swap. The round-trip checks run `Diary.base` through both line widths so that a question about a host which cannot be run from a test — does Obsidian fold long lines? — stops mattering rather than being guessed at. The rest close the door behind the change: no module under `src/` may import `js-yaml`, it may not return to `dependencies`, and the third-party lists in `NOTICE` and in the `main.js` banner must both match the lockfile's production closure. That last one is a licence obligation rather than tidiness, and the banner is the only notice a community-store install carries at all, since the installer writes three files and `NOTICE` is not one of them.
 - **`test/product-name.test.ts`:** Five assertions that the product has one name. It does not check the spelling — it derives the name from `manifest.json`, the one place Obsidian itself reads, and requires `package.json`, the repository URL, `LICENSE`, `NOTICE`, `README.md`, `LICENSING.md` and the `main.js` banner to agree with it. The attribution string in particular is a term of the licence rather than a description, and four documents quote it; nothing but a side-by-side reading would have caught them disagreeing.
 
-## [5.0.0] - 2026-08-29
+### Fixed
 
-**Initial major public release under the ChronoAnvil identity, establishing a unified journaling and study system with native calendars, heat maps, charts, trackers, dashboards, and automated vault scaffolding.**
-
-> **Vault Compatibility:** Builds on the complete 4.x foundation with the new `chronoanvil` plugin id, unified `--ca-*` styling architecture, and updated vault tokens. Vaults created in pre-release versions remain fully compatible via automatic dual-reading and the built-in migration tool (`npm run migrate:vault` or **ChronoAnvil: Maintenance: set up / repair vault**).
-
-### Changed
-
-- **Product Rename — Almanac is now ChronoAnvil:** The display name, every user-facing string, the documentation and the licence's section 7 attribution now read ChronoAnvil. The plugin id changed from `ahrymx.almanac` to `chronoanvil` — the previous id contained a period, which the community-plugin manifest charset does not allow, so this had to change before any public release regardless of the rename.
-- **Vault Format Tokens Renamed:** Fenced blocks are now ` ```chronoanvil `, ` ```chronoanvil-charts ` and ` ```chronoanvil-journal-charts `; body regions open `<!--chronoanvil:<key>`; the tracker region markers are `# chronoanvil:trackers:start` / `:end`; the graph marker is `%% chronoanvil-graph %%`; the events frontmatter property is `chronoanvil-events`. The settings mirror is `.chronoanvil-registry.json`, per-journal manifests are `.chronoanvil-journal.json`, and the vault map is `ChronoAnvil.canvas`.
-- **A Mark of Its Own:** The ribbon button drew Lucide's `book-open` — an icon three other plugins also use, on the button whose whole job is to say which plugin this is — and the banner tile drew the vault's initials. Both now draw the ChronoAnvil mark, an anvil whose waist is an hourglass — the name and the mark say the same thing — authored on Lucide's 24-unit grid so it sits correctly beside the built-ins. The banner tile's **Tile** setting still takes a letter or an emoji; leaving it empty now gives the mark rather than initials.
-- **Single CSS Namespace:** The stylesheet used two prefixes — `--am-*`/`.am-*` and a second `.almanac-*` family that had accumulated alongside it. Both are now `--ca-*` / `.ca-*`, folding 419 selectors into one namespace. **Any custom CSS snippet targeting `.am-*` or `.almanac-*` needs updating.**
-
-### Added
-
-- **`tools/migrate-vault.mjs`:** Rewrites a vault written under the old name in a single pass — note tokens, file names, and the plugin folder so `data.json` moves with it. Dry-run by default; `--write` applies, and it takes a full vault backup first unless given `--no-backup`. Idempotent, and it deliberately leaves `.obsidian/` alone apart from the plugin folder.
-- **Read-Compatibility for Pre-Rename Vaults:** The plugin writes only the new spellings but reads both at every point where failing to find a token would cost content rather than merely look wrong: body regions (a region it cannot see renders empty and the next save would append a second one beside it, orphaning what the reader wrote), tracker region markers, journal manifests, the settings mirror, the events property, and all three fence languages. Legacy `` `almanac:` `` inline spans still render.
-- **Settings Survive the Id Change:** Because the plugin id changed, the first launch finds no `data.json`. `Registry.read()` now falls back to the pre-rename mirror filename and version key, so trackers, journals and paths are restored rather than silently reset to defaults.
+- **Bundled Assets Travel Inside `main.js`:** `Scaffold.readAsset` resolved `manifest.dir + "/assets/<name>"` through the vault adapter at runtime. Obsidian's community installer writes `manifest.json`, `main.js` and `styles.css` into the plugin folder and creates no subdirectories, so `assets/` did not exist for anyone who installed the ordinary way — the plugin loaded and rendered perfectly, and then **Maintenance: set up / repair vault** built the folder tree, silently skipped `Diary.base`, `Staging.md` and the in-vault documentation README, and finished on a notice about three missing assets. The three files are now compiled into `main.js` at build time and read from there, so every install route carries them. Hand-installs from the release zip were never affected, which is why this survived the whole of 4.x: every build tested here was a zip.
+- **A Click Listener That Outlived Every Log Widget:** The log list's type filter attached an anonymous `document` click handler to dismiss its dropdown, once per widget render, with no reference kept — so it could not be removed even in principle. It survived the note being closed and the plugin being disabled, and a vault with several log widgets accumulated one per render for the length of the session. The handler is now attached when the menu opens and removed when it closes.
 
 ## [4.84.0] - 2026-08-29
 

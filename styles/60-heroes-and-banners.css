@@ -1227,232 +1227,22 @@ a.ca-jjs-row-link:hover {
  * in its body — which is `.ca-jjc-grid`'s `align-items: stretch`. Same declaration,
  * different job, and it is load-bearing for the new one. */
 
-/* ── The page title card (4.5 §4) ──────────────────────────────────────
+/* ── THE PAGE TITLE CARD STOOD HERE AND IS DELETED (5.2) ────────────────
  *
- * The page's own name, large, with the control that acts on the page. It is a
- * title and a control — NOT a band: the reference design's masthead carries
- * stat tiles, ChronoAnvil's stat strip is a different object with a different job,
- * and putting numbers here would be a release with an argument about which
- * numbers.
+ * `.ca-jtc-card` and its dozen parts — the row, the cog, the small-caps nav, the
+ * click-to-edit title — dressed `buildPageTitle`, the 4.5 page head. 4.10
+ * replaced that head with `livePageHead` and `.ca-journal-page-head` below;
+ * nothing has drawn a `.ca-jtc-*` element since, so every rule here has been
+ * matching nothing for a year rather than styling anything.
  *
- * IT HAS A SURFACE, AND IT DID NOT AT FIRST. This shipped flat — no background,
- * no border, weight carried entirely by the type — on the argument that two
- * heavy surfaces stacked would read as one thing announced twice. Looked at in
- * a vault that was wrong in the way arguments from the source usually are: a
- * bare name above a page of bordered cards does not read as restraint, it reads
- * as a heading somebody forgot to finish. It is a CARD, so it is drawn as one.
+ * DELETED WITH THE WIDGET, not before it: the rules were kept while the module
+ * was, because a stylesheet that drops a class the source still writes is worse
+ * than one carrying a rule that never fires. The module went in 5.2 and these go
+ * with it. `.ca-jtc-wide` goes too — the width has come from the FILE since
+ * 4.45.1, by `ui/page-width.ts`, and the class was only the cog's checkbox.
  *
- * THE SAME SURFACE EVERY OTHER CARD TAKES — `--background-secondary`, one
- * hairline, `--ca-radius-md` — from 91-card-surface.css's list rather than a
- * fourth opinion about what a card looks like. */
-/* ── AND IN 4.10 IT STOPPED BEING THE SAME SURFACE ─────────────────────
- *
- * The paragraph above is why this is a card at all, and it still holds. What
- * changed is that the card was drawn on ONE page for five releases, and 4.10
- * composes it onto six more — at which point "the same surface every other card
- * takes" becomes the problem rather than the answer: a reader opening a
- * dashboard would meet the page's own name in a box identical to the six boxes
- * of content under it.
- *
- * So the head keeps the family's RADIUS and BORDER TOKEN, and departs on the
- * three things that say what an object is: its ground is figured, its name is
- * set in a book face, and it is tight where a content card is roomy. That is
- * the smallest set of departures that reads as "this is the page" rather than
- * as a seventh card with a bigger heading.
- *
- * `overflow: hidden` AND `position: relative` ARE BOTH LOAD-BEARING. The figure
- * is an absolutely positioned layer, so without the first it paints past the
- * rounded corners into square ones, and without the second it resolves against
- * whatever ancestor is positioned — which in Live Preview is the code-block
- * widget and in reading view is the note's sizer. That is the same fault 4.7.0
- * shipped with the grip, from the same cause.  */
-.ca-jtc-card {
-  position: relative;
-  overflow: hidden;
-  /* MINIMAL, WHICH WAS THE BRIEF. 14px/16px was a card holding one line; this
-     holds two, and the whole head comes to about 78px — less than the old
-     one-row card, which is the only way a second row pays for itself. */
-  padding: 11px 15px 9px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--ca-radius-md);
-  background: var(--background-secondary);
-}
-.ca-jtc-row {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
+ * The four references left in this stylesheet's prose are history and say so. */
 
-/* ── The head's second row: where this page can go (4.10) ──────────────
- *
- * NO RULE ABOVE IT, which is a decision and not an omission. A hairline would
- * make the head two stacked things; the figure already separates them, and the
- * whole point of the object is that it is ONE thing that happens to say two.
- *
- * AND THESE ARE NOT `.ca-jn-pill`. The pill row is the plugin's navigation chrome
- * everywhere else and it is right there — but a pill row inside this card would
- * make the head read as one more card with one more pill row in it, which is
- * exactly what the ground and the face are spent on preventing. They take the
- * caps voice instead: the same `--ca-caps-*` every key label in the plugin uses,
- * at the size the block head and the group foot use.
- *
- * The cost, and it is real: an entry's `links:` row and this do not match, and
- * will not until entries are brought along. Written down rather than discovered. */
-.ca-jtc-nav {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-top: 1px;
-  /* Optical, not structural: the first link's own padding would otherwise set
-     its glyph in from the title's first letter by exactly that much. */
-  margin-left: -7px;
-}
-.ca-jtc-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 7px;
-  border-radius: var(--ca-radius-sm);
-  font-size: var(--ca-text-2xs);
-  font-weight: var(--ca-caps-weight);
-  letter-spacing: var(--ca-caps-tracking);
-  text-transform: uppercase;
-  color: var(--text-faint) !important;
-  text-decoration: none !important;
-  white-space: nowrap;
-  transition: color 0.15s, background 0.15s;
-}
-.ca-jtc-link:hover {
-  color: var(--text-normal) !important;
-  background: var(--background-modifier-hover);
-}
-.ca-jtc-link-icon {
-  display: inline-flex;
-  width: 0.95em;
-  height: 0.95em;
-  flex-shrink: 0;
-}
-.ca-jtc-link-icon svg {
-  width: 100%;
-  height: 100%;
-}
-/* "You are here" — lit rather than omitted, which is `links.ts`' argument and
-   the reason the set is the same three on every page: a fixed row with one lit
-   is a position you can read at a glance, where a row whose contents change is
-   a menu you have to read every time. It is not a link and does not offer a
-   hover state, because there is nowhere for it to go. */
-.ca-jtc-link.is-here {
-  color: var(--interactive-accent) !important;
-  cursor: default;
-}
-.ca-jtc-link.is-here:hover {
-  background: none;
-}
-
-/* THE COG IS AT THE FAR EDGE, and that is a requirement rather than a
- * placement. The title is click-to-edit, and study-header.ts says why its own
- * ⋯ is not beside one: "a control next to it would be a control one slip away
- * from renaming the note." `justify-content: space-between` above is what puts
- * the whole width between them. */
-.ca-jtc-cog {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  border-radius: var(--ca-radius-sm);
-  color: var(--text-muted);
-  cursor: pointer;
-  flex: none;
-}
-.ca-jtc-cog:hover {
-  color: var(--text-normal);
-  background: var(--background-modifier-hover);
-}
-
-.ca-jtc-titlerow {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-.ca-jtc-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: text;
-  max-width: 100%;
-}
-.ca-jtc-title-text {
-  /* THE FACE IS THE HEAD'S, AND IT IS THE ONLY ONE IN THE PLUGIN. See
-     `--ca-head-face`: the UI is one sans everywhere else on purpose, and this is
-     the one object that is about the page rather than about something on it.
-     A book face is a chronoanvil's own register.
-
-     ── AND IT CAME DOWN FROM 2.4em, WHICH IS A TRADE AND NOT A TIDY-UP ──
-
-     4.5.1 set 2.4em and the reason is still true as far as it goes: this
-     replaces Obsidian's own inline title, and smaller than the thing it replaced
-     read as a lesser copy of it in the first vault render.
-
-     What changed is what else the head has. In 4.5 it was a bare name on the
-     plugin's UI sans on the same surface as every card — size was the ONLY thing
-     distinguishing it, so it had to carry the whole weight. It now has a face
-     nothing else uses and a figured ground nothing else has, and it has a second
-     row under it; 2.05em is what "minimal height" costs once the other two are
-     doing that work.
-
-     IF THE HEAD READS WEAK ON A REAL PAGE, THIS IS THE FIRST THING TO PUT BACK,
-     and the number to put back is 2.4em. That is the whole of the risk in this
-     trade and it is worth one sentence rather than being rediscovered. */
-  font-family: var(--ca-head-face);
-  font-size: 2.05em;
-  font-weight: 600;
-  line-height: 1.06;
-  letter-spacing: -0.005em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* The pencil appears on hover only. A page title with a permanent edit glyph
-   reads as a form field; one that offers itself when the pointer arrives reads
-   as a title you can also change — which is what it is. */
-.ca-jtc-title-edit {
-  display: inline-flex;
-  color: var(--text-faint);
-  opacity: 0;
-  transition: opacity 120ms ease;
-}
-.ca-jtc-title:hover .ca-jtc-title-edit {
-  opacity: 1;
-}
-/* Touch has no hover to reveal it with, so it rests visible-but-quiet instead
-   of at zero — 3.9 §3.3's policy, and the same 0.45 `.ca-jsh-title-edit` takes
-   thirty files over. test/hover-reveal.test.ts fails the build for a
-   hover-revealed affordance that arrives without one of these, which is how
-   this one was caught rather than shipped. */
-@media (hover: none) {
-  .ca-jtc-title-edit {
-    opacity: 0.45;
-  }
-}
-.ca-jtc-title-input {
-  width: 100%;
-  /* The same size AND FACE as the text it replaces, or the card jumps as you
-     click it. The face is the half that is easy to forget: a serif name
-     swapping to a sans input is the same jump as a size change, in a direction
-     that reads as the field being a different control. */
-  font-family: var(--ca-head-face);
-  font-size: 2.05em;
-  font-weight: 600;
-  line-height: 1.06;
-  padding: 0;
-  border: none;
-  border-bottom: 1px solid var(--background-modifier-border);
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-normal);
-}
 
 /* ── THE PAGE BANNER: the name and the navigation row, welded (4.19) ────
  *
@@ -1485,13 +1275,6 @@ a.ca-jjs-row-link:hover {
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--ca-radius-md);
   background: var(--background-secondary);
-}
-/* The name card gives up the frame; the block has it now. */
-.ca-journal-page-banner > .ca-jtc-card {
-  position: relative;
-  border: none;
-  border-radius: 0;
-  background: none;
 }
 /* The pill row, welded under the name.
  *
@@ -1551,34 +1334,16 @@ a.ca-jjs-row-link:hover {
  * had a banner": 4.19's own table lists them as the two that already had the
  * right thing, and what nobody checked was what sat ABOVE it.
  *
- * `.ca-journal-banner-name` IS THE RIGHT ANCHOR AND `.ca-jtc-card` IS NOT A SECOND
- * ONE. The condition this rule wants is "a block on this page is already drawing
- * the file's name, large, with a rename on it" — which is exactly what that
- * class marks on both slim banners. The large banner's name card carries no such
- * class (its row is `.ca-jtc-titlerow`), so both names stay in the selector; a
- * third banner format would join it here rather than being noticed by a render
- * two releases later. */
-.markdown-preview-view:has(.ca-jtc-card) .inline-title,
-.markdown-source-view:has(.ca-jtc-card) .inline-title,
+ * `.ca-journal-banner-name` IS THE RIGHT ANCHOR AND `.ca-jtc-card` WAS NOT A
+ * SECOND ONE. The condition this rule wants is "a block on this page is already
+ * drawing the file's name, large, with a rename on it" — which is exactly what
+ * that class marks. The jtc half of the selector was dropped in 5.2 along with
+ * the widget that drew it: it had matched nothing since 4.10, so the anchor that
+ * was doing the work is the one that is left. A third banner format joins it
+ * here rather than being noticed by a render two releases later. */
 .markdown-preview-view:has(.ca-journal-banner-name) .inline-title,
 .markdown-source-view:has(.ca-journal-banner-name) .inline-title {
   display: none;
-}
-
-/* AND IT STEPS DOWN IN A NARROW BLOCK. A page title on a page is a name; in a
-   sidebar it is four words wrapped across three lines. The query is on the
-   BLOCK — `.ca-journal-widget-block` is the container — so it answers to the pane
-   the card is in rather than to the window, which is the rule every other
-   collapse in this stylesheet follows.
-
-   THE NAV ROW DOES NOT WRAP WITH IT. Three small-caps links fit a 400px pane on
-   one line and there is nothing to gain by letting them take two — a head whose
-   height depends on the pane is a page that reflows as you drag a split. */
-@container (max-width: 460px) {
-  .ca-jtc-title-text,
-  .ca-jtc-title-input {
-    font-size: 1.7em;
-  }
 }
 
 /* ── `level-cards`: a container and what is inside it, as a pair (4.36) ──

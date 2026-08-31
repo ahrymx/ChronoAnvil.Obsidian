@@ -42,6 +42,7 @@ import {
   rollingMean,
   rollingWindowFor,
   bucketByMonth,
+  HEAT_TRANSPOSE_DAYS,
   scopesFor,
   streakStats,
   summarize,
@@ -822,15 +823,76 @@ function renderStreak(args: RenderArgs, points: ChartPoint[]): ChartTeardown {
 }
 
 // ── calendar heatmap (DOM) ────────────────────────────────────────────────
-// A compact calendar: seven weekday columns, one row per week, each day shaded
-// by value across the tracker's range. The week starts on the locale's first day
-// (shared with the diary calendar via weekStartDay). Unlike Tracker's single
-// navigable month this honours the selected range directly — a week, 30 days, a
-// quarter, a year, or the exact dashboard period. Cells are intrinsically sized
-// squares (their width comes from the column, height from aspect-ratio), so the
-// grid never depends on the tile's computed height — which is what made the old
-// height-driven strip render blank until a full reload when the range changed.
+// Each day shaded by value across the tracker's range. The week starts on the
+// locale's first day (shared with the diary calendar via weekStartDay). Unlike
+// Tracker's single navigable month this honours the selected range directly —
+// a week, 30 days, a quarter, a year, or the exact dashboard period.
+//
+// TWO ORIENTATIONS, AND THE PERIOD PICKS. Under a quarter the days lay out as
+// a CALENDAR: seven weekday columns, one row per week, the shape a month is
+// read in. From a quarter up they lay out as a STRIP, transposed so weeks run
+// left to right beneath seven fixed weekday rows. HEAT_TRANSPOSE_DAYS (in
+// charts.ts, so the tile-size rule reads the same number) is the crossover, and
+// the argument for it is written there.
+//
+// WHAT THIS FUNCTION OWES THE STYLESHEET IS TWO COUNTS. The cell size is solved
+// in CSS against the tile with container units (20-charts.css carries the whole
+// argument), and that solution needs to know how many columns and how many rows
+// it is fitting. Both are properties of the resolved window rather than of the
+// design, so they are set here and nowhere else — a template reading a stale
+// count draws its labels over the wrong weeks, which is exactly how the strip's
+// month row came to sit a column off.
 const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"]; // Sun..Sat
+// The rows the strip's left rail names: Monday, Wednesday, Friday. Every other
+// row, and never two rows that share an initial — which is what picking them by
+// row index instead of by weekday produced on a Monday-start locale.
+const STRIP_RAIL_DAYS = new Set([1, 3, 5]);
+
+function enableHorizontalDragScroll(el: HTMLElement): () => boolean {
+  let isDown = false;
+  let startX = 0;
+  let scrollStart = 0;
+  let hasMoved = false;
+
+  el.addClass("has-drag-scroll");
+
+  el.addEventListener("pointerdown", (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    isDown = true;
+    hasMoved = false;
+    startX = e.clientX;
+    scrollStart = el.scrollLeft;
+    el.setPointerCapture(e.pointerId);
+  });
+
+  el.addEventListener("pointermove", (e: PointerEvent) => {
+    if (!isDown) return;
+    const dx = e.clientX - startX;
+    if (Math.abs(dx) > 3) {
+      hasMoved = true;
+      el.addClass("is-dragging");
+    }
+    el.scrollLeft = scrollStart - dx;
+  });
+
+  const endDrag = (e: PointerEvent) => {
+    if (!isDown) return;
+    isDown = false;
+    el.removeClass("is-dragging");
+    try {
+      if (el.hasPointerCapture(e.pointerId)) {
+        el.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // Pointer capture might have already been released by browser
+    }
+  };
+
+  el.addEventListener("pointerup", endDrag);
+  el.addEventListener("pointercancel", endDrag);
+
+  return () => hasMoved;
+}
 
 function renderHeatmap(
   args: RenderArgs,
@@ -874,47 +936,162 @@ function renderHeatmap(
   const totalDays = endM.diff(gridStart, "days");
 
   body.addClass("ca-chart-heatmap-body");
-  const wrap = body.createDiv({ cls: "ca-journal-chart-heatmap-wrap" });
+  const isStrip = totalDays >= HEAT_TRANSPOSE_DAYS;
 
-  // Weekday header (single letters), rotated to the week-start and aligned to
-  // the same 7 columns.
-  const head = wrap.createDiv({ cls: "ca-heat-weekdays" });
-  for (let k = 0; k < 7; k++) {
-    head.createDiv({ cls: "ca-heat-weekday", text: WEEKDAY_INITIALS[(ws + k) % 7] });
-  }
+  if (isStrip) {
+    body.addClass("is-strip");
+    const wasDragged = enableHorizontalDragScroll(body);
+    const wrap = body.createDiv({ cls: "ca-journal-chart-heatmap-wrap is-strip" });
+    const totalWeeks = Math.ceil((totalDays + 1) / 7);
+    // ON THE WRAP, not on the grid. The month-label row and the day-label
+    // column are the grid's SIBLINGS, so a property set on the grid is not in
+    // their inheritance chain: they fell back to the token's placeholder 53 and
+    // laid out 53 tracks under a 61-week year.
+    wrap.style.setProperty("--ca-heat-strip-cols", String(totalWeeks));
 
-  const grid = wrap.createDiv({ cls: "ca-journal-chart-heatmap" });
+    // Month labels, one grid column per week, across the strip's own count.
+    const monthsRow = wrap.createDiv({ cls: "ca-heat-months" });
+    monthsRow.createDiv({ cls: "ca-heat-month-spacer" });
 
-  for (let i = 0; i <= totalDays; i++) {
-    const d = gridStart.clone().add(i, "days");
-    const iso = d.format("YYYY-MM-DD");
-    const cell = grid.createDiv({ cls: "ca-journal-chart-heat-cell" });
-    cell.style.gridColumn = String(daysSinceWeekStart(d.day(), ws) + 1);
-    cell.style.gridRow = String(Math.floor(i / 7) + 1);
-
-    const inRange = iso >= start && iso <= end;
-    if (!inRange) {
-      cell.addClass("is-out");
-      continue;
+    let lastMonth = -1;
+    let lastMonthWeek = -10;
+    for (let w = 0; w < totalWeeks; w++) {
+      const d = gridStart.clone().add(w * 7, "days");
+      if (d.month() !== lastMonth) {
+        lastMonth = d.month();
+        if (w - lastMonthWeek >= 3) {
+          lastMonthWeek = w;
+          const lbl = monthsRow.createDiv({ cls: "ca-heat-month", text: d.format("MMM") });
+          lbl.style.gridColumn = String(w + 2);
+        }
+      }
     }
-    const value = byDate.get(iso);
-    if (value == null) cell.addClass("is-empty");
-    else {
-      cell.addClass(`ca-heat-${moodBucket(value, { min: lo, max: hi }) ?? 1}`);
+
+    // Body row: the weekday rail on the left + the transposed grid.
+    //
+    // EVERY OTHER ROW IS LABELLED, and WHICH rows is decided by the weekday
+    // rather than by the row index. Labelling rows 1, 3 and 5 is the same thing
+    // only while the week starts on Sunday: on a Monday-start locale it picks
+    // Tuesday, Thursday and Saturday, and a rail reading "T / T / S" looks like
+    // a bug in the initials rather than like every-other-day.
+    const bodyRow = wrap.createDiv({ cls: "ca-heat-strip-row" });
+    const dayLabels = bodyRow.createDiv({ cls: "ca-heat-strip-days" });
+    for (let k = 0; k < 7; k++) {
+      const weekday = (ws + k) % 7;
+      const txt = STRIP_RAIL_DAYS.has(weekday) ? WEEKDAY_INITIALS[weekday] : "";
+      dayLabels.createDiv({ cls: "ca-heat-strip-day", text: txt });
     }
 
-    // Link the cell to its daily note when one exists — filled days always have
-    // one; an empty-but-present day (note written, this tracker left blank) is
-    // still openable. Days with no note aren't clickable.
-    const label = value == null ? iso : `${iso}: ${display(value)}`;
-    const file = getFile(app, `${dailyDir}/Day-${iso}.md`);
-    if (file) {
-      cell.addClass("is-link");
-      cell.setAttribute("role", "link");
-      cell.addEventListener("click", () => void openFile(app, file));
+    const grid = bodyRow.createDiv({ cls: "ca-journal-chart-heatmap is-strip" });
+
+    let newest: HTMLElement | null = null;
+    for (let i = 0; i <= totalDays; i++) {
+      const d = gridStart.clone().add(i, "days");
+      const iso = d.format("YYYY-MM-DD");
+      const cell = grid.createDiv({ cls: "ca-journal-chart-heat-cell" });
+      const col = Math.floor(i / 7) + 1;
+      const row = daysSinceWeekStart(d.day(), ws) + 1;
+      cell.style.gridColumn = String(col);
+      cell.style.gridRow = String(row);
+
+      const inRange = iso >= start && iso <= end;
+      if (!inRange) {
+        cell.addClass("is-out");
+        continue;
+      }
+      const value = byDate.get(iso);
+      if (value == null) cell.addClass("is-empty");
+      else {
+        cell.addClass(`ca-heat-${moodBucket(value, { min: lo, max: hi }) ?? 1}`);
+      }
+
+      const label = value == null ? iso : `${iso}: ${display(value)}`;
+      const file = getFile(app, `${dailyDir}/Day-${iso}.md`);
+      if (file) {
+        cell.addClass("is-link");
+        cell.setAttribute("role", "link");
+        cell.addEventListener("click", () => {
+          if (wasDragged()) return;
+          void openFile(app, file);
+        });
+      }
+      cell.setAttribute("aria-label", label);
+      cell.setAttribute("title", label);
+      if (value != null) newest = cell;
     }
-    cell.setAttribute("aria-label", label);
-    cell.setAttribute("title", label);
+
+    // WHERE THE STRIP OPENS. A year is wider than its tile by design, so the
+    // scroll position is the first thing the reader sees and it should be the
+    // part with something in it. Two things were wrong with scrolling to
+    // `scrollWidth`: a window that runs to the end of the calendar year opens
+    // on empty autumn cells, and the measurement itself was taken too early —
+    // the cell size is solved by a container query, so at `setTimeout(0)` the
+    // grid can still be at its pre-layout width and the scroll is a no-op.
+    //
+    // So: the last day that HAS a value, right-aligned, measured in a frame
+    // that has been laid out. Two frames deep because the first is where the
+    // container query resolves.
+    const anchor = newest;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (!body.isConnected) return;
+        const right = anchor
+          ? anchor.offsetLeft + anchor.offsetWidth
+          : body.scrollWidth;
+        body.scrollLeft = Math.max(0, right - body.clientWidth);
+      })
+    );
+  } else {
+    // Under a quarter: the seven-column calendar
+    const wrap = body.createDiv({ cls: "ca-journal-chart-heatmap-wrap" });
+    const totalRows = Math.ceil((totalDays + 1) / 7);
+    wrap.style.setProperty("--ca-heat-rows", String(totalRows));
+
+    // Weekday header: 7 initials (Sun..Sat or Mon..Sun based on week start)
+    const head = wrap.createDiv({ cls: "ca-heat-weekdays" });
+    for (let k = 0; k < 7; k++) {
+      head.createDiv({ cls: "ca-heat-weekday", text: WEEKDAY_INITIALS[(ws + k) % 7] });
+    }
+
+    const grid = wrap.createDiv({ cls: "ca-journal-chart-heatmap" });
+
+    for (let i = 0; i <= totalDays; i++) {
+      const d = gridStart.clone().add(i, "days");
+      const iso = d.format("YYYY-MM-DD");
+      const cell = grid.createDiv({ cls: "ca-journal-chart-heat-cell" });
+
+      const inRange = iso >= start && iso <= end;
+      if (!inRange) {
+        cell.addClass("is-out");
+        continue;
+      }
+      const value = byDate.get(iso);
+      if (value == null) cell.addClass("is-empty");
+      else {
+        cell.addClass(`ca-heat-${moodBucket(value, { min: lo, max: hi }) ?? 1}`);
+      }
+
+      const label = value == null ? iso : `${iso}: ${display(value)}`;
+      const file = getFile(app, `${dailyDir}/Day-${iso}.md`);
+      if (file) {
+        cell.addClass("is-link");
+        cell.setAttribute("role", "link");
+        cell.addEventListener("click", () => void openFile(app, file));
+      }
+      cell.setAttribute("aria-label", label);
+      cell.setAttribute("title", label);
+    }
+
+    // Complete the last week, so the grid is a rectangle and the row count
+    // above is the row count drawn. SEVEN, not fourteen: the pad was written
+    // for a 14-column variant that `--ca-heat-cols` never had a rule to select,
+    // so it was adding a whole invisible row to half the windows it ran on.
+    const remainder = (totalDays + 1) % 7;
+    if (remainder !== 0) {
+      for (let pad = 0; pad < 7 - remainder; pad++) {
+        grid.createDiv({ cls: "ca-journal-chart-heat-cell is-out" });
+      }
+    }
   }
   return null;
 }

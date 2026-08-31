@@ -83,7 +83,6 @@
 
 import type { TFile } from "obsidian";
 import type { IconName } from "obsidian";
-import { Notice } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
 import { openCapture } from "../diary/capture";
 import { openEventEditor, draftEvent } from "../events/event-ui";
@@ -93,7 +92,7 @@ import { registeredJournalTypes } from "../journals/journal";
 import { journalTypeOfPath } from "../trackers/trackers";
 import { hasTabbedGroup, stepFocusedGroup } from "../ui/widgets/group-tabs";
 import { notify } from "./notify";
-import { openFile } from "./util";
+import { activeMarkdownFile as resolveActiveMarkdownFile, openFile } from "./util";
 import { runVaultExport } from "./vault-export-manager";
 
 export type ActionGroup = "diary" | "journals" | "notes" | "maintenance";
@@ -187,7 +186,7 @@ export function menuTitle(name: string): string {
 // may read — and, since 4.27, what the capture command hands the destination
 // list as the note it was pressed on.
 function activeMarkdownFile(p: ChronoAnvilPlugin): TFile | null {
-  const file = p.app.workspace.getActiveFile();
+  const file = resolveActiveMarkdownFile(p.app);
   if (!file || file.extension !== "md") return null;
   return file;
 }
@@ -535,9 +534,3 @@ export const ACTIONS: Action[] = [
     run: (p) => void p.scaffold.configureGraphGroups(),
   },
 ];
-
-// `Notice` is imported for the one caller below rather than left to main.ts, so
-// a `when` that ever needs to explain itself has somewhere to do it.
-export function noteRequiredNotice(): void {
-  new Notice("Open a note first.");
-}

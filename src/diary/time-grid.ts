@@ -516,3 +516,29 @@ export function describeWhen(item: GridItem): string {
   if (item.mins == null) return formatClock(item.start);
   return `${formatClock(item.start)}–${formatClock(itemEnd(item))}`;
 }
+
+// The key one time-grid's filter toggle state is stored under in settings.
+export function timeGridFilterKey(sourcePath: string, rest?: string): string {
+  const norm = (rest ?? "").trim();
+  return norm ? `${sourcePath}::time-grid:${norm}` : `${sourcePath}::time-grid`;
+}
+
+// Compute the active `off` set from stored disabled sources and available sources.
+export function resolveOffSources(
+  savedOff: readonly string[] | undefined,
+  available: readonly GridSource[]
+): Set<GridSource> {
+  const off = new Set<GridSource>();
+  if (Array.isArray(savedOff)) {
+    for (const s of savedOff) {
+      if (available.includes(s as GridSource)) {
+        off.add(s as GridSource);
+      }
+    }
+    // If all available sources are off, reset to none off
+    if (off.size >= available.length) {
+      off.clear();
+    }
+  }
+  return off;
+}

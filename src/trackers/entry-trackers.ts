@@ -62,7 +62,7 @@ import {
   registeredJournalTypes,
 } from "../journals/journal";
 import type { JournalType } from "../journals/journal";
-import { filesUnder, frontmatterOf, getFile, normaliseTypeValue } from "../core/util";
+import { filesUnder, frontmatterOf, getFile, normaliseTypeValue, noteTypeOf } from "../core/util";
 import { entriesOfGrain } from "../diary/lineage";
 import type { DiaryPaths } from "../diary/lineage";
 
@@ -610,7 +610,7 @@ export function noteKindOf(
   if (!(file instanceof TFile)) return null;
   const type = journalTypeOfNote(plugin, notePath);
   if (!type) return null;
-  const raw = app.metadataCache.getFileCache(file)?.frontmatter?.["type"];
+  const raw = noteTypeOf(app, file);
   // Normalised, like every other reader of this property. Passing the raw
   // string through meant `type: Lesson` resolved the journal type (which does
   // normalise) but not the kind, so kindAllowsTracker found nothing, fell

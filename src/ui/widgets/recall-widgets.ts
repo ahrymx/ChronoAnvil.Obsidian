@@ -21,10 +21,11 @@
 // claim.
 
 import { MarkdownPostProcessorContext, TFile, Notice, setIcon } from "obsidian";
-import { getFile, today as todayIso } from "../../core/util";
+import { frontmatterOf, getFile, noteTypeOf, today as todayIso } from "../../core/util";
 import { isValidNoteKey, readNoteRegion } from "../../core/notestore";
 import { pageTypeIds, registeredJournalTypes } from "../../journals/journal";
 import { ratingPropertyOf, reviewProperties } from "../../review/review-queue";
+import { noteFoldState, setNoteFold } from "./note-field";
 import {
   RecallGrade,
   RecallPair,
@@ -46,9 +47,12 @@ export async function writeRecallGrade(
   confidence: number
 ): Promise<void> {
   const props = reviewProperties(deps.plugin);
-  const fmType = deps.app.metadataCache.getFileCache(file)?.frontmatter?.[
-    "type"
-  ];
+  // `|| null` KEEPS THE ABSENT CASE ABSENT. `noteTypeOf` answers "" for a note
+  // with no `type:`, and `ratingPropertyOf` distinguishes a string from a null
+  // — an empty string would be a kind id nothing matches rather than the
+  // question not being asked. What the helper adds here is normalisation:
+  // `type: Lesson` used to reach `ratingTrackerFor` unchanged and match no kind.
+  const fmType = noteTypeOf(deps.app, file) || null;
   const rating = ratingPropertyOf(
     deps.plugin,
     file.path,
@@ -71,7 +75,7 @@ export function recallTarget(
   if (!host) return { reason: "This block isn't in a note yet." };
 
   const fmOf = (f: TFile): Record<string, unknown> =>
-    deps.app.metadataCache.getFileCache(f)?.frontmatter ?? {};
+    frontmatterOf(deps.app, f);
   const typeOf = (f: TFile): string => {
     const t = fmOf(f)["type"];
     return typeof t === "string" ? t : "";
@@ -111,11 +115,47 @@ export function buildRecall(
   label: string | null
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
-  const wrap = createDiv({ cls: "ca-journal-recall" });
+  const wrap = createDiv({
+    cls: "ca-journal-recall ca-journal-note--collapsible",
+  });
 
-  const head = wrap.createDiv({ cls: "ca-journal-recall-head" });
-  if (label) head.createDiv({ cls: "ca-journal-recall-label", text: label });
+  const isCollapsed = (): boolean =>
+    "plugin" in deps
+      ? noteFoldState(deps.plugin, ctx.sourcePath, key)
+      : false;
+
+  const setFold = (collapsed: boolean): void => {
+    if ("plugin" in deps) {
+      void setNoteFold(deps.plugin, ctx.sourcePath, key, collapsed);
+    }
+  };
+
+  const head = wrap.createDiv({
+    cls: "ca-journal-recall-head ca-journal-note-collapse-bar",
+  });
+  const titleLeft = head.createDiv({ cls: "ca-journal-recall-title-left" });
+  const chevron = titleLeft.createDiv({
+    cls: "ca-journal-note-chevron ca-journal-recall-chevron",
+  });
+  setIcon(chevron, "chevron-down");
+  const titleEl = titleLeft.createDiv({
+    cls: "ca-journal-note-label ca-journal-recall-label",
+  });
+  titleEl.setText(label ?? "Recall");
+
   const tools = head.createDiv({ cls: "ca-jrc-tools" });
+
+  const applyFold = (collapsed: boolean): void => {
+    wrap.toggleClass("is-collapsed", collapsed);
+  };
+  applyFold(isCollapsed());
+
+  head.addEventListener("click", (e) => {
+    e.preventDefault();
+    const next = !wrap.hasClass("is-collapsed");
+    applyFold(next);
+    setFold(next);
+  });
 
   if (!isValidNoteKey(key)) {
     wrap.createDiv({
@@ -337,7 +377,9 @@ export function buildRecall(
       },
     });
     setIcon(edit, editing ? "check" : "pencil");
-    edit.addEventListener("click", () => {
+    edit.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
       editing = !editing;
       render();
     });
@@ -352,7 +394,9 @@ export function buildRecall(
       },
     });
     setIcon(again, "rotate-ccw");
-    again.addEventListener("click", () => {
+    again.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
       // In-memory only. The Confidence already written stands: it was a real
       // reading of a real sitting, and un-writing it on a second run would
       // make the trend a record of your last attempt rather than your last

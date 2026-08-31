@@ -52,7 +52,9 @@ import {
   parseSources,
   placeInWindow,
   resizedTo,
+  resolveOffSources,
   spanFromDrag,
+  timeGridFilterKey,
   visibleDays,
   weekDates,
 } from "../src/diary/time-grid";
@@ -603,5 +605,34 @@ describe("mobile controls and horizontal scrolling", () => {
     expect(src).toContain("TOUCH_LONG_PRESS_MS");
     expect(src).toContain("TOUCH_SLOP_PX");
     expect(src).toContain("evt.pointerType === \"touch\"");
+  });
+});
+
+describe("filter toggles state persistence", () => {
+  it("formats filter keys consistently", () => {
+    expect(timeGridFilterKey("02 - Diary/Home.md")).toBe("02 - Diary/Home.md::time-grid");
+    expect(timeGridFilterKey("02 - Diary/Home.md", "")).toBe("02 - Diary/Home.md::time-grid");
+    expect(timeGridFilterKey("02 - Diary/Home.md", "events,tasks|5")).toBe(
+      "02 - Diary/Home.md::time-grid:events,tasks|5"
+    );
+  });
+
+  it("resolves saved off sources against available sources", () => {
+    const available = ["events", "logbooks", "tasks"] as const;
+    expect(resolveOffSources(undefined, available)).toEqual(new Set());
+    expect(resolveOffSources(["tasks"], available)).toEqual(new Set(["tasks"]));
+    expect(resolveOffSources(["tasks", "captures"], available)).toEqual(new Set(["tasks"]));
+  });
+
+  it("resets to empty set if all available sources were saved as off", () => {
+    const available = ["events", "tasks"] as const;
+    expect(resolveOffSources(["events", "tasks"], available)).toEqual(new Set());
+  });
+
+  it("wires time-grid view to load and save filter toggles", () => {
+    const src = readSrc("time-grid-view");
+    expect(src).toContain("loadTimeGridFilters");
+    expect(src).toContain("saveTimeGridFilters");
+    expect(src).toContain("plugin.settings.timeGridFilters");
   });
 });

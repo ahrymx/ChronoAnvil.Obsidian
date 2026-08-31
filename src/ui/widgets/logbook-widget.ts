@@ -40,7 +40,7 @@ import type { PluginNoteRegionHost } from "./note-regions";
 import { LOGBOOK_NOTE_KEY, type LogbookDef } from "../../core/constants";
 import { findLogbook } from "../../diary/logbooks";
 import { composeLogbookNote } from "../../diary/logbook-sections";
-import { buildLogList, LogListWatcher, type LogTypeOption } from "./log-list";
+import { buildLogList, type LogTypeOption } from "./log-list";
 import { moment, today } from "../../core/util";
 import { readEvents } from "../../events/eventstore";
 import {
@@ -221,18 +221,8 @@ export function buildAllLogbooks(
       }
     },
     itemsProvider: loadAllItems,
+    watchPaths: logbooks.map((b) => b.path),
   });
-
-  ctx.addChild(
-    new LogListWatcher(
-      app,
-      wrap,
-      logbooks.map((b) => b.path),
-      () => {
-        void loadAllItems().then(() => {});
-      }
-    )
-  );
 
   return wrap;
 }
@@ -268,6 +258,7 @@ function buildRegionLogbook(
   return buildLogList(host, {
     key: LOGBOOK_NOTE_KEY,
     file: existing instanceof TFile ? existing : null,
+    watchPath: def.path,
     modifier: "journal-note--logbook",
     // NO FOLD BAR OF ITS OWN. A logbook is composed under a `header:` bar on
     // its own note and dropped under one anywhere else, and that bar already

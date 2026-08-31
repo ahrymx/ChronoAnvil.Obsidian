@@ -142,7 +142,6 @@ import {
   composeFlatNote,
   flatNoteModel,
   bannerSection,
-  PAGE_TITLE_IDS,
 } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
@@ -205,7 +204,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
     // NO `links:` ROW, matching the journals dashboard. The contents grid below
     // is entirely destinations and the crumb trail on every note in this journal
     // now ends here, so a navigation row would be the second answer on one page.
-    bannerSection({ ids: PAGE_TITLE_IDS }),
+    bannerSection(),
 
     {
       id: "activity",

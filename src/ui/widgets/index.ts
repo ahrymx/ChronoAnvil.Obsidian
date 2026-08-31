@@ -9,6 +9,7 @@ import {
   App,
   MarkdownPostProcessorContext,
   TFile,
+  setIcon,
 } from "obsidian";
 import type ChronoAnvilPlugin from "../../main";
 import { buildYearSummary } from "../../review/year-view";
@@ -19,7 +20,6 @@ import { keywordOf } from "../../core/layout";
 import {
   buildDiarySearch,
 } from "../../diary/diary-retrieval";
-import { buildJournalContext } from "../../journals/study-header";
 // The one copy of what each superseded band spelling means. See the two arms
 // in `buildFromSpec` that read it.
 import { STATS_BAND_ALIASES } from "../../journals/stats-band";
@@ -27,9 +27,7 @@ import {
   buildMonthSummary,
   buildWeekSummary,
 } from "../../diary/calendar";
-import {
-  parseHeaderDirective,
-} from "../../core/util";
+import { frontmatterOf, parseHeaderDirective } from "../../core/util";
 import { HeaderBar } from "../headerbar";
 import { buildScopeCycle } from "../tables";
 import { HeaderSite, attachHeaderRename, boundsOf } from "../header-title";
@@ -330,10 +328,12 @@ export interface BlockComposites {
   // A page banner: the fence holds this page's own name (4.19).
   //
   // THE FOURTH OF A FAMILY, and the reason it had to join it is the reason the
-  // other three exist. `title` draws `.ca-jtc-card` — its own border, radius,
-  // background and figure — and `links:` draws `.ca-journal-links-card` with a
-  // border and radius of its own. Welded into one fence by 4.19's banner, and
-  // left alone, they render as TWO cards stacked with no gap: the exact
+  // other three exist. `title` drew `.ca-jtc-card` when this was written — its
+  // own border, radius, background and figure; it draws `livePageHead`'s
+  // `.ca-journal-page-head` now, which paints a bottom rule and no box — and
+  // `links:` draws `.ca-journal-links-card` with a border and radius of its own.
+  // Welded into one fence by 4.19's banner, and left alone, they render as TWO
+  // cards stacked with no gap: the exact
   // "resemblance instead of a card" this file's `isEntryBanner` comment
   // describes, arriving on the surface that had avoided it by keeping its two
   // halves in two blocks.
@@ -1397,14 +1397,20 @@ export class Widgets implements
         }
       }
 
-      // AND THE JOURNAL NOTE'S OWN, which says its level and its kind.
-      if (hasTrackerRegion && !isOverviewCard) {
-        const facts = buildJournalContext(this.plugin, ctx);
-        // Under the head, for the reason one block up.
-        if (facts) {
-          if (pageHead) pageHead.insertAdjacentElement("afterend", facts);
-          else container.prepend(facts);
-        }
+      // ── COLLAPSIBLE TRACKER SECTION HEAD ────────────────────────────
+      if (
+        hasTrackerRegion &&
+        !isOverviewCard &&
+        !isManagedTemplate(this.plugin, ctx.sourcePath)
+      ) {
+        container.addClass("ca-journal-note--collapsible");
+        const trackerHead = buildTrackerSectionHead(
+          this.plugin,
+          ctx,
+          container
+        );
+        if (pageHead) pageHead.insertAdjacentElement("afterend", trackerHead);
+        else container.prepend(trackerHead);
       }
 
       // ── THE ROW, LAID OUT AFTER THE LOOP ────────────────────────────
@@ -1502,23 +1508,24 @@ export class Widgets implements
         }
       }
 
-      // ── AND HOW WIDE THE PAGE IS, MARKED ON THE HEAD (4.11) ─────────
+      // ── AND THE MARK THAT WENT WITH THE OLD HEAD (4.11 → 5.2) ───────
       //
-      // THIS MARK NO LONGER SETS THE WIDTH (4.45.1). It used to: the stylesheet
-      // reached up from the card with `:has()`, because a post-processor cannot
-      // touch the sizer the width lives on. What that missed is that a reading
-      // view UNLOADS a section once it is far enough from the viewport, and this
-      // card is the first block on the page — so a dashboard long enough to
-      // scroll lost its width at the bottom of the scroll. `ui/page-width.ts`
-      // derives it from the file now and marks the view.
+      // `if (wideSpec.wide) container.querySelector(".ca-jtc-card")…` stood here
+      // and is deleted. It stopped setting the width in 4.45.1 — a reading view
+      // unloads the first block of a long dashboard, so a `:has()` reaching up
+      // from the card lost the page its width at the bottom of a scroll, and
+      // `ui/page-width.ts` derives it from the FILE now and marks the view. What
+      // kept the line alive after that was the cog's *Wide page* checkbox, which
+      // read the class back off the card it was drawn on.
       //
-      // THE MARK STAYS, because the cog's *Wide page* item reads it for its
-      // checked state — see `WIDE_CLASS` in page-title.ts. It is a fact about
-      // the card that was drawn, which is the question the menu is asking, and
-      // it is one read rather than a second trip to the file.
-      if (wideSpec.wide) {
-        container.querySelector<HTMLElement>(".ca-jtc-card")?.addClass("ca-jtc-wide");
-      }
+      // Both ends of that are gone: `.ca-jtc-card` is `buildPageTitle`'s and
+      // nothing has drawn it since 4.10, so this query has returned null on
+      // every render for a year. The vault banner's cog asks its own marker
+      // (`WIDE_PAGE_CLASS`, on the view) through the callback `sectionsMenuFor`
+      // takes for exactly this reason.
+      //
+      // `wideSpec` IS STILL READ — it reports a malformed `wide` line above, and
+      // `pageIsWide` answers the same question from the file for the width itself.
 
       if (frameSpec.frame === "section") {
         if (!hasTitledBar(lines)) {
@@ -1827,7 +1834,7 @@ export class Widgets implements
   ): unknown {
     const file = this.fileOf(ctx);
     if (!file) return undefined;
-    return this.app.metadataCache.getFileCache(file)?.frontmatter?.[prop];
+    return frontmatterOf(this.app, file)[prop];
   }
 
   async write(
@@ -2742,4 +2749,44 @@ export class Widgets implements
   // for a subject exactly as before.
 
 
+}
+
+function buildTrackerSectionHead(
+  plugin: ChronoAnvilPlugin,
+  ctx: MarkdownPostProcessorContext,
+  container: HTMLElement
+): HTMLElement {
+  const isCollapsed = (): boolean =>
+    noteFoldState(plugin, ctx.sourcePath, "trackers");
+
+  const setFold = (collapsed: boolean): void => {
+    void setNoteFold(plugin, ctx.sourcePath, "trackers", collapsed);
+  };
+
+  const head = createDiv({
+    cls: "ca-journal-tracker-head ca-journal-note-collapse-bar",
+  });
+  const titleLeft = head.createDiv({ cls: "ca-journal-tracker-title-left" });
+  const chevron = titleLeft.createDiv({
+    cls: "ca-journal-note-chevron ca-journal-tracker-chevron",
+  });
+  setIcon(chevron, "chevron-down");
+  const titleEl = titleLeft.createDiv({
+    cls: "ca-journal-note-label ca-journal-tracker-label",
+  });
+  titleEl.setText("Trackers");
+
+  const applyFold = (collapsed: boolean): void => {
+    container.toggleClass("is-collapsed", collapsed);
+  };
+  applyFold(isCollapsed());
+
+  head.addEventListener("click", (e) => {
+    e.preventDefault();
+    const next = !container.hasClass("is-collapsed");
+    applyFold(next);
+    setFold(next);
+  });
+
+  return head;
 }

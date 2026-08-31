@@ -14,7 +14,7 @@ import {
   journalSurface,
   trackersToSeed,
 } from "../trackers/trackers";
-import { childFolders } from "../core/util";
+import { childFolders, noteTypeOf } from "../core/util";
 import {
   JournalManifest,
   decodeJournalManifest,
@@ -210,10 +210,7 @@ export class JournalImporter {
     const prefix = `${rootPath}/`;
     for (const file of this.app.vault.getMarkdownFiles()) {
       if (!normalizePath(file.path).startsWith(prefix)) continue;
-      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
-      if (fm && typeof fm.type === "string" && fm.type.trim() !== "") {
-        return true;
-      }
+      if (noteTypeOf(this.app, file)) return true;
     }
     return false;
   }

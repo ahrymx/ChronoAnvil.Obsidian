@@ -188,6 +188,7 @@ export class JournalTemplates {
     const prev = cfg.layout?.[key];
     const next: TemplateLayout = {
       ...(prev ?? {}),
+      ...(prev?.order ? { order: [...sections] } : {}),
       sections: [...sections],
       ...(Object.keys(options).length
         ? { options: { ...(prev?.options ?? {}), ...options } }

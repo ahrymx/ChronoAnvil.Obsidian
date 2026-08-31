@@ -19,7 +19,7 @@
 // editor, which this catalogue is what makes possible.
 
 import { composeFlatNote, flatNoteModel, graphLinksSection } from "../core/note-sections";
-import { bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
+import { bannerSection } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
 import {
@@ -51,7 +51,7 @@ const directiveRe = (id: string): RegExp =>
 
 export function logbookSections(def: LogbookDef): FlatSection[] {
   return [
-    bannerSection({ ids: PAGE_TITLE_IDS }),
+    bannerSection(),
     {
       id: LOGBOOK_KEYWORD,
       label: def.name,
@@ -147,7 +147,7 @@ export function logbooksFolderSections(
   books: readonly LogbookDef[]
 ): FlatSection[] {
   return [
-    bannerSection({ ids: PAGE_TITLE_IDS }),
+    bannerSection(),
     ...books.map((def) => ({
       id: `${LOGBOOK_KEYWORD}-${def.id}`,
       label: def.name,

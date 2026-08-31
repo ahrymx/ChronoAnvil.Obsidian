@@ -292,11 +292,20 @@ export function plainSections(text: string, model: SectionModel): PlainSection[]
 // left of one here is a duplicate; the spacer is an inert strip that exists to
 // give the cursor somewhere to land.
 function stripPluginMarkup(raw: string): string {
-  return raw
-    .replace(/<!--chronoanvil:[\s\S]*?-->/g, "")
-    .split("\n")
-    .filter((l) => l.trim() !== "`chronoanvil:spacer`")
-    .join("\n");
+  return (
+    raw
+      .replace(/<!--chronoanvil:[\s\S]*?-->/g, "")
+      // THE PROSE SKELETON'S BRACKET, WHOSE CONTENTS ARE KEPT (5.6). The region
+      // form above swallows what is between its markers because that content is
+      // a field's value and the field is going; a bracket's markers are around
+      // the reader's own document and only the markers go. Two lines, not a
+      // span, and that difference is the whole reason the two are told apart by
+      // a `-` where a region has a `:`.
+      .replace(/<!--\/?chronoanvil-[A-Za-z0-9_-]+-->/g, "")
+      .split("\n")
+      .filter((l) => l.trim() !== "`chronoanvil:spacer`")
+      .join("\n")
+  );
 }
 
 // WHERE THIS TEXT IS GOING, which is the only thing that decides what happens
@@ -401,9 +410,10 @@ export function toPlainMarkdown(
     }
 
     // A reader's own prose, their `##` headings, and the prose skeleton — which
-    // emits no directive at all and whose own comment says the plugin cannot
-    // tell its headings from writing someone did themselves. Both arrive here
-    // and both are theirs.
+    // emits no directive at all, and whose headings are `## ` markdown that
+    // reads the same with the plugin gone. Both arrive here and both are
+    // theirs; the skeleton's two markers are markup and `stripPluginMarkup`
+    // takes them, leaving the headings between them exactly as they were.
     const raw = stripPluginMarkup(seg.lines.join("\n")).trim();
     // A run that is nothing but the band rule is ChronoAnvil's own separator
     // between an entry's structural fences and its fields. Judged by what the

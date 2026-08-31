@@ -40,8 +40,10 @@ import type { ReloadLoss } from "../core/reload-loss";
 import { looseLines } from "../core/reload-loss";
 import {
   JOURNAL_SECTIONS,
+  headingTitlesIn,
   sectionOverrides,
   sectionsFor,
+  skeletonTitles,
 } from "./journal-sections";
 import type { SectionContext, SectionOverrides } from "./journal-sections";
 import { composedFromPresent, sectionsPresent } from "./journal-plan";
@@ -201,15 +203,32 @@ export function wantFromJournalNote(
   return { sections, options, drops };
 }
 
-// The `## ` titles this note carries, in page order.
+// The `## ` titles this note's skeleton carries, in page order.
 //
 // OFF `looseLines`, so a heading inside a fence or inside a region is not one —
 // the same walk the prose check uses, which is what keeps "what the page says"
 // and "what a rewrite would destroy" reading the same page.
+//
+// ── SCOPED TO THE BRACKET WHERE THERE IS ONE (5.6) ──────────────────────
+//
+// This is the other half of what the markers bought, and it is the authoring
+// half rather than the removal one. "Save as layout…" turns the headings on
+// this page into the headings every note of this kind opens with — so a reader
+// who added `## Scratch` at the bottom of one Lesson, below everything the
+// template wrote, used to have Scratch baked into every Lesson they would ever
+// make. Nothing was wrong with the read; there was simply nothing on the page
+// that said where the skeleton stopped.
+//
+// Now there is, and the answer is the span rather than the file. A heading
+// inside the bracket is the shape of the document; one outside it is something
+// that happened in this note.
+//
+// THE WHOLE NOTE IS STILL THE ANSWER FOR A NOTE WITH NO BRACKET, which is every
+// note written before 5.6 — the same fallback the removal path takes, for the
+// same reason: an unmarked skeleton is a page the plugin can read and cannot
+// delimit, and reading it as it always did is better than reading nothing.
 function headingsOf(text: string): string[] {
-  return looseLines(text)
-    .filter((l) => /^##\s+\S/.test(l))
-    .map((l) => l.replace(/^##\s+/, "").trim());
+  return skeletonTitles(text) ?? headingTitlesIn(looseLines(text));
 }
 
 // A retitled header bar, or null when this section has none or never had one

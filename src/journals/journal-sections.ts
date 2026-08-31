@@ -21,6 +21,7 @@ import { plural } from "../core/util";
 import type { SectionQuestion } from "../core/section-model";
 import { SCOPE_ALL, SCOPE_JOURNAL } from "../core/directive-grammar";
 import { rowRuns } from "../core/note-sections";
+import { looseLines } from "../core/reload-loss";
 import {
   STATS_BAND_WORDS,
   STAT_PRESET_SHORTHAND,
@@ -456,8 +457,11 @@ export type SectionBlock =
       key: string;
     }
   | {
-      // Ordinary markdown: the banner's spacer, a prose skeleton's headings.
-      // Unprovable by construction, and never deleted or moved on that basis.
+      // ORDINARY MARKDOWN THE PLUGIN CANNOT PROVE IT WROTE — the banner's
+      // spacer, and nothing else since 5.6. Unprovable by construction, and
+      // never deleted or moved on that basis. See `sectionRemovable`: this is
+      // the one block kind that makes a section unremovable, and that is the
+      // whole of what it means.
       kind: "markdown";
       lines: string[];
       // Abut the following block with a single newline instead of a blank
@@ -466,6 +470,62 @@ export type SectionBlock =
       // fence it exists to stop the reader clicking into. Serialisation only;
       // it says nothing about extent.
       tight?: boolean;
+    }
+  | {
+      // VISIBLE MARKDOWN BETWEEN TWO INVISIBLE MARKERS — the prose skeleton,
+      // and today only that. 5.6.
+      //
+      // NAMED FOR THE MECHANISM RATHER THAN THE CONTENT, because `prose` is
+      // already a section id on this same catalogue (the Notes field) and a
+      // comment about "the prose block" would have two referents.
+      //
+      // WHY THIS IS NOT `markdown`, AND WHY IT IS NOT A `region` EITHER.
+      //
+      // `markdown` is unprovable, so a section emitting it can never be taken
+      // out again: `sectionRemovable` refuses, and the reader is told to delete
+      // their own headings by hand. That was the right answer for as long as
+      // the plugin genuinely could not tell its `## Notes` from theirs. It is
+      // not a law of prose — it is a consequence of writing prose with nothing
+      // around it.
+      //
+      // A `region` would solve identification and lose the point. Its contents
+      // live INSIDE an HTML comment, which is how `note:` fields keep the raw
+      // file readable, and a heading inside a comment is not a heading: it
+      // renders as nothing, folds as nothing, and appears in no outline. The
+      // whole argument for the skeleton being `##` markdown rather than a
+      // `note:` field is that it is the shape of the DOCUMENT and survives the
+      // plugin being uninstalled.
+      //
+      // NOT A CONTRADICTION OF notestore.ts, WHICH SETTLED THE OPPOSITE CASE.
+      // Its own header argues for "one HTML comment rather than two separate
+      // marker comments", and it is right about a `note:` field: that content
+      // must not render, and one comment hides it natively. A skeleton's
+      // content MUST render. Only its edges have to be invisible, and each edge
+      // is itself a whole comment, so both are dropped natively too. Same
+      // mechanism, opposite requirement, opposite answer.
+      //
+      // So the markers go AROUND the prose rather than over it. The headings
+      // are real markdown, in the outline, in the fold gutter, editable in any
+      // editor; the two comment lines are invisible in reading view and in
+      // every renderer that has ever handled HTML comments, and they say
+      // exactly one thing — the catalogue wrote what is between these.
+      //
+      // `chronoanvil-key` RATHER THAN `chronoanvil:key`, WITH A HYPHEN, and it
+      // is not a style choice. The colon form IS the region grammar, and three
+      // separate parsers key off it: `notestore.ts`'s `OPEN_PREFIX`,
+      // `regionsIn` in journal-plan.ts, and `looseLines` in reload-loss.ts.
+      // Each currently declines `<!--chronoanvil:skeleton-->` for its own
+      // incidental reason — a character class that happens to exclude `>`, a
+      // `\s*$` that happens to follow the key — which is three accidents to
+      // stay lucky about forever. A marker with no colon in it cannot be a
+      // region under any of them, and that is a property rather than a
+      // coincidence.
+      kind: "bracketed";
+      // Names the span in the markers. One key today; keyed anyway, because a
+      // second bracketed section would otherwise have to invent the scheme
+      // under deadline.
+      key: string;
+      lines: string[];
     };
 
 // ── rendering helpers ─────────────────────────────────────────────────────
@@ -498,12 +558,147 @@ function markdown(lines: string[], tight = false): SectionBlock {
     : { kind: "markdown", lines };
 }
 
+// The one bracketed span that exists. Named rather than inlined because it is
+// written by the catalogue, read by the planner and asserted by the tests, and
+// a marker whose key is a string literal in three files is a marker that will
+// eventually be four spellings.
+export const SKELETON_KEY = "skeleton";
+
+// A bracketed prose span: visible markdown, invisible edges.
+function bracketed(key: string, lines: string[]): SectionBlock {
+  return { kind: "bracketed", key, lines };
+}
+
+// The two markers, and the one place either is spelled.
+//
+// EXPORTED BECAUSE THE PLANNER HAS TO FIND THEM. A bracketed section is
+// removable exactly because its extent is readable off the file, and the thing
+// that reads it is `bracketSpanIn` below — which lives here, beside the writer,
+// for the reason `renderSection` gives about spacing: two spellings of one
+// marker is a schematic and a file that disagree, and the disagreement is
+// silent until somebody's headings survive a removal.
+export function bracketOpen(key: string): string {
+  return `<!--chronoanvil-${key}-->`;
+}
+export function bracketClose(key: string): string {
+  return `<!--/chronoanvil-${key}-->`;
+}
+
+// Where this key's bracketed span sits in `lines`, or null when the file has
+// none.
+//
+// NULL IS THE ANSWER FOR EVERY NOTE WRITTEN BEFORE 5.6, and callers are
+// expected to treat it as "this skeleton is unmarked prose" rather than as an
+// error. That is the whole of the backwards story: an old note keeps the old
+// refusal, a rebuild from the template writes the markers, and nothing has to
+// migrate a vault.
+//
+// FIRST OPENER, FIRST CLOSER AFTER IT. A second pair would mean a note that had
+// the skeleton added twice, which `locate` already declines to do; taking the
+// first is the conservative half of that, because a span that stops early
+// leaves prose ALONE and a span that runs long would swallow it.
+export function bracketSpanIn(
+  lines: readonly string[],
+  key: string
+): { open: number; close: number } | null {
+  const open = lines.findIndex((l) => l.trim() === bracketOpen(key));
+  if (open === -1) return null;
+  const shut = bracketClose(key);
+  for (let i = open + 1; i < lines.length; i++) {
+    if (lines[i].trim() === shut) return { open, close: i };
+  }
+  return null;
+}
+
+// The `## ` titles inside this note's skeleton, or null when it has no bracket.
+//
+// NULL AND AN EMPTY ARRAY MEAN DIFFERENT THINGS, which is the whole reason this
+// returns one. Null is "this note predates the markers, so nothing can say where
+// its skeleton stops" — the state in which the editor draws no box and the
+// planner refuses a write. An empty array is "the bracket is here and there is
+// nothing in it", which is a note whose skeleton a reader emptied and which
+// Save can perfectly well write into.
+//
+// OFF `looseLines`, so a `## ` inside a fence or inside a region is not one.
+// The same walk the reload check uses, which is what keeps "what the page says"
+// and "what a rewrite would destroy" reading the same page.
+export function skeletonTitles(text: string): string[] | null {
+  const lines = looseLines(text);
+  const span = bracketSpanIn(lines, SKELETON_KEY);
+  if (!span) return null;
+  return headingTitlesIn(lines.slice(span.open + 1, span.close));
+}
+
+// Every `## ` title in these lines, in order.
+export function headingTitlesIn(lines: readonly string[]): string[] {
+  return lines
+    .filter((l) => /^##\s+\S/.test(l.trim()))
+    .map((l) => l.trim().replace(/^##\s+/, "").trim());
+}
+
+// Titles as the skeleton overrides they stand for.
+//
+// TITLES ONLY, AND A DECLARED BODY KEPT WHERE ONE MATCHES. This is the rule
+// `wantFromJournalNote` settled in 4.33 and stated at length: a heading's NAME
+// is structure — it is what the reader arranged — and the prose beneath it is
+// what they wrote in one particular note, so carrying the body would leak a
+// sentence about last Tuesday's lesson into every Lesson made afterwards. The
+// body a TYPE declares is not that; it is prompt text belonging to the shape,
+// and matching it back by title is what stops a preset losing its prompts the
+// first time somebody reorders its headings.
+//
+// HERE RATHER THAN IN journal-template.ts, WHERE IT WAS, because 5.6 gave it a
+// second caller: the answer a reader types into the section editor becomes
+// overrides by exactly this rule, and two spellings of "which body survives a
+// retitle" is how a save and an edit come to disagree about the same page.
+export function headingsFromTitles(
+  titles: readonly string[],
+  declared?: readonly { title: string; body?: string[] }[]
+): { title: string; body?: string[] }[] {
+  const bodies = new Map((declared ?? []).map((h) => [h.title, h.body]));
+  return titles.map((title) => {
+    const body = bodies.get(title);
+    return body ? { title, body: [...body] } : { title };
+  });
+}
+
+// The key of the prose span this section writes, or null for a section that
+// writes none — which is every section but one.
+export function bracketKeyOf(
+  section: JournalSection,
+  ctx: SectionContext,
+  opts?: SectionOverrides
+): string | null {
+  for (const b of section.render(ctx, opts)) {
+    if (b.kind === "bracketed") return b.key;
+  }
+  return null;
+}
+
 // One block as the markdown it is written as.
 export function renderBlock(block: SectionBlock): string {
   if (block.kind === "fence") {
     return [`${FENCE}${block.info}`, ...block.lines, FENCE].join("\n");
   }
   if (block.kind === "region") return `<!--chronoanvil:${block.key}\n-->`;
+  if (block.kind === "bracketed") {
+    // A BLANK LINE INSIDE EACH MARKER, so that each is its own markdown block.
+    //
+    // Not cosmetic. An HTML comment on the line directly above a `## ` is a
+    // separate block to CommonMark and a SINGLE block to anything that splits a
+    // file on blank lines — and the fold walk in headerbar.ts is closed by "any
+    // markdown heading", measured over blocks. Abutting the two would hand a
+    // preceding `header:` bar a first block that is not a heading, and the
+    // Lesson's `📄 Pages` fold would run past `## Overview` into the prose. One
+    // blank line makes every block model agree, and costs a line nobody sees.
+    return [
+      bracketOpen(block.key),
+      "",
+      ...block.lines,
+      "",
+      bracketClose(block.key),
+    ].join("\n");
+  }
   return block.lines.join("\n");
 }
 
@@ -605,14 +800,28 @@ export function composeSectionRuns(
 // Whether a section can be removed from a file it is already in.
 //
 // DERIVED, not declared. A section is removable exactly when everything it
-// wrote is machine-identifiable, and the block kinds already say that: a fence
-// and a region are the plugin's and can be found precisely, a `markdown` block
-// is indistinguishable from the reader's own writing. Deriving it means a
-// section cannot claim to be removable and then emit prose, which a boolean
-// on the catalogue would happily allow.
+// wrote is machine-identifiable, and the block kinds already say that: a fence,
+// a region and a `bracketed` span are the plugin's and can be found
+// precisely, a bare `markdown` block is indistinguishable from the reader's own
+// writing. Deriving it means a section cannot claim to be removable and then
+// emit unmarked prose, which a boolean on the catalogue would happily allow.
 //
-// `banner` is excluded by `required` before its blocks are looked at;
-// `headings` excludes itself by emitting the headings.
+// UNCHANGED IN 5.6, WHICH IS THE POINT. The prose skeleton became removable by
+// becoming identifiable, not by being exempted here — `bracketed` is simply not
+// `markdown`, so this function returns true for it without knowing the section
+// exists. A `removable: true` on the catalogue entry was the alternative, and
+// it is exactly the claim-without-evidence this derivation was written to make
+// unrepresentable.
+//
+// THIS IS THE QUESTION THAT DOES NOT DEPEND ON A FILE. Whether a note the
+// reader is looking at ACTUALLY carries the markers is a different question
+// with a different answer for every note written before 5.6, and it is asked in
+// journal-plan.ts by `journalRefusal` and `planSections`. `SectionView` has kept
+// the two apart since it was written: `removable` is "ignoring what is written
+// in it", `refusal` is the one that reads the page.
+//
+// `banner` is excluded by `required` before its blocks are looked at; it is
+// also the last section in the catalogue that emits a bare `markdown` block.
 export function sectionRemovable(
   section: JournalSection,
   ctx: SectionContext,
@@ -1405,7 +1614,15 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     id: "headings",
     icon: "📝",
     label: "Prose skeleton",
-    blurb: "The markdown headings a note of this kind opens with.",
+    // NAMES THE DOOR (5.6). The headings are editable in the note like any
+    // other markdown, and "Save as layout…" has read them back off the page by
+    // title since 4.33 — so a reader who wants their own skeleton has always
+    // been able to have one and has had no way to find that out. The blurb is
+    // where a row says what it is, and this row's second sentence is the only
+    // documentation of a feature that already works.
+    blurb:
+      "The markdown headings a note of this kind opens with. " +
+      "Edit them here, then Save as layout to keep them.",
     surface: "leaf",
     // On by default, and PLAIN MARKDOWN rather than a widget. Until 2.42 the
     // catalogue could not express a heading at all, so Study's Lesson and
@@ -1421,18 +1638,78 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // Emits no directive — it is markdown — so there is nothing to claim. See
     // the catalogue shape test, which exempts it by name.
     claims: [],
+    // THE ONE QUESTION WHOSE ANSWER IS PROSE (5.6). See `LinesQuestion`, which
+    // exists for this section and says what it costs.
+    //
+    // NO `directive`, AND THAT IS NOT AN OMISSION. Every other question in every
+    // catalogue names the keyword its answer is spliced into; this section emits
+    // no keyword — `claims` is empty, three lines up — so there is nothing to
+    // name and `answerInText` is told so by kind rather than left to fall
+    // through. The read and the write are the journal planner's, over the
+    // bracket.
+    //
+    // THE PLACEHOLDER IS WHAT THIS TEMPLATE WOULD WRITE, not what the catalogue
+    // would: a type that declares its own skeleton has already answered this
+    // question in code, and showing the generic Overview/Notes/Next steps over a
+    // Study Lesson would be the control describing a note other than the one in
+    // front of the reader.
+    //
+    // `settled` IS THE PRE-5.6 NOTE'S WORDING. A skeleton with no markers cannot
+    // be written back, so the editor draws this sentence where the box would be
+    // — the same place a bridge's "set when added" goes, and for the same
+    // reason: an affordance without the capability behind it is worse than a
+    // sentence naming the route that works.
+    questions: (ctx) => [
+      {
+        kind: "lines",
+        key: "headings",
+        label: "the headings this page opens with",
+        placeholder: (
+          sectionOverrides(ctx, "headings")?.headings ?? defaultHeadings(ctx)
+        )
+          .map((h) => h.title)
+          .join("\n"),
+        rows: 5,
+        settled: {
+          text: "written as ordinary markdown here",
+          hint:
+            "This page's headings were written before ChronoAnvil marked where " +
+            "the skeleton starts, so it cannot tell them from your own prose. " +
+            "Edit them in the page itself, or use Reload this page to get the " +
+            "box back.",
+        },
+      },
+    ],
     // "Does this note already have prose headings?" is the question that
     // matters to both callers: the equivalence test asking what a template
     // contains, and "add a section" declining to append a second skeleton.
     locate: (t) => probe(t, /^##\s+\S/m),
     render: (ctx, opts) => {
       const headings = opts?.headings ?? defaultHeadings(ctx);
-      // One markdown block per heading, which is what makes the whole section
-      // unremovable: the plugin cannot tell these from the reader's own prose,
-      // and that is the price of headings that survive it being uninstalled.
-      return headings.map((h) =>
-        markdown([`## ${h.title}`, "", ...(h.body ?? [""])])
-      );
+      // ONE BRACKETED BLOCK, WHERE THIS WAS ONE `markdown` BLOCK PER HEADING.
+      //
+      // The old shape's own comment named the cost and treated it as a law:
+      // "the plugin cannot tell these from the reader's own prose, and that is
+      // the price of headings that survive it being uninstalled." The first
+      // half was true and the second half was a false trade. Headings survive
+      // an uninstall because they are `##` markdown, not because nothing marks
+      // where they start — and two HTML comments mark that without making them
+      // one character less markdown. See the `bracketed` block kind.
+      //
+      // ONE SPAN RATHER THAN ONE PER HEADING, because the bracket is the
+      // section's extent and a section has one. Bracketing each heading would
+      // put a pair of comments around every `## ` in the note to express a fact
+      // about the group.
+      //
+      // The blank line between headings is written INSIDE the block now. It
+      // used to fall out of `renderSection` joining sibling blocks with a blank
+      // line, which is the same output and a different reason for it.
+      const lines: string[] = [];
+      headings.forEach((h, i) => {
+        if (i > 0) lines.push("");
+        lines.push(`## ${h.title}`, "", ...(h.body ?? [""]));
+      });
+      return [bracketed(SKELETON_KEY, lines)];
     },
   },
 

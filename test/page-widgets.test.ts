@@ -98,12 +98,18 @@ describe("nothing dead is drawn (4.5 §2)", () => {
   });
 
   it("draws no cog where there is nothing for it to open", () => {
-    // The title card's half of the same rule. A menu that opens and then
-    // explains it cannot help is worse than no menu — which is what the ⋯ on a
-    // journal note already does, and why this asks BEFORE building the button.
+    // The page cog's half of the same rule. A menu that opens and then explains
+    // it cannot help is worse than no menu — which is what the ⋯ on a journal
+    // note already does, and why `sectionsMenuFor` answers null BEFORE anything
+    // builds a button from it.
     const title = readSrc("page-title");
     expect(title).toContain("canEditSections(notePath)");
-    expect(title).toContain("if (build) {");
+    expect(title).toContain("return null;");
+    // AND THE CALLER HONOURS THE NULL. The button was `buildPageTitle`'s until
+    // 5.2, and that widget had been unreachable since 4.10; the vault banner is
+    // the surface that draws this cog now, and it composes the menu only when
+    // there is one.
+    expect(readCode("ui/vault-banner")).toContain("if (build) build(menu);");
     // The predicate is one line and cannot grow a second opinion about which
     // notes are editable.
     expect(readSrc("section-insert")).toContain(
@@ -112,134 +118,47 @@ describe("nothing dead is drawn (4.5 §2)", () => {
   });
 });
 
-describe("the page title is the file's name", () => {
-  const src = readSrc("page-title");
+describe("the page's name is drawn once, by the head that ships", () => {
+  // REWRITTEN IN 5.2, AND THE OLD FORM IS THE REASON. Six assertions here
+  // described `buildPageTitle`'s card — its surface, its 2em title, its unframed
+  // reset, the container query that steps it down in a sidebar — and all six
+  // passed for a year after 4.10 stopped rendering it, because they read a
+  // module nothing imported and CSS nothing matched. The widget and its rules
+  // were deleted in 5.2; what a reader actually sees is `.ca-journal-page-head`,
+  // asserted in page-head.test.ts, and the one claim worth keeping here is the
+  // one about Obsidian's own title.
+  const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
-  it("renames the note rather than storing a second title", () => {
-    // The argument is older than this widget: the filename is what the quick
-    // switcher, the graph, every backlink and every table display, and a
-    // `title` property beside it would let those disagree.
-    expect(src).toContain("attachNoteRename(plugin.app, titleRow, file,");
-    // THROUGH `readCode`, WHICH STRIPS COMMENTS. The first form of this matched
-    // the paragraph above the widget explaining why it does NOT read
-    // frontmatter — a test failing on its own justification, which is the
-    // source-text trap this suite names as the 4.0.2 rule.
-    const code = readCode("page-title");
-    expect(code).not.toContain("frontmatter");
-    expect(code).not.toContain("metadataCache");
-  });
-
-  it("keeps the cog away from the click-to-edit title", () => {
-    // study-header.ts puts its own ⋯ in the crumb row and says why: "a control
-    // next to it would be a control one slip away from renaming the note."
-    // Here the whole width is between them, which is what space-between does.
-    const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = ruleAt(rules, ".ca-jtc-row");
-    expect(at, "no title row rule").toBeGreaterThan(-1);
-    expect(rules.slice(at, rules.indexOf("}", at))).toContain(
-      "justify-content: space-between"
-    );
-  });
-
-  it("says the page's name once, and works that out from the card", () => {
-    // THE FIRST VAULT RENDER SHOWED IT TWICE — Obsidian's inline title above,
-    // the card below, the plugin's copy the smaller of the two.
-    //
+  it("hides Obsidian's inline title wherever a banner draws the name", () => {
     // DERIVED, NOT DECLARED. The obvious fix is a second `cssclasses` value
-    // beside `ca-wide`, and it goes stale the moment a reader removes the
-    // title block: the class stays, Obsidian's title stays hidden, and the page
-    // has no title at all. `:has()` asks a question the note answers for
-    // itself, so the inline title comes back when the card goes.
-    const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = rules.indexOf(".markdown-preview-view:has(.ca-jtc-card) .inline-title");
+    // beside `ca-wide`, and it goes stale the moment a reader removes the block:
+    // the class stays, Obsidian's title stays hidden, and the page has no title
+    // at all. `:has()` asks a question the note answers for itself.
+    const at = rules.indexOf(
+      ".markdown-preview-view:has(.ca-journal-banner-name) .inline-title"
+    );
     expect(at, "the inline title is not hidden in reading view").toBeGreaterThan(-1);
     const rule = rules.slice(at, rules.indexOf("}", at));
     // Both views: a name that appears once when read and twice when edited is
     // the same defect with a smaller audience.
-    expect(rule).toContain(".markdown-source-view:has(.ca-jtc-card) .inline-title");
+    expect(rule).toContain(
+      ".markdown-source-view:has(.ca-journal-banner-name) .inline-title"
+    );
     expect(rule).toContain("display: none");
-    // ── AND ON EVERY SURFACE THAT DRAWS A NAME, NOT JUST THIS ONE ────
-    //
-    // The rule shipped in 4.5.1 naming `.ca-jtc-card`, which is the LARGE banner's
-    // name card and appears on the eight dashboard-shaped surfaces only. A diary
-    // entry and a journal leaf drew Obsidian's inline title AND their banner's
-    // copy of the same name for eleven releases — the exact doubling this rule
-    // exists to remove, on the two page kinds a reader is in most.
-    //
-    // The condition is "a block on this page already draws the file's name with
-    // a rename on it", and `journal-banner-name` is what marks that on both slim
-    // banners. Asserted for both views, like the pair above, because that is the
-    // half of this rule that has been forgotten before.
-    for (const view of ["markdown-preview-view", "markdown-source-view"]) {
-      expect(rule, view).toContain(
-        `.${view}:has(.ca-journal-banner-name) .inline-title`
-      );
-    }
     // And no second frontmatter class was invented for it.
     expect(readCode("home-sections")).not.toContain("ca-titled");
     expect(rules).not.toContain(".ca-titled");
   });
 
-  it("is at least as big as the title it replaces", () => {
-    // It started at 1.5em to match the journals hero, which was right while it
-    // was one heading among several and wrong once it became the page's only
-    // title — smaller than what it replaced reads as a lesser copy, which is
-    // how the render looked.
-    const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = ruleAt(rules, ".ca-jtc-title-text");
-    const rule = rules.slice(at, rules.indexOf("}", at));
-    const size = /font-size:\s*([\d.]+)em/.exec(rule);
-    expect(size, "no font size on the page title").not.toBeNull();
-    expect(Number(size![1])).toBeGreaterThanOrEqual(2);
-    // And it steps down in a narrow block rather than wrapping across three
-    // lines in a sidebar — on the BLOCK's width, not the window's.
-    expect(rules).toMatch(
-      /@container \(max-width: \d+px\) \{\s*\.ca-jtc-title-text,\s*\.ca-jtc-title-input \{\s*font-size:/
-    );
-  });
-
-  it("draws a card, on the surface every other card takes", () => {
-    // IT SHIPPED FLAT AND THAT WAS WRONG. The argument was that two heavy
-    // surfaces stacked read as one thing announced twice; in a vault, a bare
-    // name above a page of bordered cards read as a heading somebody forgot to
-    // finish. The surface is 91-card-surface.css's, not a fourth opinion about
-    // what a card looks like.
-    const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    // ANCHORED TO THE START OF A LINE, not by `ruleAt`. The class now appears in
-    // two selectors — its own rule and the unframed reset — and the reset sorts
-    // earlier in the concatenation, so a substring search finds the rule that
-    // takes the surface AWAY and asserts the opposite of what is meant.
-    const at = rules.indexOf("\n.ca-jtc-card {");
-    expect(at, "no title card rule of its own").toBeGreaterThan(-1);
-    const rule = rules.slice(at, rules.indexOf("}", at));
-    expect(rule).toContain("background: var(--background-secondary)");
-    expect(rule).toContain("border: 1px solid var(--background-modifier-border)");
-    expect(rule).toContain("border-radius: var(--ca-radius-md)");
-  });
-
-  it("gives that card up in an unframed block", () => {
-    // 4.1 §5's ONE THING THAT HAS TO BE KEPT IN STEP: keying the frame off the
-    // block covers every widget, EXCEPT a widget that draws a card inside it —
-    // only the widget knows it did. In a canvas node or another plugin's tile
-    // the node IS the frame, so a card inside one is the doubling `frame:`
-    // exists to remove. Three widgets were on that list; this is the fourth.
-    const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = ruleAt(rules, ".ca-journal-widget-block.is-unframed .ca-jtc-card");
-    expect(at, ".ca-jtc-card is not in the unframed reset").toBeGreaterThan(-1);
-    const rule = rules.slice(at, rules.indexOf("}", at));
-    expect(rule).toContain("background: none");
-    expect(rule).toContain("padding: 0");
-    // AND `.ca-jjc-card` STAYS OUT OF IT, which is the distinction: the journals
-    // grid's cards ARE the content, and a grid with its cards flattened is a
-    // list. This card is the block's own frame.
-    expect(rules).not.toContain(".ca-journal-widget-block.is-unframed .ca-jjc-card");
-  });
-
   it("does not reuse the retired page-index family", () => {
     // `.jpt-*` was the page index's private family and was retired into the
-    // shared record-list builder; appearance.test.ts fails the build if it
-    // comes back. This widget is a different thing and takes a free prefix.
-    expect(src).not.toContain("jpt-");
+    // shared record-list builder; appearance.test.ts fails the build if it comes
+    // back.
+    expect(readSrc("page-title")).not.toContain("jpt-");
+  });
+
+  it("left no rule behind for the card it replaced", () => {
+    expect(rules).not.toContain(".ca-jtc-");
   });
 });
 

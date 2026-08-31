@@ -222,6 +222,8 @@ export interface ChronoAnvilSettings {
   // can, because the reader can delete a `tab` line. It is clamped where it is
   // read and the clamp does not write — see `openTabFor` in main.ts.
   openGroupTabs: Record<string, number>;
+  // Which filter sources are turned off for a time-grid, keyed by "<notePath>::time-grid" (or "<notePath>::time-grid:<rest>").
+  timeGridFilters: Record<string, string[]>;
   // Unsaved quick-capture text, kept so closing the box doesn't lose it.
   // Lives here rather than in memory so it survives a restart.
   captureDraft: string;
@@ -343,6 +345,7 @@ export const DEFAULT_SETTINGS: ChronoAnvilSettings = {
   dismissedJournalFolders: [],
   collapsedNoteSections: {},
   openGroupTabs: {},
+  timeGridFilters: {},
   captureDraft: "",
   captureCollapsedByDefault: true,
   collapsedSettingsGroups: {},
@@ -407,9 +410,48 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
   plugin: ChronoAnvilPlugin;
   private syncTimer: number | null = null;
 
+  // WHERE THE READER WAS, ACROSS A REPAINT.
+  //
+  // Twenty-five handlers in this file end in a full rebuild — `display()`
+  // empties `containerEl` and draws the tab again — because a change to one
+  // setting can change what another one says. That is the right shape, and it
+  // came with three losses nobody chose: emptying the container collapses its
+  // scroll height, so the page snapped back to the top; the search box is
+  // rebuilt, so a query vanished; and `activeTabId` was a local, so the
+  // category pill went back to All Settings.
+  //
+  // Reordering a custom tracker made the cost obvious. The ↑ button sits three
+  // quarters of the way down the Trackers group; pressing it moved the row and
+  // then threw the reader back to the masthead, so moving a tracker two places
+  // meant two scrolls. Nothing about the repaint requires that.
+  //
+  // These two fields are the search state, lifted out of `display()` so it can
+  // seed the toolbar from them instead of from blank. `refresh()` is what a
+  // handler calls; `display()` stays the builder Obsidian itself invokes.
+  private query = "";
+  private activeTabId = "all";
+
   constructor(app: App, plugin: ChronoAnvilPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+  }
+
+  // Repaint the tab and put the reader back where they were.
+  //
+  // The scroller is FOUND rather than assumed. `containerEl` is the scrolling
+  // element in Obsidian's settings modal today, but a tab can be hosted
+  // elsewhere and the cost of being wrong is a jump — the very thing this
+  // exists to stop. Walking up until something has a non-zero `scrollTop`
+  // cannot pick the wrong element: if nothing is scrolled there is nothing to
+  // restore, and the walk ends with `null`.
+  private refresh(): void {
+    let scroller: HTMLElement | null = this.containerEl;
+    while (scroller && scroller.scrollTop === 0) {
+      scroller = scroller.parentElement;
+    }
+    const top = scroller?.scrollTop ?? 0;
+    this.display();
+    if (scroller?.isConnected) scroller.scrollTop = top;
   }
 
   // Save settings, then push the change into the vault (live template and
@@ -519,7 +561,30 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
 
     const body = details.createDiv({ cls: "ca-settings-body" });
 
+    // The reader's own answer for this group, kept on the element so clearing
+    // the search can put every group back to it. `collapsedSettingsGroups` is
+    // the same answer, but a group the reader has never touched has no entry
+    // there and the default is `group()`'s argument — which nothing outside
+    // this function knows.
+    details.dataset.caOpen = String(details.open);
+
     details.addEventListener("toggle", () => {
+      // A SEARCH OPENS A GROUP; IT DOES NOT RE-DECIDE WHETHER THAT GROUP IS
+      // OPEN. This listener could not tell the two apart, so one search for a
+      // word that appears in Paths left Paths — and every other group the word
+      // reached — expanded in data.json for good. `updateFilter` sets this
+      // marker on the group it is about to move and only when the state
+      // actually changes, so exactly one toggle consumes it.
+      //
+      // A MARKER RATHER THAN A FLAG BECAUSE THE EVENT IS ASYNCHRONOUS. `toggle`
+      // is queued, not dispatched, so a `filtering = true / … / filtering =
+      // false` pair around the loop would have been back to false before the
+      // first event arrived and would have guarded nothing.
+      if (details.dataset.caFilterOpen) {
+        delete details.dataset.caFilterOpen;
+        return;
+      }
+      details.dataset.caOpen = String(details.open);
       this.plugin.settings.collapsedSettingsGroups[key] = !details.open;
       void this.plugin.saveSettings();
     });
@@ -654,20 +719,61 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
   }
 
   // A structured table container for dense, scannable lists (Trackers, Journals).
+  //
+  // `widths` IS WHY THIS TAKES OPTIONS. Three of these tables — built-in diary,
+  // built-in journal, custom — carry the SAME five headers and sit one under
+  // the other in the same group, and each one auto-sized its own columns from
+  // its own rows. Measured on the tab as it shipped: "Type" started at x=912 in
+  // the diary table and x=931 in the custom one, "Surface" at 1057 and 1017,
+  // "Actions" at 1267 and 1237. Every column disagreed with the same column one
+  // table up, so a reader scanning down the group re-found the grid three
+  // times. Auto layout cannot fix that — the whole point of auto layout is that
+  // each table answers to its own content — so the three now hand in one set of
+  // percentages and `table-layout: fixed` honours it.
+  //
+  // `centerFrom` marks where a run of one-control-per-cell columns begins. The
+  // capture matrix is five of them, and a `th` inherits the table's left
+  // alignment while `.ca-col-grain` centres its cell, so the header sat 9px off
+  // the switch it named — close enough to look like a rendering fault rather
+  // than a decision. Both ends of the column are told the same thing here.
   private createTable(
     host: HTMLElement,
-    headers: string[]
+    headers: string[],
+    opts: { widths?: string[]; centerFrom?: number } = {}
   ): { wrap: HTMLElement; table: HTMLElement; tbody: HTMLElement } {
     const wrap = host.createDiv({ cls: "ca-settings-table-wrap" });
     const table = wrap.createEl("table", { cls: "ca-settings-table" });
+    if (opts.widths) {
+      table.addClass("is-fixed");
+      const cols = table.createEl("colgroup");
+      for (const w of opts.widths) {
+        cols.createEl("col").style.width = w;
+      }
+    }
     const thead = table.createEl("thead");
     const tr = thead.createEl("tr");
-    for (const h of headers) {
-      tr.createEl("th", { text: h });
-    }
+    headers.forEach((h, i) => {
+      const th = tr.createEl("th", { text: h });
+      if (opts.centerFrom != null && i >= opts.centerFrom) {
+        th.addClass("ca-col-grain-head");
+      }
+      if (h === "Edit") {
+        th.addClass("ca-col-edit-head");
+      }
+    });
     const tbody = table.createEl("tbody");
     return { wrap, table, tbody };
   }
+
+  // The five columns the three tracker tables share. One array, so they cannot
+  // drift apart again the way they did when each table sized itself.
+  private static readonly TRACKER_COLS = [
+    "32%",
+    "20%",
+    "22%",
+    "10%",
+    "16%",
+  ];
 
   display(): void {
     const { containerEl } = this;
@@ -736,6 +842,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       cls: "ca-settings-search-input",
       type: "text",
       placeholder: "Search settings, trackers, journals, paths…",
+      value: this.query,
     });
     const clearBtn = searchWrap.createEl("button", {
       cls: "ca-settings-search-clear is-hidden",
@@ -766,7 +873,6 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       { id: "appearance", label: "Appearance & Banner", icon: "palette" },
       { id: "vault", label: "Vault & System", icon: "folder" },
     ];
-    let activeTabId = "all";
     const tabButtons: HTMLElement[] = [];
 
     // ── Collapsible groups ──────────────────────────────────────────────
@@ -888,8 +994,18 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     });
 
     const updateFilter = () => {
-      const q = searchInput.value.trim().toLowerCase();
+      this.query = searchInput.value;
+      const q = this.query.trim().toLowerCase();
       clearBtn.classList.toggle("is-hidden", !q);
+
+      // Move a group's fold without the `toggle` listener treating it as the
+      // reader's answer. Silent about a no-op, because a marker left on a
+      // group that never fired would be consumed by the reader's next click.
+      const setOpen = (g: HTMLDetailsElement, open: boolean): void => {
+        if (g.open === open) return;
+        g.dataset.caFilterOpen = "1";
+        g.open = open;
+      };
 
       const groups = containerEl.querySelectorAll<HTMLDetailsElement>(".ca-settings-group");
       let visibleGroups = 0;
@@ -897,45 +1013,75 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       groups.forEach((g) => {
         const key = g.getAttribute("data-group-key") ?? "";
         const inCategory =
-          activeTabId === "all" ||
-          (activeTabId === "trackers" && (key === "trackers" || key === "capture")) ||
-          (activeTabId === "journals" && (key === "journals" || key === "logbooks")) ||
-          (activeTabId === "appearance" && (key === "appearance" || key === "banner")) ||
-          (activeTabId === "vault" && (key === "attachments" || key === "mobile" || key === "paths"));
+          this.activeTabId === "all" ||
+          (this.activeTabId === "trackers" && (key === "trackers" || key === "capture")) ||
+          (this.activeTabId === "journals" && (key === "journals" || key === "logbooks")) ||
+          (this.activeTabId === "appearance" && (key === "appearance" || key === "banner")) ||
+          (this.activeTabId === "vault" && (key === "attachments" || key === "mobile" || key === "paths"));
+
+        // THE CATEGORY IS A FILTER, NOT A STARTING POINT. `inCategory` used to
+        // be computed here and then dropped on the search path, so typing a
+        // query re-opened groups the reader had just filtered away — while the
+        // pill for the category they picked went on rendering as active. The
+        // interface says the two compose; they have to.
+        if (!inCategory) {
+          g.addClass("is-hidden");
+          return;
+        }
 
         if (!q) {
-          if (inCategory) {
-            g.removeClass("is-hidden");
-            visibleGroups++;
-          } else {
-            g.addClass("is-hidden");
-          }
+          g.removeClass("is-hidden");
+          // Back to the reader's answer. Without this, deleting the query left
+          // every group the query had opened standing open, so the tab a
+          // reader had folded down to four rows came back as the whole thing.
+          setOpen(g, g.dataset.caOpen === "true");
+          visibleGroups++;
           return;
         }
 
         const text = g.textContent?.toLowerCase() ?? "";
         if (text.includes(q)) {
           g.removeClass("is-hidden");
-          g.open = true;
+          setOpen(g, true);
           visibleGroups++;
         } else {
           g.addClass("is-hidden");
         }
       });
 
+      // An empty result inside a category is ambiguous on its own — the reader
+      // cannot tell a term that matches nothing from a term that matches
+      // something one tab over. Naming the category answers that, and names the
+      // control that would widen the search.
+      const activeTab = tabs.find((t) => t.id === this.activeTabId);
+      noResults.setText(
+        q && activeTab && this.activeTabId !== "all"
+          ? `No settings in ${activeTab.label} match “${searchInput.value.trim()}”. Try All Settings.`
+          : "No settings match your search."
+      );
       noResults.classList.toggle("is-hidden", visibleGroups > 0);
     };
 
     tabs.forEach((t) => {
       const btn = tabsContainer.createEl("button", {
-        cls: `ca-settings-tab-btn ${t.id === activeTabId ? "is-active" : ""}`,
+        cls: `ca-settings-tab-btn ${t.id === this.activeTabId ? "is-active" : ""}`,
       });
+      // WHICH PILL IS CHOSEN WAS ONLY EVER SAID IN CSS. `.is-active` colours
+      // the button and tells a screen reader nothing, so the selection was
+      // invisible to anyone not looking at it. `aria-pressed` is the smaller
+      // claim than a full tablist — these are toggles over one list, not tabs
+      // over separate panels, and the list stays in the same place either way.
+      btn.setAttribute("aria-pressed", String(t.id === this.activeTabId));
       setIcon(btn.createSpan(), t.icon);
       btn.createSpan({ text: t.label });
       btn.addEventListener("click", () => {
-        activeTabId = t.id;
-        tabButtons.forEach((b) => b.removeClass("is-active"));
+        this.activeTabId = t.id;
+        tabButtons.forEach((b) => {
+          b.removeClass("is-active");
+          b.setAttribute("aria-pressed", "false");
+        });
         btn.addClass("is-active");
+        btn.setAttribute("aria-pressed", "true");
         updateFilter();
       });
       tabButtons.push(btn);
@@ -949,6 +1095,12 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     });
 
     searchInput.addEventListener("input", updateFilter);
+
+    // The tab is drawn filtered, not drawn and then filtered. Every repaint
+    // runs through here, so a group hidden by the reader's query or category
+    // never flashes in before being taken away again — and the pill, the box
+    // and the list all start the repaint agreeing with each other.
+    updateFilter();
   }
 
   // ── Appearance & Themes ──────────────────────────────────────────────────
@@ -1270,7 +1422,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
           path: logbookNotePath(s.paths.logbooks, name),
           color: DEFAULT_EVENT_COLOR,
         });
-        void this.plugin.saveSettings().then(() => this.display());
+        void this.plugin.saveSettings().then(() => this.refresh());
       },
     });
 
@@ -1309,7 +1461,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
           if (emoji && emoji !== book.icon) {
             book.icon = emoji;
             await this.plugin.saveSettings();
-            this.display();
+            this.refresh();
           }
         });
       });
@@ -1326,7 +1478,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
         if (next && next !== book.name) {
           book.name = next;
           await this.plugin.saveSettings();
-          this.display();
+          this.refresh();
         }
       });
 
@@ -1373,7 +1525,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
         async () => {
           s.logbooks = s.logbooks.filter((other) => other.id !== book.id);
           await this.plugin.saveSettings();
-          this.display();
+          this.refresh();
         },
         { danger: true }
       );
@@ -1410,7 +1562,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
             s.mobile.overlayTogglePosition = v as MobileOverlayTogglePosition;
             await this.plugin.saveSettings();
             this.plugin.mobileControls?.refresh();
-            this.display();
+            this.refresh();
           })
       );
 
@@ -1572,10 +1724,22 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     const captureSection = ENTRY_SECTIONS.find((sec) => sec.id === "capture");
     if (captureSection) {
       const matrix = entrySectionMatrix();
-      const { tbody } = this.createTable(containerEl, [
-        "Capture stream",
-        ...matrix.grains.map((g) => CLASS_DEFS[g].label),
-      ]);
+      const { tbody } = this.createTable(
+        containerEl,
+        ["Capture stream", ...matrix.grains.map((g) => CLASS_DEFS[g].label)],
+        {
+          // One share of the row for the section, the rest split evenly between
+          // the grains. Evenly is the point: the columns are a matrix of the
+          // same control repeated, and letting each one take the width of its
+          // own heading spaced five identical switches at five different
+          // intervals.
+          widths: [
+            "40%",
+            ...matrix.grains.map(() => `${60 / matrix.grains.length}%`),
+          ],
+          centerFrom: 1,
+        }
+      );
 
       const tr = tbody.createEl("tr");
       const nameCell = tr.createEl("td");
@@ -1623,7 +1787,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
         t.setValue(s.captureCollapsedByDefault).onChange(async (v) => {
           s.captureCollapsedByDefault = v;
           await this.plugin.saveSettings();
-          this.display();
+          this.refresh();
         })
       );
 
@@ -1643,7 +1807,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
           b.setButtonText("Discard").onClick(async () => {
             s.captureDraft = "";
             await this.plugin.saveSettings();
-            this.display();
+            this.refresh();
           })
         );
     }
@@ -1700,7 +1864,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       if (band) s.entrySectionBand[grain] = band;
       await this.plugin.saveSettings();
       await this.plugin.scaffold.refreshDiaryTemplate(grain);
-      this.display();
+      this.refresh();
     };
 
     // The cell IS the control, and the name and blurb are the row's — see
@@ -1784,7 +1948,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
           .onChange(async (v) => {
             a.location = v as AttachmentLocation;
             await this.plugin.saveSettings();
-            this.display();
+            this.refresh();
           })
       );
 
@@ -1912,7 +2076,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
           }
           await this.plugin.saveSettings();
           await this.plugin.journals.rebuildJournalHome();
-          this.display();
+          this.refresh();
         }
       );
     };
@@ -2075,7 +2239,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
         b.setButtonText("Edit list").onClick(() =>
           openFolderEmojiEditor(this.app, this.plugin, async () => {
             await this.plugin.saveSettings();
-            this.display();
+            this.refresh();
           })
         )
       );
@@ -2131,7 +2295,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
               await this.plugin.journalImport.register([
                 { ...found, config: cfg },
               ]);
-              this.display();
+              this.refresh();
             }
           );
         })();
@@ -2140,7 +2304,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       rowButton(actions, "x", "Not a journal \u2014 stop offering it", () => {
         void (async () => {
           await this.plugin.journalImport.dismiss(folder);
-          this.display();
+          this.refresh();
         })();
       });
     }
@@ -2162,7 +2326,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     nameWrap.createSpan({ text: cfg.name });
 
     // 2. Identifier
-    const tdId = tr.createEl("td");
+    const tdId = tr.createEl("td", { cls: "ca-col-id" });
     tdId.createEl("code", { text: cfg.id });
 
     // 3. Root Folder
@@ -2201,7 +2365,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
           await this.plugin.journalImport.writeManifest(next);
           await this.plugin.journals.rebuildJournalHome();
-          this.display();
+          this.refresh();
         }
       )
     );
@@ -2219,7 +2383,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
           // folder still describes itself correctly after an edit.
           await this.plugin.journalImport.writeManifest(next);
           await this.plugin.journals.rebuildJournalHome();
-          this.display();
+          this.refresh();
         }
       )
     );
@@ -2319,7 +2483,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
             `ChronoAnvil: deleted “${cfg.name}” — its folders are in ${BIN_FOLDER}/ 🗑️`
           );
         }
-        this.display();
+        this.refresh();
       },
       { danger: true }
     );
@@ -2351,10 +2515,10 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     const { tbody: diaryTbody } = this.createTable(diarySection, [
       "Tracker",
       "Type",
-      "Surface",
       "In Entries",
+      "Edit",
       "Actions",
-    ]);
+    ], { widths: ChronoAnvilSettingTab.TRACKER_COLS });
     for (const kind of SCALE_BUILTINS) {
       const t = this.plugin.settings.trackers.find((x) => x.builtin === kind);
       if (t) this.renderScaleRow(diaryTbody, t);
@@ -2371,10 +2535,10 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     const { tbody: journalTbody } = this.createTable(journalSection, [
       "Tracker",
       "Type",
-      "Surface",
       "In Entries",
+      "Edit",
       "Actions",
-    ]);
+    ], { widths: ChronoAnvilSettingTab.TRACKER_COLS });
     for (const kind of JOURNAL_BUILTINS) {
       const t = this.plugin.settings.trackers.find((x) => x.builtin === kind);
       if (t) this.renderJournalBuiltinRow(journalTbody, t);
@@ -2408,7 +2572,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
               async (def) => {
                 this.plugin.settings.trackers.push(def);
                 await this.saveAndSync(true);
-                this.display();
+                this.refresh();
               }
             );
           },
@@ -2426,10 +2590,10 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       const { tbody: customTbody } = this.createTable(customSection, [
         "Tracker",
         "Type",
-        "Surface",
         "In Entries",
+        "Edit",
         "Actions",
-      ]);
+      ], { widths: ChronoAnvilSettingTab.TRACKER_COLS });
       customs.forEach((t) => this.renderCustomRow(customTbody, t));
     }
 
@@ -2463,15 +2627,11 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     const tdType = tr.createEl("td");
     const typePills = tdType.createDiv({ cls: "ca-list-pills" });
     typePills.createSpan({ cls: "ca-list-pill is-muted", text: "Scale" });
-
-    const tdSurface = tr.createEl("td");
-    const surfacePills = tdSurface.createDiv({ cls: "ca-list-pills" });
     const pills = [
-      { text: "Daily", tone: "muted" as const },
       ...this.surfacePill(t),
     ];
     for (const p of pills) {
-      surfacePills.createSpan({ cls: `ca-list-pill is-${p.tone}`, text: p.text });
+      typePills.createSpan({ cls: `ca-list-pill is-${p.tone}`, text: p.text });
     }
 
     const tdStatus = tr.createEl("td");
@@ -2484,17 +2644,20 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       statusPills.createSpan({ cls: "ca-list-pill is-off", text: "Disabled" });
     }
 
-    const tdActions = tr.createEl("td", { cls: "ca-col-actions-cell" });
-    const actions = tdActions.createDiv({ cls: "ca-col-actions" });
-
+    const tdEdit = tr.createEl("td", { cls: "ca-col-edit-cell" });
     if (enabled) {
-      rowButton(actions, "settings-2", `${t.label} settings`, () =>
+      rowButton(tdEdit, "settings-2", `${t.label} settings`, () =>
         openMoodEditor(this.app, this.plugin, t, async () => {
           await this.plugin.saveSettings();
-          this.display();
+          this.refresh();
         })
       );
+    } else {
+      tdEdit.createSpan({ cls: "ca-cell-absent", text: "—" });
     }
+
+    const tdActions = tr.createEl("td", { cls: "ca-col-actions-cell" });
+    const actions = tdActions.createDiv({ cls: "ca-col-actions" });
 
     const toggleHost = actions.createDiv({ cls: "ca-list-toggle" });
     new Setting(toggleHost).addToggle((c) =>
@@ -2509,7 +2672,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
             t.heatmap = false;
           }
           await this.saveAndSync(true);
-          this.display();
+          this.refresh();
         })
     );
   }
@@ -2532,16 +2695,15 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     const typePills = tdType.createDiv({ cls: "ca-list-pills" });
     typePills.createSpan({ cls: "ca-list-pill is-muted", text: "Derived (hours)" });
 
-    const tdSurface = tr.createEl("td");
-    const surfacePills = tdSurface.createDiv({ cls: "ca-list-pills" });
-    surfacePills.createSpan({ cls: "ca-list-pill is-muted", text: "Daily" });
-
     const tdStatus = tr.createEl("td");
     const statusPills = tdStatus.createDiv({ cls: "ca-list-pills" });
     statusPills.createSpan({
       cls: on ? "ca-list-pill is-on" : "ca-list-pill is-off",
       text: on ? "Every entry" : "Disabled",
     });
+
+    const tdEdit = tr.createEl("td", { cls: "ca-col-edit-cell" });
+    tdEdit.createSpan({ cls: "ca-cell-absent", text: "—" });
 
     const tdActions = tr.createEl("td", { cls: "ca-col-actions-cell" });
     const actions = tdActions.createDiv({ cls: "ca-col-actions" });
@@ -2558,7 +2720,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
             v
           );
           await this.saveAndSync(true);
-          this.display();
+          this.refresh();
         })
     );
   }
@@ -2583,14 +2745,11 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       cls: "ca-list-pill is-muted",
       text: TRACKER_TYPE_LABELS[t.type].split(" ")[0],
     });
-
-    const tdSurface = tr.createEl("td");
-    const surfacePills = tdSurface.createDiv({ cls: "ca-list-pills" });
     const pills = [
       ...this.surfacePill(t),
     ];
     for (const p of pills) {
-      surfacePills.createSpan({ cls: `ca-list-pill is-${p.tone}`, text: p.text });
+      typePills.createSpan({ cls: `ca-list-pill is-${p.tone}`, text: p.text });
     }
 
     const tdStatus = tr.createEl("td");
@@ -2599,6 +2758,9 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       cls: "ca-list-pill is-muted",
       text: "Per-entry",
     });
+
+    const tdEdit = tr.createEl("td", { cls: "ca-col-edit-cell" });
+    tdEdit.createSpan({ cls: "ca-cell-absent", text: "—" });
 
     const tdActions = tr.createEl("td", { cls: "ca-col-actions-cell" });
     const actions = tdActions.createDiv({ cls: "ca-col-actions" });
@@ -2635,36 +2797,21 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     nameWrap.createSpan({ cls: "ca-col-name-token", text: "📈" });
     nameWrap.createSpan({ text: t.label || t.id });
 
-    // 2. Type
+    // 2. Type (with surface indicator if not default daily)
     const tdType = tr.createEl("td");
     const typePills = tdType.createDiv({ cls: "ca-list-pills" });
     typePills.createSpan({
       cls: "ca-list-pill is-muted",
       text: TRACKER_TYPE_LABELS[t.type].split(" ")[0],
     });
-
-    // 3. Surface
-    const tdSurface = tr.createEl("td");
-    const surfacePills = tdSurface.createDiv({ cls: "ca-list-pills" });
     const pills = [
-      ...(diaryClassOf(t.surface) != null
-        ? [
-            {
-              text: describeSurfaceLabel(
-                t.surface,
-                journalTypeNamer(this.plugin)
-              ),
-              tone: "muted" as const,
-            },
-          ]
-        : []),
       ...this.surfacePill(t),
     ];
     for (const p of pills) {
-      surfacePills.createSpan({ cls: `ca-list-pill is-${p.tone}`, text: p.text });
+      typePills.createSpan({ cls: `ca-list-pill is-${p.tone}`, text: p.text });
     }
 
-    // 4. In Entries
+    // 3. In Entries
     const tdStatus = tr.createEl("td");
     const statusPills = tdStatus.createDiv({ cls: "ca-list-pills" });
     if (diaryClassOf(t.surface) != null) {
@@ -2687,67 +2834,15 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       });
     }
 
-    // 5. Actions
-    const tdActions = tr.createEl("td", { cls: "ca-col-actions-cell" });
-    const actions = tdActions.createDiv({ cls: "ca-col-actions" });
-
-    rowButton(
-      actions,
-      "arrow-up",
-      "Move up",
-      async () => {
-        const abs = trackers.indexOf(t);
-        const prev = trackers
-          .slice(0, abs)
-          .reduce((acc, x, i) => (!x.builtin ? i : acc), -1);
-        if (abs === -1 || prev === -1) return;
-        [trackers[prev], trackers[abs]] = [trackers[abs], trackers[prev]];
-        await this.saveAndSync(true);
-        this.display();
-      },
-      { disabled: customPos <= 0 }
-    );
-
-    rowButton(
-      actions,
-      "arrow-down",
-      "Move down",
-      async () => {
-        const abs = trackers.indexOf(t);
-        const next = trackers.findIndex((x, i) => i > abs && !x.builtin);
-        if (abs === -1 || next === -1) return;
-        [trackers[next], trackers[abs]] = [trackers[abs], trackers[next]];
-        await this.saveAndSync(true);
-        this.display();
-      },
-      { disabled: customPos === -1 || customPos >= customCount - 1 }
-    );
-
-    rowButton(actions, "pencil", "Edit tracker", () =>
+    // 4. Edit
+    const tdEdit = tr.createEl("td", { cls: "ca-col-edit-cell" });
+    rowButton(tdEdit, "pencil", "Edit tracker", () =>
       openTrackerEditor(
         this.app,
         this.plugin,
         t,
         { isNew: false, original: t },
         async (def) => {
-          // Moving a tracker that has already collected readings to another
-          // surface is metadata-only — saveAndSync rewrites templates and
-          // Diary.base, never entries — so the old readings don't move. They
-          // stay under this property in the old surface's notes, where the
-          // tracker will no longer read them: dormant, not deleted, and
-          // re-adopted if the surface is set back (or a same-id tracker of
-          // that surface is made).
-          //
-          // That is a defensible thing to want (fixing a surface set wrong on
-          // a tracker with a few days of data) and a surprising thing to
-          // trigger by accident, so it is confirmed with the actual count
-          // rather than blocked or done silently. Migrating the readings is
-          // deliberately *not* offered, for two different reasons depending on
-          // the move: within the diary, a daily series can't become a monthly
-          // one without a per-tracker reduction the data doesn't carry (mean
-          // weight, sum km); between the diary and a journal, the readings are
-          // simply in notes the new surface doesn't cover. resurfacePrompt
-          // words each case for itself.
           const moved = surfaceKey(def.surface) !== surfaceKey(t.surface);
           if (moved) {
             const stale = countReadingsOnSurface(
@@ -2771,10 +2866,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
                 prompt.confirmLabel
               );
               if (!ok) {
-                // Change nothing: the draft is discarded and the registry
-                // entry keeps its old surface. display() repaints the row from
-                // the unchanged tracker.
-                this.display();
+                this.refresh();
                 return;
               }
             }
@@ -2782,9 +2874,45 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
           const abs = trackers.indexOf(t);
           if (abs !== -1) trackers[abs] = def;
           await this.saveAndSync(true);
-          this.display();
+          this.refresh();
         }
       )
+    );
+
+    // 5. Actions (Move Up, Move Down, Delete)
+    const tdActions = tr.createEl("td", { cls: "ca-col-actions-cell" });
+    const actions = tdActions.createDiv({ cls: "ca-col-actions" });
+
+    rowButton(
+      actions,
+      "arrow-up",
+      "Move up",
+      async () => {
+        const abs = trackers.indexOf(t);
+        const prev = trackers
+          .slice(0, abs)
+          .reduce((acc, x, i) => (!x.builtin ? i : acc), -1);
+        if (abs === -1 || prev === -1) return;
+        [trackers[prev], trackers[abs]] = [trackers[abs], trackers[prev]];
+        await this.saveAndSync(true);
+        this.refresh();
+      },
+      { disabled: customPos <= 0 }
+    );
+
+    rowButton(
+      actions,
+      "arrow-down",
+      "Move down",
+      async () => {
+        const abs = trackers.indexOf(t);
+        const next = trackers.findIndex((x, i) => i > abs && !x.builtin);
+        if (abs === -1 || next === -1) return;
+        [trackers[next], trackers[abs]] = [trackers[abs], trackers[next]];
+        await this.saveAndSync(true);
+        this.refresh();
+      },
+      { disabled: customPos === -1 || customPos >= customCount - 1 }
     );
 
     rowButton(
@@ -2803,7 +2931,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
         const abs = trackers.indexOf(t);
         if (abs !== -1) trackers.splice(abs, 1);
         await this.saveAndSync(true);
-        this.display();
+        this.refresh();
       },
       { danger: true }
     );

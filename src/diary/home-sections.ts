@@ -46,7 +46,6 @@ import {
   composeFlatNote,
   flatNoteModel,
   bannerSection,
-  PAGE_TITLE_IDS,
 } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import { WIDGETS } from "../core/widget-registry";
@@ -207,26 +206,36 @@ const HOME_SECTION_DEFS: FlatSection[] = [
   // title form, and the `wide` line. Both are `BannerSpec` fields now, so the
   // difference is an argument rather than a duplicate definition.
   //
-  // AND IT CARRIES THE THREE DESTINATIONS AS OF 4.20, WHERE IT WAS BARE.
+  // IT CARRIED THE THREE DESTINATIONS FROM 4.20, AND IS BARE AGAIN SINCE 5.2 —
+  // as is every other page. The whole argument below is kept because it was had
+  // twice and lost twice, and because the observation it turned on was false.
   //
-  // THE ARGUMENT THAT KEPT IT BARE, AND WHY IT LOST. From 4.5 to 4.19 this page
-  // composed the bare `title` on the grounds that the launcher is already here,
-  // as content in a cell, shipping with Diary and Journals among its four tiles
-  // — so ids would draw the same destinations twice on one screen. That is a
-  // true observation and it was weighed against the wrong thing.
+  // THE ARGUMENT THAT KEPT IT BARE (4.5–4.19). This page composed the bare
+  // `title` on the grounds that the launcher is already here, as content in a
+  // cell, "shipping with Diary and Journals among its four tiles" — so ids would
+  // draw the same destinations twice on one screen.
   //
-  // WHAT IT WEIGHED AGAINST: doubling. What it cost: the banner meaning
+  // THAT OBSERVATION WAS NOT TRUE, AND NOBODY CHECKED IT FOR SIX RELEASES.
+  // `LAUNCHER_DEFAULT` is `["week", "month", "quarter", "year"]`: the four
+  // PERIOD dashboards. A bare `launcher` has never drawn a Diary or a Journals
+  // tile. There was no doubling to avoid — which means 4.20 reversed a decision
+  // whose premise was wrong, and reached the right composition for a reason
+  // that did not apply either.
+  //
+  // WHAT 4.20 WEIGHED, AND IT STILL HOLDS AS FAR AS IT GOES: the banner meaning
   // something different on this page than on the other eight. A reader learns
-  // the banner once — name, destinations, cog — and the homepage was the one
-  // place that row was missing, which reads as the page being unfinished rather
-  // than as a considered omission. A row you can predict is worth more than a
-  // row that is never redundant.
+  // the banner once, and the homepage was the one place its row was missing,
+  // which reads as unfinished rather than considered.
   //
-  // AND THE TWO ARE NOT THE SAME OBJECT ANYWAY, which is what makes the
-  // doubling tolerable: the banner's row is chrome you read to know where you
-  // are, drawn small-caps and faint; the launcher is content you click, drawn as
-  // tiles. `page-title.ts` makes exactly this distinction between its row and
-  // the `links:` row, and it holds one step further out.
+  // AND 5.2 SETTLES IT FROM THE OTHER END. The row was not drawn ANYWHERE: the
+  // head that rendered it was replaced in 4.10 and the ids reached nothing after
+  // that. So the banner does mean one thing on all nine pages, which is what
+  // 4.20 was after — it is just that the thing is a name and a cog. See
+  // `PAGE_TITLE_LINE` in note-sections.ts.
+  //
+  // THE DISTINCTION THAT MADE THE DOUBLING TOLERABLE IS STILL A REAL ONE, for
+  // whenever a destinations row comes back: chrome you read to know where you
+  // are is not content you click, even when the two name the same places.
   //
   // NO `links:` ROW EITHER: the diary card's destination pills ARE this page's
   // time navigation, and always were. So the homepage banner is a title and
@@ -243,7 +252,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
   // IT STILL CARRIES THE PAGE'S WIDTH (4.11). `wide` is a fact about the note,
   // read from the block that draws its title — see `HOME_CSS_CLASS` for what
   // that replaced and what it did not.
-  bannerSection({ ids: PAGE_TITLE_IDS, wide: true }),
+  bannerSection({ wide: true }),
   {
     id: "diary",
     label: "Diary",

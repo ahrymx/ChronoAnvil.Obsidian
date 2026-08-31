@@ -52,11 +52,7 @@ import { hueOf, journalTypeAtPath } from "../../journals/journal";
 import { CLASS_DEFS, noteKindOf, TrackerClass } from "../../trackers/trackers";
 import { OVERVIEW_LABELS, OverviewUnit } from "../../diary/calendar";
 import { periodAnchor, valueLabel } from "../../diary/periodnav";
-import {
-  dashboardGrainOf,
-  folderNotePath,
-  folderPrefix,
-} from "../../core/util";
+import { dashboardGrainOf, folderNotePath, folderPrefix, frontmatterOf, noteTypeOf } from "../../core/util";
 import { LOGBOOK_TITLE } from "../../core/vocabulary";
 
 /** The class the head carries. Named once — `headerbar.ts` reads it too. */
@@ -172,7 +168,7 @@ const OVERVIEW_UNIT: Partial<Record<TrackerClass, OverviewUnit>> = {
 // `noteKindOf` is the one line inside `entryContext` that answers the question,
 // and asking it directly is what that function does itself.
 function grainOf(plugin: ChronoAnvilPlugin, file: TFile): TrackerClass {
-  const fm = plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+  const fm = frontmatterOf(plugin.app, file);
   const kind = noteKindOf(
     plugin.settings.paths,
     file.path,
@@ -261,36 +257,6 @@ export function pageHeadText(
     sub: date && date !== title ? date : null,
     target: titleTargetFor(surface, date !== null),
   };
-}
-
-// Whether the head is printing this exact string as the note's name.
-//
-// The caption row's question, and it takes the STRING rather than a date so the
-// caller keeps owning what it was about to print — see `buildTrackerHead`.
-export function pageHeadNames(
-  plugin: ChronoAnvilPlugin,
-  file: TFile,
-  text: string
-): boolean {
-  return pageHeadText(plugin, file)?.title === text;
-}
-
-// Whether the head's eyebrow already carries this fact.
-//
-// SEGMENT-WISE, because an eyebrow is `Study · Subject` and the strip's fact is
-// `Subject`: a substring test would also swallow a kind called `Ub`, and an
-// equality test would never fire at all.
-export function pageHeadSays(
-  plugin: ChronoAnvilPlugin,
-  file: TFile,
-  fact: string
-): boolean {
-  const eyebrow = pageHeadText(plugin, file)?.eyebrow;
-  if (!eyebrow) return false;
-  const want = fact.trim().toLowerCase();
-  return eyebrow
-    .split("·")
-    .some((part) => part.trim().toLowerCase() === want);
 }
 
 // The head, or null on a note the bar does not reach.
@@ -401,8 +367,7 @@ function eyebrowFor(
     // The journal's own dashboard, named as what it is rather than left to
     // repeat its title.
     if (file.path === folderNotePath(type.root)) return `${type.name} · Journal`;
-    const raw = plugin.app.metadataCache.getFileCache(file)?.frontmatter?.["type"];
-    const id = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+    const id = noteTypeOf(plugin.app, file);
     const named =
       type.kinds.find((k) => k.id === id)?.label ??
       type.levels.find((l) => l.id === id)?.noun;
@@ -428,7 +393,7 @@ function titleTextOf(
   date: string | null
 ): string {
   if (titleTargetFor(surface, date !== null) === "filename") return file.basename;
-  const v = app.metadataCache.getFileCache(file)?.frontmatter?.[TITLE_PROP];
+  const v = frontmatterOf(app, file)[TITLE_PROP];
   const title = typeof v === "string" ? v.trim() : "";
   return title || date || file.basename;
 }

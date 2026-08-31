@@ -628,11 +628,6 @@ interface IndexCacheEntry {
 // Module-level, so every retrieval widget and every repaint share one index.
 const indexCache = new Map<string, IndexCacheEntry>();
 
-// Test-only: drop the cache so cases don't leak into each other.
-export function __clearIndexCache(): void {
-  indexCache.clear();
-}
-
 function cacheKey(surface: IndexSurface, path: string): string {
   return `${surface}\u0000${path}`;
 }

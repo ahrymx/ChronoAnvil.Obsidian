@@ -58,9 +58,14 @@ Guidelines and rules for developing, testing, packaging, and archiving `obsidian
   * `Almanac` stays where it is HISTORY — releases through 4.84 went out under
     it, so the section 7 naming clause covers it and `tools/migrate-vault.mjs`
     still reads its tokens. It must never be the current name.
-  * `tools/migrate-vault.mjs` carries `PRERELEASE_RULES` for a name that was
-    never released. Delete that array, its `FILE_RENAMES` entries and the
-    `chronoforge` plugin-folder id once the development vaults are migrated.
+  * `ChronoForge` is gone from the tree, and must stay gone. It was the name
+    between the two, it was never released, and `tools/migrate-vault.mjs` used
+    to carry `PRERELEASE_RULES`, three `FILE_RENAMES` rows and a `chronoforge`
+    plugin-folder id for it — read-compatibility for vaults no reader could
+    have. The development vaults are migrated and those tables are deleted; the
+    only migration the tool performs is Almanac's. `test/product-name.test.ts`
+    sweeps that file along with the licence and README, so adding the dead name
+    back by symmetry with `RULES` fails the suite.
 
 * **Obsidian Review Checklist** (`test/review-checklist.test.ts` holds all of it):
   * No command declares a `hotkeys` default. Claiming a binding in every vault
@@ -138,7 +143,7 @@ npm run package && npm run archive
 ```
 * **Archive Verification**:
   * Automatically creates:
-    * `../chronoanvil-builds/chronoanvil-<version>-plugin.zip`
-    * `../chronoanvil-source/chronoanvil-source-<version>.zip`
+    * `../archives/chronoanvil-builds/chronoanvil-<version>-plugin.zip`
+    * `../archives/chronoanvil-source/chronoanvil-source-<version>.zip`
   * Reads back the generated zips to guarantee integrity (rejects hollow or stale archives).
   * Re-run `npm test` after version bump to ensure version assertion tests pass.

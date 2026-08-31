@@ -253,6 +253,17 @@ describe("recall widget registration", () => {
     expect(widgets).toMatch(/buildRecall\((?:this, )?rest, ctx, label\)/);
   });
 
+  it("builds a surface card with a collapsible header bar", () => {
+    const recallSrc = readSrc("recall-widgets");
+    expect(recallSrc).toContain("ca-journal-recall ca-journal-note--collapsible");
+    expect(recallSrc).toContain("ca-journal-recall-head ca-journal-note-collapse-bar");
+    expect(recallSrc).toContain("ca-journal-recall-title-left");
+    expect(recallSrc).toContain("ca-journal-note-chevron ca-journal-recall-chevron");
+    expect(recallSrc).toContain("ca-journal-note-label ca-journal-recall-label");
+    expect(recallSrc).toContain("noteFoldState");
+    expect(recallSrc).toContain("setNoteFold");
+  });
+
   it("resolves both properties through the registry", () => {
     // Not spelled into a fifth place: `confidenceProperty` and
     // `reviewProperties` already resolve these from the tracker registry, so a

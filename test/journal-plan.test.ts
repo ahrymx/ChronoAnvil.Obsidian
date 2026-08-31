@@ -325,20 +325,60 @@ describe("nothing the plugin did not write is touched", () => {
   });
 
   it("never offers to remove a section that writes ordinary markdown", () => {
-    // Derived from the block model rather than special-cased here: `headings`
-    // emits `## ` markdown, which is indistinguishable from the reader's own
-    // prose, so removal is refused and said so rather than silently ignored.
+    // Derived from the block model rather than special-cased here. `banner`
+    // emits a bare `markdown` spacer, which is indistinguishable from the
+    // reader's own prose, so removal is refused and said so rather than
+    // silently ignored.
+    //
+    // `headings` USED TO BE THE SECOND NAME IN THIS TEST, and 5.6 moved it: its
+    // `## ` markdown is bracketed now, so it is findable and the plan offers a
+    // real `remove`. The claim here is about unprovable markdown, not about
+    // prose — see "removing a bracketed section" below for what replaced it.
     const lesson = allTemplates().find((t) => t.file.includes("lesson"))!;
     const present = sectionsPresent(lesson.text, lesson.ctx);
-    const ops = planSections(lesson.ctx ? lesson.text : "", lesson.ctx, []);
+    const ops = planSections(lesson.text, lesson.ctx, []);
     for (const op of ops) {
-      if (op.sectionId === "headings" || op.sectionId === "banner") {
+      if (op.sectionId === "banner") {
         expect(op.kind).toBe("keep");
         expect(op.detail).not.toBe("unchanged");
       }
-      expect(op.kind, `${op.sectionId}`).not.toBe("remove_markdown");
     }
     expect(present).toContain("banner");
+  });
+
+  it("takes out an empty heading and leaves one with writing under it", () => {
+    // THE WHOLE OF WHAT REMOVAL PROMISES, on a note built to hold both cases.
+    // The unit is the heading because the reader's writing is not in a
+    // container of its own — it is under a `## `, interleaved with the
+    // catalogue's — so "keep the whole section" and "drop the whole section"
+    // are both wrong and the choice has to be made one heading at a time.
+    const lesson = allTemplates().find((t) => t.file.includes("lesson"))!;
+    const note = lesson.text
+      .replace("What is this lesson about, and why does it matter?", "")
+      .replace("- **Definition:** \n- **Example:** ", "- **Definition:** ohms law");
+
+    // ONLY THE SKELETON IS UNTICKED. Asking for an empty note would remove
+    // every section at once, and the blank lines four removals leave between
+    // them would say nothing about this one.
+    const want = sectionsPresent(note, lesson.ctx).filter(
+      (id) => id !== "headings"
+    );
+    const op = planSections(note, lesson.ctx, want).find(
+      (o) => o.sectionId === "headings"
+    )!;
+    expect(op.kind).toBe("remove");
+    expect(op.keepsContent?.map((k) => k.key)).toContain("Key Concepts");
+    expect(op.keepsContent?.map((k) => k.key)).not.toContain("Overview");
+
+    const after = applySections(note, lesson.ctx, want)!;
+    expect(after).toContain("## Key Concepts");
+    expect(after).toContain("ohms law");
+    expect(after).not.toContain("## Overview");
+    // No marker survives a removal, and no gap opens where the empty headings
+    // were: `tidyBlanks` is what stops a note growing a blank line every time
+    // somebody unticks something.
+    expect(after).not.toContain("chronoanvil-skeleton");
+    expect(after).not.toMatch(/\n\n\n/);
   });
 
   it("refuses to remove a required section and says why", () => {

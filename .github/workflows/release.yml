@@ -1,0 +1,116 @@
+name: Release
+
+# Obsidian resolves a plugin version by looking for a GitHub release whose TAG
+# IS THE BARE VERSION -- 5.2.0, never v5.2.0 -- and by reading the three files
+# attached to it as individual assets. The community installer downloads those
+# assets; it never reads the repository tree. That is why `main.js` and
+# `styles.css` are gitignored and built here instead of committed: a copy in git
+# would go stale the first commit after someone edited a part file.
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # THE TAG IS THE VERSION, so a tag that disagrees with the manifest would
+      # publish a release advertising one number containing a build that calls
+      # itself another, and Obsidian believes the manifest. Checked before
+      # anything is built, so the failure costs seconds rather than a full run.
+      - name: Check the tag against the manifest
+        run: |
+          tag="$GITHUB_REF_NAME"
+          manifest=$(node -p "require('./manifest.json').version")
+          pkg=$(node -p "require('./package.json').version")
+          if [ "$tag" != "$manifest" ] || [ "$tag" != "$pkg" ]; then
+            echo "tag '$tag' disagrees with manifest '$manifest' / package '$pkg'"
+            exit 1
+          fi
+
+      # `check:versions` deliberately tolerates a version that is not yet in
+      # versions.json -- that is what a testing build looks like. A release is
+      # the one moment where it must be there, because versions.json is how
+      # Obsidian picks a build for a given app version.
+      - name: Require the version in versions.json
+        run: |
+          tag="$GITHUB_REF_NAME"
+          node -e "
+            const v = require('./versions.json');
+            const tag = process.argv[1];
+            if (!v[tag]) {
+              console.error('versions.json has no entry for ' + tag);
+              process.exit(1);
+            }
+          " "$tag"
+
+      - name: Check version agreement
+        run: npm run check:versions
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Run typecheck
+        run: npm run typecheck
+
+      - name: Run linter
+        run: npx eslint src test
+
+      - name: Build
+        run: npm run build
+
+      # The installer writes exactly these three files and creates no
+      # subdirectories. A zero-byte styles.css would install silently and render
+      # an unstyled plugin, so each is checked for size, not just existence.
+      - name: Verify the release assets
+        run: |
+          for f in main.js manifest.json styles.css; do
+            if [ ! -s "$f" ]; then
+              echo "missing or empty release asset: $f"
+              exit 1
+            fi
+            echo "$f  $(wc -c < "$f") bytes"
+          done
+
+      # Release notes come from the changelog section for this version, so the
+      # release page says what the CHANGELOG says rather than a list of commit
+      # subjects. If the section is missing the release still goes out, pointing
+      # at the file -- a missing heading is not a reason to fail a tagged build.
+      - name: Extract the changelog section
+        run: |
+          tag="$GITHUB_REF_NAME"
+          awk -v tag="$tag" '
+            $0 ~ "^## \\[" tag "\\]" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            printf 'See [CHANGELOG.md](CHANGELOG.md) for the notes on %s.\n' "$tag" > release-notes.md
+          fi
+
+      - name: Create the release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            main.js manifest.json styles.css

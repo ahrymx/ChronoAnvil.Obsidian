@@ -63,6 +63,10 @@ export class Notice {
   constructor(_msg?: string) {}
 }
 
+export class MarkdownView {
+  file: TFile | null = null;
+}
+
 export class PluginSettingTab {}
 
 // Enough Plugin for main.ts to be *constructed* and its loadSettings called.

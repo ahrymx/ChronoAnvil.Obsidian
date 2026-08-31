@@ -86,7 +86,6 @@ import {
   composeFlatNote,
   flatNoteModel,
   bannerSection,
-  PAGE_TITLE_IDS,
   graphLinksSection,
 } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
@@ -180,7 +179,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
   // of its own — 4.10 made the same call here and wrote it down — so a
   // navigation row in the banner would be the second answer on one page that
   // the whole release is about removing.
-  bannerSection({ ids: PAGE_TITLE_IDS }),
+  bannerSection(),
   {
     id: "today",
     label: "Today",

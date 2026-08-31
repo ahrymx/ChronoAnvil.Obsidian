@@ -15,13 +15,23 @@ You do **not** need Templater, Meta Bind, CSS snippets, or **Dataview** — the 
 
 ## First run
 
-Run **Maintenance: set up / repair vault** (ribbon 📖 menu, the command palette, or the plugin's settings tab). It creates any missing folders, templates, base files and the homepage. It never overwrites existing files, so it's safe to re-run any time something looks out of place.
+Run **Maintenance: set up / repair vault** (the ChronoAnvil ribbon menu, the command palette, or the plugin's settings tab). It creates any missing folders, templates, base files and the homepage. It never overwrites existing files, so it's safe to re-run any time something looks out of place.
+
+## Finding a setting
+
+The settings tab is one long list, so it opens with two ways to cut it down.
+
+**The search box** filters as you type — across every option's title, its description, and the names of your own trackers and journals. A group holding a match opens itself, so you see what matched rather than a list of closed headings. Clearing the box puts everything back.
+
+**The category pills** under it narrow the list to one area: **Trackers & Capture**, **Journals & Logs**, **Appearance & Banner**, **Vault & System**, or **All Settings** for the whole thing. They compose with the search, so typing while a category is chosen searches inside that category only — and if nothing matches, the message says which category it looked in, so an empty list is never a mystery.
+
+**Repair vault** sits on the same row as the search box. It is the same **Maintenance: set up / repair vault** pass described above, put where you are already looking rather than at the bottom of the page.
 
 ## Commands
 
 Everything below is also reachable from the note itself. Every journal note, index and template carries a banner, and the **⋯** control at the right of its breadcrumb row is the shortest way to what that note supports: editing its sections, adding or removing a tracker, converting it into a dashboard. The menu is built from the note, so it never offers something whose only outcome would be an error — and a note no journal recognises gets no control at all rather than a menu that opens and then explains it can't help. Each journal in Settings also has a **Templates and sections** button that opens straight onto its section list.
 
-All available from the command palette and the 📖 ribbon menu. **Every command
+All available from the command palette and the ChronoAnvil ribbon menu. **Every command
 is named `<group>: <what it does>`** (3.13), so the palette groups them when you
 filter: type `chronoanvil diary` for the diary's, `chronoanvil maint` for the ones that
 write to your vault. The ribbon menu draws the group as a heading instead, so
@@ -72,11 +82,14 @@ Directives:
 - `tracker:<id>[|Label]` — a widget for a tracker defined in Settings → Trackers (stepper for numbers, a face picker for a scale like Mood/Energy/Focus, a checkbox for a yes/no habit, otherwise the matching picker/dropdown; derived Sleep is a read-only chip). See "Trackers" below.
 - `sleep` — the coupled Wake-Up + Bedtime control with a live asleep/awake readout; re-derives the `Sleep` property on change.
 - `sleep-summary` — sleep stats across all daily entries (average, typical times, range).
+- `tracker-stat:<tracker>` — one tracker's latest reading, its average and its streak, over a month-long density strip. The tracker is named by its id from Settings → Trackers.
 - `button:<action>[:arg]` — a button. Diary/chart actions: `today`, `this-month`, `new-diary`, `new-monthly`, `week-prev`/`week-this`/`week-next`, `month-prev`/`month-this`/`month-next`, `chart-add`/`chart-edit`/`chart-remove`, `tracker-add`/`tracker-remove`, `log:<trackerId>:<delta>`.
 - `button:<typeId>:<action>[:arg]` — a journal-type button, scoped to a registered type (`study` or a custom type id). Actions: `new-journal`, `new-container`/`new-topic`, `new-lesson:<folder>`, `new-practice:<folder>`, `refresh`. E.g. `button:study:new-lesson:<folder>`.
 - `entry-header[:home,week,month]` — the unified top strip: an editable title (writes the note's `title` property; empty shows the date plus an "Add a title…" hint), quick links, and a compact prev/next navigator, in one bar. Used at the top of the daily and monthly templates in place of separate links + nav rows.
 - `period-nav:<week|month>` — the weekly/monthly dashboards' date finder: prev/next pills around a date-picker pill whose dropdown lists the weeks/months you've journaled (plus the current one) to jump to. Same look as an entry's picker, but it re-scopes the in-page summary by writing this note's `week-start` / `month-start` rather than opening a note. As of 2.22 the navigator is folded into the overview banner (see `week-summary` / `month-summary` below) — the `week-summary` / `month-summary` widget draws it in the banner's top-right corner — so it is no longer written as a separate directive in the dashboard notes.
-- `diary[:N]` — the homepage's entire Diary section in one card: a tinted header band (greeting, today's date and entry status, buttons that act on today, a strip of at-a-glance numbers, and the Weekly / Monthly / All Entries pills), then the month grid, then the next `N` upcoming events (default 5). The greeting heads the calendar rather than sitting in a card of its own, so the section has no separate header bar and cannot be collapsed. On an empty vault the band shows a first-run invitation instead of the numbers.
+- `launcher[:<ids>]` — tiles for the period overviews. Bare it draws the four — `week`, `month`, `quarter`, `year` — and a comma list picks and orders them instead. A LIST rather than a single argument, so an id nobody recognises costs its own tile and nothing else.
+- `links[:<ids>]` — a row of destination pills. The ids are the ones the whole plugin resolves through one table: `home`, `today`, `week`, `month`, `quarter`, `year`, `all`, `diary`, `journals`, `capture`, `search`, `base`, `up`. Bare draws Search alone. A pill pointing at the note you are already reading lights instead of linking.
+- `diary[:N]` — the homepage's entire Diary section in one card: a strip of actions at the top (**Capture**, which writes into today without leaving the note, and **Search**, which reaches notes no calendar can point at), then the month grid, then the next `N` upcoming events (default 5). Only those two controls: everything else the strip used to carry — Open today, Yesterday, All entries — pointed at something the grid or the page head under it already points at, and a control drawn twelve pixels from the thing it duplicates is the same control twice rather than a shortcut. The calendar heads the section itself, so it has no separate header bar and cannot be collapsed.
 
 - **The Year** (`02 - Diary/Year.md`) — a dashboard for a whole year. Pick a year with the row of buttons at the top; everything on the page follows, including the charts. Shows how many diary entries you wrote and what share of the days that covers, your longest unbroken streak and when it ran, lessons completed, tasks done, and a twelve-month strip showing when you wrote most. A year still in progress is titled "so far" and tells you how much of it the numbers cover, so a part-year is never silently compared against a whole one.
 
@@ -93,8 +106,14 @@ Directives:
 - `timeline[:N]` — every entry, newest first, grouped by month: date, title, the opening of what you wrote, and small markers for mood, open tasks, attachments and tags. This is what the **All Entries** link now opens. Shows `N` months (default 3) with a **Show earlier** button for the rest.
 - `month-summary` — the Monthly Overview dashboard's whole summary, driven by that note's `month-start` property, as one card (2.22): an accent-washed **banner** at the top — the "Monthly Overview" eyebrow, the month as its title, the stats line, and the month navigator — welded above the day grid and the year-of-reviews grid. The banner is built the same way as the homepage's diary card and a diary entry's banner, so the three read as one family.
 - `week-summary` — the Weekly Overview dashboard's summary, driven by that note's `week-start` property, in the same banner-over-body card (2.22): a "Weekly Overview" banner (eyebrow, the week's span as its title, stats, and the week navigator) above the seven-day table. Each table row leads with a logged/empty status dot, splits the weekday from the date, links the entry under its own title with a mood heat dot, and rolls the day's tasks into a count pill; an unlogged day offers a quiet **Add entry** in its place.
+- `quarter-summary` — the Quarterly Overview's whole summary: the quarter's banner over a rollup of the three months it spans, driven by that note's `quarter-start` property.
+- `year-summary` — the year's statistics band: entries, what share of the days that covers, longest streak and a twelve-month density strip. Driven by the note's `year-start`.
+- `period-recap:quarter|year` — goals, highlights and challenges gathered from the months the period covers, so a quarter or a year reads back what its months said rather than restating their numbers.
 - `events` — the special-events manager: every recurring and one-off event, grouped, with an **Add event** button. Lives in the body of the events note by default.
 - `events:upcoming[:N]` — the next `N` events (default 5), each with a relative "in 3 days" / "day 2 of 5" readout. A standalone list, for a page that wants upcoming events without a calendar; the homepage's `diary` card already ends with this list.
+- `upcoming[:N]` — the same list under its own keyword, for a page that wants it as a block of its own rather than as part of the events manager. `3`, `5` (the default) and `10` are what the section editor offers; any number works if you type it.
+- `time-grid[:<what>][:<days>]` — the week laid against the hours: meetings, logbook items, captures and tasks that are due, each in its own place. `what` is one of `events`, `logbooks`, `tasks`, `captures` and defaults to all four; `days` is `3` (around today) or `1`, and defaults to the whole week. Written together the two are joined with a bar — `time-grid:events|3`. It reads the whole vault rather than the note's folder, because events and due dates live wherever their notes do.
+- `logbook:<category>` — one logbook's standing notes and captured items, filterable by category or status. `logbook:work` draws the items in `02 - Diary/Logbooks/Work log.md` **wherever the line is written**, which makes it the one region-backed widget that does not read the note it sits on. As many as a page wants.
 - `topics-table` — per-topic rollup on a subject index note (lesson/practice counts, last activity, open tasks). Scope is the host note's own folder.
 - `kind-table:<kind>` — the notes of one kind on a topic index note: title, date, that kind's rating (if it has one) and status. Scope is the host note's own folder, the same rule `topics-table` uses, so the table and the stats band above it always agree. Open notes come first, newest first; finished ones sort to the bottom and grey out. Written once per kind by the index template, all in the same block as their headers and **New …** buttons.
 - `pages-table` — the page index on a note that has been split. Lists the pages sitting beside it, in the order they were created. Only appears with something to show; before that it invites you to press **New Page**.
@@ -109,6 +128,10 @@ Directives:
 - `activity-chart` — open vs completed tasks across the host note's folder, bucketed by each note's `date` and drawn as a calendar quarter: three month heatmaps side by side, with chevrons stepping a quarter at a time (Q1 2026, Q2 2026, …). All three grids share one shade scale — the busiest day in the quarter — so the months are comparable with each other, and the stat rail totals the quarter on screen. A day with a note behind it opens that note. Used on a subject index (it aggregates every topic beneath it) and refreshes as lessons are logged.
 - `journals` — the entire Journals section as **one card**: the hero band described below, then a row per journal (Study, any custom types) carrying its `+ Subject` / `+ Topic` buttons, then a group per subject, then a plain row per topic. Topic rows carried a button per note type until 2.51; a flat journal, which has no topic rows, keeps a single `+ {kind}` button on each group head. This is the counterpart of `diary`, which is the whole Diary section in one card. Two things fold, and each remembers its state per note: a type row folds its subjects, and a subject row folds its topics — the last is the one that matters on a subject with thirty topics. The card is live: creating a subject, adding a topic or logging a lesson repaints it in place, with no rebuild step and nothing written back to the note. **Refresh** in the hero forces a re-read from disk, for changes that arrived from outside Obsidian. **Reorganise**, beside it, opens a short window for the order the journals appear in — move a journal with the ↑/↓ buttons and press Save; nothing is written until you do, and nothing moves on disk (no folder is renamed and no note is touched). The order is the same one the homepage uses. On the homepage itself, where each journal is a card rather than a section, **drag a card onto another** to put it in that card's place — same order, same setting, and there it writes as you drop. Each page offers one of the two, not both.
 - `level-cards[:<journal>[/<folder>]]` — **what is below this note, as cards** (4.36): one card per folder in the scope, carrying its numbers — notes, when it was last worked, open tasks, and the average rating where the journal rates anything — over **Open** and a **＋** that creates the level below where there is one and a note of any of this journal's types where there is not. Where the journal declares a level below that folder, the card is joined by a **second card beside it** listing what is inside, so a two-level journal reads as pairs and a flat one as singles. Whether a card is paired is a question about the journal's SHAPE, not about what is in the folder today — a subject with no topics yet draws its pair with an empty list rather than being mistaken for a deepest level. Same two arguments as `level-index` and the same resolver, so an unknown journal or a folder outside it gets the same sentence from either; at the deepest level it declines and names `level-index`, because a card is a container and what is below a deepest folder is notes. A page may hold several.
+- `level-index[:<journal>[/<folder>]]` — what is below this note as a live table: the folders inside it, or its notes where there are no folders left. Bare it reads the host note's own folder; the journal and an optional folder inside it are joined with a slash. This is the general form of what `topics-table` asked for one journal only.
+- `stats-band[:<preset>]` — a row of numbers about what is below this note, each one picked by you. Scope is the host note's own folder and is deliberately not in the directive, so the same line means the right thing on a journal, a container and a note.
+- `journal-card:<journal>` — one journal as a card: its banner, its containers and where to go next. Where `journals` draws every journal as one card, this draws the one you name, and a page can carry as many as it likes.
+- `journal-recent[:<folder>|<N>]` — the notes you wrote most recently, newest first, with where each one lives. The folder is a journal folder or `all` for every journal; `N` is how many (the default is eight). The two are joined with a bar — `journal-recent:Study|4`.
 - `journals-header[:<journal>]` — the hero band on its own, for putting the numbers on another dashboard: at-a-glance numbers (active days, current and longest streak, open tasks) over a 53-week activity strip. Bare it covers *every* enabled journal at once, which is what it has always meant; name a journal and it covers that one (4.36), which is what each journal's own dashboard does — a band of the whole vault's figures under one journal's name is a plausible number about something else. `journals-header:all` is bare said out loud, and is what the sections editor writes when you pick **Every journal**. Unlike `activity-chart` it is a fixed window with no navigation and no day numbers — it answers "have I kept this up?" at a glance rather than being browsed — but it shares the same four-shade scale, so a colour means the same amount of work in both. A day with a note behind it opens that note, and the strip repaints as notes are added under any journal root. Renders nothing at all when no journals are enabled.
 - `tag-index[:<folder>]` — a table of tags, most-used first, counted under `<folder>`. The folder is optional and defaults to **the host note's own folder**, the same rule `tasks-table`, `review-queue` and `journal-search` follow — so a bare `tag-index` on a Subject Index covers every topic beneath it. (Before 3.11 it defaulted to the Diary root instead; the homepage now writes its folder out, so nothing there changed.) Where the scope spans more than one folder, each row also names its **sources** — the first folder beneath the scope its notes live in, so a table over your journals root says which journal each tag came from. With one source, or none, that column isn't drawn. Available as the **Tags** section on the homepage, on journal index notes, and — new in 3.14 — on the weekly, monthly, quarterly and yearly dashboards, where it is offered rather than added for you and writes the diary root out as its folder (the dashboards' own folders hold period notes, not tagged ones). Click a tag to search the **whole vault** for it; expand a row to see the notes counted in scope.
 - `entry-rollup[:day|:month]` — **What the entries said**: each entry inside the host dashboard's period that wrote something, oldest first, with its focus (and highlights and challenges, where the entry logged them). Bare gathers **days**; `entry-rollup:month` gathers **monthly entries**, which is what a Quarterly dashboard wants. Scoped by the host note's `week-start` / `month-start` / `quarter-start` property — put it on a note without one and it says so rather than guessing a window. Ships on the Weekly and Monthly dashboards and is offered on the Quarterly one, where it overlaps the Recap.
@@ -379,6 +402,34 @@ Study's own Subject and Topic dashboards are built from this same catalogue —
 they hold no prose, so there was nothing to hand-write. Its Lesson, Practice and
 Page templates stay markdown files, because their substance *is* prose you fill
 in.
+
+**The prose skeleton is yours to shape, and yours to drop.** A leaf template
+opens with a few `##` headings — Overview, Notes, Next steps, or whatever the
+journal's own preset says. They are real markdown headings rather than plugin
+fields, so they show in the outline, fold like any heading, and read the same if
+you ever uninstall ChronoAnvil. Retitle them, add them, delete them in any note;
+then **Save as layout…** on that note writes those headings into every note of
+that kind you make afterwards. Titles only — the words you wrote under a heading
+stay in the note you wrote them in.
+
+Since 5.6 you can also write the list without leaving the change window.
+**Note: edit sections…** gives the Prose skeleton row a box holding the note's
+headings, one per line: reorder them, rename one, add one, take one out. The
+list is applied to the headings the note already has rather than composed
+fresh, so a heading carries everything written under it while it moves — and a
+heading you take out but have written under is not deleted, it simply moves to
+the end, and the window tells you so before you save. One that still holds only
+the wording the template shipped does go.
+
+The same release put the skeleton between two invisible HTML comments, which is
+what lets that window take it out altogether. Removal goes heading by heading on
+exactly the rule above: untouched scaffolding goes, a heading you have written
+under stays with everything beneath it, and the change list names each one it is
+keeping. Untick it on a note you have not written in and nothing is left behind.
+A note made before 5.6 has no such markers, so its skeleton is still prose the
+plugin cannot pick out — the box is not drawn and the row says why. **Reload
+this page**, from the template window or the note's own command, composes the
+skeleton again with its markers and gives you both.
 
 **The templates are written once, at Create, and then they're yours.** Nothing
 regenerates them, there's no saved layout behind them and no "your layout has
@@ -680,7 +731,7 @@ Three doors, one editor:
 - The `events` widget on the events note itself.
 - **Right-click any day** on the homepage calendar — adds an event already dated to that day, or edits one already on it.
 
-Plus the **New special event…** command and the 📖 ribbon menu.
+Plus the **New special event…** command and the ChronoAnvil ribbon menu.
 
 Entering a run of holidays is what **Save and add another** is for: it keeps the icon, colour and kind, and clears the title and date for the next one.
 

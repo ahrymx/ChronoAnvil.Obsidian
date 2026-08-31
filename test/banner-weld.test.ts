@@ -23,6 +23,7 @@
 
 import { describe, expect, it } from "vitest";
 import { mergeBannerFences } from "../src/core/note-sections";
+import { isTitleLine } from "../src/core/directive-grammar";
 import { composeDiaryDashboard } from "../src/diary/diary-sections";
 import { composeSearchNote } from "../src/diary/search-sections";
 import { composeHomeNote } from "../src/diary/home-sections";
@@ -35,7 +36,12 @@ const GRAINS = ["weekly", "monthly", "quarterly", "yearly"] as const;
 // A 4.18-shaped note: the banner's two lines in two fences.
 function unwelded(text: string): string {
   const lines = text.split("\n");
-  const at = lines.findIndex((l) => l.startsWith("title:"));
+  // `isTitleLine` RATHER THAN A `startsWith`, since 5.2 dropped the argument and
+  // the composed line is now the bare keyword. The grammar's own predicate is
+  // what the dispatcher and the drag gesture both read the line with, so a
+  // fixture that asked a different question could disagree with the code it is
+  // testing about which line is the head.
+  const at = lines.findIndex((l) => isTitleLine(l));
   expect(at, "fixture must have a title row").toBeGreaterThan(-1);
   const out = [...lines];
   const close = out.findIndex((l, i) => i >= at && l.trim() === "```");
@@ -59,7 +65,7 @@ describe("welding a banner that is still two fences", () => {
       expect(welded).not.toBeNull();
       const fence = welded
         .split("```")
-        .find((f) => f.includes("title:home,diary,journals"))!;
+        .find((f) => f.split("\n").some(isTitleLine))!;
       expect(fence).toContain("links:today,scopes#diary");
     });
 
@@ -82,9 +88,9 @@ describe("welding a banner that is still two fences", () => {
     const out = mergeBannerFences(unwelded(composeDiaryDashboard("monthly")))!;
     const fence = out
       .split("```")
-      .find((f) => f.includes("title:home,diary,journals"))!;
+      .find((f) => f.split("\n").some(isTitleLine))!;
     expect(fence).toContain("links:today,scopes#diary");
-    expect(fence.indexOf("title:")).toBeLessThan(fence.indexOf("links:"));
+    expect(fence.indexOf("title")).toBeLessThan(fence.indexOf("links:"));
     // And the masthead below it keeps everything else it had.
     expect(out).toContain("month-summary");
     expect(out).toContain("button:new-month");
@@ -107,7 +113,7 @@ describe("what it declines to do", () => {
     // is one whose head a reader removed while that was still allowed.
     const text = unwelded(composeDiaryDashboard("weekly"))
       .split("\n")
-      .filter((l) => !l.startsWith("title:"))
+      .filter((l) => !isTitleLine(l))
       .join("\n");
     expect(mergeBannerFences(text)).toBeNull();
   });
@@ -147,6 +153,12 @@ describe("what it declines to do", () => {
     // A dashboard whose summary a reader removed leaves a fence holding only the
     // navigation row. Welding empties it, and an empty fence renders as an empty
     // block — worse than the seam this closes.
+    //
+    // SPELT THE OLD WAY ON PURPOSE. 5.2 composes the head as a bare `title`, and
+    // this fixture keeps `title:home,diary,journals` because that is what is in
+    // the notes this migration exists for: a 4.18-shaped dashboard, written by a
+    // release that carried the ids. The weld must find the line and copy it
+    // through untouched, which is what the expected output below asserts.
     const text = [
       "`chronoanvil:spacer`",
       "```chronoanvil",

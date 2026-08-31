@@ -618,6 +618,46 @@
   max-width: 60%;
 }
 
+/* THE CONTROL COLUMN IS A COLUMN, NOT A SHRINK-WRAP.
+   `flex: 0 1 auto` sizes the control to its own content, so picking a longer
+   value made the control wider, which narrowed the description beside it,
+   which re-wrapped the description onto another line, which moved every row
+   below it down the page. Changing "Aesthetic preset" from "3. Technical HUD
+   (Monospace Telemetry)" to "1. Editorial Monastic (Default — Serif & Warm
+   Parchment)" shifted the four settings under it by 9px, and it is one of the
+   longer lists in the tab — the effect is proportional to how much longer the
+   reader's new answer is than their old one.
+
+   A FIXED BASIS COSTS NOTHING AND FIXES IT AT THE SOURCE. The right edge does
+   not move: `justify-content: flex-end` already pinned it there and still
+   does, so a button or a toggle sits exactly where it sat. What stops moving
+   is the LEFT edge, which is the one the description is measured against.
+
+   Scoped to a group body's own rows. A control inside a table cell answers to
+   its column, and a control in the editor modals answers to rules of its own —
+   neither has a description beside it to reflow. */
+.ca-settings-body > .setting-item > .setting-item-control,
+.ca-section-fold-body > .setting-item > .setting-item-control {
+  flex: 0 0 var(--ca-settings-control-w);
+  max-width: var(--ca-settings-control-w);
+  min-width: 0;
+}
+
+/* Filling the column rather than sizing to the current answer, for the same
+   reason: a select that grows with its selected option is the reflow wearing a
+   different hat. */
+.ca-settings-body > .setting-item > .setting-item-control > select,
+.ca-settings-body > .setting-item > .setting-item-control > .dropdown,
+.ca-settings-body > .setting-item > .setting-item-control > input[type="text"],
+.ca-section-fold-body > .setting-item > .setting-item-control > select,
+.ca-section-fold-body > .setting-item > .setting-item-control > .dropdown,
+.ca-section-fold-body
+  > .setting-item
+  > .setting-item-control
+  > input[type="text"] {
+  width: 100%;
+}
+
 .ca-settings .setting-item-control select,
 .ca-settings .setting-item-control .dropdown {
   max-width: 100%;
@@ -635,6 +675,14 @@
   .ca-settings .setting-item:not(.setting-item-inline) .setting-item-control {
     max-width: 100%;
     justify-content: flex-start;
+  }
+  /* Stacked, the control has the whole row and the description is above it
+     rather than beside it — so there is nothing left to reflow and a fixed
+     basis would only make the control narrower than the space it has. */
+  .ca-settings-body > .setting-item > .setting-item-control,
+  .ca-section-fold-body > .setting-item > .setting-item-control {
+    flex: 1 1 auto;
+    max-width: 100%;
   }
 }
 
@@ -841,6 +889,17 @@
   font-weight: 600;
 }
 
+/* The pill's only other states are hover and active, and both are colour on a
+ * low-contrast chip — which leaves a keyboard reader tabbing through five
+ * buttons with nothing to say which one they are on. The outline is drawn
+ * outside the border so it survives `.is-active` recolouring the border, and
+ * it is `:focus-visible` rather than `:focus` so a mouse click does not leave
+ * a ring behind on a control that was already showing its state. */
+.ca-settings-tab-btn:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
 
 .ca-settings-no-match {
   padding: 32px 16px;
@@ -1035,6 +1094,41 @@
   font-size: var(--ca-text-xs);
 }
 
+/* ONE GRID FOR TABLES THAT SIT UNDER EACH OTHER.
+   The Trackers group draws three tables with the same five headings — diary
+   built-ins, journal built-ins, custom — and auto layout gave each one its own
+   column positions, because auto layout's whole job is to answer to the rows
+   it was handed. Measured as it shipped, "Surface" started at x=1057 in the
+   first table and x=1017 in the third. `settings.ts` hands all three the same
+   colgroup; `fixed` is what makes the colgroup binding rather than advisory.
+
+   The min-width is the width at which every column still holds its longest
+   shipped content — "Derived (hours)" in Type is the tightest — and below it
+   the wrap's own `overflow-x` takes over rather than the columns crushing. */
+.ca-settings-table.is-fixed {
+  table-layout: fixed;
+  min-width: 600px;
+}
+
+/* Fixed columns do not grow for a long pill, so a pill has to agree not to
+   demand it. `inline-block` because `text-overflow` has nothing to act on
+   while the pill is inline. */
+.ca-settings-table.is-fixed .ca-list-pill,
+.ca-settings-table.is-fixed .ca-col-name-sub {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A column of one control per cell, named by a heading that has to sit over
+   it. `th` inherits the table's left alignment, the cell centres its content,
+   and the two disagreed by 9px on the capture matrix — enough to read as a
+   fault and not enough to read as a decision. */
+.ca-settings-table th.ca-col-grain-head {
+  text-align: center;
+}
+
 .ca-settings-table th {
   padding: 7px 12px;
   font-size: var(--ca-text-2xs);
@@ -1140,6 +1234,7 @@
 }
 
 .ca-settings-table code {
+  display: inline-block;
   padding: 2px 6px;
   border-radius: var(--ca-radius-sm);
   background: var(--background-secondary);
@@ -1147,6 +1242,19 @@
   color: var(--text-normal);
   font-size: var(--ca-text-2xs);
   font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.3;
+  vertical-align: middle;
+}
+
+.ca-settings-table .ca-col-id {
+  white-space: nowrap;
+}
+
+.ca-settings-table th.ca-col-edit-head,
+.ca-settings-table .ca-col-edit-cell {
+  text-align: center;
+  white-space: nowrap;
 }
 
 .ca-settings-table .ca-col-actions-cell {
@@ -1158,11 +1266,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 3px;
+  gap: 4px;
 }
 
 .ca-settings-table .ca-col-actions .ca-list-toggle {
-  margin-left: 6px;
+  margin-left: 0;
 }
 
 /* --- A grain column (4.27: Diary entries) -------------------------------
@@ -1177,10 +1285,23 @@
 .ca-settings-table .ca-col-grain {
   text-align: center;
 }
-.ca-settings-table .ca-col-grain .ca-list-toggle {
+
+/* CENTRED AT EVERY LEVEL, NOT JUST THE TOP ONE.
+   `.ca-list-toggle` centred its child, and its child was Obsidian's
+   `.setting-item`, whose own `.setting-item-control` justifies to flex-end and
+   carries the platform's control padding. So the box was centred and the
+   switch sat at one end of it: measured 9px left of the column's middle on
+   every grain but the first. Each level is told to fill its parent and centre
+   what it holds, which leaves nothing between the cell's centre line and the
+   switch. */
+.ca-settings-table .ca-col-grain .ca-list-toggle,
+.ca-settings-table .ca-col-grain .ca-list-toggle .setting-item,
+.ca-settings-table .ca-col-grain .ca-list-toggle .setting-item-control {
   display: flex;
-  justify-content: center;
+  width: 100%;
+  min-width: 0;
   margin: 0;
+  justify-content: center;
 }
 .ca-settings-table .ca-col-grain .setting-item {
   border: none;

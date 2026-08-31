@@ -757,6 +757,218 @@ export function buildAddCategoryButton(
   return wrap;
 }
 
+// ── the three pieces `buildAttachments` used to hold inline (5.2) ────────
+//
+// EXTRACTED, NOT REORGANISED. The function was 332 lines: a label row, an
+// in-memory model with its render, a toolbar and two intake listeners, read
+// top to bottom as one thing. These three take the parts that talk only to the
+// DOM and to a handful of callbacks; the model — `items`, `render`, `handlers`,
+// `ingestFiles`, `ingestText` — stays where it is, because it is what the parts
+// are about and splitting it would mean threading it through three signatures.
+//
+// EVERY EXTRACTION KEEPS ITS ORDER. Each is called where its code stood, so the
+// DOM is built and the listeners registered in exactly the sequence they were —
+// which matters here: `bar` is created before the intake listeners, and the
+// zone's `drop` handler must be registered after the tiles' own.
+
+// The shelf's own subtitle row, and its remove control (3.19.2).
+//
+// BUILT ONCE AND REFRESHED, rather than rebuilt from `render`: the button is not
+// torn down on every model change, and the returned function updates the one
+// thing that changes, which is whether it is offered at all.
+//
+// TAKES A COUNT, NOT THE MODEL. `items` is reassigned by `onReorder` and by the
+// load, so a reference captured here would go stale; a getter asks the question
+// at the moment it is answered.
+function buildShelfLabel(
+  deps: PluginNoteRegionHost,
+  wrap: HTMLElement,
+  ctx: MarkdownPostProcessorContext,
+  key: string,
+  label: string,
+  count: () => number
+): () => void {
+  const head = wrap.createDiv({ cls: "ca-journal-attach-label" });
+  head.createSpan({ cls: "ca-journal-attach-label-text", text: label });
+  const drop = head.createEl("button", {
+    cls: "ca-journal-attach-remove",
+    attr: { type: "button" },
+  });
+  setIcon(drop, "x");
+  drop.addEventListener("click", async (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    const ok = await confirmAction(
+      deps.app,
+      `Remove the “${label}” category?`,
+      "It has nothing in it, so nothing is lost. You can add it again from “Add category” on the section's title bar.",
+      "Remove it",
+      true
+    );
+    if (!ok) return;
+    await removeAttachCategory(deps, ctx.sourcePath, key);
+  });
+  return (): void => {
+    // EMPTY IS THE WHOLE CONDITION. Disabled rather than hidden, on
+    // `buildScopeCycle`'s reasoning: a control that vanishes on some shelves
+    // and not others is harder to read than a quiet one, and the tooltip is
+    // where the reason belongs.
+    const n = count();
+    const empty = n === 0;
+    drop.disabled = !empty;
+    drop.toggleClass("is-static", !empty);
+    const why = empty
+      ? `Remove the “${label}” category`
+      : `“${label}” still has ${n} item${n === 1 ? "" : "s"} — remove them first`;
+    drop.setAttr("aria-label", why);
+    drop.setAttr("title", why);
+  };
+}
+
+// What the shelf's action row offers: a file picker behind a button, and a
+// prompt for a link.
+//
+// `Add category` IS NOT HERE, and 3.18 §1 is why: it sat on this row on every
+// shelf — three times on Study's Topic index — and it is a SECTION-level action
+// where these two are shelf-level ones. `buildAddCategoryButton` anchors it in
+// the Resources header bar instead.
+interface AttachToolbarActions {
+  ingestFiles: (files: File[]) => Promise<void>;
+  add: (a: Attachment) => boolean;
+  persist: () => void;
+  render: () => void;
+}
+
+function buildAttachToolbar(
+  deps: PluginNoteRegionHost,
+  bar: HTMLElement,
+  actions: AttachToolbarActions
+): void {
+  const picker = bar.createEl("input", {
+    type: "file",
+    cls: "ca-journal-attach-file-input",
+  });
+  picker.multiple = true;
+  picker.addEventListener("change", () => {
+    const chosen = Array.from(picker.files ?? []);
+    picker.value = "";
+    void actions.ingestFiles(chosen);
+  });
+
+  const addFileBtn = bar.createEl("button", {
+    cls: "ca-journal-attach-btn",
+    attr: { type: "button" },
+  });
+  setIcon(addFileBtn.createSpan({ cls: "ca-journal-attach-btn-icon" }), "image-plus");
+  addFileBtn.createSpan({ text: "Add file" });
+  addFileBtn.addEventListener("click", () => picker.click());
+
+  const addLinkBtn = bar.createEl("button", {
+    cls: "ca-journal-attach-btn",
+    attr: { type: "button" },
+  });
+  setIcon(addLinkBtn.createSpan({ cls: "ca-journal-attach-btn-icon" }), "link");
+  addLinkBtn.createSpan({ text: "Add link" });
+  addLinkBtn.addEventListener("click", () => {
+    void promptText(deps.app, "Add a link", "https://example.com").then((v) => {
+      if (!v) return;
+      const url = coerceUrl(v);
+      if (!url) {
+        new Notice("That doesn't look like a link ChronoAnvil can open.");
+        return;
+      }
+      if (!actions.add(newAttachment(url))) {
+        new Notice("That link is already attached.");
+        return;
+      }
+      actions.persist();
+      actions.render();
+    });
+  });
+
+  bar.createSpan({
+    cls: "ca-journal-attach-hint",
+    text: "…or drop files here, or paste with the field focused.",
+  });
+}
+
+// Everything that arrives by drop or by paste.
+//
+// TWO EVENTS, ONE SET OF RULES: files are ingested, a tile dragged within the
+// widget is a reorder, and text is parsed as a link or a vault path or ignored.
+// Anything else is left alone rather than stored as junk.
+interface AttachIntake {
+  handlers: AttachmentHandlers;
+  // A GETTER, for `buildShelfLabel`'s reason: `items` is reassigned, so a
+  // length captured here would be the length it had when the listener was
+  // registered.
+  count: () => number;
+  ingestFiles: (files: File[]) => Promise<void>;
+  ingestText: (text: string) => boolean;
+  persist: () => void;
+  render: () => void;
+}
+
+function attachIntake(zone: HTMLElement, io: AttachIntake): void {
+  zone.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+    zone.addClass("is-dragover");
+  });
+  zone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    zone.addClass("is-dragover");
+  });
+  zone.addEventListener("dragleave", (e) => {
+    // Only clear when the pointer actually leaves the zone, not when it
+    // crosses between a tile and its caption.
+    if (e.relatedTarget instanceof Node && zone.contains(e.relatedTarget)) return;
+    zone.removeClass("is-dragover");
+  });
+  zone.addEventListener("drop", (e) => {
+    zone.removeClass("is-dragover");
+    const dt = e.dataTransfer;
+    if (!dt) return;
+    // A tile dragged within this widget is a reorder, handled by the tile's
+    // own drop target; landing on empty zone space means "move to the end".
+    const moved = dt.getData(ATTACH_DRAG_TYPE);
+    if (moved) {
+      e.preventDefault();
+      io.handlers.onReorder(Number(moved), io.count() - 1);
+      return;
+    }
+    const files = Array.from(dt.files ?? []);
+    if (files.length > 0) {
+      e.preventDefault();
+      void io.ingestFiles(files);
+      return;
+    }
+    const text = dt.getData("text/plain");
+    if (text && io.ingestText(text)) {
+      e.preventDefault();
+      io.persist();
+      io.render();
+    }
+  });
+
+  zone.addEventListener("paste", (e) => {
+    const cd = e.clipboardData;
+    if (!cd) return;
+    const files = Array.from(cd.files ?? []);
+    if (files.length > 0) {
+      e.preventDefault();
+      void io.ingestFiles(files);
+      return;
+    }
+    const text = cd.getData("text/plain");
+    if (text && io.ingestText(text)) {
+      e.preventDefault();
+      io.persist();
+      io.render();
+    }
+  });
+}
+
 export function buildAttachments(
   deps: PluginNoteRegionHost,
   rest: string,
@@ -765,47 +977,9 @@ export function buildAttachments(
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
   const wrap = createDiv({ cls: `ca-journal-attach ca-journal-attach--${key}` });
-  // The shelf's own subtitle row, and its remove control (3.19.2). Built here
-  // rather than in `render` so the button is not torn down and rebuilt on every
-  // model change; `refreshRemove` below updates only what changes, which is
-  // whether it is offered at all.
-  let refreshRemove = (): void => {};
-  if (label) {
-    const head = wrap.createDiv({ cls: "ca-journal-attach-label" });
-    head.createSpan({ cls: "ca-journal-attach-label-text", text: label });
-    const drop = head.createEl("button", {
-      cls: "ca-journal-attach-remove",
-      attr: { type: "button" },
-    });
-    setIcon(drop, "x");
-    drop.addEventListener("click", async (evt) => {
-      evt.preventDefault();
-      evt.stopPropagation();
-      const ok = await confirmAction(
-        deps.app,
-        `Remove the “${label}” category?`,
-        "It has nothing in it, so nothing is lost. You can add it again from “Add category” on the section's title bar.",
-        "Remove it",
-        true
-      );
-      if (!ok) return;
-      await removeAttachCategory(deps, ctx.sourcePath, key);
-    });
-    refreshRemove = (): void => {
-      // EMPTY IS THE WHOLE CONDITION. Disabled rather than hidden, on
-      // `buildScopeCycle`'s reasoning: a control that vanishes on some shelves
-      // and not others is harder to read than a quiet one, and the tooltip is
-      // where the reason belongs.
-      const empty = items.length === 0;
-      drop.disabled = !empty;
-      drop.toggleClass("is-static", !empty);
-      const why = empty
-        ? `Remove the “${label}” category`
-        : `“${label}” still has ${items.length} item${items.length === 1 ? "" : "s"} — remove them first`;
-      drop.setAttr("aria-label", why);
-      drop.setAttr("title", why);
-    };
-  }
+  const refreshRemove = label
+    ? buildShelfLabel(deps, wrap, ctx, key, label, () => items.length)
+    : (): void => {};
 
   if (!isValidNoteKey(key)) {
     wrap.createDiv({
@@ -953,48 +1127,7 @@ export function buildAttachments(
     return false;
   };
 
-  // ── Toolbar ──────────────────────────────────────────────────────────
-  const picker = bar.createEl("input", {
-    type: "file",
-    cls: "ca-journal-attach-file-input",
-  });
-  picker.multiple = true;
-  picker.addEventListener("change", () => {
-    const chosen = Array.from(picker.files ?? []);
-    picker.value = "";
-    void ingestFiles(chosen);
-  });
-
-  const addFileBtn = bar.createEl("button", {
-    cls: "ca-journal-attach-btn",
-    attr: { type: "button" },
-  });
-  setIcon(addFileBtn.createSpan({ cls: "ca-journal-attach-btn-icon" }), "image-plus");
-  addFileBtn.createSpan({ text: "Add file" });
-  addFileBtn.addEventListener("click", () => picker.click());
-
-  const addLinkBtn = bar.createEl("button", {
-    cls: "ca-journal-attach-btn",
-    attr: { type: "button" },
-  });
-  setIcon(addLinkBtn.createSpan({ cls: "ca-journal-attach-btn-icon" }), "link");
-  addLinkBtn.createSpan({ text: "Add link" });
-  addLinkBtn.addEventListener("click", () => {
-    void promptText(deps.app, "Add a link", "https://example.com").then((v) => {
-      if (!v) return;
-      const url = coerceUrl(v);
-      if (!url) {
-        new Notice("That doesn't look like a link ChronoAnvil can open.");
-        return;
-      }
-      if (!add(newAttachment(url))) {
-        new Notice("That link is already attached.");
-        return;
-      }
-      persist();
-      render();
-    });
-  });
+  buildAttachToolbar(deps, bar, { ingestFiles, add, persist, render });
 
   // ── Where "Add category" used to be ──────────────────────────────────
   //
@@ -1016,63 +1149,13 @@ export function buildAttachments(
     text: "…or drop files here, or paste with the field focused.",
   });
 
-  // ── Drop / paste ─────────────────────────────────────────────────────
-  zone.addEventListener("dragenter", (e) => {
-    e.preventDefault();
-    zone.addClass("is-dragover");
-  });
-  zone.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-    zone.addClass("is-dragover");
-  });
-  zone.addEventListener("dragleave", (e) => {
-    // Only clear when the pointer actually leaves the zone, not when it
-    // crosses between a tile and its caption.
-    if (e.relatedTarget instanceof Node && zone.contains(e.relatedTarget)) return;
-    zone.removeClass("is-dragover");
-  });
-  zone.addEventListener("drop", (e) => {
-    zone.removeClass("is-dragover");
-    const dt = e.dataTransfer;
-    if (!dt) return;
-    // A tile dragged within this widget is a reorder, handled by the tile's
-    // own drop target; landing on empty zone space means "move to the end".
-    const moved = dt.getData(ATTACH_DRAG_TYPE);
-    if (moved) {
-      e.preventDefault();
-      handlers.onReorder(Number(moved), items.length - 1);
-      return;
-    }
-    const files = Array.from(dt.files ?? []);
-    if (files.length > 0) {
-      e.preventDefault();
-      void ingestFiles(files);
-      return;
-    }
-    const text = dt.getData("text/plain");
-    if (text && ingestText(text)) {
-      e.preventDefault();
-      persist();
-      render();
-    }
-  });
-
-  zone.addEventListener("paste", (e) => {
-    const cd = e.clipboardData;
-    if (!cd) return;
-    const files = Array.from(cd.files ?? []);
-    if (files.length > 0) {
-      e.preventDefault();
-      void ingestFiles(files);
-      return;
-    }
-    const text = cd.getData("text/plain");
-    if (text && ingestText(text)) {
-      e.preventDefault();
-      persist();
-      render();
-    }
+  attachIntake(zone, {
+    handlers,
+    count: () => items.length,
+    ingestFiles,
+    ingestText,
+    persist,
+    render,
   });
 
   // ── Load ─────────────────────────────────────────────────────────────

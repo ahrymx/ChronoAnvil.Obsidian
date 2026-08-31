@@ -405,12 +405,17 @@ const BANDS = [
   // THE FIX BELONGS HERE RATHER THAN IN `blockTitle`, because this list is
   // already the answer to the question being asked. The paragraph at the top of
   // this file states the rule — *a band a WIDGET drew has to be named, because
-  // only that widget knows it drew one* — and `.ca-jtc-card` is exactly that: a
-  // band that says the page's name across the top of its block. Teaching
-  // `blockTitle` to skip a fence holding `title` would be a second mechanism
-  // deciding one fact, and the two would drift the first time a banner grew a
-  // third line.
-  "ca-jtc-card",
+  // only that widget knows it drew one* — and the page's own name band is
+  // exactly that. Teaching `blockTitle` to skip a fence holding `title` would be
+  // a second mechanism deciding one fact, and the two would drift the first time
+  // a banner grew a third line.
+  //
+  // `.ca-jtc-card` WAS THE FIRST ENTRY AND LEFT IN 5.2. It was the 4.5 head's
+  // card, and 4.10 replaced that head without touching this list, so the name
+  // 4.19.1 added here has matched nothing since. The band a page banner draws
+  // today is `.ca-journal-page-head`, and it is the `pageBanner` flag on
+  // `chromeClasses` in `index.ts` rather than this list that shapes it — which
+  // is the mechanism that file's own comment block argues for at length.
   "ca-journal-overview-card",
 ];
 
@@ -863,6 +868,272 @@ function attachCardResize(
   });
 }
 
+// The two drag handles that resize rather than move: the divider between two
+// columns, and the one on the bottom edge of every card in them.
+//
+// EXTRACTED FROM `attachBlockHead` IN 5.2. It is the tail of that function and
+// the only part of it that wires a POINTER gesture — everything above is the
+// native drag-and-drop grammar, slots and grips. `attachResize` and
+// `attachCardResize` own the physics; this only decides which element gets
+// which, and the two loops that decide it are short enough to read together.
+//
+// ONLY WHERE THERE IS A ROW. A block that is not a group has no columns to
+// divide and no cards drawn by `layOutRow` to size.
+function wireResizeHandles(
+  plugin: ChronoAnvilPlugin,
+  ctx: MarkdownPostProcessorContext,
+  file: TFile,
+  container: HTMLElement,
+  row: HTMLElement,
+  cells: readonly HTMLElement[],
+  openPage: number,
+  indexNow: () => number | null,
+  bodyNow: () => string[] | null
+): void {
+  // WHERE THIS BLOCK IS AND WHAT THE FILE SAYS, both asked at `pointerdown`
+  // and never before. `indexNow`'s lesson, which cost 4.7 a patch: every drop
+  // rewrites the note, so a block index or a body taken at render time
+  // describes a page that has since moved.
+  const noteNow = (): { block: number; lines: string[] } | null => {
+    const i = indexNow();
+    if (i === null) return null;
+    const text = ctx.getSectionInfo(container)?.text;
+    return text === undefined ? null : { block: i, lines: text.split("\n") };
+  };
+  for (const divider of Array.from(
+    row.querySelectorAll<HTMLElement>(`.${GROUP_DIVIDER_CLASS}`)
+  )) {
+    const n = Number(divider.getAttribute(DIVIDER_INDEX_ATTR));
+    if (!Number.isInteger(n) || n < 1 || n >= cells.length) continue;
+    attachResize(plugin, file, divider, row, cells, n, noteNow, openPage);
+  }
+
+  // ── AND SETTING A WIDGET'S HEIGHT (4.22 §4.3) ───────────────────────
+  //
+  // The same argument, one axis over: a pointer drag cannot collide with a
+  // native one, and `.is-slotting .journal-card-divider` is inert in the
+  // stylesheet for the same belt-and-braces reason.
+  //
+  // ASKED OF THE CARD RATHER THAN OF AN INDEX. A column divider needs to know
+  // which boundary it is on and carries `data-ca-divider` to say so; a card
+  // divider needs only the card it is inside, and the card already knows which
+  // line it is. So there is no attribute here and nothing to keep in step.
+  for (const divider of Array.from(
+    row.querySelectorAll<HTMLElement>(`.${CARD_DIVIDER_CLASS}`)
+  )) {
+    const card = divider.parentElement;
+    if (!(card instanceof HTMLElement)) continue;
+    attachCardResize(plugin, file, divider, card, noteNow, bodyNow);
+  }
+}
+
+// What one landing place looks like from the outside — see `slot`, which is
+// where they are made. Named so the wiring below can be handed the factory
+// rather than being written inside the function that owns it.
+type SlotFn = (
+  host: HTMLElement,
+  cls: string,
+  needs: string,
+  range: (src: CellPayload) => { from: number; to: number } | undefined,
+  where: () => CellTarget | null,
+  live?: () => boolean
+) => void;
+
+// The five places on every widget in the row, for every widget in every cell.
+//
+// EXTRACTED FROM `attachBlockHead` IN 5.2. The essay above the call says what
+// the five are and why a swap takes the middle; this is the loop that draws
+// them, and it is the same five for every card, which is exactly what makes it
+// a thing worth naming rather than a passage to read through.
+//
+// TAKES `slot` RATHER THAN MAKING ONE. The factory closes over the block, its
+// file and its container — everything a drop has to rewrite — and it is the
+// caller that has those. What is here is only WHICH slots exist and WHERE each
+// one points.
+function wireCellSlots(
+  cells: readonly HTMLElement[],
+  opens: readonly (number | null)[],
+  slot: SlotFn,
+  indexNow: () => number | null,
+  bodyNow: () => string[] | null,
+  hasRoom: () => boolean
+): void {
+  cells.forEach((cell, n) => {
+  const before = opens[n];
+  // WHERE THE NEXT COLUMN STARTS, or the end of the body for the last one:
+  // the two of them are what "a column of my own, after this cell" means.
+  const after = (): CellTarget | null => {
+    const i = indexNow();
+    if (i === null) return null;
+    const next = opens[n + 1];
+    if (next !== null && next !== undefined) {
+      return { kind: "cell", block: i, at: next };
+    }
+    // PAST THE LAST LINE, read from the file rather than from a stamp: the end
+    // of the body is the one position no child can carry, and `moveCell`
+    // clamps anything past it anyway.
+    const body = bodyNow();
+    return body ? { kind: "cell", block: i, at: body.length } : null;
+  };
+
+  for (const child of Array.from(cell.children)) {
+    if (!(child instanceof HTMLElement)) continue;
+    const line = lineOf(child);
+    if (line === null) continue;
+
+    if (before !== null) {
+      slot(child, "ca-jbd-slot-before", CELL_TYPE, (p) => p.cell, () => {
+        const i = indexNow();
+        return i === null ? null : { kind: "cell", block: i, at: before };
+      }, hasRoom);
+    }
+    slot(child, "ca-jbd-slot-after", CELL_TYPE, (p) => p.cell, after, hasRoom);
+    slot(child, "ca-jbd-slot-over", CELL_TYPE, (p) => p.cell, () => {
+      const i = indexNow();
+      return i === null ? null : { kind: "stack", block: i, at: line, after: false };
+    });
+    slot(child, "ca-jbd-slot-under", CELL_TYPE, (p) => p.cell, () => {
+      const i = indexNow();
+      return i === null ? null : { kind: "stack", block: i, at: line, after: true };
+    });
+    slot(child, "ca-jbd-slot-swap", CELL_TYPE, (p) => p.cell, () => {
+      const i = indexNow();
+      return i === null ? null : { kind: "swap", block: i, at: line };
+    });
+  }
+});
+}
+
+// What a drag SOURCE looks like from the outside: a host to hang the grip on,
+// what to call it, whether it is the whole block, what lines it carries, and
+// what goes dim while it is in the air.
+type SourceFn = (
+  host: HTMLElement,
+  label: string,
+  whole: boolean,
+  ranges: () => Omit<CellPayload, "block" | "path"> | null,
+  dim?: HTMLElement
+) => void;
+
+// The factory behind those. EXTRACTED FROM `attachBlockHead` IN 5.2 — the grip
+// half of the same split that took `slot`'s shape out as a type: what a source
+// DOES is one thing used twice, and WHERE the two of them go is the caller's
+// business and stays there.
+//
+// A FACTORY RATHER THAN FIVE MORE PARAMETERS. Every source on a block shares
+// the same three facts — which container, which note, which block index right
+// now — and closing over them once is what lets the two call sites read as the
+// two decisions they are.
+function makeSource(
+  container: HTMLElement,
+  sourcePath: string,
+  indexNow: () => number | null
+): SourceFn {
+// One source. The ranges are asked at the drag rather than closed over,
+// because a block's body is a fact about a file every drop rewrites.
+return (
+  host: HTMLElement,
+  label: string,
+  whole: boolean,
+  ranges: () => Omit<CellPayload, "block" | "path"> | null,
+  // WHAT GOES DIM, which is not always what holds the grip (4.9 §2.2). A grip
+  // is positioned against the thing it drags, and for a group that thing is
+  // the BOX while the grip lives in the box's foot — a slim strip going half
+  // transparent on its own would say nothing about what is moving. Defaults to
+  // the host, which is every other caller.
+  dim: HTMLElement = host
+): void => {
+  const grip = attachGrip(host, label);
+  // HOW THE READER REACHES THE REST OF THE PAGE (4.57). A native drag stops
+  // the pane scrolling — the browser owns the input stream and sends the page
+  // drag events and nothing else — so a homepage taller than its pane could
+  // only be rearranged among the blocks that happened to be on screen. See
+  // `drag-scroll.ts`, which turns `dragover` coordinates into an edge band.
+  let stopPan: (() => void) | null = null;
+  grip.addEventListener("dragstart", (evt) => {
+    const block = indexNow();
+    const at = ranges();
+    if (block === null || !at) {
+      evt.preventDefault();
+      return;
+    }
+    const payload = JSON.stringify({ block, path: sourcePath, ...at });
+    // ONE TYPE PER SHAPE THIS DRAG MAY TAKE. A slot checks for its own and
+    // declines everything else, during `dragover`, before the reader has
+    // committed to anything. See `BLOCK_TYPE`.
+    evt.dataTransfer?.setData(BLOCK_TYPE, payload);
+    if (at.cell) evt.dataTransfer?.setData(CELL_TYPE, payload);
+    evt.dataTransfer?.setData("text/plain", "");
+    dragSeq++;
+    inFlight = { block, whole, frees: onlyInItsCell(host) };
+    dim.addClass("is-dragging");
+    stopPan = panDuringDrag(grip);
+  });
+  grip.addEventListener("dragend", () => {
+    stopPan?.();
+    stopPan = null;
+    inFlight = null;
+    dim.removeClass("is-dragging");
+    container.removeClass("is-slotting");
+  });
+};
+}
+
+// The factory behind every landing place on a block. EXTRACTED FROM
+// `attachBlockHead` IN 5.2, alongside `makeSource`, and for the same reason:
+// what a slot IS is one shape used seven times, and WHICH seven a block draws
+// is the caller's argument — the essay it is written in stays there with it.
+function makeSlot(
+  plugin: ChronoAnvilPlugin,
+  file: TFile,
+  sourcePath: string,
+  container: HTMLElement
+): SlotFn {
+// One landing place. `where` is asked at the drop rather than built into the
+// slot, because a block's index and its body length are both facts about a
+// file that every drop rewrites — `indexNow`'s lesson, and the same bug if it
+// is ignored here.
+// `needs` is the shape this slot takes — see `BLOCK_TYPE`. `range` reads the
+// matching half of the payload, so the slot that accepted the drag is the one
+// that decides which lines move.
+return (
+  host: HTMLElement,
+  cls: string,
+  needs: string,
+  range: (src: CellPayload) => { from: number; to: number } | undefined,
+  where: () => CellTarget | null,
+  // Whether this slot would do anything for the drag in the air. Default is
+  // "yes"; only the two block slots ask, and only about a whole block.
+  live: () => boolean = () => true
+): void => {
+  const el = host.createDiv({ cls: `ca-jbd-slot ${cls}` });
+  el.addEventListener("dragover", (evt) => {
+    if (!evt.dataTransfer?.types.includes(needs)) return;
+    // DECLINED BEFORE IT LIGHTS UP, not on drop. A slot that accepts a drag
+    // and then writes nothing is the editor lying about what it will do,
+    // which is the failure the whole plan-before-write rule exists to avoid —
+    // here it is a landing place rather than a dialog.
+    if (!live()) return;
+    evt.preventDefault();
+    el.addClass("is-live");
+  });
+  el.addEventListener("dragleave", () => el.removeClass("is-live"));
+  el.addEventListener("drop", (evt) => {
+    const src = readPayload(evt, sourcePath);
+    if (!src) return;
+    evt.preventDefault();
+    // THE BLOCK UNDER IT MUST NOT ALSO HEAR THIS. A slot sits inside a block
+    // that is itself listening, and a drop heard twice is a move made twice.
+    evt.stopPropagation();
+    el.removeClass("is-live");
+    container.removeClass("is-slotting");
+    const at = range(src);
+    const dst = where();
+    if (at && dst) void applyMove(plugin, file, { block: src.block, ...at }, dst);
+  });
+};
+}
+
 // Give this block its head, and its cells their grips.
 //
 // `title` is what the head calls the block — `blockTitle`'s answer, which is
@@ -1043,49 +1314,7 @@ export function attachBlockHead(
 
   // ── THE SLOTS, AND THE CARDS THAT AIM AT THEM ─────────────────────────
 
-  // One landing place. `where` is asked at the drop rather than built into the
-  // slot, because a block's index and its body length are both facts about a
-  // file that every drop rewrites — `indexNow`'s lesson, and the same bug if it
-  // is ignored here.
-  // `needs` is the shape this slot takes — see `BLOCK_TYPE`. `range` reads the
-  // matching half of the payload, so the slot that accepted the drag is the one
-  // that decides which lines move.
-  const slot = (
-    host: HTMLElement,
-    cls: string,
-    needs: string,
-    range: (src: CellPayload) => { from: number; to: number } | undefined,
-    where: () => CellTarget | null,
-    // Whether this slot would do anything for the drag in the air. Default is
-    // "yes"; only the two block slots ask, and only about a whole block.
-    live: () => boolean = () => true
-  ): void => {
-    const el = host.createDiv({ cls: `ca-jbd-slot ${cls}` });
-    el.addEventListener("dragover", (evt) => {
-      if (!evt.dataTransfer?.types.includes(needs)) return;
-      // DECLINED BEFORE IT LIGHTS UP, not on drop. A slot that accepts a drag
-      // and then writes nothing is the editor lying about what it will do,
-      // which is the failure the whole plan-before-write rule exists to avoid —
-      // here it is a landing place rather than a dialog.
-      if (!live()) return;
-      evt.preventDefault();
-      el.addClass("is-live");
-    });
-    el.addEventListener("dragleave", () => el.removeClass("is-live"));
-    el.addEventListener("drop", (evt) => {
-      const src = readPayload(evt, ctx.sourcePath);
-      if (!src) return;
-      evt.preventDefault();
-      // THE BLOCK UNDER IT MUST NOT ALSO HEAR THIS. A slot sits inside a block
-      // that is itself listening, and a drop heard twice is a move made twice.
-      evt.stopPropagation();
-      el.removeClass("is-live");
-      container.removeClass("is-slotting");
-      const at = range(src);
-      const dst = where();
-      if (at && dst) void applyMove(plugin, file, { block: src.block, ...at }, dst);
-    });
-  };
+  const slot = makeSlot(plugin, file, ctx.sourcePath, container);
 
   // WHICH SLOTS A BLOCK DRAWS, AND WHY THE TWO KINDS MAY NOT OVERLAP (4.8.4).
   //
@@ -1288,101 +1517,11 @@ export function attachBlockHead(
     cells.length < MAX_COLUMNS ||
     (inFlight !== null && inFlight.frees && inFlight.block === indexNow());
 
-  cells.forEach((cell, n) => {
-    const before = opens[n];
-    // WHERE THE NEXT COLUMN STARTS, or the end of the body for the last one:
-    // the two of them are what "a column of my own, after this cell" means.
-    const after = (): CellTarget | null => {
-      const i = indexNow();
-      if (i === null) return null;
-      const next = opens[n + 1];
-      if (next !== null && next !== undefined) {
-        return { kind: "cell", block: i, at: next };
-      }
-      // PAST THE LAST LINE, read from the file rather than from a stamp: the end
-      // of the body is the one position no child can carry, and `moveCell`
-      // clamps anything past it anyway.
-      const body = bodyNow();
-      return body ? { kind: "cell", block: i, at: body.length } : null;
-    };
-
-    for (const child of Array.from(cell.children)) {
-      if (!(child instanceof HTMLElement)) continue;
-      const line = lineOf(child);
-      if (line === null) continue;
-
-      if (before !== null) {
-        slot(child, "ca-jbd-slot-before", CELL_TYPE, (p) => p.cell, () => {
-          const i = indexNow();
-          return i === null ? null : { kind: "cell", block: i, at: before };
-        }, hasRoom);
-      }
-      slot(child, "ca-jbd-slot-after", CELL_TYPE, (p) => p.cell, after, hasRoom);
-      slot(child, "ca-jbd-slot-over", CELL_TYPE, (p) => p.cell, () => {
-        const i = indexNow();
-        return i === null ? null : { kind: "stack", block: i, at: line, after: false };
-      });
-      slot(child, "ca-jbd-slot-under", CELL_TYPE, (p) => p.cell, () => {
-        const i = indexNow();
-        return i === null ? null : { kind: "stack", block: i, at: line, after: true };
-      });
-      slot(child, "ca-jbd-slot-swap", CELL_TYPE, (p) => p.cell, () => {
-        const i = indexNow();
-        return i === null ? null : { kind: "swap", block: i, at: line };
-      });
-    }
-  });
+  wireCellSlots(cells, opens, slot, indexNow, bodyNow, hasRoom);
 
   // ── WHAT CAN BE PICKED UP ─────────────────────────────────────────
 
-  // One source. The ranges are asked at the drag rather than closed over,
-  // because a block's body is a fact about a file every drop rewrites.
-  const source = (
-    host: HTMLElement,
-    label: string,
-    whole: boolean,
-    ranges: () => Omit<CellPayload, "block" | "path"> | null,
-    // WHAT GOES DIM, which is not always what holds the grip (4.9 §2.2). A grip
-    // is positioned against the thing it drags, and for a group that thing is
-    // the BOX while the grip lives in the box's foot — a slim strip going half
-    // transparent on its own would say nothing about what is moving. Defaults to
-    // the host, which is every other caller.
-    dim: HTMLElement = host
-  ): void => {
-    const grip = attachGrip(host, label);
-    // HOW THE READER REACHES THE REST OF THE PAGE (4.57). A native drag stops
-    // the pane scrolling — the browser owns the input stream and sends the page
-    // drag events and nothing else — so a homepage taller than its pane could
-    // only be rearranged among the blocks that happened to be on screen. See
-    // `drag-scroll.ts`, which turns `dragover` coordinates into an edge band.
-    let stopPan: (() => void) | null = null;
-    grip.addEventListener("dragstart", (evt) => {
-      const block = indexNow();
-      const at = ranges();
-      if (block === null || !at) {
-        evt.preventDefault();
-        return;
-      }
-      const payload = JSON.stringify({ block, path: ctx.sourcePath, ...at });
-      // ONE TYPE PER SHAPE THIS DRAG MAY TAKE. A slot checks for its own and
-      // declines everything else, during `dragover`, before the reader has
-      // committed to anything. See `BLOCK_TYPE`.
-      evt.dataTransfer?.setData(BLOCK_TYPE, payload);
-      if (at.cell) evt.dataTransfer?.setData(CELL_TYPE, payload);
-      evt.dataTransfer?.setData("text/plain", "");
-      dragSeq++;
-      inFlight = { block, whole, frees: onlyInItsCell(host) };
-      dim.addClass("is-dragging");
-      stopPan = panDuringDrag(grip);
-    });
-    grip.addEventListener("dragend", () => {
-      stopPan?.();
-      stopPan = null;
-      inFlight = null;
-      dim.removeClass("is-dragging");
-      container.removeClass("is-slotting");
-    });
-  };
+  const source = makeSource(container, ctx.sourcePath, indexNow);
 
   // EVERY WIDGET IN A CELL, whether or not it wears a card. The children of a
   // cell are what `layOutRow` put there — a card for a widget that could be
@@ -1479,40 +1618,16 @@ export function attachBlockHead(
   // Belt and braces, in the stylesheet: `.is-slotting .journal-group-divider`
   // takes `pointer-events: none`, so even a divider under a drag is inert.
   if (row) {
-    // WHERE THIS BLOCK IS AND WHAT THE FILE SAYS, both asked at `pointerdown`
-    // and never before. `indexNow`'s lesson, which cost 4.7 a patch: every drop
-    // rewrites the note, so a block index or a body taken at render time
-    // describes a page that has since moved.
-    const noteNow = (): { block: number; lines: string[] } | null => {
-      const i = indexNow();
-      if (i === null) return null;
-      const text = ctx.getSectionInfo(container)?.text;
-      return text === undefined ? null : { block: i, lines: text.split("\n") };
-    };
-    for (const divider of Array.from(
-      row.querySelectorAll<HTMLElement>(`.${GROUP_DIVIDER_CLASS}`)
-    )) {
-      const n = Number(divider.getAttribute(DIVIDER_INDEX_ATTR));
-      if (!Number.isInteger(n) || n < 1 || n >= cells.length) continue;
-      attachResize(plugin, file, divider, row, cells, n, noteNow, openPage);
-    }
-
-    // ── AND SETTING A WIDGET'S HEIGHT (4.22 §4.3) ───────────────────────
-    //
-    // The same argument, one axis over: a pointer drag cannot collide with a
-    // native one, and `.is-slotting .journal-card-divider` is inert in the
-    // stylesheet for the same belt-and-braces reason.
-    //
-    // ASKED OF THE CARD RATHER THAN OF AN INDEX. A column divider needs to know
-    // which boundary it is on and carries `data-ca-divider` to say so; a card
-    // divider needs only the card it is inside, and the card already knows which
-    // line it is. So there is no attribute here and nothing to keep in step.
-    for (const divider of Array.from(
-      row.querySelectorAll<HTMLElement>(`.${CARD_DIVIDER_CLASS}`)
-    )) {
-      const card = divider.parentElement;
-      if (!(card instanceof HTMLElement)) continue;
-      attachCardResize(plugin, file, divider, card, noteNow, bodyNow);
-    }
+    wireResizeHandles(
+      plugin,
+      ctx,
+      file,
+      container,
+      row,
+      cells,
+      openPage,
+      indexNow,
+      bodyNow
+    );
   }
 }

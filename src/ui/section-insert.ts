@@ -49,12 +49,7 @@ import { promptChoice, promptDetailedSuggester, promptText } from "./modals";
 import { ArgSuggest } from "./arg-suggest";
 import { bridgeCatalogue } from "./widgets/bridge-widgets";
 import { otherSurface } from "../core/bridge";
-import {
-  dashboardGrainOf,
-  folderNotePath,
-  getFile,
-  openFile,
-} from "../core/util";
+import { dashboardGrainOf, folderNotePath, frontmatterOf, getFile, noteTypeOf, openFile } from "../core/util";
 import { openTemplateEditor } from "./template-editor";
 import { splitLayoutTargets } from "../journals/journal-sections";
 import { toPlainMarkdown } from "../core/plain-markdown";
@@ -439,7 +434,7 @@ export class SectionInserter {
   contextFor(notePath: string): SectionContext | null {
     const file = getFile(this.app, notePath);
     if (!file) return null;
-    const raw = this.app.metadataCache.getFileCache(file)?.frontmatter?.["type"];
+    const raw = noteTypeOf(this.app, file);
     return resolveSectionHost(this.refs(), notePath, raw);
   }
 
@@ -463,8 +458,8 @@ export class SectionInserter {
   diaryContextFor(notePath: string): DiaryDashboardContext | null {
     const paths = surfacePathConfig(this.plugin);
     const file = this.app.vault.getAbstractFileByPath(notePath);
-    const fm = file instanceof TFile ? this.app.metadataCache.getFileCache(file)?.frontmatter : undefined;
-    const kind = noteKindOf(paths, notePath, fm?.["journal"], fm?.["type"]);
+    const fm = file instanceof TFile ? frontmatterOf(this.app, file) : {};
+    const kind = noteKindOf(paths, notePath, fm["journal"], fm["type"]);
     if (kind == null || kind.surface !== "diary") return null;
     if (kind.grain === "daily") return null; // no daily dashboard exists
     // THE DASHBOARD'S ADDRESS, NOT ITS GRAIN FOLDER'S NOTE (4.81). This asked
@@ -537,8 +532,8 @@ export class SectionInserter {
   entryContextFor(notePath: string): EntrySectionContext | null {
     const paths = surfacePathConfig(this.plugin);
     const file = this.app.vault.getAbstractFileByPath(notePath);
-    const fm = file instanceof TFile ? this.app.metadataCache.getFileCache(file)?.frontmatter : undefined;
-    const kind = noteKindOf(paths, notePath, fm?.["journal"], fm?.["type"]);
+    const fm = file instanceof TFile ? frontmatterOf(this.app, file) : {};
+    const kind = noteKindOf(paths, notePath, fm["journal"], fm["type"]);
     if (kind == null || kind.surface !== "diary") return null;
     if (this.diaryContextFor(notePath)) return null;
     // THE ANSWERS TO THE ONE QUESTION AN ENTRY SECTION ASKS, assembled here
@@ -579,7 +574,7 @@ export class SectionInserter {
   private surfaceOfNote(notePath: string): ResolvedSurface | null {
     const file = getFile(this.app, notePath);
     if (!file) return null;
-    const raw = this.app.metadataCache.getFileCache(file)?.frontmatter?.["type"];
+    const raw = noteTypeOf(this.app, file);
     const ctx = resolveSectionHost(this.refs(), notePath, raw);
     if (ctx) return { kind: "journal", ctx };
 
@@ -1028,6 +1023,13 @@ export class SectionInserter {
       // there is nothing to join it to at the moment it is added. The toggle is
       // in the editor, beside the arrows that would move it there.
       if (q.kind === "form") continue;
+      // A LIST IS SKIPPED FOR THE TITLE'S REASON AND ONE MORE (5.6). The section
+      // is about to be written with the catalogue's own headings, which is the
+      // answer "empty" means; and a prose skeleton is the one thing here a
+      // reader edits by typing into the note itself, so a modal asking them to
+      // retype it into a prompt would be offering the worse of two editors. The
+      // box is in the section window, and their own `##` lines are in the note.
+      if (q.kind === "lines") continue;
       if (!q.values.length) {
         new Notice(`ChronoAnvil: ${q.empty}`);
         return;

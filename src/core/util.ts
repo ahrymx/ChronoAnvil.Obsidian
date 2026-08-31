@@ -5,7 +5,7 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-import { App, Notice, normalizePath, TFile, TFolder, moment as _moment } from "obsidian";
+import { App, Notice, MarkdownView, normalizePath, TFile, TFolder, moment as _moment } from "obsidian";
 import { FENCE_OPEN, FENCE_CLOSE, HEADER_PREFIX } from "./constants";
 
 // The `moment` export is typed as a namespace; cast to its callable form.
@@ -118,6 +118,45 @@ export async function readTemplate(
 
 export async function openFile(app: App, file: TFile): Promise<void> {
   await app.workspace.getLeaf(false).openFile(file);
+}
+
+function isMarkdownFile(file: unknown): file is TFile {
+  if (!file || typeof file !== "object") return false;
+  const f = file as { extension?: string; path?: string };
+  return (
+    (typeof f.extension === "string" && f.extension === "md") ||
+    (typeof f.path === "string" && f.path.endsWith(".md"))
+  );
+}
+
+// The active markdown file in the workspace.
+//
+// FALLS BACK FROM `workspace.getActiveFile()` to `getActiveViewOfType(MarkdownView)`
+// and workspace leaves. When a modal (e.g. SectionEditorModal or Settings) closes
+// or when clicking directly inside a rendered widget/preview, `getActiveFile()`
+// can be null even though a markdown note is active in the workspace.
+export function activeMarkdownFile(app: App): TFile | null {
+  const direct = app.workspace?.getActiveFile?.();
+  if (isMarkdownFile(direct)) return direct;
+
+  const view = app.workspace?.getActiveViewOfType?.(MarkdownView);
+  if (isMarkdownFile(view?.file)) return view.file;
+
+  const leaves = app.workspace?.getLeavesOfType?.("markdown") ?? [];
+  for (const leaf of leaves) {
+    const viewFile = (leaf?.view as { file?: TFile })?.file;
+    if (isMarkdownFile(viewFile)) {
+      return viewFile;
+    }
+  }
+
+  const recent = app.workspace?.getLastOpenFiles?.() ?? [];
+  for (const r of recent) {
+    const f = app.vault?.getAbstractFileByPath?.(r);
+    if (isMarkdownFile(f)) return f;
+  }
+
+  return null;
 }
 
 // Open Obsidian's own core Search pane pre-filled with `query` (e.g.
@@ -337,11 +376,37 @@ export function filesUnder(app: App, folderPath: string): TFile[] {
   return app.vault.getMarkdownFiles().filter((f) => f.path.startsWith(prefix));
 }
 
+// THE ONE READ OF A NOTE'S FRONTMATTER, and it is the `folderPrefix` argument
+// one paragraph up applied to a second repeated expression. Thirty-four sites
+// across twenty-one files wrote `app.metadataCache.getFileCache(file)
+// ?.frontmatter ?? {}` out by hand, which is harmless right up until the
+// expression has to change — a different cache, a fallback for a file the cache
+// has not seen yet — and then it is thirty-four edits with no list of where
+// they are.
 export function frontmatterOf(
   app: App,
   file: TFile
 ): Record<string, unknown> {
   return app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+}
+
+// A note's `type:` value, normalised — the id of its kind or level, or "".
+//
+// NORMALISED, WHICH IS THE POINT AND WAS NOT UNIFORM. Eight sites read this one
+// property and three of them did something different with the result: two
+// handed the raw value to a resolver that normalises internally, three
+// normalised inline, and `isContainerFolder` in tables.ts compared the raw
+// string against a set of lowercase kind ids — so a folder note written
+// `type: Lesson` was a container and one written `type: lesson` was a leaf.
+// entry-trackers.ts already carries the account of the same bug the last time
+// it happened: "`type: Lesson` resolved the journal type (which does normalise)
+// but not the kind, so kindAllowsTracker found nothing, fell through to
+// permissive, and the per-kind picker filter quietly stopped filtering."
+//
+// Empty string rather than null, because every caller's next move is a lookup
+// in a set of ids and no id is "".
+export function noteTypeOf(app: App, file: TFile): string {
+  return normaliseTypeValue(frontmatterOf(app, file)["type"]) ?? "";
 }
 
 // Normalize a frontmatter date-ish value to "YYYY-MM-DD". Handles plain

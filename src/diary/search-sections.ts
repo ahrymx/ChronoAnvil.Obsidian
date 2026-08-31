@@ -27,7 +27,7 @@
 // maintained without a catalogue entry to hold it.
 
 import { composeFlatNote, flatNoteModel, graphLinksSection } from "../core/note-sections";
-import { bannerSection, PAGE_TITLE_IDS } from "../core/note-sections";
+import { bannerSection } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
 import { WIDGET_FORM, formQuestion, type SectionModel } from "../core/section-model";
@@ -68,7 +68,7 @@ export const SEARCH_SECTIONS: FlatSection[] = [
   // section — a section a reader may remove, whose blurb says nothing about
   // navigation, and which the editor could not show as a nav row because it was
   // not one. The page rendered two strips and reported one section.
-  bannerSection({ ids: PAGE_TITLE_IDS }),
+  bannerSection(),
   {
     id: "search",
     label: "Search the diary",

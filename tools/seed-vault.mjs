@@ -986,16 +986,58 @@ export function buildPlan({
   const files = [];
   const paths = settings.paths;
   const journals = settings.customJournals ?? [];
-  let cursor = 0;
   // A task that stayed open is recorded here rather than counted afterwards,
   // so the run can report the oldest one and a test can assert there is nothing
   // outside the window without re-reading the vault.
   const noteOpenTask = (date) => seeded.openTasks.push(date);
-  // Dates are handed out in order across the whole vault, so a note's date and
-  // the diary entry beside it belong to the same day — a heatmap where the
-  // journals and the diary disagree about when the year was busy is worse than
-  // one with less in it.
-  const nextDate = () => dates[cursor++ % dates.length];
+  // Dates come from `dates`, so a journal note's day is a day the diary was
+  // also written on — a heatmap where the journals and the diary disagree about
+  // when the year was busy is worse than one with less in it.
+  //
+  // SPREAD ACROSS THE WINDOW, AND PER JOURNAL (5.3). This was one shared cursor
+  // and `dates[cursor++ % dates.length]`, which handed the Nth journal note in
+  // the whole vault the Nth active day. About forty notes against thirteen
+  // months of dates meant every journal note landed in the OLDEST two months,
+  // and nothing was written in the eleven since.
+  //
+  // WHAT THAT COST, AND WHY IT WAS INVISIBLE. The run reported "402 written, 0
+  // warnings" — every note existed, every date was real, every date was an
+  // active day. What was wrong was only visible on a dashboard: the activity
+  // strip covers 53 weeks back from today, and Study's notes ended 2025-08-24
+  // against a strip opening 2025-08-31. One day outside, so the Study dashboard
+  // drew a year of empty cells over a Contents section listing seventeen notes.
+  // The other three fared no better — a cluster against the left edge and eleven
+  // blank months.
+  //
+  // PER JOURNAL RATHER THAN ACROSS ALL OF THEM, which is the second half of the
+  // fix and the one a single shared stride would have missed: dealing four
+  // journals in sequence from one cursor gives each of them a contiguous
+  // QUARTER of the window and leaves every journal dashboard blank for the other
+  // nine months. Each journal now strides the whole window on its own — first
+  // note on the oldest active day, last on the newest — which is what a reader
+  // keeping four journals over a year actually looks like, and what makes all
+  // four dashboards worth a screenshot. Two journals sharing a day is a
+  // collision the vault is welcome to have.
+  //
+  // COUNTED FROM THE CORPUS BEFORE THE WALK, because a stride has to know how
+  // many there will be. It counts what `walk` consumes: one date per container
+  // node for its index stamp, one per note.
+  const dateCalls = (nodes = []) =>
+    nodes.reduce(
+      (n, node) => n + 1 + (node.notes?.length ?? 0) + dateCalls(node.children),
+      0
+    );
+  const dealDates = (total) => {
+    let cursor = 0;
+    // `total - 1` so the last note lands ON the newest active day rather than a
+    // stride short of it; guarded because a one-note journal would divide by
+    // zero, and it takes the oldest day.
+    const span = Math.max(1, total - 1);
+    return () => {
+      const at = Math.round((cursor++ * (dates.length - 1)) / span);
+      return dates[Math.min(dates.length - 1, Math.max(0, at))];
+    };
+  };
 
   // A VAULT WITH NO JOURNALS IS A LEGITIMATE VAULT AND A SURPRISING RUN. The
   // corpus carries four journals and thirty-two notes, and none of them can be
@@ -1019,6 +1061,7 @@ export function buildPlan({
       warn(`no corpus for journal "${journal.id}" — skipped`);
       continue;
     }
+    const nextDate = dealDates(dateCalls(entry.containers));
     const levels = journal.levels ?? [];
     const kindsById = new Map((journal.kinds ?? []).map((k) => [k.id, k]));
     // Which tracker keys this journal logs — read from the settings' own tracker

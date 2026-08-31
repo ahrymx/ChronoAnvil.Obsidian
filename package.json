@@ -1,6 +1,6 @@
 {
   "name": "obsidian-chronoanvil-plugin",
-  "version": "5.1.0",
+  "version": "5.8.0",
   "description": "Keep a daily diary and your own journal types with one shared tracker registry, and render calendars, charts, tables and period dashboards natively. Includes quick capture, full-text search, an entry navigator and vault scaffolding.",
   "main": "main.js",
   "type": "module",
@@ -19,6 +19,7 @@
     "migrate:vault": "node tools/migrate-vault.mjs",
     "pretest": "node tools/build-css.mjs && node tools/build-assets.mjs",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest"
   },
   "keywords": [
@@ -41,6 +42,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "builtin-modules": "^3.3.0",
     "esbuild": "^0.20.0",
     "eslint": "^9.39.5",

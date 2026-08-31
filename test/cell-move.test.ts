@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import { moveCell, widgetCount, widgetRun } from "../src/core/cell-move";
-import { readCode, readCss, readSrc } from "./sources";
+import { fnBody, readCode, readCss, readSrc } from "./sources";
 
 // The head class, spelled once so the assertion below cannot drift from it.
 const HEAD = "ca-journal-block-head";
@@ -570,17 +570,21 @@ describe("the gesture that reaches this", () => {
     // open side by side would otherwise let a card name whichever block of the
     // OTHER note happened to have that number — and move it.
     expect(src).toContain("if (p.path !== path) return null;");
-    expect(src).toContain("readPayload(evt, ctx.sourcePath)");
+    // `sourcePath` rather than `ctx.sourcePath` since 5.2: the slot factory
+    // was lifted to `makeSlot` and takes the path as an argument. Same value,
+    // asked of the same note.
+    expect(src).toContain("readPayload(evt, sourcePath)");
   });
 
   it("stops a slot's drop from also reaching the block under it", () => {
     // A slot sits inside a block that is itself a drop target for the other
     // gesture. Without this a drag carrying both types lands twice — once as a
     // cell and once as a swap.
-    const at = src.indexOf("const slot = (");
-    expect(at).toBeGreaterThan(-1);
-    const rule = src.slice(at, src.indexOf("// ABOVE AND BELOW", at));
-    expect(rule).toContain("evt.stopPropagation()");
+    // The factory itself, which is where every slot's drop handler is written
+    // once — `makeSlot` since 5.2, `const slot` inside `attachBlockHead` before
+    // it. Read as a whole function rather than as a slice between two comments,
+    // so a later move cannot silently shrink what is being checked.
+    expect(fnBody("makeSlot", "block-drag")).toContain("evt.stopPropagation()");
   });
 
   it("asks where a slot points at the drop rather than at the render", () => {

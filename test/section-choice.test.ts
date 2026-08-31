@@ -147,13 +147,21 @@ describe("patch 5: the option reaches the catalogue that understands it", () => 
     // A layout's `SectionOverrides` is what the journal TYPE declares; a
     // `SectionChoice` is what this reader asked for on this note. The preset is
     // a default and the choice is an answer.
+    //
+    // THE SPREAD MOVED INTO `renderOptionsFor` IN 5.6, and the order is the
+    // reason it moved rather than something the move risked: two call sites
+    // built the same two-layer object by hand, and the `lines` answer that
+    // arrives as text and has to leave as a layout needed converting in both.
+    // One helper, so the precedence is written once.
     const src = readCode("journal-plan");
-    const at = src.indexOf("renderSection(section, ctx, {");
+    const at = src.indexOf("function renderOptionsFor(");
     expect(at).toBeGreaterThan(0);
-    const call = src.slice(at, src.indexOf("});", at));
-    expect(call.indexOf("sectionOverrides(ctx, id)")).toBeLessThan(
-      call.indexOf("optionsFor(requested, id)")
+    const body = src.slice(at, src.indexOf("\n}", at));
+    expect(body.indexOf("...declared")).toBeLessThan(
+      body.indexOf("optionsFor(requested, section.id)")
     );
+    // And nothing composes those two layers anywhere else.
+    expect(src).not.toContain("renderSection(section, ctx, {");
   });
 });
 

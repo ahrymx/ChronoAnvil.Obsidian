@@ -85,9 +85,16 @@ export class LogListWatcher extends MarkdownRenderChild {
   }
 
   onload(): void {
+    const trigger = (path: string) => {
+      if (this.paths.has(path)) this.refresh();
+    };
+    this.registerEvent(this.app.vault.on("modify", (f) => trigger(f.path)));
+    this.registerEvent(this.app.vault.on("create", (f) => trigger(f.path)));
+    this.registerEvent(this.app.vault.on("delete", (f) => trigger(f.path)));
     this.registerEvent(
-      this.app.vault.on("modify", (f) => {
-        if (this.paths.has(f.path)) this.refresh();
+      this.app.vault.on("rename", (f, oldPath) => {
+        trigger(f.path);
+        trigger(oldPath);
       })
     );
   }
@@ -111,6 +118,9 @@ export interface LogListOptions {
    * exist draws its empty state and waits. See `onAdd`.
    */
   file: TFile | null;
+  /** Explicit path or paths to watch for external modifications/creates */
+  watchPath?: string;
+  watchPaths?: string[];
   /** Extra modifier class on the wrapper, so the two callers can be told apart. */
   modifier: string;
   /** The fold bar's text, or null for a list with no bar. */
@@ -240,47 +250,50 @@ function formatLogText(el: HTMLElement, text: string, query: string): void {
   }
 }
 
-export function buildLogList(
-  host: NoteRegionHost,
-  opts: LogListOptions
-): HTMLElement {
-  const { key } = opts;
-  // `journal-note--collapsible` is borrowed rather than reimplemented: the
-  // fold bar, its chevron and its collapsed state are the same three rules the
-  // `note:` field uses, and a second set would drift the first time either
-  // moved. The list joins that rule's hidden-children selector.
-  const wrap = createDiv({
-    cls: `ca-journal-capture-log ca-journal-note ${opts.modifier}${
-      opts.collapsible ? " ca-journal-note--collapsible" : ""
-    }`,
-  });
+// What the deck sets and `render` reads: the four questions a reader can ask of
+// the list without touching the note behind it.
+//
+// A MUTABLE RECORD RATHER THAN FOUR SETTERS. The deck writes it, `render` reads
+// it, and the alternative — four callbacks passed down against four `let`s held
+// up — is the same coupling written twice. Nothing outlives the widget: one
+// record per list, reachable from nowhere else.
+interface LogFilters {
+  search: string;
+  type: string;
+  status: "all" | "open" | "done" | "timed";
+  sort: "desc" | "asc";
+}
 
-  // The fold bar, kept identical to the `note:#collapse` one it replaces — the
-  // section folds where it always folded, remembers what it always remembered,
-  // and the `captureCollapsedByDefault` setting still means what it says.
-  if (opts.collapsible && opts.label) {
-    const bar = wrap.createDiv({ cls: "ca-journal-note-collapse-bar" });
-    setIcon(bar.createDiv({ cls: "ca-journal-note-chevron" }), "chevron-down");
-    bar.createDiv({ cls: "ca-journal-note-label", text: opts.label });
-    const apply = (v: boolean): void => wrap.toggleClass("is-collapsed", v);
-    apply(opts.startCollapsed());
-    bar.addEventListener("click", (evt) => {
-      evt.preventDefault();
-      const next = !wrap.hasClass("is-collapsed");
-      apply(next);
-      opts.onFold(next);
-    });
-  } else if (opts.label && (!opts.types || opts.types.length <= 1)) {
-    wrap.createDiv({ cls: "ca-journal-note-label", text: opts.label });
-  }
-
+// The bar above the list: which logbook, what text, which status, which way up,
+// and how tightly drawn.
+//
+// EXTRACTED FROM `buildLogList` IN 5.2 — the filter bar M7 names, and the one
+// stretch of that function whose entire job is to set four values and ask for a
+// repaint. Every element it builds is its own; the only things that leave are
+// the count badges, which `render` fills because only `render` knows how many
+// items there are.
+//
+// THE DISMISSAL LISTENER MOVES WITH IT, its add and its remove still in one pair
+// of lines — which is what `test/review-checklist.test.ts` sweeps for, and what
+// the essay inside is about.
+//
+// `onChange` IS A THUNK OVER `render`, which the caller declares AFTER this
+// call. Safe for exactly the reason it was safe inline: nothing here calls it
+// while building, only listeners do, and by then the const is bound. Same for
+// `setCompact`, which reaches a scroll container that does not exist yet.
+function buildLogDeck(
+  wrap: HTMLElement,
+  opts: LogListOptions,
+  filters: LogFilters,
+  onChange: () => void,
+  setCompact: (on: boolean) => void
+): Map<string, HTMLElement> {
   // ── CONTROLS DECK (Dropdown Type Selector, Collapsible Search, Status Segment) ───
   const deck = wrap.createDiv({ cls: "ca-journal-logbook-deck" });
 
-  let searchQuery = "";
-  let activeTypeFilter = opts.activeType ?? "all";
-  let activeStatusFilter: "all" | "open" | "done" | "timed" = "all";
-  let sortOrder: "desc" | "asc" = "desc";
+  // `isCompact` and `searchOpen` STAY HERE while the four filters do not: they
+  // are how this bar looks, not what the list shows. Nothing below the deck ever
+  // asks whether the search strip is open.
   let isCompact = false;
   let searchOpen = false;
 
@@ -336,7 +349,7 @@ export function buildLogList(
 
     // "All" option
     const allItem = dropdownMenuEl.createEl("button", {
-      cls: `ca-jcl-dropdown-item${activeTypeFilter === "all" ? " is-selected" : ""}`,
+      cls: `ca-jcl-dropdown-item${filters.type === "all" ? " is-selected" : ""}`,
       attr: { type: "button" },
     });
     const allLeft = allItem.createDiv({ cls: "ca-jcl-dropdown-item-left" });
@@ -347,14 +360,14 @@ export function buildLogList(
 
     allItem.addEventListener("click", (e) => {
       e.stopPropagation();
-      activeTypeFilter = "all";
+      filters.type = "all";
       updateDropdownSelection();
-      render();
+      onChange();
     });
 
     for (const t of opts.types) {
       const item = dropdownMenuEl.createEl("button", {
-        cls: `ca-jcl-dropdown-item${activeTypeFilter === t.id ? " is-selected" : ""}`,
+        cls: `ca-jcl-dropdown-item${filters.type === t.id ? " is-selected" : ""}`,
         attr: { type: "button" },
       });
       const itemLeft = item.createDiv({ cls: "ca-jcl-dropdown-item-left" });
@@ -365,9 +378,9 @@ export function buildLogList(
 
       item.addEventListener("click", (e) => {
         e.stopPropagation();
-        activeTypeFilter = t.id;
+        filters.type = t.id;
         updateDropdownSelection();
-        render();
+        onChange();
       });
     }
 
@@ -386,19 +399,19 @@ export function buildLogList(
     const items = Array.from(
       dropdownMenuEl.querySelectorAll<HTMLButtonElement>(".ca-jcl-dropdown-item")
     );
-    if (items[0]) items[0].toggleClass("is-selected", activeTypeFilter === "all");
+    if (items[0]) items[0].toggleClass("is-selected", filters.type === "all");
     if (opts.types) {
       opts.types.forEach((t, i) => {
         if (items[i + 1]) {
-          items[i + 1].toggleClass("is-selected", activeTypeFilter === t.id);
+          items[i + 1].toggleClass("is-selected", filters.type === t.id);
         }
       });
     }
-    if (activeTypeFilter === "all") {
+    if (filters.type === "all") {
       typeIconEl.setText("📚");
       typeLabelEl.setText("All Logbooks");
     } else {
-      const activeDef = opts.types?.find((t) => t.id === activeTypeFilter);
+      const activeDef = opts.types?.find((t) => t.id === filters.type);
       if (activeDef) {
         typeIconEl.setText(activeDef.icon ?? "🗒️");
         typeLabelEl.setText(activeDef.label);
@@ -425,9 +438,9 @@ export function buildLogList(
   setIcon(sortIcon, "arrow-down-up");
   const sortLabel = sortBtn.createSpan({ cls: "ca-jcl-action-label", text: "Newest" });
   sortBtn.addEventListener("click", () => {
-    sortOrder = sortOrder === "desc" ? "asc" : "desc";
-    sortLabel.setText(sortOrder === "desc" ? "Newest" : "Oldest");
-    render();
+    filters.sort = filters.sort === "desc" ? "asc" : "desc";
+    sortLabel.setText(filters.sort === "desc" ? "Newest" : "Oldest");
+    onChange();
   });
 
   const compactBtn = actionsGroup.createEl("button", {
@@ -440,7 +453,7 @@ export function buildLogList(
   compactBtn.addEventListener("click", () => {
     isCompact = !isCompact;
     compactBtn.toggleClass("is-active", isCompact);
-    scrollContainer.toggleClass("is-compact", isCompact);
+    setCompact(isCompact);
   });
 
   // Collapsible Search Strip
@@ -466,23 +479,23 @@ export function buildLogList(
       searchInput.focus();
     } else {
       searchInput.value = "";
-      searchQuery = "";
+      filters.search = "";
       searchClear.style.display = "none";
-      render();
+      onChange();
     }
   });
 
   searchInput.addEventListener("input", () => {
-    searchQuery = searchInput.value;
-    searchClear.style.display = searchQuery ? "inline-flex" : "none";
-    render();
+    filters.search = searchInput.value;
+    searchClear.style.display = filters.search ? "inline-flex" : "none";
+    onChange();
   });
   searchClear.addEventListener("click", () => {
     searchInput.value = "";
-    searchQuery = "";
+    filters.search = "";
     searchClear.style.display = "none";
     searchInput.focus();
-    render();
+    onChange();
   });
 
   // Status Segment Row
@@ -496,17 +509,274 @@ export function buildLogList(
     { id: "timed" as const, label: "Timed" },
   ]) {
     const btn = statusSegment.createEl("button", {
-      cls: `ca-jcl-status-segment-btn${activeStatusFilter === s.id ? " is-active" : ""}`,
+      cls: `ca-jcl-status-segment-btn${filters.status === s.id ? " is-active" : ""}`,
       text: s.label,
       attr: { type: "button" },
     });
     btn.addEventListener("click", () => {
-      activeStatusFilter = s.id;
-      statusPills.forEach((p) => p.btn.toggleClass("is-active", p.id === activeStatusFilter));
-      render();
+      filters.status = s.id;
+      statusPills.forEach((p) => p.btn.toggleClass("is-active", p.id === filters.status));
+      onChange();
     });
     statusPills.push({ ...s, btn });
   }
+
+  return pillCountMap;
+}
+
+// The list the reader is looking at: the items, minus the ones the deck's four
+// filters exclude, in the order the sort button asks for.
+//
+// EXTRACTED FROM `render` IN 5.2 and the only piece of it with no DOM in it —
+// which is the whole reason it is the piece that came out. `render` keeps the
+// counts, the empty states, the cards and their callbacks, because every one of
+// those closes over state this function must not see.
+//
+// CARRIES `originalIndex` THROUGH. A card edits, toggles or deletes by position
+// in `items`, not by position on screen, and filtering or reversing the list
+// must not change which item a click lands on — that pairing is the reason this
+// maps to a record before it filters rather than filtering the items directly.
+function filterLogItems(
+  items: LogItem[],
+  filters: LogFilters,
+  opts: LogListOptions
+): { item: LogItem; originalIndex: number }[] {
+  // Filter items
+  let filtered = items.map((item, originalIndex) => ({ item, originalIndex }));
+
+  if (filters.type !== "all" && opts.getItemType) {
+    filtered = filtered.filter(({ item }) => opts.getItemType!(item) === filters.type);
+  }
+
+  if (filters.status === "open") {
+    filtered = filtered.filter(({ item }) => !item.done);
+  } else if (filters.status === "done") {
+    filtered = filtered.filter(({ item }) => !!item.done);
+  } else if (filters.status === "timed") {
+    filtered = filtered.filter(({ item }) => item.mins != null);
+  }
+
+  if (filters.search.trim()) {
+    const q = filters.search.toLowerCase();
+    filtered = filtered.filter(({ item }) => {
+      const matchesText = item.text.toLowerCase().includes(q);
+      const matchesDate = item.date ? item.date.toLowerCase().includes(q) : false;
+      const matchesTime = item.time ? item.time.toLowerCase().includes(q) : false;
+      return matchesText || matchesDate || matchesTime;
+    });
+  }
+
+  // Sort items
+  filtered.sort((a, b) => {
+    const stampA = `${a.item.date ?? ""} ${a.item.time ?? ""}`;
+    const stampB = `${b.item.date ?? ""} ${b.item.time ?? ""}`;
+    return filters.sort === "desc" ? stampB.localeCompare(stampA) : stampA.localeCompare(stampB);
+  });
+  return filtered;
+}
+
+// What the add box needs from the list it sits under. Every one of these is a
+// closure in `buildLogList`, and they are handed over rather than duplicated
+// because there must be exactly one write path — see `persist`, and 4.27, which
+// is what a second one cost.
+//
+// `file` IS A FUNCTION PAIR, not a value. A logbook's note may not exist yet,
+// and the first item added is what creates it, so the box both reads the field
+// and assigns it. Passing the `TFile` would hand over a copy of the answer at
+// build time, which is `null` in exactly the case this matters in.
+interface LogAddIO {
+  items: () => LogItem[];
+  file: () => TFile | null;
+  setFile: (f: TFile) => void;
+  persist: () => void;
+  render: () => void;
+  refresh: () => Promise<void>;
+  watch: (target: TFile) => void;
+}
+
+// The box at the foot of the list: which type, when it happened, and the text.
+//
+// EXTRACTED FROM `buildLogList` IN 5.2 alongside `buildLogDeck` — the deck asks
+// questions of the items and this is the one control that adds one, so between
+// them they are everything on the widget that is not the list itself.
+//
+// DRAWN LAST AND ONLY WHERE THERE IS SOMEWHERE TO PUT AN ITEM. `opts.add` is
+// what says there is; a read-only list of somebody else's log has no box.
+function buildLogAddBox(
+  wrap: HTMLElement,
+  opts: LogListOptions,
+  add: NonNullable<LogListOptions["add"]>,
+  io: LogAddIO
+): void {
+  const row = wrap.createDiv({ cls: "ca-journal-capture-add" });
+  const box = row.createDiv({ cls: "ca-journal-capture-add-box" });
+  const controls = box.createDiv({ cls: "ca-journal-capture-add-controls" });
+
+  let chosenType = opts.types && opts.types.length > 0 ? opts.types[0].id : undefined;
+  if (opts.types && opts.types.length > 1) {
+    const typeSelect = controls.createEl("select", { cls: "ca-jcl-add-type-select" });
+    for (const t of opts.types) {
+      const opt = typeSelect.createEl("option", { value: t.id, text: `${t.icon ? t.icon + " " : ""}${t.label}` });
+      if (t.id === chosenType) opt.selected = true;
+    }
+    typeSelect.addEventListener("change", () => {
+      chosenType = typeSelect.value;
+    });
+  }
+
+  let chosen: WhenValue | null = null;
+  let when: HTMLElement | null = null;
+
+  const reveal = controls.createEl("button", {
+    cls: "ca-journal-capture-when-btn",
+    attr: { type: "button", "aria-label": "Say when this happened", title: "Say when this happened" },
+  });
+  setIcon(reveal, "clock");
+  const revealLabel = reveal.createSpan({ cls: "ca-journal-capture-when-label", text: "Now" });
+
+  reveal.addEventListener("click", () => {
+    if (when) {
+      when.remove();
+      when = null;
+      chosen = null;
+      reveal.removeClass("is-active");
+      revealLabel.setText("Now");
+      return;
+    }
+    const now = add.stamp();
+    chosen = { date: now.date, time: now.time, mins: now.mins };
+    when = whenEditor(row, chosen, opts.dated, (v) => {
+      chosen = v;
+      const parts: string[] = [];
+      if (v.time) parts.push(v.time);
+      else if (v.date) parts.push(v.date);
+      revealLabel.setText(parts.join(" ") || "Custom");
+    });
+    reveal.addClass("is-active");
+  });
+
+  const resetWhen = (): void => {
+    if (!when) return;
+    when.remove();
+    when = null;
+    chosen = null;
+    reveal.removeClass("is-active");
+    revealLabel.setText("Now");
+  };
+
+  const input = box.createEl("textarea", {
+    cls: "ca-journal-capture-add-input",
+    attr: { placeholder: add.placeholder, rows: "1" },
+  });
+
+  const commit = (): void => {
+    const text = input.value;
+    if (!text.trim()) return;
+    input.value = "";
+    const stamp = chosen ?? add.stamp();
+    const newItem: LogItem = {
+      date: stamp.date,
+      time: stamp.time,
+      text,
+      done: null,
+      mins: stamp.mins ?? null,
+    };
+
+    if (opts.onAddMulti && chosenType) {
+      void opts.onAddMulti(chosenType, newItem).then(async () => {
+        resetWhen();
+        if (opts.itemsProvider) {
+          await io.refresh();
+        } else {
+          io.items().push(newItem);
+          io.render();
+        }
+      });
+      return;
+    }
+
+    // APPENDED TO THE LIST IN HAND AND WRITTEN THROUGH `persist`, so the one
+    // write path — and the one merge — is the one every other control here
+    // uses. A direct `appendToNoteRegion` would be a second writer racing the
+    // first, which is the shape of the bug 4.27 closed.
+    io.items().push(newItem);
+    resetWhen();
+    if (io.file()) {
+      io.persist();
+      io.render();
+      return;
+    }
+    // NO NOTE YET. This is the one place a logbook's note is created, and it
+    // is the first item that creates it — never a render, on the rule
+    // `captureDestinations` states in its own words: "a reader who opens the
+    // box, reads the options and presses Escape has not asked for five
+    // notes."
+    const make = opts.createNote;
+    if (!make) return;
+    void make().then((made) => {
+      if (!made) return;
+      io.setFile(made);
+      io.persist();
+      io.render();
+      io.watch(made);
+    });
+  };
+  input.addEventListener("keydown", (evt) => {
+    if (evt.key === "Enter" && !evt.shiftKey) {
+      evt.preventDefault();
+      commit();
+    }
+  });
+  input.addEventListener("blur", commit);
+}
+
+export function buildLogList(
+  host: NoteRegionHost,
+  opts: LogListOptions
+): HTMLElement {
+  const { key } = opts;
+  // `journal-note--collapsible` is borrowed rather than reimplemented: the
+  // fold bar, its chevron and its collapsed state are the same three rules the
+  // `note:` field uses, and a second set would drift the first time either
+  // moved. The list joins that rule's hidden-children selector.
+  const wrap = createDiv({
+    cls: `ca-journal-capture-log ca-journal-note ${opts.modifier}${
+      opts.collapsible ? " ca-journal-note--collapsible" : ""
+    }`,
+  });
+
+  // The fold bar, kept identical to the `note:#collapse` one it replaces — the
+  // section folds where it always folded, remembers what it always remembered,
+  // and the `captureCollapsedByDefault` setting still means what it says.
+  if (opts.collapsible && opts.label) {
+    const bar = wrap.createDiv({ cls: "ca-journal-note-collapse-bar" });
+    setIcon(bar.createDiv({ cls: "ca-journal-note-chevron" }), "chevron-down");
+    bar.createDiv({ cls: "ca-journal-note-label", text: opts.label });
+    const apply = (v: boolean): void => wrap.toggleClass("is-collapsed", v);
+    apply(opts.startCollapsed());
+    bar.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      const next = !wrap.hasClass("is-collapsed");
+      apply(next);
+      opts.onFold(next);
+    });
+  } else if (opts.label && (!opts.types || opts.types.length <= 1)) {
+    wrap.createDiv({ cls: "ca-journal-note-label", text: opts.label });
+  }
+
+  const filters: LogFilters = {
+    search: "",
+    type: opts.activeType ?? "all",
+    status: "all",
+    sort: "desc",
+  };
+  const pillCountMap = buildLogDeck(
+    wrap,
+    opts,
+    filters,
+    () => render(),
+    (on) => scrollContainer.toggleClass("is-compact", on)
+  );
 
   // ── CONTAINED SCROLL VIEWPORT ─────────────────────────────────────────
   const scrollContainer = wrap.createDiv({ cls: "ca-journal-capture-scroll" });
@@ -558,37 +828,9 @@ export function buildLogList(
       return;
     }
 
-    // Filter items
-    let filtered = items.map((item, originalIndex) => ({ item, originalIndex }));
-
-    if (activeTypeFilter !== "all" && opts.getItemType) {
-      filtered = filtered.filter(({ item }) => opts.getItemType!(item) === activeTypeFilter);
-    }
-
-    if (activeStatusFilter === "open") {
-      filtered = filtered.filter(({ item }) => !item.done);
-    } else if (activeStatusFilter === "done") {
-      filtered = filtered.filter(({ item }) => !!item.done);
-    } else if (activeStatusFilter === "timed") {
-      filtered = filtered.filter(({ item }) => item.mins != null);
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(({ item }) => {
-        const matchesText = item.text.toLowerCase().includes(q);
-        const matchesDate = item.date ? item.date.toLowerCase().includes(q) : false;
-        const matchesTime = item.time ? item.time.toLowerCase().includes(q) : false;
-        return matchesText || matchesDate || matchesTime;
-      });
-    }
-
-    // Sort items
-    filtered.sort((a, b) => {
-      const stampA = `${a.item.date ?? ""} ${a.item.time ?? ""}`;
-      const stampB = `${b.item.date ?? ""} ${b.item.time ?? ""}`;
-      return sortOrder === "desc" ? stampB.localeCompare(stampA) : stampA.localeCompare(stampB);
-    });
+    // WHAT IS SHOWN, worked out in `filterLogItems` (5.2); what follows is
+    // what that is drawn as.
+    const filtered = filterLogItems(items, filters, opts);
 
     footerCount.setText(`Showing ${filtered.length} of ${items.length} items`);
 
@@ -607,7 +849,7 @@ export function buildLogList(
         item,
         originalIndex === editing,
         opts.dated,
-        searchQuery,
+        filters.search,
         typeTag,
         {
           onWhen: (value) => {
@@ -694,151 +936,70 @@ export function buildLogList(
   };
 
   if (opts.add) {
-    const add = opts.add;
-    const row = wrap.createDiv({ cls: "ca-journal-capture-add" });
-    const box = row.createDiv({ cls: "ca-journal-capture-add-box" });
-    const controls = box.createDiv({ cls: "ca-journal-capture-add-controls" });
-
-    let chosenType = opts.types && opts.types.length > 0 ? opts.types[0].id : undefined;
-    if (opts.types && opts.types.length > 1) {
-      const typeSelect = controls.createEl("select", { cls: "ca-jcl-add-type-select" });
-      for (const t of opts.types) {
-        const opt = typeSelect.createEl("option", { value: t.id, text: `${t.icon ? t.icon + " " : ""}${t.label}` });
-        if (t.id === chosenType) opt.selected = true;
-      }
-      typeSelect.addEventListener("change", () => {
-        chosenType = typeSelect.value;
-      });
-    }
-
-    let chosen: WhenValue | null = null;
-    let when: HTMLElement | null = null;
-
-    const reveal = controls.createEl("button", {
-      cls: "ca-journal-capture-when-btn",
-      attr: { type: "button", "aria-label": "Say when this happened", title: "Say when this happened" },
+    buildLogAddBox(wrap, opts, opts.add, {
+      items: () => items,
+      file: () => file,
+      setFile: (f) => {
+        file = f;
+      },
+      persist,
+      render,
+      refresh,
+      watch,
     });
-    setIcon(reveal, "clock");
-    const revealLabel = reveal.createSpan({ cls: "ca-journal-capture-when-label", text: "Now" });
-
-    reveal.addEventListener("click", () => {
-      if (when) {
-        when.remove();
-        when = null;
-        chosen = null;
-        reveal.removeClass("is-active");
-        revealLabel.setText("Now");
-        return;
-      }
-      const now = add.stamp();
-      chosen = { date: now.date, time: now.time, mins: now.mins };
-      when = whenEditor(row, chosen, opts.dated, (v) => {
-        chosen = v;
-        const parts: string[] = [];
-        if (v.time) parts.push(v.time);
-        else if (v.date) parts.push(v.date);
-        revealLabel.setText(parts.join(" ") || "Custom");
-      });
-      reveal.addClass("is-active");
-    });
-
-    const resetWhen = (): void => {
-      if (!when) return;
-      when.remove();
-      when = null;
-      chosen = null;
-      reveal.removeClass("is-active");
-      revealLabel.setText("Now");
-    };
-
-    const input = box.createEl("textarea", {
-      cls: "ca-journal-capture-add-input",
-      attr: { placeholder: add.placeholder, rows: "1" },
-    });
-
-    const commit = (): void => {
-      const text = input.value;
-      if (!text.trim()) return;
-      input.value = "";
-      const stamp = chosen ?? add.stamp();
-      const newItem: LogItem = {
-        date: stamp.date,
-        time: stamp.time,
-        text,
-        done: null,
-        mins: stamp.mins ?? null,
-      };
-
-      if (opts.onAddMulti && chosenType) {
-        void opts.onAddMulti(chosenType, newItem).then(async () => {
-          resetWhen();
-          if (opts.itemsProvider) {
-            await refresh();
-          } else {
-            items.push(newItem);
-            render();
-          }
-        });
-        return;
-      }
-
-      // APPENDED TO THE LIST IN HAND AND WRITTEN THROUGH `persist`, so the one
-      // write path — and the one merge — is the one every other control here
-      // uses. A direct `appendToNoteRegion` would be a second writer racing the
-      // first, which is the shape of the bug 4.27 closed.
-      items.push(newItem);
-      resetWhen();
-      if (file) {
-        persist();
-        render();
-        return;
-      }
-      // NO NOTE YET. This is the one place a logbook's note is created, and it
-      // is the first item that creates it — never a render, on the rule
-      // `captureDestinations` states in its own words: "a reader who opens the
-      // box, reads the options and presses Escape has not asked for five
-      // notes."
-      const make = opts.createNote;
-      if (!make) return;
-      void make().then((made) => {
-        if (!made) return;
-        file = made;
-        persist();
-        render();
-        watch(made);
-      });
-    };
-    input.addEventListener("keydown", (evt) => {
-      if (evt.key === "Enter" && !evt.shiftKey) {
-        evt.preventDefault();
-        commit();
-      }
-    });
-    input.addEventListener("blur", commit);
   }
+
+  const watchPaths: string[] = [
+    ...(opts.watchPaths ?? []),
+    ...(opts.watchPath ? [opts.watchPath] : []),
+    ...(file ? [file.path] : []),
+  ];
 
   if (opts.itemsProvider) {
     void refresh();
-  } else if (file) {
-    watch(file);
-    const watchPath = file.path;
-    opts.addChild(
-      new LogListWatcher(host.app, wrap, watchPath, () => {
-        // Mid-edit, the reader's card wins — the same rule the textarea used,
-        // for the same reason. The next commit re-renders from disk anyway, and
-        // the write carries a baseline so the arriving item is not lost.
-        if (editing != null) return;
-        const target = file;
-        if (!target) return;
-        void host.app.vault.read(target).then((text) => {
-          const onDisk = readNoteRegion(text, key);
-          if (onDisk === baseline) return;
-          load(text);
-        });
-      })
-    );
+    if (watchPaths.length > 0) {
+      opts.addChild(
+        new LogListWatcher(host.app, wrap, watchPaths, () => {
+          void refresh();
+        })
+      );
+    }
   } else {
-    render();
+    if (file) {
+      watch(file);
+    } else {
+      render();
+    }
+
+    if (watchPaths.length > 0) {
+      opts.addChild(
+        new LogListWatcher(host.app, wrap, watchPaths, () => {
+          // Mid-edit, the reader's card wins — the same rule the textarea used,
+          // for the same reason. The next commit re-renders from disk anyway, and
+          // the write carries a baseline so the arriving item is not lost.
+          if (editing != null) return;
+          const target =
+            file ??
+            (watchPaths[0]
+              ? (host.app.vault.getAbstractFileByPath(watchPaths[0]) as TFile | null)
+              : null);
+          if (!target) {
+            if (items.length > 0) {
+              items = [];
+              baseline = "";
+              render();
+            }
+            return;
+          }
+          file = target;
+          void host.app.vault.read(target).then((text) => {
+            const onDisk = readNoteRegion(text, key);
+            if (onDisk === baseline && items.length > 0) return;
+            load(text);
+          });
+        })
+      );
+    }
   }
 
   return wrap;

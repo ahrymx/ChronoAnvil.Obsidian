@@ -739,10 +739,3 @@ export function openDayEventMenu(
 
   menu.showAtMouseEvent(evt);
 }
-
-// A one-line summary of an event, shared by the settings list and the widget
-// so the two never describe the same event differently.
-export function eventSummary(def: EventDef): string {
-  const date = describeEventDate(def);
-  return def.note ? `${date} · ${def.note}` : date;
-}

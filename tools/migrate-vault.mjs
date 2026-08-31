@@ -58,45 +58,10 @@ export const RULES = [
 ];
 
 // Vault files whose NAME carries the old brand.
-// ── The pre-release pass, which is deletable ──────────────────────────────
-//
-// WHAT THESE ARE. Between Almanac and ChronoAnvil the plugin briefly carried a
-// third name that never left this machine — no release, no repository, no copy
-// in anyone else's hands — so the vault format has only ever had two public
-// spellings and the rest of this repository knows nothing about the third. The
-// only vaults that can contain it are the working ones it was developed in.
-//
-// KEPT SEPARATE, AND SAFE TO DELETE. They are not part of the migration story
-// the plugin tells anybody: no reader can have a vault that needs them. Once
-// the development vaults have been through one `--write` pass, this array and
-// its two entries in FILE_RENAMES can go, and nothing else changes.
-//
-// The plugin itself has NO fallback for these spellings, deliberately. A
-// fallback is a promise to keep reading something forever, and this one would
-// be a promise made to nobody.
-export const PRERELEASE_RULES = [
-  ["<!--chronoforge:", "<!--chronoanvil:"],
-  ["# chronoforge:trackers:start", "# chronoanvil:trackers:start"],
-  ["# chronoforge:trackers:end", "# chronoanvil:trackers:end"],
-  ["```chronoforge-journal-charts", "```chronoanvil-journal-charts"],
-  ["```chronoforge-charts", "```chronoanvil-charts"],
-  ["```chronoforge", "```chronoanvil"],
-  ["%% chronoforge-graph %%", "%% chronoanvil-graph %%"],
-  ["chronoforge-events:", "chronoanvil-events:"],
-  ["`chronoforge:", "`chronoanvil:"],
-  ["cf-wide", "ca-wide"],
-  ['"chronoforgeJournal"', '"chronoanvilJournal"'],
-  ['"chronoforgeRegistry"', '"chronoanvilRegistry"'],
-];
-
 export const FILE_RENAMES = [
   [".almanac-registry.json", ".chronoanvil-registry.json"],
   [".almanac-journal.json", ".chronoanvil-journal.json"],
   ["Almanac.canvas", "ChronoAnvil.canvas"],
-  // Pre-release, and deletable with PRERELEASE_RULES above.
-  [".chronoforge-registry.json", ".chronoanvil-registry.json"],
-  [".chronoforge-journal.json", ".chronoanvil-journal.json"],
-  ["ChronoForge.canvas", "ChronoAnvil.canvas"],
 ];
 
 export const TEXT_EXT = new Set([".md", ".canvas", ".base", ".json"]);
@@ -105,7 +70,7 @@ export const TEXT_EXT = new Set([".md", ".canvas", ".base", ".json"]);
 // exact transform the tool performs without touching a disk.
 export function migrateText(text) {
   let out = text;
-  for (const [from, to] of [...RULES, ...PRERELEASE_RULES]) out = out.split(from).join(to);
+  for (const [from, to] of RULES) out = out.split(from).join(to);
   return out;
 }
 
@@ -153,7 +118,7 @@ const hits = new Map();
 for (const f of files) {
   const before = await readFile(f, "utf8");
   let after = before;
-  for (const [from, to] of [...RULES, ...PRERELEASE_RULES]) {
+  for (const [from, to] of RULES) {
     if (!after.includes(from)) continue;
     const n = after.split(from).length - 1;
     hits.set(from, (hits.get(from) ?? 0) + n);
@@ -170,9 +135,9 @@ for (const f of files) {
 // (The plugin can recover from the vault-root mirror, but only if one exists —
 // moving the folder is the direct fix and keeps the reader's data.json intact.)
 const newPlugin = path.join(vault, ".obsidian/plugins/chronoanvil");
-// Either previous id. `chronoforge` is the pre-release one and goes with
-// PRERELEASE_RULES; `ahrymx.almanac` is the one readers actually have.
-const oldPlugin = [".obsidian/plugins/ahrymx.almanac", ".obsidian/plugins/chronoforge"]
+// The one previous id readers actually have. Almanac shipped through 4.84, so
+// this is the only plugin folder a vault outside this machine can be carrying.
+const oldPlugin = [".obsidian/plugins/ahrymx.almanac"]
   .map((p) => path.join(vault, p))
   .find((p) => existsSync(p));
 const movePlugin = oldPlugin != null && !existsSync(newPlugin);
@@ -183,7 +148,7 @@ console.log(`files scanned:  ${files.length}`);
 console.log(`files to edit:  ${changed.length}`);
 if (hits.size) {
   console.log("\ntokens found:");
-  for (const [from, to] of [...RULES, ...PRERELEASE_RULES]) {
+  for (const [from, to] of RULES) {
     const n = hits.get(from) ?? 0;
     if (n) console.log(`  ${from.padEnd(30)} -> ${to.padEnd(32)} ${n}`);
   }

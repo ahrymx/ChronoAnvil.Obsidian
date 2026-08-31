@@ -17,10 +17,13 @@ import { describe, expect, it } from "vitest";
 import { STUDY_CONFIG, STUDY_JOURNAL, buildJournalType } from "../src/journals/journal";
 import { composeTemplate } from "../src/journals/custom-journal";
 import {
+  chosenSectionIds,
   sectionContext,
+  sectionsFor,
   templateKeyFor,
 } from "../src/journals/journal-sections";
 import type { SectionContext } from "../src/journals/journal-sections";
+import { applySections } from "../src/journals/journal-plan";
 import {
   journalReloadLoss,
   wantFromJournalNote,
@@ -494,6 +497,38 @@ describe("saving a default", () => {
 
     expect(cfg.layout![key].order).toEqual(before);
     expect(cfg.layout![key].sections?.length).toBeGreaterThan(0);
+  });
+
+  it("updates order when a reordered note is saved as default", async () => {
+    const ctx = sectionContext(STUDY_JOURNAL, { page: STUDY_JOURNAL.kinds[0] });
+    const key = templateKeyFor(ctx);
+    const text = composedFor(ctx);
+    const reordered = ["banner", "recall", "checklist", "headings"];
+    const applied = applySections(
+      text,
+      ctx,
+      reordered.map((id) => ({ id }))
+    )!;
+    const { app } = appWith("03 - Journals/Study/Maths/Algebra/page.md", applied);
+    const { plugin, cfg } = stubPlugin();
+    cfg.layout = {
+      ...(cfg.layout ?? {}),
+      [key]: { order: ["banner", "headings", "recall", "checklist"] },
+    };
+    const mgr = new JournalTemplates(app, plugin);
+    (plugin as unknown as { scaffold: unknown }).scaffold = {
+      refreshJournalTemplates: async (): Promise<void> => {},
+    };
+    await mgr.saveDefault("03 - Journals/Study/Maths/Algebra/page.md", ctx);
+
+    expect(cfg.layout![key].order).toEqual(reordered);
+    expect(cfg.layout![key].sections).toEqual(reordered);
+    expect(chosenSectionIds(ctx, cfg.layout![key])).toEqual(reordered);
+    expect(
+      sectionsFor(ctx, cfg.layout![key])
+        .filter((s) => reordered.includes(s.id))
+        .map((s) => s.id)
+    ).toEqual(reordered);
   });
 
   it("does not reach the shipped preset it was installed from", async () => {

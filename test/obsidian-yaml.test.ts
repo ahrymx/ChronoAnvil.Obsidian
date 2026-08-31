@@ -115,7 +115,7 @@ describe("NOTICE lists exactly what is bundled", () => {
     // for shipping LICENSE and NOTICE at all. The corollary is that the notice
     // has to be TRUE, and the way it stops being true is a dependency changing
     // without the file changing with it. That is exactly what happened here:
-    // js-yaml left `dependencies` in 5.0.1 and its MIT block had to leave
+    // js-yaml left `dependencies` in 5.0.0 and its MIT block had to leave
     // NOTICE in the same commit.
     //
     // The lockfile's `dev` flag is the authority rather than `dependencies`,
@@ -164,6 +164,54 @@ describe("NOTICE lists exactly what is bundled", () => {
     expect(claim).toContain("Chart.js");
     expect(claim).toContain("@kurkle/color");
     expect(claim, "the main.js banner still credits js-yaml").not.toContain("js-yaml");
+  });
+
+  it("agrees with the prose in README.md and LICENSING.md", () => {
+    // THE TWO THAT DRIFTED, AND WHY THEY COULD. The two assertions above hold
+    // NOTICE and the banner, and both were corrected when js-yaml left the
+    // bundle. But the same claim is written out twice more in prose — the
+    // README's licence paragraph and LICENSING.md's dependency FAQ — and no
+    // test read either, so both went on crediting a parser that is not in
+    // main.js. A sentence naming what is bundled is an attribution statement
+    // rather than a description, so it is held to the lockfile like the rest.
+    //
+    // Deriving the list from the lockfile rather than naming it here is the
+    // point: the next dependency change breaks this test in four places at
+    // once, which is the only way prose stays true to a build.
+    const lock = JSON.parse(repoFile("package-lock.json"));
+    const bundled = new Set<string>();
+    for (const [path, meta] of Object.entries(lock.packages) as [
+      string,
+      { dev?: boolean }
+    ][]) {
+      if (!path || meta.dev) continue;
+      bundled.add(path.slice(path.lastIndexOf("node_modules/") + "node_modules/".length));
+    }
+
+    // One paragraph in each file, anchored on its opening words. The paragraph
+    // rather than the file, because "MIT" and the package names both appear
+    // elsewhere in passages that are not claims about the bundle.
+    const claims: [string, string][] = [
+      ["README.md", "Third-party components bundled into"],
+      ["LICENSING.md", "ChronoAnvil bundles"],
+    ];
+
+    for (const [file, opening] of claims) {
+      const text = repoFile(file);
+      const start = text.indexOf(opening);
+      expect(start, `${file} no longer says what is bundled`).toBeGreaterThan(-1);
+      const end = text.indexOf("\n\n", start);
+      const claim = (end === -1 ? text.slice(start) : text.slice(start, end)).toLowerCase();
+
+      for (const name of bundled) {
+        expect(claim, `${file} does not mention ${name}, which is bundled`).toContain(
+          name.toLowerCase()
+        );
+      }
+      expect(claim, `${file} still credits js-yaml, which is not bundled`).not.toContain(
+        "js-yaml"
+      );
+    }
   });
 });
 

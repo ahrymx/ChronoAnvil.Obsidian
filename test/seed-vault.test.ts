@@ -1085,6 +1085,86 @@ describe("seed-vault: the month that bounds the open tasks", () => {
     expect(open).toBeLessThan(60);
   });
 
+  it("spreads every journal's notes across the whole strip, not the front of it", () => {
+    // THE BUG THIS PINS, FOUND ON A SCREENSHOT OF THE SEEDED VAULT. Journal note
+    // dates came from one shared cursor — `dates[cursor++ % dates.length]` — so
+    // the Nth journal note in the VAULT took the Nth active day. Forty notes
+    // against thirteen months of dates put every one of them in the oldest two
+    // months, and the activity strip covers 53 weeks back from TODAY: Study's
+    // newest note landed 2025-08-24 against a strip opening 2025-08-31, so its
+    // dashboard drew a year of empty cells above a Contents section listing
+    // seventeen notes.
+    //
+    // The run reported "402 written, 0 warnings" throughout. Every note existed,
+    // every date was real, and every date was an active day — the only thing
+    // wrong with them was WHICH days, which nothing outside a dashboard could
+    // see. That is why this test reads dates out of the plan rather than
+    // counting files.
+    const today = "2026-08-29";
+    // The window the plugin's own strip draws: 53 whole weeks back from the week
+    // containing today. Derived rather than typed, so it tracks STRIP_WEEKS.
+    const stripOpens = isoShift(today, -(53 * 7 - 1) - 6);
+    const journal = (id: string) => ({
+      id,
+      name: id,
+      root: id,
+      templatesFolder: `T/${id}`,
+      levels: [{ id: "subject", fallbackEmoji: "📚" }],
+      kinds: [{ id: "lesson", emoji: "📝", templates: [{ template: "lesson.md" }] }],
+    });
+    const templates = new Map(
+      ["a", "b"].flatMap((id) => [
+        [`T/${id}/subject-index.md`, "---\ncreated: {{created}}\n---\n"],
+        [`T/${id}/lesson.md`, "---\ndate: {{date}}\ncreated: {{created}}\n---\n"],
+      ])
+    );
+    const notes = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ kind: "lesson", title: `n${i}` }));
+    const files = buildPlan({
+      settings: {
+        paths: { templatesDiary: "T", diaryDaily: "D" },
+        customJournals: [journal("a"), journal("b")],
+        trackers: [],
+      },
+      templates,
+      corpus: {
+        a: { containers: [{ name: "A", notes: notes(8) }] },
+        b: { containers: [{ name: "B", notes: notes(8) }] },
+      },
+      dates: activeDays({ today, months: 13, rng: mulberry32(20260818) }),
+      rng: mulberry32(5),
+      today,
+      warn: () => {},
+    });
+
+    const datesIn = (root: string) =>
+      (files as { path: string; content: string }[])
+        .filter((f) => f.path.startsWith(`${root}/`))
+        .map((f) => /^date: (\d{4}-\d{2}-\d{2})$/m.exec(f.content)?.[1] ?? null)
+        .filter((d): d is string => d !== null)
+        .sort();
+
+    for (const root of ["a", "b"]) {
+      const ds = datesIn(root);
+      expect(ds.length).toBe(8);
+      // NOT ONE DAY OUTSIDE THE STRIP. This alone fails the old cursor.
+      expect(ds[0] >= stripOpens).toBe(true);
+      // AND SPANNING IT, PER JOURNAL. A single shared stride across all the
+      // journals would satisfy the line above and still give each journal a
+      // contiguous QUARTER of the window — four dashboards blank for nine
+      // months each. Both halves of the fix are needed and both are asserted:
+      // every journal reaches the last month on its own.
+      expect(isoDaysBetween(ds[ds.length - 1], today)).toBeLessThan(31);
+      // and starts in the first third of it rather than partway through.
+      expect(isoDaysBetween(stripOpens, ds[0])).toBeLessThan(130);
+    }
+    // The two journals overlap in time rather than following one another, which
+    // is the same claim read from the other side.
+    const a = datesIn("a");
+    const b = datesIn("b");
+    expect(a[0] < b[b.length - 1] && b[0] < a[a.length - 1]).toBe(true);
+  });
+
   it("always ends on today, so the vault does not read as abandoned", () => {
     for (const seed of [1, 2, 3, 20260818]) {
       const dates = activeDays({ today: "2026-08-29", months: 13, rng: mulberry32(seed) });
