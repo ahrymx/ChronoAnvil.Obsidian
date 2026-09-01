@@ -243,6 +243,10 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // SECOND CELL OF THE DUE-AND-OPEN ROW (4.70), SO NO BAR AND NO TOGGLE FOR
     // ONE — the queue beside it composes the single title this fence gets.
     row: DUE_ROW,
+    // AND ITS OWN TITLE BACK IF THE QUEUE IS NOT THERE — see `soloBar`. Review
+    // above is `locked: false`, so the row this cell is barless for can lose the
+    // cell that titles it.
+    bar: "header:⏳ Open tasks",
     render: () => ({ fence: "chronoanvil", lines: ["tasks-table"] }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },

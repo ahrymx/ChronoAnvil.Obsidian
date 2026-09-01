@@ -327,6 +327,20 @@ export interface JournalSection {
   // and the two answers have to agree. Asking one predicate is how they do.
   row?: string | ((ctx: SectionContext) => string | undefined);
   cell?: string;
+  // The bar this section composes ONLY IF its row comes down to it alone.
+  //
+  // THE OTHER HALF OF THE PARAGRAPH ABOVE. A row carries one title, composed by
+  // the cell that opens it, and the cells after it compose none — which leaves
+  // those cells titleless the moment a reader unticks the opener, because every
+  // opener on every one of these pages is freely removable. `soloBar` in
+  // `directive-grammar.ts` carries the argument; `RowMember.bar` is the same
+  // field on the other three catalogues' section type.
+  //
+  // A FUNCTION OF THE CONTEXT for `row`'s reason, and it is the same predicate
+  // read twice: a section that is a column here and a full-width block there
+  // wants its own title in both cases, and the wording is the one its non-row
+  // branch already writes.
+  bar?: string | ((ctx: SectionContext) => string | undefined);
   surface: SectionSurface;
 
   // Structurally possible here at all. Distinct from `default`: a section that
@@ -752,6 +766,16 @@ export function rowOf(
   return typeof section.row === "function" ? section.row(ctx) : section.row;
 }
 
+// A section's solo bar, whichever way the catalogue declared it. `rowOf`'s twin,
+// and read in the same two places: composition, and the planner cutting a cell
+// out of a fence that is already in a file.
+export function soloBarOf(
+  section: JournalSection,
+  ctx: SectionContext
+): string | undefined {
+  return typeof section.bar === "function" ? section.bar(ctx) : section.bar;
+}
+
 export function composeSectionRuns(
   sections: readonly JournalSection[],
   ctx: SectionContext,
@@ -775,7 +799,12 @@ export function composeSectionRuns(
   const flush = (): void => {
     if (!chunk.length) return;
     for (const run of rowRuns(
-      chunk.map((r) => ({ row: rowOf(r.section, ctx), cell: r.section.cell, r })),
+      chunk.map((r) => ({
+        row: rowOf(r.section, ctx),
+        cell: r.section.cell,
+        bar: soloBarOf(r.section, ctx),
+        r,
+      })),
       ({ r }) => {
         const block = r.blocks[0] as Extract<SectionBlock, { kind: "fence" }>;
         return { fence: block.info, lines: block.lines };
@@ -993,6 +1022,11 @@ function trackerSeeds(ctx: SectionContext, opts?: SectionOverrides): string[] {
 // the tracker grid makes one file over, and the reason neither is a column.
 const DUE_ROW = "due";
 const DUE_BAR = "header:🔁 Due and open";
+// Open tasks' OWN name, as against the band's. Written twice by that section —
+// once on a leaf index, where there is no row to join, and once by `soloBar`
+// when the row it joined has lost the cell that titles it — so it is a constant
+// rather than the same string typed in two branches.
+const TASKS_BAR = "header:⏳ Open tasks";
 
 export const JOURNAL_SECTIONS: JournalSection[] = [
   {
@@ -1062,11 +1096,16 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // has, not a reason for the grid to exist.
     applies: (ctx) => trackerSeeds(ctx).length > 0,
     default: always,
-    claims: ["tracker"],
+    claims: ["header", "tracker"],
     locate: (t) =>
       probe(t, new RegExp(`^(?:${TRACKER_MARK_START}|${LEGACY_TRACKER_MARK_START})\\s*$`, "m")),
     render: (ctx, opts) => [
-      fence([TRACKER_MARK_START, ...trackerSeeds(ctx, opts), TRACKER_MARK_END]),
+      headerBar(
+        "📊 Trackers",
+        TRACKER_MARK_START,
+        ...trackerSeeds(ctx, opts),
+        TRACKER_MARK_END
+      ),
     ],
   },
 
@@ -1162,7 +1201,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // note composed before 4.46 and offer to add a second copy of what is
     // already there — 4.16 §1's finding, arriving through a merged directive
     // instead of a renamed one. Both old words still render.
-    claims: [...STATS_BAND_WORDS],
+    claims: ["header", ...STATS_BAND_WORDS],
     locate: (t) => probe(t, statsBandProbe()),
     // BARE WHERE THE PRESET IS THE SCOPE'S OWN DEFAULT, which is how a Topic
     // index composed by this release and one composed by 4.45 come out reading
@@ -1182,11 +1221,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // shorthand the plugin expanded on their behalf.
     render: (_ctx, opts) => {
       const preset = opts?.preset;
-      if (!preset || preset === DEFAULT_CONTAINER_PRESET) {
-        return [fence(["stats-band"])];
-      }
-      const cells = STAT_PRESET_SHORTHAND[preset] ?? preset;
-      return [fence([`stats-band:${cells}`])];
+      const line =
+        !preset || preset === DEFAULT_CONTAINER_PRESET
+          ? "stats-band"
+          : `stats-band:${STAT_PRESET_SHORTHAND[preset] ?? preset}`;
+      return [headerBar("🔢 Stats", line)];
     },
   },
 
@@ -1402,12 +1441,14 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // two cells of one row have to be adjacent. What it displaced — Progress and
     // Charts — are the two blocks that read as the bottom of the page anyway.
     row: (ctx) => (ctx.hasSubContainers ? DUE_ROW : undefined),
+    // AND THE SAME TITLE BACK IF REVIEW IS NOT THERE. The bar below is composed
+    // by the cell that opens the row, and Review is freely removable — untick it
+    // and this table is a bordered box with nothing above it. `soloBar` puts the
+    // section's own name back, which is the string the leaf branch already
+    // writes, so a lone table is titled the same wherever it stands.
+    bar: TASKS_BAR,
     render: (ctx) => [
-      fence(
-        ctx.hasSubContainers
-          ? ["tasks-table"]
-          : ["header:⏳ Open tasks", "tasks-table"]
-      ),
+      fence(ctx.hasSubContainers ? ["tasks-table"] : [TASKS_BAR, "tasks-table"]),
     ],
   },
 
@@ -1477,12 +1518,12 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   // *Edit sections…*, which is the silence 4.29 and 4.33 both chose.
   {
     id: "tally",
-    icon: "🔢",
-    label: "Tally",
+    icon: "🧮",
+    label: "Status tally",
     blurb: "How many of the things beneath this one sit at each value of a tracker.",
     surface: "index",
     default: never,
-    claims: ["journal-tally"],
+    claims: ["header", "journal-tally"],
     locate: (t) => probe(t, /^journal-tally:/m),
     // THE TRACKER IS AN OVERRIDE WITH A DEFAULT, not a required question. The
     // catalogue cannot read the registry, so it names the one id every journal
@@ -1491,7 +1532,10 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // `options.tally.tracker`. Exactly the shape `bridge` uses for the same
     // reason, and the field is the one `SectionOverrides.tracker` already is.
     render: (_ctx, opts) => [
-      fence([`journal-tally:${opts?.tracker ?? DEFAULT_TALLY_TRACKER}`]),
+      headerBar(
+        "🧮 Status",
+        `journal-tally:${opts?.tracker ?? DEFAULT_TALLY_TRACKER}`
+      ),
     ],
   },
 

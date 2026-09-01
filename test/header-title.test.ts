@@ -63,7 +63,7 @@ describe("the defect that shipped", () => {
     const lines = topicIndex();
     const span = argSpanIn(lines, "header");
     expect(span).not.toBeNull();
-    expect(readArg(lines, span!)).toBe("🔁 Review");
+    expect(readArg(lines, span!)).toBe("📊 Trackers");
   });
 
   it("soleArgSpanIn refuses rather than picking one of six", () => {

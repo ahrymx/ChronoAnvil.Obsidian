@@ -1145,7 +1145,11 @@ export const MODIFIER_KEYWORDS: ReadonlySet<string> = new Set([
 export function cutFromFence(
   lines: readonly string[],
   cutting: ReadonlySet<string>,
-  spare: ReadonlySet<string>
+  spare: ReadonlySet<string>,
+  // The bar the survivor puts on if the cut leaves it alone and barless. See
+  // `soloBar`; the caller supplies it because only a catalogue knows the
+  // wording, and only when exactly one cell is left to wear it.
+  bar?: string
 ): string[] | null {
   const take = [...cutting].filter((k) => !spare.has(k));
   if (!take.length) return null;
@@ -1154,24 +1158,111 @@ export function cutFromFence(
     (l) => !takeSet.has(splitDirective(l.trim()).keyword)
   );
   if (out.length === lines.length) return null;
-  return undoRowOfOne(out);
+  return undoRowOfOne(out, bar);
 }
 
 // A fence body with its `row` and `cell` lines dropped when it holds fewer than
 // two widgets. See `cutFromFence` for the argument; this is separate because the
 // flat-note reconciler cuts by line index and still needs the same tidy-up.
-export function undoRowOfOne(lines: readonly string[]): string[] {
+//
+// `bar` IS THE TITLE THE SURVIVOR PUTS ON, and it is the other half of undoing a
+// row — see `soloBar` directly below for why a cell that has lost its row needs
+// one at all. Absent for a caller that has no survivor to name, which is every
+// caller that is not undoing a removal.
+export function undoRowOfOne(
+  lines: readonly string[],
+  bar?: string
+): string[] {
   const widgets = lines.filter((l) => {
     const t = l.trim();
     if (!t || t.startsWith("```")) return false;
     return !MODIFIER_KEYWORDS.has(splitDirective(t).keyword);
   }).length;
-  return widgets > 1
-    ? [...lines]
-    : lines.filter(
-        (l) =>
-          !isRowLine(l.trim()) &&
-          !isCellLine(l.trim()) &&
-          !isTabLine(l.trim())
-      );
+  if (widgets > 1) return [...lines];
+  return soloBar(
+    lines.filter(
+      (l) =>
+        !isRowLine(l.trim()) &&
+        !isCellLine(l.trim()) &&
+        !isTabLine(l.trim())
+    ),
+    bar
+  );
+}
+
+// ── THE TITLE A CELL WEARS ONCE ITS ROW IS DOWN TO IT ALONE (5.9) ────────
+//
+// A row carries exactly one bar, worded for the band and composed by the cell
+// that OPENS it — `JournalSection.row` states that rule in full, and the cells
+// after the opener therefore compose no title of their own. Every catalogue in
+// this plugin has a pair built that way: `review` opens "🔁 Due and open" and
+// `tasks-table` follows it barless, `on-this-day` opens "🕘 Looking back" and
+// `sleep-summary` follows, and so on for four more.
+//
+// WHICH IS RIGHT UNTIL THE OPENER IS NOT THERE. Every one of those openers is
+// freely removable, and `undoRowOfOne` already knows what happens next: the
+// `row` line goes, the fence falls to a single widget — and that widget has no
+// bar, because the section that was going to title it has been taken off the
+// page. The result renders as a bordered box of content with nothing above it,
+// which is the one shape on these pages that reads as an unfinished widget
+// rather than as a section. Both composition and reconciliation reach it, so it
+// is reachable by unticking the opener OR by composing a page without it.
+//
+// NEVER OVERWRITES A BAR THAT IS ALREADY THERE, and that is what makes this
+// safe to hand to any cell. The opener going solo keeps the band's wording — a
+// title that is a shade broad is not the defect — and a reader who titled the
+// fence by hand keeps what they typed. It only fills a gap.
+// ABOVE THE FIRST LINE THAT IS CONTENT, which is not always index 0: the
+// reconciler hands whole fences here, markers included, and a `header:` written
+// outside the ``` is not a directive at all. Blank lines are skipped for the
+// same reason a composed bar leads its fence — the title goes at the top of what
+// the block draws.
+export function soloBar(
+  lines: readonly string[],
+  bar: string | undefined
+): string[] {
+  // `isSectionFence` RATHER THAN `hasSectionBar`, so a fence that titles itself
+  // through `frame: section` is left alone too. A `header:` added under one is
+  // the contradiction `parseFrame` already refuses, and this must not be the
+  // thing that writes it.
+  if (!bar || isSectionFence(lines)) return [...lines];
+  const at = lines.findIndex((l) => {
+    const t = l.trim();
+    return t !== "" && !t.startsWith("```");
+  });
+  const out = [...lines];
+  out.splice(at < 0 ? out.length : at, 0, bar);
+  return out;
+}
+
+// `soloBar`'s inverse, and the reason remove-then-re-add is still a round trip:
+// a cell rejoining its row gives back the title it took on while it stood
+// alone, because the cell arriving beside it composes the band's bar again.
+//
+// MATCHED AGAINST THE DECLARED STRING, not against "any `header:` line". Only
+// the line this module put there comes off, so a bar the reader wrote by hand
+// or renamed in place is left exactly as they have it — and a fence that never
+// went solo is returned unchanged whatever else is in it.
+// Whether a fence is the shape `soloBar` fills: content with no title of any
+// kind over it, and a catalogue that named one for it.
+//
+// THE THIRD DOOR'S GATE. Composition and the cut both know they have just made a
+// lone cell; a page ALREADY on disk has to be asked, and three reconcilers ask
+// it. `isSectionFence` rather than `hasSectionBar`, so a fence the reader
+// titled themselves — under any wording, or through `frame: section` — answers
+// yes and is left exactly as they have it.
+export function needsSoloBar(
+  lines: readonly string[],
+  bar: string | undefined
+): boolean {
+  return bar !== undefined && !isSectionFence(lines);
+}
+
+export function dropSoloBar(
+  lines: readonly string[],
+  bar: string | undefined
+): string[] {
+  if (!bar) return [...lines];
+  const at = lines.findIndex((l) => l.trim() === bar);
+  return at < 0 ? [...lines] : lines.filter((_, i) => i !== at);
 }

@@ -582,4 +582,17 @@ describe("the gesture around it", () => {
     const at = rules.indexOf("@media (hover: none)");
     expect(rules.slice(at).includes(".ca-jbd-handle")).toBe(true);
   });
+
+  it("reveals grabber icon on hover across section blocks, review queue, tables, and collapsible note sections", () => {
+    const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+    const at = rules.indexOf(".ca-jbd-host:hover > .ca-jbd-handle");
+    expect(at, "grip hover selector missing").toBeGreaterThan(-1);
+    const sel = rules.slice(at, rules.indexOf("{", at));
+    expect(sel).toContain(".ca-journal-sec-block:hover .ca-jbd-handle");
+    expect(sel).toContain(".ca-journal-sec-fold:hover > .ca-jbd-handle");
+    expect(sel).toContain(".ca-journal-widget-block:hover > .ca-jbd-handle");
+    expect(sel).toContain(".ca-journal-widget-card:hover > .ca-jbd-handle");
+    expect(sel).toContain(".ca-journal-note--collapsible:hover > .ca-jbd-handle");
+    expect(sel).toContain(".ca-journal-table:hover .ca-jbd-handle");
+  });
 });

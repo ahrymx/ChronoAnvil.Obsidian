@@ -658,13 +658,19 @@
 .ca-journal-tally {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  min-height: 0;
 }
-.ca-jtly-title {
-  font-size: var(--ca-text-sm);
-  font-weight: 600;
-  color: var(--text-muted);
-}
+/* THE HEAD IS `foldableSection`'S AS OF 5.6, so there is nothing to declare for
+   it here. What stood in this space was a private fold bar — a label and a
+   chevron on the LEFT with no rule under it, which is the `note:` FIELD's bar
+   and not a section's — drawn on a block that sits between Find and Charts on a
+   journal index wearing the frame they both wear. The tally still titles itself
+   from the tracker it names (`SECTION_TITLES` has no `journal-tally` entry, and
+   says why); only the chrome around that title is now shared.
+
+   `.ca-jtly-head`, `.ca-jtly-title-left`, `.ca-jtly-chevron`,
+   `.ca-jtly-label-title` and the `is-collapsed` rules that drove them all went
+   with it, along with `.ca-jtly-title`, which nothing had drawn for some time. */
 .ca-jtly-strip {
   display: flex;
   flex-wrap: wrap;
@@ -677,8 +683,9 @@
   padding: 4px 10px;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--ca-radius-md);
-  background: var(--background-secondary);
+  background: var(--background-primary);
   min-width: 0;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 .ca-jtly-count {
   font-size: 1.05em;

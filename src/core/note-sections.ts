@@ -86,6 +86,9 @@ import {
   argSpansIn,
   readArg,
   splitDirective,
+  dropSoloBar,
+  needsSoloBar,
+  soloBar,
   undoRowOfOne,
 } from "./directive-grammar";
 import {
@@ -208,6 +211,11 @@ export interface FlatSection {
   // writing itself into a cell the reader may have rearranged since.
   cell?: string;
   tab?: boolean;
+  // `RowMember.bar`: the title this cell takes on when its row has come down to
+  // it alone, which for a cell that composes none is the difference between a
+  // section and a box of content with nothing above it. Only the barless cells
+  // of a row declare it; see `soloBar` for why filling a gap is all it does.
+  bar?: string;
   render: (opts?: Record<string, unknown>) => { fence: string; lines: string[] };
   // What this section can be asked, and where the answer is written.
   //
@@ -632,6 +640,10 @@ export interface RowMember {
   row?: string;
   cell?: string;
   tab?: boolean;
+  // The bar this member composes ONLY IF its row comes down to it alone — the
+  // barless cells of every row this plugin composes. `soloBar` in
+  // `directive-grammar.ts` is the rule and the argument for it.
+  bar?: string;
 }
 
 // A catalogue's sections, grouped into the fences they compose to. 4.70.
@@ -704,7 +716,14 @@ export function rowRuns<T extends RowMember>(
   const sameCell = (a: string | undefined, b: string | undefined): boolean =>
     a !== undefined && a === b;
 
-  const runs: { fence: string; lines: string[]; members: number }[] = [];
+  const runs: {
+    fence: string;
+    lines: string[];
+    members: number;
+    // The opener's, and read only where `members` stayed at one — a run that
+    // kept its row already carries the band's bar.
+    bar?: string;
+  }[] = [];
   let openRow: string | undefined;
   let openCell: string | undefined;
   for (const s of members) {
@@ -735,6 +754,7 @@ export function rowRuns<T extends RowMember>(
       fence,
       lines: s.row ? [ROW_KEYWORD, ...lines] : [...lines],
       members: 1,
+      bar: s.bar,
     });
   }
   // A ROW OF ONE IS NOT A ROW, and it is composed as though it had never been
@@ -754,9 +774,14 @@ export function rowRuns<T extends RowMember>(
   // row id becoming a function of the context — four catalogues each restating
   // which of their sections happen to coincide on which grain, and each able to
   // get it wrong in a way that only shows up in composed markdown.
-  return runs.map(({ fence, lines, members }) =>
+  //
+  // AND IT GETS A TITLE WHILE THE ROW IS COMING OFF, because the cell left
+  // behind is usually the one that composed no bar — see `soloBar`, which is
+  // the same rule the reconciler applies when a reader unticks the opener of a
+  // row that is already in a file. One answer, both directions.
+  return runs.map(({ fence, lines, members, bar }) =>
     members === 1 && lines[0] === ROW_KEYWORD
-      ? { fence, lines: lines.slice(1) }
+      ? { fence, lines: soloBar(lines.slice(1), bar) }
       : { fence, lines }
   );
 }
@@ -1291,8 +1316,27 @@ export function planFlatSections(
   requested: readonly SectionWant[]
 ): SectionOp[] {
   const { sections, noun, heldUnit } = spec;
+  const planSegs = segment(text.split("\n"));
   const runs = parseFlatSections(text, sections);
   const order = runs.flatMap((r) => r.sectionIds);
+  // ── A CELL ALREADY ON DISK WITH NO TITLE OVER IT (5.9) ──────────────
+  //
+  // `soloBar` titles a lone cell when a page is COMPOSED without its row's
+  // opener and when one is CUT out of a fence. Neither reaches a page written
+  // before those rules existed, and its reader has no gesture that fixes it —
+  // unticking the section and ticking it back composes the same headless fence.
+  // So the plan looks, reports it as an `extend`, and the write adds one line.
+  //
+  // ONLY WHERE THE RUN HOLDS ONE SECTION and the fence carries no bar of any
+  // kind; `needsSoloBar` is the gate and says why.
+  const barless = new Map<string, string>();
+  for (const run of runs) {
+    if (run.sectionIds.length !== 1) continue;
+    const only = sections.find((x) => x.id === run.sectionIds[0]);
+    const runLines = planSegs[run.index]?.lines ?? [];
+    if (!only?.row || !needsSoloBar(runLines, only.bar)) continue;
+    barless.set(only.id, only.bar as string);
+  }
   const sharers = sharersIn(runs);
   const present = new Set(order);
   const byId = new Map(sections.map((s) => [s.id, s]));
@@ -1370,8 +1414,13 @@ export function planFlatSections(
     const section = byId.get(id);
     if (!section) continue;
     if (want.includes(id)) {
+      // A TITLE IS A MISSING PART, and `extend` is the word for a section short
+      // of something it should have. A reconfigure still wins the label — it is
+      // the one that rewrites a line the reader may have edited — and says both.
+      const noBar = barless.get(id);
+      const barDetail = "this block has no title over it — one will be added";
       ops.push({
-        kind: rewriting.has(id) ? "reconfigure" : "keep",
+        kind: rewriting.has(id) ? "reconfigure" : noBar ? "extend" : "keep",
         sectionId: section.id,
         label: section.label,
         detail: rewriting.has(id)
@@ -1379,8 +1428,10 @@ export function planFlatSections(
               section.questions?.(spec) ?? [],
               optionsFor(requested, id),
               hostLabel(spec)
-            )
-          : "unchanged",
+            ) + (noBar ? `; ${barDetail}` : "")
+          : noBar
+            ? barDetail
+            : "unchanged",
       });
       continue;
     }
@@ -1572,6 +1623,14 @@ function joinFlatRowChunk(
   if (at < 0) return false;
 
   const chunk = chunks[at];
+  // AND THE SOLO BAR COMES BACK OFF FIRST — `dropSoloBar`, `soloBar`'s inverse.
+  // The survivor took a title on when the cut left it alone; the cell arriving
+  // beside it composes the band's again, so the borrowed one goes and the file
+  // is the file the reader started with.
+  const base = chunk.ids.reduce(
+    (out, id) => dropSoloBar(out, byId.get(id)?.bar),
+    chunk.lines as readonly string[]
+  );
   const rank = order.indexOf(section.id);
   // Ahead of the first member that outranks it, found by the keyword that
   // member writes — the same probe the cut above works by, so the two cannot
@@ -1584,21 +1643,21 @@ function joinFlatRowChunk(
         )
       )
     : null;
-  let insertAt = chunk.lines.length;
-  for (let n = chunk.lines.length - 1; n >= 0; n--) {
-    if (chunk.lines[n].trim() === "```") {
+  let insertAt = base.length;
+  for (let n = base.length - 1; n >= 0; n--) {
+    if (base[n].trim() === "```") {
       insertAt = n;
       break;
     }
   }
   if (laterKeywords) {
-    const found = chunk.lines.findIndex((l) =>
+    const found = base.findIndex((l) =>
       laterKeywords.has(splitDirective(l.trim()).keyword)
     );
     if (found >= 0) insertAt = found;
   }
 
-  const lines = [...chunk.lines];
+  const lines = [...base];
   // The `row` line comes back with the cell, because the cut took it when the
   // fence fell to one widget. A fence that gained a second directive without it
   // would be two widgets stacked in one block rather than a row of two.
@@ -1702,7 +1761,22 @@ export function applyFlatSections(
       .map((o) => o.sectionId)
       .filter((id): id is string => id !== null)
   );
-  if (!removing.size && !adding.length && !moving && !rewriting.size) {
+  // A missing title is a write like any other, so it counts towards "anything to
+  // do" — the plan already named it, and a plan that promises a line the writer
+  // then declines to add is the disagreement this module is built not to have.
+  const extending = new Set(
+    ops
+      .filter((o) => o.kind === "extend")
+      .map((o) => o.sectionId)
+      .filter((id): id is string => id !== null)
+  );
+  if (
+    !removing.size &&
+    !adding.length &&
+    !moving &&
+    !rewriting.size &&
+    !extending.size
+  ) {
     return null;
   }
 
@@ -1761,8 +1835,16 @@ export function applyFlatSections(
         }
       }
       const remaining = tidyHeights(tidyCells(tidyTabs(lines.filter((_, i) => !cut.has(i)))));
+      // THE SURVIVOR'S OWN TITLE, WHERE THERE IS EXACTLY ONE SURVIVOR. Untick
+      // the cell that opened the row and the one left behind is the barless
+      // one — a fence of content with nothing above it. `soloBar` fills that
+      // gap and nothing else; a run with two cells left still has its bar.
+      const kept = run.sectionIds.filter((id) => !removing.has(id));
       lines = run.sectionIds.every((id) => byId.get(id)?.row !== undefined)
-        ? undoRowOfOne(remaining)
+        ? undoRowOfOne(
+            remaining,
+            kept.length === 1 ? byId.get(kept[0])?.bar : undefined
+          )
         : remaining;
     }
     // ALL OF THE RUN'S SECTIONS, OR NONE OF THEM — the whole-block path, which
@@ -1777,6 +1859,13 @@ export function applyFlatSections(
       // passed through at all.
       let out = lines;
       for (const id of run.sectionIds) {
+        // The title the plan said this block was missing, added before the
+        // answers so it cannot land between a directive and its argument span.
+        // Asked of `needsSoloBar` again rather than trusted from the op, which
+        // is this file's rule wherever a preview promises a write.
+        if (extending.has(id)) {
+          out = soloBar(out, byId.get(id)?.bar);
+        }
         if (!rewriting.has(id)) continue;
         const section = byId.get(id);
         if (!section) continue;
@@ -1808,8 +1897,13 @@ export function applyFlatSections(
       continue;
     }
     const at = insertionPoint(chunks, order, id);
-    const body = renderFlatSection(section, optionsFor(requested, id)).split(
-      "\n"
+    // AND A CELL THAT COULD NOT REJOIN ONE IS COMPOSING A BLOCK OF ITS OWN, so
+    // it takes the title a block of its own needs — `soloBar`'s third door.
+    // Without it, ticking a barless cell onto a page whose row opener is not
+    // there hands back exactly the headless fence the other doors exist to stop.
+    const body = soloBar(
+      renderFlatSection(section, optionsFor(requested, id)).split("\n"),
+      section.bar
     );
     // WHICH SIDE THE BLANK LINE GOES ON, and it is not always the same side.
     //

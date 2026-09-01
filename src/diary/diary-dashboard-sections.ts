@@ -309,6 +309,9 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
         hostFolder: spec.hostFolder ?? null,
       },
     ],
+    // ITS OWN TITLE BACK IF `open-tasks` IS NOT THERE — see `soloBar`. That
+    // section opens this row with `INDEXES_BAR` and is freely removable.
+    bar: "header:🏷️ Tags",
     render: () => ({ fence: "chronoanvil", lines: ["tag-index"] }),
     // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who repoints the cloud
     // at their own folder still has a section the editor can find.
@@ -378,6 +381,9 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     row: LOOKING_BACK,
     // SECOND CELL, SO NO BAR AND NO TOGGLE FOR ONE — On this day composes the
     // row's, and it says "Looking back" because it is drawn over this too.
+    // ITS OWN TITLE BACK IF `on-this-day` IS NOT THERE — see `soloBar`. That
+    // section opens this row with `LOOKING_BACK_BAR` and is freely removable.
+    bar: "header:😴 Sleep",
     render: () => ({ fence: "chronoanvil", lines: ["sleep-summary"] }),
     locate: (text) => probe(text, /^sleep-summary\b/m),
   },

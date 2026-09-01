@@ -690,6 +690,21 @@
   box-shadow: inset 0 1px 0 var(--ca-edge-highlight);
 }
 
+.ca-journal-sec-block .ca-journal-widget-block.ca-journal-tracker-section,
+.ca-journal-sec-block.ca-journal-widget-block.ca-journal-tracker-section,
+.ca-journal-sec-block > .ca-journal-tracker-section {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ca-journal-sec-block .ca-journal-tracker-head {
+  display: none;
+}
+
 .ca-journal-tracker-section.ca-journal-note--collapsible > .ca-journal-tracker-head {
   display: flex;
   align-items: center;

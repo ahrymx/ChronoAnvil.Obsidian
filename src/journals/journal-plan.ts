@@ -96,6 +96,7 @@ import {
   renderBlock,
   renderSection,
   rowOf,
+  soloBarOf,
   sectionOverrides,
   sectionRemovable,
   sectionsFor,
@@ -105,6 +106,9 @@ import {
   MODIFIER_KEYWORDS,
   ROW_KEYWORD,
   cutFromFence,
+  dropSoloBar,
+  needsSoloBar,
+  soloBar,
   splitDirective,
 } from "../core/directive-grammar";
 import {
@@ -690,6 +694,37 @@ export function missingParts(
   return parts.filter((p) => !present.has(p.probe.trim()));
 }
 
+// ── A CELL ALREADY ON DISK WITH NO TITLE OVER IT (5.9) ───────────────────
+//
+// `soloBar` gives a row's surviving cell a title when the row is COMPOSED
+// without its opener and when one is CUT out of a fence. Neither reaches a page
+// that is already in that state — written by a release that had no such rule,
+// or by a removal made before it — and the reader of that page has no gesture
+// that fixes it: unticking the section and ticking it back composes the same
+// barless fence they started with.
+//
+// So it is the third door, and it is reported before it is written. An
+// `extend` is exactly what this is — a section short of something it should
+// have — which is the shape `missingParts` already established and the reason
+// this needs no new op kind.
+//
+// EVERYTHING ABOUT IT IS NARROW ON PURPOSE. Only a section that declares a row,
+// only where the run holds that section alone, only where the fence carries no
+// bar of ANY kind, and only where the catalogue named the wording. A fence the
+// reader has titled themselves answers `isSectionFence` and is left exactly as
+// they have it.
+export function missingSoloBar(
+  runLines: readonly string[],
+  run: SectionRun,
+  section: JournalSection,
+  ctx: SectionContext
+): string | null {
+  if (run.sectionIds.length !== 1) return null;
+  if (!rowOf(section, ctx)) return null;
+  const bar = soloBarOf(section, ctx);
+  return needsSoloBar(runLines, bar) ? (bar as string) : null;
+}
+
 export function planSections(
   text: string,
   ctx: SectionContext,
@@ -717,19 +752,26 @@ export function planSections(
       const runLines: string[] = [];
       for (let i = run.from; i <= run.to; i++) runLines.push(...segs[i].lines);
       const gaps = missingParts(runLines, section, ctx);
+      // A TITLE IS A MISSING PART TOO, and it is reported in the same words for
+      // the same reason — see `missingSoloBar`, which is what decides.
+      const noBar = missingSoloBar(runLines, run, section, ctx);
       // A reconfigure and an extension are both real writes, and a section can
       // want both at once. `reconfigure` wins the label because it is the one
       // that rewrites a line the reader may have edited; the extension is
       // reported in the same detail rather than swallowed.
       const kindOfOp = rewriting.has(section.id)
         ? "reconfigure"
-        : gaps.length
+        : gaps.length || noBar
           ? "extend"
           : "keep";
-      const gapDetail =
+      const partDetail =
         gaps.length === 1
           ? `${gaps[0].label} has no table here — it will be added`
           : `${gaps.map((g) => g.label).join(", ")} have no table here — they will be added`;
+      const barDetail = "this block has no title over it — one will be added";
+      const gapDetail = gaps.length
+        ? partDetail + (noBar ? `; ${barDetail}` : "")
+        : barDetail;
       // A HEADING THE READER DID NOT LIST, BUT HAS WRITTEN UNDER, SURVIVES THE
       // rewrite — so the plan says so before the write rather than leaving them
       // to notice afterwards that the list they typed is not the list they got.
@@ -758,8 +800,8 @@ export function planSections(
               journalHostLabel(ctx)
             ) +
             (orphans.length ? ` — ${describeKept(orphans)}` : "") +
-            (gaps.length ? `; ${gapDetail}` : "")
-          : gaps.length
+            (gaps.length || noBar ? `; ${gapDetail}` : "")
+          : gaps.length || noBar
             ? gapDetail
             : "unchanged",
       });
@@ -1094,6 +1136,10 @@ export function applySections(
         const section = byId.get(id);
         if (section && extending.has(section.id)) {
           out = withMissingParts(out, section, ctx);
+          // AND THE TITLE, IF THE PLAN SAID SO. Asked of the same function the
+          // plan asked rather than of a second derivation of it, which is this
+          // file's rule wherever a preview promises a write.
+          out = soloBar(out, missingSoloBar(out, run, section, ctx) ?? undefined);
         }
       }
       chunks.push({ ids: run.sectionIds, filler: run.filler, lines: out });
@@ -1116,10 +1162,17 @@ export function applySections(
           .flatMap((b) => (b.kind === "fence" ? b.lines : []))
           .map((l) => splitDirective(l).keyword);
       };
+      const survivor = keeping.length === 1 ? byId.get(keeping[0]) : undefined;
       const cut = cutFromFence(
         lines,
         new Set(doomed.flatMap(keywordsOf)),
-        new Set(keeping.flatMap(keywordsOf))
+        new Set(keeping.flatMap(keywordsOf)),
+        // THE SURVIVOR'S OWN TITLE WHERE ONE CELL IS LEFT (5.9). Removing Review
+        // takes the bar with it — it is Review's line — and what remains is the
+        // barless cell beside it. `soloBar` gives that cell the name the
+        // catalogue already writes for it standing alone, and does nothing at
+        // all to a fence that still has a bar or still has two cells.
+        survivor ? soloBarOf(survivor, ctx) : undefined
       );
       if (cut) {
         chunks.push({ ids: keeping, filler: false, lines: cut });
@@ -1198,11 +1251,17 @@ export function applySections(
     // with. The ordinary add path composes a BLOCK, and a cut cell came out of
     // a fence somebody else is still in.
     if (joinRowChunk(chunks, section, ctx, byId, order, requested)) continue;
+    // AND A CELL THAT COULD NOT REJOIN ONE IS COMPOSING A BLOCK OF ITS OWN, so
+    // it takes the title a block of its own needs. `soloBar`'s third door, and
+    // the one a reader reaches by ticking Open tasks onto a page whose Review
+    // queue is not there: without it the add path hands back exactly the
+    // headless fence the other two doors exist to stop.
+    const alone = soloBar(markdown.split("\n"), soloBarOf(section, ctx));
     const at = insertionPoint(chunks, order, id);
     chunks.splice(at, 0, {
       ids: [id],
       filler: false,
-      lines: ["", ...markdown.split("\n")],
+      lines: ["", ...alone],
     });
   }
 
@@ -1288,7 +1347,14 @@ function joinRowChunk(
       )
     : null;
 
-  const lines = [...chunk.lines];
+  // AND THE SOLO BAR COMES BACK OFF — `dropSoloBar`, `soloBar`'s inverse. The
+  // cut gave the survivor a title when it was left alone in the fence; the cell
+  // arriving beside it composes the band's again, so the borrowed one goes and
+  // remove-then-re-add restores the file byte for byte.
+  const lines = chunk.ids.reduce((out, id) => {
+    const member = byId.get(id);
+    return member ? dropSoloBar(out, soloBarOf(member, ctx)) : out;
+  }, chunk.lines as readonly string[]).slice();
   let insertAt = lines.length;
   for (let n = lines.length - 1; n >= 0; n--) {
     if (lines[n].trim() === "```") {

@@ -1079,7 +1079,7 @@ mark.ca-jdr-highlight {
 /* Hide the field itself, not the bar, so the label stays clickable and the
    entry keeps a visible anchor for where captures live.
    All children except the collapse bar hide when folded. */
-.ca-journal-note--collapsible.is-collapsed > :not(.ca-journal-note-collapse-bar) {
+.ca-journal-note--collapsible.is-collapsed > :not(.ca-journal-note-collapse-bar, .ca-jbd-handle, .ca-jbd-slot) {
   display: none;
 }
 

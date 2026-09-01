@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.9.0] - 2026-09-01
+
+### Added
+
+- **Section header bars for Trackers and Stats Band.** Trackers and Stats Band sections now consistently feature standard collapsible section header bars (`📊 Trackers`, `🔢 Stats`) across journal and dashboard templates, ensuring visual unity with Open tasks, Review queue, and other section surfaces.
+
+### Fixed
+
+- **Status tally section frame size & header alignment.** Replaced the inner nested foldable card with direct card rendering inside the standard outer section frame, matching the full width, collapsible chevron, and drag grabber alignment of other sections.
+- **Review Queue drag grabber visibility.** Restored hover drag handle visibility on the Review Queue section.
+- **Remnant section drag handle positioning.** Fixed section drag handles (`.ca-jbd-handle`) overflowing into the margin above section headers on dashboard and overview notes, anchoring them cleanly inside the header bar.
+- **Deduplicated Trackers card surface.** Eliminated double card backgrounds and inner border padding when the Trackers section is rendered within a section block frame.
+- **A row's surviving cell keeps a title.** Sections that share a row are titled once, by the cell that opens the row — so unticking that opener left the cell beside it drawn as a loose widget with no header bar. Open tasks was the visible case (beside Review on a journals dashboard, beside the rollup on a period dashboard), and Tags, Sleep and the diary's own task table had the same shape. A cell that is left alone in its row now composes its own title, on every path: composing a page without the opener, cutting the opener out of a page you have, and adding the cell back afterwards. Pages already written this way are repaired in place — the Section Editor reports the block as needing a title and adds the one line, which no gesture could do before. A fence you titled yourself, or one framed as a section, is left exactly as it is.
+- **The journal tally wears the section frame.** The tally drew a private fold bar — a label and a chevron on the left, with no hairline under it — which is the bar a `note:` field wears, not a section. Sitting between Find and Charts, both of which wear the section frame, it read as a widget left loose on the page. It now uses the same collapsible frame as every other section: hairline divider, glyph in its slot, chevron on the right. It still titles itself from the tracker it names, and a tally you had collapsed stays collapsed.
+
 ## [5.8.0] - 2026-08-31
 
 ### Added

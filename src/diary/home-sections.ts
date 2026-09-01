@@ -315,6 +315,12 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // BARE, so the note carries no list to keep in step with the destinations
     // the plugin knows about. `launcher` alone draws the default four, and a
     // reader who wants their own writes them after it.
+    // NO `bar`, AND IT IS NOT AN OVERSIGHT. `soloBar` gives a barless cell the
+    // title its row's opener was composing for it; this row has no opener that
+    // does. Every cell here — the Today card, the tasks list, the logbook —
+    // defaults to WIDGET form and composes no `header:` at all, so the top row
+    // ships with no band title and a lone launcher is titleless because the
+    // page is, not because a section was removed from it.
     render: () => ({ fence: "chronoanvil", lines: ["launcher"] }),
     locate: (text) => probe(text, /^launcher\b/m),
   },

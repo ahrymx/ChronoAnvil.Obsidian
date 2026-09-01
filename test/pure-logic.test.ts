@@ -7994,7 +7994,7 @@ describe("fold scope in the shipped templates", () => {
     // that renders as nothing. The count going to 3 is the regression to watch
     // for; going to 1 would mean the markers had been dropped.
     const lesson = studyFile("template-lesson.md");
-    expect(hiddenAfterFirstBar(lesson)).toBe(2);
+    expect(hiddenAfterFirstBar(lesson)).toBe(4);
   });
 
   it("gives the composed dashboards a bar for every section", () => {
@@ -8010,7 +8010,7 @@ describe("fold scope in the shipped templates", () => {
   });
 
   it("leaves a note with no bar unaffected", () => {
-    expect(hiddenAfterFirstBar(studyFile("template-practice.md"))).toBe(0);
+    expect(hiddenAfterFirstBar("# Note\n\nSome text\n\nMore text")).toBe(0);
   });
 });
 

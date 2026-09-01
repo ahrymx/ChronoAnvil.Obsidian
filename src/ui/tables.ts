@@ -1926,7 +1926,7 @@ export function buildJournalTally(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   trackerId: string,
-  label: string | null
+  _label: string | null
 ): HTMLElement {
   const app = plugin.app;
   const root = createDiv({ cls: "ca-journal-table ca-journal-tally" });
@@ -1948,9 +1948,6 @@ export function buildJournalTally(
     root.createDiv({ cls: "ca-journal-widget-error", text: refusal ?? "" });
     return root;
   }
-
-  const title = label ?? `${def.label ?? trackerId} tally`;
-  root.createDiv({ cls: "ca-jtly-title", text: title });
 
   // IN THE TRACKER'S DECLARED ORDER, NOT BY COUNT. A status vocabulary is a
   // pipeline — Planned, Active, Blocked, Done — and sorting it by size would

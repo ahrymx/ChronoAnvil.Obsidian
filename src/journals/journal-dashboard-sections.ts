@@ -443,6 +443,10 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // gets — see `LATELY_BAR` above the catalogue for why it is worded for
       // the band rather than for either column.
       row: LATELY_ROW,
+      // AND ITS OWN TITLE BACK IF `recent` IS NOT THERE — see `soloBar`. That
+      // section composes `LATELY_BAR` for the band and is freely removable, so
+      // without this the table is a box of rows with nothing above it.
+      bar: `${HEADER_KEYWORD}:⏳ Open tasks`,
       render: () => ({ fence: "chronoanvil", lines: ["tasks-table"] }),
       locate: (text) => probe(text, /^tasks-table\b/m),
     },

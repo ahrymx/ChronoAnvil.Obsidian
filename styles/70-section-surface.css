@@ -94,9 +94,13 @@
  * single selector would lose to them on the first and last block of a run — and
  * a welded section is both. */
 .ca-journal-sec-block:has(.ca-journal-overview-card),
+.ca-journal-sec-block:has(.ca-journal-sec-fold),
 .ca-journal-sec-block.is-first:has(.ca-journal-overview-card),
+.ca-journal-sec-block.is-first:has(.ca-journal-sec-fold),
 .ca-journal-sec-block.is-last:has(.ca-journal-overview-card),
-.ca-journal-sec-block.is-first.is-last:has(.ca-journal-overview-card) {
+.ca-journal-sec-block.is-last:has(.ca-journal-sec-fold),
+.ca-journal-sec-block.is-first.is-last:has(.ca-journal-overview-card),
+.ca-journal-sec-block.is-first.is-last:has(.ca-journal-sec-fold) {
   background: none;
   border: none;
   border-radius: 0;

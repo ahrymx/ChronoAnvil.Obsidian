@@ -52,6 +52,7 @@ import {
 } from "../src/core/constants";
 import { folderNotePath } from "../src/core/util";
 import { planLayout, segment } from "../src/core/layout";
+import { isHeaderLine } from "../src/core/directive-grammar";
 import type { FlatSection } from "../src/core/note-sections";
 import { isPageWidgetId } from "../src/core/widget-sections";
 
@@ -179,6 +180,83 @@ describe("both catalogues are data, which is the point", () => {
       it("returns null when nothing would change", () => {
         const composed = page.sections.filter((s) => !s.optIn).map((s) => s.id);
         expect(page.model().apply(page.compose(), composed)).toBeNull();
+      });
+
+      // ── A CELL LEFT ALONE STILL HAS A TITLE (5.9) ──────────────────
+      //
+      // A row carries one bar, worded for the band and composed by the cell that
+      // OPENS it; the cells after it compose none. Every opener on these pages
+      // is freely removable, so unticking one used to leave the cell beside it
+      // as a bordered box of content with nothing above it — the one shape on a
+      // dashboard that reads as an unfinished widget rather than as a section.
+      //
+      // ASKED OF EVERY ROW ON EVERY PAGE, not of the one that was reported. The
+      // same pairing exists four times across these catalogues and the diary
+      // entry's, and a fix written against one of them is three pages from being
+      // wrong again.
+      it("gives a row's surviving cell a bar when its opener is removed", () => {
+        const live = page.sections.filter((s) => !s.optIn);
+        const rows = [...new Set(live.map((s) => s.row).filter(Boolean))];
+        for (const row of rows) {
+          const members = live.filter((s) => s.row === row);
+          if (members.length < 2) continue;
+          const [opener, ...rest] = members;
+          // Only where the opener actually writes the band's bar. The homepage's
+          // top row has no such cell — every one of its members defaults to
+          // WIDGET form — and a lone cell there is titleless because the page
+          // is, which `soloBar` deliberately does not change.
+          if (!isHeaderLine(opener.render().lines[0] ?? "")) continue;
+          const survivor = rest[0];
+          expect(survivor.bar, `${row}/${survivor.id}`).toBeTruthy();
+
+          const out = page.model().apply(
+            page.compose(),
+            live.filter((s) => s.id !== opener.id).map((s) => s.id)
+          );
+          expect(out, `${row}: removing ${opener.id} changed nothing`).not.toBeNull();
+          const fence = (out as string)
+            .split("```")
+            .find((b) => b.includes(survivor.render().lines[0]));
+          expect(fence, `${row}: ${survivor.id} is gone`).toBeTruthy();
+          expect(fence, `${row}/${survivor.id}`).toContain(survivor.bar as string);
+        }
+      });
+
+      // ── AND REPAIRS ONE THAT IS ALREADY ON DISK (5.9) ─────────────────
+      //
+      // The pair above covers COMPOSING and CUTTING. Neither reaches a page a
+      // reader already has: unticking a row's opener in any release before this
+      // one left the cell beside it in a fence with nothing over it, and no
+      // gesture fixed it — unticking that cell and ticking it back composed the
+      // same headless fence. So the plan reports an `extend` and the write adds
+      // the one line, which is what this asserts against a file built to be
+      // exactly that shape.
+      it("repairs a barless cell that is already in the file", () => {
+        const live = page.sections.filter((s) => !s.optIn);
+        const rows = [...new Set(live.map((s) => s.row).filter(Boolean))];
+        for (const row of rows) {
+          const members = live.filter((s) => s.row === row);
+          if (members.length < 2) continue;
+          const [opener, ...rest] = members;
+          if (!isHeaderLine(opener.render().lines[0] ?? "")) continue;
+          const survivor = rest[0];
+          const kept = live.filter((s) => s.id !== opener.id).map((s) => s.id);
+          const cut = page.model().apply(page.compose(), kept) as string;
+          const stale = cut.replace(`${survivor.bar as string}\n`, "");
+          expect(stale, `${row}: nothing to strip`).not.toBe(cut);
+
+          const op = page
+            .model()
+            .plan(stale, kept.map((id) => ({ id })))
+            .find((o) => o.sectionId === survivor.id);
+          expect(op?.kind, `${row}/${survivor.id}`).toBe("extend");
+          expect(op?.detail).toContain("no title over it");
+
+          const fixed = page.model().apply(stale, kept.map((id) => ({ id })));
+          expect(fixed, `${row}/${survivor.id}`).toBe(cut);
+          // And it is a fixed point: the repaired file needs no second pass.
+          expect(page.model().apply(cut, kept.map((id) => ({ id })))).toBeNull();
+        }
       });
 
       it("restores the file exactly on remove-then-re-add", () => {

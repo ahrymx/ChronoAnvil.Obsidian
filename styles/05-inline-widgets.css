@@ -1359,6 +1359,7 @@
 /* THE TWO CASES ONLY CSS CAN SEE. A block inside a section run is already under
    a bar, and an unframed block has given up its chrome; either way the head was
    built before the class arrived, so it is hidden rather than never drawn. */
+.ca-journal-sec-block .ca-journal-widget-block > .ca-journal-block-head,
 .ca-journal-widget-block.ca-journal-sec-block > .ca-journal-block-head,
 .ca-journal-widget-block.is-unframed > .ca-journal-block-head {
   display: none;
@@ -1410,10 +1411,22 @@
 .ca-jbd-host {
   position: relative;
 }
+.ca-journal-sec-block .ca-jbd-handle,
+.ca-journal-sec-block .ca-journal-widget-block > .ca-jbd-handle {
+  top: 4px;
+}
 /* EACH GRIP ANSWERS TO ITS OWN HOST. Unscoped, hovering anywhere in a row lit
    every grip in it at once, which is the "form under construction" this
    affordance is built to avoid. A grip appears where the hand already is. */
-.ca-jbd-host:hover > .ca-jbd-handle {
+.ca-jbd-host:hover > .ca-jbd-handle,
+.ca-journal-sec-block:hover .ca-jbd-handle,
+.ca-journal-sec-fold:hover > .ca-jbd-handle,
+.ca-journal-sec-fold:hover .ca-jbd-handle,
+.ca-journal-widget-block:hover > .ca-jbd-handle,
+.ca-journal-widget-card:hover > .ca-jbd-handle,
+.ca-journal-note--collapsible:hover > .ca-jbd-handle,
+.ca-journal-note--collapsible:hover .ca-jbd-handle,
+.ca-journal-table:hover .ca-jbd-handle {
   opacity: 1;
 }
 /* A GROUP'S GRIP LIVES IN ITS FOOT (4.9 §2.2), AND `.jbd-aside` IS GONE WITH THE

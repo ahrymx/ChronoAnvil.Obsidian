@@ -31,6 +31,18 @@ import type { TrackerDef, TrackerSurface } from "../src/trackers/trackers";
 import { buildJournalType } from "../src/journals/journal";
 import { EXERCISE_PRESET } from "../src/journals/journal";
 import type ChronoAnvilPlugin from "../src/main";
+import { cssRule, cssRules, readSrc } from "./sources";
+
+// `buildJournalTally`'s own source, cut at the next top-level function.
+// `fnBody` overshoots here — the widget is followed by a long comment block
+// before the next declaration — and an assertion that reads the wrong function
+// is one that passes for the wrong reason.
+const tallySource = (): string => {
+  const src = readSrc("tables");
+  const from = src.indexOf("export function buildJournalTally");
+  const next = src.indexOf("\nexport function ", from + 1);
+  return src.slice(from, next < 0 ? undefined : next);
+};
 
 const surfaceName = (s: TrackerSurface): string =>
   s.kind === "journal" ? (s.typeId ?? "journal") : "diary";
@@ -218,5 +230,25 @@ describe("the totals predicate", () => {
       "calories",
       "protein",
     ]);
+  });
+});
+
+describe("tally card surface styling", () => {
+  it("gives the tally section its card surface via the shared section frame without nesting", () => {
+    const tallyRule = cssRule(".ca-journal-tally");
+    expect(tallyRule).not.toContain("border:");
+    expect(tallyRule).not.toContain("background: var(--background-secondary)");
+    const secRule = cssRule(".ca-journal-sec-block");
+    expect(secRule).toContain("var(--background-secondary)");
+    expect(secRule).toContain("border-left:");
+    expect(secRule).toContain("border-right:");
+  });
+
+  it("wears the shared section frame rather than a private fold bar", () => {
+    const body = tallySource();
+    expect(body).not.toContain('cls: "ca-jtly-head');
+    expect(body).not.toContain("ca-journal-note-collapse-bar");
+    expect(cssRules(".ca-jtly-head")).toEqual([]);
+    expect(cssRules(".ca-jtly-chevron")).toEqual([]);
   });
 });

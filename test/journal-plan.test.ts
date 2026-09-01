@@ -158,8 +158,17 @@ describe("reading a template back", () => {
       subject.ctx,
       ids.filter((id) => id !== "review")
     );
-    expect(noReview).toContain("```chronoanvil\ntasks-table\n```");
+    // AND THE SURVIVOR IS TITLED, WHICH IT WAS NOT UNTIL 5.6. The bar came out
+    // with Review — it is Review's line — and what was left was a fence of
+    // rows with nothing above it: the one shape on these pages that reads as an
+    // unfinished widget rather than as a section. `soloBar` puts the section's
+    // own name back, and it is the string the catalogue already writes when
+    // this section stands alone on a leaf index.
+    expect(noReview).toContain(
+      "```chronoanvil\nheader:⏳ Open tasks\ntasks-table\n```"
+    );
     expect(noReview).not.toContain("review-queue");
+    expect(noReview).not.toContain("Due and open");
     // A ROW OF ONE IS NOT A ROW — the `row` line goes with the second-to-last
     // cell, or the editor draws a group over a section grouped with nothing.
     expect(noReview).not.toContain("\nrow\n");
@@ -171,6 +180,58 @@ describe("reading a template back", () => {
     );
     expect(noTasks).toContain("```chronoanvil\nheader:🔁 Due and open\nreview-queue\n```");
     expect(noTasks).not.toContain("tasks-table");
+  });
+
+  it("titles a barless cell that is already in the file", () => {
+    // ── THE PAGE THAT IS ALREADY WRONG ──────────────────────────────────
+    //
+    // Composition and the cut both give a lone cell a title now. Neither
+    // reaches a note WRITTEN BEFORE THEY DID, and the reader of that note has no
+    // gesture that fixes it: unticking the section and ticking it back composed
+    // the same headless fence they started with. So the plan reports it as an
+    // `extend` — a section short of something it should have, which is exactly
+    // what `missingParts` already means — and the write adds the one line.
+    const subject = allTemplates().find((t) => t.file.includes("subject"))!;
+    const ids = sectionsPresent(subject.text, subject.ctx).filter(
+      (id) => id !== "review"
+    );
+    // The 5.5 shape, built by hand: Review gone, and the cell it used to title
+    // left in a fence with nothing over it.
+    const stale = applySections(subject.text, subject.ctx, ids)!.replace(
+      "header:⏳ Open tasks\n",
+      ""
+    );
+    expect(stale).toContain("```chronoanvil\ntasks-table\n```");
+
+    const ops = planSections(stale, subject.ctx, ids.map((id) => ({ id })));
+    const op = ops.find((o) => o.sectionId === "tasks")!;
+    expect(op.kind).toBe("extend");
+    expect(op.detail).toContain("no title over it");
+
+    const fixed = applySections(stale, subject.ctx, ids.map((id) => ({ id })));
+    expect(fixed).toContain("```chronoanvil\nheader:⏳ Open tasks\ntasks-table\n```");
+    // AND ONLY ONCE — the second pass has nothing left to say, which is the
+    // null-means-no-change convention this whole module rests on.
+    expect(
+      applySections(fixed as string, subject.ctx, ids.map((id) => ({ id })))
+    ).toBeNull();
+  });
+
+  it("leaves a fence the reader titled themselves alone", () => {
+    // `isSectionFence` is the gate, so a bar the reader wrote — under any
+    // wording — answers the question and the repair does not fire. The plugin
+    // is filling a gap, not enforcing a name.
+    const subject = allTemplates().find((t) => t.file.includes("subject"))!;
+    const ids = sectionsPresent(subject.text, subject.ctx).filter(
+      (id) => id !== "review"
+    );
+    const mine = applySections(subject.text, subject.ctx, ids)!.replace(
+      "header:⏳ Open tasks",
+      "header:🔨 What is left"
+    );
+    expect(
+      applySections(mine, subject.ctx, ids.map((id) => ({ id })))
+    ).toBeNull();
   });
 
   it("puts a cut cell back into its row, not beside it", () => {

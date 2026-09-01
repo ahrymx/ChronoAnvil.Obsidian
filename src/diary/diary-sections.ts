@@ -54,6 +54,9 @@ import { segment } from "../core/layout";
 import {
   HEADER_KEYWORD,
   cutFromFence,
+  dropSoloBar,
+  needsSoloBar,
+  soloBar,
   isSectionFence,
   isCellLine,
   isRowLine,
@@ -212,6 +215,11 @@ export interface DiarySection {
   // that happens to be true on.
   row?: string;
   cell?: string;
+  // `RowMember.bar`: the title this cell puts on when its row has come down to
+  // it alone. Declared by the cells that compose none — the ones the paragraph
+  // above `BODY_ROW` says carry the band's bar for them — because the section
+  // that carries it is freely removable. See `soloBar`.
+  bar?: string;
   // Which band of the page this section belongs to, and therefore which fence.
   //
   // NEW IN 3.2 PATCH 3, AND IT IS THE PATCH. A dashboard used to be a flat list
@@ -824,6 +832,12 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // the `row` line from a run of one, so a grain where only the rollup applies
     // composes exactly the block it composed before rows existed.
     row: BODY_ROW,
+    // AND ITS OWN TITLE BACK IF THE ROLLUP IS NOT THERE, which is the case the
+    // paragraph above did not have: `entry-rollup` is `locked: false`, so the
+    // cell that titles this band can be unticked and leave the table headless.
+    // `soloBar` fills exactly that gap — on a year, where the rollup does not
+    // APPLY, it does the same for the same reason.
+    bar: "header:⏳ Open tasks",
     render: () => ({ fence: "chronoanvil", lines: ["tasks-table:,period"] }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },
@@ -1650,6 +1664,7 @@ export function planDiarySections(
   const runs = parseDiarySections(text, ctx);
   const order = runs.flatMap((r) => r.sectionIds);
   const present = new Set(order);
+  const planSegs = segment(text.split("\n"));
   // THE TEXT AND THE WANT BOTH, because either can name a section this grain's
   // catalogue does not hold: the text names the widget cards it already carries,
   // and the want names the ones the reader staged this session. A section
@@ -1671,6 +1686,26 @@ export function planDiarySections(
 
   const rewriting = new Set(reconfigured(order, requested));
 
+  // ── A CELL ALREADY ON DISK WITH NO TITLE OVER IT (5.9) ──────────────
+  //
+  // `soloBar` titles a lone cell when a page is COMPOSED without its row's
+  // opener and when one is CUT out of a fence. Neither reaches a page written
+  // before those rules existed — untick the rollup on a week, in any release
+  // before this one, and the tasks table beside it was left in a fence with
+  // nothing over it — and its reader has no gesture that fixes it: unticking
+  // the table and ticking it back composed the same headless fence. So the plan
+  // looks, reports it as an `extend`, and the write adds one line.
+  // `needsSoloBar` is the gate and says why.
+  const barless = new Map<string, string>();
+  for (const run of runs) {
+    if (run.sectionIds.length !== 1) continue;
+    const only = byId.get(run.sectionIds[0]);
+    const lines: string[] = [];
+    for (let i = run.from; i <= run.to; i++) lines.push(...planSegs[i].lines);
+    if (!only?.row || !needsSoloBar(lines, only.bar)) continue;
+    barless.set(only.id, only.bar as string);
+  }
+
   const ops: SectionOp[] = [];
 
   // Removals, keeps and reconfigures, in file order, so the plan reads down the
@@ -1679,8 +1714,13 @@ export function planDiarySections(
     const section = byId.get(id);
     if (!section) continue;
     if (want.includes(id)) {
+      // A TITLE IS A MISSING PART, and `extend` is the word for a section short
+      // of one. A reconfigure still wins the label — it is the one that rewrites
+      // a line the reader may have edited — and reports both.
+      const noBar = barless.get(id);
+      const barDetail = "this block has no title over it — one will be added";
       ops.push({
-        kind: rewriting.has(id) ? "reconfigure" : "keep",
+        kind: rewriting.has(id) ? "reconfigure" : noBar ? "extend" : "keep",
         sectionId: section.id,
         label: section.label,
         detail: rewriting.has(id)
@@ -1688,8 +1728,10 @@ export function planDiarySections(
               section.questions?.(ctx) ?? [],
               optionsFor(requested, id),
               diaryHostLabel(ctx)
-            )
-          : "unchanged",
+            ) + (noBar ? `; ${barDetail}` : "")
+          : noBar
+            ? barDetail
+            : "unchanged",
       });
       continue;
     }
@@ -1807,7 +1849,15 @@ function cutFromRun(
   };
   const spare = new Set(keeping.flatMap(keywordsOf));
   const cutting = new Set(doomed.flatMap(keywordsOf));
-  return cutFromFence(lines, cutting, spare);
+  // THE SURVIVOR'S OWN TITLE WHERE ONE CELL IS LEFT (5.9) — the bar came out
+  // with the cell that composed it, and `soloBar` is what stops the remaining
+  // one being a fence of content with nothing above it.
+  return cutFromFence(
+    lines,
+    cutting,
+    spare,
+    keeping.length === 1 ? byId.get(keeping[0])?.bar : undefined
+  );
 }
 
 // ── A CELL REJOINING THE ROW IT LEFT (4.70) ──────────────────────────────
@@ -1851,6 +1901,14 @@ function joinRowChunk(
   if (at < 0) return false;
 
   const chunk = chunks[at];
+  // AND THE SOLO BAR COMES BACK OFF FIRST — `dropSoloBar`, `soloBar`'s inverse.
+  // `cutFromRun` gave the survivor a title when the cut left it alone; the cell
+  // arriving beside it composes the band's again, so the borrowed one goes and
+  // remove-then-re-add stays the round trip this function exists for.
+  const base = chunk.ids.reduce(
+    (out, id) => dropSoloBar(out, byId.get(id)?.bar),
+    chunk.lines as readonly string[]
+  );
   const rank = order.indexOf(section.id);
   // The first member that outranks the arrival, by the keyword it writes — the
   // same probe `cutFromRun` cuts by, so the two agree about which line is whose.
@@ -1859,21 +1917,21 @@ function joinRowChunk(
     ? new Set(byId.get(later)?.render(ctx).lines.map((l) => splitDirective(l).keyword))
     : null;
   // Default: last line before the fence closes.
-  let insertAt = chunk.lines.length;
-  for (let n = chunk.lines.length - 1; n >= 0; n--) {
-    if (chunk.lines[n].trim() === "```") {
+  let insertAt = base.length;
+  for (let n = base.length - 1; n >= 0; n--) {
+    if (base[n].trim() === "```") {
       insertAt = n;
       break;
     }
   }
   if (laterKeywords) {
-    const found = chunk.lines.findIndex((l) =>
+    const found = base.findIndex((l) =>
       laterKeywords.has(splitDirective(l.trim()).keyword)
     );
     if (found >= 0) insertAt = found;
   }
 
-  const lines = [...chunk.lines];
+  const lines = [...base];
   if (!lines.some((l) => isRowLine(l.trim()))) {
     const open = lines.findIndex((l) => l.trim().startsWith("```"));
     lines.splice(open + 1, 0, ROW_KEYWORD);
@@ -1938,7 +1996,22 @@ export function applyDiarySections(
       .map((o) => o.sectionId)
       .filter((id): id is string => id !== null)
   );
-  if (!removing.size && !adding.length && !moving && !rewriting.size) {
+  // A missing title is a write like any other, so it counts towards "anything to
+  // do" — the plan already named it, and a plan that promises a line the writer
+  // then declines to add is the disagreement this module is built not to have.
+  const extending = new Set(
+    ops
+      .filter((o) => o.kind === "extend")
+      .map((o) => o.sectionId)
+      .filter((id): id is string => id !== null)
+  );
+  if (
+    !removing.size &&
+    !adding.length &&
+    !moving &&
+    !rewriting.size &&
+    !extending.size
+  ) {
     return null;
   }
 
@@ -1987,6 +2060,9 @@ export function applyDiarySections(
       // the reader's line, unchanged. See `withAnswers`.
       let out = lines;
       for (const id of run.sectionIds) {
+        // The title the plan said this block was missing, added before the
+        // answers so it cannot land inside a directive's argument span.
+        if (extending.has(id)) out = soloBar(out, byId.get(id)?.bar);
         if (!rewriting.has(id)) continue;
         out = withAnswers(
           out,
@@ -2023,11 +2099,16 @@ export function applyDiarySections(
       continue;
     }
     const at = insertionPoint(chunks, order, id);
+    // AND A CELL THAT COULD NOT REJOIN ONE IS COMPOSING A BLOCK OF ITS OWN, so
+    // it takes the title a block of its own needs — `soloBar`'s third door.
     chunks.splice(at, 0, {
       ids: [id],
       lines: [
         "",
-        ...renderDiarySection(section, ctx, optionsFor(requested, id)).split("\n"),
+        ...soloBar(
+          renderDiarySection(section, ctx, optionsFor(requested, id)).split("\n"),
+          section.bar
+        ),
       ],
     });
   }

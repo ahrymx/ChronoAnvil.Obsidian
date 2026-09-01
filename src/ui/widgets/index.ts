@@ -468,6 +468,7 @@ const SECTION_TITLES: Record<string, string> = {
   // aliases' entries are further down this table where they have always been.
   "stats-band": "🔢 Stats",
   "journal-totals": "🧮 Totals",
+  "journal-tally": "🧮 Status",
   "pages-table": "📄 Pages",
   "kind-table": "🗂 Notes",
   "activity-chart": "📈 Activity",
@@ -1400,6 +1401,7 @@ export class Widgets implements
       // ── COLLAPSIBLE TRACKER SECTION HEAD ────────────────────────────
       if (
         hasTrackerRegion &&
+        !lines.some((l) => l.trim().startsWith("header:")) &&
         !isOverviewCard &&
         !isManagedTemplate(this.plugin, ctx.sourcePath)
       ) {
