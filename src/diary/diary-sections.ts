@@ -55,6 +55,7 @@ import {
   HEADER_KEYWORD,
   cutFromFence,
   dropSoloBar,
+  leadingBar,
   needsSoloBar,
   soloBar,
   isSectionFence,
@@ -1686,7 +1687,7 @@ export function planDiarySections(
 
   const rewriting = new Set(reconfigured(order, requested));
 
-  // ── A CELL ALREADY ON DISK WITH NO TITLE OVER IT (5.9) ──────────────
+  // ── A BLOCK ALREADY ON DISK WITH NO TITLE OVER IT (5.9, widened 5.10) ──
   //
   // `soloBar` titles a lone cell when a page is COMPOSED without its row's
   // opener and when one is CUT out of a fence. Neither reaches a page written
@@ -1695,15 +1696,36 @@ export function planDiarySections(
   // nothing over it — and its reader has no gesture that fixes it: unticking
   // the table and ticking it back composed the same headless fence. So the plan
   // looks, reports it as an `extend`, and the write adds one line.
+  //
+  // AND NOT ONLY A ROW'S CELL. 5.9's scope was drawn around the one way a
+  // barless block was known to arise; a section whose catalogue entry gains a
+  // bar arrives at the same place, and a page composed before that gain is
+  // equally stranded. `note-sections.ts` carries the argument in full.
+  //
   // `needsSoloBar` is the gate and says why.
+  //
+  // AND NEVER WHERE THE SECTION OFFERS THE FORM TOGGLE (5.11) — the same
+  // refusal `planFlatSections` makes, for the same reason and with the argument
+  // written out there: a barless fence under a toggle is an ANSWER, and a
+  // repair that cannot tell an answer from an omission must not overwrite one.
+  // It bites harder here, because the summary and the rollup both word their
+  // bar from the grain: a reader who dropped the title on a week would have
+  // been handed it back every time the editor opened.
   const barless = new Map<string, string>();
   for (const run of runs) {
     if (run.sectionIds.length !== 1) continue;
     const only = byId.get(run.sectionIds[0]);
+    if (!only) continue;
     const lines: string[] = [];
     for (let i = run.from; i <= run.to; i++) lines.push(...planSegs[i].lines);
-    if (!only?.row || !needsSoloBar(lines, only.bar)) continue;
-    barless.set(only.id, only.bar as string);
+    const asks = (only.questions?.(ctx) ?? []).some((q) => q.kind === "form");
+    const bar =
+      only.bar ??
+      (only.row || asks
+        ? undefined
+        : leadingBar(only.render(ctx, optionsFor(requested, only.id)).lines));
+    if (!needsSoloBar(lines, bar)) continue;
+    barless.set(only.id, bar as string);
   }
 
   const ops: SectionOp[] = [];

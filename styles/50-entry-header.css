@@ -690,6 +690,9 @@
   box-shadow: inset 0 1px 0 var(--ca-edge-highlight);
 }
 
+/* Inside a section the surface is the section's, so the card here stands down —
+   4.59.0's rule, which this file's own comment above already states as "a block
+   that already is a card does not get a second one". */
 .ca-journal-sec-block .ca-journal-widget-block.ca-journal-tracker-section,
 .ca-journal-sec-block.ca-journal-widget-block.ca-journal-tracker-section,
 .ca-journal-sec-block > .ca-journal-tracker-section {
@@ -697,70 +700,51 @@
   border: none;
   border-radius: 0;
   box-shadow: none;
+}
+/* ── AND ONLY THE CARD INSIDE STANDS DOWN, NOT THE SECTION (5.10) ────────
+ *
+ * `padding: 0; margin: 0` was in the rule above, on all three selectors, and
+ * the middle one is the block that IS the section — a `header:` fence whose
+ * body is the logging grid, which is every journal note's Trackers section. So
+ * the section surface lost its own padding: 12px at the sides, 2px at the top,
+ * 10px at the foot.
+ *
+ * WHAT THAT LOOKED LIKE, and it is the reason this was reported. Collapse a
+ * Study subject and five sections close to the same bar — except Trackers,
+ * which closed ~16px shorter than Topics, Find, Due and open and Progress, and
+ * sat its title higher inside its own card. One section on the page collapsing
+ * to a different height than its neighbours is the defect; the two rules that
+ * produced it were each right about their own half.
+ *
+ * SO THE TWO HALVES ARE SPLIT. A tracker block INSIDE a section block gives up
+ * its box entirely — the block around it is already padded. A tracker block
+ * that IS the section block gives up only its chrome, and keeps the padding
+ * every other section block draws, including the `is-first` / `is-last` /
+ * collapsed adjustments in 70-section-surface.css, which reach it at their own
+ * specificity because nothing here is fighting them any more. */
+.ca-journal-sec-block .ca-journal-widget-block.ca-journal-tracker-section,
+.ca-journal-sec-block > .ca-journal-tracker-section {
   padding: 0;
   margin: 0;
 }
 
-.ca-journal-sec-block .ca-journal-tracker-head {
-  display: none;
-}
-
-.ca-journal-tracker-section.ca-journal-note--collapsible > .ca-journal-tracker-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 2px 0;
-  margin-bottom: 8px;
-  cursor: pointer;
-  user-select: none;
-  background: transparent;
-  border-bottom: none;
-}
-
-.ca-journal-tracker-section.ca-journal-note--collapsible.is-collapsed > .ca-journal-tracker-head {
-  margin-bottom: 0;
-}
-
-.ca-journal-tracker-title-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.ca-journal-tracker-section.ca-journal-note--collapsible > .ca-journal-tracker-head:hover .ca-journal-tracker-label {
-  color: var(--text-normal);
-}
-
-.ca-journal-tracker-chevron {
-  display: flex;
-  align-items: center;
-  color: var(--text-faint);
-  transition: transform 120ms ease;
-}
-
-.ca-journal-tracker-chevron .svg-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.ca-journal-tracker-section.is-collapsed .ca-journal-tracker-chevron {
-  transform: rotate(-90deg);
-}
-
-.ca-journal-tracker-section.is-collapsed > :not(.ca-journal-tracker-head) {
-  display: none;
-}
-
-.ca-journal-tracker-label {
-  font-size: var(--ca-text-xs);
-  font-weight: var(--ca-caps-weight);
-  letter-spacing: var(--ca-caps-tracking);
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin: 0;
-}
+/* ── THE TRACKER HEAD IS THE SECTION'S (5.10) ──────────────────────────
+ *
+ * Fifty lines stood here styling `buildTrackerSectionHead`: a private fold bar
+ * with the chevron on the LEFT, an uppercase micro-label and no hairline,
+ * added in 5.8 as a fallback for notes carrying no `header:` line over their
+ * trackers — and hidden again by
+ * `.ca-journal-sec-block .ca-journal-tracker-head { display: none }` on every
+ * note that did carry one. Two looks for one object, chosen by the age of the
+ * note.
+ *
+ * The catalogue emits `header:📊 Trackers`, and a note composed before it is
+ * REPAIRED rather than decorated: the Section Editor reports the missing bar
+ * and writing it adds the one line. See `missingSoloBar` in journal-plan.ts.
+ *
+ * `.ca-journal-tracker-head` is gone from the tree; nothing builds it. The
+ * strip below is `.ca-journal-note-context`, which is a different object — the
+ * level-and-kind facts, not a title. */
 
 /* ── THE TRACKER SECTION TOP STRIP ──────────────────────────────────────
  *

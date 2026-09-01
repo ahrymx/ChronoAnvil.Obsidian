@@ -25,7 +25,6 @@ import { frontmatterOf, getFile, noteTypeOf, today as todayIso } from "../../cor
 import { isValidNoteKey, readNoteRegion } from "../../core/notestore";
 import { pageTypeIds, registeredJournalTypes } from "../../journals/journal";
 import { ratingPropertyOf, reviewProperties } from "../../review/review-queue";
-import { noteFoldState, setNoteFold } from "./note-field";
 import {
   RecallGrade,
   RecallPair,
@@ -115,47 +114,23 @@ export function buildRecall(
   label: string | null
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
-  const wrap = createDiv({
-    cls: "ca-journal-recall ca-journal-note--collapsible",
-  });
+  const wrap = createDiv({ cls: "ca-journal-recall" });
 
-  const isCollapsed = (): boolean =>
-    "plugin" in deps
-      ? noteFoldState(deps.plugin, ctx.sourcePath, key)
-      : false;
-
-  const setFold = (collapsed: boolean): void => {
-    if ("plugin" in deps) {
-      void setNoteFold(deps.plugin, ctx.sourcePath, key, collapsed);
-    }
-  };
-
-  const head = wrap.createDiv({
-    cls: "ca-journal-recall-head ca-journal-note-collapse-bar",
-  });
-  const titleLeft = head.createDiv({ cls: "ca-journal-recall-title-left" });
-  const chevron = titleLeft.createDiv({
-    cls: "ca-journal-note-chevron ca-journal-recall-chevron",
-  });
-  setIcon(chevron, "chevron-down");
-  const titleEl = titleLeft.createDiv({
-    cls: "ca-journal-note-label ca-journal-recall-label",
-  });
-  titleEl.setText(label ?? "Recall");
-
+  // ── NO FOLD BAR OF ITS OWN (5.10) ─────────────────────────────────────
+  //
+  // 5.7 gave this widget a private collapse bar — chevron on the LEFT, an
+  // uppercase micro-label, no hairline, no glyph slot — and the `recall`
+  // section in `journal-sections.ts` already renders `header:🧠 Recall` above
+  // it. So every Study note drew two heads for one section, and the second was
+  // removed again by a stylesheet rule
+  // (`.ca-journal-sec-block .ca-journal-recall-head { display: none }`): a bar
+  // built in TypeScript so that CSS could unbuild it wherever it was wrong,
+  // which is to say everywhere the section is composed.
+  //
+  // The head is the section's. This draws the widget.
+  const head = wrap.createDiv({ cls: "ca-journal-recall-head" });
+  if (label) head.createDiv({ cls: "ca-journal-recall-label", text: label });
   const tools = head.createDiv({ cls: "ca-jrc-tools" });
-
-  const applyFold = (collapsed: boolean): void => {
-    wrap.toggleClass("is-collapsed", collapsed);
-  };
-  applyFold(isCollapsed());
-
-  head.addEventListener("click", (e) => {
-    e.preventDefault();
-    const next = !wrap.hasClass("is-collapsed");
-    applyFold(next);
-    setFold(next);
-  });
 
   if (!isValidNoteKey(key)) {
     wrap.createDiv({
@@ -377,9 +352,7 @@ export function buildRecall(
       },
     });
     setIcon(edit, editing ? "check" : "pencil");
-    edit.addEventListener("click", (e) => {
-      e.stopPropagation();
-      e.preventDefault();
+    edit.addEventListener("click", () => {
       editing = !editing;
       render();
     });
@@ -394,9 +367,7 @@ export function buildRecall(
       },
     });
     setIcon(again, "rotate-ccw");
-    again.addEventListener("click", (e) => {
-      e.stopPropagation();
-      e.preventDefault();
+    again.addEventListener("click", () => {
       // In-memory only. The Confidence already written stands: it was a real
       // reading of a real sitting, and un-writing it on a second run would
       // make the trend a record of your last attempt rather than your last

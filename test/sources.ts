@@ -329,6 +329,34 @@ export function repoFile(relative: string): string {
  * groups would make `readSrc(name)` ambiguous, so it is better to hear about it
  * here than to silently read whichever the search reached first.
  */
+/**
+ * Every module under `src/`, as a repo-relative path and its text.
+ *
+ * FOR THE SWEEPS, and the reason it lives here rather than in the test that
+ * needs it is the defect that prompted it. `test/section-frame.test.ts` built
+ * its own list with a bare `readdirSync("src")` — non-recursive — and `src/`
+ * holds exactly one `.ts` file. Both of its "this is the only thing that emits
+ * a header bar" assertions were therefore reading `main.ts` and nothing else,
+ * for as long as the tree has had subdirectories. Three private section heads
+ * were added against a green suite.
+ *
+ * A sweep that quietly scans nothing is worse than no sweep: it reports the
+ * invariant as held. So the walk is one exported function, beside the other
+ * source readers, where the next sweep will find it instead of writing a
+ * fourth copy of the same loop.
+ *
+ * PATHS, NOT MODULE NAMES. `readSrc("widgets")` concatenates every file under
+ * `src/ui/widgets/`, which is right for reading a module and wrong for naming
+ * an offender — "widgets" does not tell anyone which of its eleven files broke
+ * the rule.
+ */
+export function srcFiles(): { path: string; code: string }[] {
+  return tsFilesUnder(SRC).map((p) => ({
+    path: p.slice(ROOT.length + 1).split(sep).join("/"),
+    code: readFileSync(p, "utf8"),
+  }));
+}
+
 export function allSrcNames(): string[] {
   // A "module" is a .ts file, OR a directory holding an index.ts — the shape a
   // module takes once it is split. Group folders (core/, ui/, …) have no

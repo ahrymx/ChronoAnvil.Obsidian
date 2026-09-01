@@ -80,13 +80,14 @@ import {
   isLinksLine,
   isRowLine,
   isTabLine,
-  isTitleLine,
+  isPageHeadLine,
   isWideLine,
   parseWide,
   argSpansIn,
   readArg,
   splitDirective,
   dropSoloBar,
+  leadingBar,
   needsSoloBar,
   soloBar,
   undoRowOfOne,
@@ -1319,7 +1320,7 @@ export function planFlatSections(
   const planSegs = segment(text.split("\n"));
   const runs = parseFlatSections(text, sections);
   const order = runs.flatMap((r) => r.sectionIds);
-  // ── A CELL ALREADY ON DISK WITH NO TITLE OVER IT (5.9) ──────────────
+  // ── A BLOCK ALREADY ON DISK WITH NO TITLE OVER IT (5.9, widened 5.10) ──
   //
   // `soloBar` titles a lone cell when a page is COMPOSED without its row's
   // opener and when one is CUT out of a fence. Neither reaches a page written
@@ -1327,15 +1328,42 @@ export function planFlatSections(
   // unticking the section and ticking it back composes the same headless fence.
   // So the plan looks, reports it as an `extend`, and the write adds one line.
   //
+  // 5.9 SCOPED THIS TO A ROW'S CELL and that was too narrow. A section whose
+  // catalogue entry GAINED a bar is in the same state on every page composed
+  // before it, for the same reason, and the alternative — drawing a fallback
+  // bar at render time — gives a vault two looks for one object, chosen by the
+  // age of the page and never said out loud.
+  //
+  // THE TITLE COMES FROM THE RENDER. A row member names its own (`bar`, worded
+  // for itself rather than for the band); everything else opens with the
+  // `header:` line it would compose today, which is what `leadingBar` reads.
+  //
   // ONLY WHERE THE RUN HOLDS ONE SECTION and the fence carries no bar of any
   // kind; `needsSoloBar` is the gate and says why.
+  //
+  // AND NEVER WHERE THE SECTION OFFERS THE FORM TOGGLE (5.11). Once a section
+  // asks the reader "a section with its own title, or a widget?", a fence with
+  // no bar in it has TWO causes — a page composed before the title existed, and
+  // a reader who answered `widget` — and this rule cannot tell them apart. It
+  // used to guess the first, so opening the editor on a dashboard whose Recently
+  // written had been turned into a widget offered to put the title back, and
+  // saving took the answer away. Going quiet leaves the older page untitled,
+  // which the reader can fix with the toggle they were offered anyway; the
+  // opposite mistake overwrites an answer they already gave.
   const barless = new Map<string, string>();
   for (const run of runs) {
     if (run.sectionIds.length !== 1) continue;
     const only = sections.find((x) => x.id === run.sectionIds[0]);
+    if (!only) continue;
     const runLines = planSegs[run.index]?.lines ?? [];
-    if (!only?.row || !needsSoloBar(runLines, only.bar)) continue;
-    barless.set(only.id, only.bar as string);
+    const asks = (only.questions?.(spec) ?? []).some((q) => q.kind === "form");
+    const bar =
+      only.bar ??
+      (only.row || asks
+        ? undefined
+        : leadingBar(only.render(optionsFor(requested, only.id)).lines));
+    if (!needsSoloBar(runLines, bar)) continue;
+    barless.set(only.id, bar as string);
   }
   const sharers = sharersIn(runs);
   const present = new Set(order);
@@ -2124,11 +2152,17 @@ export function flatBlocks(
       // cannot disagree.
       //
       // AND NEVER THE PAGE HEAD, which is the one refusal `widgetRun` does not
-      // make: `moveCell` refuses a run holding `title` separately and by name, so
-      // this asks the same question here rather than letting the window offer a
-      // join the write declines.
+      // make: `moveCell` refuses a run holding the page's name separately and by
+      // name, so this asks the same question here rather than letting the window
+      // offer a join the write declines.
+      //
+      // `isPageHeadLine` RATHER THAN `isTitleLine` AS OF 5.11, which is the same
+      // widening `moveCell` takes and for the same reason: a journal note's head
+      // is `journal-header` and an entry's is `entry-header`, so the narrower
+      // question answered "not the head" about the one block on those pages that
+      // is.
       const isColumn =
-        !body.some(isTitleLine) &&
+        !body.some(isPageHeadLine) &&
         (body.some(isRowLine) || widgetRun(body) !== null);
       return {
         ids: [...run.sectionIds],

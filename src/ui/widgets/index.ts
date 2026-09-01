@@ -9,7 +9,6 @@ import {
   App,
   MarkdownPostProcessorContext,
   TFile,
-  setIcon,
 } from "obsidian";
 import type ChronoAnvilPlugin from "../../main";
 import { buildYearSummary } from "../../review/year-view";
@@ -20,6 +19,7 @@ import { keywordOf } from "../../core/layout";
 import {
   buildDiarySearch,
 } from "../../diary/diary-retrieval";
+import { buildJournalContext } from "../../journals/study-header";
 // The one copy of what each superseded band spelling means. See the two arms
 // in `buildFromSpec` that read it.
 import { STATS_BAND_ALIASES } from "../../journals/stats-band";
@@ -981,6 +981,32 @@ export class Widgets implements
       // exactly what the file counts: an untitled `header:` renders no title,
       // is not renameable, and is skipped on both sides (see `headerTitleSpan`).
       let headerIndex = 0;
+      // ── DOES ANYTHING ELSE TITLE THIS FENCE (5.10) ───────────────────
+      //
+      // A widget that carries a head of its own — the `tasks:` region is the
+      // one left — must not draw it under a section bar that already names the
+      // block. Two heads for one section is what the 5.7-5.9 wave produced
+      // three times over, and the stylesheet was left hiding the loser: the
+      // `tasks:` head's Compact toggle and progress readout went with it, so a
+      // control disappeared from every Study note to settle a layout question.
+      //
+      // ONE ANSWER FOR THE FENCE, unlike `hostedScope` beside it, which is per
+      // directive because a fence may hold a hosted table and an unhosted one.
+      // A title is not like that: a `header:` bar names everything under it.
+      //
+      // AND `frame: section` COUNTS AS A TITLE, because it draws one — from the
+      // first directive `SECTION_TITLES` knows, further down this function. A
+      // fence with no `header:` line but a `frame: section` modifier is still a
+      // named section, so a widget inside it that titled itself as well would be
+      // the same two-heads defect arriving by the other door. When no line in
+      // the fence is in that table the frame refuses out loud and draws no head,
+      // which is why the lookup is asked rather than the modifier alone.
+      const fenceTitled =
+        hasTitledBar(lines) ||
+        (frameSpec.frame === "section" &&
+          lines.some(
+            (l) => SECTION_TITLES[l.split("|")[0].split(":")[0].trim()] !== undefined
+          ));
       // Which titled header this fence's shelves hang under, or -1 for a fence
       // with none. Computed in one pass up front rather than discovered during
       // the loop, because the button has to be placed when its header is drawn
@@ -1208,7 +1234,12 @@ export class Widgets implements
           }
         }
 
-        const widget = this.buildFromSpec(line, ctx, scopeHeader === headerIndex - 1);
+        const widget = this.buildFromSpec(
+          line,
+          ctx,
+          scopeHeader === headerIndex - 1,
+          fenceTitled
+        );
 
         if (!widget) {
           bar = null;
@@ -1398,21 +1429,36 @@ export class Widgets implements
         }
       }
 
-      // ── COLLAPSIBLE TRACKER SECTION HEAD ────────────────────────────
-      if (
-        hasTrackerRegion &&
-        !lines.some((l) => l.trim().startsWith("header:")) &&
-        !isOverviewCard &&
-        !isManagedTemplate(this.plugin, ctx.sourcePath)
-      ) {
-        container.addClass("ca-journal-note--collapsible");
-        const trackerHead = buildTrackerSectionHead(
-          this.plugin,
-          ctx,
-          container
-        );
-        if (pageHead) pageHead.insertAdjacentElement("afterend", trackerHead);
-        else container.prepend(trackerHead);
+      // AND THE JOURNAL NOTE'S OWN, which says its level and its kind.
+      //
+      // ── AND NOT A FOLD BAR OF ITS OWN (5.10) ──────────────────────────
+      //
+      // What stood here between 5.8 and 5.10 was `buildTrackerSectionHead`: a
+      // private collapse bar with the chevron on the LEFT, an uppercase
+      // micro-label and no hairline — which is the bar a `note:` FIELD wears,
+      // built in a file that is not section-frame.ts. It was added as a
+      // fallback for notes that carry no `header:` line over their trackers,
+      // and it solved that by giving the vault two looks for one object: a
+      // proper section bar on a note composed by 5.9 or later, a field bar on
+      // every older one.
+      //
+      // THE CATALOGUE IS WHERE THE TITLE COMES FROM. `journal-sections.ts`
+      // emits `header:📊 Trackers`, so the section folds, aligns and reads like
+      // every other one; and a note composed before that is REPAIRED rather
+      // than decorated — `missingSoloBar` reports the absent bar to the Section
+      // Editor and writing it adds the one line. A reader gets the same object
+      // on both notes, and gets told it changed.
+      //
+      // `buildJournalContext` came out with the fallback and comes back with
+      // it. It was never the thing being replaced; it was standing in the spot
+      // the fallback wanted.
+      if (hasTrackerRegion && !isOverviewCard) {
+        const facts = buildJournalContext(this.plugin, ctx);
+        // Under the head, for the reason one block up.
+        if (facts) {
+          if (pageHead) pageHead.insertAdjacentElement("afterend", facts);
+          else container.prepend(facts);
+        }
       }
 
       // ── THE ROW, LAID OUT AFTER THE LOOP ────────────────────────────
@@ -1682,6 +1728,12 @@ export class Widgets implements
       // is what stops a folded Charts section being opaque. Passed as a number
       // rather than as `null` because this caller genuinely knows — `specs` is
       // right here — which is the distinction the frame asks for.
+      //
+      // INTO `container`, AND BEFORE ITS BODY (5.10). The diary's grid carries
+      // the argument in full; this is the same defect in the same shape, and
+      // the two were introduced together. A journal note's Charts section was
+      // drawing its Confidence widgets above its own title, and folding it hid
+      // nothing, because the bar had no later siblings to hide.
       const frame = sectionFrame(container, {
         title: header.title,
         level: header.level,
@@ -1883,7 +1935,11 @@ export class Widgets implements
     // section-level controls. Only `tasks-table` reads it today; it is a
     // parameter rather than state because the answer is per DIRECTIVE, not per
     // fence — a fence may hold a hosted table and an unhosted one.
-    hostedScope = false
+    hostedScope = false,
+    // True when a titled `header:` bar in this fence already names the block.
+    // A widget that draws its own head withholds it — see the note at
+    // `fenceTitled`, which is where this is decided.
+    fenceTitled = false
   ): HTMLElement | null {
     const barIdx = spec.indexOf("|");
     const label = barIdx === -1 ? null : spec.slice(barIdx + 1).trim();
@@ -2008,7 +2064,7 @@ export class Widgets implements
         // format), rendered as an interactive list: checkbox, editable text,
         // priority + due controls, delete, and an add-input. Not the Tasks
         // plugin — self-contained, no external dependency.
-        widget = buildTasks(this, rest, ctx, label);
+        widget = buildTasks(this, rest, ctx, label, fenceTitled);
         break;
       case "path":
         // A re-orderable checklist rendered as a table: each step has a
@@ -2261,7 +2317,7 @@ export class Widgets implements
       case "journal-breakdown":
         return buildJournalBreakdownRegion(this.plugin, rest, label, ctx);
       case "journal-tally":
-        return buildJournalTallyRegion(this.plugin, rest, label, ctx);
+        return buildJournalTallyRegion(this.plugin, rest, label, ctx, fenceTitled);
       case "review-queue":
         return buildReviewQueueRegion(this.plugin, rest, ctx);
       case "journal-search":
@@ -2751,44 +2807,4 @@ export class Widgets implements
   // for a subject exactly as before.
 
 
-}
-
-function buildTrackerSectionHead(
-  plugin: ChronoAnvilPlugin,
-  ctx: MarkdownPostProcessorContext,
-  container: HTMLElement
-): HTMLElement {
-  const isCollapsed = (): boolean =>
-    noteFoldState(plugin, ctx.sourcePath, "trackers");
-
-  const setFold = (collapsed: boolean): void => {
-    void setNoteFold(plugin, ctx.sourcePath, "trackers", collapsed);
-  };
-
-  const head = createDiv({
-    cls: "ca-journal-tracker-head ca-journal-note-collapse-bar",
-  });
-  const titleLeft = head.createDiv({ cls: "ca-journal-tracker-title-left" });
-  const chevron = titleLeft.createDiv({
-    cls: "ca-journal-note-chevron ca-journal-tracker-chevron",
-  });
-  setIcon(chevron, "chevron-down");
-  const titleEl = titleLeft.createDiv({
-    cls: "ca-journal-note-label ca-journal-tracker-label",
-  });
-  titleEl.setText("Trackers");
-
-  const applyFold = (collapsed: boolean): void => {
-    container.toggleClass("is-collapsed", collapsed);
-  };
-  applyFold(isCollapsed());
-
-  head.addEventListener("click", (e) => {
-    e.preventDefault();
-    const next = !container.hasClass("is-collapsed");
-    applyFold(next);
-    setFold(next);
-  });
-
-  return head;
 }

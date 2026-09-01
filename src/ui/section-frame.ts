@@ -327,6 +327,15 @@ export interface FoldableSection {
   // Everything the section holds. Hidden by the fold, so a caller appends here
   // rather than to the host.
   body: HTMLElement;
+  // The element the fold marks, wrapping both of the above.
+  //
+  // RETURNED BECAUSE THE CALLERS THAT KEPT PRIVATE FOLDS NEED IT (5.10). The
+  // Journals card hangs `.ca-jjs-type` and its per-journal `--jjc-hue` on the
+  // element it collapses, and a bridge replaces its header in place and has to
+  // take the previous wrapper out. Both wrote their own fold rather than reach
+  // for this one, and "the wrapper is private" is the whole reason they could
+  // not — a fourth fold is what withholding it buys.
+  wrapper: HTMLElement;
 }
 
 // What a fold needs to remember its state between renders.
@@ -386,5 +395,5 @@ export function foldableSection(
     store.setCollapsed(key, next);
   });
 
-  return { frame, body };
+  return { frame, body, wrapper: section };
 }

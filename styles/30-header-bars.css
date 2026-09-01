@@ -24,6 +24,13 @@
   margin: 2px 0 var(--ca-sec-gap);
   border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
 }
+/* A COLLAPSED SECTION IS ONE HEIGHT WHATEVER IT CARRIES (5.10). See
+   `--ca-sec-bar-h` in 00-tokens.css for why the title line is the floor, and
+   why an untitled control strip is not given one. `min-height` rather than a
+   height: a bar with a wrapped title or a taller control still grows. */
+.ca-journal-sec-l1:not(.ca-journal-header-bar-untitled) {
+  min-height: var(--ca-sec-bar-h);
+}
 /* The glyph, in a fixed slot.
    It used to be the first characters of the title string, so "🎓 Study" and
    "Learning Path" started their words at different x positions and a column

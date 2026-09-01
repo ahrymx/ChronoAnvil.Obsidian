@@ -1371,7 +1371,7 @@
   /* THE TOP EDGE, not the whole height of the host: the host is now the card or
      the block itself rather than an 18px head, and a full-height drag target
      over a widget would swallow every click in it. */
-  top: 0;
+  top: 4px;
   height: 10px;
   z-index: 2;
   /* AROUND THE DOTS, NOT ACROSS THE BLOCK. Full width was right while the strip
@@ -1412,7 +1412,8 @@
   position: relative;
 }
 .ca-journal-sec-block .ca-jbd-handle,
-.ca-journal-sec-block .ca-journal-widget-block > .ca-jbd-handle {
+.ca-journal-sec-block .ca-journal-widget-block > .ca-jbd-handle,
+.ca-journal-header-bar > .ca-jbd-handle {
   top: 4px;
 }
 /* EACH GRIP ANSWERS TO ITS OWN HOST. Unscoped, hovering anywhere in a row lit
@@ -1422,6 +1423,8 @@
 .ca-journal-sec-block:hover .ca-jbd-handle,
 .ca-journal-sec-fold:hover > .ca-jbd-handle,
 .ca-journal-sec-fold:hover .ca-jbd-handle,
+.ca-journal-header-bar:hover .ca-jbd-handle,
+.ca-journal-header-bar:hover > .ca-jbd-handle,
 .ca-journal-widget-block:hover > .ca-jbd-handle,
 .ca-journal-widget-card:hover > .ca-jbd-handle,
 .ca-journal-note--collapsible:hover > .ca-jbd-handle,

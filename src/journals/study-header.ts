@@ -51,6 +51,7 @@ import {
 import { settingsButton } from "../ui/section-frame";
 import { openJournalTemplateWindow } from "../ui/journal-template-modal";
 import { attachNoteRename } from "../ui/header-title";
+import { pageHeadSays } from "../ui/widgets/page-head";
 import type ChronoAnvilPlugin from "../main";
 import { folderNotePath, frontmatterOf, getFile, isoDate, moment, noExt, openFile } from "../core/util";
 import { pagesUnder, relativeActivity } from "../core/query";
@@ -551,4 +552,57 @@ export function buildStudyHeader(
 //
 // READ THROUGH `contextFor`, which is the same question `section-insert.ts` asks
 // to decide which catalogue a note has — so the strip cannot disagree with the
+// section editor about what level a note is at.
+//
+// NOTHING TO SAY IS NOTHING DRAWN. A note outside a registered journal root has
+// no level and no kind, and an empty strip is a rule ruled across a card for no
+// reason — `buildEntryContext` returns null on the same grounds.
+export function buildJournalContext(
+  plugin: ChronoAnvilPlugin,
+  ctx: MarkdownPostProcessorContext
+): HTMLElement | null {
+  const sctx = plugin.sections.contextFor(ctx.sourcePath);
+  if (!sctx) return null;
 
+  const level = sctx.type.levels[sctx.depth ?? 0];
+  const kind = sctx.kind ?? null;
+  // A page is a part of the note above it rather than a note of its own, so it
+  // has no level of its own to report.
+  let levelNoun = sctx.noteKind === "page" ? null : (level?.noun ?? null);
+  let kindLabel = kind?.label ?? null;
+
+  // ── AND NOT WHAT THE HEAD'S EYEBROW ALREADY SAYS (4.51.7) ─────────────
+  //
+  // The page head above this card reads `STUDY · SUBJECT`, and the first vault
+  // render of 4.51.6 showed this strip printing `SUBJECT` again inside the card
+  // under it. Both facts are still true; only one of them needs saying, and the
+  // head is the one a reader meets first.
+  //
+  // ASKED, NOT DERIVED. `pageHeadSays` is the head's own answer — including
+  // whether there IS a head, which is what keeps the strip whole on a note with
+  // the bar turned off.
+  const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
+  if (file instanceof TFile) {
+    if (levelNoun && pageHeadSays(plugin, file, levelNoun)) levelNoun = null;
+    if (kindLabel && pageHeadSays(plugin, file, kindLabel)) kindLabel = null;
+  }
+  // A strip with nothing left to report draws nothing, which it has always
+  // done — the empty case is not new, only newly reachable.
+  if (!levelNoun && !kindLabel) return null;
+
+  const bar = createDiv({ cls: "ca-journal-widget-bar ca-journal-note-context" });
+  const facts = bar.createDiv({ cls: "ca-jnc-facts" });
+
+  if (levelNoun) {
+    const el = facts.createSpan({ cls: "ca-jnc-fact" });
+    setIcon(el.createSpan({ cls: "ca-jnc-fact-icon" }), "layers");
+    el.createSpan({ cls: "ca-jnc-fact-text", text: levelNoun });
+  }
+  if (kindLabel) {
+    const el = facts.createSpan({ cls: "ca-jnc-fact ca-jnc-fact-kind" });
+    setIcon(el.createSpan({ cls: "ca-jnc-fact-icon" }), "file-text");
+    el.createSpan({ cls: "ca-jnc-fact-text", text: kindLabel });
+  }
+
+  return bar;
+}

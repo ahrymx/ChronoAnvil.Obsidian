@@ -283,6 +283,25 @@
   --ca-sec-gap: 4px;
   --ca-sec-pad: 2px;
   --ca-sec-indent: 1.1em;
+  /* ── ONE COLLAPSED HEIGHT FOR EVERY SECTION (5.10) ──────────────────
+     A collapsed section is its title row and nothing else, so five closed
+     sections down a page are five bars — and they have to be five of the SAME
+     bar. What made them differ was what happened to be IN each one: a count
+     pill, a muted window phrase, an actions strip, a glyph, or none of those.
+     Each of those has its own type scale, and the tallest thing in a bar was
+     deciding the bar's height.
+
+     THE TITLE IS THE FLOOR, because it is the one part every section has.
+     `1.35` is `.ca-journal-header-title`'s line-height and `--ca-sec-pad` is the
+     bar's own, so this is the height a bar carrying nothing but its name already
+     draws — a floor rather than a new size, which is why no open section moves.
+     A bar whose contents are taller than this still grows; a bar with nothing
+     but a short title no longer shrinks below its neighbours.
+
+     NOT APPLIED TO THE UNTITLED CONTROL STRIP, which has no title line to be
+     the floor of — the same exception `30-header-bars.css` already draws for the
+     actions row. */
+  --ca-sec-bar-h: calc(1.35 * var(--ca-sec-title-size) + 2 * var(--ca-sec-pad));
   /* A WIDTH, ON AN ELEMENT WHOSE OWN FONT-SIZE RESOLVES IT — which is the whole
      reason this number moved in 4.13 rather than staying put. `em` on a `width`
      is relative to the element's own type, so when the glyph came down from

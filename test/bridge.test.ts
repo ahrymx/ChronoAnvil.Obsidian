@@ -452,8 +452,12 @@ describe("every bridge names the period it covered", () => {
     // header with the shared section frame, and the first version of this test
     // named a class rather than the promise — so it failed on a change that
     // kept the promise exactly.
+    //
+    // `foldableSection` SINCE 5.10, which is the same frame plus the fold this
+    // block used to write by hand. The promise is unchanged and so is the slot
+    // the label goes in.
     const src = readSrc("bridge-widgets");
-    expect(src).toContain("sectionFrame");
+    expect(src).toContain("foldableSection");
     expect(src).toContain("plan.window.label");
   });
 
@@ -461,8 +465,8 @@ describe("every bridge names the period it covered", () => {
     // `note` is "a short muted phrase after the title", which is what a window
     // is. Two muted spans competing beside a title read as two headings.
     const src = readSrc("bridge-widgets");
-    const at = src.indexOf("const frame = sectionFrame(");
-    const call = src.slice(at, src.indexOf("});", at));
+    const at = src.indexOf("const section = foldableSection(");
+    const call = src.slice(at, src.indexOf("fold.store", at));
     expect(call).toContain("note:");
     expect(call).toContain("plan.window.label");
   });
@@ -478,7 +482,18 @@ describe("every bridge names the period it covered", () => {
       expect(css).not.toContain(`.${cls}`);
     }
     expect(css).toContain(".ca-bridge-row");
-    expect(css).toContain(".ca-bridge-chevron");
+    // AND THE FOLD IS THE FRAME'S TOO, AS OF 5.10. `.ca-bridge-chevron` was
+    // asserted here — a private chevron on the left, its own rotation, and
+    // `.ca-bridge.is-collapsed > .ca-bridge-body` to hide the rows. Those are
+    // four opinions `foldableSection` had already formed, and the first of them
+    // put this section's control on the opposite side from every other section
+    // on the page. What a bridge still says for itself is the margin a
+    // collapsed bar no longer needs.
+    expect(css).not.toContain(".ca-bridge-chevron");
+    expect(css).not.toContain(".ca-bridge.is-collapsed");
+    expect(css).toContain(
+      ".ca-bridge .ca-journal-sec-fold.is-collapsed > .ca-journal-sec"
+    );
   });
 
   it("persists and reads collapse state", () => {

@@ -220,6 +220,25 @@ export function computeSectionRuns(nodes: SecNode[]): SecMark[] {
     }
     if (last === -1) last = 0;
     run.forEach((idx, i) => {
+      // AND THE TAIL AFTER IT CARRIES NO SURFACE AT ALL (5.11).
+      //
+      // 4.13 took the EDGE off a trailing storage region and left it a member,
+      // reasoning that it belongs to the section and only cannot carry the
+      // rounding. That was half the answer. A member with no `is-last` still
+      // paints the background and the two side borders, and the block that DOES
+      // carry `is-last` sets `margin-bottom: var(--ca-widget-gap)` — so a
+      // section ending in one renders as a closed card, a gap, and then an
+      // open-sided strip of empty surface hanging under it. Resources is where
+      // a reader meets it: `header:📚 Resources` and its `attach:` zones are one
+      // fence, and the three `<!--chronoanvil:res-*-->` regions that store the
+      // links follow it as three blocks that draw nothing.
+      //
+      // BELONGING AND PAINTING ARE NOT THE SAME QUESTION, which is what the old
+      // comment conflated. Nothing else reads `member`: the fold is a separate
+      // scope calculation (`computeFoldHidden`), so a region still hides with
+      // its section, and the run still ENDS where it ended. This says only that
+      // there is no surface to draw past the last thing a reader can see.
+      marks[idx].member = i <= last;
       marks[idx].first = i === 0;
       marks[idx].last = i === last;
     });
@@ -1078,6 +1097,28 @@ export class HeaderBar extends MarkdownRenderChild {
     const last = bars[bars.length - 1];
     const host = last?.parentElement;
     if (!host) return false;
+    // BESIDE THE BAR OR INSIDE IT (5.11), AND THE LOGGING GRID IS INSIDE IT.
+    //
+    // "Beside" was the whole of this question for four releases and it is only
+    // most of the answer. A `header:` directive opens a bar and then points the
+    // block's widget row AT THAT BAR'S ACTIONS SLOT — `bar = headerGroup` in
+    // `widgets/index.ts` — so a `tracker:` cell in the same fence is rendered
+    // as a DESCENDANT of the bar rather than as its sibling. The fence had
+    // drawn its body; this predicate looked past the bar, found nothing, and
+    // answered that the section was still waiting for its blocks.
+    //
+    // WHAT THAT COST, and it is both walks at once, which is the point of one
+    // predicate: `📊 Trackers` on a Study topic index took the barless stats
+    // band under it into its own card, and collapsing Trackers folded the stats
+    // band away with it. The reader had asked for one section and got two.
+    //
+    // ASKED OF THE GRID RATHER THAN OF THE SLOT, because the slot is where a
+    // section's CONTROLS live and controls are not a body: `header:📖 Lessons`
+    // has "New Lesson" there and its table below, and it must keep owning that
+    // table. `.ca-journal-tracker-bar` is put on the row only where a `tracker:`
+    // or `sleep:` cell landed in it, which is the one case where what the fence
+    // drew IS the bar's own row.
+    if (last.querySelector(".ca-journal-tracker-bar")) return true;
     const kin = Array.from(host.children);
     const after = kin.slice(kin.indexOf(last) + 1);
     return after.some(

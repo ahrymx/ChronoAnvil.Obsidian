@@ -19,7 +19,18 @@ import {
 import { JOURNAL_CHARTS_FENCE } from "../charts/journal-charts";
 import { plural } from "../core/util";
 import type { SectionQuestion } from "../core/section-model";
-import { SCOPE_ALL, SCOPE_JOURNAL } from "../core/directive-grammar";
+import {
+  SECTION_FORM,
+  WIDGET_FORM,
+  formQuestion,
+} from "../core/section-model";
+import {
+  SCOPE_ALL,
+  SCOPE_JOURNAL,
+  isHeaderLine,
+  leadingBar,
+  splitDirective,
+} from "../core/directive-grammar";
 import { rowRuns } from "../core/note-sections";
 import { looseLines } from "../core/reload-loss";
 import {
@@ -198,6 +209,17 @@ export interface SectionOverrides {
   // a preset a later release removes degrades to the ordinary band rather than
   // to a refusal in the reader's note.
   preset?: string;
+  // WHETHER THIS SECTION IS DRAWN AS A SECTION OR AS A BARE WIDGET. 5.11.
+  //
+  // `FormQuestion`'s answer, in the field its `key` names — which is the
+  // contract `withAnswers` runs on and the reason every other question's key is
+  // a field on this interface too. `sectionBlocks` is what acts on it.
+  //
+  // A LAYOUT CARRIES IT, which is the reason it is here rather than only in the
+  // editor's answers: "Save as layout…" stores a `SectionOverrides` per section,
+  // so a reader who arranged two widgets into a group and saved the page as a
+  // layout gets that arrangement back when the layout is applied.
+  form?: string;
 }
 
 // How one template departs from the catalogue's own arrangement.
@@ -729,7 +751,11 @@ export function renderSection(
   ctx: SectionContext,
   opts?: SectionOverrides
 ): string {
-  const parts = section.render(ctx, opts);
+  // THROUGH `sectionBlocks`, so a section the reader answered "as a widget"
+  // composes without its bar (5.11). Every other caller of `render` on this
+  // page asks a STRUCTURAL question — how many blocks, of what kinds — and the
+  // form changes neither, which is why they still ask `render` directly.
+  const parts = sectionBlocks(section, ctx, opts);
   return parts.reduce((out, block, i) => {
     const text = renderBlock(block);
     if (i === 0) return text;
@@ -776,6 +802,151 @@ export function soloBarOf(
   return typeof section.bar === "function" ? section.bar(ctx) : section.bar;
 }
 
+// ── WHICH SECTIONS MAY BE DRAWN AS A WIDGET INSTEAD (5.11) ───────────────
+//
+// THE REPORT THIS ANSWERS: a subject index composes ONE group — Review queue
+// beside Open tasks, under "🔁 Due and open" — and the section editor showed
+// the two as separate sections with no group anywhere on screen. Half of that
+// is the editor's (`journalSectionModel` now implements `blocks` and
+// `regroup`); the other half is this file's, because a reader who wanted a
+// group of their OWN had nothing to make one out of. Every section here but the
+// row's two cells titles itself, and `isSectionFence` refuses a fence that
+// titles itself as a column: `layOutRow` inserts the group at the first cell
+// child and a bar is not cell content, so the bar would render BELOW the group
+// it was supposed to title. A section cannot be grouped; a widget can.
+//
+// `FormQuestion` (4.59.0) IS THE TOGGLE, AND IT IS ALREADY THE ANSWER ON THE
+// OTHER FOUR CATALOGUES. What is new here is that it is DERIVED rather than
+// typed out per entry — asked of what the section renders, the way `leadingBar`
+// and `sectionRemovable` are — so a catalogue entry that gains a bar gains the
+// toggle, one that loses it loses the toggle, and neither can declare one title
+// and draw another.
+//
+// ── THE THREE THINGS THAT MAKE A SECTION CONVERTIBLE ──────────────────
+//
+// ONE FENCE AND NOTHING ELSE, which is `composeSectionRuns`' own test for
+// whether a section can be a column at all: a `region` is the reader's writing
+// in the note body and lives outside every fence, and `markdown` is prose
+// indistinguishable from theirs. Neither has anything a `cell` line could
+// delimit.
+//
+// ONE BAR, AT THE TOP, AND IT IS THE SECTION'S OWN. `leadingBar` reads it.
+// `children` is the entry this clause is for: its fence composes a header, a
+// button and a table PER NOTE KIND, so a journal with two kinds has two bars in
+// one fence — and `withAnswers`' widget branch filters every `header:` line,
+// which would take the second kind's title with the first's.
+//
+// AND NOTHING IN IT ANCHORED TO THAT BAR. `BAR_ANCHORED` below is that clause,
+// and it is the whole of it: a section WITHOUT an action row is convertible.
+//
+// THE TRACKER GRID IS IN, AND WAS BRIEFLY OUT (5.11). The first cut also refused
+// a fence holding a managed region, on the argument that "+ Add tracker" splices
+// a `tracker:` line the way "+ Add chart" splices a `jchart:` one, so the grid
+// was the same object as the charts region. The reader's rule is narrower and
+// better: what disqualifies a section is a control ANCHORED INTO ITS BAR, which
+// has nowhere to go once the bar does. The grid's Add is a tile in the grid
+// (`buildTrackerAddCell`) and travels with it, so dropping the bar costs the
+// reader nothing — which is the question, and it is theirs to answer.
+const BAR_ANCHORED = new Set([
+  // The action row itself. `button:` resolves to a registered create-action and
+  // the dispatcher anchors it into the bar ABOVE it — "New Topic", "New page" —
+  // so a fence with no bar has one action loose above its table.
+  "button",
+  // "+ Add chart" and "Edit…", appended to `frame.actions` by `chart-grid.ts`.
+  // It has a barless fallback — a `ca-journal-chart-toolbar` of its own — and
+  // that fallback is exactly the shape 4.9 gave the managed region a section
+  // frame to replace.
+  "jchart",
+  // "Add category", which acts on the note's own fence rather than resolving to
+  // a create-action, and is hosted by the header the shelves render under
+  // (`widgets/index.ts`). No bar, no host, no control.
+  "attach",
+]);
+
+// The bar a section would drop to become a widget, or undefined for one that
+// cannot become a widget at all.
+//
+// ASKED OF THE RENDER WITH ITS `SECTION` FORM, so the answer does not depend on
+// the answer: a fence already written as a widget must still report the bar it
+// would take BACK, or the toggle would be offered in one direction only.
+//
+// NOT `tasks-table`, WHOSE SCOPE CYCLE IS THE NEAR MISS. The button that reads
+// "Below" on a subject index is appended to `frame.actions` like the two above,
+// so the obvious rule would exclude Open tasks — the one section on this
+// catalogue that is ALREADY a cell of a shipped group, whose editor row would
+// then offer no way back. It is out because it is a READ control over a
+// directive the section editor asks about anyway, and because a cell in a group
+// has the group's bar to host it.
+export function widgetFormBar(
+  section: JournalSection,
+  ctx: SectionContext,
+  opts?: SectionOverrides
+): string | undefined {
+  const blocks = section.render(ctx, { ...opts, form: SECTION_FORM });
+  const only = blocks[0];
+  if (blocks.length !== 1 || only.kind !== "fence") return undefined;
+  const bar = leadingBar(only.lines);
+  if (!bar) return undefined;
+  if (only.lines.slice(1).some((l) => isHeaderLine(l.trim()))) return undefined;
+  const anchored = only.lines.some((l) =>
+    BAR_ANCHORED.has(splitDirective(l.trim()).keyword)
+  );
+  return anchored ? undefined : bar;
+}
+
+// The toggle itself, for a section that has one.
+export function widgetFormQuestion(
+  section: JournalSection,
+  ctx: SectionContext,
+  opts?: SectionOverrides
+): SectionQuestion | undefined {
+  const bar = widgetFormBar(section, ctx, opts);
+  return bar ? formQuestion(bar) : undefined;
+}
+
+// What a section can be asked, INCLUDING the question it did not have to
+// declare.
+//
+// THE ONE READER OF `JournalSection.questions`, and that is the whole point:
+// the plan, the write, the editor's row and the answers read back off a file
+// all come through here, so a derived question cannot be visible to one of them
+// and invisible to another. That asymmetry is exactly how 4.59.0's first cut
+// spliced the token "section" into a bar's title.
+//
+// A CATALOGUE THAT DECLARES ITS OWN FORM QUESTION KEEPS IT. Nothing on this
+// catalogue does today; the guard is there because the other four do, and a
+// second toggle on one section would be two answers to one question.
+export function questionsOf(
+  section: JournalSection,
+  ctx: SectionContext,
+  opts?: SectionOverrides
+): SectionQuestion[] {
+  const declared = section.questions?.(ctx) ?? [];
+  if (declared.some((q) => q.kind === "form")) return declared;
+  const form = widgetFormQuestion(section, ctx, opts);
+  return form ? [...declared, form] : declared;
+}
+
+// A section's blocks in the form the reader asked for.
+//
+// THE ONE PLACE THE ANSWER IS ACTED ON, and it wraps `render` rather than being
+// threaded through nineteen catalogue entries. `withAnswers` already writes the
+// bar in and out of a fence that EXISTS — this is the other half, for a section
+// being composed: a widget added to a page arrives without the bar rather than
+// with one that the next save takes off again.
+export function sectionBlocks(
+  section: JournalSection,
+  ctx: SectionContext,
+  opts?: SectionOverrides
+): SectionBlock[] {
+  const blocks = section.render(ctx, opts);
+  if (opts?.form !== WIDGET_FORM) return blocks;
+  const bar = widgetFormBar(section, ctx, opts);
+  const only = blocks[0];
+  if (!bar || only?.kind !== "fence") return blocks;
+  return [{ ...only, lines: only.lines.filter((l) => l !== bar) }];
+}
+
 export function composeSectionRuns(
   sections: readonly JournalSection[],
   ctx: SectionContext,
@@ -783,7 +954,7 @@ export function composeSectionRuns(
 ): string[] {
   const rendered = sections.map((section) => {
     const opts = optionsFor?.(section);
-    const blocks = section.render(ctx, opts);
+    const blocks = sectionBlocks(section, ctx, opts);
     return {
       section,
       opts,
@@ -1826,9 +1997,9 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // Long-form enough to be worth drilling: a note that can be split across
     // pages, or one of those pages. An exercise set is already the drill.
     default: (ctx) => ctx.documentLike,
-    claims: ["recall"],
+    claims: ["header", "recall"],
     locate: (t) => probe(t, /^recall:/m),
-    render: () => [fence(["recall:recall|🧠 Recall"]), region("recall")],
+    render: () => [headerBar("🧠 Recall", "recall:recall"), region("recall")],
   },
 
   {
@@ -1840,9 +2011,9 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // Not on a page: the tasks of a document belong to the document, and
     // spreading them across its parts is how a rollup starts double-counting.
     default: (ctx) => ctx.noteKind !== "page",
-    claims: ["tasks"],
+    claims: ["header", "tasks"],
     locate: (t) => probe(t, /^tasks:/m),
-    render: () => [fence(["tasks:tasks|✅ Tasks"]), region("tasks")],
+    render: () => [headerBar("✅ Tasks", "tasks:tasks"), region("tasks")],
   },
 
   {

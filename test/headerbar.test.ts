@@ -335,6 +335,41 @@ describe("section bodies are marked for the surface", () => {
     expect(method("bodyInOwnFence")).toContain("sib.matches(BLOCK_FURNITURE)");
   });
 
+  it("counts a logging grid inside the bar as the fence's body (5.11)", () => {
+    // THE BUG, REPORTED FROM A STUDY TOPIC INDEX. `header:📊 Trackers` and the
+    // marked region are ONE fence, so the section ends with its block — and it
+    // did not. A `header:` directive points the block's widget row at the bar's
+    // own actions slot (`bar = headerGroup`), so the `tracker:` cells render as
+    // DESCENDANTS of the bar rather than as its siblings; this predicate looked
+    // past the bar, found nothing, and answered that the section was still
+    // waiting for its blocks. Both walks then took the barless stats band under
+    // it: into the Trackers card, and into the Trackers fold.
+    const widgets = readSrc("widgets");
+    expect(widgets).toContain("headerGroup = frame.actions;");
+    expect(widgets).toContain('bar.addClass("ca-journal-tracker-bar");');
+    expect(method("bodyInOwnFence")).toContain(
+      'last.querySelector(".ca-journal-tracker-bar")'
+    );
+  });
+
+  it("does not count a section's controls as its body", () => {
+    // The other half of the same clause, and the reason it names the GRID
+    // rather than the slot. `header:📖 Lessons` has "New Lesson" in that slot
+    // and its table in the block below, and it has to keep owning that table —
+    // so the question is whether the row BECAME a logging grid, which is what
+    // `.ca-journal-tracker-bar` records and what only a `tracker:` or `sleep:`
+    // cell puts there.
+    const widgets = readSrc("widgets");
+    const at = widgets.indexOf('widget.addClass("ca-journal-tracker-cell");');
+    expect(at).toBeGreaterThan(-1);
+    expect(widgets.slice(at, at + 200)).toContain(
+      'bar.addClass("ca-journal-tracker-bar");'
+    );
+    expect(method("bodyInOwnFence")).not.toContain(
+      '"ca-journal-header-widgets"'
+    );
+  });
+
   it("leaves a bar alone in its fence owning the blocks after it", () => {
     // THE 2.x SHAPE, AND WHY THE SCOPE EXISTS. A section used to be two fences
     // — a `header:` fence and a body fence — because Obsidian renders each block
@@ -924,8 +959,40 @@ describe("computeSectionRuns", () => {
     const m = computeSectionRuns([head(), node(), node({ renders: false })]);
     expect(m[1].last).toBe(true);
     expect(m[2].last).toBe(false);
-    // Still a member: it belongs to the section, it just cannot carry the edge.
-    expect(m[2].member).toBe(true);
+    // AND IT IS NOT A MEMBER EITHER, WHICH 4.13 GOT HALF RIGHT (5.11). This
+    // asserted `member: true` on the argument that the region belongs to the
+    // section and merely cannot carry the edge — and a member with no `is-last`
+    // still paints the background and both side borders, while the block that
+    // does carry `is-last` puts `--ca-widget-gap` under itself. The result is a
+    // closed card, a gap, and an open-sided strip of empty surface below it:
+    // the Resources section on a Study topic, whose three `attach:` regions
+    // follow its fence as three blocks that draw nothing.
+    expect(m[2].member).toBe(false);
+  });
+
+  it("stops painting at the last visible block, not at the run's end", () => {
+    // The shape from the screenshots, spelled out: a head whose fence drew its
+    // own body cannot reach here (`ends` closes it), so this is the 2.x shape —
+    // a bar, one block of content, and three storage regions after it.
+    const m = computeSectionRuns([
+      head(),
+      node(),
+      node({ renders: false }),
+      node({ renders: false }),
+      node({ renders: false }),
+    ]);
+    expect(m.map((x) => x.member)).toEqual([true, true, false, false, false]);
+    expect(m.map((x) => x.last)).toEqual([false, true, false, false, false]);
+  });
+
+  it("keeps a block that draws nothing INSIDE the run", () => {
+    // The rule is about the tail and only the tail. A region between two
+    // visible blocks must stay a member — dropping it would cut the surface in
+    // two and draw the hairline this file's "THE EDGE IS THREE-SIDED" note
+    // exists to prevent.
+    const m = computeSectionRuns([head(), node({ renders: false }), node()]);
+    expect(m.map((x) => x.member)).toEqual([true, true, true]);
+    expect(m[2].last).toBe(true);
   });
 
   it("skips hidden blocks when placing the bottom", () => {

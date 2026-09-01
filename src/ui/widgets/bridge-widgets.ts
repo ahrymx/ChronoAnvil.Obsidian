@@ -74,7 +74,8 @@ import type { ChartTeardown } from "../../charts/chart-render";
 import { readNoteRegion, writeNoteRegion } from "../../core/notestore";
 import { confirmAction } from "../modals";
 import { notify } from "../../core/notify";
-import { overflowButton, sectionFrame } from "../section-frame";
+import { foldableSection, overflowButton } from "../section-frame";
+import type { FoldableSection, FoldStore } from "../section-frame";
 import { getFile, today } from "../../core/util";
 import { emptyLine } from "../empty";
 import { liveScopedWidget } from "./live-widgets";
@@ -321,9 +322,9 @@ function bridgeHeader(
     rescoping: boolean;
     toggleMode?: () => void;
     mode?: "cards" | "list";
-    toggleFold?: () => void;
-  }
-): void {
+  },
+  fold: { store: FoldStore; key: string }
+): FoldableSection {
   // A BRIDGE IS A SECTION. That is what it is to a reader — a titled band with
   // a count and a menu, holding a list — so it is built from the same frame as
   // every other one instead of the bespoke title/window/overflow row it shipped
@@ -339,38 +340,47 @@ function bridgeHeader(
   // It therefore draws its OWN frame rather than a `header:` line above it. A
   // bridge inside a fence that already has a header would be a bar inside a
   // bar, which is the box-in-a-box the empty-state rule names.
-  const frame = sectionFrame(host, {
-    title: `🌉 ${label ?? plan.targetLabel}`,
-    level: 2,
-    owns: "children",
-    // The rows, once they are known. Null while the read is still out, because
-    // a pill reading `0` because nothing has counted yet is worse than no pill.
-    count,
-    // The window, in the slot meant for exactly this: "a short muted phrase
-    // after the title", not a quantity. A frozen block appends when it was
-    // taken — one phrase, because two muted spans competing beside a title read
-    // as two headings.
-    note:
-      snap.frozen && snap.takenIso
-        ? `${plan.window.label} · frozen ${snap.takenIso}`
-        : plan.window.label,
-  });
-
-  const chevron = createDiv({ cls: "ca-journal-note-chevron ca-bridge-chevron" });
-  setIcon(chevron, "chevron-down");
-  frame.root.prepend(chevron);
-  frame.root.addClass("is-foldable");
-
-  if (actions.toggleFold) {
-    frame.root.addEventListener("click", (evt) => {
-      const target = evt.target as HTMLElement;
-      if (target.closest(".ca-journal-header-widgets, a, button, input, select")) {
-        return;
-      }
-      evt.preventDefault();
-      actions.toggleFold?.();
-    });
-  }
+  //
+  // ── AND ITS FOLD IS THE FRAME'S TOO (5.10) ──────────────────────────
+  //
+  // The paragraph above says a bridge is a section and then built one and a
+  // half: the frame drew the bar, and thirty lines here drew a chevron on the
+  // LEFT with `.ca-bridge-chevron`, hung a click handler that repeated the
+  // frame's own control-exclusion selector word for word, and hid the body with
+  // a private `.ca-bridge.is-collapsed > .ca-bridge-body` rule.
+  //
+  // Every one of those is a second opinion about a decision `foldableSection`
+  // had already taken — including which SIDE the chevron is on, which is the
+  // one a reader sees. So the fold moves onto the frame, the chevron moves to
+  // the right with every other section's, and the state lands on the wrapper
+  // the shared rules already close.
+  //
+  // `FoldStore` is the seam that makes it possible: an interface rather than
+  // the plugin, so a caller with its own persistence — this one writes through
+  // `setBridgeFold`, under its own key namespace — supplies two methods instead
+  // of a fold.
+  const section = foldableSection(
+    host,
+    {
+      title: `🌉 ${label ?? plan.targetLabel}`,
+      level: 2,
+      // The rows, once they are known. Null while the read is still out,
+      // because a pill reading `0` because nothing has counted yet is worse
+      // than no pill.
+      count,
+      // The window, in the slot meant for exactly this: "a short muted phrase
+      // after the title", not a quantity. A frozen block appends when it was
+      // taken — one phrase, because two muted spans competing beside a title
+      // read as two headings.
+      note:
+        snap.frozen && snap.takenIso
+          ? `${plan.window.label} · frozen ${snap.takenIso}`
+          : plan.window.label,
+    },
+    fold.store,
+    fold.key
+  );
+  const frame = section.frame;
 
   if (actions.toggleMode && !snap.frozen) {
     const viewBtn = frame.actions.createEl("button", {
@@ -433,6 +443,8 @@ function bridgeHeader(
     buildMenu(menu);
     menu.showAtMouseEvent(evt as MouseEvent);
   });
+
+  return section;
 }
 
 // Render a frozen region back to the screen.
@@ -613,10 +625,17 @@ function buildBridge(
     const el = createDiv({ cls: "ca-bridge" });
     const body = el.createDiv({ cls: "ca-bridge-body" });
 
-    const applyFold = (collapsed: boolean): void => {
-      el.toggleClass("is-collapsed", collapsed);
+    // The fold's memory, in the two methods `foldableSection` asks for. The
+    // KEY is this module's — `bridgeFoldKey` namespaces it under `bridge:` so a
+    // bridge and a `header:` bar of the same name in the same note cannot
+    // collide — so the store ignores the one handed back and answers about the
+    // bridge it was built for.
+    const foldStore: FoldStore = {
+      isCollapsed: () => bridgeFoldState(plugin, path, key),
+      setCollapsed: (_foldKey, value) => {
+        void setBridgeFold(plugin, path, key, value);
+      },
     };
-    applyFold(bridgeFoldState(plugin, path, key));
 
     // THE FROZEN STATE IS READ FROM THE FILE, ASYNCHRONOUSLY, AND THAT ORDER
     // IS FORCED. LiveWidget's `build` is synchronous by contract; Obsidian has
@@ -650,10 +669,14 @@ function buildBridge(
         : null;
 
       let mode: "cards" | "list" = "cards";
-      const head = createDiv();
+      let fold: FoldableSection | null = null;
       const redrawHeader = (currentMode: "cards" | "list") => {
-        head.empty();
-        bridgeHeader(head, plan, label, frozenRows, snap, {
+        // REDRAWN, NOT EMPTIED, because the header now brings the fold wrapper
+        // with it. The old wrapper comes out after the body has moved into the
+        // new one, so the rows are never off the page and the fold's state is
+        // read fresh from the store either way.
+        const previous = fold?.wrapper ?? null;
+        fold = bridgeHeader(el, plan, label, frozenRows, snap, {
           freeze: act(
             async () => writeSnapshot(plugin, path, key, await rowsFor(plan), false),
             "Bridge frozen."
@@ -673,15 +696,16 @@ function buildBridge(
             (body as HTMLElement & { toggleMode?: (m: "cards" | "list") => void }).toggleMode?.(mode);
             redrawHeader(mode);
           },
-          toggleFold: () => {
-            const next = !el.hasClass("is-collapsed");
-            applyFold(next);
-            void setBridgeFold(plugin, path, key, next);
-          },
-        });
+        }, { store: foldStore, key });
+        // The body was drawn before the header could be — the frozen read is
+        // async and the header must not flash the wrong state — so it MOVES
+        // into the frame's body rather than the frame being built around it.
+        // That is the same answer `frame: section` gives, and it is what keeps
+        // the bar above the rows it titles.
+        fold.body.appendChild(body);
+        previous?.remove();
       };
       redrawHeader(mode);
-      el.prepend(head);
 
       if (snap.frozen && region.trim()) renderFrozen(body, region);
       else fill(body, plan);

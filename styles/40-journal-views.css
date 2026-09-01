@@ -392,55 +392,37 @@
   gap: 8px;
   transition: border-color 0.15s ease;
 }
-.ca-journal-recall:focus-within {
-  border-color: var(--interactive-accent);
+
+.ca-journal-sec-block .ca-journal-recall,
+.ca-journal-sec-block.ca-journal-recall {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
 }
-.ca-journal-recall.ca-journal-note--collapsible > .ca-journal-recall-head {
+
+/* ── THE RECALL HEAD IS THE SECTION'S (5.10) ───────────────────────────
+ *
+ * Forty lines stood here: a private fold bar for the Recall widget with the
+ * chevron on the LEFT, an uppercase micro-label and no hairline, plus a
+ * `.ca-journal-sec-block .ca-journal-recall-head { display: none }` rule to
+ * take it away again wherever the `recall` section's own `header:🧠 Recall`
+ * bar was already drawing one. A bar built in TypeScript so that CSS could
+ * unbuild it is two mechanisms disagreeing about one object.
+ *
+ * The section bar is the head. What is left below is the widget: a label slot
+ * for a bare `recall:` fence that nothing else names, and its tools. */
+.ca-journal-recall-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  padding: 2px 0;
-  cursor: pointer;
-  user-select: none;
-  background: transparent;
-  border-bottom: none;
-}
-.ca-journal-recall.ca-journal-note--collapsible.is-collapsed > .ca-journal-recall-head {
-  margin-bottom: 0;
-}
-.ca-journal-recall-title-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.ca-journal-recall.ca-journal-note--collapsible > .ca-journal-recall-head:hover .ca-journal-recall-label {
-  color: var(--text-normal);
-}
-.ca-journal-recall-chevron {
-  display: flex;
-  align-items: center;
-  color: var(--text-faint);
-  transition: transform 120ms ease;
-}
-.ca-journal-recall-chevron .svg-icon {
-  width: 14px;
-  height: 14px;
-}
-.ca-journal-recall.is-collapsed .ca-journal-recall-chevron {
-  transform: rotate(-90deg);
-}
-.ca-journal-recall.is-collapsed > :not(.ca-journal-recall-head) {
-  display: none;
 }
 .ca-journal-recall-label {
-  font-size: var(--ca-text-xs);
-  font-weight: var(--ca-caps-weight);
-  letter-spacing: var(--ca-caps-tracking);
-  text-transform: uppercase;
+  font-size: var(--ca-text-sm);
+  font-weight: 600;
   color: var(--text-muted);
-  margin: 0;
 }
 .ca-jrc-tools {
   display: flex;
@@ -658,19 +640,32 @@
 .ca-journal-tally {
   display: flex;
   flex-direction: column;
+  gap: 6px;
   min-height: 0;
 }
-/* THE HEAD IS `foldableSection`'S AS OF 5.6, so there is nothing to declare for
-   it here. What stood in this space was a private fold bar — a label and a
-   chevron on the LEFT with no rule under it, which is the `note:` FIELD's bar
-   and not a section's — drawn on a block that sits between Find and Charts on a
-   journal index wearing the frame they both wear. The tally still titles itself
-   from the tracker it names (`SECTION_TITLES` has no `journal-tally` entry, and
-   says why); only the chrome around that title is now shared.
-
+/* THE SECTION'S HEAD IS THE SECTION'S. What stood in this space was a private
+   fold bar — a label and a chevron on the LEFT with no rule under it, which is
+   the `note:` FIELD's bar and not a section's — drawn on a block that sits
+   between Find and Charts on a journal index wearing the frame they both wear.
    `.ca-jtly-head`, `.ca-jtly-title-left`, `.ca-jtly-chevron`,
-   `.ca-jtly-label-title` and the `is-collapsed` rules that drove them all went
-   with it, along with `.ca-jtly-title`, which nothing had drawn for some time. */
+   `.ca-jtly-label-title` and the `is-collapsed` rules that drove them went with
+   it in 5.6.
+
+   THE PARAGRAPH THAT STOOD HERE WAS OUT OF DATE BY THE TIME IT SHIPPED (5.10).
+   It said the head was `foldableSection`'s and that `SECTION_TITLES` had no
+   `journal-tally` entry — a reverted design and a table that had gained the
+   entry in the same wave. Both halves described code nobody could find.
+
+   WHAT IS TRUE: a tally under a `header:🧮 Status` bar, or in a `frame: section`
+   fence, is named by the section and draws no title of its own. Anywhere else —
+   a reader's own note, a page holding two of them — it says what it counts, in
+   `.ca-jtly-title`, at `journal-breakdown`'s scale beside it, because two
+   widgets doing the same job at two sizes is what the pair is here to avoid. */
+.ca-jtly-title {
+  font-size: var(--ca-text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
 .ca-jtly-strip {
   display: flex;
   flex-wrap: wrap;

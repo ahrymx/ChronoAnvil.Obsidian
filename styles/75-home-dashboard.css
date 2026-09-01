@@ -717,6 +717,37 @@
   margin: 0 0 0.9em;
   transition: border-color 0.15s ease;
 }
+
+.ca-journal-sec-block .ca-journal-tasks,
+.ca-journal-sec-block.ca-journal-tasks {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* ── THE FIELD BAR UNDER A SECTION BAR (5.10) ──────────────────────────
+ *
+ * This rule read `display: none` — a head built in TypeScript so that CSS
+ * could unbuild it wherever it was wrong, which was every note the `checklist`
+ * section composed. It took the Compact toggle and the progress readout with
+ * it, so a control vanished from the page to settle a layout question.
+ *
+ * `buildTasks` now withholds the title and the chevron when a `header:` bar
+ * already names the block, and keeps the tools. `is-bare` is that head: a
+ * right-aligned control strip under a section title, not a second title. */
+.ca-journal-tasks-head.is-bare {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 0 var(--ca-space-2);
+  background: transparent;
+  border-bottom: none;
+}
+
 .ca-journal-tasks:focus-within {
   border-color: var(--interactive-accent);
 }

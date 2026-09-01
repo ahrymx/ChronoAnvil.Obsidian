@@ -25,7 +25,7 @@ import { parseTasks } from "../src/ui/tasks";
 import { allNoteRegions, writeNoteRegion } from "../src/core/notestore";
 import { reviewIntervalDays } from "../src/review/review";
 
-import { readSrc } from "./sources";
+import { cssRule, cssRules, readCss, readSrc } from "./sources";
 const asset = studyFile;
 
 describe("the recall line format", () => {
@@ -253,15 +253,36 @@ describe("recall widget registration", () => {
     expect(widgets).toMatch(/buildRecall\((?:this, )?rest, ctx, label\)/);
   });
 
-  it("builds a surface card with a collapsible header bar", () => {
+  it("builds a surface card, and lets the section own the head (5.10)", () => {
+    // 5.7 gave this widget a fold bar of its own — chevron on the LEFT, an
+    // uppercase micro-label, no hairline — while `journal-sections.ts` was
+    // already rendering `header:🧠 Recall` above it. Two heads for one section,
+    // with a stylesheet rule deleting whichever one lost.
+    //
+    // THE CARD IS THE HALF THAT WAS RIGHT and it stays: a bare `recall:` fence
+    // is a bounded block, and inside a section run the section is the card.
     const recallSrc = readSrc("recall-widgets");
-    expect(recallSrc).toContain("ca-journal-recall ca-journal-note--collapsible");
-    expect(recallSrc).toContain("ca-journal-recall-head ca-journal-note-collapse-bar");
-    expect(recallSrc).toContain("ca-journal-recall-title-left");
-    expect(recallSrc).toContain("ca-journal-note-chevron ca-journal-recall-chevron");
-    expect(recallSrc).toContain("ca-journal-note-label ca-journal-recall-label");
-    expect(recallSrc).toContain("noteFoldState");
-    expect(recallSrc).toContain("setNoteFold");
+    const css = readCss();
+    expect(cssRule(".ca-journal-recall")).toContain("var(--background-secondary)");
+    expect(css).toContain(".ca-journal-sec-block .ca-journal-recall");
+
+    // The private bar and everything that drove it.
+    expect(recallSrc).not.toContain("ca-journal-note-collapse-bar");
+    expect(recallSrc).not.toContain("ca-journal-recall-title-left");
+    expect(recallSrc).not.toContain("ca-journal-recall-chevron");
+    expect(recallSrc).not.toContain("noteFoldState");
+    expect(recallSrc).not.toContain("setNoteFold");
+    // AND NO RULE LEFT STYLING MARKUP NOBODY BUILDS. The pair that
+    // section-frame.test.ts insists on for every retired family: the rules go
+    // and the markup goes, in one pass, or the next reader finds one of them
+    // and re-derives the other.
+    expect(cssRules(".ca-journal-recall-chevron")).toEqual([]);
+    expect(cssRules(".ca-journal-recall-title-left")).toEqual([]);
+
+    // What the widget still draws: a label slot for a fence nothing else
+    // names, and its tools.
+    expect(recallSrc).toContain('cls: "ca-journal-recall-head"');
+    expect(recallSrc).toContain('cls: "ca-jrc-tools"');
   });
 
   it("resolves both properties through the registry", () => {

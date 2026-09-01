@@ -591,11 +591,30 @@ export function buildTasks(
   host: NoteRegionHost,
   rest: string,
   ctx: MarkdownPostProcessorContext,
-  label: string | null
+  label: string | null,
+  // ── WHETHER A SECTION BAR ALREADY NAMES THIS BLOCK (5.10) ──────────────
+  //
+  // `tasks:` is a FIELD, and its bar belongs to the family `note:` and the
+  // capture log wear — a label, a chevron on the left, no hairline. That is a
+  // consistent family and it is not the thing this release is correcting.
+  //
+  // What it corrects is the field bar drawn UNDER A SECTION BAR. The
+  // `checklist` section renders `header:✅ Tasks` over a single `tasks:tasks`
+  // field, so a Study note drew two heads for one section and the stylesheet
+  // deleted the second — taking Compact and the progress readout with it,
+  // which is a control removed from the page to settle a layout question.
+  //
+  // Titled, the field keeps its tools and gives up its title and its fold: the
+  // section's bar is the title, and the section's chevron is the fold. Untitled
+  // — a hand-written `tasks:` fence, a leaf note's own list — nothing else
+  // names it and it draws exactly the bar it always drew.
+  titled = false
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
   const wrap = createDiv({
-    cls: "ca-journal-tasks ca-journal-note--collapsible",
+    cls: titled
+      ? "ca-journal-tasks"
+      : "ca-journal-tasks ca-journal-note--collapsible",
   });
 
   const isCollapsed = (): boolean =>
@@ -615,17 +634,21 @@ export function buildTasks(
   };
 
   const head = wrap.createDiv({
-    cls: "ca-journal-tasks-head ca-journal-note-collapse-bar",
+    cls: titled
+      ? "ca-journal-tasks-head is-bare"
+      : "ca-journal-tasks-head ca-journal-note-collapse-bar",
   });
-  const titleLeft = head.createDiv({ cls: "ca-journal-tasks-title-left" });
-  const chevron = titleLeft.createDiv({
-    cls: "ca-journal-note-chevron ca-journal-tasks-chevron",
-  });
-  setIcon(chevron, "chevron-down");
-  const titleEl = titleLeft.createDiv({
-    cls: "ca-journal-note-label ca-journal-tasks-label",
-  });
-  titleEl.setText(label ?? "Tasks");
+  if (!titled) {
+    const titleLeft = head.createDiv({ cls: "ca-journal-tasks-title-left" });
+    const chevron = titleLeft.createDiv({
+      cls: "ca-journal-note-chevron ca-journal-tasks-chevron",
+    });
+    setIcon(chevron, "chevron-down");
+    const titleEl = titleLeft.createDiv({
+      cls: "ca-journal-note-label ca-journal-tasks-label",
+    });
+    titleEl.setText(label ?? "Tasks");
+  }
 
   const headRight = head.createDiv({ cls: "ca-journal-tasks-head-right" });
 
@@ -652,17 +675,19 @@ export function buildTasks(
 
   const progressEl = headRight.createDiv({ cls: "ca-journal-tasks-progress" });
 
-  const applyFold = (collapsed: boolean): void => {
-    wrap.toggleClass("is-collapsed", collapsed);
-  };
-  applyFold(isCollapsed());
+  if (!titled) {
+    const applyFold = (collapsed: boolean): void => {
+      wrap.toggleClass("is-collapsed", collapsed);
+    };
+    applyFold(isCollapsed());
 
-  head.addEventListener("click", (e) => {
-    e.preventDefault();
-    const next = !wrap.hasClass("is-collapsed");
-    applyFold(next);
-    setFold(next);
-  });
+    head.addEventListener("click", (e) => {
+      e.preventDefault();
+      const next = !wrap.hasClass("is-collapsed");
+      applyFold(next);
+      setFold(next);
+    });
+  }
 
   if (!isValidNoteKey(key)) {
     wrap.createDiv({

@@ -1140,7 +1140,17 @@ describe("the period summary is a section and wears a section's bar", () => {
       )
       .find((o) => o.sectionId === "summary");
     expect(op?.kind).toBe("reconfigure");
-    expect(op?.detail).toContain("sit in a row");
+    // THE CATALOGUE'S WORDS, WHATEVER THEY ARE. This asserted the phrase "sit in
+    // a row" until 5.11 shortened the answer to "Show as widget" — which made it
+    // a test of the copy rather than of the plumbing it was written for. What has
+    // to hold is that the plan quotes `FormQuestion.widget` rather than composing
+    // a sentence of its own, so the detail is read from the question.
+    const q = model
+      .sections(base)
+      .find((v) => v.id === "summary")
+      ?.questions?.find((x) => x.kind === "form");
+    expect(q).toBeDefined();
+    expect(op?.detail).toContain(q && "widget" in q ? q.widget : "");
   });
 
   it("titles an untitled fence on a dashboard that predates the bar", () => {

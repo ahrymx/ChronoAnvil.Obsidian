@@ -49,30 +49,18 @@
   margin-bottom: var(--ca-space-2);
 }
 
-.ca-bridge-chevron {
-  display: flex;
-  align-items: center;
-  color: var(--text-faint);
-  cursor: pointer;
-  transition: transform 120ms ease;
-  flex: 0 0 auto;
-  margin-right: 4px;
-}
+/* ── THE FOLD IS THE FRAME'S (5.10) ──────────────────────────────────────
+   Thirty lines stood here drawing a bridge's own chevron on the LEFT, rotating
+   it by hand, and hiding `.ca-bridge-body` off a private `.is-collapsed` on the
+   block root. All four of those are `foldableSection`'s already — including the
+   SIDE, which is the part a reader sees, and which disagreed with every other
+   section on the same page for three releases.
 
-.ca-bridge-chevron .svg-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.ca-bridge.is-collapsed .ca-bridge-chevron {
-  transform: rotate(-90deg);
-}
-
-.ca-bridge.is-collapsed > .ca-bridge-body {
-  display: none;
-}
-
-.ca-bridge.is-collapsed .ca-journal-sec {
+   What is left is the one thing that is genuinely this block's: a collapsed
+   bridge is a bar and nothing else, so the bar's own bottom margin — which
+   exists to separate it from the rows — has nothing to separate. The state now
+   sits on the wrapper, so the selector reaches it through the wrapper. */
+.ca-bridge .ca-journal-sec-fold.is-collapsed > .ca-journal-sec {
   margin-bottom: 0;
 }
 

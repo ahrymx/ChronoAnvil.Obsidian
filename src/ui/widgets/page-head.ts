@@ -259,6 +259,24 @@ export function pageHeadText(
   };
 }
 
+// Whether the head's eyebrow already carries this fact.
+//
+// SEGMENT-WISE, because an eyebrow is `Study · Subject` and the strip's fact is
+// `Subject`: a substring test would also swallow a kind called `Ub`, and an
+// equality test would never fire at all.
+export function pageHeadSays(
+  plugin: ChronoAnvilPlugin,
+  file: TFile,
+  fact: string
+): boolean {
+  const eyebrow = pageHeadText(plugin, file)?.eyebrow;
+  if (!eyebrow) return false;
+  const want = fact.trim().toLowerCase();
+  return eyebrow
+    .split("·")
+    .some((part) => part.trim().toLowerCase() === want);
+}
+
 // The head, or null on a note the bar does not reach.
 //
 // NULL IS NOT A FAILURE HERE and the caller must not draw an error for it: the

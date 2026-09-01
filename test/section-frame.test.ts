@@ -6,10 +6,9 @@
 // LICENSING.md.
 
 import { describe, expect, it } from "vitest";
-import { readdirSync, readFileSync } from "fs";
 import { splitGlyph } from "../src/ui/section-frame";
 
-import { readCode, readCss, readSrc } from "./sources";
+import { readCode, readCss, readSrc, srcFiles } from "./sources";
 // ── one section frame ─────────────────────────────────────────────────────
 //
 // This file is the mechanism, not a nicety. The 2.56 plan counts 39
@@ -28,16 +27,34 @@ import { readCode, readCss, readSrc } from "./sources";
 // comment quoting the classes a bar used to build by hand is a record of what
 // changed, and rewriting those would be revising the minutes.
 
-const SRC = "src";
-const sources = readdirSync(SRC)
-  .filter((f) => f.endsWith(".ts"))
-  .map((f) => ({
-    file: f,
-    code: readFileSync(`${SRC}/${f}`, "utf8")
-      .split("\n")
-      .filter((line) => !line.trim().startsWith("//"))
-      .join("\n"),
-  }));
+// ── AND IT HAS TO ACTUALLY SCAN THE TREE (5.10) ───────────────────────
+//
+// This list was built with `readdirSync("src")` — no recursion — against a
+// tree whose only top-level `.ts` file is `main.ts`. Every sweep below was
+// therefore reading one irrelevant module and reporting the invariant held.
+//
+// THAT IS NOT A COSMETIC FAULT. It is the exact failure the comment above
+// describes and exists to prevent: while the sweep was scanning nothing, three
+// private section heads were added — the Trackers head and the Recall head in
+// 5.7-5.9, on top of the tally's — each with its own left-hand chevron and its
+// own forty lines of copied CSS, all against a green suite. A guard rail that
+// silently covers one file is worse than none, because the green is read as an
+// answer.
+//
+// `srcFiles` is in test/sources.ts beside the other source readers, so the
+// next sweep finds a walker instead of writing a fifth copy of this loop, and
+// it yields PATHS rather than module names — "widgets" does not tell anyone
+// which of eleven files broke the rule.
+const sources = srcFiles().map(({ path, code }) => ({
+  file: path,
+  code: code
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("//"))
+    .join("\n"),
+}));
+
+// The one file allowed to build the frame's own markup.
+const FRAME = "src/ui/section-frame.ts";
 
 describe("the section header is built in one place", () => {
   it("lives in its own module, reachable from anywhere", () => {
@@ -55,7 +72,7 @@ describe("the section header is built in one place", () => {
     const offenders = sources
       .filter(
         (s) =>
-          s.file !== "section-frame.ts" &&
+          s.file !== FRAME &&
           s.code.includes('cls: `ca-journal-header-bar')
       )
       .map((s) => s.file);
@@ -64,11 +81,171 @@ describe("the section header is built in one place", () => {
 
   it("is the only thing that emits a header title or a glyph slot", () => {
     for (const { file, code } of sources) {
-      if (file === "section-frame.ts") continue;
+      if (file === FRAME) continue;
       expect(code, file).not.toContain('"ca-journal-header-title"');
       expect(code, file).not.toContain('"ca-journal-header-glyph"');
       expect(code, file).not.toContain('"ca-journal-header-count"');
     }
+  });
+
+  it("is the only thing that builds a section's fold bar", () => {
+    // ── THE ASSERTION THAT STOPS A FOURTH COPY, WRITTEN OUT (5.10) ────────
+    //
+    // `.ca-journal-note-collapse-bar` is the `note:` FIELD bar — chevron on the
+    // left, uppercase micro-label, no hairline, no glyph slot, no count, no
+    // actions row. It is a legitimate object at the scale it was drawn for, and
+    // that is exactly what made it the thing three section heads were copied
+    // from: it is four lines and it folds.
+    //
+    // Two modules own the field family and keep it. Anything else building this
+    // class is a section head wearing a field's clothes, which is what the
+    // Trackers head, the Recall head and the tally head each were.
+    //
+    // `note-regions.ts` IS IN THE FAMILY, for the one region that is a field:
+    // `tasks:` under a Study note's own markdown heading has nothing titling
+    // it, so it draws the field bar its neighbours draw. Under a section bar it
+    // draws no head at all — asserted below rather than trusted, because "is
+    // allowed to build it" and "builds it in the untitled branch only" are
+    // different claims and only the second is the rule.
+    const FIELD = [
+      "src/ui/widgets/note-field.ts",
+      "src/ui/widgets/log-list.ts",
+      "src/ui/widgets/note-regions.ts",
+    ];
+    const offenders = sources
+      .filter(
+        (s) =>
+          !FIELD.includes(s.file) &&
+          s.code.includes("ca-journal-note-collapse-bar")
+      )
+      .map((s) => s.file);
+    expect(offenders).toEqual([]);
+
+    // The tasks head is the untitled arm of a conditional, and the titled arm
+    // is `is-bare` — a right-aligned strip carrying the Compact toggle and the
+    // progress readout into the section's own frame. Between 5.7 and 5.10 both
+    // arms drew a bar and the stylesheet deleted whichever one lost, which is
+    // how a Study note quietly stopped having a Compact toggle at all.
+    const tasks = sources.find(
+      (s) => s.file === "src/ui/widgets/note-regions.ts"
+    )!.code;
+    expect(tasks).toContain('cls: titled');
+    expect(tasks).toContain('? "ca-journal-tasks-head is-bare"');
+    expect(tasks).toContain(': "ca-journal-tasks-head ca-journal-note-collapse-bar"');
+  });
+
+  it("is given the host the section's body goes into", () => {
+    // RULE ONE, ASSERTED STRUCTURALLY. `sectionFrame` APPENDS its bar, so the
+    // host it is handed decides where the title lands relative to the content.
+    // Every renderer here is passed two elements — the `container` it fills and
+    // the `blockEl` the fold walks — and passing the second builds the bar into
+    // a parent that already holds the filled first, which puts the title under
+    // the section it names.
+    //
+    // That is not a matter of taste and it is not only cosmetic: the fold is
+    // computed from the bar's LATER siblings, so a bar that arrives last folds
+    // nothing at all. Both chart renderers were in that state from 5.7 to 5.9
+    // and both looked fine in the stylesheet.
+    //
+    // A renderer that must draw first MOVES its nodes into the frame's body
+    // afterwards — the `frame: section` idiom in widgets/index.ts — so there is
+    // no case this refuses that has no answer.
+    for (const { file, code } of sources) {
+      expect(code, file).not.toContain("sectionFrame(blockEl");
+      expect(code, file).not.toContain("foldableSection(blockEl");
+    }
+  });
+
+  it("puts the chart sections' bars above their bodies", () => {
+    // The same rule read off the two files that broke it, because "does not
+    // pass blockEl" is satisfied by a call that is merely in the wrong PLACE.
+    // Both renderers draw an empty state and a chart host into `container`, and
+    // the frame has to be built before either.
+    for (const module of ["chart-grid", "index"]) {
+      const code = sources.find((s) =>
+        s.file === `src/ui/widgets/${module}.ts`
+      )!.code;
+      const frame = code.indexOf("sectionFrame(container");
+      const empty = code.indexOf("ca-journal-chart-empty");
+      expect(frame, module).toBeGreaterThan(0);
+      expect(empty, module).toBeGreaterThan(0);
+      expect(frame, module).toBeLessThan(empty);
+    }
+  });
+
+  it("lets a section block keep its own padding when the widget is the block (5.10)", () => {
+    // THE MEASURED HALF OF "EVERY SECTION COLLAPSES TO THE SAME HEIGHT".
+    // `--ca-sec-bar-h` makes the BAR one height whatever it carries; this is the
+    // BLOCK around it. `.ca-journal-tracker-section` is the one widget whose
+    // block can BE the section block — a `header:` fence whose body is the
+    // logging grid — and the rule that stopped it drawing a second card was
+    // zeroing the section's padding with it. On a Study subject that closed
+    // Trackers ~16px shorter than the four sections under it.
+    //
+    // Asserted as a SPLIT: the chrome rule names all three selectors, the
+    // padding rule names only the two where the tracker block sits INSIDE
+    // something else.
+    const t = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+    const chrome = t.indexOf(
+      ".ca-journal-sec-block .ca-journal-widget-block.ca-journal-tracker-section,"
+    );
+    expect(chrome, "no tracker chrome rule").toBeGreaterThan(0);
+    const chromeRule = t.slice(chrome, t.indexOf("}", chrome));
+    expect(chromeRule).toContain(
+      ".ca-journal-sec-block.ca-journal-widget-block.ca-journal-tracker-section"
+    );
+    expect(chromeRule).toContain("background: none");
+    expect(chromeRule).not.toContain("padding");
+    // The padding rule is the next one, and the self-selector is NOT in it.
+    const pad = t.indexOf(
+      ".ca-journal-sec-block .ca-journal-widget-block.ca-journal-tracker-section,",
+      chrome + 1
+    );
+    expect(pad, "no tracker padding rule").toBeGreaterThan(0);
+    const padRule = t.slice(pad, t.indexOf("}", pad));
+    expect(padRule).toContain("padding: 0");
+    expect(padRule).not.toContain(
+      ".ca-journal-sec-block.ca-journal-widget-block.ca-journal-tracker-section"
+    );
+  });
+
+  it("has retired the two private heads the framing wave added", () => {
+    // THE PAIR, AGAIN — the rules AND the markup, for the reason the quarter
+    // cards taught below. `.ca-journal-tracker-head` and the Recall head's
+    // chevron/title family were ~90 lines of copied CSS between them, each
+    // shipped with a `display: none` rule to hide whichever of the two bars a
+    // section ended up with second. Deleting one half would have left either
+    // dead rules or an unstyled bar, and the second is the one that renders.
+    //
+    // SCANS RULES, NOT PROSE, the same distinction the source sweep above
+    // draws: `styles/` is where the argument for a deletion is written down,
+    // and 50-entry-header.css explains the tracker head's removal by naming
+    // it. A comment recording what went is not the thing coming back.
+    const css = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const cls of [
+      ".ca-journal-tracker-head",
+      ".ca-journal-recall-chevron",
+      ".ca-journal-recall-title-left",
+    ]) {
+      expect(css, cls).not.toContain(cls);
+    }
+    for (const { file, code } of sources) {
+      for (const cls of [
+        "ca-journal-tracker-head",
+        "ca-journal-recall-chevron",
+        "ca-journal-recall-title-left",
+      ]) {
+        expect(code, `${file} / ${cls}`).not.toContain(cls);
+      }
+    }
+    // AND THE RULE THAT HID THE LOSER IS GONE TOO. A stylesheet that deletes
+    // one of two bars is the tell that two were being drawn — it took the
+    // tasks region's Compact toggle and its progress readout off every Study
+    // note for three releases, silently, because the thing hidden was a whole
+    // head and not just a title.
+    expect(css).not.toContain(
+      ".ca-journal-sec-block .ca-journal-tasks-head {"
+    );
   });
 
   it("keeps the classes the fold walk and the stylesheet already know", () => {
@@ -330,15 +507,22 @@ describe("the section's actions sit on a strip of their own", () => {
     // `header:` bar puts it on the BAR ITSELF (`headerbar.ts`). One selector
     // cannot reach both, and a rule written for the wrong one matches nothing —
     // which is 4.13 §3's `:has(>` fault, and looks exactly like a decision.
+    //
+    // ONE RULE WITH TWO SELECTORS AS OF 5.10, where it was two rules. The pair
+    // became a trio when the Journals card's private fold arrived, and the trio
+    // is what this file's next case is about: a fold that joins a selector LIST
+    // is one line, and a fold that has to copy a whole rule is one nobody
+    // notices was not copied.
     const t = css();
-    for (const sel of [
+    const sels = [
       ".ca-journal-sec-fold.is-collapsed > .ca-journal-sec > .ca-journal-header-widgets",
       ".ca-journal-sec-l1.ca-journal-header-bar.is-collapsed > .ca-journal-header-widgets",
-    ]) {
-      const at = t.indexOf(`${sel} {`);
-      expect(at, `no rule for ${sel}`).toBeGreaterThan(0);
-      expect(t.slice(at, t.indexOf("}", at)), sel).toContain("display: none");
-    }
+    ];
+    const at = t.indexOf(`${sels[0]},`);
+    expect(at, "no shared rule for the two folds").toBeGreaterThan(0);
+    const rule = t.slice(at, t.indexOf("}", at));
+    for (const sel of sels) expect(rule, sel).toContain(sel);
+    expect(rule).toContain("display: none");
     // AND NOT AT LEVEL 2, where the buttons sit on the title LINE rather than on
     // a strip of their own. There is no second row to close there, and hiding
     // them would take a control off a bar that is still drawn.
@@ -348,20 +532,28 @@ describe("the section's actions sit on a strip of their own", () => {
     );
   });
 
-  it("closes on the Journals card's own fold too (4.13.2 §4)", () => {
-    // THERE ARE THREE FOLDS, NOT TWO. `journals-section.ts::makeFoldable` marks
-    // `.ca-jjs-type` and builds its bar with `owns: "children"` — which withholds
-    // `.ca-journal-header-bar` deliberately, so an enclosing dashboard cannot read
-    // its fold level off a descendant. The consequence is that it matches
-    // neither rule above, and a collapsed journal went on showing `+ Subject`
-    // and `+ Topic` while every other collapsed section had stopped.
-    const t = css();
-    const sel = ".ca-jjs-type.is-collapsed > .ca-journal-sec > .ca-journal-header-widgets";
-    const at = t.indexOf(`${sel} {`);
-    expect(at, "no rule for the journals fold").toBeGreaterThan(0);
-    expect(t.slice(at, t.indexOf("}", at))).toContain("display: none");
-    // The marker really is withheld, which is why the rule cannot be shared.
-    expect(readSrc("journals-section")).toContain('owns: "children"');
+  it("closes the Journals card with the same rule, not a third one (5.10)", () => {
+    // WHAT THIS TEST USED TO ASSERT: *"there are three folds, not two"* — a rule
+    // naming `.ca-jjs-type.is-collapsed` because `journals-section.ts::
+    // makeFoldable` marked an element of its own, matched neither selector
+    // above, and left a collapsed journal showing `+ Subject` while every other
+    // collapsed section on the page had stopped.
+    //
+    // Three folds was never a decision anybody took; it was two files each
+    // solving privately what `foldableSection` solves. A journal type is built
+    // by it now, `.ca-jjs-type` is worn BY the fold wrapper rather than by an
+    // element around it, and the pair above reaches it unchanged — so the
+    // assertion is that the third rule is GONE and the shared one covers it.
+    const t = css().replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(t).not.toContain(
+      ".ca-jjs-type.is-collapsed > .ca-journal-sec > .ca-journal-header-widgets"
+    );
+    expect(readSrc("journals-section")).toContain("foldableSection(");
+    expect(readSrc("journals-section")).not.toContain("makeFoldable(");
+    // `owns: "children"` is `foldableSection`'s to set, and it must still be
+    // set: the marker is withheld so an enclosing dashboard cannot read its fold
+    // level off a descendant.
+    expect(readSrc("section-frame")).toContain('{ ...opts, owns: "children" }');
   });
 
   it("does not write the same rule for a subject, which cannot use it", () => {
@@ -375,15 +567,16 @@ describe("the section's actions sit on a strip of their own", () => {
     // made, which is the fault 4.13 §3 caught in this same file.
     expect(css()).not.toContain(".jjs-group.is-collapsed > .ca-journal-sec");
     // ONE FOLD LEFT IN THAT MODULE, and it is the type's. Counted on the CALL,
-    // because the function itself and the paragraphs about it still name it.
+    // because the paragraphs about what went still name it.
+    //
+    // THE CALL IS `foldableSection` AS OF 5.10 and the count is the claim: a
+    // subject is a card, and a card has no stack under it for a chevron to
+    // close. Reaching for the shared fold does not change that — it removes the
+    // reason a second one would be written.
     const code = readSrc("journals-section").replace(/\/\/.*$/gm, "");
-    // `makeFoldable(plugin` matches a CALL and never the definition, whose
-    // parameter list starts on the next line — and it is not anchored on
-    // indentation, which is what let a mutation past a sibling count in
-    // `journal-cards.test.ts`.
-    const calls = code.match(/makeFoldable\(plugin/g) ?? [];
-    expect(calls.length, "makeFoldable is called for more than the type").toBe(1);
-    expect(code).toContain("makeFoldable(plugin, section, head, foldKey(ctx.sourcePath, type.id));");
+    const calls = code.match(/foldableSection\(/g) ?? [];
+    expect(calls.length, "a fold for more than the type").toBe(1);
+    expect(code).toContain("foldKey(ctx.sourcePath, type.id)");
   });
 
   it("keeps the class the fold exclusions name, which is why no caller changed", () => {

@@ -81,6 +81,27 @@ export function buildChartGrid(
     // is what stops a folded Charts section being opaque. Passed as a number
     // rather than as `null` because this caller genuinely knows — `specs` is
     // right here — which is the distinction the frame asks for.
+    //
+    // ── INTO `container`, AND BEFORE ITS BODY (5.10) ──────────────────
+    //
+    // This read `sectionFrame(blockEl, …)` for three releases. `container` is
+    // created by the caller and handed here empty, then filled below — so a
+    // bar appended to the BLOCK landed after everything in it, and the section
+    // rendered upside down: the empty state above the title, and the Add chart
+    // button under it — a sentence pointing at a control that was below where
+    // it said to look. The screenshots that reported this show exactly that,
+    // on the home page and on a Study subject.
+    //
+    // AND THE FOLD WENT WITH IT, which is the half that does not look like a
+    // layout bug. `HeaderBar.recompute` hides THE BAR'S LATER SIBLINGS; with
+    // the body sitting before the bar there are none, so collapsing the
+    // section closed nothing and the empty state went on drawing under a
+    // chevron pointing the other way.
+    //
+    // So the host is the element the body goes into, and the bar is built
+    // first. That is rule one of the frame and it is not a chart rule: a
+    // renderer that must draw its content first moves it into the frame
+    // afterwards, the way `frame: section` does in widgets/index.ts.
     const frame = sectionFrame(container, {
       title: header.title,
       level: header.level,

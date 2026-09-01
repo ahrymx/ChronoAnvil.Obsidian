@@ -1926,7 +1926,9 @@ export function buildJournalTally(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   trackerId: string,
-  _label: string | null
+  label: string | null,
+  // Whether the block this sits in is already named — see below.
+  titled = false
 ): HTMLElement {
   const app = plugin.app;
   const root = createDiv({ cls: "ca-journal-table ca-journal-tally" });
@@ -1947,6 +1949,27 @@ export function buildJournalTally(
   if (refusal != null || !def) {
     root.createDiv({ cls: "ca-journal-widget-error", text: refusal ?? "" });
     return root;
+  }
+
+  // ── ITS OWN TITLE, WHERE NOTHING ELSE GIVES IT ONE (5.10) ─────────────
+  //
+  // This read `_label` for three releases: the parameter was taken and dropped,
+  // and `journal-tally:status|Pipeline` drew the word nowhere. The catalogue
+  // gained `header:🧮 Status` in the same wave, which is right for the section
+  // the catalogue composes — and wrong as a reason to make the widget mute,
+  // because a page can hold two tallies. One head saying "Status" over both
+  // names neither, which is the argument `SECTION_TITLES` makes about this exact
+  // widget a few hundred lines away in widgets/index.ts.
+  //
+  // So: under a `header:` bar or a `frame: section` fence the block is already
+  // named and this draws nothing; anywhere else the tally says what it counts,
+  // exactly as `journal-breakdown` does beside it and in the same words —
+  // "<tracker> tally", with an explicit `|Label` winning.
+  if (!titled) {
+    root.createDiv({
+      cls: "ca-jtly-title",
+      text: label ?? `${def.label ?? trackerId} tally`,
+    });
   }
 
   // IN THE TRACKER'S DECLARED ORDER, NOT BY COUNT. A status vocabulary is a

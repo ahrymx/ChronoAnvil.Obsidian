@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.12.0] - 2026-09-01
+
+### Added
+
+- **A journal note's groups are in the Section Editor.** The Study subject page has shipped a two-column row since 4.70 — *🔁 Due and open* holding the review queue beside the open-task table — and the editor could not see it: no group card, no **Break up group**, and both columns labelled *Section* in the list. Journal notes now answer the same two questions every other surface answers, so a group on the page is a group in the window: it can be broken apart, cells can be moved between rows, and a new one can be made.
+- **Any journal section without an action row can be drawn as a widget.** The Section Editor's **how this is drawn** question now reaches *📊 Trackers*, *🔎 Find*, *🔁 Review*, *⏳ Open tasks*, *📈 Progress*, *🔢 Stats*, *🧮 Status* and *🏷️ Tags*. The rule is exactly the one it sounds like: a section is offered the choice unless something in it is anchored INTO its title bar — *🗂️ Topics* has **New Topic** there, *📊 Charts* has **+ Add chart**, *📚 Resources* has **Add category**, and those buttons have nowhere to go once the bar does. The tracker grid's **+ Add tracker** is a tile in the grid rather than a button in the bar, so it travels with the widget. This is what makes grouping possible at all — a fence that titles itself is a section, and a section cannot be a column, so a section had to be able to take its title off before it could join a row.
+
+### Changed
+
+- **The section/widget toggle says "Show as widget".** It read *"Show as a widget, so it can sit in a row"* — a paragraph in a row of eight sections, where the questions beside it are a phrase. The reason it was spelling out is now something the window itself does: a group can be made here, so a reader who wants one meets the answer where they make it.
+
+### Fixed
+
+- **The 5.10 missing-title repair no longer overwrites an answer you gave.** A block with no title above it has two causes once the toggle exists — a page composed before the title, and a reader who asked for the widget form — and the repair could not tell them apart, so it offered the title back and the next save took the answer away. It now stays quiet wherever the section offers the choice, on journal notes, dashboards, the home page and every period dashboard. A section that has no widget form, such as *⏳ Open tasks*, is still offered its missing line.
+- **A section with a logging grid swallowed the block under it.** `📊 Trackers` and its marked region are one fence, so the section ends with its own block — but a `header:` bar takes the fence's widget row INTO its own actions slot, so the tracker cells render inside the bar rather than beside it, and the rule that asks "did this fence draw its body?" looked past the bar and found nothing. Trackers therefore behaved like a title with no body: on a Study topic index it drew the untitled stats band under it inside its own card, and collapsing Trackers folded the stats band away with it. A section's controls still do not count as its body — *📖 Lessons* keeps **New Lesson** in that slot and keeps owning its table below.
+- **An empty strip of card hung under the last section on a page.** A section owns the blocks after its bar, and the blocks that store a section's own data — the three `<!--chronoanvil:res-*-->` regions under *📚 Resources*, and the graph link at the foot of every note — draw nothing at all. Those got the section's background and its two side borders while the rounded bottom edge sat on the last block a reader could actually see, so the card closed and then a second, open-ended band of surface hung below it. It went away when the section was collapsed, which is why it read as a rendering artifact. The surface now stops at the last visible block; the invisible tail still belongs to the section and still folds with it.
+- **A page banner could be grouped.** The rule that keeps a page's own header out of rows named the flat notes' `title` keyword only, so a journal note's `journal-header` and a diary entry's `entry-header` were treated as ordinary one-line widgets: each could be reported as a column and a cell could be moved into it. All three heads are now known by the same rule.
+
+## [5.10.0] - 2026-09-01
+
+### Added
+
+- **Unified section framing & collapsible headers for Recall and Tasks.** Standardized Recall (`🧠 Recall`) and Tasks (`✅ Tasks`) sections with first-class collapsible section header bars and full-width card framing matching all other sections in custom journal notes.
+
+### Fixed
+
+- **Anchored drag grabber handle in section header bars.** Fixed an issue where the 6-dot drag handle (`.ca-jbd-handle`) on sections such as `Trends and statistics` and `Open tasks` floated into the empty margin above section cards, anchoring it cleanly at the top-center of the section header bar.
+- **De-nested Recall and Tasks card surfaces.** Stood down duplicate inner card backgrounds, borders, and private fold headers when Recall and Tasks are rendered within section block frames.
+- **Two chart sections drew their header under their own content.** *Trends and statistics* on the home page and *Charts* on a journal note built their title bar into the block rather than into the box they had just filled, so the section rendered upside down: *"No charts yet — use Add chart above."* printed above the header, with the **+ Add chart** button below the sentence pointing at it. Collapsing such a section closed nothing, because a fold hides what comes after the bar and nothing did. Both are the shared renderers, so the repair reaches journal notes, the journals dashboard, the home page and every period dashboard at once.
+- **Trackers and Recall each drew a second header.** Both grew a private fold bar of their own — chevron on the left, no hairline, no glyph slot — while the section they sit in already had one, and the stylesheet was left hiding whichever bar lost. On the tasks region the bar that lost was the one carrying the **Compact** toggle and the progress readout, so both controls silently disappeared from every Study note. Each section now has exactly one header, the shared one, and the tasks controls sit in its actions row.
+- **The Journals card and bridges folded differently from everything else.** Both wrote their own fold: a chevron on the LEFT, their own click handling, their own collapsed rules. Their chevrons now sit on the right with every other section's, and a collapsed one hides its actions like the rest.
+- **Sections collapse to one height.** A closed section is its title row and nothing else, so what it happens to carry — a count pill, a muted phrase, an actions strip — no longer decides how tall it is.
+- **A tally said nothing about itself.** `journal-tally:<tracker>|Label` drew that label nowhere, and two tallies on one page were two unlabelled strips of numbers. A tally now names what it counts wherever nothing else names it, and stays quiet under a section bar that does.
+- **A note written before a section had a title gets offered the missing line.** Any section whose composed form opens with a header bar, on a note that has the block but not the bar, is now reported by the Section Editor as needing a title — writing it adds exactly one line and changes nothing else. `📊 Trackers` and `🔢 Stats` are the sections this reaches today.
+
 ## [5.9.0] - 2026-09-01
 
 ### Added

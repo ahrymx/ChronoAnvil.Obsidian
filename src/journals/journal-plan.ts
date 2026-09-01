@@ -82,7 +82,13 @@
 // is what 2.59 spent six patches removing.
 
 import { JournalType } from "./journal";
-import { graphLinksSection } from "../core/note-sections";
+import {
+  answersOn,
+  flatBlocks,
+  graphLinksSection,
+  regroupFlatNote,
+} from "../core/note-sections";
+import type { FlatSection } from "../core/note-sections";
 import {
   JournalSection,
   SectionContext,
@@ -90,6 +96,9 @@ import {
   SectionPart,
   composeSectionRuns,
   bracketKeyOf,
+  questionsOf,
+  sectionBlocks,
+  widgetFormBar,
   bracketSpanIn,
   headingsFromTitles,
   skeletonTitles,
@@ -107,6 +116,7 @@ import {
   ROW_KEYWORD,
   cutFromFence,
   dropSoloBar,
+  leadingBar,
   needsSoloBar,
   soloBar,
   splitDirective,
@@ -412,7 +422,13 @@ const isBlank = (lines: string[]): boolean =>
 // Split a raw segment where a frontmatter block or region comment is followed
 // by other content (such as the prose skeleton or another region), so that
 // lookaheads like region absorption do not swallow unrelated sections.
-function splitRawSegments(segs: readonly Segment[]): Segment[] {
+//
+// EXPORTED BECAUSE `SectionRun.from`/`to` ARE INDICES INTO ITS OUTPUT (5.10),
+// not into `segment(...)`. A caller holding a run and wanting its lines has to
+// segment the file the same way this module did, and there is no second way to
+// arrive at the same numbering — so the alternative to exporting it is every
+// reader of a run reimplementing it and one of them getting it wrong.
+export function splitRawSegments(segs: readonly Segment[]): Segment[] {
   const out: Segment[] = [];
 
   for (const seg of segs) {
@@ -708,11 +724,70 @@ export function missingParts(
 // have — which is the shape `missingParts` already established and the reason
 // this needs no new op kind.
 //
-// EVERYTHING ABOUT IT IS NARROW ON PURPOSE. Only a section that declares a row,
-// only where the run holds that section alone, only where the fence carries no
-// bar of ANY kind, and only where the catalogue named the wording. A fence the
-// reader has titled themselves answers `isSectionFence` and is left exactly as
-// they have it.
+// ── AND EVERY OTHER SECTION THAT LOST ITS TITLE (5.10) ───────────────────
+//
+// 5.9 scoped this to a ROW's surviving cell, because that was the only way a
+// block was known to end up untitled. It was not. A section whose catalogue
+// entry gained a `header:` line — `trackers` and `stats` both did — is in the
+// same state on every note composed before that, and for the same reason: the
+// file says one thing, the catalogue says another, and no gesture reconciles
+// them because unticking and re-ticking composes what the file already has.
+//
+// The alternative that was tried and is being undone here was to draw a
+// fallback bar at render time. That gives a vault two looks for one object,
+// chosen by the age of the note, and it does it silently. Reporting the gap
+// puts the change in front of the reader, in the window whose job is exactly
+// that, and leaves the file as the single source of what the note holds.
+//
+// SO THE QUESTION IS ASKED OF THE RENDER, not of a new catalogue field. If
+// composing this section today would open it with a `header:` line, that is
+// the title it is missing — which means a section cannot declare one place and
+// draw another, and adding a bar to a catalogue entry needs no second edit
+// here.
+//
+// STILL NARROW WHERE IT MATTERS. Only where the run holds this section alone,
+// only where the fence carries no bar of ANY kind, and never over a title. A
+// fence the reader has titled themselves, or one framed with `frame: section`,
+// answers `isSectionFence` and is left exactly as they have it.
+//
+// AND ON EVERY NOTE KIND, unlike `missingParts` beside it, which is withheld
+// from a leaf and a page on the grounds that a rollup can be WRONG about the
+// world where a reader's writing cannot. A bar is not content. It is one line
+// of chrome at the top of a fence the plugin composed, and a leaf note wearing
+// last release's chrome is the same defect on a page nobody is arguing about.
+function declaredBar(
+  section: JournalSection,
+  ctx: SectionContext
+): string | undefined {
+  // ── AND A SECTION THE READER MAY HAVE MEANT TO BE BARE IS NEVER SHORT OF
+  //    A BAR (5.11) ───────────────────────────────────────────────────
+  //
+  // This repair reads a barless fence as a page BEHIND the catalogue, and that
+  // reading is only honest while "barless" has one cause. A section carrying a
+  // form toggle has two: the reader answered "as a widget", which is what makes
+  // it groupable at all — and nothing in the file tells the two apart.
+  //
+  // SO THE AMBIGUOUS CASE IS LEFT ALONE, which is the cheap side of the trade.
+  // Repairing it would overwrite an answer the reader gave, on a save they
+  // asked for something else in, with a line the plan called an `extend`;
+  // declining leaves a page as they have it, and the toggle that would put the
+  // bar back is in the same window as the sentence that would have offered it.
+  //
+  // NOT A NARROWING OF 5.10. Everything that catalogue repairs — the tracker
+  // grid, the note tables, the charts region, the banner — hosts a control in
+  // its bar and therefore has no widget form to be in.
+  if (widgetFormBar(section, ctx)) return undefined;
+  // A row member names its solo title outright: the bar it wears is worded for
+  // ITSELF rather than for the band, so it cannot be read off a render that
+  // composes the band's.
+  const own = soloBarOf(section, ctx);
+  if (own) return own;
+  if (rowOf(section, ctx)) return undefined;
+
+  const first = section.render(ctx, sectionOverrides(ctx, section.id))[0];
+  return first?.kind === "fence" ? leadingBar(first.lines) : undefined;
+}
+
 export function missingSoloBar(
   runLines: readonly string[],
   run: SectionRun,
@@ -720,8 +795,7 @@ export function missingSoloBar(
   ctx: SectionContext
 ): string | null {
   if (run.sectionIds.length !== 1) return null;
-  if (!rowOf(section, ctx)) return null;
-  const bar = soloBarOf(section, ctx);
+  const bar = declaredBar(section, ctx);
   return needsSoloBar(runLines, bar) ? (bar as string) : null;
 }
 
@@ -795,7 +869,7 @@ export function planSections(
         ...(orphans.length ? { keepsContent: orphans } : {}),
         detail: rewriting.has(section.id)
           ? describeAnswers(
-              section.questions?.(ctx) ?? [],
+              questionsOf(section, ctx),
               optionsFor(requested, section.id),
               journalHostLabel(ctx)
             ) +
@@ -1123,14 +1197,31 @@ export function applySections(
       let out = lines;
       for (const id of run.sectionIds) {
         if (rewriting.has(id)) {
+          const listedSection = byId.get(id);
           out = withAnswers(
             out,
-            byId.get(id)?.questions?.(ctx) ?? [],
+            // AND A ROW FENCE ANSWERS NO FORM QUESTION (5.11). `withAnswers`'
+            // widget branch filters every `header:` line in the chunk it is
+            // handed, and a chunk holding two cells has one bar between them —
+            // the band's, composed by the opener. So a form answer arriving for
+            // one cell of a row would take the whole group's title off. The
+            // editor already declines to offer the box there ("widgets in a
+            // group are automatically drawn as widgets"); this is the same
+            // refusal at the write, where a `want` built anywhere else lands.
+            listedSection
+              ? questionsOf(listedSection, ctx).filter(
+                  (q) => q.kind !== "form" || run.sectionIds.length === 1
+                )
+              : [],
             optionsFor(requested, id)
           );
-          const listed = byId.get(id);
-          if (listed) {
-            out = withListedHeadings(out, listed, ctx, optionsFor(requested, id));
+          if (listedSection) {
+            out = withListedHeadings(
+              out,
+              listedSection,
+              ctx,
+              optionsFor(requested, id)
+            );
           }
         }
         const section = byId.get(id);
@@ -1629,7 +1720,7 @@ function listedTitles(
   ctx: SectionContext,
   options: Record<string, unknown> | undefined
 ): string[] | null {
-  const q = (section.questions?.(ctx) ?? []).find((x) => x.kind === "lines");
+  const q = questionsOf(section, ctx).find((x) => x.kind === "lines");
   if (!q) return null;
   const answer = options?.[q.key];
   if (typeof answer !== "string") return null;
@@ -1671,7 +1762,7 @@ function renderOptionsFor(
     ...declared,
     ...(optionsFor(requested, section.id) ?? {}),
   };
-  const q = (section.questions?.(ctx) ?? []).find((x) => x.kind === "lines");
+  const q = questionsOf(section, ctx).find((x) => x.kind === "lines");
   const titles = listedTitles(section, ctx, opts);
   if (q && titles && titles.length) {
     const carried = (declared as Record<string, unknown> | undefined)?.[q.key];
@@ -2057,8 +2148,18 @@ function answeredIn(
   section: JournalSection,
   ctx: SectionContext
 ): Record<string, string> {
-  const questions = section.questions?.(ctx) ?? [];
+  const questions = questionsOf(section, ctx);
   const out = answersInText(text, questions);
+  // AND THE FORM, WHICH IS READ OFF THE FENCE RATHER THAN OFF AN ARGUMENT
+  // (5.11). `answerInText` answers null for a `form` question by construction —
+  // the answer is a LINE'S EXISTENCE, not a span inside one — so a question this
+  // catalogue derives would have reached the editor unreadable, and the control
+  // would have been replaced by its `settled` wording on every section that has
+  // one. `answersOn` is the read the other two models already use, and what it
+  // wants is the section's anchor, which `locate` is.
+  if (questions.some((q) => q.kind === "form")) {
+    Object.assign(out, answersOn(section.locate(text, ctx), questions, text));
+  }
   // THE KEY IS READ OFF THE QUESTION, not written here. This file knows that a
   // bracketed section's prose answers a `lines` question; it does not need to
   // know that the journal catalogue happens to call the answer "headings".
@@ -2088,7 +2189,12 @@ const viewOf = (
   // that argument belongs with the patch that moves `nav` into the banner fence
   // rather than with the one that fixes a required row.
   movable: true,
-  ...(section.questions ? { questions: section.questions(ctx) } : {}),
+  // THROUGH `questionsOf`, so the derived form toggle reaches the row (5.11). A
+  // section that declares nothing can still HAVE a question, which is why this
+  // no longer asks whether the catalogue entry has a `questions` field.
+  ...(questionsOf(section, ctx).length
+    ? { questions: questionsOf(section, ctx) }
+    : {}),
   // WHAT THE FILE ALREADY SAYS, PER QUESTION (4.47), and this catalogue was the
   // one that never supplied it.
   //
@@ -2103,7 +2209,16 @@ const viewOf = (
   // shorthand argument both have to be resolved before the pieces are split, and
   // doing that here rather than in the editor is what keeps the window from
   // learning what a stats band is.
-  ...(text !== undefined && section.questions
+  //
+  // AND THROUGH `questionsOf` TOO, WHICH THE FIELD ABOVE ALREADY IS. This read
+  // `section.questions` — the DECLARED field — for one turn after the toggle
+  // became derived, so a section that declares nothing got the question and no
+  // answer to it: the box came up unticked over a fence with no bar, and the
+  // next save wrote the bar back over the reader's choice. `trackers`, `stats`,
+  // `progress` and `tally` are the four that declare nothing; `find`, `review`,
+  // `tasks` and `tags` hid it, because a `folder` question was enough to open
+  // this branch.
+  ...(text !== undefined && questionsOf(section, ctx).length
     ? { answered: answeredIn(text, section, ctx) }
     : {}),
   // ONE BAND. A journal note is a stack of sections with no structural rule
@@ -2168,10 +2283,69 @@ function journalRefusal(
   return null;
 }
 
+// ── A JOURNAL SECTION AS THE ROW MACHINERY READS IT (5.11) ───────────────
+//
+// `flatBlocks` and `regroupFlatNote` are the flat note's, and the diary
+// dashboard has borrowed them through an adapter of exactly this shape since
+// 4.58 — one function, `asFlat`, and the two lines in the model below. This is
+// the third caller, and it is a THIRD CALLER rather than a third copy for the
+// reason `rowRuns` is one function: what a `row` line means, where a cell may
+// be cut, and what a group is are decided once.
+//
+// THE TWO THINGS THAT ARE THIS CATALOGUE'S. A journal section renders a LIST of
+// blocks where a flat one renders a fence, so the fence is picked out and a
+// section that emits none — the prose skeleton, which is bracketed markdown —
+// answers with no lines and is in no block. That is the honest answer: it has
+// nothing a `cell` line could delimit, so it is never a column, never joined,
+// and `blocks` simply does not list it. And `locate` takes a context here,
+// which the adapter closes over.
+//
+// `render` FORWARDS ITS OPTIONS, which is what makes `hasKnownExtent` right:
+// that predicate asks whether a section renders ONE line — in either form — and
+// a section whose bar is its first line is a one-line widget the moment the
+// reader drops it. A cell that cannot be bounded is not offered a split, so
+// getting this wrong would take the group controls away from exactly the
+// sections this release exists to give them to.
+//
+// `bar` IS DELIBERATELY LEFT UNANSWERED, and the reasoning is worth keeping
+// because the field looks like it wants `widgetFormBar`. `RowMember.bar` is the
+// title a cell takes BACK — `undoRowOfOne` and the out-path of a break-up hand
+// it to `soloBar`. On this catalogue the only section that can be a cell is one
+// already in the widget form, because `isSectionFence` refuses a self-titling
+// fence as a column; so every id this field would be read for is one whose bar
+// the READER took off. Answering it would put that title back the first time
+// they broke the group up, quietly reversing the toggle they had just used.
+// Leaving it undefined is what makes the form answer survive a round trip
+// through a row, which `test/journal-rows.test.ts` asserts from both ends.
+function asFlat(section: JournalSection, ctx: SectionContext): FlatSection {
+  return {
+    id: section.id,
+    label: section.label,
+    blurb: section.blurb,
+    icon: section.icon,
+    locked: Boolean(section.required),
+    render: (opts) => {
+      const merged = {
+        ...sectionOverrides(ctx, section.id),
+        ...((opts as SectionOverrides | undefined) ?? {}),
+      } as SectionOverrides;
+      const block = sectionBlocks(section, ctx, merged).find(
+        (b) => b.kind === "fence"
+      );
+      return block?.kind === "fence"
+        ? { fence: block.info, lines: block.lines }
+        : { fence: "chronoanvil", lines: [] };
+    },
+    locate: (text) => section.locate(text, ctx),
+  };
+}
+
 // This journal surface, as the editor sees it.
 export function journalSectionModel(ctx: SectionContext): SectionModel {
   const find = (id: string): JournalSection | undefined =>
     sectionsFor(ctx).find((s) => s.id === id);
+  const flats = (): FlatSection[] =>
+    sectionsFor(ctx).map((s) => asFlat(s, ctx));
   return {
     sections: (text) => sectionsFor(ctx).map((s) => viewOf(s, ctx, text)),
     present: (text) => sectionsPresent(text, ctx),
@@ -2187,5 +2361,22 @@ export function journalSectionModel(ctx: SectionContext): SectionModel {
     },
     plan: (text, want) => planSections(text, ctx, want),
     apply: (text, want) => applySections(text, ctx, want),
+    // ── THE GROUP THE EDITOR COULD NOT SEE (5.11) ────────────────────
+    //
+    // A subject index has composed `row / header:🔁 Due and open /
+    // review-queue / tasks-table` since 4.70 — one block, two cells, one bar —
+    // and this model implemented neither of these, so `SectionEditorModal`
+    // drew the list it draws for a surface with no rows: two independent rows,
+    // both wearing the "Section" pill, with no card round them and no control
+    // that could make or break one. The page said group and the window that
+    // edits the page said nothing.
+    //
+    // BOTH OR NEITHER — `hasRows` reads them together, and it must: `blocks`
+    // alone would seed the window's `joined` bits from the file and give it no
+    // way to write a change back, so the first Save would flatten the group it
+    // had just drawn.
+    blocks: (text) => flatBlocks(text, flats()),
+    regroup: (text, blocks, pages) =>
+      regroupFlatNote(text, flats(), blocks, pages),
   };
 }

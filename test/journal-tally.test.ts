@@ -251,4 +251,29 @@ describe("tally card surface styling", () => {
     expect(cssRules(".ca-jtly-head")).toEqual([]);
     expect(cssRules(".ca-jtly-chevron")).toEqual([]);
   });
+
+  it("still says what it counts where nothing else does (5.10)", () => {
+    // THE HALF THAT WENT WITH THE PRIVATE BAR. Deleting the bar was right; the
+    // parameter went with it — `_label`, taken and dropped — so
+    // `journal-tally:status|Pipeline` drew that word nowhere at all, and two
+    // tallies on one page were two unlabelled strips of numbers.
+    //
+    // The catalogue's `header:🧮 Status` is the answer for the section the
+    // catalogue composes and only for that one. `titled` is what tells the two
+    // apart: a `header:` bar or a `frame: section` fence names the block, and
+    // anywhere else the widget names itself — the same rule, in the same words,
+    // as `journal-breakdown` beside it.
+    const body = tallySource();
+    // On the SIGNATURE, not on the file: the paragraph above the change quotes
+    // the old parameter by name, and that record is worth more than the
+    // assertion's convenience.
+    expect(body).not.toContain("_label: string | null");
+    expect(body).toContain("label: string | null");
+    expect(body).toContain("if (!titled) {");
+    expect(body).toContain('cls: "ca-jtly-title"');
+    expect(body).toContain("label ?? `${def.label ?? trackerId} tally`");
+    // And it has a rule to be drawn by, at the breakdown's scale — the pair is
+    // one decision, so a size that drifted apart would be two.
+    expect(cssRule(".ca-jtly-title")).toBe(cssRule(".ca-jbd-title"));
+  });
 });

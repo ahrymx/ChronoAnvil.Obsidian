@@ -20,14 +20,17 @@ import {
   sectionContext,
   sectionsFor,
   templateTargets,
+  widgetFormBar,
 } from "../src/journals/journal-sections";
 import type { SectionContext } from "../src/journals/journal-sections";
+import { segment } from "../src/core/layout";
 import {
   applySections,
   isHandEdited,
   parseSections,
   planSections,
   sectionsPresent,
+  splitRawSegments,
 } from "../src/journals/journal-plan";
 
 // ── the section planner ───────────────────────────────────────────────────
@@ -234,6 +237,116 @@ describe("reading a template back", () => {
     ).toBeNull();
   });
 
+  it("titles every barless section a template already carries (5.10)", () => {
+    // ── AND NOT ONLY A ROW'S CELL ────────────────────────────────────────
+    //
+    // The pair above is 5.9's, and its scope was drawn around the one way a
+    // barless block was then known to arise. `trackers` and `stats` gained a
+    // `header:` line in the catalogue afterwards, which puts every note
+    // composed before that in exactly the same state and for exactly the same
+    // reason — the file says one thing, the catalogue says another, and no
+    // gesture reconciles them.
+    //
+    // A PROPERTY OVER THE TEMPLATE rather than three named sections, because
+    // the failure this guards against is a catalogue entry gaining a bar and
+    // nobody remembering this file exists. Strip any section's title, and the
+    // plan must offer it back and the write must restore the file byte for
+    // byte.
+    for (const t of allTemplates()) {
+      const ids = sectionsPresent(t.text, t.ctx);
+      const want = ids.map((id) => ({ id }));
+      // THE RUN'S OWN COORDINATES. `from`/`to` index the split segments, which
+      // is what the planner segments with — a bare `segment(...)` numbers the
+      // file differently the moment a frontmatter block is followed by content.
+      const segs = splitRawSegments(segment(t.text.split("\n")));
+      const all = t.text
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => /^header:\S/.test(l));
+      // ONE SECTION TO A RUN. A row fence carries ONE bar for the BAND, worded
+      // by the cell that opens it, and a run of two is not the solo case —
+      // `header:🔁 Due and open` names Review and Open tasks together, so
+      // stripping it is a different repair with a different answer (5.9's cut
+      // path, two tests up). The scan asks the parser rather than the text.
+      const bars = parseSections(t.text, t.ctx)
+        .filter((r) => r.sectionIds.length === 1)
+        .flatMap((r) => {
+          const lines: string[] = [];
+          for (let i = r.from; i <= r.to; i++) lines.push(...segs[i].lines);
+          const heads = lines
+            .map((l) => l.trim())
+            .filter((l) => /^header:\S/.test(l));
+          // AND ONE BAR TO A FENCE. `children` composes a bar per kind —
+          // `📖 Lessons` over the lesson table, `🛠️ Practice` over the practice
+          // one — so a fence that has lost the first still carries the second,
+          // and `isSectionFence` reads it as titled because it is. That is a
+          // different loss with a different answer; this repair is only ever
+          // about a block with no title of any kind over it.
+          // AND NOT A SECTION THE READER COULD HAVE MEANT TO BE BARE (5.11).
+          // A section that offers the widget form has TWO reasons to carry no
+          // bar — a page written before the catalogue grew one, and an answer
+          // the reader gave in the section editor — and nothing in the file
+          // tells them apart. `declaredBar` declines the ambiguous case rather
+          // than overwriting an answer; this is the same rule, said from the
+          // test's side, and the assertion below it is the half that keeps the
+          // decline honest.
+          const only = findSection(r.sectionIds[0], t.ctx);
+          if (only && widgetFormBar(only, t.ctx)) return [];
+          return heads.length === 1 ? heads : [];
+        });
+      for (const bar of new Set(bars)) {
+        // A title the file carries twice is not this repair's case: removing
+        // one leaves the fence titled, which `isSectionFence` reads as titled.
+        if (all.filter((b) => b === bar).length > 1) continue;
+        const stale = t.text.replace(`${bar}\n`, "");
+        if (stale === t.text) continue;
+
+        const op = planSections(stale, t.ctx, want).find(
+          (o) => o.kind === "extend" && o.detail?.includes("no title over it")
+        );
+        expect(op, `${t.file} / ${bar}`).toBeTruthy();
+        expect(applySections(stale, t.ctx, want), `${t.file} / ${bar}`).toBe(
+          t.text
+        );
+        // AND ONLY ONCE. A repair that fires on its own output is a note that
+        // never stops being offered a change.
+        expect(applySections(t.text, t.ctx, want), `${t.file} / ${bar}`).toBeNull();
+      }
+    }
+  });
+
+  it("leaves a widget-form section's missing bar alone (5.11)", () => {
+    // THE OTHER HALF OF THE NARROWING ABOVE, and the reason it is a narrowing
+    // rather than a hole. Dropping the bar off a section that can be drawn as a
+    // widget is what the section editor's toggle DOES, so a plan that read the
+    // result as a page behind the catalogue would offer — and a save would
+    // make — a write undoing the reader's own answer, under a sentence saying
+    // the block has no title over it.
+    //
+    // ASSERTED OVER EVERY TEMPLATE, so the property survives a catalogue entry
+    // gaining or losing its toggle.
+    let checked = 0;
+    for (const t of allTemplates()) {
+      const want = sectionsPresent(t.text, t.ctx).map((id) => ({ id }));
+      for (const id of sectionsPresent(t.text, t.ctx)) {
+        const section = findSection(id, t.ctx);
+        const bar = section && widgetFormBar(section, t.ctx);
+        if (!bar) continue;
+        const stale = t.text.replace(`${bar}\n`, "");
+        if (stale === t.text) continue;
+        checked++;
+        const op = planSections(stale, t.ctx, want).find(
+          (o) => o.kind === "extend" && o.detail?.includes("no title over it")
+        );
+        expect(op, `${t.file} / ${bar}`).toBeUndefined();
+        expect(applySections(stale, t.ctx, want), `${t.file} / ${bar}`).toBeNull();
+      }
+    }
+    // The templates really do carry sections with a toggle — a rule that
+    // checked nothing would pass this file silently.
+    expect(checked).toBeGreaterThan(0);
+  });
+
   it("puts a cut cell back into its row, not beside it", () => {
     // THE PROPERTY THE CUT EXISTS FOR: remove a section, put it back, and the
     // file is the file you started with. The ordinary add path composes a
@@ -322,7 +435,14 @@ describe("nothing the plugin did not write is touched", () => {
 
   it("leaves a hand-added block exactly where it was", () => {
     const { ctx, text } = topic();
-    const mine = "```chronoanvil\ntag-index\n```";
+    // `on-this-day` RATHER THAN `tag-index`, AND FOR 3.11 §6's REASON (5.10).
+    // The test below already made this correction and this one did not: a
+    // `tag-index` fence is the Tags SECTION, not a hand-add, so what stood here
+    // was the planner recognising its own section and this assertion reading
+    // that as "untouched". It went on passing until the release that completes
+    // a recognised section's missing title, at which point it failed for the
+    // right reason and named the wrong thing.
+    const mine = "```chronoanvil\non-this-day\n```";
     const hacked = `${text}\n${mine}\n`;
     const want = sectionsPresent(hacked, ctx).filter((id) => id !== "review");
     const after = applySections(hacked, ctx, want)!;
@@ -577,8 +697,10 @@ describe("reordering", () => {
     // The one undecidable case, decided out loud: a reader's own fence between
     // two sections being swapped has no correct destination, so it keeps its
     // index and the sections trade the slots they had.
+    //
+    // FOREIGN, WHICH `tag-index` IS NOT — see the correction one describe up.
     const { ctx, text } = topic();
-    const mine = "```chronoanvil\ntag-index\n```";
+    const mine = "```chronoanvil\non-this-day\n```";
     const hacked = `${text}\n${mine}\n`;
     const present = sectionsPresent(hacked, ctx);
     const want = [...present].reverse();

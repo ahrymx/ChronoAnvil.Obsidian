@@ -538,9 +538,11 @@ a.ca-jjs-type-name:hover {
    of the actions are the frame's. The two comments that used to sit here both
    explained how to push the buttons right, once on the count span and once on
    the head, which is the same decision made twice in one file. */
-.ca-jjs-type.is-collapsed .ca-jjs-type-body {
-  display: none;
-}
+/* `.ca-jjs-type.is-collapsed .ca-jjs-type-body { display: none }` STOOD HERE and
+   is `foldableSection`'s now (5.10): the type's body IS the fold's body, wearing
+   this file's class for its padding, so the shared
+   `.ca-journal-sec-fold.is-collapsed > .ca-journal-sec-fold-body` closes it with
+   every other section on the page. */
 .ca-jjs-type-body {
   /* INSIDE A CARD NOW (4.41), so the sides are stated too: the grid used to run
      to the section card's own padding and now has a box of its own to clear.
@@ -945,18 +947,15 @@ a.ca-jjs-row-link:hover {
 .ca-journal-sec.is-foldable {
   cursor: pointer;
 }
-.ca-journal-sec.is-foldable:hover .ca-jjs-toggle {
+.ca-journal-sec.is-foldable:hover .ca-journal-sec-fold-toggle {
   color: var(--text-normal);
 }
-/* Down means closed, up means open — the idiom every header bar in the plugin
-   uses as of 4.13 §1b. A chevron on the right pointing right points off the edge
-   of the card it would open.
-   ONE SELECTOR SINCE 4.13.3, where there were two: a subject's `.jjs-group` had
-   a chevron of its own until it became a card, and a card has no stack under it
-   to close. The type's is the only fold this file draws now. */
-.ca-jjs-type:not(.is-collapsed) .ca-jjs-toggle {
-  transform: rotate(180deg);
-}
+/* `.ca-jjs-toggle` RETIRED (5.10). This file drew its own chevron and rotated it
+   with a rule of its own — down means closed, up means open, the idiom every
+   header bar in the plugin has used since 4.13 §1b, restated here because the
+   fold was private. It is `foldableSection`'s chevron now, in the same slot at
+   the same end, and 05-inline-widgets.css turns it. The hover above is kept
+   because it is about THIS file's head, not about the control. */
 
 /* Empty states — a type with no subjects, or no types at all.
    THE BOX IS 91-card-surface.css §3a'S NOW (4.11). Two rules stood here: a plain

@@ -555,8 +555,8 @@ export function formQuestion(
     label: "how this is drawn",
     directive: directive ?? (bar.startsWith("frame:") ? FRAME_KEYWORD : HEADER_KEYWORD),
     bar,
-    section: "A section of its own, with a foldable bar",
-    widget: "Show as a widget, so it can sit in a row",
+    section: "Show as section",
+    widget: "Show as widget",
   };
 }
 

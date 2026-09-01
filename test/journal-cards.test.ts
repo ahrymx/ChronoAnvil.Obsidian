@@ -656,10 +656,13 @@ describe("a subject is a card", () => {
       src.indexOf("if (tops.length === 0) {"),
       src.indexOf("const grid = body.createDiv")
     );
+    // A BARE `return` SINCE 5.10: `buildType` appends into the host it is given
+    // rather than returning the element, because `foldableSection` builds its
+    // wrapper into a host. The ordering this claims is unchanged.
     expect(branch).toMatch(
-      /if \(root\) \{\s*body\s*\.createDiv\(\{ cls: "ca-jjs-grid" \}\)[\s\S]*?return section;\s*\}/
+      /if \(root\) \{\s*body\s*\.createDiv\(\{ cls: "ca-jjs-grid" \}\)[\s\S]*?return;\s*\}/
     );
-    expect(branch.indexOf("return section;")).toBeLessThan(
+    expect(branch.indexOf("return;")).toBeLessThan(
       branch.indexOf('cls: "ca-jjs-empty"')
     );
     // A REGISTERED JOURNAL WHOSE ROOT DOES NOT EXIST YET is the one state where
@@ -999,11 +1002,23 @@ describe("a subject is a card", () => {
     // fold keys stay in `collapsedNoteSections`, unread and unmigrated: the map
     // is per note and per id, so a stale entry costs nothing and rewriting a
     // reader's settings to tidy ours is the worse trade.
-    // `makeFoldable(plugin` matches a CALL and never the definition, whose own
-    // parameter list starts on the next line. Not anchored on indentation: that
-    // is what let a mutation past this file's `addButtons` count.
-    const calls = code().match(/makeFoldable\(plugin/g) ?? [];
+    // ── AND THE FOLD IS THE SHARED ONE AS OF 5.10 ──────────────────────
+    //
+    // `makeFoldable` was this file's own: its own chevron, its own click
+    // handler, its own `is-collapsed`, and a rule in 70-section-surface.css
+    // naming it as THE THIRD FOLD so that "a collapsed section hides its
+    // actions" could reach it at all. It is `foldableSection` now — one call,
+    // for the type, exactly where the private one was.
+    //
+    // COUNTED ON THE CALL, for the reason the old assertion gave: the paragraphs
+    // around it still name what went, and a substring count would read those.
+    expect(code()).not.toContain("makeFoldable(");
+    const calls = code().match(/foldableSection\(/g) ?? [];
     expect(calls.length).toBe(1);
+    // The wrapper the fold marks IS the card, which is what lets the stylesheet
+    // stop naming a third fold — `.ca-jjs-type` is added to it rather than
+    // wrapped around it.
+    expect(code()).toContain('section.addClass("ca-jjs-type")');
     // Comments stripped: two paragraphs record that a subject used to fold and
     // why the selector for it is deliberately absent, and that account is worth
     // more than the assertion's convenience.
@@ -1120,14 +1135,21 @@ describe("the journals banner is the last band to lose its wash", () => {
     // The base rule is untouched, which is what keeps this scoped. Matched as text
     // rather than through `cssRule`, because that selector is written across two
     // lines in the source and the helper compares a selector string exactly.
+    //
+    // ANCHORED ON THE WHOLE SELECTOR AS OF 5.10. The `:not(untitled)` prefix
+    // alone is no longer unique — `--ca-sec-bar-h`'s min-height rule shares it,
+    // deliberately, because it is the same exception about the same bar — so an
+    // `indexOf` on the prefix found whichever came first in the file.
     const css = readCss();
-    const baseAt = css.indexOf(".ca-journal-sec-l1:not(.ca-journal-header-bar-untitled)");
+    const STRIP =
+      ".ca-journal-sec-l1:not(.ca-journal-header-bar-untitled)\n  > .ca-journal-header-widgets.ca-journal-widget-bar";
+    const baseAt = css.indexOf(STRIP);
     expect(baseAt, "the level-1 strip rule was renamed").toBeGreaterThan(0);
     expect(css.slice(baseAt, css.indexOf("}", baseAt))).toContain("flex: 1 0 100%");
     // SPECIFICITY IS A TIE AND FILENAME ORDER BREAKS IT — four class selectors
     // each — so the override only works because `build-css` concatenates in sorted
     // order and 30 precedes 60. Asserted because a rename would flip it silently.
-    expect(css.indexOf(".ca-journal-sec-l1:not(.ca-journal-header-bar-untitled)")).toBeLessThan(
+    expect(baseAt).toBeLessThan(
       css.indexOf(".ca-jjs-type > .ca-journal-sec > .ca-journal-header-widgets")
     );
   });

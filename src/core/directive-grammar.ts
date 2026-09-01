@@ -415,6 +415,38 @@ export function isTitleLine(line: string): boolean {
   return splitDirective(line).keyword === TITLE_KEYWORD;
 }
 
+// ── AND THE OTHER TWO WAYS A PAGE CARRIES ITS OWN NAME (5.11) ────────────
+//
+// `title:` is the DASHBOARD head. A journal note's is `journal-header` and a
+// diary entry's is `entry-header` — `widget-registry.ts` files all three under
+// the same exclusion and calls them "the strip that makes a note a journal
+// note", "a second banner is a second answer to which note this is". They are
+// three spellings of one fact, and until this release only one of them was
+// asked about.
+//
+// WHAT THAT COST, AND IT WAS REACHABLE BY CLICKING. `cell-move.ts` refuses to
+// move the head, to merge anything into its block, or to insert a block above
+// it — three refusals, all keyed on `isTitleLine`, all silently inapplicable on
+// the two surfaces where the head is a banner instead. `flatBlocks` asks the
+// same question to decide whether a block may be a COLUMN, so a journal note's
+// banner was reported as groupable the moment that model was given rows.
+//
+// A LIST RATHER THAN A THIRD PREDICATE, so the next surface that grows a head
+// adds a word here rather than a branch at each of the four callers.
+export const PAGE_HEAD_KEYWORDS: readonly string[] = [
+  TITLE_KEYWORD,
+  "journal-header",
+  "entry-header",
+];
+
+// Whether this fence body line is the page's own name, on any surface.
+//
+// `isTitleLine`'s NOTE APPLIES UNCHANGED: read with `splitDirective`, exact, and
+// asked only of a line already known to be inside a fence body.
+export function isPageHeadLine(line: string): boolean {
+  return PAGE_HEAD_KEYWORDS.includes(splitDirective(line).keyword);
+}
+
 // ── the banner's other half (4.19) ────────────────────────────────────
 //
 // `links:` HAS BEEN SPELLED AS A STRING LITERAL IN FOUR FILES. `MANAGED_ARGS`
@@ -1233,6 +1265,27 @@ export function soloBar(
   const out = [...lines];
   out.splice(at < 0 ? out.length : at, 0, bar);
   return out;
+}
+
+// The title a section would open with, if it opens with one at all.
+//
+// ── WHY THIS IS ASKED OF THE RENDER (5.10) ──────────────────────────────
+//
+// A section that composes `header:🏷️ Tags` above its widget has DECLARED that
+// title; a note on disk holding the same fence with no bar in it is behind the
+// catalogue rather than deliberately bare. Reading the answer off what the
+// section would compose today means a catalogue entry that gains a bar needs no
+// second edit anywhere — and, more usefully, means a section cannot declare one
+// title and draw another, which a separate field would allow on the first
+// careless copy-paste.
+//
+// TITLED ONLY. An untitled `header:` is a control strip anchored under a real
+// markdown heading (Study, the custom journals); it names nothing, so there is
+// nothing to be missing.
+export function leadingBar(lines: readonly string[]): string | undefined {
+  const first = lines[0]?.trim();
+  if (!first || !isHeaderLine(first)) return undefined;
+  return splitDirective(first).argument.trim() ? first : undefined;
 }
 
 // `soloBar`'s inverse, and the reason remove-then-re-add is still a round trip:

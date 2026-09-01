@@ -149,7 +149,7 @@ export function homeSections(diaryRoot: string): FlatSection[] {
           ...s,
           render: () => ({
             fence: "chronoanvil",
-            lines: ["header:🏷️ Tags", `tag-index:${diaryRoot}`],
+            lines: [TAGS_BAR, `tag-index:${diaryRoot}`],
           }),
         }
       : s
@@ -198,6 +198,12 @@ const HOME_ASIDE = "aside";
 //
 // The logbooks are still composed, on their own folder note, one section per
 // registered book (`logbook-sections.ts`).
+
+// The Tags cloud's title, spelled once. Its render is written twice — the
+// catalogue's bare form below and the folder-filled one in `homeSections` — and
+// a toggle whose bar and whose render disagreed by one character would read the
+// answer off a line it never wrote.
+const TAGS_BAR = `${HEADER_PREFIX}🏷️ Tags`;
 
 const HOME_SECTION_DEFS: FlatSection[] = [
   // THE BANNER, FIRST — and as of 4.19 it is `bannerSection`'s, not a fourth
@@ -656,7 +662,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // the section is readable here beside its siblings.
     render: () => ({
       fence: "chronoanvil",
-      lines: ["header:🏷️ Tags", "tag-index"],
+      lines: [TAGS_BAR, "tag-index"],
     }),
     // AND NOW THE DIALOG CAN REPOINT IT (3.15). The folder is written into the
     // note by `homeSections` and read back out of it by the section editor;
@@ -670,6 +676,21 @@ const HOME_SECTION_DEFS: FlatSection[] = [
         directive: "tag-index",
         hostFolder: spec.hostFolder ?? null,
       },
+      // AND NO FORM TOGGLE, WHICH IS DELIBERATE (5.11). Every other section
+      // composing a `header:` bar over one directive is offered "a section of
+      // its own, or a widget?", and this one reads like the copy that was
+      // missed. It is not. `hasKnownExtent` asks whether a section renders one
+      // line IN EITHER FORM, and a toggle here would make it answer yes for
+      // every Tags block — including one a reader has hand-built into a row
+      // WITH its bar, where the anchor is `tag-index` and cutting that one line
+      // leaves the title standing over nothing. The other toggled sections do
+      // not have this problem because their bar is opt-IN (`SECTION_FORM ?
+      // [bar] : []`) and a cell of theirs is barless already. Offering it here
+      // needs `hasKnownExtent` to ask about the form the FILE is in rather than
+      // the two the catalogue can compose, which is a change to machinery four
+      // catalogues share; until then the refusal in `home-sections.test.ts`
+      // ("refuses a cell whose extent is more than one line") is the one that
+      // stands.
     ],
     // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who repoints the
     // cloud at their own folder still has a section the editor can find.

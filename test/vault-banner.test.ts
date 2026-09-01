@@ -1083,8 +1083,13 @@ describe("what the Banner section became", () => {
     expect(t).toContain(
       'if (pageHead) pageHead.insertAdjacentElement("afterend", strip);'
     );
+    // AND THE JOURNAL NOTE'S OWN FACTS STRIP, which is the same rule on the
+    // other surface. Between 5.8 and 5.10 this line read `trackerHead` — a
+    // private fold bar that had displaced `buildJournalContext` from the spot.
+    // The bar is the section's now (`header:📊 Trackers`), and what prepends
+    // here is the level-and-kind strip again.
     expect(t).toContain(
-      'if (pageHead) pageHead.insertAdjacentElement("afterend", trackerHead);'
+      'if (pageHead) pageHead.insertAdjacentElement("afterend", facts);'
     );
   });
 

@@ -58,7 +58,7 @@ import {
   isRowLine,
   isSectionFence,
   isTabLine,
-  isTitleLine,
+  isPageHeadLine,
   splitDirective,
 } from "./directive-grammar";
 
@@ -848,8 +848,15 @@ export function moveCell(
   //   AS A DESTINATION ABOVE IT — a block inserted at or before the head's index.
   //   `holdPinned` guarantees the same thing on the editor's side, and the two
   //   must not be able to disagree about which end of the page the name is at.
-  const headBlock = at.findIndex((i) => bodyOf(segs[i]).some(isTitleLine));
-  if (run.some(isTitleLine)) return null;
+  //
+  // AND THE HEAD IS A BANNER ON TWO OF THE THREE SURFACES (5.11). This asked
+  // `isTitleLine`, which is the DASHBOARD's head and no part of a journal note
+  // or a diary entry — so all three refusals were silently inapplicable on the
+  // two surfaces whose head is `journal-header` / `entry-header`, and a cell
+  // could be dropped into the block that names the note. `isPageHeadLine` is the
+  // same question asked of all three spellings.
+  const headBlock = at.findIndex((i) => bodyOf(segs[i]).some(isPageHeadLine));
+  if (run.some(isPageHeadLine)) return null;
   if (dst.kind === "block") {
     if (headBlock !== -1 && dst.at <= headBlock) return null;
   } else if (dst.block === headBlock) {

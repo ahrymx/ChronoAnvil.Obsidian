@@ -963,8 +963,14 @@ describe("the landing places, as drawn", () => {
     const src = readSrc("block-drag");
     // UNCONDITIONALLY, which is the whole of what 4.8.5 restored: the call is
     // not inside any `if`, and the only thing 4.9 changed is WHERE the grip
-    // hangs — `foot ?? container`, so a block with no group still gets its own.
-    expect(src).toContain("source(\n    foot ?? container,");
+    // hangs — so a block with no group still gets its own.
+    //
+    // THREE PLACES IT CAN HANG AS OF 5.10, and the middle one is why the
+    // expression is asserted rather than a variable name: the group's foot, the
+    // block's own section bar where it has one, then the block. What this
+    // pins is that the fallback chain still ends at `container`, so there is no
+    // shape of block the grip can miss.
+    expect(src).toContain("foot ?? bar ?? container,");
     expect(rules).not.toContain(".jbd-handle-join");
   });
 });

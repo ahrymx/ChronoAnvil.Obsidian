@@ -55,7 +55,8 @@ import {
 } from "./journal";
 import { getFolder, plural } from "../core/util";
 import { addCardTile, addTile, childRow, folderLink } from "../ui/tables";
-import { sectionFrame } from "../ui/section-frame";
+import { foldableSection, sectionFrame } from "../ui/section-frame";
+import type { FoldStore } from "../ui/section-frame";
 
 // ── Collapse state ───────────────────────────────────────────────────────
 // Shares settings.collapsedNoteSections with headerbar.ts, whose own keys are
@@ -87,49 +88,34 @@ async function setCollapsed(
   await plugin.saveSettings();
 }
 
-// Wire a head element as a fold control for a body element. Returns nothing —
-// the DOM is the state, and the settings write is fire-and-forget (a failed
-// save costs a remembered fold, not correctness).
+// ── THE FOLD IS `foldableSection`'S NOW (5.10) ────────────────────────────
 //
-// ONE CALLER AS OF 4.13.3: a journal type. Subjects folded too until this
-// release turned them into cards, and a card has no stack under it to close up.
-// The function is unchanged and stays general — what it wires is "a head, a
-// body, a key", and the second caller went for a reason about the SUBJECT rather
-// than a reason about folding.
-function makeFoldable(
-  plugin: ChronoAnvilPlugin,
-  section: HTMLElement,
-  head: HTMLElement,
-  key: string
-): void {
-  // THE RIGHT-HAND END, WITH EVERY OTHER HEADER BAR'S (4.13 §1b). `head` is a
-  // `.ca-journal-sec` — the same object the dashboards' section bars are — so a
-  // chevron prepended here put two fold controls on opposite sides of one page:
-  // the Journals section's own bar opening from the right and every group head
-  // inside its card opening from the left. Inserted before the actions rather
-  // than appended, for the reason `headerbar.ts` gives at its own toggle.
-  const chevron = createDiv({ cls: "ca-jjs-toggle" });
-  setIcon(chevron, "chevron-down");
-  const actions = head.querySelector(".ca-journal-header-widgets");
-  if (actions) head.insertBefore(chevron, actions);
-  else head.appendChild(chevron);
-  head.addClass("is-foldable");
-
-  const apply = (collapsed: boolean) =>
-    section.toggleClass("is-collapsed", collapsed);
-  apply(isCollapsed(plugin, key));
-
-  head.addEventListener("click", (evt) => {
-    // Clicks on the row's own controls (buttons, the subject link) act, they
-    // don't fold. Only the bare strip is a fold target — the same rule the
-    // header bars use for their anchored widget group.
-    const target = evt.target as HTMLElement;
-    if (target.closest(".ca-jjs-actions, a")) return;
-    evt.preventDefault();
-    const next = !isCollapsed(plugin, key);
-    apply(next);
-    void setCollapsed(plugin, key, next);
-  });
+// `makeFoldable` stood here: a chevron of its own (`.ca-jjs-toggle`), its own
+// `is-foldable` class, its own click handler with its own exclusion list, and
+// its own `is-collapsed` on `.ca-jjs-type` — which 70-section-surface.css had to
+// name as THE THIRD FOLD, because a rule about "a collapsed section" could not
+// otherwise reach it. Its own comment already conceded the shape: *"the same
+// rule the header bars use for their anchored widget group"*, written beside a
+// second copy of that rule.
+//
+// It predates `foldableSection`, which is the only reason it existed — the
+// shared fold arrived in 4.1 for `frame: section` and nothing came back for
+// this one. What is left is the two things that are genuinely this file's: WHERE
+// the state is kept, and the marker class its own stylesheet reads.
+//
+// `FoldStore` is how a caller keeps its own persistence without the frame
+// importing the plugin — an interface, for the reason section-frame.ts gives:
+// taking `ChronoAnvilPlugin` there would be the import cycle that put a private
+// fold in this file in the first place.
+function foldStore(plugin: ChronoAnvilPlugin): FoldStore {
+  return {
+    isCollapsed: (key) => isCollapsed(plugin, key),
+    // Fire-and-forget, exactly as it was: a failed save costs a remembered
+    // fold, not correctness.
+    setCollapsed: (key, value) => {
+      void setCollapsed(plugin, key, value);
+    },
+  };
 }
 
 // ── Small builders ───────────────────────────────────────────────────────
@@ -386,11 +372,16 @@ function buildGroup(
 
 // ── One journal type (Study, or a custom type) ───────────────────────────
 
+// APPENDS RATHER THAN RETURNS (5.10). `foldableSection` builds its wrapper INTO
+// a host, because a frame that is handed the element its body goes into is the
+// one rule this plugin's sections have. The caller passed the parent already;
+// it now passes it here.
 function buildType(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
+  host: HTMLElement,
   type: JournalType
-): HTMLElement {
+): void {
   const root = getFolder(plugin.app, type.root);
   const tops = journalChildFolders(plugin, type, root);
   const topLevel = type.levels[0];
@@ -398,54 +389,75 @@ function buildType(
   // level itself is not gone — `buildGroup` reads it to name a subject's rows and
   // its empty tile — only this function's use of it.
 
-  const section = createDiv({ cls: "ca-jjs-type" });
-  // THE HUE, ON THE TYPE (4.38). Every card in this group belongs to this
-  // journal, so the tint on their heads is set once here and read from an ancestor
-  // — a card that resolved its own could not be made to disagree with its
-  // siblings, which is the same reason `buildLevelCards` sets it on the grid.
-  // `.ca-jjs-card > .ca-journal-sec` is what reads it.
-  section.style.setProperty("--jjc-hue", String(hueOf(type.id)));
-  // `owns: "children"` — the type's body is the `jjs-type-body` div below,
-  // inside this widget's own DOM. It folds by toggling a class on itself
-  // (makeFoldable), not by walking the note's blocks, so it must not carry the
-  // fold walk's marker. See section-frame.ts.
+  // ── ONE FOLD, AND IT IS THE SHARED ONE (5.10) ─────────────────────────
+  //
+  // A journal is a titled thing that folds its own children, which is what
+  // `foldableSection` builds — the bar, the body, the chevron at the right-hand
+  // end, the click handler that lets a control act instead of folding, and the
+  // `is-collapsed` the stylesheet's fold rules already close. This file wrote
+  // all five of those itself until now.
+  //
+  // `.ca-jjs-type` MOVES ONTO THE WRAPPER rather than staying a wrapper of its
+  // own. It is the card — the ground, the border, the clipped corners, the hue
+  // its subject cards read from an ancestor — and the element the fold marks has
+  // to be the element the card is, or a collapsed journal would draw a card
+  // around a hidden body. One element wearing both is what lets 70-section-
+  // surface.css stop naming a third fold.
+  //
+  // `owns: "children"` is not passed and cannot be: `foldableSection` sets it.
+  // The type's body is its own div, inside this widget's DOM, so the bar must
+  // not carry the fold walk's marker or an enclosing dashboard would read its
+  // level off a descendant. See section-frame.ts.
+  //
   // NO COUNT HERE EITHER (4.13.2 §2) — "1 subject" over a list of one subject.
   // See the same removal on the group bar below; the two went together because
   // they were one habit rather than two decisions.
-  const frame = sectionFrame(section, {
-    title: type.name,
-    glyph: type.emoji,
-    level: 1,
-    owns: "children",
-    // ── THE TITLE OPENS THE JOURNAL (4.42) ──────────────────────────────
-    //
-    // The head named the journal and went nowhere, while every card BELOW it has
-    // been a link to its own folder note since 4.13.3. So the page's shallowest
-    // object was the only one you could not enter, and the way in was the file
-    // explorer.
-    //
-    // `folderLink` RATHER THAN AN ANCHOR WRITTEN HERE, and the reason is one
-    // line in it: a card's head is a fold target, so the link stops propagation
-    // as well as preventing the default — *"a click that opened the subject and
-    // ALSO folded its journal would do two things for one press"*. That is
-    // exactly this bar's situation one rank up, and a second implementation is
-    // one that will be missing that line.
-    //
-    // THE TITLE ONLY. The glyph, the empty span past the name and the chevron all
-    // still fold, which is the same division the subject cards already use — so
-    // the gesture means the same thing at both ranks rather than inverting
-    // between them.
-    //
-    // A JOURNAL WHOSE FOLDER NOTE IS NOT THERE stays plain text: `folderLink`
-    // draws `is-orphan` instead of a dead link, which is the rule a container row
-    // has followed since it was written — *"a folder with no index note of its
-    // own is still a row; it just has nothing to open"*.
-    titleRender: root
-      ? (slot) =>
-          folderLink(plugin, slot, root, ctx.sourcePath, "ca-jjs-type-name", type.name)
-      : undefined,
-  });
-  const head = frame.root;
+  const fold = foldableSection(
+    host,
+    {
+      title: type.name,
+      glyph: type.emoji,
+      level: 1,
+      // ── THE TITLE OPENS THE JOURNAL (4.42) ──────────────────────────────
+      //
+      // The head named the journal and went nowhere, while every card BELOW it has
+      // been a link to its own folder note since 4.13.3. So the page's shallowest
+      // object was the only one you could not enter, and the way in was the file
+      // explorer.
+      //
+      // `folderLink` RATHER THAN AN ANCHOR WRITTEN HERE, and the reason is one
+      // line in it: a card's head is a fold target, so the link stops propagation
+      // as well as preventing the default — *"a click that opened the subject and
+      // ALSO folded its journal would do two things for one press"*. That is
+      // exactly this bar's situation one rank up, and a second implementation is
+      // one that will be missing that line.
+      //
+      // THE TITLE ONLY. The glyph, the empty span past the name and the chevron all
+      // still fold, which is the same division the subject cards already use — so
+      // the gesture means the same thing at both ranks rather than inverting
+      // between them.
+      //
+      // A JOURNAL WHOSE FOLDER NOTE IS NOT THERE stays plain text: `folderLink`
+      // draws `is-orphan` instead of a dead link, which is the rule a container row
+      // has followed since it was written — *"a folder with no index note of its
+      // own is still a row; it just has nothing to open"*.
+      titleRender: root
+        ? (slot) =>
+            folderLink(plugin, slot, root, ctx.sourcePath, "ca-jjs-type-name", type.name)
+        : undefined,
+    },
+    foldStore(plugin),
+    foldKey(ctx.sourcePath, type.id)
+  );
+  const frame = fold.frame;
+  const section = fold.wrapper;
+  section.addClass("ca-jjs-type");
+  // THE HUE, ON THE TYPE (4.38). Every card in this group belongs to this
+  // journal, so the tint on their heads is set once here and read from an
+  // ancestor — a card that resolved its own could not be made to disagree with
+  // its siblings, which is the same reason `buildLevelCards` sets it on the
+  // grid. `.ca-jjs-card > .ca-journal-sec` is what reads it.
+  section.style.setProperty("--jjc-hue", String(hueOf(type.id)));
 
   // `+ Subject` / `+ Topic`, not `+ New Subject` / `New Topic`.
   //
@@ -515,9 +527,13 @@ function buildType(
   // 30-header-bars.css that hides an unused slot.
   if (specs.length > 0) addButtons(frame.actions, specs);
 
-  makeFoldable(plugin, section, head, foldKey(ctx.sourcePath, type.id));
-
-  const body = section.createDiv({ cls: "ca-jjs-type-body" });
+  // THE FOLD'S OWN BODY, WEARING THIS FILE'S CLASS. `.ca-jjs-type-body` carries
+  // the padding that lines the grid up with a subject card's rows; the fold's
+  // body is what `is-collapsed` hides. Two divs would mean two answers to "what
+  // does a collapsed journal hide", and the second one is always the one that
+  // is out of date.
+  const body = fold.body;
+  body.addClass("ca-jjs-type-body");
 
   if (tops.length === 0) {
     // ── THE TILE IS THE EMPTY STATE (4.39.1) ────────────────────────────
@@ -541,7 +557,7 @@ function buildType(
       body
         .createDiv({ cls: "ca-jjs-grid" })
         .appendChild(addCardTile(plugin, type, root, topLevel.noun));
-      return section;
+      return;
     }
     // NO FOLDER, NO TILE, SO THE WORDS STAY. `getFolder` returns null for a
     // registered journal whose root has not been created yet — a preset enabled
@@ -563,7 +579,7 @@ function buildType(
       cls: "ca-jjs-empty-body",
       text: `${plural(topLevel.noun)} appear here automatically.`,
     });
-    return section;
+    return;
   }
 
   // A GRID, NOT A STACK (4.13.3). The subjects were bars laid one under another
@@ -590,7 +606,6 @@ function buildType(
   // made MORE empty tracks, not fewer — the gap is a card count, and the only thing
   // that fills a trailing gap honestly is the control that adds the next card.
   if (root) grid.appendChild(addCardTile(plugin, type, root, topLevel.noun));
-  return section;
 }
 
 // ── The section ──────────────────────────────────────────────────────────
@@ -657,7 +672,7 @@ export function buildJournalsSection(
     })
   );
 
-  for (const type of types) list.appendChild(buildType(plugin, ctx, type));
+  for (const type of types) buildType(plugin, ctx, list, type);
   root.appendChild(list);
 
   return root;

@@ -33,6 +33,7 @@
   --ca-sec-pad-x: 12px;
   padding: 0 var(--ca-sec-pad-x);
   display: flow-root;
+  position: relative;
   /* THE EDGE IS THREE-SIDED, and that is not fussiness. A section is a RUN of
      blocks, so a border on each of them draws a hairline between every pair —
      the stripes this release has already produced twice, in a new costume. The
@@ -335,46 +336,35 @@
  * hard-code `.ca-journal-header-widgets` so a click on a control does not fold the
  * section; a hidden element is not clicked, so that guard is untouched and stays
  * exactly as load-bearing as it was for the open case. */
-.ca-journal-sec-fold.is-collapsed > .ca-journal-sec > .ca-journal-header-widgets {
-  display: none;
-}
-/* The `header:` half of the pair. UNSCOPED BY THE CARD, unlike the
-   `border-bottom` rule further up this file: a bar that folds outside a section
-   surface — under a real markdown heading, or in a fence with no card — folds
-   the same way, and there is no version of "closed" where a strip belongs. The
-   untitled variant has no strip to hide (30-header-bars.css excludes it), so it
-   is not named here either. */
+/* ONE RULE, ONE TREATMENT, TWO SELECTORS (5.10). This was a pair of rules with
+   a paragraph each, and the pair became a trio the moment a third fold appeared
+   — which is how a collapsed journal kept showing `+ Subject` for two releases.
+   A fold that is added and forgets to join a LIST is a missing selector on a
+   rule that is visibly about all of them; a fold that forgets to copy a whole
+   rule leaves nothing to notice.
+
+   BOTH ARE UNSCOPED BY THE CARD, unlike the `border-bottom` rule further up
+   this file: a bar that folds outside a section surface — under a real markdown
+   heading, or in a fence with no card — folds the same way, and there is no
+   version of "closed" where a strip belongs. The untitled variant has no strip
+   to hide (30-header-bars.css excludes it), so it is not named here either. */
+.ca-journal-sec-fold.is-collapsed > .ca-journal-sec > .ca-journal-header-widgets,
 .ca-journal-sec-l1.ca-journal-header-bar.is-collapsed > .ca-journal-header-widgets {
   display: none;
 }
-/* AND THE THIRD FOLD, WHICH 4.13.1 COULD NOT SEE (4.13.2 §4).
+/* AND THERE IS NO THIRD FOLD ANY MORE (5.10).
  *
- * The pair above was written as "two rules because there are two folds". There
- * are three. The Journals card rolls its own: `journals-section.ts::makeFoldable`
- * toggles `is-collapsed` on `.ca-jjs-type` / `.jjs-group`, and the bar inside them
- * is built with `owns: "children"`, which withholds `.ca-journal-header-bar` — so
- * it matches neither selector, and a collapsed journal went on showing
- * `+ Subject` and `+ Topic` while every other collapsed section on the page had
- * stopped showing anything.
+ * A rule stood here for one: `.ca-jjs-type.is-collapsed > .ca-journal-sec >
+ * .ca-journal-header-widgets`, because `journals-section.ts::makeFoldable`
+ * marked its own element and matched neither selector above, and a collapsed
+ * journal went on showing `+ Subject` while every other collapsed section had
+ * stopped. Its own comment closed with *"if a subject ever folds again, this is
+ * the line it joins"* — an invitation to a fourth.
  *
- * That is not a third mechanism anybody chose; `section-frame.ts` explains why
- * this one exists — an inner section folds its own CHILDREN and must not carry
- * the marker HeaderBar's block walk looks for, or an enclosing dashboard would
- * read its fold level off a descendant. The cost is that a rule about "a
- * collapsed section" has to name all three, which is what this file now does.
- *
- * `.jjs-group` IS DELIBERATELY NOT NAMED, and it was written in and taken out
- * once already. In 4.13.2 it would have matched nothing because a subject that
- * had a create button never folded and a subject that folded had an empty slot
- * `:empty` already hides. As of 4.13.3 it cannot match at all: a subject is a
- * card, `makeFoldable` is not called for one, and there is no stack under a card
- * for a chevron to close. A rule that cannot fire is indistinguishable from a
- * decision that was made — the fault 4.13 §3 caught in this same file.
- *
- * If a subject ever folds again, this is the line it joins. */
-.ca-jjs-type.is-collapsed > .ca-journal-sec > .ca-journal-header-widgets {
-  display: none;
-}
+ * `makeFoldable` is gone. A journal type is `foldableSection` like every other
+ * children-owning section, `.ca-jjs-type` is worn BY the fold wrapper rather
+ * than by an element around it, and the first rule of the pair above reaches it
+ * unchanged. TWO FOLDS AND TWO RULES, which is what 4.13.1 thought it had. */
 /* The content gives up the spacing at the surface's edges, because the surface
    decides it — `.ca-journal-sec-block > :first-child` says the same thing about
    the other kind of section. */

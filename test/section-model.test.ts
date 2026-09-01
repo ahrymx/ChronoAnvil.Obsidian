@@ -351,13 +351,43 @@ describe("the editor cannot learn which surface it is on", () => {
     // was and the questions live in `stats-band.ts` for the band's own menu to
     // write through. `emptyLabel` and the corrected `questionIsRequired` stay:
     // they are the shared model's, and `folder` and `title` questions use them.
+    // AND FIVE MORE ROWS ON THE JOURNAL SURFACES IN 5.11, WHICH ARE DERIVED
+    // RATHER THAN DECLARED. `questionsOf` asks each journal section what it
+    // renders and adds the `form` toggle to every one that is a single fence
+    // titled by its own bar with nothing anchored INTO that bar. Eight sections
+    // qualify — `trackers`, `stats`, `find`, `review`, `tasks`, `progress`,
+    // `tally` and `tags` — so those can be drawn as widgets; `children`, `pages`
+    // and `charts` cannot, because each hosts its Add control IN the bar and
+    // that control has nowhere to go once the bar does, and `banner` composes
+    // no bar at all.
+    //
+    // `trackers` IS THE ONE THE RULE WAS RESTATED FOR. It was out while the
+    // rule also refused a fence owning a managed region; the reader's rule is
+    // the action row and nothing else, and the grid's "+ Add tracker" is a TILE
+    // IN THE GRID rather than a button in the bar, so it travels with the
+    // widget wherever the widget goes.
+    //
+    // ONLY FIVE OF THE EIGHT ARE NEW ROWS HERE. `find`, `review`, `tasks` and
+    // `tags` already asked a `folder` question, so they were on this list
+    // before the toggle existed and gained a second question rather than a
+    // first.
+    //
+    // THE LIST IS STILL EXACT, and it is the reason this test earns its keep
+    // twice over now: a derivation that quietly widened would show up here as a
+    // section that started asking, and one that quietly narrowed as a section
+    // that stopped.
     expect(asking).toEqual([
+      "journal index/trackers",
+      "journal index/stats",
       "journal index/find",
       "journal index/review",
       "journal index/tasks",
+      "journal index/progress",
+      "journal index/tally",
       "journal index/tags",
       "journal index/path",
       "journal index/resources",
+      "journal leaf/trackers",
       "journal leaf/resources",
       // A SIXTH KIND IN 5.6, AND THE FIRST WHOSE ANSWER IS NOT A DIRECTIVE'S
       // ARGUMENT AT ALL. `lines` asks for the note's opening headings, which

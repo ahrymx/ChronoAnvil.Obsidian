@@ -1522,11 +1522,13 @@ export class SectionEditorModal extends EditorModal {
   // sides, for the reason the folder box's placeholder states its default: a
   // control that describes its own effect needs no legend.
   //
-  // THE SENTENCE UNDER IT IS THE POINT, not decoration. "So it can sit in a row
-  // beside another block" is the only reason a reader would want this, and it is
-  // not guessable from a bar disappearing — `isSectionFence` refuses a fence
-  // that titles itself as a column of a group, and nothing in this window would
-  // otherwise say so.
+  // AND THE LABEL IS THREE WORDS (5.11). It read "Show as a widget, so it can
+  // sit in a row", on the argument that the clause was the only reason a reader
+  // would want this and was not guessable from a bar disappearing. Sitting in
+  // a row of eight sections it was a paragraph where the three questions beside
+  // it are a phrase, and the reader asked for it to stop being one. The reason
+  // it stated is now the row's own — a group can be made in this window, so a
+  // reader who wants one meets the answer there.
   private renderFormQuestion(
     host: HTMLElement,
     section: SectionView,

@@ -1582,11 +1582,26 @@ export function attachBlockHead(
   // nobody can re-derive. A control that has somewhere of its own to be does not
   // need an exception.
   //
-  // AND THE BOX IS WHAT DIMS, not the strip: see `source`'s `dim`.
+  // AND ON THE SECTION BAR WHERE THE BLOCK HAS ONE (5.10). A bar is the block's
+  // own top edge in exactly the sense the foot is the group's, so a grip there
+  // collides with nothing inside the section and does not float above the card.
+  //
+  // ONE LOOKUP, INSIDE `container`, and the second one this replaced is worth
+  // naming: it asked `container.parentElement` first, because for three
+  // releases the bar was appended to the BLOCK instead of into `container` and
+  // could not be found from here. That shape is gone — see `chart-grid.ts` —
+  // and a handle that can anchor onto a sibling of the block it drags is a
+  // control that outlives its own subject.
+  //
+  // AND THE BOX IS WHAT DIMS, not the strip and not the bar: see `source`'s
+  // `dim`. Dimming a title while its body stays lit says the title is moving.
   const box = container.querySelector<HTMLElement>(`.${GROUP_CLASS}`);
   const foot = box?.querySelector<HTMLElement>(`.${GROUP_FOOT_CLASS}`) ?? null;
+  const bar = container.querySelector<HTMLElement>(
+    ":scope > .ca-journal-header-bar"
+  );
   source(
-    foot ?? container,
+    foot ?? bar ?? container,
     foot ? "Drag to move this group" : "Drag to move this block",
     true,
     () => {

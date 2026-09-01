@@ -482,7 +482,10 @@ export function buildJournalTallyRegion(
   plugin: ChronoAnvilPlugin,
   rest: string,
   label: string | null,
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext,
+  // Whether the fence this sits in already carries a name — a titled `header:`
+  // bar, or `frame: section`. See `buildJournalTally` for what it decides.
+  titled = false
 ): HTMLElement | null {
   // `journal-tally:<tracker>[|Label]` — `journal-breakdown`'s grammar, and
   // the same folder rule: scope is the host note's own folder, so an Area
@@ -492,7 +495,7 @@ export function buildJournalTallyRegion(
   const file = fileOfCtx(plugin, ctx);
   if (!file?.parent) return null;
   return liveScopedWidget(plugin, ctx, file.parent.path, () =>
-    buildJournalTally(plugin, ctx, rest.trim(), label)
+    buildJournalTally(plugin, ctx, rest.trim(), label, titled)
   );
 }
 
