@@ -135,7 +135,6 @@ export function buildAllLogbooks(
     file: null,
     modifier: "journal-note--logbook-all",
     label: null,
-    collapsible: false,
     startCollapsed: () => false,
     onFold: () => {},
     emptyText: "No items across any logbook yet.",
@@ -264,7 +263,6 @@ function buildRegionLogbook(
     // its own note and dropped under one anywhere else, and that bar already
     // folds — a second label inside it would be the name twice.
     label: null,
-    collapsible: false,
     startCollapsed: () => false,
     onFold: () => {},
     emptyText: def.blurb

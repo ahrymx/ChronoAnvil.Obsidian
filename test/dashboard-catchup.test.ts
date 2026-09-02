@@ -37,7 +37,8 @@ const ctx = () => sectionContext(STUDY_JOURNAL, { depth: 1 });
 // rather than by hand, so it cannot drift from what the catalogue composes.
 function staleTopicIndex(): string {
   const lines = studyTemplate("topic-index.md").split("\n");
-  const from = lines.findIndex((l) => l.trim() === "header:🛠️ Practice");
+  // `header:2:` SINCE 5.12: a kind's head is a group inside the section's bar.
+  const from = lines.findIndex((l) => l.trim() === "header:2:🛠️ Practice");
   expect(from).toBeGreaterThan(-1);
   // Three lines per kind — header, button, table — which is what the fence
   // carries and therefore what a dashboard written before the kind lacks.
@@ -107,7 +108,7 @@ describe("what applying it writes", () => {
   it("adds the kind's header and button with it", () => {
     // A table with no header above it and no "new Practice" button beside it
     // would be half a section, which is what the fence carries per kind.
-    expect(after!).toContain("header:🛠️ Practice");
+    expect(after!).toContain("header:2:🛠️ Practice");
     expect(after!).toContain("button:study:new-practice");
   });
 
@@ -126,7 +127,7 @@ describe("what applying it writes", () => {
     // The failure `extend` exists to avoid: before 3.18 the planner could only
     // say `add`, which appends a duplicate fence beside the short one.
     expect(after!.split("kind-table:lesson").length - 1).toBe(1);
-    expect(after!.split("header:📖 Lessons").length - 1).toBe(1);
+    expect(after!.split("header:2:📖 Lessons").length - 1).toBe(1);
   });
 
   it("restores the file the catalogue would have composed", () => {

@@ -90,7 +90,7 @@ import {
   DIVIDER_INDEX_ATTR,
   GROUP_CLASS,
   GROUP_DIVIDER_CLASS,
-  GROUP_FOOT_CLASS,
+  GROUP_HEAD_CLASS,
   ROW_CELL_CLASS,
   ROW_CLASS,
   ROW_CLOSED_CLASS,
@@ -1557,6 +1557,108 @@ export function attachBlockHead(
     }
   }
 
+  // ── AND EVERY WIDGET IN A BARE FENCE (5.14) ───────────────────────────
+  //
+  // WHAT A READER SAW. A diary entry composes three fences — the banner, the
+  // tracker grid, and one SHARED fence holding Focus, Highlights, Challenges,
+  // Notes, Attachments, Tasks and Captured. Those seven now draw as seven
+  // cards, so the page reads as seven sections; the block's single grip sits on
+  // the top edge of the block, which is the top edge of the FIRST card, and the
+  // other six have nothing. Reported as *"only trackers and today's focus have
+  // the grabbers"*, which is exactly right and describes the grip lying about
+  // its own scope as much as it describes six missing ones.
+  //
+  // THE GRAMMAR IS THE ROW'S, MINUS THE COLUMNS. A widget in a cell has had
+  // five places since 4.8.6 — a column before it, a column after it, above it,
+  // below it, and a swap. Two of those are about COLUMNS and a bare fence has
+  // none; the swap is a third gesture on a surface that is asking for one. So a
+  // loose widget gets the two that stack, `moveCell`'s `stack` target with the
+  // block index on both ends, which is a reorder inside the fence and is the
+  // one thing the reader asked for.
+  //
+  // ITS TWO RANGES ARE THE SAME RUN, verbatim from the cell loop above and for
+  // the same reason: a widget dragged to a block of its own takes exactly what
+  // it took past its neighbour. `runWithHeight` so a `height:` line travels
+  // with the widget it sizes rather than staying behind to size whatever moves
+  // up into its place.
+  //
+  // ── AND THE THREE CONDITIONS, EACH OF WHICH IS A REFUSAL ──────────────
+  //
+  // NOT A ROW. Its cells already draw all five places per widget, and the essay
+  // above says why two kinds of slot may not overlap: a cell is a
+  // `container-type` and therefore a stacking context, so these would be sealed
+  // inside it and lose every drop to the cell's own.
+  //
+  // NOT A SECTION. `section` is the dispatcher's answer to "does this fence
+  // draw its own chrome" — a `header:` line or `frame: section`. Such a fence
+  // is a SECTION and its lines are that section's body: a `header:2:` group
+  // head over a table, a bar over the widgets it names. Reordering those
+  // against each other by dragging produces a table above the head that names
+  // it, which is a question the Section Editor asks properly and a gesture
+  // cannot. It is also what keeps the bar out of this loop — the bar is a
+  // stamped child too, and a fence's own title is not one of its widgets.
+  //
+  // MORE THAN ONE. A fence holding a single widget already has a grip that
+  // means that widget, on the block, and there is nowhere inside it to reorder
+  // to. Drawing a second one over the first is 4.8.6's duplicate.
+  //
+  // AND NOT THE WIDGET BAR, WHICH IS THE ONE CHILD THAT IS NOT ONE DIRECTIVE.
+  // `stampLines` stamps every direct child with the line of the last directive
+  // whose render reached it, and the inline kinds — `tracker:`, `sleep:`,
+  // `slider:`, `button:` and the rest — all land in ONE `.ca-journal-widget-bar`
+  // together. So the bar carries the line of the FIRST of them, and a drag
+  // reading that stamp would pick up one directive and move it out from under
+  // the nine still drawn inside the element the reader is holding. An entry's
+  // tracker grid is exactly this: one bar, one stamp, ten cells.
+  //
+  // THE BAR IS THE ONLY SUCH CHILD — everything else here is appended to the
+  // container one directive at a time — so this is a named exception rather
+  // than a rule, and it is stated as the class it is rather than as a count,
+  // because the count is what `stampLines` cannot tell us.
+  const loose =
+    row || section
+      ? []
+      : Array.from(container.children).filter(
+          (c): c is HTMLElement =>
+            c instanceof HTMLElement &&
+            lineOf(c) !== null &&
+            !c.hasClass("ca-journal-widget-bar")
+        );
+  if (loose.length > 1) {
+    for (const child of loose) {
+      const line = lineOf(child);
+      if (line === null) continue;
+      const at = (): { from: number; to: number } => {
+        const body = bodyNow();
+        return body ? runWithHeight(body, line) : { from: line, to: line + 1 };
+      };
+      source(child, "Drag to move this widget", false, () => {
+        const run = at();
+        return { whole: run, cell: run };
+      });
+      slot(child, "ca-jbd-slot-over", CELL_TYPE, (p) => p.cell, () => {
+        const i = indexNow();
+        return i === null
+          ? null
+          : { kind: "stack", block: i, at: line, after: false };
+      });
+      slot(child, "ca-jbd-slot-under", CELL_TYPE, (p) => p.cell, () => {
+        const i = indexNow();
+        return i === null
+          ? null
+          : { kind: "stack", block: i, at: line, after: true };
+      });
+    }
+    // AND THE BLOCK'S OWN GRIP STEPS ASIDE, which is 4.8.6's collision arriving
+    // in the one place 5.14 did not close it. The note below this records
+    // `jbd-aside` being deleted because a group has a head to put its grip on;
+    // a bare fence has no head and no bar, so its grip lands on the container's
+    // top edge — the same two coordinates as the FIRST widget's. The stylesheet
+    // takes it off the centre line when this class is present, and only then:
+    // a block with one widget draws no widget grip and keeps the centre.
+    container.addClass("has-widget-grips");
+  }
+
   // AND THE BLOCK ITSELF, ALWAYS. 4.8.5.
   //
   // Its whole body when it lands as a block — modifiers, delimiters and all,
@@ -1566,7 +1668,8 @@ export function attachBlockHead(
   // it; `widgetRun` is that rule, and it says null for a block holding two
   // widgets, which is what withholds `CELL_TYPE` and with it every column slot
   // on the page.
-  // AND ITS GRIP LIVES IN THE GROUP'S FOOT, WHERE THERE IS ONE (4.9 §2.2).
+  // AND ITS GRIP LIVES ON THE GROUP'S HEAD, WHERE THERE IS ONE (5.14; 4.9 §2.2
+  // for the half of this that has not changed).
   //
   // WHAT THIS REPLACES, AND WHY THAT IS A DELETION RATHER THAN A MOVE. Every
   // grip is centred over the top edge of the thing it drags, which on a row of
@@ -1575,12 +1678,25 @@ export function attachBlockHead(
   // one duplicated. 4.8.6 shoved the block's to the left with `jbd-aside`: a
   // class whose entire content was "get out of the way of grips I cannot see".
   //
-  // The foot is not a better place to hide it. It is the group's OWN edge — the
-  // one strip on the box that belongs to the box rather than to anything in it
-  // — so the collision cannot happen from there, and `jbd-aside` goes with the
+  // The strip is not a better place to hide it. It is the group's OWN edge — a
+  // band on the box that belongs to the box rather than to anything in it — so
+  // the collision cannot happen from there, and `jbd-aside` goes with the
   // problem it was working around rather than being carried forward as a rule
   // nobody can re-derive. A control that has somewhere of its own to be does not
   // need an exception.
+  //
+  // AND IN 5.14 THAT EDGE IS THE TOP ONE. 4.9 put it at the bottom because the
+  // group had no top edge to put it on — every card drew its own head there and
+  // a strip across them would have been a title above a row of titles. The
+  // group has a head now (row.ts), so the grip goes where a grip goes: centred
+  // over the top edge of the thing it drags, which is what every other grip on
+  // the page does and what `jbd-aside` was an exception to.
+  //
+  // THE COLLISION STILL DOES NOT COME BACK, and the reason is that the head is
+  // a STRIP ABOVE the cards rather than a line across them. A card's own grip
+  // hangs 4px inside its top edge; the block's now hangs 4px inside the head's,
+  // which is a band's height further up. They can share an x and cannot share a
+  // place.
   //
   // AND ON THE SECTION BAR WHERE THE BLOCK HAS ONE (5.10). A bar is the block's
   // own top edge in exactly the sense the foot is the group's, so a grip there
@@ -1596,13 +1712,13 @@ export function attachBlockHead(
   // AND THE BOX IS WHAT DIMS, not the strip and not the bar: see `source`'s
   // `dim`. Dimming a title while its body stays lit says the title is moving.
   const box = container.querySelector<HTMLElement>(`.${GROUP_CLASS}`);
-  const foot = box?.querySelector<HTMLElement>(`.${GROUP_FOOT_CLASS}`) ?? null;
+  const head = box?.querySelector<HTMLElement>(`.${GROUP_HEAD_CLASS}`) ?? null;
   const bar = container.querySelector<HTMLElement>(
     ":scope > .ca-journal-header-bar"
   );
   source(
-    foot ?? bar ?? container,
-    foot ? "Drag to move this group" : "Drag to move this block",
+    head ?? bar ?? container,
+    head ? "Drag to move this group" : "Drag to move this block",
     true,
     () => {
       const body = bodyNow();

@@ -114,6 +114,10 @@ const chartLinesIn = (text: string): number =>
 // over a task table as well. `review` opens the row and composes it.
 const DUE_ROW = "due";
 const DUE_BAR = "header:🔁 Due and open";
+// The title the second cell takes back when it leaves that row — named here
+// rather than written twice, because `bar` and the toggle's `bar` must be the
+// same string: `dropSoloBar` matches it exactly.
+const OPEN_TASKS_BAR = "header:⏳ Open tasks";
 
 export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
   // THE BANNER, FIRST. 4.10 gave this page a head; 4.19 made the head a banner
@@ -239,14 +243,28 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
         directive: "tasks-table",
         hostFolder: spec.hostFolder ?? null,
       },
+      formQuestion(OPEN_TASKS_BAR, HEADER_KEYWORD),
     ],
-    // SECOND CELL OF THE DUE-AND-OPEN ROW (4.70), SO NO BAR AND NO TOGGLE FOR
-    // ONE — the queue beside it composes the single title this fence gets.
+    // SECOND CELL OF THE DUE-AND-OPEN ROW (4.70), SO IT COMPOSES NO BAR — the
+    // queue beside it carries the single title this fence gets.
     row: DUE_ROW,
     // AND ITS OWN TITLE BACK IF THE QUEUE IS NOT THERE — see `soloBar`. Review
     // above is `locked: false`, so the row this cell is barless for can lose the
     // cell that titles it.
-    bar: "header:⏳ Open tasks",
+    // AND THE TOGGLE THAT TAKES IT OFF AGAIN (5.14). The rule is the one 5.12
+    // stated for journal sections and did not carry here: a section is offered
+    // **how this is drawn** unless something of its own is anchored INTO its
+    // title bar, and nothing is anchored into this one. It was missed because a
+    // second cell composes no bar, so it read as a section that had never had a
+    // title rather than one that could take its title off — but `bar` above is
+    // that title, and a reader who wants this drawn as a bare widget on a page
+    // where it stands alone had no way to say so.
+    //
+    // NO GUARD FOR THE ROW ITSELF: `renderFormQuestion` draws the box checked
+    // and disabled for a cell in a group — *"Widgets in a group are
+    // automatically drawn as widgets"* — so the answer cannot be given from
+    // inside the band whose bar belongs to the cell beside it.
+    bar: OPEN_TASKS_BAR,
     render: () => ({ fence: "chronoanvil", lines: ["tasks-table"] }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },

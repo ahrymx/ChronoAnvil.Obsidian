@@ -415,6 +415,22 @@ const ROLLUP_TITLES: Record<string, string> = {
 const rollupBar = (ctx: DiaryDashboardContext): string =>
   `${HEADER_PREFIX}${ROLLUP_TITLES[noun(ctx)] ?? "📖 Inside this period"}`;
 
+// THE OPEN-TASK TABLE'S OWN TITLE, SAID ONCE. It is read by three things that
+// would otherwise each carry a copy: `RowMember.bar`, which `soloBar` splices
+// when the table is standing alone; `FormQuestion.bar`, which `withAnswers`
+// splices when the reader answers *how this is drawn*; and `dropSoloBar`, which
+// takes it back off when the table rejoins its row — and that last one matches
+// the string EXACTLY, so two spellings would leave the borrowed title behind.
+//
+// NOT GRAIN-WORDED, unlike the rollup's beside it. `rollupBar` says "Inside this
+// week" because the rollup opens the band and its bar names the whole of it;
+// this one names the table and nothing else, which is the same on every grain.
+const OPEN_TASKS_BAR = "header:⏳ Open tasks";
+// And the dashboard tag cloud's, which it composes in `render` rather than
+// declaring — one string either way, so the toggle and the line it removes
+// cannot drift apart.
+const TAGS_BAR = "header:🏷️ Tags";
+
 export const DIARY_SECTIONS: DiarySection[] = [
   {
     id: BANNER_ID,
@@ -811,6 +827,37 @@ export const DIARY_SECTIONS: DiarySection[] = [
         directive: "tasks-table",
         hostFolder: ctx.hostFolder ?? null,
       },
+      // ── AND HOW IT IS DRAWN, WHICH IT COULD NOT BE ASKED (5.14) ───────
+      //
+      // 5.12's rule is that a section is offered this unless something in it is
+      // anchored INTO its title bar — Topics has **New Topic** there, Resources
+      // has **Add category**, and those have nowhere to go once the bar does. A
+      // task table anchors nothing: its scope button moved onto the bar in
+      // 3.19.2 and moves back into the table when there is no bar to host it,
+      // which is the case this toggle creates. So it qualifies, and it was
+      // missing anyway.
+      //
+      // WHY IT WAS MISSING. Every other section on this catalogue derives the
+      // toggle from the bar its `render` composes, and this one composes none —
+      // it is the row's SECOND cell, and the rollup beside it writes the single
+      // bar the fence gets. Its title lives in `bar` below instead, the line it
+      // takes back when it is standing alone, and nothing was reading that
+      // field as the answer to this question. A reader who broke the group up
+      // got a section whose row said *Section* and whose page drew a bare card,
+      // with no control anywhere to reconcile the two.
+      //
+      // THE SAME STRING AS `bar`, and that is not a coincidence to be tidied
+      // into a shared constant later: `withAnswers` splices `FormQuestion.bar`
+      // into the fence and `soloBar` splices `RowMember.bar`, so two spellings
+      // would be two titles for one section, each written by a different
+      // gesture. `OPEN_TASKS_BAR` is the one place it is said.
+      //
+      // SAFE WHILE IT IS A CELL, and the editor is what makes it so rather than
+      // a guard here: `renderFormQuestion` draws the box checked and disabled
+      // for a row in a group — *"Widgets in a group are automatically drawn as
+      // widgets"* — so the answer that would strip the band's bar cannot be
+      // given from inside the band.
+      formQuestion(OPEN_TASKS_BAR, HEADER_KEYWORD),
     ],
     id: "open-tasks",
     label: "Open tasks",
@@ -838,7 +885,14 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // cell that titles this band can be unticked and leave the table headless.
     // `soloBar` fills exactly that gap — on a year, where the rollup does not
     // APPLY, it does the same for the same reason.
-    bar: "header:⏳ Open tasks",
+    bar: OPEN_TASKS_BAR,
+    // STILL COMPOSES NO BAR, and that is not an oversight the toggle fixes. In
+    // the row this section is the second cell, and `rowRuns` concatenates what
+    // each member renders — a bar here would be the second full-width strip
+    // over one band that the note above `row` warns about. The title arrives by
+    // the two routes that know the section is ALONE: `soloBar`, when the row
+    // composes with one member or loses one, and `withAnswers`, when the reader
+    // answers this question.
     render: () => ({ fence: "chronoanvil", lines: ["tasks-table:,period"] }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },
@@ -924,6 +978,28 @@ export const DIARY_SECTIONS: DiarySection[] = [
         // and the composed path is what the reader actually finds in the field.
         hostFolder: ctx.hostFolder ?? null,
       },
+      // AND NO FORM TOGGLE, WHICH IS THE HOMEPAGE'S REFUSAL AND ITS REASON —
+      // see the long note on `tags` in `home-sections.ts`, which is the same
+      // section on another surface and states this once.
+      //
+      // WRITTEN, THEN TAKEN BACK OUT (5.14), so the reason is recorded here
+      // rather than rediscovered. The rule this release carried into the diary
+      // catalogues — offered unless something is anchored into the bar — says
+      // yes for this section, and nothing IS anchored into its bar. The
+      // obstacle is one layer down. A toggled section branches its own render
+      // (`opts?.form === WIDGET_FORM ? [] : [BAR]`), which is what makes
+      // `hasKnownExtent` answer yes for it, and a yes here reaches every Tags
+      // block in the vault — including one a reader hand-built into a row WITH
+      // its bar, where the anchor is `tag-index` and cutting the one line the
+      // extent claims leaves their title standing over nothing.
+      //
+      // WHICH IS WHY THE FOUR SECTIONS THIS RELEASE DID TOGGLE ARE SAFE and
+      // this one is not: `open-tasks`, `tags` and `sleep` on the dashboards
+      // render ONE line in both forms and declare their bar in `bar`, so their
+      // extent was already known and the toggle changes nothing about it. This
+      // one renders two. Lifting the refusal needs `hasKnownExtent` to ask
+      // about the form the FILE is in rather than the two the catalogue can
+      // compose, which is machinery four catalogues share.
     ],
     id: "tags",
     label: "Tags",
@@ -944,7 +1020,7 @@ export const DIARY_SECTIONS: DiarySection[] = [
     render: (ctx) => ({
       fence: "chronoanvil",
       lines: [
-        "header:🏷️ Tags",
+        TAGS_BAR,
         `tag-index:${ctx.diaryRoot ?? DEFAULT_PATHS.diaryRoot}`,
       ],
     }),
@@ -1073,6 +1149,25 @@ const asFlat = (s: DiarySection, ctx: DiaryDashboardContext): FlatSection => ({
   blurb: s.blurb,
   icon: s.icon,
   locked: s.locked,
+  // ── AND THE TITLE IT TAKES BACK (5.14) ─────────────────────────────
+  //
+  // `RowMember.bar`, forwarded so `regroupFlatNote` can hand it to `soloBar`
+  // when a cell stops being one. It was left off, and the gap was reachable in
+  // one gesture: **Break up the group** on *Inside this week* moved the open
+  // task table into a fence of its own, the regrouper knew no title for it, and
+  // the page drew a bare card under a row the editor still labelled *Section*.
+  //
+  // THE JOURNAL ADAPTER LEAVES THIS UNANSWERED ON PURPOSE and the two are not
+  // in disagreement — see `journal-plan.ts`, which spells the reason out. There,
+  // the only section that can be a cell is one the READER put in the widget
+  // form, so a title handed back would silently reverse their toggle. Here a
+  // cell is a cell because the CATALOGUE said so: `open-tasks` declares `row`
+  // and composes no bar because the rollup beside it writes the band's, and the
+  // `bar` field is that section's own name for when it is standing alone. There
+  // is a toggle on it now, and `regroupFlatNote` is careful about it — the
+  // title goes back only to a section that has JUST stopped being a cell, never
+  // to one that was already alone and barless, which is where an answer lives.
+  bar: s.bar,
   render: (opts) => s.render(ctx, opts),
   locate: s.locate,
 });
@@ -1719,11 +1814,26 @@ export function planDiarySections(
     const lines: string[] = [];
     for (let i = run.from; i <= run.to; i++) lines.push(...planSegs[i].lines);
     const asks = (only.questions?.(ctx) ?? []).some((q) => q.kind === "form");
-    const bar =
-      only.bar ??
-      (only.row || asks
-        ? undefined
-        : leadingBar(only.render(ctx, optionsFor(requested, only.id)).lines));
+    // ── AND `bar` NO LONGER JUMPS THAT GUARD (5.14) ──────────────────
+    //
+    // `only.bar ?? (only.row || asks ? … )` read the solo title FIRST, so a
+    // section declaring one was repaired whatever it offered. That was harmless
+    // while no section declared both — `open-tasks` was the only `bar` on this
+    // catalogue and it had no questions but a folder. It has the form toggle
+    // now, and the precedence became exactly the overwrite 5.11 is about: a
+    // reader who answered *show as widget* on a lone task table would have been
+    // handed the title back on the next save, every time.
+    //
+    // THE GESTURE THAT USED TO NEED THIS STILL WORKS, and better: breaking a
+    // group up hands the survivor its title in the same write
+    // (`regroupFlatNote`), at the moment the cell stops being a cell, rather
+    // than on the next open of a window the reader may not open.
+    const bar = asks
+      ? undefined
+      : (only.bar ??
+        (only.row
+          ? undefined
+          : leadingBar(only.render(ctx, optionsFor(requested, only.id)).lines)));
     if (!needsSoloBar(lines, bar)) continue;
     barless.set(only.id, bar as string);
   }

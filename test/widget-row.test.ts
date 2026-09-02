@@ -39,7 +39,7 @@ import {
   ROW_CELL_CLASS,
   ROW_CLASS,
 } from "../src/ui/widgets/row";
-import { readCss, readSrc } from "./sources";
+import { readCode, readCss, readSrc } from "./sources";
 
 // A boundary rather than `indexOf`, for the reason frame.test.ts records: a
 // class matched as a substring is a class that cannot be told from a longer one
@@ -668,11 +668,16 @@ describe("the box a group is drawn in — 4.9 §2", () => {
     // is what a page swap pins a height on. The group cannot be that box —
     // its height includes the foot, and sliding the strip the reader is
     // pressing is the whole bug the pin exists to prevent.
+    //
+    // AND A FOURTH THING IN THE BOX SINCE 5.14, above the pages: the head. The
+    // order of the three is the reading order, so it is asserted as an order
+    // rather than as a set.
     const at = src.indexOf("const box = createDiv({ cls: GROUP_CLASS });");
     expect(at).toBeGreaterThan(-1);
-    expect(src.slice(at, at + 700)).toContain(
-      "const pages = box.createDiv({ cls: GROUP_PAGES_CLASS });"
-    );
+    const headAt = src.indexOf("const head = titled ? null : box.createDiv(");
+    const pagesAt = src.indexOf("const pages = box.createDiv({ cls: GROUP_PAGES_CLASS });");
+    expect(headAt).toBeGreaterThan(at);
+    expect(pagesAt).toBeGreaterThan(headAt);
     expect(src).toContain("const row = pages.createDiv({");
   });
 
@@ -717,5 +722,172 @@ describe("the box a group is drawn in — 4.9 §2", () => {
     expect(readCss().replace(/\/\*[\s\S]*?\*\//g, "")).not.toContain(
       ".journal-group-foot-count"
     );
+  });
+});
+
+describe("the head a group draws for itself — 5.14", () => {
+  const src = readSrc("row");
+  const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("names the group by listing the cards in it", () => {
+    // THE REPORT: *"the homepage group has no header, so give it one."* 4.9
+    // gave the box a foot and argued against a bar over the cards — "a title
+    // above a row of titles" — and that argument is about a TITLE. What goes
+    // there is a caption: each card's own name, joined, with no name of its
+    // own invented for the group.
+    //
+    // ` · ` RATHER THAN A COMMA. The parts are peers; a comma would rank them
+    // as a list belonging to something. It is the separator `links.ts` already
+    // uses between the quick links.
+    expect(src).toContain('.join(" · ")');
+    // FROM THE CALLER'S LIST, NOT FROM THE DOM. row.ts has one import on
+    // purpose and `splitGlyph` is not it — see `CellName`.
+    expect(src).toContain("names: readonly CellName[] = []");
+    expect(src).toContain("row.contains(n.el)");
+    const dispatch = readSrc("widgets");
+    expect(dispatch).toContain("splitGlyph(title).text");
+  });
+
+  it("re-derives the caption when a page is swapped", () => {
+    // The head names what is ON SCREEN. A group whose first page is three
+    // tables and whose second is one chart has two different lists, and a
+    // caption that kept the first would be naming a box the reader is no
+    // longer looking at.
+    //
+    // IN `paint`, which is the one place that says which page is showing — the
+    // class, the `aria-selected` and the `tabindex` are already stated there
+    // together for exactly this reason.
+    const at = src.indexOf("const paint = (n: number): void => {");
+    expect(at).toBeGreaterThan(-1);
+    expect(src.slice(at, at + 600)).toContain("retitle(n);");
+  });
+
+  it("draws the strip even when nothing in it can be named", () => {
+    // The head is the box's top edge and the grip's host before it is a
+    // caption. A group of three charts — none of which carries a
+    // `SECTION_TITLES` entry — gets an empty caption and keeps its edge; an
+    // affordance that appeared only on nameable groups would be the harder
+    // thing to learn.
+    //
+    // SO WHAT IT TURNS ON IS `titled` AND NOTHING ELSE — not the caption's
+    // length, not whether any cell could be named. The one ternary is the whole
+    // condition, and `names` appears nowhere in it.
+    const at = src.indexOf("const head = titled ? null : box.createDiv(");
+    expect(at).toBeGreaterThan(-1);
+    const line = src.slice(at, src.indexOf("\n", at));
+    expect(line).not.toContain("names");
+    expect(line).not.toContain("length");
+  });
+
+  it("withholds it where the fence already drew a head — 5.14", () => {
+    // THE REPORT: *"some groups in the default layouts are hardcoded inside a
+    // section frame?"* They are, and deliberately — a `header:` line in a row
+    // fence is drawn once, full width, above the columns, because a bar is a
+    // section's title strip and a row is one section. The shipped catalogue
+    // composes `header:🕒 Lately` INTO the row fence for exactly that reason.
+    //
+    // SO THE CAPTION UNDER IT WAS THE SAME OBJECT TWICE: `LATELY · OPEN TASKS`
+    // directly beneath a bar reading *Lately*, inside a second card. This is
+    // the field rule of 5.14 asked of a row — a head is withheld wherever
+    // something already names the thing — and it reads the same `fenceTitled`
+    // the fields do.
+    expect(src).toContain("titled = false");
+    const dispatch = readSrc("widgets");
+    const at = dispatch.indexOf("layOutRow(");
+    expect(at).toBeGreaterThan(-1);
+    expect(dispatch.slice(at, dispatch.indexOf(");", at))).toContain("fenceTitled");
+    // AND THE GRIP NEEDS NO BRANCH FOR IT. `attachBlockHead` already falls from
+    // the group's head to the block's bar, which is the 5.10 placement.
+    expect(readCode("block-drag")).toContain("head ?? bar ?? container");
+  });
+
+  it("takes the box down with the head, in one place", () => {
+    // NO HEAD, NO BOX — said in the stylesheet only, because the bar brings a
+    // section card with it and a group box inside that is a card in a card.
+    // `:not(:has())` rather than a class: the absence IS the condition, and a
+    // class would be a second way of saying it that could disagree.
+    const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+    const at = rules.indexOf(
+      ".ca-journal-group:not(:has(> .ca-journal-group-head))"
+    );
+    expect(at).toBeGreaterThan(-1);
+    const rule = rules.slice(rules.indexOf("{", at), rules.indexOf("}", at));
+    expect(rule).toContain("background: none");
+    expect(rule).toContain("border: none");
+    expect(rule).toContain("padding: 0");
+    // THE FOOT STAYS. It is the paging strip and the `+`'s home, and a section
+    // bar has nowhere to put either.
+    expect(rules).not.toContain(
+      ".ca-journal-group:not(:has(> .ca-journal-group-head)) .ca-journal-group-foot"
+    );
+  });
+
+  it("draws the foot on every group, and keeps the + in it", () => {
+    // THE FIRST DRAFT OF 5.14 DID THE OPPOSITE and this test asserted it: the
+    // grip and the `+` both moved to the new head, which left a one-page group's
+    // foot a hairline holding nothing — 4.34.2's argument against the column
+    // count, reached from the other end. The reader read three surfaces side by
+    // side and asked for the reverse: *"groups should always look like the
+    // homepages (header and footer)."* Two pages drew two strips and one page
+    // drew one, so the same object had two silhouettes according to something
+    // nobody was thinking about.
+    //
+    // BUILT BEFORE THE ONE-PAGE EARLY RETURN, which is the whole mechanism: a
+    // foot after it could only ever exist on a paged group.
+    const footAt = src.indexOf("const foot = box.createDiv({ cls: GROUP_FOOT_CLASS });");
+    const returnAt = src.indexOf("if (plans[0].cells.length > 1) addPage();");
+    expect(footAt).toBeGreaterThan(-1);
+    expect(returnAt).toBeGreaterThan(-1);
+    expect(footAt).toBeLessThan(returnAt);
+    // ONE CONSTRUCTION, NOT TWO. A second one in the paged branch would give a
+    // paged group two feet and pass every other assertion here.
+    expect(src.split("cls: GROUP_FOOT_CLASS").length - 1).toBe(1);
+  });
+
+  it("gives that foot a reason to exist rather than an empty rule", () => {
+    // The `+` comes back down with it. This is what separates the reader's ask
+    // from the furniture the first draft refused: on a one-page group the foot
+    // is where the first page is MADE, and on a paged one the control that adds
+    // a page sits beside the numbers it adds to — where it was from 4.34.1 until
+    // this release briefly moved it.
+    expect(src).toContain("const addPage = (host: HTMLElement = foot): void => {");
+    expect(src).toContain("if (plans[plans.length - 1].cells.length > 1) addPage(strip);");
+    // AND THE HEAD KEEPS THE CAPTION AND THE GRIP. The placement rule that
+    // pushed the `+` past the caption is gone with it; the foot is `flex-end`
+    // and needs none.
+    expect(readCss().replace(/\/\*[\s\S]*?\*\//g, "")).not.toContain(
+      ".ca-journal-group-head > .ca-journal-group-add"
+    );
+  });
+
+  it("is a caption's scale, not a bar's, and ends before the grip", () => {
+    // `--ca-text-2xs` uppercase and muted is the chrome scale a section's
+    // actions strip and a group head inside a card already take — the thing
+    // 4.9 refused was a BAR, and this is not one.
+    const at = ruleAt(rules, ".ca-journal-group-head-title");
+    expect(at).toBeGreaterThan(-1);
+    const rule = rules.slice(at, rules.indexOf("}", at));
+    expect(rule).toContain("var(--ca-text-2xs)");
+    expect(rule).toContain("text-transform: uppercase");
+    // THE GRIP IS 44px AND CENTRED, so anything past `50% - 22px` runs under
+    // it. The caption ellipsises rather than sliding beneath the dots.
+    expect(rule).toContain("text-overflow: ellipsis");
+    expect(rule).toContain("max-width: calc(50% - 30px)");
+  });
+
+  it("gives the grip room to be centred at the top, as every other grip is", () => {
+    // 4.8.6's collision needed both grips on the SAME edge. The head is a strip
+    // above the cards, so it cannot arise — and the group's grip goes back to
+    // the base rule (`top: 4px`, 10px tall, centred) with nothing overridden.
+    // 16px rather than the foot's 14, or the last row of dots would be clipped.
+    const at = ruleAt(rules, ".ca-journal-group-head");
+    expect(at).toBeGreaterThan(-1);
+    const rule = rules.slice(at, rules.indexOf("}", at));
+    expect(rule).toContain("position: relative");
+    expect(rule).toContain("min-height: 16px");
+    // A HEAD NAMES WHAT FOLLOWS, so the hairline is under it — the foot's
+    // idiom the right way up.
+    expect(rule).toContain("border-bottom:");
+    expect(rules).not.toContain(".jbd-aside");
   });
 });

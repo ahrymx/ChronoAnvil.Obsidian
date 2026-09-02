@@ -1357,11 +1357,21 @@ export function planFlatSections(
     if (!only) continue;
     const runLines = planSegs[run.index]?.lines ?? [];
     const asks = (only.questions?.(spec) ?? []).some((q) => q.kind === "form");
-    const bar =
-      only.bar ??
-      (only.row || asks
-        ? undefined
-        : leadingBar(only.render(optionsFor(requested, only.id)).lines));
+    // AND THE TOGGLE OUTRANKS A DECLARED `bar` (5.14). Until this release the
+    // two could not coexist — a row member declared `bar` and offered no
+    // toggle, everything else offered a toggle and composed its title in
+    // `render` — so `only.bar ?? (only.row || asks ? …)` read correctly by
+    // accident. `open-tasks`, `tags` and `sleep` now declare BOTH: the bar is
+    // the line they take back when they leave a row, and the toggle is the
+    // reader's answer about whether they want it. Leaving `bar` in front would
+    // have re-offered that line to exactly the sections that just learned to
+    // refuse it, which is 5.12's overwrite with a new set of victims.
+    const bar = asks
+      ? undefined
+      : (only.bar ??
+        (only.row
+          ? undefined
+          : leadingBar(only.render(optionsFor(requested, only.id)).lines)));
     if (!needsSoloBar(runLines, bar)) continue;
     barless.set(only.id, bar as string);
   }
@@ -2282,6 +2292,15 @@ export function regroupFlatNote(
   const owner = new Map<string, string>();
   for (const b of want) for (const id of b) owner.set(id, b[0]);
 
+  // HOW BIG EACH SECTION'S BLOCK WAS BEFORE ANY OF THIS, read once and never
+  // again. The last phase hands a title back to a cell that has just STOPPED
+  // being one, and "just" is the whole of the gate — see it for why a section
+  // that was already alone must not be touched.
+  const wasWith = new Map<string, number>();
+  for (const b of flatBlocks(text, sections)) {
+    for (const id of b.ids) wasWith.set(id, b.ids.length);
+  }
+
   let lines = text.split("\n");
   // A CEILING RATHER THAN A `while (true)`. Each pass makes exactly one move
   // and every move settles at least one section, so twice the sections is
@@ -2327,6 +2346,38 @@ export function regroupFlatNote(
     // something checked separately and forgotten.
     if (!next) break;
     lines = next;
+  }
+
+  // ── BETWEEN ONE AND TWO: A BORROWED TITLE COMES OFF (5.14) ──────────
+  //
+  // `dropSoloBar` is `soloBar`'s inverse and this is the third caller of the
+  // pair — `rowRuns` composes it, `joinRowChunk` takes it off, and a regroup
+  // does both. A cell that stood alone wears the title the phase below hands
+  // it; carried into a group it would be a second full-width bar inside a row
+  // fence, which is the two-heads defect this release has spent two patches on.
+  //
+  // HERE RATHER THAN INSIDE PHASE TWO, and after phase one for the reason phase
+  // one exists: everything that had to leave has left, so every section about
+  // to join is alone in a fence and the bar over it is unambiguously its own.
+  // Phase two then lifts `widgetRun`, which travels with whatever is above the
+  // directive — so the line has to be gone before the lift rather than after.
+  //
+  // NON-OPENERS ONLY. The first member of a block keeps what it has: its bar,
+  // if it has one, is that block's bar and titles the whole of it, which is
+  // exactly what a section opening a group is entitled to do.
+  //
+  // MATCHED AGAINST THE DECLARED STRING, which `dropSoloBar` does and is the
+  // safety here: a title the reader wrote or renamed is not this line, so it
+  // stays.
+  for (const b of want) {
+    for (const id of b.slice(1)) {
+      const bar = sections.find((s) => s.id === id)?.bar;
+      if (!bar) continue;
+      const at = whereIs(lines, sections, id);
+      if (!at) continue;
+      const next = replaceBlockBody(lines, at.block, dropSoloBar(at.body, bar));
+      if (next) lines = next;
+    }
   }
 
   // PHASE TWO: in. A section whose block is opened by another one joins that
@@ -2566,6 +2617,53 @@ export function regroupFlatNote(
       break;
     }
     if (!dealt) break;
+  }
+
+  // ── PHASE SIX: THE TITLE A CELL TAKES BACK (5.14) ───────────────────
+  //
+  // THE REPORT: *"I broke up the 'inside this week' group … open tasks is
+  // rendering as a widget despite it not being toggled."* It was. The open-task
+  // table is the second cell of that band and composes no bar — the rollup
+  // beside it writes the single one the fence gets, because a bar is a section's
+  // title strip and a row is one section — so the cell that left carried a
+  // `tasks-table` line and nothing else into a fence of its own. A block with no
+  // title over it is drawn as a bare widget, which is what the reader saw, on a
+  // row the editor was still labelling *Section*.
+  //
+  // `soloBar`'S FOURTH DOOR, and the same one behind the other three: `rowRuns`
+  // composes a row of one this way, `cutFromRun` hands the survivor a title when
+  // a removal empties the seat beside it, the add path titles a cell that could
+  // not rejoin its row — and now the gesture that does exactly what those three
+  // describe, from the window where the reader asks for it.
+  //
+  // ONLY A CELL THAT HAS JUST STOPPED BEING ONE, which `wasWith` is for and is
+  // the whole of what keeps this from being the 5.11 overwrite. A barless lone
+  // block has two causes — a title never given, and a reader who answered *show
+  // as widget* on a section that offers the toggle — and nothing in the file
+  // tells them apart. This does not have to ask: it looks at the block the
+  // section was in a moment ago, and a section that was ALREADY alone is not
+  // touched however barless it is. Only one that was a column of a group, in the
+  // note as this function received it, is handed the name the catalogue has for
+  // it standing alone.
+  //
+  // AND `soloBar` STILL DECLINES A FENCE THAT TITLES ITSELF, under any wording
+  // or through `frame: section`. A group broken up into cells that each drew
+  // their own bar is left exactly as it is.
+  //
+  // LAST, because every phase above moves lines between fences and this one only
+  // adds a line to a fence that is already settled — the same argument phase
+  // four makes for its own placement, and there is nothing after it to
+  // invalidate.
+  for (const block of flatBlocks(lines.join("\n"), sections)) {
+    if (block.ids.length !== 1) continue;
+    const id = block.ids[0];
+    if ((wasWith.get(id) ?? 1) < 2) continue;
+    const bar = sections.find((s) => s.id === id)?.bar;
+    if (!bar) continue;
+    const at = whereIs(lines, sections, id);
+    if (!at) continue;
+    const next = replaceBlockBody(lines, at.block, soloBar(at.body, bar));
+    if (next) lines = next;
   }
 
   const out = lines.join("\n");

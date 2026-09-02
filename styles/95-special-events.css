@@ -1046,42 +1046,27 @@ mark.ca-jdr-highlight {
   gap: var(--ca-space-2);
 }
 
-/* Collapsible note field (`note:key#collapse`). The label becomes the fold
-   control; the content hides beneath it. */
-.ca-journal-note--collapsible > .ca-journal-note-collapse-bar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  user-select: none;
-  /* Padding rather than margin so the whole strip is a hit target. */
-  padding: 2px 0;
-}
-.ca-journal-note--collapsible > .ca-journal-note-collapse-bar:hover {
-  color: var(--text-normal);
-}
-.ca-journal-note--collapsible > .ca-journal-note-collapse-bar .ca-journal-note-label {
-  margin: 0;
-  cursor: pointer;
-}
-.ca-journal-note-chevron {
-  display: flex;
-  color: var(--text-faint);
-  transition: transform 120ms ease;
-}
-.ca-journal-note-chevron .svg-icon {
-  width: 14px;
-  height: 14px;
-}
-.ca-journal-note--collapsible.is-collapsed .ca-journal-note-chevron {
-  transform: rotate(-90deg);
-}
-/* Hide the field itself, not the bar, so the label stays clickable and the
-   entry keeps a visible anchor for where captures live.
-   All children except the collapse bar hide when folded. */
-.ca-journal-note--collapsible.is-collapsed > :not(.ca-journal-note-collapse-bar, .ca-jbd-handle, .ca-jbd-slot) {
-  display: none;
-}
+/* ── EVERY FIELD FOLDS NOW, SO `#collapse` STYLES NOTHING (5.14) ────────
+ *
+ * What stood here was the private fold for `note:key#collapse`: a bar with the
+ * chevron on the LEFT, its own hover, a rotation, and a `:not(...)` rule
+ * hiding every sibling but the bar and the drag grips. One directive suffix
+ * decided which fields could close, and the answer was one of them — the
+ * capture log — while Highlights and Focus beside it could not.
+ *
+ * `fieldHead` gives all seven the same head and the same fold, remembered
+ * per (note, region) in `settings.collapsedNoteSections`. The chevron is on
+ * the right, with the section bars', and the body is hidden by
+ * `.ca-journal-sec-fold.is-collapsed > .ca-journal-sec-fold-body` — one
+ * declaration, in the file that owns the fold.
+ *
+ * `#collapse` IS STILL PARSED AND NOW SELECTS NOTHING. It stays in the grammar
+ * because `note:capture#collapse:…|Captured` is written into five template
+ * assets and every entry composed from them; dropping it from the parse would
+ * turn `capture#collapse` into a region key nobody has. What decided Captured's
+ * default was never the suffix anyway — `captureCollapsedByDefault` is read off
+ * the KEY by `noteFoldState` — so the one field that opened folded still does,
+ * and the other six gained a chevron rather than losing one. */
 
 /* Captures are a chronological strip rather than prose: a monospace-ish,
    slightly tighter block reads as a log of stamped moments and visually
@@ -1449,17 +1434,30 @@ body.is-mobile .ca-jcl-action-chip {
   transition: border-color 0.15s ease;
 }
 
+/* AND IT STANDS DOWN AROUND A FIELD HEAD (5.14), on 4.1 §3.1's rule and by the
+   same route `.ca-journal-tasks` takes in 75-home-dashboard.css — including the
+   inside-out first draft, which is why both files now say which element is
+   which. `capture-log-widget.ts` creates this as the widget's own wrap and
+   hands it to `fieldHead`, so the field's card is built INSIDE it: two edges a
+   dozen pixels apart, on the only two fields of an entry that draw a surface of
+   their own. Outside a field head — a bare `capture:` in a fence with no bar —
+   the surface above is still the widget's only box, so this cancels rather than
+   deletes. */
+.ca-journal-capture-log:has(> .ca-journal-sec-fold.ca-journal-field) {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+}
 .ca-journal-capture-log:focus-within {
   border-color: var(--interactive-accent);
 }
 
-.ca-journal-capture-log.ca-journal-note--collapsible > .ca-journal-note-collapse-bar {
-  margin-bottom: var(--ca-space-1);
-}
-
-.ca-journal-capture-log.ca-journal-note--collapsible.is-collapsed > .ca-journal-note-collapse-bar {
-  margin-bottom: 0;
-}
+/* The capture log's two tweaks to that bar went with it (5.14): the head's
+   bottom margin is `--ca-sec-gap` for every field, and the wrapper's own
+   collapsed rule drops it to zero when the field closes. */
 
 .ca-journal-widget-card.is-sized > .ca-journal-capture-log,
 .ca-journal-block-cell > .is-sized.ca-journal-capture-log,

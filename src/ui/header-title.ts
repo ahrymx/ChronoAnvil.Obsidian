@@ -55,7 +55,15 @@
 // cycle writes through.
 
 import { App, MarkdownPostProcessorContext, Notice, TFile, setIcon } from "obsidian";
-import { ArgSpan, argSpansIn, readArg, spliceArg } from "../core/directive-grammar";
+import {
+  ArgSpan,
+  argSpansIn,
+  headerLevel,
+  isHeaderLine,
+  readArg,
+  spliceArg,
+  splitDirective,
+} from "../core/directive-grammar";
 import { frontmatterOf, getFile, isFolderNote, parseHeaderDirective, plural, singularGuess } from "../core/util";
 import { splitGlyph } from "./section-frame";
 import type ChronoAnvilPlugin from "../main";
@@ -311,11 +319,34 @@ async function offerKindRename(
 // NULL FOR EVERY OTHER HEADER. Review, Charts, Learning Path and Resources are
 // section headings that name no kind, and renaming one means exactly what it
 // has meant since 3.19.0 and nothing more.
+//
+// ── AND NULL FOR THE SECTION'S OWN BAR (5.12) ────────────────────────────
+//
+// The deepest index carries a bar of its own now, and on a type with ONE note
+// kind that bar sits directly over that kind's table — structurally identical to
+// a kind's heading, three lines and all. Nothing in the file separates them, so
+// the LEVEL does: a kind's heading is a group head, and the section's bar is not.
+//
+// UNLESS IT IS THE ONLY HEAD IN ITS FENCE, which is where the two readings stop
+// disagreeing: a type with one note kind composes a bar named for that kind
+// ("🍽️ Recipes") over that kind's table, so the section's bar and the kind's
+// heading are one line, and renaming it does mean what the offer asks about.
+//
+// THE COST IS ONE HEAD ON AN UNREPAIRED NOTE, and it is the right way round. A
+// Topic index composed before this release opens with a bare `header:📖 Lessons`
+// above a `header:🛠️ Practice`, and the demotion rule reads the first —
+// everywhere, including on screen — as the section's own bar; declining to offer
+// a note-type rename from it agrees with what the reader is looking at. The
+// heads below it keep the offer, and the plan offers the missing bar that puts
+// the first one back among them.
 export function kindHeadedBy(
   lines: readonly string[],
   span: ArgSpan,
   type: JournalType
 ): JournalKind | null {
+  const heads = fenceHeadsAt(lines, span.line);
+  const level = headerLevel(readArg(lines, span), heads.first);
+  if (level !== 2 && heads.count > 1) return null;
   // Only the lines between this header and the next one, so a two-kind fence
   // cannot let one heading claim the other's table.
   for (let i = span.line + 1; i < lines.length; i++) {
@@ -325,6 +356,42 @@ export function kindHeadedBy(
     if (m) return type.kinds.find((k) => k.id === m[1]) ?? null;
   }
   return null;
+}
+
+// The titled heads of the fence a line sits in: how many, and whether this one
+// opens them.
+//
+// BOUNDED BY THE FENCE MARKS, which is what makes this the same question the
+// block processor answers going forwards — it counts titled heads within one
+// fence's lines, and a note is a stack of fences. A `header:` outside a fence is
+// not a directive at all. Both ends fall back to the file's, for a caller handed
+// a fence's own body rather than a whole note.
+function fenceHeadsAt(
+  lines: readonly string[],
+  at: number
+): { first: boolean; count: number } {
+  let start = 0;
+  let end = lines.length - 1;
+  for (let i = at - 1; i >= 0; i--) {
+    if (lines[i].trim().startsWith("```")) {
+      start = i + 1;
+      break;
+    }
+  }
+  for (let i = at + 1; i < lines.length; i++) {
+    if (lines[i].trim().startsWith("```")) {
+      end = i - 1;
+      break;
+    }
+  }
+  const heads: number[] = [];
+  for (let i = start; i <= end; i++) {
+    const line = lines[i].trim();
+    if (isHeaderLine(line) && splitDirective(line).argument.trim() !== "") {
+      heads.push(i);
+    }
+  }
+  return { first: heads[0] === at, count: heads.length };
 }
 
 // Make a bar's title slot click-to-edit.

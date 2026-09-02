@@ -17,11 +17,12 @@
 import {
   MarkdownPostProcessorContext,
   MarkdownRenderChild,
-  setIcon,
 } from "obsidian";
 import type { App } from "obsidian";
 import type ChronoAnvilPlugin from "../../main";
-import type { PluginNoteRegionHost } from "./note-regions";
+import type { NoteRegionHost, PluginNoteRegionHost } from "./note-regions";
+import { fieldFrame } from "../section-frame";
+import type { FoldStore } from "../section-frame";
 import type { NoteWriteScheduler } from "./note-write-scheduler";
 import {
   appendedSince,
@@ -115,6 +116,42 @@ export async function setNoteFold(
   await plugin.saveSettings();
 }
 
+// The three functions above, as the interface `foldableSection` asks for. 5.14.
+//
+// AN ADAPTER RATHER THAN A REWRITE, because the store is not the new thing: the
+// fold has been remembered per (note, region) in `collapsedNoteSections` since
+// 4.28, and `headerbar.ts` keeps its own keys in the same table. What is new is
+// that a `list:` and an `attach:` field can be folded at all, and they must land
+// in the table that already holds `note:`'s and `tasks:`'s answers rather than
+// in a second one beside it.
+//
+// A HOST WITHOUT A PLUGIN GETS A STORE THAT FORGETS. `NoteRegionHost` is the
+// contract the renderers are tested against and it has no settings to write to;
+// the fold still works for the life of the render, which is the same bargain
+// `buildTasks` struck when it wrote `"plugin" in host` inline. Stating it once
+// here is what stops the fourth copy of that conditional.
+export function fieldFoldStore(
+  host: NoteRegionHost,
+  sourcePath: string
+): FoldStore {
+  if (!("plugin" in host)) {
+    const local = new Map<string, boolean>();
+    return {
+      isCollapsed: (key) => local.get(key) ?? false,
+      setCollapsed: (key, value) => {
+        local.set(key, value);
+      },
+    };
+  }
+  const plugin = (host as PluginNoteRegionHost).plugin;
+  return {
+    isCollapsed: (key) => noteFoldState(plugin, sourcePath, key),
+    setCollapsed: (key, value) => {
+      void setNoteFold(plugin, sourcePath, key, value);
+    },
+  };
+}
+
 // MOVED TO `core/notestore.ts` IN 4.30, unchanged, and re-exported here so
 // every existing caller is untouched.
 //
@@ -125,11 +162,92 @@ export async function setNoteFold(
 // which is the one thing the two must never disagree about.
 export { noteKeyOf } from "../../core/notestore";
 
+// ── ONE HEAD FOR EVERY FIELD, AND THE RULE FOR NOT DRAWING ONE (5.14) ──
+//
+// Five renderers asked this question and answered it five ways. It is asked
+// once now, here, and the answers are the three cases below.
+//
+// TITLED FROM OUTSIDE → NO HEAD. A `header:` bar over the fence, or a
+// `frame: section` modifier, already names everything under it and already
+// carries a chevron. A field that drew its own head there would be the
+// two-heads defect 5.10 spent a release removing — and the stylesheet's answer
+// to it last time was to hide the loser, which is how the `tasks:` Compact
+// toggle and its progress readout disappeared from every Study note. So the
+// head is not drawn AND the controls are not lost: they go into that bar's
+// actions slot, or, where the titling thing has no slot to offer, into a bare
+// strip of the field's own.
+//
+// NO LABEL → NO HEAD EITHER. `note:scratch` with nothing after a `|` names
+// nothing. An empty bar is a rule ruled across a page for no reason — the same
+// judgement `attachBlockHead` makes about a block it cannot name.
+//
+// OTHERWISE → THE FRAME. Title, chevron on the right, actions slot, fold.
+//
+// THE ACTIONS SLOT IS A FUNCTION, not an element, so a field with no controls
+// costs no empty div and no `:empty` rule to hide one.
+export interface FieldHead {
+  // Where the field's content goes: the frame's fold body, or the wrap itself
+  // where no head was drawn.
+  body: HTMLElement;
+  // Where its controls go, built on first use.
+  actions: () => HTMLElement;
+}
+
+export interface FieldHeadOptions {
+  // The field's own element, which the head is built into.
+  wrap: HTMLElement;
+  // Where the fold is remembered. `fieldFoldStore` is the answer for a field
+  // drawn on a note; the capture log and the logbook carry their own, because
+  // their callers already decide the default (`captureCollapsedByDefault`).
+  //
+  // REQUIRED, RATHER THAN DERIVED FROM A CONTEXT. This function used to take a
+  // `MarkdownPostProcessorContext` to build the default store itself, which
+  // meant `buildLogList` — a renderer that deliberately takes no ctx, only an
+  // `addChild` — had nothing to hand it.
+  store: FoldStore;
+  // The body region this field owns. It is the fold's key, not just the store's
+  // lookup: two fields over one region are one fold.
+  key: string;
+  // The title, as the reader wrote it after the `|`. Null draws no head.
+  label: string | null;
+  // Whether a section bar in this fence already names THIS field. See the
+  // dispatcher's `soleField`, which is what decides "this".
+  titled?: boolean;
+  // That bar's actions slot.
+  barActions?: HTMLElement | null;
+}
+
+export function fieldHead(opts: FieldHeadOptions): FieldHead {
+  const { wrap, key, label } = opts;
+  const barActions = opts.barActions ?? null;
+  if (opts.titled || !label) {
+    let strip: HTMLElement | null = barActions;
+    return {
+      body: wrap,
+      actions: () => {
+        if (!strip) {
+          strip = wrap.createDiv({ cls: "ca-journal-field-tools" });
+          // BEFORE THE BODY, because the body is already in `wrap` by the time
+          // a caller asks for this on a field it built content into first.
+          wrap.insertBefore(strip, wrap.firstChild);
+        }
+        return strip;
+      },
+    };
+  }
+  const built = fieldFrame(wrap, { title: label }, opts.store, key);
+  return { body: built.body, actions: () => built.frame.actions };
+}
+
 export function buildNote(
   deps: NoteFieldHost,
   rest: string,
   ctx: MarkdownPostProcessorContext,
-  label: string | null
+  label: string | null,
+  // Whether something else already titles this fence, and the actions slot it
+  // offers. See `fieldHead`.
+  titled = false,
+  barActions: HTMLElement | null = null
 ): HTMLElement {
   // `rest` is `key` or `key:placeholder text`. Only the first colon
   // separates them, so a placeholder may itself contain colons. `key` names
@@ -146,45 +264,49 @@ export function buildNote(
   const key = (hash === -1 ? head : head.slice(0, hash)).trim();
   const variant = hash === -1 ? "" : head.slice(hash + 1).trim();
   const singleLine = variant === "line";
-  // `#collapse` makes the field's content foldable behind its label. Used by
-  // the capture field, which accumulates all day and would otherwise push the
-  // rest of the entry down; the label stays visible so it can still be
-  // written into with one click.
-  const collapsible = variant === "collapse";
+  // `#collapse` NO LONGER SELECTS ANYTHING, AND THE DIRECTIVE KEEPS IT (5.14).
+  //
+  // It used to be what made a field foldable: `note:capture#collapse` folded and
+  // `note:log` did not. Every labelled field folds now, so the modifier selects
+  // a behaviour that is unconditional — and it stays in the grammar and on disk
+  // regardless, because `note:capture#collapse:…|Captured` is written into five
+  // template assets and a dozen assertions. Removing it from the parse would
+  // turn `capture#collapse` into a region key nobody has, which is a rewrite of
+  // every entry in every vault to change nothing a reader can see.
+  //
+  // WHAT DECIDES CAPTURED'S DEFAULT is `noteFoldState`, and always did: the
+  // `captureCollapsedByDefault` setting is read off the KEY, not off this
+  // modifier. So the one field that opened folded still opens folded.
 
   const wrap = createDiv({
     cls: `ca-journal-note ca-journal-note--${key}${
       singleLine ? " ca-journal-note--line" : ""
-    }${collapsible ? " ca-journal-note--collapsible" : ""}`,
+    }`,
   });
 
-  // Per-(note,key) collapsed state, sharing the store header bars use so
-  // there's one place a fold is remembered. See `noteFoldState` above.
-  const isCollapsed = (): boolean =>
-    noteFoldState(deps.plugin, ctx.sourcePath, key);
-
-  if (collapsible && label) {
-    const bar = wrap.createDiv({ cls: "ca-journal-note-collapse-bar" });
-    const chevron = bar.createDiv({ cls: "ca-journal-note-chevron" });
-    setIcon(chevron, "chevron-down");
-    bar.createDiv({ cls: "ca-journal-note-label", text: label });
-
-    const apply = (collapsed: boolean): void => {
-      wrap.toggleClass("is-collapsed", collapsed);
-    };
-    apply(isCollapsed());
-
-    bar.addEventListener("click", (evt) => {
-      evt.preventDefault();
-      const next = !isCollapsed();
-      apply(next);
-      void setNoteFold(deps.plugin, ctx.sourcePath, key, next);
-    });
-  } else if (label) {
-    wrap.createDiv({ cls: "ca-journal-note-label", text: label });
-  }
-
-  const input = wrap.createEl("textarea", { cls: "ca-journal-note-input" });
+  // ── THE HEAD, WHICH IS THE FRAME'S NOW (5.14) ──────────────────────
+  //
+  // Three branches used to live here: a collapse bar with the chevron on the
+  // left, a plain label, and nothing. Two of them are gone. What is left is the
+  // one question this renderer actually gets to answer — is there a title for
+  // this field, and is something else already drawing it.
+  //
+  // NO LABEL, NO HEAD. A hand-written `note:scratch` with no `|` names nothing,
+  // and a head over it would be a rule ruled across the page with no word on it.
+  // TITLED FROM OUTSIDE, NO HEAD EITHER: a section bar over the fence is the
+  // title, its chevron is the fold, and the controls this field has go into that
+  // bar rather than under it. See `fieldHead`.
+  const chrome = fieldHead({
+    wrap,
+    key,
+    label,
+    titled,
+    barActions,
+    store: fieldFoldStore(deps, ctx.sourcePath),
+  });
+  const input = chrome.body.createEl("textarea", {
+    cls: "ca-journal-note-input",
+  });
   input.rows = 1;
   if (placeholder) input.placeholder = placeholder;
 

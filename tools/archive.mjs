@@ -87,7 +87,7 @@ const DIST = path.join(ROOT, "dist", "chronoanvil");
 // gitignored, and it arrived carrying 200 HTML files — nearly three megabytes,
 // most of the archive. A source snapshot holds what the source is, not what the
 // last command to touch it printed.
-const SOURCE_SKIP = new Set(["node_modules", "dist", ".git", "docs", "coverage"]);
+const SOURCE_SKIP = new Set(["node_modules", "dist", ".git", "coverage"]);
 
 // What each archive must contain to be worth keeping. Read back OUT of the file
 // on disk, not asserted about the directory that went in.
@@ -97,7 +97,13 @@ const PLUGIN_MUST_HOLD = [
   "chronoanvil/styles.css",
   "chronoanvil/assets/",
 ];
-const SOURCE_MUST_HOLD = ["/src/", "/test/", "/package.json", "/manifest.json"];
+const SOURCE_MUST_HOLD = [
+  "/src/",
+  "/test/",
+  "/package.json",
+  "/manifest.json",
+  "/docs/screenshots/",
+];
 
 // Run a command and hand back its output.
 //

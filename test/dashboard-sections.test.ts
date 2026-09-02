@@ -231,9 +231,24 @@ describe("both catalogues are data, which is the point", () => {
       // same headless fence. So the plan reports an `extend` and the write adds
       // the one line, which is what this asserts against a file built to be
       // exactly that shape.
+      //
+      // UNLESS THE CELL OFFERS THE FORM TOGGLE, WHICH IS EVERY ONE OF THEM
+      // NOW (5.14). 5.12 set the rule and this test was written before the
+      // second cells reached it: once a section can be ASKED to be a widget, a
+      // fence with no bar has two causes — a page composed before the title,
+      // and a reader who said they wanted none — and the repair cannot tell
+      // them apart, so it goes quiet and the reader's answer stands. The
+      // barless page above is what that costs, and the toggle is what pays for
+      // it: the title is one tick away, where a silently overwritten answer was
+      // not recoverable at all.
+      //
+      // BOTH BRANCHES ARE ASSERTED so this cannot quietly become a test of
+      // nothing. Whichever branch a survivor is in, it is checked, and the
+      // catalogues are swept for at least one of them.
       it("repairs a barless cell that is already in the file", () => {
         const live = page.sections.filter((s) => !s.optIn);
         const rows = [...new Set(live.map((s) => s.row).filter(Boolean))];
+        let swept = 0;
         for (const row of rows) {
           const members = live.filter((s) => s.row === row);
           if (members.length < 2) continue;
@@ -244,11 +259,24 @@ describe("both catalogues are data, which is the point", () => {
           const cut = page.model().apply(page.compose(), kept) as string;
           const stale = cut.replace(`${survivor.bar as string}\n`, "");
           expect(stale, `${row}: nothing to strip`).not.toBe(cut);
+          swept++;
 
           const op = page
             .model()
             .plan(stale, kept.map((id) => ({ id })))
             .find((o) => o.sectionId === survivor.id);
+
+          const asks = (survivor.questions?.({ hostFolder: null }) ?? []).some(
+            (q) => q.kind === "form"
+          );
+          if (asks) {
+            // The answer stands, and it stands on a second pass too — a repair
+            // that went quiet once and spoke up later would be the overwrite
+            // arriving late.
+            expect(op?.kind ?? "keep", `${row}/${survivor.id}`).toBe("keep");
+            expect(page.model().apply(stale, kept.map((id) => ({ id })))).toBeNull();
+            continue;
+          }
           expect(op?.kind, `${row}/${survivor.id}`).toBe("extend");
           expect(op?.detail).toContain("no title over it");
 
@@ -257,6 +285,7 @@ describe("both catalogues are data, which is the point", () => {
           // And it is a fixed point: the repaired file needs no second pass.
           expect(page.model().apply(cut, kept.map((id) => ({ id })))).toBeNull();
         }
+        expect(swept, `${page.name}: no titled row to sweep`).toBeGreaterThan(0);
       });
 
       it("restores the file exactly on remove-then-re-add", () => {
@@ -1020,4 +1049,97 @@ describe("no block on either dashboard is loose content", () => {
     expect(studyWidget).not.toContain("frame: section\nlevel-cards:study");
     expect(studyWidget).toContain("level-cards:study");
   });
+});
+
+// ── EVERY SECTION WITHOUT AN ANCHORED CONTROL IS OFFERED THE TOGGLE (5.14) ──
+//
+// 5.12 gave the Section Editor's **how this is drawn** question to journal
+// sections and stated the rule in one line: a section is offered the choice
+// UNLESS something of its own is anchored INTO its title bar, because those
+// controls have nowhere to go once the bar does. `test/journal-rows.test.ts`
+// pins that for the journal catalogue. The two folder-note dashboards were not
+// swept, and the gap showed up in a vault rather than here: breaking up *Due
+// and open* left Open tasks drawn as a widget with no way to say whether that
+// was wanted.
+//
+// ENUMERATED RATHER THAN DERIVED, deliberately and for the same reason the
+// journal sweep enumerates: "is a control anchored into this bar?" is a fact
+// about what the fence composes, and a predicate that answered it would be the
+// catalogue's own rule restated in the test — agreeing with the code by
+// construction and therefore proving nothing. A new section makes this fail
+// until somebody writes down which side of the rule it is on.
+describe("the widget form of a dashboard section — 5.14", () => {
+  const OFFERED: Record<string, string[]> = {
+    "the diary dashboard": [
+      "today",
+      "this-month",
+      "open-tasks",
+      "tags",
+      "on-this-day",
+      "sleep",
+    ],
+    "the journals dashboard": ["journals", "review", "open-tasks", "recent"],
+  };
+  // The other side, with the reason each one is on it. Both pages' `charts` is
+  // a `chronoanvil-charts` fence whose **+ Add chart** lives in the bar — take
+  // the bar off and the manager has no control at all. The banners compose no
+  // bar to drop in the first place, and `isPageWidgetId` is the rule that keeps
+  // them out of rows for the same reason.
+  const WITHHELD: Record<string, string[]> = {
+    "the diary dashboard": ["banner", "charts"],
+    "the journals dashboard": ["banner", "charts"],
+  };
+
+  for (const page of PAGES) {
+    const offered = OFFERED[page.name];
+    if (!offered) continue;
+    it(`is offered on ${page.name} exactly where nothing is anchored into the bar`, () => {
+      const asks = (s: FlatSection): boolean =>
+        (s.questions?.({ hostFolder: null }) ?? []).some((q) => q.kind === "form");
+      const ids = page.sections.map((s) => s.id);
+      // The table is the whole catalogue, so a section added to the page
+      // without an entry here fails rather than being swept past.
+      expect(new Set(ids)).toEqual(
+        new Set([...offered, ...(WITHHELD[page.name] ?? [])])
+      );
+      for (const s of page.sections) {
+        expect(asks(s), `${page.name}/${s.id}`).toBe(offered.includes(s.id));
+      }
+    });
+
+    it(`gives each of them a title to put back on ${page.name}`, () => {
+      // A toggle whose two answers are not both reachable is half a control.
+      // The `section` answer writes the bar the question carries, so that bar
+      // has to BE something — and where the section also declares `bar`, the
+      // two must be the same string, because `dropSoloBar` matches the declared
+      // one exactly when the cell rejoins a row.
+      for (const s of page.sections) {
+        if (!offered.includes(s.id)) continue;
+        const form = (s.questions?.({ hostFolder: null }) ?? []).find(
+          (q) => q.kind === "form"
+        );
+        const bar = (form as { bar?: string } | undefined)?.bar;
+        expect(bar, `${page.name}/${s.id}`).toBeTruthy();
+        if (s.bar) expect(bar, `${page.name}/${s.id}`).toBe(s.bar);
+      }
+    });
+
+    it(`keeps every toggled section's extent known on ${page.name}`, () => {
+      // THE CONSTRAINT THAT KEPT ONE SECTION OFF THE LIST. `hasKnownExtent`
+      // asks whether a section renders one line in EITHER form, and it is what
+      // decides whether a cell can be cut out of a row at a single line. The
+      // homepage's Tags — a `header:` bar and a `tag-index` under it — is
+      // refused the toggle for this reason and says so at length; the period
+      // dashboard's copy was refused with it in 5.14. Every section that IS
+      // offered the toggle here already renders one line, so the offer changes
+      // nothing about where it ends.
+      for (const s of page.sections) {
+        if (!offered.includes(s.id)) continue;
+        const oneLine =
+          s.render().lines.length === 1 ||
+          s.render({ form: "widget" }).lines.length === 1;
+        expect(oneLine, `${page.name}/${s.id}`).toBe(true);
+      }
+    });
+  }
 });

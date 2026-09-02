@@ -33,7 +33,12 @@ export function buildCaptureLog(
   rest: string,
   ctx: MarkdownPostProcessorContext,
   label: string | null,
-  opts: { collapsible: boolean; startCollapsed: () => boolean; onFold: (v: boolean) => void }
+  opts: {
+    titled: boolean;
+    barActions: HTMLElement | null;
+    startCollapsed: () => boolean;
+    onFold: (v: boolean) => void;
+  }
 ): HTMLElement {
   const key = rest.split(":")[0].split("#")[0].trim();
   if (!isValidNoteKey(key)) {
@@ -50,7 +55,8 @@ export function buildCaptureLog(
     file: host.fileOf(ctx),
     modifier: "ca-journal-note--capture",
     label,
-    collapsible: opts.collapsible,
+    titled: opts.titled,
+    barActions: opts.barActions,
     startCollapsed: opts.startCollapsed,
     onFold: opts.onFold,
     // NO DATE ON A CAPTURE'S STAMP, which is this file's third answer above and

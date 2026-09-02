@@ -93,15 +93,27 @@
  * LISTED FOR `is-first` AND `is-last` TOO, which is not repetition: those carry
  * the run's edges and rounding at the same specificity as the base rule, so a
  * single selector would lose to them on the first and last block of a run — and
- * a welded section is both. */
+ * a welded section is both.
+ *
+ * AND A FIELD'S FOLD IS NOT THE SECTION'S (5.14). `.ca-journal-sec-fold` used
+ * to mean one thing — a `frame: section` fence, where the wrapper IS the
+ * section and the block around it is therefore redundant. Since `fieldFrame` a
+ * field wears the same wrapper, and a field is INSIDE a section rather than
+ * being one: a Study topic's `header:📚 Resources` over three `attach:` shelves
+ * is one section card holding three fields, and matching it here took the card
+ * off the section because of what was in it. `:not(.ca-journal-field)` is the
+ * whole fix; the fields themselves stand their own cards down instead, at the
+ * foot of this file, which is the same trade made the other way round. */
 .ca-journal-sec-block:has(.ca-journal-overview-card),
-.ca-journal-sec-block:has(.ca-journal-sec-fold),
+.ca-journal-sec-block:has(.ca-journal-sec-fold:not(.ca-journal-field)),
 .ca-journal-sec-block.is-first:has(.ca-journal-overview-card),
-.ca-journal-sec-block.is-first:has(.ca-journal-sec-fold),
+.ca-journal-sec-block.is-first:has(.ca-journal-sec-fold:not(.ca-journal-field)),
 .ca-journal-sec-block.is-last:has(.ca-journal-overview-card),
-.ca-journal-sec-block.is-last:has(.ca-journal-sec-fold),
+.ca-journal-sec-block.is-last:has(.ca-journal-sec-fold:not(.ca-journal-field)),
 .ca-journal-sec-block.is-first.is-last:has(.ca-journal-overview-card),
-.ca-journal-sec-block.is-first.is-last:has(.ca-journal-sec-fold) {
+.ca-journal-sec-block.is-first.is-last:has(
+    .ca-journal-sec-fold:not(.ca-journal-field)
+  ) {
   background: none;
   border: none;
   border-radius: 0;
@@ -374,3 +386,63 @@
 .ca-journal-sec-fold-body > :last-child {
   margin-bottom: 0;
 }
+
+/* THE GAP IS THE COLUMN'S, NOT THE CARD'S (5.14). `.ca-journal-sec-fold` ends
+   with `margin-bottom: var(--ca-widget-gap)` because a `frame: section` fence
+   is ONE fold in a block, and that margin is the space to the block after it.
+   A field is not one of anything: a diary entry is seven of them inside a
+   single `.ca-journal-widget-block`, which is a flex column that already draws
+   `gap: var(--ca-widget-gap)` between its children. Flex gaps and item margins
+   ADD — they do not collapse the way two block margins would — so keeping the
+   margin would space the entry's fields at twice the rate every other stack on
+   the page is spaced at, and only on the surface the whole change is about. */
+.ca-journal-sec-fold.ca-journal-field {
+  margin: 0;
+}
+/* ── A FIELD INSIDE A SECTION IS A PART OF IT, NOT A CARD IN IT (5.14) ──
+ *
+ * `fieldFrame` builds at level 1 and the wrapper it builds is
+ * `.ca-journal-sec-fold`, so everything above applies to a field unchanged: the
+ * fill, the border, the radius, the 12px inset, the full-bleed head and its
+ * hairline. On a diary entry that is exactly right — the fence carries no
+ * `header:` line, so the seven fields are the only objects on the page and each
+ * one is its own card, which is the render the reader pointed at on the
+ * journals surface and asked for here.
+ *
+ * INSIDE A SECTION IT IS A CARD IN A CARD, which is 4.1 §3.1's rule and the
+ * same one the block surface makes about `.ca-journal-tasks`. A Study topic's
+ * Resources is one section holding three shelves; three bordered boxes inset
+ * inside a bordered box is the doubling that rule exists to stop.
+ *
+ * THE INNER ONE STANDS DOWN HERE, where the `:has()` rules further up stand the
+ * OUTER one down for an overview card. The two are not in tension: there the
+ * inner card has its own bands measured against it and the outer is only a
+ * background, and here it is the other way about — the section's bar bleeds to
+ * the section's edges, and taking that away to keep a shelf's border would
+ * strand the title of the thing the reader actually navigated to.
+ *
+ * `--ca-sec-pad-x: 0px` RATHER THAN `padding: 0`. The head's full bleed is a
+ * negative margin of exactly this variable, so zeroing the padding alone would
+ * leave the head hanging 12px past both edges of a field that no longer has
+ * them. Setting the variable takes the inset and the bleed together, and the
+ * hairline under the title stays — inside a card a rule under a head is a
+ * division of it, which is what a field in a section is.
+ *
+ * THREE ENCLOSURES, AND THAT IS THE WHOLE LIST. A section is two things
+ * structurally — a run of blocks (`header:`) and a wrapper (`frame: section`)
+ * — which is the split the comment at the top of this file is about, and a
+ * field can sit in either. The third is `.ca-journal-widget-card`: `cardWidget`
+ * wraps EVERY widget in a row, so a reader who puts a Notes field in a row of
+ * three gets one, and it is a card by the same three declarations. Nothing
+ * else in the plugin draws a box a field can land inside; if a fourth appears,
+ * it joins this selector rather than growing a rule of its own. */
+.ca-journal-sec-block .ca-journal-sec-fold.ca-journal-field,
+.ca-journal-sec-fold .ca-journal-sec-fold.ca-journal-field,
+.ca-journal-widget-card .ca-journal-sec-fold.ca-journal-field {
+  --ca-sec-pad-x: 0px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding-bottom: 0;
+}
+

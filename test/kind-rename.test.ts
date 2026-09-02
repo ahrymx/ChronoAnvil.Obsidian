@@ -39,9 +39,12 @@ describe("which headings name a note type", () => {
     const found = spans
       .map((s) => [readArg(lines, s), kindHeadedBy(lines, s, STUDY_JOURNAL)?.id])
       .filter(([, id]) => id);
+    // WRITTEN `header:2:` SINCE 5.12 — the heads are groups inside the section's
+    // own bar rather than three sections sharing a card. The argument carries the
+    // level; `parseHeaderDirective` is what separates it from the title.
     expect(found).toEqual([
-      ["📖 Lessons", "lesson"],
-      ["🛠️ Practice", "practice"],
+      ["2:📖 Lessons", "lesson"],
+      ["2:🛠️ Practice", "practice"],
     ]);
   });
 
@@ -50,7 +53,7 @@ describe("which headings name a note type", () => {
     const lines = topic();
     for (const s of argSpansIn(lines, "header")) {
       const title = readArg(lines, s);
-      if (title === "📖 Lessons" || title === "🛠️ Practice") continue;
+      if (title === "2:📖 Lessons" || title === "2:🛠️ Practice") continue;
       expect(kindHeadedBy(lines, s, STUDY_JOURNAL), title).toBeNull();
     }
   });
@@ -60,7 +63,7 @@ describe("which headings name a note type", () => {
     // the fence would give the Lessons heading Practice's table.
     const lines = topic();
     const lessons = argSpansIn(lines, "header").find(
-      (s) => readArg(lines, s) === "📖 Lessons"
+      (s) => readArg(lines, s) === "2:📖 Lessons"
     )!;
     expect(kindHeadedBy(lines, lessons, STUDY_JOURNAL)?.id).toBe("lesson");
   });
@@ -70,10 +73,10 @@ describe("which headings name a note type", () => {
     // last week and is renaming it again today must still be offered the right
     // note type — matching on the text would have lost it at the first rename.
     const lines = topic().map((l) =>
-      l.trim() === "header:📖 Lessons" ? "header:🎓 Seminars" : l
+      l.trim() === "header:2:📖 Lessons" ? "header:2:🎓 Seminars" : l
     );
     const span = argSpansIn(lines, "header").find(
-      (s) => readArg(lines, s) === "🎓 Seminars"
+      (s) => readArg(lines, s) === "2:🎓 Seminars"
     )!;
     expect(kindHeadedBy(lines, span, STUDY_JOURNAL)?.id).toBe("lesson");
   });

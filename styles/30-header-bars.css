@@ -273,6 +273,115 @@
   padding: var(--ca-space-1) var(--ca-space-5);
   gap: 4px;
 }
+
+/* ── A GROUP HEAD INSIDE A SECTION (5.12) ───────────────────────────────
+ *
+ * `header:2:` in a fence that already carries a section bar. The deepest index
+ * is the case it was written for: `children` composes one head per note kind,
+ * and until this release each of those was a level-1 bar — three of them in one
+ * card, identical in weight, hairline, type and chevron to the sections on
+ * either side. The card was the only thing saying they belonged together, and
+ * it said nothing about what they belonged to.
+ *
+ * A DIVISION, NOT A BAR, which is the whole of the treatment below. The rule
+ * goes ABOVE the head rather than under it: a hairline under a title says "this
+ * names what follows, as a section does", and a hairline over it says "a new
+ * part of the thing you are already in" — the `.ca-journal-group-foot` idiom
+ * turned the right way up. Everything else follows from that: no surface of its
+ * own, no fill on its button, the title a tier down and muted, the count an
+ * outline rather than a solid.
+ *
+ * WHY A CLASS AND NOT `.ca-journal-sec-l2`. Level 2 is a FOLD SCOPE and is
+ * already three other things': a subject group in the Journals section, a
+ * bridge, the tally band. Each of those draws inside its own widget's DOM where
+ * it is nobody's neighbour, and none of them wants a rule above it. This marks
+ * the one that is a neighbour — a head inside a card, dividing it — which is why
+ * the selectors below can be exact without reaching any of the others.
+ * `widgets/index.ts` adds it; nothing else may. */
+.ca-journal-sec.ca-journal-sec-group {
+  border-bottom: 0;
+  border-top: var(--ca-rule-hair) solid var(--background-modifier-border);
+  margin-top: var(--ca-sec-gap);
+  padding-top: 8px;
+  min-height: var(--ca-grp-head-h);
+}
+/* THE FIRST GROUP NEEDS NO RULE, because the section's own bar has just drawn
+   one. Two hairlines four pixels apart is a double line, which is what the
+   `--ca-rule` / `--ca-rule-hair` split exists to avoid one file up. */
+.ca-journal-sec-l1 + .ca-journal-sec-group {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: var(--ca-sec-pad);
+}
+/* A TIER DOWN, AND SAID THREE WAYS AT ONCE — size, case and ink. One of them
+   alone is a shade rather than a rank: 4.13 §1 brought the section title down to
+   `--ca-sec-title-size` and argued that a title is "a label on a band, not a
+   heading"; a group head is a label on a PART of one, and has to read as such
+   beside its own section's title six pixels above it. */
+.ca-journal-sec-group > .ca-journal-header-title {
+  font-size: var(--ca-text-sm);
+  text-transform: uppercase;
+  letter-spacing: var(--ca-bar-track);
+  color: var(--text-muted);
+}
+/* THE SLOT KEEPS ITS WIDTH AND LOSES ITS SIZE. The width is what aligns a
+   column of titles — the reason the glyph is its own element at all — so it
+   stays `--ca-sec-glyph`; only the emoji inside it comes down to sit on the
+   smaller title's line. */
+.ca-journal-sec-group > .ca-journal-header-glyph {
+  font-size: var(--ca-text-sm);
+}
+/* AN OUTLINE WHERE THE SECTION'S IS A SOLID. Both say how many; the section's
+   counts everything in the card and a group's counts its own rows, and a folded
+   group's pill is the only thing it has left to say. */
+.ca-journal-sec-group > .ca-journal-header-count {
+  background: transparent;
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  color: var(--text-faint);
+}
+/* A GROUP'S CREATE KEEPS ITS FILL, AND THE RULE THAT TOOK IT AWAY IS GONE.
+   It read "the fill is the section's": `mod-cta` is a filled pill against a
+   transparent one, and that one step of contrast separated "the action this
+   card is for" from "add a row to this part of it". The premise was the section
+   bar carrying the first kind's create — and it does not. Every create now sits
+   inline in the head of the rows it adds to, so the groups' buttons are the only
+   actions in the card, and de-tinting them would make the one thing a reader is
+   meant to press the quietest thing on the surface. They are already held a tier
+   down by the strip's scale, ~22px against a title line, which is the frame's
+   own way of saying subordinate and does not cost the affordance. */
+/* ── WHERE THE FIELD HEAD WENT (5.14) ──────────────────────────────────
+ *
+ * Six rules stood here under the heading *A FIELD HEAD*, drafted earlier in
+ * this same release, and they were a third size of this one bar: `.ca-journal-sec-field` with no hairline and
+ * a height of its own, an uppercase `--ca-text-xs` eyebrow in place of the
+ * title, a chevron sized down to match it, buttons at `--ca-text-2xs`, and two
+ * rules on `.ca-journal-field` cancelling the card 70-section-surface.css
+ * paints on every other `.ca-journal-sec-fold`.
+ *
+ * THE READER REJECTED THE EYEBROW, in those words, and asked for the head the
+ * journals surface already draws — a card, a full-bleed bar, a glyph in its
+ * slot, a mixed-case title at `--ca-sec-title-size`, a hairline under it and
+ * the chevron at the right-hand end. That head is `.ca-journal-sec-l1` inside
+ * `.ca-journal-sec-fold`, which is to say: it already existed, and every rule
+ * deleted here was a smaller copy of it.
+ *
+ * SO `fieldFrame` BUILDS AT LEVEL 1 AND THIS FILE SAYS NOTHING ABOUT FIELDS.
+ * Not one selector, which is the check that the revert is real — a field that
+ * needed a rule here would be a third size again under a different name. The
+ * eyebrow type itself is not gone from the plugin: `.ca-journal-sec-group` two
+ * screens up still wears it, because a group head IS a division of a card
+ * rather than a card of its own, and that is the distinction 5.14 lost.
+ *
+ * WHAT THE DRAFT KEEPS. All of it except the size. One builder still draws every
+ * field head (`section-frame.ts`), the four label classes and the two
+ * left-hand collapse bars stay retired, every field still folds, the fold is
+ * still keyed by region, and a field under a bar that already names it still
+ * draws no head and lifts its controls into that bar. The report about
+ * collapsed heights is answered by `--ca-sec-bar-h` instead of by a token of
+ * its own — better answered, because a closed field is now the same height as
+ * a closed section rather than merely the same height as another closed
+ * field. */
+
 /* A links row tucked into a header sheds the standalone navigator's
    full-width border strip and bottom margin — inside the bar it's just a
    pill group sitting beside the title. */

@@ -168,6 +168,12 @@ const INDEXES_BAR = "header:🗂️ Across the diary";
 const LOOKING_BACK = "back";
 const LOOKING_BACK_BAR = "header:🕘 Looking back";
 
+// AND THE TITLE EACH SECOND CELL TAKES BACK. Named here rather than written
+// twice: `bar` and the toggle's `bar` have to be the same string, because
+// `dropSoloBar` matches the declared one exactly when the cell rejoins a row.
+const TAGS_BAR = "header:🏷️ Tags";
+const SLEEP_BAR = "header:😴 Sleep";
+
 export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
   // THE BANNER, FIRST. 4.10 gave this page a head; 4.19 made the head a banner
   // — see `bannerSection`. This page's own name is the folder's, which is worth
@@ -296,10 +302,15 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // additive and touches nothing that is already there.
     locked: false,
     row: INDEXES,
-    // NO FORM QUESTION, WHICH IS THE SECOND CELL'S SHAPE. The row's one bar is
-    // Open tasks' to compose; a toggle here would offer the reader a second
-    // full-width bar over the same band, which is the doubling the whole rule
-    // exists to prevent.
+    // A FORM QUESTION AFTER ALL (5.14). It was withheld on the argument that a
+    // toggle here would offer a second full-width bar over the band Open tasks
+    // already titles — and that argument was about the ROW, which is where the
+    // editor answers it: `renderFormQuestion` draws this box checked and
+    // disabled for a cell in a group, saying *"Widgets in a group are
+    // automatically drawn as widgets"*. The question the toggle actually asks
+    // is the one about this cell ALONE, and `bar` below is proof the cell has
+    // an answer to give: untick Open tasks and this section takes that title,
+    // with no way to say it did not want it.
     questions: (spec) => [
       {
         kind: "folder",
@@ -308,10 +319,11 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
         directive: "tag-index",
         hostFolder: spec.hostFolder ?? null,
       },
+      formQuestion(TAGS_BAR, HEADER_KEYWORD),
     ],
     // ITS OWN TITLE BACK IF `open-tasks` IS NOT THERE — see `soloBar`. That
     // section opens this row with `INDEXES_BAR` and is freely removable.
-    bar: "header:🏷️ Tags",
+    bar: TAGS_BAR,
     render: () => ({ fence: "chronoanvil", lines: ["tag-index"] }),
     // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who repoints the cloud
     // at their own folder still has a section the editor can find.
@@ -379,11 +391,19 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // other end, and it is why both exist.
     locked: false,
     row: LOOKING_BACK,
-    // SECOND CELL, SO NO BAR AND NO TOGGLE FOR ONE — On this day composes the
-    // row's, and it says "Looking back" because it is drawn over this too.
+    // SECOND CELL, SO IT COMPOSES NO BAR — On this day composes the row's, and
+    // it says "Looking back" because it is drawn over this too.
+    //
     // ITS OWN TITLE BACK IF `on-this-day` IS NOT THERE — see `soloBar`. That
     // section opens this row with `LOOKING_BACK_BAR` and is freely removable.
-    bar: "header:😴 Sleep",
+    //
+    // AND THE TOGGLE THAT DECLINES IT (5.14), on the rule 5.12 stated and this
+    // catalogue did not carry: offered unless something is anchored into the
+    // section's own bar, and nothing is anchored into this one. In the row the
+    // editor draws it ticked and disabled; the answer is about the cell left
+    // standing alone, which `bar` is the other half of.
+    questions: () => [formQuestion(SLEEP_BAR, HEADER_KEYWORD)],
+    bar: SLEEP_BAR,
     render: () => ({ fence: "chronoanvil", lines: ["sleep-summary"] }),
     locate: (text) => probe(text, /^sleep-summary\b/m),
   },

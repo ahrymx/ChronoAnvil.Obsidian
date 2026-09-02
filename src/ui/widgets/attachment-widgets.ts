@@ -64,6 +64,7 @@ import {
   uniquePath,
 } from "../attachments";
 import type { PluginNoteRegionHost } from "./note-regions";
+import { fieldFoldStore, fieldHead } from "./note-field";
 
 
 // MIME type used by the attachments widget's own drag-to-reorder, so its drop
@@ -771,7 +772,13 @@ export function buildAddCategoryButton(
 // which matters here: `bar` is created before the intake listeners, and the
 // zone's `drop` handler must be registered after the tiles' own.
 
-// The shelf's own subtitle row, and its remove control (3.19.2).
+// The shelf's remove control (3.19.2), which is a head ACTION now (5.14).
+//
+// WHAT WENT: the row it used to build. `.ca-journal-attach-label` was a label
+// and a ✕ in a flex row above the drop zone — a head, drawn by this file, for a
+// field whose only box was its dashed drop target. The label is
+// `fieldHead`'s now and the ✕ is one of its actions, which is what closes the
+// frame this shelf never had: the head, the tools and the body are one object.
 //
 // BUILT ONCE AND REFRESHED, rather than rebuilt from `render`: the button is not
 // torn down on every model change, and the returned function updates the one
@@ -780,17 +787,15 @@ export function buildAddCategoryButton(
 // TAKES A COUNT, NOT THE MODEL. `items` is reassigned by `onReorder` and by the
 // load, so a reference captured here would go stale; a getter asks the question
 // at the moment it is answered.
-function buildShelfLabel(
+function buildShelfRemove(
   deps: PluginNoteRegionHost,
-  wrap: HTMLElement,
+  host: HTMLElement,
   ctx: MarkdownPostProcessorContext,
   key: string,
   label: string,
   count: () => number
 ): () => void {
-  const head = wrap.createDiv({ cls: "ca-journal-attach-label" });
-  head.createSpan({ cls: "ca-journal-attach-label-text", text: label });
-  const drop = head.createEl("button", {
+  const drop = host.createEl("button", {
     cls: "ca-journal-attach-remove",
     attr: { type: "button" },
   });
@@ -886,10 +891,13 @@ function buildAttachToolbar(
     });
   });
 
-  bar.createSpan({
-    cls: "ca-journal-attach-hint",
-    text: "…or drop files here, or paste with the field focused.",
-  });
+  // THE HINT IS NOT DRAWN HERE, AND WAS DRAWN TWICE UNTIL 5.14. This function
+  // ended with one `bar.createSpan` of it and `buildAttachments` made a second
+  // into the same row, so every shelf in every vault printed *"…or drop files
+  // here, or paste with the field focused."* twice, side by side. Neither copy
+  // was newer than the other in any comment; it is what an extraction leaves
+  // when the caller keeps the line it moved. One copy survives, on the zone —
+  // see the end of `buildAttachments`.
 }
 
 // Everything that arrives by drop or by paste.
@@ -973,29 +981,41 @@ export function buildAttachments(
   deps: PluginNoteRegionHost,
   rest: string,
   ctx: MarkdownPostProcessorContext,
-  label: string | null
+  label: string | null,
+  titled = false,
+  barActions: HTMLElement | null = null
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
   const wrap = createDiv({ cls: `ca-journal-attach ca-journal-attach--${key}` });
-  const refreshRemove = label
-    ? buildShelfLabel(deps, wrap, ctx, key, label, () => items.length)
-    : (): void => {};
+  const chrome = fieldHead({
+    wrap,
+    key,
+    label,
+    titled,
+    barActions,
+    store: fieldFoldStore(deps, ctx.sourcePath),
+  });
+  // ASSIGNED LATER, DECLARED HERE, because the control it refreshes is built
+  // beside the toolbar at the foot of this function — the two share the head's
+  // actions slot and their order in it is the order they read in: add, add,
+  // remove. `render` reads this variable at call time, and the first render
+  // cannot run before the load resolves.
+  let refreshRemove: () => void = () => {};
 
   if (!isValidNoteKey(key)) {
-    wrap.createDiv({
+    chrome.body.createDiv({
       cls: "ca-journal-widget-error",
       text: `Invalid attachments key: "${key}"`,
     });
     return wrap;
   }
 
-  const zone = wrap.createDiv({
+  const zone = chrome.body.createDiv({
     cls: "ca-journal-attach-zone",
     attr: { tabindex: "0" },
   });
   const gallery = zone.createDiv({ cls: "ca-journal-attach-gallery" });
   const chips = zone.createDiv({ cls: "ca-journal-attach-chips" });
-  const bar = zone.createDiv({ cls: "ca-journal-attach-actions" });
 
   // In-memory model, exactly like buildTasks: the region is the source of
   // truth on load, this array is the model while the widget is mounted.
@@ -1127,7 +1147,17 @@ export function buildAttachments(
     return false;
   };
 
-  buildAttachToolbar(deps, bar, { ingestFiles, add, persist, render });
+  // ── THE TOOLS, IN THE HEAD (5.14) ───────────────────────────────────
+  //
+  // They were a third row INSIDE the dashed zone: a drop target with buttons in
+  // it, under a label that belonged to neither. `Add file` and `Add link` are
+  // what this field can do, which is what a head's actions slot is for — and
+  // with them gone the zone is what it says it is, a place to drop things.
+  const tools = chrome.actions();
+  buildAttachToolbar(deps, tools, { ingestFiles, add, persist, render });
+  if (label) {
+    refreshRemove = buildShelfRemove(deps, tools, ctx, key, label, () => items.length);
+  }
 
   // ── Where "Add category" used to be ──────────────────────────────────
   //
@@ -1144,7 +1174,10 @@ export function buildAttachments(
   // the Resources header bar, which is the section's own strip — one bar, one
   // button, and the duplication goes with it.
 
-  bar.createSpan({
+  // ON THE ZONE, WHICH IS WHAT IT IS ABOUT (5.14). It was the tail of the
+  // toolbar row, and the toolbar has moved into the head — read from up there
+  // it would be a sentence about a box it is no longer beside.
+  zone.createSpan({
     cls: "ca-journal-attach-hint",
     text: "…or drop files here, or paste with the field focused.",
   });

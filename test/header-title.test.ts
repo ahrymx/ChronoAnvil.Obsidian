@@ -29,6 +29,7 @@ import {
   MODIFIER_KEYWORDS,
   argSpanIn,
   argSpansIn,
+  parseHeaderDirective,
   readArg,
   soleArgSpanIn,
   spliceArg,
@@ -168,7 +169,11 @@ describe("a bar finding its own line back", () => {
     // index within that fence — the two facts the renderer has at draw time.
     const spans = argSpansIn(lines, "header");
     for (const span of spans) {
-      const title = readArg(lines, span);
+      // THE TITLE, NOT THE ARGUMENT. A group head is written `header:2:📖
+      // Lessons` since 5.12, and the renderer hands `HeaderSite` the parsed
+      // title — the same half `headerTitleSpan` compares against, which is what
+      // lets a level prefix survive a rename (`retitledArgument`).
+      const title = parseHeaderDirective(readArg(lines, span)).title;
       const found = headerTitleSpan(lines, {
         bounds: { from: span.line, to: span.line },
         index: 0,
@@ -182,8 +187,8 @@ describe("a bar finding its own line back", () => {
     // The deepest index emits one header per note kind into a SINGLE fence, so
     // these two are the case that no whole-file rule can tell apart — and the
     // case §3.2 of the roadmap gave up on for exactly that reason.
-    const lessons = lines.findIndex((l) => l.trim() === "header:📖 Lessons");
-    const practice = lines.findIndex((l) => l.trim() === "header:🛠️ Practice");
+    const lessons = lines.findIndex((l) => l.trim() === "header:2:📖 Lessons");
+    const practice = lines.findIndex((l) => l.trim() === "header:2:🛠️ Practice");
     expect(lessons).toBeGreaterThan(-1);
     expect(practice).toBeGreaterThan(lessons);
     const bounds = { from: lessons, to: practice };

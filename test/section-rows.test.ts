@@ -775,3 +775,135 @@ describe("a group is dealt into two columns", () => {
     expect(regroupFlatNote(PAGE, CAT, blocksOf(PAGE))).toBeNull();
   });
 });
+
+// ── THE TITLE A CELL TAKES BACK WHEN THE GROUP COMES APART (5.14) ────────
+//
+// THE REPORT: *"I broke up the 'inside this week' group from the default layout
+// of the week overview page, and noticed that open tasks is rendering as a
+// widget despite it not being toggled."*
+//
+// A row's second cell composes no bar — the opener writes the single one the
+// fence gets — so a cell that leaves lands in a fence of its own with a
+// directive and nothing over it, which the page draws as a bare widget. Every
+// other route into that shape already handed the section its `bar`: `rowRuns`
+// when a row composes with one member, `cutFromRun` when a removal empties the
+// seat beside it, the add path when a cell cannot rejoin its row. **Break up the
+// group** is the fourth, and it was the one nobody had written.
+describe("a cell that stops being one takes its title back — 5.14", () => {
+  // Two sections that share a row. The second declares `bar` and composes none,
+  // which is the shape every catalogue's barless cell has.
+  const opener: FlatSection = {
+    ...one("first", "alpha"),
+    render: () => ({ fence: "chronoanvil", lines: ["header:📖 The band", "alpha"] }),
+  };
+  const cell: FlatSection = { ...one("second", "beta"), bar: "header:⏳ Beta" };
+  const cat = [opener, cell];
+
+  const grouped = [
+    "```chronoanvil",
+    "row",
+    "header:📖 The band",
+    "alpha",
+    "cell",
+    "beta",
+    "```",
+  ].join("\n");
+
+  const apart = (): string =>
+    regroupFlatNote(grouped, cat, [["first"], ["second"]]) ?? grouped;
+
+  it("gives the departing cell the bar its catalogue declares", () => {
+    expect(apart()).toContain("header:⏳ Beta");
+    // OVER ITS OWN DIRECTIVE, not over the one it left behind.
+    const fences = apart().split("```").filter((f) => f.includes("beta"));
+    expect(fences).toHaveLength(1);
+    expect(fences[0]).toContain("header:⏳ Beta");
+    expect(fences[0]).not.toContain("alpha");
+  });
+
+  it("leaves the opener's own bar exactly where it was", () => {
+    // The band's title belongs to the section that wrote it. A break-up moves
+    // the other cell out; it does not rename what is left.
+    expect(apart()).toContain("header:📖 The band");
+    expect(apart().match(/header:📖 The band/g)).toHaveLength(1);
+  });
+
+  it("says nothing to a section that was already alone", () => {
+    // THE 5.11 GUARD, STRUCTURALLY. A lone barless block has two causes — a
+    // title never given, and a reader who answered *show as widget* on a section
+    // that offers the toggle — and the file cannot tell them apart. This does
+    // not have to ask: it looks at the block the section was in when the regroup
+    // BEGAN, so a section that was not a cell a moment ago is never handed a
+    // title, however barless it is.
+    const already = ["```chronoanvil", "beta", "```"].join("\n");
+    expect(regroupFlatNote(already, cat, [["second"]])).toBeNull();
+  });
+
+  it("does not rescue a title the cut leaves behind", () => {
+    // WRITTEN AS A FAILING EXPECTATION FIRST, and the failure is the point.
+    //
+    // The gate on this phase is `soloBar`'s: a fence that titles itself, in the
+    // reader's words or through `frame: section`, is left exactly as they have
+    // it. That gate is asked of the fence the section LANDS IN — and a cell the
+    // reader titled by hand inside a row does not bring its title with it.
+    // Phase one moves the section's own directive line, which is what
+    // `cellLineIn` answers, and anything the reader wrote above it stays in the
+    // fence it came from. So the departing fence arrives untitled, the gate
+    // says so correctly, and the catalogue's bar goes on.
+    //
+    // OLDER THAN THIS PHASE AND NOT CAUSED BY IT. Before it, the same cut
+    // orphaned the same line and the cell landed with nothing over it; the only
+    // thing that changed is which title the reader ends up looking at. Fixing
+    // it means teaching phase one to carry a bare `header:` above a cell's
+    // directive, which is a question about where a cell BEGINS — `widgetRun`'s
+    // territory — and not one to answer inside a title phase.
+    //
+    // NOT REACHABLE FROM THE WINDOW, which is why it is recorded rather than
+    // repaired here: no catalogue composes a cell with a bar of its own, and the
+    // editor refuses to make a column of a section that draws one. It takes a
+    // hand-edited fence to get here.
+    const titled = [
+      "```chronoanvil",
+      "row",
+      "header:📖 The band",
+      "alpha",
+      "cell",
+      "header:🌟 Mine",
+      "beta",
+      "```",
+    ].join("\n");
+    const out = regroupFlatNote(titled, cat, [["first"], ["second"]]) ?? titled;
+    const mine = out.split("```").find((f) => f.includes("header:🌟 Mine"));
+    // The reader's line is still in the note, and it is in the WRONG fence.
+    expect(mine).toBeDefined();
+    expect(mine).toContain("alpha");
+    expect(mine).not.toContain("beta");
+    // And the cell that left is titled by the catalogue, because by the time
+    // the gate is asked there is nothing else over it.
+    expect(out.split("```").find((f) => f.includes("beta"))).toContain(
+      "header:⏳ Beta"
+    );
+  });
+
+  it("takes a borrowed title back off when the cell rejoins", () => {
+    // `dropSoloBar`, which is `soloBar`'s inverse and the reason a break-up
+    // followed by a regroup is a round trip rather than a fence with two bars in
+    // it. Matched against the declared string, so only the line this module
+    // wrote comes off.
+    const solo = [
+      "```chronoanvil",
+      "alpha",
+      "```",
+      "",
+      "```chronoanvil",
+      "header:⏳ Beta",
+      "beta",
+      "```",
+    ].join("\n");
+    const bare: FlatSection[] = [one("first", "alpha"), cell];
+    const back = regroupFlatNote(solo, bare, [["first", "second"]]) ?? solo;
+    expect(back).not.toContain("header:⏳ Beta");
+    expect(back).toContain("row");
+    expect(back.split("```").filter((f) => f.includes("beta"))).toHaveLength(1);
+  });
+});

@@ -16,7 +16,7 @@ import {
 } from "./custom-journal";
 import { PAGE_TEMPLATE } from "./journal";
 import { TrackerDef, TrackerType, journalSurface } from "../trackers/trackers";
-import { plural, slugify } from "../core/util";
+import { parseHeaderDirective, plural, slugify } from "../core/util";
 import type { StoredJournalConfig } from "./journal-manifest";
 
 // ── Reading a journal back out of its own folder ──────────────────────────
@@ -244,6 +244,23 @@ function trackersIn(file: ScannedFile): string[] {
 // processor itself does when it renders them (each `header:` opens a new bar
 // and the widgets after it anchor into that bar), and it reads the old
 // one-fence-per-kind layout identically.
+//
+// ── AND THE LINE IT PAIRS WITH IS THE TABLE, NOT THE BUTTON (5.12) ────────
+//
+// The button was a proxy for "which kind is this head over", and it stopped
+// being a reliable one when the deepest index gained a bar of its own: the
+// primary kind's create rises to that bar, so `header:🗂️ What's below` sat
+// directly above `button:cooking:new-recipe` and recovered the SECTION's name
+// as the recipe kind's — "🗂️" and "What's below" written into a journal's
+// config, from a note that says nothing of the sort.
+//
+// `kind-table:<id>` names the kind outright, sits under the same head, and is
+// there whether or not the head carries a button. It is what the pairing was
+// reaching for through the button all along.
+//
+// THE LEVEL PREFIX IS NOT PART OF THE TITLE. A group head is composed
+// `header:2:📖 Lessons`, so the emoji read off `rest` unparsed is "2:📖". Taken
+// through `parseHeaderDirective`, which is the one place that grammar lives.
 function kindLabelsFromFences(files: ScannedFile[]): Map<
   string,
   { emoji?: string; plural?: string }
@@ -257,13 +274,11 @@ function kindLabelsFromFences(files: ScannedFile[]): Map<
           header = d;
           continue;
         }
-        if (d.key !== "button" || !header) continue;
-        const action = d.rest.split(":").slice(1).join(":").trim();
-        if (!action.startsWith("new-")) continue;
-        const kindId = action.slice("new-".length);
-        if (!kindId || kindId === "container" || kindId === "page") continue;
+        if (d.key !== "kind-table" || !header) continue;
+        const kindId = d.rest.trim();
+        if (!kindId) continue;
         // "📋 Recipes" → emoji, then the rest.
-        const text = header.rest.trim();
+        const text = parseHeaderDirective(header.rest.trim()).title;
         const space = text.indexOf(" ");
         if (space === -1) continue;
         out.set(kindId, {

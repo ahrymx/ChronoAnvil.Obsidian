@@ -49,7 +49,7 @@ import {
   parseTasks,
   serializeTasks,
 } from "../tasks";
-import { noteFoldState, setNoteFold } from "./note-field";
+import { fieldFoldStore, fieldHead } from "./note-field";
 
 /**
  * What a body-region widget needs in order to persist itself.
@@ -372,7 +372,9 @@ export function buildList(
   host: NoteRegionHost,
   rest: string,
   ctx: MarkdownPostProcessorContext,
-  label: string | null
+  label: string | null,
+  titled = false,
+  barActions: HTMLElement | null = null
 ): HTMLElement {
   // `key[:placeholder]` — same grammar as `note:`, minus the `#variant` slot,
   // since a list has only one rendering.
@@ -381,17 +383,27 @@ export function buildList(
   const placeholder = colon === -1 ? "" : rest.slice(colon + 1).trim();
 
   const wrap = createDiv({ cls: `ca-journal-list ca-journal-list--${key}` });
-  if (label) wrap.createDiv({ cls: "ca-journal-list-label", text: label });
+  // A LIST FOLDS NOW, WHICH IS THE HALF OF 5.14 A READER ASKS FOR FIRST.
+  // Highlights and Challenges are two of the longest fields on a monthly entry
+  // and were the only two in the plugin with no way to put them away.
+  const chrome = fieldHead({
+    wrap,
+    key,
+    label,
+    titled,
+    barActions,
+    store: fieldFoldStore(host, ctx.sourcePath),
+  });
 
   if (!isValidNoteKey(key)) {
-    wrap.createDiv({
+    chrome.body.createDiv({
       cls: "ca-journal-widget-error",
       text: `Invalid list key: "${key}"`,
     });
     return wrap;
   }
 
-  const list = wrap.createDiv({ cls: "ca-journal-list-rows" });
+  const list = chrome.body.createDiv({ cls: "ca-journal-list-rows" });
 
   // In-memory model, same contract as buildTasks: the region is the source of
   // truth on load, this is the source of truth while the widget is open. All
@@ -483,21 +495,30 @@ export function buildPath(
   host: NoteRegionHost,
   rest: string,
   ctx: MarkdownPostProcessorContext,
-  label: string | null
+  label: string | null,
+  titled = false,
+  barActions: HTMLElement | null = null
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
   const wrap = createDiv({ cls: "ca-journal-path" });
-  if (label) wrap.createDiv({ cls: "ca-journal-path-label", text: label });
+  const chrome = fieldHead({
+    wrap,
+    key,
+    label,
+    titled,
+    barActions,
+    store: fieldFoldStore(host, ctx.sourcePath),
+  });
 
   if (!isValidNoteKey(key)) {
-    wrap.createDiv({
+    chrome.body.createDiv({
       cls: "ca-journal-widget-error",
       text: `Invalid path key: "${key}"`,
     });
     return wrap;
   }
 
-  const addRow = wrap.createDiv({ cls: "ca-journal-path-add" });
+  const addRow = chrome.body.createDiv({ cls: "ca-journal-path-add" });
   const addIcon = addRow.createSpan({ cls: "ca-journal-path-add-icon" });
   setIcon(addIcon, "circle-plus");
   const addInput = addRow.createEl("input", {
@@ -505,7 +526,7 @@ export function buildPath(
     cls: "ca-journal-path-add-input",
   });
   addInput.placeholder = "Add a step…";
-  const table = wrap.createDiv({ cls: "ca-journal-path-list" });
+  const table = chrome.body.createDiv({ cls: "ca-journal-path-list" });
 
   // In-memory model; the region is the source of truth on load, this array
   // thereafter. Steps are ChronoAnvil tasks (order = array order = on-disk order).
@@ -592,65 +613,37 @@ export function buildTasks(
   rest: string,
   ctx: MarkdownPostProcessorContext,
   label: string | null,
-  // ── WHETHER A SECTION BAR ALREADY NAMES THIS BLOCK (5.10) ──────────────
+  // ── WHETHER A SECTION BAR ALREADY NAMES THIS BLOCK (5.10, 5.14) ────────
   //
-  // `tasks:` is a FIELD, and its bar belongs to the family `note:` and the
-  // capture log wear — a label, a chevron on the left, no hairline. That is a
-  // consistent family and it is not the thing this release is correcting.
+  // 5.10 wrote this: *"`tasks:` is a FIELD, and its bar belongs to the family
+  // `note:` and the capture log wear — a label, a chevron on the left, no
+  // hairline. That is a consistent family and it is not the thing this release
+  // is correcting."* It was a consistent family of one file's opinion: `list:`
+  // and `path:` drew a label and no fold, and `attach:` drew a label row
+  // outside its own box. 5.14 is the release that corrects it, and the branch
+  // this comment guards is now `fieldHead`'s, asked once for all six.
   //
-  // What it corrects is the field bar drawn UNDER A SECTION BAR. The
-  // `checklist` section renders `header:✅ Tasks` over a single `tasks:tasks`
-  // field, so a Study note drew two heads for one section and the stylesheet
-  // deleted the second — taking Compact and the progress readout with it,
-  // which is a control removed from the page to settle a layout question.
-  //
-  // Titled, the field keeps its tools and gives up its title and its fold: the
-  // section's bar is the title, and the section's chevron is the fold. Untitled
-  // — a hand-written `tasks:` fence, a leaf note's own list — nothing else
-  // names it and it draws exactly the bar it always drew.
-  titled = false
+  // What 5.10 corrected stands unchanged: the `checklist` section renders
+  // `header:✅ Tasks` over a single `tasks:tasks` field, and a field that drew
+  // its own head under that bar made two heads for one section. Titled, this
+  // keeps its tools and gives up its title and its fold — and the tools go INTO
+  // the bar's actions slot now rather than into a bare strip under it, which is
+  // where they were always meant to be.
+  titled = false,
+  barActions: HTMLElement | null = null
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
-  const wrap = createDiv({
-    cls: titled
-      ? "ca-journal-tasks"
-      : "ca-journal-tasks ca-journal-note--collapsible",
+  const wrap = createDiv({ cls: "ca-journal-tasks" });
+
+  const chrome = fieldHead({
+    wrap,
+    key,
+    label: label ?? "Tasks",
+    titled,
+    barActions,
+    store: fieldFoldStore(host, ctx.sourcePath),
   });
-
-  const isCollapsed = (): boolean =>
-    "plugin" in host
-      ? noteFoldState((host as PluginNoteRegionHost).plugin, ctx.sourcePath, key)
-      : false;
-
-  const setFold = (collapsed: boolean): void => {
-    if ("plugin" in host) {
-      void setNoteFold(
-        (host as PluginNoteRegionHost).plugin,
-        ctx.sourcePath,
-        key,
-        collapsed
-      );
-    }
-  };
-
-  const head = wrap.createDiv({
-    cls: titled
-      ? "ca-journal-tasks-head is-bare"
-      : "ca-journal-tasks-head ca-journal-note-collapse-bar",
-  });
-  if (!titled) {
-    const titleLeft = head.createDiv({ cls: "ca-journal-tasks-title-left" });
-    const chevron = titleLeft.createDiv({
-      cls: "ca-journal-note-chevron ca-journal-tasks-chevron",
-    });
-    setIcon(chevron, "chevron-down");
-    const titleEl = titleLeft.createDiv({
-      cls: "ca-journal-note-label ca-journal-tasks-label",
-    });
-    titleEl.setText(label ?? "Tasks");
-  }
-
-  const headRight = head.createDiv({ cls: "ca-journal-tasks-head-right" });
+  const headRight = chrome.actions();
 
   let isCompact = false;
   const compactBtn = headRight.createEl("button", {
@@ -675,29 +668,15 @@ export function buildTasks(
 
   const progressEl = headRight.createDiv({ cls: "ca-journal-tasks-progress" });
 
-  if (!titled) {
-    const applyFold = (collapsed: boolean): void => {
-      wrap.toggleClass("is-collapsed", collapsed);
-    };
-    applyFold(isCollapsed());
-
-    head.addEventListener("click", (e) => {
-      e.preventDefault();
-      const next = !wrap.hasClass("is-collapsed");
-      applyFold(next);
-      setFold(next);
-    });
-  }
-
   if (!isValidNoteKey(key)) {
-    wrap.createDiv({
+    chrome.body.createDiv({
       cls: "ca-journal-widget-error",
       text: `Invalid tasks key: "${key}"`,
     });
     return wrap;
   }
 
-  const addRow = wrap.createDiv({ cls: "ca-journal-tasks-add" });
+  const addRow = chrome.body.createDiv({ cls: "ca-journal-tasks-add" });
   const addIcon = addRow.createSpan({ cls: "ca-journal-tasks-add-icon" });
   setIcon(addIcon, "circle-plus");
   const addInput = addRow.createEl("input", {
@@ -705,7 +684,7 @@ export function buildTasks(
     cls: "ca-journal-tasks-add-input",
   });
   addInput.placeholder = "Add a task…";
-  const list = wrap.createDiv({ cls: "ca-journal-tasks-list" });
+  const list = chrome.body.createDiv({ cls: "ca-journal-tasks-list" });
 
   // In-memory model. Populated from the body region on load; thereafter the
   // widget mutates this and persists + re-renders.

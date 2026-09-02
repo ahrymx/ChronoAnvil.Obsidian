@@ -250,7 +250,7 @@ describe("recall widget registration", () => {
     expect(widgets).toContain('case "recall":');
     // Either call form: `this.buildRecall(...)` while it sat on the class, or
     // `buildRecall(this, ...)` now that it lives in ./recall-widgets.ts.
-    expect(widgets).toMatch(/buildRecall\((?:this, )?rest, ctx, label\)/);
+    expect(widgets).toMatch(/buildRecall\((?:this, )?rest, ctx, label[,)]/);
   });
 
   it("builds a surface card, and lets the section own the head (5.10)", () => {
@@ -279,10 +279,26 @@ describe("recall widget registration", () => {
     expect(cssRules(".ca-journal-recall-chevron")).toEqual([]);
     expect(cssRules(".ca-journal-recall-title-left")).toEqual([]);
 
-    // What the widget still draws: a label slot for a fence nothing else
-    // names, and its tools.
-    expect(recallSrc).toContain('cls: "ca-journal-recall-head"');
-    expect(recallSrc).toContain('cls: "ca-jrc-tools"');
+    // ── AND NOT ITS OWN HEAD ELEMENT EITHER, AS OF 5.14 ────────────────
+    //
+    // 5.10 stopped this drawing a TITLE and left the element that held it:
+    // `.ca-journal-recall-head`, whose only remaining job was to be a box for
+    // `.ca-jrc-tools`. That is an actions slot, and the frame has one. So the
+    // head goes the way the bar went, and the tools land where every other
+    // field's controls land — in the section's bar when one names this fence,
+    // in the field's own head when nothing does.
+    expect(recallSrc).not.toContain('cls: "ca-journal-recall-head"');
+    expect(cssRules(".ca-journal-recall-head")).toEqual([]);
+    expect(recallSrc).toContain("fieldHead({");
+
+    // AND THE TOOLS WRAPPER WENT WITH IT. `.ca-jrc-tools` was a flex row with a
+    // 4px gap and `margin-left: auto` — which is `.ca-journal-header-widgets`,
+    // spelled a second time inside the head that already anchors it. Two auto
+    // margins on one flex line is the stranding failure 30-header-bars.css
+    // documents, so keeping it would have been a bug and not just a duplicate.
+    expect(recallSrc).not.toContain('cls: "ca-jrc-tools"');
+    expect(cssRules(".ca-jrc-tools")).toEqual([]);
+    expect(recallSrc).toContain("chrome.actions()");
   });
 
   it("resolves both properties through the registry", () => {

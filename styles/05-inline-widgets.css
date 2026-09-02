@@ -419,24 +419,155 @@
   touch-action: pan-y;
 }
 
-/* WITHHELD WHERE THE BLOCK ALREADY PAINTS, which is the four-case rule the block
-   head already follows two rules down and the `is-unframed` reset list follows
-   above. A canvas tile and a section run are both surfaces somebody else owns:
-   `frame: none` says this block has given up its chrome, and a box inside it
-   would be the chrome arriving again under a different name; a `journal-sec-block`
-   is already inside a section's own card, and a second border there is the
-   doubling this whole comment is about, one level out.
+/* WITHHELD WHERE THE READER ASKED FOR NO CHROME, and nowhere else.
+   `frame: none` says this block has given up its box; a group drawing one
+   inside it would be the chrome arriving again under a different name, which
+   is an instruction ignored rather than a border doubled.
+
+   `is-unframed` COVERS `frame: section` TOO — one class for everything the
+   block can hold, said at the top of `chromeClasses` — and that used to need
+   disentangling here, because the two mean opposite things about chrome. It no
+   longer does: a `frame: section` block draws a head from its fold, so the
+   group inside it draws none, and the rule BELOW stands its box down on that
+   ground instead. One predicate, in one place.
+
+   ── AND A SECTION RUN IS NO LONGER ON THIS LIST (5.14) ──
+   `.ca-journal-sec-block .ca-journal-group` stood the box down here too, on the
+   argument that a section is already a card and a second border inside it is
+   the doubling this file is about one level out. That argument was written
+   when a group's only self-description was a 14px strip along its foot — take
+   the box away and what is left still reads as a row of cards, which is what
+   the reader was looking at anyway.
+
+   IT STOPPED BEING TRUE THE MOMENT THE GROUP GREW A HEAD. A caption naming
+   three cards, with the grip on it, announces a container — and then nothing
+   contained anything: on a `header:` section the strip floated over two loose
+   cards with no edge under them or beside them, while the same group on the
+   homepage was a framed panel. Reported as exactly that, from three
+   screenshots: *"groups should always look like the homepages (header and
+   footer)."*
+
+   THE DOUBLING IT WAS AVOIDING IS NOT WHAT HAPPENS. This box is
+   `--ca-rule-hair` on `--background-primary-alt`, which is DARKER than the
+   `--background-secondary` a section paints — so inside a section it reads as
+   an inset panel, the same way the cards inside it read against the box. Two
+   borders argue when they are the same weight on the same ground at the same
+   radius; these are neither.
+
+   AND THE CASE THAT PROMPTED THE SELECTOR IS THE RULE BELOW'S NOW, not this
+   one's — which is the whole reason it had to go rather than be narrowed. A
+   section run is not one situation but two, and one selector could not tell
+   them apart: where the bar is in the group's OWN fence it names the group, so
+   the group draws no head and the next rule takes its box; where the bar is in
+   an earlier block of the run it names the section and not this group, which is
+   one thing among several inside it, so the group keeps both. Both answers are
+   reached by asking about the head.
 
    GROUND, BORDER AND PADDING ONLY. The flex column stays — it is what puts the
    foot under the row rather than beside it, and that is true wherever the box is
    drawn. */
-.ca-journal-widget-block.is-unframed .ca-journal-group,
-.ca-journal-sec-block .ca-journal-group {
+.ca-journal-widget-block.is-unframed .ca-journal-group {
   background: none;
   border: none;
   border-radius: 0;
   padding: 0;
 }
+
+/* ── AND WHEREVER SOMETHING ELSE ALREADY DREW THE HEAD (5.14) ──
+ *
+ * NO HEAD, NO BOX. A group withholds its caption strip when its fence carries a
+ * `header:` bar — the bar IS the group's head, drawn once and full width above
+ * the columns, which is what a row fence has meant since 4.70 and what the
+ * shipped catalogue composes. row.ts makes that call; this rule follows it, so
+ * the decision is made once and read here rather than restated.
+ *
+ * WHY THE BOX HAS TO GO WITH IT. The bar comes with a section card around the
+ * whole block, so a group box inside it is a card in a card — and the reader
+ * saw both at once on the shipped *Lately* section: `LATELY · OPEN TASKS`
+ * captioned directly under a bar reading *Lately*, inside a second border.
+ * *"Some groups in the default layouts are hardcoded inside a section frame?"*
+ * They are, deliberately; one section is what should be drawn.
+ *
+ * THE FOOT STAYS. It is the paging strip and the `+`'s home, and neither has a
+ * place on a section bar — the bar's own actions row belongs to the section.
+ *
+ * `:not(:has())` RATHER THAN A CLASS, because the absence IS the condition and
+ * a class would be a second way of saying it that could disagree with the
+ * first. */
+.ca-journal-group:not(:has(> .ca-journal-group-head)) {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+/* ── The head (5.14) ────────────────────────────────────────────────────
+ *
+ * The group's own top edge, and the answer to a report that read: *"the
+ * homepage group has no header, so give it one and move the drag handle to the
+ * top-middle."*
+ *
+ * WHY THERE WAS NONE. 4.9 built the foot instead and the note below it still
+ * carries the argument — "the top of a group is where every card inside it
+ * draws its own head, and a bar across that would be a title above a row of
+ * titles". That is an argument against a BAR, and it holds. What it left behind
+ * is a box whose top edge is nothing, holding three cards that read as three
+ * blocks, with everything the box has to say about itself hidden in a 14px
+ * strip underneath.
+ *
+ * SO THIS IS A CAPTION, NOT A BAR. `--ca-text-2xs` uppercase and muted, the
+ * chrome scale a section's actions strip and a group head inside a card already
+ * take; a hairline UNDER it rather than over, because unlike the foot it names
+ * what follows; and its words are DERIVED — each card's own name, glyph off,
+ * joined with ` · ` (row.ts). It says TODAY · OPEN TASKS · LOGBOOK, which is
+ * not a title over three titles but a list of the three, which is what a box
+ * around them is for.
+ *
+ * AND THE GRIP COMES BACK TO THE CENTRE. `.jbd-aside` shoved a group's grip off
+ * the centre line in 4.8.6 because a grip centred on the top edge of a row of
+ * three landed on the middle card's own; 4.9 moved it to the foot instead. The
+ * head is a STRIP ABOVE the cards, so the two grips are a band's height apart
+ * even when they share an x — the collision needs both to be on the same edge,
+ * and they no longer are. So the group's grip is where every other grip on the
+ * page is, and the rule below is the base rule with nothing overridden. */
+.ca-journal-group-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 16px, not the foot's 14: the grip is `top: 4px` and 10px tall, and a strip
+     that ended at 14 would clip the last row of dots. */
+  min-height: 16px;
+  /* MIRRORS THE FOOT'S `padding-top`, which mirrors the section bar's strip.
+     The three bands are one object at three places and the number is one
+     decision — see 30-header-bars.css, which carries the measurement. */
+  padding-bottom: 8px;
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
+}
+/* THE CAPTION ENDS BEFORE THE GRIP, which is the one measurement in this rule
+   that is not a scale. The grip is 44px wide and centred, so anything reaching
+   past `50% - 22px` is under it; the extra 8px is the gap this strip already
+   sets between its own children. A long list of card names ellipsises rather
+   than running beneath the dots. */
+.ca-journal-group-head-title {
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
+  text-transform: uppercase;
+  color: var(--text-faint);
+  line-height: 1.35;
+  min-width: 0;
+  max-width: calc(50% - 30px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Nothing to say and still an edge. A group whose cards carry no names of their
+   own — three charts, say — draws the strip anyway: it is the box's top edge and
+   the grip's host, and an affordance that appeared only on groups that happened
+   to be nameable would be the harder thing to learn. `:empty` would hide the
+   caption's element, not the strip, and hiding it would change nothing on
+   screen, so there is no rule here. */
 
 /* ── The foot (4.9 §2.2) ────────────────────────────────────────────────
  *
@@ -447,9 +578,16 @@
  * its own head, and a bar across that would be a title above a row of titles.
  * The foot is the one edge of the box with nothing already on it.
  *
- * IT IS ALSO THE GRIP'S HOST, which is what retired `.jbd-aside`: a block's grip
- * used to be shoved off the centre line to avoid landing on the middle widget's,
- * and a strip that belongs to the box has no such collision to avoid. */
+ * IT WAS ALSO THE GRIP'S HOST until 5.14, which is what retired `.jbd-aside`: a
+ * block's grip used to be shoved off the centre line to avoid landing on the
+ * middle widget's, and a strip that belongs to the box had no such collision to
+ * avoid. The head is a strip above the cards and has none either, so the grip
+ * sits where every other grip on the page does and this band keeps the paging.
+ *
+ * ── AND IT IS DRAWN ON EVERY GROUP (5.14) ──
+ * Briefly it was not — see row.ts, which carries the reversal and the report
+ * that forced it. What matters here is that this rule is unconditional and the
+ * `is-focused` mark below can therefore land on any group. */
 .ca-journal-group-foot {
   position: relative;
   display: flex;
@@ -663,12 +801,14 @@
   outline: 2px solid var(--ca-border-focus);
   outline-offset: 1px;
 }
-/* The count sits at the right on a group with no pages, so the `+` needs the
-   strip's place rather than the count's — pushed to the end, where the numbers
-   are on a group that has them. */
-.ca-journal-group-foot > .ca-journal-group-add:last-child {
-  margin-left: 6px;
-}
+/* AND IT NEEDS NO PLACEMENT RULE, because the foot is `justify-content:
+   flex-end` and the `+` is its last child in both branches — alone on a
+   one-page group, after the page numbers on a paged one, which is what makes it
+   read as "one more of these" rather than as a control of its own.
+
+   IT SPENT THE FIRST DRAFT OF 5.14 ON THE HEAD, with a `margin-left: auto` to
+   push it past the caption. That move is reversed: it went up because the foot
+   was about to stop being drawn, and the foot is drawn again. */
 /* A HOVER-REVEALED CONTROL NEEDS A RESTING STATE ON TOUCH, which is the rule
    `hover-reveal.test.ts` enforces across the whole stylesheet — and it caught
    this one before it shipped. There is no hover on a phone, so an affordance
@@ -1427,8 +1567,9 @@
 .ca-journal-header-bar:hover > .ca-jbd-handle,
 .ca-journal-widget-block:hover > .ca-jbd-handle,
 .ca-journal-widget-card:hover > .ca-jbd-handle,
-.ca-journal-note--collapsible:hover > .ca-jbd-handle,
-.ca-journal-note--collapsible:hover .ca-jbd-handle,
+/* `.ca-journal-note--collapsible` was a fourth and fifth selector here until
+   5.14. The class is gone — every field is a `.ca-journal-sec-fold` now, and
+   the two selectors for that one are already in this list. */
 .ca-journal-table:hover .ca-jbd-handle {
   opacity: 1;
 }
@@ -1441,30 +1582,64 @@
    coordinates — two sets of dots on top of each other, read from a vault as one
    duplicated. Its whole content was "get out of the way of grips I cannot see".
 
-   What replaces it is not a better hiding place. The foot is the group's OWN
-   edge, the one strip on the box with nothing else on it, so the collision
-   cannot arise there at all — and a rule that exists only to work around a
-   collision is deleted with it rather than carried forward as an exception
-   nobody can re-derive.
+   What replaces it is not a better hiding place. 4.9 moved the grip to the FOOT
+   — the one strip on the box with nothing else on it — and dressed it there:
+   full height, flush left, no centring, because a 14px strip with nothing under
+   it can be the whole target.
 
-   FULL HEIGHT rather than the 10px a grip laid over a block's top edge takes:
-   there the height is small because everything under it is a widget with
-   controls of its own, and here the foot IS the target, with nothing beneath it
-   for a taller hit area to swallow. */
-.ca-journal-group-foot > .ca-jbd-handle {
-  top: 0;
-  bottom: 0;
-  height: auto;
-  left: 0;
-  transform: none;
-  justify-content: flex-start;
-}
+   AND 5.14 BROUGHT IT BACK TO THE CENTRE, ON THE HEAD. The collision needs both
+   grips on the same edge; a head is a strip ABOVE the cards, so the block's grip
+   and the middle card's are a band apart even when they share an x. There is
+   nothing left to dodge, so there is no rule left to write: the base rule above
+   already centres a grip over the top edge of what it drags at 4px and 10px
+   tall, which is where a reader looks for one, and the head is sized to hold it.
+   `.jbd-aside`, and the foot's own overrides with it, are gone with the problem
+   they were working around rather than carried forward as exceptions nobody can
+   re-derive. */
 /* AND IT ANSWERS TO THE WHOLE BOX. `.ca-jbd-host:hover` reveals a grip when the
    thing it drags is hovered, and the thing this one drags is the group — where
-   that rule alone would ask a reader to find a 14px strip before it showed them
+   that rule alone would ask a reader to find a 16px strip before it showed them
    what the strip was for. */
-.ca-journal-group:hover .ca-journal-group-foot > .ca-jbd-handle {
+.ca-journal-group:hover .ca-journal-group-head > .ca-jbd-handle {
   opacity: 1;
+}
+/* ── AND A BARE FENCE'S BLOCK GRIP STEPS OFF THE CENTRE LINE (5.14) ─────
+ *
+ * The obituary above says `jbd-aside` went "with the problem it was working
+ * around". It went with the problem in a GROUP, where a head is a strip above
+ * the cards and the two grips are a band apart. The same collision arrived
+ * somewhere else in the same release, and this is the one place it could not be
+ * closed by giving the control an edge of its own.
+ *
+ * WHAT THE CASE IS. A fence with no `header:` line and several widgets — a
+ * diary entry's shared band is the whole of it — now draws a grip per widget
+ * (`block-drag.ts`). The block's own grip has no head and no bar to sit on, so
+ * it lands on the container's top edge, which IS the first widget's top edge:
+ * 4.8.6's two sets of dots at two identical coordinates, read from a vault as
+ * one duplicated.
+ *
+ * OFF THE CENTRE AND UP INTO THE BLOCK'S OWN MARGIN, which is both axes rather
+ * than the one `jbd-aside` used, and the second is what makes it a PLACE rather
+ * than a dodge. `.ca-journal-widget-block` opens with `margin-top: 0.5em` — a
+ * strip that belongs to the block and to nothing inside it, which is the group
+ * head's argument reached without a head. Left-aligned as well, so that even on
+ * a block whose margin is collapsed away the two are not on the same x.
+ *
+ * ONLY WITH THE CLASS, and `block-drag.ts` adds it only where it drew widget
+ * grips. A fence with one widget has no second grip to avoid and keeps the
+ * centre, which is where a reader looks. */
+.ca-journal-widget-block.has-widget-grips > .ca-jbd-handle {
+  top: -8px;
+  left: 0;
+  transform: none;
+  width: 36px;
+}
+/* AND IT KEEPS THAT PLACE INSIDE A SECTION RUN, where the rule a few screens up
+   pins every grip to `top: 4px`. That rule is about a grip with no margin above
+   it to use; this block has one either way, and a grip pulled back onto the
+   card's top edge would be the collision again with the class still on. */
+.ca-journal-sec-block .ca-journal-widget-block.has-widget-grips > .ca-jbd-handle {
+  top: -8px;
 }
 .ca-jbd-handle:active {
   cursor: grabbing;

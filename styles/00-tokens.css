@@ -302,6 +302,30 @@
      the floor of — the same exception `30-header-bars.css` already draws for the
      actions row. */
   --ca-sec-bar-h: calc(1.35 * var(--ca-sec-title-size) + 2 * var(--ca-sec-pad));
+  /* ── AND ONE HEIGHT FOR EVERY GROUP HEAD (5.12) ─────────────────────
+     The same argument one tier down. A group head inside a card is a division
+     of it, and three of them down one card have to be three of the same object
+     — a count pill on one and a create button on the next must not make the
+     first shorter.
+
+     ITS OWN TITLE IS THE FLOOR, on `--ca-sec-bar-h`'s rule: `--ca-text-sm` at
+     the same 1.35 line-height the frame sets, plus the head's own 8px of air
+     above the rule and `--ca-sec-pad` below it. Smaller than a section bar on
+     purpose — a group that collapsed to the same height as the section holding
+     it would be the tiering this token exists to draw, undone by a number. */
+  --ca-grp-head-h: calc(1.35 * var(--ca-text-sm) + 8px + var(--ca-sec-pad));
+  /* ── AND THERE IS NO THIRD HEIGHT (5.14) ───────────────────────────
+     `--ca-field-bar-h` stood here for one draft of this release: a smaller floor for the head
+     a `note:`, `list:`, `attach:`, `tasks:` or capture directive draws over its
+     own body, chevron-floored rather than title-floored because that head's
+     title was an eyebrow two tiers under its own chevron.
+
+     THE HEAD IT SIZED IS GONE. The eyebrow was rejected on sight and a field is
+     drawn as a level-1 section now (`fieldFrame`), so `--ca-sec-bar-h` above is
+     its floor — which is the same answer to the same report. The defect was
+     never that fields wanted a height of their own; it was that four renderers
+     each picked one, and a token no other tier reads is a fourth pick with a
+     nicer name. */
   /* A WIDTH, ON AN ELEMENT WHOSE OWN FONT-SIZE RESOLVES IT — which is the whole
      reason this number moved in 4.13 rather than staying put. `em` on a `width`
      is relative to the element's own type, so when the glyph came down from

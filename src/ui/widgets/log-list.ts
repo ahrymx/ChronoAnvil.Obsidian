@@ -55,6 +55,7 @@
 import { MarkdownRenderChild, setIcon } from "obsidian";
 import type { App, TFile } from "obsidian";
 import type { NoteRegionHost } from "./note-regions";
+import { fieldHead } from "./note-field";
 import { readNoteRegion } from "../../core/notestore";
 import { whenEditor, type WhenValue } from "../when-editor";
 import {
@@ -123,9 +124,23 @@ export interface LogListOptions {
   watchPaths?: string[];
   /** Extra modifier class on the wrapper, so the two callers can be told apart. */
   modifier: string;
-  /** The fold bar's text, or null for a list with no bar. */
+  /** The field head's title, or null for a list with no head. */
   label: string | null;
-  collapsible: boolean;
+  /**
+   * WHETHER SOMETHING ELSE ALREADY NAMES THIS LIST, and that bar's actions
+   * slot. 5.14, and the same pair every field renderer now takes.
+   */
+  titled?: boolean;
+  barActions?: HTMLElement | null;
+  /**
+   * Where the fold is remembered.
+   *
+   * `collapsible` USED TO BE HERE AND IS GONE (5.14). It meant "draw a fold
+   * bar", and a labelled list that did not fold is not a thing any more: a head
+   * is a head, and every one of them folds. Both logbook callers passed
+   * `label: null` with it false, which is the same widget it was before —
+   * no label, no head, nothing to fold.
+   */
   startCollapsed: () => boolean;
   onFold: (v: boolean) => void;
   /** What to say when there is nothing here. */
@@ -735,34 +750,34 @@ export function buildLogList(
   opts: LogListOptions
 ): HTMLElement {
   const { key } = opts;
-  // `journal-note--collapsible` is borrowed rather than reimplemented: the
-  // fold bar, its chevron and its collapsed state are the same three rules the
-  // `note:` field uses, and a second set would drift the first time either
-  // moved. The list joins that rule's hidden-children selector.
   const wrap = createDiv({
-    cls: `ca-journal-capture-log ca-journal-note ${opts.modifier}${
-      opts.collapsible ? " ca-journal-note--collapsible" : ""
-    }`,
+    cls: `ca-journal-capture-log ca-journal-note ${opts.modifier}`,
   });
 
-  // The fold bar, kept identical to the `note:#collapse` one it replaces — the
-  // section folds where it always folded, remembers what it always remembered,
-  // and the `captureCollapsedByDefault` setting still means what it says.
-  if (opts.collapsible && opts.label) {
-    const bar = wrap.createDiv({ cls: "ca-journal-note-collapse-bar" });
-    setIcon(bar.createDiv({ cls: "ca-journal-note-chevron" }), "chevron-down");
-    bar.createDiv({ cls: "ca-journal-note-label", text: opts.label });
-    const apply = (v: boolean): void => wrap.toggleClass("is-collapsed", v);
-    apply(opts.startCollapsed());
-    bar.addEventListener("click", (evt) => {
-      evt.preventDefault();
-      const next = !wrap.hasClass("is-collapsed");
-      apply(next);
-      opts.onFold(next);
-    });
-  } else if (opts.label && (!opts.types || opts.types.length <= 1)) {
-    wrap.createDiv({ cls: "ca-journal-note-label", text: opts.label });
-  }
+  // ── THE HEAD IS THE FRAME'S (5.14) ───────────────────────────────────
+  //
+  // What was here: a private copy of the `note:` collapse bar — chevron on the
+  // left, micro-label, its own click handler — plus a second branch drawing a
+  // bare label for a list that was labelled but not collapsible. Both are
+  // `fieldHead`'s cases now, and the second one no longer exists: a labelled
+  // field folds.
+  //
+  // THE STORE IS PASSED IN rather than derived, because this widget's fold has
+  // always been the CALLER's: `captureCollapsedByDefault` is read by
+  // `noteFoldState` through the capture widget's own `startCollapsed`, and a
+  // logbook's is a no-op. Handing the frame those two functions keeps every
+  // caller's answer exactly where it was.
+  const chrome = fieldHead({
+    wrap,
+    key,
+    label: opts.label,
+    titled: opts.titled,
+    barActions: opts.barActions,
+    store: {
+      isCollapsed: (): boolean => opts.startCollapsed(),
+      setCollapsed: (_k: string, v: boolean): void => opts.onFold(v),
+    },
+  });
 
   const filters: LogFilters = {
     search: "",
@@ -771,7 +786,7 @@ export function buildLogList(
     sort: "desc",
   };
   const pillCountMap = buildLogDeck(
-    wrap,
+    chrome.body,
     opts,
     filters,
     () => render(),
@@ -779,11 +794,13 @@ export function buildLogList(
   );
 
   // ── CONTAINED SCROLL VIEWPORT ─────────────────────────────────────────
-  const scrollContainer = wrap.createDiv({ cls: "ca-journal-capture-scroll" });
+  const scrollContainer = chrome.body.createDiv({
+    cls: "ca-journal-capture-scroll",
+  });
   const list = scrollContainer.createDiv({ cls: "ca-journal-capture-list" });
 
   // ── FOOTER STATUS ─────────────────────────────────────────────────────
-  const footer = wrap.createDiv({ cls: "ca-journal-logbook-footer" });
+  const footer = chrome.body.createDiv({ cls: "ca-journal-logbook-footer" });
   const footerCount = footer.createSpan({ cls: "ca-jcl-footer-count" });
   footer.createSpan({ cls: "ca-jcl-footer-cap", text: "Scrollable viewport" });
 
@@ -936,7 +953,7 @@ export function buildLogList(
   };
 
   if (opts.add) {
-    buildLogAddBox(wrap, opts, opts.add, {
+    buildLogAddBox(chrome.body, opts, opts.add, {
       items: () => items,
       file: () => file,
       setFile: (f) => {

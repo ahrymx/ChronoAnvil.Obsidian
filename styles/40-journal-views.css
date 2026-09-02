@@ -414,22 +414,14 @@
  *
  * The section bar is the head. What is left below is the widget: a label slot
  * for a bare `recall:` fence that nothing else names, and its tools. */
-.ca-journal-recall-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.ca-journal-recall-label {
-  font-size: var(--ca-text-sm);
-  font-weight: 600;
-  color: var(--text-muted);
-}
-.ca-jrc-tools {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-}
+/* AND IN 5.14 THE LABEL SLOT WENT TOO. What 5.10 left standing was a head for
+   the bare `recall:` case — the last private one on this widget — and the field
+   frame is that head for every kind at once. `fieldHead` in note-field.ts is
+   where the two branches this comment describes now live, stated once. */
+/* AND THE TOOLS WRAPPER WENT WITH IT (5.14). Its two jobs were a 4px gap and
+   `margin-left: auto`, and `.ca-journal-header-widgets` — the slot the frame
+   already anchors to the right of every head — does both. A second auto margin
+   inside the first is the stranding failure 30-header-bars.css documents. */
 .ca-jrc-tool {
   display: inline-flex;
   align-items: center;

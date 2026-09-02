@@ -89,49 +89,72 @@ describe("the section header is built in one place", () => {
   });
 
   it("is the only thing that builds a section's fold bar", () => {
-    // ── THE ASSERTION THAT STOPS A FOURTH COPY, WRITTEN OUT (5.10) ────────
+    // ── THE ALLOWANCE LIST RETIRED (5.14) ────────────────────────────────
     //
-    // `.ca-journal-note-collapse-bar` is the `note:` FIELD bar — chevron on the
-    // left, uppercase micro-label, no hairline, no glyph slot, no count, no
-    // actions row. It is a legitimate object at the scale it was drawn for, and
-    // that is exactly what made it the thing three section heads were copied
-    // from: it is four lines and it folds.
+    // What stood here: `.ca-journal-note-collapse-bar`, the `note:` FIELD bar —
+    // chevron on the left, uppercase micro-label, no hairline, no actions slot
+    // — with THREE files allowed to build it, because a field was a different
+    // object from a section and the field family owned its own head. The test
+    // stopped a fourth SECTION head from being copied off it and could not
+    // stop a fourth FIELD head, which is what `path:`, `attach:` and the
+    // capture log each turned out to be.
     //
-    // Two modules own the field family and keep it. Anything else building this
-    // class is a section head wearing a field's clothes, which is what the
-    // Trackers head, the Recall head and the tally head each were.
-    //
-    // `note-regions.ts` IS IN THE FAMILY, for the one region that is a field:
-    // `tasks:` under a Study note's own markdown heading has nothing titling
-    // it, so it draws the field bar its neighbours draw. Under a section bar it
-    // draws no head at all — asserted below rather than trusted, because "is
-    // allowed to build it" and "builds it in the untitled branch only" are
-    // different claims and only the second is the rule.
-    const FIELD = [
-      "src/ui/widgets/note-field.ts",
-      "src/ui/widgets/log-list.ts",
-      "src/ui/widgets/note-regions.ts",
-    ];
-    const offenders = sources
-      .filter(
-        (s) =>
-          !FIELD.includes(s.file) &&
-          s.code.includes("ca-journal-note-collapse-bar")
-      )
-      .map((s) => s.file);
-    expect(offenders).toEqual([]);
+    // A field is now `foldableSection` through `fieldFrame`, so
+    // the list has nothing to hold: no module outside this one builds a head
+    // of either kind. The assertion is the rule with no exceptions to state.
+    for (const { file, code } of sources) {
+      if (file === FRAME) continue;
+      expect(code, file).not.toContain("ca-journal-note-collapse-bar");
+      expect(code, file).not.toContain("ca-journal-tasks-head");
+      expect(code, file).not.toContain("ca-journal-recall-head");
+      expect(code, file).not.toContain('"ca-journal-sec-fold-toggle"');
+    }
 
-    // The tasks head is the untitled arm of a conditional, and the titled arm
-    // is `is-bare` — a right-aligned strip carrying the Compact toggle and the
-    // progress readout into the section's own frame. Between 5.7 and 5.10 both
-    // arms drew a bar and the stylesheet deleted whichever one lost, which is
-    // how a Study note quietly stopped having a Compact toggle at all.
-    const tasks = sources.find(
-      (s) => s.file === "src/ui/widgets/note-regions.ts"
-    )!.code;
-    expect(tasks).toContain('cls: titled');
-    expect(tasks).toContain('? "ca-journal-tasks-head is-bare"');
-    expect(tasks).toContain(': "ca-journal-tasks-head ca-journal-note-collapse-bar"');
+    // AND THERE IS NO FIELD-SIZED HEAD LEFT TO COPY. 5.14 first gave the frame
+    // a `variant: "field"` — a third size of the bar, `ca-journal-sec-field` in
+    // place of `ca-journal-sec-l<n>` — and this test guarded the class against a
+    // renderer spelling it. The reader rejected that size before release, so
+    // `fieldFrame` builds a level-1 section like every other fold and the
+    // class exists nowhere, which is a stronger form of the same guard: the
+    // sweep below is over the WHOLE tree, `section-frame.ts` included.
+    for (const { file, code } of sources) {
+      expect(code, file).not.toContain("ca-journal-sec-field");
+      expect(code, file).not.toContain('variant: "field"');
+    }
+    const frame = readSrc("section-frame");
+    expect(frame).toContain("export function fieldFrame(");
+    // One head, still: the point of 5.14 that survives its own revert.
+    expect(frame).toContain("foldableSection(");
+  });
+
+  it("draws every field's head through the frame, and withholds it by one rule", () => {
+    // ── DECISION 2, ASSERTED WHERE IT IS DECIDED (5.14) ───────────────────
+    //
+    // Seven field kinds, one head. `fieldHead` in note-field.ts states the two
+    // branches once — no label or already titled from outside means no head and
+    // the controls go into the bar that named it; otherwise `fieldFrame` — and
+    // every renderer calls it rather than restating them. Before this release
+    // `buildTasks` was the only one that knew about the titled case, and it
+    // knew by carrying two `cls:` strings for CSS to choose between.
+    const head = readSrc("note-field");
+    expect(head).toContain("export function fieldHead(");
+    expect(head).toContain("fieldFrame(");
+    for (const file of [
+      "src/ui/widgets/note-regions.ts",
+      "src/ui/widgets/attachment-widgets.ts",
+      "src/ui/widgets/recall-widgets.ts",
+      "src/ui/widgets/log-list.ts",
+    ]) {
+      const code = sources.find((s) => s.file === file)!.code;
+      expect(code, file).toContain("fieldHead({");
+    }
+
+    // THE TOOLS SURVIVE THE WITHHELD HEAD, which is the half of the rule that
+    // is easy to lose: a Study note's `tasks:` under `header:✅ Tasks` draws no
+    // title and still shows Compact and its progress readout. 5.10 fixed that
+    // once for this one widget by hand; the frame now owes it to all seven.
+    expect(head).toContain("barActions");
+    expect(head).toContain("ca-journal-field-tools");
   });
 
   it("is given the host the section's body goes into", () => {
@@ -274,8 +297,10 @@ describe("the section header is built in one place", () => {
     const block = frame.slice(at, at + 220);
     expect(block).toContain('owns === "blocks"');
     expect(block).toContain("ca-journal-header-bar");
-    // Both variants share the look.
-    expect(frame).toContain("ca-journal-sec ca-journal-sec-l");
+    // Both variants share the look, and there is one spelling of it again:
+    // the composed class had a second arm for the field size while 5.14 was
+    // being written, and the size went before the release did.
+    expect(frame).toContain("ca-journal-sec ca-journal-sec-l${opts.level}");
   });
 
   it("lets one section put a link in the title slot", () => {
@@ -601,6 +626,119 @@ describe("the section's actions sit on a strip of their own", () => {
 // Asserted here rather than left to the DOM, for the reason applyTypeChange
 // became a method in 2.55.5: a decision reachable only through a rendered
 // element is a decision nobody can check.
+
+describe("a field wears the section's own head — 5.14", () => {
+  // ── THE REVERT, PINNED ─────────────────────────────────────────────────
+  //
+  // 5.14 unified the diary's seven field heads and first drew the result at a
+  // third size: `variant: "field"`, an uppercase `--ca-text-xs` eyebrow, no
+  // hairline, no glyph slot, a `--ca-field-bar-h` of its own, and a rule
+  // cancelling the card 70-section-surface.css paints on every fold.
+  //
+  // The reader rejected the size — "I do not like the eyebrow headers" — and
+  // named the head they wanted: the one the journals surface draws. So the
+  // unification stands and the size is gone, which is a thing worth asserting
+  // in both directions. The eyebrow was reached for because the four labels it
+  // replaced were eyebrows, and the same reasoning would reach for it again.
+  const css = () => readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("builds the field head at level 1, through the same frame", () => {
+    const frame = readSrc("section-frame");
+    const at = frame.indexOf("export function fieldFrame(");
+    expect(at).toBeGreaterThan(0);
+    const body = frame.slice(at, at + 600);
+    expect(body).toContain("foldableSection(");
+    expect(body).toContain("level: 1");
+    // The marker the three stand-down rules read. It is the whole of what
+    // `fieldFrame` adds on top of an ordinary fold.
+    expect(body).toContain('addClass("ca-journal-field")');
+  });
+
+  it("leaves no third size of the bar in the stylesheet", () => {
+    const t = css();
+    expect(t).not.toContain("ca-journal-sec-field");
+    expect(t).not.toContain("--ca-field-bar-h");
+    // AND NOTHING TAKES THE CARD BACK OFF THE WRAPPER. That was the shape of
+    // the rejected treatment — the fold kept its class and a rule cancelled
+    // the fill, the border and the radius 70-section-surface.css had just
+    // painted — so the check is on the three declarations rather than on the
+    // selector: a rule whose SUBJECT is the bare field wrapper may adjust its
+    // spacing (the flex column supplies the gap) and may not undraw its box.
+    //
+    // "BARE" IS TWO CONDITIONS, and both are load-bearing.
+    //
+    // THE FIELD IS THE SUBJECT — the rightmost compound — with `:has()` stripped
+    // first. `.ca-journal-tasks:has(> .ca-journal-sec-fold.ca-journal-field)`
+    // names the field only to say what its own subject CONTAINS, and that rule
+    // stands the WIDGET's card down, which is required rather than forbidden.
+    // Without the strip this test reads the argument as the subject and fails
+    // the very rule that fixed the doubling it exists to catch.
+    //
+    // AND THERE IS NO ANCESTOR. A field inside a section card gives its own box
+    // up (70-section-surface.css), so those rules cancel all three declarations
+    // on purpose. What must never happen is the UNSCOPED cancel — the shape of
+    // the rejected treatment, where a field is never a card anywhere.
+    for (const rule of t.split("}")) {
+      const [selectors, body = ""] = rule.split("{");
+      const bare = selectors.replace(/:has\([^)]*\)/g, "");
+      const unscoped = bare.split(",").some((sel) => {
+        const parts = sel.trim().split(/[\s>+~]+/).filter(Boolean);
+        return (
+          parts.length === 1 && parts[0].includes("ca-journal-field")
+        );
+      });
+      if (!unscoped) continue;
+      for (const decl of ["background:", "border:", "border-radius:"]) {
+        expect(body, decl).not.toContain(decl);
+      }
+    }
+  });
+
+  it("closes to the same height as every other section head", () => {
+    // The reader's second report — "sections collapsed are not the same size"
+    // — is answered by `--ca-sec-bar-h` rather than by a token of its own, so
+    // a closed field and a closed section are one box rather than two boxes
+    // that happen to agree.
+    const t = css();
+    expect(t).toContain(
+      ".ca-journal-sec-l1:not(.ca-journal-header-bar-untitled) {"
+    );
+    expect(t).toMatch(/min-height:\s*var\(--ca-sec-bar-h\)/);
+  });
+
+  it("draws exactly one box around a field, in all three places", () => {
+    const t = css();
+    // 1. On a diary entry the field IS the card: nothing stands it down, and
+    //    the two widgets that draw a surface of their own stand theirs down
+    //    instead. THE WRAP IS THE OUTER ELEMENT — `buildTasks` and the capture
+    //    log create it and hand it to `fieldHead`, which builds the field card
+    //    inside it — so these are `:has(>` rather than descendant selectors.
+    //    Written the other way round they match nothing at all, and a vault
+    //    render showed the doubling this is here to stop.
+    expect(t).toContain(
+      ".ca-journal-tasks:has(> .ca-journal-sec-fold.ca-journal-field)"
+    );
+    expect(t).toContain(
+      ".ca-journal-capture-log:has(> .ca-journal-sec-fold.ca-journal-field)"
+    );
+    expect(t).not.toContain(".ca-journal-field .ca-journal-tasks");
+    expect(t).not.toContain(".ca-journal-field .ca-journal-capture-log");
+    // 2. Inside a section the field's card stands down, so a Study topic's
+    //    three Resources shelves are three parts of one card.
+    expect(t).toContain(
+      ".ca-journal-sec-block .ca-journal-sec-fold.ca-journal-field"
+    );
+    // 3. …and the section it is inside keeps its OWN surface, which the
+    //    `:has()` stand-down took away for one release because a field wears
+    //    the same wrapper class a `frame: section` fence does.
+    expect(t).toContain(
+      ".ca-journal-sec-fold:not(.ca-journal-field)"
+    );
+    expect(t).not.toMatch(
+      /:has\(\s*\.ca-journal-sec-fold\s*\)/
+    );
+  });
+});
 
 describe("splitGlyph", () => {
   it("lifts a leading emoji out of the title", () => {

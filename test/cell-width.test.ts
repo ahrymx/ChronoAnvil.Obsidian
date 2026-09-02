@@ -563,17 +563,48 @@ describe("the divider and the box, as drawn", () => {
     expect(rules).not.toContain(".ca-journal-block-cell > * + *");
   });
 
-  it("is withheld where the block already paints", () => {
-    // The four-case rule the block head already follows. A canvas tile has given
-    // up its chrome and a section run is already inside somebody's card; a box
-    // in either is the doubling this whole design is about, one level out.
+  it("is withheld only where the reader asked for no chrome", () => {
+    // `frame: none` is an INSTRUCTION, not a surface: a group drawing its box
+    // inside a block that has given up its own is the chrome coming back under
+    // another name. That is the one case, and it is the only one left.
     const rule = ruleFor(
       rules,
-      ".ca-journal-widget-block.is-unframed .ca-journal-group,\n.ca-journal-sec-block .ca-journal-group"
+      ".ca-journal-widget-block.is-unframed .ca-journal-group"
     );
     expect(rule).toContain("background: none");
     expect(rule).toContain("border: none");
     expect(rule).toContain("padding: 0");
+  });
+
+  it("needs no clause for `frame: section` — 5.14", () => {
+    // `chromeClasses` gives `frame: none` AND `frame: section` the same
+    // `is-unframed`, and about chrome the two mean opposite things: `none` is a
+    // block with no box, `section` is a block whose box is a fold wrapped round
+    // everything it drew. A `:not(:has(> .ca-journal-sec-fold))` stood here to
+    // tell them apart, and it is deleted — a `frame: section` block draws a
+    // head, so the group inside it draws NONE, and the no-head rule stands its
+    // box down on that ground. Two predicates agreeing is one predicate too
+    // many, and the one that stays is the one that also answers `header:`.
+    expect(rules).not.toContain(":not(:has(> .ca-journal-sec-fold))");
+  });
+
+  it("draws the box inside a section run, which it did not — 5.14", () => {
+    // THE REPORT, from three screenshots: *"groups should always look like the
+    // homepages (header and footer)."* A group under a `header:` bar stood its
+    // box down, on the 4.59-era argument that a section is already a card. That
+    // held while a group's only self-description was a strip along its foot; it
+    // stopped holding the moment the group grew a HEAD, because a caption
+    // naming three cards with the grip on it announces a container and then
+    // nothing contained anything — the strip floated over two loose cards with
+    // no edge under them, while the identical group on the homepage was a
+    // framed panel.
+    //
+    // ASSERTED AS AN ABSENCE, because that is what the fix is: the selector is
+    // gone from the stylesheet, so the base rule reaches every surface. Written
+    // against the comment-stripped text so the paragraph above this rule — which
+    // names the retired selector, as every obituary in these files does — is not
+    // itself the match.
+    expect(rules).not.toContain(".ca-journal-sec-block .ca-journal-group");
   });
 
   it("says nothing in the foot that the reader can already see", () => {

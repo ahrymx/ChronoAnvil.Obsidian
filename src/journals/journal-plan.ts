@@ -116,9 +116,12 @@ import {
   ROW_KEYWORD,
   cutFromFence,
   dropSoloBar,
+  insertBar,
+  isHeaderLine,
   leadingBar,
   needsSoloBar,
   soloBar,
+  titledHeadersIn,
   splitDirective,
 } from "../core/directive-grammar";
 import {
@@ -799,6 +802,61 @@ export function missingSoloBar(
   return needsSoloBar(runLines, bar) ? (bar as string) : null;
 }
 
+// ── A FENCE FULL OF GROUP HEADS AND NO SECTION BAR (5.12) ────────────────
+//
+// `needsSoloBar` asks `isSectionFence`, which asks whether the fence carries a
+// `header:` at all — the right question while a fence carried at most one. The
+// deepest index carries one PER NOTE KIND, so every Topic index already in a
+// vault answers "titled" while missing the only bar that names the section those
+// heads sit in. Its first group's head is read as the section's, and the card
+// comes out headed "📝 Notes" with Lessons and Experiments inside it.
+//
+// COUNTED, NOT MATCHED, and that is the whole of why this is safe. Comparing the
+// file's first head against the bar the catalogue would compose reports a
+// missing bar on every note whose reader RENAMED it — the one thing this must
+// never do, since renaming in place is the gesture that titles it. A count moves
+// with a rename: one head per group that is actually here, and nothing else, is
+// a fence with no bar; one more than that is a fence with one, whatever it says.
+//
+// STRICT ON BOTH SIDES. A head short (a reader deleted one and kept its table)
+// and a head over (something else in the fence titles itself) both decline —
+// the repair writes a line into somebody's note, so the only case it takes is
+// the one it can name exactly.
+export function missingGroupBar(
+  runLines: readonly string[],
+  section: JournalSection,
+  ctx: SectionContext
+): string | null {
+  const parts = section.parts?.(ctx, sectionOverrides(ctx, section.id)) ?? [];
+  const groups = parts.filter((p) => p.lines.some((l) => isHeaderLine(l.trim())));
+  // ONE GROUP IS NO GROUPING on this side too: a section whose parts carry no
+  // heads composes a bar and a body, which is exactly what `needsSoloBar`
+  // already reports. Two doors onto one case is two answers to be told apart.
+  if (groups.length < 2) return null;
+  const present = new Set(runLines.map((l) => l.trim()));
+  const here = groups.filter((g) => present.has(g.probe.trim())).length;
+  if (here === 0) return null;
+  if (titledHeadersIn(runLines).length !== here) return null;
+  return declaredBar(section, ctx) ?? null;
+}
+
+// The bar this run is short of, by either door.
+//
+// ONE ANSWER FOR THE PLAN AND THE WRITE, which is this file's rule wherever a
+// preview promises something: the sentence the reader reads and the line the
+// save inserts come from the same call.
+export function missingBar(
+  runLines: readonly string[],
+  run: SectionRun,
+  section: JournalSection,
+  ctx: SectionContext
+): string | null {
+  return (
+    missingSoloBar(runLines, run, section, ctx) ??
+    missingGroupBar(runLines, section, ctx)
+  );
+}
+
 export function planSections(
   text: string,
   ctx: SectionContext,
@@ -828,7 +886,7 @@ export function planSections(
       const gaps = missingParts(runLines, section, ctx);
       // A TITLE IS A MISSING PART TOO, and it is reported in the same words for
       // the same reason — see `missingSoloBar`, which is what decides.
-      const noBar = missingSoloBar(runLines, run, section, ctx);
+      const noBar = missingBar(runLines, run, section, ctx);
       // A reconfigure and an extension are both real writes, and a section can
       // want both at once. `reconfigure` wins the label because it is the one
       // that rewrites a line the reader may have edited; the extension is
@@ -1230,7 +1288,11 @@ export function applySections(
           // AND THE TITLE, IF THE PLAN SAID SO. Asked of the same function the
           // plan asked rather than of a second derivation of it, which is this
           // file's rule wherever a preview promises a write.
-          out = soloBar(out, missingSoloBar(out, run, section, ctx) ?? undefined);
+          // `insertBar` RATHER THAN `soloBar`, because the gate has already been
+          // asked: `missingBar` is the same call the plan made, and `soloBar`'s
+          // own guard would refuse the group case it just approved.
+          const bar = missingBar(out, run, section, ctx);
+          if (bar) out = insertBar(out, bar);
         }
       }
       chunks.push({ ids: run.sectionIds, filler: run.filler, lines: out });

@@ -424,14 +424,18 @@ describe("the section catalogue", () => {
       const rendered = renderSection(section, indexCtx(twoKind, 0));
       expect(rendered.match(/```chronoanvil/g)?.length).toBe(1);
       expect(rendered).not.toContain("```base");
-      // Order within the fence is header → button → table, per kind, so the
-      // importer can pair each button with the header above it.
+      // ONE BAR, THEN A GROUP PER KIND (5.12). The fence opens with the
+      // section's own name — and only that. Each kind is a level-2 head with
+      // its own create button inline in it and its own table under it, so the
+      // section bar has no actions strip at all: an action belongs beside the
+      // rows it adds to, and every row here is inside a group.
       expect(rendered.split("\n").filter((l) => l.trim())).toEqual([
         "```chronoanvil",
-        "header:🍽️ Recipes",
+        "header:🗂️ What's below",
+        "header:2:🍽️ Recipes",
         "button:cooking:new-recipe",
         "kind-table:recipe",
-        "header:🔥 Attempts",
+        "header:2:🔥 Attempts",
         "button:cooking:new-attempt",
         "kind-table:attempt",
         "```",

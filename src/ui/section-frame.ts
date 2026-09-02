@@ -213,6 +213,25 @@ export interface SectionFrameOptions {
   owns?: SectionOwns;
 }
 
+// ── AND THERE IS NO THIRD SIZE OF THIS BAR ─────────────────────────────
+//
+// 5.14's first pass added `variant: "field"` here: a smaller head for the
+// seven region widgets, with an uppercase eyebrow in place of the title, no
+// hairline and no glyph slot. The reader saw it before the release went out
+// and rejected it — "I do not like the eyebrow headers" — and named the head
+// they wanted instead: the one the journals surface already draws.
+//
+// SO THE VARIANT IS GONE RATHER THAN RETUNED. What it bought was one head for
+// every field, and that survives untouched: `fieldFrame` below still builds
+// every `note:`, `list:`, `path:`, `tasks:`, `attach:` and capture head through
+// `foldableSection`, and the four private label classes and two left-hand
+// collapse bars 5.14 retired stay retired. What it cost was a THIRD SPELLING of
+// a bar the plugin already had two of — its own type scale, its own height
+// token, its own chevron size, and a wrapper rule cancelling the card that
+// 70-section-surface.css paints on every other fold. A field is a section of a
+// note; drawing it as a section is both what was asked for and one fewer size
+// to keep in agreement.
+
 export interface SectionFrame {
   // `.ca-journal-header-bar` — what HeaderBar folds and what the fold walk finds.
   root: HTMLElement;
@@ -255,6 +274,13 @@ export function sectionFrame(
     };
   }
 
+  // A FIELD'S TITLE IS SPLIT LIKE ANY OTHER. The field variant used to
+  // skip this on the argument that a field's title is the reader's own string
+  // after the `|` and moving its first character into a slot they cannot see
+  // edits their note. The slot is not a rewrite — the string on disk is
+  // untouched, `splitGlyph` only moves a leading token with no letter or digit
+  // in it, and `attach:photos|📎 Files` is exactly the case that reads better
+  // with the emoji in the same column as every section's above it.
   const split = splitGlyph(opts.title);
   const glyph = opts.glyph ?? split.glyph;
   const text = opts.glyph ? opts.title.trim() : split.text;
@@ -396,4 +422,61 @@ export function foldableSection(
   });
 
   return { frame, body, wrapper: section };
+}
+
+// ── the field head (5.14) ─────────────────────────────────────────────
+//
+// WHAT THIS REPLACES. Five renderers drew four heads for one job:
+//
+//   `note:`   a plain label, or `.ca-journal-note-collapse-bar` under
+//             `#collapse` — chevron on the LEFT, no hairline, no actions slot
+//   `list:`   a plain label, and no fold at all
+//   `path:`   a plain label, and no fold at all
+//   `attach:` a label ROW with the shelf's ✕ in it, sitting OUTSIDE the dashed
+//             drop zone, so the only box on the field was the drop target
+//   `tasks:`  the collapse bar again, plus Compact and a progress readout
+//
+// A diary entry is composed almost entirely out of these — one shared fence,
+// no `header:` line anywhere — so the entry surface is the one place in the
+// plugin where the heads a reader sees down a page are drawn by five different
+// functions. It shows: Captured folds to a bare label, Tasks folds to a head
+// still carrying a button, and Highlights does not fold.
+//
+// THE FIELD IS NOT A NEW COMPONENT, AND IT IS NOT A NEW SIZE EITHER. It is `foldableSection` at level 1: the same card, the same
+// full-bleed head, the same glyph slot, the same mixed-case title, the same
+// chevron on the right, the same `--ca-sec-bar-h` collapsed height, the same
+// actions strip. The one thing this function adds is `.ca-journal-field` on the
+// wrapper, and that class is a MARKER rather than a look — three rules read it,
+// all of them to stop a box being drawn twice around one field, and they are
+// named where they live (70-section-surface.css, 75-home-dashboard.css,
+// 95-special-events.css).
+//
+// WHY LEVEL 1 AND NOT 2. Level decides the fold scope a `header:` bar claims
+// over the blocks after it, and this bar claims none — `foldableSection` passes
+// `owns: "children"`, so no `.ca-journal-header-bar` marker is written and the
+// note's fold walk never sees it. What the number is left deciding is the SIZE,
+// and a field is the only thing on a diary entry: drawn at level 2 it would be
+// a nested bar with no bar to nest in.
+//
+// THE STORE IS THE CALLER'S, and for the diary it is the one that already
+// exists: `noteFoldState` / `setNoteFold` in note-field.ts, keyed by
+// `noteFoldKey(sourcePath, key)` over `settings.collapsedNoteSections`. That
+// key is `<path>::note:<region>` for every field, deliberately — the fold
+// belongs to the REGION rather than to whichever widget is drawing it, so a
+// reader who folded Captured keeps it folded when the widget changes under
+// them, which is precisely what this release does to five of them.
+export function fieldFrame(
+  host: HTMLElement,
+  opts: { title: string; note?: string },
+  store: FoldStore,
+  key: string
+): FoldableSection {
+  const built = foldableSection(
+    host,
+    { title: opts.title, level: 1, note: opts.note },
+    store,
+    key
+  );
+  built.wrapper.addClass("ca-journal-field");
+  return built;
 }

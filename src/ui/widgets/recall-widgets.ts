@@ -38,6 +38,7 @@ import {
   tally,
 } from "../../review/recall";
 import type { PluginNoteRegionHost } from "./note-regions";
+import { fieldFoldStore, fieldHead } from "./note-field";
 
 
 export async function writeRecallGrade(
@@ -111,12 +112,14 @@ export function buildRecall(
   deps: PluginNoteRegionHost,
   rest: string,
   ctx: MarkdownPostProcessorContext,
-  label: string | null
+  label: string | null,
+  titled = false,
+  barActions: HTMLElement | null = null
 ): HTMLElement {
   const key = rest.split(":")[0].trim();
   const wrap = createDiv({ cls: "ca-journal-recall" });
 
-  // ── NO FOLD BAR OF ITS OWN (5.10) ─────────────────────────────────────
+  // ── NO HEAD OF ITS OWN, AND NOW NO PRIVATE ONE EITHER (5.10, 5.14) ────
   //
   // 5.7 gave this widget a private collapse bar — chevron on the LEFT, an
   // uppercase micro-label, no hairline, no glyph slot — and the `recall`
@@ -127,21 +130,32 @@ export function buildRecall(
   // built in TypeScript so that CSS could unbuild it wherever it was wrong,
   // which is to say everywhere the section is composed.
   //
-  // The head is the section's. This draws the widget.
-  const head = wrap.createDiv({ cls: "ca-journal-recall-head" });
-  if (label) head.createDiv({ cls: "ca-journal-recall-label", text: label });
-  const tools = head.createDiv({ cls: "ca-jrc-tools" });
+  // 5.10 stopped drawing the title. What was left was a head element that
+  // existed to hold `.ca-jrc-tools` — the edit and reset controls — which is
+  // an actions slot by another name. It is `fieldHead`'s now: under the
+  // section's bar the tools go INTO that bar, and on a hand-written
+  // `recall:key|Cards` fence the widget gets the same head every other field
+  // gets, instead of the label element the stylesheet was hiding.
+  const chrome = fieldHead({
+    wrap,
+    key,
+    label,
+    titled,
+    barActions,
+    store: fieldFoldStore(deps, ctx.sourcePath),
+  });
+  const tools = chrome.actions();
 
   if (!isValidNoteKey(key)) {
-    wrap.createDiv({
+    chrome.body.createDiv({
       cls: "ca-journal-widget-error",
       text: `Invalid recall key: "${key}"`,
     });
     return wrap;
   }
 
-  const body = wrap.createDiv({ cls: "ca-jrc-body" });
-  const foot = wrap.createDiv({ cls: "ca-jrc-foot" });
+  const body = chrome.body.createDiv({ cls: "ca-jrc-body" });
+  const foot = chrome.body.createDiv({ cls: "ca-jrc-foot" });
 
   // The region is the source of truth on load; this is the source of truth
   // while the widget is open — the same contract buildTasks and buildList use.

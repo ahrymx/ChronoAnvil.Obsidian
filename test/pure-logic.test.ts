@@ -290,25 +290,53 @@ describe("parseHeaderDirective", () => {
     expect(parseHeaderDirective("📚 Journals")).toEqual({
       level: 1,
       title: "📚 Journals",
+      // A LEVEL NOBODY WROTE (5.12). The grammar still answers 1, and now says
+      // that it chose the number rather than read it — which is what lets the
+      // block processor fill it in from the head's position in its fence, and
+      // leave a `header:1:` that means it alone.
+      explicit: false,
     });
   });
   it("explicit level prefix is parsed and stripped", () => {
-    expect(parseHeaderDirective("2:Study")).toEqual({ level: 2, title: "Study" });
-    expect(parseHeaderDirective("1:Top")).toEqual({ level: 1, title: "Top" });
+    expect(parseHeaderDirective("2:Study")).toEqual({
+      level: 2,
+      title: "Study",
+      explicit: true,
+    });
+    expect(parseHeaderDirective("1:Top")).toEqual({
+      level: 1,
+      title: "Top",
+      explicit: true,
+    });
   });
   it("trims the title", () => {
     expect(parseHeaderDirective("  Spaced  ")).toEqual({
       level: 1,
       title: "Spaced",
+      explicit: false,
     });
   });
   it("clamps a level the grammar doesn't have, rather than mis-titling", () => {
     // Was: `3:Sources` fell through the `^([12]):` match and rendered a
     // level-1 bar literally titled "3:Sources". A number the grammar doesn't
     // have should not become part of the text.
-    expect(parseHeaderDirective("3:Nope")).toEqual({ level: 2, title: "Nope" });
-    expect(parseHeaderDirective("9:Deep")).toEqual({ level: 2, title: "Deep" });
-    expect(parseHeaderDirective("0:Top")).toEqual({ level: 1, title: "Top" });
+    // CLAMPED AND STILL EXPLICIT: the reader wrote a number, so the head is not
+    // one the position rule may fill in — it is one the grammar corrected.
+    expect(parseHeaderDirective("3:Nope")).toEqual({
+      level: 2,
+      title: "Nope",
+      explicit: true,
+    });
+    expect(parseHeaderDirective("9:Deep")).toEqual({
+      level: 2,
+      title: "Deep",
+      explicit: true,
+    });
+    expect(parseHeaderDirective("0:Top")).toEqual({
+      level: 1,
+      title: "Top",
+      explicit: true,
+    });
   });
 
   it("leaves a title that merely contains a colon alone", () => {
@@ -316,6 +344,7 @@ describe("parseHeaderDirective", () => {
     expect(parseHeaderDirective("Note: read this")).toEqual({
       level: 1,
       title: "Note: read this",
+      explicit: false,
     });
   });
 });
@@ -324,7 +353,11 @@ describe("parseHeaderDirective", () => {
 describe("headerAtFence", () => {
   const fence = ["```chronoanvil", "header:📚 Journals", "```"];
   it("recognises a header fence", () => {
-    expect(headerAtFence(fence, 0)).toEqual({ level: 1, title: "📚 Journals" });
+    expect(headerAtFence(fence, 0)).toEqual({
+      level: 1,
+      title: "📚 Journals",
+      explicit: false,
+    });
   });
   it("returns null when the line is not a fence open", () => {
     expect(headerAtFence(fence, 1)).toBeNull();
@@ -4430,14 +4463,25 @@ describe("shipped stylesheet", () => {
     expect(rootBlock).not.toContain("--ca-area-diary:");
   });
 
-  it("styles every note key the monthly template joins into one box", () => {
-    // The joined highlights/challenges box is CSS-only — buildNote emits the
-    // `journal-note--<key>` hook and the stylesheet does the rest. If a key is
-    // renamed in the template and not here, the box silently falls apart into
-    // two plain fields with no error anywhere.
+  it("keeps highlights and challenges as two regions, and stops joining them", () => {
+    // ── THE BOX IS GONE, THE STORAGE IS NOT (5.14) ────────────────────────
+    //
+    // This test used to pin the opposite: a `.ca-journal-list--<key>` rule for
+    // each key, because the joined box was CSS-only and a renamed key would
+    // have let it fall apart into two plain fields with no error anywhere.
+    // Two plain fields IS the render now — each with the same head every other
+    // field draws — so the rules it pinned are what had to go.
+    //
+    // WHAT THIS STILL PINS is the half of 2.11 that was about disk. The monthly
+    // template composes two `list:` regions and must keep composing two: "pull
+    // twelve months of highlights" is a region read only while there are two
+    // regions, and merging them would be a rewrite of every month note.
     for (const key of ["highlights", "challenges"]) {
       expect(monthly).toContain(`list:${key}:`);
-      expect(css).toContain(`.ca-journal-list--${key}`);
+    }
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const key of ["highlights", "challenges"]) {
+      expect(bare, key).not.toContain(`.ca-journal-list--${key}`);
     }
   });
 
@@ -4539,17 +4583,19 @@ describe("shipped stylesheet", () => {
     }
   });
 
-  it("cancels the widget gap so the joined box is one box", () => {
-    // The bug this pins: `.ca-journal-widget-block` separates its children with
-    // flex `gap`, which `margin-bottom: 0` cannot close — the first attempt
-    // shipped a 10px trough straight down the middle of a "single" box. The
-    // cancel has to reference the same token the gap uses, so retuning the
-    // spacing can't reopen the seam.
+  it("no longer cancels the widget gap to fuse two fields", () => {
+    // The rule this replaces pinned a negative `margin-top` on the challenges
+    // half, because `.ca-journal-widget-block` separates its children with flex
+    // `gap` and `margin-bottom: 0` cannot close one — the first attempt at the
+    // joined box shipped a 10px trough straight down its middle.
+    //
+    // Nothing is being fused any more, so the cancel is a widget pulled 10px
+    // into the one above it for no reason. The gap token itself stays and is
+    // still what separates the fields — asserted, because deleting the cancel
+    // by deleting the gap would close the seam the other way.
     expect(css).toContain("--ca-widget-gap");
     expect(css).toMatch(/gap:\s*var\(--ca-widget-gap\)/);
-    expect(css).toMatch(
-      /\.ca-journal-list--challenges\s*\{[^}]*margin-top:\s*calc\(-1 \* var\(--ca-widget-gap\)\)/
-    );
+    expect(css).not.toMatch(/margin-top:\s*calc\(-1 \* var\(--ca-widget-gap\)\)/);
   });
 
   it("keeps :has() out of the plain hover rule", () => {
@@ -4931,7 +4977,11 @@ describe("list widget registration", () => {
     // class as its host. Which form a given kind uses says only how far the
     // 2.56.25 split has reached, and asserting one of them would make this
     // test fail on the next extraction rather than on a real change.
-    expect(widgets).toMatch(/buildList\((?:this, )?rest, ctx, label\)/);
+    // The trailing arguments are 5.14's: `titled` and the section bar's
+    // actions slot, which every field builder now takes. Matched loosely for
+    // the same reason the call form is: what this test is for is that `list:`
+    // reaches `buildList` at all.
+    expect(widgets).toMatch(/buildList\((?:this, )?rest, ctx, label[,)]/);
   });
 });
 

@@ -1198,6 +1198,14 @@ const DUE_BAR = "header:🔁 Due and open";
 // when the row it joined has lost the cell that titles it — so it is a constant
 // rather than the same string typed in two branches.
 const TASKS_BAR = "header:⏳ Open tasks";
+// The deepest index's own name for what is under it (5.12).
+//
+// THE WORDING `SECTION_TITLES` ALREADY USES for `level-index` — the widget this
+// section draws one level up — because the two are one question asked of two
+// depths, and a card headed "What's below" on a Subject and something else on a
+// Topic would be the plugin having two names for its own answer. The section's
+// row in the editor has said "What's below this note" since 3.18.
+const CHILDREN_BAR = "🗂️ What's below";
 
 export const JOURNAL_SECTIONS: JournalSection[] = [
   {
@@ -1448,6 +1456,24 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // named per kind through `fields` instead, which is the field `resources`
     // already uses for exactly this job, and they are reachable from a saved
     // layout rather than from this control.
+    //
+    // ── AND IT STAYS ONE-SIDED AFTER 5.12, FOR THE SECOND HALF OF THAT
+    //    SENTENCE ─────────────────────────────────────────────────────
+    //
+    // The deepest branch now HAS a title — `childrenBar` composes one — so the
+    // first half of the paragraph above has stopped being true. The box still
+    // is not offered, because the reason it could not be answered has not
+    // changed: both the read (`answerInText`) and the write (`withAnswers`)
+    // find a title question's line with `soleArgSpanIn`, and a fence carrying
+    // one bar plus a head per kind has no sole `header:`. A box that showed the
+    // wrong head's words and wrote the reader's answer onto it is worse than no
+    // box, and dropping the write in silence is worse than both.
+    //
+    // THE RENAME IS ON THE BAR ITSELF, which is where 3.18 follow-ups §2 put it
+    // and what that release's note says this control now points at: the title
+    // slot is `attachHeaderRename`, and it rewrites the line it IS rather than a
+    // line it has to identify. `label` is still honoured where a saved layout
+    // carries one, so nothing composed through `layout-transfer` is lost.
     questions: (ctx) =>
       ctx.hasSubContainers
         ? [
@@ -1489,7 +1515,16 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
       // and the planner that notices a fence is short of one. Deriving them
       // separately is the drift that would let the plan report a gap filling
       // it could not close.
-      return [fence(childrenParts(ctx, opts).flatMap((p) => p.lines))];
+      //
+      // UNDER ONE BAR AS OF 5.12 — see `childrenBar`. The parts are groups now,
+      // level 2, and the fence they sit in is one section rather than a stack of
+      // them sharing a card by accident of being one fence.
+      return [
+        fence([
+          ...childrenBar(ctx, opts),
+          ...childrenParts(ctx, opts).flatMap((p) => p.lines),
+        ]),
+      ];
     },
     // Its `fields` keys are kind ids — see `fieldKeys`. This is the one section
     // whose overrides cannot cross a journal boundary unresolved.
@@ -2098,6 +2133,31 @@ export function childrenParts(
   // uses for its shelves, because it is the same decision: a section that emits
   // several of one thing names them individually or not at all.
   const named = new Map((opts?.fields ?? []).map((f) => [f.key, f.label]));
+  // ── ONE GROUP IS NO GROUPING (5.12) ──────────────────────────────
+  //
+  // A type with a single note kind draws no head of its own: the section's bar
+  // takes that kind's name, its create button sits on the bar, and the table
+  // follows. A "📝 NOTES" strip under "🗂️ What's below" divides nothing and puts
+  // two names on one table, which is the doubling `blockTitle` refuses one layer
+  // up — and `childrenBar` is where the surviving name is chosen.
+  //
+  // AND WHERE THERE ARE GROUPS, EVERY CREATE SITS BESIDE ITS OWN HEAD.
+  //
+  // 5.12 first raised the FIRST kind's button to the section bar, on the reading
+  // that a card's one filled action is the section's. On the page that bought a
+  // full-width actions strip holding a single button whose rows were six lines
+  // further down, while the kind directly beside it — the one the button adds
+  // to — showed an empty head. The strip is `flex: 1 0 100%`: a second row, a
+  // hairline and ~34px of chrome, spent saying nothing the head beneath it did
+  // not say better.
+  //
+  // So the button goes where its rows are. "New Lesson" beside LESSONS, "New
+  // Practice" beside PRACTICE, one rule for every kind including the first, and
+  // the section's own actions strip composes EMPTY — which the frame already
+  // drops rather than draws (`.ca-journal-sec-l1 > …widgets:empty`), so the card
+  // opens with one line. A section whose parts each carry their own action has
+  // nothing left to put in a strip of its own.
+  const grouped = ctx.type.kinds.length > 1;
   return ctx.type.kinds.map((kind) => {
     const heading = named.get(kind.id) ?? `${kind.emoji} ${kindPlural(kind)}`;
     return {
@@ -2107,12 +2167,56 @@ export function childrenParts(
       // an inserted part lands after the group before it rather than inside it.
       probe: `kind-table:${kind.id}`,
       lines: [
-        `header:${heading}`,
-        `button:${ctx.type.id}:new-${kind.id}`,
+        // LEVEL 2, WRITTEN OUT. The renderer reads a bare second head as a group
+        // anyway — see the demotion rule in `widgets/index.ts`, which is what
+        // repairs the notes already in vaults — but a note composed today should
+        // say what it draws rather than lean on a rule that fills in a blank.
+        ...(grouped ? [`header:2:${heading}`] : []),
+        ...(grouped ? [`button:${ctx.type.id}:new-${kind.id}`] : []),
         `kind-table:${kind.id}`,
       ],
     };
   });
+}
+
+// What the deepest index's fence opens with: the section's own bar — and, where
+// the type has ONE kind and therefore no group heads, that kind's create button
+// anchored into it.
+//
+// THE SECTION HAD NO TITLE OF ITS OWN UNTIL 5.12, and the catalogue said so —
+// "on the deepest level it emits one header PER NOTE KIND, so 'the title' is not
+// a thing the section has". That was a description of the defect rather than a
+// decision: the editor listed one section, the note drew three bars, and nothing
+// on the page carried the name the editor used. The bar is that name.
+export function childrenBar(
+  ctx: SectionContext,
+  opts?: SectionOverrides
+): string[] {
+  const primary = ctx.type.kinds[0];
+  // ── AND A TYPE WITH ONE KIND IS NAMED BY THAT KIND ──────────────────
+  //
+  // "What's below" is a generic word for a card holding several named groups.
+  // Where there is one, the group and the section are the same object, and the
+  // honest name for it is the one the reader gave that kind — exactly as the
+  // container branch is named by its child LEVEL ("🗂️ Dishes") rather than by a
+  // word that would fit any level.
+  //
+  // IT ALSO MEANS A ONE-KIND JOURNAL'S FENCE IS UNCHANGED BY THIS RELEASE, byte
+  // for byte: bar, create button, table, which is what it has composed since
+  // 2.54. Nothing to migrate where there was never a stack of bars to unstack.
+  const solo = ctx.type.kinds.length === 1 && primary;
+  const named = solo ? `${primary.emoji} ${kindPlural(primary)}` : CHILDREN_BAR;
+  // ── THE BAR CARRIES AN ACTION ONLY WHERE NOTHING ELSE CAN ───────────
+  //
+  // With groups, each head takes its own kind's create (see `childrenParts`), so
+  // the bar composes a title and nothing else and its actions strip is dropped
+  // for being empty. With one kind there is no head to sit beside — the bar IS
+  // that kind's head — so the button belongs on it, which is also what keeps a
+  // one-kind fence byte-identical to every release since 2.54.
+  return [
+    `header:${opts?.label ?? named}`,
+    ...(solo ? [`button:${ctx.type.id}:new-${primary.id}`] : []),
+  ];
 }
 
 function kindTableProbe(ctx: SectionContext): RegExp {

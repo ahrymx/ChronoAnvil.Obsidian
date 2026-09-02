@@ -318,7 +318,17 @@
    nested among the blocks that follow it" — a claim only a bar walking its
    siblings can make. An inner dashboard section is already contained by the
    widget drawing it, so indenting it would bracket a thing off from itself. */
-.ca-journal-sec-l2.ca-journal-header-bar {
+/* NOT A GROUP HEAD, AND THE EXCLUSION IS THE RULE'S OWN ARGUMENT (5.12).
+   Everything above says the indent and the bracket are for a section nested
+   AMONG THE BLOCKS THAT FOLLOW IT — a journal type under "📚 Journals", which
+   has a container to be tucked inside of. A `.ca-journal-sec-group` head is
+   level 2 for the fold scope and nothing else: it divides ONE card that it is
+   already inside, and it has its own body directly under it. Bracketing it
+   offsets a head from the rows it names, adds the second vertical line the
+   group treatment exists to not draw, and leaves the glyph column of the head
+   out of line with the section title six pixels above it. Scoped to the marker
+   rather than to the look, exactly as the paragraph above scopes it. */
+.ca-journal-sec-l2.ca-journal-header-bar:not(.ca-journal-sec-group) {
   margin-left: var(--ca-sec-indent);
   padding-left: 12px;
   border-left: 2px solid var(--background-modifier-border);
@@ -347,7 +357,7 @@
   .ca-journal-sec {
     gap: 3px 6px;
   }
-  .ca-journal-sec-l2.ca-journal-header-bar {
+  .ca-journal-sec-l2.ca-journal-header-bar:not(.ca-journal-sec-group) {
     margin-left: calc(var(--ca-sec-indent) / 2);
     padding-left: 8px;
   }

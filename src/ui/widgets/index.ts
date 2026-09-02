@@ -143,7 +143,7 @@ import {
   buildEntryContext,
 } from "../../diary/entryheader";
 import { buildPeriodNav } from "../../diary/periodnav";
-import { foldableSection, sectionFrame } from "../section-frame";
+import { foldableSection, sectionFrame, splitGlyph } from "../section-frame";
 import { bannerSuppressed } from "../vault-banner";
 import type { FoldStore } from "../section-frame";
 import {
@@ -152,6 +152,7 @@ import {
   TITLE_KEYWORD,
   cellWeightOf,
   hasTitledBar,
+  headerLevel,
   isFrameLine,
   isHeightLine,
   isRowLine,
@@ -547,6 +548,13 @@ export function blockTitle(lines: readonly string[]): string | null {
   const only = [...named];
   return only.length === 1 ? SECTION_TITLES[only[0]] : null;
 }
+
+// The directives that own a region of the note body and draw a field head over
+// it. `fieldHead` in note-field.ts is the head; this is the list of what wears
+// one, and it is here rather than there because the question this answers is
+// about a FENCE — how many of them are in it — which only the dispatcher can
+// see. 5.14.
+const FIELD_KINDS = new Set(["note", "list", "path", "tasks", "attach", "recall"]);
 
 const INLINE_KINDS = new Set([
   "slider",
@@ -1007,6 +1015,20 @@ export class Widgets implements
           lines.some(
             (l) => SECTION_TITLES[l.split("|")[0].split(":")[0].trim()] !== undefined
           ));
+      // ── WHETHER THE BAR CAN BE READ AS NAMING ONE FIELD (5.14) ───────
+      //
+      // A region field — `note:`, `list:`, `path:`, `tasks:`, `attach:`,
+      // `recall:` — draws its own head unless something else names it. The
+      // "something else" is the fence's own bar, and a bar names one thing. So
+      // the withholding rule needs both halves: the fence is titled, and there
+      // is exactly one field under that title for it to be titling.
+      //
+      // COUNTED OFF THE LINES, not off what got built, because the answer has
+      // to be known before the first field is built and every field in the
+      // fence has to be given the same answer. A fence of three shelves must
+      // not have its first shelf silently promoted by being first.
+      const soleField =
+        lines.filter((l) => FIELD_KINDS.has(keywordOf(l))).length === 1;
       // Which titled header this fence's shelves hang under, or -1 for a fence
       // with none. Computed in one pass up front rather than discovered during
       // the loop, because the button has to be placed when its header is drawn
@@ -1113,8 +1135,38 @@ export class Widgets implements
           // until the next bar of level ≤ 1, so a level-1 "Journals" bar folds
           // away its level-2 type bars too, while a level-2 bar folds only its
           // own body. Unprefixed defaults to level 1.
-          const { level, title } = parseHeaderDirective(
+          const title = parseHeaderDirective(
             line.slice(line.indexOf(":") + 1).trim()
+          ).title;
+          // ── A BARE SECOND HEAD IS A GROUP, NOT A SECOND SECTION (5.12) ──
+          //
+          // A fence carries one section. Where it carries several titled heads,
+          // the first names the section and the rest name REPEATS INSIDE it —
+          // the deepest index is the case that exists: `children` emits one head
+          // per note kind, each of them bare, so three level-1 bars landed in one
+          // card, identical in every respect to the sections on either side of
+          // it. The card was the only thing saying they belonged together and it
+          // said nothing about what they belonged to.
+          //
+          // WHY THE RENDERER AND NOT ONLY THE COMPOSER. Every index note already
+          // in a vault holds those bare heads, and a composer change reaches none
+          // of them. Read here, the tiering is right on the next repaint of a
+          // note nobody edits, and the composer still writes `header:2:` outright
+          // so that a note composed today says what it draws.
+          //
+          // AN EXPLICIT LEVEL IS AN INTENT AND IS LEFT ALONE. `header:1:` said
+          // which level it wanted; only a level the grammar DEFAULTED is filled
+          // in here, which is what `explicit` was added to say.
+          //
+          // SAFE BECAUSE IT IS SWEPT, not because it is unlikely: no catalogue in
+          // the tree composes two level-1 heads in one fence — a row fence
+          // carries exactly one, worded for the band by the cell that opens it,
+          // and `resources` carries one over all its shelves. `children` at the
+          // deepest level was the sole exception and is the thing being fixed.
+          // `test/journal-groups.test.ts` fails if a second one appears.
+          const level = headerLevel(
+            line.slice(line.indexOf(":") + 1).trim(),
+            headerIndex === 0
           );
           // A title-less `header:` anchors its widgets under the section's
           // existing markdown heading (used by Study / custom journals, whose
@@ -1149,6 +1201,14 @@ export class Widgets implements
                 }
               : {}),
           });
+          // THE GROUP LOOK IS A CLASS RATHER THAN A LEVEL (5.12). Level 2 is a
+          // fold scope and is already three other things' — a subject group in
+          // the Journals section, a bridge, the tally band — each of which draws
+          // in its own DOM and is nobody's neighbour. This marks the one that is:
+          // a head INSIDE a card, dividing it, which is why the stylesheet can
+          // give it a rule above and no surface of its own without reaching any
+          // of the others.
+          if (title && level === 2) frame.root.addClass("ca-journal-sec-group");
           if (title) {
             // A titled bar owns its section: make it collapse everything after
             // it up to the next same-or-higher-level bar, with persisted state.
@@ -1238,7 +1298,21 @@ export class Widgets implements
           line,
           ctx,
           scopeHeader === headerIndex - 1,
-          fenceTitled
+          // ── ONLY WHERE THE BAR NAMES **THIS** FIELD (5.14) ────────────
+          //
+          // `fenceTitled` answers "is this fence titled", which is the right
+          // question for a widget that is the whole of what the section is —
+          // the `checklist` section's one `tasks:` field, 5.10's case. It is
+          // the WRONG question for a fence holding several: Study's Resources
+          // section renders `header:📚 Resources` over three `attach:` shelves
+          // named Docs, Tutorials and Practice, and a bar cannot be three
+          // names. Withholding all three heads there would delete the only
+          // thing telling a reader which shelf is which.
+          //
+          // So the head is withheld exactly when the bar can be read as naming
+          // the field: the fence is titled AND holds one region field.
+          fenceTitled && soleField,
+          headerGroup
         );
 
         if (!widget) {
@@ -1507,11 +1581,28 @@ export class Widgets implements
         // no `tab` line is exactly where it has to be offered. Resolving the
         // note position stays behind `count > 1` inside `tabHandle`, so an
         // ordinary page of groups still segments nothing.
+        // AND THE GROUP'S HEAD IS NAMED BY ITS CELLS (5.14). `named` is
+        // already the list this needs — every widget in the block that has a
+        // `SECTION_TITLES` entry, in DOM order, paired with the element it was
+        // drawn into — because `cardWidget` above wants the same pairs. The
+        // head takes the same answer the cards take, with the glyph off it:
+        // one emoji per card is a row of icons, and three of them stacked into
+        // one caption is a rebus.
+        //
+        // WHY NOT `blockTitle`. That answers for the FENCE and refuses a row of
+        // three on purpose — "a head cannot announce a third of what is under
+        // it". A caption that lists all three announces all three, which is the
+        // question `blockTitle` is not being asked here.
         layOutRow(
           container,
           cellBounds,
           tabBounds,
-          tabHandle(this.plugin, ctx, container, tabBounds.length + 1)
+          tabHandle(this.plugin, ctx, container, tabBounds.length + 1),
+          named.map(({ el, title }) => ({ el, text: splitGlyph(title).text })),
+          // AND NO CAPTION WHERE THE FENCE ALREADY DREW A HEAD (5.14). The same
+          // `fenceTitled` the field heads read, for the same reason one object
+          // out — see the head's own note in row.ts.
+          fenceTitled
         );
       }
 
@@ -1939,7 +2030,12 @@ export class Widgets implements
     // True when a titled `header:` bar in this fence already names the block.
     // A widget that draws its own head withholds it — see the note at
     // `fenceTitled`, which is where this is decided.
-    fenceTitled = false
+    fenceTitled = false,
+    // That bar's actions slot, where a field whose head is withheld puts its
+    // controls. Null where nothing in the fence offers one — a `frame: section`
+    // wrapper, or a fence with no header at all — and `fieldHead` then builds
+    // the field a bare strip of its own rather than dropping the controls.
+    barActions: HTMLElement | null = null
   ): HTMLElement | null {
     const barIdx = spec.indexOf("|");
     const label = barIdx === -1 ? null : spec.slice(barIdx + 1).trim();
@@ -2050,13 +2146,14 @@ export class Widgets implements
         widget =
           noteKeyOf(rest) === CAPTURE_NOTE_KEY
             ? buildCaptureLog(this, rest, ctx, label, {
-                collapsible: rest.includes("#collapse"),
+                titled: fenceTitled,
+                barActions,
                 startCollapsed: () =>
                   noteFoldState(this.plugin, ctx.sourcePath, CAPTURE_NOTE_KEY),
                 onFold: (v: boolean) =>
                   void setNoteFold(this.plugin, ctx.sourcePath, CAPTURE_NOTE_KEY, v),
               })
-            : buildNote(this, rest, ctx, label);
+            : buildNote(this, rest, ctx, label, fenceTitled, barActions);
         break;
       case "tasks":
         // ChronoAnvil's own task manager. Reads/writes real task lines stored in the
@@ -2064,7 +2161,7 @@ export class Widgets implements
         // format), rendered as an interactive list: checkbox, editable text,
         // priority + due controls, delete, and an add-input. Not the Tasks
         // plugin — self-contained, no external dependency.
-        widget = buildTasks(this, rest, ctx, label, fenceTitled);
+        widget = buildTasks(this, rest, ctx, label, fenceTitled, barActions);
         break;
       case "path":
         // A re-orderable checklist rendered as a table: each step has a
@@ -2073,10 +2170,10 @@ export class Widgets implements
         // is just a ChronoAnvil task), but presents order as meaningful and gives
         // explicit reorder controls instead of priority/due. Used for a Topic's
         // Learning Path, where sequence is the point.
-        widget = buildPath(this, rest, ctx, label);
+        widget = buildPath(this, rest, ctx, label, fenceTitled, barActions);
         break;
       case "list":
-        widget = buildList(this, rest, ctx, label);
+        widget = buildList(this, rest, ctx, label, fenceTitled, barActions);
         break;
       case "recall":
         // `recall:<key>[|Label]` — question/answer pairs over the same body
@@ -2086,14 +2183,14 @@ export class Widgets implements
         // the cards belong to — which is what turns the review queue and the
         // confidence trend from things you feed by hand into things that feed
         // themselves.
-        widget = buildRecall(this, rest, ctx, label);
+        widget = buildRecall(this, rest, ctx, label, fenceTitled, barActions);
         break;
       case "attach":
         // The multi-purpose attachments field: an image gallery plus a row of
         // link/file chips, over the same `<!--chronoanvil:<key>-->` body region the
         // other body-backed widgets use. Accepts dropped/pasted files, pasted
         // URLs, and links dragged in from the vault itself.
-        widget = buildAttachments(this, rest, ctx, label);
+        widget = buildAttachments(this, rest, ctx, label, fenceTitled, barActions);
         break;
       case "tracker":
         widget = buildTracker(this, rest, ctx);

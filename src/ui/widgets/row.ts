@@ -108,6 +108,46 @@ export const ROW_CELL_CLASS = "ca-journal-block-cell";
 export const GROUP_CLASS = "ca-journal-group";
 export const GROUP_FOOT_CLASS = "ca-journal-group-foot";
 
+// ── the head, which is the group's own top edge (5.14) ───────────────────
+//
+// A group had no head, and 4.9 §2.2 says why it did not: "the top of a group is
+// where every card inside it draws its own head, and a bar across that would be
+// a title above a row of titles". The foot was the answer — the one edge of the
+// box with nothing on it — and it carried the grip and the `+`.
+//
+// WHAT THAT LEFT. A box whose top edge is nothing at all, and a strip along the
+// bottom that a reader has to hover to find anything in. On the homepage the
+// group holding the three cards a reader lands on had no name and no visible
+// edge above them, so the three cards read as three blocks rather than as one
+// object that can be picked up.
+//
+// AND THE DOUBLING 4.9 FEARED IS NOT WHAT THIS DRAWS. The head is not a section
+// bar: it is `--ca-text-2xs`, uppercase, muted, on the `.ca-journal-group-foot`
+// idiom turned the right way up, and its title is DERIVED from the cards under
+// it rather than written anywhere. It names the group by listing what is in it
+// — `TODAY · OPEN TASKS · LOGBOOK` — which is a caption on a box, not a second
+// title over three titles.
+export const GROUP_HEAD_CLASS = "ca-journal-group-head";
+export const GROUP_HEAD_TITLE_CLASS = "ca-journal-group-head-title";
+
+// What a cell contributes to that title: the element the widget landed in, and
+// its own name with the glyph already off it.
+//
+// THE CALLER STRIPS THE GLYPH, and that is this file's one import rule showing
+// through rather than an oversight. `splitGlyph` lives in section-frame.ts,
+// which imports Obsidian; row.ts draws a row out of a list of children and is
+// tested with neither a vault nor a settings object, which is the property the
+// comment at the top of this file exists to protect. A pre-split string costs
+// the caller one `.map` and costs this file nothing.
+//
+// AND THE ELEMENT IS HOW A PAGE RE-DERIVES ITS OWN TITLE. `named` is the whole
+// block in DOM order; which of those names belong to page 2 is a question about
+// where the elements ended up, and only this file knows that.
+export interface CellName {
+  el: HTMLElement;
+  text: string;
+}
+
 // ── the pages of a group, and the strip that switches them (4.34) ────────
 //
 // `journal-group-pages` wraps the rows and is what a swap pins a height on; the
@@ -515,7 +555,9 @@ export function layOutRow(
   container: HTMLElement,
   boundaries: readonly CellBound[] = [],
   tabBounds: readonly number[] = [],
-  tabs: TabHandle | null = null
+  tabs: TabHandle | null = null,
+  names: readonly CellName[] = [],
+  titled = false
 ): void {
   const children = Array.from(container.children).filter(
     (n): n is HTMLElement => n instanceof HTMLElement
@@ -541,6 +583,51 @@ export function layOutRow(
   // during a swap (4.34 §A). The group cannot be that box: its height includes
   // the foot, so transitioning it would slide the strip the reader is pressing.
   // With one page this is a wrapper around one row and costs a div.
+  // ── THE HEAD, ABOVE THE PAGES (5.14) ────────────────────────────────
+  //
+  // BUILT BEFORE THE ROWS, because it is the box's top edge and the DOM order
+  // is the reading order. Its title is filled in after them — it names what is
+  // in the cells, and the cells do not exist yet.
+  //
+  // DRAWN EVEN WHEN NOTHING CAN BE NAMED. A group of three widgets that carry
+  // no `SECTION_TITLES` entry gets a head with no words in it, and that is not
+  // an empty state to suppress: the strip is the edge, the grip lives on it,
+  // and a group whose grip appeared or vanished depending on what happened to
+  // be inside it would be the harder thing to learn.
+  //
+  // ── UNLESS THE FENCE ALREADY DREW ONE (5.14) ────────────────────────
+  //
+  // A `header:` LINE IN A ROW FENCE IS THAT HEAD. It is drawn once, full width,
+  // above the columns, and that is not an accident of layout — a bar is a
+  // section's title strip and a row is one section, which is why a row gets
+  // exactly one bar however many cells it holds. The catalogue relies on it:
+  // `journal-dashboard-sections.ts` composes `header:🕒 Lately` INTO the row
+  // fence and words it for the whole band rather than for the column that
+  // happens to write the line.
+  //
+  // SO A CAPTION UNDER IT IS THE SAME OBJECT TWICE. On the shipped Lately
+  // section it read `LATELY · OPEN TASKS` directly beneath a bar saying
+  // *Lately* — a head restating the head above it — and the box around it was a
+  // card inside the section's own card. Reported as exactly that: *"some groups
+  // in the default layouts are hardcoded inside a section frame?"* They are, on
+  // purpose, and the render's job is to draw one section rather than two.
+  //
+  // THIS IS THE FIELD RULE, ONE OBJECT OUT. 5.14 gave every field the section's
+  // head and withheld it wherever a bar already named the field; a group is the
+  // same question asked of a row. `fenceTitled` in index.ts is the same answer
+  // both of them read, and `frame: section` counts as titled there because it
+  // draws a head of its own from the fold.
+  //
+  // THE GRIP FOLLOWS IT WITHOUT BEING TOLD. `attachBlockHead` asks for the
+  // group's head, then the block's bar, then the container — so a group with no
+  // head of its own is picked up by the bar that names it, which is the 5.10
+  // placement and needs no branch here.
+  //
+  // AND NO HEAD MEANS NO BOX, said once, in the stylesheet: the ground, the
+  // border and the padding stand down on a group that drew no head, so this
+  // line is the only place the decision is made.
+  const head = titled ? null : box.createDiv({ cls: GROUP_HEAD_CLASS });
+  const headTitle = head?.createDiv({ cls: GROUP_HEAD_TITLE_CLASS }) ?? null;
   const pages = box.createDiv({ cls: GROUP_PAGES_CLASS });
   container.insertBefore(box, children[plans[0].cells[0][0]]);
 
@@ -548,20 +635,73 @@ export function layOutRow(
   // happens to it afterwards is the rest of this function.
   const rows = plans.map((plan) => buildRowCells(pages, children, plan));
 
+  // ── WHAT THE HEAD CALLS THIS PAGE ───────────────────────────────────
+  //
+  // ` · ` BECAUSE THE PARTS ARE PEERS. A comma would rank them as a list with a
+  // subject; the middot is what `links.ts` already separates the quick-links
+  // with, and what the documentation uses when it names a row's cells.
+  //
+  // IN `names` ORDER RATHER THAN IN THE ROW'S. They are the same order — the
+  // block's children were appended in fence order and the cells take them in
+  // that order — and `names` is the one that stays true when a cell holds two
+  // widgets stacked, where the row has one child and two names.
+  const nameOf = (row: HTMLElement): string =>
+    names
+      .filter((n) => row.contains(n.el))
+      .map((n) => n.text)
+      .filter((t) => t.length > 0)
+      .join(" · ");
+  // `?.` SHORT-CIRCUITS THE ARGUMENT TOO, which is the whole of why this needs
+  // no branch: a titled fence never walks the rows to build a caption nothing
+  // will show.
+  const retitle = (n: number): void => {
+    headTitle?.setText(nameOf(rows[n]));
+  };
+  retitle(0);
+
   // ── THE FOOT (4.9 §2.2) ─────────────────────────────────────────────
   //
-  // A slim strip under the columns carrying the two things the group has to say
-  // about ITSELF: how many columns it has, and where to pick it up.
+  // A slim strip under the columns — the box's bottom edge, the way the head is
+  // its top one.
   //
-  // UNDER RATHER THAN OVER, which is the one placement decision here. The top of
-  // a group is where every card inside it draws its own head, and a bar across
-  // that would be a title above a row of titles — the doubling 4.7.2 spent a
-  // patch removing. The foot is the one edge of the box with nothing on it.
+  // UNDER RATHER THAN OVER was the one placement decision in 4.9, and the head
+  // above is what made it a pair rather than a choice: the top of a group is
+  // where every card inside it draws its own head, so a TITLE across it would be
+  // a title above a row of titles. A caption is not a title, and a control strip
+  // is not either.
   //
-  // THE GRIP IS NOT BUILT HERE. `attachBlockHead` owns every grip on the page —
-  // it is the only thing that knows whether this block can be located in its
-  // file at all, and a grip that cannot move anything must not be drawn. This
-  // builds the strip and the count; block-drag.ts hangs the grip on it.
+  // ── IT IS DRAWN ON EVERY GROUP, AND THAT IS A REVERSAL (5.14) ───────
+  //
+  // The first draft of this release built it only where there were pages to
+  // number: the grip and the `+` had both moved up to the new head, so what was
+  // left on a one-page group was a hairline holding nothing — 4.34.2's argument
+  // against the column count, arrived at from the other end.
+  //
+  // THE READER LOOKED AT THE RESULT ACROSS THREE SURFACES AND ASKED FOR THE
+  // OPPOSITE: *"groups should always look like the homepages (header and
+  // footer)."* A group with two pages had two strips and a group with one had
+  // one, so the same object wore two silhouettes according to something the
+  // reader had never thought about. One shape everywhere is worth more than the
+  // pixels a bare rule costs.
+  //
+  // SO THE `+` COMES BACK DOWN WITH IT, which is what stops this being the empty
+  // furniture the first draft refused. The foot has a reason to exist on a
+  // one-page group — it is where the first page is made — and on a paged one the
+  // control that adds a page sits beside the numbers it adds to, which is where
+  // it was from 4.34.1 until this release moved it.
+  //
+  // THE HEAD KEEPS THE CAPTION AND THE GRIP. Naming the box and picking it up
+  // are what a top edge is for; paging is what this one is for.
+  //
+  // AND `is-focused` NOW HAS SOMEWHERE TO LAND ON EVERY GROUP. The mark that
+  // says which group the page keys drive is painted on the foot's hairline
+  // (05-inline-widgets.css), so under the first draft a one-page group could be
+  // the key's target and say nothing about it.
+  //
+  // THE GRIP IS STILL NOT BUILT HERE. `attachBlockHead` owns every grip on the
+  // page — it is the only thing that knows whether this block can be located in
+  // its file at all, and a grip that cannot move anything must not be drawn.
+  // This builds the strips; block-drag.ts hangs the grip on the head.
   const foot = box.createDiv({ cls: GROUP_FOOT_CLASS });
 
   // ── ONE PAGE: THE COUNT, EXACTLY AS BEFORE ──────────────────────────
@@ -595,7 +735,8 @@ export function layOutRow(
   // strip. What it said, the reader could already see — the columns are RIGHT
   // THERE, and counting them was a label restating the thing it sat under. 4.9
   // put it there because the foot needed something in it to be a bar at all;
-  // the foot now has the grip, the `+` and, where there are pages, the strip.
+  // the foot now has the `+` and, where there are pages, the strip, and it is a
+  // bar because it is the box's bottom edge whether or not either is in it.
   //
   // A LABEL THAT NAMES WHAT IS VISIBLE IS THE SAME FAULT AS AN EMPTY STATE THAT
   // SAYS "no data" — it spends a line to say nothing the reader did not have.
@@ -626,6 +767,8 @@ export function layOutRow(
   const wanted = tabs?.open ?? 0;
   const found = plans.findIndex((plan) => plan.page === wanted);
   const open = found === -1 ? 0 : found;
+  // THE STRIP GOES IN THE FOOT BUILT ABOVE — the foot itself is not conditional
+  // on anything and has not been since the reader asked for one shape.
   const strip = foot.createDiv({
     cls: GROUP_TABS_CLASS,
     attr: { role: "tablist", "aria-label": "Pages in this group" },
@@ -653,6 +796,13 @@ export function layOutRow(
   // selected and read unselected.
   let current = open;
   const paint = (n: number): void => {
+    // AND THE HEAD RE-DERIVES WITH THE SWAP. The title names what is on
+    // screen; a page of charts and a page of tables are two different lists,
+    // and a head that kept the first one would be a caption for a box the
+    // reader is no longer looking at. It is set here rather than in `swapTo`
+    // for the reason the class, the `aria-selected` and the `tabindex` are:
+    // this is the one place that says which page is showing.
+    retitle(n);
     rows.forEach((row, i) => {
       row.toggleClass(ROW_CLOSED_CLASS, i !== n);
       row.setAttr("aria-hidden", i === n ? "false" : "true");

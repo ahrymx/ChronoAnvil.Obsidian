@@ -364,6 +364,155 @@ describe("stacking a widget into a column that already has one", () => {
   });
 });
 
+describe("a bare fence's widgets reorder themselves — 5.14", () => {
+  // ── WHAT THIS IS ABOUT ────────────────────────────────────────────────
+  //
+  // A diary entry composes three fences, and one of them — the shared band —
+  // holds all seven fields with no `header:` line anywhere. 5.14 drew those
+  // seven as seven cards, and a reader read the result back: *"only trackers
+  // and today's focus have the grabbers"*. The block's one grip sits on the
+  // block's top edge, which is the FIRST card's top edge, and six cards have
+  // nothing.
+  //
+  // THE ARITHMETIC WAS ALREADY THERE. `stack` has meant "beside the widget on
+  // line `at`, in that block" since 4.8.6, and nothing in it wants a row: the
+  // `delimit` branch fires only on a body that HAS a `row` line. So this is a
+  // gesture reaching a target that already worked, and these are its cases.
+
+  // Seven directives in one fence, no `header:`, no `row` — the shape of a
+  // diary entry's shared band, with the region blocks it owns left out because
+  // they are separate blocks and no drag touches them.
+  const BAND = [
+    "```chronoanvil",
+    "note:focus|Today's focus",
+    "list:highlights|Highlights",
+    "list:challenges|Challenges",
+    "note:log|Notes, reflections & learnings",
+    "attach:attachments|Attachments",
+    "tasks:todo|Tasks",
+    "note:capture#collapse|Captured",
+    "```",
+  ];
+
+  it("moves one field below another, adding no delimiter", () => {
+    // Challenges (line 2) dropped on the underside of Focus (line 0). No `cell`
+    // line is written, because a fence with no `row` in it is not a row and two
+    // adjacent directives are two widgets in a column either way.
+    const out = moveCell(
+      BAND,
+      { block: 0, from: 2, to: 3 },
+      { kind: "stack", block: 0, at: 0, after: true }
+    );
+    expect(body(out, 0)).toEqual([
+      "note:focus|Today's focus",
+      "list:challenges|Challenges",
+      "list:highlights|Highlights",
+      "note:log|Notes, reflections & learnings",
+      "attach:attachments|Attachments",
+      "tasks:todo|Tasks",
+      "note:capture#collapse|Captured",
+    ]);
+    expect(out!.some((l) => l.trim() === "cell")).toBe(false);
+    expect(out!.some((l) => l.trim() === "row")).toBe(false);
+  });
+
+  it("moves one upward, over the field it was pointed at", () => {
+    // Captured (the last line) onto the top half of Highlights. The run is
+    // lifted before the target is located — `moveCell` maps the index — so a
+    // drop from below lands where the reader aimed rather than one line off.
+    const out = moveCell(
+      BAND,
+      { block: 0, from: 6, to: 7 },
+      { kind: "stack", block: 0, at: 1, after: false }
+    );
+    expect(body(out, 0)).toEqual([
+      "note:focus|Today's focus",
+      "note:capture#collapse|Captured",
+      "list:highlights|Highlights",
+      "list:challenges|Challenges",
+      "note:log|Notes, reflections & learnings",
+      "attach:attachments|Attachments",
+      "tasks:todo|Tasks",
+    ]);
+  });
+
+  it("refuses the two drops that would change nothing", () => {
+    // Its own two halves, and the place it already occupies. Both are the
+    // commonest drop a reader makes, and both mean "I have changed my mind".
+    expect(
+      moveCell(BAND, { block: 0, from: 3, to: 4 }, {
+        kind: "stack",
+        block: 0,
+        at: 3,
+        after: true,
+      })
+    ).toBeNull();
+    expect(
+      moveCell(BAND, { block: 0, from: 3, to: 4 }, {
+        kind: "stack",
+        block: 0,
+        at: 2,
+        after: true,
+      })
+    ).toBeNull();
+  });
+
+  it("draws a grip and two stacking halves on each of them", () => {
+    // `readCode` strips comments, so the anchors are the code itself — the
+    // loop from the guard that opens it to the class that closes it.
+    const src = readCode("block-drag");
+    const at = src.indexOf("const loose =");
+    expect(at).toBeGreaterThan(0);
+    const chunk = src.slice(
+      at,
+      src.indexOf('container.addClass("has-widget-grips")', at)
+    );
+    expect(chunk).toContain("ca-jbd-slot-over");
+    expect(chunk).toContain("ca-jbd-slot-under");
+    expect(chunk).toContain('kind: "stack"');
+    expect(chunk).toContain("runWithHeight(body, line)");
+    // The two ranges are the same run, exactly as they are for a widget in a
+    // cell: what it takes past its neighbour is what it takes out to a block.
+    expect(chunk).toContain("{ whole: run, cell: run }");
+  });
+
+  it("draws none of it where a row, a section or a lone widget says not to", () => {
+    const src = readCode("block-drag");
+    const at = src.indexOf("const loose =");
+    expect(at).toBeGreaterThan(0);
+    const chunk = src.slice(at, at + 400);
+    // A row's cells already draw all five places, and a cell is a stacking
+    // context that would seal these inside it.
+    expect(chunk).toContain("row || section");
+    // A fence that titles itself is a section: its lines are that section's
+    // body, and its own bar is one of the stamped children this would pick up.
+    expect(src.slice(at, at + 900)).toContain("loose.length > 1");
+    // AND NOT THE WIDGET BAR. It is the one child that is not one directive —
+    // every inline kind lands in it together and `stampLines` gives it the line
+    // of the first — so a drag off it would move one tracker out from under the
+    // nine still drawn inside the element being held.
+    expect(chunk).toContain('hasClass("ca-journal-widget-bar")');
+  });
+
+  it("takes the block's own grip off the collision", () => {
+    // 4.8.6's duplicate, arriving in the one place 5.14 did not close: with no
+    // head and no bar, the block's grip lands on the first widget's top edge.
+    const src = readCode("block-drag");
+    expect(src).toContain('container.addClass("has-widget-grips")');
+    const css = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+    const at = css.indexOf(
+      ".ca-journal-widget-block.has-widget-grips > .ca-jbd-handle"
+    );
+    expect(at).toBeGreaterThan(0);
+    const rule = css.slice(at, css.indexOf("}", at));
+    expect(rule).toContain("left: 0");
+    expect(rule).toContain("transform: none");
+    // Up into the block's own top margin, which is the half that makes it a
+    // place rather than a dodge.
+    expect(rule).toContain("top: -8px");
+  });
+});
+
 describe("swapping two widgets", () => {
   it("trades them, leaving every column with the count it had", () => {
     const out = moveCell(
@@ -851,16 +1000,25 @@ describe("the landing places, as drawn", () => {
     expect(fn.indexOf("?.remove()")).toBeLessThan(fn.indexOf("host.createDiv("));
   });
 
-  it("hangs a group's own grip in its foot, and keeps nothing of the dodge", () => {
+  it("hangs a group's own grip on its head, and keeps nothing of the dodge", () => {
     // Every grip is centred over the top edge of what it drags, so on a row of
     // three the block's and the middle widget's landed on the same two
-    // coordinates. 4.8.6 shoved the block's aside; 4.9 §2.2 gives it the group's
+    // coordinates. 4.8.6 shoved the block's aside; 4.9 §2.2 gave it the group's
     // foot instead — the box's own edge, with nothing else on it — so the
-    // collision cannot arise rather than being stepped around.
+    // collision could not arise rather than being stepped around.
+    //
+    // AND 5.14 MOVED IT TO THE HEAD, which is the same argument with the box's
+    // OTHER own edge: a head is a strip ABOVE the cards, so the two grips are a
+    // band apart even sharing an x. The dodge stays gone, and so do the foot's
+    // overrides — a grip on the head is the base rule, centred at the top of
+    // what it drags like every other grip on the page.
     const src = readSrc("block-drag");
-    expect(src).toContain("const foot = box?.querySelector<HTMLElement>");
-    expect(src).toContain('foot ? "Drag to move this group" : "Drag to move this block"');
-    expect(ruleFor(".ca-journal-group-foot > .ca-jbd-handle {")).toContain("left: 0");
+    expect(src).toContain("const head = box?.querySelector<HTMLElement>");
+    expect(src).toContain('head ? "Drag to move this group" : "Drag to move this block"');
+    expect(ruleFor(".ca-journal-group:hover .ca-journal-group-head > .ca-jbd-handle {")).toContain(
+      "opacity: 1"
+    );
+    expect(rules).not.toContain(".ca-journal-group-foot > .ca-jbd-handle");
     // AND THE EXCEPTION IS GONE FROM BOTH SIDES. A rule kept "just in case"
     // after the thing it worked around has been removed is the kind nobody can
     // re-derive and nobody dares delete.
@@ -966,11 +1124,11 @@ describe("the landing places, as drawn", () => {
     // hangs — so a block with no group still gets its own.
     //
     // THREE PLACES IT CAN HANG AS OF 5.10, and the middle one is why the
-    // expression is asserted rather than a variable name: the group's foot, the
-    // block's own section bar where it has one, then the block. What this
-    // pins is that the fallback chain still ends at `container`, so there is no
-    // shape of block the grip can miss.
-    expect(src).toContain("foot ?? bar ?? container,");
+    // expression is asserted rather than a variable name: the group's own strip
+    // (its head since 5.14), the block's own section bar where it has one, then
+    // the block. What this pins is that the fallback chain still ends at
+    // `container`, so there is no shape of block the grip can miss.
+    expect(src).toContain("head ?? bar ?? container,");
     expect(rules).not.toContain(".jbd-handle-join");
   });
 });

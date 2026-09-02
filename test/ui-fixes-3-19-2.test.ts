@@ -135,13 +135,35 @@ describe("an empty resources category can be removed", () => {
   });
 
   it("is reachable on a phone", () => {
-    // The hover-reveal policy (3.9 §3.3). There is no second route to this
-    // control, so with no touch branch it would be invisible rather than faint.
-    // `test/hover-reveal.test.ts` enforces this mechanically; this names the
-    // case so a future removal has to argue with something.
+    // WAS: a `@media (hover: none)` branch holding this at 0.45, because the
+    // control was `opacity: 0` until the shelf was hovered and there is no
+    // second route to it. The comment ended "so a future removal has to argue
+    // with something", so here is the argument.
+    //
+    // THE HOVER-REVEAL IS GONE, WHICH IS WHAT THE BRANCH COMPENSATED FOR. The
+    // ✕ was an affordance on a bare label row; 5.14 made it an action on the
+    // field's own head, beside *Add file* and *Add link*, both of which are
+    // always drawn. A reader reported the result: one slot in a row of three
+    // behaving differently from the other two. It is drawn at full opacity on
+    // every pointer now, so a touch branch would be the only place it is
+    // DIMMED — the policy inverted rather than applied.
+    //
+    // The invariant this test is about is unchanged and is asserted directly:
+    // reachable without hovering. `test/hover-reveal.test.ts` still sweeps for
+    // the pattern this no longer is.
     const css = readCss();
-    expect(css).toMatch(
+    const rule = css.slice(
+      css.indexOf(".ca-journal-attach-remove {"),
+      css.indexOf(".ca-journal-attach-remove svg")
+    );
+    expect(rule).toContain("opacity: 1");
+    expect(css).not.toMatch(
       /@media \(hover: none\)[\s\S]{0,400}\.ca-journal-attach-remove/
+    );
+    // And no hover on the field reveals it, because there is nothing left to
+    // reveal — the pair of rules that did is gone with the zero.
+    expect(css).not.toContain(
+      ".ca-journal-attach:hover .ca-journal-attach-remove"
     );
   });
 });

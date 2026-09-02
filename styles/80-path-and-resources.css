@@ -10,14 +10,11 @@
   border: none;
   box-shadow: none;
 }
-.ca-journal-path-label {
-  font-size: var(--ca-text-xs);
-  font-weight: var(--ca-caps-weight);
-  letter-spacing: var(--ca-caps-tracking);
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 5px;
-}
+/* The `path:` copy of the eyebrow, gone in 5.14 with the other three — see
+   75-home-dashboard.css where `note:`'s went for the whole argument. The head
+   that replaced all four was an eyebrow for one draft of that release and is a
+   section bar in the one that shipped; the four labels stay retired either way,
+   which was always the point of deleting them. */
 .ca-journal-path-add {
   display: flex;
   align-items: center;
@@ -232,14 +229,14 @@ body.is-mobile .ca-journal-path-del {
 .ca-journal-attach--res-practice .ca-journal-attach-zone {
   transition: border-color 0.15s ease;
 }
-/* Section sub-labels (Docs/Tutorials/Practice) use the same uppercase, muted,
-   outside-the-box treatment as every other standalone field's label, so the
-   three read as siblings under the Resources header. */
-.ca-journal-attach--res-docs .ca-journal-attach-label,
-.ca-journal-attach--res-tutorials .ca-journal-attach-label,
-.ca-journal-attach--res-practice .ca-journal-attach-label {
-  margin: 2px 0 4px;
-}
+/* THE THREE SHELVES STILL KEEP THEIR NAMES (5.14), and this is the rule that
+   nearly cost them. `header:📚 Resources` names ONE thing and three `attach:`
+   shelves render under it, so the "a field under a bar that already names it
+   draws no head" rule cannot be read off the fence's `header:` alone — it would
+   have deleted Docs, Tutorials and Practice and left one anonymous stack of
+   chips. `widgets/index.ts` therefore withholds a head only when the titled
+   fence holds exactly ONE field directive (`soleField`). The margin this rule
+   tuned belongs to the head now, and is the same for all three. */
 
 .ca-journal-stepper {
   gap: 2px;

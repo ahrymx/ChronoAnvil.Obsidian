@@ -33,14 +33,20 @@
 .ca-journal-note:last-child {
   margin-bottom: 0;
 }
-.ca-journal-note-label {
-  font-size: var(--ca-text-xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 5px;
-}
+/* THE NOTE'S LABEL IS THE FRAME'S NOW (5.14). What stood here was an eyebrow —
+   `--ca-text-xs`, 600, uppercase, muted — drawn by `buildNote` above its
+   textarea, and three near-copies of it stood in this file and the next two for
+   `list:`, `path:` and `attach:`. One head draws all four now, and the four
+   classes are retired for good.
+
+   THE EYEBROW ITSELF DID NOT SURVIVE THE RELEASE, which is worth saying here
+   rather than only where it was deleted: the frame first drew that same
+   small-caps label, on the argument that keeping the type identical meant no field's name
+   moved on the page. The reader's answer was that the type was the problem —
+   the diary was the one surface still wearing it while every other section on
+   every other surface had a real title bar. A field head is
+   `.ca-journal-sec-l1` inside `.ca-journal-sec-fold` now, the same object the
+   journals sections draw. Nothing in this file styles it. */
 .ca-journal-note-input {
   display: block;
   width: 100%;
@@ -117,14 +123,8 @@
 .ca-journal-list:last-child {
   margin-bottom: 0;
 }
-.ca-journal-list-label {
-  font-size: var(--ca-text-xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 5px;
-}
+/* The `list:` copy of the same label, gone the same way — see the note above
+   the input rules for `note:`. */
 .ca-journal-list-row {
   display: flex;
   align-items: flex-start;
@@ -182,82 +182,35 @@
   outline: none;
 }
 
-/* Highlights + Challenges: two regions, one box (2.11, widened 2.12).
-   ------------------------------------------------------------------------
-   These were `>[!highlights]` / `>[!challenges]` callouts until 2.11. As
-   callouts they rendered as two near-empty titled boxes that couldn't be typed
-   into from reading view, and nothing else in ChronoAnvil could read them. They're
-   now `list:` fields — but a monthly retrospective is *one* thought ("how did
-   the month go"), so they're presented as one box with a divider rather than
-   two stacked cards.
-
-   Deliberately still two regions on disk. Merging them into a single field
-   would read the same and be simpler, but it would make "pull twelve months of
-   highlights" (a year-in-review digest) a prose-parsing problem rather than a
-   region read — and un-merging later would mean hand-editing every month note.
-   The presentation is the cheap thing to change; the storage is not.
-
-   Two things this got wrong on the way here, worth stating so they aren't
-   reintroduced:
-
-   1. The halves are flex items of `.ca-journal-widget-block`, which separates its
-      children with `gap`, not margin. Zeroing `margin-bottom` did nothing and
-      the box rendered as two boxes with a 10px trough between them. The gap has
-      to be cancelled explicitly — hence `--ca-widget-gap` above.
-
-   2. Every other field in an entry puts its label *outside* its box, uppercase
-      and muted. Sentence-case labels inside the box made this pair read as a
-      foreign component rather than one more field. The labels here match the
-      page's label typography exactly; the shared border and divider do the
-      grouping, without a second competing label style. */
-.ca-journal-list--highlights,
-.ca-journal-list--challenges {
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary);
-  border-radius: var(--ca-radius-md);
-  padding: 9px 12px 10px;
-  transition: border-color 0.15s ease;
-}
-.ca-journal-list--highlights:has(+ .ca-journal-list--challenges) {
-  border-radius: var(--ca-radius-md) var(--ca-radius-md) 0 0;
-  border-bottom: none;
-  margin-bottom: 0;
-}
-/* Cancels the container's flex gap so the two halves actually touch. The
-   divider the user sees is the challenges half's own top border. */
-.ca-journal-list--highlights + .ca-journal-list--challenges {
-  border-radius: 0 0 var(--ca-radius-md) var(--ca-radius-md);
-  margin-top: calc(-1 * var(--ca-widget-gap));
-}
-.ca-journal-list--highlights .ca-journal-list-label,
-.ca-journal-list--challenges .ca-journal-list-label {
-  margin-bottom: 3px;
-}
-
-/* Hover and focus light the *whole* box, not the half under the cursor.
-   Accenting one half alone draws the accent along the shared seam and makes the
-   join look like a rendering fault — the opposite of what the join is for.
-   Forward propagation (top half active -> bottom half follows) is a plain
-   adjacent-sibling selector. */
-.ca-journal-list--highlights:hover,
-.ca-journal-list--highlights:focus-within,
-.ca-journal-list--challenges:hover,
-.ca-journal-list--challenges:focus-within,
-.ca-journal-list--highlights:hover + .ca-journal-list--challenges,
-.ca-journal-list--highlights:focus-within + .ca-journal-list--challenges {
-  border-color: var(--interactive-accent);
-}
-
-/* Backward propagation (bottom half active -> top half follows) needs `:has()`,
-   which is kept in its own rule on purpose: an unsupported selector invalidates
-   the *entire* group it appears in, so folding this into the list above would
-   take ordinary hover down with it on any renderer that lacks `:has()`. Isolated
-   like this, the worst case is that the top half doesn't light up — a cosmetic
-   asymmetry rather than a dead interaction. */
-.ca-journal-list--highlights:has(+ .ca-journal-list--challenges:hover),
-.ca-journal-list--highlights:has(+ .ca-journal-list--challenges:focus-within) {
-  border-color: var(--interactive-accent);
-}
+/* ── HIGHLIGHTS + CHALLENGES ARE TWO FIELDS AGAIN (5.14) ─────────────────
+ *
+ * Seventy lines stood here welding them into one box: a shared border and fill
+ * on `.ca-journal-list--highlights` / `--challenges`, the top half's bottom
+ * corners squared and its border dropped, the flex gap cancelled with a
+ * negative margin so the halves touched, their labels pulled INSIDE the box,
+ * and four hover rules — two of them needing `:has()` and kept apart precisely
+ * because an unsupported selector would have taken ordinary hover down with it
+ * — so that lighting either half lit both.
+ *
+ * WHY IT WENT. 2.11's argument was that a monthly retrospective is one thought,
+ * and it is. But this pair was the only WELDED box on the page — two fields
+ * sharing one border, with their labels pulled inside it, and neither able to
+ * fold. Its own comment recorded that as a bug it had already fixed once
+ * ("read as a foreign component rather than one more field"); the weld was the
+ * part still saying it. One head, drawn the same way for all seven fields,
+ * groups them by being the same object rather than by being fused into one.
+ *
+ * EVERY FIELD IS A BORDERED BOX, which is the opposite of what this note said
+ * when it was written — it argued from "an eyebrow over an unbordered body",
+ * and that treatment lasted one draft of this release before the reader saw it
+ * and rejected it. A field is a card with a title bar now. The pair still does not
+ * come back: two cards side by side is the grouping, and it is the same
+ * grouping every other pair of fields on the page gets.
+ *
+ * WHAT DID NOT CHANGE, AND WAS THE ONLY PART OF 2.11 ABOUT STORAGE: they are
+ * still two regions on disk. "Pull twelve months of highlights" stays a region
+ * read rather than a prose-parsing problem, and no note is rewritten. The
+ * presentation was the cheap thing to change; the storage still is not. */
 
 /* --- Settings: derived paths under a root -------------------------------
    Read-only rows showing where each path that follows a root currently
@@ -309,26 +262,43 @@
   display: block;
   margin: 0 0 0.9em;
 }
-.ca-journal-attach-label {
-  font-size: var(--ca-text-xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 5px;
-  /* A row since 3.19.2, so the shelf's remove control can sit at its end. The
-     text keeps every type rule it had; only the box around it changed. */
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ca-space-2);
-}
+/* THE SHELF'S LABEL ROW IS THE FRAME'S HEAD NOW (5.14), and this one is the
+   reason the reader opened the report. It was the third copy of the eyebrow
+   PLUS a flex row holding the shelf's ✕ — and it sat OUTSIDE
+   `.ca-journal-attach-zone`, which is the only box the widget draws. So an
+   attachments field rendered as a label with nothing around it above a dashed
+   rectangle: "the frame is not complete", exactly. The ✕ is now in the head's
+   own actions slot (`buildShelfRemove`), and the dashed edge stays where it
+   belongs, on the drop target inside the body. */
 
 /* Remove this category.
 
    FAINT UNTIL HOVER, on the same reasoning as .ca-jsh-title-edit: it is an
    affordance on a row that is mostly a label, and a always-visible ✕ beside
    every shelf would read as three ways to delete something. */
+/* ── AND IT IS NOT FAINT ANY MORE (5.14) ────────────────────────────────
+ *
+ * WHAT STOOD HERE: `opacity: 0`, revealed by `.ca-journal-attach:hover`, on the
+ * argument recorded below — *"it is an affordance on a row that is mostly a
+ * label, and an always-visible ✕ beside every shelf would read as three ways to
+ * delete something"*.
+ *
+ * THE ROW IT WAS AN AFFORDANCE ON IS GONE. That reasoning was about
+ * `.ca-journal-attach-label`, a bare label with a ✕ floating at the end of it;
+ * the ✕ is a head ACTION now, sitting on the field's own strip beside *Add
+ * file* and *Add link*. Those are always drawn, so a third control that is
+ * invisible until the pointer finds it is not restraint — it is one slot in a
+ * row of three behaving differently from the other two, which is what the
+ * reader reported.
+ *
+ * MUTED IS STILL THE ANSWER TO "three ways to delete something", and it is the
+ * half of the old rule worth keeping: `--text-faint` against the pills' own
+ * ink, with the error tint arriving only under the pointer. What changed is
+ * that the control is THERE to be read before it is hovered.
+ *
+ * `.is-static` KEEPS ITS 0.35 and gains meaning from the change: a shelf with
+ * files in it now reads as a dimmed control among lit ones rather than as an
+ * absent one among absent ones. */
 .ca-journal-attach-remove {
   display: inline-flex;
   align-items: center;
@@ -339,16 +309,13 @@
   box-shadow: none;
   color: var(--text-faint);
   cursor: pointer;
-  opacity: 0;
+  opacity: 1;
   border-radius: var(--ca-radius-sm);
   transition: opacity 0.12s, color 0.12s, background 0.12s;
 }
 .ca-journal-attach-remove svg {
   width: 13px;
   height: 13px;
-}
-.ca-journal-attach:hover .ca-journal-attach-remove {
-  opacity: 1;
 }
 .ca-journal-attach-remove:hover:not(:disabled) {
   color: var(--text-error);
@@ -359,9 +326,6 @@
    inconsistency rather than as a rule. */
 .ca-journal-attach-remove.is-static {
   cursor: default;
-  opacity: 0.35;
-}
-.ca-journal-attach:hover .ca-journal-attach-remove.is-static {
   opacity: 0.35;
 }
 
@@ -586,13 +550,13 @@
   background: transparent;
 }
 
-/* Toolbar + empty/busy hints. */
-.ca-journal-attach-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
+/* Toolbar + empty/busy hints.
+   THE TOOLBAR'S OWN ROW IS GONE (5.14): "Add file", "Add link" and the paste
+   hint were a flex row built INSIDE the drop zone, under the chips. They are
+   the field's actions, so they now go where every other head puts its actions
+   — `.ca-journal-header-widgets`, which is already a wrapping flex row with a
+   gap and already sizes its buttons down. The zone keeps the drop hint alone,
+   which is the one thing in it that was about dropping. */
 .ca-journal-attach-file-input {
   display: none;
 }
@@ -718,8 +682,30 @@
   transition: border-color 0.15s ease;
 }
 
+/* A CARD IN A CARD (4.1 §3.1). The first two selectors are that rule: a section
+   surface is a card, so the widget inside it gives its own up.
+ *
+ * THE THIRD IS THE SAME RULE POINTING THE OTHER WAY, and it was written
+ * backwards first — as `.ca-journal-field .ca-journal-tasks`, which describes a
+ * `.ca-journal-tasks` INSIDE a field and matches nothing. `buildTasks` creates
+ * this element as the widget's own wrap and hands it to `fieldHead`, so the
+ * field's card is built INSIDE it: the wrap is the outer box, the field card is
+ * the inner one, and a vault render showed exactly that — Tasks and Captured
+ * each drawn as a card inset a dozen pixels inside a second card, the only two
+ * fields on the entry with two edges.
+ *
+ * `:has(>` RATHER THAN A CLASS, on 70-section-surface.css's own reasoning about
+ * `.ca-journal-overview-card`: the fact is already in the DOM, and a mark saying
+ * "a head was drawn in here" would be a second copy of it that `fieldHead`'s
+ * other branch could leave stale. The child combinator is exact — `fieldFrame`
+ * appends the fold to the wrap it is given — and it keeps this from reaching a
+ * field nested somewhere deeper inside the widget's body.
+ *
+ * The surface is not deleted, only stood down where something else is already
+ * drawing one. A bare `tasks:` in a fence with no bar and no head keeps it. */
 .ca-journal-sec-block .ca-journal-tasks,
-.ca-journal-sec-block.ca-journal-tasks {
+.ca-journal-sec-block.ca-journal-tasks,
+.ca-journal-tasks:has(> .ca-journal-sec-fold.ca-journal-field) {
   background: none;
   border: none;
   border-radius: 0;
@@ -728,81 +714,36 @@
   margin: 0;
 }
 
-/* ── THE FIELD BAR UNDER A SECTION BAR (5.10) ──────────────────────────
+/* ── THE TASKS HEAD IS THE FRAME'S (5.14) ──────────────────────────────
  *
- * This rule read `display: none` — a head built in TypeScript so that CSS
- * could unbuild it wherever it was wrong, which was every note the `checklist`
- * section composed. It took the Compact toggle and the progress readout with
- * it, so a control vanished from the page to settle a layout question.
+ * Eighty lines stood here: `.ca-journal-tasks-head` in two arms — `is-bare`, a
+ * right-aligned control strip for the case where a `header:` bar already named
+ * the block, and a `.ca-journal-note--collapsible` arm that was a fold bar with
+ * the chevron on the LEFT — plus `-title-left`, `-label`, `-chevron`, its svg
+ * size, its rotation, `-head-right`, and a `:not(.ca-journal-tasks-head)` rule
+ * to hide everything else when closed.
  *
- * `buildTasks` now withholds the title and the chevron when a `header:` bar
- * already names the block, and keeps the tools. `is-bare` is that head: a
- * right-aligned control strip under a section title, not a second title. */
-.ca-journal-tasks-head.is-bare {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 0 0 var(--ca-space-2);
-  background: transparent;
-  border-bottom: none;
-}
-
+ * All of it was `foldableSection` written a second time, badly: the chevron on
+ * the wrong side, no shared height, and a fold key of its own. 5.10 had already
+ * generalised the interesting half of it — "a field under a bar that names it
+ * draws no title and keeps its tools" — and 5.14 applies that rule to all seven
+ * field kinds through `fieldHead`, so the arm that stated it for this one is
+ * the frame's now.
+ *
+ * THE CLOSED-HEIGHT DEFECT THE READER REPORTED IS THIS FILE'S. A closed Tasks
+ * cost ~28px because its head kept the Compact toggle and the progress readout
+ * while Captured closed to a bare ~20px label. The wrapper's own collapsed
+ * rules in 70-section-surface.css hide a folded head's actions, and
+ * `--ca-sec-bar-h` floors what is left, so the two now close to one box — and
+ * to the same box as a closed SECTION, which is better than the answer the
+ * first draft of this release gave: the field head had a height token of its
+ * own, and now it shares the one every other head is measured by.
+ *
+ * WHAT STAYS: the surface. `.ca-journal-tasks` above is a card with a border
+ * and a focus tint, and that is the FIELD's box rather than its head's — the
+ * distinction decision 5 turns on, and the one attachments got wrong. */
 .ca-journal-tasks:focus-within {
   border-color: var(--interactive-accent);
-}
-.ca-journal-tasks.ca-journal-note--collapsible > .ca-journal-tasks-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 2px 0;
-  cursor: pointer;
-  user-select: none;
-  background: transparent;
-  border-bottom: none;
-  margin-bottom: var(--ca-space-2);
-}
-.ca-journal-tasks.ca-journal-note--collapsible.is-collapsed > .ca-journal-tasks-head {
-  margin-bottom: 0;
-}
-.ca-journal-tasks-title-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.ca-journal-tasks.ca-journal-note--collapsible > .ca-journal-tasks-head:hover .ca-journal-tasks-label {
-  color: var(--text-normal);
-}
-.ca-journal-tasks-chevron {
-  display: flex;
-  align-items: center;
-  color: var(--text-faint);
-  transition: transform 120ms ease;
-}
-.ca-journal-tasks-chevron .svg-icon {
-  width: 14px;
-  height: 14px;
-}
-.ca-journal-tasks.is-collapsed .ca-journal-tasks-chevron {
-  transform: rotate(-90deg);
-}
-.ca-journal-tasks.is-collapsed > :not(.ca-journal-tasks-head) {
-  display: none;
-}
-.ca-journal-tasks-label {
-  font-size: var(--ca-text-xs);
-  font-weight: var(--ca-caps-weight);
-  letter-spacing: var(--ca-caps-tracking);
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin: 0;
-}
-.ca-journal-tasks-head-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 .ca-journal-tasks-compact-toggle {
   display: inline-flex;
@@ -1337,13 +1278,12 @@ body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-at-wrap.has-at {
   .ca-journal-attach-menu {
     opacity: 0.55;
   }
-  /* Same rule, same reason (3.19.2): on a phone there is no hover to reveal
-     this, so a shelf's remove control would be invisible rather than faint —
-     and unlike the pencils, there is no second route to it anywhere. Kept
-     dimmer than the menu because it deletes something and the menu does not. */
-  .ca-journal-attach-remove {
-    opacity: 0.45;
-  }
+  /* AND THIS BRANCH IS GONE (5.14). It read: "on a phone there is no hover to
+     reveal this, so a shelf's remove control would be invisible rather than
+     faint". There is no hover to compensate for any more — the control is
+     drawn at full opacity on every pointer, so a phone rule holding it at 0.45
+     would be the only place it is dimmed, which is the opposite of what this
+     branch was for. `.is-static` still dims it everywhere, on both. */
 }
 
 /* ── A page of widgets sets its own width (4.2 §2) ─────────────────────

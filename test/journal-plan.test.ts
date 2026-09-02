@@ -14,6 +14,7 @@ import {
   journalTemplateFiles,
 } from "../src/journals/custom-journal";
 import {
+  childrenBar,
   defaultSectionIds,
   detectSections,
   findSection,
@@ -768,7 +769,10 @@ describe("parts and the extend op", () => {
       .split("\n")
       .filter(
         (l) =>
-          !/^(header:🛠️|button:study:new-practice|kind-table:practice)/.test(
+          // `header:2:` SINCE 5.12 — a kind's head is a group inside the
+          // section's bar. Both spellings, so the fixture keeps deleting the
+          // same three lines whichever release composed the template.
+          !/^(header:(?:2:)?🛠️|button:study:new-practice|kind-table:practice)/.test(
             l.trim()
           )
       )
@@ -797,10 +801,26 @@ describe("parts and the extend op", () => {
         const rendered = s
           .render(t.ctx)
           .flatMap((b) => (b.kind === "fence" ? b.lines : []));
+        // ── PLUS WHAT THE FENCE OPENS WITH (5.12) ────────────────────
+        //
+        // `children` composes a bar of its own now — the section's name, and the
+        // primary kind's create button anchored into it — and the parts are the
+        // GROUPS under it. The tripwire is unchanged in what it guards: the
+        // rendered fence is still exactly the parts, in order, with nothing
+        // between them; it is now allowed a head, and the head is derived from
+        // the same catalogue rather than written out here, so a drift in either
+        // still shows up as a disagreement.
+        const head = rendered.slice(
+          0,
+          rendered.length - parts.flatMap((p) => p.lines).length
+        );
         expect(
-          parts.flatMap((p) => p.lines),
+          [...head, ...parts.flatMap((p) => p.lines)],
           `${s.id}'s parts and render disagree on ${t.file}`
         ).toEqual(rendered);
+        expect(head, `${s.id} opens its fence with more than a bar`).toEqual(
+          s.id === "children" && head.length ? childrenBar(t.ctx) : []
+        );
         // And the probe closes its group, which is what makes "insert after
         // the preceding part" land between groups rather than inside one.
         for (const p of parts) {
@@ -911,21 +931,24 @@ describe("parts and the extend op", () => {
     )!.content;
     // Practice above Lessons, Lessons retitled by hand, and no Quiz yet.
     const edited = composed.replace(
-      /```chronoanvil\nheader:📖[\s\S]*?```/,
+      /```chronoanvil\nheader:🗂️[\s\S]*?```/,
       [
         "```chronoanvil",
-        "header:🛠️ Practice",
+        // The section's own bar, which the reader has left alone, and the two
+        // groups under it in THEIR order rather than the catalogue's.
+        "header:🗂️ What's below",
+        "button:s3:new-lesson",
+        "header:2:🛠️ Practice",
         "button:s3:new-practice",
         "kind-table:practice",
-        "header:📖 My Own Title",
-        "button:s3:new-lesson",
+        "header:2:📖 My Own Title",
         "kind-table:lesson",
         "```",
       ].join("\n")
     );
     const out = applySections(edited, ctx, sectionsPresent(edited, ctx))!;
     const fence = out.split("\n").map((l) => l.trim());
-    expect(out).toContain("header:📖 My Own Title");
+    expect(out).toContain("header:2:📖 My Own Title");
     // Their order survives: Practice still before Lessons.
     expect(fence.indexOf("kind-table:practice")).toBeLessThan(
       fence.indexOf("kind-table:lesson")
@@ -999,19 +1022,22 @@ describe("renameable section titles", () => {
     // the name: `missing` reports parts by their `kind-table:` probe, and the
     // header above it is neither matched nor re-emitted.
     const { ctx, text } = topic();
-    const renamed = text.replace("header:📖 Lessons", "header:📖 My Lessons");
+    const renamed = text.replace("header:2:📖 Lessons", "header:2:📖 My Lessons");
     const stale = renamed
       .split("\n")
       .filter(
         (l) =>
-          !/^(header:🛠️|button:study:new-practice|kind-table:practice)/.test(
+          // `header:2:` SINCE 5.12 — a kind's head is a group inside the
+          // section's bar. Both spellings, so the fixture keeps deleting the
+          // same three lines whichever release composed the template.
+          !/^(header:(?:2:)?🛠️|button:study:new-practice|kind-table:practice)/.test(
             l.trim()
           )
       )
       .join("\n");
     const out = applySections(stale, ctx, sectionsPresent(stale, ctx))!;
-    expect(out).toContain("header:📖 My Lessons");
-    expect(out).not.toContain("header:📖 Lessons\n");
+    expect(out).toContain("header:2:📖 My Lessons");
+    expect(out).not.toContain("header:2:📖 Lessons\n");
     expect(out).toContain("kind-table:practice");
   });
 });

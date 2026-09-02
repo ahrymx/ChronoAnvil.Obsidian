@@ -1098,6 +1098,15 @@ export function spliceArg(
 export function parseHeaderDirective(rest: string): {
   level: number;
   title: string;
+  // Whether the LEVEL was written, as against defaulted to. 5.12.
+  //
+  // Nothing needed the difference while every bare `header:` was a section: the
+  // grammar's default and the reader's intent were the same answer. They part
+  // company the moment a fence carries several heads — see the demotion rule in
+  // the block processor, which reads a bare second head as a GROUP inside the
+  // first section rather than as a second section touching it. A head written
+  // `header:1:` said which level it wanted and keeps it.
+  explicit: boolean;
 } {
   // Any leading `<digits>:` is a level, CLAMPED to the two that exist.
   //
@@ -1110,11 +1119,30 @@ export function parseHeaderDirective(rest: string): {
   // Only digits, so a title that legitimately opens with a word and a colon
   // ("Note: read this") is untouched.
   const m = rest.match(/^(\d+):(.*)$/);
-  if (!m) return { level: 1, title: rest.trim() };
+  if (!m) return { level: 1, title: rest.trim(), explicit: false };
   return {
     level: Math.min(2, Math.max(1, Number(m[1]))),
     title: m[2].trim(),
+    explicit: true,
   };
+}
+
+// The level a `header:` line actually renders at: the one it names, or the one
+// its POSITION names when it names none. 5.12.
+//
+// ONE STATEMENT OF THE DEMOTION RULE, and it is here because three places have
+// to agree about it: the block processor that draws the bar, the rename offer
+// that asks whether a head names a note kind, and the tests that sweep for a
+// second level-1 head in a composed fence. A rule about what the reader SEES,
+// re-derived in the module that acts on it, is how a control comes to act on a
+// head the page is drawing as something else.
+//
+// `firstInFence` is asked of the TITLED heads only, on `leadingBar`'s rule: an
+// untitled `header:` is a control strip under a markdown heading, it opens no
+// section, and counting it would demote the first head that does.
+export function headerLevel(rest: string, firstInFence: boolean): number {
+  const parsed = parseHeaderDirective(rest);
+  return parsed.explicit || firstInFence ? parsed.level : 2;
 }
 
 // ── EVERY KEYWORD THAT MODIFIES A BLOCK RATHER THAN BEING ONE (4.70) ─────
@@ -1258,6 +1286,23 @@ export function soloBar(
   // the contradiction `parseFrame` already refuses, and this must not be the
   // thing that writes it.
   if (!bar || isSectionFence(lines)) return [...lines];
+  return insertBar(lines, bar);
+}
+
+// The splice `soloBar` performs, without the policy that decides whether to.
+//
+// SEPARATED IN 5.12, when a second caller needed the placement and not the
+// gate. A fence of GROUP heads — the deepest index's, one `header:2:` per note
+// kind — answers `isSectionFence` yes, because it is full of headers, and is
+// nonetheless missing the one bar that names the section they sit in. Only the
+// catalogue can tell that fence from a titled one (it is the one that knows how
+// many groups the section has), so the gate lives there and the placement lives
+// here rather than being written a second time beside it.
+//
+// ABOVE THE FIRST LINE THAT IS CONTENT, which is `soloBar`'s rule and is the
+// half both callers share: the reconciler hands whole fences here, markers
+// included, so index 0 is usually the ``` and never the title's place.
+export function insertBar(lines: readonly string[], bar: string): string[] {
   const at = lines.findIndex((l) => {
     const t = l.trim();
     return t !== "" && !t.startsWith("```");
@@ -1265,6 +1310,17 @@ export function soloBar(
   const out = [...lines];
   out.splice(at < 0 ? out.length : at, 0, bar);
   return out;
+}
+
+// Every titled `header:` line in a fence, in file order.
+//
+// TITLED ONLY, on `leadingBar`'s rule and for its reason: an untitled `header:`
+// is a control strip anchored under a real markdown heading, it names nothing,
+// and a count of section heads that included it would be counting a toolbar.
+export function titledHeadersIn(lines: readonly string[]): string[] {
+  return lines
+    .map((l) => l.trim())
+    .filter((t) => isHeaderLine(t) && splitDirective(t).argument.trim() !== "");
 }
 
 // The title a section would open with, if it opens with one at all.
