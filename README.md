@@ -13,7 +13,7 @@ It replaces Templater, Meta Bind, Tracker, Tasks and Dataview for this workflow.
 
 | | |
 | --- | --- |
-| **Diary** | Daily and monthly entries, overview calendar with heat maps and special events, week / month / quarter / year dashboards, full-text search filtered by date, tag and tracker, on-this-day and timeline recaps. |
+| **Diary** | D/W/M/Q/Y entries, overviews (dashboards), calendars, heat maps, and special events, full-text search filtered by date, tag and tracker, on-this-day and timeline recaps. |
 | **Journals** | Define your own custom journals with folder levels and note types. Presets for Study (*Subjects → Topics → Lessons/Practice*), Projects, Fitness, and Media ship ready to use. |
 | **Trackers** | Defined once, synced everywhere. Numberless rating scales, dynamic bedtime & wake-up buttons with live sleep/wake duration, steppers, dropdowns, multi-row tag flow, and habit pills. Any tracker can be added to individual entries on the fly. |
 | **Charts** | Line, bar, calendar heat map, scatter correlation, streak and summary stat cards, rendered natively from your frontmatter onto dashboards and journal indexes. |
