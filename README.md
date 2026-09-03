@@ -32,7 +32,7 @@ queries, no Templater scripts, no external chart plugins.
 | ![Tracker controls at the head of a daily entry](docs/screenshots/diary-entry.png) | ![Trends and statistics with heatmaps, line charts and scatter plots](docs/screenshots/charts.png) |
 | *Dynamic sleep buttons, numberless scales, 2-row tags* | *Annual heatmaps, 90d rolling averages, scatter plots* |
 
-| Custom journals & Study preset | Period dashboards & digests |
+| Custom journals &  presets | Period dashboards & digests |
 | :---: | :---: |
 | ![A Study journal index, subjects and topics](docs/screenshots/study-journal.png) | ![A yearly overview dashboard rolling up entries and recaps](docs/screenshots/period-dashboard.png) |
 | *Subjects, topics, confidence ratings, and activity heatmaps* | *Yearly, quarterly and weekly rollups with recap digests* |
