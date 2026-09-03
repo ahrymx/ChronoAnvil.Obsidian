@@ -376,9 +376,18 @@ describe("the editor cannot learn which surface it is on", () => {
     // twice over now: a derivation that quietly widened would show up here as a
     // section that started asking, and one that quietly narrowed as a section
     // that stopped.
+    //
+    // AND TWO ROWS LEFT IT IN 5.18, WHICH IS THE SAME DERIVATION WORKING. The
+    // journal index this test builds is the DEEPEST one, and that is where the
+    // tracker grid and the stats band are now the two pages of one group — so
+    // neither composes a bar, `widgetFormBar` has none to report, and the
+    // toggle is not offered. That is exactly where `tasks` stands on a
+    // CONTAINER index and has stood since 4.70: a cell of a row is already a
+    // widget, and the control for it is the group card's Ungroup rather than a
+    // form toggle on a section that is not one. Both are on this list on the
+    // surfaces where they are blocks — see `journal leaf/trackers` below, and
+    // the container index the row does not apply to.
     expect(asking).toEqual([
-      "journal index/trackers",
-      "journal index/stats",
       "journal index/find",
       "journal index/review",
       "journal index/tasks",

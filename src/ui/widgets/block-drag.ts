@@ -75,7 +75,7 @@ import type { MarkdownPostProcessorContext } from "obsidian";
 import type ChronoAnvilPlugin from "../../main";
 import { blockIndexAt } from "../../core/block-move";
 import { splitGlyph } from "../section-frame";
-import { moveCell, widgetRun } from "../../core/cell-move";
+import { moveCell, pageSlice, widgetRun } from "../../core/cell-move";
 import type { CellSource, CellTarget } from "../../core/cell-move";
 import { cellWidthsIn, snapRatio, widenCells } from "../../core/cell-width";
 import { MAX_COLUMNS } from "../../core/directive-grammar";
@@ -150,6 +150,9 @@ let inFlight: { block: number; whole: boolean; frees: boolean } | null = null;
 let dragSeq = 0;
 const LINE_ATTR = "data-ca-line";
 const BODY_ATTR = "data-ca-body";
+// THE LAST LINE OF A CHILD THAT DREW MORE THAN ONE (5.16). Absent on every
+// child that is one directive, which is nearly all of them — see `markSpan`.
+const SPAN_ATTR = "data-ca-span";
 
 // The head itself, which a block and a widget build the same way.
 //
@@ -221,6 +224,10 @@ export function cardWidget(widget: HTMLElement, title: string): void {
   // rewritten.
   const line = widget.getAttribute(LINE_ATTR);
   if (line !== null) card.setAttribute(LINE_ATTR, line);
+  // AND ITS SPAN WITH IT, for a widget bar — the card is what a reader grabs,
+  // so the card is what has to know how many lines that is.
+  const span = widget.getAttribute(SPAN_ATTR);
+  if (span !== null) card.setAttribute(SPAN_ATTR, span);
   card.appendChild(widget);
 }
 
@@ -332,12 +339,93 @@ function attachGrip(host: HTMLElement, label: string, cls = ""): HTMLElement {
   });
 }
 
+// ── THE ONE CHILD THAT IS NOT ONE DIRECTIVE ───────────────────────────
+//
+// `stampLines` stamps every direct child with the line of the last directive
+// whose render reached it, and the inline kinds — `tracker:`, `sleep`,
+// `slider:`, `button:` and the rest — all land in ONE `.ca-journal-widget-bar`
+// together. So the bar carries the line of the FIRST of them, and a drag
+// reading that stamp alone picks up one directive and moves it out from under
+// the nine still drawn inside the element the reader is holding. An entry's
+// tracker grid is exactly this: one bar, one stamp, ten cells.
+//
+// 5.15 ANSWERED THAT BY WITHHOLDING THE GESTURE, AND 5.16 GIVES IT A RANGE.
+// The bar got no grip and no places of its own, which fixed the wrong move by
+// removing the move — and a vault read the result as what it was: *"these
+// widgets headers are missing the drag icons."* A head over something the
+// reader cannot pick up is a card that says less than the cards beside it.
+//
+// A SECOND STAMP, WRITTEN BY THE ONLY CODE THAT KNOWS THE ANSWER. The dispatch
+// loop appends each inline directive to the bar in turn, so it is holding the
+// run's last line at the moment it appends the last cell; nothing downstream
+// can re-derive that, because the DOM has one element where the file has ten
+// lines. `markSpan` records it, `spanOf` reads it back, and everything else in
+// this file goes on treating the bar as one widget.
+//
+// AND A MARKED REGION IS STAMPED AS ITS MARKERS, WHICH IS WHY THE SPAN IS A
+// PAIR RATHER THAN A COUNT. A tracker grid is delimited by
+// `# chronoanvil:trackers:start` and its `end`; both are filtered out before
+// the dispatch loop ever runs (see `kept`), so no child is ever stamped with
+// them, and "+ Add tracker" writes between them. A range from the first
+// `tracker:` to the last would carry the cells out of their own region and
+// leave the markers behind. `markRegion` is `index.ts` saying so: the grid's
+// range is marker to marker, so the region travels whole and lands whole.
+//
+// THE CARD COUNTS AS THE BAR. `cardWidget` wraps the bar in place and copies
+// both stamps onto the wrapper, so by the time a grip is hung the stamped child
+// is the CARD and the bar is inside it.
+export function markSpan(el: HTMLElement, last: number): void {
+  el.setAttribute(SPAN_ATTR, String(last));
+}
+
+// The whole of a marked region, markers included, as the range that moves it.
+export function markRegion(el: HTMLElement, first: number, last: number): void {
+  el.setAttribute(LINE_ATTR, String(first));
+  el.setAttribute(SPAN_ATTR, String(last));
+}
+
+// A CHILD NO DIRECTIVE DREW HAS NO LINE, and `index.ts` has exactly one: the
+// empty grid a note gets when it declares a tracker region and holds no
+// trackers yet. `stampLines` would hand it the line of whatever was drawn
+// before it — a stamp that names another widget's directive — so it is cleared
+// rather than left to be picked up.
+export function clearStamp(el: HTMLElement): void {
+  el.removeAttribute(LINE_ATTR);
+  el.removeAttribute(SPAN_ATTR);
+}
+
 // The line a stamped element came from, or null on anything unstamped.
 function lineOf(el: Element | null): number | null {
   const raw = el?.getAttribute(LINE_ATTR);
   if (raw === null || raw === undefined) return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
+}
+
+// The last line of a child that drew a run of them, or null for the ordinary
+// child that drew one.
+function spanOf(el: Element | null): number | null {
+  const raw = el?.getAttribute(SPAN_ATTR);
+  if (raw === null || raw === undefined) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+// What a stamped child carries: its own line, a `height:` line above it where
+// there is one, and every line to the end of its run where it drew more than
+// one.
+//
+// ONE HELPER FOR THE THREE PLACES THAT ASK — a widget in a cell, a widget in a
+// bare fence, and the slots that point at either. They disagreed once, in 4.22,
+// and the symptom was a height line left behind sizing whatever moved up into
+// its place.
+function runOf(
+  body: readonly string[] | null,
+  line: number,
+  span: number | null
+): { from: number; to: number } {
+  const base = body ? runWithHeight(body, line) : { from: line, to: line + 1 };
+  return span === null ? base : { from: base.from, to: Math.max(base.to, span + 1) };
 }
 
 // Whether this widget is the only thing in its column. 4.52.1.
@@ -955,8 +1043,12 @@ function wireCellSlots(
   opens: readonly (number | null)[],
   slot: SlotFn,
   indexNow: () => number | null,
-  bodyNow: () => string[] | null,
-  hasRoom: () => boolean
+  hasRoom: () => boolean,
+  // WHERE THIS PAGE ENDS, which is the end of the BODY only on the last one
+  // (5.16). A group with two pages is one fence, so the line after the last
+  // widget on page 1 is page 2's `tab` delimiter — and a column opened at
+  // `body.length` from a card on page 1 opened it after everything on page 2.
+  endNow: () => number | null
 ): void {
   cells.forEach((cell, n) => {
   const before = opens[n];
@@ -969,17 +1061,24 @@ function wireCellSlots(
     if (next !== null && next !== undefined) {
       return { kind: "cell", block: i, at: next };
     }
-    // PAST THE LAST LINE, read from the file rather than from a stamp: the end
-    // of the body is the one position no child can carry, and `moveCell`
-    // clamps anything past it anyway.
-    const body = bodyNow();
-    return body ? { kind: "cell", block: i, at: body.length } : null;
+    // PAST THE LAST LINE OF THIS PAGE, read from the file rather than from a
+    // stamp: the end of a page is the one position no child can carry, and
+    // `moveCell` clamps anything past it anyway.
+    const end = endNow();
+    return end === null ? null : { kind: "cell", block: i, at: end };
   };
 
   for (const child of Array.from(cell.children)) {
     if (!(child instanceof HTMLElement)) continue;
     const line = lineOf(child);
     if (line === null) continue;
+    // WHERE THIS CHILD ENDS, WHICH IS ITS OWN LINE FOR ALL BUT ONE OF THEM
+    // (5.16). A widget bar drew a run, and its two stacking places are about
+    // the run rather than about its first line: "below the tracker grid" is
+    // after the LAST of them, and pointing at the first would land a widget
+    // between two tracker cells — inside the bar the reader dropped it under.
+    const span = spanOf(child);
+    const ends = span ?? line;
 
     if (before !== null) {
       slot(child, "ca-jbd-slot-before", CELL_TYPE, (p) => p.cell, () => {
@@ -994,12 +1093,21 @@ function wireCellSlots(
     });
     slot(child, "ca-jbd-slot-under", CELL_TYPE, (p) => p.cell, () => {
       const i = indexNow();
-      return i === null ? null : { kind: "stack", block: i, at: line, after: true };
+      return i === null ? null : { kind: "stack", block: i, at: ends, after: true };
     });
-    slot(child, "ca-jbd-slot-swap", CELL_TYPE, (p) => p.cell, () => {
-      const i = indexNow();
-      return i === null ? null : { kind: "swap", block: i, at: line };
-    });
+    // AND A RUN IS NOT A SWAP TARGET. `moveCell`'s swap trades the run in hand
+    // for ONE line of the destination — the shape the target payload can carry
+    // — so a swap onto a widget bar would take one `tracker:` line out of the
+    // middle of a grid and leave the rest of the region around the arrival.
+    // The two stacking places are the whole grammar a run has; the middle of it
+    // belongs to nobody, which is exactly what 5.15 drew for a bare fence's
+    // widgets and for the same reason.
+    if (span === null) {
+      slot(child, "ca-jbd-slot-swap", CELL_TYPE, (p) => p.cell, () => {
+        const i = indexNow();
+        return i === null ? null : { kind: "swap", block: i, at: line };
+      });
+    }
   }
 });
 }
@@ -1369,10 +1477,42 @@ export function attachBlockHead(
   const row = container.querySelector<HTMLElement>(
     `.${ROW_CLASS}:not(.${ROW_CLOSED_CLASS})`
   );
-  const cells = Array.from(row?.children ?? []).filter(
-    (c): c is HTMLElement =>
-      c instanceof HTMLElement && c.hasClass(ROW_CELL_CLASS)
-  );
+  const cellsIn = (host: HTMLElement | null): HTMLElement[] =>
+    Array.from(host?.children ?? []).filter(
+      (c): c is HTMLElement =>
+        c instanceof HTMLElement && c.hasClass(ROW_CELL_CLASS)
+    );
+  const cells = cellsIn(row);
+  // ── AND EVERY PAGE'S CELLS, NOT ONLY THE OPEN PAGE'S (5.16) ─────────
+  //
+  // A group with pages has one row per page, all of them in the document at
+  // once, and swapping pages is a class toggle — `paint` in row.ts flips
+  // `is-closed` and nothing re-renders. So the gesture, hung once against the
+  // row that happened to be open, was hung against that row FOREVER: a reader
+  // who pressed [2] got a page of cards with no grips and no landing places,
+  // and a head that opened over nothing to pick up. Reported from a vault as
+  // one of six states — the page-2 card with its name and no dots.
+  //
+  // THE RESIZE STAYS ON THE OPEN PAGE, and that is not an oversight: a divider
+  // drag writes column widths into ONE page's slice of the body (`widenCells`
+  // takes the ordinal), the handles are pointer targets rather than drop
+  // targets, and 4.34 §6 wired them to the open row for exactly that reason.
+  // What is safe to hang everywhere is what is addressed by a STAMP — a grip
+  // reads its child's own line, a slot reads its cell's — plus this page's own
+  // end, which is why `pageSlice` is asked per row rather than once.
+  //
+  // A HIDDEN PAGE'S SLOTS COST NOTHING. `is-closed` takes the row out of the
+  // layout, so nothing in it can be hovered, dragged from, or dropped on until
+  // the reader opens it — at which point it behaves like the page they were
+  // already on, which is the whole of what was missing.
+  const pageRows = Array.from(
+    container.querySelectorAll<HTMLElement>(`.${ROW_CLASS}`)
+    // NOT A NESTED GROUP'S ROWS. `querySelectorAll` reaches through the cells
+    // into whatever a widget drew, and a fence inside a cell owns its own
+    // gesture — the same scoping `:scope >` states for the header bar below,
+    // asked of a shape that has a wrapper between it and this block.
+  ).filter((r) => r.closest(`.${ROW_CELL_CLASS}`) === null);
+  const allCells = pageRows.flatMap(cellsIn);
   // WHICH PAGE THAT IS, for the writers that speak in body lines. `widenCells`
   // and `cellWidthsIn` take a page ordinal and do their arithmetic inside that
   // page's slice; handing them the default 0 would write tab 1's widths from
@@ -1383,6 +1523,28 @@ export function attachBlockHead(
   // so the nth row on screen is not the nth page in the note. The stamp is the
   // ordinal both sides agree on.
   const openPage = Number(row?.getAttribute(ROW_PAGE_ATTR) ?? 0) || 0;
+
+  // WHICH OF THIS BLOCK'S CHILDREN ARE WIDGETS A READER MAY REORDER, asked here
+  // rather than at the loop that hangs their grips, because the answer decides
+  // the shape of the block's OWN two slots as well — see `edge`, below.
+  //
+  // The two refusals it encodes are the loop's, and each is stated where it is
+  // used: not a row, and not a section. 5.14; the lift to here is 5.15. A third
+  // stood beside them until 5.16 — not the widget bar — and it is gone with the
+  // rest of that withholding: a bar carries its run now, so it is a widget in
+  // this list like any other.
+  const loose =
+    row || section
+      ? []
+      : Array.from(container.children).filter(
+          (c): c is HTMLElement =>
+            c instanceof HTMLElement && lineOf(c) !== null
+        );
+  // WHETHER THIS FENCE HANDED ITS PLACES OUT TO ITS WIDGETS. One widget keeps
+  // everything on the block — its grip, and its two halves — because the block
+  // IS that widget. More than one, and the block is a stack a reader arranges,
+  // which is a different surface with different targets.
+  const perWidget = loose.length > 1;
 
   // ABOVE AND BELOW: this block's place in the note, which is what a block drag
   // means and what a widget leaving a row is asking for. 4.8.5 restored it to
@@ -1419,7 +1581,37 @@ export function attachBlockHead(
   // must. A refusal computed from a missing answer is how one uncertain block
   // turns into a page where nothing can be dropped at all, which is the failure
   // this whole item exists to end.
-  const edge = row ? " ca-jbd-slot-edge" : "";
+  // ── AND A STACK'S BANDS ARE ITS EDGES TOO (5.15) ──────────────────────
+  //
+  // WHAT A READER SAW, mid-drag on a diary entry: *"the drag-section editing
+  // system could use some refining. It seems to let the user place sections at
+  // odd positions."* Screenshotted three times, and each shot says the same
+  // thing — the pointer is over the middle of a field and what lights up is the
+  // accent bar on the block's own top or bottom edge, "outside this fence".
+  //
+  // THIS IS 4.54 §1 ARRIVING A SECOND TIME. The essay under `.ca-jbd-slot-edge`
+  // tells it about a row: the block's two halves TILE it, so a card's own five
+  // places are inside them and the band takes every drop the reader meant for a
+  // card. The answer there was to swap the ground rather than the numbers —
+  // bands to the block's edges, columns lifted over what is left.
+  //
+  // A BARE FENCE BECAME THE SAME SHAPE IN 5.14 AND THE BANDS DID NOT MOVE. Its
+  // widgets got two places each; the block kept two halves over the whole of
+  // it. A field's own targets are strips (`ca-jbd-slot-loose` widens them to
+  // the whole card, which is the other half of this fix) and everything the
+  // strips do not cover is still the band — so the commonest aim on the page,
+  // the middle of a card, means "take this field out of the fence".
+  //
+  // SO THE CONDITION IS THE SAME QUESTION IN BOTH SHAPES: does anything inside
+  // this block draw places of its own? A row's cells do and a stack's widgets
+  // now do, and in both the block's own two mean the one thing nothing inside
+  // it can say — beside all of it. That is an edge, and it is where they go.
+  //
+  // AND THE GESTURE IS NOT WITHDRAWN, only moved to where it means something. A
+  // field can still leave the fence; it is asked for at the strip above the
+  // block or the one below it, plus `--ca-slot-reach` outside, which is exactly
+  // the aim a reader takes to say "out here" rather than "in there".
+  const edge = row || perWidget ? " ca-jbd-slot-edge" : "";
   slot(container, `ca-jbd-slot-above${edge}`, BLOCK_TYPE, (p) => p.whole, () => {
     const i = indexNow();
     return i === null ? null : { kind: "block", at: i };
@@ -1480,7 +1672,8 @@ export function attachBlockHead(
   // stamped descendant is the widget that opens it, and the stamp is the line
   // that drew that widget — so a slot names a place in the FILE rather than a
   // position in the row.
-  const opens = cells.map((cell) => lineOf(cell.querySelector(`[${LINE_ATTR}]`)));
+  const opensOf = (of: readonly HTMLElement[]): (number | null)[] =>
+    of.map((cell) => lineOf(cell.querySelector(`[${LINE_ATTR}]`)));
 
   // FIVE PLACES ON EVERY WIDGET IN THE ROW, and they are the grammar 4.4 §1
   // already had, drawn (4.8.6). A cell has been able to hold more than one
@@ -1513,11 +1706,32 @@ export function attachBlockHead(
   // drag rather than a trip to the section editor. The three slots that do not
   // open a column — above, below, and the swap in the middle — are untouched and
   // are how a third widget joins a full row.
-  const hasRoom = (): boolean =>
-    cells.length < MAX_COLUMNS ||
+  const hasRoomIn = (of: readonly HTMLElement[]) => (): boolean =>
+    of.length < MAX_COLUMNS ||
     (inFlight !== null && inFlight.frees && inFlight.block === indexNow());
 
-  wireCellSlots(cells, opens, slot, indexNow, bodyNow, hasRoom);
+  for (const pageRow of pageRows) {
+    const pageCells = cellsIn(pageRow);
+    // ITS OWN ORDINAL, off the row rather than counted, for `pageSlice`'s
+    // argument — `TabbedPlan`'s rule: a page whose directives drew nothing has a
+    // row in the file and none on the screen.
+    const page = Number(pageRow.getAttribute(ROW_PAGE_ATTR) ?? 0) || 0;
+    wireCellSlots(
+      pageCells,
+      opensOf(pageCells),
+      slot,
+      indexNow,
+      hasRoomIn(pageCells),
+      () => {
+        const body = bodyNow();
+        if (!body) return null;
+        // A GROUP WITH NO `tab` LINE HAS ONE SLICE COVERING THE WHOLE BODY, so
+        // this is the end of the body for every group that has never been
+        // paged — which is what it was before pages existed.
+        return pageSlice(body, page)?.to ?? body.length;
+      }
+    );
+  }
 
   // ── WHAT CAN BE PICKED UP ─────────────────────────────────────────
 
@@ -1530,11 +1744,16 @@ export function attachBlockHead(
   //
   // ITS TWO RANGES ARE THE SAME ONE LINE: a widget leaving a row for a block of
   // its own takes exactly what it took to another column.
-  for (const cell of cells) {
+  for (const cell of allCells) {
     for (const child of Array.from(cell.children)) {
       if (!(child instanceof HTMLElement)) continue;
       const line = lineOf(child);
       if (line === null) continue;
+      // AND A WIDGET BAR CARRIES ITS WHOLE RUN — see `markSpan`. It is the one
+      // child that is not one directive, and until 5.16 it was the one child
+      // with no grip at all, which a vault reported as a head that could not be
+      // picked up: *"these widgets headers are missing the drag icons."*
+      const span = spanOf(child);
       // AND A STATED HEIGHT TRAVELS WITH THE WIDGET IT SIZES (4.22 §5.1, §5.2).
       // A `height:` line is positional, so a range of one line would leave it
       // behind sizing whatever moved up into its place — a layout gesture
@@ -1548,10 +1767,7 @@ export function attachBlockHead(
       // height cannot mean anything, which `parseHeights` says out loud rather
       // than leaving a line that quietly does nothing.
       source(child, "Drag to move this widget", false, () => {
-        const body = bodyNow();
-        const at = body
-          ? runWithHeight(body, line)
-          : { from: line, to: line + 1 };
+        const at = runOf(bodyNow(), line, span);
         return { whole: at, cell: at };
       });
     }
@@ -1602,64 +1818,52 @@ export function attachBlockHead(
   // means that widget, on the block, and there is nowhere inside it to reorder
   // to. Drawing a second one over the first is 4.8.6's duplicate.
   //
-  // AND NOT THE WIDGET BAR, WHICH IS THE ONE CHILD THAT IS NOT ONE DIRECTIVE.
-  // `stampLines` stamps every direct child with the line of the last directive
-  // whose render reached it, and the inline kinds — `tracker:`, `sleep:`,
-  // `slider:`, `button:` and the rest — all land in ONE `.ca-journal-widget-bar`
-  // together. So the bar carries the line of the FIRST of them, and a drag
-  // reading that stamp would pick up one directive and move it out from under
-  // the nine still drawn inside the element the reader is holding. An entry's
-  // tracker grid is exactly this: one bar, one stamp, ten cells.
-  //
-  // THE BAR IS THE ONLY SUCH CHILD — everything else here is appended to the
-  // container one directive at a time — so this is a named exception rather
-  // than a rule, and it is stated as the class it is rather than as a count,
-  // because the count is what `stampLines` cannot tell us.
-  const loose =
-    row || section
-      ? []
-      : Array.from(container.children).filter(
-          (c): c is HTMLElement =>
-            c instanceof HTMLElement &&
-            lineOf(c) !== null &&
-            !c.hasClass("ca-journal-widget-bar")
-        );
-  if (loose.length > 1) {
+  // AND THE WIDGET BAR IS ONE OF THEM AS OF 5.16, WITH A RANGE RATHER THAN A
+  // LINE. It is the one child that is not one directive — see `markSpan` — and
+  // 5.15 kept it out of this loop rather than teach the loop to ask. `runOf` is
+  // that question asked once, so the bar reorders inside a bare fence the way
+  // every other widget in it does and lands with its whole run.
+  if (perWidget) {
     for (const child of loose) {
       const line = lineOf(child);
       if (line === null) continue;
-      const at = (): { from: number; to: number } => {
-        const body = bodyNow();
-        return body ? runWithHeight(body, line) : { from: line, to: line + 1 };
-      };
+      const span = spanOf(child);
+      const ends = span ?? line;
+      const at = (): { from: number; to: number } =>
+        runOf(bodyNow(), line, span);
       source(child, "Drag to move this widget", false, () => {
         const run = at();
         return { whole: run, cell: run };
       });
-      slot(child, "ca-jbd-slot-over", CELL_TYPE, (p) => p.cell, () => {
+      // `ca-jbd-slot-loose` IS THE HALF OF THE CARD EACH OF THESE TAKES (5.15).
+      //
+      // A widget in a CELL has five places and its middle is the fifth — a
+      // swap — so its top and bottom strips are a fifth of the height each and
+      // the middle is the largest target. A widget in a STACK has two, and a
+      // stack is not a surface a swap makes sense on, so the middle belongs to
+      // nobody. It went to the block's band, which is the bug above.
+      //
+      // THE TWO TILE THE CARD INSTEAD: above this widget, below this widget,
+      // half each, full width. There is then nowhere on a field that means
+      // something other than what a reader pointing at that field means, which
+      // is the same rule the row's four zones are drawn to.
+      slot(child, "ca-jbd-slot-over ca-jbd-slot-loose", CELL_TYPE, (p) => p.cell, () => {
         const i = indexNow();
         return i === null
           ? null
           : { kind: "stack", block: i, at: line, after: false };
       });
-      slot(child, "ca-jbd-slot-under", CELL_TYPE, (p) => p.cell, () => {
+      slot(child, "ca-jbd-slot-under ca-jbd-slot-loose", CELL_TYPE, (p) => p.cell, () => {
         const i = indexNow();
         return i === null
           ? null
-          : { kind: "stack", block: i, at: line, after: true };
+          : { kind: "stack", block: i, at: ends, after: true };
       });
     }
-    // AND THE BLOCK'S OWN GRIP STEPS ASIDE, which is 4.8.6's collision arriving
-    // in the one place 5.14 did not close it. The note below this records
-    // `jbd-aside` being deleted because a group has a head to put its grip on;
-    // a bare fence has no head and no bar, so its grip lands on the container's
-    // top edge — the same two coordinates as the FIRST widget's. The stylesheet
-    // takes it off the centre line when this class is present, and only then:
-    // a block with one widget draws no widget grip and keeps the centre.
-    container.addClass("has-widget-grips");
   }
 
-  // AND THE BLOCK ITSELF, ALWAYS. 4.8.5.
+  // AND THE BLOCK ITSELF, UNLESS ITS WIDGETS ARE HOLDING ITS GRIPS. 4.8.5, and
+  // the exception is 5.15.
   //
   // Its whole body when it lands as a block — modifiers, delimiters and all,
   // which is what makes this a block move rather than a re-render. Only the
@@ -1711,25 +1915,65 @@ export function attachBlockHead(
   //
   // AND THE BOX IS WHAT DIMS, not the strip and not the bar: see `source`'s
   // `dim`. Dimming a title while its body stays lit says the title is moving.
+  //
+  // ── AND WHERE THERE IS NO EDGE OF ITS OWN, THERE IS NO GRIP (5.15) ────
+  //
+  // WHAT A READER SAW, on the release that gave a bare fence's widgets grips of
+  // their own: *"there seems to be a dragger for the entire group of sections
+  // on diary entries? it is not necessary."* Exactly so, and the two halves of
+  // that sentence are two different faults.
+  //
+  // IT IS NOT NECESSARY. An entry's shared fence IS the entry — Focus through
+  // Captured, with only the banner (immovable, `fixed`) and the tracker grid
+  // around it. The move this grip offers is "put all seven above the trackers",
+  // which is not a thing anybody has wanted; the move readers do want is one
+  // field past another, and that is the seven grips the loop above just hung.
+  //
+  // AND IT COULD NOT SAY THAT IT WAS THE ENTIRE GROUP. This is the deeper half.
+  // Every essay on this page turns on a grip being centred over the top edge of
+  // THE THING IT DRAGS, which is how a reader knows what is in their hand. A
+  // group has a head to say it with and a section has its bar; a bare fence has
+  // neither, so `container` was the fallback — and a bare fence's top edge is
+  // the first widget's top edge. 5.14 read that as a collision and shoved the
+  // dots aside with `has-widget-grips`, which is `jbd-aside` under a new name:
+  // a grip parked somewhere it does not mean anything, next to a card it does
+  // not drag. The obituary above says a control that has somewhere of its own
+  // to be does not need an exception. The converse is this line: a control with
+  // nowhere of its own to be, whose subject is already reachable a better way,
+  // is not moved — it is withheld.
+  //
+  // ONLY WHERE THE WIDGETS TOOK OVER, which is why this reads `perWidget` and
+  // not `!head && !bar`. A fence holding ONE widget also falls back to
+  // `container`, and there the fallback is honest: the block IS that widget,
+  // its top edge is that widget's, and nothing else on it has a grip. Taking
+  // that away is 4.8.1's removal again — *"the grips are missing"* — and it is
+  // the whole reason 4.8.5 put this back for every block.
+  //
+  // THE BLOCK IS STILL A DESTINATION. Its `above` and `below` slots are drawn
+  // well before this line and accept `BLOCK_TYPE` from anywhere; what has gone
+  // is this block's own ability to be picked up as one, not the page's ability
+  // to put something next to it.
   const box = container.querySelector<HTMLElement>(`.${GROUP_CLASS}`);
   const head = box?.querySelector<HTMLElement>(`.${GROUP_HEAD_CLASS}`) ?? null;
   const bar = container.querySelector<HTMLElement>(
     ":scope > .ca-journal-header-bar"
   );
-  source(
-    head ?? bar ?? container,
-    head ? "Drag to move this group" : "Drag to move this block",
-    true,
-    () => {
-      const body = bodyNow();
-      if (!body?.length) return null;
-      return {
-        whole: { from: 0, to: body.length },
-        cell: widgetRun(body) ?? undefined,
-      };
-    },
-    box ?? container
-  );
+  if (!perWidget) {
+    source(
+      head ?? bar ?? container,
+      head ? "Drag to move this group" : "Drag to move this block",
+      true,
+      () => {
+        const body = bodyNow();
+        if (!body?.length) return null;
+        return {
+          whole: { from: 0, to: body.length },
+          cell: widgetRun(body) ?? undefined,
+        };
+      },
+      box ?? container
+    );
+  }
 
   // ── SETTING A COLUMN'S WIDTH (4.9 §3) ─────────────────────────────────
   //

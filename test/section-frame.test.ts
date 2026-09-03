@@ -694,6 +694,32 @@ describe("a field wears the section's own head — 5.14", () => {
     }
   });
 
+  it("keeps one gap between seven fields, whatever kind they are (5.15)", () => {
+    // WHAT 5.14 LEFT HALF DONE. `tasks:` and the capture log had their wrappers
+    // stood down — box AND margin — because the frame inside draws the card.
+    // `note:`, `list:` and `attach:` kept `margin: 0 0 0.9em`, which is what
+    // each needed when it was an unlabelled box stacked in a fence.
+    //
+    // SO AN ENTRY'S RHYTHM DEPENDED ON WHICH KIND EACH FIELD WAS: 24px under
+    // five of them (`--ca-widget-gap` plus the wrapper's own margin), 10px
+    // under the other two, and 10px under whichever happened to be last. Two
+    // fields dragged past each other took their gaps with them, so the page
+    // re-spaced itself around a drop nobody asked for — half of *"it seems to
+    // let the user place sections at odd positions"*.
+    const t = css();
+    for (const kind of ["note", "list", "attach"]) {
+      const at = t.indexOf(
+        `.ca-journal-${kind}:has(> .ca-journal-sec-fold.ca-journal-field)`
+      );
+      expect(at, `${kind} keeps a margin of its own`).toBeGreaterThan(0);
+    }
+    // AND THE CONDITION IS THE ONE THE OTHER TWO ALREADY USE, so this is one
+    // rule with five hosts rather than a special case — and a bare `note:`
+    // under a section bar, which draws no frame, matches none of them and
+    // keeps the margin it has always had.
+    expect(t).toContain(".ca-journal-note:last-child");
+  });
+
   it("closes to the same height as every other section head", () => {
     // The reader's second report — "sections collapsed are not the same size"
     // — is answered by `--ca-sec-bar-h` rather than by a token of its own, so

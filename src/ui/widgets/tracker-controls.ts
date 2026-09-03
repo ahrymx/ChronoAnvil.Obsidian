@@ -360,7 +360,6 @@ export function buildScalePicker(
     // rather than a stray node beside a text child — `setText` on the
     // button would otherwise wipe the badge out.
     btn.createSpan({ cls: "ca-journal-mood-face-glyph", text: face });
-    btn.createSpan({ cls: "ca-journal-mood-face-val", text: String(value) });
     const selected = (): boolean =>
       known != null && Math.abs(valueFor(i) - known) < 1e-9;
     btn.addEventListener("click", (evt) => {
@@ -416,25 +415,107 @@ export function buildSleep(
   }
 
   const wrap = createDiv({ cls: "ca-journal-widget ca-journal-sleep" });
-  const inputs = wrap.createDiv({ cls: "ca-journal-sleep-inputs" });
+  const buttonsRow = wrap.createDiv({ cls: "ca-journal-sleep-inputs" });
 
-  const field = (def: TrackerDef): HTMLInputElement => {
-    const group = inputs.createDiv({ cls: "ca-journal-sleep-field" });
-    group.createSpan({ cls: "ca-journal-sleep-label", text: def.label });
-    const input = group.createEl("input", { type: "time" });
-    const cur = deps.currentValue(ctx, def.id);
-    if (cur != null && cur !== "") input.value = String(cur);
-    return input;
+  const createSleepButton = (
+    def: TrackerDef,
+    icon: string,
+    defaultLabel: string
+  ): { getValue: () => string; setValue: (v: string | null) => void } => {
+    const btn = buttonsRow.createEl("button", {
+      cls: "ca-journal-sleep-btn",
+      attr: {
+        type: "button",
+        "aria-label": `${def.label}: click to set time`,
+        title: `${def.label}: click to set time (right-click to clear)`,
+      },
+    });
+
+    btn.createSpan({ cls: "ca-journal-sleep-btn-icon", text: icon });
+    const labelSpan = btn.createSpan({
+      cls: "ca-journal-sleep-btn-text",
+      text: defaultLabel,
+    });
+
+    const hiddenInput = btn.createEl("input", {
+      type: "time",
+      cls: "ca-journal-sleep-hidden-input",
+      attr: {
+        "aria-label": def.label,
+        title: def.label,
+      },
+    });
+
+    const updateDisplay = (val: string | null): void => {
+      if (val && val.trim() !== "") {
+        hiddenInput.value = val;
+        labelSpan.setText(val);
+        btn.addClass("is-set");
+      } else {
+        hiddenInput.value = "";
+        labelSpan.setText(defaultLabel);
+        btn.removeClass("is-set");
+      }
+    };
+
+    const initial = deps.currentValue(ctx, def.id);
+    updateDisplay(initial != null && initial !== "" ? String(initial) : null);
+
+    const openPicker = (): void => {
+      try {
+        if (typeof hiddenInput.showPicker === "function") {
+          hiddenInput.showPicker();
+        } else {
+          hiddenInput.focus();
+          hiddenInput.click();
+        }
+      } catch {
+        hiddenInput.focus();
+        hiddenInput.click();
+      }
+    };
+
+    btn.addEventListener("click", (evt) => {
+      if (evt.defaultPrevented) return;
+      openPicker();
+    });
+
+    btn.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter" || evt.key === " ") {
+        evt.preventDefault();
+        openPicker();
+      }
+    });
+
+    hiddenInput.addEventListener("change", () => {
+      const val = hiddenInput.value || null;
+      updateDisplay(val);
+      void deps.write(ctx, def.id, val);
+      refresh();
+    });
+
+    btn.addEventListener("contextmenu", (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      updateDisplay(null);
+      void deps.write(ctx, def.id, null);
+      refresh();
+    });
+
+    return {
+      getValue: () => hiddenInput.value,
+      setValue: (v: string | null) => updateDisplay(v),
+    };
   };
 
   // Bedtime first, then Wake-Up — the order a night runs.
-  const bedInput = field(bed);
-  const wakeInput = field(wake);
+  const bedCtrl = createSleepButton(bed, "🌙", "Bed");
+  const wakeCtrl = createSleepButton(wake, "⏰", "Wake");
   const readout = wrap.createDiv({ cls: "ca-journal-sleep-readout" });
 
   const refresh = (): void => {
     readout.empty();
-    const hrs = sleepHours(bedInput.value, wakeInput.value);
+    const hrs = sleepHours(bedCtrl.getValue(), wakeCtrl.getValue());
     if (hrs == null) {
       readout.createSpan({
         cls: "ca-journal-sleep-hint",
@@ -442,7 +523,7 @@ export function buildSleep(
       });
       return;
     }
-    const awake = awakeHours(bedInput.value, wakeInput.value);
+    const awake = awakeHours(bedCtrl.getValue(), wakeCtrl.getValue());
     readout.createSpan({
       cls: "ca-journal-sleep-asleep",
       text: `😴 ${formatSleepRatio(hrs)}`,
@@ -456,15 +537,6 @@ export function buildSleep(
       text: `${formatSleepRatio(awake)} ☀️`,
     });
   };
-
-  bedInput.addEventListener("change", () => {
-    void deps.write(ctx, bed.id, bedInput.value || null);
-    refresh();
-  });
-  wakeInput.addEventListener("change", () => {
-    void deps.write(ctx, wake.id, wakeInput.value || null);
-    refresh();
-  });
 
   refresh();
   return wrap;
@@ -594,8 +666,18 @@ function buildTagsField(
         "aria-label": `Manage ${def.label.toLowerCase()} (${tags.length})`,
       },
     });
-    for (const tag of tags) {
+    const maxVisibleTags = 5;
+    const visibleTags = tags.length > maxVisibleTags ? tags.slice(0, 4) : tags;
+    const overflowCount = tags.length - visibleTags.length;
+
+    for (const tag of visibleTags) {
       chips.createSpan({ cls: "ca-journal-tags-chip", text: `#${tag}` });
+    }
+    if (overflowCount > 0) {
+      chips.createSpan({
+        cls: "ca-journal-tags-chip ca-journal-tags-overflow",
+        text: `+${overflowCount}`,
+      });
     }
     setIcon(
       chips.createSpan({ cls: "ca-journal-btn-icon ca-journal-tags-pencil" }),

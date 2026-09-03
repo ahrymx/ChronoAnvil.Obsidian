@@ -349,6 +349,20 @@ export interface JournalSection {
   // and the two answers have to agree. Asking one predicate is how they do.
   row?: string | ((ctx: SectionContext) => string | undefined);
   cell?: string;
+  // WHETHER THIS MEMBER OPENS A PAGE OF THE ROW RATHER THAN A COLUMN (5.18).
+  //
+  // `RowMember.tab` on the other catalogues, and it means here exactly what it
+  // means on the homepage's top row: the delimiter above this section is `tab`
+  // rather than `cell`, so the group pages between its members instead of
+  // dividing the width between them. A row where nobody asks for one is
+  // composed with no delimiter at all, unchanged.
+  //
+  // NOT A FUNCTION OF THE CONTEXT, where `row` is. `row` answers "is there a
+  // band here at all", which genuinely differs by surface; a member that is a
+  // page is a page wherever its row is composed, and a section that wanted to
+  // be a column on one surface and a tab on another would be describing two
+  // arrangements under one id.
+  tab?: boolean;
   // The bar this section composes ONLY IF its row comes down to it alone.
   //
   // THE OTHER HALF OF THE PARAGRAPH ABOVE. A row carries one title, composed by
@@ -973,6 +987,7 @@ export function composeSectionRuns(
       chunk.map((r) => ({
         row: rowOf(r.section, ctx),
         cell: r.section.cell,
+        tab: r.section.tab,
         bar: soloBarOf(r.section, ctx),
         r,
       })),
@@ -1207,6 +1222,41 @@ const TASKS_BAR = "header:⏳ Open tasks";
 // row in the editor has said "What's below this note" since 3.18.
 const CHILDREN_BAR = "🗂️ What's below";
 
+// ── THE GRID AND THE BAND, ONE GROUP WITH TWO PAGES (5.18) ──────────────
+//
+// A leaf index draws two blocks of numbers about the same note — the tracker
+// grid, which is what this note is graded on, and the stats band, which is what
+// everything under it adds up to. Stacked, they are two bordered boxes reading
+// as one subject, and the band was the block a reader had to scroll past to
+// reach the page's actual content.
+//
+// PAGED RATHER THAN COLUMNED, WHICH IS THE WHOLE REASON THIS PAIR CAN BE A ROW
+// AT ALL. 4.70 looked at Stats beside Review and declined it in these words:
+// `stats-band` is ALREADY a horizontal band, four numbered cells dividing the
+// width of the block, so halving that width wraps it into two rows of two. The
+// tracker grid makes the same objection. `tab` answers both — each page of the
+// group gets the fence's FULL width and only one is drawn at a time — so the
+// two blocks become one box with two tabs rather than two boxes side by side.
+//
+// NO BAND TITLE, WHERE `DUE_ROW` HAS ONE. There is no honest name for "what
+// this note is graded on" and "what is under it" together, which is the test
+// 4.70 applied to Find-beside-Review and is the same answer here. A tabbed
+// group needs none: 5.16 derives the group's head from the cells it holds, so
+// the box is headed TRACKERS · STATS by the widgets themselves rather than by a
+// line in the note that would have to be worded for both.
+//
+// ON A LEAF INDEX AND NOWHERE ELSE. `stats` is a container's question — it is
+// `default: (ctx) => !ctx.hasSubContainers` — so a Subject or an Area draws the
+// grid alone, and a leaf template draws it alone, and in both cases the row
+// comes down to one member and `soloBar` gives it back the title below. One
+// predicate, read by both sections, so the row and what its members render can
+// never disagree about whether there is a band.
+const STATE_ROW = "state";
+const TRACKERS_BAR = "header:📊 Trackers";
+const STATS_BAR = "header:🔢 Stats";
+const stateRow = (ctx: SectionContext): string | undefined =>
+  ctx.noteKind === "index" && !ctx.hasSubContainers ? STATE_ROW : undefined;
+
 export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "banner",
@@ -1278,13 +1328,22 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     claims: ["header", "tracker"],
     locate: (t) =>
       probe(t, new RegExp(`^(?:${TRACKER_MARK_START}|${LEGACY_TRACKER_MARK_START})\\s*$`, "m")),
+    // THE CELL THAT OPENS THE STATE ROW, so on a leaf index this composes no
+    // title and the band below it opens a page of its own. Everywhere else —
+    // a container index, every leaf template — there is no row and it keeps the
+    // bar it has always written.
+    row: stateRow,
+    // AND THE TITLE BACK WHERE THE BAND IS NOT THERE. `stats` is freely
+    // removable and is not composed on a journal that has no numbers to band,
+    // so the group comes down to this grid alone more often than not.
+    bar: TRACKERS_BAR,
     render: (ctx, opts) => [
-      headerBar(
-        "📊 Trackers",
+      fence([
+        ...(stateRow(ctx) ? [] : [TRACKERS_BAR]),
         TRACKER_MARK_START,
         ...trackerSeeds(ctx, opts),
-        TRACKER_MARK_END
-      ),
+        TRACKER_MARK_END,
+      ]),
     ],
   },
 
@@ -1398,13 +1457,20 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // but a note composed today should say what it draws, so that the four boxes
     // in *Edit sections…* are showing the reader their own line rather than a
     // shorthand the plugin expanded on their behalf.
-    render: (_ctx, opts) => {
+    // THE SECOND PAGE OF THE STATE ROW — see `STATE_ROW` above the catalogue.
+    // `tab` rather than a cell, because a band halved is a band wrapped.
+    row: stateRow,
+    tab: true,
+    // Its own name back if the grid is not there: a journal that seeds no
+    // tracker composes no grid, and the band is then the whole of the fence.
+    bar: STATS_BAR,
+    render: (ctx, opts) => {
       const preset = opts?.preset;
       const line =
         !preset || preset === DEFAULT_CONTAINER_PRESET
           ? "stats-band"
           : `stats-band:${STAT_PRESET_SHORTHAND[preset] ?? preset}`;
-      return [headerBar("🔢 Stats", line)];
+      return [fence([...(stateRow(ctx) ? [] : [STATS_BAR]), line])];
     },
   },
 
@@ -2506,7 +2572,24 @@ export function sectionOverrides(
   ctx: SectionContext,
   sectionId: string
 ): SectionOverrides | undefined {
-  return ctx.type.layout?.[templateKeyFor(ctx)]?.options?.[sectionId];
+  return surfaceLayout(ctx)?.options?.[sectionId];
+}
+
+// The layout this surface composes under, read off the type the context holds.
+//
+// SEPARATED FROM `sectionOverrides` IN 5.18, WHICH ONLY EVER WANTED ITS
+// `options`. The reconciler wants its `order`: `planSections` ranks a re-added
+// section against `sectionsFor(ctx)` to decide where it goes back, and a
+// catalogue-order ranking is the arrangement of a journal that declared none.
+// Study's Topic index composes the learning path ABOVE the review queue, so
+// removing the queue and adding it back landed it above the path — a file that
+// came back a different shape from the one it went in as, which is exactly what
+// `test/journal-plan.test.ts`'s round trip exists to refuse.
+//
+// ONE READER OF `type.layout` FOR BOTH QUESTIONS, so a surface cannot compose
+// under one layout and be reconciled against another.
+export function surfaceLayout(ctx: SectionContext): TemplateLayout | undefined {
+  return ctx.type.layout?.[templateKeyFor(ctx)];
 }
 
 export function templateTargets(type: JournalType): TemplateTarget[] {

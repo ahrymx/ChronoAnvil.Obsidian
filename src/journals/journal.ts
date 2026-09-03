@@ -508,16 +508,38 @@ export const STUDY_CONFIG: JournalConfig = {
       },
     },
     page: { options: { headings: { headings: [{ title: "Notes" }] } } },
+    // ── WHAT IS BELOW COMES FIRST, ON BOTH INDEXES (5.18) ────────────
+    //
+    // Every index in every preset now opens with its children. A Subject index
+    // read banner → grid → topics, so the one thing the page exists to link to
+    // sat under a block of numbers about it; the numbers are what the reader
+    // looks at second, and the tables are where they are going.
+    //
+    // `order` AND NOT `sections`, so Study still gains a section the day the
+    // catalogue does — the distinction `index:1` below was already written to
+    // demonstrate.
+    "index:0": {
+      order: [
+        "banner",
+        "children",
+        "trackers",
+        "review",
+        "tasks",
+        "progress",
+        "find",
+        "charts",
+      ],
+    },
     "index:1": {
       order: [
         "banner",
+        "children",
         "trackers",
         "stats",
-        "review",
-        "charts",
         "path",
-        "children",
+        "review",
         "resources",
+        "charts",
       ],
       options: {
         path: { label: "🧭 Learning Path" },
@@ -826,12 +848,12 @@ export const PROJECTS_CONFIG: JournalConfig = {
     "index:0": {
       sections: [
         "banner",
-        "trackers",
         "children",
+        "trackers",
+        "tasks",
         "tally",
         "find",
         "charts",
-        "tasks",
       ],
     },
     // AND `index:1` SHIPS `order` DELIBERATELY, TO SHOW THE DIFFERENCE. A
@@ -841,7 +863,16 @@ export const PROJECTS_CONFIG: JournalConfig = {
     // for every later reader, which is what `sections` means and is a price
     // worth paying only where a widget has to be turned on.
     "index:1": {
-      order: ["banner", "trackers", "tasks", "children", "charts", "find"],
+      order: [
+        "banner",
+        "children",
+        "trackers",
+        "stats",
+        "path",
+        "review",
+        "resources",
+        "charts",
+      ],
     },
   },
 };
@@ -881,15 +912,22 @@ export const EXERCISE_CONFIG: JournalConfig = {
     // section emitting `journal-totals`; that widget is now the `totals` preset
     // of the merged stats band, and the layout says so here rather than by
     // naming a second section.
+    // ── AND IT SHIPS NO BAND AS OF 5.18 ──────────────────────────────
+    //
+    // A Block index is a month of workouts and meals, and what the reader opens
+    // it for is the two tables. The band's four sums are the same four numbers
+    // the charts region below draws over time, and one page does not need both
+    // — so the section comes off the shipped page and the preset stays, because
+    // ticking Stats back on in *Edit sections…* should give the reader the sums
+    // this journal was built to add up rather than the generic band.
     "index:0": {
       sections: [
         "banner",
-        "trackers",
-        "stats",
         "children",
-        "charts",
-        "find",
+        "trackers",
         "tasks",
+        "find",
+        "charts",
       ],
       options: { stats: { preset: "totals" } },
     },
@@ -980,11 +1018,11 @@ export const MEDIA_CONFIG: JournalConfig = {
     "index:0": {
       sections: [
         "banner",
+        "children",
         "trackers",
         "stats",
-        "children",
-        "charts",
         "find",
+        "charts",
       ],
       options: { stats: { preset: "summary" } },
     },

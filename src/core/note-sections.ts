@@ -1643,6 +1643,79 @@ const composesBar = (section: FlatSection | undefined): boolean => {
 // every section in the run declares a row, which is true of a composed one and
 // false of every hand-built fence.
 
+// ── THE DELIMITER AN ARRIVING CELL WRITES, FOR BOTH RECONCILERS (5.18) ───
+//
+// `rowRuns` writes a delimiter only where the cell id CHANGES, only in a row
+// where somebody named one, and a `tab` wherever a member asked to open a page
+// of its own. An arrival has to answer the same question about the one place it
+// is landing: does the member ahead of me sit in a different cell, or am I a
+// page in my own right? The homepage is the page that makes the cell half
+// concrete — its row is `diary:3` in one cell and three widgets stacked in the
+// other — and without this, re-adding the first of those three would put it in
+// the diary card's column.
+//
+// A DELIMITER ALREADY THERE IS THE ANSWER, NOT A SECOND ONE. Cutting one of
+// several cells leaves the fence's `cell` lines exactly where they were, so the
+// commonest rejoin lands directly after one and needs nothing added. Arriving
+// FIRST is the mirror image: the delimiter above the insert point belongs
+// between this section and the one below it, so the arrival goes ABOVE it
+// rather than gaining one of its own — which is what the returned `insertAt`
+// says, and why it is returned rather than assumed unchanged.
+//
+// ── WHY IT IS A FUNCTION AND NOT TWO COPIES OF THE BLOCK (5.18) ─────────
+//
+// `rowRuns`' reason, one layer up. The rule was `joinFlatRowChunk`'s alone
+// while flat notes were the only catalogue with a tabbed row; 5.18 gives the
+// journal catalogue one — the tracker grid paged against the stats band on
+// every leaf index — and `journal-plan.ts`'s `joinRowChunk` spliced a cell in
+// with no delimiter at all, which welds a page onto the cell above it. Two
+// spellings of "where does the divider go" is how a group re-added through the
+// section editor comes back a different shape from the one composition writes.
+//
+// ASKED OF `RowMember` AND NOTHING MORE, so the journal catalogue — whose `row`
+// is a function of the context — satisfies it with the two fields that are
+// plain data on every catalogue.
+export function rowDelimiter(arrival: {
+  lines: readonly string[];
+  insertAt: number;
+  member: Pick<RowMember, "cell" | "tab">;
+  // Undefined means "nothing of this row is above me in the fence", which is a
+  // branch of its own rather than a member with no cell.
+  prev: Pick<RowMember, "cell"> | undefined;
+  later: Pick<RowMember, "cell"> | undefined;
+  divided: boolean;
+}): { delimiter: string | false; insertAt: number } {
+  const { lines, insertAt, member, prev, later, divided } = arrival;
+  const sameCell = (a: string | undefined, b: string | undefined): boolean =>
+    a !== undefined && a === b;
+  const above = (test: (line: string) => boolean): boolean =>
+    insertAt > 0 && test(lines[insertAt - 1].trim());
+  if (member.tab) {
+    return {
+      delimiter: above(isTabLine) ? false : TAB_KEYWORD,
+      insertAt,
+    };
+  }
+  if (prev !== undefined) {
+    return {
+      delimiter:
+        divided && !sameCell(prev.cell, member.cell) && !above(isCellLine)
+          ? CELL_KEYWORD
+          : false,
+      insertAt,
+    };
+  }
+  if (above(isCellLine)) return { delimiter: false, insertAt: insertAt - 1 };
+  if (later !== undefined) {
+    return {
+      delimiter:
+        divided && !sameCell(member.cell, later.cell) ? CELL_KEYWORD : false,
+      insertAt,
+    };
+  }
+  return { delimiter: false, insertAt };
+}
+
 // A section that declares a row rejoins that row's fence instead of composing a
 // block. False for "no row of mine on this page", which is the ordinary case and
 // where a block of its own is exactly right.
@@ -1705,56 +1778,30 @@ function joinFlatRowChunk(
     if (insertAt > open) insertAt++;
   }
 
-  // ── AND THE `cell` DELIMITER, WHERE THE ROW HAS ONE ──────────────────
-  //
-  // `rowRuns` writes a delimiter only where the cell id CHANGES and only in a
-  // row where somebody named one, so an arrival has to answer the same question
-  // about the one place it is landing: does the member ahead of me sit in a
-  // different cell? The homepage is the page that makes this concrete — its row
-  // is `diary:3` in one cell and three widgets stacked in the other — and
-  // without this, re-adding the first of those three would put it in the diary
-  // card's column.
-  //
-  // A DELIMITER ALREADY THERE IS THE ANSWER, NOT A SECOND ONE. Cutting one of
-  // several cells leaves the fence's `cell` lines exactly where they were, so
-  // the commonest rejoin lands directly after one and needs nothing added.
-  // Arriving FIRST is the mirror image: the delimiter above the insert point
-  // belongs between this section and the one below it, so the arrival goes
-  // ABOVE it rather than gaining one of its own.
   const rowMembers = order.filter((id) => byId.get(id)?.row === section.row);
-  const divided = rowMembers.some((id) => byId.get(id)?.cell !== undefined);
-  const sameCell = (a: string | undefined, b: string | undefined): boolean =>
-    a !== undefined && a === b;
   const before = chunk.ids.filter((id) => order.indexOf(id) < rank);
-  const prev = before.length ? before[before.length - 1] : undefined;
-  let delimiter: string | false = false;
-  if (section.tab) {
-    delimiter = !(insertAt > 0 && isTabLine(lines[insertAt - 1].trim()))
-      ? TAB_KEYWORD
-      : false;
-  } else if (prev !== undefined) {
-    delimiter =
-      divided &&
-      !sameCell(byId.get(prev)?.cell, section.cell) &&
-      !(insertAt > 0 && isCellLine(lines[insertAt - 1].trim()))
-        ? CELL_KEYWORD
-        : false;
-  } else if (insertAt > 0 && isCellLine(lines[insertAt - 1].trim())) {
-    insertAt--;
-  } else if (later !== undefined) {
-    delimiter =
-      divided && !sameCell(section.cell, byId.get(later)?.cell)
-        ? CELL_KEYWORD
-        : false;
-  }
+  const prevId = before.length ? before[before.length - 1] : undefined;
+  const arrival = rowDelimiter({
+    lines,
+    insertAt,
+    member: section,
+    // AN ID IN THE CHUNK IS A MEMBER, so `?? {}` keeps "there is a cell above
+    // me" true for one the map cannot resolve rather than turning it into
+    // "I arrive first", which is a different branch with a different answer.
+    prev: prevId === undefined ? undefined : (byId.get(prevId) ?? {}),
+    later: later === undefined ? undefined : (byId.get(later) ?? {}),
+    divided: rowMembers.some((id) => byId.get(id)?.cell !== undefined),
+  });
+  const delimiter = arrival.delimiter;
+  insertAt = arrival.insertAt;
 
   lines.splice(
     insertAt,
     0,
     ...section.render(opts).lines,
-    ...(delimiter && prev === undefined ? [delimiter] : [])
+    ...(delimiter && prevId === undefined ? [delimiter] : [])
   );
-  if (delimiter && prev !== undefined) lines.splice(insertAt, 0, delimiter);
+  if (delimiter && prevId !== undefined) lines.splice(insertAt, 0, delimiter);
 
   chunks[at] = {
     ids: [...chunk.ids, section.id].sort(

@@ -60,6 +60,7 @@ import { entryContext } from "./nav";
 import type { EntryContext } from "./nav";
 import {
   frontmatterOf,
+  isoDate,
   moment,
   openFile,
 } from "../core/util";
@@ -100,7 +101,7 @@ export function entryDateLabel(
   file: TFile,
   grain: TrackerClass
 ): string | null {
-  const key = entryDateKey(frontmatterOf(app, file), grain);
+  const key = entryDateKey(frontmatterOf(app, file), grain) || isoDate(file.basename);
   if (!key) return null;
   // DAILY IS THE ONE GRAIN WITH ITS OWN FORMAT HERE. `labelForGrain` gives it
   // "Friday 14 August 2026" — right for a nav pill you read once, too long for a

@@ -27,14 +27,21 @@
 
 import { describe, expect, it } from "vitest";
 import { isPageHeadLine, PAGE_HEAD_KEYWORDS } from "../src/core/directive-grammar";
-import { STUDY_JOURNAL } from "../src/journals/journal";
-import { journalTemplateFiles } from "../src/journals/custom-journal";
+import { JOURNAL_PRESETS, STUDY_JOURNAL } from "../src/journals/journal";
+import {
+  buildJournalType,
+  journalTemplateFiles,
+} from "../src/journals/custom-journal";
 import {
   findSection,
   templateTargets,
   widgetFormBar,
 } from "../src/journals/journal-sections";
-import { journalSectionModel } from "../src/journals/journal-plan";
+import {
+  applySections,
+  journalSectionModel,
+  sectionsPresent,
+} from "../src/journals/journal-plan";
 import {
   composeJournalsDashboardNote,
   journalsDashboardSectionModel,
@@ -249,7 +256,7 @@ describe("grouping a journal note (5.11)", () => {
       "```chronoanvil\nrow\njournal-search\ncell\nactivity-chart\n```"
     );
     expect(shape(model, grouped as string)).toEqual([
-      "banner", "trackers", "children", "find+progress", "review+tasks", "charts",
+      "banner", "children", "trackers", "review+tasks", "find+progress", "charts",
     ]);
     // AND IT SETTLES. The editor re-reads the file it just wrote; a second pass
     // that found anything to do would loop the window.
@@ -289,7 +296,7 @@ describe("grouping a journal note (5.11)", () => {
     );
     expect(apart).not.toBeNull();
     expect(shape(model, apart as string)).toEqual([
-      "banner", "trackers", "children", "find", "progress", "review+tasks", "charts",
+      "banner", "children", "trackers", "review+tasks", "find", "progress", "charts",
     ]);
     // Two blocks, each one widget, each still in the form the reader chose —
     // this is why `asFlat` leaves `RowMember.bar` unanswered.
@@ -341,5 +348,108 @@ describe("the same guard on the other two catalogues (5.11)", () => {
     expect(
       model.plan(widget, model.present(widget)).filter((o) => o.kind === "extend")
     ).toEqual([]);
+  });
+});
+
+// ── THE STATE ROW — THE GRID AND THE BAND, PAGED (5.18) ──────────────────
+//
+// The reader arranged the four shipped journals in a vault and the plugin was
+// asked to ship what came out. The pair this file is about is the one that
+// needed catalogue work rather than an order: a leaf index draws the tracker
+// grid and the stats band as ONE group with two tabs. See `STATE_ROW` in
+// `journal-sections.ts` for why it is paged rather than columned, and why it
+// carries no band title where "🔁 Due and open" does.
+describe("the tracker grid and the stats band (5.18)", () => {
+  const topic = () => {
+    const target = templateTargets(STUDY_JOURNAL).find((t) =>
+      t.file.includes("topic")
+    );
+    if (!target) throw new Error("no topic template");
+    const file = journalTemplateFiles(STUDY_JOURNAL).find(
+      (f) => f.name === target.file
+    );
+    if (!file) throw new Error("no topic file");
+    return {
+      text: file.content,
+      ctx: target.ctx,
+      model: journalSectionModel(target.ctx),
+    };
+  };
+
+  it("composes them as one group of two pages, untitled", () => {
+    const { text, model } = topic();
+    expect(text).toContain(
+      [
+        "```chronoanvil",
+        "row",
+        "# chronoanvil:trackers:start",
+        "tracker:status",
+        "# chronoanvil:trackers:end",
+        "tab",
+        "stats-band",
+        "```",
+      ].join("\n")
+    );
+    // NO BAR ANYWHERE IN IT. A row carries one title composed by the cell that
+    // opens it, and this row deliberately has none — 5.16 derives the group's
+    // head from the cells, so the box is headed by the widgets themselves.
+    expect(text).not.toContain("header:📊 Trackers\nrow");
+    expect(text).not.toContain("row\nheader:");
+    // And the editor reads the fence back as one block of two columns.
+    const row = model.blocks!(text).find((b) => b.ids.includes("stats"));
+    expect(row?.ids).toEqual(["trackers", "stats"]);
+    expect([...(row?.column ?? [])].sort()).toEqual(["stats", "trackers"]);
+  });
+
+  it("gives the grid its own title back where there is no band", () => {
+    // A container index composes no band (`stats` is the deepest index's
+    // question), so the row comes down to one member and `soloBar` puts the
+    // grid's own name back. Exercise & Diet is the leaf-index case of the same
+    // thing: it ships without the band at all.
+    const subjectText = subject().text;
+    expect(subjectText).toContain(
+      [
+        "```chronoanvil",
+        "header:📊 Trackers",
+        "# chronoanvil:trackers:start",
+        "tracker:status",
+        "# chronoanvil:trackers:end",
+        "```",
+      ].join("\n")
+    );
+    expect(subjectText).not.toContain("row\n# chronoanvil:trackers:start");
+
+    const exercise = buildJournalType(
+      JOURNAL_PRESETS.find((p) => p.id === "exercise-diet")!.config
+    );
+    const block = journalTemplateFiles(exercise).find((f) =>
+      f.name.includes("block")
+    );
+    expect(block?.content).toContain("header:📊 Trackers");
+    expect(block?.content).not.toContain("stats-band");
+    expect(block?.content).not.toContain("\nrow\n");
+  });
+
+  it("takes the band off and puts it back byte for byte", () => {
+    // THE RECONCILER'S HALF, and the reason `rowDelimiter` was hoisted out of
+    // the flat-note one: an arrival spliced into the fence with no delimiter is
+    // welded onto the page above it, so Stats re-added from the section editor
+    // would have come back as a second widget in the grid's own tab rather than
+    // as a page of its own.
+    const { text, ctx } = topic();
+    const present = sectionsPresent(text, ctx);
+    expect(present).toContain("stats");
+    const without = applySections(
+      text,
+      ctx,
+      present.filter((id) => id !== "stats")
+    )!;
+    // The grid is alone in the fence, so the row is undone and the title it was
+    // not composing comes back.
+    expect(without).toContain(
+      "```chronoanvil\nheader:📊 Trackers\n# chronoanvil:trackers:start"
+    );
+    expect(without).not.toContain("\ntab\n");
+    expect(applySections(without, ctx, present)).toBe(text);
   });
 });

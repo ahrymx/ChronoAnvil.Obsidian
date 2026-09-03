@@ -1349,12 +1349,6 @@
      walked off the dots onto it. */
   pointer-events: auto;
 }
-/* TOUCH KEEPS THE OLD SHAPE, IN FLOW, and that is the one place the two
-   behaviours differ on purpose. There is no hover to open a band with, and an
-   overlay that is permanently on would cover the top of every widget in the
-   vault. A phone has no drag to reach for either — the reader was never going
-   to move a widget by its head there — so the head is simply the card's top
-   band, which is what it has always been. */
 @media (hover: none) {
   .ca-journal-widget-card > .ca-journal-block-head {
     position: static;
@@ -1451,6 +1445,41 @@
   overflow: visible;
   /* Taken back only now, so the band keeps itself open under the pointer that
      walked off the dots onto it. */
+  pointer-events: auto;
+}
+/* ── THE TOP STRIP IS THE TRIGGER, FOR BOTH OF THEM (5.16) ─────────
+ *
+ * The rest state above is inert — `pointer-events: none`, 4.34.4 — so the only
+ * thing that could open the band was the grip laid over it. That made the grip
+ * the trigger for the NAME as well as the handle for the drag, and it holds
+ * only where there is a grip. Two vault reports, one release apart, are the two
+ * halves of what that costs.
+ *
+ * A tracker grid had no grip — its cells are a marked region no line range
+ * could carry — so its head was drawn, named, and impossible to see: *"Trackers
+ * widget is missing the widget header entirely."* The grid has a grip again
+ * (see `markSpan` in block-drag.ts), but the fault it exposed is not about
+ * trackers: any head this project draws over something it cannot move is a band
+ * with nothing to open it.
+ *
+ * And with the grip hidden until the grip is hovered, a reader who came at the
+ * band from the side or from below opened the name and saw no dots in it:
+ * *"these widgets headers are missing the drag icons."* Two controls in one
+ * 10px strip, each of which could be the only one showing.
+ *
+ * SO THE STRIP OPENS THEM BOTH, WHICHEVER HALF OF IT THE POINTER IS ON. The
+ * head takes its hit area back at rest — the full width of the card, 10px tall,
+ * which is 4.34.3's own shape — and the grip lights from the head's hover as
+ * well as its own. Hover the top of a widget and you get its name and its
+ * handle together; hover the body and you get neither, which is the whole of
+ * what 4.34.3 was protecting.
+ *
+ * WHAT 4.34.4 GAVE UP TO NARROW IT: a band that opens as a pointer crosses the
+ * card's top edge on the way somewhere else. It is a 10px strip over the card's
+ * own padding, it displaces nothing, and it is the price of the two controls
+ * never disagreeing about whether they are there. */
+.ca-journal-widget-card.has-head > .ca-journal-block-head,
+.ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head {
   pointer-events: auto;
 }
 @media (hover: none) {
@@ -1573,6 +1602,63 @@
 .ca-journal-table:hover .ca-jbd-handle {
   opacity: 1;
 }
+/* ── A HEAD AND ITS GRIP ARE ONE CONTROL, ON ONE TRIGGER (5.16) ────────
+ *
+ * The list above reveals a grip when the thing it drags is hovered, and for a
+ * section bar, a table or a bare block that is the whole affordance: there is
+ * nothing else on those surfaces to say a drag is possible. A widget with a
+ * HEAD is the case that list was written before. Its head is the 44px band
+ * `.ca-journal-widget-card > .ca-journal-block-head` opens over the dots, and
+ * that band already has one trigger of its own: the grip. So a card answered
+ * two questions with two different gestures — dots on a hover of the whole
+ * card, the name only on a hover of the dots — and a reader crossing a
+ * dashboard collected a trail of grab icons naming nothing.
+ *
+ * A vault put it as an instruction: *"drag icon should only appear when the
+ * widget's header does (with the mouse hovering around top mid/around the grab
+ * icon)."* That is one control with one trigger, and the trigger is the top of
+ * the widget. The dots and the band now appear together, on a hover of either,
+ * and on nothing else — hovering the BODY of a widget reveals neither.
+ *
+ * WRITTEN AS AN OVERRIDE RATHER THAN AS FIVE `:not(.has-head)` ARMS ABOVE. The
+ * list reaches a card's grip by five routes, three of them descendant selectors
+ * (`.ca-journal-sec-block:hover .ca-jbd-handle` and its two neighbours) that
+ * light every grip inside a section run, so an exception written into the list
+ * would have to be written into each of them and would be one selector away
+ * from being wrong again. One rule naming the case is the case.
+ *
+ * SPECIFICITY, NOT FILE ORDER, DECIDES THE RE-REVEALS. `.has-head` is carried
+ * in every one of them, and the `:has()` arms take their argument's weight on
+ * top of that, so each outranks both the hide below and the list above wherever
+ * it lands. */
+.ca-journal-widget-card.has-head > .ca-jbd-handle,
+.ca-journal-widget-block.has-head > .ca-jbd-handle {
+  opacity: 0;
+}
+/* Its own rule, for the reason given at the head's: one unsupported selector
+   takes down the group it is written in. */
+.ca-journal-widget-card.has-head:has(> .ca-jbd-handle:hover) > .ca-jbd-handle,
+.ca-journal-widget-block.has-head:has(> .ca-jbd-handle:hover) > .ca-jbd-handle {
+  opacity: 1;
+}
+/* AND THE BAND KEEPS THEM BOTH LIT once the pointer has walked down off the
+   dots onto it — the head takes its hit area back exactly then, which is what
+   makes this hover reachable at all. */
+.ca-journal-widget-card.has-head:has(> .ca-journal-block-head:hover) > .ca-jbd-handle,
+.ca-journal-widget-block.has-head:has(> .ca-journal-block-head:hover) > .ca-jbd-handle {
+  opacity: 1;
+}
+/* THE STATES WHERE THE HEAD IS OPEN WITHOUT A POINTER ON IT, and the same four
+   the head's own rules name: a drag in hand, a resize in progress, and every
+   widget in a block that is being dropped into. The grip is what is being used
+   in the first two and what is being aimed at in the third; a control that
+   vanished mid-gesture would be the pairing breaking exactly where it matters. */
+.ca-journal-widget-card.has-head.is-dragging > .ca-jbd-handle,
+.ca-journal-widget-card.has-head.is-resizing > .ca-jbd-handle,
+.ca-journal-widget-block.has-head.is-dragging > .ca-jbd-handle,
+.ca-journal-widget-block.is-slotting .ca-journal-widget-card.has-head > .ca-jbd-handle {
+  opacity: 1;
+}
 /* A GROUP'S GRIP LIVES IN ITS FOOT (4.9 §2.2), AND `.jbd-aside` IS GONE WITH THE
    PROBLEM IT DODGED.
 
@@ -1603,44 +1689,24 @@
 .ca-journal-group:hover .ca-journal-group-head > .ca-jbd-handle {
   opacity: 1;
 }
-/* ── AND A BARE FENCE'S BLOCK GRIP STEPS OFF THE CENTRE LINE (5.14) ─────
+/* ── AND A BARE FENCE'S BLOCK GRIP IS GONE, NOT PARKED (5.15) ──────────
  *
- * The obituary above says `jbd-aside` went "with the problem it was working
- * around". It went with the problem in a GROUP, where a head is a strip above
- * the cards and the two grips are a band apart. The same collision arrived
- * somewhere else in the same release, and this is the one place it could not be
- * closed by giving the control an edge of its own.
+ * `.has-widget-grips` was here, with two rules: it took the block's grip off
+ * the centre line and up into `.ca-journal-widget-block`'s own `margin-top`,
+ * plus a second rule holding that place inside a section run. The case it was
+ * for is a fence with no `header:` line and several widgets — a diary entry's
+ * shared band is the whole of it — where the block's grip has no head and no
+ * bar to sit on and therefore lands on the container's top edge, which IS the
+ * first widget's.
  *
- * WHAT THE CASE IS. A fence with no `header:` line and several widgets — a
- * diary entry's shared band is the whole of it — now draws a grip per widget
- * (`block-drag.ts`). The block's own grip has no head and no bar to sit on, so
- * it lands on the container's top edge, which IS the first widget's top edge:
- * 4.8.6's two sets of dots at two identical coordinates, read from a vault as
- * one duplicated.
- *
- * OFF THE CENTRE AND UP INTO THE BLOCK'S OWN MARGIN, which is both axes rather
- * than the one `jbd-aside` used, and the second is what makes it a PLACE rather
- * than a dodge. `.ca-journal-widget-block` opens with `margin-top: 0.5em` — a
- * strip that belongs to the block and to nothing inside it, which is the group
- * head's argument reached without a head. Left-aligned as well, so that even on
- * a block whose margin is collapsed away the two are not on the same x.
- *
- * ONLY WITH THE CLASS, and `block-drag.ts` adds it only where it drew widget
- * grips. A fence with one widget has no second grip to avoid and keeps the
- * centre, which is where a reader looks. */
-.ca-journal-widget-block.has-widget-grips > .ca-jbd-handle {
-  top: -8px;
-  left: 0;
-  transform: none;
-  width: 36px;
-}
-/* AND IT KEEPS THAT PLACE INSIDE A SECTION RUN, where the rule a few screens up
-   pins every grip to `top: 4px`. That rule is about a grip with no margin above
-   it to use; this block has one either way, and a grip pulled back onto the
-   card's top edge would be the collision again with the class still on. */
-.ca-journal-sec-block .ca-journal-widget-block.has-widget-grips > .ca-jbd-handle {
-  top: -8px;
-}
+ * That was `jbd-aside` again: a grip moved somewhere it means nothing rather
+ * than a grip that means something. A vault put it plainly — *"there seems to
+ * be a dragger for the entire group of sections on diary entries? it is not
+ * necessary."* `block-drag.ts` now draws no block grip at all where it handed
+ * grips to the widgets, so there is no second control for a rule here to place
+ * and this family is deleted rather than retuned. A fence with ONE widget still
+ * has its centred grip, which is where a reader looks and is honest about its
+ * own scope: the block is that widget. */
 .ca-jbd-handle:active {
   cursor: grabbing;
 }
@@ -1924,6 +1990,33 @@
    TOP of the next card — naming the boundary from the wrong side. */
 .ca-jbd-slot-under::after {
   bottom: var(--ca-widget-gap);
+}
+/* ── IN A STACK THE TWO OF THEM TILE THE CARD (5.15) ────────────────────
+ *
+ * WHY THEY ARE A FIFTH ABOVE. A widget in a cell has FIVE places and the middle
+ * is one of them — a swap — so the two that stack take a strip each and leave
+ * the middle to the ring. That is the right proportion there: a swap needs no
+ * aim, and the strips are what a reader aims at.
+ *
+ * A WIDGET IN A BARE FENCE HAS TWO, and 5.14 drew them with the cell's numbers.
+ * A stack is not a surface a swap belongs on — it is a third gesture on a
+ * surface asking for one — so nothing claimed the middle 60% of every field,
+ * and what a reader pointing there actually reached was the block's own band
+ * underneath: "take this field out of the fence". Reported as *"it seems to let
+ * the user place sections at odd positions"*, which is exactly what it did.
+ *
+ * HALF EACH, FULL WIDTH, and the pair still hands the gap below to the card
+ * above it for the reason the rule above gives. Nowhere on a field then means
+ * anything but that field. */
+.ca-jbd-slot-loose {
+  left: 0;
+  right: 0;
+}
+.ca-jbd-slot-over.ca-jbd-slot-loose {
+  height: 50%;
+}
+.ca-jbd-slot-under.ca-jbd-slot-loose {
+  height: calc(50% + var(--ca-widget-gap));
 }
 /* And the middle, which is a swap. Its mark is a ring rather than a bar: a bar
    says "the arrival goes on this side of that line" and a swap has no side. */

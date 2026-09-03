@@ -405,6 +405,124 @@ describe("the gesture around it", () => {
     expect(widgets).toContain("rowSpec.row ? null : blockTitle(lines)");
   });
 
+  it("names the tracker grid too, so no widget in a row goes bare (5.15)", () => {
+    // WHAT A READER MET: *"I made a group with trackers and stats widgets …
+    // the drag icons are not supposed to show like that, what should happen is
+    // the widget's hover header appears."* Page 2 was `stats-band`, which
+    // `SECTION_TITLES` names, so it wore a card and a head. Page 1 was a
+    // tracker grid — ten `tracker:` lines drawn into one widget bar — and the
+    // title table is keyed on a DIRECTIVE, so it named nothing and the grid sat
+    // on the page's own background under a naked grip.
+    const widgets = readCode("widgets");
+    // NOT A `SECTION_TITLES` ENTRY, and the registry test is the reason: an
+    // inline widget must have no heading there, because a heading for a
+    // control drawn in a line is looked up, handed over and dropped. What
+    // wears this is the BAR, which is a different object.
+    expect(widgets).toContain('const TRACKER_BAR_TITLE = "📊 Trackers"');
+    expect(widgets).toContain("named.push({ el: grid, title: TRACKER_BAR_TITLE })");
+    // ONE ENTRY PER GRID, however many of the three paths that build one ran.
+    expect(widgets).toContain("if (named.some((n) => n.el === grid)) return;");
+    // AND ONLY WHERE THE GRID IS THE BLOCK'S OWN CHILD — inside a period
+    // card's `overviewHost` the card is the named thing.
+    expect(widgets).toContain("if (grid.parentElement !== container) return;");
+    // ALL THREE PATHS, so the name cannot be attached to two of them: the habit
+    // chip, the ordinary tracker cell, and the empty marked region.
+    expect(
+      widgets.split("nameTrackerGrid(").length - 1,
+      "a path that builds a grid without naming it"
+    ).toBe(3);
+  });
+
+  it("hangs the gesture on every page of a group, not the open one (5.16)", () => {
+    // A GROUP WITH PAGES IS ONE FENCE AND SEVERAL ROWS, all of them in the
+    // document at once, and `paint` swaps between them by toggling `is-closed`
+    // — nothing re-renders. So a gesture hung against the row that happened to
+    // be open stayed hung against that row: page 2 drew cards with no grips and
+    // no landing places. A vault caught it as a card with its name showing and
+    // no dots in it.
+    const src = readCode("block-drag");
+    // Every row this block owns, and not a nested group's — `querySelectorAll`
+    // reaches through the cells into whatever a widget drew.
+    expect(src).toContain("container.querySelectorAll<HTMLElement>(`.${ROW_CLASS}`)");
+    expect(src).toContain("r.closest(`.${ROW_CELL_CLASS}`) === null");
+    expect(src).toContain("const allCells = pageRows.flatMap(cellsIn);");
+    expect(src).toContain("for (const pageRow of pageRows) {");
+    // AND THE RESIZE STAYS ON THE OPEN PAGE. A divider writes one page's column
+    // widths into that page's slice of the body, so it is wired to the row the
+    // reader can see — 4.34 §6, unchanged.
+    const resize = src.indexOf("wireResizeHandles(", src.indexOf("if (row) {"));
+    expect(resize).toBeGreaterThan(-1);
+    expect(src.slice(resize, resize + 200)).toContain("cells,");
+    expect(src.slice(resize, resize + 200)).toContain("openPage,");
+    // AND A PAGE'S LAST CARD OPENS A COLUMN AT THE END OF ITS OWN PAGE. The
+    // fallback was `body.length`, which on page 1 of two is past everything on
+    // page 2 — the same wrong row a moment later.
+    expect(src).toContain("pageSlice(body, page)?.to ?? body.length");
+  });
+
+  it("names a fence that is nothing but a tracker grid (5.16)", () => {
+    // `blockTitle` reads keywords against `SECTION_TITLES`, and `tracker:` has
+    // no entry there and must not gain one — `widget-registry.test.ts` refuses
+    // an entry for an inline widget. So the same grid was a named card inside a
+    // group and an unnamed box on its own, which a vault caught one screenshot
+    // apart: *"Drag to move this block"* over a box with no name on it.
+    const widgets = readCode("widgets");
+    expect(widgets).toContain('const gridKinds = new Set(["tracker", "sleep"]);');
+    // THE DRAWN GRID AND THE FENCE'S LINES TOGETHER: the bar is what makes this
+    // a grid rather than a run of sliders, and the line test is what keeps the
+    // name off a fence holding a grid AND something else — `blockTitle`'s own
+    // rule, applied to the one kind it cannot see.
+    expect(widgets).toContain(
+      "trackerBar !== null && lines.every((l) => gridKinds.has(keywordOf(l)))"
+    );
+    expect(widgets).toContain(
+      "blockTitle(lines) ?? (gridOnly ? TRACKER_BAR_TITLE : null)"
+    );
+    // AND IT IS THE SAME STRING THE CARD IN A ROW GETS. Two spellings of one
+    // name is how a group's head and its card come to disagree.
+    expect(widgets).toContain("named.push({ el: grid, title: TRACKER_BAR_TITLE });");
+    // AND THE TABLE STAYS OUT OF IT — the whole reason this is a fallback.
+    const titles = widgets.slice(
+      widgets.indexOf("const SECTION_TITLES"),
+      widgets.indexOf("};", widgets.indexOf("const SECTION_TITLES"))
+    );
+    expect(titles).not.toContain('"tracker"');
+    expect(titles).not.toContain('"sleep"');
+  });
+
+  it("tells a widget bar how many lines it drew (5.16)", () => {
+    // ONE ELEMENT, TEN LINES. Every inline directive lands in one bar, so
+    // `stampLines` gives it the line of the FIRST and a drag reading that stamp
+    // alone moves one tracker out from under the nine still drawn inside the
+    // element being held. 5.15 answered that by giving the bar no grip; a vault
+    // answered back — *"these widgets headers are missing the drag icons."*
+    //
+    // The dispatch loop is the only code that knows where the run ends, and it
+    // knows it at the append.
+    const widgets = readCode("widgets");
+    const at = widgets.indexOf("bar.appendChild(widget);");
+    expect(at, "nothing appends to the bar").toBeGreaterThan(-1);
+    expect(widgets.slice(at, at + 120)).toContain("markSpan(bar, lineAt[n]);");
+
+    // AND THE REGION IS STAMPED AS ITS MARKERS, AFTER THE STAMPING PASS. Both
+    // `# chronoanvil:trackers:start` and its `end` are filtered out of `lines`
+    // before the loop, so the span above stops one line short at each end;
+    // `markRegion` is read off `rawLines`, which is the fence as the file has it
+    // and the numbering `moveCell` splices against.
+    const stamp = widgets.indexOf("stampLines(container, drawn, rawLines.length);");
+    const region = widgets.indexOf("markRegion(trackerBar, start, end);");
+    expect(stamp, "nothing stamps the block").toBeGreaterThan(-1);
+    expect(region, "the region is never stamped").toBeGreaterThan(-1);
+    expect(region).toBeGreaterThan(stamp);
+    const guard = widgets.slice(widgets.indexOf("if (trackerBar && hasTrackerRegion) {"), region);
+    expect(guard).toContain("rawLines.indexOf(TRACKER_MARK_START)");
+    expect(guard).toContain("rawLines.indexOf(TRACKER_MARK_END, start + 1)");
+    // AND AN EMPTY REGION IS NOT A WIDGET. The grid a note gets when it declares
+    // the region and holds no trackers is a child no directive drew, so the
+    // stamp `stampLines` handed it names somebody else's line.
+    expect(widgets).toContain("else clearStamp(trackerBar);");
+  });
+
   it("puts no head on a widget that already has a band", () => {
     // THE SAME RULE THE BLOCK FOLLOWS, ONE LEVEL DOWN. A period dashboard's
     // summary says MONTHLY OVERVIEW across its own top
@@ -575,6 +693,105 @@ describe("the gesture around it", () => {
     expect(drag, "the head is never attached").toBeGreaterThan(-1);
     expect(row, "the row is never laid out").toBeGreaterThan(-1);
     expect(drag).toBeGreaterThan(row);
+  });
+
+  it("shows a widget's grip only where its head shows too (5.16)", () => {
+    // ONE CONTROL, ONE TRIGGER. The reveal list below answers a hover of the
+    // whole host, which is right for a section bar or a table — there is
+    // nothing else on those to say a drag is possible. A widget with a head has
+    // something else: the band over the dots, which opens on a hover of the
+    // dots alone. So a card said "drag me" to a pointer crossing it and said
+    // WHAT could be dragged only to a pointer that had already found the 44px
+    // it was hiding in. A vault read the result as grab icons appearing without
+    // their headers.
+    //
+    // The hide is one rule keyed on `.has-head`, and every re-reveal carries
+    // that class too, so each outranks it on specificity rather than on where
+    // it happens to sit in the file.
+    const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+    const hide = rules.indexOf(
+      "\n.ca-journal-widget-card.has-head > .ca-jbd-handle,"
+    );
+    expect(hide, "a head's grip is still revealed by the host").toBeGreaterThan(
+      -1
+    );
+    const sel = rules.slice(hide, rules.indexOf("{", hide));
+    expect(sel).toContain(".ca-journal-widget-block.has-head > .ca-jbd-handle");
+    expect(rules.slice(rules.indexOf("{", hide), rules.indexOf("}", hide))).toContain(
+      "opacity: 0"
+    );
+    // The three ways it comes back: the grip's own hover, the band's once the
+    // pointer has walked onto it, and the states where the head is open with no
+    // pointer on it at all.
+    for (const back of [
+      ".ca-journal-widget-card.has-head:has(> .ca-jbd-handle:hover) > .ca-jbd-handle",
+      ".ca-journal-widget-card.has-head:has(> .ca-journal-block-head:hover) > .ca-jbd-handle",
+      ".ca-journal-widget-card.has-head.is-dragging > .ca-jbd-handle",
+      ".ca-journal-widget-block.is-slotting .ca-journal-widget-card.has-head > .ca-jbd-handle",
+    ]) {
+      const at = rules.indexOf(back);
+      expect(at, `no way back for ${back}`).toBeGreaterThan(-1);
+      expect(
+        rules.slice(rules.indexOf("{", at), rules.indexOf("}", at))
+      ).toContain("opacity: 1");
+    }
+    // AND A `:has()` ARM NEVER SHARES A RULE WITH ONE THAT DOES NOT — the
+    // policy this stylesheet follows everywhere: an unsupported selector takes
+    // down the whole group it is written in, and the grip would be gone with
+    // it.
+    for (const m of rules.matchAll(/([^{}]*:has\([^{}]*\)[^{}]*)\{/g)) {
+      const group = m[1].split(",").map((x) => x.trim()).filter(Boolean);
+      if (!group.some((x) => x.includes(":has("))) continue;
+      // THE GRIP AND ITS HEAD, WHICH IS WHAT THIS TEST IS ABOUT. A mixed group
+      // elsewhere in the sheet loses a background on a renderer with no
+      // `:has()`; a mixed group here loses the only control that moves a
+      // widget. The sweep is scoped to the second kind rather than made a
+      // stylesheet-wide rule this test is not the place to introduce.
+      if (!m[1].includes("jbd-handle") && !m[1].includes("block-head")) continue;
+      expect(
+        group.every((x) => x.includes(":has(")),
+        `a :has() arm sharing a rule with a plain one: ${m[1].trim()}`
+      ).toBe(true);
+    }
+  });
+
+  it("makes the top strip open the head, not only the grip (5.16)", () => {
+    // 4.34.4 MADE THE HEAD INERT AT REST so the grip over it was the only thing
+    // that could open it. That is one control opening two things where there is
+    // a grip, and nothing at all where there is not: a tracker grid's head was
+    // drawn, named and impossible to see, and a reader who reached the band from
+    // the side saw a name with no dots in it. Both halves came back from the
+    // same vault, a release apart.
+    //
+    // The strip takes its hit area back — 4.34.3's own shape, full width and
+    // 10px — so hovering the top of a widget opens the name and lights the grip
+    // together, and hovering its body still does neither.
+    const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+    const at = rules.indexOf(
+      "\n.ca-journal-widget-card.has-head > .ca-journal-block-head,"
+    );
+    expect(at, "the head is still inert on a card that has a grip").toBeGreaterThan(-1);
+    const sel = rules.slice(at, rules.indexOf("{", at));
+    // THE BLOCK'S ARM CARRIES `:not(.ca-journal-widget-card)`, and not for
+    // symmetry: the rest rule it overrides carries it too, so an arm without it
+    // weighs one class less and loses to the rule it is written to beat.
+    expect(sel).toContain(
+      ".ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head"
+    );
+    expect(rules.slice(rules.indexOf("{", at), rules.indexOf("}", at))).toContain(
+      "pointer-events: auto"
+    );
+    // AND IT SITS AFTER BOTH REST RULES. The card's is less specific and would
+    // lose anywhere; the block's weighs exactly the same, so file order is the
+    // whole of what decides it.
+    const cardRest = rules.indexOf("\n.ca-journal-widget-card > .ca-journal-block-head {");
+    const blockRest = rules.indexOf(
+      "\n.ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head {"
+    );
+    expect(cardRest).toBeGreaterThan(-1);
+    expect(blockRest).toBeGreaterThan(-1);
+    expect(at).toBeGreaterThan(cardRest);
+    expect(at).toBeGreaterThan(blockRest);
   });
 
   it("has a resting state on touch, like every other hover affordance", () => {

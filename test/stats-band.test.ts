@@ -375,7 +375,14 @@ describe("Media is the shelf this release was written from", () => {
   it("leaves Exercise & Diet banding its four sums out of one section", () => {
     const ex = JOURNAL_PRESETS.find((p) => p.id === "exercise-diet")!;
     const layout = ex.config.layout?.["index:0"];
-    expect(layout?.sections).toContain("stats");
+    // OFF THE SHIPPED PAGE IN 5.18, AND THE PRESET KEPT. The reader took the
+    // band off the Block index — the two note tables and the charts region are
+    // what that page is for, and the band's four sums are the same four numbers
+    // the charts draw over time. The override stays because it is the answer to
+    // "what does this journal band", which is still true and is what ticking
+    // Stats back on in *Edit sections…* must give them: this journal's four
+    // sums, not the generic band.
+    expect(layout?.sections).not.toContain("stats");
     expect(layout?.sections).not.toContain("totals");
     expect(layout?.options?.["stats"]?.preset).toBe("totals");
     expect(

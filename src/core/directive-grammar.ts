@@ -1235,7 +1235,19 @@ export function undoRowOfOne(
 ): string[] {
   const widgets = lines.filter((l) => {
     const t = l.trim();
-    if (!t || t.startsWith("```")) return false;
+    // BLANKS, FENCE LINES AND `#` COMMENTS ARE NOT WIDGETS — `isContent` in
+    // `cell-move.ts` states the rule and the reason, and this is the same
+    // count asked one file over.
+    //
+    // THE COMMENT CLAUSE ARRIVED IN 5.18 AND IS NOT A NEW RULE. A managed
+    // region's markers are `# chronoanvil:trackers:start` and its twin, and they
+    // were counted here as two widgets — so a row whose cell holds a tracker
+    // grid could never come down to one: cutting the OTHER cell left a fence
+    // of one grid, three "widgets" by this count, and the `row` line, the
+    // stray `tab` and the missing solo bar all stayed behind. Reachable from
+    // 4.20, when the grid became a section; found by 5.18, when it became a
+    // cell.
+    if (!t || t.startsWith("```") || t.startsWith("#")) return false;
     return !MODIFIER_KEYWORDS.has(splitDirective(t).keyword);
   }).length;
   if (widgets > 1) return [...lines];

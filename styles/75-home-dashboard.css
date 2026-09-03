@@ -33,6 +33,32 @@
 .ca-journal-note:last-child {
   margin-bottom: 0;
 }
+/* ── AND A FIELD'S GAP IS THE BLOCK'S, NOT ITS WRAPPER'S (5.15) ─────────
+ *
+ * `0.9em` is what a `note:`, `list:` or `attach:` used to need: each was a
+ * standalone widget stacked in a fence, and the fence's own `--ca-widget-gap`
+ * (10px) was too tight between two unlabelled boxes.
+ *
+ * 5.14 made all seven fields one object, and this line is what the release did
+ * not finish. `tasks:` and the capture log had their wrappers stood down —
+ * background, border, padding and margin — because the frame inside draws the
+ * card now; the other three kept a margin nothing else on the page has. So an
+ * entry's rhythm depends on WHICH KIND each field is: 24px under Focus,
+ * Highlights, Challenges, Notes and Attachments, 10px under Tasks and Captured,
+ * and 10px under any of them that happens to be last (the rule above). Move two
+ * fields past each other and the gap between them changes with them, which is a
+ * reader watching the page rearrange itself around a drop they did not ask for.
+ *
+ * THE SAME CONDITION THE OTHER TWO USE, so this reads as one rule with five
+ * hosts rather than a special case: a wrapper whose direct child is a field
+ * frame is a box inside a box, and the outer one keeps nothing of its own. A
+ * bare `note:` under a section bar draws no frame, matches nothing here, and
+ * keeps its margin. */
+.ca-journal-note:has(> .ca-journal-sec-fold.ca-journal-field),
+.ca-journal-list:has(> .ca-journal-sec-fold.ca-journal-field),
+.ca-journal-attach:has(> .ca-journal-sec-fold.ca-journal-field) {
+  margin: 0;
+}
 /* THE NOTE'S LABEL IS THE FRAME'S NOW (5.14). What stood here was an eyebrow —
    `--ca-text-xs`, 600, uppercase, muted — drawn by `buildNote` above its
    textarea, and three near-copies of it stood in this file and the next two for

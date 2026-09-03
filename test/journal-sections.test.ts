@@ -709,20 +709,37 @@ describe("the section catalogue", () => {
       expect(topic).not.toContain("learning-path");
     });
 
-    it("puts the note tables below the learning path", () => {
+    it("puts the learning path above the review queue", () => {
+      // THE NOTE TABLES CAME BACK UP IN 5.18, and this test held the old claim:
+      // a Topic index put its tables BELOW the learning path, on the argument
+      // that the path is the curated route through them and the tables are the
+      // fallback. The reader reversed it across all four presets — what is
+      // below a note is the first thing every index now draws — so the per-
+      // template difference this test exists for is a different pair.
+      //
+      // IT IS THE PATH AND THE QUEUE. The catalogue composes the review queue
+      // well above the path (`review` is an index staple, `path` is a field a
+      // journal opts into); Study's Topic index puts the route first and what
+      // has come round for another look after it.
       const ids = defaultSectionIds(
         indexCtx(STUDY_JOURNAL, 1),
         STUDY_JOURNAL.layout?.["index:1"]
       );
-      expect(ids.indexOf("path")).toBeLessThan(ids.indexOf("children"));
-      // And the level above does the opposite, which is why order is per
-      // template rather than one list for the catalogue.
-      const top = defaultSectionIds(indexCtx(STUDY_JOURNAL, 0));
-      // SECOND UNTIL 4.20, THIRD NOW. The tracker grid became a section of its
-      // own and sits directly under the banner, so everything below it shifts
-      // by one. What this test is about — the note tables below the learning
-      // path — is a relative order and is unchanged.
-      expect(top.indexOf("children")).toBe(2);
+      expect(ids.indexOf("path")).toBeLessThan(ids.indexOf("review"));
+      const catalogue = defaultSectionIds(indexCtx(STUDY_JOURNAL, 1));
+      expect(catalogue.indexOf("review")).toBeLessThan(
+        catalogue.indexOf("path")
+      );
+      // And what is below the note opens both levels, which is the arrangement
+      // the presets now share.
+      for (const depth of [0, 1]) {
+        const ctx = indexCtx(STUDY_JOURNAL, depth);
+        const level = defaultSectionIds(
+          ctx,
+          STUDY_JOURNAL.layout?.[`index:${depth}`]
+        );
+        expect(level[1], `index:${depth}`).toBe("children");
+      }
     });
   });
 
@@ -816,15 +833,21 @@ describe("the section catalogue", () => {
       // that would mean per-level ordering data earning its keep on a single
       // cosmetic difference.
       const c = indexCtx(STUDY_JOURNAL, 0);
-      expect(defaultSectionIds(c)).toEqual(
+      // ASKED WITH THE LAYOUT AS OF 5.18, because the template is now composed
+      // with one: Study declares an `index:0` arrangement where it declared
+      // none, so the catalogue's own order and the file on disk are two
+      // different questions and this test is about the file.
+      const layout = STUDY_JOURNAL.layout?.["index:0"];
+      expect(defaultSectionIds(c, layout)).toEqual(
         detectSections(studyTemplate("Subject Index.md"), c)
       );
-      expect(defaultSectionIds(c)).toEqual([
+      expect(defaultSectionIds(c, layout)).toEqual([
         "banner",
+        // 5.18: WHAT IS BELOW COMES FIRST. The page exists to link into the
+        // subject; the grid of ratings is what the reader looks at second.
+        "children",
         // 4.20: the ratings left the banner's fence to become a section.
         "trackers",
-        "children",
-        "find",
         // 4.70 MOVED OPEN TASKS UP TO SIT BESIDE REVIEW, because the two are
         // now one row — "🔁 Due and open" — and two cells of a row have to be
         // adjacent in the catalogue for `rowRuns` to weld them. What it
@@ -833,6 +856,9 @@ describe("the section catalogue", () => {
         "review",
         "tasks",
         "progress",
+        // AND FIND MOVED DOWN WITH THEM (5.18). A search box is a control the
+        // reader reaches for, not a block they read past.
+        "find",
         "charts",
       ]);
     });

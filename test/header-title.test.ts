@@ -64,7 +64,11 @@ describe("the defect that shipped", () => {
     const lines = topicIndex();
     const span = argSpanIn(lines, "header");
     expect(span).not.toBeNull();
-    expect(readArg(lines, span!)).toBe("📊 Trackers");
+    // The FIRST header on the page, which is the children table's since 5.18
+    // reordered the Topic index — and the tracker grid's before that. Which
+    // section owns it is exactly what this function cannot tell you, so the
+    // string moving is the claim rather than a break in it.
+    expect(readArg(lines, span!)).toBe("🗂️ What's below");
   });
 
   it("soleArgSpanIn refuses rather than picking one of six", () => {

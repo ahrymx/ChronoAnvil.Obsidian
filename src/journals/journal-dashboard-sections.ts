@@ -206,35 +206,21 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
     // now ends here, so a navigation row would be the second answer on one page.
     bannerSection(),
 
-    {
-      id: "activity",
-      label: "Activity",
-      blurb: `What has been happening in ${type.name}, over the last twelve months.`,
-      icon: "🔥",
-      // NAMED, BECAUSE THE BAND UNIONS EVERY JOURNAL WHEN IT IS NOT. That is
-      // `journals-header`'s documented scope — "every registered journal's root
-      // folder, unioned" — and on a page about ONE journal every number in it
-      // would be a plausible figure about something else, which is the worst
-      // shape a statistic can have. 4.36 §3 gives the keyword its argument; this
-      // is the caller that needed it.
-      //
-      // `frame: section` RATHER THAN A `header:` BAR, on the rule both other
-      // dashboards state: a card-drawing widget takes the modifier, because a
-      // `header:` in the same fence would give the container both a bar and a
-      // card. The band is not an overview card, but it is a band with its own
-      // ground, and `SECTION_TITLES` has named it "🔥 Activity" since 4.15 §1.
-      locked: false,
-      render: (opts) => ({
-        fence: "chronoanvil",
-        lines: [
-          ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
-          `journals-header:${type.id}`,
-        ],
-      }),
-      questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
-      locate: (text) => probe(text, /^journals-header\b/m),
-    },
-
+    // ── CONTENTS, THEN THE NUMBERS, THEN THE YEAR (5.18) ──────────────
+    //
+    // The activity band was the second block on this page and is now the
+    // fourth. It was written first because it is the one composite that is
+    // about the journal as a whole, and reading the page settled it the other
+    // way: a folder note's job is to get the reader INTO the folder, and the
+    // way in is the grid of shelves. The band and the stats above it are how
+    // the journal is DOING, which is what a reader looks at second — and both
+    // are dense, so putting them first pushed every destination on the page
+    // below the fold.
+    //
+    // ORDER HERE IS COMPOSITION ORDER AND NOTHING ELSE. `repairNote` is
+    // additive and matches by `locate`, so no journal dashboard already in a
+    // vault is reordered by this; it is the shape a page composed from today
+    // opens with.
     {
       id: "contents",
       label: "Contents",
@@ -350,6 +336,35 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // Totals onto carries `journal-totals`, and a locator that knew only the
       // new word would call the section missing and offer to add a second band.
       locate: (text) => probe(text, statsBandProbe()),
+    },
+
+    {
+      id: "activity",
+      label: "Activity",
+      blurb: `What has been happening in ${type.name}, over the last twelve months.`,
+      icon: "🔥",
+      // NAMED, BECAUSE THE BAND UNIONS EVERY JOURNAL WHEN IT IS NOT. That is
+      // `journals-header`'s documented scope — "every registered journal's root
+      // folder, unioned" — and on a page about ONE journal every number in it
+      // would be a plausible figure about something else, which is the worst
+      // shape a statistic can have. 4.36 §3 gives the keyword its argument; this
+      // is the caller that needed it.
+      //
+      // `frame: section` RATHER THAN A `header:` BAR, on the rule both other
+      // dashboards state: a card-drawing widget takes the modifier, because a
+      // `header:` in the same fence would give the container both a bar and a
+      // card. The band is not an overview card, but it is a band with its own
+      // ground, and `SECTION_TITLES` has named it "🔥 Activity" since 4.15 §1.
+      locked: false,
+      render: (opts) => ({
+        fence: "chronoanvil",
+        lines: [
+          ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
+          `journals-header:${type.id}`,
+        ],
+      }),
+      questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
+      locate: (text) => probe(text, /^journals-header\b/m),
     },
 
     {

@@ -35,6 +35,7 @@ import {
   CAPTURE_NOTE_KEY,
   HEADER_PREFIX,
   RETIRED_WIDGETS,
+  TRACKER_MARK_END,
   TRACKER_MARK_START,
 } from "../../core/constants";
 import {
@@ -174,6 +175,9 @@ import {
   applyCardHeights,
   attachBlockHead,
   cardWidget,
+  clearStamp,
+  markRegion,
+  markSpan,
   stampLines,
 } from "./block-drag";
 import { livePageHead } from "./page-head";
@@ -555,6 +559,30 @@ export function blockTitle(lines: readonly string[]): string | null {
 // about a FENCE — how many of them are in it — which only the dispatcher can
 // see. 5.14.
 const FIELD_KINDS = new Set(["note", "list", "path", "tasks", "attach", "recall"]);
+
+// ── WHAT A TRACKER GRID IS CALLED (5.15) ──────────────────────────────
+//
+// NOT AN ENTRY IN `SECTION_TITLES`, AND THE DISTINCTION IS THE WHOLE POINT.
+// That table is keyed on a DIRECTIVE KEYWORD, and `tracker:` is `inline` in the
+// registry — one control, drawn in a line, with no block for a head to sit on.
+// `test/widget-registry.test.ts` asserts exactly that: an inline widget gets no
+// heading, because a heading there would be looked up, handed over and dropped.
+//
+// WHAT WEARS THIS IS THE BAR, which is a different object from any of the
+// directives in it: ten `tracker:` lines and a `sleep` draw one
+// `.ca-journal-widget-bar`, and that bar is a block-level thing a reader points
+// at, drags past, and — until this release — met with no name at all. A vault
+// found it the moment a group made the omission visible: *"I made a group with
+// trackers and stats widgets … the drag icons are not supposed to show like
+// that, what should happen is the widget's hover header appears."* Page 2 of
+// that group is `stats-band`, which the map can name, so it wore a card and a
+// head; page 1 was a grid on the page's own background with a naked grip over
+// it.
+//
+// THE SAME WORDS THE CATALOGUE COMPOSES. `journal-sections.ts` renders this
+// section as `headerBar("📊 Trackers", …)`, so a fence drawn as a SECTION and
+// the same fence drawn as a WIDGET say one thing rather than two.
+const TRACKER_BAR_TITLE = "📊 Trackers";
 
 const INLINE_KINDS = new Set([
   "slider",
@@ -1082,6 +1110,30 @@ export class Widgets implements
       // shape `blockTitle` exists to avoid one level up.
       const named: { el: HTMLElement; title: string }[] = [];
 
+      // AND A TRACKER GRID IS ONE OF THEM (5.15). Three paths build the grid —
+      // a habit chip, an ordinary `tracker:`/`sleep` cell, and an empty marked
+      // region that gets the tile alone — and all three call this, so the name
+      // cannot be attached to two of them.
+      //
+      // IN DOM ORDER, WHICH IS WHAT `named` PROMISES and what the group's
+      // caption reads. The bar is always the newest child when a tracker draws
+      // into it — a non-inline directive sets `bar` back to null, so the bar
+      // and its contents are contiguous — and the empty-region grid is created
+      // after the loop, so a push is in order in every case.
+      //
+      // ONLY WHERE IT IS THE BLOCK'S OWN CHILD. `openActionsBar` builds into
+      // `overviewHost` on a period card, where the card is the named thing and
+      // a second name inside it would be the doubling `hasOwnBar` refuses.
+      //
+      // ASKED OF `named` RATHER THAN OF `trackerBar`, because the caller owns
+      // that variable and TypeScript follows an assignment it can see. One
+      // grid, one entry, however many directives drew into it.
+      const nameTrackerGrid = (grid: HTMLElement): void => {
+        if (grid.parentElement !== container) return;
+        if (named.some((n) => n.el === grid)) return;
+        named.push({ el: grid, title: TRACKER_BAR_TITLE });
+      };
+
       // WHICH LINE DREW WHICH CHILD, as the number of children the block had
       // when the dispatcher reached that line. 4.8 §1.4.
       //
@@ -1278,6 +1330,7 @@ export class Widgets implements
           }
             bar.addClass("ca-journal-tracker-bar");
             trackerBar = bar;
+            nameTrackerGrid(bar);
             if (!habitsCell || habitsCell.parentElement !== bar) {
               habitsCell = this.habitsCell();
               bar.appendChild(habitsCell);
@@ -1421,8 +1474,17 @@ export class Widgets implements
             bar.addClass("ca-journal-tracker-bar");
             attachTrackerRemove(this, widget, line, ctx);
             trackerBar = bar;
+            nameTrackerGrid(bar);
           }
           bar.appendChild(widget);
+          // AND THE BAR IS TOLD HOW FAR IT NOW REACHES (5.16). `stampLines`
+          // gives every child the line of the directive that drew it, which for
+          // a bar is the FIRST of the run it holds — one element where the file
+          // has ten lines. This loop is the only code that knows the other end,
+          // and it knows it here, at the append: the last line to reach this
+          // bar is the last line of its run. `block-drag.ts` reads the pair back
+          // as one range, and a grid drags as the grid a reader sees.
+          markSpan(bar, lineAt[n]);
         }
       }
 
@@ -1440,6 +1502,7 @@ export class Widgets implements
         trackerBar = container.createDiv({
           cls: "ca-journal-widget-bar ca-journal-tracker-bar",
         });
+        nameTrackerGrid(trackerBar);
       }
       if (trackerBar && !isManagedTemplate(this.plugin, ctx.sourcePath)) {
         trackerBar.appendChild(buildTrackerAddCell(this, ctx));
@@ -1558,6 +1621,38 @@ export class Widgets implements
       // since `layOutRow` is about to move them into cells and `cardWidget` is
       // about to put a wrapper where a widget was.
       stampLines(container, drawn, rawLines.length);
+
+      // ── AND A MARKED REGION IS STAMPED AS ITS MARKERS (5.16) ────────
+      //
+      // A tracker grid is not the run of `tracker:` lines a reader sees. It is
+      // `# chronoanvil:trackers:start`, those lines, and `# chronoanvil:trackers:end`
+      // — the region "+ Add tracker" writes into and the Section Editor moves.
+      // Both markers are filtered out of `lines` before the dispatch loop (see
+      // `kept`), so no child was stamped with either, and the range `markSpan`
+      // recorded above stops one line short at each end. Dragging THAT range
+      // would carry the cells out of their own region and leave the markers
+      // behind on a grid that no longer exists.
+      //
+      // ASKED OF `rawLines`, WHICH IS THE FENCE AS THE FILE HAS IT — the same
+      // numbering `data-ca-line` carries and the same one `moveCell` splices
+      // against. `kept`'s indices would be a second numbering to keep in step.
+      //
+      // AND AN EMPTY REGION IS NOT A WIDGET. A note that declares the region and
+      // holds no trackers draws a grid with only the add tile in it: a child no
+      // directive drew, which `stampLines` would hand the line of whatever came
+      // before it. That stamp names another widget, so it is cleared — the grid
+      // keeps its head and its add tile and offers no drag, which is honest
+      // about there being nothing in it to move.
+      if (trackerBar && hasTrackerRegion) {
+        const start = rawLines.indexOf(TRACKER_MARK_START);
+        const end = rawLines.indexOf(TRACKER_MARK_END, start + 1);
+        const holds =
+          start !== -1 &&
+          end > start &&
+          rawLines.slice(start + 1, end).some((l) => l.trim().length > 0);
+        if (holds) markRegion(trackerBar, start, end);
+        else clearStamp(trackerBar);
+      }
 
       // AND EVERY SIZED CARD IS TOLD ITS HEIGHT (4.22 §3.1), between the two,
       // and the order is load-bearing in both directions. AFTER the cards,
@@ -1724,11 +1819,35 @@ export class Widgets implements
       //
       // Draws nothing when `getSectionInfo` cannot locate the block, which is
       // an embed, an export, or any render outside a live view.
+      // AND A FENCE THAT IS NOTHING BUT A TRACKER GRID IS NAMED (5.16).
+      //
+      // `blockTitle` reads the fence's keywords against `SECTION_TITLES`, and
+      // `tracker:` has no entry there and must not gain one — the table is the
+      // one `frame: section` reads, and `test/widget-registry.test.ts` refuses
+      // an entry for a widget the registry calls inline. So a grid in a ROW got
+      // a card head (`nameTrackerGrid`) and the same grid alone in a fence got
+      // nothing: a vault caught the pair one screenshot apart — a named card on
+      // a group's page, and a bare box on a note with the tooltip *"Drag to move
+      // this block"* over it and no name anywhere.
+      //
+      // ASKED OF THE DRAWN GRID AND THE FENCE'S OWN LINES TOGETHER. The bar is
+      // what makes this a grid rather than a run of sliders; the line test is
+      // what keeps the name off a fence that holds a grid AND something else,
+      // where "📊 Trackers" would announce a part of what is under it — the rule
+      // `blockTitle` states for every other block, applied to the one kind it
+      // cannot see.
+      //
+      // A `header:` LINE STILL WINS, twice over: it is not a tracker keyword, so
+      // this answers null, and `hasOwnBar` would refuse the head anyway. A diary
+      // entry's grid is titled by its catalogue section and is untouched.
+      const gridKinds = new Set(["tracker", "sleep"]);
+      const gridOnly =
+        trackerBar !== null && lines.every((l) => gridKinds.has(keywordOf(l)));
       attachBlockHead(
         this.plugin,
         container,
         ctx,
-        rowSpec.row ? null : blockTitle(lines),
+        rowSpec.row ? null : blockTitle(lines) ?? (gridOnly ? TRACKER_BAR_TITLE : null),
         fixed,
         sectionFence
       );

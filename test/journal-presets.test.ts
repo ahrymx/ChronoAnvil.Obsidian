@@ -20,6 +20,7 @@
 // carrying no field a reader's own journal could not carry.
 
 import { describe, expect, it } from "vitest";
+import { composeJournalDashboardNote } from "../src/journals/journal-dashboard-sections";
 import {
   presetAsNewJournal,
   presetConfig,
@@ -107,7 +108,15 @@ describe("a preset is an ordinary journal", () => {
     expect(registeredJournalTypes(plugin)).toEqual([]);
   });
 
-  it("places the trackers section in 2nd position (under banner) in every preset template where it appears", () => {
+  it("places the trackers section at the top of every preset template where it appears", () => {
+    // UNDER THE BANNER ON A LEAF, UNDER THE CHILDREN TABLE ON AN INDEX (5.18).
+    // It was second everywhere until the reader moved what-is-below to the top
+    // of all six index templates: an index exists to link into the folder, so
+    // the tables open the page and the grid follows them. On a note that has
+    // nothing below it there is no table, and the grid is second as it was.
+    //
+    // WHAT THE TEST IS ACTUALLY FOR is unchanged: the ratings a note is graded
+    // on are never below the fold, on any surface, in any preset.
     for (const preset of JOURNAL_PRESETS) {
       const type = buildJournalType(preset.config);
       const targets = templateTargets(type);
@@ -116,16 +125,31 @@ describe("a preset is an ordinary journal", () => {
         const sections = sectionsFor(target.ctx, layout);
         const trackerIndex = sections.findIndex((s) => s.id === "trackers");
         if (trackerIndex !== -1) {
-          expect(trackerIndex, `${preset.id} ${target.key}`).toBe(1);
-          expect(sections[0].id, `${preset.id} ${target.key} banner`).toBe("banner");
+          const where = `${preset.id} ${target.key}`;
+          expect(sections[0].id, `${where} banner`).toBe("banner");
+          if (target.ctx.noteKind === "index") {
+            expect(trackerIndex, where).toBe(2);
+            expect(sections[1].id, `${where} children`).toBe("children");
+          } else {
+            expect(trackerIndex, where).toBe(1);
+          }
         }
       }
       if (preset.config.layout) {
         for (const [key, tLayout] of Object.entries(preset.config.layout)) {
           const list = tLayout.sections ?? tLayout.order;
           if (list && list.includes("trackers")) {
-            expect(list.indexOf("trackers"), `${preset.id} layout.${key}`).toBe(1);
+            // The same two placements as above, read off the declaration this
+            // time rather than off what it composes to: an index layout opens
+            // banner → children → trackers, anything else banner → trackers.
+            const at = key.startsWith("index:") ? 2 : 1;
+            expect(list.indexOf("trackers"), `${preset.id} layout.${key}`).toBe(at);
             expect(list[0], `${preset.id} layout.${key} banner`).toBe("banner");
+            if (at === 2) {
+              expect(list[1], `${preset.id} layout.${key} children`).toBe(
+                "children"
+              );
+            }
           }
         }
       }
@@ -367,5 +391,169 @@ describe("a preset's folders follow its name", () => {
     });
     expect(held.root).toBe("Notes/Learning");
     expect(held.templatesFolder).toBe("T/Studies");
+  });
+});
+
+// ── THE ARRANGEMENT THE READER SHIPPED (5.18) ────────────────────────────
+//
+// The four presets were installed into a vault, rearranged there with the drag
+// grips and *Edit sections…*, and the result was read back into their configs.
+// This is that result, stated as the block a reader meets in the order they
+// meet it, so the arrangement cannot drift without somebody saying so here.
+//
+// WHAT THE FOUR PAGES AGREE ON, which is the whole of the decision:
+//
+//   WHAT IS BELOW COMES FIRST. Every index opens banner → children. An index
+//   exists to get the reader into the folder; the numbers about it are what
+//   they look at second.
+//
+//   THE GRID AND THE BAND ARE ONE GROUP on a leaf index — see the state row in
+//   `journal-sections.ts` — and the grid stands alone, titled, everywhere else.
+//
+//   FIND AND CHARTS CLOSE THE PAGE. A search box is a control the reader
+//   reaches for rather than a block they read past, and the charts region is
+//   the page's long tail.
+//
+// READ OFF THE COMPOSED FILE, not off the layout it was composed from: a
+// `sections` list that named the right ids in the right order and composed to
+// something else would pass a test written against the config.
+describe("the arrangement the presets ship (5.18)", () => {
+  // The line that opens each block, which on a titled fence is its bar and on
+  // the state row is the first thing in the group. `row` and `tab` are the
+  // grammar of the fence rather than a block, so they are named separately by
+  // the group's own test in `journal-rows.test.ts`.
+  const blocks = (text: string): string[] => {
+    const out: string[] = [];
+    let open = false;
+    let want = false;
+    for (const line of text.split("\n")) {
+      if (line.startsWith("```")) {
+        open = !open && line.length > 3;
+        want = open;
+        continue;
+      }
+      if (!open || !want) continue;
+      if (line.trim() === "row") continue;
+      out.push(line);
+      want = false;
+    }
+    return out;
+  };
+
+  const templateFor = (presetId: string, stem: string): string => {
+    const preset = JOURNAL_PRESETS.find((p) => p.id === presetId)!;
+    const type = buildJournalType(preset.config);
+    const file = journalTemplateFiles(type).find((f) => f.name.includes(stem));
+    if (!file) throw new Error(`no ${stem} template in ${presetId}`);
+    return file.content;
+  };
+
+  const CASES: [string, string, string[]][] = [
+    [
+      "study",
+      "subject-index",
+      [
+        "journal-header",
+        "header:🗂️ Topics",
+        "header:📊 Trackers",
+        "header:🔁 Due and open",
+        "header:📈 Progress",
+        "header:🔎 Find",
+        "header:📊 Charts",
+      ],
+    ],
+    [
+      "study",
+      "topic-index",
+      [
+        "journal-header",
+        "header:🗂️ What's below",
+        "# chronoanvil:trackers:start",
+        "header:🧭 Learning Path",
+        "header:🔁 Review",
+        "header:📚 Resources",
+        "header:📊 Charts",
+      ],
+    ],
+    [
+      "projects",
+      "area-index",
+      [
+        "journal-header",
+        "header:🗂️ Projects",
+        "header:📊 Trackers",
+        "header:⏳ Open tasks",
+        "header:🧮 Status",
+        "header:🔎 Find",
+        "header:📊 Charts",
+      ],
+    ],
+    [
+      "projects",
+      "project-index",
+      [
+        "journal-header",
+        "header:🗂️ What's below",
+        "# chronoanvil:trackers:start",
+        "header:🧭 Task Manager",
+        "header:🔁 Review",
+        "header:📚 Resources",
+        "header:📊 Charts",
+      ],
+    ],
+    [
+      "exercise-diet",
+      "block-index",
+      [
+        "journal-header",
+        "header:🗂️ What's below",
+        "header:📊 Trackers",
+        "header:⏳ Open tasks",
+        "header:🔎 Find",
+        "header:📊 Charts",
+      ],
+    ],
+    [
+      "media",
+      "medium-index",
+      [
+        "journal-header",
+        "header:🎬 Titles",
+        "# chronoanvil:trackers:start",
+        "header:🔎 Find",
+        "header:📊 Charts",
+      ],
+    ],
+  ];
+
+  for (const [presetId, stem, expected] of CASES) {
+    it(`${presetId}'s ${stem.replace("-", " ")}`, () => {
+      expect(blocks(templateFor(presetId, stem))).toEqual(expected);
+    });
+  }
+
+  it("opens every journal's front page on the way in", () => {
+    // ONE PAGE FOR ALL FOUR, because a journal folder note is composed from a
+    // catalogue rather than from a preset — so this is the arrangement every
+    // journal gets, custom ones included. The activity band moved below the
+    // stats band in 5.18 for the reason the two indexes moved their children
+    // up: the destinations come first.
+    for (const preset of JOURNAL_PRESETS) {
+      const type = buildJournalType(preset.config);
+      expect(blocks(composeJournalDashboardNote(type)), preset.id).toEqual([
+        "title",
+        "frame: section",
+        "frame: section",
+        "frame: section",
+        "header:🕒 Lately",
+      ]);
+      const note = composeJournalDashboardNote(type);
+      expect(note.indexOf(`level-cards:${type.id}`)).toBeLessThan(
+        note.indexOf("stats-band")
+      );
+      expect(note.indexOf("stats-band")).toBeLessThan(
+        note.indexOf(`journals-header:${type.id}`)
+      );
+    }
   });
 });

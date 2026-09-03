@@ -160,10 +160,16 @@ describe("what Save refuses", () => {
     // plan is computed from the text it was given, so a stale text yields a
     // stale plan rather than an obviously wrong one.
     const stale = topic();
-    const moved = stale.replace(
-      /```chronoanvil\n(?:header:🔢 Stats\n)?stats-band\n```\n\n/,
-      ""
-    );
+    // THE REMOVAL IS THE PLUGIN'S OWN AS OF 5.18, because the band is no longer
+    // a fence of its own to cut with a pattern: it is the second page of the
+    // group the tracker grid opens. Asking `applySections` for the page without
+    // it is the same edit a reader makes, and it cannot fall out of step with
+    // how the section is composed.
+    const moved = applySections(
+      stale,
+      ctx,
+      sectionsPresent(stale, ctx).filter((id) => id !== "stats")
+    )!;
     expect(sectionsPresent(stale, ctx)).toContain("stats");
     expect(sectionsPresent(moved, ctx)).not.toContain("stats");
     expect(planSections(stale, ctx, sectionsPresent(moved, ctx))).not.toEqual(

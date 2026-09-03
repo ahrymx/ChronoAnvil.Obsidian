@@ -64,11 +64,16 @@ const TYPES: JournalType[] = JOURNAL_PRESETS.map((p) => buildJournalType(p.confi
 // `totals` BECAME `stats` IN 4.46. The section is the same one — it offers the
 // band — and the widget under it merged with `topic-stats`, so Totals is now one
 // of the four presets rather than a section of its own.
+//
+// AND `activity` MOVED BELOW `stats` IN 5.18. The order here is composition
+// order, and the band of a whole year was the second block on a page whose job
+// is to get the reader into the folder — see `journalDashboardSections`. The
+// set is unchanged; only where the reader meets it is.
 const COMPOSED = [
   "banner",
-  "activity",
   "contents",
   "stats",
+  "activity",
   "recent",
   "open-tasks",
 ];

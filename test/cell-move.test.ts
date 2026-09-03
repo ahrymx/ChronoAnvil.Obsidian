@@ -457,20 +457,71 @@ describe("a bare fence's widgets reorder themselves — 5.14", () => {
     ).toBeNull();
   });
 
+  it("moves a tracker grid as its whole marked region (5.16)", () => {
+    // THE ARITHMETIC BEHIND `markRegion`, checked rather than argued. A grid is
+    // `# chronoanvil:trackers:start`, its cells, and the `end` — and both
+    // markers are filtered out before the dispatch loop, so no child is ever
+    // stamped with either. A range over the cells alone would land them
+    // somewhere else and leave the markers behind on nothing; the range the
+    // stamp names is marker to marker.
+    const NOTE = [
+      "```chronoanvil",
+      "row",
+      "# chronoanvil:trackers:start",
+      "tracker:mood|Mood",
+      "tracker:steps|Steps",
+      "# chronoanvil:trackers:end",
+      "cell",
+      "stats-band",
+      "```",
+      "",
+    ];
+    // Under the stats band, which is where its own two places point once the
+    // grid is one widget: after the LAST line of the run, not the first.
+    const out = moveCell(
+      NOTE,
+      { block: 0, from: 1, to: 5 },
+      { kind: "stack", block: 0, at: 6, after: true }
+    );
+    expect(out, "the region would not move whole").not.toBeNull();
+    const moved = body(out, 0);
+    // The four lines arrive in order, and nothing of the region is left behind.
+    const from = moved.indexOf("# chronoanvil:trackers:start");
+    expect(from).toBeGreaterThan(-1);
+    expect(moved.slice(from, from + 4)).toEqual([
+      "# chronoanvil:trackers:start",
+      "tracker:mood|Mood",
+      "tracker:steps|Steps",
+      "# chronoanvil:trackers:end",
+    ]);
+    expect(moved.filter((l) => l.startsWith("# chronoanvil:trackers")).length).toBe(2);
+    expect(moved.indexOf("stats-band")).toBeLessThan(from);
+    // AND THE MIDDLE OF A RUN IS NOT A PLACE. `wireCellSlots` draws no swap on
+    // a child with a span, and this is why: the swap trades one line of the
+    // destination for the run in hand, which here is a marker.
+    expect(
+      moveCell(NOTE, { block: 0, from: 6, to: 7 }, { kind: "swap", block: 0, at: 2 })
+    ).not.toBeNull();
+    expect(
+      moveCell(NOTE, { block: 0, from: 6, to: 7 }, { kind: "swap", block: 0, at: 1 })
+    ).toBeNull();
+  });
+
   it("draws a grip and two stacking halves on each of them", () => {
     // `readCode` strips comments, so the anchors are the code itself — the
     // loop from the guard that opens it to the class that closes it.
     const src = readCode("block-drag");
     const at = src.indexOf("const loose =");
     expect(at).toBeGreaterThan(0);
-    const chunk = src.slice(
-      at,
-      src.indexOf('container.addClass("has-widget-grips")', at)
-    );
+    // ENDS AT THE BLOCK'S OWN GRIP, which the loop used to be followed by a
+    // class-add before — 5.15 deleted that line along with the grip it placed.
+    const chunk = src.slice(at, src.indexOf("if (!perWidget) {", at));
     expect(chunk).toContain("ca-jbd-slot-over");
     expect(chunk).toContain("ca-jbd-slot-under");
     expect(chunk).toContain('kind: "stack"');
-    expect(chunk).toContain("runWithHeight(body, line)");
+    // ONE HELPER FOR THE RANGE AS OF 5.16, and it is what carries a widget
+    // bar's whole run as well as a `height:` line above an ordinary widget.
+    expect(chunk).toContain("runOf(bodyNow(), line, span)");
     // The two ranges are the same run, exactly as they are for a widget in a
     // cell: what it takes past its neighbour is what it takes out to a block.
     expect(chunk).toContain("{ whole: run, cell: run }");
@@ -487,29 +538,57 @@ describe("a bare fence's widgets reorder themselves — 5.14", () => {
     // A fence that titles itself is a section: its lines are that section's
     // body, and its own bar is one of the stamped children this would pick up.
     expect(src.slice(at, at + 900)).toContain("loose.length > 1");
-    // AND NOT THE WIDGET BAR. It is the one child that is not one directive —
-    // every inline kind lands in it together and `stampLines` gives it the line
-    // of the first — so a drag off it would move one tracker out from under the
-    // nine still drawn inside the element being held.
-    expect(chunk).toContain('hasClass("ca-journal-widget-bar")');
+    // AND THE WIDGET BAR IS IN IT AGAIN AS OF 5.16, WITH A RANGE. It is the one
+    // child that is not one directive — every inline kind lands in it together
+    // and `stampLines` gives it the line of the first — so 5.15 kept it out of
+    // both loops rather than move one tracker out from under the nine still
+    // drawn inside the element being held. A vault read the result as the head
+    // it left behind: *"these widgets headers are missing the drag icons."*
+    //
+    // `holdsBar` IS GONE WITH THE WITHHOLDING, and its absence is asserted
+    // rather than left to be noticed: a predicate that still existed would be
+    // the next release's way of writing the same refusal back in.
+    expect(src).not.toContain("holdsBar");
+    const looseLoop = src.slice(src.indexOf("if (perWidget) {"));
+    expect(looseLoop.slice(0, 500)).toContain("const span = spanOf(child);");
+    // `allCells` RATHER THAN `cells` AS OF 5.16 — every page's, not the open
+    // page's; see the pages test in block-move.test.ts.
+    const cellLoop = src.slice(src.indexOf("for (const cell of allCells) {"));
+    expect(cellLoop.slice(0, 600)).toContain("const span = spanOf(child);");
   });
 
-  it("takes the block's own grip off the collision", () => {
+  it("draws no block grip at all where the widgets took them (5.15)", () => {
     // 4.8.6's duplicate, arriving in the one place 5.14 did not close: with no
     // head and no bar, the block's grip lands on the first widget's top edge.
+    // 5.14 shoved it aside with `has-widget-grips`; a reader read the result
+    // for what it was — *"there seems to be a dragger for the entire group of
+    // sections on diary entries? it is not necessary."*
     const src = readCode("block-drag");
-    expect(src).toContain('container.addClass("has-widget-grips")');
-    const css = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = css.indexOf(
-      ".ca-journal-widget-block.has-widget-grips > .ca-jbd-handle"
-    );
+    // The gate is the same fact the widget loop turns on, named once.
+    expect(src).toContain("const perWidget = loose.length > 1;");
+    expect(src).toContain("if (perWidget) {");
+    const at = src.indexOf("if (!perWidget) {");
     expect(at).toBeGreaterThan(0);
-    const rule = css.slice(at, css.indexOf("}", at));
-    expect(rule).toContain("left: 0");
-    expect(rule).toContain("transform: none");
-    // Up into the block's own top margin, which is the half that makes it a
-    // place rather than a dodge.
-    expect(rule).toContain("top: -8px");
+    // And what it withholds is the BLOCK source, head/bar/container and all.
+    const chunk = src.slice(at, at + 500);
+    expect(chunk).toContain("head ?? bar ?? container");
+    expect(chunk).toContain("Drag to move this group");
+
+    // THE PARKING SPACE IS DELETED WITH THE PROBLEM, in the TS and in the
+    // sheet both — a class nothing adds and a rule nothing matches are the two
+    // halves of the same dead branch.
+    expect(src).not.toContain("has-widget-grips");
+    expect(readCss().replace(/\/\*[\s\S]*?\*\//g, "")).not.toContain(
+      "has-widget-grips"
+    );
+  });
+
+  it("keeps it for a fence holding one widget", () => {
+    // The fallback onto `container` is honest there — the block IS that widget
+    // — and taking it away is 4.8.1's removal again: *"the grips are missing"*.
+    const src = readCode("block-drag");
+    const at = src.indexOf("const loose =");
+    expect(src.slice(at, at + 900)).toContain("loose.length > 1");
   });
 });
 
@@ -687,7 +766,11 @@ describe("the gesture that reaches this", () => {
     // which is the same reading 4.8.7 made of the block slots. The other three
     // on every card are untouched: above, below and the swap in the middle do
     // not open a column, and they are how a third widget joins a full row.
-    expect(src).toContain("cells.length < MAX_COLUMNS");
+    // ASKED OF THE PAGE BEING WIRED (5.16), which is every page rather than the
+    // one that happened to be open: a group's rows are all in the document at
+    // once and swapping pages toggles a class, so a count taken from the open
+    // row would be page 1's column count applied to page 2's slots.
+    expect(src).toContain("of.length < MAX_COLUMNS");
     expect(src).toContain('slot(child, "ca-jbd-slot-before", CELL_TYPE, (p) => p.cell, () => {');
     expect(src).toContain("}, hasRoom);");
     expect(src).toContain('slot(child, "ca-jbd-slot-after", CELL_TYPE, (p) => p.cell, after, hasRoom);');
@@ -868,10 +951,18 @@ describe("the landing places, as drawn", () => {
     // `z-index` inside one cannot rise above anything outside it. No ordering of
     // the two numbers could have worked.
     const src = readSrc("block-drag");
-    // On a row block the block's own slots become 16px bands along its edges —
-    // the block's padding, which is the strip visibly outside the row — and the
+    // On a row block the block's own slots become bands along its edges — the
+    // block's padding, which is the strip visibly outside the row — and the
     // cells tile everything between them.
-    expect(src).toContain('const edge = row ? " ca-jbd-slot-edge" : ""');
+    //
+    // AND ON A STACK, FOR THE SAME REASON, SINCE 5.15. A bare fence whose
+    // widgets draw their own places is the same shape as a row: something
+    // inside the block covers it, so the block's own two mean the one thing
+    // nothing inside it can say. The condition reads as the question rather
+    // than as two cases.
+    expect(src).toContain(
+      'const edge = row || perWidget ? " ca-jbd-slot-edge" : ""'
+    );
     // A share of the block with a floor — it was a flat 16px, which is the
     // block's own padding and about a fingertip.
     expect(ruleFor(".ca-jbd-slot-edge {")).toContain("clamp(");
@@ -923,6 +1014,47 @@ describe("the landing places, as drawn", () => {
     expect(ruleFor(".ca-jbd-slot-below.ca-jbd-slot-edge::after {")).toContain(
       "var(--ca-slot-reach)"
     );
+  });
+
+  it("gives the whole card to its two places, and the block only its edges", () => {
+    // THE BUG A READER REPORTED: *"the drag-section editing system could use
+    // some refining. It seems to let the user place sections at odd
+    // positions."* Screenshotted mid-drag on an entry — the pointer is over the
+    // middle of a field and the accent bar lights on the block's own top edge,
+    // which is "take this field out of the fence".
+    //
+    // TWO HALVES, AND EITHER ONE ALONE IS THE BUG BACK. The widget's strips
+    // were a fifth of the card each (the cell's numbers, where the middle is a
+    // swap); a stack has no swap, so the middle 60% of every field belonged to
+    // nobody and fell through to the band underneath. Widening the strips with
+    // the band still tiling the block leaves the band on top; moving the band
+    // to the edges without widening the strips leaves the middle dead.
+    const src = readSrc("block-drag");
+    expect(src).toContain(
+      'const edge = row || perWidget ? " ca-jbd-slot-edge" : ""'
+    );
+    expect(src).toContain('"ca-jbd-slot-over ca-jbd-slot-loose"');
+    expect(src).toContain('"ca-jbd-slot-under ca-jbd-slot-loose"');
+    // Half each and full width, so the pair tiles the card.
+    expect(ruleFor(".ca-jbd-slot-loose {")).toContain("left: 0");
+    expect(ruleFor(".ca-jbd-slot-loose {")).toContain("right: 0");
+    expect(ruleFor(".ca-jbd-slot-over.ca-jbd-slot-loose {")).toContain(
+      "height: 50%"
+    );
+    // The lower one still carries the gap below the card, which is the rule the
+    // strip it widens was already drawn to.
+    expect(ruleFor(".ca-jbd-slot-under.ca-jbd-slot-loose {")).toContain(
+      "calc(50% + var(--ca-widget-gap))"
+    );
+    // AND THE WIDENED STRIPS OUTRANK THE BAND WITHOUT A LIFT. A row's cells
+    // needed one because a cell is `container-type` and seals its slots in; a
+    // loose widget is only `position: relative` (`.ca-jbd-host`), so its slots
+    // resolve in the block's own stacking context and the numbers decide.
+    const band = Number(/z-index: (\d+)/.exec(ruleFor(".ca-jbd-slot-edge {"))?.[1]);
+    const strip = Number(
+      /z-index: (\d+)/.exec(ruleFor(".ca-jbd-slot-over,"))?.[1]
+    );
+    expect(strip).toBeGreaterThan(band);
   });
 
   it("leaves no dead strip between two cards in a column (4.54 §1)", () => {

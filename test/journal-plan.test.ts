@@ -20,6 +20,7 @@ import {
   findSection,
   sectionContext,
   sectionsFor,
+  surfaceLayout,
   templateTargets,
   widgetFormBar,
 } from "../src/journals/journal-sections";
@@ -575,15 +576,35 @@ describe("nothing the plugin did not write is touched", () => {
 describe("adding", () => {
   const topic = () => allTemplates().find((t) => t.file.includes("topic"))!;
 
-  it("puts a new section where the catalogue would have", () => {
+  it("puts a new section where this surface would have", () => {
     const { ctx, text } = topic();
     const present = sectionsPresent(text, ctx);
     expect(present).not.toContain("find");
     const after = applySections(text, ctx, [...present, "find"])!;
     const order = sectionsPresent(after, ctx);
     expect(order).toContain("find");
-    // Between the sections that flank it in the catalogue, not appended.
-    expect(order.indexOf("find")).toBeLessThan(order.indexOf("review"));
+    // WHERE THE TEMPLATE WOULD HAVE, WHICH IS THE CATALOGUE'S ANSWER ONLY
+    // WHERE THE SURFACE DECLARES NO LAYOUT (5.18). Study's Topic index does,
+    // and the arrival is ranked against it — see `surfaceLayout`. A section the
+    // layout does not name keeps catalogue order AFTER the ones it does, which
+    // is `TemplateLayout.order`'s own rule, so Find lands below the named
+    // sections rather than between two of them.
+    expect(order).toEqual(
+      sectionsFor(ctx, surfaceLayout(ctx))
+        .map((s) => s.id)
+        .filter((id) => order.includes(id))
+    );
+    // AND IT IS NOT AN APPEND, which is what makes the two answers the same
+    // claim rather than a coincidence on a page whose layout happens to end
+    // where the arrival goes. On a Lesson — a surface whose layout carries
+    // options and no order — the same add lands Find where the CATALOGUE puts
+    // it, between the sections that flank it there.
+    const lesson = sectionContext(STUDY_JOURNAL, {
+      kind: STUDY_JOURNAL.kinds[0],
+    });
+    expect(surfaceLayout(lesson)?.order).toBeUndefined();
+    const leaf = sectionsFor(lesson, surfaceLayout(lesson)).map((s) => s.id);
+    expect(leaf.indexOf("resources")).toBeLessThan(leaf.indexOf("headings"));
   });
 
   it("separates what it adds with one blank line", () => {

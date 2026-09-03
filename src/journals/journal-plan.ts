@@ -87,6 +87,7 @@ import {
   flatBlocks,
   graphLinksSection,
   regroupFlatNote,
+  rowDelimiter,
 } from "../core/note-sections";
 import type { FlatSection } from "../core/note-sections";
 import {
@@ -109,6 +110,7 @@ import {
   sectionOverrides,
   sectionRemovable,
   sectionsFor,
+  surfaceLayout,
 } from "./journal-sections";
 import { Segment, keywordOf, segment } from "../core/layout";
 import {
@@ -1383,7 +1385,10 @@ export function applySections(
   // preceding section the file actually has, else before the earliest
   // following one, else at the end. A reader who reordered their template
   // keeps their order and gets the new block somewhere sensible.
-  const order = sectionsFor(ctx).map((s) => s.id);
+  // ORDERED THE WAY THIS SURFACE COMPOSES, layout included — see
+  // `surfaceLayout`. This is the rank `insertionPoint` reads, so a section
+  // re-added through the editor goes back where the template would have put it.
+  const order = sectionsFor(ctx, surfaceLayout(ctx)).map((s) => s.id);
   for (const id of adding) {
     const section = byId.get(id);
     if (!section) continue;
@@ -1529,7 +1534,50 @@ function joinRowChunk(
     lines.splice(open + 1, 0, ROW_KEYWORD);
     if (insertAt > open) insertAt++;
   }
-  lines.splice(insertAt, 0, ...mine.lines);
+  // ── AND THE DELIMITER, WHICH THIS RECONCILER OWED THE OTHER ONE (5.18) ─
+  //
+  // `rowDelimiter` is the flat-note reconciler's rule, hoisted so both ask it
+  // once. It arrived here because 5.18 gives this catalogue a TABBED row — the
+  // tracker grid paged against the stats band — and a cell spliced in with no
+  // delimiter is welded onto the one above it: re-adding Stats from the section
+  // editor would have produced one page holding both widgets, which is neither
+  // the shape composition writes nor a shape a reader asked for.
+  //
+  // THE ROW'S MEMBERS ARE ASKED OF THE CONTEXT, because `row` here is a
+  // predicate rather than a constant — the same call `joinRowChunk` already
+  // makes above to find the chunk.
+  const before = chunk.ids.filter((id) => order.indexOf(id) < rank);
+  const prevId = before.length ? before[before.length - 1] : undefined;
+  const memberOf = (id: string | undefined): JournalSection | undefined =>
+    id === undefined ? undefined : byId.get(id);
+  const arrival = rowDelimiter({
+    lines,
+    insertAt,
+    member: section,
+    // An id in the chunk is a member; `?? {}` keeps "there is a cell above me"
+    // true for one the map cannot resolve rather than turning it into "I
+    // arrive first", which is a different branch with a different answer.
+    prev: prevId === undefined ? undefined : (memberOf(prevId) ?? {}),
+    later: later === undefined ? undefined : (memberOf(later) ?? {}),
+    divided: order.some((id) => {
+      const other = byId.get(id);
+      return (
+        other !== undefined &&
+        rowOf(other, ctx) === row &&
+        other.cell !== undefined
+      );
+    }),
+  });
+  insertAt = arrival.insertAt;
+  lines.splice(
+    insertAt,
+    0,
+    ...mine.lines,
+    ...(arrival.delimiter && prevId === undefined ? [arrival.delimiter] : [])
+  );
+  if (arrival.delimiter && prevId !== undefined) {
+    lines.splice(insertAt, 0, arrival.delimiter);
+  }
 
   chunks[at] = {
     ids: [...chunk.ids, section.id].sort(
