@@ -1,60 +1,66 @@
 # ChronoAnvil
 
-A self-contained journaling and study-journal system for
-[Obsidian](https://obsidian.md) — diary entries, journals you define yourself,
-one tracker registry across both, and native charts, calendars, tables and
-dashboards drawn by the plugin itself.
+A self-contained journaling, diary, habit tracking and study system for
+[Obsidian](https://obsidian.md) — daily entries, custom journal hierarchies,
+one unified tracker registry across both, and native charts, calendars, hourly
+schedules and period dashboards drawn by the plugin itself.
 
 It replaces Templater, Meta Bind, Tracker, Tasks and Dataview for this workflow.
-[Bases](https://help.obsidian.md/bases) is still needed for the standalone
+[Bases](https://help.obsidian.md/bases) is still supported for standalone
 `.base` files.
 
 ## What it does
 
 | | |
 | --- | --- |
-| **Diary** | Daily and monthly entries, a calendar with heat map and special events, week / month / quarter / year dashboards, full-text search filtered by date, tag and tracker, on-this-day and a timeline. |
-| **Journals** | Define your own, with your own levels and note types. A Study journal — subjects → topics → lessons and practice — ships as an optional preset. |
-| **Trackers** | Defined once, then synced into the templates and `Diary.base`. Steppers, scales, times, dates, dropdowns and habit chips; any tracker can also be added to a single entry on the day. |
-| **Charts** | Line, bar, calendar heat map, scatter, streak and summary, drawn from your own frontmatter onto dashboards and journal indexes. |
-| **Capture** | Quick capture into any entry that can hold one, plus review queues, recall decks, attachments and task rollups. |
+| **Diary** | Daily and monthly entries, overview calendar with heat maps and special events, week / month / quarter / year dashboards, full-text search filtered by date, tag and tracker, on-this-day and timeline recaps. |
+| **Journals** | Define your own custom journals with folder levels and note types. Presets for Study (*Subjects → Topics → Lessons/Practice*), Projects, Fitness, and Media ship ready to use. |
+| **Trackers** | Defined once, synced everywhere. Numberless rating scales, dynamic bedtime & wake-up buttons with live sleep/wake duration, steppers, dropdowns, multi-row tag flow, and habit pills. Any tracker can be added to individual entries on the fly. |
+| **Charts** | Line, bar, calendar heat map, scatter correlation, streak and summary stat cards, rendered natively from your frontmatter onto dashboards and journal indexes. |
+| **Scheduling** | The week by the hour: an interactive hourly scheduling grid with color-coded event blocks, logbooks, and task blocks. |
+| **Customizer** | Modular section & widget catalogue, rich page ground textures (scanlines, dot grid, graph paper, weaves), and adaptive theme styling. |
 
 ## Visual tour
-
-<!-- REPLACE the URL below once the tour recording is uploaded to YouTube. The
-     source capture is a 38 MB GIF, far too heavy to inline in a README — the
-     link is deliberate, not a placeholder for an embed. -->
-▶ **[Watch the tour](https://youtu.be/REPLACE_WITH_VIDEO_ID)** — the same vault, moving.
 
 ![The ChronoAnvil homepage: a year calendar with heat map, period dashboards and an open-task rollup](docs/screenshots/dashboard.png)
 
 Everything here is drawn by the plugin from your own frontmatter — no Dataview
-query, no Templater script, no chart plugin.
+queries, no Templater scripts, no external chart plugins.
 
-| Native calendars and heat maps | One tracker registry, everywhere |
+| Daily entry & dynamic trackers | Native charts & rolling statistics |
 | :---: | :---: |
-| ![The diary calendar with its heat map and special events](docs/screenshots/calendar.png) | ![Tracker controls at the head of a daily entry](docs/screenshots/diary-entry.png) |
-| *Heat maps, special events, four grains of calendar* | *Scales, times and steppers, on the entry itself* |
+| ![Tracker controls at the head of a daily entry](docs/screenshots/diary-entry.png) | ![Trends and statistics with heatmaps, line charts and scatter plots](docs/screenshots/charts.png) |
+| *Dynamic sleep buttons, numberless scales, 2-row tags* | *Annual heatmaps, 90d rolling averages, scatter plots* |
 
-| Charts from your frontmatter | Custom journals and the Study preset |
+| Custom journals & Study preset | Period dashboards & digests |
 | :---: | :---: |
-| ![Five chart blocks on a dashboard](docs/screenshots/charts.png) | ![A Study journal index, subjects and topics](docs/screenshots/study-journal.png) |
-| *Bar, line, summary and dual-axis time-of-day* | *Your own levels and note types, with reviews* |
+| ![A Study journal index, subjects and topics](docs/screenshots/study-journal.png) | ![A yearly overview dashboard rolling up entries and recaps](docs/screenshots/period-dashboard.png) |
+| *Subjects, topics, confidence ratings, and activity heatmaps* | *Yearly, quarterly and weekly rollups with recap digests* |
 
-| Period dashboards | The vault it builds |
+| Journals, defined in settings | Modular section & widget catalogue |
 | :---: | :---: |
-| ![A week dashboard rolling up entries and open tasks](docs/screenshots/week-dashboard.png) | ![Obsidian's graph view of a ChronoAnvil vault](docs/screenshots/graph.png) |
-| *Week, month, quarter and year, rolled up from the days* | *Entries chained by period, journals branching off* |
+| ![The Journals settings panel listing four presets with their folders and structure](docs/screenshots/journals.png) | ![The section and widget palette modal](docs/screenshots/section-composer.png) |
+| *Identifiers, root folders, levels and note types* | *Modular drag-and-drop section composer* |
 
-Nothing above is themed by the plugin. Every colour comes from your vault's own
-theme, so the same homepage looks like this under three of them:
+| Quick capture | Logbooks |
+| :---: | :---: |
+| ![The Quick capture modal, choosing a destination note and a timestamp](docs/screenshots/quick-capture.png) | ![A logbook with its sub-logbook menu open, showing entry counts](docs/screenshots/logbook.png) |
+| *One box, any note, stamped with the time* | *Named logbooks, open / done / timed, counted* |
 
-![The same homepage under three Obsidian themes, sliced diagonally](docs/screenshots/themes.png)
+| Ground textures & vault banners | Adaptive theme integration |
+| :---: | :---: |
+| ![Appearance and ground textures configuration](docs/screenshots/settings.png) | ![The same homepage under five themes, cut into diagonal bands](docs/screenshots/themes.png) |
+| *Dot grid, graph paper, scanlines, weaves & banner customizer* | *One page, five themes — it takes the palette it is given* |
 
-*One page, three themes, cut on the diagonal — left to right: neutral grey,
-warm, cool. Text sits differently in each because the themes set their own
-fonts; the panels, spacing and accents are the plugin reading your theme's
-variables rather than painting over them.*
+### The week by the hour
+
+![The hourly week grid, with its three gestures numbered](docs/screenshots/time-grid.png)
+
+| | Gesture | What it does |
+| :---: | --- | --- |
+| **1** | Drag down an empty column | Blocks out a new slot at the hours you swept |
+| **2** | Click a block | Opens it to edit the title, times and colour *(coming soon)* |
+| **3** | Drag a block | Moves it to another day or hour — the dashed outline is where it lands |
 
 ## Install
 
@@ -68,7 +74,7 @@ into `main.js`, so there is nothing else to copy.
 
 ## Keyboard
 
-No shortcut is claimed. Every command lives in the palette under
+No shortcut is claimed by default. Every command lives in the palette under
 **ChronoAnvil:**, and any of them can be bound in **Settings → Hotkeys**.
 
 The one worth binding first is **Search everything** — full-text across the
@@ -99,7 +105,7 @@ empty on first launch they are not gone: they are restored from
 
 ```bash
 npm install
-npm test          # 5,100+ tests, ~5s
+npm test          # 5,300+ tests, ~6s
 npm run package   # → dist/chronoanvil/, ready to copy into a vault
 ```
 
@@ -111,18 +117,21 @@ first if they are missing.
 - **[Reference](assets/documentation.md)** — every command, widget, directive
   and setting. The same file the plugin writes into your vault when it
   scaffolds, so it is readable here before you install anything.
-- **[Changelog](CHANGELOG.md)** — reader-facing release notes.
+- **[Changelog](CHANGELOG.md)** — reader-facing release notes for 5.x.
+  Everything before the rename is in
+  [CHANGELOG-ARCHIVE.md](./CHANGELOG-ARCHIVE.md).
+- **[Contributing](./CONTRIBUTING.md)** — the test contract and the inbound
+  licence grant.
+- **[Security](./SECURITY.md)** — how to report a vulnerability.
 
 ## Contributing
 
 Issues and pull requests are welcome. The test suite is the contract: `npm test`,
 `npm run typecheck` and `npx eslint src test` must all be clean. Many tests
 assert *why* something is written the way it is — read the comment before
-changing one.
-
-[CONTRIBUTING.md](./CONTRIBUTING.md) carries the licensing terms. The short
-version: you keep your copyright, and your work is published under the AGPL-3.0
-like everything else.
+changing one. [CONTRIBUTING.md](./CONTRIBUTING.md) has the rest, including the
+licensing terms: you keep your copyright, and your work is published under the
+AGPL-3.0 like everything else.
 
 ## Support
 

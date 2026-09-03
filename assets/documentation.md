@@ -895,6 +895,34 @@ ChronoAnvil's own pages — the homepage, Search, the dashboards, journal notes 
 
 To stop it for one note, add `obsidianUIMode: source` to that note's properties. The same key works the other way on any note (`obsidianUIMode: preview`), and it is the key the *Force note view mode* community plugin reads, so a vault that already uses that plugin needs nothing from this one. There is no plugin setting for it: the decision is a line in the note.
 
+## Appearance: page grounds and presets
+
+**Settings → Appearance & Banner** decides how ChronoAnvil's own pages look. It changes nothing about your notes' content and writes nothing into them — every option here is a plugin setting, so turning one off returns every page to plain surfaces at once.
+
+**Aesthetic preset** picks the typography and the palette the plugin's cards, bars and charts draw with. Three ship:
+
+- **1. Editorial Monastic** — serif headings on warm parchment. The default.
+- **2. Modern Fluent** — clean sans, glassier surfaces.
+- **3. Technical HUD** — monospace telemetry.
+
+A preset sets ChronoAnvil's own tokens only. It sits *on top of* your Obsidian theme rather than replacing it, so a page keeps your theme's background, accent and link colours and takes its type and its card treatment from here.
+
+**Page ground** is the texture drawn behind a ChronoAnvil page. Seventeen of them, in five families:
+
+| Family | Grounds |
+| --- | --- |
+| **Paper** — desk surfaces, safest under dense text | Dot grid, Graph paper, Ruled lines, Crosshatch, Isometric |
+| **Weave & tile** — geometry that repeats on a tile | Checkerboard, Argyle, Zigzag, Carbon fibre |
+| **Print & screen** — reproduction artefacts | Halftone, Scanlines, Pinstripe, Candy stripe |
+| **Ground & light** — no repeat you can point at | Wave scales, Star dust |
+| **Crystal** — facets and a single light catch | Facet, Smoke |
+
+**Scanlines** is the default, and **Off** is the first item in the list. The Paper family is the one to reach for under a page that is mostly text — a dashboard full of tables reads fine over Carbon fibre, an index of long prose does not.
+
+A ground is drawn from your theme's own colours rather than from a fixed palette, which is why the same setting looks like faint ink on a light theme and faint light on a dark one, and why switching Obsidian themes needs nothing done here.
+
+**Vault banner** is the image strip at the top of the pages that carry one. A journal's banner is read from a `banner:` property in that journal's own folder note, so it is a line in a note rather than a setting; this group holds the vault-wide default and the banner's height and treatment.
+
 ## Folder notes
 
 Double-clicking a folder in the file explorer opens its same-named note (e.g. `Development/Development.md`). A single click always expands/collapses the folder, same as any other folder. Toggle this off in the plugin settings if you prefer plain folders.
@@ -908,7 +936,3 @@ A journal's page is also the note the **journal cards** point at, and where a `b
 ## A note on paths
 
 The plugin's create/scaffold logic, and every `chronoanvil` widget (including `diary`, `month-summary`, `events`, `topics-table`, `topic-stats`, `tag-index`, `tasks-table`, `activity-chart`, `journals` and `journals-header`), follow the paths in its settings. **Settings → Paths** holds five fields — the homepage and the four roots — and every other path is shown read-only beneath the root it follows; changing a root moves them with it. Those fields only point ChronoAnvil at a folder, though. To actually reorganise, **rename or drag the folder in the file explorer**: ChronoAnvil watches for that and retargets any path setting that pointed at it (or at anything inside it), including each custom journal's own root, then tells you what it changed. The `tasks-table` blocks on the Weekly, Monthly and Staging overviews still carry their folder as plain text (e.g. `tasks-table:02 - Diary/Weekly`) — a Subject dashboard's block resolves its `{{folder}}` at creation, so it's plain text too — so after moving one of those folders, update the folder in the matching block — either by hand, or from **“Edit this note's sections…”**, where a folder-scoped section now carries a folder field with type-ahead (3.15). Leave that field empty and the block scopes to its own note's folder, which needs no such edit at all; `journal-search` and `review-queue` also accept **Every journal**. (Journal *templates* show the folder as read-only: one template is used in every folder of its level, so a path written there would follow into every note made from it.)
-
-## Upgrading from before 1.5.0
-
-1.5.0 removes the last `dataviewjs` blocks from this vault. Run **Maintenance: set up / repair vault** once after upgrading — it scans `Homepage.md` and every subject/topic index note, and replaces any unmodified, shipped `dataviewjs` block with its native widget equivalent. Blocks you've edited yourself are left untouched and reported (console + a summary notice) so you can swap them in by hand. Back up your vault (or use git) first, same as any bulk rewrite. Once migrated, Dataview can be disabled or uninstalled.

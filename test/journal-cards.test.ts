@@ -1573,7 +1573,7 @@ describe("a journal's card carries its numbers", () => {
     // The file opened with *"THE FRAME, AND THE FRAME ONLY"* and deferred the
     // card's content for eight minors. Shipping the content makes that paragraph
     // false, and a false paragraph at the top of a file is worse than no
-    // paragraph — this is the same fix 4.36 made to `docs/reference.md`'s "Six
+    // paragraph — this is the same fix 4.36 made to `assets/documentation.md`'s "Six
     // notes are written" over a table of eight.
     const src = readSrc("journals-cards");
     // ASSERTED POSITIVELY, AND THE REASON IS A LESSON WORTH KEEPING: an ABSENCE

@@ -1325,7 +1325,7 @@ describe("making a group out of two blocks", () => {
   it("leaves a modifier at the top, above the row line", () => {
     // `frame:` describes the block and is read before the loop, so where it sits
     // does not change what it does — but it is the reader's line and it goes
-    // where `docs/reference.md` shows it, not wherever a splice happened to put
+    // where `assets/documentation.md` shows it, not wherever a splice happened to put
     // it. A `row` line buried under a directive is a fence nobody can scan.
     const framed = [
       "```chronoanvil",

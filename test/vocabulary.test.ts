@@ -125,22 +125,26 @@ describe("the frontmatter key is untouched", () => {
 });
 
 describe("the docs agree with the UI", () => {
+  // EVERY FILE HERE IS READ, NOT SKIPPED IF ABSENT. The list used to hold
+  // `docs/reference.md` and `docs/what-it-replaces.md` behind an existsSync,
+  // and neither has ever existed in a clone — `docs/*` is gitignored — so two
+  // of the four entries were sweeping nothing and reading as though they were.
+  // A `continue` on a missing file is indistinguishable from a clean pass.
+  //
+  // CHANGELOG-ARCHIVE.md IS IN THE LIST FOR THE SAME REASON. It holds ~90% of
+  // the words the changelog ever contained; splitting it out of CHANGELOG.md
+  // without adding it here would have quietly emptied this sweep of most of
+  // its subject matter.
+  const READER_FACING = ["README.md", "CHANGELOG.md", "CHANGELOG-ARCHIVE.md"];
+
   it("uses the current words in the reference sections", () => {
-    // Both README and CHANGELOG are reader-facing, so both are held to the current words.
-    // If docs/ files exist, they are validated as well.
-    for (const f of ["README.md", "docs/reference.md", "docs/what-it-replaces.md", "CHANGELOG.md"]) {
-      if (!existsSync(f)) continue;
+    for (const f of READER_FACING) {
+      expect(existsSync(f), `${f} is missing`).toBe(true);
       const text = readFileSync(f, "utf8").toLowerCase();
       for (const { was } of RETIRED_WORDS) {
         expect(text, `${f} uses the retired word "${was}"`).not.toContain(was);
       }
     }
-  });
-
-  it("leaves the dev log as written", () => {
-    if (!existsSync("docs/dev-log.md")) return;
-    const log = readFileSync("docs/dev-log.md", "utf8");
-    expect(log.toLowerCase()).toContain("journal type");
   });
 
   it("uses the current words in the in-vault documentation", () => {
