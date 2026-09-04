@@ -23,7 +23,7 @@
 // was already looking for it.
 
 import { describe, expect, it } from "vitest";
-import { studyTemplate } from "./study-template";
+import { studyComposed } from "./study-template";
 import { readCode, readCss, readSrc } from "./sources";
 import {
   MODIFIER_KEYWORDS,
@@ -42,7 +42,32 @@ import {
 import { sectionContext, sectionsFor } from "../src/journals/journal-sections";
 import { STUDY_JOURNAL } from "../src/journals/journal";
 
-const topicIndex = (): string[] => studyTemplate("topic-index.md").split("\n");
+// ── SIX HEADERS, NAMED (5.20) ───────────────────────────────────────────
+//
+// The file's own opening note says why this is Study's Topic index and not a
+// constructed fixture: "six headers in one file is not a pathological case
+// somebody constructed — it is what the plugin composes for the note the
+// feature was demonstrated on." As of 5.20 it composes two, and a file whose
+// first test asserts "more than one header" would have gone on passing while
+// testing nothing — which is exactly the failure that note was written against.
+//
+// So the six are named. It is still Study's Topic index, still composed through
+// the catalogue with Study's own overrides, and still a page a reader reaches
+// in one visit to *Edit sections…*; what it is not any more is the page they
+// get without asking.
+const RICH_TOPIC = [
+  "banner",
+  "trackers",
+  "children",
+  "stats",
+  "path",
+  "review",
+  "resources",
+  "charts",
+];
+
+const topicIndex = (): string[] =>
+  studyComposed("Topic Index.md", RICH_TOPIC).split("\n");
 
 // The deepest Study index: the surface all three title questions land on.
 const topicCtx = (): ReturnType<typeof sectionContext> =>
@@ -64,10 +89,11 @@ describe("the defect that shipped", () => {
     const lines = topicIndex();
     const span = argSpanIn(lines, "header");
     expect(span).not.toBeNull();
-    // The FIRST header on the page, which is the children table's since 5.18
-    // reordered the Topic index — and the tracker grid's before that. Which
-    // section owns it is exactly what this function cannot tell you, so the
-    // string moving is the claim rather than a break in it.
+    // The FIRST header on the page, which is the children table's: the tracker
+    // grid is paged with the stats band into a group that composes NO bar, so
+    // the first `header:` line in the file belongs to the section after it.
+    // Which section owns it is exactly what this function cannot tell you, so
+    // the string is the claim rather than a break in it.
     expect(readArg(lines, span!)).toBe("🗂️ What's below");
   });
 

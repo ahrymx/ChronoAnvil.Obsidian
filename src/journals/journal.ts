@@ -48,9 +48,11 @@ import {
   PAGE_LAYOUT_DEFAULT,
   PAGE_LAYOUT_KEY,
   configOfJournal,
+  nextPageOrder,
   pageLayoutChoices,
   pageLayoutOf,
   pageLayoutShown,
+  pageOrderOf,
 } from "./page-default";
 
 // ── Who owns a template ──────────────────────────────────────────────────
@@ -439,18 +441,26 @@ export const STUDY_CONFIG: JournalConfig = {
     },
   ],
   // Study's dashboards are composed from the catalogue (2.40) rather than
-  // shipped as assets. These are the two places its arrangement differs from
-  // the catalogue's defaults, and both are load-bearing:
+  // shipped as assets.
   //
-  //   ORDER — a Topic index puts its note tables *below* the learning path,
-  //   because the path is the curated route through them and the tables are
-  //   the fallback. The Subject index above it puts its children first. One
-  //   global order cannot be both.
+  // ── THE ARRANGEMENT PINS ARE GONE (5.20) ─────────────────────────────
   //
-  //   FIELDS — a Topic index carries three resource shelves rather than the
-  //   catalogue's single one, which is a real arrangement difference and not a
-  //   compatibility shim. (The `key` override that sat here until 2.41 *was*
-  //   one: it pinned `learning-path` for notes already holding that region.)
+  // Study named the sections on both of its indexes, in order. It no longer
+  // names any: the catalogue's four defaults are what a Subject index and a
+  // Topic index open with, the same as every other preset and every journal a
+  // reader makes. See the note above `JOURNAL_SECTIONS`.
+  //
+  // WHAT REMAINS HERE IS `options`, AND THAT IS DELIBERATE. An override applies
+  // only to a section that is actually composed, so Study's three resource
+  // shelves and its "🧭 Learning Path" label now sit here waiting: the day a
+  // reader ticks Resources on a Topic index they get Docs, Tutorials and
+  // Practice rather than the catalogue's single "Files" shelf. Deleting them
+  // with the order would have thrown away an arrangement opinion that costs
+  // nothing to keep and cannot be recovered from the catalogue.
+  //
+  // (The `key` override that sat here until 2.41 was a compatibility shim of a
+  // different sort: it pinned `learning-path` for notes already holding that
+  // region. This is not that.)
   layout: {
     // The three leaf templates' prose. Assets until 2.42 — `assets/template-
     // lesson.md` and friends — on the reasoning that "prose belongs in a
@@ -508,39 +518,18 @@ export const STUDY_CONFIG: JournalConfig = {
       },
     },
     page: { options: { headings: { headings: [{ title: "Notes" }] } } },
-    // ── WHAT IS BELOW COMES FIRST, ON BOTH INDEXES (5.18) ────────────
+    // A SUBJECT INDEX HAS NO ENTRY AT ALL NOW. It pinned eight sections in
+    // order and overrode nothing, so with the order gone there is nothing left
+    // to say about it, and an empty `{}` would be a pin the next reader has to
+    // work out is vacuous.
     //
-    // Every index in every preset now opens with its children. A Subject index
-    // read banner → grid → topics, so the one thing the page exists to link to
-    // sat under a block of numbers about it; the numbers are what the reader
-    // looks at second, and the tables are where they are going.
-    //
-    // `order` AND NOT `sections`, so Study still gains a section the day the
-    // catalogue does — the distinction `index:1` below was already written to
-    // demonstrate.
-    "index:0": {
-      order: [
-        "banner",
-        "children",
-        "trackers",
-        "review",
-        "tasks",
-        "progress",
-        "find",
-        "charts",
-      ],
-    },
+    // 5.18's headline — "what is below comes first, on both indexes" — is
+    // reversed here, and on purpose. It moved `children` above `trackers` when
+    // an index opened with eight sections and the tables were buried under a
+    // block of numbers. An index now opens with three, the numbers are one
+    // tracker card, and the catalogue's own order (banner, trackers, children)
+    // puts the tables one card down rather than one screen down.
     "index:1": {
-      order: [
-        "banner",
-        "children",
-        "trackers",
-        "stats",
-        "path",
-        "review",
-        "resources",
-        "charts",
-      ],
       options: {
         path: { label: "🧭 Learning Path" },
         resources: {
@@ -840,41 +829,19 @@ export const PROJECTS_CONFIG: JournalConfig = {
   // IT SHIPS NO TRACKERS AND DECLARES NO RATING. The only thing a project
   // tracks is `status`, which every journal already has, and a second
   // vocabulary for it is the split `status` was unified to end.
-  layout: {
-    // The Area index counts the PROJECTS beneath it, which is the sentence this
-    // journal is kept to be able to say. `sections` rather than `order`,
-    // because that is the only field that can turn a `default: never` section
-    // on — see the `tally` section for why it must default off.
-    "index:0": {
-      sections: [
-        "banner",
-        "children",
-        "trackers",
-        "tasks",
-        "tally",
-        "find",
-        "charts",
-      ],
-    },
-    // AND `index:1` SHIPS `order` DELIBERATELY, TO SHOW THE DIFFERENCE. A
-    // Project index wants its updates first and its tasks high, which is an
-    // arrangement — so it says only that, and gains a section the day the
-    // catalogue adds one. A layout that shipped `sections` here would be frozen
-    // for every later reader, which is what `sections` means and is a price
-    // worth paying only where a widget has to be turned on.
-    "index:1": {
-      order: [
-        "banner",
-        "children",
-        "trackers",
-        "stats",
-        "path",
-        "review",
-        "resources",
-        "charts",
-      ],
-    },
-  },
+  // AND IT DECLARES NO `layout` AT ALL (5.20), which is the shortest statement
+  // of what changed. It shipped two: an Area index pinned with `sections` so it
+  // would draw a Projects tally, and a Project index pinned with `order` so its
+  // updates came before its tasks. Both are now what the catalogue gives every
+  // journal — banner, trackers, the table of what is below — and neither key
+  // overrode a single option, so with the arrangement gone there was nothing
+  // left inside them. An `index:0: {}` would be a pin that says nothing while
+  // looking like it says something.
+  //
+  // THE TALLY IS THE ONE REAL LOSS, and it is the trade the reader asked for: a
+  // fresh Area index no longer counts the projects under it until somebody ticks
+  // Project tally in *Edit sections…*. The section still exists, still defaults
+  // off for the reason its own entry gives, and is one checkbox away.
 };
 
 export const PROJECTS_PRESET: JournalPreset = {
@@ -905,30 +872,23 @@ export const EXERCISE_CONFIG: JournalConfig = {
     { id: "meal", emoji: "🍽️", label: "Meal" },
   ],
   layout: {
-    // The Block index bands what its workouts and meals add up to. Turned on
-    // through `sections` for the reason the catalogue entry gives.
-    //
     // ONE SECTION AND A PRESET AS OF 4.46. This named `totals`, which was its own
     // section emitting `journal-totals`; that widget is now the `totals` preset
     // of the merged stats band, and the layout says so here rather than by
     // naming a second section.
-    // ── AND IT SHIPS NO BAND AS OF 5.18 ──────────────────────────────
     //
-    // A Block index is a month of workouts and meals, and what the reader opens
-    // it for is the two tables. The band's four sums are the same four numbers
-    // the charts region below draws over time, and one page does not need both
-    // — so the section comes off the shipped page and the preset stays, because
-    // ticking Stats back on in *Edit sections…* should give the reader the sums
-    // this journal was built to add up rather than the generic band.
+    // AND IT SHIPS NO BAND AS OF 5.18: a Block index is a month of workouts and
+    // meals, and what the reader opens it for is the two tables. The band's four
+    // sums are the same four numbers the charts region draws over time, and one
+    // page does not need both.
+    //
+    // SO WHAT IS LEFT HERE IN 5.20 IS THE PRESET AND NOTHING ELSE — the key no
+    // longer lists a section, because listing them was how it also un-listed
+    // Stats, and the catalogue's defaults now do that for every journal. The
+    // override waits: tick Stats back on in *Edit sections…* and the band that
+    // appears is the four sums this journal was built to add up, not the
+    // generic one.
     "index:0": {
-      sections: [
-        "banner",
-        "children",
-        "trackers",
-        "tasks",
-        "find",
-        "charts",
-      ],
       options: { stats: { preset: "totals" } },
     },
     // THE QUANTITIES EACH NOTE STARTS WITH. Without this a Workout would open
@@ -1015,15 +975,13 @@ export const MEDIA_CONFIG: JournalConfig = {
     // second band directly beneath it. Two objects, two markup families, two
     // collapse rules, one question. The `summary` preset is those four cells in
     // one band — see `stats-band.ts`, which cites this shelf.
+    //
+    // THE SHELF NO LONGER SHIPS THE BAND EITHER (5.20). A shelf opens with its
+    // banner, its trackers and its titles, like every other index in every other
+    // journal; the preset stays because it is the answer to *which* band, not to
+    // *whether*, and a reader who ticks Stats on a Media shelf should get the
+    // four cells this preset was written for rather than the generic three.
     "index:0": {
-      sections: [
-        "banner",
-        "children",
-        "trackers",
-        "stats",
-        "find",
-        "charts",
-      ],
       options: { stats: { preset: "summary" } },
     },
     "kind:title": {
@@ -1149,6 +1107,40 @@ export function recognisedTypeValues(type: JournalType): Set<string> {
   }
   for (const level of type.levels) out.add(level.id);
   return out;
+}
+
+// What this journal CALLS a note carrying that `type:` value — "Lesson",
+// "Topic", "Page". 5.20.
+//
+// ── THE LABELLED HALF OF `recognisedTypeValues` ────────────────────────
+//
+// That function walks kinds, then each paged kind's `pages`, then levels, and
+// answers whether a value is one of this journal's own. This walks the same
+// three lists and answers what the value is called. They are one question asked
+// for two purposes, and the reason this is a function rather than three lines
+// at the call site is that the caller which had those three lines HAD ONLY TWO
+// OF THEM: `pageHeadText` looked at kinds and levels, and never at pages.
+//
+// The eyebrow over a page therefore fell through to naming the journal alone,
+// so every page in the vault wore `STUDY` where its lesson wore `STUDY ·
+// LESSON` — the one note kind whose head could not say what it was, on the
+// surface where a reader is most likely to have forgotten. Nothing failed,
+// because a shorter eyebrow is a legal eyebrow.
+//
+// ORDER IS KINDS, LEVELS, PAGES, and it does not matter today: the four sets of
+// ids are disjoint by construction — `buildJournalType` writes `page` for every
+// journal's pages and refuses a kind id that collides with a level's. It is
+// written in the order a reader would guess anyway, so that if that ever stops
+// being true the more specific answer is the one that wins.
+export function journalNounOf(type: JournalType, value: string): string | null {
+  const id = normaliseTypeValue(value);
+  if (id == null) return null;
+  return (
+    type.kinds.find((k) => k.id === id)?.label ??
+    type.levels.find((l) => l.id === id)?.noun ??
+    type.kinds.find((k) => k.pages?.id === id)?.pages?.label ??
+    null
+  );
 }
 
 // The journal type a note belongs to, or undefined.
@@ -1842,12 +1834,19 @@ export class JournalManager {
   // The kind a note belongs to, and its page config, resolved from the note's
   // own `type` frontmatter rather than from where it sits — the same reason
   // the banner reads `type` for its own index test.
+  // NORMALISED, LIKE EVERY OTHER READ OF THIS PROPERTY (5.20). It compared the
+  // raw string against a lowercase id, so `type: Lesson` matched nothing and the
+  // two callers fell through to their text-reading fallback — which lowercases,
+  // and so quietly did this function's job as well as its own. That fallback is
+  // for a metadata cache a moment behind a save; leaving it to cover a case
+  // analysis this could answer directly meant a file read on every New Page for
+  // anyone who had ever capitalised a `type:` by hand.
   private pageKindOf(
     type: JournalType,
     fm: Record<string, unknown>
   ): JournalKind | null {
-    const t = typeof fm["type"] === "string" ? fm["type"] : "";
-    const kind = type.kinds.find((k) => k.id === t);
+    const t = normaliseTypeValue(fm["type"]);
+    const kind = t == null ? undefined : type.kinds.find((k) => k.id === t);
     return kind?.pages ? kind : null;
   }
 
@@ -1965,9 +1964,6 @@ export class JournalManager {
       return;
     }
 
-    const host = await this.promoteToDashboard(type, file, kind);
-    if (!host?.parent) return;
-
     const pages = kind.pages;
 
     // THE PAGE DIALOGUE IS THE TITLE DIALOGUE (4.50 §4). It was a bare
@@ -1982,10 +1978,31 @@ export class JournalManager {
     //
     // A PAGE HAS NO PAGES, so no third field — §1's argument for drawing a
     // one-option field is an argument about a pair.
+    //
+    // ── AND IT IS ASKED BEFORE THE NOTE IS MOVED (5.20) ─────────────────
+    //
+    // `promoteToDashboard` ran three lines above this window. It creates a
+    // folder, `fileManager.renameFile`s the note into it — rewriting every
+    // wikilink in the vault that pointed at it — and splices a Pages section
+    // into the body. Then the dialogue opened, and pressing **Cancel** returned
+    // from here having done all of that.
+    //
+    // A CANCELLED ACTION THAT RESTRUCTURES THE VAULT IS NOT A CANCELLED ACTION.
+    // Nothing warned, nothing was reversible from inside the plugin, and the
+    // reader's own undo does not reach a rename plus a folder plus an edit. It
+    // was invisible from the promoted side, too — the reader who says OK gets
+    // exactly the same result either way, which is why the ordering read as an
+    // implementation detail for four releases.
+    //
+    // THE WINDOW NEEDS NOTHING FROM THE PROMOTION. It named `host.basename`,
+    // and promotion moves a note's PATH, never its basename — so `file` answers
+    // the same string before the move as after it. That was the whole of the
+    // dependency, and stating it is what keeps someone from restoring the old
+    // order to "have the host handy".
     const cfg = this.configOf(type);
     const rows = pageLayoutChoices(cfg, pages.label);
     const details = await promptNewNote(this.app, {
-      heading: `${pages.label} in ${host.basename}`,
+      heading: `${pages.label} in ${file.basename}`,
       titlePlaceholder: `${pages.label} title`,
       layoutLabel: "Layout",
       templates: rows,
@@ -1994,6 +2011,15 @@ export class JournalManager {
     if (!details?.title.trim()) return;
     const safeTitle = details.title.trim().replace(/[\\/:"*?<>|]/g, "-");
 
+    const host = await this.promoteToDashboard(type, file, kind);
+    if (!host?.parent) return;
+
+    // AFTER THE PROMOTION, AND IT STILL CANNOT FIRE ON AN UNPROMOTED NOTE. The
+    // folder this path is in either did not exist a moment ago — in which case
+    // nothing can be in it — or the note was already a dashboard, in which case
+    // `promoteToDashboard` returned it untouched and the check is the same
+    // check it always was. So moving the window up did not buy a collision that
+    // costs a promotion.
     const notePathNew = `${host.parent.path}/${safeTitle}.md`;
     if (getFile(this.app, notePathNew)) {
       notify.fail(`"${safeTitle}" already exists in this note`);
@@ -2021,10 +2047,15 @@ export class JournalManager {
 
     // Pages are read in order, so each one gets its position at creation.
     // Derived from what is already there rather than stored on the parent: a
-    // count is recomputable, and a counter on the dashboard would drift the
-    // first time a page was deleted by hand.
-    const order =
-      childFiles(host.parent).filter((f) => f.path !== host.path).length + 1;
+    // counter on the dashboard would drift the first time a page was deleted by
+    // hand. So does a COUNT of the files beside it, which is what stood here —
+    // see `nextPageOrder`, which owns the rule and states the deletion that
+    // breaks both.
+    const order = nextPageOrder(
+      childFiles(host.parent)
+        .filter((f) => f.path !== host.path)
+        .map((f) => pageOrderOf(frontmatterOf(this.app, f)))
+    );
 
     const content = fillTemplate(tpl, {
       title: safeTitle,

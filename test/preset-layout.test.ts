@@ -69,7 +69,7 @@ class Probe extends JournalEditModal {
         [key]: {
           ...(prev ?? {}),
           order: [...ids],
-          ...(prev?.sections ? { sections: [...ids] } : {}),
+          sections: [...ids],
         },
       };
     }
@@ -175,9 +175,11 @@ describe("installing a preset through the wizard", () => {
     expect(p.layout()[target.key].sections).toEqual(kept);
   });
 
-  it("never grows a `sections` on a preset that shipped only `order`", () => {
-    // The weaker, better field: a journal created today still gains a section
-    // the catalogue adds tomorrow.
+  it("writes `sections` even where the preset shipped only `order` (5.20)", () => {
+    // THIS TEST USED TO ASSERT THE OPPOSITE, and the argument for it was *"the
+    // weaker, better field: a journal created today still gains a section the
+    // catalogue adds tomorrow."* That is a claim about the sections nobody
+    // touched. What it actually bought was silence about the ones they did.
     const draft = presetAsNewJournal(JOURNAL_PRESETS[0], PATHS);
     const type = buildJournalType(draft);
     const target = templateTargets(type)[0];
@@ -191,7 +193,40 @@ describe("installing a preset through the wizard", () => {
     p.writeLayout();
 
     expect(p.layout()[target.key].order).toBeDefined();
-    expect(p.layout()[target.key].sections).toBeUndefined();
+    expect(p.layout()[target.key].sections).toEqual(
+      p.layout()[target.key].order
+    );
+  });
+
+  it("keeps a section the reader ticked, through a template refresh", () => {
+    // THE DEFECT 5.20 MADE TOTAL. `defaultSectionIds` filters on `default(ctx)`
+    // REGARDLESS OF LAYOUT — `sections` is the only field that can turn on a
+    // section the catalogue defaults to off — so a wizard writing `order`
+    // alone recorded the tick nowhere. It survived Create, because
+    // `createJournalType` is handed `chosen` directly, and then
+    // `refreshJournalTemplates` recomposed from the catalogue and took it back
+    // out. 5.20 flipped ten sections to `default: never` and deleted every
+    // preset's `sections` pin, so `prev?.sections` went false on essentially
+    // every key at the same moment there were ten more answers worth keeping.
+    const draft = presetAsNewJournal(JOURNAL_PRESETS[0], PATHS);
+    const type = buildJournalType(draft);
+    const target = templateTargets(type)[0];
+
+    // A section this surface offers and the catalogue does not default on.
+    const off = sectionsFor(target.ctx)
+      .map((s) => s.id)
+      .find((id) => !defaultSectionIds(target.ctx).includes(id));
+    expect(off).toBeDefined();
+
+    const p = wizard(draft);
+    p.seed();
+    p.tick(target.key, [...defaultSectionIds(target.ctx), off!]);
+    p.writeLayout();
+
+    // What a later reader — or `refreshJournalTemplates` — reads back.
+    expect(
+      chosenSectionIds(target.ctx, p.layout()[target.key])
+    ).toContain(off!);
   });
 });
 

@@ -654,8 +654,13 @@ describe("the editor carries the defence the add command left it (3.13 §9.1)", 
     // the flag is the model's, so this window still does not know what makes a
     // widget repeatable.
     expect(src).toContain(
-      ".filter((s) => s.repeatable || !this.rows.includes(s.id))"
+      "(s) => s.repeatable || !this.rows.includes(s.id)"
     );
+    // OVER `offered()`, WHICH IS `addable` PLUS WHATEVER THE SURFACE OFFERS
+    // THAT ITS MODEL CANNOT (5.20). The rule above is unchanged; the list it
+    // filters grew a second source. See `StructuralSink`.
+    expect(src).toContain("private offered(): SectionView[]");
+    expect(src).toContain("const absent = this.offered().filter(");
     // And the id it stages is the model's to mint, because an instance id says
     // WHICH occurrence it is and this window must not learn that spelling.
     expect(src).toContain("this.model.instanceOf(chosen, this.spec.text, this.rows)");

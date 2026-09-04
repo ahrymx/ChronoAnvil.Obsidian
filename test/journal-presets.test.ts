@@ -109,49 +109,34 @@ describe("a preset is an ordinary journal", () => {
   });
 
   it("places the trackers section at the top of every preset template where it appears", () => {
-    // UNDER THE BANNER ON A LEAF, UNDER THE CHILDREN TABLE ON AN INDEX (5.18).
-    // It was second everywhere until the reader moved what-is-below to the top
-    // of all six index templates: an index exists to link into the folder, so
-    // the tables open the page and the grid follows them. On a note that has
-    // nothing below it there is no table, and the grid is second as it was.
+    // SECOND, ON EVERY SURFACE, IN EVERY PRESET (5.20). It was second until
+    // 5.18 moved what-is-below above it on the six index templates, and it is
+    // second again — the reason 5.18 had is gone. An index no longer opens with
+    // a block of numbers for the reader to look past; it opens with one tracker
+    // card, and the table of what is below sits directly under it.
     //
-    // WHAT THE TEST IS ACTUALLY FOR is unchanged: the ratings a note is graded
-    // on are never below the fold, on any surface, in any preset.
+    // WHAT THE TEST IS ACTUALLY FOR is unchanged across all three arrangements:
+    // the ratings a note is graded on are never below the fold, on any surface,
+    // in any preset.
     for (const preset of JOURNAL_PRESETS) {
       const type = buildJournalType(preset.config);
-      const targets = templateTargets(type);
-      for (const target of targets) {
+      for (const target of templateTargets(type)) {
         const layout = type.layout?.[target.key];
         const sections = sectionsFor(target.ctx, layout);
         const trackerIndex = sections.findIndex((s) => s.id === "trackers");
-        if (trackerIndex !== -1) {
-          const where = `${preset.id} ${target.key}`;
-          expect(sections[0].id, `${where} banner`).toBe("banner");
-          if (target.ctx.noteKind === "index") {
-            expect(trackerIndex, where).toBe(2);
-            expect(sections[1].id, `${where} children`).toBe("children");
-          } else {
-            expect(trackerIndex, where).toBe(1);
-          }
-        }
+        if (trackerIndex === -1) continue;
+        const where = `${preset.id} ${target.key}`;
+        expect(sections[0].id, `${where} banner`).toBe("banner");
+        expect(trackerIndex, where).toBe(1);
       }
-      if (preset.config.layout) {
-        for (const [key, tLayout] of Object.entries(preset.config.layout)) {
-          const list = tLayout.sections ?? tLayout.order;
-          if (list && list.includes("trackers")) {
-            // The same two placements as above, read off the declaration this
-            // time rather than off what it composes to: an index layout opens
-            // banner → children → trackers, anything else banner → trackers.
-            const at = key.startsWith("index:") ? 2 : 1;
-            expect(list.indexOf("trackers"), `${preset.id} layout.${key}`).toBe(at);
-            expect(list[0], `${preset.id} layout.${key} banner`).toBe("banner");
-            if (at === 2) {
-              expect(list[1], `${preset.id} layout.${key} children`).toBe(
-                "children"
-              );
-            }
-          }
-        }
+      // AND NO PRESET DECLARES AN ARRANGEMENT TO CHECK IT AGAINST. This loop
+      // used to read the same two placements back off `layout.sections` /
+      // `layout.order`; 5.20 deleted every one of those lists, so the honest
+      // assertion is that they are gone rather than a loop that silently runs
+      // zero times.
+      for (const [key, tLayout] of Object.entries(preset.config.layout ?? {})) {
+        expect(tLayout.sections, `${preset.id} layout.${key}.sections`).toBeUndefined();
+        expect(tLayout.order, `${preset.id} layout.${key}.order`).toBeUndefined();
       }
     }
   });
@@ -401,23 +386,33 @@ describe("a preset's folders follow its name", () => {
 // This is that result, stated as the block a reader meets in the order they
 // meet it, so the arrangement cannot drift without somebody saying so here.
 //
-// WHAT THE FOUR PAGES AGREE ON, which is the whole of the decision:
+// WHAT THE FOUR PAGES AGREE ON IS NOW EVERYTHING (5.20). There is no per-preset
+// arrangement left to state: every index in every preset composes banner →
+// trackers → what is below, because that is what the catalogue gives every
+// journal and no preset overrides it any more. The table below is fifteen
+// templates' worth of the same three answers, which is the change.
 //
-//   WHAT IS BELOW COMES FIRST. Every index opens banner → children. An index
-//   exists to get the reader into the folder; the numbers about it are what
-//   they look at second.
+//   THE TRACKER CARD IS SECOND. 5.18 put what-is-below above it on the argument
+//   that an index exists to get the reader into the folder and the numbers are
+//   second. The numbers were a stats band, a progress band and a charts region
+//   then; they are one card now, so the table it displaced is one card down
+//   rather than one screen down, and catalogue order stands.
 //
-//   THE GRID AND THE BAND ARE ONE GROUP on a leaf index — see the state row in
-//   `journal-sections.ts` — and the grid stands alone, titled, everywhere else.
+//   THE GRID STANDS ALONE, TITLED, ON EVERY SURFACE. It used to weld into a
+//   state row with the stats band on a deepest index — the `# chronoanvil:
+//   trackers:start` opener three of these cases carried. With the band off by
+//   default there is no second cell to weld to, so the group is one grid and it
+//   draws its own bar.
 //
-//   FIND AND CHARTS CLOSE THE PAGE. A search box is a control the reader
-//   reaches for rather than a block they read past, and the charts region is
-//   the page's long tail.
+//   NOTHING CLOSES THE PAGE BUT THE PROSE. Find and Charts used to; both are
+//   off, and on a leaf the last thing composed is the skeleton — asserted
+//   separately below, because it is markdown and this helper reads fences.
 //
 // READ OFF THE COMPOSED FILE, not off the layout it was composed from: a
 // `sections` list that named the right ids in the right order and composed to
-// something else would pass a test written against the config.
-describe("the arrangement the presets ship (5.18)", () => {
+// something else would pass a test written against the config. That the configs
+// no longer carry such a list is `journal-presets`' other test, above.
+describe("the arrangement the presets ship (5.20)", () => {
   // The line that opens each block, which on a titled fence is its bar and on
   // the state row is the first thing in the group. `row` and `tab` are the
   // grammar of the fence rather than a block, so they are named separately by
@@ -448,82 +443,32 @@ describe("the arrangement the presets ship (5.18)", () => {
     return file.content;
   };
 
+  // EVERY TEMPLATE ALL FOUR PRESETS WRITE, not just the indexes. The six index
+  // cases were the whole table until 5.20, because the leaves had nothing
+  // preset-specific to say; now neither do the indexes, and the reason to list
+  // all fifteen is that "the same three answers everywhere" is only worth
+  // asserting if everywhere is where it is asserted.
   const CASES: [string, string, string[]][] = [
-    [
-      "study",
-      "subject-index",
-      [
-        "journal-header",
-        "header:🗂️ Topics",
-        "header:📊 Trackers",
-        "header:🔁 Due and open",
-        "header:📈 Progress",
-        "header:🔎 Find",
-        "header:📊 Charts",
-      ],
-    ],
-    [
-      "study",
-      "topic-index",
-      [
-        "journal-header",
-        "header:🗂️ What's below",
-        "# chronoanvil:trackers:start",
-        "header:🧭 Learning Path",
-        "header:🔁 Review",
-        "header:📚 Resources",
-        "header:📊 Charts",
-      ],
-    ],
-    [
-      "projects",
-      "area-index",
-      [
-        "journal-header",
-        "header:🗂️ Projects",
-        "header:📊 Trackers",
-        "header:⏳ Open tasks",
-        "header:🧮 Status",
-        "header:🔎 Find",
-        "header:📊 Charts",
-      ],
-    ],
-    [
-      "projects",
-      "project-index",
-      [
-        "journal-header",
-        "header:🗂️ What's below",
-        "# chronoanvil:trackers:start",
-        "header:🧭 Task Manager",
-        "header:🔁 Review",
-        "header:📚 Resources",
-        "header:📊 Charts",
-      ],
-    ],
-    [
-      "exercise-diet",
-      "block-index",
-      [
-        "journal-header",
-        "header:🗂️ What's below",
-        "header:📊 Trackers",
-        "header:⏳ Open tasks",
-        "header:🔎 Find",
-        "header:📊 Charts",
-      ],
-    ],
-    [
-      "media",
-      "medium-index",
-      [
-        "journal-header",
-        "header:🎬 Titles",
-        "# chronoanvil:trackers:start",
-        "header:🔎 Find",
-        "header:📊 Charts",
-      ],
-    ],
+    ["study", "subject-index", ["journal-header", "header:📊 Trackers", "header:🗂️ Topics"]],
+    ["study", "topic-index", ["journal-header", "header:📊 Trackers", "header:🗂️ What's below"]],
+    ["study", "lesson", ["journal-header", "header:📊 Trackers", "header:📄 Pages"]],
+    // A kind with no pages under it has nothing below to table, so its leaf is
+    // the banner, the grid and the prose.
+    ["study", "practice", ["journal-header", "header:📊 Trackers"]],
+    // AND A PAGE IS THE BANNER AND THE PROSE. It is not graded — a per-page
+    // rating would count a note's own parts as its peers — so even `trackers`
+    // is absent here, and this is the shortest template the plugin writes.
+    ["study", "page", ["journal-header"]],
+    ["projects", "area-index", ["journal-header", "header:📊 Trackers", "header:🗂️ Projects"]],
+    ["projects", "project-index", ["journal-header", "header:📊 Trackers", "header:🗂️ What's below"]],
+    ["projects", "update", ["journal-header", "header:📊 Trackers"]],
+    ["projects", "decision", ["journal-header", "header:📊 Trackers"]],
+    ["exercise-diet", "block-index", ["journal-header", "header:📊 Trackers", "header:🗂️ What's below"]],
+    ["exercise-diet", "workout", ["journal-header", "header:📊 Trackers"]],
+    ["exercise-diet", "meal", ["journal-header", "header:📊 Trackers"]],
+    ["media", "medium-index", ["journal-header", "header:📊 Trackers", "header:🎬 Titles"]],
+    ["media", "title", ["journal-header", "header:📊 Trackers", "header:📄 Pages"]],
+    ["media", "page", ["journal-header"]],
   ];
 
   for (const [presetId, stem, expected] of CASES) {
@@ -531,6 +476,30 @@ describe("the arrangement the presets ship (5.18)", () => {
       expect(blocks(templateFor(presetId, stem))).toEqual(expected);
     });
   }
+
+  it("ends every leaf on the reader's own prose", () => {
+    // THE FOURTH DEFAULT, AND THE ONE `blocks` CANNOT SEE — a skeleton is `##`
+    // markdown, not a fence, which is the whole reason it survives the plugin
+    // being uninstalled. So it is asserted by position instead: on every leaf
+    // and every page, the last fence closes before the first heading opens, and
+    // nothing composed sits under what the reader wrote.
+    for (const preset of JOURNAL_PRESETS) {
+      const type = buildJournalType(preset.config);
+      for (const f of journalTemplateFiles(type)) {
+        const where = `${preset.id}/${f.name}`;
+        if (f.name.includes("-index")) {
+          expect(f.content, where).not.toMatch(/^## /m);
+          continue;
+        }
+        const firstHeading = f.content.search(/^## /m);
+        expect(firstHeading, `${where} has a skeleton`).toBeGreaterThan(-1);
+        expect(
+          f.content.lastIndexOf("```"),
+          `${where} prose is last`
+        ).toBeLessThan(firstHeading);
+      }
+    }
+  });
 
   it("opens every journal's front page on the way in", () => {
     // ONE PAGE FOR ALL FOUR, because a journal folder note is composed from a

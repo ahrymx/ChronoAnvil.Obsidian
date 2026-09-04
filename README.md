@@ -13,7 +13,7 @@ It replaces Templater, Meta Bind, Tracker, Tasks and Dataview for this workflow.
 
 | | |
 | --- | --- |
-| **Diary** | D/W/M/Q/Y entries, overviews (dashboards), calendars, heat maps, and special events, full-text search filtered by date, tag and tracker, on-this-day and timeline recaps. |
+| **Diary** | Daily and monthly entries, overview calendar with heat maps and special events, week / month / quarter / year dashboards, full-text search filtered by date, tag and tracker, on-this-day and timeline recaps. |
 | **Journals** | Define your own custom journals with folder levels and note types. Presets for Study (*Subjects → Topics → Lessons/Practice*), Projects, Fitness, and Media ship ready to use. |
 | **Trackers** | Defined once, synced everywhere. Numberless rating scales, dynamic bedtime & wake-up buttons with live sleep/wake duration, steppers, dropdowns, multi-row tag flow, and habit pills. Any tracker can be added to individual entries on the fly. |
 | **Charts** | Line, bar, calendar heat map, scatter correlation, streak and summary stat cards, rendered natively from your frontmatter onto dashboards and journal indexes. |
@@ -32,7 +32,7 @@ queries, no Templater scripts, no external chart plugins.
 | ![Tracker controls at the head of a daily entry](docs/screenshots/diary-entry.png) | ![Trends and statistics with heatmaps, line charts and scatter plots](docs/screenshots/charts.png) |
 | *Dynamic sleep buttons, numberless scales, 2-row tags* | *Annual heatmaps, 90d rolling averages, scatter plots* |
 
-| Custom journals &  presets | Period dashboards & digests |
+| Custom journals & Study preset | Period dashboards & digests |
 | :---: | :---: |
 | ![A Study journal index, subjects and topics](docs/screenshots/study-journal.png) | ![A yearly overview dashboard rolling up entries and recaps](docs/screenshots/period-dashboard.png) |
 | *Subjects, topics, confidence ratings, and activity heatmaps* | *Yearly, quarterly and weekly rollups with recap digests* |

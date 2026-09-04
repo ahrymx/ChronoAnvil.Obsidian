@@ -48,7 +48,7 @@ import { BannerSurface, bannerSurfaceOf, titleTargetFor } from "../../core/banne
 import { bannerScopeOf } from "../vault-banner";
 import { attachNoteRename, attachPropertyRename } from "../header-title";
 import { TITLE_PROP, entryDateLabel } from "../../diary/entryheader";
-import { hueOf, journalTypeAtPath } from "../../journals/journal";
+import { hueOf, journalNounOf, journalTypeAtPath } from "../../journals/journal";
 import { CLASS_DEFS, noteKindOf, TrackerClass } from "../../trackers/trackers";
 import { OVERVIEW_LABELS, OverviewUnit } from "../../diary/calendar";
 import { periodAnchor, valueLabel } from "../../diary/periodnav";
@@ -385,10 +385,18 @@ function eyebrowFor(
     // The journal's own dashboard, named as what it is rather than left to
     // repeat its title.
     if (file.path === folderNotePath(type.root)) return `${type.name} · Journal`;
-    const id = noteTypeOf(plugin.app, file);
-    const named =
-      type.kinds.find((k) => k.id === id)?.label ??
-      type.levels.find((l) => l.id === id)?.noun;
+    // ── AND `journalNounOf` KNOWS ABOUT PAGES, WHICH THIS DID NOT (5.20) ──
+    //
+    // This was two `find`s inline — kinds, then levels — and a page's `type:`
+    // is neither: it is `kind.pages.id`, the fourth list `recognisedTypeValues`
+    // walks and the only one nothing here looked at. So every page fell to the
+    // bare-journal fallback below and wore `STUDY` while the lesson it belongs
+    // to wore `STUDY · LESSON`.
+    //
+    // The lookup moved to `journal.ts` rather than gaining a third `find` here,
+    // because the list it walks is the journal's and the omission was the kind
+    // that recurs by being retyped one caller at a time.
+    const named = journalNounOf(type, noteTypeOf(plugin.app, file));
     // A NOTE WITH NO `type` IS STILL SOMETHING — it is a page of this journal,
     // and naming the journal is better than naming nothing.
     return named ? `${type.name} · ${named}` : type.name;

@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { describe, it, expect } from "vitest";
-import { studyTemplate } from "./study-template";
+import { studyComposed } from "./study-template";
 import {
   STUDY_JOURNAL,
   deriveLevelId,
@@ -230,7 +230,10 @@ describe("journal-breakdown wiring", () => {
     // moved: since 2.35 the two are `jchart:` lines in the note's managed
     // charts region rather than a pair of hand-written directives, so this
     // asserts what the template gives you rather than how it says it.
-    const t = studyTemplate("Subject Index.md");
+    // `charts` NAMED (5.20): the region is off by default on every index now,
+    // and what this pins is what the SECTION seeds — two readings, trend first
+    // — not whether a fresh Subject index arrives carrying it.
+    const t = studyComposed("Subject Index.md", ["banner", "charts"]);
     const shapes = parseJournalChartRegion(t.split("\n")).map((s) => s.shape);
     expect(shapes).toEqual(["trend", "breakdown"]);
   });

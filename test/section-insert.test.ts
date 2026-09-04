@@ -164,12 +164,17 @@ describe("adding a section to an existing note", () => {
       // Not offered-and-refused: every content field persists into a
       // `<!--chronoanvil:key-->` region keyed by name, so a second copy of one
       // would give two widgets one region to fight over.
-      const text = composeTemplate(topicCtx);
+      // COMPOSED WITH THE IDS NAMED (5.20). A Topic index composes three
+      // sections now, and a test that withheld three would still pass while
+      // barely asking the question. What is under test is that a section IN the
+      // file is not offered again, so the file is given some.
+      const carries = ["banner", "children", "review", "charts", "path"];
+      const text = composeTemplate(topicCtx, carries);
       const ids = addableSections(topicCtx, text).map((s) => s.id);
-      for (const present of ["banner", "children", "review", "charts", "path"]) {
+      for (const present of carries) {
         expect(ids, present).not.toContain(present);
       }
-      // What a Topic Index does not carry by default is still on offer.
+      // And what the page does not carry is still on offer.
       expect(ids).toContain("find");
       expect(ids).toContain("progress");
       expect(ids).toContain("tasks");

@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import { STUDY_JOURNAL } from "../src/journals/journal";
-import { journalTemplateFiles } from "../src/journals/custom-journal";
+import { composeTemplate, journalTemplateFiles } from "../src/journals/custom-journal";
 import {
   SKELETON_KEY,
   bracketClose,
@@ -59,6 +59,36 @@ const indexCtx = sectionContext(STUDY_JOURNAL, { depth: 1 });
 const lesson = (): string =>
   journalTemplateFiles(STUDY_JOURNAL).find((f) => f.name === "lesson.md")!
     .content;
+
+// The same note with its markers taken out — every Lesson in every vault on the
+// day this ships.
+// ── A LESSON WITH SOMETHING UNDER ITS SKELETON ──────────────────────────
+//
+// Every Lesson written before 5.20 is this note: the headings, and a recall
+// deck beneath them. The catalogue cannot compose it any more — `headings` is
+// its LAST entry, so nothing composed sits under the reader's writing — which
+// is why this is built by moving the span rather than by asking for an order.
+// A note on disk is not obliged to match what the composer would write today,
+// and the two tests below are about exactly the notes that do not.
+const MID_ORDER = ["banner", "trackers", "pages", "headings", "recall"];
+const midSkeleton = (): string => {
+  const text = composeTemplate(
+    lessonCtx,
+    MID_ORDER,
+    STUDY_JOURNAL.layout?.["kind:lesson"]
+  );
+  const open = bracketOpen(SKELETON_KEY);
+  const close = bracketClose(SKELETON_KEY);
+  const a = text.indexOf(open);
+  const b = text.indexOf(close) + close.length;
+  const skeleton = text.slice(a, b);
+  const head = text.slice(0, a);
+  const tail = text.slice(b);
+  // The top of the fence that holds the deck, found through its directive so
+  // the fixture does not depend on the bar's wording.
+  const cut = head.lastIndexOf("```chronoanvil", head.indexOf("recall:recall"));
+  return `${head.slice(0, cut)}${skeleton}\n\n${head.slice(cut).trimEnd()}${tail}`;
+};
 
 // The same note with its markers taken out — every Lesson in every vault on the
 // day this ships.
@@ -217,7 +247,15 @@ describe("removing it keeps what was written under it", () => {
     // blank. A skeleton is a RAW segment, and the separators on both sides are
     // its own lines — so dropping the run wholesale would weld the block above
     // straight onto the block below.
-    const bare = lesson()
+    //
+    // WHICH NEEDS A BLOCK BELOW, AND A SHIPPED LESSON NO LONGER HAS ONE (5.20).
+    // The skeleton is the LAST section in the catalogue now — nothing composed
+    // may sit under the reader's writing — so on a fresh note there is nothing
+    // for a dropped run to weld onto and this test would have passed vacuously.
+    // A reader can still put it mid-note, which is what `midSkeleton` builds and
+    // what the permutation test below is about, so the case is reached the way
+    // a reader reaches it.
+    const bare = midSkeleton()
       .replace("What is this lesson about, and why does it matter?", "")
       .replace("- **Definition:** \n- **Example:** ", "")
       .replace("- [[]] — ", "")
@@ -228,11 +266,23 @@ describe("removing it keeps what was written under it", () => {
     expect(after).not.toContain("pages-table\n```\n```chronoanvil");
     expect(after).not.toMatch(/\n\n\n/);
 
-    // And putting it back restores the gap on both sides, so removing and
+    // And putting it back gives it a blank line on both sides, so removing and
     // re-adding is not a way to reformat somebody's note.
+    //
+    // IT COMES BACK AT THE BOTTOM, NOT WHERE IT WAS (5.20), and that is the
+    // catalogue's answer rather than a loss: an arrival is ranked by
+    // `sectionsFor`, `headings` is the last entry in it, and the whole reason it
+    // is the last entry is that nothing composed may sit under the reader's
+    // writing. A reader who had moved it up can move it up again; a reader who
+    // never did gets the arrangement this release ships.
     const back = applySections(after, lessonCtx, sectionsPresent(bare, lessonCtx))!;
-    expect(back).toContain("```\n\n<!--chronoanvil-skeleton-->");
-    expect(back).toContain("<!--/chronoanvil-skeleton-->\n\n```chronoanvil");
+    expect(back).toContain("-->\n\n<!--chronoanvil-skeleton-->");
+    expect(back).toContain("<!--/chronoanvil-skeleton-->\n\n%% chronoanvil-graph %%");
+    expect(back).not.toMatch(/\n\n\n/);
+    // Nothing composed below it, which is the property the move was made for.
+    expect(back.indexOf("```chronoanvil")).toBeLessThan(
+      back.indexOf("<!--chronoanvil-skeleton-->")
+    );
   });
 
   it("never leaves a marker behind, whatever survives", () => {
@@ -505,14 +555,20 @@ describe("editing the list, which is what makes the skeleton the reader's", () =
   });
 
   it("can be moved among other sections and is still detected when reopening", () => {
-    const text = lesson();
+    // ON `midSkeleton` (5.20), because every id in a permutation has to be one
+    // the file already holds. A shipped Lesson no longer carries a recall deck,
+    // so these lists stopped being reorderings and became "remove trackers, add
+    // recall, and put the rest in this order" — and an ARRIVAL lands where the
+    // catalogue puts it, not where the list asks, which is correct behaviour
+    // and not what this test is about.
+    const text = midSkeleton();
     const permutations = [
-      ["headings", "banner", "pages", "recall"],
-      ["banner", "headings", "pages", "recall"],
-      ["banner", "pages", "recall", "headings"],
-      ["banner", "recall", "headings", "pages"],
-      ["recall", "headings", "pages", "banner"],
-      ["recall", "banner", "pages", "headings"],
+      ["headings", "banner", "trackers", "pages", "recall"],
+      ["banner", "headings", "trackers", "pages", "recall"],
+      ["banner", "trackers", "pages", "recall", "headings"],
+      ["banner", "recall", "headings", "trackers", "pages"],
+      ["recall", "headings", "pages", "trackers", "banner"],
+      ["recall", "banner", "trackers", "pages", "headings"],
     ];
     for (const reordered of permutations) {
       const applied = applySections(

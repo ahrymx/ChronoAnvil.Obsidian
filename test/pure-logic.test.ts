@@ -8,7 +8,7 @@
 import { composeEntryTemplate } from "../src/diary/entry-sections";
 import { describe, it, expect, beforeEach } from "vitest";
 import { composeCss } from "../tools/build-css.mjs";
-import { studyFile, studyTemplate } from "./study-template";
+import { studyComposed, studyFile, studyTemplate } from "./study-template";
 import { composeDiaryDashboard } from "../src/diary/diary-sections";
 import { TFile, TFolder } from "./obsidian-stub";
 import type { App } from "obsidian";
@@ -4011,7 +4011,11 @@ describe("subject and topic dashboard banner", () => {
   });
 
   it("resolves the Subject dashboard's folder arguments at read time", () => {
-    const t = studyTemplate("Subject Index.md");
+    // COMPOSED WITH `tasks` NAMED (5.20). The open-task table is one of the two
+    // widgets this test is about and it is no longer on by default; what is
+    // under test is the ABSENCE of a creation-time argument after each
+    // directive, which is a property of the widgets and not of the arrangement.
+    const t = studyComposed("Subject Index.md", ["banner", "children", "tasks"]);
     // Both of these used to carry a creation-time literal — `{{folder}}` and
     // `{{name}}` — that a folder rename left pointing at a path which no
     // longer existed. tasks-table already defaults to its host note's folder,
@@ -4055,7 +4059,7 @@ describe("subject and topic dashboard banner", () => {
   });
 
   it("states the topic's totals as a band, not a sentence", () => {
-    const t = studyTemplate("Topic Index.md");
+    const t = studyComposed("Topic Index.md", ["banner", "stats"]);
     // The band replaces the one-line confidence-summary under its own
     // collapsible Progress header, matching how the subject page one level
     // up already states its totals.
@@ -4088,7 +4092,7 @@ describe("subject Progress section", () => {
     readSrc(name);
 
   it("folds Activity into Progress as a single section", () => {
-    const t = studyTemplate("Subject Index.md");
+    const t = studyComposed("Subject Index.md", ["banner", "progress"]);
     expect(t).toContain("header:\u{1F4C8} Progress");
     expect(t).toContain("activity-chart");
     // The separate collapsible Activity sub-header is gone — the heatmap now
@@ -4162,12 +4166,22 @@ describe("subject Progress section", () => {
     // index there is no such row, because Open tasks is not composed there, so
     // it keeps the title it has always written. `journal-sections.ts` carries
     // the argument; this is what each page ends up saying.
+    //
+    // AND BOTH ARE COMPOSED WITH THE IDS NAMED (5.20), which is also what keeps
+    // the pair meaningful: the row exists only where Open tasks is beside the
+    // queue, so a Subject index is asked for both and a Topic index for the
+    // queue alone. That was the shipped difference; it is now the difference
+    // between two tick-lists, and it is still the thing under test.
+    const IDS: Record<string, string[]> = {
+      "Subject Index.md": ["banner", "review", "tasks", "charts"],
+      "Topic Index.md": ["banner", "review", "charts"],
+    };
     const BAR: Record<string, string> = {
       "Subject Index.md": "header:🔁 Due and open",
       "Topic Index.md": "header:🔁 Review",
     };
     for (const f of ["Subject Index.md", "Topic Index.md"]) {
-      const t = asset(f);
+      const t = studyComposed(f, IDS[f]);
       expect(t).toContain("review-queue");
       expect(t).toContain(BAR[f]);
       // A confidence trend, still — as of 2.35 held in the note's managed
@@ -4288,7 +4302,9 @@ describe("study templates use the ChronoAnvil task marker", () => {
     ["template-practice.md", "tasks"],
   ] as const) {
     it(`${name} drives its checklist as a tasks widget with an empty region`, () => {
-      const text = asset(name);
+      // `checklist` NAMED (5.20): the section is off by default on every leaf
+      // now, and what this test is about is the shape of the widget it writes.
+      const text = studyComposed(name, ["banner", "checklist"]);
       // The widget and its body region ship, so the note has a task list
       // with an add-input from the first render.
       expect(text).toContain(`tasks:${key}`);
@@ -4312,7 +4328,10 @@ describe("study templates use the ChronoAnvil task marker", () => {
   });
 
   it("the topic template drives Learning Path and Resources as widgets", () => {
-    const text = studyTemplate("Topic Index.md");
+    // The two sections Study's `index:1` key still carries overrides for — its
+    // "🧭 Learning Path" label and its three shelves — asked for by name now
+    // that neither composes on a fresh index. See `studyComposed`.
+    const text = studyComposed("Topic Index.md", ["banner", "path", "resources"]);
     // Learning Path is the re-orderable path widget with its body region. The
     // bar keeps Study's label; the region key is the catalogue's since 2.41.
     expect(text).toContain("header:🧭 Learning Path");
@@ -4494,7 +4513,7 @@ describe("shipped stylesheet", () => {
     // asset — which is exactly why they still have to be these three: existing
     // Topic notes keep their content in `<!--chronoanvil:res-docs-->` and friends,
     // and a composed template emitting different keys would orphan all of it.
-    const topic = studyTemplate("Topic Index.md");
+    const topic = studyComposed("Topic Index.md", ["banner", "resources"]);
     for (const key of ["res-docs", "res-tutorials", "res-practice"]) {
       expect(topic).toContain(`attach:${key}|`);
       expect(css).toContain(`.ca-journal-attach--${key}`);
@@ -8036,15 +8055,21 @@ describe("fold scope in the shipped templates", () => {
     // halves of the claim matter: measured before the heading rule existed,
     // folding this bar hid 21 blocks and the note vanished.
     //
-    // THE SECOND BLOCK IS THE MARKER, AND IT IS WHY IT GETS ITS OWN LINE (5.6).
+    // THE LAST BLOCK IS THE MARKER, AND IT IS WHY IT GETS ITS OWN LINE (5.6).
     // `<!--chronoanvil-skeleton-->` is not a heading, so a fold that reaches it
     // does not stop — and if it were abutted to `## Overview` the two would be
     // ONE block under this model, which would carry the fold past the heading
     // and into the prose. Separated, the cost is bounded at one hidden element
-    // that renders as nothing. The count going to 3 is the regression to watch
-    // for; going to 1 would mean the markers had been dropped.
+    // that renders as nothing.
+    //
+    // FOUR AS OF 5.20, WHICH IS THE WHOLE NOTE ABOVE THE PROSE: two tracker
+    // lines welded into the grid's bar, the pages table welded into its own,
+    // and the skeleton's opening marker. It was nine while a Lesson also
+    // composed a recall deck and a checklist. Going to 3 would mean a marker
+    // had been dropped; going up means something composed below the skeleton,
+    // which is the arrangement rule the catalogue's last entry states.
     const lesson = studyFile("template-lesson.md");
-    expect(hiddenAfterFirstBar(lesson)).toBe(9);
+    expect(hiddenAfterFirstBar(lesson)).toBe(4);
   });
 
   it("gives the composed dashboards a bar for every section", () => {

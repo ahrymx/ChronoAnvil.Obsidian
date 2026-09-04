@@ -82,6 +82,60 @@ const allTemplates = (): {
   return out;
 };
 
+// ── THE PLANNER'S FIXTURES ARE COMPOSED, NOT SHIPPED (5.20) ──────────────
+//
+// Almost every test below reached for the Study Subject or Topic index as the
+// generator writes it, because until 5.20 those were the longest templates in
+// the tree: eight sections, a row fence welding Review to Open tasks, two
+// managed regions, a renameable bar. They are three sections and no row now,
+// which is right for a reader opening a fresh index and useless as a fixture
+// for a module whose entire job is moving, cutting and retitling sections that
+// are there.
+//
+// SO THE FIXTURES NAME THEIR SECTIONS. Nothing in the planner asks whether a
+// section was on by default — it takes a text and a list of ids — so pinning
+// the list here loses no coverage, and it means the next change to the defaults
+// cannot quietly thin eighteen tests down to assertions about three blocks. It
+// nearly did: every one of these failed as a null dereference or a vacuous
+// filter rather than as a claim about the planner.
+//
+// THE STUDY LAYOUT IS STILL PASSED, because two of these tests are about the
+// Learning Path's label and Study's three resource shelves — the overrides that
+// outlived the arrangement they used to sit beside.
+const RICH_INDEX = [
+  "banner",
+  "trackers",
+  "children",
+  "review",
+  "tasks",
+  "progress",
+  "path",
+  "resources",
+  "find",
+  "charts",
+];
+
+const richIndex = (
+  depth: number,
+  ids: string[] = RICH_INDEX
+): { file: string; ctx: SectionContext; text: string } => {
+  const target = templateTargets(STUDY_JOURNAL).find(
+    (t) => t.key === `index:${depth}`
+  )!;
+  return {
+    file: target.file,
+    ctx: target.ctx,
+    text: composeTemplate(
+      target.ctx,
+      ids,
+      STUDY_JOURNAL.layout?.[`index:${depth}`]
+    ),
+  };
+};
+
+const richSubject = () => richIndex(0);
+const richTopic = () => richIndex(1);
+
 describe("reading a template back", () => {
   it("agrees with detectSections on every composed template", () => {
     // The inverse of composeTemplate, cross-checked against the detector that
@@ -140,7 +194,7 @@ describe("reading a template back", () => {
   // that could break any of them — and the three cases below are the ones that
   // only a row can reach.
   it("attributes both cells of a row fence", () => {
-    const subject = allTemplates().find((t) => t.file.includes("subject"))!;
+    const subject = richSubject();
     const present = sectionsPresent(subject.text, subject.ctx);
     expect(present).toContain("review");
     expect(present).toContain("tasks");
@@ -155,7 +209,7 @@ describe("reading a template back", () => {
     // composes the band's bar and the one after it composes none — so removing
     // the first takes a `header:` line with it and removing the second does
     // not, and each has to leave a fence that is still valid grammar.
-    const subject = allTemplates().find((t) => t.file.includes("subject"))!;
+    const subject = richSubject();
     const ids = sectionsPresent(subject.text, subject.ctx);
 
     const noReview = applySections(
@@ -196,7 +250,7 @@ describe("reading a template back", () => {
     // the same headless fence they started with. So the plan reports it as an
     // `extend` — a section short of something it should have, which is exactly
     // what `missingParts` already means — and the write adds the one line.
-    const subject = allTemplates().find((t) => t.file.includes("subject"))!;
+    const subject = richSubject();
     const ids = sectionsPresent(subject.text, subject.ctx).filter(
       (id) => id !== "review"
     );
@@ -226,7 +280,7 @@ describe("reading a template back", () => {
     // `isSectionFence` is the gate, so a bar the reader wrote — under any
     // wording — answers the question and the repair does not fire. The plugin
     // is filling a gap, not enforcing a name.
-    const subject = allTemplates().find((t) => t.file.includes("subject"))!;
+    const subject = richSubject();
     const ids = sectionsPresent(subject.text, subject.ctx).filter(
       (id) => id !== "review"
     );
@@ -355,7 +409,7 @@ describe("reading a template back", () => {
     // BLOCK, and a cut cell came out of a fence somebody else is still in — so
     // without `joinRowChunk` this restores a template whose row has become two
     // stacked blocks, and nothing tells the reader their page changed shape.
-    const subject = allTemplates().find((t) => t.file.includes("subject"))!;
+    const subject = richSubject();
     const ids = sectionsPresent(subject.text, subject.ctx);
     for (const drop of ["review", "tasks"]) {
       const without = applySections(
@@ -374,14 +428,14 @@ describe("reading a template back", () => {
     // Headers are retitleable, which layout.ts settled for dashboards. A
     // reader who renamed a section's bar still has that section, and a parser
     // that disagreed would offer to add a second copy.
-    const topic = allTemplates().find((t) => t.file.includes("topic"))!;
+    const topic = richTopic();
     const renamed = topic.text.replace("header:🔁 Review", "header:🔁 Come back to");
     expect(sectionsPresent(renamed, topic.ctx)).toContain("review");
   });
 });
 
 describe("the plan and the write cannot disagree", () => {
-  const topic = () => allTemplates().find((t) => t.file.includes("topic"))!;
+  const topic = richTopic;
 
   it("returns null when asked for what is already there", () => {
     // Idempotence made structural rather than claimed: applyLayout's and
@@ -433,7 +487,7 @@ describe("the plan and the write cannot disagree", () => {
 });
 
 describe("nothing the plugin did not write is touched", () => {
-  const topic = () => allTemplates().find((t) => t.file.includes("topic"))!;
+  const topic = richTopic;
 
   it("leaves a hand-added block exactly where it was", () => {
     const { ctx, text } = topic();
@@ -574,7 +628,11 @@ describe("nothing the plugin did not write is touched", () => {
 });
 
 describe("adding", () => {
-  const topic = () => allTemplates().find((t) => t.file.includes("topic"))!;
+  // ONE SECTION SHORT ON PURPOSE. The fixture is the rich index with `find`
+  // held back, so there is something for the add to be about; before 5.20 the
+  // shipped template happened to lack it and the tests read that as a fact
+  // about the surface rather than about the arrangement of the day.
+  const topic = () => richIndex(1, RICH_INDEX.filter((id) => id !== "find"));
 
   it("puts a new section where this surface would have", () => {
     const { ctx, text } = topic();
@@ -583,12 +641,13 @@ describe("adding", () => {
     const after = applySections(text, ctx, [...present, "find"])!;
     const order = sectionsPresent(after, ctx);
     expect(order).toContain("find");
-    // WHERE THE TEMPLATE WOULD HAVE, WHICH IS THE CATALOGUE'S ANSWER ONLY
-    // WHERE THE SURFACE DECLARES NO LAYOUT (5.18). Study's Topic index does,
-    // and the arrival is ranked against it — see `surfaceLayout`. A section the
-    // layout does not name keeps catalogue order AFTER the ones it does, which
-    // is `TemplateLayout.order`'s own rule, so Find lands below the named
-    // sections rather than between two of them.
+    // WHERE THE TEMPLATE WOULD HAVE, WHICH IS THE CATALOGUE'S ANSWER WHEREVER
+    // THE SURFACE DECLARES NO ORDER — and as of 5.20 no surface of any preset
+    // declares one, so this is now the catalogue's answer everywhere. The
+    // ranking still goes through `surfaceLayout`, because the mechanism is what
+    // is under test: a layout that DID name an order would rank the arrival
+    // against it and put the unnamed section after the named ones, which is
+    // `TemplateLayout.order`'s own rule.
     expect(order).toEqual(
       sectionsFor(ctx, surfaceLayout(ctx))
         .map((s) => s.id)
@@ -655,7 +714,7 @@ describe("fence signatures", () => {
 });
 
 describe("reordering", () => {
-  const topic = () => allTemplates().find((t) => t.file.includes("topic"))!;
+  const topic = richTopic;
 
   it("returns null when the order is unchanged", () => {
     const { ctx, text } = topic();
@@ -775,14 +834,7 @@ describe("reordering", () => {
 
 describe("parts and the extend op", () => {
   // The Study Topic index — the deepest index, where children is per-kind.
-  const topic = (): { ctx: SectionContext; text: string } => {
-    const target = templateTargets(STUDY_JOURNAL).find((t) => t.key === "index:1")!;
-    const files = journalTemplateFiles(STUDY_JOURNAL);
-    return {
-      ctx: target.ctx,
-      text: files.find((f) => f.name === target.file)!.content,
-    };
-  };
+  const topic = richTopic;
   const want = (ctx: SectionContext): string[] => sectionsPresent(topic().text, ctx);
   // A file written before `practice` existed.
   const dropPractice = (text: string): string =>
@@ -1001,17 +1053,7 @@ describe("parts and the extend op", () => {
 // ── a section's title is a question with an answer in the file (3.18 §3) ───
 
 describe("renameable section titles", () => {
-  const topic = (): { ctx: SectionContext; text: string } => {
-    const target = templateTargets(STUDY_JOURNAL).find(
-      (t) => t.key === "index:1"
-    )!;
-    return {
-      ctx: target.ctx,
-      text: journalTemplateFiles(STUDY_JOURNAL).find(
-        (f) => f.name === target.file
-      )!.content,
-    };
-  };
+  const topic = richTopic;
 
   it("writes the answer into the header the section emitted", () => {
     const { ctx, text } = topic();
@@ -1084,7 +1126,12 @@ describe("a chosen order is composed, and no order is still catalogue order", ()
 
   it("writes the sections in the order the wizard collected", () => {
     const { ctx } = target();
-    const ids = defaultSectionIds(ctx);
+    // RICH_INDEX RATHER THAN THE DEFAULTS (5.20), because a Topic index no
+    // longer composes Resources at all and the reordering this test performs is
+    // "move Resources to the front". The ids a caller passes are the ids
+    // composed — that is `composeTemplate`'s first argument — so naming them
+    // here asks the ordering question without also asking the defaults one.
+    const ids = RICH_INDEX;
     // Move `resources` to the front — a real reordering, not a no-op.
     const moved = ["resources", ...ids.filter((i) => i !== "resources")];
     const out = composeTemplateOrdered(ctx, ids, moved);
@@ -1114,7 +1161,7 @@ describe("a chosen order is composed, and no order is still catalogue order", ()
     // three-shelf signature does not match — an artifact of the fixture, not of
     // ordering. `cooking` has no options, so the two agree.
     const ctx = templateTargets(cooking).find((t) => t.key === "index:1")!.ctx;
-    const ids = defaultSectionIds(ctx);
+    const ids = RICH_INDEX;
     const out = composeTemplateOrdered(ctx, ids, ["resources"]);
     for (const id of ids) {
       expect(sectionsPresent(out, ctx)).toContain(id);

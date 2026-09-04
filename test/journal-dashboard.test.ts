@@ -280,6 +280,42 @@ describe("the editor opens on it, as that journal's page", () => {
     }
   });
 
+  it("is a page the journal NOTE resolver refuses, which is why the cog needed a fallthrough (5.20)", () => {
+    // THE ASYMMETRY THAT HID THE DOOR FOR FOUR RELEASES. `bannerSurfaceOf`
+    // answers "journal" for anything under a journal root, so the vault
+    // banner reached for `journalBannerMenu` on this page too — and that
+    // builder asks `contextFor`, which is `resolveSectionHost`: a journal NOTE,
+    // resolved from a `type:` value against the journal's own levels and kinds.
+    // This page writes no frontmatter at all (asserted below), so the answer is
+    // null, and null was read as "there is no menu here". The cog opened on
+    // *Banner art & settings…* alone on every journal's front page.
+    //
+    // The refusal itself is CORRECT and stays: there is no Template…, no
+    // tracker and no Convert to a dashboard to offer on a page that is not a
+    // note of any kind. What was wrong is what the caller did with it.
+    const refs: JournalHostRef[] = TYPES.map((type) => ({
+      type,
+      root: type.root,
+      templatesFolder: type.templatesFolder,
+    }));
+    for (const type of TYPES) {
+      const dash = folderNotePath(type.root);
+      // No `type:` to resolve, and nothing resolves without one.
+      expect(composeJournalDashboardNote(type).startsWith("---")).toBe(false);
+      expect(resolveSectionHost(refs, dash, undefined), type.name).toBeNull();
+      // And the surface that DOES claim it hands over this journal's own
+      // catalogue — the door the fallthrough opens.
+      const { model, noun } = modelForSurface({
+        kind: "journal-dashboard",
+        ctx: { type },
+      });
+      expect(noun).toBe(`${type.name} dashboard`);
+      expect(own(model.sections().map((s) => s.id)), type.name).toEqual(
+        journalDashboardSections(type).map((s) => s.id)
+      );
+    }
+  });
+
   it("says which page a refusal is about", () => {
     const model = journalDashboardSectionModel(STUDY_JOURNAL, STUDY_JOURNAL.root);
     const why = model.refusal("contents", composeJournalDashboardNote(STUDY_JOURNAL));

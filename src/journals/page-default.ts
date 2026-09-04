@@ -61,6 +61,45 @@ export function configOfJournal(
   return (configs ?? []).find((j) => j.id === id) ?? null;
 }
 
+// ── WHERE A PAGE SITS IN ITS NOTE (5.20) ────────────────────────────────
+//
+// `order` is the one property a page carries that nothing else in the plugin
+// carries, and its two halves — the reader and the allocator — lived in two
+// files and disagreed.
+//
+// THE READER was inline in `buildPagesTable`: `Number(fm["order"])`, with
+// non-finite values sorted to the end. THE ALLOCATOR was inline in `newPage`,
+// and it did not read `order` at all. It COUNTED the files beside the note and
+// added one, on the argument that *"a count is recomputable, and a counter on
+// the dashboard would drift the first time a page was deleted by hand"*.
+//
+// THE COUNT DRIFTS ON EXACTLY THAT DELETION. Pages 1, 2, 3; delete the second;
+// two files remain, so the next page is made `3` — the ordinal page three
+// already has. The table then breaks the tie on basename, so two pages swap
+// places in the index depending on their names, and every page made afterwards
+// inherits the collision. The stored counter it was written to avoid had this
+// bug; so did the count that replaced it.
+//
+// MAX PLUS ONE IS THE ANSWER TO BOTH, and it is still recomputed from the notes
+// rather than stored: it reads the same property the table sorts on, so a page
+// dragged, renumbered or hand-edited is a page this has already accounted for.
+//
+// The two are here, pure and beside each other, so that the next release cannot
+// change what an ordinal is in one place only.
+export function pageOrderOf(fm: Record<string, unknown>): number | null {
+  const n = Number(fm["order"]);
+  return Number.isFinite(n) ? n : null;
+}
+
+// The ordinal a new page takes, given every ordinal already in the note.
+//
+// AN EMPTY NOTE STARTS AT 1, which is what makes the first page's `order`
+// agree with the `1` the table prints beside it.
+export function nextPageOrder(existing: readonly (number | null)[]): number {
+  const known = existing.filter((n): n is number => n != null);
+  return known.length === 0 ? 1 : Math.max(...known) + 1;
+}
+
 /** One row of a layout dropdown. Structurally `TemplateChoice`, without the UI import. */
 export interface LayoutChoice {
   id: string;

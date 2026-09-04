@@ -542,7 +542,9 @@ export function buildStudyHeader(
 //
 // WHAT AN ENTRY PUTS THERE is its alias and the navigator between days. What a
 // JOURNAL NOTE puts there is the pair that says where it sits in its journal:
-// its LEVEL — Subject, Topic, Lesson — and, on a leaf, its KIND.
+// its LEVEL on an index — Subject, Topic — and its KIND on a leaf — Lesson,
+// Practice. Never both, because a note is never both: the two nulls are the
+// same fact stated from either end, and `sectionContext` is where they are set.
 //
 // WHY THOSE TWO. A journal's crumb trail says which subject and topic a note is
 // under; it does not say what the note IS. Two notes with identical trails can
@@ -564,11 +566,28 @@ export function buildJournalContext(
   const sctx = plugin.sections.contextFor(ctx.sourcePath);
   if (!sctx) return null;
 
-  const level = sctx.type.levels[sctx.depth ?? 0];
+  // ── THE LEVEL IS READ, NOT INDEXED (5.20) ─────────────────────────────
+  //
+  // This was `sctx.type.levels[sctx.depth ?? 0]`, and `depth` is NULL ON EVERY
+  // LEAF AND EVERY PAGE — `sectionContext` says so in the field's own comment.
+  // So `?? 0` resolved to Study's FIRST level on every lesson in the vault, and
+  // the strip under a Lesson's tracker card read `SUBJECT`: not a stale word,
+  // not the wrong case, but the name of a different note four folders up.
+  //
+  // IT SURVIVED BECAUSE THE SUPPRESSION BELOW HID THE HONEST HALF. The head
+  // over that card says `STUDY · LESSON`, so `pageHeadSays` withheld the KIND —
+  // the one fact that was right — and printed the fabricated level alone. A
+  // defect that deletes the true statement and keeps the false one reads as a
+  // layout quirk rather than as a wrong answer, which is why it took a vault
+  // render to see.
+  //
+  // `sctx.level` IS THE SAME LOOKUP ALREADY DONE, by the function that knows
+  // which of the three note kinds it is building: a number for an index, null
+  // for a leaf and for a page. Reading it is what makes "a page has no level of
+  // its own" true by construction instead of by a branch here that only ever
+  // covered two of the three cases.
   const kind = sctx.kind ?? null;
-  // A page is a part of the note above it rather than a note of its own, so it
-  // has no level of its own to report.
-  let levelNoun = sctx.noteKind === "page" ? null : (level?.noun ?? null);
+  let levelNoun = sctx.level?.noun ?? null;
   let kindLabel = kind?.label ?? null;
 
   // ── AND NOT WHAT THE HEAD'S EYEBROW ALREADY SAYS (4.51.7) ─────────────

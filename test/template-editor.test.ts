@@ -7,7 +7,10 @@
 
 import { describe, expect, it } from "vitest";
 import { STUDY_JOURNAL } from "../src/journals/journal";
-import { journalTemplateFiles } from "../src/journals/custom-journal";
+import {
+  composeTemplate,
+  journalTemplateFiles,
+} from "../src/journals/custom-journal";
 import {
   findSection,
   sectionContext,
@@ -33,9 +36,31 @@ import {
 // what makes it checkable without a browser.
 
 const ctx = sectionContext(STUDY_JOURNAL, { depth: 1 });
+
+// ── THE FIXTURE IS COMPOSED, NOT SHIPPED (5.20) ──────────────────────────
+//
+// The editor's decisions are about sections that are IN a file: which rows are
+// locked, what the footer counts, what Save refuses. A Topic index as the
+// generator now writes it holds three, none removable-with-consequences, so
+// five of these tests went vacuous or null the moment the defaults changed —
+// "counts an addition and a removal" counted one, because there was no `review`
+// to remove.
+//
+// So the fixture names its sections. Nothing the editor does asks whether a
+// section was on by default; it reads a file and a tick-list, and this is a
+// file a reader could produce in one visit to the editor itself.
+const RICH = [
+  "banner",
+  "trackers",
+  "children",
+  "stats",
+  "path",
+  "review",
+  "resources",
+  "charts",
+];
 const topic = () =>
-  journalTemplateFiles(STUDY_JOURNAL).find((f) => f.name === "topic-index.md")!
-    .content;
+  composeTemplate(ctx, RICH, STUDY_JOURNAL.layout?.["index:1"]);
 const lessonCtx = sectionContext(STUDY_JOURNAL, {
   kind: STUDY_JOURNAL.kinds.find((k) => k.id === "lesson")!,
 });

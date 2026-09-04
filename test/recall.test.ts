@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { studyFile } from "./study-template";
+import { studyComposed, studyFile } from "./study-template";
 import {
   RecallPair,
   confidenceFor,
@@ -334,16 +334,24 @@ describe("recall widget registration", () => {
 });
 
 describe("the shipped templates", () => {
-  it("gives the Lesson template a Recall section", () => {
-    const t = asset("template-lesson.md");
+  // ── THE DECK IS A TICK NOW, NOT A DEFAULT (5.20) ────────────────────
+  //
+  // Both of these read the shipped template and asserted the deck was in it.
+  // Recall is `default: never` on every surface as of 5.20 — see the note above
+  // `JOURNAL_SECTIONS` — so what is left to assert is that a Lesson and a Page
+  // are surfaces that OFFER it and compose it correctly when asked, which is
+  // every claim these two were making about the widget itself.
+  it("gives the Lesson template a Recall section when it is asked for", () => {
+    const t = studyComposed("template-lesson.md", ["banner", "recall"]);
     expect(t).toContain("recall:recall");
     expect(t).toContain("<!--chronoanvil:recall");
+    expect(asset("template-lesson.md")).not.toContain("recall:recall");
   });
 
   it("gives the Page template one too", () => {
     // The branch that only exists because pages exist: a page carries no
     // Confidence, so its cards grade the lesson it belongs to.
-    const t = asset("template-page.md");
+    const t = studyComposed("template-page.md", ["banner", "recall"]);
     expect(t).toContain("recall:recall");
     expect(t).toContain("<!--chronoanvil:recall");
   });

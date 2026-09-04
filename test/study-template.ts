@@ -6,8 +6,9 @@
 // LICENSING.md.
 
 import { STUDY_JOURNAL } from "../src/journals/journal";
-import { journalTemplateFiles } from "../src/journals/custom-journal";
+import { composeTemplate, journalTemplateFiles } from "../src/journals/custom-journal";
 
+import { templateTargets } from "../src/journals/journal-sections";
 import { readAsset } from "./sources";
 import { STUDY_PRESET } from "../src/journals/journal";
 import { presetConfig } from "../src/journals/custom-journal";
@@ -69,6 +70,36 @@ export function studyFile(name: string): string {
   );
   if (hit) return hit.content;
   return readAsset(name);
+}
+
+// ── ASKING FOR A SECTION THAT IS NO LONGER ON (5.20) ─────────────────────
+//
+// `studyTemplate` returns what the generator writes, which is now the banner,
+// the tracker card, what is below and the prose — the catalogue's four. Every
+// other section is a box a reader ticks.
+//
+// A LOT OF TESTS ARE ABOUT WHAT ONE OF THOSE SECTIONS RENDERS ON A STUDY
+// SURFACE — the review queue's directive, the Learning Path's overridden label,
+// Study's three resource shelves — and none of them is about whether a fresh
+// index carries it. Those go through here: the same surface, the same layout
+// overrides, with the ids named. What they lose is the ability to notice a
+// default changing, which is `journal-sections.test.ts`'s and
+// `journal-presets.test.ts`'s job and was never theirs.
+export function studyComposed(name: string, ids: string[]): string {
+  const file = ASSET_NAMES[name] ?? name;
+  const target = templateTargets(STUDY_JOURNAL).find((t) => t.file === file);
+  if (!target) {
+    throw new Error(
+      `No Study template named ${name} (have: ${templateTargets(STUDY_JOURNAL)
+        .map((t) => t.file)
+        .join(", ")})`
+    );
+  }
+  return composeTemplate(
+    target.ctx,
+    ids,
+    STUDY_JOURNAL.layout?.[target.key]
+  );
 }
 
 // The Study journal as a STORED config, for a fixture that needs it registered.

@@ -30,6 +30,7 @@ import { isPageHeadLine, PAGE_HEAD_KEYWORDS } from "../src/core/directive-gramma
 import { JOURNAL_PRESETS, STUDY_JOURNAL } from "../src/journals/journal";
 import {
   buildJournalType,
+  composeTemplate,
   journalTemplateFiles,
 } from "../src/journals/custom-journal";
 import {
@@ -48,18 +49,58 @@ import {
 } from "../src/journals/journals-dashboard-sections";
 import { composeDiaryDashboard, diarySectionModel } from "../src/diary/diary-sections";
 
-// The Study subject index — the container page the shipped row is on.
-const subject = () => {
+// ── THE ROWS ARE COMPOSED, NOT SHIPPED (5.20) ────────────────────────────
+//
+// Every group this file is about — Review beside Open tasks on a container
+// index, the tracker grid paged with the stats band on a leaf one — was a
+// SHIPPED row until 5.20 turned all four of those sections off by default.
+// Reading the templates off disk therefore stopped producing a row at all, and
+// eight tests failed on a null rather than on anything about grouping.
+//
+// The grammar is unchanged: a group is still what the catalogue welds when two
+// adjacent sections are both composed, and `rowRuns` still decides it. So the
+// fixtures name the sections and the tests go on asking the question they were
+// written to ask.
+//
+// STATS IS ABSENT FROM THE CONTAINER LIST DELIBERATELY. "The grid alone gets
+// its title back" is one of the cases below, and a container index is where
+// that has always been true — one level above the notes, the band's numbers are
+// already a column each in the children table.
+const CONTAINER_IDS = [
+  "banner",
+  "trackers",
+  "children",
+  "review",
+  "tasks",
+  "progress",
+  "find",
+  "charts",
+];
+const LEAF_INDEX_IDS = [
+  "banner",
+  "trackers",
+  "stats",
+  "children",
+  "path",
+  "review",
+  "resources",
+  "charts",
+];
+
+const studyIndex = (stem: string, ids: string[]) => {
   const target = templateTargets(STUDY_JOURNAL).find((t) =>
-    t.file.includes("subject")
+    t.file.includes(stem)
   );
-  if (!target) throw new Error("no subject template");
-  const file = journalTemplateFiles(STUDY_JOURNAL).find(
-    (f) => f.name === target.file
-  );
-  if (!file) throw new Error("no subject file");
-  return { text: file.content, ctx: target.ctx, model: journalSectionModel(target.ctx) };
+  if (!target) throw new Error(`no ${stem} template`);
+  return {
+    text: composeTemplate(target.ctx, ids, STUDY_JOURNAL.layout?.[target.key]),
+    ctx: target.ctx,
+    model: journalSectionModel(target.ctx),
+  };
 };
+
+// The Study subject index — the container page the row is on.
+const subject = () => studyIndex("subject", CONTAINER_IDS);
 
 const shape = (model: ReturnType<typeof journalSectionModel>, text: string) =>
   model.blocks!(text).map((b) => b.ids.join("+"));
@@ -256,7 +297,11 @@ describe("grouping a journal note (5.11)", () => {
       "```chronoanvil\nrow\njournal-search\ncell\nactivity-chart\n```"
     );
     expect(shape(model, grouped as string)).toEqual([
-      "banner", "children", "trackers", "review+tasks", "find+progress", "charts",
+      // FIND BEFORE REVIEW (5.20): the shipped Subject index pinned its own
+      // order until this release, and with the pin gone this is the catalogue's
+      // — `find` sits above the queue in the array. What the test is about is
+      // the grouping, which is unchanged.
+      "banner", "trackers", "children", "find+progress", "review+tasks", "charts",
     ]);
     // AND IT SETTLES. The editor re-reads the file it just wrote; a second pass
     // that found anything to do would loop the window.
@@ -296,7 +341,7 @@ describe("grouping a journal note (5.11)", () => {
     );
     expect(apart).not.toBeNull();
     expect(shape(model, apart as string)).toEqual([
-      "banner", "children", "trackers", "review+tasks", "find", "progress", "charts",
+      "banner", "trackers", "children", "find", "progress", "review+tasks", "charts",
     ]);
     // Two blocks, each one widget, each still in the form the reader chose —
     // this is why `asFlat` leaves `RowMember.bar` unanswered.
@@ -360,21 +405,7 @@ describe("the same guard on the other two catalogues (5.11)", () => {
 // `journal-sections.ts` for why it is paged rather than columned, and why it
 // carries no band title where "🔁 Due and open" does.
 describe("the tracker grid and the stats band (5.18)", () => {
-  const topic = () => {
-    const target = templateTargets(STUDY_JOURNAL).find((t) =>
-      t.file.includes("topic")
-    );
-    if (!target) throw new Error("no topic template");
-    const file = journalTemplateFiles(STUDY_JOURNAL).find(
-      (f) => f.name === target.file
-    );
-    if (!file) throw new Error("no topic file");
-    return {
-      text: file.content,
-      ctx: target.ctx,
-      model: journalSectionModel(target.ctx),
-    };
-  };
+  const topic = () => studyIndex("topic", LEAF_INDEX_IDS);
 
   it("composes them as one group of two pages, untitled", () => {
     const { text, model } = topic();
@@ -402,10 +433,11 @@ describe("the tracker grid and the stats band (5.18)", () => {
   });
 
   it("gives the grid its own title back where there is no band", () => {
-    // A container index composes no band (`stats` is the deepest index's
-    // question), so the row comes down to one member and `soloBar` puts the
-    // grid's own name back. Exercise & Diet is the leaf-index case of the same
-    // thing: it ships without the band at all.
+    // With no band beside it the row comes down to one member and `soloBar`
+    // puts the grid's own name back. A container index is where that has always
+    // been true, and as of 5.20 it is true of every SHIPPED index too — the
+    // band is off by default everywhere, so Exercise & Diet's block index, read
+    // straight off the generator below, is the same case again.
     const subjectText = subject().text;
     expect(subjectText).toContain(
       [

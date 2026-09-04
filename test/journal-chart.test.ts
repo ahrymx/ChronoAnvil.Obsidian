@@ -6,7 +6,7 @@
 // LICENSING.md.
 
 import { describe, it, expect } from "vitest";
-import { studyFile, studyTemplate } from "./study-template";
+import { studyComposed, studyFile } from "./study-template";
 
 import { journalChartRefusal, isChartable, chartableType } from "../src/charts/charts";
 import {
@@ -497,7 +497,7 @@ describe("the shipped index templates carry a region", () => {
   const read = studyFile;
 
   it("gives a subject index both readings of confidence", () => {
-    const t = studyTemplate("Subject Index.md");
+    const t = studyComposed("Subject Index.md", ["banner", "charts"]);
     expect(t).toContain("```chronoanvil-journal-charts");
     expect(parseJournalChartRegion(t.split("\n")).map((s) => s.shape)).toEqual([
       "trend",
@@ -506,9 +506,11 @@ describe("the shipped index templates carry a region", () => {
   });
 
   it("gives a topic index the trend it always had", () => {
-    // The shipped default doesn't change by moving into the region — a fresh
-    // Topic note still opens with a confidence trend on it.
-    const t = studyTemplate("Topic Index.md");
+    // The section's seed doesn't change by moving into the region — a Topic
+    // index that carries Charts opens with a confidence trend on it. It no
+    // longer carries one unasked (5.20), which is the arrangement question and
+    // is asked elsewhere.
+    const t = studyComposed("Topic Index.md", ["banner", "charts"]);
     expect(parseJournalChartRegion(t.split("\n"))).toEqual([
       { key: "j1", shape: "trend", tracker: "confidence" },
     ]);

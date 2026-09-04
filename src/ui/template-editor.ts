@@ -40,6 +40,7 @@
 import { App } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
 import { openSectionEditor } from "./section-editor";
+import type { SectionModel } from "../core/section-model";
 import type {
   SectionContext,
   SectionOverrides,
@@ -95,11 +96,65 @@ export async function openTemplateEditor(
     options: Record<string, SectionOverrides>,
     // Which kinds the layout is offered on. 3.18 follow-ups §5.
     kinds: string[]
-  ) => Promise<void>
+  ) => Promise<void>,
+  // Store whether this kind's notes can be split across pages. 5.20.
+  //
+  // OPTIONAL, AND ONLY THE SETTINGS RAIL PASSES IT. `kind.pages` is a property
+  // of the KIND, so a Pages row on a reader's own lesson note would be one
+  // note quietly changing what every other note of its kind is — which is
+  // exactly the confusion the deleted Structure checkbox created from the other
+  // direction. The rail opens a kind's TEMPLATE, which is the one file that
+  // means the kind rather than an instance of it, so that is where the row is
+  // offered and the second door goes without.
+  //
+  // RETURNS FALSE WHEN THE READER DECLINED, because unsetting it is a change
+  // `confirmKindChange` asks about and the answer has to be able to be no.
+  onSetPaged?: (paged: boolean) => Promise<boolean>
 ): Promise<boolean> {
   const file = getFile(app, path);
   if (!file) return false;
   const text = await app.vault.read(file);
+
+  // The model that composes this note when `ids` are its sections.
+  //
+  // THE UNION, NOT THE TICK LIST (5.20). `hasPages` is true where the config
+  // says so OR the reader has ticked the row, and the "or" is load-bearing in
+  // both directions:
+  //
+  //   • TICKED ON AN UNPAGED KIND — the config still says no, and this is what
+  //     lets the window compose, preview and plan the table before anything is
+  //     written. The tick is the answer; the config catches up on Save.
+  //   • UNTICKED ON A PAGED ONE — `applySections` REMOVES a section by knowing
+  //     it exists and finding it absent from `want`. A model narrowed to the
+  //     tick list would not have `pages` in its catalogue at all, so it would
+  //     walk past the reader's pages table and report nothing to change: the
+  //     untick would clear `kind.pages` and leave the table sitting in the
+  //     file. Widening only is what makes the removal expressible.
+  //
+  // `documentLike` follows exactly as `sectionContext` derives it, so nothing
+  // downstream can tell this ctx from a stored one.
+  //
+  // BUILT HERE, NOT IN THE MODAL, for the reason everything else in this file
+  // is: it is a `SectionContext` away from a journal catalogue, and the window
+  // holds neither.
+  const modelWith = (ids: readonly string[]): SectionModel => {
+    const paged = ids.includes("pages") || ctx.hasPages;
+    return journalSectionModel({
+      ...ctx,
+      hasPages: paged,
+      documentLike: paged || ctx.noteKind === "page",
+    });
+  };
+  // A KIND'S DEFAULT TEMPLATE ONLY. A saved layout is one arrangement of a kind
+  // among several, so a Pages row on `kind:lesson:compact` would be a
+  // per-variant control over a per-kind fact — ticking it on one layout would
+  // change every other, including the default nobody had open. The page
+  // template is excluded too: `sectionContext` says a page has no variant, and
+  // it is also not the note the question is about.
+  const structuralHere =
+    !!onSetPaged &&
+    ctx.noteKind === "leaf" &&
+    (ctx.variantId ?? "default") === "default";
 
   return openSectionEditor(app, plugin, path, {
     model: journalSectionModel(ctx),
@@ -112,6 +167,33 @@ export async function openTemplateEditor(
     // none of those.
     handEdited: isHandEdited(text, ctx),
     ...(onSaved ? { onSaved } : {}),
+    ...(structuralHere
+      ? {
+          structural: {
+            // OFFERED ONLY WHILE THE KIND IS UNPAGED. Once it is, the catalogue
+            // offers the section itself — `applies: (ctx) => ctx.hasPages` is
+            // satisfied — and a second copy of the row in the Add list would be
+            // this file disagreeing with the catalogue about what exists.
+            //
+            // TAKEN FROM `modelWith` RATHER THAN SPELLED, so the row carries the
+            // catalogue's own icon, label, blurb and locks. A `SectionView` is
+            // built by machinery this file does not own and must not reproduce.
+            offer: ctx.hasPages
+              ? []
+              : modelWith(["pages"])
+                  .sections()
+                  .filter((sv) => sv.id === "pages"),
+            modelWith,
+            save: async (ids: readonly string[]): Promise<boolean> => {
+              const paged = ids.includes("pages");
+              // NOTHING TO ASK WHEN NOTHING MOVED. A reader reordering a paged
+              // kind's template must not be shown a confirmation about pages.
+              if (paged === ctx.hasPages) return true;
+              return onSetPaged!(paged);
+            },
+          },
+        }
+      : {}),
     ...(onSaveVariant
       ? {
           arrangement: {

@@ -366,10 +366,17 @@ describe("Media is the shelf this release was written from", () => {
       "open",
       "totals",
     ]);
+    // THE SHELF NAMES ITS BAND AND NOT ITS ARRANGEMENT (5.20). `sections` and
+    // `order` are gone from every preset; the override that says WHICH band a
+    // Media shelf draws stayed, because it is the answer to a question the
+    // catalogue cannot answer for this journal.
     const layout = MEDIA_PRESET.config.layout?.["index:0"];
-    expect(layout?.sections).toContain("stats");
-    expect(layout?.sections).not.toContain("totals");
+    expect(layout?.sections).toBeUndefined();
+    expect(layout?.order).toBeUndefined();
     expect(layout?.options?.["stats"]?.preset).toBe("summary");
+    // And `totals` is gone as an id, not merely unlisted — a layout still
+    // naming it would resolve to nothing.
+    expect(JSON.stringify(layout)).not.toContain("totals");
   });
 
   it("leaves Exercise & Diet banding its four sums out of one section", () => {
@@ -382,8 +389,13 @@ describe("Media is the shelf this release was written from", () => {
     // "what does this journal band", which is still true and is what ticking
     // Stats back on in *Edit sections…* must give them: this journal's four
     // sums, not the generic band.
-    expect(layout?.sections).not.toContain("stats");
-    expect(layout?.sections).not.toContain("totals");
+    //
+    // AND THE KEY LISTS NO SECTIONS AT ALL AS OF 5.20, which is the same
+    // decision one release further: 5.18 took the band off this page by
+    // omitting it from a `sections` list, and 5.20 deleted the list. The
+    // override is what is left, and it is what the test was always about.
+    expect(layout?.sections).toBeUndefined();
+    expect(layout?.order).toBeUndefined();
     expect(layout?.options?.["stats"]?.preset).toBe("totals");
     expect(
       (ex.trackers ?? []).filter((t) => t.reduce === "sum").length

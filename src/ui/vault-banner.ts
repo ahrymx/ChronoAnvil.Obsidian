@@ -674,12 +674,37 @@ export class VaultBanner {
     isIndex: boolean,
     host: HTMLElement
   ): ((menu: Menu) => void) | null {
+    // ── THE JOURNAL LIST, OR THE FLAT ONE UNDER IT (5.20) ──────────────
+    //
+    // `surface` says which half of the vault a path is in; it does NOT say what
+    // kind of page this is. Three notes are in the journals half and are not
+    // journal notes: `03 - Journals.md`, and one folder note per registered
+    // journal — the page in the screenshot, the one a reader lands on when they
+    // click Study.
+    //
+    // `journalBannerMenu` asks `contextFor`, which resolves a journal NOTE from
+    // its `type:` frontmatter against the journal's own levels and kinds. These
+    // three pages are composed by `composeFlatNote` and write no frontmatter at
+    // all, so it answers null for every one of them — correctly, since there is
+    // no Template…, no tracker and no Convert to a dashboard to offer. It used
+    // to be read as "no menu", and the cog opened on *Banner art & settings…*
+    // alone: three pages with a full section catalogue, a section model and a
+    // working `editSectionsHere`, and no door to any of it.
+    //
+    // `??`, SO THE JOURNAL LIST STILL WINS WHERE THERE IS ONE. A journal note
+    // never falls through — `canEditSections` would say yes about it too, and
+    // the flat list would then offer *Wide page* on a Lesson and drop
+    // *Template…* from it. The fallthrough is for the pages the first resolver
+    // was right to refuse, and `sectionsMenuFor` refuses in turn — returning
+    // null on a note nothing recognises — so a stray file under a journal root
+    // still draws no list rather than one that opens and apologises.
     const build =
-      surface === "journal"
+      (surface === "journal"
         ? journalBannerMenu(this.plugin, file.path, isIndex)
-        : sectionsMenuFor(this.plugin, file.path, () =>
-            host.hasClass(WIDE_PAGE_CLASS)
-          );
+        : null) ??
+      sectionsMenuFor(this.plugin, file.path, () =>
+        host.hasClass(WIDE_PAGE_CLASS)
+      );
 
     return (menu: Menu) => {
       if (build) build(menu);

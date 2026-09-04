@@ -117,9 +117,9 @@ Directives:
 - `topics-table` — per-topic rollup on a subject index note (lesson/practice counts, last activity, open tasks). Scope is the host note's own folder.
 - `kind-table:<kind>` — the notes of one kind on a topic index note: title, date, that kind's rating (if it has one) and status. Scope is the host note's own folder, the same rule `topics-table` uses, so the table and the stats band above it always agree. Open notes come first, newest first; finished ones sort to the bottom and grey out. Written once per kind by the index template, all in the same block as their headers and **New …** buttons.
 - `pages-table` — the page index on a note that has been split. Lists the pages sitting beside it, in the order they were created. Only appears with something to show; before that it invites you to press **New Page**.
-- `recall:<key>[|Label]` — question-and-answer cards, stored in the note's `<!--chronoanvil:<key>-->` body region like the other content fields. Each card shows its question with the answer hidden; press **Show answer**, then say whether you **Got it** or **Not yet**. Grading writes the note's own rating — 🎯 Confidence on a Lesson, ✔️ Accuracy on a Practice note — and stamps 🔁 Last reviewed, which is what feeds the review queue and the trend. The pencil in the top-right switches to an editable list for writing the cards; the arrow clears the sitting so you can run the deck again. On the Lesson and Page templates by default.
+- `recall:<key>[|Label]` — question-and-answer cards, stored in the note's `<!--chronoanvil:<key>-->` body region like the other content fields. Each card shows its question with the answer hidden; press **Show answer**, then say whether you **Got it** or **Not yet**. Grading writes the note's own rating — 🎯 Confidence on a Lesson, ✔️ Accuracy on a Practice note — and stamps 🔁 Last reviewed, which is what feeds the review queue and the trend. The pencil in the top-right switches to an editable list for writing the cards; the arrow clears the sitting so you can run the deck again. Off the templates by default — tick **Recall cards** in *Edit sections…* on any Lesson or Page you want a deck on.
 - `review-queue[:all|:<folder>]` — what is worth reopening. Reads the dated notes in scope, works out when each is next due from its Confidence rating and when it was last reviewed, and lists the ones that have come round. Bare, it scopes to the host note's folder (so a subject page covers every topic beneath it); `:all` spans every journal at once. Each row has a ✓ that stamps today's date into 🔁 Last reviewed and drops the row from the list. Deliberately quiet: no overdue counter, no streak, and the list is capped — a short list is a next action, a long one is a backlog.
-- `journal-search[:all|:<folder>]` — full-text search across your journal notes: the note **body**, not just frontmatter, so it finds the words in your Overview, Notes, recall cards and tasks. Same scope grammar as `review-queue`: bare it covers the host note's folder (on a subject index, every topic beneath it), `:all` spans every journal, or name a folder. Filters go in the same box — `from:30d`, `to:2026-03`, `tag:algebra`, `is:lesson` / `is:page` / `is:practice` (whatever kinds your journals define), `has:task` / `has:attachment`, and a tracker comparison like `confidence<=2`. Every word must appear, `"quoted phrases"` stay whole, and anything unrecognised is simply searched for. Each result shows the note, its trail (Subject › Topic › Lesson) and the matching text. On the Subject Index template by default.
+- `journal-search[:all|:<folder>]` — full-text search across your journal notes: the note **body**, not just frontmatter, so it finds the words in your Overview, Notes, recall cards and tasks. Same scope grammar as `review-queue`: bare it covers the host note's folder (on a subject index, every topic beneath it), `:all` spans every journal, or name a folder. Filters go in the same box — `from:30d`, `to:2026-03`, `tag:algebra`, `is:lesson` / `is:page` / `is:practice` (whatever kinds your journals define), `has:task` / `has:attachment`, and a tracker comparison like `confidence<=2`. Every word must appear, `"quoted phrases"` stay whole, and anything unrecognised is simply searched for. Each result shows the note, its trail (Subject › Topic › Lesson) and the matching text. Off the templates by default — tick **Find** in *Edit sections…* on the index you want it on.
 - `journal-chart:<tracker>[|Label]` — any journal tracker, plotted over the dated notes in the host note's folder. Same folder rule as `topic-stats`, so it reads a subject index (every topic beneath it) or a topic index (just itself) without being told which. Titled with the tracker's own name unless you give it a label. Needs at least two readings; one is a dot, not a trend. Once a trend passes about eighteen readings it also draws a dashed **rolling average** through itself, labelled in the legend — there is nothing to switch on, because below that count the smoothed line would just be the same line half a step late. This is how a Reading journal plots "pages read" or a Cooking one plots "difficulty" — any numeric journal tracker you have defined, not just the built-in one.
 - `journal-breakdown:<tracker>[|Label]` — the same tracker, ranked instead of plotted: one bar per topic below the host note, **weakest first**. The counterpart to `journal-chart` — that one answers "am I improving?", this one answers "where am I weakest?", and only the second changes what you open next. On a note whose children are notes rather than folders (a topic index), it ranks the notes instead, which is the same question one level down. Bars scale to the tracker's own range, not to the best bar, so a good set doesn't stretch to look full. Averages through the same helper `topics-table`'s confidence column uses, so the bar and the column can't disagree.
 - `journal-tally:<tracker>` — how many of the things below sit at **each value** of a select. The question a chart cannot ask: charts refuse `select` by design, so nothing could count "how many finished". On a note whose children are folders it counts those folders' index notes, and where they are notes it counts the notes — so an Area tallies its **Projects** and a Project tallies its **Updates**. Options are drawn in the order the tracker declares them, not by size, so the row reads as a pipeline; an option nothing carries is dimmed rather than dropped, because a missing stage reads as a stage that doesn't exist.
@@ -364,8 +364,8 @@ On the **Sections** step each template's list can be reordered with the
 up/down arrows beside each row, and the schematic on the right redraws in the
 order the file will actually be written. The banner stays first and cannot be
 moved: it carries the spacer that keeps a click at the top of a note from
-expanding the fence below it. Change nothing and you get the arrangement the
-plugin has always written.
+expanding the fence below it. Change nothing and you get the four sections
+every journal starts with, in the order below.
 
 **Identity** is just a name and an emoji. The folders follow the name — a
 journal called "Cook Book" gets `<journals root>/Cook Book` for its notes and
@@ -378,25 +378,45 @@ renaming it later is just a relabel; to actually move one, move the folder in
 the file explorer and ChronoAnvil retargets the setting.
 
 **Structure** is the folder depth and the note types, one row per kind: an
-emoji, a name, what it's rated on, whether it can be split across **pages**
-(like a Study Lesson — tick it and the type gets a Page template), and which
-trackers it carries.
+emoji, a name, what it's rated on, and which trackers it carries. Everything on
+that row is what the kind **is**; what its notes are made of is the next step.
 
 **Sections** is the interesting one. It lists the
 templates your type will have down the left — one per folder level, one per note
 kind — and on the right, the sections each of those templates can carry, with a
-schematic of the arrangement beneath. Everything starts ticked as Study arranges
-it, so Next-Next-Next-Create is a perfectly good way through, and you'll get a
-journal with the same topics table, search box, review queue, charts, activity
-heatmap and task rollup that Study has.
+schematic of the arrangement beneath.
 
-Which sections are offered depends on the template. An index note (a folder's
-dashboard) can have a review queue, a search box and an activity chart; a leaf
-note can have recall cards and a checklist. A top-level index gets the search
-and the rollups because there's a tree beneath it worth searching; the deepest
-index gets a path and a resources shelf instead, because that's where the notes
-actually are. None of this is Study-specific — the same rules produce a Cooking
-journal whose Cuisine index aggregates and whose Dish index lists recipes.
+**Four things start ticked**, and they are the same four on every template of
+every journal, Study included: the **banner**, the **tracker card**, the table
+of **what is below** (a folder's notes, or a long note's pages), and the
+**prose skeleton** — the markdown headings the note opens with, always last, so
+nothing the plugin composes sits under your own writing. Next-Next-Next-Create
+gives you that, which is a page you can start using rather than a page you have
+to prune.
+
+Everything else is a box. A review queue, a search box, an activity chart, a
+progress band, a charts region, a task rollup, a learning path, a resources
+shelf, recall cards, a checklist — all of them are one tick away, on the step
+you are already on, and all of them are off until you ask. Which ones are
+*offered* still depends on the template: an index note (a folder's dashboard)
+is offered the aggregates and the search; a leaf note is offered recall cards
+and a checklist. None of this is Study-specific — the same rules produce a
+Cooking journal whose Cuisine index aggregates and whose Dish index lists
+recipes.
+
+**Pages is one of those boxes.** Tick **📄 Pages** on a note type's own template
+and long notes of that kind can be split into pages, each with its own Recall
+deck — the note gains a table of its pages and a **New page** button, and the
+journal gains one shared **Page** template for all of them. Untick it and the
+kind goes back to being a single page; notes already split keep their pages and
+go on working. There is no second place to say this: the tick *is* the setting.
+
+You can change your mind at any time on any note: *Edit sections…* is the same
+list, on a page that already exists, and it shows you the change before it
+writes anything. On a journal you have already created, **Settings → Journals →
+edit → Sections** lists the templates themselves — pressing *Edit sections* on
+one opens the same window over the template, which is where the Pages tick lives
+once the wizard is behind you.
 
 Study's own Subject and Topic dashboards are built from this same catalogue —
 they hold no prose, so there was nothing to hand-write. Its Lesson, Practice and
@@ -633,9 +653,10 @@ next bit now".
 Splitting a long lesson also makes it harder to *find*, which is why
 **`journal-search`** exists: one large note is greppable in one place, five
 pages are five places. The search indexes bodies, so a phrase you wrote on page
-three is findable, and each result names the lesson the page belongs to. It is
-on the Subject Index by default; put `journal-search:all` on your homepage if
-you'd rather search everything at once.
+three is findable, and each result names the lesson the page belongs to. Tick **Find**
+in *Edit sections…* on the Subject Index to put it there; put
+`journal-search:all` on your homepage if you'd rather search everything at
+once.
 
 **A page is not a lesson**, and that distinction does the work. Pages carry no
 Confidence and no Status, never appear in the review queue, are not counted in
@@ -927,7 +948,9 @@ A ground is drawn from your theme's own colours rather than from a fixed palette
 
 Double-clicking a folder in the file explorer opens its same-named note (e.g. `Development/Development.md`). A single click always expands/collapses the folder, same as any other folder. Toggle this off in the plugin settings if you prefer plain folders.
 
-ChronoAnvil writes several of these for you, and they are the pages you land on: `02 - Diary/02 - Diary.md` is about the diary, `03 - Journals/03 - Journals.md` is about every journal at once, and **each journal's own folder gets one too** (4.36) — `03 - Journals/Study/Study.md`, and one for each journal you have. A journal's page opens with its name, a twelve-month activity band scoped to that journal alone, its contents as cards, and its open tasks; a Review queue, a Totals band, a Tally, a Tags cloud and a charts region are offered in **“Edit this note's sections…”** rather than written for you, because each of them draws nothing on a journal that has not got the thing it counts.
+ChronoAnvil writes several of these for you, and they are the pages you land on: `02 - Diary/02 - Diary.md` is about the diary, `03 - Journals/03 - Journals.md` is about every journal at once, and **each journal's own folder gets one too** (4.36) — `03 - Journals/Study/Study.md`, and one for each journal you have. A journal's page opens with six sections — its name, its contents as cards, a stats band, a twelve-month activity band scoped to that journal alone, what was written lately, and its open tasks; a Review queue, a Tally, a Tags cloud and a charts region are offered in **“Edit this note's sections…”** rather than written for you, because each of them draws nothing on a journal that has not got the thing it counts.
+
+**Every journal's page is written from the same list**, so a journal you make next year opens the same way as the one you made today — and from then on the page is yours. The **⋯** control at the right of its breadcrumb row carries *Edit sections…*, *Add a section…* and *Wide page*, the same three every other dashboard's does; before 5.20 that menu held only *Banner art & settings…*, so the only way in was the **Note: edit sections…** command. Only *Contents* is locked — a page about a journal with no way into the journal is worse than no page at all. **Set up / repair vault** will offer to put back a section you removed, and shows you the change before making it; it never removes anything you added.
 
 None of these paths is a setting. They are derived from the folders, so renaming a folder in the file explorer carries its page along with everything else under it — and the pages themselves write no folder into their directives, so nothing inside them needs updating either.
 

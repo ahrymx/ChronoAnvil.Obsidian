@@ -48,6 +48,7 @@ import {
   registeredJournalTypes,
 } from "../journals/journal";
 import { kindPlural, plural, typeRating } from "../journals/journal-sections";
+import { pageOrderOf } from "../journals/page-default";
 // The band's own table: which measures a preset names, which of them a scope
 // can answer, and how many cells a band may have. Pure — see `stats-band.ts`
 // for why the arithmetic that reads a vault is here and the decisions are not.
@@ -2343,23 +2344,36 @@ export function buildPagesTable(
   if (!file?.parent) return root;
 
   const type = journalTypeOfNote(plugin, file.path);
-  const fm = frontmatterOf(app, file);
-  const kind = type?.kinds.find((k) => k.id === fm["type"]);
+  // ── `type:` IS READ, NOT COMPARED RAW (5.20) ────────────────────────
+  //
+  // Both of these were `fm["type"]` against a lowercase id — the host's, to find
+  // which kind's pages these are, and each page's, to decide whether it is one.
+  // A note written `type: Lesson` by hand matched neither, so the host fell to
+  // the "page"/"Page" defaults and every page under a `type: Page` note
+  // vanished from its own index while the file sat in the folder.
+  //
+  // `noteTypeOf` is the reader with the trim and the lowercase in it, and 5.2
+  // made exactly this repair in `isContainerFolder` for exactly this reason.
+  // Nothing here is new but the second and third call sites.
+  const kind = type?.kinds.find((k) => k.id === noteTypeOf(app, file));
   const pageId = kind?.pages?.id ?? "page";
   const label = kind?.pages?.label ?? "Page";
 
+  // `order` THROUGH `pageOrderOf`, which is the property's one reader — the
+  // allocator in `newPage` writes what this sorts on, and they used to be two
+  // opinions about what a missing ordinal means. Absent still sorts last: a page
+  // nobody numbered belongs after every page somebody did.
   const pages = childFiles(file.parent)
     .filter((f) => f.path !== file.path)
     .map((f) => ({
       file: f,
-      fm: frontmatterOf(app, f),
+      type: noteTypeOf(app, f),
+      order: pageOrderOf(frontmatterOf(app, f)),
     }))
-    .filter((p) => p.fm["type"] === pageId)
+    .filter((p) => p.type === pageId)
     .sort((a, b) => {
-      const ao = Number(a.fm["order"]);
-      const bo = Number(b.fm["order"]);
-      const av = Number.isFinite(ao) ? ao : Number.MAX_SAFE_INTEGER;
-      const bv = Number.isFinite(bo) ? bo : Number.MAX_SAFE_INTEGER;
+      const av = a.order ?? Number.MAX_SAFE_INTEGER;
+      const bv = b.order ?? Number.MAX_SAFE_INTEGER;
       return av !== bv ? av - bv : a.file.basename.localeCompare(b.file.basename);
     });
 

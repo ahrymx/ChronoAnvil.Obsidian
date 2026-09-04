@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import { readCode, readSrc } from "./sources";
-import { studyTemplate } from "./study-template";
+import { studyComposed } from "./study-template";
 
 const attach = (): string => readCode("attachment-widgets");
 const widgets = (): string => readCode("widgets");
@@ -66,7 +66,12 @@ describe("the duplication it removes", () => {
   it("Study's Topic index has three shelves and one Resources header", () => {
     // The measurement the follow-up made: three `attach:` lines meant three
     // identical buttons doing one thing. One header bar means one button.
-    const lines = studyTemplate("topic-index.md").split("\n");
+    //
+    // COMPOSED WITH `resources` NAMED (5.20). Study no longer ships the section
+    // on its Topic index; what it still ships is the three-shelf override that
+    // makes this measurement three rather than one, and that is what the test
+    // is about.
+    const lines = studyComposed("Topic Index.md", ["banner", "resources"]).split("\n");
     const shelves = lines.filter((l) => /^\s*attach:/.test(l));
     expect(shelves.length).toBe(3);
     const resources = lines.filter((l) => l.trim() === "header:📚 Resources");

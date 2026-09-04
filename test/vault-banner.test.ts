@@ -543,6 +543,24 @@ describe("the banner's hook", () => {
     expect(t).not.toContain('.setTitle("Wide page")');
   });
 
+  it("falls through to the flat list on a journal page that is not a journal note (5.20)", () => {
+    // THREE PAGES SIT IN THE JOURNALS HALF AND ARE NOT JOURNAL NOTES:
+    // `03 - Journals.md` and one folder note per registered journal — the page
+    // a reader lands on when they click Study. `journalBannerMenu` resolves a
+    // journal note from its `type:` frontmatter and these write none, so it
+    // answers null for all three; read as "no menu", the cog opened on *Banner
+    // art & settings…* alone. Each has a section catalogue, a section model and
+    // a working `editSectionsHere` behind it, and no door to any of them.
+    //
+    // `??` RATHER THAN A SECOND SURFACE TEST, so a journal NOTE never falls
+    // through: `canEditSections` would say yes about a Lesson too, and the flat
+    // list would then offer it *Wide page* and drop *Template…*.
+    const t = banner();
+    expect(t).toMatch(
+      /\(surface === "journal"\s*\?\s*journalBannerMenu\(this\.plugin, file\.path, isIndex\)\s*:\s*null\)\s*\?\?/
+    );
+  });
+
   it("carries the vault's four places, and Today is not one of them", () => {
     // 4.51.8, on the reader's instruction: `today` off, `diary` in, and the row
     // reordered so the two halves of the vault sit together — Home, Capture,
@@ -1029,12 +1047,28 @@ describe("what the Banner section became", () => {
     expect(head()).toContain("return named ? `${type.name} · ${named}` : type.name;");
   });
 
-  it("reads a kind's label and a level's noun, each by its own word", () => {
-    // `JournalKind` carries `label` and `JournalLevel` carries `noun`; asking
-    // either for the other's field is `undefined` printed as an eyebrow.
-    const t = head();
+  it("reads a kind's label, a level's noun and a page's label, each by its own word", () => {
+    // `JournalKind` carries `label`, `JournalLevel` carries `noun` and
+    // `JournalPages` carries `label`; asking any of them for another's field is
+    // `undefined` printed as an eyebrow.
+    //
+    // ── ASKED OF `journal.ts` SINCE 5.20, WHICH IS THE FINDING ──────────
+    //
+    // This read `page-head.ts` and passed against two inline `find`s — kinds,
+    // then levels. THE LIST HAS FOUR ENTRIES: `recognisedTypeValues` walks
+    // kinds, each paged kind's `pages`, and levels, and a page's `type:` is
+    // `kind.pages.id`. So every page in the vault fell through to the
+    // name-the-journal fallback the test above this one pins, and wore `STUDY`
+    // where its lesson wore `STUDY · LESSON`.
+    //
+    // A test that names two of three lists cannot fail for the third being
+    // missing, which is why this one now asserts the lookup where it lives
+    // rather than the shape of the caller that happened to have it.
+    expect(head()).toContain("journalNounOf(type, noteTypeOf(plugin.app, file))");
+    const t = readSrc("journal.ts");
     expect(t).toContain("type.kinds.find((k) => k.id === id)?.label");
     expect(t).toContain("type.levels.find((l) => l.id === id)?.noun");
+    expect(t).toContain("type.kinds.find((k) => k.pages?.id === id)?.pages?.label");
   });
 
   it("does not print the date twice on an untitled entry", () => {

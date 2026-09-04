@@ -9,6 +9,28 @@ This file covers the **5.x series**, in reader-facing summary. The unabridged
 notes — every entry as it was originally written, and the whole of the Almanac
 era through 4.84 — are in [CHANGELOG-ARCHIVE.md](./CHANGELOG-ARCHIVE.md).
 
+## [5.20.0] - 2026-09-04
+
+Journal templates open with four sections, and two controls that had no door on
+the page now have one. Nothing in a vault is rewritten by this release:
+templates already written keep their sections, notes already split into pages
+keep their pages, and journal dashboards already in a vault keep theirs.
+
+### Changed
+
+- **Every template a journal writes starts with four sections.** The banner, the tracker card, the table of **what is below** — a folder's notes, or a long note's pages — and the **prose skeleton**, which is always last so nothing the plugin composes sits under your own writing. Ten sections that used to be composed for you, wherever they applied, are now one tick away on the step you are already on: the review queue, the task rollup, the progress band, the charts region, the learning path, the resources shelf, recall cards, the checklist, the stats band and Find. Next-Next-Next-Create gives you a page you can start using rather than one you have to prune.
+- **The four preset journals ship those defaults too**, and their arrangement pins are gone with them — Study, Projects, Exercise & Diet and Media are now composed by the same rules as a journal you make yourself, rather than being the one set of journals that carried a hand-written layout.
+- **The prose skeleton is the last thing in the catalogue**, so a section re-added after it goes above it rather than under it.
+- **Pages stopped being a checkbox on the Structure step.** It was the one field on a note type's row that was not about what the type *is* — it decided what the type's template *contains*, one step before the step that asks exactly that. It is now the **📄 Pages** section, on the Sections list where its effect is shown: tick it and long notes of that type can be split into pages, each with its own Recall deck, and the journal gains a shared **Page** template. Untick it and notes already split keep their pages and go on working. The tick is available in the wizard and, on a journal you already have, in *Edit sections…* over that type's template — which is a question an established journal had no way to answer at all.
+
+### Added
+
+- **A journal's front page can be edited from the page.** The **⋯** control on `03 - Journals/Study/Study.md`, on every other journal's folder note, and on `03 - Journals.md` now carries *Edit sections…*, *Add a section…* and *Wide page*, the same three every diary dashboard has had. Those pages have had a section catalogue and a working editor since 4.36; the only way in was the command palette. Every journal is still created from the same hardcoded list, so a journal you make next year opens the way the one you made today did.
+
+### Fixed
+
+- **A section you ticked in the New journal wizard is no longer silently taken back out.** The wizard recorded the *order* of your sections but not *which* ones, so a Recall deck or a search box ticked at Create survived into the templates and was then removed by the next **Refresh journal templates** — a command whose own warning is that it replaces custom edits. Both are written now. This had been latent since 4.35 and became total in this release, when ten more sections came to depend on it.
+
 ## [5.19.0] - 2026-09-03
 
 Documentation only. No change to the plugin's behaviour, and nothing in a vault

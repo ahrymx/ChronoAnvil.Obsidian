@@ -339,18 +339,37 @@ describe("the section catalogue", () => {
       );
     });
 
-    it("searches and aggregates only where there is a tree to search", () => {
-      const top = defaultSectionIds(indexCtx(cooking, 0));
-      const deepest = defaultSectionIds(indexCtx(cooking, 1));
-      for (const id of ["find", "progress", "tasks"]) {
-        expect(top, id).toContain(id);
-        expect(deepest, id).not.toContain(id);
+    // ── STRUCTURE NOW DECIDES WHAT IS *OFFERED*, NOT WHAT IS ON (5.20) ──
+    //
+    // These two tests used to read `defaultSectionIds` and assert that `find`,
+    // `progress` and `tasks` were pre-ticked on a top index and off on the
+    // deepest, and that `path` was the other way round. Both claims are gone
+    // with the per-section judgements that produced them: an index of any depth
+    // now composes banner, trackers and its children, and every one of those
+    // four is a box a reader ticks.
+    //
+    // THE STRUCTURAL QUESTION IS STILL ASKED, one call to the left. `applies`
+    // is what a surface offers and `default` is what it starts with, and the
+    // pair were only ever conflated because `default` happened to answer both.
+    // A section that is off everywhere but offered nowhere is unreachable, so
+    // the offer set is the thing worth pinning now.
+    it("offers the aggregates on every index, whatever its depth", () => {
+      for (const depth of [0, 1]) {
+        const offered = sectionsFor(indexCtx(cooking, depth)).map((s) => s.id);
+        for (const id of ["find", "progress", "tasks", "path"]) {
+          expect(offered, `${id} @ ${depth}`).toContain(id);
+        }
       }
     });
 
-    it("puts the path on the level where the notes actually are", () => {
-      expect(defaultSectionIds(indexCtx(cooking, 0))).not.toContain("path");
-      expect(defaultSectionIds(indexCtx(cooking, 1))).toContain("path");
+    it("starts every index with the same three, whatever its depth", () => {
+      for (const depth of [0, 1]) {
+        expect(defaultSectionIds(indexCtx(cooking, depth)), `${depth}`).toEqual([
+          "banner",
+          "trackers",
+          "children",
+        ]);
+      }
     });
 
     it("gives a flat journal's only index the deepest-level arrangement", () => {
@@ -469,7 +488,10 @@ describe("the section catalogue", () => {
 
     it("charts the rating the type declares, not confidence", () => {
       expect(typeRating(cooking)).toBe("difficulty");
-      const top = composeTemplate(indexCtx(cooking, 0));
+      // COMPOSED WITH `charts` NAMED, because it is no longer on by default
+      // (5.20) and this test is about what the section RENDERS rather than
+      // about whether a fresh index carries it.
+      const top = composeTemplate(indexCtx(cooking, 0), ["banner", "charts"]);
       expect(top).toContain("jchart:j1:trend:difficulty");
       expect(top).toContain("jchart:j2:breakdown:difficulty");
       expect(top).not.toContain("confidence");
@@ -482,7 +504,7 @@ describe("the section catalogue", () => {
         ...freshCustomJournal(new Set()),
         kinds: [{ id: "entry", emoji: "📝", label: "Entry" }],
       });
-      const top = composeTemplate(indexCtx(unrated, 0));
+      const top = composeTemplate(indexCtx(unrated, 0), ["banner", "charts"]);
       expect(top).toContain("```chronoanvil-journal-charts");
       expect(top).toContain("header:📊 Charts");
       expect(top).not.toContain("jchart:");
@@ -580,9 +602,14 @@ describe("the section catalogue", () => {
 
     it("offers a page the sections a document gets, not a note's", () => {
       const page = sectionContext(paged, { page: paged.kinds[0] });
-      expect(defaultSectionIds(page)).toEqual(["banner", "headings", "recall"]);
+      // TWO, NOT THREE (5.20). `recall` was the third, and a page of a document
+      // is exactly the surface the argument for it was made about — which is
+      // why the section is still OFFERED here and is now off until asked for.
+      expect(defaultSectionIds(page)).toEqual(["banner", "headings"]);
+      expect(sectionsFor(page).map((s) => s.id)).toContain("recall");
       // Its own pages table would list its siblings, and its own checklist
-      // would be counted separately from the note it is part of.
+      // would be counted separately from the note it is part of — and those two
+      // are absent from the OFFER, not merely unticked.
       expect(sectionApplies(findSection("pages")!, page)).toBe(false);
       expect(defaultSectionIds(page)).not.toContain("checklist");
     });
@@ -607,9 +634,12 @@ describe("the section catalogue", () => {
 
     it("gives an unpaged kind of a paged type an ordinary leaf template", () => {
       const note = sectionContext(paged, { kind: paged.kinds[1] });
-      expect(defaultSectionIds(note)).not.toContain("pages");
-      expect(defaultSectionIds(note)).not.toContain("recall");
-      expect(defaultSectionIds(note)).toContain("checklist");
+      expect(defaultSectionIds(note)).toEqual(["banner", "trackers", "headings"]);
+      // `pages` is not offered — the kind has none. `checklist` is offered and
+      // off, which is the 5.20 distinction this pair now draws.
+      const offered = sectionsFor(note).map((s) => s.id);
+      expect(offered).not.toContain("pages");
+      expect(offered).toContain("checklist");
     });
   });
 
@@ -626,10 +656,15 @@ describe("the section catalogue", () => {
     const deepest = () => sectionContext(cooking, { depth: 1 });
 
     it("reorders only what the layout names", () => {
-      const plain = defaultSectionIds(deepest());
-      const moved = defaultSectionIds(deepest(), {
+      // THE FIXTURE IS THE OFFER SET, NOT THE DEFAULTS (5.20). This read
+      // `defaultSectionIds`, which on any index is now three ids — too few to
+      // tell "reordered" from "reversed", and none of them the `review`/`path`
+      // pair the old assertion named. `sectionsFor` is where ordering actually
+      // happens, and it is asked over everything the surface offers.
+      const plain = sectionsFor(deepest()).map((s) => s.id);
+      const moved = sectionsFor(deepest(), {
         order: ["banner", "review", "path", "children"],
-      });
+      }).map((s) => s.id);
       expect(moved.slice(0, 4)).toEqual([
         "banner",
         "review",
@@ -643,6 +678,24 @@ describe("the section catalogue", () => {
       expect(rest).toEqual(plain.filter((id) => rest.includes(id)));
     });
 
+    it("naming a section in `order` does not turn it on", () => {
+      // The other half of the same precedence, and the half 5.20 made load-
+      // bearing: with almost every section defaulting off, `order` is now
+      // routinely handed ids that are not composed. It must move them if they
+      // are there and add nothing if they are not — `sections` is the only
+      // field that turns a section on.
+      expect(
+        defaultSectionIds(deepest(), {
+          order: ["banner", "review", "path", "children"],
+        })
+      ).toEqual(["banner", "children", "trackers"]);
+      expect(
+        defaultSectionIds(deepest(), {
+          sections: ["banner", "review", "children"],
+        })
+      ).toEqual(["banner", "children", "trackers"]);
+    });
+
     it("leaves the catalogue's order alone when no layout is given", () => {
       expect(defaultSectionIds(deepest(), {})).toEqual(
         defaultSectionIds(deepest())
@@ -654,7 +707,7 @@ describe("the section catalogue", () => {
       // template kept emitting the `learning-path` region existing Topic notes
       // stored their text in. Compatibility, not expressiveness. The label
       // stays overridable; the key is now one value for every type.
-      const out = composeTemplate(deepest(), undefined, {
+      const out = composeTemplate(deepest(), ["banner", "path"], {
         options: { path: { label: "🧭 Learning Path" } },
       });
       expect(out).toContain("header:🧭 Learning Path");
@@ -663,7 +716,7 @@ describe("the section catalogue", () => {
     });
 
     it("emits one attach field and one region per declared resource shelf", () => {
-      const out = composeTemplate(deepest(), undefined, {
+      const out = composeTemplate(deepest(), ["banner", "resources"], {
         options: {
           resources: {
             fields: [
@@ -698,9 +751,14 @@ describe("the section catalogue", () => {
       // `fields` is a real arrangement difference — a Topic index carries three
       // shelves where the catalogue's default carries one — so the keys it
       // names survive. The path's key does not: it is the catalogue's.
+      // THE IDS ARE NAMED NOW (5.20): Study's `index:1` key no longer lists
+      // sections, it only carries the overrides, so this test asks for the two
+      // sections whose overrides it is about. That is precisely the situation
+      // the overrides were kept for — a reader ticks Learning path and
+      // Resources on a Topic index, and gets Study's three shelves.
       const topic = composeTemplate(
         indexCtx(STUDY_JOURNAL, 1),
-        undefined,
+        ["banner", "path", "resources"],
         STUDY_JOURNAL.layout?.["index:1"]
       );
       for (const key of ["path", "res-docs", "res-tutorials", "res-practice"]) {
@@ -709,36 +767,36 @@ describe("the section catalogue", () => {
       expect(topic).not.toContain("learning-path");
     });
 
-    it("puts the learning path above the review queue", () => {
-      // THE NOTE TABLES CAME BACK UP IN 5.18, and this test held the old claim:
-      // a Topic index put its tables BELOW the learning path, on the argument
-      // that the path is the curated route through them and the tables are the
-      // fallback. The reader reversed it across all four presets — what is
-      // below a note is the first thing every index now draws — so the per-
-      // template difference this test exists for is a different pair.
+    it("declares no arrangement at all — only overrides", () => {
+      // ── WHAT THIS TEST USED TO SAY ───────────────────────────────────
       //
-      // IT IS THE PATH AND THE QUEUE. The catalogue composes the review queue
-      // well above the path (`review` is an index staple, `path` is a field a
-      // journal opts into); Study's Topic index puts the route first and what
-      // has come round for another look after it.
-      const ids = defaultSectionIds(
-        indexCtx(STUDY_JOURNAL, 1),
-        STUDY_JOURNAL.layout?.["index:1"]
-      );
-      expect(ids.indexOf("path")).toBeLessThan(ids.indexOf("review"));
-      const catalogue = defaultSectionIds(indexCtx(STUDY_JOURNAL, 1));
-      expect(catalogue.indexOf("review")).toBeLessThan(
-        catalogue.indexOf("path")
-      );
-      // And what is below the note opens both levels, which is the arrangement
-      // the presets now share.
+      // Twice over: 2.40 pinned "a Topic index puts its note tables BELOW the
+      // learning path", 5.18 reversed it to "what is below comes first, on both
+      // indexes", and each time the claim was a `sections`/`order` list in
+      // STUDY_CONFIG. 5.20 deletes the lists. Study arranges nothing, which
+      // means there is no Study-shaped arrangement left to assert and the
+      // honest test is that the keys are empty of one.
+      //
+      // `index:0` IS GONE ENTIRELY, because with its order removed it overrode
+      // nothing and an empty object is a pin that says nothing.
+      expect(STUDY_JOURNAL.layout?.["index:0"]).toBeUndefined();
+      const topic = STUDY_JOURNAL.layout?.["index:1"];
+      expect(topic?.sections).toBeUndefined();
+      expect(topic?.order).toBeUndefined();
+      expect(Object.keys(topic?.options ?? {}).sort()).toEqual([
+        "path",
+        "resources",
+      ]);
+
+      // So both of Study's indexes compose the catalogue's four-minus-one —
+      // there is nothing below a leaf, so an index gets three — in catalogue
+      // order, exactly like a journal a reader made this morning.
       for (const depth of [0, 1]) {
         const ctx = indexCtx(STUDY_JOURNAL, depth);
-        const level = defaultSectionIds(
-          ctx,
-          STUDY_JOURNAL.layout?.[`index:${depth}`]
-        );
-        expect(level[1], `index:${depth}`).toBe("children");
+        expect(
+          defaultSectionIds(ctx, STUDY_JOURNAL.layout?.[`index:${depth}`]),
+          `index:${depth}`
+        ).toEqual(["banner", "trackers", "children"]);
       }
     });
   });
@@ -826,41 +884,42 @@ describe("the section catalogue", () => {
     }
 
     it("composes the top-level index in the order Study writes it", () => {
-      // Order is asserted for the one template the roadmap names — "a custom
-      // journal arrives with topics-table, search, review, charts, activity
-      // and tasks". The other three are set-compared above: Study's Topic
-      // Index puts its note tables below its learning path, and reproducing
-      // that would mean per-level ordering data earning its keep on a single
-      // cosmetic difference.
+      // ── THE ROADMAP'S LIST, AND WHAT IS LEFT OF IT (5.20) ────────────
+      //
+      // This asserted the eight sections the 2.28 roadmap named — "a custom
+      // journal arrives with topics-table, search, review, charts, activity and
+      // tasks" — reordered twice since (4.70 welded review beside tasks, 5.18
+      // moved the children table to the top). All eight are still catalogue
+      // sections, still offered on this surface, and none of them is composed
+      // into a fresh Subject index any more.
+      //
+      // THE TEST IS KEPT, POINTED AT THE THREE. What it guards has not changed:
+      // the file Study writes and the catalogue's answer for this surface are
+      // one arrangement, and the equality below is what fails if they come
+      // apart. The list being short is the change under test.
       const c = indexCtx(STUDY_JOURNAL, 0);
-      // ASKED WITH THE LAYOUT AS OF 5.18, because the template is now composed
-      // with one: Study declares an `index:0` arrangement where it declared
-      // none, so the catalogue's own order and the file on disk are two
-      // different questions and this test is about the file.
+      // AND THE LAYOUT LOOKUP IS KEPT TOO, though `index:0` is now undefined —
+      // this is the call the generator makes, and passing what it passes is how
+      // the two stay the same question.
       const layout = STUDY_JOURNAL.layout?.["index:0"];
       expect(defaultSectionIds(c, layout)).toEqual(
         detectSections(studyTemplate("Subject Index.md"), c)
       );
       expect(defaultSectionIds(c, layout)).toEqual([
         "banner",
-        // 5.18: WHAT IS BELOW COMES FIRST. The page exists to link into the
-        // subject; the grid of ratings is what the reader looks at second.
-        "children",
         // 4.20: the ratings left the banner's fence to become a section.
         "trackers",
-        // 4.70 MOVED OPEN TASKS UP TO SIT BESIDE REVIEW, because the two are
-        // now one row — "🔁 Due and open" — and two cells of a row have to be
-        // adjacent in the catalogue for `rowRuns` to weld them. What it
-        // displaced, Progress and Charts, are the two blocks that read as the
-        // bottom of the page anyway.
-        "review",
-        "tasks",
-        "progress",
-        // AND FIND MOVED DOWN WITH THEM (5.18). A search box is a control the
-        // reader reaches for, not a block they read past.
-        "find",
-        "charts",
+        // What the page exists to link into. 5.18 put this above `trackers`;
+        // 5.20 put it back below, because an index no longer opens with a block
+        // of numbers to look past — it opens with one tracker card.
+        "children",
       ]);
+      // The five that left, all still offered here and all one tick away.
+      const offered = sectionsFor(c, layout).map((s) => s.id);
+      for (const id of ["review", "tasks", "progress", "find", "charts"]) {
+        expect(offered, id).toContain(id);
+        expect(defaultSectionIds(c, layout), id).not.toContain(id);
+      }
     });
 
     it("reproduces the tracker grid of each shipped leaf template", () => {
@@ -924,13 +983,15 @@ describe("the section catalogue", () => {
 
     it("reports sections in the order they appear in the file", () => {
       const text = composeTemplate(lesson);
+      // FOUR, AND THE PROSE LAST (5.20). `recall` and `checklist` followed the
+      // headings here until 5.20 turned them off, which is also what made the
+      // skeleton's position worth pinning: it is the bottom of the note now, so
+      // nothing composed can sit under the reader's own writing.
       expect(detectSections(text, lesson)).toEqual([
         "banner",
         "trackers",
         "pages",
         "headings",
-        "recall",
-        "checklist",
       ]);
     });
 

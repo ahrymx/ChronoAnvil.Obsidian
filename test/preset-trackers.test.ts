@@ -336,17 +336,29 @@ describe("the 4.35 band that is left is off by default", () => {
     });
   }
 
-  it("but the band itself is, on the deepest index and nowhere else", () => {
-    // THE HALF THE MERGE MUST NOT HAVE CHANGED. `stats` defaulted on for the
-    // deepest index before 4.46 and does after it, because that is where every
-    // Study Topic index in every vault already carries the band — and a bare
-    // directive there resolves to `progress`, which is what `topic-stats` drew.
+  it("and the band is off with them, on every index of every preset", () => {
+    // ── THE HALF THAT DID CHANGE, IN 5.20 ─────────────────────────────
+    //
+    // This asserted the opposite: `stats` defaulted ON for the deepest index
+    // before 4.46 and after it, because that is where every Study Topic index
+    // in every vault already carried the band. 5.20 turns it off there too, and
+    // the argument that kept it is now the argument for where it BELONGS —
+    // stated at its own catalogue entry, which is where a reader looking at the
+    // tick-list will find it.
+    //
+    // WHAT DID NOT CHANGE IS THE PRESET. A bare directive on a deepest index
+    // still resolves to `progress`, still cell-for-cell what `topic-stats`
+    // drew, and Media's and Exercise's overrides still name theirs — see
+    // `stats-band.test.ts`. Ticking Stats on gives a reader the band this
+    // journal was built to draw; nothing about the merge is undone by it
+    // starting off.
     for (const preset of JOURNAL_PRESETS) {
       const type = buildJournalType(preset.config);
-      const deepest = `index:${type.levels.length - 1}`;
       for (const target of templateTargets(type)) {
-        const on = defaultSectionIds(target.ctx).includes("stats");
-        expect(on, `${preset.id} ${target.key}`).toBe(target.key === deepest);
+        expect(
+          defaultSectionIds(target.ctx),
+          `${preset.id} ${target.key}`
+        ).not.toContain("stats");
       }
     }
   });

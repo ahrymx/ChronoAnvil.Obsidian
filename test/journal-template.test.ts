@@ -69,6 +69,18 @@ const targets = (): { key: string; ctx: SectionContext }[] => {
 const composedFor = (ctx: SectionContext): string =>
   composeTemplate(ctx, undefined, STUDY_JOURNAL.layout?.[templateKeyFor(ctx)]);
 
+// The same page with sections NAMED, for the losses that are about one section
+// in particular.
+//
+// FOUR TESTS BELOW ARE ABOUT A REGION OR A FENCE — a checklist the reader typed
+// into, a chart they added to the charts region — and as of 5.20 neither of
+// those sections is composed into a fresh page. The loss detector does not ask
+// how a section got into the file, so naming it is the whole fix; what it must
+// not do is compose without the type's own layout, which is the mistake the
+// note above records.
+const composedWith = (ctx: SectionContext, ids: string[]): string =>
+  composeTemplate(ctx, ids, STUDY_JOURNAL.layout?.[templateKeyFor(ctx)]);
+
 describe("a freshly created note holds nothing a reload would destroy", () => {
   it("has no losses on any of Study's template targets", () => {
     // THE ASSERTION THE WHOLE FEATURE HANGS OFF. Composing a page over itself
@@ -101,7 +113,7 @@ describe("what a reload would destroy", () => {
 
   it("reports a region the reader has written in", () => {
     const ctx = lesson();
-    const clean = composedFor(ctx);
+    const clean = composedWith(ctx, ["banner", "checklist", "headings"]);
     const written = clean.replace(
       /(<!--chronoanvil:tasks\n)/,
       "$1- [ ] finish the proof\n"
@@ -154,7 +166,7 @@ describe("what a reload would destroy", () => {
     // inside it — a plan over this note reports "Charts — unchanged" while a
     // rewrite would delete every spec in it.
     const ctx = topicIndex();
-    const clean = composedFor(ctx);
+    const clean = composedWith(ctx, ["banner", "charts"]);
     expect(clean).toContain("jchart:");
     const withChart = clean.replace(
       /(jchart:[^\n]*\n)/,
@@ -209,7 +221,7 @@ describe("the fence walk the diary never needed", () => {
     // prose. It hid itself, because on a freshly composed page the stray lines
     // appear on both sides of the diff and cancel.
     const ctx = sectionContext(STUDY_JOURNAL, { depth: 1 });
-    const text = composedFor(ctx);
+    const text = composedWith(ctx, ["banner", "charts"]);
     expect(text).toContain("```chronoanvil-journal-charts");
     expect(looseLines(text).some((l) => l.startsWith("jchart:"))).toBe(false);
     expect(fenceLines(text).some((l) => l.startsWith("jchart:"))).toBe(true);
@@ -476,18 +488,28 @@ describe("the reload refuses rather than trusting the window", () => {
 
 describe("saving a default", () => {
   it("merges into the layout rather than replacing it", async () => {
-    // STUDY'S TOPIC INDEX CARRIES `order` AND NO `sections`, deliberately:
-    // `order` lets the catalogue keep deciding WHICH sections there are, so
-    // "Study's dashboards gain a section the day the catalogue does". A
-    // `{sections, options}` write over that object would delete `order` and
-    // freeze that membership for good.
+    // ── WHAT THIS TEST GUARDS, AND WHAT IT USED TO GUARD ──────────────
+    //
+    // Study's Topic index carried `order` and no `sections`, and the claim was
+    // that a `{sections, options}` write over that object would delete the
+    // `order` and freeze the membership for good. 5.20 deleted every preset
+    // `order` and `sections` list, so there is no order left to preserve — but
+    // the key is still there and still carries the two OVERRIDES that outlived
+    // it, the Learning Path's label and Study's three resource shelves.
+    //
+    // THOSE ARE NOW WHAT A CARELESS WRITE WOULD DESTROY, and they are worth
+    // more than the order was: a reader who saves a Topic index as its default
+    // and thereby loses the three shelves has lost data the catalogue cannot
+    // reconstruct. `saveDefault` spreads `prev` and merges `options`, which is
+    // the line under test either way.
     const ctx = sectionContext(STUDY_JOURNAL, { depth: 1 });
     const key = templateKeyFor(ctx);
-    const text = composedFor(ctx);
+    const text = composedWith(ctx, ["banner", "trackers", "children", "path"]);
     const { app } = appWith("03 - Journals/Study/Maths/Maths.md", text);
     const { plugin, cfg } = stubPlugin();
-    expect(cfg.layout?.[key]?.order).toBeTruthy();
-    const before = [...(cfg.layout![key].order ?? [])];
+    expect(cfg.layout?.[key]?.order).toBeUndefined();
+    const shelves = cfg.layout?.[key]?.options?.resources;
+    expect(shelves).toBeTruthy();
 
     const mgr = new JournalTemplates(app, plugin);
     (plugin as unknown as { scaffold: unknown }).scaffold = {
@@ -495,7 +517,10 @@ describe("saving a default", () => {
     };
     await mgr.saveDefault("03 - Journals/Study/Maths/Maths.md", ctx);
 
-    expect(cfg.layout![key].order).toEqual(before);
+    // The page named no Resources section, so nothing overwrote the shelves.
+    expect(cfg.layout![key].options?.resources).toEqual(shelves);
+    // And an `order` is not invented for a key that never had one.
+    expect(cfg.layout![key].order).toBeUndefined();
     expect(cfg.layout![key].sections?.length).toBeGreaterThan(0);
   });
 

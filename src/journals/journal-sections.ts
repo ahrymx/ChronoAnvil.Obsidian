@@ -1257,6 +1257,33 @@ const STATS_BAR = "header:🔢 Stats";
 const stateRow = (ctx: SectionContext): string | undefined =>
   ctx.noteKind === "index" && !ctx.hasSubContainers ? STATE_ROW : undefined;
 
+// ── WHAT A PAGE STARTS WITH, AND WHY IT IS FOUR THINGS (5.20) ──────────
+//
+// A composed page opens with its header, the trackers it is scored by, whatever
+// is below it, and the prose. That is the whole default arrangement, on every
+// surface of every journal, and every other section in this catalogue is now
+// `default: never` — offered in *Edit sections…*, ticked by a reader who wants
+// it, and written into no template that nobody asked for.
+//
+// WHAT IT REPLACED was a per-section judgement about where each block earns its
+// place: `find` on an index with a tree under it, `path` on the deepest one,
+// `stats` where the numbers are, `recall` on anything long enough to drill.
+// Every one of those judgements was defensible on its own, and the SUM of them
+// was a Subject index that opened with eight sections and a Lesson with six — a
+// page the reader has to prune before they can use it, and a wizard whose
+// pre-ticked column was almost every box.
+//
+// THE JUDGEMENTS ARE NOT DELETED. Each still sits at its own site, reworded as
+// what it is now: the answer to *where does this belong when you turn it on*.
+// That is the sentence a reader needs at the moment they are looking at the
+// list, and it was never the same sentence as *is this on by default*.
+//
+// ORDER IS THE ARRAY'S, and the four fall out of it in the order asked for —
+// `banner`, `trackers`, then `children` or `pages`, then everything a reader may
+// add, and `headings` LAST. The prose skeleton is where the writing goes, so
+// nothing composed may sit under it; that is why it moved from the middle of
+// this array to the end of it, and why its position is a rule rather than a
+// convenience. See the entry itself.
 export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "banner",
@@ -1411,12 +1438,14 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // drew; and `summary` is the two of them at once, inside the four cells a
     // band gets. See `stats-band.ts`.
     //
-    // THE DEFAULT STAYS THE DEEPEST INDEX and stays `progress`, which is the
-    // half of this that must not change: every Study Topic index in every vault
-    // has drawn that band since 3.11, and a merge that quietly re-picked its
-    // numbers would be the release editing notes it did not compose. One level
-    // up the same numbers are already a column each in the children table.
-    default: (ctx) => !ctx.hasSubContainers,
+    // THE PRESET STAYS `progress`, which is the half of this that must not
+    // change: every Study Topic index in every vault has drawn that band since
+    // 3.11, and a merge that quietly re-picked its numbers would be the release
+    // editing notes it did not compose.
+    //
+    // WHERE IT BELONGS is the deepest index. One level up, the same numbers are
+    // already a column each in the children table.
+    default: never,
     // ── AND IT ASKS NOTHING HERE, AS OF 4.48 ──────────────────────────
     //
     // 4.46 asked ONE question naming a whole arrangement; 4.47 corrected that to
@@ -1623,10 +1652,10 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     label: "Find",
     blurb: "Full-text search across the notes beneath this one.",
     surface: "index",
-    // Pre-ticked only where there is a tree to search. On the deepest index
-    // the notes are already listed on the page, so a search box over them is
-    // a control that duplicates the table above it.
-    default: (ctx) => ctx.hasSubContainers,
+    // WHERE IT BELONGS is an index with a tree to search. On the deepest one the
+    // notes are already listed on the page, so a search box over them is a
+    // control that duplicates the table above it.
+    default: never,
     questions: (ctx) => [
       {
         kind: "folder",
@@ -1650,7 +1679,9 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     label: "Review queue",
     blurb: "Notes that have come round for another look.",
     surface: "index",
-    default: always,
+    // WHERE IT BELONGS is any index: the queue reads everything beneath it, so
+    // there is no level at which it has nothing to say.
+    default: never,
     questions: (ctx) => [
       {
         kind: "folder",
@@ -1686,7 +1717,9 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     label: "Open tasks",
     blurb: "Every unfinished task in the notes beneath this one.",
     surface: "index",
-    default: (ctx) => ctx.hasSubContainers,
+    // WHERE IT BELONGS is an index with containers under it — a rollup across
+    // one folder of notes is the checklist on each of them, listed twice.
+    default: never,
     questions: (ctx) => [
       {
         kind: "folder",
@@ -1730,7 +1763,9 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     label: "Progress",
     blurb: "A calendar heatmap of activity in the notes beneath this one.",
     surface: "index",
-    default: (ctx) => ctx.hasSubContainers,
+    // WHERE IT BELONGS is an index with enough under it for a year of squares
+    // to have a shape — which is the one with containers beneath it.
+    default: never,
     claims: ["header", "activity-chart"],
     locate: (t) => probe(t, /^activity-chart\s*$/m),
     render: () => [headerBar("📈 Progress", "activity-chart")],
@@ -1742,7 +1777,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     label: "Charts",
     blurb: "A managed region of tracker charts, with Add / Edit / Remove.",
     surface: "index",
-    default: always,
+    // WHERE IT BELONGS is any index, and it ships EMPTY even there — a managed
+    // region with no charts in it. That is most of the argument for it being off
+    // now: a section whose default content is nothing is a heading and a blank
+    // band on every index in the vault until somebody adds a chart.
+    default: never,
     claims: ["jchart"],
     locate: (t) => t.indexOf(JOURNAL_CHARTS_FENCE),
     render: (ctx) => {
@@ -1864,9 +1903,9 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     label: "Task manager",
     blurb: "An ordered route through the notes here, for working in sequence.",
     surface: "index",
-    // The deepest index is where the notes actually are, so it is the only
-    // level at which "do these in order" means anything.
-    default: (ctx) => !ctx.hasSubContainers,
+    // WHERE IT BELONGS is the deepest index — that is where the notes actually
+    // are, so it is the only level at which "do these in order" means anything.
+    default: never,
     // 3.18 §3. The override has been honoured since it existed; this is the
     // control for it.
     questions: () => [
@@ -1901,7 +1940,10 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     label: "Resources",
     blurb: "Attached files and links, as a row of tiles.",
     surface: "both",
-    default: (ctx) => ctx.noteKind === "index" && !ctx.hasSubContainers,
+    // WHERE IT BELONGS is the deepest index, beside the notes the material is
+    // for. It applies to a leaf as well, and always has — a reader who keeps
+    // their references on the note rather than on its container is not wrong.
+    default: never,
     questions: () => [
       {
         kind: "title",
@@ -1927,6 +1969,133 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   },
 
   {
+    id: "bridge",
+    icon: "🌉",
+    label: "From the diary",
+    blurb: "A tracker's diary readings, over a period this note picks.",
+    surface: "leaf",
+    // OFF BY DEFAULT, and the only section here that is off for a reason other
+    // than taste. Every other default answers "does this arrangement suit this
+    // note"; this one answers "has the reader got a tracker worth pulling
+    // across", which the catalogue cannot see — it has a JournalType and no
+    // plugin, so it cannot read the tracker registry. Pre-ticking would emit
+    // `bridge-readings:` naming a tracker that may not exist, and a refusal on
+    // every leaf note of a fresh journal is exactly the state `confidence-trend`
+    // stays silent to avoid.
+    default: never,
+
+    // NOT OFFERED ON A PAGE. A page has no frontmatter of its own worth
+    // anchoring — it names its parent instead of a date — so a period property
+    // on one would be a window nothing else on the page agrees with. This is
+    // the §2.3 move: a bridge that cannot work is not offered, rather than
+    // offered and then refused in the note.
+    applies: (ctx) => ctx.noteKind !== "page",
+
+    claims: ["period-nav", "bridge-readings"],
+    locate: (t) => probe(t, /^bridge-readings\b/m),
+
+    // THE ANCHOR SHIPS WITH THE BRIDGE, and that pairing is the whole section.
+    //
+    // A journal note has no period of its own: the four `*-start` properties
+    // live only on the diary's own dashboards, so until 2.57.0 a
+    // `bridge-readings:` written on a leaf note could only ever refuse. The fix
+    // is not to invent a second kind of window — it is to let the note say
+    // which period it means, using the property every chart and summary in the
+    // plugin already reads, written by the widget that already writes it.
+    //
+    // `period-nav:month` rather than `:week` because a journal leaf is revisited
+    // over weeks; a week-scoped bridge on a routine note would be empty more
+    // often than not.
+    //
+    // SCOPED TO THE BRIDGE ON PURPOSE. The property this writes is the same
+    // `month-start` a diary dashboard carries, so anything period-scoped would
+    // read it — but nothing period-scoped is offered on a leaf, and a test
+    // pins that. Widening it later is a decision to make once, out loud;
+    // arriving at it because a widget quietly started counting differently is
+    // how a scope rule stops being one.
+    render: (_ctx, opts) => {
+      // Mood by default, and only because it is the one tracker a fresh vault
+      // is guaranteed to have: it ships enabled, it is diary-surfaced, and it
+      // is numeric. Emitting `bridge-readings:` with no tracker would write a
+      // directive that refuses the moment it renders, which is the state §2.3
+      // exists to make impossible — a section is offered because it works.
+      const tracker = opts?.tracker ?? DEFAULT_BRIDGE_TRACKER;
+      // NO `header:` LINE. A bridge draws its own section frame as of 2.57.7 —
+      // it is a section, not a thing that sits in one — so a header directive
+      // above it would be a bar inside a bar. The period navigator rides in the
+      // same fence and lands above it.
+      return [fence(["period-nav:month", `bridge-readings:${tracker}`])];
+    },
+  },
+
+  {
+    id: "recall",
+    icon: "🧠",
+    label: "Recall cards",
+    blurb: "Question-and-answer cards; grading writes this note's rating.",
+    surface: "leaf",
+    // WHERE IT BELONGS is anything long-form enough to be worth drilling: a
+    // note that can be split across pages, or one of those pages. An exercise
+    // set is already the drill.
+    default: never,
+    claims: ["header", "recall"],
+    locate: (t) => probe(t, /^recall:/m),
+    render: () => [headerBar("🧠 Recall", "recall:recall"), region("recall")],
+  },
+
+  {
+    id: "checklist",
+    icon: "✅",
+    label: "Tasks",
+    blurb: "A checklist on this note, counted by the rollups above it.",
+    surface: "leaf",
+    // WHERE IT BELONGS is a leaf and not one of its pages: the tasks of a
+    // document belong to the document, and spreading them across its parts is
+    // how a rollup starts double-counting.
+    default: never,
+    claims: ["header", "tasks"],
+    locate: (t) => probe(t, /^tasks:/m),
+    render: () => [headerBar("✅ Tasks", "tasks:tasks"), region("tasks")],
+  },
+
+  {
+    id: "prose",
+    icon: "📝",
+    label: "Notes field",
+    blurb: "A free-text box that saves into the note body.",
+    surface: "both",
+    // Off by default: the shipped templates write their prose as ordinary
+    // markdown headings, which stay editable in any editor and survive the
+    // plugin being uninstalled. The widget is for a field you want to look
+    // like a field.
+    default: never,
+    claims: ["note", "list"],
+    locate: (t) => probe(t, /^(note|list):/m),
+    render: (_ctx, opts) => {
+      const fields = opts?.fields ?? [
+        { key: "notes", label: "Notes and reflections…|Notes" },
+      ];
+      return [
+        fence(fields.map((f) => `note:${f.key}:${f.label}`)),
+        ...fields.map((f) => region(f.key)),
+      ];
+    },
+  },
+
+  // LAST IN THIS ARRAY, AND THAT IS THE POINT (5.20). Composition walks the
+  // catalogue in order, so a section's index IS its position on the page, and
+  // this one is where the reader's own writing goes. Anything composed below a
+  // prose skeleton sits under the reader's last paragraph — a band of widgets
+  // that appears to belong to whatever they wrote last, and that moves further
+  // down the note every time they write more.
+  //
+  // IT USED TO SIT IN THE MIDDLE, between `resources` and `bridge`, which was
+  // survivable only because almost nothing after it was on by default. Now that
+  // everything after it is a section a reader may tick on at any time, "the
+  // prose is at the bottom" stops being an accident of which boxes happen to be
+  // ticked and becomes a property of the array. Moving this entry up again
+  // reintroduces the bug for whichever section overtakes it.
+  {
     id: "headings",
     icon: "📝",
     label: "Prose skeleton",
@@ -1946,10 +2115,16 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // were composed — which meant a custom journal's leaf note arrived with a
     // banner and nothing else, and nobody reading the code would notice.
     //
-    // Headings rather than `note:` fields (the `prose` section below) because
-    // they survive the plugin being uninstalled and stay editable in any
-    // editor. A field is for prose you want to look like a field; this is for
-    // the shape of the document.
+    // Headings rather than `note:` fields (the `prose` section ABOVE — it moved
+    // when this entry did) because they survive the plugin being uninstalled and
+    // stay editable in any editor. A field is for prose you want to look like a
+    // field; this is for the shape of the document.
+    //
+    // ONE OF THE FOUR (5.20). Every section in this catalogue is now
+    // `default: never` except `banner`, `trackers`, the two "what is below"
+    // indexes and this — see the note above the array. A composed leaf that
+    // opened with a banner and no place to write would be a page that composes
+    // everything about a note except the note.
     default: always,
     // Emits no directive — it is markdown — so there is nothing to claim. See
     // the catalogue shape test, which exempts it by name.
@@ -2026,118 +2201,6 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
         lines.push(`## ${h.title}`, "", ...(h.body ?? [""]));
       });
       return [bracketed(SKELETON_KEY, lines)];
-    },
-  },
-
-  {
-    id: "bridge",
-    icon: "🌉",
-    label: "From the diary",
-    blurb: "A tracker's diary readings, over a period this note picks.",
-    surface: "leaf",
-    // OFF BY DEFAULT, and the only section here that is off for a reason other
-    // than taste. Every other default answers "does this arrangement suit this
-    // note"; this one answers "has the reader got a tracker worth pulling
-    // across", which the catalogue cannot see — it has a JournalType and no
-    // plugin, so it cannot read the tracker registry. Pre-ticking would emit
-    // `bridge-readings:` naming a tracker that may not exist, and a refusal on
-    // every leaf note of a fresh journal is exactly the state `confidence-trend`
-    // stays silent to avoid.
-    default: never,
-
-    // NOT OFFERED ON A PAGE. A page has no frontmatter of its own worth
-    // anchoring — it names its parent instead of a date — so a period property
-    // on one would be a window nothing else on the page agrees with. This is
-    // the §2.3 move: a bridge that cannot work is not offered, rather than
-    // offered and then refused in the note.
-    applies: (ctx) => ctx.noteKind !== "page",
-
-    claims: ["period-nav", "bridge-readings"],
-    locate: (t) => probe(t, /^bridge-readings\b/m),
-
-    // THE ANCHOR SHIPS WITH THE BRIDGE, and that pairing is the whole section.
-    //
-    // A journal note has no period of its own: the four `*-start` properties
-    // live only on the diary's own dashboards, so until 2.57.0 a
-    // `bridge-readings:` written on a leaf note could only ever refuse. The fix
-    // is not to invent a second kind of window — it is to let the note say
-    // which period it means, using the property every chart and summary in the
-    // plugin already reads, written by the widget that already writes it.
-    //
-    // `period-nav:month` rather than `:week` because a journal leaf is revisited
-    // over weeks; a week-scoped bridge on a routine note would be empty more
-    // often than not.
-    //
-    // SCOPED TO THE BRIDGE ON PURPOSE. The property this writes is the same
-    // `month-start` a diary dashboard carries, so anything period-scoped would
-    // read it — but nothing period-scoped is offered on a leaf, and a test
-    // pins that. Widening it later is a decision to make once, out loud;
-    // arriving at it because a widget quietly started counting differently is
-    // how a scope rule stops being one.
-    render: (_ctx, opts) => {
-      // Mood by default, and only because it is the one tracker a fresh vault
-      // is guaranteed to have: it ships enabled, it is diary-surfaced, and it
-      // is numeric. Emitting `bridge-readings:` with no tracker would write a
-      // directive that refuses the moment it renders, which is the state §2.3
-      // exists to make impossible — a section is offered because it works.
-      const tracker = opts?.tracker ?? DEFAULT_BRIDGE_TRACKER;
-      // NO `header:` LINE. A bridge draws its own section frame as of 2.57.7 —
-      // it is a section, not a thing that sits in one — so a header directive
-      // above it would be a bar inside a bar. The period navigator rides in the
-      // same fence and lands above it.
-      return [fence(["period-nav:month", `bridge-readings:${tracker}`])];
-    },
-  },
-
-  {
-    id: "recall",
-    icon: "🧠",
-    label: "Recall cards",
-    blurb: "Question-and-answer cards; grading writes this note's rating.",
-    surface: "leaf",
-    // Long-form enough to be worth drilling: a note that can be split across
-    // pages, or one of those pages. An exercise set is already the drill.
-    default: (ctx) => ctx.documentLike,
-    claims: ["header", "recall"],
-    locate: (t) => probe(t, /^recall:/m),
-    render: () => [headerBar("🧠 Recall", "recall:recall"), region("recall")],
-  },
-
-  {
-    id: "checklist",
-    icon: "✅",
-    label: "Tasks",
-    blurb: "A checklist on this note, counted by the rollups above it.",
-    surface: "leaf",
-    // Not on a page: the tasks of a document belong to the document, and
-    // spreading them across its parts is how a rollup starts double-counting.
-    default: (ctx) => ctx.noteKind !== "page",
-    claims: ["header", "tasks"],
-    locate: (t) => probe(t, /^tasks:/m),
-    render: () => [headerBar("✅ Tasks", "tasks:tasks"), region("tasks")],
-  },
-
-  {
-    id: "prose",
-    icon: "📝",
-    label: "Notes field",
-    blurb: "A free-text box that saves into the note body.",
-    surface: "both",
-    // Off by default: the shipped templates write their prose as ordinary
-    // markdown headings, which stay editable in any editor and survive the
-    // plugin being uninstalled. The widget is for a field you want to look
-    // like a field.
-    default: never,
-    claims: ["note", "list"],
-    locate: (t) => probe(t, /^(note|list):/m),
-    render: (_ctx, opts) => {
-      const fields = opts?.fields ?? [
-        { key: "notes", label: "Notes and reflections…|Notes" },
-      ];
-      return [
-        fence(fields.map((f) => `note:${f.key}:${f.label}`)),
-        ...fields.map((f) => region(f.key)),
-      ];
     },
   },
 ];

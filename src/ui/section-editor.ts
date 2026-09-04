@@ -164,6 +164,44 @@ export interface ArrangementSink {
   save: (name: string, sections: string[], targets: string[]) => Promise<void>;
 }
 
+// ── A SECTION WHOSE GATE IS CONFIG RATHER THAN TEXT (5.20) ───────────────
+//
+// `ArrangementSink`'s shape once more, for the same reason and with the same
+// discipline: a surface fact arrives as data or does not arrive, and nothing in
+// this window asks which surface it is on.
+//
+// THE CASE IT EXISTS FOR is the journal catalogue's `pages` section, which is
+// gated on `applies: (ctx) => ctx.hasPages` — a fact about the KIND, stored in
+// settings, not a fact about the note. `layout-transfer.ts` names that gate as
+// the thing that stops a layout copied out of a paged journal from composing a
+// pages table over a kind that has none, so it cannot be loosened; and a reader
+// looking at `lesson.md` still has to be able to say "this kind has pages".
+// So the surface offers the row, and ticking it changes the config that makes
+// the catalogue offer it for real.
+//
+// OPAQUE, LIKE EVERY OTHER SEAM HERE. This window never learns what a kind is,
+// what `pages` means, or that a config exists. It draws an extra row, asks for
+// the model that composes the note once that row is ticked, and gives the
+// caller one chance to persist and one chance to refuse before anything is
+// written.
+export interface StructuralSink {
+  // Rows this surface offers that its model does not, because whether they
+  // apply is not a question about the note.
+  //
+  // EMPTY IS THE NORMAL STATE: once the config says yes, the model offers the
+  // section itself and this list has nothing left to add.
+  offer: SectionView[];
+  // The model that composes this note once these are the ticked rows.
+  //
+  // ASKED ON EVERY READ of `model`, because the preview, the schematic, the
+  // plan and the Save all go through that one getter — which is what makes a
+  // tick show its own consequence before anything is persisted.
+  modelWith: (ids: readonly string[]) => SectionModel;
+  // Persist what the ticks imply, before the file is written. False means the
+  // reader was asked something and declined, and nothing at all is written.
+  save: (ids: readonly string[]) => Promise<boolean>;
+}
+
 export interface SectionEditorSpec {
   file: TFile;
   text: string;
@@ -180,6 +218,7 @@ export interface SectionEditorSpec {
   handEdited?: boolean;
   onSaved?: () => void;
   arrangement?: ArrangementSink;
+  structural?: StructuralSink;
 }
 
 export class SectionEditorModal extends EditorModal {
@@ -320,8 +359,36 @@ export class SectionEditorModal extends EditorModal {
     this.modalEl.addClass("ca-section-editor");
   }
 
+  // The model built for the ticked rows, kept until they change. See `model`.
+  private structuralModel: { key: string; model: SectionModel } | null = null;
+
   private get model(): SectionModel {
-    return this.spec.model;
+    const sink = this.spec.structural;
+    if (!sink) return this.spec.model;
+    // THE TICKED ROWS, NOT `want`. `want` filters on `unanswered`, which asks
+    // `view`, which asks `model` — so reading it here is a stack overflow. It
+    // is also the wrong list: a row whose question is still blank is a row the
+    // reader has said yes to, and whether this kind has pages is not waiting on
+    // an answer to anything.
+    const ids = this.rows.filter((id) => !this.removed.has(id));
+    // MEMOISED ON THE LIST, because `view()` reads this getter once per row and
+    // every read would otherwise rebuild a catalogue. The key is the list, so a
+    // tick invalidates it and nothing else does.
+    const key = ids.join("\u0000");
+    if (this.structuralModel?.key !== key) {
+      this.structuralModel = { key, model: sink.modelWith(ids) };
+    }
+    return this.structuralModel.model;
+  }
+
+  // What may still be added: the model's answer, plus whatever the surface
+  // offers that the model cannot. See `StructuralSink`.
+  private offered(): SectionView[] {
+    const base = this.model.addable(this.spec.text);
+    const extra = (this.spec.structural?.offer ?? []).filter(
+      (s) => !base.some((b) => b.id === s.id)
+    );
+    return [...base, ...extra];
   }
 
   // The rows still ticked, in row order, each with whatever the reader answered
@@ -1873,9 +1940,9 @@ export class SectionEditorModal extends EditorModal {
     // nothing, so "you already added this" is not a reason to stop offering
     // another. The flag is the model's, so this window still does not know what
     // makes one.
-    const absent = this.model
-      .addable(this.spec.text)
-      .filter((s) => s.repeatable || !this.rows.includes(s.id));
+    const absent = this.offered().filter(
+      (s) => s.repeatable || !this.rows.includes(s.id)
+    );
     if (!absent.length) return;
 
     // THE CATALOGUE'S OWN SECTIONS FIRST, THEN THE WIDGETS (4.12 §C).
@@ -1956,9 +2023,7 @@ export class SectionEditorModal extends EditorModal {
     // a reader adding a third card in one session has already claimed it — so
     // the model is asked for one nothing holds, given what this window holds.
     // The window never learns how an instance id is spelled.
-    const view = this.model
-      .addable(this.spec.text)
-      .find((s) => s.id === chosen);
+    const view = this.offered().find((s) => s.id === chosen);
     const id =
       view?.repeatable && this.model.instanceOf
         ? this.model.instanceOf(chosen, this.spec.text, this.rows)
@@ -2132,6 +2197,19 @@ export class SectionEditorModal extends EditorModal {
       new Notice(
         "ChronoAnvil: this file changed while the window was open — nothing was written. Reopen it to see the current sections."
       );
+      return;
+    }
+
+    // THE CONFIG FIRST, THEN THE FILE (5.20). A structural row is a settings
+    // change with a template change behind it, and the settings change is the
+    // one a reader can be asked to confirm — so it goes first, and `false`
+    // means they said no and NEITHER happens. Writing the file first would
+    // leave a `lesson.md` with a pages table over a kind that still says it has
+    // none, which is the state the whole seam exists to make unreachable.
+    if (
+      this.spec.structural &&
+      !(await this.spec.structural.save(this.rows.filter((id) => !this.removed.has(id))))
+    ) {
       return;
     }
 
