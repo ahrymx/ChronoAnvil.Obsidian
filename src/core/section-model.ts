@@ -44,6 +44,7 @@ import {
   HEADER_KEYWORD,
   argSpanIn,
   hasSectionBar,
+  insertBar,
   isFrameLine,
   isHeaderLine,
   parseFrame,
@@ -1046,8 +1047,16 @@ export function withAnswers(
       // FOLLOW it, so one written below the summary would title nothing and take
       // the `button:` line into its actions strip. A chunk with no opening fence
       // is a section written as loose lines, and the bar goes at the top of it.
-      const open = out.findIndex((l) => l.startsWith(FENCE_MARK));
-      out.splice(open + 1, 0, form.bar);
+      //
+      // ── THROUGH `insertBar`, WHICH IS THE SAME PLACEMENT (5.21) ────────
+      //
+      // This was that rule spelled a second time, and the second spelling went
+      // out of date the moment a group could be titled from here: a row fence
+      // opens with its `row` line and carries the bar UNDER it, which is what
+      // `rowRuns` composes and what `insertBar` now knows. Written above it, a
+      // group given its head back was a file the composer would not have
+      // written — see `insertBar` for why that costs more than a line's order.
+      out = insertBar(out, form.bar);
     }
   }
   // A DIRECTIVE IS WRITTEN ONCE, HOWEVER MANY QUESTIONS ANSWER IT (4.16). Two

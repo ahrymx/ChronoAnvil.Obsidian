@@ -49,7 +49,6 @@ import {
   buildPagesTable,
   buildTagIndex,
   buildTasksTable,
-  TasksScope,
   buildStatsBand,
   buildLevelCards,
   buildLevelIndex,
@@ -93,10 +92,6 @@ import {
 } from "./live-widgets";
 import {
   PERIOD_FLAG_RE,
-  SCOPE_JOURNAL,
-  argSpanIn,
-  readArg,
-  spliceArg,
 } from "../../core/directive-grammar";
 
 // A `, period` suffix on a directive means "follow the host note's period"
@@ -616,37 +611,6 @@ export function buildTagIndexRegion(
   );
 }
 
-// Rewrite one `tasks-table` directive's argument in the note it is drawn from.
-// 3.18 §5.3.
-//
-// `argSpanIn` + `spliceArg` RATHER THAN A SECOND PARSER, which is the pair 3.15
-// built for exactly this and the reason a scope control needed no grammar of
-// its own. The span covers the argument and nothing else, so a `|Label` after
-// it, the `,period` suffix and any hand-editing around the line all survive —
-// and the `,period` flag is re-appended rather than being carried through the
-// splice, because it is not part of the argument the reader is changing.
-//
-// ONE DIRECTIVE PER NOTE is the assumption, and it is the one `argSpanIn`
-// already makes for every other answer written this way. A note with two task
-// tables would have the first rewritten; that is a limitation the folder
-// control shares and not one this button introduces.
-async function setTasksScope(
-  plugin: ChronoAnvilPlugin,
-  notePath: string,
-  next: string
-): Promise<void> {
-  const file = plugin.app.vault.getAbstractFileByPath(notePath);
-  if (!(file instanceof TFile)) return;
-  const text = await plugin.app.vault.read(file);
-  const lines = text.split("\n");
-  const span = argSpanIn(lines, "tasks-table");
-  if (!span) return;
-  const had = PERIOD_FLAG_RE.test(readArg(lines, span));
-  const written = next + (had ? ",period" : "");
-  const out = spliceArg(lines, span, written);
-  await plugin.app.vault.modify(file, out.join("\n"));
-}
-
 // Is the note hosting this directive part of the diary?
 //
 // WRITTEN OUT TWICE, IDENTICALLY, until 4.81 — once for `tasks-table` and once
@@ -655,6 +619,10 @@ async function setTasksScope(
 // dashboard now lives in `02 - Diary/Dashboards`, which is not any grain folder
 // and is caught by the root prefix; a reader who points one grain outside the
 // diary is caught by the five that follow.
+//
+// The second caller went with the scope cycle in 5.21; the shared function
+// stays, because the argument for one spelling of this test does not depend on
+// how many callers it currently has.
 export function hostIsDiary(
   paths: {
     diaryRoot: string;
@@ -681,9 +649,7 @@ export function hostIsDiary(
 export function buildTasksTableRegion(
   plugin: ChronoAnvilPlugin,
   rest: string,
-  ctx: MarkdownPostProcessorContext,
-  // True when the section's header bar is already showing the scope button.
-  hostedControls = false
+  ctx: MarkdownPostProcessorContext
 ): HTMLElement | null {
   // `tasks-table:<folder>` — collects open ChronoAnvil tasks from every note
   // under `<folder>`, grouped by note. Replaces the vault's old
@@ -761,20 +727,23 @@ export function buildTasksTableRegion(
   const folder = folders[0];
   if (folder == null) return null;
 
-  // Whether "This whole journal" is reachable from here. Asked by resolving the
-  // keyword rather than by testing the path a second way — the button must not
-  // offer a state that would resolve to nothing.
-  const inJournal =
-    journalFolderScope(plugin, SCOPE_JOURNAL, defaultFolder).length > 0;
-
-  // THE SCOPE BUTTON MAY BE HOSTED IN THE SECTION'S HEADER BAR (3.19.2), in
-  // which case this widget must not draw a second one inside itself. The bar's
-  // copy is built by the block processor and is NOT part of this subtree, which
-  // is the whole reason it can live there: `liveScopedWidget` rebuilds
-  // everything below on any change under the folder, and a control parented
-  // into a header it does not own would be duplicated on every rebuild. The
-  // bar's copy stays correct without being rebuilt because cycling writes the
-  // directive and the note repaints from source.
+  // ── THE TABLE DRAWS NO SCOPE CONTROL (5.21) ─────────────────────────
+  //
+  // It used to draw one here, and from 3.19.2 it drew one only when the block
+  // processor had not already put a copy on the section's header bar — a
+  // `hostedControls` flag this signature carried for the purpose.
+  //
+  // THAT FLAG WAS ANSWERED WRONG ON EVERY HEADERLESS FENCE, which is how the
+  // homepage came to have no scope button at all. The processor asked
+  // `scopeHeader === headerIndex - 1`, and on a fence with no `header:` line
+  // BOTH sides are −1: the table was told a bar had drawn the control, and no
+  // bar had. The homepage's Open tasks has been bare since 3.19.2 and the
+  // regression test written alongside it asserted the fallback existed rather
+  // than that it fired.
+  //
+  // THE FIX IS THE ONE THE READER ASKED FOR: no control, on any surface. See
+  // the note where `buildScopeCycle` used to be, in `tables.ts`, for why the
+  // button was the wrong shape for this even where it did appear.
   return liveScopedWidget(plugin, ctx, folder, () =>
     // Bounds resolved *inside* the build closure: LiveWidget re-invokes
     // this on any change under the folder, and its scope check already
@@ -786,65 +755,9 @@ export function buildTasksTableRegion(
       plugin,
       ctx,
       folder,
-      scopeToPeriod ? resolvePeriodBounds(plugin, ctx) : null,
-      hostedControls
-        ? null
-        : {
-            arg,
-            hostFolder: defaultFolder,
-            inJournal,
-            cycle: (next) => {
-              void setTasksScope(plugin, ctx.sourcePath, next);
-            },
-          }
+      scopeToPeriod ? resolvePeriodBounds(plugin, ctx) : null
     )
   );
-}
-
-// The scope a `tasks-table:` directive resolves to, for a caller that wants the
-// CONTROL without the table — the block processor hosting the button in the
-// section's header bar.
-//
-// SHARED WITH THE REGION RATHER THAN RE-DERIVED, because the two must agree
-// about what the current scope is or the button would announce a state the
-// table is not in. The parsing constraints are the region's and are subtle
-// enough already: a trailing `,period` suffix stripped before the keyword is
-// read, and a folder that may legitimately contain a comma.
-export function tasksScopeFor(
-  plugin: ChronoAnvilPlugin,
-  rest: string,
-  ctx: MarkdownPostProcessorContext
-): TasksScope | null {
-  const arg = rest.replace(PERIOD_FLAG_RE, "").trim();
-  const file = fileOfCtx(plugin, ctx);
-  const hostFolder = file?.parent?.path ?? null;
-  const paths = plugin.settings.paths;
-
-  const isDiary = hostIsDiary(paths, hostFolder);
-
-  let defaultFolder = hostFolder;
-  if (arg === "") {
-    if (isDiary) {
-      defaultFolder = paths.diaryRoot;
-    } else if (hostFolder) {
-      const customRoot = registeredJournalTypes(plugin).find(
-        (t) => hostFolder === t.root || hostFolder.startsWith(`${t.root}/`)
-      )?.root;
-      if (customRoot) defaultFolder = customRoot;
-    }
-  }
-
-  // `== null` for the reason the region states: the vault root can be spelled
-  // with the empty string, and a falsy test reads that as "unresolvable".
-  if (journalFolderScope(plugin, arg, defaultFolder)[0] == null) return null;
-  return {
-    arg,
-    hostFolder: defaultFolder,
-    inJournal: journalFolderScope(plugin, SCOPE_JOURNAL, defaultFolder).length > 0,
-    cycle: (next) => {
-      void setTasksScope(plugin, ctx.sourcePath, next);
-    },
-  };
 }
 
 export function buildActivityChartRegion(

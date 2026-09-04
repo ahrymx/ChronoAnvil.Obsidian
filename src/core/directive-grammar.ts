@@ -1314,10 +1314,31 @@ export function soloBar(
 // ABOVE THE FIRST LINE THAT IS CONTENT, which is `soloBar`'s rule and is the
 // half both callers share: the reconciler hands whole fences here, markers
 // included, so index 0 is usually the ``` and never the title's place.
+//
+// ── AND UNDER `row`, WHICH IS NOT CONTENT (5.21) ────────────────────────
+//
+// A row fence opens with the `row` line and carries its bar directly under it —
+// `rowRuns` composes `[ROW_KEYWORD, ...lines]` where `lines` begins with the
+// opener's title, and every group in every shipped note is written that way.
+// This placed the bar ABOVE it, so a group titled from the section editor came
+// back a file the composer would not have written: the same object, spelled two
+// ways according to which gesture made it.
+//
+// It renders the same, which is why it went unnoticed and is not the reason to
+// fix it. `isHandEdited` compares a note against a freshly composed baseline, so
+// a fence one line out of order is a page reported as edited by hand because the
+// window that wrote it put the title in the other place.
+//
+// `row` ONLY, NOT EVERY MODIFIER. `insertBar`'s other caller (5.12) hands it a
+// fence full of `header:2:` group heads and wants the section's own bar ABOVE
+// all of them; `header` is a modifier keyword, so skipping the set would put the
+// missing title under the heads it is meant to name. `row` is the one modifier
+// that precedes a bar in anything this plugin composes, and there is at most one
+// of them in a fence.
 export function insertBar(lines: readonly string[], bar: string): string[] {
   const at = lines.findIndex((l) => {
     const t = l.trim();
-    return t !== "" && !t.startsWith("```");
+    return t !== "" && !t.startsWith("```") && !isRowLine(t);
   });
   const out = [...lines];
   out.splice(at < 0 ? out.length : at, 0, bar);

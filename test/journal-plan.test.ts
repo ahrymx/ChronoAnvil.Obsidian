@@ -241,21 +241,28 @@ describe("reading a template back", () => {
     expect(noTasks).not.toContain("tasks-table");
   });
 
-  it("titles a barless cell that is already in the file", () => {
-    // ── THE PAGE THAT IS ALREADY WRONG ──────────────────────────────────
+  it("leaves a barless cell alone once the reader can answer for it (5.21)", () => {
+    // ── THE PAGE THAT IS ALREADY WRONG, AND IS NO LONGER CORRECTED ──────
     //
-    // Composition and the cut both give a lone cell a title now. Neither
-    // reaches a note WRITTEN BEFORE THEY DID, and the reader of that note has no
-    // gesture that fixes it: unticking the section and ticking it back composed
-    // the same headless fence they started with. So the plan reports it as an
-    // `extend` — a section short of something it should have, which is exactly
-    // what `missingParts` already means — and the write adds the one line.
+    // This asserted the opposite until 5.21. Composition and the cut both give
+    // a lone cell a title, neither reaches a note WRITTEN BEFORE THEY DID, and
+    // the plan used to report the difference as an `extend` and add the line.
+    //
+    // WHAT TOOK IT AWAY IS 5.11'S RULE, NOT A NEW ONE. `declaredBar` goes quiet
+    // for any section carrying a form toggle, because a barless fence under one
+    // has two causes — behind the catalogue, or answered — and nothing in the
+    // file tells them apart. Open tasks gained that toggle when `widgetFormBar`
+    // learned to report the bar a CELL wears alone, so it joined the sections
+    // this repair has always declined to touch.
+    //
+    // THE READER IS NOT LEFT WITHOUT THE LINE, which is the whole trade: the
+    // control that adds it is the toggle, in the same window that would have
+    // offered the repair, and it takes it off again afterwards — which the
+    // repair never could.
     const subject = richSubject();
     const ids = sectionsPresent(subject.text, subject.ctx).filter(
       (id) => id !== "review"
     );
-    // The 5.5 shape, built by hand: Review gone, and the cell it used to title
-    // left in a fence with nothing over it.
     const stale = applySections(subject.text, subject.ctx, ids)!.replace(
       "header:⏳ Open tasks\n",
       ""
@@ -263,17 +270,20 @@ describe("reading a template back", () => {
     expect(stale).toContain("```chronoanvil\ntasks-table\n```");
 
     const ops = planSections(stale, subject.ctx, ids.map((id) => ({ id })));
-    const op = ops.find((o) => o.sectionId === "tasks")!;
-    expect(op.kind).toBe("extend");
-    expect(op.detail).toContain("no title over it");
-
-    const fixed = applySections(stale, subject.ctx, ids.map((id) => ({ id })));
-    expect(fixed).toContain("```chronoanvil\nheader:⏳ Open tasks\ntasks-table\n```");
-    // AND ONLY ONCE — the second pass has nothing left to say, which is the
-    // null-means-no-change convention this whole module rests on.
+    expect(ops.find((o) => o.sectionId === "tasks")?.kind).not.toBe("extend");
     expect(
-      applySections(fixed as string, subject.ctx, ids.map((id) => ({ id })))
+      applySections(stale, subject.ctx, ids.map((id) => ({ id })))
     ).toBeNull();
+
+    // AND THE ANSWER PUTS IT BACK, on the gesture that says so out loud.
+    const titled = applySections(
+      stale,
+      subject.ctx,
+      ids.map((id) => (id === "tasks" ? { id, options: { form: "section" } } : { id }))
+    );
+    expect(titled).toContain(
+      "```chronoanvil\nheader:⏳ Open tasks\ntasks-table\n```"
+    );
   });
 
   it("leaves a fence the reader titled themselves alone", () => {

@@ -832,10 +832,12 @@ export const DIARY_SECTIONS: DiarySection[] = [
       // 5.12's rule is that a section is offered this unless something in it is
       // anchored INTO its title bar — Topics has **New Topic** there, Resources
       // has **Add category**, and those have nowhere to go once the bar does. A
-      // task table anchors nothing: its scope button moved onto the bar in
-      // 3.19.2 and moves back into the table when there is no bar to host it,
-      // which is the case this toggle creates. So it qualifies, and it was
-      // missing anyway.
+      // task table anchors nothing. That was already the answer when this was
+      // written, on a longer argument — its scope button moved onto the bar in
+      // 3.19.2 and was said to move back into the table when there was no bar to
+      // host it, which is the case this toggle creates — and 5.21 deleted the
+      // button, so the answer no longer needs the argument. It qualifies, and it
+      // was missing anyway.
       //
       // WHY IT WAS MISSING. Every other section on this catalogue derives the
       // toggle from the bar its `render` composes, and this one composes none —

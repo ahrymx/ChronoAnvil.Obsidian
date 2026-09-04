@@ -223,8 +223,9 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // It scopes to the FOLDER where the queue scopes to every registered
     // journal. That is a real difference on a vault with a journal rooted
     // outside `03 - Journals/`, and it is the right one for tasks: a task table
-    // is a view of a subtree, and the scope button in its header bar is how a
-    // reader points it somewhere else.
+    // is a view of a subtree, and the folder question below is how a reader
+    // points it at a different one. (It used to be a button on this bar as
+    // well, until 5.21 — see `buildTasksTableRegion`.)
     //
     // AND NO `Every journal` KEYWORD, unlike the queue above — `journal-
     // sections.ts` offers `SCOPE_JOURNAL` here and never `SCOPE_ALL`, because

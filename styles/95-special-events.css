@@ -2935,6 +2935,24 @@ body.is-mobile .ca-jcl-action-chip {
   opacity: 0.45;
   cursor: default;
 }
+/* ── Whether the group draws a head (5.21) ──────────────────────────────
+ *
+ * The third control on the card's bar, beside the two that move it and the one
+ * that breaks it up. It reuses `.ca-tpl-form`'s box and label wholesale — the
+ * same question is asked on a section's own row and this is the group's copy of
+ * it, so a second look would be two idioms for one control.
+ *
+ * WHAT IT OVERRIDES IS THE WRAPPING. `.ca-tpl-form` is built for a field in a
+ * column, where the label is a sentence that may take two lines; the card's bar
+ * is a single row of controls and a label that wrapped would make it two rows
+ * tall. `flex: 0 0 auto` and `nowrap` keep it the width of its own words, and
+ * the title attribute carries the sentence the row version can afford to
+ * print. */
+.ca-tpl-block-form {
+  flex: 0 0 auto;
+  align-items: center;
+  white-space: nowrap;
+}
 
 /* And the same block in the Layout pane, where the point is the SHAPE: three
    widgets across the page are drawn across it. */

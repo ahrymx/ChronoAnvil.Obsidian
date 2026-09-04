@@ -1956,7 +1956,24 @@ export function applyFlatSections(
         if (!section) continue;
         out = withAnswers(
           out,
-          section.questions?.(spec) ?? [],
+          // ── THE FORM QUESTION IS THE OPENER'S (5.21) ────────────────
+          //
+          // `withAnswers`' widget branch filters every `header:` line in the
+          // chunk it is handed, and a chunk holding two cells has ONE bar
+          // between them — the band's, composed by the cell that opens the row.
+          // So a form answer arriving for the second cell took the whole
+          // group's title off: `open-tasks` answered *widget* and the Lately
+          // band lost its head, which is not what either answer meant.
+          //
+          // AND THE OPENER'S ANSWER IS KEPT, WHICH IS THE OTHER HALF. Its bar
+          // IS the group's, so the toggle on the group card writes through here
+          // — see `renderBlock` in `section-editor.ts`, where the control lives.
+          // `journal-plan.ts` has had the refusal since 5.11 and had it as
+          // "a run of one", which refused the opener along with the rest; both
+          // paths now say the same sentence and say it the same way.
+          section
+            .questions?.(spec)
+            .filter((q) => q.kind !== "form" || id === run.sectionIds[0]) ?? [],
           optionsFor(requested, id)
         );
       }

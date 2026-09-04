@@ -465,8 +465,8 @@ describe("the section's actions sit on a strip of their own", () => {
 
   it("is not drawn at all when the section has no actions", () => {
     // `:empty` RATHER THAN A RENDER-TIME TEST, and this is the load-bearing half:
-    // `buildAddCategoryButton`, `buildScopeCycle` and every LiveWidget append into
-    // this slot AFTER the frame is built, so a decision taken at draw time would be
+    // `buildAddCategoryButton` and every LiveWidget append into this slot AFTER
+    // the frame is built, so a decision taken at draw time would be
     // wrong for exactly the sections with the most in them.
     expect(css()).toContain(
       ".ca-journal-sec-l1 > .ca-journal-header-widgets.ca-journal-widget-bar:empty"

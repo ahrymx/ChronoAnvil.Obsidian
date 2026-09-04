@@ -64,13 +64,26 @@ queries, no Templater scripts, no external chart plugins.
 
 ## Install
 
-Download `main.js`, `manifest.json` and `styles.css` from a
-[release](../../releases) into `<vault>/.obsidian/plugins/chronoanvil/`, enable
-it under **Settings → Community plugins**, then run **ChronoAnvil: Maintenance:
-set up / repair vault** to scaffold the folders and dashboards.
+Download `main.js`, `manifest.json` and `styles.css` into
+`<vault>/.obsidian/plugins/chronoanvil/`, enable it under **Settings →
+Community plugins**, then run **ChronoAnvil: Maintenance: set up / repair
+vault** to scaffold the folders and dashboards.
 
 Those three files are the whole plugin — the notes it scaffolds are compiled
 into `main.js`, so there is nothing else to copy.
+
+The newest build is always at the same three addresses, whatever the version:
+
+- [`main.js`](../../releases/download/latest/main.js)
+- [`manifest.json`](../../releases/download/latest/manifest.json)
+- [`styles.css`](../../releases/download/latest/styles.css)
+
+Or take the folder in one piece —
+[`chronoanvil-plugin.zip`](../../releases/download/latest/chronoanvil-plugin.zip),
+unzipped into `<vault>/.obsidian/plugins/`. The
+[source](../../releases/download/latest/chronoanvil-source.zip) is attached to
+the same release. For a particular version rather than the newest one, every
+release is listed [here](../../releases).
 
 ## Keyboard
 

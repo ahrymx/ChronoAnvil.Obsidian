@@ -9,6 +9,29 @@ This file covers the **5.x series**, in reader-facing summary. The unabridged
 notes — every entry as it was originally written, and the whole of the Almanac
 era through 4.84 — are in [CHANGELOG-ARCHIVE.md](./CHANGELOG-ARCHIVE.md).
 
+## [5.21.0] - 2026-09-04
+
+A control that only ever half-worked is gone, and two that had no door on the
+page now have one. Nothing in a vault is rewritten by this release: notes keep
+the sections and the groups they have, and a group already titled keeps its
+title.
+
+### Changed
+
+- **The Open tasks table no longer carries its own scope button.** The Below / Journal / Path cycle sat on the section's title bar and rewrote the folder the table searched — on some pages. On the homepage it was never drawn at all, which was not a decision: the table was told a title bar had drawn the control when none had, so the one page whose task list covers your whole vault was the page the control was missing from. Rather than fix a button onto a fourth surface, it is removed. The folder is still yours to set, in *Edit sections…*, where every other widget's folder is set and where the change is shown to you before it happens.
+- **Cells after the first in a group say why their form is fixed.** The tick box on those rows reads *"Cells after the first are always widgets — the group's title is the first cell's"*, which names the reason rather than restating the state.
+
+### Added
+
+- **Open tasks can be drawn bare.** It is the second cell of the *Lately* band on a journal dashboard, so it composes no title of its own — and once it was on its own, having been taken out of that band, there was no way to take the title back off again. The section now offers the same *draw it as a widget* box the sections beside it do, on the line it wears when it stands alone.
+- **A group can be told whether to draw a head.** The card in *Edit sections…* carries a **Title header** tick beside *Break up the group*: ticked, one full-width bar is drawn over the whole group, worded by its first cell; unticked, the group captions itself from the names of its cells — *Lately · Open tasks* — in a light box of its own. Both were already how a group could look and there was no way to choose between them, so a group broken up and made again came back wearing the other one for good.
+- **One GitHub release that is always the current build.** A rolling `latest` pre-release now carries `main.js`, `manifest.json`, `styles.css` and both zips under permanent links, replaced on every version pushed to the default branch. The per-version releases are unchanged — Obsidian still resolves a version by its own tag — and the README's Install section now hands out links that do not go stale.
+
+### Fixed
+
+- **A tick answered for one column of a group no longer takes the whole group's title off.** *Draw it as a widget*, answered for a cell that is not the first, removed the band's one title bar — an answer about a single column, spent on the group it was in. It is now refused, as it already was on journal templates.
+- **A group given its title back is written the way it is composed.** The title bar went in above the group's own `row` line rather than below it. It renders identically and it is not the same file: the plugin compares your note against a freshly composed one to decide whether you have edited it by hand, so a group titled from the editor was a page reported as hand-edited on the strength of one line's position.
+
 ## [5.20.0] - 2026-09-04
 
 Journal templates open with four sections, and two controls that had no door on

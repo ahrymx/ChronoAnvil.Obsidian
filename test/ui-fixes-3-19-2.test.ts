@@ -17,6 +17,12 @@
 // a whole section was sitting inside that section's body. "Add category" moved
 // to the title bar in 3.19.0 for this reason; the task table's scope button and
 // the shelf's remove control are the rest of it.
+//
+// THE SCOPE BUTTON DID NOT SURVIVE THE ARGUMENT. Moving it onto the bar put it
+// on whichever bar happened to open the row — "🕒 Lately", above a list of
+// recent notes — and the move also silently took it off every headerless fence,
+// the homepage included. 5.21 removes it, and the describe that pinned the move
+// now pins the removal. The reasoning is in `tables.ts` where the builder was.
 
 import { describe, expect, it } from "vitest";
 import { readCode, readCss, readSrc } from "./sources";
@@ -52,34 +58,67 @@ describe("an editable title is drawn once", () => {
   });
 });
 
-describe("the task table's scope button is on the bar", () => {
-  it("is drawn by the processor, into the header's actions", () => {
-    expect(readCode("widgets")).toContain("buildScopeCycle(frame.actions, scope)");
-  });
-
-  it("is not owned by the widget that rebuilds", () => {
-    // `liveScopedWidget` rebuilds the table's whole subtree on any change under
-    // its folder. A control the widget owned but parented into a bar it does
-    // not own would be duplicated on every rebuild — the welded-ownership
-    // hazard the widget layer already documents.
-    expect(readCode("widgets")).toContain("hostedScope");
-    expect(readCode("directive-regions")).toContain("hostedControls");
-  });
-
-  it("draws exactly one, wherever it ends up", () => {
-    // The table still draws its own when no header hosts one — a fence with a
-    // `tasks-table` and no `header:` is legal and must not lose the control.
-    expect(readCode("directive-regions")).toMatch(
-      /hostedControls\s*\?\s*null\s*:/
+// ── THE SCOPE BUTTON IS GONE (5.21) ─────────────────────────────────────
+//
+// This file's second and third fixes were about MOVING that button: out of the
+// table's body, onto the section's own actions strip, and then (3.21.2) undoing
+// the absolute positioning the move had orphaned. 5.21 removes the control
+// instead, so the claims below are the inverse of the ones they replace.
+//
+// KEPT HERE RATHER THAN DELETED WITH THE CODE. Two of the three fixes this file
+// records were about a control that was still in the DOM and no longer visible
+// — created, positioned against the wrong ancestor, and gone from the page. A
+// sweep is how that gets noticed, and "no scope control anywhere" is a claim
+// worth sweeping for precisely because the last two attempts to place this
+// button both shipped it somewhere nobody could see.
+describe("the task table draws no scope control", () => {
+  it("has no cycle to draw", () => {
+    // The builder, the state it needed, and the writer behind it are all gone.
+    expect(readCode("tables")).not.toContain("export function buildScopeCycle");
+    expect(readCode("tables")).not.toContain("export interface TasksScope");
+    expect(readCode("directive-regions")).not.toContain(
+      "export function tasksScopeFor"
     );
+    expect(readCode("directive-regions")).not.toContain("async function setTasksScope");
   });
 
-  it("reads the same scope the table does", () => {
-    // Shared resolution rather than a second derivation: a button announcing a
-    // state the table is not in is worse than no button. The parsing is subtle
-    // enough on its own — a trailing `,period` stripped before the keyword is
-    // read, and a folder that may contain a comma.
-    expect(readCode("directive-regions")).toContain("export function tasksScopeFor");
+  it("takes no `hosted` flag, on either side of the seam", () => {
+    // `hostedControls` on the region and `hostedScope` on the dispatcher existed
+    // only to keep the bar's copy and the table's copy from both drawing. With
+    // one control they were a question worth asking; with none they are a
+    // parameter that can only be answered wrong.
+    expect(readCode("directive-regions")).not.toMatch(/hostedControls\s*=/);
+    expect(readCode("widgets")).not.toMatch(/hostedScope\s*=/);
+    expect(readCode("widgets")).not.toContain("buildScopeCycle(frame.actions");
+  });
+
+  it("was answered wrong on every headerless fence, which is why", () => {
+    // THE DEFECT THAT MADE THIS A REMOVAL RATHER THAN A MOVE. The processor
+    // asked `scopeHeader === headerIndex - 1`; on a fence with no `header:`
+    // line both sides are −1, so the table was told a bar had drawn the control
+    // and no bar had. The homepage's Open tasks — a bare `tasks-table` in a
+    // `cell`, with no header — therefore had no scope button from 3.19.2 on,
+    // and the test written beside that change asserted the fallback EXISTED
+    // rather than that it fired.
+    //
+    // Asserted as the absence of the comparison, because the comparison is the
+    // bug: nothing may reintroduce a `-1` sentinel that doubles as a real index.
+    expect(readCode("widgets")).not.toContain("scopeHeader");
+  });
+
+  it("leaves the reader a way to point the table somewhere else", () => {
+    // NOT A NICETY — it is the whole reason the button could go. Every Open
+    // tasks section asks for the folder in the section editor, which writes the
+    // same directive argument the cycle wrote.
+    for (const module of [
+      "home-sections",
+      "diary-sections",
+      "diary-dashboard-sections",
+      "journals-dashboard-sections",
+      "journal-dashboard-sections",
+    ]) {
+      expect(readSrc(module), module).toContain('directive: "tasks-table"');
+    }
   });
 });
 
@@ -168,45 +207,26 @@ describe("an empty resources category can be removed", () => {
   });
 });
 
-describe("the scope button is visible where it was moved to", () => {
+describe("no style is left behind for the button that is gone", () => {
   const css = (): string => readCss();
-  const rule = (): string =>
-    css().slice(
-      css().indexOf(".ca-journal-tasks-scope {"),
-      css().indexOf(".ca-journal-tasks-scope:hover")
-    );
 
-  it("is an ordinary flex item, not an absolutely positioned corner control", () => {
-    // 3.21.2. Moving the button into the header bar (3.19.2) left this rule
-    // behind: `position: absolute; top: 0; right: 0` pinned it to the corner of
-    // the TABLE's wrapper, which is what it was drawn inside until then. In the
-    // actions strip it positioned itself against whatever ancestor happened to
-    // be positioned and vanished — created, in the DOM, and nowhere a reader
-    // could see. The section looked like it had lost its control.
-    //
-    // Declarations only; the rule explains what it stopped doing and a naive
-    // substring check trips on its own explanation.
-    const declarations = rule()
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.includes(":"));
-    expect(declarations).not.toContain("position: absolute;");
-    expect(declarations).toContain("flex: 0 0 auto;");
+  it("drops every rule that named it", () => {
+    // 3.19.2 moved the button and left `position: absolute` behind, which put a
+    // live control somewhere no reader could see and made the section look like
+    // it had lost it. The mirror of that mistake is a stylesheet still carrying
+    // rules for an element nothing builds, so the whole group goes.
+    expect(css()).not.toContain(".ca-journal-tasks-scope");
   });
 
-  it("keeps the corner treatment where it is still drawn in the table", () => {
-    // A fence carrying `tasks-table` with no `header:` above it has no actions
-    // strip to host the control, so the table draws its own — and that case
-    // must not lose the placement the absolute rule was written for.
-    expect(css()).toContain(".ca-journal-tasks-table > .ca-journal-tasks-scope");
-    const scoped = css().slice(
-      css().indexOf(".ca-journal-tasks-table > .ca-journal-tasks-scope")
+  it("drops the positioning context that existed only for it", () => {
+    // `.ca-journal-tasks-table { position: relative }` was the anchor for the
+    // absolute corner placement and nothing else under that class is
+    // positioned. A stacking context kept for a control that no longer exists
+    // is how the original orphan happened.
+    const at = css().indexOf(".ca-journal-tasks-table {");
+    expect(at).toBeGreaterThan(-1);
+    expect(css().slice(at, css().indexOf("}", at))).not.toContain(
+      "position: relative"
     );
-    expect(scoped).toContain("position: absolute;");
-  });
-
-  it("has a positioning context for that fallback", () => {
-    expect(css()).toMatch(/\.ca-journal-tasks-table \{[^}]*position: relative;/);
   });
 });

@@ -884,13 +884,41 @@ const BAR_ANCHORED = new Set([
 // the answer: a fence already written as a widget must still report the bar it
 // would take BACK, or the toggle would be offered in one direction only.
 //
-// NOT `tasks-table`, WHOSE SCOPE CYCLE IS THE NEAR MISS. The button that reads
-// "Below" on a subject index is appended to `frame.actions` like the two above,
-// so the obvious rule would exclude Open tasks — the one section on this
-// catalogue that is ALREADY a cell of a shipped group, whose editor row would
-// then offer no way back. It is out because it is a READ control over a
-// directive the section editor asks about anyway, and because a cell in a group
-// has the group's bar to host it.
+// NOT `tasks-table`, AND IT NO LONGER EVEN LOOKS LIKE A CASE. Its scope cycle
+// — the button that read "Below" on a subject index — was appended to
+// `frame.actions` like the two above, so the obvious rule would have excluded
+// Open tasks: the one section on this catalogue that is ALREADY a cell of a
+// shipped group, whose editor row would then have offered no way back. It was
+// out because it was a READ control over a directive the section editor asks
+// about anyway, and because a cell in a group has the group's bar to host it.
+//
+// 5.21 REMOVED THAT BUTTON, so Open tasks now anchors nothing at all and the
+// plain rule reaches the same answer. The argument is kept because the
+// conclusion it defends is the one still shipping, and because the next control
+// anchored into a bar will raise it again.
+//
+// ── AND A CELL'S BAR IS THE ONE IT WEARS ALONE (5.21) ────────────────────
+//
+// A row carries one bar, composed by the cell that OPENS it, so the cells after
+// it render barless — and `leadingBar` alone therefore answered "cannot be a
+// widget" for the one section on this catalogue that most obviously can. On a
+// subject index that is Open tasks, the second cell of *🔁 Due and open*: a
+// reader who unticked the Review queue was left with a titled table and no
+// control anywhere to say they wanted it bare.
+//
+// THE BAR IT WOULD TAKE BACK IS `soloBarOf`, WHICH IS THE SAME LINE. That field
+// exists precisely because a cell standing alone needs a title of its own, and
+// it is the string `soloBar` splices and `withAnswers` removes — so answering
+// the question written from it can only ever add or remove the line the other
+// two gestures write. A section with neither bar has nothing to drop and is
+// still refused.
+//
+// AND IT COSTS THE MISSING-TITLE REPAIR, DELIBERATELY. `declaredBar` in
+// `journal-plan.ts` goes quiet for any section carrying this toggle — 5.11's
+// rule, that a barless fence under a toggle is an ANSWER rather than an
+// omission — so an Open tasks left headless by an old untick stops being
+// repaired. That is the trade 5.11 already priced: declining leaves a page as
+// the reader has it, where repairing overwrites an answer they gave.
 export function widgetFormBar(
   section: JournalSection,
   ctx: SectionContext,
@@ -899,9 +927,18 @@ export function widgetFormBar(
   const blocks = section.render(ctx, { ...opts, form: SECTION_FORM });
   const only = blocks[0];
   if (blocks.length !== 1 || only.kind !== "fence") return undefined;
-  const bar = leadingBar(only.lines);
+  const composed = leadingBar(only.lines);
+  const bar = composed ?? soloBarOf(section, ctx);
   if (!bar) return undefined;
-  if (only.lines.slice(1).some((l) => isHeaderLine(l.trim()))) return undefined;
+  // EVERY LINE WHEN THE FENCE COMPOSED NO BAR, and all but the first when it
+  // did. The question is the same one either way — is there a SECOND head in
+  // here — and on a barless cell line 0 is content rather than the title, so
+  // skipping it would let a fence that heads itself some other way through.
+  if (
+    only.lines.slice(composed ? 1 : 0).some((l) => isHeaderLine(l.trim()))
+  ) {
+    return undefined;
+  }
   const anchored = only.lines.some((l) =>
     BAR_ANCHORED.has(splitDirective(l.trim()).keyword)
   );
@@ -988,7 +1025,21 @@ export function composeSectionRuns(
         row: rowOf(r.section, ctx),
         cell: r.section.cell,
         tab: r.section.tab,
-        bar: soloBarOf(r.section, ctx),
+        // ── NOT OVER AN ANSWER THAT SAID BARE (5.21) ──────────────────
+        //
+        // `soloBar` gives a run that has come down to one member the title its
+        // cell wears alone, and that is right for a cell whose bar the ROW was
+        // carrying. It is wrong for one whose bar the READER took off: since
+        // `widgetFormBar` learned to report a cell's solo bar, `tasks` and the
+        // two state-row cells can be answered `widget`, and composing them
+        // alone put the line straight back — reversing the answer on the way
+        // out of the same function that had just honoured it in
+        // `sectionBlocks`.
+        //
+        // `asFlat` LEAVES `RowMember.bar` UNDEFINED FOR THE SAME REASON and
+        // says so at length; this is that rule reaching the composer, which had
+        // no answer to consult when the rule was written.
+        bar: r.opts?.form === WIDGET_FORM ? undefined : soloBarOf(r.section, ctx),
         r,
       })),
       ({ r }) => {

@@ -35,6 +35,7 @@ import {
 } from "../src/journals/custom-journal";
 import {
   findSection,
+  questionsOf,
   templateTargets,
   widgetFormBar,
 } from "../src/journals/journal-sections";
@@ -237,15 +238,41 @@ describe("the widget form of a journal section (5.11)", () => {
     expect(model.apply(widget, model.present(widget))).toBeNull();
   });
 
-  it("still repairs a barless section that has no widget form", () => {
-    // THE OTHER SIDE OF THE SAME RULE, and the reason the guard is drawn around
-    // the toggle rather than around "barless". On THIS page Open tasks is the
-    // second cell of the shipped row, so it composes no bar of its own — the
-    // row's belongs to Review, which opens it — and the toggle is not offered
-    // to it here (it is on every other Study note, where the section stands
-    // alone). Cut out of the row it is a fence with nothing over it and no
-    // answer behind that, which is an omission: `soloBarOf` has the title a
-    // cell takes when it stops being one, and the repair still writes it.
+  it("offers the toggle to a cell too, on the bar it wears alone (5.21)", () => {
+    // WHAT CHANGED, AND WHAT IT COST. This case used to assert the opposite,
+    // on the argument 5.18 wrote out in `test/section-model.test.ts`: *"a cell
+    // of a row is already a widget, and the control for it is the group card's
+    // Ungroup rather than a form toggle on a section that is not one."*
+    //
+    // That argument is right while the section IS a cell, and it runs out one
+    // gesture later. Ungrouping hands the cell its solo title — `undoRowOfOne`
+    // and the cut path both do — so the reader ends up with a titled Open tasks
+    // and, because `widgetFormBar` asked what the section RENDERS on this
+    // surface and it renders barless here, no control anywhere to take the
+    // title off again. The bar arrives by a gesture and cannot leave by one.
+    //
+    // So the bar a cell would drop is `soloBarOf`: the same line `soloBar`
+    // splices and `withAnswers` removes, which is what makes answering the
+    // question a round trip rather than a third writer.
+    const { ctx } = subject();
+    const tasks = findSection("tasks", ctx)!;
+    expect(widgetFormBar(tasks, ctx)).toBe("header:⏳ Open tasks");
+    expect(
+      questionsOf(tasks, ctx).some((q) => q.kind === "form")
+    ).toBe(true);
+  });
+
+  it("and pays for it by leaving a stale barless cell alone", () => {
+    // THE PRICE, ASSERTED RATHER THAN DISCOVERED. 5.11's rule is that a barless
+    // fence under a toggle is an ANSWER, not an omission — `declaredBar` goes
+    // quiet for any section that carries one — so the 5.10 repair no longer
+    // offers Open tasks the title it used to. A page written before the cut
+    // path titled its cells keeps the headless fence it has.
+    //
+    // That is the cheap side of the trade and it is 5.11's own: repairing would
+    // overwrite an answer the reader gave, on a save they asked for something
+    // else in. What they get instead is the control — the toggle above is in
+    // the same window as the sentence that would have offered the repair.
     const { text, model } = subject();
     const apart = model.regroup!(
       text,
@@ -256,9 +283,60 @@ describe("the widget form of a journal section (5.11)", () => {
     );
     expect(apart).not.toBeNull();
     const ops = model.plan(apart as string, model.present(apart as string));
-    expect(ops.find((o) => o.sectionId === "tasks")?.kind).toBe("extend");
-    const fixed = model.apply(apart as string, model.present(apart as string));
-    expect(fixed).toContain("header:⏳ Open tasks");
+    expect(ops.find((o) => o.sectionId === "tasks")?.kind).not.toBe("extend");
+  });
+
+  it("composes the answer rather than reversing it (5.21)", () => {
+    // WHERE THE TOGGLE NEARLY DID NOTHING. `sectionBlocks` honours the answer
+    // and hands `composeSectionRuns` a fence with no bar in it, and the very
+    // next thing that function did was pass `soloBarOf` to `rowRuns` — which
+    // welds the title back on for any run that has come down to one member.
+    // Open tasks alone IS such a run, so a stored layout answering `widget`
+    // composed a titled section: the answer honoured and then undone inside one
+    // call, with no gesture in between that a reader could see.
+    //
+    // Reachable from a saved layout, which is where a section's `options` live
+    // — the same field `label` and `headings` already ride in.
+    // The row is broken up first — Review left out — so Open tasks is the run
+    // of one this is about. With Review beside it the fence takes the ROW's
+    // title and there is no solo bar for anything to reverse.
+    const target = templateTargets(STUDY_JOURNAL).find((t) =>
+      t.file.includes("subject")
+    )!;
+    const alone = CONTAINER_IDS.filter((id) => id !== "review");
+    const bare = composeTemplate(target.ctx, alone, {
+      order: alone,
+      options: { tasks: { form: "widget" } },
+    });
+    expect(bare).toContain("tasks-table");
+    expect(bare).not.toContain("header:⏳ Open tasks");
+
+    // AND NOT AT THE COST OF THE CELL THAT NEVER ANSWERED: the same run, with
+    // nothing said about it, still gets the title `soloBar` exists to give it.
+    // The guard reads the section's own options, not the shape of the run.
+    const titled = composeTemplate(target.ctx, alone, { order: alone });
+    expect(titled).toContain("header:⏳ Open tasks");
+  });
+
+  it("still repairs a barless section that has no widget form", () => {
+    // THE OTHER SIDE OF THE SAME RULE, AND THE REASON THE GUARD IS DRAWN AROUND
+    // THE TOGGLE RATHER THAN AROUND "BARLESS". `children` opens with a
+    // `button:` — "New Topic", anchored INTO its bar with nowhere to go once
+    // the bar does — so it has no widget form, a fence of its own with no title
+    // over it can only be a page behind the catalogue, and the repair still
+    // writes the line.
+    //
+    // It used to be `tasks` that made this point, which is the whole of what
+    // 5.21 changed: that section now has somewhere for the answer to come from
+    // and this one still does not.
+    const { text, ctx, model } = subject();
+    const children = findSection("children", ctx)!;
+    expect(widgetFormBar(children, ctx)).toBeUndefined();
+
+    const stale = text.replace("header:🗂️ Topics\n", "");
+    expect(stale).not.toBe(text);
+    const ops = model.plan(stale, model.present(stale));
+    expect(ops.find((o) => o.sectionId === "children")?.kind).toBe("extend");
   });
 });
 

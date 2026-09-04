@@ -907,3 +907,141 @@ describe("a cell that stops being one takes its title back — 5.14", () => {
     expect(back.split("```").filter((f) => f.includes("beta"))).toHaveLength(1);
   });
 });
+
+describe("whether the group draws a head — 5.21", () => {
+  // ── THE REPORT WAS TWO SCREENSHOTS OF ONE BAND ────────────────────────
+  //
+  // A journal dashboard's Lately group as it ships: one full-width bar reading
+  // *Lately*, its two cells bare beneath it. And the same group broken up and
+  // made again, which came back as a boxed caption reading *LATELY · OPEN
+  // TASKS*. Both looks are `row.ts`'s and both are deliberate — a group whose
+  // fence titles it nothing captions itself from its cells, and one whose fence
+  // does stands the box down. What there was no way to do was CHOOSE.
+  //
+  // AND THE ANSWER ALREADY EXISTED, GREYED OUT ONE ROW DOWN. A row fence carries
+  // exactly one bar and the OPENING cell composes it, so that cell's
+  // section/widget toggle is this question. The window disabled the box for
+  // every member of a group on the rule that a cell is always a widget — right
+  // for the cells that follow the opener, wrong for the opener itself, whose bar
+  // is the group's own.
+  const opener: FlatSection = {
+    ...one("first", "alpha"),
+    render: (opts) => ({
+      fence: "chronoanvil",
+      lines: [
+        ...(opts?.form === "widget" ? [] : ["header:📖 The band"]),
+        "alpha",
+      ],
+    }),
+    questions: () => [
+      {
+        kind: "form",
+        key: "form",
+        label: "how it is drawn",
+        directive: "header",
+        bar: "header:📖 The band",
+        section: "Draw it as a section",
+        widget: "Draw it as a widget",
+      },
+    ],
+  };
+  // AND THE FOLLOWING CELL HAS THE QUESTION TOO, which is what makes the
+  // refusal below a live claim rather than a vacuous one: 5.21 gave a barless
+  // cell the toggle on the bar it wears ALONE, so `open-tasks` — the second cell
+  // of the very band this release is about — now carries one.
+  const cell: FlatSection = {
+    ...one("second", "beta"),
+    bar: "header:⏳ Beta",
+    questions: () => [
+      {
+        kind: "form",
+        key: "form",
+        label: "how it is drawn",
+        directive: "header",
+        bar: "header:⏳ Beta",
+        section: "Draw it as a section",
+        widget: "Draw it as a widget",
+      },
+    ],
+  };
+  const cat = [opener, cell];
+  const model = flatNoteModel({ sections: cat, text: "" });
+
+  const grouped = [
+    "```chronoanvil",
+    "row",
+    "header:📖 The band",
+    "alpha",
+    "cell",
+    "beta",
+    "```",
+  ].join("\n");
+
+  const answer = (id: string, form: string): string | null =>
+    model.apply(grouped, model.present(grouped).map((x) =>
+      x === id ? { id: x, options: { form } } : x
+    ));
+
+  it("takes the group's head off through the opener, and puts it back", () => {
+    const bare = answer("first", "widget");
+    expect(bare).not.toBeNull();
+    expect(bare).not.toContain("header:📖 The band");
+    // The cells are untouched: this is a question about the band's title, not
+    // about what is in it.
+    expect(bare).toContain("row");
+    expect(bare).toContain("alpha");
+    expect(bare).toContain("beta");
+
+    const back = model.apply(
+      bare as string,
+      model.present(bare as string).map((x) =>
+        x === "first" ? { id: x, options: { form: "section" } } : x
+      )
+    );
+    // BYTE-EXACT, WHICH IS THE CLAIM AND NOT A FLOURISH. `insertBar` puts the
+    // bar UNDER the `row` line because that is where `rowRuns` composes it; a
+    // title written above it renders the same and makes `isHandEdited` call a
+    // page edited by hand because this window put the line in the other place.
+    expect(back).toBe(grouped);
+  });
+
+  it("refuses the same answer from a cell that follows the opener", () => {
+    // THE DEFECT THIS CLOSES, AND IT WAS LIVE ON EVERY FLAT SURFACE.
+    // `withAnswers`' widget branch filters every `header:` line in the chunk it
+    // is handed, and a chunk holding two cells has ONE bar between them. So the
+    // second cell answering *widget* took the WHOLE BAND's title off — an
+    // answer about one column, spent on the group.
+    //
+    // `journal-plan.ts` has refused this since 5.11 and the flat path never
+    // did. Both now say the same sentence: the form question is the opener's.
+    expect(answer("second", "widget")).toBeNull();
+  });
+
+  it("puts the control on the card rather than on the opener's row", () => {
+    // A group's title is not a property of a cell, and two controls writing one
+    // line is the thing this release is fixing rather than repeating. The
+    // opener's own box is not drawn inside a group; the card's is.
+    const editor = readCode("section-editor");
+    expect(editor).toContain("private renderBlockTitle(");
+    expect(editor).toContain("this.renderBlockTitle(bar, group);");
+    expect(editor).toContain('if (block.length > 1 && block[0] === section.id) return;');
+    // TICKED IS THE HEAD, which is the opposite sense to the row's box — that
+    // one asks "draw this as a widget" and this asks for a title.
+    expect(editor).toContain("box.checked = this.shownAnswer(opener, q) !== WIDGET_FORM;");
+  });
+
+  it("says the narrower sentence to the cells that are still always widgets", () => {
+    // The old wording — *"widgets in a group are automatically drawn as
+    // widgets"* — was true of every member while the opener's box was disabled
+    // beside them, and became wrong for the opener the moment its answer meant
+    // something. It now names which cells it is about and where the group's
+    // title comes from.
+    const editor = readCode("section-editor");
+    expect(editor).toContain(
+      "Cells after the first are always widgets — the group's title is the first cell's"
+    );
+    expect(editor).not.toContain(
+      "Widgets in a group are automatically drawn as widgets"
+    );
+  });
+});

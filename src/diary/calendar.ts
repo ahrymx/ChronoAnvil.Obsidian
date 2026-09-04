@@ -612,8 +612,9 @@ export function buildCalendar(
   // whole card is a LiveWidget that rebuilds its subtree whenever anything under
   // the diary folder changes, so a control built here and appended to a bar
   // OUTSIDE the widget would be orphaned by the first rebuild and duplicated by
-  // the next. That is the same reason `buildScopeCycle` is drawn by the block
-  // processor and not by the table it belongs to. The strip reads as the
+  // the next. It is the same reason the task table's scope cycle was drawn by
+  // the block processor rather than by the table it belonged to, for as long as
+  // that button existed (removed in 5.21). The strip reads as the
   // section's because it takes the same four values — a hairline, 4px of air,
   // right-aligned, at the bar's scale — not because it shares its element.
   //

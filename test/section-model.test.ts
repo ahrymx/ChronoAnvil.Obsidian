@@ -377,17 +377,33 @@ describe("the editor cannot learn which surface it is on", () => {
     // section that started asking, and one that quietly narrowed as a section
     // that stopped.
     //
-    // AND TWO ROWS LEFT IT IN 5.18, WHICH IS THE SAME DERIVATION WORKING. The
-    // journal index this test builds is the DEEPEST one, and that is where the
-    // tracker grid and the stats band are now the two pages of one group — so
-    // neither composes a bar, `widgetFormBar` has none to report, and the
-    // toggle is not offered. That is exactly where `tasks` stands on a
-    // CONTAINER index and has stood since 4.70: a cell of a row is already a
-    // widget, and the control for it is the group card's Ungroup rather than a
-    // form toggle on a section that is not one. Both are on this list on the
-    // surfaces where they are blocks — see `journal leaf/trackers` below, and
-    // the container index the row does not apply to.
+    // TWO ROWS LEFT IT IN 5.18 AND CAME BACK IN 5.21, AND THE ROUND TRIP IS
+    // THE ARGUMENT. The journal index this test builds is the DEEPEST one,
+    // where the tracker grid and the stats band are the two pages of one group,
+    // so neither composes a bar. 5.18 read that as "no bar to report, no toggle
+    // to offer", and wrote the rule out: *a cell of a row is already a widget,
+    // and the control for it is the group card's Ungroup rather than a form
+    // toggle on a section that is not one.*
+    //
+    // THAT IS TRUE WHILE THE SECTION IS A CELL AND FALSE ONE GESTURE LATER.
+    // Ungroup hands the cell its solo title — `undoRowOfOne` and the cut path
+    // both do — and `widgetFormBar` was asking what the section RENDERS on this
+    // surface, which is still barless. So the reader ended with a titled
+    // section and no control anywhere to take the title off: the bar arrived by
+    // a gesture and could not leave by one. 5.21 reports `soloBarOf` where the
+    // render composes nothing, which is the same line by the same name, and the
+    // three rows that were cells — these two and `journal index/tasks`, which
+    // was reported by its `folder` question all along — can now answer for it.
+    //
+    // AND THE EDITOR SAYS IT OF THE CELLS THAT FOLLOW THE OPENER (5.21).
+    // `renderFormQuestion` draws the box checked and disabled for those, so the
+    // toggle describes the state rather than offering to change it, and Ungroup
+    // is still the control that does. The OPENER's box is a different question
+    // wearing the same field — its bar is the group's own title — so it is not
+    // drawn on the row at all and appears on the card as **Title header**.
     expect(asking).toEqual([
+      "journal index/trackers",
+      "journal index/stats",
       "journal index/find",
       "journal index/review",
       "journal index/tasks",

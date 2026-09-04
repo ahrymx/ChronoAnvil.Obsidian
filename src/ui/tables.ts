@@ -16,7 +16,6 @@
 // LiveWidget by widgets.ts so it refreshes when anything in its scope
 // changes, not just the host note itself.
 
-import { SCOPE_JOURNAL } from "../core/directive-grammar";
 import { App, MarkdownPostProcessorContext, normalizePath, setIcon, TFile, TFolder } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
 import { childFiles, filesUnder, folderPrefix, frontmatterOf, getFile, getFolder, isVaultRoot, isoDate, moment, noExt, noteTypeOf, openFile, openGlobalSearch } from "../core/util";
@@ -1188,8 +1187,7 @@ export function buildLevelCards(
 // returns an `actions` slot for exactly this, and at level 2 that slot sits
 // inline on the title line pushed right (`30-header-bars.css:147`). So the
 // control costs no geometry, no row, and nothing new to learn — it is where the
-// chart edit button, the scope cycle and the journals section's own `+ Subject`
-// already are.
+// chart edit button and the journals section's own `+ Subject` already are.
 //
 // THE TILE STAYS A TILE, because the grid has no head of its own to put a
 // control in — its head belongs to the Contents SECTION, which is a different
@@ -3140,126 +3138,38 @@ export function dueLabel(
   return { text: moment(dueIso).format("D MMM"), overdue: false };
 }
 
-// The scope cycle — Below / Journal / Path. 3.18 §5.3.
+// ── THE SCOPE CYCLE IS GONE (5.21) ───────────────────────────────────────
 //
-// BUILT TO `buildRangeCycle`'S SHAPE (chart-widgets.ts), which is the control
-// this was asked to resemble and the established pattern for a widget-level
-// scope change: one small button in the corner, an optimistic local update, and
-// a write back into the directive it is about.
+// A task table used to carry a small button reading **Below** / **Journal** /
+// **Path**, which rewrote the directive's folder argument in place. It was
+// built into the table in 3.18 §5.3, moved onto the section's own header bar in
+// 3.19.2, and is removed here.
 //
-// PATH IS CARRIED, NEVER PROPOSED. A reader whose directive names a folder —
-// typed in the section editor, or shipped as `tasks-table:{{folder}}` on the
-// Subject Index — must be able to cycle away and back without losing the path,
-// so it is a state the cycle passes THROUGH when one exists and never a state
-// it invents. That is also why the third option is offered at all: it is the
-// one that already exists.
+// WHAT ARGUED IT AWAY IS WHERE IT ENDED UP. On the journal front page Open
+// tasks is the second cell of the **Lately** row, and a row's bar is written by
+// its first cell — so the button landed on a strip titled "🕒 Lately", above a
+// list of recent notes it has nothing to do with, describing a scope for the
+// table beside it. Three sections put it somewhere equally arbitrary. A control
+// whose label ("Below") only makes sense once you know which of the two columns
+// under the bar it belongs to is not a control, it is a puzzle.
 //
-// STATIC RATHER THAN ABSENT when there is nowhere to cycle to, on
-// buildRangeCycle's reasoning — the scope is worth showing whether or not it
-// can be changed, and a button that vanishes on some tables and not others is
-// harder to read than a quiet one.
-// EXPORTED SINCE 3.19.2 so the block processor can draw it in the section's
-// header bar. It was built into the table's own root — inside the section body,
-// under the title rather than on it — which put a section-level control in the
-// same place as the section's content. The bar is where this belongs for the
-// same reason "Add category" moved there: the strip is the section's own, and a
-// control that acts on the whole table is not one of the table's rows.
-export function buildScopeCycle(root: HTMLElement, scope: TasksScope): void {
-  const isKeyword = scope.arg === SCOPE_JOURNAL;
-  const hasPath = !!scope.arg && !isKeyword;
-  const current = isKeyword ? "journal" : hasPath ? "path" : "below";
-  // THE ROOT IS A WRITTEN SCOPE LIKE ANY OTHER, AND IS NOT A PATH (4.44.0). A
-  // directive may name it — `tasks-table:./` is how a note inside a folder says
-  // "the whole vault", which empty cannot say anywhere but the top — so it is
-  // CARRIED by the cycle exactly as a folder is, under a name that describes
-  // it. Calling that state "Path" would be the same wrong word as the "/" the
-  // hint used to print.
-  const hostAtRoot = scope.hostFolder != null && isVaultRoot(scope.hostFolder);
-  const argAtRoot = hasPath && isVaultRoot(scope.arg);
-
-  const states: { id: string; value: string; label: string; hint: string }[] = [
-    {
-      id: "below",
-      value: "",
-      label: "Below",
-      // AND AT THE ROOT IT SAYS SO IN WORDS (4.44.0). `hostFolder` is `"/"` on
-      // every top-level note, so this hint read "Tasks in notes under /" — a
-      // path no reader could type, describing the one scope that is not a path.
-      // "Below" is still the right LABEL there: what is below the homepage is
-      // the vault.
-      hint: hostAtRoot
-        ? "Tasks in every note in the vault"
-        : `Tasks in notes under ${scope.hostFolder ?? "this note's folder"}`,
-    },
-    ...(scope.inJournal
-      ? [
-          {
-            id: "journal",
-            value: SCOPE_JOURNAL,
-            label: "Journal",
-            hint: "Tasks in every note of this journal",
-          },
-        ]
-      : []),
-    ...(hasPath
-      ? [
-          {
-            id: "path",
-            value: scope.arg,
-            label: argAtRoot ? "Vault" : "Path",
-            hint: argAtRoot
-              ? "Tasks in every note in the vault"
-              : `Tasks in notes under ${scope.arg}`,
-          },
-        ]
-      : []),
-  ];
-
-  const at = Math.max(
-    0,
-    states.findIndex((s) => s.id === current)
-  );
-  const btn = root.createEl("button", { cls: "ca-journal-tasks-scope" });
-  btn.createSpan({
-    cls: "ca-journal-tasks-scope-text",
-    text: states[at]?.label ?? "Below",
-  });
-  if (states.length < 2) {
-    btn.addClass("is-static");
-    btn.disabled = true;
-    btn.setAttr("title", `${states[at]?.hint ?? ""} — the only scope available here`);
-    return;
-  }
-  const next = states[(at + 1) % states.length];
-  const hint = `${states[at].hint} — click for ${next.label.toLowerCase()}`;
-  btn.setAttr("aria-label", hint);
-  btn.setAttr("title", hint);
-  btn.addEventListener("click", (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    scope.cycle(next.value);
-  });
-}
+// AND THE HOMEPAGE HAD ALREADY LOST IT, silently, since 3.19.2 — see the note
+// on `buildTasksTableRegion`. That page is the one this change was asked to
+// mirror: it has shown a bare Open tasks card for eleven releases and nobody
+// missed the button.
+//
+// THE SCOPE IS STILL THE READER'S TO SET, and through the control that was
+// always the better one for it: every Open tasks section asks
+// *"the folder to collect tasks from"* as a folder question in the section
+// editor, which writes the same argument this button did, with a folder picker
+// instead of a three-state cycle and without a second parser
+// (`setTasksScope`) writing into the note behind the editor's back.
 
 // `period` non-null restricts the table to notes whose `journal-date` falls
 // inside the host dashboard's current week/month (see inPeriod). It's resolved
 // by the caller on every repaint — the Monthly Overview is a single note whose
 // `month-start` the period-nav buttons rewrite in place, so the bounds must be
 // re-read per build, never captured once.
-// What the scope cycle needs to draw itself, or null on a surface that has no
-// scope to change. 3.18 §5.3.
-export interface TasksScope {
-  // The directive's argument as written, minus any `,period` suffix.
-  arg: string;
-  // Where a bare directive reads, for the Below label's tooltip.
-  hostFolder: string | null;
-  // Whether "This whole journal" is reachable from here — false outside every
-  // registered journal root, where the keyword would resolve to nothing.
-  inJournal: boolean;
-  // Write the next argument back into the note.
-  cycle: (next: string) => void;
-}
-
 // The table's own label row: what it is, how much of it there is, and how much
 // of that is late.
 //
@@ -3502,12 +3412,10 @@ export function buildTasksTable(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   folder: string,
-  period: PeriodBounds | null = null,
-  scope: TasksScope | null = null
+  period: PeriodBounds | null = null
 ): HTMLElement {
   const app = plugin.app;
   const root = createDiv({ cls: "ca-journal-table ca-journal-tasks-table" });
-  if (scope) buildScopeCycle(root, scope);
 
   // Was a two-branch conditional over a four-value union, so a quarter-scoped
   // table labelled itself "week of 1 Jul 2026". See formatPeriodLabel.

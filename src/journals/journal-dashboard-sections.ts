@@ -176,6 +176,15 @@ const journalChartLinesIn = (text: string): number =>
 // which is the question this page had no block for at all before 4.70.
 const LATELY_ROW = "lately";
 const LATELY_BAR = `${HEADER_KEYWORD}:🕒 Lately`;
+// The title Open tasks wears when it is standing alone — worded for ITSELF
+// rather than for the band, which is what `LATELY_BAR` is worded for.
+//
+// ONE PLACE IT IS SAID, and that is not tidiness. `soloBar` splices
+// `JournalSection.bar` into a run that has come down to one member and
+// `withAnswers` splices `FormQuestion.bar` when the reader answers the toggle
+// below; two spellings would be two titles for one section, each written by a
+// different gesture and neither able to take the other off.
+const OPEN_TASKS_BAR = `${HEADER_KEYWORD}:⏳ Open tasks`;
 
 // The whole catalogue for one journal, shipped and offered together.
 //
@@ -452,16 +461,44 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
           directive: "tasks-table",
           hostFolder: spec.hostFolder ?? null,
         },
+        // ── AND HOW IT IS DRAWN, WHICH IT COULD NOT BE ASKED (5.21) ──────
+        //
+        // 5.12's rule is that a section is offered this unless something of its
+        // own is anchored INTO its title bar, which has nowhere to go once the
+        // bar does. This one anchored the task table's scope button until 5.21
+        // removed it, and now anchors nothing at all — so it qualifies plainly,
+        // where before it qualified on an argument.
+        //
+        // WHY IT WAS MISSING, WHICH IS NOT THAT ARGUMENT. Every other section
+        // on this catalogue derives the toggle from the bar its `render`
+        // composes, and this one composes none — it is the row's SECOND cell,
+        // and Recent notes beside it writes the single bar the fence gets. Its
+        // title lives in `bar` below instead, the line it takes back when it
+        // stands alone, and nothing was reading that field as the answer to
+        // this question. `diary-sections.ts` had the same gap and closed it in
+        // 5.14; this catalogue and the journal-note one were not swept then.
+        //
+        // A reader who unticked Recent notes therefore got an Open tasks
+        // section whose editor row said *Section*, whose page drew a titled
+        // card, and which offered no control anywhere to say otherwise.
+        //
+        // SAFE WHILE IT IS A CELL, and the editor is what makes it so rather
+        // than a guard here: `renderFormQuestion` draws the box checked and
+        // disabled for a row in a group — *"Widgets in a group are
+        // automatically drawn as widgets"* — so the answer that would put a
+        // second full-width strip over this band cannot be given from inside
+        // it.
+        formQuestion(OPEN_TASKS_BAR, HEADER_KEYWORD),
       ],
-      // SECOND CELL OF THE LATELY ROW (4.70), SO NO BAR AND NO TOGGLE FOR ONE.
-      // Recent notes opens the row and composes the single title this fence
-      // gets — see `LATELY_BAR` above the catalogue for why it is worded for
-      // the band rather than for either column.
+      // SECOND CELL OF THE LATELY ROW (4.70), SO IT COMPOSES NO BAR. Recent
+      // notes opens the row and composes the single title this fence gets — see
+      // `LATELY_BAR` above the catalogue for why it is worded for the band
+      // rather than for either column.
       row: LATELY_ROW,
       // AND ITS OWN TITLE BACK IF `recent` IS NOT THERE — see `soloBar`. That
       // section composes `LATELY_BAR` for the band and is freely removable, so
       // without this the table is a box of rows with nothing above it.
-      bar: `${HEADER_KEYWORD}:⏳ Open tasks`,
+      bar: OPEN_TASKS_BAR,
       render: () => ({ fence: "chronoanvil", lines: ["tasks-table"] }),
       locate: (text) => probe(text, /^tasks-table\b/m),
     },

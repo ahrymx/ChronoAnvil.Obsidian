@@ -270,57 +270,14 @@ body.is-mobile .ca-journal-path-del {
   padding: 0 2px;
 }
 
-/* The task table's scope cycle — Below / Journal / Path (3.18 §5.3).
-   A quiet control that states the scope whether or not it can be changed, so a
-   reader always knows what the table below is counting.
+/* THE TASK TABLE'S SCOPE CYCLE WAS STYLED HERE AND IS GONE (5.21). Five rules:
+   the button, its hover, its `is-static` state, a `position: relative` on the
+   table to give it a positioning context, and the absolute corner placement
+   that used that context on a fence with no header bar to host the control.
 
-   NO LONGER ABSOLUTELY POSITIONED (3.21.2). It was `position: absolute; top: 0;
-   right: 0`, which is what pinned it to the top-right corner of the table's own
-   wrapper — correct for as long as it lived inside the table. 3.19.2 moved it
-   into the section's header bar and left this rule behind, so the button was
-   still created and still in the DOM, and still absolutely positioned against
-   whatever the nearest positioned ancestor happened to be: it landed on top of
-   the section frame's own corner, behind the fold chevron, or nowhere visible
-   at all. The section appeared to have lost its control entirely.
+   The button is gone from the plugin, not just from the stylesheet — see the
+   note where `buildScopeCycle` was, in `tables.ts`. The `position: relative`
+   goes with it because nothing else under `.ca-journal-tasks-table` is
+   positioned; leaving a stacking context behind for a control that no longer
+   exists is how the 3.19.2 orphan happened in the first place. */
 
-   An ordinary flex item now, because the actions strip is a flex row that
-   already spaces and aligns what it holds — the same treatment every other
-   header-anchored button gets, and the reason none of them carries coordinates
-   of its own. */
-/* `background: transparent` since 4.13.1 §1. It filled with
-   `--background-primary` — the NOTE's colour, under a section card painted
-   `--background-secondary` — so the one control on the strip that is not a
-   `.ca-journal-btn` was also the only one with a fill, and read as sunk into the
-   bar rather than sitting on it. */
-.ca-journal-tasks-scope {
-  flex: 0 0 auto;
-  padding: 2px var(--ca-space-3);
-  border-radius: var(--ca-radius-sm);
-  border: 1px solid var(--background-modifier-border);
-  background: transparent;
-  box-shadow: none;
-  color: var(--text-muted);
-  font-size: var(--ca-text-2xs);
-  cursor: pointer;
-}
-.ca-journal-tasks-scope:hover {
-  color: var(--text-normal);
-}
-.ca-journal-tasks-scope.is-static {
-  cursor: default;
-  opacity: 0.6;
-}
-/* The positioning context for the scope button in the ONE place it is still
-   drawn inside the table: a fence carrying `tasks-table` with no `header:`
-   above it, which has no actions strip to host the control. Kept rather than
-   removed with the absolute rule, because that case is legal and must not lose
-   the button — it is the fallback `buildTasksTableRegion` renders when
-   `hostedControls` is false. */
-.ca-journal-tasks-table {
-  position: relative;
-}
-.ca-journal-tasks-table > .ca-journal-tasks-scope {
-  position: absolute;
-  top: 0;
-  right: 0;
-}

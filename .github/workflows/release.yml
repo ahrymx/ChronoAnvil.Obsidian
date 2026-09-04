@@ -23,19 +23,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
       # THE TAG IS THE VERSION, so a tag that disagrees with the manifest would
       # publish a release advertising one number containing a build that calls
-      # itself another, and Obsidian believes the manifest. Checked before
-      # anything is built, so the failure costs seconds rather than a full run.
+      # itself another, and Obsidian believes the manifest.
+      #
+      # AHEAD OF THE COMPOSITE ON PURPOSE. This and the check below read JSON
+      # with the Node the runner already ships, so neither needs `npm ci` — and
+      # asking them first is what makes a mistyped tag cost seconds rather than
+      # an install and a full test run.
       - name: Check the tag against the manifest
         run: |
           tag="$GITHUB_REF_NAME"
@@ -62,17 +57,9 @@ jobs:
             }
           " "$tag"
 
-      - name: Check version agreement
-        run: npm run check:versions
-
-      - name: Run test suite
-        run: npm test
-
-      - name: Run typecheck
-        run: npm run typecheck
-
-      - name: Run linter
-        run: npx eslint src test
+      # The same four checks CI and the rolling release run, from one place.
+      - name: Install and check
+        uses: ./.github/actions/checks
 
       - name: Build
         run: npm run build

@@ -20,7 +20,7 @@
 // the ambiguity `frame:` and `row` each refused in their own grammar.
 //
 // And they are not the same idea. A `links:` row is navigation CHROME: a
-// breadcrumb trail, an "up", a scope cycle, attached to a page that is about
+// breadcrumb trail, an "up", a filter, attached to a page that is about
 // something else. A launcher is CONTENT — a block a reader puts on a page
 // because getting somewhere is what that part of the page is for. The
 // difference shows in where each one goes: the row is welded to a header band,

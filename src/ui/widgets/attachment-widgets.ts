@@ -814,10 +814,10 @@ function buildShelfRemove(
     await removeAttachCategory(deps, ctx.sourcePath, key);
   });
   return (): void => {
-    // EMPTY IS THE WHOLE CONDITION. Disabled rather than hidden, on
-    // `buildScopeCycle`'s reasoning: a control that vanishes on some shelves
-    // and not others is harder to read than a quiet one, and the tooltip is
-    // where the reason belongs.
+    // EMPTY IS THE WHOLE CONDITION. Disabled rather than hidden, on the
+    // reasoning the scope cycle used to state and this comment now keeps: a
+    // control that vanishes on some shelves and not others is harder to read
+    // than a quiet one, and the tooltip is where the reason belongs.
     const n = count();
     const empty = n === 0;
     drop.disabled = !empty;

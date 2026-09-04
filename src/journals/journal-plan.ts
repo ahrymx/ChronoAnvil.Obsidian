@@ -1260,17 +1260,23 @@ export function applySections(
           const listedSection = byId.get(id);
           out = withAnswers(
             out,
-            // AND A ROW FENCE ANSWERS NO FORM QUESTION (5.11). `withAnswers`'
-            // widget branch filters every `header:` line in the chunk it is
-            // handed, and a chunk holding two cells has one bar between them —
-            // the band's, composed by the opener. So a form answer arriving for
-            // one cell of a row would take the whole group's title off. The
-            // editor already declines to offer the box there ("widgets in a
-            // group are automatically drawn as widgets"); this is the same
-            // refusal at the write, where a `want` built anywhere else lands.
+            // AND A ROW FENCE ANSWERS ONE FORM QUESTION, THE OPENER'S (5.11,
+            // widened in 5.21). `withAnswers`' widget branch filters every
+            // `header:` line in the chunk it is handed, and a chunk holding two
+            // cells has one bar between them — the band's, composed by the
+            // opener. So a form answer arriving for a FOLLOWING cell would take
+            // the whole group's title off, and that is still refused here.
+            //
+            // THE OPENER IS NOT THAT CASE AND USED TO BE REFUSED WITH IT. Its
+            // bar is the group's own, so the answer means exactly what the
+            // reader is asking: draw this band with a head, or bare. The gate
+            // read `length === 1`, which is "this is not a group" — one
+            // character away from the rule it was written for and the reason a
+            // group made in the editor could not be titled again. The control
+            // is on the group card; see `renderBlock` in `section-editor.ts`.
             listedSection
               ? questionsOf(listedSection, ctx).filter(
-                  (q) => q.kind !== "form" || run.sectionIds.length === 1
+                  (q) => q.kind !== "form" || id === run.sectionIds[0]
                 )
               : [],
             optionsFor(requested, id)

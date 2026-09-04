@@ -127,9 +127,10 @@ export function sectionsMenuFor(
 // Write the page's width into the note that asked for it.
 //
 // READS THE FILE AT THE MOMENT OF THE CLICK rather than trusting what was
-// rendered, which is the same shape `setTasksScope` uses one file over: the note
-// may have changed since the head was drawn, and `setPageWide` splices one line
-// into the text it is given.
+// rendered, which was `setTasksScope`'s shape one file over until 5.21 removed
+// it and now leaves this the only writer of its kind: the note may have changed
+// since the head was drawn, and `setPageWide` splices one line into the text it
+// is given.
 //
 // NOTHING IS WRITTEN WHEN NOTHING WOULD CHANGE. `setPageWide` returns null for
 // that and for a note with no head at all — a `vault.modify` that leaves a file

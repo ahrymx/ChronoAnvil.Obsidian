@@ -236,12 +236,20 @@ describe("what a root-scoped table says and watches", () => {
     expect(tables).toContain("Open tasks from notes under ${folder} collect here");
   });
 
-  it("calls the root scope 'Vault' in the cycle, never 'Path'", () => {
-    // A carried `tasks-table:./` is a written scope like any other and must
-    // survive a cycle away and back — but it is not a path, and the button that
-    // said "Path" over it would be printing the same wrong word the hint did.
-    expect(tables).toContain('label: argAtRoot ? "Vault" : "Path"');
-    expect(tables).toContain('"Tasks in every note in the vault"');
+  it("said 'Vault' in the cycle too, for as long as there was one", () => {
+    // 4.44.0 fixed this wording in two places: the empty-state callouts above,
+    // and the scope button, where a carried `tasks-table:./` was labelled
+    // "Path" over a scope that is not a path.
+    //
+    // THE BUTTON WENT IN 5.21 AND THIS HALF WENT WITH IT. Asserted as an
+    // absence rather than deleted, because the surviving half is the same
+    // wording rule and a control reintroduced here would have to answer it
+    // again: at the root, name the vault, do not print `/`.
+    expect(tables).not.toContain('label: argAtRoot ? "Vault" : "Path"');
+    expect(tables).not.toContain("argAtRoot");
+    // `./` is still a scope a reader can WRITE — the keyword above offers it —
+    // so what it renders at the root still has to say "the vault".
+    expect(tables).toContain("in the vault");
   });
 
   it("watches every note in the vault when the scope is the root", () => {

@@ -1,0 +1,51 @@
+name: Install and check
+description: >
+  Node, dependencies, and the four checks every workflow in this repository runs
+  before it is allowed to build anything.
+
+# ── WHY THIS IS AN ACTION AND NOT FOUR LINES IN THREE FILES (5.21) ────────
+#
+# `ci.yml`, `release.yml` and `latest.yml` all begin the same way: set up Node,
+# `npm ci`, then version agreement, tests, typecheck and lint. That was written
+# out three times, and the third copy is the one that arrived with the rolling
+# release — so this was the moment to stop, on the same argument the rest of this
+# repository makes about a rule with two spellings.
+#
+# THE COST OF THE DRIFT IS NOT THEORETICAL HERE. The one workflow that publishes
+# to a link people install from is the one that must never skip a check, and a
+# check added to CI and forgotten here would leave exactly that gap — silently,
+# because a workflow that runs fewer steps still goes green.
+#
+# WHAT IS DELIBERATELY NOT IN IT: the checkout, and the build. The caller does
+# its own checkout because `latest.yml` needs history that CI does not, and each
+# workflow builds differently — `npm run package` for CI and the rolling
+# release, `npm run build` for the tagged one, which needs the three loose files
+# and nothing else.
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: npm
+
+    - name: Install dependencies
+      run: npm ci
+      shell: bash
+
+    - name: Check version agreement
+      run: npm run check:versions
+      shell: bash
+
+    - name: Run test suite
+      run: npm test
+      shell: bash
+
+    - name: Run typecheck
+      run: npm run typecheck
+      shell: bash
+
+    - name: Run linter
+      run: npx eslint src test
+      shell: bash

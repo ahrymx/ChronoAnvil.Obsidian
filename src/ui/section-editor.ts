@@ -907,6 +907,8 @@ export class SectionEditorModal extends EditorModal {
       this.settle(breakUp(this.arrangement, band, group[0]));
     });
 
+    this.renderBlockTitle(bar, group);
+
     const body = card.createDiv({ cls: "ca-tpl-block-body" });
     // ONE BAND PER PAGE, AND ONLY WHERE THERE IS MORE THAN ONE. A single page is
     // the group itself, and a band saying `Page 1` over the whole card would be
@@ -923,6 +925,79 @@ export class SectionEditorModal extends EditorModal {
         const section = this.view(id);
         if (section) this.renderRow(body, section);
       }
+    });
+  }
+
+  // ── WHETHER THE GROUP DRAWS A HEAD (5.21) ─────────────────────────────
+  //
+  // THE REPORT WAS TWO SCREENSHOTS OF THE SAME BAND. A journal dashboard's
+  // Lately group as it ships — one full-width bar reading *Lately*, the two
+  // cells bare beneath it — and the same group broken up and made again, which
+  // came back as a boxed caption reading *LATELY · OPEN TASKS*. Both are
+  // deliberate looks: `row.ts` draws the caption for a group whose fence titles
+  // it nothing, and stands the box down for one whose fence does. What there was
+  // no way to do was choose.
+  //
+  // AND THE ANSWER ALREADY EXISTED, ONE ROW DOWN AND GREYED OUT. A row fence
+  // carries exactly one bar and the OPENING cell composes it, so that cell's
+  // section/widget toggle IS this question — answer it *widget* and the band
+  // loses its head, answer it *section* and the head comes back. The window
+  // disabled the box for every member of a group on the rule that a cell is
+  // always a widget, which is right for the cells that FOLLOW the opener and
+  // wrong for the opener itself. So a reader could take a group's title off
+  // while it was still two blocks and had no way to put it back once it was one.
+  //
+  // ON THE CARD, WHICH IS WHAT IT DESCRIBES. The bar already carries the two
+  // operations that act on the group rather than on a cell — move it, break it
+  // up — and this is a third. Put back on the opener's row it would be a control
+  // on a cell that changes the whole card, which is the placement 4.53.0 argued
+  // against for the arrows and the reason they moved here.
+  //
+  // ONLY WHERE THE OPENER HAS THE QUESTION. A section that anchors a `button:`
+  // into its bar has no widget form at all — the control would have nowhere to
+  // go — and one that is in the file without the window having read it cannot be
+  // answered from here. Both draw nothing rather than a box that refuses:
+  // `split` is disabled with a sentence because a reader can act on that
+  // sentence, and there is nothing to be done about a section that composes no
+  // title.
+  private renderBlockTitle(bar: HTMLElement, group: readonly string[]): void {
+    const kept = group.filter((id) => !this.removed.has(id));
+    const opener = this.view(kept[0] ?? "");
+    if (!opener) return;
+    const q = (opener.questions ?? []).find(
+      (x): x is FormQuestion => x.kind === "form"
+    );
+    if (!q) return;
+
+    const wrap = bar.createDiv({ cls: "ca-tpl-form ca-tpl-block-form" });
+    const box = wrap.createEl("input", {
+      type: "checkbox",
+      cls: "ca-tpl-form-box",
+    });
+    box.id = `ca-block-title-${(kept[0] ?? "").replace(/[^a-z0-9]+/gi, "-")}`;
+    const label = wrap.createEl("label", {
+      cls: "ca-tpl-form-label",
+      text: "Title header",
+    });
+    label.htmlFor = box.id;
+
+    // TICKED IS THE HEAD, WHICH IS THE OPPOSITE SENSE TO THE ROW'S BOX. That one
+    // asks "draw this as a widget" and this asks "give this group a title", so
+    // the same answer reads inverted — and it has to, because a control on a
+    // card is describing the card and a reader ticking a box called *Title
+    // header* is asking for one.
+    box.checked = this.shownAnswer(opener, q) !== WIDGET_FORM;
+    const explanation = `Draw a title bar over the whole group. Unticked, it captions itself from its cells instead.`;
+    box.title = explanation;
+    label.title = explanation;
+    box.setAttribute("aria-label", `Title header (${explanation})`);
+    box.addEventListener("change", () => {
+      this.answer(
+        kept[0],
+        q.key,
+        box.checked ? SECTION_FORM : WIDGET_FORM
+      );
+      this.refreshFrame();
     });
   }
 
@@ -1615,13 +1690,28 @@ export class SectionEditorModal extends EditorModal {
     label.htmlFor = id;
 
     const band = this.bandOf(section.id);
-    const inGroup = blockOf(band, this.joined, section.id).length > 1;
+    const block = blockOf(band, this.joined, section.id);
 
-    if (inGroup) {
+    // ── THE OPENER'S BOX IS ON THE CARD, NOT ON THE ROW (5.21) ──────────
+    //
+    // A group's title is the opening cell's bar — one bar per row fence,
+    // worded for the band — so the answer this question holds for that section
+    // is the answer to "does this group draw a head". It is drawn where the
+    // object is, which is the card, and drawing it here as well would be two
+    // controls writing one line.
+    if (block.length > 1 && block[0] === section.id) return;
+
+    if (block.length > 1) {
       box.checked = true;
       box.disabled = true;
       wrap.addClass("is-disabled");
-      const explanation = "Widgets in a group are automatically drawn as widgets";
+      // AND THE SENTENCE NARROWED WITH IT. It said "widgets in a group are
+      // automatically drawn as widgets", which was true of every cell while the
+      // opener's box was disabled beside it and is now true of the cells that
+      // follow one — the first cell writes the group's own title, and the card
+      // says so.
+      const explanation =
+        "Cells after the first are always widgets — the group's title is the first cell's";
       box.title = explanation;
       label.title = explanation;
       box.setAttribute("aria-label", `${q.widget} (${explanation})`);

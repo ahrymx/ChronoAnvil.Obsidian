@@ -29,7 +29,6 @@ import {
 } from "../../diary/calendar";
 import { frontmatterOf, parseHeaderDirective } from "../../core/util";
 import { HeaderBar } from "../headerbar";
-import { buildScopeCycle } from "../tables";
 import { HeaderSite, attachHeaderRename, boundsOf } from "../header-title";
 import {
   CAPTURE_NOTE_KEY,
@@ -101,7 +100,6 @@ import {
   buildReviewQueueRegion,
   buildTagIndexRegion,
   buildTasksTableRegion,
-  tasksScopeFor,
   buildTimelineRegion,
   buildStatsBandRegion,
   buildLevelCardsRegion,
@@ -1026,9 +1024,12 @@ export class Widgets implements
       // `tasks:` head's Compact toggle and progress readout went with it, so a
       // control disappeared from every Study note to settle a layout question.
       //
-      // ONE ANSWER FOR THE FENCE, unlike `hostedScope` beside it, which is per
-      // directive because a fence may hold a hosted table and an unhosted one.
-      // A title is not like that: a `header:` bar names everything under it.
+      // ONE ANSWER FOR THE FENCE, unlike the `hostedScope` flag that used to
+      // sit beside it, which was per DIRECTIVE because a fence may hold a
+      // hosted table and an unhosted one. A title is not like that: a `header:`
+      // bar names everything under it. (That flag went with the scope button in
+      // 5.21; the distinction is kept here because it is the reason this one is
+      // computed for the fence and `soleField` below is not.)
       //
       // AND `frame: section` COUNTS AS A TITLE, because it draws one — from the
       // first directive `SECTION_TITLES` knows, further down this function. A
@@ -1061,9 +1062,6 @@ export class Widgets implements
       // with none. Computed in one pass up front rather than discovered during
       // the loop, because the button has to be placed when its header is drawn
       // and the `attach:` line proving it is a Resources bar comes later.
-      // Which titled header this fence's task table hangs under, on the same
-      // reasoning as `shelfHeader`: the scope button is a section-level control
-      // and belongs on the section's own strip rather than inside its body.
       const headerOwning = (keyword: string): number => {
         let seen = -1;
         for (const line of lines) {
@@ -1076,19 +1074,12 @@ export class Widgets implements
         }
         return -1;
       };
-      const scopeHeader = headerOwning("tasks-table");
-      const shelfHeader = ((): number => {
-        let seen = -1;
-        for (const line of lines) {
-          const kw = line.split("|")[0].split(":")[0].trim();
-          if (kw === "attach") return seen;
-          if (kw !== "header") continue;
-          if (parseHeaderDirective(line.slice(line.indexOf(":") + 1).trim()).title) {
-            seen++;
-          }
-        }
-        return -1;
-      })();
+      // THROUGH THE HELPER SINCE 5.21, and the two were the same walk written
+      // out twice before that: `headerOwning` was generalised out of this IIFE
+      // for the task table's scope button, and the copy it was generalised from
+      // stayed. Removing the scope button left the helper with one caller,
+      // which is this one.
+      const shelfHeader = headerOwning("attach");
 
       // WHERE EACH CELL OF THE ROW ENDS, as the number of children the block
       // had when the dispatcher met the delimiter. 4.4 §1, and `cellPlan` says
@@ -1293,24 +1284,10 @@ export class Widgets implements
           if (title && shelfHeader === headerIndex - 1) {
             frame.actions.appendChild(buildAddCategoryButton(this, ctx));
           }
-          // The task table's scope button, on the bar rather than inside the
-          // table (3.19.2). Drawn here, by the processor, because the table is
-          // a LiveWidget that rebuilds its whole subtree on any change under
-          // its folder — a control it owned but parented into this bar would be
-          // duplicated on every rebuild. It stays correct without being rebuilt
-          // because cycling rewrites the directive and the note repaints.
-          if (title && scopeHeader === headerIndex - 1) {
-            const line = lines.find(
-              (l) => l.split("|")[0].split(":")[0].trim() === "tasks-table"
-            );
-            const rest = line?.slice(line.indexOf(":") + 1) ?? "";
-            const scope = tasksScopeFor(
-              this.plugin,
-              line && line.includes(":") ? rest : "",
-              ctx
-            );
-            if (scope) buildScopeCycle(frame.actions, scope);
-          }
+          // A SECOND HOSTED CONTROL SAT HERE AND IS GONE (5.21) — the task
+          // table's scope button, moved onto the bar in 3.19.2 on exactly the
+          // reasoning above. It is removed rather than moved back: see the
+          // note where `buildScopeCycle` was, in `tables.ts`.
           // Following widgets flow into this group; keep it as `bar`.
           headerGroup = frame.actions;
           bar = headerGroup;
@@ -1350,7 +1327,6 @@ export class Widgets implements
         const widget = this.buildFromSpec(
           line,
           ctx,
-          scopeHeader === headerIndex - 1,
           // ── ONLY WHERE THE BAR NAMES **THIS** FIELD (5.14) ────────────
           //
           // `fenceTitled` answers "is this fence titled", which is the right
@@ -2141,11 +2117,6 @@ export class Widgets implements
   private buildFromSpec(
     spec: string,
     ctx: MarkdownPostProcessorContext,
-    // True when this fence's header bar is already drawing the widget's own
-    // section-level controls. Only `tasks-table` reads it today; it is a
-    // parameter rather than state because the answer is per DIRECTIVE, not per
-    // fence — a fence may hold a hosted table and an unhosted one.
-    hostedScope = false,
     // True when a titled `header:` bar in this fence already names the block.
     // A widget that draws its own head withholds it — see the note at
     // `fenceTitled`, which is where this is decided.
@@ -2543,9 +2514,7 @@ export class Widgets implements
       case "tag-index":
         return buildTagIndexRegion(this.plugin, rest, ctx);
       case "tasks-table":
-        // `hostedControls` — the header bar has already drawn the scope button,
-        // so the table must not draw a second one. See `scopeHeader`.
-        return buildTasksTableRegion(this.plugin, rest, ctx, hostedScope);
+        return buildTasksTableRegion(this.plugin, rest, ctx);
       case "activity-chart":
         return buildActivityChartRegion(this.plugin, ctx);
       case "title":

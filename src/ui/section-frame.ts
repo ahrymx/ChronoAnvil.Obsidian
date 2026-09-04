@@ -410,7 +410,8 @@ export function foldableSection(
   frame.root.addEventListener("click", (evt) => {
     // Clicks on the section's own controls act; they do not fold. The same rule
     // the header bars use for their anchored widget group, and the reason a
-    // scope button in a section's actions strip is not a fold target.
+    // button in a section's actions strip — *Add category*, a chart's edit
+    // control — is not a fold target.
     const target = evt.target as HTMLElement;
     if (target.closest(".ca-journal-header-widgets, a, button, input, select")) {
       return;

@@ -336,6 +336,75 @@ describe("the editor opens on it, as that journal's page", () => {
   });
 });
 
+describe("open tasks can be drawn bare (5.21)", () => {
+  const model = journalDashboardSectionModel(STUDY_JOURNAL, STUDY_JOURNAL.root);
+  const shipped = composeJournalDashboardNote(STUDY_JOURNAL);
+
+  const view = (text: string) =>
+    model.sections(text).find((v) => v.id === "open-tasks");
+
+  it("offers the toggle at all, which it did not before", () => {
+    // THE GAP THIS CLOSED. Open tasks is the second cell of the Lately row, so
+    // it composes no bar — Recent notes beside it writes the one the fence
+    // gets — and every other section on this catalogue derives its toggle from
+    // the bar its own `render` composes. Nothing was reading `bar`, the line it
+    // takes back when it stands alone, as the answer to the same question.
+    // `diary-sections.ts` closed the identical gap in 5.14 and this catalogue
+    // was not swept with it.
+    const qs = view(shipped)?.questions ?? [];
+    expect(qs.some((q) => q.kind === "form")).toBe(true);
+  });
+
+  it("takes its solo title off, and puts it back, through the answer", () => {
+    // THE ROUND TRIP IS THE CLAIM. `soloBar` gives a lone cell the title and
+    // `withAnswers` is the only gesture that can take it off again, so the two
+    // must be spelling the same line — which is why `OPEN_TASKS_BAR` is said
+    // once in that catalogue and read by both.
+    const alone = model.apply(
+      shipped,
+      model.present(shipped).filter((id) => id !== "recent")
+    ) as string;
+    expect(alone).not.toBeNull();
+    expect(alone).toContain("header:⏳ Open tasks");
+    expect(view(alone)?.answered?.form).toBe("section");
+
+    const bare = model.apply(
+      alone,
+      model
+        .present(alone)
+        .map((id) =>
+          id === "open-tasks" ? { id, options: { form: "widget" } } : id
+        )
+    ) as string;
+    expect(bare).not.toBeNull();
+    expect(bare).not.toContain("header:⏳ Open tasks");
+    expect(bare).toContain("tasks-table");
+    // Read back off the FILE, which is where the answer lives — there is no
+    // second record of it and `formOf` is the one reader.
+    expect(view(bare)?.answered?.form).toBe("widget");
+
+    const back = model.apply(
+      bare,
+      model
+        .present(bare)
+        .map((id) =>
+          id === "open-tasks" ? { id, options: { form: "section" } } : id
+        )
+    );
+    expect(back).toBe(alone);
+  });
+
+  it("says the same line in both places it is written", () => {
+    // `soloBar` splices `JournalSection.bar` and `withAnswers` splices
+    // `FormQuestion.bar`. Two spellings would be two titles for one section,
+    // each written by a different gesture and neither able to remove the other.
+    const src = readSrc("journal-dashboard-sections");
+    expect(src).toContain("const OPEN_TASKS_BAR = ");
+    expect(src).toContain("bar: OPEN_TASKS_BAR,");
+    expect(src).toContain("formQuestion(OPEN_TASKS_BAR, HEADER_KEYWORD)");
+  });
+});
+
 describe("repair converges the page without touching what a reader wrote", () => {
   const type = STUDY_JOURNAL;
   const model = journalDashboardSectionModel(type, type.root);

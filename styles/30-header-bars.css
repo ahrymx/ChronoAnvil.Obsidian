@@ -202,8 +202,8 @@
  * have shipped.
  *
  * `:empty` DECIDES, NOT THE RENDERER. The slot is always built and is often
- * filled AFTER the frame exists — `buildAddCategoryButton`, `buildScopeCycle` and
- * every LiveWidget append into it later — so a render-time "has it got anything in
+ * filled AFTER the frame exists — `buildAddCategoryButton` and every LiveWidget
+ * append into it later — so a render-time "has it got anything in
  * it" would be wrong for exactly the sections that have the most in them. A
  * pseudo-class is re-evaluated whenever the DOM changes, which is the one way to
  * ask this question that cannot go stale.
