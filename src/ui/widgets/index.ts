@@ -142,7 +142,12 @@ import {
   buildEntryContext,
 } from "../../diary/entryheader";
 import { buildPeriodNav } from "../../diary/periodnav";
-import { foldableSection, sectionFrame, splitGlyph } from "../section-frame";
+import {
+  fieldFrame,
+  foldableSection,
+  sectionFrame,
+  splitGlyph,
+} from "../section-frame";
 import { bannerSuppressed } from "../vault-banner";
 import type { FoldStore } from "../section-frame";
 import {
@@ -173,6 +178,7 @@ import {
   applyCardHeights,
   attachBlockHead,
   cardWidget,
+  carryStamp,
   clearStamp,
   markRegion,
   markSpan,
@@ -515,6 +521,41 @@ const SECTION_TITLES: Record<string, string> = {
   links: "🔗 Links",
 };
 
+// The directives that own a region of the note body and draw a field head over
+// it. `fieldHead` in note-field.ts is the head; this is the list of what wears
+// one, and it is here rather than there because the question this answers is
+// about a FENCE — how many of them are in it — which only the dispatcher can
+// see. 5.14.
+//
+// MOVED ABOVE `blockTitle` IN 5.26.1, unchanged, because the head's own rule
+// now depends on it — see `fieldBand` directly below.
+const FIELD_KINDS = new Set(["note", "list", "path", "tasks", "attach", "recall"]);
+
+// ── IS THIS FENCE A BAND? (5.26.1) ────────────────────────────────────
+//
+// A BAND IS SEVERAL SECTIONS SHARING ONE BLOCK, EACH DRAWING ITS OWN HEAD, and
+// a diary entry's shared band is the one the plugin composes: `note:focus`,
+// `list:highlights`, `tasks:todo` and the rest, one directive per section, in a
+// single ```chronoanvil fence below the rule. `composeEntryTemplate` makes the
+// case for one fence there in full — sections that are to look like one card
+// must share one block.
+//
+// A FIELD IS THE TELL, and it is the honest one rather than a convenient one.
+// Every keyword in `FIELD_KINDS` owns a keyed span of the note body and titles
+// itself from the `|Title` the reader wrote, which is precisely why none of them
+// is in `SECTION_TITLES`: the map that answers *what should the bar over this
+// BLOCK say* has nothing to say about a thing that has already said it.
+//
+// TWO CALLERS, ONE SENTENCE. `blockTitle` refuses to name such a fence after a
+// widget in it, and the dispatcher hands each named widget in one a card of its
+// own. Those are the two halves of the same rule — a block that cannot be one
+// name does not wear one, and the things under it name themselves — and writing
+// it once is what keeps the head and the card from disagreeing about which
+// fence is a band.
+export function fieldBand(lines: readonly string[]): boolean {
+  return lines.some((l) => FIELD_KINDS.has(l.split("|")[0].split(":")[0].trim()));
+}
+
 // What this block's head calls it, when the block is one thing.
 //
 // THE SAME TITLES `frame: section` USES, and deliberately not a second list.
@@ -546,17 +587,33 @@ export function blockTitle(lines: readonly string[]): string | null {
   // break: a banner fence with exactly one nameable widget in it is the failing
   // case rather than the safe one.
   if (keywords.some((k) => BANNER_KINDS.has(k))) return null;
+  // AND A BAND IS NEVER NAMED BY A WIDGET IN IT EITHER — see `fieldBand`. The
+  // same sentence as the banner clause above, about the other kind of fence that
+  // holds several things at once, and it is asked in the same place for the same
+  // reason: a band with exactly one nameable widget in it is the FAILING case,
+  // not the safe one.
+  //
+  // WHAT IT DREW, reported from a vault the day 5.26 opened the entry door.
+  // Adding Open tasks to a daily entry appended `tasks-table` to the shared
+  // band — the right line, in the right fence — and the count below then saw a
+  // block of seven titled fields plus one nameable widget as a block that was
+  // ONE nameable thing. So the whole band took a head reading "⏳ Open tasks",
+  // and with the head came `has-head`'s card: Focus, Highlights, Challenges,
+  // Notes, Attachments, Tasks and Captured welded into a single surface, named
+  // after the eighth thing in it. *"It merged all of the daily entry's entries
+  // into one surface."*
+  //
+  // THE RULE WAS ALREADY WRITTEN DOWN, one screen below, where `gridOnly` keeps
+  // "📊 Trackers" off a fence holding a grid AND something else — *"the rule
+  // `blockTitle` states for every other block"*. It did not state it. It counted
+  // what it could NAME and ignored everything it could not, which is the same
+  // rule only on a fence where everything unnamed is a control.
+  if (fieldBand(lines)) return null;
   const named = new Set(keywords.filter((k) => SECTION_TITLES[k]));
   const only = [...named];
   return only.length === 1 ? SECTION_TITLES[only[0]] : null;
 }
 
-// The directives that own a region of the note body and draw a field head over
-// it. `fieldHead` in note-field.ts is the head; this is the list of what wears
-// one, and it is here rather than there because the question this answers is
-// about a FENCE — how many of them are in it — which only the dispatcher can
-// see. 5.14.
-const FIELD_KINDS = new Set(["note", "list", "path", "tasks", "attach", "recall"]);
 
 // ── WHAT A TRACKER GRID IS CALLED (5.15) ──────────────────────────────
 //
@@ -1675,6 +1732,71 @@ export class Widgets implements
           // out — see the head's own note in row.ts.
           fenceTitled
         );
+      } else if (!fenceTitled && fieldBand(lines)) {
+        // ── AND A WIDGET IN A BAND NAMES ITSELF (5.26.1) ──────────────
+        //
+        // THE OTHER HALF OF `fieldBand`'s SENTENCE. The clause in `blockTitle`
+        // stops the band taking a head that names one thing in it. Without this
+        // the widget a reader added would then be the only section on the page
+        // with no name at all — a table of open tasks under the Captured field,
+        // on the note's own background, which is the *"bare box with a naked
+        // grip over it"* 5.16 fixed for the tracker grid and which would have
+        // shipped again here by the other door.
+        //
+        // IT IS DRESSED AS A FIELD, NOT AS A CARD, and that is the whole of the
+        // decision. `cardWidget` is what a ROW does and was tried first: it
+        // gives the right box and the wrong head — `.ca-journal-widget-card`'s
+        // head is an overlay that opens from the grip laid over it, and outside
+        // a row there is no per-widget grip to open it from, so the name would
+        // be drawn and never seen.
+        //
+        // `fieldFrame` IS WHAT EVERYTHING ELSE IN THE BAND ALREADY IS. Every
+        // field in this fence is one — 70-section-surface.css says so in as many
+        // words: *"a diary entry is seven of them inside a single
+        // `.ca-journal-widget-block`"* — so a widget built the same way gets the
+        // same card, the same permanent title, the same chevron, the same fold
+        // and the same spacing, with no selector added anywhere. A section a
+        // reader added to their entry looks like a section of their entry.
+        //
+        // `named` IS ALREADY THE RIGHT LIST, and it is right for the reason it
+        // is EMPTY on every band composed before 5.26: a field has no
+        // `SECTION_TITLES` entry, so a band of fields alone pushes nothing to
+        // it. This branch runs on every entry in every vault and wraps nothing
+        // until a reader adds a page widget.
+        //
+        // NOT WHERE SOMETHING ELSE TITLES THE FENCE. `fenceTitled` is the same
+        // answer the field heads read one screen up: under a `header:` bar or a
+        // `frame: section` modifier the fields draw no head of their own, so a
+        // widget drawing one there would be the two-heads defect 5.14 removed.
+        //
+        // THE FOLD IS KEYED ON THE TITLE rather than on a region key, because a
+        // page widget HAS no region — that is the structural rule the whole of
+        // `WIDGETS` rests on. The title is `SECTION_TITLES`' answer for the
+        // keyword, so it is one per kind and one per fence, which is exactly as
+        // many folds as there are widgets to fold: `parseEntry` attributes a
+        // line with no instance tally, so a band holds one of each keyword.
+        //
+        // AFTER `stampLines`, for the reason the row branch above depends on:
+        // the stamp is taken against the children as they stand, and this moves
+        // one into a wrapper. The stamp goes with it, so the block still knows
+        // which line the thing a reader is looking at came from.
+        for (const { el, title } of named) {
+          // ONLY THE BLOCK'S OWN CHILDREN. `nameTrackerGrid` already makes this
+          // check for its own reason, and it is the same one: a widget drawn
+          // into a period card or a header's actions slot is inside something
+          // that named it, and moving it out of there to name it again would
+          // take it out of the thing it belongs to.
+          if (el.parentElement !== container) continue;
+          const built = fieldFrame(
+            container,
+            { title },
+            this.foldStore(),
+            `${ctx.sourcePath}::band:${title}`
+          );
+          container.insertBefore(built.wrapper, el);
+          carryStamp(el, built.wrapper);
+          built.body.appendChild(el);
+        }
       }
 
       // ── THE ENTRY BANNER'S BANDS, IN BANNER ORDER (4.21.1) ──────────

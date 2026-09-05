@@ -32,6 +32,13 @@ import {
   splitDirective,
 } from "../core/directive-grammar";
 import { rowRuns } from "../core/note-sections";
+import type { FlatSection } from "../core/note-sections";
+import type { VaultLists } from "../core/widget-registry";
+import {
+  instanceId,
+  instanceSectionFor,
+  pageWidgetKeywords,
+} from "../core/widget-sections";
 import { looseLines } from "../core/reload-loss";
 import {
   STATS_BAND_WORDS,
@@ -83,6 +90,13 @@ import {
 //           plugin, so a promoted leaf note counts too
 //   leaf    a note of one of the type's kinds
 //   both    genuinely surface-agnostic (the banner; free prose)
+import type {
+  Section,
+  SectionBlock,
+  SectionPart,
+} from "../core/sections";
+import { bindSection } from "../core/sections";
+
 export type SectionSurface = "index" | "leaf" | "both";
 
 // Everything a section needs to render itself without asking what type it is
@@ -108,6 +122,18 @@ export interface SectionContext {
   // templates and passes null; `section-insert.ts` opens notes and passes their
   // parent. Nothing here asks which it is.
   hostFolder?: string | null;
+  // WHAT THIS VAULT CAN ANSWER A WIDGET'S ARGUMENT WITH (5.26).
+  //
+  // The same field, for the same reason, as `DiaryDashboardContext.vault`: the
+  // catalogue holds a `JournalType` and no plugin, so it cannot ask which
+  // journals, kinds or trackers this vault has. Only the caller knows, and
+  // `section-insert.ts` is the caller that does.
+  //
+  // ABSENT IS A CALLER WITH NO VAULT IN HAND — a template being composed, a
+  // test — and it is the same answer as a vault with nothing in it: the
+  // question is drawn as the sentence saying so rather than as an empty
+  // dropdown. Exactly the posture a null `hostFolder` above already takes.
+  vault?: VaultLists;
   type: JournalType;
   // WHAT THE NOTE IS — one field, three values.
   //
@@ -220,6 +246,21 @@ export interface SectionOverrides {
   // so a reader who arranged two widgets into a group and saved the page as a
   // layout gets that arrangement back when the layout is applied.
   form?: string;
+  // ── A PAGE WIDGET'S ANSWER (5.26) ─────────────────────────────────────
+  //
+  // The keys `widgetQuestions` generates, in the field each question's `key`
+  // names — the same contract every field above is here for. A widget declares
+  // one or two arguments and its questions are keyed `arg` and `arg2`; a third
+  // would be `arg3`, and would be added here rather than inferred.
+  //
+  // WHY A JOURNAL LAYOUT HAS TO CARRY THEM. `composeTemplate` renders each
+  // section with `layout.options[id]`, and a widget's whole configuration is
+  // its argument — a `tasks-table` scoped to a folder is a different widget on
+  // the page from one that is not. Without these the answer would survive in
+  // the note and vanish from the layout, which is the half-persistence
+  // `layout-transfer.ts` refuses to ship anywhere else.
+  arg?: string;
+  arg2?: string;
 }
 
 // How one template departs from the catalogue's own arrangement.
@@ -251,159 +292,47 @@ export interface TemplateLayout {
   sections?: string[];
 }
 
-// One repeatable piece of a section that a file may be missing. 3.18 §1.3.
-//
-// WHY A SECTION NEEDS PIECES AT ALL
-//
-// Every section shipped before 3.18 was all-or-nothing: it is in the file or it
-// is not, and `locate` answers which. `children` is not, and never was — on the
-// deepest index it emits one header, one button and one table PER NOTE KIND, so
-// a journal that gains a kind has dashboards that are present and short of
-// something. The model had no word for that, so the planner called it `add` and
-// would have appended a second copy of the whole section (§1.2).
-//
-// THE PROBE IS THE LAST LINE OF THE PART, and that is a rule rather than a
-// coincidence of how `children` happens to be written. `journal-plan.ts` finds
-// a part in an existing fence by its probe and inserts a missing part directly
-// after the probe of the part before it — which is the correct position only
-// because the probe closes its own group. A part whose probe sat first would
-// insert the new block into the middle of the previous one.
-//
-// Sections that declare no parts are unaffected, which is every section but
-// this one: `parts` absent means all-or-nothing, and that is the truth about
-// all of them.
-export interface SectionPart {
-  // Stable within the section — the note kind's id, here.
-  id: string;
-  // Human name, read into the plan's detail line ("Practice has no table
-  // here"), so it is written as a noun phrase rather than a sentence.
-  label: string;
-  // The line that identifies this part in a file. MUST be the last entry in
-  // `lines`; see above. Matched whole, so a retitled `header:` above it does
-  // not stop the part being found — the same rule fence matching already
-  // follows, where headers are excluded because they are retitleable.
-  probe: string;
-  // Every line this part contributes, in order.
-  lines: string[];
-}
 
-export interface JournalSection {
-  // What this section can be asked, and where the answer is written. Absent on
-  // every section whose directive the catalogue can compose unaided.
+export interface JournalSection
+  extends Section<SectionContext, SectionOverrides> {
+  // ── WHAT MOVED, AND WHAT DID NOT ────────────────────────────────────
   //
-  // A FUNCTION OF THE CONTEXT, and on this surface the context is the reason
-  // the answer is often unavailable: `SectionContext` describes a journal's
-  // LEVEL, not a note, because one template is used in every folder of that
-  // level. `hostFolder` is what the caller adds when it holds an actual note,
-  // and its absence is what keeps a live folder control off a template.
-  questions?: (ctx: SectionContext) => SectionQuestion[];
-  // Stable id. Used by the wizard's checklist, by the "add a section" picker,
-  // and as the unit the Study-equivalence test compares.
-  id: string;
-  label: string;
-  // One line, for the picker and the wizard's schematic.
-  blurb: string;
-  // The glyph the schematic labels this block with. Where the section renders
-  // a header bar this is that bar's own emoji, so the drawing and the note
-  // agree — a schematic that used different icons from the finished note would
-  // be teaching an arrangement nobody is going to see.
-  icon: string;
-  // Which composed ROW this section is a cell of, and which CELL of it — 4.70.
+  // Everything this interface used to declare that the shared machinery reads
+  // is now `Section`'s, in `core/sections.ts`, with the arguments intact:
+  // `id`, `label`, `blurb`, `icon`, `locked` (which was spelled `required`
+  // here), `row`, `cell`, `tab`, `bar`, `applies`, `questions`, `parts`,
+  // `render` and `locate`. Three fields stay, because only this catalogue's
+  // own code reads them.
   //
-  // `FlatSection.row` AND `.cell`'s MEANINGS, argued in full there and not
-  // repeated: an id rather than a flag, consecutive members only, and an absent
-  // `cell` is not a value.
+  // ── AND ONLY A SINGLE-FENCE SECTION CAN HONOUR `row`/`cell` ──────────
   //
-  // ── AND ONLY A SINGLE-FENCE SECTION CAN HONOUR THEM ──────────────────
-  //
-  // This is the one catalogue where the field is a REQUEST rather than an
-  // instruction, and the reason is `SectionBlock`. A journal section renders a
-  // LIST of blocks, and three of the kinds cannot be a column of anything: a
-  // `region` is the reader's writing in the note body and lives outside every
-  // fence, and `markdown` is prose indistinguishable from theirs. So a section
-  // that emits either has nothing a `cell` line could delimit, and
+  // Kept here because it is true of this catalogue and of no other. A journal
+  // section renders a LIST of blocks, and three of the kinds cannot be a column
+  // of anything: a `region` is the reader's writing in the note body and lives
+  // outside every fence, and `markdown` is prose indistinguishable from theirs.
+  // So a section that emits either has nothing a `cell` line could delimit, and
   // `composeSectionRuns` drops its row rather than composing a fence that would
-  // swallow the blocks after it.
+  // swallow the blocks after it. WHICH SECTIONS THAT EXCLUDES IS NOT A LIST
+  // KEPT ANYWHERE, deliberately — it is whatever `render` returns, asked at
+  // compose time.
+
+  // Where a section may be written: an index, or a note with a body.
   //
-  // WHICH SECTIONS THAT EXCLUDES IS NOT A LIST KEPT HERE, deliberately — it is
-  // whatever `render` returns, asked at compose time, so a section that gains a
-  // region next release stops being a column without anybody remembering to
-  // come back and say so. Today it is `path`, `resources`, `headings`, `recall`,
-  // `checklist` and `prose`.
-  //
-  // ── A FUNCTION OF THE CONTEXT, WHERE THE OTHER THREE CATALOGUES TAKE A
-  //    STRING ──────────────────────────────────────────────────────────
-  //
-  // One catalogue serves two shapes of page here — a container index and a leaf
-  // index — and `default` already reads `ctx.hasSubContainers` to tell them
-  // apart. A row that a section joins on one and not the other cannot be a
-  // constant, and the alternative is worse than a callback: it is the same
-  // section written twice, once per surface, with the drift that always
-  // follows.
-  //
-  // WHAT IT IS ACTUALLY FOR is the bar. A `header:` in a row fence is drawn
-  // ONCE, full width, above the columns (`row.ts`), so a row carries exactly one
-  // title, worded for the band, composed by the cell that OPENS it — and the
-  // cells after it compose none. A section that is a column on one surface and a
-  // full-width block on the other therefore has to render differently on each,
-  // and the two answers have to agree. Asking one predicate is how they do.
-  row?: string | ((ctx: SectionContext) => string | undefined);
-  cell?: string;
-  // WHETHER THIS MEMBER OPENS A PAGE OF THE ROW RATHER THAN A COLUMN (5.18).
-  //
-  // `RowMember.tab` on the other catalogues, and it means here exactly what it
-  // means on the homepage's top row: the delimiter above this section is `tab`
-  // rather than `cell`, so the group pages between its members instead of
-  // dividing the width between them. A row where nobody asks for one is
-  // composed with no delimiter at all, unchanged.
-  //
-  // NOT A FUNCTION OF THE CONTEXT, where `row` is. `row` answers "is there a
-  // band here at all", which genuinely differs by surface; a member that is a
-  // page is a page wherever its row is composed, and a section that wanted to
-  // be a column on one surface and a tab on another would be describing two
-  // arrangements under one id.
-  tab?: boolean;
-  // The bar this section composes ONLY IF its row comes down to it alone.
-  //
-  // THE OTHER HALF OF THE PARAGRAPH ABOVE. A row carries one title, composed by
-  // the cell that opens it, and the cells after it compose none — which leaves
-  // those cells titleless the moment a reader unticks the opener, because every
-  // opener on every one of these pages is freely removable. `soloBar` in
-  // `directive-grammar.ts` carries the argument; `RowMember.bar` is the same
-  // field on the other three catalogues' section type.
-  //
-  // A FUNCTION OF THE CONTEXT for `row`'s reason, and it is the same predicate
-  // read twice: a section that is a column here and a full-width block there
-  // wants its own title in both cases, and the wording is the one its non-row
-  // branch already writes.
-  bar?: string | ((ctx: SectionContext) => string | undefined);
+  // NOT FOLDED INTO `applies`, AND THAT IS A DECISION RATHER THAN AN OVERSIGHT.
+  // `sectionApplies` states it: this is TWO-valued while what a note IS is
+  // three-valued, and "collapsing them would make every section state an
+  // opinion about pages when almost none has one". The few that do use
+  // `applies`.
   surface: SectionSurface;
 
-  // Structurally possible here at all. Distinct from `default`: a section that
-  // does not apply is not offered, whereas one that applies but is off is
-  // offered unticked. `pages` does not apply to a kind that cannot hold pages;
-  // `find` applies to any index but is only pre-ticked where there is enough
-  // beneath it to be worth searching.
-  applies?: (ctx: SectionContext) => boolean;
-
-  // Pre-ticked in the wizard, and emitted by the generator with no GUI at all.
+  // Pre-ticked, and emitted by the generator with no GUI at all.
   //
-  // A PREDICATE rather than the roadmap's `default: boolean`, and the reason
-  // is that a flag cannot express Study's own arrangement: its Subject Index
-  // and its Topic Index carry different sets, and the difference is the
-  // meaningful one — an index with containers beneath it aggregates and
-  // searches, an index with notes beneath it lists them. A boolean would have
-  // forced one of the two shipped templates to be wrong, and the equivalence
-  // test to be weakened until it stopped catching anything.
+  // REQUIRED HERE WHERE `Section` LEAVES IT OPTIONAL, because every section in
+  // this catalogue answers it and the catalogue-shape test asserts so. A
+  // predicate rather than a flag: Study's Subject Index and its Topic Index
+  // carry different sets, and a boolean would have forced one of the two
+  // shipped templates to be wrong.
   default: (ctx: SectionContext) => boolean;
-
-  // Never offered unticked, because a note without it is the defect a previous
-  // release shipped a fix for. Only the banner: a journal note with no
-  // `journal-header` has no title, no crumbs and nowhere to render a tracker,
-  // which is exactly the state 2.28 existed to end. Everything else is taste.
-  required?: boolean;
-
-  render: (ctx: SectionContext, opts?: SectionOverrides) => SectionBlock[];
 
   // What this section's `fields` keys ARE. 3.18 follow-ups §5, second half.
   //
@@ -417,40 +346,12 @@ export interface JournalSection {
   // SAID HERE RATHER THAN INFERRED THERE, because this is where the meaning
   // lives. `layout-transfer.ts` would otherwise have to know that `children` is
   // special — an id check in a module whose whole job is to be told things
-  // rather than to know them, and one that would silently stop covering the
-  // second section keyed this way.
+  // rather than to know them.
   fieldKeys?: "kinds";
 
-  // The repeatable pieces this section is built from, when it has any. 3.18 §1.
-  //
-  // ABSENT ON EVERY SECTION BUT `children`, and absent means all-or-nothing —
-  // which is what every section shipped before 3.18 is. A section that declares
-  // parts is one the planner may `extend`: present in a file, wanted, and short
-  // of a piece it should have.
-  //
-  // MUST BE THE SAME LIST `render` COMPOSES FROM. Two derivations of "what this
-  // section contains" is exactly the drift this file keeps arguing against, and
-  // here it would be a live bug rather than an untidiness: a `parts` that named
-  // something `render` did not emit would have the planner report a gap that
-  // filling it could not close. So the section builds both from one helper, and
-  // the catalogue shape test asserts a freshly composed file reports no missing
-  // parts (§11.1).
-  parts?: (ctx: SectionContext, opts?: SectionOverrides) => SectionPart[];
-
-  // Where this section's markdown starts in an existing file, or -1.
-  //
-  // Detection exists for two callers and neither of them is rendering: the
-  // Study-equivalence test (which reads the shipped assets and asks which
-  // sections they contain) and the "add a section" command (which declines to
-  // append a second copy of something already there). It is deliberately a
-  // probe for the section's own directive rather than a parse of the file: the
-  // catalogue does not own the note, and anything richer would be the first
-  // step toward rewriting one.
-  locate: (text: string, ctx: SectionContext) => number;
-
   // The directive kinds this section emits. Read only by the equivalence
-  // test's coverage assertion, which is the guard against the rot this whole
-  // file exists to fix: a widget added to a shipped Study template that no
+  // test's coverage assertion, which is the guard against the rot the
+  // catalogue exists to fix: a widget added to a shipped Study template that no
   // section claims fails the build.
   claims: string[];
 }
@@ -489,94 +390,12 @@ export interface JournalSection {
 // case for a thing with no producer is a shape to be careful about for no
 // reason. If one is ever needed again, add it then — and note that it would
 // also be the first block a section could not fold into its own fence.
-export type SectionBlock =
-  | {
-      kind: "fence";
-      // Info string after the backticks. Only `charts` differs, and it differs
-      // because that region is managed by journal-charts.ts rather than by the
-      // catalogue.
-      info: string;
-      lines: string[];
-    }
-  | {
-      // A `<!--chronoanvil:key-->` body region a content field persists into.
-      // Written immediately after its fence so the section stays one
-      // contiguous run — which is what makes cut-and-paste move the whole
-      // thing, and a splice well-defined.
-      kind: "region";
-      key: string;
-    }
-  | {
-      // ORDINARY MARKDOWN THE PLUGIN CANNOT PROVE IT WROTE — the banner's
-      // spacer, and nothing else since 5.6. Unprovable by construction, and
-      // never deleted or moved on that basis. See `sectionRemovable`: this is
-      // the one block kind that makes a section unremovable, and that is the
-      // whole of what it means.
-      kind: "markdown";
-      lines: string[];
-      // Abut the following block with a single newline instead of a blank
-      // line. True in exactly one place — the banner's `chronoanvil:spacer`, which
-      // is documented as sitting on line 0 of the body, immediately above the
-      // fence it exists to stop the reader clicking into. Serialisation only;
-      // it says nothing about extent.
-      tight?: boolean;
-    }
-  | {
-      // VISIBLE MARKDOWN BETWEEN TWO INVISIBLE MARKERS — the prose skeleton,
-      // and today only that. 5.6.
-      //
-      // NAMED FOR THE MECHANISM RATHER THAN THE CONTENT, because `prose` is
-      // already a section id on this same catalogue (the Notes field) and a
-      // comment about "the prose block" would have two referents.
-      //
-      // WHY THIS IS NOT `markdown`, AND WHY IT IS NOT A `region` EITHER.
-      //
-      // `markdown` is unprovable, so a section emitting it can never be taken
-      // out again: `sectionRemovable` refuses, and the reader is told to delete
-      // their own headings by hand. That was the right answer for as long as
-      // the plugin genuinely could not tell its `## Notes` from theirs. It is
-      // not a law of prose — it is a consequence of writing prose with nothing
-      // around it.
-      //
-      // A `region` would solve identification and lose the point. Its contents
-      // live INSIDE an HTML comment, which is how `note:` fields keep the raw
-      // file readable, and a heading inside a comment is not a heading: it
-      // renders as nothing, folds as nothing, and appears in no outline. The
-      // whole argument for the skeleton being `##` markdown rather than a
-      // `note:` field is that it is the shape of the DOCUMENT and survives the
-      // plugin being uninstalled.
-      //
-      // NOT A CONTRADICTION OF notestore.ts, WHICH SETTLED THE OPPOSITE CASE.
-      // Its own header argues for "one HTML comment rather than two separate
-      // marker comments", and it is right about a `note:` field: that content
-      // must not render, and one comment hides it natively. A skeleton's
-      // content MUST render. Only its edges have to be invisible, and each edge
-      // is itself a whole comment, so both are dropped natively too. Same
-      // mechanism, opposite requirement, opposite answer.
-      //
-      // So the markers go AROUND the prose rather than over it. The headings
-      // are real markdown, in the outline, in the fold gutter, editable in any
-      // editor; the two comment lines are invisible in reading view and in
-      // every renderer that has ever handled HTML comments, and they say
-      // exactly one thing — the catalogue wrote what is between these.
-      //
-      // `chronoanvil-key` RATHER THAN `chronoanvil:key`, WITH A HYPHEN, and it
-      // is not a style choice. The colon form IS the region grammar, and three
-      // separate parsers key off it: `notestore.ts`'s `OPEN_PREFIX`,
-      // `regionsIn` in journal-plan.ts, and `looseLines` in reload-loss.ts.
-      // Each currently declines `<!--chronoanvil:skeleton-->` for its own
-      // incidental reason — a character class that happens to exclude `>`, a
-      // `\s*$` that happens to follow the key — which is three accidents to
-      // stay lucky about forever. A marker with no colon in it cannot be a
-      // region under any of them, and that is a property rather than a
-      // coincidence.
-      kind: "bracketed";
-      // Names the span in the markers. One key today; keyed anyway, because a
-      // second bracketed section would otherwise have to invent the scheme
-      // under deadline.
-      key: string;
-      lines: string[];
-    };
+// `SectionBlock` AND `SectionPart` MOVED TO `core/sections.ts`, unchanged, and
+// are re-exported here so every existing importer is untouched. They were
+// always the general vocabulary — a block is what a section on ANY surface
+// composes — and they lived in this module for the accident of having been
+// needed here first. The same move `SectionOp` made in 3.0.
+export type { SectionBlock, SectionPart };
 
 // ── rendering helpers ─────────────────────────────────────────────────────
 
@@ -798,23 +617,12 @@ export function renderSection(
 // That keeps one implementation of what a `row` line and a `cell` delimiter
 // mean, which is the property the extraction was for: four catalogues that
 // compose rows, one function that decides what a row is.
-// A section's row on this surface, whichever way the catalogue declared it.
-export function rowOf(
-  section: JournalSection,
-  ctx: SectionContext
-): string | undefined {
-  return typeof section.row === "function" ? section.row(ctx) : section.row;
-}
-
-// A section's solo bar, whichever way the catalogue declared it. `rowOf`'s twin,
-// and read in the same two places: composition, and the planner cutting a cell
-// out of a fence that is already in a file.
-export function soloBarOf(
-  section: JournalSection,
-  ctx: SectionContext
-): string | undefined {
-  return typeof section.bar === "function" ? section.bar(ctx) : section.bar;
-}
+// `rowOf` and `soloBarOf` MOVED TO `core/sections.ts` in 5.22, with the field
+// they read. They are re-exported here because this catalogue's own planner
+// imports them by name and because the surface that needed the function form —
+// a container index and a leaf index served from one entry — is this one.
+import { rowOf, soloBarOf } from "../core/sections";
+export { rowOf, soloBarOf };
 
 // ── WHICH SECTIONS MAY BE DRAWN AS A WIDGET INSTEAD (5.11) ───────────────
 //
@@ -1093,7 +901,7 @@ export function sectionRemovable(
   ctx: SectionContext,
   opts?: SectionOverrides
 ): boolean {
-  if (section.required) return false;
+  if (section.locked) return false;
   return !section.render(ctx, opts).some((b) => b.kind === "markdown");
 }
 
@@ -1343,13 +1151,14 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // editor is the one place a reader compares them, because it is the only
     // screen that draws a section as a row with an icon on it.
     icon: "🏷️",
+    category: "structure",
     label: "Banner",
     // THE TRACKER GRID LEFT IN 4.20 and this sentence did not, so the editor
     // described the block by naming something that is now the row beneath it.
     blurb:
       "The note's own name, the trail back through its journal, and the control that renames it and edits its sections.",
     surface: "both",
-    required: true,
+    locked: true,
     default: always,
     // THE TRACKER GRID LEFT THIS SECTION IN 4.20 — see `trackers` below. What is
     // claimed here is now exactly what the banner draws: the strip that names
@@ -1368,12 +1177,14 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "trackers",
     icon: "📊",
+    category: "trackers",
     label: "Trackers",
     // The level and the kind are named for `entry-sections.ts`' reason one
     // catalogue over: 4.21 put them on this block's own strip, and a blurb that
     // mentions only the ratings sends a reader looking for them in the banner.
     blurb: "What kind of note this is, and the ratings it is graded on.",
     surface: "both",
+    locked: false,
     // ── ITS OWN SECTION AS OF 4.20 ────────────────────────────────────
     //
     // It was lines inside the banner's fence, which made it part of the banner's
@@ -1428,9 +1239,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "nav",
     icon: "🔗",
+    category: "structure",
     label: "Navigation links",
     blurb: "A row of links back to the homepage and the folder above.",
     surface: "both",
+    locked: false,
     // Off by default because no shipped Study template carries one: the banner
     // already renders breadcrumbs, so a `links:` row beneath it is a second
     // way up. Kept in the catalogue because a flat journal — whose banner has
@@ -1472,9 +1285,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "stats",
     icon: "🔢",
+    category: "trackers",
     label: "Stats band",
     blurb: "A row of numbers about everything below — you pick each one.",
     surface: "index",
+    locked: false,
     // ── IT ABSORBED `totals` IN 4.46 ──────────────────────────────────
     //
     // There were two sections here — this one, emitting `topic-stats`, and
@@ -1557,9 +1372,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "children",
     icon: "🗂️",
+    category: "journals",
     label: "What's below this note",
     blurb: "A live table of the folders or notes inside this one.",
     surface: "index",
+    locked: false,
     default: always,
     claims: ["header", "button", "topics-table", "kind-table"],
     // EITHER SPELLING, ABOVE THE DEEPEST LEVEL (4.16 §1). The catalogue now
@@ -1681,9 +1498,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "pages",
     icon: "📄",
+    category: "journals",
     label: "Pages",
     blurb: "The index of pages this note has been split across.",
     surface: "leaf",
+    locked: false,
     applies: (ctx) => ctx.hasPages,
     default: (ctx) => ctx.hasPages,
     claims: ["header", "button", "pages-table"],
@@ -1700,9 +1519,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "find",
     icon: "🔎",
+    category: "finding",
     label: "Find",
     blurb: "Full-text search across the notes beneath this one.",
     surface: "index",
+    locked: false,
     // WHERE IT BELONGS is an index with a tree to search. On the deepest one the
     // notes are already listed on the page, so a search box over them is a
     // control that duplicates the table above it.
@@ -1727,9 +1548,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "review",
     icon: "🔁",
+    category: "tasks",
     label: "Review queue",
     blurb: "Notes that have come round for another look.",
     surface: "index",
+    locked: false,
     // WHERE IT BELONGS is any index: the queue reads everything beneath it, so
     // there is no level at which it has nothing to say.
     default: never,
@@ -1765,9 +1588,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // section drew the wrong icon in the section editor AND wrote the wrong one
     // into the note.
     icon: "⏳",
+    category: "tasks",
     label: "Open tasks",
     blurb: "Every unfinished task in the notes beneath this one.",
     surface: "index",
+    locked: false,
     // WHERE IT BELONGS is an index with containers under it — a rollup across
     // one folder of notes is the checklist on each of them, listed twice.
     default: never,
@@ -1811,9 +1636,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "progress",
     icon: "📈",
+    category: "trackers",
     label: "Progress",
     blurb: "A calendar heatmap of activity in the notes beneath this one.",
     surface: "index",
+    locked: false,
     // WHERE IT BELONGS is an index with enough under it for a year of squares
     // to have a shape — which is the one with containers beneath it.
     default: never,
@@ -1825,9 +1652,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "charts",
     icon: "📊",
+    category: "trackers",
     label: "Charts",
     blurb: "A managed region of tracker charts, with Add / Edit / Remove.",
     surface: "index",
+    locked: false,
     // WHERE IT BELONGS is any index, and it ships EMPTY even there — a managed
     // region with no charts in it. That is most of the argument for it being off
     // now: a section whose default content is nothing is a heading and a blank
@@ -1881,9 +1710,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "tally",
     icon: "🧮",
+    category: "journals",
     label: "Status tally",
     blurb: "How many of the things beneath this one sit at each value of a tracker.",
     surface: "index",
+    locked: false,
     default: never,
     claims: ["header", "journal-tally"],
     locate: (t) => probe(t, /^journal-tally:/m),
@@ -1904,9 +1735,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "tags",
     icon: "🏷️",
+    category: "finding",
     label: "Tags",
     blurb: "Every tag on the notes beneath this one, most-used first.",
     surface: "index",
+    locked: false,
     // OFF BY DEFAULT, AND THE ONE REASON IS TASTE — unlike `bridge`, which is
     // off because the catalogue cannot see whether the vault has a tracker
     // worth pulling. A tag cloud works on any index from the first tagged note;
@@ -1947,6 +1780,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "path",
     icon: "🧭",
+    category: "structure",
     // RENAMED IN 3.18 (§5.1). The id stays `path`, the directive stays `path:`
     // and the region key stays `path` — an id with a name in it has an
     // unbounded space, so a saved layout would stop matching the day the label
@@ -1954,6 +1788,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     label: "Task manager",
     blurb: "An ordered route through the notes here, for working in sequence.",
     surface: "index",
+    locked: false,
     // WHERE IT BELONGS is the deepest index — that is where the notes actually
     // are, so it is the only level at which "do these in order" means anything.
     default: never,
@@ -1988,9 +1823,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "resources",
     icon: "📚",
+    category: "writing",
     label: "Resources",
     blurb: "Attached files and links, as a row of tiles.",
     surface: "both",
+    locked: false,
     // WHERE IT BELONGS is the deepest index, beside the notes the material is
     // for. It applies to a leaf as well, and always has — a reader who keeps
     // their references on the note rather than on its container is not wrong.
@@ -2022,9 +1859,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "bridge",
     icon: "🌉",
+    category: "diary",
     label: "From the diary",
     blurb: "A tracker's diary readings, over a period this note picks.",
     surface: "leaf",
+    locked: false,
     // OFF BY DEFAULT, and the only section here that is off for a reason other
     // than taste. Every other default answers "does this arrangement suit this
     // note"; this one answers "has the reader got a tracker worth pulling
@@ -2082,9 +1921,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "recall",
     icon: "🧠",
+    category: "writing",
     label: "Recall cards",
     blurb: "Question-and-answer cards; grading writes this note's rating.",
     surface: "leaf",
+    locked: false,
     // WHERE IT BELONGS is anything long-form enough to be worth drilling: a
     // note that can be split across pages, or one of those pages. An exercise
     // set is already the drill.
@@ -2097,9 +1938,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "checklist",
     icon: "✅",
+    category: "writing",
     label: "Tasks",
     blurb: "A checklist on this note, counted by the rollups above it.",
     surface: "leaf",
+    locked: false,
     // WHERE IT BELONGS is a leaf and not one of its pages: the tasks of a
     // document belong to the document, and spreading them across its parts is
     // how a rollup starts double-counting.
@@ -2112,9 +1955,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "prose",
     icon: "📝",
+    category: "writing",
     label: "Notes field",
     blurb: "A free-text box that saves into the note body.",
     surface: "both",
+    locked: false,
     // Off by default: the shipped templates write their prose as ordinary
     // markdown headings, which stay editable in any editor and survive the
     // plugin being uninstalled. The widget is for a field you want to look
@@ -2149,6 +1994,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   {
     id: "headings",
     icon: "📝",
+    category: "writing",
     label: "Prose skeleton",
     // NAMES THE DOOR (5.6). The headings are editable in the note like any
     // other markdown, and "Save as layout…" has read them back off the page by
@@ -2160,6 +2006,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
       "The markdown headings a note of this kind opens with. " +
       "Edit them here, then Save as layout to keep them.",
     surface: "leaf",
+    locked: false,
     // On by default, and PLAIN MARKDOWN rather than a widget. Until 2.42 the
     // catalogue could not express a heading at all, so Study's Lesson and
     // Practice stayed hand-written assets while every custom journal's notes
@@ -2490,7 +2337,24 @@ export function sectionsFor(
   ctx: SectionContext,
   layout?: TemplateLayout
 ): JournalSection[] {
-  const offered = JOURNAL_SECTIONS.filter((s) => sectionApplies(s, ctx));
+  const catalogue = JOURNAL_SECTIONS.filter((s) => sectionApplies(s, ctx));
+  // THE CATALOGUE, PLUS EVERY PAGE WIDGET IT HAS NO OPINION ABOUT (5.26) —
+  // `flatNoteModel`'s tail, on the surface that had none. See `journalWidgets`.
+  //
+  // HERE RATHER THAN IN THE MODEL, WHICH IS THE ONE STRUCTURAL DIFFERENCE FROM
+  // THE FLAT DOOR. A flat note's tail is added in `flatNoteModel` precisely so
+  // that nothing which WRITES a file can see it; a journal template is written
+  // by `composeTemplate`, which reads this function and composes the ids a
+  // saved layout names. A tail the composer could not see would make a widget
+  // addable through the editor and deleted by the next **refresh journal
+  // templates**, which is the exact failure this door exists to end.
+  //
+  // NOTHING SHIPPED MOVES ANYWAY, and for a reason rather than by luck:
+  // `defaultSectionIds` ticks `locked || default(ctx)` and a widget is neither,
+  // and `composeTemplate` writes `ids.has(s.id) || s.locked`. So a widget
+  // reaches a template only where a layout NAMES it, and every preset layout in
+  // the tree names catalogue ids alone.
+  const offered = [...catalogue, ...journalWidgets(ctx, catalogue)];
   // A saved layout's `sections` list is already in the order it wants, so it
   // doubles as `order` — see TemplateLayout. `order` still wins when both are
   // set, on the general rule that the more specific field does.
@@ -2514,8 +2378,8 @@ export function sectionsFor(
       // argument composeTemplate already makes about `required` and inclusion:
       // the wizard cannot produce this order, and this function is also what a
       // preset, a saved variant and any future caller reach.
-      const pa = a.s.required ? 0 : 1;
-      const pb = b.s.required ? 0 : 1;
+      const pa = a.s.locked ? 0 : 1;
+      const pb = b.s.locked ? 0 : 1;
       if (pa !== pb) return pa - pb;
       const ra = rank.get(a.s.id) ?? Infinity;
       const rb = rank.get(b.s.id) ?? Infinity;
@@ -2526,6 +2390,111 @@ export function sectionsFor(
     .map((e) => e.s);
 }
 
+// ── THE WIDGET DOOR, ON A JOURNAL SURFACE (5.26) ──────────────────────────
+//
+// WHY A JOURNAL TEMPLATE IS THE SURFACE THAT NEEDED THIS MOST. A widget typed
+// into a diary entry by hand renders and survives; a widget typed into a
+// journal template is destroyed by the next **Maintenance: refresh journal
+// templates**, which says so in as many words — *"Custom edits will be
+// replaced."* The only thing that survives a refresh is what a saved layout
+// names, and a saved layout is exactly what this door writes. So here the door
+// is the difference between a widget that persists and one that is deleted,
+// rather than between one a reader can ask for and one they must type.
+//
+// ONE INSTANCE PER KEYWORD, AND THE PARSER IS WHY. `parseSections` deals a
+// fence's keyword list against section SIGNATURES — longest first, all or
+// nothing — and `signaturesFor` builds one signature per section. Two sections
+// with the same single-keyword signature are two answers to one fence, and the
+// walk has no instance tally to tell them apart; its own comment says this
+// catalogue has "no repeating sections". So the tail is one `w:<keyword>#1`
+// apiece, `repeatable` is false, and a reader who wants two writes the second
+// by hand — where it is foreign, and foreign is left alone.
+//
+// NO SIGNATURE CAN STEAL A CATALOGUE FENCE, which is the property that makes
+// the paragraph above safe rather than merely stated: `pageWidgetKeywords` has
+// already removed every keyword this catalogue claims, in both directions —
+// what a section's `locate` matches, and what the catalogue COMPOSES. A widget
+// signature is a single keyword no catalogue section writes.
+const asJournal = (flat: FlatSection, keyword: string): JournalSection => ({
+  id: flat.id,
+  label: flat.label,
+  blurb: flat.blurb,
+  icon: flat.icon,
+  category: flat.category,
+  locked: false,
+  optIn: true,
+  // NOT REPEATABLE HERE, WHERE IT IS ON EVERY FLAT NOTE — so the flag is
+  // dropped rather than carried over. It tells the editor that "add another" is
+  // a legal thing to ask for, and on this surface it is not: see the signature
+  // argument above.
+  //
+  // ── the three fields `JournalSection` requires beyond `Section` ──
+  //
+  // `surface: "both"` because a page widget is indifferent to what the note
+  // is: `buildFromSpec` does not know which surface it is on, which is the
+  // fact this whole release rests on.
+  surface: "both",
+  // NEVER PRE-TICKED. A widget is on a template because a reader put it there;
+  // `default` is how the catalogue says what a FRESH journal starts with, and
+  // no fresh journal starts with one.
+  default: () => false,
+  claims: [keyword],
+  // THE CONTEXT IS DROPPED RATHER THAN THREADED, and that is the whole content
+  // of this projection: a widget's line is its keyword and the reader's answer,
+  // and neither is a function of which journal, level or kind this is. The
+  // opposite of `children`, whose keys are kind ids — see `fieldKeys`.
+  render: (_ctx, opts) =>
+    flat.render(undefined, opts as unknown as Record<string, unknown>),
+  locate: (text) => flat.locate(text, undefined),
+  ...(flat.questions
+    ? {
+        // THE ENV COMES OFF THE CONTEXT, NOT OFF THE PARAMETER — which is the
+        // one place this projection differs from `asDiary`'s. A journal
+        // section is asked its questions as `section.questions?.(ctx)` with no
+        // second argument (see `sectionQuestions`), because every catalogue
+        // entry here reads `ctx.hostFolder` itself. A widget's questions are
+        // built by `widgetQuestions`, which takes them as an env — so this is
+        // where the two spellings of the same two facts meet.
+        questions: (ctx: SectionContext) =>
+          flat.questions!(undefined, {
+            hostFolder: ctx.hostFolder ?? null,
+            vault: ctx.vault,
+          }),
+      }
+    : {}),
+});
+
+// Which keywords this surface's catalogue leaves free, as journal sections.
+//
+// THE CATALOGUE IS BOUND TO THE CONTEXT FIRST, which `diary-sections.ts` and
+// `entry-sections.ts` both do and for the same reason: `pageWidgetKeywords`
+// probes what a section's `locate` matches and what its `render` COMPOSES, and
+// a journal section renders nothing without a context. `sectionOverrides` goes
+// in with it so the probe sees the lines this template actually writes rather
+// than the catalogue's unconfigured ones.
+//
+// NOT CACHED, WHERE THE TWO DIARY SURFACES CACHE ON THE GRAIN. There is no key
+// here that a `SectionContext` reduces to — a journal, a level, a kind, a
+// variant and three resolved nouns — and a cache keyed on the wrong subset is
+// a stale add list on the one surface where a saved layout makes the answer
+// visible for months. The probe is a few dozen regex searches over single
+// keywords, run when a window opens or a template composes.
+const journalWidgets = (
+  ctx: SectionContext,
+  catalogue: readonly JournalSection[]
+): JournalSection[] => {
+  const bound: FlatSection[] = catalogue.map((s) =>
+    bindSection(s, ctx, { defaults: sectionOverrides(ctx, s.id) })
+  );
+  // SUPPLIES NOTHING. A journal note carries `type:` and its own dates, never
+  // `week-start` — so the two widgets that need a dashboard period are withheld
+  // here exactly as they are on a diary entry. See `WidgetSpec.needs`.
+  return pageWidgetKeywords(bound).flatMap((keyword) => {
+    const flat = instanceSectionFor(instanceId(keyword, 1));
+    return flat ? [asJournal(flat, keyword)] : [];
+  });
+};
+
 // The ids a fresh journal starts with — the arrangement every step of the
 // wizard opens pre-ticked, and the set the generator writes with no GUI at
 // all. One function so the two can never offer different things.
@@ -2534,7 +2503,7 @@ export function defaultSectionIds(
   layout?: TemplateLayout
 ): string[] {
   return sectionsFor(ctx, layout)
-    .filter((s) => s.required || s.default(ctx))
+    .filter((s) => s.locked || s.default(ctx))
     .map((s) => s.id);
 }
 
@@ -2762,11 +2731,16 @@ export function findSection(id: string): JournalSection | undefined {
   return JOURNAL_SECTIONS.find((s) => s.id === id);
 }
 
-// Which catalogue sections a piece of markdown already contains, in the order
-// they appear in the file. Used by the Study-equivalence test and by the "add
-// a section" picker.
+// Which sections a piece of markdown already contains, in the order they appear
+// in the file. Used by the Study-equivalence test and by the "add a section"
+// picker.
+//
+// `sectionsFor` RATHER THAN THE BARE CATALOGUE (5.26), which is where the
+// widget tail has to reach for the picker to work: `addableSections` withholds
+// what this reports, so a catalogue-only read would offer a second copy of
+// every widget already on the page.
 export function detectSections(text: string, ctx: SectionContext): string[] {
-  return JOURNAL_SECTIONS.filter((s) => sectionApplies(s, ctx))
+  return sectionsFor(ctx)
     .map((s) => ({ id: s.id, at: s.locate(text, ctx) }))
     .filter((s) => s.at >= 0)
     .sort((a, b) => a.at - b.at)

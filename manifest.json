@@ -1,7 +1,7 @@
 {
   "id": "chronoanvil",
   "name": "ChronoAnvil",
-  "version": "5.21.0",
+  "version": "5.27.0",
   "minAppVersion": "1.7.0",
   "description": "Keep a daily diary and your own journal types with one shared tracker registry, and render calendars, charts, tables and period dashboards natively. Includes quick capture, full-text search, an entry navigator and vault scaffolding.",
   "author": "AhryMX",

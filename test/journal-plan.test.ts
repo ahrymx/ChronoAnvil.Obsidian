@@ -21,11 +21,15 @@ import {
   sectionContext,
   sectionsFor,
   surfaceLayout,
+  templateKeyFor,
   templateTargets,
   widgetFormBar,
 } from "../src/journals/journal-sections";
 import type { SectionContext } from "../src/journals/journal-sections";
 import { segment } from "../src/core/layout";
+import { wantFromJournalNote } from "../src/journals/journal-template";
+import { WIDGETS } from "../src/core/widget-registry";
+import { isPageWidgetId } from "../src/core/widget-sections";
 import {
   applySections,
   isHandEdited,
@@ -501,14 +505,18 @@ describe("nothing the plugin did not write is touched", () => {
 
   it("leaves a hand-added block exactly where it was", () => {
     const { ctx, text } = topic();
-    // `on-this-day` RATHER THAN `tag-index`, AND FOR 3.11 §6's REASON (5.10).
-    // The test below already made this correction and this one did not: a
-    // `tag-index` fence is the Tags SECTION, not a hand-add, so what stood here
-    // was the planner recognising its own section and this assertion reading
-    // that as "untouched". It went on passing until the release that completes
-    // a recognised section's missing title, at which point it failed for the
-    // right reason and named the wrong thing.
-    const mine = "```chronoanvil\non-this-day\n```";
+    // `entry-header` RATHER THAN `on-this-day` SINCE 5.26, AND IT IS THE THIRD
+    // TIME THIS FIXTURE HAS HAD TO MOVE — `tag-index` until 3.11 §6 gave the
+    // journal catalogue a Tags section, `on-this-day` until this release gave
+    // every journal surface the page-widget door. Each time the reason is the
+    // same: the plugin learned to own a directive that had been chosen for
+    // being unowned.
+    //
+    // `entry-header` cannot move again for that reason. It is in
+    // `NOT_PAGE_WIDGETS`, so it is not a page widget and cannot be offered by
+    // the door; and it is the directive that makes a note a DIARY ENTRY, which
+    // no journal catalogue will ever claim.
+    const mine = "```chronoanvil\nentry-header\n```";
     const hacked = `${text}\n${mine}\n`;
     const want = sectionsPresent(hacked, ctx).filter((id) => id !== "review");
     const after = applySections(hacked, ctx, want)!;
@@ -517,13 +525,12 @@ describe("nothing the plugin did not write is touched", () => {
 
   it("reports foreign blocks rather than removing them", () => {
     const { ctx, text } = topic();
-    // `on-this-day` RATHER THAN `tag-index` SINCE 3.11 §6, which gave the
-    // journal catalogue a Tags section — so the old fixture stopped being
-    // foreign and started being a section the planner recognises. The
+    // `entry-header`, for the reason spelled out on the test above: the
     // assertion is about what happens to a block the catalogue does NOT own,
-    // so the fixture has to be a directive no journal section claims: this one
-    // is diary-only and there is no plausible journal reading of it.
-    const hacked = `${text}\n\`\`\`chronoanvil\non-this-day\n\`\`\`\n`;
+    // and 5.26's widget door made every PAGE WIDGET a block some journal
+    // surface owns. What is left unowned is what the registry excludes and the
+    // diary keeps, which is exactly this directive.
+    const hacked = `${text}\n\`\`\`chronoanvil\nentry-header\n\`\`\`\n`;
     const ops = planSections(hacked, ctx, sectionsPresent(hacked, ctx));
     const foreign = ops.find((o) => o.kind === "foreign");
     expect(foreign?.detail).toContain("left alone");
@@ -1175,6 +1182,145 @@ describe("a chosen order is composed, and no order is still catalogue order", ()
     const out = composeTemplateOrdered(ctx, ids, ["resources"]);
     for (const id of ids) {
       expect(sectionsPresent(out, ctx)).toContain(id);
+    }
+  });
+});
+
+// ── THE WIDGET DOOR, ON A JOURNAL SURFACE (5.26) ─────────────────────────
+//
+// The journal was the only one of the four surfaces where a hand-written widget
+// does not survive: `refreshTemplates` says "Custom edits will be replaced",
+// and it means it. The only thing a refresh keeps is what the saved LAYOUT
+// names — so on this surface the door is the difference between a widget that
+// persists and one that is deleted, and the test that decides whether it worked
+// is the recompose at the bottom of this block.
+describe("the widget door, on a journal surface (5.26)", () => {
+  const lesson = (): SectionContext =>
+    sectionContext(STUDY_JOURNAL, {
+      kind: STUDY_JOURNAL.kinds.find((k) => k.id === "lesson")!,
+    });
+
+  const widgetIds = (ctx: SectionContext): string[] =>
+    sectionsFor(ctx)
+      .map((s) => s.id)
+      .filter(isPageWidgetId);
+
+  it("offers page widgets, one instance each, after the catalogue", () => {
+    const ctx = lesson();
+    const ids = sectionsFor(ctx).map((s) => s.id);
+    const first = ids.findIndex(isPageWidgetId);
+    expect(first).toBeGreaterThan(0);
+    // A TAIL, NOT A MIXTURE. Everything from the first widget on is a widget,
+    // so the catalogue's own order is exactly what it was and `defaultSectionIds`
+    // — which reads `locked || default(ctx)` — cannot pick one up.
+    expect(ids.slice(first).every(isPageWidgetId)).toBe(true);
+    expect(ids.slice(first).every((id) => id.endsWith("#1"))).toBe(true);
+    expect(defaultSectionIds(ctx).some(isPageWidgetId)).toBe(false);
+  });
+
+  it("and never one the catalogue already claims, on any surface", () => {
+    // THE PROPERTY `signaturesFor` DEPENDS ON. Every offered widget gains a
+    // single-keyword fence signature, and the parser deals a fence's keywords
+    // against signatures all-or-nothing with no instance tally. A widget
+    // signature that matched a keyword some catalogue section also writes would
+    // be two sections answering for one fence.
+    for (const target of templateTargets(STUDY_JOURNAL)) {
+      const claimed = new Set(
+        sectionsFor(target.ctx)
+          .filter((s) => !isPageWidgetId(s.id))
+          .flatMap((s) => s.claims)
+      );
+      for (const id of widgetIds(target.ctx)) {
+        const keyword = id.slice("w:".length, id.lastIndexOf("#"));
+        expect(claimed.has(keyword), `${target.key}/${keyword}`).toBe(false);
+      }
+    }
+  });
+
+  it("and not the two that need a period a journal note has not got", () => {
+    // Part 1's `needs` field. A journal note carries `type:` and its own dates,
+    // never `week-start` — so `entry-rollup` would draw its own refusal and
+    // `period-nav` would WRITE the property `diaryKindOf` reads.
+    const needy = Object.keys(WIDGETS).filter((k) => WIDGETS[k].needs);
+    expect(needy.length).toBeGreaterThan(0);
+    for (const target of templateTargets(STUDY_JOURNAL)) {
+      for (const keyword of needy) {
+        expect(widgetIds(target.ctx), `${target.key}/${keyword}`).not.toContain(
+          `w:${keyword}#1`
+        );
+      }
+    }
+  });
+
+  it("adds one to a note, reads it back, and refuses a second copy", () => {
+    const ctx = lesson();
+    const base = composeTemplate(ctx);
+    expect(sectionsPresent(base, ctx).some(isPageWidgetId)).toBe(false);
+    const next = applySections(base, ctx, [
+      ...sectionsPresent(base, ctx),
+      { id: "w:tasks-table#1", options: { arg: "03 - Journals/Study" } },
+    ])!;
+    expect(next).toContain("tasks-table:03 - Journals/Study");
+    expect(sectionsPresent(next, ctx)).toContain("w:tasks-table#1");
+    // Withheld once present, which is `addableSections`' rule for every section
+    // and the reason `detectSections` had to learn the tail too.
+    expect(detectSections(next, ctx)).toContain("w:tasks-table#1");
+    // And a save that changes nothing writes nothing.
+    expect(applySections(next, ctx, sectionsPresent(next, ctx))).toBeNull();
+  });
+
+  it("and a template composed from a layout that names it keeps it — with its argument", () => {
+    // THE WHOLE POINT OF THIS PART, AND THE ONE THING A HAND EDIT CANNOT DO.
+    // "Save as layout…" reads the page back into `{sections, options}`, and
+    // **Maintenance: refresh journal templates** composes the file from exactly
+    // that. So this is the refresh, in the two calls it is made of.
+    const ctx = lesson();
+    const base = composeTemplate(ctx);
+    const edited = applySections(base, ctx, [
+      ...sectionsPresent(base, ctx),
+      { id: "w:tasks-table#1", options: { arg: "03 - Journals/Study" } },
+    ])!;
+
+    const saved = wantFromJournalNote(edited, ctx);
+    expect(saved.sections).toContain("w:tasks-table#1");
+    expect(saved.options["w:tasks-table#1"]).toEqual({
+      arg: "03 - Journals/Study",
+    });
+    // AND NOTHING IS REPORTED AS DROPPED. The notice this list feeds says which
+    // lines a save will not carry; a widget being carried must not appear in
+    // it, which is what made the baseline take the options it is about to
+    // store.
+    expect(saved.drops).toEqual([]);
+
+    const layout = { sections: saved.sections, options: saved.options };
+    const refreshed = composeTemplate(ctx, undefined, layout);
+    expect(refreshed).toContain("tasks-table:03 - Journals/Study");
+    expect(sectionsPresent(refreshed, ctx)).toContain("w:tasks-table#1");
+
+    // AND THE REFRESHED FILE READS AS THE PLUGIN'S OWN. `isHandEdited` composes
+    // its baseline from the TYPE's stored config, so the layout has to be ON
+    // the type for the question to be asked the way the vault asks it — which
+    // is what "save as the default" does one line after `wantFromJournalNote`
+    // returns. A journal whose stored layout carries the widget is a journal
+    // whose refreshed template is not hand-edited.
+    const stored: SectionContext = {
+      ...ctx,
+      type: {
+        ...ctx.type,
+        layout: { ...(ctx.type.layout ?? {}), [templateKeyFor(ctx)]: layout },
+      },
+    };
+    expect(isHandEdited(refreshed, stored)).toBe(false);
+  });
+
+  it("and a shipped template is untouched by all of it", () => {
+    // THE INVARIANT, ON THIS SURFACE. Every preset layout names catalogue ids
+    // alone, `defaultSectionIds` cannot tick a widget, and `composeTemplate`
+    // writes `ids.has(s.id) || s.locked` — so the tail is invisible to every
+    // composer. `test/composed-notes.test.ts` is the byte-level check; this is
+    // the one that says why.
+    for (const { ctx, text } of allTemplates()) {
+      expect(sectionsPresent(text, ctx).some(isPageWidgetId)).toBe(false);
     }
   });
 });

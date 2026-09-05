@@ -38,6 +38,7 @@ import {
   offerableEntrySections,
   sectionsForEntry,
 } from "../src/diary/entry-sections";
+import { isPageWidgetId } from "../src/core/widget-sections";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
 import { TRACKER_CLASSES } from "../src/trackers/trackers";
 
@@ -234,7 +235,7 @@ describe("patch 6: the setting `extra` has been describing since 2.60.1", () => 
     // change, but the grain that best demonstrates it did.
     const ships = new Set(sectionsForEntry({ grain: "weekly" }).map((s) => s.id));
     const offer = offerableEntrySections({ grain: "weekly" })
-      .filter((s) => !ships.has(s.id) && s.fence === "shared")
+      .filter((s) => !ships.has(s.id) && s.band === "shared")
       .map((s) => s.id);
     expect(offer).toContain("bridge");
     expect(offer).toContain("capture");
@@ -245,11 +246,23 @@ describe("patch 6: the setting `extra` has been describing since 2.60.1", () => 
     // The other half of the above, stated rather than left implicit: after
     // §4.1 and §4.2 a daily entry ships every shared section the catalogue has
     // for it except the one that has to be asked a question first.
+    //
+    // THE CATALOGUE'S OWN, WHICH IS WHAT THIS SENTENCE WAS ALWAYS ABOUT. 5.26
+    // gave the entry the page-widget door every flat note already had, so the
+    // offer now ends in a tail of `w:` instances. They are not sections
+    // somebody wrote for the daily grain — they are the registry, offered here
+    // because nothing on this surface claims their keyword — and counting them
+    // would turn a claim about the catalogue's completeness into a count of
+    // the widget list. The tail gets its own assertion below rather than
+    // silently inflating this one.
     const ships = new Set(sectionsForEntry({ grain: "daily" }).map((s) => s.id));
-    const offer = offerableEntrySections({ grain: "daily" })
-      .filter((s) => !ships.has(s.id) && s.fence === "shared")
-      .map((s) => s.id);
-    expect(offer).toEqual(["bridge"]);
+    const offered = offerableEntrySections({ grain: "daily" }).filter(
+      (s) => !ships.has(s.id) && s.band === "shared"
+    );
+    expect(offered.filter((s) => !isPageWidgetId(s.id)).map((s) => s.id)).toEqual([
+      "bridge",
+    ]);
+    expect(offered.some((s) => isPageWidgetId(s.id))).toBe(true);
   });
 
   it("and answers §6's open question with silence, plus a sentence", () => {
@@ -360,7 +373,7 @@ describe("patch 8: From the journals", () => {
     // it. If a second one ever answers false, that is a decision worth making
     // out loud rather than discovering.
     const exempt = ENTRY_SECTIONS.filter(
-      (s) => s.fence === "shared" && s.ownsRegion === false
+      (s) => s.band === "shared" && s.ownsRegion === false
     ).map((s) => s.id);
     expect(exempt).toEqual(["bridge"]);
   });
@@ -502,6 +515,27 @@ describe("patch 7: an option is set on the way in", () => {
     // with gets the catalogue's sentence about what is missing.
     expect(add).toContain("if (!answer) return;");
     expect(add).toContain("new Notice(`ChronoAnvil: ${q.empty}`)");
+  });
+
+  it("and it draws the same subject headings the editor draws", () => {
+    // 3.0.1'S LESSON APPLIED TO THE WORDS, not only to the behaviour. This
+    // command and the editor list the same options from the same models, and
+    // until 5.27 this one drew them flat while the editor drew headings over
+    // them — the reader met two different lists behind two doors onto one
+    // write, which is the drift the paragraph above names.
+    const src = readCode("section-insert");
+    const add = src.slice(src.indexOf("async addSectionHere("));
+    expect(add).toContain("categoryRank(a.category) - categoryRank(b.category)");
+    expect(add).toContain("group: categoryLabel(s.category)");
+    // BOTH READ `SECTION_CATEGORIES`, so neither can grow its own spelling of a
+    // heading or its own idea of the order. Asserted as the import rather than
+    // as the seven labels, because the seven labels appearing here at all would
+    // be the defect.
+    expect(src).toContain('from "../core/sections"');
+    expect(src).not.toContain('"Tasks & events"');
+    // AND THE HEADINGS ONLY WHERE THERE IS SOMETHING TO SEPARATE, which is the
+    // editor's rule too — a list that is all one subject gets no heading.
+    expect(add).toContain(".size > 1");
   });
 
   it("and the answers come from the one list a refusal also prints", () => {

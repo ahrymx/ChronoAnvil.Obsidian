@@ -217,18 +217,32 @@ export function cardWidget(widget: HTMLElement, title: string): void {
   const card = createDiv({ cls: `${CARD_CLASS} has-head` });
   parent.insertBefore(card, widget);
   buildHead(card, title);
-  // THE STAMP COMES WITH IT. The card is what a reader grabs, so the card is
-  // what has to know which line it is — and it knows because the widget it was
-  // built around was told first. Re-deriving it here would mean counting
-  // children a second time, against a list that is halfway through being
-  // rewritten.
-  const line = widget.getAttribute(LINE_ATTR);
-  if (line !== null) card.setAttribute(LINE_ATTR, line);
-  // AND ITS SPAN WITH IT, for a widget bar — the card is what a reader grabs,
-  // so the card is what has to know how many lines that is.
-  const span = widget.getAttribute(SPAN_ATTR);
-  if (span !== null) card.setAttribute(SPAN_ATTR, span);
+  carryStamp(widget, card);
   card.appendChild(widget);
+}
+
+// Move a child's stamps onto the wrapper that has just been put around it.
+//
+// THE STAMP COMES WITH IT. `stampLines` marks every DIRECT child of a block
+// with the line of the directive that drew it, and a wrapper takes that child's
+// place — so the wrapper is what a reader now grabs and the wrapper is what has
+// to know which line it is. Re-deriving it would mean counting children a
+// second time, against a list halfway through being rewritten.
+//
+// AND ITS SPAN WITH IT, for a widget bar: how many lines the thing being
+// grabbed is.
+//
+// A FUNCTION SINCE 5.26.1, WHERE IT WAS `cardWidget`'S LAST SIX LINES. There is
+// a second wrapper now — the field frame a band puts around a widget added to a
+// diary entry — and it is built in `widgets/index.ts`, which cannot see these
+// two attribute names and must not be given them one at a time. One operation,
+// named, is what stops the second wrapper from carrying half of what the first
+// one carries.
+export function carryStamp(from: HTMLElement, to: HTMLElement): void {
+  const line = from.getAttribute(LINE_ATTR);
+  if (line !== null) to.setAttribute(LINE_ATTR, line);
+  const span = from.getAttribute(SPAN_ATTR);
+  if (span !== null) to.setAttribute(SPAN_ATTR, span);
 }
 
 // What a card wears when the note says how tall it is, and where the number

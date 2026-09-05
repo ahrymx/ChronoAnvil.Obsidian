@@ -101,7 +101,7 @@ describe("which rows are locked", () => {
     expect(sectionRemovable(banner, ctx, sectionOverrides(ctx, "banner"))).toBe(
       false
     );
-    expect(banner.required).toBe(true);
+    expect(banner.locked).toBe(true);
   });
 
   it("unlocks the prose skeleton, and not by exempting it", () => {
@@ -116,7 +116,7 @@ describe("which rows are locked", () => {
     // switched off: it is required, and its spacer is a bare `markdown` block
     // besides.
     const headings = findSection("headings")!;
-    expect(headings.required).toBeFalsy();
+    expect(headings.locked).toBeFalsy();
     expect(
       sectionRemovable(headings, lessonCtx, sectionOverrides(lessonCtx, "headings"))
     ).toBe(true);

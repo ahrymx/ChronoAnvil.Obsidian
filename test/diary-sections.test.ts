@@ -14,6 +14,7 @@
 
 import { HEADER_PREFIX, TRENDS_HEADING } from "../src/core/constants";
 import { describe, it, expect } from "vitest";
+import { soleFence } from "../src/core/sections";
 import { existsSync } from "node:fs";
 import { readCode, readSrc } from "./sources";
 import { resolve } from "node:path";
@@ -383,12 +384,12 @@ describe("what a dashboard already has, and what it could gain", () => {
     // that is real code rather than a wider `applies`. `:month` singular,
     // matching `month-start` rather than the index's `monthly`.
     const roll = DIARY_SECTIONS.find((s) => s.id === "entry-rollup")!;
-    expect(roll.render({ grain: "quarterly" }).lines).toContain(
+    expect(soleFence(roll.render({ grain: "quarterly" })).lines).toContain(
       "entry-rollup:month"
     );
     for (const g of ["weekly", "monthly"] as const) {
-      expect(roll.render({ grain: g }).lines, g).toContain("entry-rollup");
-      expect(roll.render({ grain: g }).lines, g).not.toContain(
+      expect(soleFence(roll.render({ grain: g })).lines, g).toContain("entry-rollup");
+      expect(soleFence(roll.render({ grain: g })).lines, g).not.toContain(
         "entry-rollup:month"
       );
     }
@@ -400,8 +401,8 @@ describe("what a dashboard already has, and what it could gain", () => {
     // differ — so the catalogue writes which one it is. A directive that lost
     // the argument refuses rather than guessing (see buildPeriodRecap).
     const recap = DIARY_SECTIONS.find((s) => s.id === "recap")!;
-    expect(recap.render({ grain: "yearly" }).lines).toContain("period-recap:year");
-    expect(recap.render({ grain: "quarterly" }).lines).toContain(
+    expect(soleFence(recap.render({ grain: "yearly" })).lines).toContain("period-recap:year");
+    expect(soleFence(recap.render({ grain: "quarterly" })).lines).toContain(
       "period-recap:quarter"
     );
   });

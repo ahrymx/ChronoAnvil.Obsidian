@@ -45,7 +45,7 @@ import type { ChronoAnvilSettings } from "../src/core/settings";
 // both use, so a band this helper can read is a band the plugin can read.
 const sharedBand = (text: string, grain: TrackerClass = "daily"): string[] => {
   const structural = new Set(
-    ENTRY_SECTIONS.filter((s) => s.fence !== "shared").map((s) => s.id)
+    ENTRY_SECTIONS.filter((s) => s.band !== "shared").map((s) => s.id)
   );
   return detectEntrySections(text, { grain }).filter((id) => !structural.has(id));
 };
@@ -60,7 +60,7 @@ describe("the shared band's order", () => {
     // reversed, sorted, stable-but-shuffled — fails here on every grain.
     for (const grain of TRACKER_CLASSES) {
       const expected = sectionsForEntry({ grain })
-        .filter((s) => s.fence === "shared")
+        .filter((s) => s.band === "shared")
         .map((s) => s.id);
       expect(sharedBand(composeEntryTemplate(grain), grain), grain).toEqual(expected);
     }
@@ -97,11 +97,11 @@ describe("the shared band's order", () => {
     // question after a release changes which grain ships what.
     const present = new Set(
       sectionsForEntry({ grain: "weekly" })
-        .filter((s) => s.fence === "shared")
+        .filter((s) => s.band === "shared")
         .map((s) => s.id)
     );
     const absent = ENTRY_SECTIONS.find(
-      (s) => s.fence === "shared" && !present.has(s.id)
+      (s) => s.band === "shared" && !present.has(s.id)
     );
     expect(absent).toBeTruthy();
     const id = absent?.id ?? "";

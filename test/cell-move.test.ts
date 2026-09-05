@@ -867,12 +867,23 @@ describe("which line drew which widget", () => {
     expect(stamp).toBeLessThan(row);
   });
 
-  it("hands the stamp to the card built around the widget", () => {
-    // The card is what a reader grabs, so the card is what has to know which
-    // line it is.
+  it("hands the stamp to the wrapper built around the widget", () => {
+    // The wrapper is what a reader grabs, so the wrapper is what has to know
+    // which line it is.
+    //
+    // ONE OPERATION SINCE 5.26.1, WHERE THERE CAME TO BE TWO WRAPPERS. The row's
+    // card was the only one until a band started dressing an added widget as
+    // one of its fields (`widgets/index.ts`), and that second wrapper is built
+    // in a file that cannot see `LINE_ATTR` or `SPAN_ATTR` at all. So the six
+    // lines became `carryStamp`, and both wrappers carry the same two things
+    // rather than one carrying half of what the other does.
     const src = readSrc("block-drag");
-    const at = src.indexOf("export function cardWidget");
-    expect(src.slice(at, src.indexOf("\n}", at))).toContain("setAttribute(LINE_ATTR");
+    const at = src.indexOf("export function carryStamp");
+    const body = src.slice(at, src.indexOf("\n}", at));
+    expect(body).toContain("setAttribute(LINE_ATTR");
+    expect(body).toContain("setAttribute(SPAN_ATTR");
+    const card = src.indexOf("export function cardWidget");
+    expect(src.slice(card, src.indexOf("\n}", card))).toContain("carryStamp(");
   });
 });
 

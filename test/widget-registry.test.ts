@@ -31,6 +31,7 @@ import {
   isPageWidget,
 } from "../src/core/widget-registry";
 import { RETIRED_WIDGETS } from "../src/core/constants";
+import { SECTION_CATEGORIES } from "../src/core/sections";
 import { repoFile, readSrc } from "./sources";
 
 const index = repoFile("src/ui/widgets/index.ts");
@@ -96,14 +97,91 @@ describe("the widget registry describes the switch", () => {
 });
 
 describe("every entry is drawable", () => {
-  it("gives each widget a label, a glyph and a blurb", () => {
+  it("gives each widget a label, a glyph, a blurb and a subject", () => {
+    const known = new Set(SECTION_CATEGORIES.map((c) => c.id));
     for (const [keyword, spec] of Object.entries(WIDGETS)) {
       expect(spec.label, keyword).toBeTruthy();
       expect(spec.glyph, keyword).toBeTruthy();
       expect(spec.blurb, keyword).toBeTruthy();
       // A blurb is a sentence about the page, not a restatement of the keyword.
       expect(spec.blurb.length, keyword).toBeGreaterThan(20);
+      // 5.27. The type says this much too; the runtime check is here because
+      // `widgetSection` COPIES it onto a `SectionView` and the add list groups
+      // on it, so a value outside the table would draw a heading nobody named.
+      expect(known.has(spec.category), keyword).toBe(true);
     }
+  });
+
+  // ── THE SUBJECTS, AND WHICH OF THEM THE REGISTRY ANSWERS FOR (5.27) ─────
+  //
+  // COUNTED PER SUBJECT rather than merely "every category is used", because
+  // the interesting fact is the SHAPE: `structure` has one widget and `writing`
+  // has none, and both of those are claims about where a subject's rows come
+  // from. Writing is entirely the entry's and the journal's own fields — no
+  // registry keyword composes one — and a future entry that files itself under
+  // `writing` is a decision somebody should have to make on purpose.
+  //
+  // SPELLED OUT rather than asserted loosely, on `needs`' own reasoning two
+  // tests down: a reader of the diff sees which subject a new widget joined.
+  it("files all thirty-two widgets under six of the seven subjects", () => {
+    const count: Record<string, number> = {};
+    for (const spec of Object.values(WIDGETS)) {
+      count[spec.category] = (count[spec.category] ?? 0) + 1;
+    }
+    expect(count).toEqual({
+      diary: 11,
+      journals: 6,
+      tasks: 4,
+      trackers: 4,
+      finding: 6,
+      structure: 1,
+    });
+    expect(Object.values(count).reduce((a, b) => a + b, 0)).toBe(
+      Object.keys(WIDGETS).length
+    );
+    // WRITING IS THE CATALOGUES', and the assertion is that nothing here
+    // quietly takes it over.
+    expect(count.writing).toBeUndefined();
+  });
+
+  // ── WHAT A WIDGET NEEDS FROM ITS HOST (5.26) ────────────────────────────
+  //
+  // WHY A TEST RATHER THAN THE FIELD ALONE. `needs` is optional, so a widget
+  // that wants a period and forgets to say gets offered on a diary entry, drawn
+  // as its own refusal sentence, and nothing anywhere fails. The field cannot
+  // catch that; a list can. This is `NOT_PAGE_WIDGETS`' own arrangement — the
+  // union of the two tables is asserted against the switch, so absence is a
+  // claim — applied to a field where absence is the common case.
+  //
+  // THE LIST IS SPELLED OUT rather than counted, so ADDING a member is a change
+  // to this file and a reader of the diff can see which widget joined and go
+  // read why. The reasons themselves live beside the entries, where a reader
+  // meeting the field first will find them.
+  it("names the widgets that need something from their host", () => {
+    const needy = Object.entries(WIDGETS)
+      .filter(([, spec]) => spec.needs !== undefined)
+      .map(([k]) => k)
+      .sort();
+    expect(needy).toEqual(["entry-rollup", "period-nav"]);
+  });
+
+  it("says what each needy widget does when the need is unmet", () => {
+    // THE FIELD IS ONLY TRUE IF THE CODE AGREES WITH IT, and these two agree in
+    // different ways — which is the distinction worth pinning rather than the
+    // fact that both are listed. `entry-rollup` REFUSES: it draws a sentence
+    // naming the four properties. `period-nav` WRITES: it puts `week-start`
+    // into the host's frontmatter, and a note that carries one is a period
+    // dashboard as far as `diaryKindOf` is concerned.
+    //
+    // So a `needs: "period"` that turned out to be neither would be a widget
+    // withheld for a reason that had stopped being true, and this is the
+    // assertion that would notice.
+    expect(repoFile("src/diary/entry-rollup.ts")).toContain(
+      "entry-rollup needs a dashboard period"
+    );
+    expect(repoFile("src/ui/widgets/button-widgets.ts")).toContain(
+      'shiftPeriod(ctx.sourcePath, "week-start"'
+    );
   });
 
   it("gives each exclusion a reason and a sentence", () => {

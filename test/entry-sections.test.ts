@@ -18,16 +18,21 @@ import { readCode, readSrc } from "./sources";
 import { resolve } from "node:path";
 import {
   ENTRY_SECTIONS,
+  applyEntrySections,
   composeEntryTemplate,
   sectionsForEntry,
   removableEntrySections,
   entryRemovalRefusal,
   isMovable,
+  offerableEntrySections,
   removableFrom,
   addSectionToNote,
   detectEntrySections,
   addableEntrySections,
 } from "../src/diary/entry-sections";
+import { WIDGETS } from "../src/core/widget-registry";
+import { isPageWidgetId } from "../src/core/widget-sections";
+import { blockTitle, fieldBand } from "../src/ui/widgets/index";
 import type { EntrySection } from "../src/diary/entry-sections";
 import { regionHasContent } from "../src/core/notestore";
 import { isReconcilable } from "../src/core/scaffold";
@@ -122,7 +127,7 @@ describe("a section is a widget and its region", () => {
     // one thing.
     // Shared sections only: a locked one is structure and owns no region, so
     // its id is a name rather than a key. That split is the point of `fence`.
-    for (const s of ENTRY_SECTIONS.filter((x) => x.fence === "shared")) {
+    for (const s of ENTRY_SECTIONS.filter((x) => x.band === "shared")) {
       const daily = s.directive({ grain: "daily" });
       if (daily) expect(daily, s.id).toContain(`:${s.id}`);
     }
@@ -147,7 +152,7 @@ describe("a section is a widget and its region", () => {
     for (const grain of TRACKER_CLASSES) {
       const out = composeEntryTemplate(grain);
       const shared = sectionsForEntry({ grain }).filter(
-        (s) => s.fence === "shared"
+        (s) => s.band === "shared"
       );
       for (const s of shared) {
         expect(out, `${grain}/${s.id}`).toContain(`<!--chronoanvil:${s.id}`);
@@ -270,7 +275,7 @@ describe("locked means unremovable, not unmovable", () => {
     // own reason. Asked directly rather than through a fence, which is what the
     // sentence above always meant.
     for (const s of ENTRY_SECTIONS) {
-      expect(s.locked, s.id).toBe(s.fence !== "shared");
+      expect(s.locked, s.id).toBe(s.band !== "shared");
     }
   });
 
@@ -289,11 +294,12 @@ describe("locked means unremovable, not unmovable", () => {
   it("builds the structural fence from the catalogue, not a skeleton", () => {
     // Was `own.flatMap(ownFence)` while each structural section had a fence of
     // its own; then `own.flatMap(ownLines)` when 3.2 patch 2 made it one fence;
-    // now `bandFences(own, …)`, since 4.70 makes it one fence PER ROW RUN. The
-    // assertion has followed each rename and what it guards is unchanged: the
-    // composer enumerates the catalogue rather than hardcoding two directives it
-    // happens to know.
-    expect(readSrc("entry-sections")).toContain("bandFences(own, ownLines)");
+    // then `bandFences(own, ownLines)`, since 4.70 makes it one fence PER ROW
+    // RUN; and now `bandFences(own)` alone, because 5.22 put `ownLines` on the
+    // section as `render`. The assertion has followed each rename and what it
+    // guards is unchanged: the composer enumerates the catalogue rather than
+    // hardcoding two directives it happens to know.
+    expect(readSrc("entry-sections")).toContain("bandFences(own)");
   });
 });
 
@@ -513,7 +519,7 @@ describe("immovability is derived, not declared", () => {
     // become "read the flag": a band of one has nowhere to trade places to
     // whatever the flag says, and the day a second structural section arrives
     // the rule has to notice on its own.
-    const band = ENTRY_SECTIONS.filter((s) => s.fence === "own");
+    const band = ENTRY_SECTIONS.filter((s) => s.band === "own");
     expect(band.map((s) => s.id)).toEqual(["banner"]);
     // One unpinned member is what makes it false; the rule reads "more than
     // one", so the day a second arrives it flips on its own.
@@ -521,7 +527,7 @@ describe("immovability is derived, not declared", () => {
   });
 
   it("leaves everything below the rule movable", () => {
-    for (const s of ENTRY_SECTIONS.filter((x) => x.fence === "shared")) {
+    for (const s of ENTRY_SECTIONS.filter((x) => x.band === "shared")) {
       expect(isMovable(s), s.id).toBe(true);
     }
   });
@@ -725,4 +731,183 @@ describe("splitting the shared band is caused by row ids and nothing else", () =
       expect(outside(rowless)).toBe(outside(shipped));
     });
   }
+});
+
+// ── THE WIDGET DOOR, ON AN ENTRY (5.26) ──────────────────────────────────
+//
+// The homepage, the Search note and both logbook notes have offered every page
+// widget their catalogue does not already claim since 4.12; a diary entry
+// offered none. That was structural rather than decided — an entry's shared
+// band IS a widget fence, and a directive typed into it by hand has always
+// rendered and always survived a save — so what these tests pin is that the
+// door opened onto the fence the reader already had, and onto nothing else.
+describe("the widget door, on an entry (5.26)", () => {
+  const ctx = { grain: "daily" as const } as const;
+  const offered = (): string[] =>
+    offerableEntrySections(ctx)
+      .map((s) => s.id)
+      .filter(isPageWidgetId);
+
+  // The last ```chronoanvil fence in a note, which is the shared band.
+  const sharedFence = (text: string): string[] => {
+    const fences = text.split("```chronoanvil\n").slice(1);
+    return fences[fences.length - 1].split("\n```")[0].split("\n");
+  };
+
+  const withWidget = (id: string, keyword: string): string => {
+    const base = composeEntryTemplate("daily");
+    const next = applyEntrySections(base, ctx, [
+      ...detectEntrySections(base, ctx),
+      id,
+    ]);
+    expect(next, keyword).not.toBeNull();
+    return next!;
+  };
+
+  it("offers page widgets, one instance of each and no more", () => {
+    const ids = offered();
+    expect(ids.length).toBeGreaterThan(20);
+    // `w:<keyword>#1` and never `#2`. The limit is `parseEntry`'s: it
+    // attributes a LINE inside the shared fence by probe with no instance
+    // tally, so a second `logbook` line would be found by the first section's
+    // probe and by that one alone.
+    expect(ids.every((id) => id.endsWith("#1"))).toBe(true);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Every one of them is a registry keyword the entry catalogue does not
+    // claim — `focus`, `log` and the rest are `note:`/`list:` directives and
+    // are not page widgets at all.
+    for (const id of ids) {
+      const keyword = id.slice("w:".length, id.lastIndexOf("#"));
+      expect(WIDGETS[keyword], keyword).toBeDefined();
+    }
+  });
+
+  it("and not the two that need a period this note has not got", () => {
+    // Part 1's `needs` field, on the surface it was added for. A daily entry
+    // carries `journal-date`; `entry-rollup` would draw its own refusal here,
+    // and `period-nav` would WRITE `week-start` onto the note, which is the
+    // property `diaryKindOf` reads to decide a diary note is a weekly one.
+    for (const keyword of Object.keys(WIDGETS).filter((k) => WIDGETS[k].needs)) {
+      expect(offered(), keyword).not.toContain(`w:${keyword}#1`);
+    }
+    expect(Object.values(WIDGETS).filter((w) => w.needs).length).toBeGreaterThan(0);
+  });
+
+  it("composes an added widget into the shared fence and nowhere else", () => {
+    const base = composeEntryTemplate("daily");
+    const next = withWidget("w:tasks-table#1", "tasks-table");
+    expect(sharedFence(next)).toContain("tasks-table");
+    // ITS DIRECTIVE ONLY. A `header:` line in this fence would title the whole
+    // BAND rather than the widget under it — every section of an entry shares
+    // the fence — so the one widget that wears a bar on a flat note writes
+    // none here.
+    expect(next).not.toContain("header:");
+    // AND NO REGION. A page widget owns no keyed span, which is the structural
+    // rule the whole of `WIDGETS` is built on, so the reader's prose below the
+    // fence is exactly what it was.
+    const regions = (t: string): string[] =>
+      [...t.matchAll(/<!--chronoanvil:([\w-]+)/g)].map((m) => m[1]);
+    expect(regions(next)).toEqual(regions(base));
+    // The two structural fences above the rule are untouched.
+    expect(next.slice(0, next.indexOf("\n---\n\n"))).toBe(
+      base.slice(0, base.indexOf("\n---\n\n"))
+    );
+  });
+
+  it("is found again by the parser, and refused a second copy", () => {
+    const next = withWidget("w:tasks-table#1", "tasks-table");
+    expect(detectEntrySections(next, ctx)).toContain("w:tasks-table#1");
+    // Withheld rather than offered and refused — `addableEntrySections`' rule
+    // for every section already in the note.
+    expect(addableEntrySections(ctx, next).map((s) => s.id)).not.toContain(
+      "w:tasks-table#1"
+    );
+    // And saving with no change is still a no-op, which is what says the write
+    // path and the read path agree about the line.
+    expect(applyEntrySections(next, ctx, detectEntrySections(next, ctx))).toBeNull();
+  });
+
+  it("and the grain's template carries it when the setting names it", () => {
+    // `EntryTemplates.saveDefault` turns the note a reader is looking at into
+    // the grain's default: it reads the page's present sections and writes
+    // their ids into `entrySections[grain]`. Add a widget, save as default,
+    // and the id in that list is a `w:` one — so the composer has to know it.
+    const plain = composeEntryTemplate("daily");
+    const withIt = composeEntryTemplate("daily", [{ id: "w:tasks-table#1" }], []);
+    expect(plain).not.toContain("tasks-table");
+    expect(sharedFence(withIt)).toContain("tasks-table");
+    expect(sectionsForEntry({ ...ctx, extra: ["w:tasks-table#1"] }).map((s) => s.id))
+      .toContain("w:tasks-table#1");
+    // NAMED ONLY, NEVER BY DEFAULT — which is why no shipped template moved.
+    expect(sectionsForEntry(ctx).map((s) => s.id).some(isPageWidgetId)).toBe(false);
+  });
+
+  it("and a pre-3.2 entry's own links fence is still not the widget fence", () => {
+    // THE REGRESSION THIS DOOR NEARLY SHIPPED. `links` is a page widget and
+    // this catalogue no longer claims it — the banner composes `entry-header`
+    // alone since 4.19 — so it is offered here. Every entry written before 3.2
+    // patch 2 carries a SEPARATE `links:` fence above the rule with no
+    // structural directive in it, and `parseEntry` picks the fence the editor
+    // writes into by asking which fences hold a shared directive. A widget
+    // probe voting in that question would adopt the reader's navigation row as
+    // the band the editor rewrites.
+    const legacy = composeEntryTemplate("daily").replace(
+      "```chronoanvil\nentry-header\n",
+      "```chronoanvil\nlinks:home,today,scopes#diary\n```\n```chronoanvil\nentry-header\n"
+    );
+    expect(offered()).toContain("w:links#1");
+    expect(detectEntrySections(legacy, ctx)).not.toContain("w:links#1");
+    // And an add still lands below the rule, in the fence it always did.
+    const next = applyEntrySections(legacy, ctx, [
+      ...detectEntrySections(legacy, ctx),
+      "w:tasks-table#1",
+    ])!;
+    expect(sharedFence(next)).toContain("tasks-table");
+    expect(next).toContain("```chronoanvil\nlinks:home,today,scopes#diary\n```");
+  });
+
+  it("and the band it lands in still wears no head of its own (5.26.1)", () => {
+    // ── WHAT THE FIRST HAND TEST FOUND ──────────────────────────────────
+    //
+    // The write above is right and always was: one directive, appended to the
+    // band, with every region and both structural fences untouched. What was
+    // wrong was one line away, in what the RENDERER then made of that fence.
+    //
+    // `blockTitle` names a block when the block is one nameable thing, and it
+    // decided that by counting the keywords `SECTION_TITLES` knows. A band's
+    // fields are not among them — each draws its own head from the `|Title`
+    // after it — so a band of seven titled sections plus one page widget counted
+    // as ONE, took a head reading "⏳ Open tasks", and with the head took
+    // `has-head`'s card: the whole entry welded into a single surface named
+    // after the last thing added to it.
+    //
+    // ASSERTED AGAINST THE COMPOSER'S OWN OUTPUT rather than a hand-written
+    // fence, because the defect was in the pairing: either half alone renders
+    // correctly, and only the band this file composes puts them together.
+    const base = composeEntryTemplate("daily");
+    const next = withWidget("w:tasks-table#1", "tasks-table");
+    for (const text of [base, next]) {
+      const fence = sharedFence(text).filter((l) => l.trim() !== "");
+      expect(fieldBand(fence)).toBe(true);
+      expect(blockTitle(fence)).toBeNull();
+    }
+    // AND THE WIDGET IS NOT LEFT NAMELESS FOR IT. The head the block gives up
+    // is the card the widget gains — see `fieldBand`'s second caller in the
+    // dispatcher, pinned in `block-move.test.ts`.
+    expect(sharedFence(next)).toContain("tasks-table");
+  });
+
+  it("and every grain's band is one, so no entry can take a widget's name", () => {
+    // THE FIX HELD FOR THE GRAIN THE DEFECT WAS REPORTED ON. Asked of all five,
+    // because a weekly entry composes a different set of fields and the clause
+    // is only true if every band has one — a grain whose band held no field at
+    // all would take the head again the day a reader added a widget to it.
+    for (const grain of TRACKER_CLASSES) {
+      const fence = sharedFence(composeEntryTemplate(grain)).filter(
+        (l) => l.trim() !== ""
+      );
+      expect(fieldBand(fence), grain).toBe(true);
+      expect(blockTitle([...fence, "tasks-table"]), grain).toBeNull();
+    }
+  });
 });

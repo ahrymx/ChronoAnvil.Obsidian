@@ -45,6 +45,8 @@ import {
   formQuestion,
   withAnswers,
 } from "../src/core/section-model";
+import { SECTION_CATEGORIES, categoryRank } from "../src/core/sections";
+import { isPageWidgetId } from "../src/core/widget-sections";
 import type { FormQuestion, SectionModel } from "../src/core/section-model";
 
 interface Surface {
@@ -104,6 +106,49 @@ describe("every model answers the same six questions", () => {
       expect(new Set(all.map((s) => s.id)).size, name).toBe(all.length);
     }
   });
+
+  // ── EVERY ROW HAS A SUBJECT, INCLUDING THE WIDGET TAIL (5.27) ──────────
+  //
+  // THE TEXT IS PASSED HERE AND NOT ABOVE, deliberately. `sections()` with no
+  // text lists no widgets — the rule 5.26 spread to all four surfaces — so the
+  // catalogue-only list is the case above and this is the list a reader
+  // actually opens the add prompt onto, tail included. A widget arrives through
+  // `widgetSection`/`asDiary`/`asJournal`/`entryWidgetSection`, four builders
+  // that each forward the registry's answer, and this is what says all four do.
+  it("gives every row on every surface one of the seven subjects", () => {
+    const known = new Set(SECTION_CATEGORIES.map((c) => c.id));
+    for (const { name, model, text } of surfaces()) {
+      const all = model.sections(text);
+      expect(all.some((s) => isPageWidgetId(s.id)), name).toBe(true);
+      for (const s of all) {
+        expect(known.has(s.category), `${name}/${s.id}`).toBe(true);
+      }
+    }
+  });
+
+  // THE HEADINGS THE ADD PROMPT WOULD DRAW, on the real surfaces.
+  //
+  // `DetailedChoice.group` draws a heading where the value CHANGES and never
+  // sorts, so "grouped correctly" means "the sorted list has each subject in
+  // exactly one run". Asserted here rather than only in the editor's own file
+  // because the property belongs to the DATA — a surface whose catalogue and
+  // whose widget tail disagreed about a subject would break it, and neither
+  // half is the window's.
+  it("sorts into one run per subject, in the table's order", () => {
+    for (const { name, model, text } of surfaces()) {
+      const ranked = [...model.sections(text)]
+        .sort((a, b) => categoryRank(a.category) - categoryRank(b.category))
+        .map((s) => s.category);
+      const runs = ranked.filter((c, i) => i === 0 || ranked[i - 1] !== c);
+      expect(new Set(runs).size, name).toBe(runs.length);
+      expect(runs, name).toEqual(
+        SECTION_CATEGORIES.map((c) => c.id).filter((id) => runs.includes(id))
+      );
+      // A surface with one subject would make the assertion above vacuous.
+      expect(runs.length, name).toBeGreaterThan(1);
+    }
+  });
+
 
   it("finds what a file it composed already contains", () => {
     for (const { name, model, text } of surfaces()) {
@@ -264,6 +309,24 @@ describe("the editor cannot learn which surface it is on", () => {
       for (const s of model.sections()) {
         expect(Object.keys(s).sort(), `${name}/${s.id}`).toEqual([
           "blurb",
+          // 5.27, and the second field this assertion made somebody argue for.
+          //
+          // 4.12 §C REFUSED IT, twice in writing: *"The alternative was a
+          // `family` field on `SectionView` that three of the four models would
+          // never set, existing so that one `<select>` could group its
+          // options."* Both halves stopped being true in 5.26 — all four models
+          // offer page widgets now, and the control is a suggester over thirty
+          // rows rather than a picker over three.
+          //
+          // AND IT IS THE ONE ADDITION HERE THAT TAKES SOMETHING AWAY. The
+          // editor used to import `isPageWidgetId` and test ids to cut its add
+          // list in two, which is §2's forbidden move — the window asking what
+          // it is looking at — conceded as such in a comment and kept only
+          // because nothing else was available. This field is the something
+          // else: the catalogue SAYS the subject, and `section-editor.ts` now
+          // imports nothing from `widget-sections.ts` at all. A field that
+          // deletes a departure is not a new one.
+          "category",
           "group",
           "icon",
           "id",

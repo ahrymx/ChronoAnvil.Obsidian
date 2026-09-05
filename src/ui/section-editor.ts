@@ -100,7 +100,7 @@ import {
   unitOf,
 } from "../core/row-order";
 import type { Arrangement, MoveUnit, NextArrangement } from "../core/row-order";
-import { isPageWidgetId } from "../core/widget-sections";
+import { categoryLabel, categoryRank } from "../core/sections";
 import { panDuringDrag } from "./drag-scroll";
 import type {
   FolderQuestion,
@@ -2035,23 +2035,39 @@ export class SectionEditorModal extends EditorModal {
     );
     if (!absent.length) return;
 
-    // THE CATALOGUE'S OWN SECTIONS FIRST, THEN THE WIDGETS (4.12 §C).
+    // BY SUBJECT, IN `SECTION_CATEGORIES` ORDER (5.27).
     //
     // A PAGE OFFERS TWO OR THREE OF ITS OWN AND ABOUT TWENTY-FIVE WIDGETS, and a
-    // flat list of twenty-eight buries the two the page was designed around under
-    // an alphabet of things it merely permits.
+    // flat list of twenty-eight buries the two the page was designed around
+    // under an alphabet of things it merely permits. That much 4.12 §C had
+    // right; what it had wrong was the cut.
     //
-    // PARTITIONED ON THE ID, WHICH IS THE ONE THING THIS WINDOW LEARNS ABOUT
-    // KINDS. It is a real departure from `SectionView`'s discipline and it is the
-    // smallest available one: the predicate is imported from the model layer
-    // rather than spelled here, the way `questionIsRequired` and `optionsFor`
-    // already are, so the rule has one home and this file does not know what
-    // makes an id a widget. The alternative was a `family` field on
-    // `SectionView` that three of the four models would never set.
-    const isWidget = (id: string): boolean =>
-      isPageWidgetId(id) && !id.startsWith("w:logbook");
-    const own = absent.filter((s) => !isWidget(s.id));
-    const widgets = absent.filter((s) => isWidget(s.id));
+    // ── WHAT THIS REPLACES, AND WHY IT WAS THE WRONG QUESTION ────────────
+    //
+    // The list used to be "Sections" above "Widgets", partitioned on the id —
+    // `isPageWidgetId(id) && !id.startsWith("w:logbook")` — with the comment
+    // here conceding it was "a real departure from `SectionView`'s discipline"
+    // and the smallest one available. It sorted by a TOGGLE: whether a section
+    // is drawn as a widget is `formQuestion`'s answer, flipped per section on
+    // the page, not a class the section belongs to. And every one of the 32
+    // entries in `WIDGETS` carries a `SECTION_TITLES` heading — so "Widgets"
+    // was a heading over two dozen rows that are all sections.
+    //
+    // THE `w:logbook` CLAUSE IS GONE RATHER THAN TRANSLATED. It existed only to
+    // push logbook cards onto the correct side of a two-way split; with a
+    // subject on the view there is no wrong side to fall on, and the logbook
+    // files under Finding with the rest of the ways to look something up.
+    //
+    // THE SORT IS LOAD-BEARING, NOT COSMETIC. `DetailedChoice.group` draws a
+    // heading where the value CHANGES and never sorts (see modals.ts), so
+    // contiguous runs are this line's job, not the modal's.
+    //
+    // STABLE, so a catalogue's own order survives inside its subject — the
+    // homepage's diary card still leads the diary rows.
+    const byCategory = [...absent].sort(
+      (a, b) => categoryRank(a.category) - categoryRank(b.category)
+    );
+    const headings = new Set(byCategory.map((s) => s.category)).size;
 
     // A SUGGESTER, NOT A `<select>` (4.15 §3).
     //
@@ -2077,7 +2093,7 @@ export class SectionEditorModal extends EditorModal {
     const row = host.createDiv({ cls: "ca-tpl-add" });
     const button = row.createEl("button", { text: "Add a section…" });
     button.addEventListener("click", () => {
-      void this.promptAdd([...own, ...widgets], widgets.length > 0);
+      void this.promptAdd(byCategory, headings > 1);
     });
   }
 
@@ -2092,18 +2108,11 @@ export class SectionEditorModal extends EditorModal {
         value: s.id,
         label: `${s.icon} ${s.label}`,
         description: s.blurb,
-        // THE HEADING ONLY WHERE THERE IS SOMETHING TO SEPARATE. A page whose
-        // widgets are all present already offers its own sections alone, and
-        // "Sections" over an undivided list names a distinction that is not on
-        // screen.
-        ...(grouped
-          ? {
-              group:
-                isPageWidgetId(s.id) && !s.id.startsWith("w:logbook")
-                  ? "Widgets"
-                  : "Sections",
-            }
-          : {}),
+        // THE HEADING ONLY WHERE THERE IS SOMETHING TO SEPARATE, which is the
+        // rule 4.15 §3 wrote and 5.27 only generalised: a list that is all one
+        // subject gets no heading, because a single "Diary" over an undivided
+        // list names a distinction that is not on screen.
+        ...(grouped ? { group: categoryLabel(s.category) } : {}),
       })),
       "Add a section…"
     );

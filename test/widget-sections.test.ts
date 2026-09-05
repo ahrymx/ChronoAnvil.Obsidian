@@ -34,12 +34,24 @@ import { WIDGETS, NOT_PAGE_WIDGETS } from "../src/core/widget-registry";
 import { readCode } from "./sources";
 import { flatBlocks, flatNoteModel } from "../src/core/note-sections";
 import type { FlatSection } from "../src/core/note-sections";
+import { fenceBlock, soleFence } from "../src/core/sections";
 import {
   composeHomeNote,
   homeSectionModel,
   homeSections,
 } from "../src/diary/home-sections";
 import { composeSearchNote, searchSectionModel } from "../src/diary/search-sections";
+import {
+  logbookSectionModel,
+  logbooksFolderSectionModel,
+} from "../src/diary/logbook-sections";
+import { diarySectionModel } from "../src/diary/diary-sections";
+import { entrySectionModel } from "../src/diary/entry-sections";
+import { journalSectionModel } from "../src/journals/journal-plan";
+import { STUDY_JOURNAL } from "../src/journals/journal";
+import { sectionContext } from "../src/journals/journal-sections";
+import { DEFAULT_LOGBOOKS } from "../src/core/constants";
+import type { SectionModel } from "../src/core/section-model";
 import { DEFAULT_PATHS } from "../src/core/constants";
 
 const ROOT = DEFAULT_PATHS.diaryRoot;
@@ -70,7 +82,21 @@ describe("what the generator makes", () => {
     // both located the same first line, which `parseFlatSections` resolves by
     // giving the run to whichever it walks into first and reporting the other as
     // nobody's. One form cannot do that.
-    expect(tail).toHaveLength(Object.keys(WIDGETS).length);
+    //
+    // ── AND ONE PER WIDGET THIS SURFACE CAN SUPPLY (5.26) ──────────────
+    //
+    // `pageWidgetSections` takes what the surface answers a `needs` with, and
+    // this call supplies nothing — which is every flat note in the tree. So the
+    // count is the registry minus the widgets that declare a need, and the
+    // second assertion is what says the subtraction is the FIELD rather than an
+    // off-by-two: hand the same empty catalogue a period and all thirty-two
+    // come back.
+    const needy = Object.values(WIDGETS).filter((w) => w.needs).length;
+    expect(needy).toBeGreaterThan(0);
+    expect(tail).toHaveLength(Object.keys(WIDGETS).length - needy);
+    expect(pageWidgetSections([], "", ["period"])).toHaveLength(
+      Object.keys(WIDGETS).length
+    );
     expect(tail.every((s) => isPageWidgetId(s.id))).toBe(true);
     expect(tail.every((s) => s.id.endsWith("#1"))).toBe(true);
     expect(new Set(tail.map((s) => s.id)).size).toBe(tail.length);
@@ -117,8 +143,8 @@ describe("what the generator makes", () => {
     // out of a shared fence, it is `loose`, and it is a legal column of a group.
     for (const s of tail) {
       const rendered = s.id.startsWith("w:logbook")
-        ? s.render({ form: "widget" })
-        : s.render();
+        ? soleFence(s.render(undefined, { form: "widget" }))
+        : soleFence(s.render());
       expect(rendered.lines, s.id).toHaveLength(1);
       expect(rendered.fence, s.id).toBe("chronoanvil");
     }
@@ -131,18 +157,18 @@ describe("what the generator makes", () => {
     // that shows nothing to change it.
     const timeline = tail.find((s) => s.id === "w:timeline#1") as FlatSection;
     expect(timeline.questions).toBeUndefined();
-    expect(timeline.render({ arg: "6" }).lines).toEqual(["timeline"]);
+    expect(soleFence(timeline.render(undefined, { arg: "6" })).lines).toEqual(["timeline"]);
   });
 
   it("writes the answer into the directive, and nothing when there is none", () => {
     const tasks = tail.find((s) => s.id === "w:tasks-table#1") as FlatSection;
-    expect(tasks.render().lines).toEqual(["tasks-table"]);
-    expect(tasks.render({ arg: "02 - Diary" }).lines).toEqual([
+    expect(soleFence(tasks.render()).lines).toEqual(["tasks-table"]);
+    expect(soleFence(tasks.render(undefined, { arg: "02 - Diary" })).lines).toEqual([
       "tasks-table:02 - Diary",
     ]);
     // A blank answer is the folder question's DEFAULT — the host note's own
     // folder — and composes the bare directive rather than a trailing colon.
-    expect(tasks.render({ arg: "   " }).lines).toEqual(["tasks-table"]);
+    expect(soleFence(tasks.render(undefined, { arg: "   " })).lines).toEqual(["tasks-table"]);
   });
 
   it("asks one question per piece the registry declares", () => {
@@ -159,7 +185,7 @@ describe("what the generator makes", () => {
     for (const s of tail) {
       const w = WIDGETS[kw(s.id)];
       const args = w.args ?? (w.arg ? (w.arg2 ? [w.arg, w.arg2] : [w.arg]) : []);
-      const qs = (s.questions?.(spec as never) ?? []).filter((q) => q.kind !== "form");
+      const qs = (s.questions?.(undefined, spec as never) ?? []).filter((q) => q.kind !== "form");
       expect(qs, s.id).toHaveLength(args.length);
       const arg = args[0];
       if (!arg) continue;
@@ -192,7 +218,7 @@ describe("what the generator makes", () => {
   it("offers a vault question the vault's own answers, and says so when there are none", () => {
     const card = widgetInstances(["journal-card"], "")[0];
     expect(card.id).toBe("w:journal-card#1");
-    const q = card.questions?.({
+    const q = card.questions?.(undefined, {
       vault: { journals: [{ value: "study", label: "Study" }] },
     } as never)[0];
     expect(q?.kind === "choice" && q.values).toEqual([
@@ -202,16 +228,16 @@ describe("what the generator makes", () => {
     // `ChoiceQuestion.empty` was written for, and the first widget that can
     // actually reach it. A caller with no vault in hand is the same case as a
     // vault with no journals, and gets the same answer.
-    const none = card.questions?.({} as never)[0];
+    const none = card.questions?.(undefined, {} as never)[0];
     expect(none?.kind === "choice" && none.values).toEqual([]);
     expect(none?.kind === "choice" && none.empty).toMatch(/Settings/);
   });
 
   it("resolves a folder question against the note the window opened on", () => {
     const tags = tail.find((s) => s.id === "w:tag-index#1") as FlatSection;
-    const q = tags.questions?.({ hostFolder: "02 - Diary" } as never)[0];
+    const q = tags.questions?.(undefined, { hostFolder: "02 - Diary" } as never)[0];
     expect(q?.kind === "folder" && q.hostFolder).toBe("02 - Diary");
-    const none = tags.questions?.({} as never)[0];
+    const none = tags.questions?.(undefined, {} as never)[0];
     // Null leaves the control inert rather than promising a default the caller
     // could not name — `FolderQuestion.hostFolder`'s own rule.
     expect(none?.kind === "folder" && none.hostFolder).toBeNull();
@@ -292,7 +318,7 @@ describe("the de-dup probe, which runs both ways", () => {
         blurb: "Matches an events fence it no longer writes.",
         icon: "📦",
         locked: false,
-        render: () => ({ fence: "chronoanvil", lines: ["header:📦 Legacy"] }),
+        render: () => fenceBlock({ fence: "chronoanvil", lines: ["header:📦 Legacy"] }),
         locate: (text) => text.search(/^events\b/m),
       },
     ];
@@ -535,7 +561,7 @@ describe("as many copies of a widget as a page wants", () => {
     // rather than from a pool whose depth nobody could pick.
     const far = instanceSectionFor("w:journal-card#9");
     expect(far?.id).toBe("w:journal-card#9");
-    expect(far?.render({ arg: "study" }).lines).toEqual(["journal-card:study"]);
+    expect(soleFence(far!.render(undefined, { arg: "study" })).lines).toEqual(["journal-card:study"]);
     expect(instanceSectionFor("w:not-a-widget#9")).toBeNull();
   });
 
@@ -791,5 +817,125 @@ describe("as many copies of a widget as a page wants", () => {
     expect(present).toEqual(["w:journal-card#1", "w:journal-card#2"]);
     expect(model.plan(text, model.present(text)).filter((o) => o.kind === "foreign"))
       .toEqual([]);
+  });
+});
+
+// ── ONE DOOR, SIX SURFACES (5.26) ────────────────────────────────────────
+//
+// Three screenshots of three "Add a section…" lists started this release, and
+// the reason they differed was not a decision anybody made: two of the four
+// surfaces were wired to `pageWidgetKeywords` and two were not. They all are
+// now, and this is the table that says so.
+//
+// COUNTS RATHER THAN A DESCRIPTION, AND THEY ARE MEANT TO MOVE. A new widget in
+// `WIDGETS` raises every row that does not claim its keyword, and a catalogue
+// that starts writing one lowers exactly the row it was added to. Both are
+// changes worth seeing in a diff — the alternative is a sweep that says "each
+// surface offers some widgets" and would have passed unchanged through the
+// release that gave two of them none.
+describe("one door, six surfaces (5.26)", () => {
+  const widgetsIn = (model: SectionModel): number =>
+    model
+      .sections("")
+      .map((s) => s.id)
+      .filter(isPageWidgetId).length;
+
+  // WHAT EVERY ROW BELOW STARTS FROM: the registry, less the two widgets that
+  // need a period property, which only a dashboard supplies. `needs` is the
+  // one subtraction that is about the WIDGET rather than about the catalogue.
+  const FREE = Object.keys(WIDGETS).length -
+    Object.values(WIDGETS).filter((w) => w.needs).length;
+
+  it("offers the registry, less what each catalogue already claims", () => {
+    expect(Object.keys(WIDGETS).length).toBe(32);
+    expect(FREE).toBe(30);
+
+    const rows: [string, SectionModel, number][] = [
+      // The homepage claims nine keywords of its own — the most of any
+      // catalogue, and the reason its list looked short beside the others.
+      ["home", homeSectionModel(DEFAULT_PATHS.diary), 21],
+      ["search", searchSectionModel(), 27],
+      // Both logbook surfaces claim exactly `logbook`.
+      [
+        "logbook",
+        logbookSectionModel(DEFAULT_LOGBOOKS[0]),
+        29,
+      ],
+      ["logbooks", logbooksFolderSectionModel(DEFAULT_LOGBOOKS), 29],
+      // A period dashboard SUPPLIES `period`, so the two needy widgets are
+      // offered here — and are claimed by its own catalogue, which is why the
+      // number is not simply higher.
+      ["weekly dashboard", diarySectionModel({ grain: "weekly" }), 24],
+      ["yearly dashboard", diarySectionModel({ grain: "yearly" }), 26],
+      // A DIARY ENTRY CLAIMS NO PAGE-WIDGET KEYWORD AT ALL — its catalogue is
+      // `note:`, `list:`, `tasks:` and `attach:` directives, none of which is a
+      // widget — so it is offered every free one. It was offered none before
+      // this release.
+      ["daily entry", entrySectionModel({ grain: "daily" }), 30],
+      // A journal INDEX claims the most of the three journal surfaces: its
+      // dashboard sections are built from widgets a leaf note has no use for.
+      [
+        "journal index",
+        journalSectionModel(sectionContext(STUDY_JOURNAL, { depth: 1 })),
+        23,
+      ],
+      [
+        "journal leaf",
+        journalSectionModel(
+          sectionContext(STUDY_JOURNAL, {
+            kind: STUDY_JOURNAL.kinds.find((k) => k.id === "lesson")!,
+          })
+        ),
+        28,
+      ],
+    ];
+
+    for (const [name, model, want] of rows) {
+      expect(widgetsIn(model), name).toBe(want);
+    }
+  });
+
+  it("and no surface offers a widget that needs what it cannot supply", () => {
+    // The two are `entry-rollup`, which refuses outright, and `period-nav`,
+    // which WRITES `week-start` onto its host — so on a note with no period the
+    // second is worse than the first. A dashboard is the only surface that
+    // declares `supplies: ["period"]`, and its own catalogue claims both, so
+    // nothing anywhere lists them as free.
+    const needy = Object.keys(WIDGETS).filter((k) => WIDGETS[k].needs);
+    expect(needy).toEqual(["entry-rollup", "period-nav"]);
+    const models: SectionModel[] = [
+      homeSectionModel(DEFAULT_PATHS.diary),
+      searchSectionModel(),
+      logbooksFolderSectionModel(DEFAULT_LOGBOOKS),
+      entrySectionModel({ grain: "daily" }),
+      journalSectionModel(sectionContext(STUDY_JOURNAL, { depth: 1 })),
+    ];
+    for (const model of models) {
+      const ids = model.sections("").map((s) => s.id);
+      for (const keyword of needy) {
+        expect(ids).not.toContain(`w:${keyword}#1`);
+      }
+    }
+  });
+
+  it("and a surface with no text in hand lists no widget at all", () => {
+    // `sections()` WITHOUT A TEXT IS A QUESTION ABOUT THE CATALOGUE, on all six
+    // surfaces since 5.26. A widget section is what a note could be GIVEN, and
+    // "what could this note be given" is unanswerable without the note; the
+    // flat models have taken that position since 4.56, and the entry and
+    // journal models joined it when their doors opened. It is also what keeps
+    // `test/section-model.test.ts`' cross-surface sweeps counting the sections
+    // somebody wrote rather than the registry.
+    const models: SectionModel[] = [
+      homeSectionModel(DEFAULT_PATHS.diary),
+      searchSectionModel(),
+      entrySectionModel({ grain: "daily" }),
+      journalSectionModel(sectionContext(STUDY_JOURNAL, { depth: 1 })),
+    ];
+    for (const model of models) {
+      expect(model.sections().map((s) => s.id).filter(isPageWidgetId)).toEqual(
+        []
+      );
+    }
   });
 });

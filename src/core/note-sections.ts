@@ -43,15 +43,41 @@
 
 import { segment } from "./layout";
 import {
-  instanceId,
-  instanceIdOf,
+  addOps,
+  barlessRuns,
+  fenceBlock,
+  joinRowChunk,
+  rowDelimiter,
+  finalOrder,
+  foreignOp,
+  insertionPoint,
+  moveOpsFor,
+  permuteChunks,
+  plannedWrites,
+  soleFence,
+} from "./sections";
+import {
+  isBlank,
+  isFillerRun,
+  optInOf,
+  parseSectionRuns,
+  rowOf,
+  soloBarOf,
+  viewOf,
+} from "./sections";
+import type { Chunk, OwnedRun, RowMember } from "./sections";
+// Re-exported because this is where the composers look for them: `rowRuns` is
+// here and its member type moved out from under it in 5.24, along with the
+// arrival rule the reconcilers ask.
+export type { RowMember };
+export { rowDelimiter };
+import type { NoteSpec, Section } from "./sections";
+import {
   instanceSectionFor,
-  locateNth,
   nextInstanceId,
   pageWidgetKeywords,
   widgetInstances,
 } from "./widget-sections";
-import type { VaultLists } from "./widget-registry";
 import { fencesOf } from "./block-move";
 import {
   columnLoadOf,
@@ -75,7 +101,6 @@ import {
   TITLE_KEYWORD,
   WIDE_KEYWORD,
   HEADER_KEYWORD,
-  isCellLine,
   isHeightLine,
   isLinksLine,
   isRowLine,
@@ -87,8 +112,6 @@ import {
   readArg,
   splitDirective,
   dropSoloBar,
-  leadingBar,
-  needsSoloBar,
   soloBar,
   undoRowOfOne,
 } from "./directive-grammar";
@@ -102,11 +125,9 @@ import {
   WIDGET_FORM,
   formAt,
   describeAnswers,
-  desiredOrder,
   partsOf,
   holdPinned,
   idsOf,
-  moveOps,
   optionsFor,
   reconfigured,
   withAnswers,
@@ -114,125 +135,24 @@ import {
 
 // One section of a flat note.
 //
-// Deliberately the smallest of the four section shapes in the project. There is
-// no `applies` (nothing varies — a note has the sections it has), no `band`
-// (there is one), and no context parameter on `render`.
+// `Section` WITH NO CONTEXT, WHICH IS WHAT "FLAT" MEANS. The type moved to
+// `core/sections.ts` in 5.22 — the same move `SectionOp` made in 3.0 and
+// `SectionBlock` made alongside this one — and the name stays here because
+// every importer in the tree spells it this way and a flat surface is a real
+// thing to be a section OF.
 //
-// AND THERE IS NOW ONE `pinned`, WHICH THERE WAS NOT (4.11). This interface used
-// to say "no `pinned` (position is the reader's throughout)", and that sentence
-// was true for exactly as long as every section of a flat note was one more
-// widget. 4.10 put the page's own NAME at the top of four of them, and a name is
-// not a widget: `DiarySection.pinned` argues it one file over and the argument
-// carries across unchanged — *a page's own name being somewhere other than the
-// top is a page with its title in the middle of it*.
+// WHAT IT LOST IN THE MOVE IS NOTHING, and what it GAINED is the fields the
+// other three catalogues needed: `band`, `applies`, `default`, `parts`,
+// `probe`, `ownsRegion`. A flat note has one band and no variation, so it
+// leaves all six out and composes exactly the note it composed before.
 //
-// WHAT DOES NOT CARRY ACROSS IS THE BAND HALF. On a dashboard the head is
-// `band: "head"`, and a band of one is immovable by the arithmetic `isMovable`
-// already does — the flag is a second statement of the same fact there. A flat
-// note has one band, so there is no arithmetic to lean on and the flag is the
-// whole of the mechanism here.
-export interface FlatSection {
-  id: string;
-  label: string;
-  blurb: string;
-  // The glyph a row is tokened with. Where the section renders a header bar
-  // this is that bar's own emoji, so the row and the note agree — the rule
-  // `DiarySection.icon` and `JournalSection.icon` both follow. Where a section
-  // draws its own card and has no header line, it is chosen to match what the
-  // card shows.
-  icon: string;
-  // LOCKED sections cannot be removed. They can still be moved: the lock is on
-  // existence, not on order — 2.60.2's distinction, and it holds here without
-  // qualification because a flat note has no band arithmetic that could strand
-  // a section the way the dashboard masthead strands `summary`.
-  locked: boolean;
-  // PINNED sections cannot be moved. They can still be REMOVED, which is the
-  // other half of the same distinction and the reason these are two fields
-  // rather than one: the page head is a coherent thing to want gone — the note's
-  // name is in the tab, the file explorer and the window — and an incoherent
-  // thing to want third.
-  //
-  // ABSENT MEANS NO, and every section but one leaves it out. `viewOf` turns it
-  // into `SectionView.movable`, which is where the editor reads it; nothing in
-  // this file asks it directly except the two `holdPinned` calls that keep the
-  // write side honest when a stale `want` disagrees.
-  pinned?: boolean;
-  // How many lines of the READER'S OWN content this section holds, for a
-  // section whose body is theirs rather than the catalogue's. Absent means
-  // removing it costs nothing but the section.
-  holds?: (text: string) => number;
-  // Offered but not shipped: in `sections()` and `addable`, absent from
-  // `compose`. `DiarySection.optIn`'s meaning exactly.
-  optIn?: boolean;
-  // Whether a page may hold more than one of these. 4.15 §4.
-  //
-  // ABSENT MEANS ONE, which every section in every catalogue means and which is
-  // what the whole model assumed before this field: a section is located by one
-  // anchor and owns one run. A repeating section does not change that — it is
-  // one of a family whose members each own a run — and this flag exists so the
-  // ADD LIST knows to keep offering it once it is present. `viewOf` carries it
-  // out to `SectionView.repeatable`, which is where the editor reads it.
-  repeatable?: boolean;
-  // Which composed ROW this section is a cell of, or absent for a section that
-  // takes a block of its own. 4.2 §2.
-  //
-  // AN ID RATHER THAN A FLAG, because a page has more than one row and adjacent
-  // rows have to be told apart — two rows running together would compose as one
-  // block of six cells, which is the near-miss the `row` grammar refuses when a
-  // reader types it and which a composer must not create by accident.
-  //
-  // CONSECUTIVE MEMBERS ONLY. A row is a block, a block is a contiguous run of
-  // the note, so two sections with the same `row` and another section between
-  // them are not a row and are not composed as one. The catalogue's order is
-  // what makes a row, which keeps this one fact in one place.
-  //
-  // A SECTION IN A ROW STILL RENDERS ALONE when it is ADDED back later, because
-  // `renderFlatSection` composes one section and knows nothing about its
-  // neighbours. That is the honest outcome rather than a gap: re-adding gives
-  // the reader the section in a block of its own, which they can then move into
-  // the row by hand. Guessing that it wanted to rejoin a row would mean writing
-  // into a block they may have arranged since.
-  row?: string;
-  // Which CELL of that row this section shares, or absent for a section that
-  // takes a cell of its own. 4.4 §3.
-  //
-  // AN ID FOR `row`'s REASON, one level in: a row has more than one cell, and
-  // two sections that happen to be adjacent are not in the same one unless they
-  // say so. Consecutive members of a row carrying the same id share a cell and
-  // stack inside it; anything else starts the next cell.
-  //
-  // ABSENT IS NOT A VALUE. Two sections that both leave this out do NOT share a
-  // cell — they each get their own, which is what a row meant before cells
-  // existed. That is the property that keeps this additive: a catalogue where
-  // nobody declares a cell composes exactly the note it composed before, `cell`
-  // lines and all, which is to say none.
-  //
-  // `renderFlatSection` ignores it, as it ignores `row`, and for the same
-  // reason: a section added back arrives in a block of its own rather than
-  // writing itself into a cell the reader may have rearranged since.
-  cell?: string;
-  tab?: boolean;
-  // `RowMember.bar`: the title this cell takes on when its row has come down to
-  // it alone, which for a cell that composes none is the difference between a
-  // section and a box of content with nothing above it. Only the barless cells
-  // of a row declare it; see `soloBar` for why filling a gap is all it does.
-  bar?: string;
-  render: (opts?: Record<string, unknown>) => { fence: string; lines: string[] };
-  // What this section can be asked, and where the answer is written.
-  //
-  // A FUNCTION OF THE SPEC rather than a literal, for `EntrySection.questions`'
-  // reason one file over: the answers are what THIS VAULT defines — here, what
-  // the host note's own folder resolves to — and a catalogue that hardcoded one
-  // would be describing a vault rather than reading it.
-  questions?: (spec: FlatNoteSpec) => SectionQuestion[];
-  // Where this section already is in a note's text, or -1.
-  //
-  // MATCHES THE DIRECTIVE, NOT THE HEADER, which is the rule both diary
-  // catalogues state and the reason is the same: a reader retitles a header —
-  // that is what the `header:` argument is for — and matching on it would make
-  // a renamed section invisible and then offer to add a second copy.
-  locate: (text: string) => number;
-}
+// `Ctx` IS `void` HERE. `render` and `locate` take it and ignore it, which is
+// why the catalogue literals below are written `render: () => …` and
+// `render: (_ctx, opts) => …`: a shorter function is assignable to a longer
+// signature, so a section that has nothing to say about a context does not
+// have to name one. The arguments those fields' comments used to make in this
+// file are made in `core/sections.ts` now, in full and once.
+export type FlatSection = Section<void>;
 
 // What the head is composed as. 4.10, and BARE since 5.2.
 //
@@ -474,9 +394,10 @@ export function bannerSection(spec: BannerSpec = {}): FlatSection {
       ? "The page's own name, where it can go in the vault and in time, and the control that renames it and edits its sections."
       : "The page's own name, where it can go, and the control that renames it and edits its sections.",
     icon: "🏷️",
+    category: "structure",
     locked: true,
     pinned: true,
-    render: () => ({
+    render: () => fenceBlock({
       fence: "chronoanvil",
       lines: [
         // THE MODIFIER FIRST, where `composeFlatNote` already puts `row` and
@@ -630,22 +551,23 @@ export function mergeBannerFences(text: string): string | null {
 // top of the note landing inside the first widget.
 // ── one row rule, four catalogues ─────────────────────────────────────
 
-// What `rowRuns` needs to know about a section, and the whole of it.
+// `row` and `bar`, READ FOR A SURFACE WHOSE CONTEXT IS `void`.
 //
-// TWO OPTIONAL FIELDS AND NO ID. Every catalogue's section type carries these
-// two under the names and the meanings `FlatSection.row` and `FlatSection.cell`
-// argue for at length; nothing here needs to know which type it has been handed,
-// which is `SectionModel`'s discipline applied to composition rather than to
-// editing.
-export interface RowMember {
-  row?: string;
-  cell?: string;
-  tab?: boolean;
-  // The bar this member composes ONLY IF its row comes down to it alone — the
-  // barless cells of every row this plugin composes. `soloBar` in
-  // `directive-grammar.ts` is the rule and the argument for it.
-  bar?: string;
-}
+// `Section.row` and `.bar` are `string | ((ctx) => string | undefined)` since
+// 5.22, because ONE catalogue needs the function form: the journal one serves a
+// container index and a leaf index from a single entry, and a row a section
+// joins on one and not the other cannot be a constant. Nothing in a flat note
+// varies that way, so every literal in every flat catalogue writes a string —
+// and these two exist so that fact is stated once here rather than as a cast at
+// each of the dozen places that read the field.
+//
+// TOLERANT OF A MISSING SECTION, which is why they take `undefined`: the reads
+// below are overwhelmingly `byId.get(id)?.bar`, and a helper that refused that
+// shape would turn a widening into a rewrite of every caller.
+const flatRow = (s: FlatSection | undefined): string | undefined =>
+  s && rowOf(s, undefined);
+const flatBar = (s: FlatSection | undefined): string | undefined =>
+  s && soloBarOf(s, undefined);
 
 // A catalogue's sections, grouped into the fences they compose to. 4.70.
 //
@@ -798,8 +720,13 @@ export function composeFlatNote(sections: readonly FlatSection[]): string {
   // gained the same two fields. Nothing about what this composes changed; see
   // that function for why one copy rather than four.
   const runs = rowRuns(
-    sections.filter((s) => !s.optIn),
-    (s) => s.render()
+    sections
+      .filter((s) => !optInOf(s, undefined))
+      // `RowMember` IS THE RESOLVED SHAPE, which is what the journal composer
+      // already hands it: `row` and `bar` are read here, once, and the row rule
+      // downstream never learns that either could have been a function.
+      .map((s) => ({ ...s, row: flatRow(s), bar: flatBar(s) })),
+    (s) => soleFence(s.render())
   );
   const blocks = runs.map((r) =>
     ["```" + r.fence, ...r.lines, "```"].join("\n")
@@ -811,7 +738,7 @@ export function renderFlatSection(
   section: FlatSection,
   opts?: Record<string, unknown>
 ): string {
-  const { fence, lines } = section.render(opts);
+  const { fence, lines } = soleFence(section.render(undefined, opts));
   return ["```" + fence, ...lines, "```"].join("\n");
 }
 
@@ -838,24 +765,14 @@ export function addableFlatSections(
 // One contiguous run of a note, attributed. `sectionIds` is empty for a run the
 // catalogue did not write — the reader's own prose, a hand-added fence — and
 // those are reported and never moved.
-interface FlatRun {
-  sectionIds: string[];
-  // Which line of this run each of its sections is on, counted from the run's
-  // first line — the opening fence included, which is the base both callers of
-  // it already use.
-  //
-  // RECORDED BY THE WALK THAT ATTRIBUTED THEM (4.15 §4). It used to be worked
-  // out again from the section's own anchor, which was one derivation too many
-  // even before it stopped being possible: an instance's anchor is an ordinal
-  // over the whole note, and asked of one fence every card in it answers with
-  // the first card's line.
-  lineOf: Record<string, number>;
-  index: number;
-  filler: boolean;
-}
-
-const isBlank = (lines: string[]): boolean =>
-  lines.every((l) => l.trim() === "");
+// One run of a flat note.
+//
+// `OwnedRun` UNDER THIS FILE'S NAME (5.23). The shape moved to
+// `core/sections.ts` with the walk that produces it; the alias stays because
+// six functions here take one and `FlatRun` is what they call it. `index` became
+// `from` in the move — a flat run is always one segment, so `from === to`, and
+// the two-field form is what a journal run needs to absorb its regions.
+type FlatRun = OwnedRun;
 
 // A leading frontmatter block, taken off.
 //
@@ -934,134 +851,38 @@ export function replaceBody(text: string, composed: string): string | null {
   return next === text ? null : next;
 }
 
-// Which sections this fence holds, and which of its lines each one is on.
+// The inverse of `composeFlatNote`, and deliberately conservative: a section is
+// present iff its own fence is present.
 //
-// WHY THE ORDINAL IS COUNTED HERE AND NOT INSIDE A `locate` (4.15 §4). An
-// instance's id says WHICH occurrence it is — `w:journal-card#2` is the second
-// `journal-card` line in the note — and a `locate` cannot answer that, because
-// this function asks each fence about itself. Every fence containing a card
-// would see it as the first one, so a note with three cards would report three
-// copies of `#1` and hand two runs to nobody.
-//
-// So the count runs along the walk instead. `seen` is carried across the
-// segments by `parseFlatSections`, which is the only thing that reads the note
-// in order, and this is the single place an ordinal is decided.
-//
-// AND THE LINE COMES BACK WITH IT, which removes a re-derivation rather than
-// adding one: `cellLineIn` used to work the same answer out a second time from
-// the section's own anchor, and for an instance it could not — every card in a
-// fence would report the fence's first card's line. Two callers needed that
-// number and both have the run in hand.
-function ownersOf(
-  lines: string[],
-  sections: readonly FlatSection[],
-  seen?: Map<string, number>
-): { id: string; line: number }[] {
-  const text = lines.join("\n");
-  const lineAt = (at: number): number => text.slice(0, at).split("\n").length - 1;
-  const found: { id: string; at: number }[] = [];
-  // The keywords whose sections are instances, taken from the list this note's
-  // model was built with rather than from the registry — so a catalogue that
-  // manages one itself is not second-guessed here.
-  const repeating = new Set<string>();
-  for (const s of sections) {
-    const inst = instanceIdOf(s.id);
-    if (inst) {
-      repeating.add(inst.keyword);
-      continue;
-    }
-    const at = s.locate(text);
-    if (at >= 0) found.push({ id: s.id, at });
-  }
-  for (const keyword of repeating) {
-    let n = seen?.get(keyword) ?? 0;
-    // EVERY OCCURRENCE IN THIS FENCE, not just the first: a reader may group two
-    // cards into one block, and each is its own section with its own line.
-    for (let k = 1; ; k++) {
-      const at = locateNth(keyword, k)(text);
-      if (at < 0) break;
-      found.push({ id: instanceId(keyword, ++n), at });
-    }
-    seen?.set(keyword, n);
-  }
-  return found
-    .sort((a, b) => a.at - b.at)
-    .map((f) => ({ id: f.id, line: lineAt(f.at) }));
-}
-
+// THE WALK IS `parseSectionRuns`', IN `core/sections.ts` (5.23). This function
+// and `parseDiarySections` were the same forty lines — the claim-once set, the
+// instance tally carried across the segments, the `lineOf` map — and the second
+// said so in its own comment. What is left here is the one thing the two
+// genuinely disagreed about, below.
 export function parseFlatSections(
   text: string,
   sections: readonly FlatSection[]
 ): FlatRun[] {
-  const segs = segment(text.split("\n"));
-  // A SECTION IS ITS FIRST RUN, AND NOTHING AFTER IT (4.12 §A).
-  //
-  // THE BUG THIS CLOSES LOSES A READER'S CONTENT, SILENTLY. `ownersOf` is asked
-  // of each fence on its own, and a `locate` is a match rather than a claim — so
-  // two fences holding one keyword BOTH come back owning that id. Downstream,
-  // `applyFlatSections`' reorder builds `byChunk` keyed by `chunks[i].ids[0]`,
-  // and a `Map` keeps the last entry written under a key: the two chunks become
-  // one object, which is then written into both slots. The first fence's content
-  // is replaced by the second's, on Save, with nothing in the plan saying so.
-  //
-  // Reachable by hand today — write `on-this-day` twice on the Search note and
-  // reorder anything — and about to be reachable by clicking, because §C makes a
-  // keyword an id the window offers.
-  //
-  // A SET RATHER THAN A SMARTER `ownersOf`, and the difference is what it turns
-  // the failure INTO. The second fence now owns nothing, so it is a run with no
-  // `sectionIds` — which every path already knows how to treat: `flatBlocks`
-  // skips it, `applyFlatSections` re-emits it byte-identically, and the plan
-  // reports it as one block that is not the catalogue's. A silent content swap
-  // becomes a line in the Changes tab saying a block here was left alone.
-  //
-  // FILE ORDER IS WHAT DECIDES, because `segs` is in file order and this walks
-  // it once. The first fence in the note is the one the catalogue manages, which
-  // is the only choice a reader could predict without reading this comment.
-  //
-  // AN INSTANCE CANNOT BE CLAIMED TWICE ANYWAY (4.15 §4), which is worth saying
-  // beside the set rather than instead of it: a repeating widget's ordinal is
-  // handed out by `seen` as the walk passes each occurrence, so no two runs are
-  // ever offered the same one and the filter below never fires for one. The set
-  // still guards every other section, which is what it was written for.
-  const claimed = new Set<string>();
-  const seen = new Map<string, number>();
-  return segs.map((seg, i) => {
-    const held = seg.kind === "fence" ? ownersOf(seg.lines, sections, seen) : [];
-    const owners = held
-      .filter((o) => {
-        if (claimed.has(o.id)) return false;
-        claimed.add(o.id);
-        return true;
-      })
-      .map((o) => o.id);
-    const lineOf: Record<string, number> = {};
-    for (const o of held) if (claimed.has(o.id)) lineOf[o.id] = o.line;
-    // The note's opening run carries its frontmatter, because `segment` lumps
-    // every non-fence line before the first fence into one raw run. Only this
-    // run can hold frontmatter, and only here is a leading `---` anything other
-    // than a thematic break.
-    const body = i === 0 ? withoutFrontmatter(seg.lines) : seg.lines;
-    return {
-      sectionIds: owners,
-      lineOf,
-      index: i,
-      // The spacer counts as filler along with the blank separators and the
-      // frontmatter: all three are structure, and reporting them as "a block
-      // here isn't the catalogue's" would be true, useless and alarming on
-      // every untouched note.
-      filler:
-        !owners.length &&
-        (isBlank(body) ||
-          body.every(
-            (l) =>
-              l.trim() === "" ||
-              l.trim() === "`chronoanvil:spacer`" ||
-              l.trim().startsWith("%%") ||
-              l.trim().startsWith("[[")
-          )),
-    };
-  });
+  return parseSectionRuns(segment(text.split("\n")), sections, undefined, (seg, i) =>
+    // FRONTMATTER IS TAKEN OFF RATHER THAN TESTED FOR, which is this surface's
+    // answer and not the dashboard's. The note's opening run carries its
+    // frontmatter, because `segment` lumps every non-fence line before the
+    // first fence into one raw run; only this run can hold frontmatter, and
+    // only here is a leading `---` anything other than a thematic break.
+    //
+    // WHAT THE DIFFERENCE COSTS, stated so nobody unifies it by eye: an opening
+    // run holding frontmatter AND a paragraph of the reader's prose is FOREIGN
+    // here and FILLER on a dashboard. Both are defensible; neither is going to
+    // be changed under cover of a refactor.
+    //
+    // The spacer counts as filler along with the blank separators and the
+    // frontmatter: all three are structure, and reporting them as "a block here
+    // isn't the catalogue's" would be true, useless and alarming on every
+    // untouched note.
+    isFillerRun(i === 0 ? withoutFrontmatter(seg.lines) : seg.lines, {
+      spacer: true,
+    })
+  );
 }
 
 // Why this section cannot be removed from THIS note, or null if it can.
@@ -1115,43 +936,10 @@ export function flatRemovalRefusal(
   return null;
 }
 
-export interface FlatNoteSpec {
-  sections: readonly FlatSection[];
-  // The folder this note itself sits in, when the caller knows it — what an
-  // empty folder answer resolves to (3.15 §10.9). Absent means the caller could
-  // not say, and a folder question drawn from it stays inert rather than
-  // promising a default it cannot name.
-  //
-  // The homepage sits at the vault root, so its value is the empty string —
-  // which is a KNOWN folder rather than an absent one, and the distinction is
-  // exactly why this is `string | null | undefined` and not just falsy.
-  hostFolder?: string | null;
-  // What THIS VAULT can answer a widget's argument with. 4.15 §4.
-  //
-  // THE THING `needs-vault-answer` SAID WAS MISSING. `widget-registry.ts`
-  // withholds five keywords from the add list because each must name a tracker,
-  // a note kind or a journal, and this spec carried "the catalogue, the host
-  // folder and two nouns" — nothing that could say what a vault contains. Its
-  // note quotes the price of the fix as widening this type and threading the
-  // lists through the model constructors, and that is what this field is.
-  //
-  // SUPPLIED BY THE CALLER THAT OPENED THE WINDOW, for `hostFolder`'s reason one
-  // field up: only that caller knows which vault it is in. `note-sections.ts`
-  // opens by forbidding itself to carry anything that says which note it is on
-  // or what this vault contains, and that rule is honoured rather than broken —
-  // this is data handed IN, not read.
-  //
-  // ABSENT IS A VAULT THAT COULD NOT BE ASKED, not an empty one, and both come
-  // out as the same empty list with the same sentence over it. A journal
-  // template has no vault to speak of and a test fixture has none either; both
-  // want the question drawn as "there is nothing to choose" rather than as a
-  // dropdown with no entries.
-  vault?: VaultLists;
-  // The page, named as the reader would name it, for refusal messages.
-  noun: string;
-  // What `holds` counts, singular. "chart" on the homepage.
-  heldUnit: string;
-}
+// `NoteSpec` WITH NO CONTEXT, for `FlatSection`'s reason and by the same move.
+// The field prose — what an absent `hostFolder` means, why an unaskable vault
+// and an empty one come out the same — is in `core/sections.ts` with the type.
+export type FlatNoteSpec = NoteSpec<void>;
 
 // How to say "the host note's own folder" for THIS note, in a plan line. The
 // homepage's own folder is the vault root, which has no name a reader would
@@ -1217,8 +1005,8 @@ function sharersIn(runs: readonly FlatRun[]): Map<string, string[]> {
 const hasKnownExtent = (section: FlatSection | undefined): boolean => {
   if (!section) return false;
   return (
-    section.render().lines.length === 1 ||
-    section.render({ form: WIDGET_FORM }).lines.length === 1
+    soleFence(section.render()).lines.length === 1 ||
+    soleFence(section.render(undefined, { form: WIDGET_FORM })).lines.length === 1
   );
 };
 
@@ -1320,64 +1108,13 @@ export function planFlatSections(
   const planSegs = segment(text.split("\n"));
   const runs = parseFlatSections(text, sections);
   const order = runs.flatMap((r) => r.sectionIds);
-  // ── A BLOCK ALREADY ON DISK WITH NO TITLE OVER IT (5.9, widened 5.10) ──
-  //
-  // `soloBar` titles a lone cell when a page is COMPOSED without its row's
-  // opener and when one is CUT out of a fence. Neither reaches a page written
-  // before those rules existed, and its reader has no gesture that fixes it —
-  // unticking the section and ticking it back composes the same headless fence.
-  // So the plan looks, reports it as an `extend`, and the write adds one line.
-  //
-  // 5.9 SCOPED THIS TO A ROW'S CELL and that was too narrow. A section whose
-  // catalogue entry GAINED a bar is in the same state on every page composed
-  // before it, for the same reason, and the alternative — drawing a fallback
-  // bar at render time — gives a vault two looks for one object, chosen by the
-  // age of the page and never said out loud.
-  //
-  // THE TITLE COMES FROM THE RENDER. A row member names its own (`bar`, worded
-  // for itself rather than for the band); everything else opens with the
-  // `header:` line it would compose today, which is what `leadingBar` reads.
-  //
-  // ONLY WHERE THE RUN HOLDS ONE SECTION and the fence carries no bar of any
-  // kind; `needsSoloBar` is the gate and says why.
-  //
-  // AND NEVER WHERE THE SECTION OFFERS THE FORM TOGGLE (5.11). Once a section
-  // asks the reader "a section with its own title, or a widget?", a fence with
-  // no bar in it has TWO causes — a page composed before the title existed, and
-  // a reader who answered `widget` — and this rule cannot tell them apart. It
-  // used to guess the first, so opening the editor on a dashboard whose Recently
-  // written had been turned into a widget offered to put the title back, and
-  // saving took the answer away. Going quiet leaves the older page untitled,
-  // which the reader can fix with the toggle they were offered anyway; the
-  // opposite mistake overwrites an answer they already gave.
-  const barless = new Map<string, string>();
-  for (const run of runs) {
-    if (run.sectionIds.length !== 1) continue;
-    const only = sections.find((x) => x.id === run.sectionIds[0]);
-    if (!only) continue;
-    const runLines = planSegs[run.index]?.lines ?? [];
-    const asks = (only.questions?.(spec) ?? []).some((q) => q.kind === "form");
-    // AND THE TOGGLE OUTRANKS A DECLARED `bar` (5.14). Until this release the
-    // two could not coexist — a row member declared `bar` and offered no
-    // toggle, everything else offered a toggle and composed its title in
-    // `render` — so `only.bar ?? (only.row || asks ? …)` read correctly by
-    // accident. `open-tasks`, `tags` and `sleep` now declare BOTH: the bar is
-    // the line they take back when they leave a row, and the toggle is the
-    // reader's answer about whether they want it. Leaving `bar` in front would
-    // have re-offered that line to exactly the sections that just learned to
-    // refuse it, which is 5.12's overwrite with a new set of victims.
-    const bar = asks
-      ? undefined
-      : (only.bar ??
-        (only.row
-          ? undefined
-          : leadingBar(only.render(optionsFor(requested, only.id)).lines)));
-    if (!needsSoloBar(runLines, bar)) continue;
-    barless.set(only.id, bar as string);
-  }
+  const byId = new Map(sections.map((s) => [s.id, s]));
+  // The solo-bar repair, in `core/sections.ts` since 5.24 along with the whole
+  // of its argument — which this file used to carry and which the dashboard
+  // planner carried a second time.
+  const barless = barlessRuns(runs, planSegs, byId, undefined, requested, spec);
   const sharers = sharersIn(runs);
   const present = new Set(order);
-  const byId = new Map(sections.map((s) => [s.id, s]));
   // A PINNED SECTION KEEPS THE INDEX THE FILE GIVES IT, whatever the window was
   // holding when Save was pressed. `planDiarySections` normalises here for the
   // stated reason that the plan and the write must not disagree about where a
@@ -1463,7 +1200,7 @@ export function planFlatSections(
         label: section.label,
         detail: rewriting.has(id)
           ? describeAnswers(
-              section.questions?.(spec) ?? [],
+              section.questions?.(undefined, spec) ?? [],
               optionsFor(requested, id),
               hostLabel(spec)
             ) + (noBar ? `; ${barDetail}` : "")
@@ -1493,27 +1230,19 @@ export function planFlatSections(
     });
   }
 
-  const adding: string[] = [];
-  for (const id of want) {
-    if (present.has(id)) continue;
-    const section = byId.get(id);
-    if (!section) continue;
-    adding.push(id);
-    ops.push({
-      kind: "add",
-      sectionId: id,
-      label: section.label,
-      detail: `adds ${section.label.toLowerCase()}`,
-    });
-  }
+  const added = addOps(
+    want,
+    (id) => present.has(id),
+    byId,
+    (s) => `adds ${s.label.toLowerCase()}`
+  );
+  const adding = added.adding;
+  ops.push(...added.ops);
 
   // Moves, against the arrangement the adds and removes will leave behind, so
   // a move is reported against the final order rather than an intermediate one
   // nobody will ever see. One band, so no partition.
-  const surviving = order.filter((id) => want.includes(id));
-  const target = want.filter(
-    (id) => surviving.includes(id) || adding.includes(id)
-  );
+  const { target } = finalOrder(order, want, adding);
   // A SECTION IN A SHARED BLOCK TRAVELS WITH THE BLOCK. The reorder pass
   // permutes CHUNKS and a chunk is a block, so a move naming one of two
   // sections inside one is a move that cannot happen — and reporting it would
@@ -1524,7 +1253,7 @@ export function planFlatSections(
   const runOf = new Map(
     runs.flatMap((r) => r.sectionIds.map((id) => [id, r] as [string, FlatRun]))
   );
-  for (const op of moveOps(surviving, target, (id) => byId.get(id)?.label)) {
+  for (const op of moveOpsFor(order, want, adding, byId)) {
     const with_ = op.sectionId ? sharers.get(op.sectionId) : undefined;
     if (!with_?.length) {
       ops.push(op);
@@ -1576,17 +1305,12 @@ export function planFlatSections(
     });
   }
 
-  const foreign = runs.filter((r) => !r.sectionIds.length && !r.filler).length;
-  if (foreign) {
-    ops.push({
-      kind: "foreign",
-      sectionId: null,
-      label: "—",
-      detail: `${foreign} block${foreign === 1 ? "" : "s"} in this file ${
-        foreign === 1 ? "isn't" : "aren't"
-      } the catalogue's; left alone`,
-    });
-  }
+  const foreign = foreignOp(
+    runs.filter((r) => !r.sectionIds.length && !r.filler).length,
+    "block",
+    "in this file"
+  );
+  if (foreign) ops.push(foreign);
 
   return ops;
 }
@@ -1625,7 +1349,7 @@ const isBarLine = (line: string): boolean =>
 
 const composesBar = (section: FlatSection | undefined): boolean => {
   if (!section) return false;
-  const lines = section.render().lines;
+  const lines = soleFence(section.render()).lines;
   return (
     lines.length > 1 && splitDirective(lines[0]).keyword === HEADER_KEYWORD
   );
@@ -1642,175 +1366,6 @@ const composesBar = (section: FlatSection | undefined): boolean => {
 // exactly as they typed it, argument included. So the caller asks it only when
 // every section in the run declares a row, which is true of a composed one and
 // false of every hand-built fence.
-
-// ── THE DELIMITER AN ARRIVING CELL WRITES, FOR BOTH RECONCILERS (5.18) ───
-//
-// `rowRuns` writes a delimiter only where the cell id CHANGES, only in a row
-// where somebody named one, and a `tab` wherever a member asked to open a page
-// of its own. An arrival has to answer the same question about the one place it
-// is landing: does the member ahead of me sit in a different cell, or am I a
-// page in my own right? The homepage is the page that makes the cell half
-// concrete — its row is `diary:3` in one cell and three widgets stacked in the
-// other — and without this, re-adding the first of those three would put it in
-// the diary card's column.
-//
-// A DELIMITER ALREADY THERE IS THE ANSWER, NOT A SECOND ONE. Cutting one of
-// several cells leaves the fence's `cell` lines exactly where they were, so the
-// commonest rejoin lands directly after one and needs nothing added. Arriving
-// FIRST is the mirror image: the delimiter above the insert point belongs
-// between this section and the one below it, so the arrival goes ABOVE it
-// rather than gaining one of its own — which is what the returned `insertAt`
-// says, and why it is returned rather than assumed unchanged.
-//
-// ── WHY IT IS A FUNCTION AND NOT TWO COPIES OF THE BLOCK (5.18) ─────────
-//
-// `rowRuns`' reason, one layer up. The rule was `joinFlatRowChunk`'s alone
-// while flat notes were the only catalogue with a tabbed row; 5.18 gives the
-// journal catalogue one — the tracker grid paged against the stats band on
-// every leaf index — and `journal-plan.ts`'s `joinRowChunk` spliced a cell in
-// with no delimiter at all, which welds a page onto the cell above it. Two
-// spellings of "where does the divider go" is how a group re-added through the
-// section editor comes back a different shape from the one composition writes.
-//
-// ASKED OF `RowMember` AND NOTHING MORE, so the journal catalogue — whose `row`
-// is a function of the context — satisfies it with the two fields that are
-// plain data on every catalogue.
-export function rowDelimiter(arrival: {
-  lines: readonly string[];
-  insertAt: number;
-  member: Pick<RowMember, "cell" | "tab">;
-  // Undefined means "nothing of this row is above me in the fence", which is a
-  // branch of its own rather than a member with no cell.
-  prev: Pick<RowMember, "cell"> | undefined;
-  later: Pick<RowMember, "cell"> | undefined;
-  divided: boolean;
-}): { delimiter: string | false; insertAt: number } {
-  const { lines, insertAt, member, prev, later, divided } = arrival;
-  const sameCell = (a: string | undefined, b: string | undefined): boolean =>
-    a !== undefined && a === b;
-  const above = (test: (line: string) => boolean): boolean =>
-    insertAt > 0 && test(lines[insertAt - 1].trim());
-  if (member.tab) {
-    return {
-      delimiter: above(isTabLine) ? false : TAB_KEYWORD,
-      insertAt,
-    };
-  }
-  if (prev !== undefined) {
-    return {
-      delimiter:
-        divided && !sameCell(prev.cell, member.cell) && !above(isCellLine)
-          ? CELL_KEYWORD
-          : false,
-      insertAt,
-    };
-  }
-  if (above(isCellLine)) return { delimiter: false, insertAt: insertAt - 1 };
-  if (later !== undefined) {
-    return {
-      delimiter:
-        divided && !sameCell(member.cell, later.cell) ? CELL_KEYWORD : false,
-      insertAt,
-    };
-  }
-  return { delimiter: false, insertAt };
-}
-
-// A section that declares a row rejoins that row's fence instead of composing a
-// block. False for "no row of mine on this page", which is the ordinary case and
-// where a block of its own is exactly right.
-function joinFlatRowChunk(
-  chunks: { ids: string[]; lines: string[] }[],
-  section: FlatSection,
-  byId: Map<string, FlatSection>,
-  order: readonly string[],
-  opts: Record<string, unknown> | undefined
-): boolean {
-  if (!section.row) return false;
-  const at = chunks.findIndex(
-    (c) =>
-      c.ids.length > 0 && c.ids.every((id) => byId.get(id)?.row === section.row)
-  );
-  if (at < 0) return false;
-
-  const chunk = chunks[at];
-  // AND THE SOLO BAR COMES BACK OFF FIRST — `dropSoloBar`, `soloBar`'s inverse.
-  // The survivor took a title on when the cut left it alone; the cell arriving
-  // beside it composes the band's again, so the borrowed one goes and the file
-  // is the file the reader started with.
-  const base = chunk.ids.reduce(
-    (out, id) => dropSoloBar(out, byId.get(id)?.bar),
-    chunk.lines as readonly string[]
-  );
-  const rank = order.indexOf(section.id);
-  // Ahead of the first member that outranks it, found by the keyword that
-  // member writes — the same probe the cut above works by, so the two cannot
-  // disagree about which line belongs to whom.
-  const later = chunk.ids.find((id) => order.indexOf(id) > rank);
-  const laterKeywords = later
-    ? new Set(
-        (byId.get(later)?.render().lines ?? []).map(
-          (l) => splitDirective(l).keyword
-        )
-      )
-    : null;
-  let insertAt = base.length;
-  for (let n = base.length - 1; n >= 0; n--) {
-    if (base[n].trim() === "```") {
-      insertAt = n;
-      break;
-    }
-  }
-  if (laterKeywords) {
-    const found = base.findIndex((l) =>
-      laterKeywords.has(splitDirective(l.trim()).keyword)
-    );
-    if (found >= 0) insertAt = found;
-  }
-
-  const lines = [...base];
-  // The `row` line comes back with the cell, because the cut took it when the
-  // fence fell to one widget. A fence that gained a second directive without it
-  // would be two widgets stacked in one block rather than a row of two.
-  if (!lines.some((l) => isRowLine(l.trim()))) {
-    const open = lines.findIndex((l) => l.trim().startsWith("```"));
-    lines.splice(open + 1, 0, ROW_KEYWORD);
-    if (insertAt > open) insertAt++;
-  }
-
-  const rowMembers = order.filter((id) => byId.get(id)?.row === section.row);
-  const before = chunk.ids.filter((id) => order.indexOf(id) < rank);
-  const prevId = before.length ? before[before.length - 1] : undefined;
-  const arrival = rowDelimiter({
-    lines,
-    insertAt,
-    member: section,
-    // AN ID IN THE CHUNK IS A MEMBER, so `?? {}` keeps "there is a cell above
-    // me" true for one the map cannot resolve rather than turning it into
-    // "I arrive first", which is a different branch with a different answer.
-    prev: prevId === undefined ? undefined : (byId.get(prevId) ?? {}),
-    later: later === undefined ? undefined : (byId.get(later) ?? {}),
-    divided: rowMembers.some((id) => byId.get(id)?.cell !== undefined),
-  });
-  const delimiter = arrival.delimiter;
-  insertAt = arrival.insertAt;
-
-  lines.splice(
-    insertAt,
-    0,
-    ...section.render(opts).lines,
-    ...(delimiter && prevId === undefined ? [delimiter] : [])
-  );
-  if (delimiter && prevId !== undefined) lines.splice(insertAt, 0, delimiter);
-
-  chunks[at] = {
-    ids: [...chunk.ids, section.id].sort(
-      (a, b) => order.indexOf(a) - order.indexOf(b)
-    ),
-    lines,
-  };
-  return true;
-}
 
 export function applyFlatSections(
   text: string,
@@ -1829,57 +1384,21 @@ export function applyFlatSections(
     idsOf(requested),
     (id) => sections.find((s) => s.id === id)?.pinned === true
   );
-  const removing = new Set(
-    ops
-      .filter((o) => o.kind === "remove")
-      .map((o) => o.sectionId)
-      .filter((id): id is string => id !== null)
-  );
-  const adding = ops
-    .filter((o) => o.kind === "add")
-    .map((o) => o.sectionId)
-    .filter((id): id is string => id !== null);
-  const moving = ops.some((o) => o.kind === "move");
-  const rewriting = new Set(
-    ops
-      .filter((o) => o.kind === "reconfigure")
-      .map((o) => o.sectionId)
-      .filter((id): id is string => id !== null)
-  );
-  // A missing title is a write like any other, so it counts towards "anything to
-  // do" — the plan already named it, and a plan that promises a line the writer
-  // then declines to add is the disagreement this module is built not to have.
-  const extending = new Set(
-    ops
-      .filter((o) => o.kind === "extend")
-      .map((o) => o.sectionId)
-      .filter((id): id is string => id !== null)
-  );
-  if (
-    !removing.size &&
-    !adding.length &&
-    !moving &&
-    !rewriting.size &&
-    !extending.size
-  ) {
-    return null;
-  }
+  const { removing, adding, moving, rewriting, extending, any } =
+    plannedWrites(ops);
+  if (!any) return null;
 
   const segs = segment(text.split("\n"));
   const runs = parseFlatSections(text, sections);
   const byId = new Map(sections.map((s) => [s.id, s]));
 
-  interface Chunk {
-    ids: string[];
-    lines: string[];
-  }
   // The order the reorder pass is measured against, computed exactly as the plan
   // computes it — this is the second half of the note above about recomputing
   // `want` rather than being handed it, one question further in.
   const chunks: Chunk[] = [];
   for (let ri = 0; ri < runs.length; ri++) {
     const run = runs[ri];
-    let lines = [...segs[run.index].lines];
+    let lines = [...segs[run.from].lines];
     const doomed = run.sectionIds.filter((id) => removing.has(id));
     // A CELL CUT OUT OF A BLOCK THAT IS STAYING. Only reachable for a section
     // whose extent is one line — `planFlatSections` refuses the rest — so this
@@ -1925,10 +1444,10 @@ export function applyFlatSections(
       // one — a fence of content with nothing above it. `soloBar` fills that
       // gap and nothing else; a run with two cells left still has its bar.
       const kept = run.sectionIds.filter((id) => !removing.has(id));
-      lines = run.sectionIds.every((id) => byId.get(id)?.row !== undefined)
+      lines = run.sectionIds.every((id) => flatRow(byId.get(id)) !== undefined)
         ? undoRowOfOne(
             remaining,
-            kept.length === 1 ? byId.get(kept[0])?.bar : undefined
+            kept.length === 1 ? flatBar(byId.get(kept[0])) : undefined
           )
         : remaining;
     }
@@ -1949,7 +1468,7 @@ export function applyFlatSections(
         // Asked of `needsSoloBar` again rather than trusted from the op, which
         // is this file's rule wherever a preview promises a write.
         if (extending.has(id)) {
-          out = soloBar(out, byId.get(id)?.bar);
+          out = soloBar(out, flatBar(byId.get(id)));
         }
         if (!rewriting.has(id)) continue;
         const section = byId.get(id);
@@ -1972,7 +1491,7 @@ export function applyFlatSections(
           // "a run of one", which refused the opener along with the rest; both
           // paths now say the same sentence and say it the same way.
           section
-            .questions?.(spec)
+            .questions?.(undefined, spec)
             .filter((q) => q.kind !== "form" || id === run.sectionIds[0]) ?? [],
           optionsFor(requested, id)
         );
@@ -1982,7 +1501,7 @@ export function applyFlatSections(
     }
     // Removed. Take the blank separator that followed it too — otherwise every
     // removal leaves a widening gap behind.
-    if (runs[ri + 1]?.filler && isBlank(segs[runs[ri + 1].index].lines)) ri++;
+    if (runs[ri + 1]?.filler && isBlank(segs[runs[ri + 1].from].lines)) ri++;
   }
 
   const order = sections.map((s) => s.id);
@@ -1994,7 +1513,14 @@ export function applyFlatSections(
     // below is the block path, unchanged, and is what runs when the row is not
     // on this page.
     if (
-      joinFlatRowChunk(chunks, section, byId, order, optionsFor(requested, id))
+      joinRowChunk(
+        chunks,
+        section,
+        undefined,
+        byId,
+        order,
+        optionsFor(requested, id)
+      )
     ) {
       continue;
     }
@@ -2005,7 +1531,7 @@ export function applyFlatSections(
     // there hands back exactly the headless fence the other doors exist to stop.
     const body = soloBar(
       renderFlatSection(section, optionsFor(requested, id)).split("\n"),
-      section.bar
+      flatBar(section)
     );
     // WHICH SIDE THE BLANK LINE GOES ON, and it is not always the same side.
     //
@@ -2039,19 +1565,7 @@ export function applyFlatSections(
   // SECTIONS MOVE AROUND FOREIGN BLOCKS, WHICH KEEP THEIR INDEX. A reader's own
   // fence sitting between two sections being swapped has no correct
   // destination, so it stays put and the sections trade the slots they had.
-  if (moving) {
-    const slots: number[] = [];
-    for (let i = 0; i < chunks.length; i++) {
-      if (chunks[i].ids[0]) slots.push(i);
-    }
-    const occupants = slots.map((i) => chunks[i].ids[0]);
-    const desired = desiredOrder(occupants, want);
-    const byChunk = new Map(slots.map((i) => [chunks[i].ids[0], chunks[i]]));
-    slots.forEach((slot, n) => {
-      const wanted = byChunk.get(desired[n]);
-      if (wanted) chunks[slot] = wanted;
-    });
-  }
+  if (moving) permuteChunks(chunks, want);
 
   const next = chunks
     .flatMap((c) => c.lines)
@@ -2060,41 +1574,23 @@ export function applyFlatSections(
   return next === text ? null : next;
 }
 
-// Where a new section goes, in chunk space. Anchored to the sections the file
-// actually has rather than to an absolute position, so a note someone
-// rearranged keeps its arrangement — and remove-then-re-add restores the file
-// exactly, which is the property worth having because a test can check it.
-function insertionPoint(
-  chunks: { ids: string[] }[],
-  order: string[],
-  id: string
-): number {
-  const rank = order.indexOf(id);
-  let after = -1;
-  for (let i = 0; i < chunks.length; i++) {
-    const ranks = chunks[i].ids
-      .map((k) => order.indexOf(k))
-      .filter((r) => r !== -1);
-    if (!ranks.length) continue;
-    if (Math.max(...ranks) > rank) return after === -1 ? i : after + 1;
-    after = i;
-  }
-  return after === -1 ? chunks.length : after + 1;
-}
-
 const viewFor =
   (spec: FlatNoteSpec, text?: string) =>
   (s: FlatSection): SectionView => {
-    const questions = s.questions?.(spec);
-    return {
-      ...viewOf(s),
-      // Resolved against the spec, because only the caller that opened the
-      // window knows which file it opened. See `FlatNoteSpec.hostFolder`.
-      ...(questions ? { questions } : {}),
+    // Resolved against the spec, because only the caller that opened the window
+    // knows which file it opened. See `FlatNoteSpec.hostFolder`.
+    const questions = s.questions?.(undefined, spec);
+    // THE SHAPE IS `viewOf`'s, IN `core/sections.ts` (5.22). What this file used
+    // to state — that a flat note has one band, so `group` is null and nothing
+    // is stranded by arithmetic; and that the one row which does not move says
+    // so itself through `pinned` — are that function's two defaults, argued
+    // there. What is left here is the policy only this surface knows.
+    return viewOf(s, {
+      questions,
       ...(questions && text !== undefined
         ? { answered: answersOn(s.locate(text), questions, text) }
         : {}),
-    };
+    });
   };
 
 // What this section's OWN line already says, per question. 4.15 §4.
@@ -2156,31 +1652,6 @@ export function answersOn(
   return out;
 }
 
-const viewOf = (s: FlatSection): SectionView => ({
-  id: s.id,
-  label: s.label,
-  blurb: s.blurb,
-  icon: s.icon,
-  removable: !s.locked,
-  // NOTHING IS STRANDED BY ARITHMETIC HERE, which is what this line used to say
-  // in full: a flat note has one band, so no section is immovable because of
-  // where the other sections are, the way the dashboard masthead makes `summary`
-  // immovable by being alone in its band. That is still true and is no longer the
-  // whole answer.
-  //
-  // THE ONE ROW THAT DOES NOT MOVE SAYS SO ITSELF (4.11). The head is immovable
-  // by DECLARATION rather than by arithmetic — `FlatSection.pinned` — and this is
-  // the only place that reads it, because `SectionView.movable` is the only thing
-  // the editor asks. `bandOf` puts an immovable row in no band at all, which
-  // makes it not a drag source, not a drop target, and the host of two disabled
-  // arrows: three behaviours from one omission, none of them a check about which
-  // section this is.
-  movable: !s.pinned,
-  // ONE BAND, so null, which is what the editor's "two rows may swap when
-  // their groups match" rule reads as "any two rows may swap".
-  group: null,
-  ...(s.repeatable ? { repeatable: true } : {}),
-});
 
 // ── rows, as the editor sees them ─────────────────────────────────────
 //
@@ -2201,13 +1672,13 @@ export function flatBlocks(
   // answered from `sections` alone. `column` is a question about the FILE: what
   // is actually in this fence, including a `header:` line the reader typed that
   // no catalogue entry knows about. So the segments are read here and indexed by
-  // `run.index`, which is the numbering `whereIs` already speaks.
+  // `run.from`, which is the numbering `whereIs` already speaks.
   const segs = segment(text.split("\n"));
   const bodyOf = (index: number): string[] => segs[index]?.lines.slice(1, -1) ?? [];
   return parseFlatSections(text, sections)
     .filter((run) => run.sectionIds.length > 0)
     .map((run) => {
-      const body = bodyOf(run.index);
+      const body = bodyOf(run.from);
       // WHETHER THIS BLOCK MAY TAKE PART IN A GROUP, asked of the block and
       // answered for every section in it — because a column is a whole fence's
       // worth of lines, which is what `widgetRun` bounds.
@@ -2282,9 +1753,9 @@ function whereIs(
   const runs = parseFlatSections(lines.join("\n"), sections);
   const run = runs.find((r) => r.sectionIds.includes(id));
   if (!run) return null;
-  const block = at.indexOf(run.index);
+  const block = at.indexOf(run.from);
   if (block === -1) return null;
-  const body = segs[run.index].slice(1, -1);
+  const body = segs[run.from].slice(1, -1);
   // BODY-RELATIVE, because that is what `moveCell` speaks and what `body` is.
   // The run records its lines counted from the opening fence, so the marker
   // comes off here — one subtraction at the one caller that wants the other
@@ -2435,7 +1906,7 @@ export function regroupFlatNote(
   // stays.
   for (const b of want) {
     for (const id of b.slice(1)) {
-      const bar = sections.find((s) => s.id === id)?.bar;
+      const bar = flatBar(sections.find((s) => s.id === id));
       if (!bar) continue;
       const at = whereIs(lines, sections, id);
       if (!at) continue;
@@ -2722,7 +2193,7 @@ export function regroupFlatNote(
     if (block.ids.length !== 1) continue;
     const id = block.ids[0];
     if ((wasWith.get(id) ?? 1) < 2) continue;
-    const bar = sections.find((s) => s.id === id)?.bar;
+    const bar = flatBar(sections.find((s) => s.id === id));
     if (!bar) continue;
     const at = whereIs(lines, sections, id);
     if (!at) continue;
@@ -2775,7 +2246,7 @@ export function flatNoteModel(spec: FlatNoteSpec): SectionModel {
   // WHICH KEYWORDS THIS CATALOGUE LEAVES FREE, PROBED ONCE. The probe reads every
   // catalogue section's `locate` and is the expensive half; what a text holds is
   // a line count.
-  const keywords = pageWidgetKeywords(spec.sections);
+  const keywords = pageWidgetKeywords(spec.sections, spec.supplies ?? []);
 
   // ── and the instances THIS TEXT holds (4.15 §4, all widgets since 4.56) ─
   //

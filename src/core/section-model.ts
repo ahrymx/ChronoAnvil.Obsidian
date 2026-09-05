@@ -39,6 +39,10 @@
 // interface would give the editor a method whose only correct use is to destroy
 // the thing it is editing.
 
+// TYPE-ONLY, AND IT HAS TO BE. `sections.ts` imports this file for real, so a
+// value import here would close a cycle; `SectionCategory` is erased, and the
+// seven live beside `Section` because that is where a catalogue declares one.
+import type { SectionCategory } from "./sections";
 import {
   FRAME_KEYWORD,
   HEADER_KEYWORD,
@@ -139,6 +143,35 @@ export interface SectionView {
   // did, for the same reason journal sections have one — a row with no token
   // reads as a different list from the one two clicks away.
   icon: string;
+  // WHAT THIS SECTION IS ABOUT — the subject its row is filed under in the add
+  // list. See `SectionCategory` in sections.ts for the seven and their order.
+  //
+  // ── THE FIELD THAT WAS REFUSED ONCE, AND WHY IT IS HERE NOW (5.27) ───
+  //
+  // 4.12 §C wrote the rejection twice, in `widget-sections.ts` and in
+  // `section-editor.ts`: *"The alternative was a `family` field on
+  // `SectionView` that three of the four models would never set, existing so
+  // that one `<select>` could group its options."* Both halves of that reason
+  // have since stopped being true, and this is the argument §2 asks for.
+  //
+  // "THREE OF THE FOUR WOULD NEVER SET IT" ended in 5.26, when the widget door
+  // opened on the entry and the journal. All four models offer page widgets
+  // now, and every section any of them offers has a subject. There is no model
+  // here writing a field for another model's benefit.
+  //
+  // "SO THAT ONE `<select>` COULD GROUP ITS OPTIONS" ended in 5.26 too. The
+  // control is a suggester over thirty-odd rows, and the heading is how a
+  // reader finds one in it — not decoration on a picker with three entries.
+  //
+  // AND IT TAKES KNOWLEDGE AWAY FROM THE EDITOR RATHER THAN ADDING IT, which
+  // is the part that decides it. `renderAdd` used to import `isPageWidgetId`
+  // and test ids to cut its list in two — a departure this interface's own
+  // rule names ("the editor learning which surface it is on. If it asks, the
+  // interface is wrong"), apologised for in place, and kept only because there
+  // was nothing else. With a subject on the view the import is gone and the
+  // window learns nothing about ids at all. The one thing the editor knew
+  // about kinds is now something the catalogue SAYS.
+  category: SectionCategory;
   // Whether this section may be removed AT ALL, ignoring what is written in
   // it. `refusal` answers the question that depends on the note's contents;
   // this one is a property of the section, and the row needs it before the

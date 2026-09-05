@@ -22,6 +22,7 @@ import { isManagedTemplate } from "../trackers/entry-trackers";
 import { openSectionEditor } from "./section-editor";
 import { journalSectionModel } from "../journals/journal-plan";
 import type { SectionModel, SectionWant } from "../core/section-model";
+import { categoryLabel, categoryRank } from "../core/sections";
 import type { VaultLists } from "../core/widget-registry";
 import { logbookChoices } from "../diary/logbooks";
 import {
@@ -276,7 +277,11 @@ export function modelForSurface(
 ): { model: SectionModel; noun: string } {
   if (surface.kind === "journal") {
     return {
-      model: journalSectionModel({ ...surface.ctx, hostFolder }),
+      // AND THE VAULT LISTS REACH THIS BRANCH AS OF 5.26, for the reason the
+      // dashboard branch below states about 4.58.0: a journal note had no
+      // widget to ask a question of until this release opened the door, and
+      // now it has thirty.
+      model: journalSectionModel({ ...surface.ctx, hostFolder, vault }),
       noun: `${surface.ctx.ownNoun} note`,
     };
   }
@@ -333,8 +338,14 @@ export function modelForSurface(
       noun: `${surface.ctx.type.name} dashboard`,
     };
   }
+  // AND THE ENTRY TAKES THE SAME TWO AS THE SEVEN ABOVE IT (5.26). An entry
+  // offers page widgets now, and a widget with a folder or a journal argument
+  // asks for one — `hostFolder` is the note's own folder, which is what a
+  // scoped directive defaults to, and `vault` is what the dropdowns are filled
+  // from. Without them the tail would draw empty controls on the one surface
+  // where the reader is most likely to want a scoped table.
   return {
-    model: entrySectionModel(surface.ctx),
+    model: entrySectionModel({ ...surface.ctx, hostFolder, vault }),
     noun: `${CLASS_DEFS[surface.ctx.grain].adjective} entry`,
   };
 }
@@ -938,16 +949,34 @@ export class SectionInserter {
       return;
     }
 
+    // GROUPED BY SUBJECT, EXACTLY AS THE EDITOR GROUPS IT (5.27).
+    //
+    // THE RULE STATED BELOW APPLIES TO THE WORDS AS MUCH AS TO THE BEHAVIOUR:
+    // "One command knowing something its neighbour does not is the drift that
+    // keeps costing a release." This list and the editor's are the same options
+    // from the same models, and until now this one drew them flat while the
+    // editor drew headings over them. Both read `SECTION_CATEGORIES`, so
+    // neither can grow its own idea of the order or its own spelling of a
+    // heading.
+    //
+    // THE SORT MAKES THE HEADINGS, not the modal — `DetailedChoice.group` draws
+    // one where the value changes and never sorts.
+    const byCategory = [...options].sort(
+      (a, b) => categoryRank(a.category) - categoryRank(b.category)
+    );
+    const grouped = new Set(byCategory.map((s) => s.category)).size > 1;
+
     // KEEPS ASKING AT ONE, for a different reason from the tracker remover:
     // this is not destructive, but the section IS what the reader asked for
     // rather than bookkeeping around it. Taking the last remaining option would
     // write a block into their note without ever naming it. See modals.ts::only.
     const chosen = await promptDetailedSuggester(
       this.app,
-      options.map((s) => ({
+      byCategory.map((s) => ({
         value: s.id,
         label: `${s.icon} ${s.label}`,
         description: s.blurb,
+        ...(grouped ? { group: categoryLabel(s.category) } : {}),
       })),
       `Add a section to this ${noun}…`
     );

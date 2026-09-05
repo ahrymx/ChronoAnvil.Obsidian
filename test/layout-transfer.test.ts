@@ -89,6 +89,29 @@ describe("what crosses", () => {
     ]);
   });
 
+  it("keeps a page widget and its argument, on the tracker's argument", () => {
+    // 5.26: a journal template can carry a page widget now, so a layout can
+    // name one. Its argument is a folder path, a journal id or a kind id —
+    // something this module holds a `JournalType` and no vault to resolve — so
+    // it travels the way `tracker` does: carried and left for the reader to
+    // look at. Dropping it turns a `tasks-table` the reader scoped into a
+    // vault-wide one, which looks right and is not.
+    const type = cooking();
+    const { layout, dropped } = resolveLayoutFor(
+      {
+        sections: ["banner", "w:tasks-table#1"],
+        options: { "w:tasks-table#1": { arg: "03 - Journals/Study" } },
+      },
+      type,
+      ctxFor(type)
+    );
+    expect(layout.sections).toEqual(["banner", "w:tasks-table#1"]);
+    expect(layout.options?.["w:tasks-table#1"]).toEqual({
+      arg: "03 - Journals/Study",
+    });
+    expect(dropped).toEqual([]);
+  });
+
   it("copies rather than sharing, so the source cannot be edited through it", () => {
     // A COPY AND NOT A REFERENCE is the design, and a shared array would make
     // it one by accident — editing the new journal's shelves would rewrite the

@@ -89,10 +89,12 @@ import {
   graphLinksSection,
 } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
+import { fenceBlock, sectionOf } from "../core/sections";
+import type { QuestionEnv } from "../core/sections";
 import type { VaultLists } from "../core/widget-registry";
 import { WIDGET_FORM, formQuestion } from "../core/section-model";
 import type { SectionModel } from "../core/section-model";
-import { FRAME_KEYWORD, HEADER_KEYWORD } from "../core/directive-grammar";
+import { HEADER_KEYWORD } from "../core/directive-grammar";
 
 const probe = (text: string, re: RegExp): number => text.search(re);
 
@@ -186,11 +188,12 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
   // navigation row in the banner would be the second answer on one page that
   // the whole release is about removing.
   bannerSection(),
-  {
+  sectionOf({
     id: "today",
     label: "Today",
     blurb: "The greeting, today's numbers, the month grid and what's coming up.",
     icon: "📆",
+    category: "diary",
     // LOCKED, on `home-sections`' argument for the same widget: a page about
     // the diary with no way into the diary is worse than no page at all. It is
     // also the only section here carrying navigation — the card's destination
@@ -201,23 +204,18 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // collapsible bar every other section on this page has. See the header
     // note: standing bare, it was the one block here that could not be folded
     // and did not look like its siblings.
-    render: (opts) => ({
-      fence: "chronoanvil",
-      lines: [
-        ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
-        `diary:${DASHBOARD_AGENDA}`,
-      ],
-    }),
-    questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
-    locate: (text) => probe(text, /^diary\b/m),
-  },
-  {
+    title: "frame: section",
+    lines: [`diary:${DASHBOARD_AGENDA}`],
+    anchor: /^diary\b/m,
+  }),
+  sectionOf({
     id: "this-month",
     label: "This month",
     // "banner" LEFT THIS SENTENCE IN 4.19 — see `DIARY_SECTIONS`' summary for
     // the argument. This page's banner is the section at the top of it.
     blurb: "What the month holds, and its date navigator.",
     icon: "📅",
+    category: "diary",
     // `frame: section`, not a `header:` bar — a period summary takes the
     // overview card, and a bar in the same fence would nest that card inside a
     // section surface. The modifier withholds the card and supplies the bar
@@ -234,21 +232,16 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // not meant to, so the section is always "this month", which is what the
     // label promises.
     locked: false,
-    render: (opts) => ({
-      fence: "chronoanvil",
-      lines: [
-        ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
-        "month-summary",
-      ],
-    }),
-    questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
-    locate: (text) => probe(text, /^month-summary\b/m),
-  },
+    title: "frame: section",
+    lines: ["month-summary"],
+    anchor: /^month-summary\b/m,
+  }),
   {
     id: "open-tasks",
     label: "Open tasks",
     blurb: "Still-open ChronoAnvil tasks from every entry under the diary.",
     icon: "⏳",
+    category: "tasks",
     // The tasks live in the entries this aggregates, not here, so removing the
     // section costs nothing but the view — `diary-sections.ts` makes the same
     // call for the same widget.
@@ -260,7 +253,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     locked: false,
     // FIRST CELL OF THE INDEXES ROW — see the note above the catalogue.
     row: INDEXES,
-    questions: (spec) => [
+    questions: (_ctx, spec: QuestionEnv = {}) => [
       {
         kind: "folder",
         key: "folder",
@@ -273,7 +266,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // THE BAR IT COMPOSES IS THE ROW'S, NOT ITS OWN — "Across the diary"
     // rather than "Open tasks", because it is drawn over the tag cloud beside
     // it as well. See the note above the catalogue, which owns this argument.
-    render: (options) => ({
+    render: (_ctx, options) => fenceBlock({
       fence: "chronoanvil",
       lines: [
         ...(options?.form === WIDGET_FORM ? [] : [INDEXES_BAR]),
@@ -287,6 +280,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     label: "Tags",
     blurb: "Every tag under the diary, most-used first, with the notes carrying it.",
     icon: "🏷️",
+    category: "finding",
     // MOVED HERE FROM THE HOMEPAGE (§2.1), where it is one of five sections
     // today and is the one most likely to be unwanted on a page you land on.
     //
@@ -311,7 +305,7 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // is the one about this cell ALONE, and `bar` below is proof the cell has
     // an answer to give: untick Open tasks and this section takes that title,
     // with no way to say it did not want it.
-    questions: (spec) => [
+    questions: (_ctx, spec: QuestionEnv = {}) => [
       {
         kind: "folder",
         key: "folder",
@@ -324,16 +318,17 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // ITS OWN TITLE BACK IF `open-tasks` IS NOT THERE — see `soloBar`. That
     // section opens this row with `INDEXES_BAR` and is freely removable.
     bar: TAGS_BAR,
-    render: () => ({ fence: "chronoanvil", lines: ["tag-index"] }),
+    render: () => fenceBlock({ fence: "chronoanvil", lines: ["tag-index"] }),
     // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who repoints the cloud
     // at their own folder still has a section the editor can find.
     locate: (text) => probe(text, /^tag-index\b/m),
   },
-  {
+  sectionOf({
     id: "on-this-day",
     label: "On this day",
     blurb: "This date in previous years, holding its space even when empty.",
     icon: "🕘",
+    category: "diary",
     // SHIPPED HERE, WHERE THE HOMEPAGE ONLY OFFERS IT. 3.13 §11 took it off the
     // homepage because "the homepage is the only note in the vault that is
     // about NOW" — and that reasoning survives this release intact. It is also
@@ -349,21 +344,16 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // changed is which page COMPOSES it, and that page is this one.
     locked: false,
     row: LOOKING_BACK,
-    render: (options) => ({
-      fence: "chronoanvil",
-      lines: [
-        ...(options?.form === WIDGET_FORM ? [] : [LOOKING_BACK_BAR]),
-        "on-this-day:always",
-      ],
-    }),
-    questions: () => [formQuestion(LOOKING_BACK_BAR, HEADER_KEYWORD)],
-    locate: (text) => probe(text, /^on-this-day\b/m),
-  },
-  {
+    title: LOOKING_BACK_BAR,
+    lines: ["on-this-day:always"],
+    anchor: /^on-this-day\b/m,
+  }),
+  sectionOf({
     id: "sleep",
     label: "Sleep",
     blurb: "Nights logged, average sleep, and the typical bedtime and wake-up.",
     icon: "😴",
+    category: "trackers",
     // ── COMPOSED SOMEWHERE, AT LAST (4.70) ───────────────────────────────
     //
     // `sleep-summary` shipped in 3.2, survived 3.11's retirement review by name
@@ -402,23 +392,24 @@ export const DIARY_DASHBOARD_SECTIONS: FlatSection[] = [
     // section's own bar, and nothing is anchored into this one. In the row the
     // editor draws it ticked and disabled; the answer is about the cell left
     // standing alone, which `bar` is the other half of.
-    questions: () => [formQuestion(SLEEP_BAR, HEADER_KEYWORD)],
     bar: SLEEP_BAR,
-    render: () => ({ fence: "chronoanvil", lines: ["sleep-summary"] }),
-    locate: (text) => probe(text, /^sleep-summary\b/m),
-  },
+    asks: true,
+    lines: ["sleep-summary"],
+    anchor: /^sleep-summary\b/m,
+  }),
   {
     id: "charts",
     label: "Trends and statistics",
     blurb: "The charts manager for the diary.",
     icon: "📊",
+    category: "trackers",
     // NOT LOCKED, AND NOT FREELY REMOVABLE EITHER — the one section here where
     // those are different answers, exactly as on the homepage and on the four
     // period dashboards. A reader who wants no charts should be able to say so;
     // a reader with nine configured must not lose them to an untick.
     locked: false,
     holds: (text) => chartLinesIn(text),
-    render: () => ({
+    render: () => fenceBlock({
       fence: "chronoanvil-charts",
       lines: [`${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`],
     }),

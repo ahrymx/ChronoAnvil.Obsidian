@@ -6,6 +6,7 @@
 // LICENSING.md.
 
 import { describe, it, expect } from "vitest";
+import { soleFence } from "../src/core/sections";
 import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -127,7 +128,7 @@ describe("the two flat notes, where they overlap", () => {
     // homepage is not an absence — it is a third of the top row left blank.
     // Both notes reserve the space, so both explain it.
     const home = HOME_SECTIONS.find((s) => s.id === "on-this-day");
-    expect(home?.render().lines).toContain("on-this-day:always");
+    expect(soleFence(home!.render()).lines).toContain("on-this-day:always");
     expect(search()).toContain("on-this-day:always");
   });
 

@@ -16,6 +16,7 @@
 // editor's.
 
 import { describe, expect, it } from "vitest";
+import { soleFence } from "../src/core/sections";
 import {
   composeDiaryDashboard,
   applyDiarySections,
@@ -224,12 +225,12 @@ describe("a section cannot be reordered across the rule", () => {
   it("declares the two bands as data rather than leaving them to the editor", () => {
     // ONE SECTION ABOVE THE RULE AS OF 4.19, where there were two composing into
     // one fence. The band is still declared as data; there is simply less data.
-    const own = ENTRY_SECTIONS.filter((s) => s.fence === "own").map((s) => s.id);
+    const own = ENTRY_SECTIONS.filter((s) => s.band === "own").map((s) => s.id);
     expect(own).toEqual(["banner"]);
     // AND A THIRD BAND ABOVE THE RULE AS OF 4.20 — the grid, which left the
     // banner's fence so the banner could be the file's name, its navigation and
     // its cog and nothing else.
-    expect(ENTRY_SECTIONS.filter((s) => s.fence === "trackers").map((s) => s.id))
+    expect(ENTRY_SECTIONS.filter((s) => s.band === "trackers").map((s) => s.id))
       .toEqual(["trackers"]);
     // The locked set and the structural set are the same set, which is §4's
     // rule stated twice and agreeing: a section that owns a region owns the
@@ -237,7 +238,7 @@ describe("a section cannot be reordered across the rule", () => {
     // The locked set is the STRUCTURAL set — everything above the rule — which
     // is two fences as of 4.20 rather than one.
     expect(ENTRY_SECTIONS.filter((s) => s.locked).map((s) => s.id)).toEqual(
-      ENTRY_SECTIONS.filter((s) => s.fence !== "shared").map((s) => s.id)
+      ENTRY_SECTIONS.filter((s) => s.band !== "shared").map((s) => s.id)
     );
   });
 });
@@ -637,9 +638,9 @@ describe("every section has a token to draw a row with", () => {
     // the row's token is that bar's own emoji, so the list and the note agree.
     for (const grain of DASH_GRAINS) {
       for (const s of sectionsForDashboard({ grain })) {
-        const header = s
-          .render({ grain })
-          .lines.find((l) => l.startsWith("header:"));
+        const header = soleFence(s.render({ grain })).lines.find((l) =>
+          l.startsWith("header:")
+        );
         if (!header) continue;
         expect(header, `${grain}/${s.id}`).toContain(s.icon);
       }

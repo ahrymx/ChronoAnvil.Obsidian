@@ -144,8 +144,10 @@ import {
   bannerSection,
 } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
+import { fenceBlock, sectionOf } from "../core/sections";
+import type { QuestionEnv } from "../core/sections";
 import type { VaultLists } from "../core/widget-registry";
-import { FRAME_KEYWORD, HEADER_KEYWORD } from "../core/directive-grammar";
+import { HEADER_KEYWORD } from "../core/directive-grammar";
 import { WIDGET_FORM, formQuestion, type SectionModel } from "../core/section-model";
 import { DEFAULT_TALLY_TRACKER } from "./journal-sections";
 import { statsBandProbe } from "./stats-band";
@@ -230,23 +232,18 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
     // additive and matches by `locate`, so no journal dashboard already in a
     // vault is reordered by this; it is the shape a page composed from today
     // opens with.
-    {
+    sectionOf({
       id: "contents",
       label: "Contents",
       blurb: `Every ${topLevel.noun.toLowerCase()} in ${type.name}, and what is inside it.`,
       icon: "🗂️",
+      category: "journals",
       // LOCKED, on the argument the journals dashboard makes for its own main
       // section: a page about a journal with no way into the journal is worse
       // than no page at all. Here the section IS the page.
       locked: true,
-      render: (opts) => ({
-        fence: "chronoanvil",
-        lines: [
-          ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
-          `level-cards:${type.id}`,
-        ],
-      }),
-      questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
+      title: "frame: section",
+      lines: [`level-cards:${type.id}`],
       // EITHER SPELLING, AND THE SECOND ONE IS NOT SPECULATIVE (4.16 §1's rule,
       // reused). 4.36.0 composed `level-index` here — the table — and 4.36.1
       // composes `level-cards`, which is the same question in a card
@@ -261,14 +258,15 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // a table is a coherent thing to prefer on a journal with forty subjects
       // and this section is the one place a reader cannot untick. Swapping is a
       // one-word edit they can make and undo.
-      locate: (text) => probe(text, /^level-(?:index|cards)\b/m),
-    },
+      anchor: /^level-(?:index|cards)\b/m,
+    }),
 
-    {
+    sectionOf({
       id: "stats",
       label: "Stats band",
       blurb: `A row of numbers about ${type.name} — you pick each one.`,
       icon: "🔢",
+      category: "trackers",
       locked: false,
       // ── IT WAS `totals`, AND IT IS THE SAME SECTION (4.46) ────────────
       //
@@ -333,25 +331,20 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // framed fence titles itself from `SECTION_TITLES`, which has named this
       // keyword "🔢 Stats" since the 4.46 merge. A `header:` bar would be a
       // second name for the same widget, kept in a second place.
-      render: (opts) => ({
-        fence: "chronoanvil",
-        lines: [
-          ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
-          "stats-band",
-        ],
-      }),
-      questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
+      title: "frame: section",
+      lines: ["stats-band"],
       // ALL THREE SPELLINGS. A page composed before 4.46 that a reader had ticked
       // Totals onto carries `journal-totals`, and a locator that knew only the
       // new word would call the section missing and offer to add a second band.
-      locate: (text) => probe(text, statsBandProbe()),
-    },
+      anchor: statsBandProbe(),
+    }),
 
-    {
+    sectionOf({
       id: "activity",
       label: "Activity",
       blurb: `What has been happening in ${type.name}, over the last twelve months.`,
       icon: "🔥",
+      category: "journals",
       // NAMED, BECAUSE THE BAND UNIONS EVERY JOURNAL WHEN IT IS NOT. That is
       // `journals-header`'s documented scope — "every registered journal's root
       // folder, unioned" — and on a page about ONE journal every number in it
@@ -365,40 +358,33 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // card. The band is not an overview card, but it is a band with its own
       // ground, and `SECTION_TITLES` has named it "🔥 Activity" since 4.15 §1.
       locked: false,
-      render: (opts) => ({
-        fence: "chronoanvil",
-        lines: [
-          ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
-          `journals-header:${type.id}`,
-        ],
-      }),
-      questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
-      locate: (text) => probe(text, /^journals-header\b/m),
-    },
+      title: "frame: section",
+      lines: [`journals-header:${type.id}`],
+      anchor: /^journals-header\b/m,
+    }),
 
-    {
+    sectionOf({
       id: "tally",
       label: "Tally",
       blurb: `How many ${plural(topLevel.noun).toLowerCase()} sit at each value of a tracker.`,
       icon: "🔢",
+      category: "journals",
       locked: false,
       optIn: true,
       // `status` FOR 4.35'S REASON, WHICH IS THE ONLY ONE AVAILABLE: it is the
       // single id every journal is guaranteed to define, unified across every
       // journal and every note type in `constants.ts`, and the only select this
       // catalogue can name without reading a registry it cannot see.
-      render: () => ({
-        fence: "chronoanvil",
-        lines: [`journal-tally:${DEFAULT_TALLY_TRACKER}`],
-      }),
-      locate: (text) => probe(text, /^journal-tally:/m),
-    },
+      lines: [`journal-tally:${DEFAULT_TALLY_TRACKER}`],
+      anchor: /^journal-tally:/m,
+    }),
 
     {
       id: "recent",
       label: "Recent notes",
       blurb: `The notes you wrote most recently in ${type.name}, newest first.`,
       icon: "🕒",
+      category: "finding",
       // ── THE THING A JOURNAL DASHBOARD COULD NOT SAY ─────────────────
       //
       // This page counted (`journals-header`), grouped (`level-cards`) and
@@ -418,7 +404,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // is `review`'s sentence below, and it is the same rule.
       locked: false,
       row: LATELY_ROW,
-      questions: (spec) => [
+      questions: (_ctx, spec: QuestionEnv = {}) => [
         formQuestion(LATELY_BAR, HEADER_KEYWORD),
         {
           kind: "folder",
@@ -428,7 +414,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
           hostFolder: spec.hostFolder ?? null,
         },
       ],
-      render: (opts) => ({
+      render: (_ctx, opts) => fenceBlock({
         fence: "chronoanvil",
         lines: [
           ...(opts?.form === WIDGET_FORM ? [] : [LATELY_BAR]),
@@ -443,6 +429,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       label: "Open tasks",
       blurb: `Still-open ChronoAnvil tasks from every note in ${type.name}.`,
       icon: "⏳",
+      category: "tasks",
       // The tasks live in the notes this aggregates, not here, so removing the
       // section costs nothing but the view — every other catalogue makes the
       // same call for this widget.
@@ -453,7 +440,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // length and the registry entry repeats it. Bare is the journal root,
       // which is the whole of what this page wants.
       locked: false,
-      questions: (spec) => [
+      questions: (_ctx, spec: QuestionEnv = {}) => [
         {
           kind: "folder",
           key: "folder",
@@ -499,7 +486,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // section composes `LATELY_BAR` for the band and is freely removable, so
       // without this the table is a box of rows with nothing above it.
       bar: OPEN_TASKS_BAR,
-      render: () => ({ fence: "chronoanvil", lines: ["tasks-table"] }),
+      render: () => fenceBlock({ fence: "chronoanvil", lines: ["tasks-table"] }),
       locate: (text) => probe(text, /^tasks-table\b/m),
     },
 
@@ -508,6 +495,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       label: "Review",
       blurb: `What is due for recall across ${type.name}, soonest first.`,
       icon: "🔁",
+      category: "tasks",
       locked: false,
       optIn: true,
       // OFFERED RATHER THAN COMPOSED, and the reason is not the one Totals has.
@@ -520,7 +508,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // NO `all` KEYWORD OFFERED, unlike the journals dashboard's copy: this
       // page is about one journal, and a control offering "every journal" here
       // would silently widen a page whose every other section is scoped to it.
-      questions: (spec) => [
+      questions: (_ctx, spec: QuestionEnv = {}) => [
         formQuestion("header:🔁 Review"),
         {
           kind: "folder",
@@ -530,7 +518,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
           hostFolder: spec.hostFolder ?? null,
         },
       ],
-      render: (opts) => ({
+      render: (_ctx, opts) => fenceBlock({
         fence: "chronoanvil",
         lines: [
           ...(opts?.form === WIDGET_FORM ? [] : ["header:🔁 Review"]),
@@ -545,12 +533,13 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       label: "Tags",
       blurb: `Every tag on the notes in ${type.name}, most-used first.`,
       icon: "🏷️",
+      category: "finding",
       locked: false,
       // OFFERED, because the journals dashboard already carries a `tag-index`
       // over the whole journals root. A per-journal cloud is a refinement of
       // something a reader already has rather than a thing they are missing.
       optIn: true,
-      questions: (spec) => [
+      questions: (_ctx, spec: QuestionEnv = {}) => [
         {
           kind: "folder",
           key: "folder",
@@ -559,7 +548,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
           hostFolder: spec.hostFolder ?? null,
         },
       ],
-      render: () => ({
+      render: () => fenceBlock({
         fence: "chronoanvil",
         lines: ["header:🏷️ Tags", "tag-index"],
       }),
@@ -573,6 +562,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       label: "Trends and statistics",
       blurb: `Tracker charts over the whole of ${type.name}.`,
       icon: "📊",
+      category: "trackers",
       locked: false,
       // OFFERED RATHER THAN COMPOSED, unlike every other dashboard in the
       // plugin, and the difference is which fence this is. The four diary pages
@@ -606,7 +596,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // one layer up. The `## ` comes off because a `header:` argument is a
       // title, not a markdown heading — the same `replace` every other
       // catalogue's chart section makes.
-      render: () => ({
+      render: () => fenceBlock({
         fence: JOURNAL_CHARTS_FENCE.slice(3),
         lines: [`${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`],
       }),

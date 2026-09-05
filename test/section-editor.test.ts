@@ -32,6 +32,12 @@ import {
   composeEntryTemplate,
   entrySectionModel,
 } from "../src/diary/entry-sections";
+import {
+  composeHomeNote,
+  homeSectionModel,
+} from "../src/diary/home-sections";
+import { DEFAULT_PATHS } from "../src/core/constants";
+import { SECTION_CATEGORIES, categoryRank } from "../src/core/sections";
 import { idsOf } from "../src/core/section-model";
 import type { SectionModel, SectionWant } from "../src/core/section-model";
 
@@ -725,14 +731,61 @@ describe("the editor carries the defence the add command left it (3.13 §9.1)", 
     expect(src).toContain('q.hostFolder ? q.hostFolder : "the vault root"');
   });
 
-  it("keeps the page's own sections above the widgets", () => {
-    // 4.12 §C's argument, carried across the control change: a flat list of
-    // twenty-eight buries the two the page was designed around under an
-    // alphabet of things it merely permits. The order is the caller's and the
-    // modal never sorts, so the partition survives as a heading over a run.
-    expect(src).toContain("[...own, ...widgets]");
-    expect(src).toContain('? "Widgets"');
-    expect(src).toContain(': "Sections"');
+  it("groups the add list by subject rather than by kind", () => {
+    // 4.12 §C's argument survives — a flat list of twenty-eight buries the two
+    // the page was designed around under an alphabet of things it merely
+    // permits — but its CUT does not. "Sections" above "Widgets" sorted by a
+    // toggle: `formQuestion` flips a section between the two forms on the page,
+    // and every one of the 32 `WIDGETS` entries carries a `SECTION_TITLES`
+    // heading, so the second heading stood over two dozen rows that are all
+    // sections. 5.27 replaces it with the seven subjects.
+    expect(src).toContain("categoryRank(a.category) - categoryRank(b.category)");
+    expect(src).toContain("group: categoryLabel(s.category)");
+    // AND THE OLD CUT IS GONE RATHER THAN RENAMED. Each of these is asserted
+    // separately: matching only the partition let a mutant leave the literal
+    // headings behind, which is where a reader would still see them.
+    //
+    // AGAINST `readCode` AND NOT `src`, because the comment above `renderAdd`
+    // QUOTES the headings it replaced — that is the record of why they went,
+    // and a sweep that could not tell a quotation from a live string would
+    // force the argument to be deleted to satisfy the test.
+    const code = readCode("section-editor");
+    expect(code).not.toContain("[...own, ...widgets]");
+    expect(code).not.toContain('"Widgets"');
+    expect(code).not.toContain('"Sections"');
+    // THE `w:logbook` CLAUSE WENT WITH IT. It only ever existed to put logbook
+    // cards on the correct side of a two-way split.
+    expect(code).not.toContain('startsWith("w:logbook")');
+    // THE WINDOW NOW LEARNS NOTHING ABOUT IDS. `widget-sections.ts` argued at
+    // length that the id test was the smallest departure from `SectionView`'s
+    // discipline available; the subject on the view is what made it avoidable,
+    // so the import going is the substance of the change rather than tidying.
+    expect(code).not.toContain("isPageWidgetId");
+    expect(code).not.toContain('from "../core/widget-sections"');
+  });
+
+  it("sorts before it groups, because the modal never does", () => {
+    // `DetailedChoice.group` draws a heading where the value CHANGES and never
+    // sorts — modals.ts says so and 4.16's bug was exactly this. So a category
+    // that appears twice in the caller's array draws its heading twice, and the
+    // sort in `renderAdd` is the whole mechanism rather than a nicety.
+    //
+    // PINNED ON THE REAL LIST, not on the source: the homepage is the longest
+    // one this plugin has — thirty-odd rows once the widget tail is on it — and
+    // it is the surface the split was invented for. The text is passed because
+    // `sections()` with none lists no widgets (5.26).
+    const root = DEFAULT_PATHS.diaryRoot;
+    const views = homeSectionModel(root).sections(composeHomeNote(root));
+    const ranked = [...views]
+      .sort((a, b) => categoryRank(a.category) - categoryRank(b.category))
+      .map((s) => s.category);
+    const runs = ranked.filter((c, i) => i === 0 || ranked[i - 1] !== c);
+    expect(new Set(runs).size).toBe(runs.length);
+    // And the order is the table's, not the alphabet's — "Writing" before
+    // "Diary" is a choice, and a sort that lost it would still be contiguous.
+    expect(runs).toEqual(
+      SECTION_CATEGORIES.map((c) => c.id).filter((id) => runs.includes(id))
+    );
   });
 });
 

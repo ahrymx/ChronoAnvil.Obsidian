@@ -2304,15 +2304,15 @@ export class JournalEditModal extends SteppedEditorModal {
       const row = list.createDiv({ cls: "ca-wizard-check" });
       const box = row.createEl("input", { type: "checkbox" });
       this.renderMoveArrows(row, active, section.id);
-      box.checked = picked.has(section.id) || !!section.required;
-      box.disabled = !!section.required;
+      box.checked = picked.has(section.id) || !!section.locked;
+      box.disabled = !!section.locked;
       const text = row.createDiv({ cls: "ca-wizard-check-text" });
       text.createDiv({
         cls: "ca-wizard-check-label",
         text: `${section.icon} ${section.label}`,
       });
       text.createDiv({ cls: "ca-wizard-check-blurb", text: section.blurb });
-      if (section.required) {
+      if (section.locked) {
         text
           .createDiv({ cls: "ca-wizard-check-blurb" })
           .setText("Always included — it carries the title and tracker grid.");
@@ -2377,8 +2377,8 @@ export class JournalEditModal extends SteppedEditorModal {
           // Required sections lead, whatever the catalogue rank arithmetic
           // says — see renderMoveArrows for why the banner cannot be second.
           now.sort((a, b) => {
-            const ra = byId.get(a)?.required ? 0 : 1;
-            const rb = byId.get(b)?.required ? 0 : 1;
+            const ra = byId.get(a)?.locked ? 0 : 1;
+            const rb = byId.get(b)?.locked ? 0 : 1;
             return ra - rb;
           });
         } else if (!box.checked && at !== -1) {
@@ -2520,8 +2520,8 @@ export class JournalEditModal extends SteppedEditorModal {
     // cross it. Expressed by clamping the reachable range rather than by
     // refusing the move afterwards, so a control that cannot act is disabled
     // rather than misleading (3.2 §4).
-    const pinned = ids.filter((x) => byId.get(x)?.required).length;
-    const locked = !!byId.get(id)?.required;
+    const pinned = ids.filter((x) => byId.get(x)?.locked).length;
+    const locked = !!byId.get(id)?.locked;
     const wrap = row.createDiv({ cls: "ca-wizard-arrows" });
     const arrow = (dir: -1 | 1, glyph: string, name: string): void => {
       const b = wrap.createEl("button", {
@@ -2572,7 +2572,7 @@ export class JournalEditModal extends SteppedEditorModal {
     // Same order as the rows, which is the whole point of the preview: it is
     // the arrangement being chosen, not the catalogue's.
     const shown = this.displayOrder(target).filter(
-      (s) => chosen.has(s.id) || s.required
+      (s) => chosen.has(s.id) || s.locked
     );
     for (const s of shown) {
       const block = stack.createDiv({ cls: "ca-wizard-block" });

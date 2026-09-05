@@ -87,9 +87,24 @@ import {
   flatBlocks,
   graphLinksSection,
   regroupFlatNote,
-  rowDelimiter,
 } from "../core/note-sections";
 import type { FlatSection } from "../core/note-sections";
+import { isPageWidgetId } from "../core/widget-sections";
+import {
+  addOps,
+  bindSection,
+  foreignOp,
+  insertionPoint,
+  isBlank,
+  joinRowChunk,
+  isFillerRun,
+  moveOpsFor,
+  permuteChunks,
+  plannedWrites,
+  regionSpans,
+  viewOf,
+} from "../core/sections";
+import type { Chunk, SectionRun } from "../core/sections";
 import {
   JournalSection,
   SectionContext,
@@ -117,7 +132,6 @@ import {
   MODIFIER_KEYWORDS,
   ROW_KEYWORD,
   cutFromFence,
-  dropSoloBar,
   insertBar,
   isHeaderLine,
   leadingBar,
@@ -134,7 +148,6 @@ import {
   SectionWant,
   describeAnswers,
   idsOf,
-  moveOps,
   optionsFor,
   reconfigured,
   answersInText,
@@ -147,22 +160,12 @@ import {
 //
 // `sectionId` is null for a run the catalogue did not write: the reader's own
 // prose, a hand-added fence, frontmatter. Those are reported and never moved.
-export interface SectionRun {
-  // The section this run belongs to, or the FIRST of them where a row fence
-  // holds several — 4.70. Kept beside `sectionIds` rather than replaced by it
-  // because every consumer that asks "whose block is this" wants one answer,
-  // and for every run but a row it is the only one there is.
-  sectionId: string | null;
-  // Every section in this run, in file order. Empty for a run that is nobody's.
-  sectionIds: string[];
-  // Index into the segment list, inclusive.
-  from: number;
-  to: number;
-  // Blank separators and frontmatter: structure rather than content. See the
-  // note in parseSections for why these are not reported as the reader's own
-  // blocks.
-  filler: boolean;
-}
+// MOVED TO `core/sections.ts` IN 5.23, and re-exported here so no caller
+// changed — the move `SectionOp` made in 3.0, for the same reason. Three
+// surfaces had a run type agreeing about `sectionIds` and `filler`; this was
+// the widest of them, and what it gained in the move is the optional `lineOf`
+// the two `locate`-based parsers record.
+export type { SectionRun };
 
 // ── operations ────────────────────────────────────────────────────────
 
@@ -218,24 +221,15 @@ const OPAQUE_FENCE_KINDS = new Set(["chronoanvil-charts", "chronoanvil-journal-c
 // whole-file indexOf, so it need not be adjacent to anything; here it only has
 // to be findable, which is weaker.
 function regionsIn(lines: string[]): Map<string, number> {
+  // THE SPAN COMES FROM `regionSpans` (5.23) and the COUNT is worked out over
+  // it. This walk and `parseEntry`'s were the same scan for the same marker
+  // wanting two different answers; the span is the one that answers both.
   const out = new Map<string, number>();
-  let key: string | null = null;
-  let count = 0;
-  for (const line of lines) {
-    if (key === null) {
-      const m = line.match(/^<!--chronoanvil:([A-Za-z0-9_-]+)\s*$/);
-      if (m) {
-        key = m[1];
-        count = 0;
-      }
-      continue;
-    }
-    if (line.trim() === "-->") {
-      out.set(key, count);
-      key = null;
-      continue;
-    }
-    if (line.trim() !== "") count++;
+  for (const [key, at] of regionSpans(lines)) {
+    out.set(
+      key,
+      lines.slice(at.from + 1, at.to).filter((l) => l.trim() !== "").length
+    );
   }
   return out;
 }
@@ -392,7 +386,7 @@ function ownerOf(seg: Segment, sigs: Signature[]): JournalSection | null {
 // `ownerOf` applies: a fence the catalogue cannot fully account for is the
 // reader's, and half-attributing it is how a reconciler cuts a line it did not
 // write.
-function ownersOf(seg: Segment, sigs: Signature[]): JournalSection[] {
+function ownersBySignature(seg: Segment, sigs: Signature[]): JournalSection[] {
   const one = ownerOf(seg, sigs);
   if (one) return [one];
   if (seg.kind !== "fence") return [];
@@ -420,9 +414,6 @@ function ownersOf(seg: Segment, sigs: Signature[]): JournalSection[] {
   }
   return out.length > 1 ? out : [];
 }
-
-const isBlank = (lines: string[]): boolean =>
-  lines.every((l) => l.trim() === "");
 
 // Split a raw segment where a frontmatter block or region comment is followed
 // by other content (such as the prose skeleton or another region), so that
@@ -510,6 +501,26 @@ export function splitRawSegments(segs: readonly Segment[]): Segment[] {
 // present iff its own fence is present. Its regions are attributed to it when
 // they follow; a region the reader moved elsewhere keeps its content either
 // way, because nothing in this module deletes one.
+//
+// ── WHY THIS IS NOT `parseSectionRuns` (5.23) ────────────────────────────
+//
+// The two diary surfaces' parsers merged into one walk in `core/sections.ts`,
+// and this one did not join them. Two differences, either of which is enough:
+//
+//   IT ATTRIBUTES BY SIGNATURE, NOT BY PROBE. `ownersBySignature` deals a
+//   fence's keyword list against section signatures, longest first, all or
+//   nothing. The shared walk asks each section to find ITSELF with `locate` and
+//   tallies repeating widgets as it goes — a question this catalogue does not
+//   ask, having no repeating sections.
+//
+//   A RUN HERE IS MANY SEGMENTS. The loop below absorbs the region segments
+//   that follow a fence, so `from` and `to` differ; the shared walk maps one
+//   segment to one run.
+//
+// Parameterising one function with an `owners` callback, an `absorb` callback
+// and two flags would put two implementations behind one name. What IS shared
+// is the run TYPE, `isBlank`, `isFillerRun` and `regionSpans` — the pieces that
+// were genuinely the same text.
 export function parseSections(text: string, ctx: SectionContext): SectionRun[] {
   const segs = splitRawSegments(segment(text.split("\n")));
   const { fences, regionOwners } = signaturesFor(ctx);
@@ -518,7 +529,7 @@ export function parseSections(text: string, ctx: SectionContext): SectionRun[] {
   let i = 0;
   while (i < segs.length) {
     const seg = segs[i];
-    const owners = ownersOf(seg, fences);
+    const owners = ownersBySignature(seg, fences);
     const owner =
       owners[0] ?? markdownOwnerOf(seg, ctx, sectionsFor(ctx)) ?? null;
 
@@ -537,15 +548,13 @@ export function parseSections(text: string, ctx: SectionContext): SectionRun[] {
         // which sits on line 0 of the body with no blank line above it and is
         // therefore in the same raw segment. That is fine: banner is
         // `required` and never removable, so nothing ever needs to splice it.
+        // NO SPACER CLAUSE, unlike the two diary surfaces, and it is not an
+        // omission: a journal template's `chronoanvil:spacer` sits on line 0 of
+        // the body with no blank line above it, so it arrives inside the
+        // frontmatter run and the `---` clause already covers it.
         filler:
-          isBlank(seg.lines) ||
           (i === 0 && seg.lines[0]?.trim() === "---") ||
-          seg.lines.every(
-            (l) =>
-              l.trim() === "" ||
-              l.trim().startsWith("%%") ||
-              l.trim().startsWith("[[")
-          ),
+          isFillerRun(seg.lines),
       });
       i++;
       continue;
@@ -949,7 +958,7 @@ export function planSections(
         kind: "keep",
         sectionId: section.id,
         label: section.label,
-        detail: section.required
+        detail: section.locked
           ? "required — cannot be removed"
           : "written as ordinary markdown — delete it by hand",
       });
@@ -1030,19 +1039,9 @@ export function planSections(
   // Additions, in the order the reader asked for them rather than in
   // catalogue order: `want` is an ordered list now, and a plan that renamed
   // its own input would be describing a different request.
-  const adding: string[] = [];
-  for (const id of want) {
-    if (present.has(id)) continue;
-    const section = byId.get(id);
-    if (!section) continue;
-    adding.push(id);
-    ops.push({
-      kind: "add",
-      sectionId: id,
-      label: section.label,
-      detail: describeAdd(section),
-    });
-  }
+  const added = addOps(want, (id) => present.has(id), byId, describeAdd);
+  const adding = added.adding;
+  ops.push(...added.ops);
 
   // Moves, worked out from what the order will be once the adds and removes
   // have happened.
@@ -1052,34 +1051,34 @@ export function planSections(
   // plan that named all of those would say "moves Charts, Path, Resources"
   // when the reader dragged Review. What actually moved is what is not in the
   // longest run that kept its relative order.
-  const surviving = runs
-    .flatMap((r) => r.sectionIds)
-    .filter((id) => want.includes(id));
-  const target = want.filter(
-    (id) => surviving.includes(id) || adding.includes(id)
+  // Through the shared helper as of 3.0, and through the shared PASS as of
+  // 5.24. The computation is unchanged — the minimal set via a longest common
+  // subsequence, so dragging one section does not report the three it shifted
+  // past — and it is shared because the diary catalogues need the same answer
+  // to the same question. The alternative was the diary importing this planner,
+  // which would drag `JournalType` and the whole journal catalogue into a
+  // module about diary entries.
+  //
+  // NO BANDS ON THIS SURFACE, so the partition `moveOpsFor` performs for a
+  // dashboard is one pass over everything here.
+  ops.push(
+    ...moveOpsFor(
+      runs.flatMap((r) => r.sectionIds),
+      want,
+      adding,
+      byId
+    )
   );
-  // Through the shared helper as of 3.0. The computation is unchanged — the
-  // minimal set via a longest common subsequence, so dragging one section does
-  // not report the three it shifted past — and it is shared because the diary
-  // catalogues need the same answer to the same question. The alternative was
-  // the diary importing this planner, which would drag `JournalType` and the
-  // whole journal catalogue into a module about diary entries.
-  ops.push(...moveOps(surviving, target, (id) => byId.get(id)?.label));
 
   // Anything the catalogue did not write, counted rather than named: the
   // reader knows what their own blocks are, and the useful fact is that the
   // plan is not going to touch them.
-  const foreign = runs.filter((r) => !r.sectionIds.length && !r.filler).length;
-  if (foreign) {
-    ops.push({
-      kind: "foreign",
-      sectionId: null,
-      label: "—",
-      detail: `${foreign} block${
-        foreign === 1 ? "" : "s"
-      } in this file aren't the catalogue's; left alone`,
-    });
-  }
+  const foreign = foreignOp(
+    runs.filter((r) => !r.sectionIds.length && !r.filler).length,
+    "block",
+    "in this file"
+  );
+  if (foreign) ops.push(foreign);
 
   return ops;
 }
@@ -1192,55 +1191,30 @@ export function applySections(
 ): string | null {
   const want = idsOf(requested);
   const ops = planSections(text, ctx, requested);
-  const removing = new Set(
-    ops
-      .filter((o) => o.kind === "remove")
-      .map((o) => o.sectionId)
-      .filter((id): id is string => id !== null)
-  );
-  const adding = ops
-    .filter((o) => o.kind === "add")
-    .map((o) => o.sectionId)
-    .filter((id): id is string => id !== null);
-  const moving = ops.some((o) => o.kind === "move");
-  const rewriting = new Set(
-    ops
-      .filter((o) => o.kind === "reconfigure")
-      .map((o) => o.sectionId)
-      .filter((id): id is string => id !== null)
-  );
-  // A reconfigure may ALSO be short of a part (see planSections), so extending
-  // is asked of both kinds rather than read off the op name.
-  const extending = new Set(
-    ops
-      .filter((o) => o.kind === "extend" || o.kind === "reconfigure")
-      .map((o) => o.sectionId)
-      .filter((id): id is string => id !== null)
-  );
-  if (
-    !removing.size &&
-    !adding.length &&
-    !moving &&
-    !rewriting.size &&
-    !ops.some((o) => o.kind === "extend")
-  ) {
-    return null;
-  }
+  const { removing, adding, moving, rewriting, extending: short, any } =
+    plannedWrites(ops);
+  if (!any) return null;
+  // A reconfigure may ALSO be short of a part (see `planSections`), so what the
+  // part-filler is asked about is BOTH kinds rather than the op name alone.
+  // Only this surface has parts, which is why the widening is here and not in
+  // `plannedWrites` — where it would tell the other three that every rewrite is
+  // also an extension.
+  const extending = new Set([...short, ...rewriting]);
 
   const segs = splitRawSegments(segment(text.split("\n")));
   const runs = parseSections(text, ctx);
   const byId = new Map(sectionsFor(ctx).map((s) => [s.id, s]));
 
-  interface Chunk {
-    // Every section in this chunk, in file order — a list as of 4.70 for the
-    // same reason `SectionRun` grew one: a row fence is two sections in one
-    // block, and a chunk is what a block becomes on the way out.
-    ids: string[];
+  // `Chunk`'s two fields — `ids`, in file order because a row fence is two
+  // sections in one block, and `lines` — plus the one this surface adds. A
+  // journal template's runs absorb the region segments that follow a fence, so
+  // the writer has to know which of its chunks are filler; no other catalogue
+  // produces one.
+  interface RawChunk extends Chunk {
     filler: boolean;
-    lines: string[];
   }
 
-  const chunks: Chunk[] = [];
+  const chunks: RawChunk[] = [];
   for (let ri = 0; ri < runs.length; ri++) {
     const run = runs[ri];
     const lines: string[] = [];
@@ -1414,7 +1388,22 @@ export function applySections(
     // where it does: remove a section, put it back, get the file you started
     // with. The ordinary add path composes a BLOCK, and a cut cell came out of
     // a fence somebody else is still in.
-    if (joinRowChunk(chunks, section, ctx, byId, order, requested)) continue;
+    if (
+      joinRowChunk(
+        chunks,
+        section,
+        ctx,
+        byId,
+        order,
+        renderOptionsFor(section, ctx, requested),
+        // THE OVERRIDES THE LAYOUT DECLARES, for the member ahead of the
+        // arrival — asked so its keywords are the ones it would actually
+        // compose. No other catalogue has per-section overrides to render with.
+        (id) => sectionOverrides(ctx, id)
+      )
+    ) {
+      continue;
+    }
     // AND A CELL THAT COULD NOT REJOIN ONE IS COMPOSING A BLOCK OF ITS OWN, so
     // it takes the title a block of its own needs. `soloBar`'s third door, and
     // the one a reader reaches by ticking Open tasks onto a page whose Review
@@ -1440,159 +1429,16 @@ export function applySections(
   //
   // Blank separators keep their positions for the same reason — they are
   // filler, so permuting them would be reformatting a file to no end.
-  if (moving) {
-    const slots: number[] = [];
-    for (let i = 0; i < chunks.length; i++) {
-      if (chunks[i].ids.length) slots.push(i);
-    }
-    // The order the reader asked for, restricted to what is actually present,
-    // then anything present that `want` does not mention appended in the order
-    // it already had. The second half matters: a section the reader never
-    // touched must not be dropped because it was not in the list.
-    const occupants = slots.map((i) => chunks[i].ids[0]);
-    const desired = [
-      ...want.filter((id) => occupants.includes(id)),
-      ...occupants.filter((id) => !want.includes(id)),
-    ];
-    const byIdChunk = new Map(slots.map((i) => [chunks[i].ids[0], chunks[i]]));
-    slots.forEach((slot, n) => {
-      const wanted = byIdChunk.get(desired[n]);
-      if (wanted) chunks[slot] = wanted;
-    });
-  }
+  // The order the reader asked for, restricted to what is actually present,
+  // then anything present that `want` does not mention appended in the order it
+  // already had — `desiredOrder`, which this function spelled out inline until
+  // 5.24 and which `section-model.ts` has exported since 3.0. The second half
+  // matters: a section the reader never touched must not be dropped because it
+  // was not in the list.
+  if (moving) permuteChunks(chunks, want);
 
   const next = chunks.flatMap((c) => c.lines).join("\n");
   return next === text ? null : next;
-}
-
-// ── A CELL REJOINING THE ROW IT LEFT (4.70) ──────────────────────────────
-//
-// The third copy of this rule and the last, after the diary dashboards and the
-// flat notes: a section that declares a row looks for that row's fence before it
-// composes a block of its own, and puts its line back inside it. See
-// `diary-sections.ts` for the argument in full — this differs only in that a
-// journal section renders a LIST of blocks, so a section that is not a lone
-// fence has nothing a cell line could hold and is turned away at the top.
-//
-// FALSE FOR "NOT MY ROW", which includes the ordinary case of a row whose other
-// cells are not on this surface at all: there is nothing to join, and a block of
-// its own is exactly right.
-function joinRowChunk(
-  chunks: { ids: string[]; filler: boolean; lines: string[] }[],
-  section: JournalSection,
-  ctx: SectionContext,
-  byId: Map<string, JournalSection>,
-  order: string[],
-  requested: readonly SectionWant[]
-): boolean {
-  const row = rowOf(section, ctx);
-  if (!row) return false;
-  const opts = renderOptionsFor(section, ctx, requested);
-  const blocks = section.render(ctx, opts);
-  if (blocks.length !== 1 || blocks[0].kind !== "fence") return false;
-  const mine = blocks[0];
-
-  const at = chunks.findIndex(
-    (c) => c.ids.length > 0 && c.ids.every((id) => {
-      const other = byId.get(id);
-      return other !== undefined && rowOf(other, ctx) === row;
-    })
-  );
-  if (at < 0) return false;
-
-  const chunk = chunks[at];
-  const rank = order.indexOf(section.id);
-  const later = chunk.ids.find((id) => order.indexOf(id) > rank);
-  const laterKeywords = later
-    ? new Set(
-        (byId.get(later)?.render(ctx, sectionOverrides(ctx, later)) ?? [])
-          .flatMap((b) => (b.kind === "fence" ? b.lines : []))
-          .map((l) => splitDirective(l).keyword)
-      )
-    : null;
-
-  // AND THE SOLO BAR COMES BACK OFF — `dropSoloBar`, `soloBar`'s inverse. The
-  // cut gave the survivor a title when it was left alone in the fence; the cell
-  // arriving beside it composes the band's again, so the borrowed one goes and
-  // remove-then-re-add restores the file byte for byte.
-  const lines = chunk.ids.reduce((out, id) => {
-    const member = byId.get(id);
-    return member ? dropSoloBar(out, soloBarOf(member, ctx)) : out;
-  }, chunk.lines as readonly string[]).slice();
-  let insertAt = lines.length;
-  for (let n = lines.length - 1; n >= 0; n--) {
-    if (lines[n].trim() === "```") {
-      insertAt = n;
-      break;
-    }
-  }
-  if (laterKeywords) {
-    const found = lines.findIndex((l) =>
-      laterKeywords.has(splitDirective(l.trim()).keyword)
-    );
-    if (found >= 0) insertAt = found;
-  }
-  // The `row` line comes back with the cell, because the cut took it when the
-  // fence fell to one widget.
-  if (!lines.some((l) => l.trim() === ROW_KEYWORD)) {
-    const open = lines.findIndex((l) => l.trim().startsWith("```"));
-    if (open < 0) return false;
-    lines.splice(open + 1, 0, ROW_KEYWORD);
-    if (insertAt > open) insertAt++;
-  }
-  // ── AND THE DELIMITER, WHICH THIS RECONCILER OWED THE OTHER ONE (5.18) ─
-  //
-  // `rowDelimiter` is the flat-note reconciler's rule, hoisted so both ask it
-  // once. It arrived here because 5.18 gives this catalogue a TABBED row — the
-  // tracker grid paged against the stats band — and a cell spliced in with no
-  // delimiter is welded onto the one above it: re-adding Stats from the section
-  // editor would have produced one page holding both widgets, which is neither
-  // the shape composition writes nor a shape a reader asked for.
-  //
-  // THE ROW'S MEMBERS ARE ASKED OF THE CONTEXT, because `row` here is a
-  // predicate rather than a constant — the same call `joinRowChunk` already
-  // makes above to find the chunk.
-  const before = chunk.ids.filter((id) => order.indexOf(id) < rank);
-  const prevId = before.length ? before[before.length - 1] : undefined;
-  const memberOf = (id: string | undefined): JournalSection | undefined =>
-    id === undefined ? undefined : byId.get(id);
-  const arrival = rowDelimiter({
-    lines,
-    insertAt,
-    member: section,
-    // An id in the chunk is a member; `?? {}` keeps "there is a cell above me"
-    // true for one the map cannot resolve rather than turning it into "I
-    // arrive first", which is a different branch with a different answer.
-    prev: prevId === undefined ? undefined : (memberOf(prevId) ?? {}),
-    later: later === undefined ? undefined : (memberOf(later) ?? {}),
-    divided: order.some((id) => {
-      const other = byId.get(id);
-      return (
-        other !== undefined &&
-        rowOf(other, ctx) === row &&
-        other.cell !== undefined
-      );
-    }),
-  });
-  insertAt = arrival.insertAt;
-  lines.splice(
-    insertAt,
-    0,
-    ...mine.lines,
-    ...(arrival.delimiter && prevId === undefined ? [arrival.delimiter] : [])
-  );
-  if (arrival.delimiter && prevId !== undefined) {
-    lines.splice(insertAt, 0, arrival.delimiter);
-  }
-
-  chunks[at] = {
-    ids: [...chunk.ids, section.id].sort(
-      (a, b) => order.indexOf(a) - order.indexOf(b)
-    ),
-    filler: false,
-    lines,
-  };
-  return true;
 }
 
 // The lines of a removed section's run that must survive: its non-empty
@@ -1975,24 +1821,6 @@ function tidyBlanks(lines: readonly string[]): string[] {
 //
 // Falls through to the end, which is where "add a section to this note" has
 // always put things.
-function insertionPoint(
-  chunks: { ids: string[] }[],
-  order: string[],
-  id: string
-): number {
-  const rank = order.indexOf(id);
-  let after = -1;
-  for (let i = 0; i < chunks.length; i++) {
-    const k = chunks[i].ids[0];
-    if (!k) continue;
-    const r = order.indexOf(k);
-    if (r === -1) continue;
-    if (r > rank) return after === -1 ? i : after + 1;
-    after = i;
-  }
-  return after === -1 ? chunks.length : after + 1;
-}
-
 // ── the whole-type view ───────────────────────────────────────────────
 
 // Whether a file differs from what the catalogue would compose for the
@@ -2021,11 +1849,21 @@ export function isHandEdited(text: string, ctx: SectionContext): boolean {
 // catalogue directive the replacement drops is not a loss, it is the reload
 // doing what it was asked", carried onto a surface whose fences also hold
 // things the reader wrote.
+//
+// AND AN OPTIONAL OVERRIDE SOURCE (5.26). By default the baseline is composed
+// from the TYPE's stored config, which is the right answer for the reload gate:
+// "what would a refresh write here". `wantFromJournalNote` asks a different
+// question — "which of these lines will the save I am about to make not keep" —
+// and the answer has to be measured against the options that save is storing,
+// or a widget the reader has just configured is reported as a line being
+// dropped at the moment it is being carried.
 export function composedFromPresent(
   text: string,
-  ctx: SectionContext
+  ctx: SectionContext,
+  optionsFor: (id: string) => SectionOverrides | undefined = (id) =>
+    sectionOverrides(ctx, id)
 ): string {
-  return composeFrom(ctx, sectionsPresent(text, ctx));
+  return composeFrom(ctx, sectionsPresent(text, ctx), optionsFor);
 }
 
 // Composed in the order the sections appear IN THE FILE, not in catalogue
@@ -2040,7 +1878,12 @@ function stripFrontmatter(text: string): string {
   return end === -1 ? text : text.slice(end + 5);
 }
 
-function composeFrom(ctx: SectionContext, ids: string[]): string {
+function composeFrom(
+  ctx: SectionContext,
+  ids: string[],
+  optionsFor: (id: string) => SectionOverrides | undefined = (id) =>
+    sectionOverrides(ctx, id)
+): string {
   const byId = new Map(sectionsFor(ctx).map((s) => [s.id, s]));
   // THROUGH `composeSectionRuns`, NOT SECTION BY SECTION (4.70). This mapped
   // each id to its own block and joined them, which was the same thing while
@@ -2057,7 +1900,7 @@ function composeFrom(ctx: SectionContext, ids: string[]): string {
       .map((id) => byId.get(id))
       .filter((s): s is JournalSection => s !== undefined),
     ctx,
-    (s) => sectionOverrides(ctx, s.id)
+    (s) => optionsFor(s.id)
   ).join("\n\n");
   // THE TYPE'S OWN NOTE, NOT THE LEVEL'S NOUN. This read
   // `ctx.type.levels[d].noun` — "Topic", "Lesson" — which is the word a level
@@ -2288,60 +2131,61 @@ function answeredIn(
   return out;
 }
 
-const viewOf = (
+const rowFor = (
   section: JournalSection,
   ctx: SectionContext,
   text?: string
-): SectionView => ({
-  id: section.id,
-  label: section.label,
-  blurb: section.blurb,
-  icon: section.icon,
-  removable: sectionRemovable(section, ctx, sectionOverrides(ctx, section.id)),
-  // EVERY JOURNAL SECTION MOVES. 3.2 §4 pins navigation on the two diary
-  // surfaces and deliberately does not answer the question here: the journal's
-  // `nav` is optional rather than locked, so "it must always be first" and "it
-  // may not be there at all" have to be reconciled before it can be pinned, and
-  // that argument belongs with the patch that moves `nav` into the banner fence
-  // rather than with the one that fixes a required row.
-  movable: true,
+): SectionView => {
   // THROUGH `questionsOf`, so the derived form toggle reaches the row (5.11). A
   // section that declares nothing can still HAVE a question, which is why this
-  // no longer asks whether the catalogue entry has a `questions` field.
-  ...(questionsOf(section, ctx).length
-    ? { questions: questionsOf(section, ctx) }
-    : {}),
-  // WHAT THE FILE ALREADY SAYS, PER QUESTION (4.47), and this catalogue was the
-  // one that never supplied it.
+  // no longer asks whether the catalogue entry has a `questions` field — and
+  // why the shared projection takes the list rather than reading the field.
+  const questions = questionsOf(section, ctx);
+  // THE SHAPE IS `viewOf`'s, IN `core/sections.ts` (5.22). Both policies
+  // this catalogue differs on are handed in:
   //
-  // `note-sections.ts` has set `answered` on flat sections since 4.16, and a
-  // journal note's model did not — which cost nothing while every question here
-  // owned a WHOLE argument, because the editor falls back to reading the file
-  // itself. It stops being free the moment a question owns a PIECE: the fallback
-  // hands every one of four boxes the entire argument, so a band configured
-  // `notes,rating,open` would show that string in all four.
+  //   EVERY JOURNAL SECTION MOVES. 3.2 §4 pins navigation on the two diary
+  //   surfaces and deliberately does not answer the question here: the
+  //   journal's `nav` is optional rather than locked, so "it must always be
+  //   first" and "it may not be there at all" have to be reconciled before it
+  //   can be pinned, and that argument belongs with the patch that moves `nav`
+  //   into the banner fence rather than with the one that fixes a required row.
   //
-  // THROUGH `answersInText`, WHICH ALSO EXPANDS. A superseded keyword and a
-  // shorthand argument both have to be resolved before the pieces are split, and
-  // doing that here rather than in the editor is what keeps the window from
-  // learning what a stats band is.
-  //
-  // AND THROUGH `questionsOf` TOO, WHICH THE FIELD ABOVE ALREADY IS. This read
-  // `section.questions` — the DECLARED field — for one turn after the toggle
-  // became derived, so a section that declares nothing got the question and no
-  // answer to it: the box came up unticked over a fence with no bar, and the
-  // next save wrote the bar back over the reader's choice. `trackers`, `stats`,
-  // `progress` and `tally` are the four that declare nothing; `find`, `review`,
-  // `tasks` and `tags` hid it, because a `folder` question was enough to open
-  // this branch.
-  ...(text !== undefined && questionsOf(section, ctx).length
-    ? { answered: answeredIn(text, section, ctx) }
-    : {}),
-  // ONE BAND. A journal note is a stack of sections with no structural rule
-  // through it, so every section may be reordered against every other. A diary
-  // entry is the one surface where that is not true.
-  group: null,
-});
+  //   ONE BAND. A journal note is a stack of sections with no structural rule
+  //   through it, so every section may be reordered against every other. A
+  //   diary entry is the one surface where that is not true.
+  return viewOf(section, {
+    removable: sectionRemovable(section, ctx, sectionOverrides(ctx, section.id)),
+    movable: true,
+    questions,
+    // WHAT THE FILE ALREADY SAYS, PER QUESTION (4.47), and this catalogue was
+    // the one that never supplied it.
+    //
+    // `note-sections.ts` has set `answered` on flat sections since 4.16, and a
+    // journal note's model did not — which cost nothing while every question
+    // here owned a WHOLE argument, because the editor falls back to reading the
+    // file itself. It stops being free the moment a question owns a PIECE: the
+    // fallback hands every one of four boxes the entire argument, so a band
+    // configured `notes,rating,open` would show that string in all four.
+    //
+    // THROUGH `answersInText`, WHICH ALSO EXPANDS. A superseded keyword and a
+    // shorthand argument both have to be resolved before the pieces are split,
+    // and doing that here rather than in the editor is what keeps the window
+    // from learning what a stats band is.
+    //
+    // AND THROUGH `questionsOf` TOO, WHICH THE FIELD ABOVE ALREADY IS. This
+    // read `section.questions` — the DECLARED field — for one turn after the
+    // toggle became derived, so a section that declares nothing got the
+    // question and no answer to it: the box came up unticked over a fence with
+    // no bar, and the next save wrote the bar back over the reader's choice.
+    // `trackers`, `stats`, `progress` and `tally` are the four that declare
+    // nothing; `find`, `review`, `tasks` and `tags` hid it, because a `folder`
+    // question was enough to open this branch.
+    ...(text !== undefined && questions.length
+      ? { answered: answeredIn(text, section, ctx) }
+      : {}),
+  });
+};
 
 // Why this section cannot be removed from THIS file, or null if it can.
 //
@@ -2356,7 +2200,7 @@ function journalRefusal(
   text: string
 ): string | null {
   if (!sectionRemovable(section, ctx, sectionOverrides(ctx, section.id))) {
-    return section.required
+    return section.locked
       ? "Part of every journal note, so it can't be removed. You can still move it."
       : "Written as ordinary markdown — the plugin cannot tell it from your own prose, so delete it by hand.";
   }
@@ -2408,13 +2252,15 @@ function journalRefusal(
 // reason `rowRuns` is one function: what a `row` line means, where a cell may
 // be cut, and what a group is are decided once.
 //
-// THE TWO THINGS THAT ARE THIS CATALOGUE'S. A journal section renders a LIST of
-// blocks where a flat one renders a fence, so the fence is picked out and a
-// section that emits none — the prose skeleton, which is bracketed markdown —
-// answers with no lines and is in no block. That is the honest answer: it has
-// nothing a `cell` line could delimit, so it is never a column, never joined,
-// and `blocks` simply does not list it. And `locate` takes a context here,
-// which the adapter closes over.
+// THE BINDING ITSELF IS `bindSection` AS OF 5.24 — the argument for it is
+// there, and what is left here is the two answers only this catalogue can give.
+//
+// A journal section renders a LIST of blocks where a flat one renders a fence,
+// so the fence is picked out downstream and a section that emits none — the
+// prose skeleton, which is bracketed markdown — answers with no lines and is in
+// no block. That is the honest answer: it has nothing a `cell` line could
+// delimit, so it is never a column, never joined, and `blocks` simply does not
+// list it.
 //
 // `render` FORWARDS ITS OPTIONS, which is what makes `hasKnownExtent` right:
 // that predicate asks whether a section renders ONE line — in either form — and
@@ -2423,37 +2269,28 @@ function journalRefusal(
 // getting this wrong would take the group controls away from exactly the
 // sections this release exists to give them to.
 //
-// `bar` IS DELIBERATELY LEFT UNANSWERED, and the reasoning is worth keeping
-// because the field looks like it wants `widgetFormBar`. `RowMember.bar` is the
-// title a cell takes BACK — `undoRowOfOne` and the out-path of a break-up hand
-// it to `soloBar`. On this catalogue the only section that can be a cell is one
-// already in the widget form, because `isSectionFence` refuses a self-titling
-// fence as a column; so every id this field would be read for is one whose bar
-// the READER took off. Answering it would put that title back the first time
-// they broke the group up, quietly reversing the toggle they had just used.
-// Leaving it undefined is what makes the form answer survive a round trip
-// through a row, which `test/journal-rows.test.ts` asserts from both ends.
+// `keepBar: false` IS THIS CATALOGUE'S ONE REFUSAL, and the reasoning is worth
+// keeping because the field looks like it wants `widgetFormBar`. `Section.bar`
+// is the title a cell takes BACK — `undoRowOfOne` and the out-path of a
+// break-up hand it to `soloBar`. Here the only section that can be a cell is
+// one already in the widget form, because `isSectionFence` refuses a
+// self-titling fence as a column; so every id this field would be read for is
+// one whose bar the READER took off. Answering it would put that title back the
+// first time they broke the group up, quietly reversing the toggle they had
+// just used. Leaving it undefined is what makes the form answer survive a round
+// trip through a row, which `test/journal-rows.test.ts` asserts from both ends.
 function asFlat(section: JournalSection, ctx: SectionContext): FlatSection {
-  return {
-    id: section.id,
-    label: section.label,
-    blurb: section.blurb,
-    icon: section.icon,
-    locked: Boolean(section.required),
-    render: (opts) => {
-      const merged = {
-        ...sectionOverrides(ctx, section.id),
-        ...((opts as SectionOverrides | undefined) ?? {}),
-      } as SectionOverrides;
-      const block = sectionBlocks(section, ctx, merged).find(
-        (b) => b.kind === "fence"
-      );
-      return block?.kind === "fence"
-        ? { fence: block.info, lines: block.lines }
-        : { fence: "chronoanvil", lines: [] };
-    },
-    locate: (text) => section.locate(text, ctx),
-  };
+  return bindSection(section, ctx, {
+    // THE READER'S CHOICE OVER THE PRESET'S. A layout's `SectionOverrides` is
+    // what the journal TYPE declares about this section; a `SectionChoice` is
+    // what this reader asked for on this note. `bindSection` merges these UNDER
+    // the caller's options, which is that order.
+    defaults: sectionOverrides(ctx, section.id),
+    keepBar: false,
+    // `sectionBlocks`, NOT `render` — the widget form's bar strip, which
+    // `hasKnownExtent` depends on. See `bindSection`.
+    renderWith: (s, c, opts) => sectionBlocks(s as JournalSection, c, opts),
+  });
 }
 
 // This journal surface, as the editor sees it.
@@ -2463,13 +2300,21 @@ export function journalSectionModel(ctx: SectionContext): SectionModel {
   const flats = (): FlatSection[] =>
     sectionsFor(ctx).map((s) => asFlat(s, ctx));
   return {
-    sections: (text) => sectionsFor(ctx).map((s) => viewOf(s, ctx, text)),
+    // NO TEXT MEANS NO WIDGETS — `flatNoteModel`'s rule, and the entry model's
+    // (5.26). A caller with no note in hand is asking what this SURFACE is,
+    // and the page-widget tail is what a note here could be GIVEN. Every
+    // caller in the UI passes the text; `template-editor.ts` is the one that
+    // does not, and it asks for one catalogue row by id.
+    sections: (text) =>
+      sectionsFor(ctx)
+        .filter((s) => text !== undefined || !isPageWidgetId(s.id))
+        .map((s) => rowFor(s, ctx, text)),
     present: (text) => sectionsPresent(text, ctx),
     addable: (text) => {
       const present = new Set(sectionsPresent(text, ctx));
       return sectionsFor(ctx)
         .filter((s) => !present.has(s.id))
-        .map((s) => viewOf(s, ctx));
+        .map((s) => rowFor(s, ctx));
     },
     refusal: (id, text) => {
       const s = find(id);

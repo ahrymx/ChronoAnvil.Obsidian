@@ -52,6 +52,7 @@ import {
 } from "../journals/journal-sections";
 import type { SectionContext } from "../journals/journal-sections";
 import { sectionsPresent } from "../journals/journal-plan";
+import { instanceSectionFor } from "./widget-sections";
 import {
   migrateTrends,
   migrateTrendsHeader,
@@ -1249,7 +1250,12 @@ export class Scaffold {
     const want = sectionsPresent(shipped, ctx);
     const gained = want.filter((id) => !have.includes(id));
     const lost = have.filter((id) => !want.includes(id));
-    const label = (id: string): string => findSection(id)?.label ?? id;
+    // THE WIDGET TAIL IS NAMED TOO (5.26). A journal template can carry a page
+    // widget now, so a drift line reading "loses w:tasks-table#1" would be the
+    // one row in this report spelled as an id — and this whole function exists
+    // to turn ids into the words a reader recognises.
+    const label = (id: string): string =>
+      findSection(id)?.label ?? instanceSectionFor(id)?.label ?? id;
 
     const parts: string[] = [];
     if (gained.length) parts.push(`adds ${gained.map(label).join(", ")}`);

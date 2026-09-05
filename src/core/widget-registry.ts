@@ -32,6 +32,11 @@
 // already claims this keyword — is computed by the caller. `note-sections.ts`
 // holds the probe; this file holds the words.
 
+// TYPE-ONLY, WHICH IS WHAT KEEPS THE RULE ABOVE TRUE. `sections.ts` reads this
+// file's types and this file reads one of its; both imports are erased, so the
+// table still depends on nothing at runtime.
+import type { SectionCategory } from "./sections";
+
 // A choice a reader can be offered, in the shape `ChoiceQuestion.values` and
 // `FolderQuestion.keywords` both already use.
 export interface WidgetChoice {
@@ -160,6 +165,31 @@ export type VaultLists = {
   [K in WidgetArgVaultSource]?: readonly WidgetChoice[];
 };
 
+// What a widget needs from the note it is written into.
+//
+// ── WHY THIS IS NOT `NOT_PAGE_WIDGETS` ──────────────────────────────────
+//
+// That table answers "may a page ever hold this", once, for the whole plugin.
+// This answers "may THIS page hold it", and the two questions have different
+// shapes: an exclusion there is a widget no reader can add anywhere, and a
+// need here is a widget most surfaces can offer and some cannot.
+//
+// ── AND WHY IT IS ONE VALUE RATHER THAN A VOCABULARY ────────────────────
+//
+// Because two widgets want it and thirty do not, and every candidate for a
+// second value turned out to be soft on inspection. `week-summary` and its
+// three siblings read the host's period property and fall back to the current
+// one — which `home-sections.ts` argues "is the intent rather than a miss" on
+// the page about now. `stats-band` and `pages-table` scope to the host note's
+// own folder, which every note has. `level-index` refuses without a folder OR a
+// journal, and its argument supplies the second.
+//
+// So the honest membership is the widgets that already REFUSE, plus the one
+// that is worse than a refusal because it writes what it wanted to find. A
+// third value invented ahead of a third widget would be a vocabulary with one
+// producer, which is what `widget-registry.ts` warns against one table down.
+export type WidgetNeed = "period";
+
 // One widget, as a list of widgets needs it.
 export interface WidgetSpec {
   // A NOUN, and this is the one field most easily got wrong. `SECTION_TITLES`
@@ -178,6 +208,17 @@ export interface WidgetSpec {
   // `FlatSection.blurb` in the row. Says what the widget puts on the page, in
   // the reader's words rather than the directive's.
   blurb: string;
+  // WHAT THIS WIDGET IS ABOUT — the heading its row is filed under in the add
+  // list. `widgetSection` forwards it to `Section.category`, so a widget and a
+  // catalogue section on the same subject land under one heading.
+  //
+  // IT DOES NOT MATCH THE BANNER COMMENTS BELOW, and is not meant to. The
+  // banners are this file's reading order — the diary, then the dashboards,
+  // then the journals — and `across the vault` alone spans four subjects. The
+  // order a reader sees is `SECTION_CATEGORIES`'; the order below is the one
+  // that makes the table easy to edit. Trying to make them agree would cost the
+  // second without buying the first.
+  category: SectionCategory;
   // The argument this directive takes, where the window can ask about it.
   arg?: WidgetArg;
   // A SECOND question, answered into the same argument. 4.16.
@@ -218,6 +259,16 @@ export interface WidgetSpec {
   // a piece does not rename the ones it had. A saved layout names those keys.
   args?: readonly WidgetArg[];
   argJoin?: string;
+  // What this widget needs from its host, where a surface that cannot supply it
+  // must not offer the widget at all. Absent — which is thirty of the
+  // thirty-two — means it draws wherever it is written.
+  //
+  // WITHHELD RATHER THAN OFFERED-AND-EXPLAINED, on `pageWidgetKeywords`' own
+  // manners: that function already withholds a keyword the catalogue claims,
+  // silently, because a list of things you can add is not the place to explain
+  // what you cannot. The widget still says so on the page if somebody types the
+  // directive by hand, which is where the sentence belongs.
+  needs?: WidgetNeed;
 }
 
 // ── HOW MANY OF ONE WIDGET A PAGE MAY HOLD: AS MANY AS THE READER WANTS ──
@@ -334,26 +385,31 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "📆",
     blurb:
       "The greeting, today's numbers, the month grid and what is coming up, as one card.",
+    category: "diary",
   },
   "diary-search": {
     label: "Diary search",
     glyph: "🔍",
     blurb: "Full-text search across every diary entry, filters typed into the box.",
+    category: "finding",
   },
   timeline: {
     label: "Entry timeline",
     glyph: "📜",
     blurb: "Every entry, newest first, grouped by the month it was written in.",
+    category: "diary",
   },
   "on-this-day": {
     label: "On this day",
     glyph: "🕘",
     blurb: "This date in earlier years, one group per year that has an entry.",
+    category: "diary",
   },
   events: {
     label: "Events",
     glyph: "🎉",
     blurb: "The special-events manager: every recurring and one-off event, with an Add button.",
+    category: "tasks",
   },
   // THE NEXT FEW, AS A KEYWORD OF ITS OWN — 4.70.
   //
@@ -386,6 +442,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     label: "Upcoming events",
     glyph: "⏭️",
     blurb: "The next few events, each with how long until it — or how far into it you are.",
+    category: "tasks",
     arg: {
       kind: "choice",
       label: "how many to show",
@@ -406,6 +463,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "\u23F1\uFE0F",
     blurb:
       "The week laid against the hours — meetings, logbook items and what is due, each in its own place.",
+    category: "diary",
     // TWO QUESTIONS DIVIDING ONE ARGUMENT (4.62), which is what `args` is for
     // and why the grid did not need a grammar of its own to ask the second one.
     // `time-grid:events|3` is the sources and then the day count, on
@@ -453,6 +511,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "😴",
     blurb:
       "Nights logged, average sleep, typical bedtime and wake-up, across every daily entry.",
+    category: "trackers",
   },
   // ONE TRACKER'S NUMBERS, FOR ANY TRACKER — 4.70.
   //
@@ -478,6 +537,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "📉",
     blurb:
       "One tracker's latest reading, its average and its streak, over a month-long density strip.",
+    category: "trackers",
     // REQUIRED, WITH NO `keywords` AND NO EMPTY STATE, unlike the two vault
     // arguments above it. `journals-header` bare means every journal and
     // `review-queue` takes `all`, because a band over several journals is a
@@ -492,33 +552,48 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     label: "Week summary",
     glyph: "📅",
     blurb: "The seven-day table in a banner card, driven by this note's week-start.",
+    category: "diary",
   },
   "month-summary": {
     label: "Month summary",
     glyph: "🗓️",
     blurb: "The day grid and the year of reviews in a banner card, driven by month-start.",
+    category: "diary",
   },
   "quarter-summary": {
     label: "Quarter summary",
     glyph: "📊",
     blurb: "The quarter's banner over a rollup of the three months it spans.",
+    category: "diary",
   },
   "year-summary": {
     label: "Year summary",
     glyph: "🗓️",
     blurb:
       "The year's statistics band: entries, coverage, longest streak and a twelve-month density strip.",
+    category: "diary",
   },
   "entry-rollup": {
     label: "Entry rollup",
     glyph: "📋",
     blurb:
       "One dated line per day in this period that wrote something worth rolling up, oldest first.",
+    category: "diary",
+    // IT REFUSES, IN ITS OWN WORDS. `buildEntryRollup` draws *"entry-rollup
+    // needs a dashboard period — put it on a note carrying week-start,
+    // month-start, quarter-start or year-start"* and the comment above that
+    // line is the whole argument for this field: *"refusing with a reason beats
+    // falling back to a trailing window: this widget's whole scope is 'the
+    // dashboard's period', and a silent default would draw a plausible,
+    // unrelated set of days"*. Offering it on a page that can only ever draw
+    // that sentence is the add list disagreeing with the widget.
+    needs: "period",
   },
   "period-recap": {
     label: "Period recap",
     glyph: "📝",
     blurb: "Goals, highlights and challenges gathered from the months this period covers.",
+    category: "diary",
     arg: {
       kind: "choice",
       label: "the period to recap",
@@ -536,6 +611,15 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "⏮️",
     blurb:
       "A prev/next pair around a date picker that re-scopes this page to another week, month, quarter or year.",
+    category: "diary",
+    // IT WRITES THE PROPERTY IT WANTED TO FIND, which is worse than a refusal
+    // and is why this one is not a matter of taste. `shiftPeriod` puts
+    // `week-start` into the host note's frontmatter, and `diaryKindOf`
+    // (`diary/diary-index.ts`) decides what a diary note IS by which period
+    // property it carries. A reader who added the navigator to a daily entry
+    // and clicked it once would have reclassified that entry as weekly — the
+    // index would stop finding it as a day, and nothing on screen would say so.
+    needs: "period",
     arg: {
       kind: "choice",
       label: "the period this page steps through",
@@ -558,12 +642,14 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     label: "Journals",
     glyph: "📚",
     blurb: "Every enabled journal, with its notes and where to go next.",
+    category: "journals",
   },
   "journal-card": {
     label: "Journal card",
     glyph: "📓",
     blurb:
       "One journal as a card — its banner, its containers and where to go next. Add as many as you like.",
+    category: "journals",
     // THE FIRST `vault` ARGUMENT, and the first repeating widget. `journals`
     // draws every journal as one card and `journals:cards` draws a grid of all
     // of them; this draws ONE, chosen, so a page can put two side by side or
@@ -583,6 +669,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "🔥",
     blurb:
       "At-a-glance numbers over a 53-week activity strip — every enabled journal at once, or one you name.",
+    category: "journals",
     // POINTABLE AS OF 4.36 §3, because a page about ONE journal was composing
     // this band and getting the whole vault's figures under its name. The band's
     // own note states the scope it has always had — "every registered journal's
@@ -610,6 +697,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "🗂️",
     blurb:
       "What is below this note, as a live table — the folders inside it, or its notes where there are no folders left.",
+    category: "journals",
     // WHAT IT REPLACED SAYS WHY IT IS GENERAL. `topics-table` asked "what topics
     // are under this subject" and was already answering it in every journal's
     // own nouns; what it could not do was be pointed anywhere, or say anything
@@ -658,6 +746,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "🗂️",
     blurb:
       "What is below this note, as cards — one per folder, paired with what is inside it where there is a level below.",
+    category: "journals",
     arg: { kind: "vault", label: "the journal to show", source: "journals" },
     arg2: {
       kind: "folder",
@@ -699,16 +788,19 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     label: "Stats band",
     glyph: "🔢",
     blurb: "A row of numbers about what is below this note — you pick each one.",
+    category: "trackers",
   },
   "pages-table": {
     label: "Pages table",
     glyph: "📄",
     blurb: "The pages beneath this folder, one row each.",
+    category: "journals",
   },
   "review-queue": {
     label: "Review queue",
     glyph: "🔁",
     blurb: "What is due for recall, soonest first.",
+    category: "tasks",
     arg: {
       kind: "folder",
       label: "the folder to review",
@@ -719,6 +811,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     label: "Journal search",
     glyph: "🔎",
     blurb: "Full-text search over journal notes — what did I write about this?",
+    category: "finding",
     arg: {
       kind: "folder",
       label: "the folder to search",
@@ -750,6 +843,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     label: "Recent notes",
     glyph: "🕒",
     blurb: "The notes you wrote most recently, newest first, with where each one lives.",
+    category: "finding",
     args: [
       {
         kind: "folder",
@@ -782,6 +876,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     label: "Open tasks",
     glyph: "⏳",
     blurb: "Every still-open ChronoAnvil task from the notes under a folder, grouped by note.",
+    category: "tasks",
     arg: {
       kind: "folder",
       label: "the folder to collect tasks from",
@@ -806,22 +901,26 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     label: "Tag index",
     glyph: "🏷️",
     blurb: "A table of tags, most-used first, counted under a folder.",
+    category: "finding",
     arg: { kind: "folder", label: "the folder to count tags under" },
   },
   "activity-chart": {
     label: "Activity chart",
     glyph: "📊",
     blurb: "Open and completed tasks bucketed by date, drawn as three month heatmaps.",
+    category: "trackers",
   },
   launcher: {
     label: "Overview navigator",
     glyph: "🧭",
     blurb: "Tiles for the weekly, monthly, quarterly, and yearly overviews.",
+    category: "finding",
   },
   links: {
     label: "Quick links",
     glyph: "🔗",
     blurb: "A row of destination pills.",
+    category: "structure",
   },
 
   // ── the diary's undated layer ───────────────────────────────────────
@@ -830,6 +929,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "🗒️",
     blurb:
       "Standing notes and captured items, filterable by logbook category or status.",
+    category: "finding",
     // AS MANY AS A PAGE WANTS, WHICH IS WHY THE FLAG IS GONE (4.56). This is the
     // entry that showed the old default was wrong: a homepage carrying the work
     // log beside Current focus beside what is scheduled is three `logbook:`

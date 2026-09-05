@@ -48,11 +48,12 @@ import {
   bannerSection,
 } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
+import { fenceBlock, sectionOf } from "../core/sections";
+import type { QuestionEnv } from "../core/sections";
 import { WIDGETS } from "../core/widget-registry";
 import type { VaultLists } from "../core/widget-registry";
-import { widgetLine, widgetQuestions } from "../core/widget-sections";
-import { WIDGET_FORM, SECTION_FORM, formQuestion, type SectionModel } from "../core/section-model";
-import { FRAME_KEYWORD, HEADER_KEYWORD } from "../core/directive-grammar";
+import { SECTION_FORM, formQuestion, type SectionModel } from "../core/section-model";
+import { HEADER_KEYWORD } from "../core/directive-grammar";
 
 const probe = (text: string, re: RegExp): number => text.search(re);
 
@@ -147,7 +148,7 @@ export function homeSections(diaryRoot: string): FlatSection[] {
     s.id === "tags"
       ? {
           ...s,
-          render: () => ({
+          render: () => fenceBlock({
             fence: "chronoanvil",
             lines: [TAGS_BAR, `tag-index:${diaryRoot}`],
           }),
@@ -259,11 +260,12 @@ const HOME_SECTION_DEFS: FlatSection[] = [
   // read from the block that draws its title — see `HOME_CSS_CLASS` for what
   // that replaced and what it did not.
   bannerSection({ wide: true }),
-  {
+  sectionOf({
     id: "diary",
     label: "Diary",
     blurb: "The greeting, today's numbers, the month grid and what's coming up.",
     icon: "📆",
+    category: "diary",
     // UNLOCKED AS OF 4.53, and it was locked from 4.2 until then. The old
     // argument was `links`' one catalogue over: this note has no `links:` row,
     // the diary card's destination pills ARE its time navigation, and a vault
@@ -285,14 +287,9 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     locked: false,
     // The first cell of the top row. 4.2 §2.
     row: HOME_TOP_ROW,
-    render: (options) => ({
-      fence: "chronoanvil",
-      lines: [
-        ...(options?.form === SECTION_FORM ? ["header:📆 Today"] : []),
-        `diary:${HOME_AGENDA}`,
-      ],
-    }),
-    questions: () => [formQuestion("header:📆 Today", HEADER_KEYWORD)],
+    title: "header:📆 Today",
+    form: "widget",
+    lines: [`diary:${HOME_AGENDA}`],
     // THE KEYWORD AND ITS ARGUMENT, AND NOT A LONGER WORD THAT STARTS WITH IT.
     //
     // This was `/^diary\b/m` until 4.12, and `\b` matches at a hyphen — so this
@@ -305,13 +302,14 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // switch extends any of them. `diary` is the one that does — `diary-search`
     // — so it is the one that has to say what follows it. Written as "a colon and
     // whatever it takes, or nothing", which is the grammar `diary:N` has.
-    locate: (text) => probe(text, /^diary(?::.*)?$/m),
-  },
-  {
+    anchor: /^diary(?::.*)?$/m,
+  }),
+  sectionOf({
     id: "launcher",
     label: "Overview navigator",
     blurb: "Tiles for the weekly, monthly, quarterly, and yearly overviews.",
     icon: "🧭",
+    category: "finding",
     locked: false,
     // THE TOP OF THE ASIDE, above the two lists. It is the smallest block on
     // the page and the only one that is about leaving it, so it reads as a
@@ -327,18 +325,19 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // defaults to WIDGET form and composes no `header:` at all, so the top row
     // ships with no band title and a lone launcher is titleless because the
     // page is, not because a section was removed from it.
-    render: () => ({ fence: "chronoanvil", lines: ["launcher"] }),
-    locate: (text) => probe(text, /^launcher\b/m),
-  },
+    lines: ["launcher"],
+    anchor: /^launcher\b/m,
+  }),
   {
     id: "tasks",
     label: "Open tasks",
     blurb: "Every unticked task in the vault, grouped by the note it is in.",
     icon: "⏳",
+    category: "tasks",
     locked: false,
     row: HOME_TOP_ROW,
     cell: HOME_ASIDE,
-    questions: (spec) => [
+    questions: (_ctx, spec: QuestionEnv = {}) => [
       formQuestion("header:⏳ Open tasks", HEADER_KEYWORD),
       {
         kind: "folder",
@@ -349,7 +348,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
         emptyLabel: "the whole vault",
       },
     ],
-    render: (options) => ({
+    render: (_ctx, options) => fenceBlock({
       fence: "chronoanvil",
       lines: [
         ...(options?.form === SECTION_FORM ? ["header:⏳ Open tasks"] : []),
@@ -360,52 +359,41 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },
-  {
+  sectionOf({
     id: "logbook",
     label: WIDGETS.logbook.label,
     blurb: WIDGETS.logbook.blurb,
     icon: WIDGETS.logbook.glyph,
+    category: "finding",
     locked: false,
     row: HOME_TOP_ROW,
     tab: true,
-    render: (options) => ({
-      fence: "chronoanvil",
-      lines: [
-        ...(options?.form === SECTION_FORM ? ["header:🗒️ Logbook"] : []),
-        widgetLine("logbook", options),
-      ],
-    }),
-    questions: () => [
-      formQuestion("header:🗒️ Logbook", HEADER_KEYWORD),
-      ...widgetQuestions("logbook"),
-    ],
-    locate: (text) => probe(text, /^logbook\b/m),
-  },
-  {
+    title: "header:🗒️ Logbook",
+    form: "widget",
+    // THE REGISTRY'S LINE AND THE REGISTRY'S QUESTIONS, named once. `widget`
+    // buys both — see `DeclaredSection`.
+    widget: "logbook",
+    anchor: /^logbook\b/m,
+  }),
+  sectionOf({
     id: "upcoming",
     label: WIDGETS.upcoming.label,
     blurb: WIDGETS.upcoming.blurb,
     icon: WIDGETS.upcoming.glyph,
+    category: "tasks",
     locked: false,
     optIn: true,
-    render: (options) => ({
-      fence: "chronoanvil",
-      lines: [
-        ...(options?.form === SECTION_FORM ? ["header:⏭️ Coming up"] : []),
-        widgetLine("upcoming", options),
-      ],
-    }),
-    questions: () => [
-      formQuestion("header:⏭️ Coming up", HEADER_KEYWORD),
-      ...widgetQuestions("upcoming"),
-    ],
-    locate: (text) => probe(text, /^upcoming\b/m),
-  },
-  {
+    title: "header:⏭️ Coming up",
+    form: "widget",
+    widget: "upcoming",
+    anchor: /^upcoming\b/m,
+  }),
+  sectionOf({
     id: "on-this-day",
     label: "On this day",
     blurb: "This date in previous years, newest first.",
     icon: "🕘",
+    category: "diary",
     // OFFERED, NOT SHIPPED, AS OF 3.13 §11 — and the argument for taking it
     // off the homepage is the argument that used to justify shipping it.
     //
@@ -492,10 +480,10 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // block that draws nothing at all for a year is a worse answer to that than
     // one saying what it is waiting for.
     optIn: true,
-    render: () => ({ fence: "chronoanvil", lines: ["on-this-day:always"] }),
-    locate: (text) => probe(text, /^on-this-day\b/m),
-  },
-  {
+    lines: ["on-this-day:always"],
+    anchor: /^on-this-day\b/m,
+  }),
+  sectionOf({
     id: "time-grid",
     label: "Time grid",
     // THE REGISTRY'S OWN SENTENCE AND GLYPH. The same widget through a second
@@ -503,6 +491,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // widget list reads — one description, in `widget-registry.ts`.
     blurb: WIDGETS["time-grid"].blurb,
     icon: WIDGETS["time-grid"].glyph,
+    category: "diary",
     // Nothing of the reader's is stored here — the meetings, the log items and
     // the tasks live in their own notes, and this is a view onto them.
     locked: false,
@@ -542,36 +531,26 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // repair — stacked, at the composed position, because reconciliation is
     // additive and reorders nothing. That is stated in the changelog because it
     // is what an existing vault will actually see.
-    render: (options) => ({
-      fence: "chronoanvil",
-      lines: [
-        // `WIDGET_FORM`, AS IT HAS BEEN SINCE 4.59. A full-width block above a
-        // full-width `journals:cards` needs the bar to say where one ends; the
-        // one-line rule that strips bars applies to a section that shares a
-        // fence, and this shares none.
-        ...(options?.form === WIDGET_FORM
-          ? []
-          : ["header:⏱️ The week by the hour"]),
-        widgetLine("time-grid", options),
-      ],
-    }),
-    // THE REGISTRY'S QUESTION, ASKED FROM HERE — `time-grid`'s three sources are
-    // declared once and this composes the same directive, so it asks through
-    // `widgetQuestions` rather than re-typing them.
-    questions: () => [
-      formQuestion("header:⏱️ The week by the hour", HEADER_KEYWORD),
-      ...widgetQuestions("time-grid"),
-    ],
+    // THE SECTION FORM BY DEFAULT, AS IT HAS BEEN SINCE 4.59. A full-width block
+    // above a full-width `journals:cards` needs the bar to say where one ends;
+    // the one-line rule that strips bars applies to a section that shares a
+    // fence, and this shares none.
+    title: "header:⏱️ The week by the hour",
+    // THE REGISTRY'S LINE AND ITS QUESTIONS, ASKED FROM HERE — `time-grid`'s
+    // three sources are declared once, and naming the keyword composes the same
+    // directive rather than re-typing it.
+    widget: "time-grid",
     // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who narrows the grid to
     // `time-grid:events` still has a section the editor can find rather than a
     // second one it offers to add.
-    locate: (text) => probe(text, /^time-grid\b/m),
-  },
-  {
+    anchor: /^time-grid\b/m,
+  }),
+  sectionOf({
     id: "journals",
     label: "Journals",
     blurb: "One card per journal, with its numbers.",
     icon: "📚",
+    category: "journals",
     // The counterpart of `diary`, and unlocked as that one now is too: a
     // vault can reasonably have no journals at all — Study is a preset that
     // ships enabled and can be turned off, and custom types are opt-in — so a
@@ -593,27 +572,22 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // opens its dashboard, over four figures about it. `journals` is untouched and
     // still the right answer on a page about journals; the journals dashboard
     // composes it for that reason.
-    render: (options) => ({
-      fence: "chronoanvil",
-      lines: [
-        ...(options?.form === WIDGET_FORM ? [] : ["frame: section"]),
-        "journals:cards",
-      ],
-    }),
-    questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
+    title: "frame: section",
+    lines: ["journals:cards"],
     // MATCHES BOTH SPELLINGS, which is the same shape of locator 4.36 wrote for
     // `level-(index|cards)` and for the same reason: this page is RECONCILED, so
     // a homepage written before this release must be recognised as already having
     // this section rather than having a second one added beside it. `\S*` rather
     // than `(:cards)?` so a reader who wrote a third arrangement by hand is also
     // found — the section is "the journals block", whichever way it is drawn.
-    locate: (text) => probe(text, JOURNALS_DIRECTIVE_LINE),
-  },
+    anchor: JOURNALS_DIRECTIVE_LINE,
+  }),
   {
     id: "charts",
     label: "Trends and statistics",
     blurb: "The charts manager for the whole vault.",
     icon: "📊",
+    category: "trackers",
     // NOT LOCKED, AND NOT FREELY REMOVABLE EITHER — the one section here where
     // those are different answers, exactly as on the dashboards.
     //
@@ -621,7 +595,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // a reader with nine configured must not lose them to an untick.
     locked: false,
     holds: (text) => chartLinesIn(text),
-    render: () => ({
+    render: () => fenceBlock({
       fence: "chronoanvil-charts",
       lines: [`${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`],
     }),
@@ -632,6 +606,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     label: "Tags",
     blurb: "Every tag under the diary, most-used first, with the notes carrying it.",
     icon: "🏷️",
+    category: "finding",
     // The last block on the shipped page and the one most likely to be
     // unwanted, which is the whole argument for cataloguing it: before this it
     // could only be removed by editing markdown, and removing it by hand is
@@ -660,7 +635,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // The folder is filled in by `homeSections` — see there. This default is
     // the bare form and is never the one composed; it exists so the shape of
     // the section is readable here beside its siblings.
-    render: () => ({
+    render: () => fenceBlock({
       fence: "chronoanvil",
       lines: [TAGS_BAR, "tag-index"],
     }),
@@ -668,7 +643,7 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // note by `homeSections` and read back out of it by the section editor;
     // there is still exactly one place it lives, which is the property 3.11 §6
     // chose the note for in the first place.
-    questions: (spec) => [
+    questions: (_ctx, spec: QuestionEnv = {}) => [
       {
         kind: "folder",
         key: "folder",

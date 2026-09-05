@@ -283,7 +283,7 @@ class EntryTemplateModal extends Modal {
 function bandOf(composed: string): string[] {
   const labels: string[] = [];
   for (const section of ENTRY_SECTIONS) {
-    if (section.fence !== "shared") continue;
+    if (section.band !== "shared") continue;
     if (!composed.includes(`:${section.id}`)) continue;
     labels.push(section.label);
   }

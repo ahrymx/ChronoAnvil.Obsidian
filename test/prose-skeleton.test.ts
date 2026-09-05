@@ -175,7 +175,7 @@ describe("what a composed template carries", () => {
 describe("removability is derived, not granted", () => {
   it("allows the skeleton without the derivation being told it exists", () => {
     const headings = findSection("headings")!;
-    expect(headings.required).toBeFalsy();
+    expect(headings.locked).toBeFalsy();
     expect(
       sectionRemovable(headings, lessonCtx, sectionOverrides(lessonCtx, "headings"))
     ).toBe(true);

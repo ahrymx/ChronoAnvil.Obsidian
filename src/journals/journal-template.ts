@@ -47,6 +47,8 @@ import {
 } from "./journal-sections";
 import type { SectionContext, SectionOverrides } from "./journal-sections";
 import { composedFromPresent, sectionsPresent } from "./journal-plan";
+import { answersInText } from "../core/section-model";
+import { isPageWidgetId } from "../core/widget-sections";
 
 
 // What a recompose of this note as `composed` would destroy. Empty means the
@@ -106,8 +108,20 @@ export function journalReloadLoss(
 // The tracker block is excluded because `reloadLoss` check 2 already owns it,
 // and reporting a hand-added tracker twice would make the window's list read as
 // two problems where there is one.
-function fenceContentLoss(text: string, ctx: SectionContext): ReloadLoss[] {
-  const catalogue = new Set(fenceLines(composedFromPresent(text, ctx)));
+function fenceContentLoss(
+  text: string,
+  ctx: SectionContext,
+  // WHAT THE CALLER IS ABOUT TO STORE, WHERE IT HAS ONE (5.26). The reload gate
+  // passes nothing and measures against the type's config, which is what a
+  // refresh would write. "Save as layout…" passes the options it has just read
+  // back off the page, because its question is which of these lines THAT save
+  // will not keep — and a widget whose argument is being carried into the
+  // layout must not be reported as a line being dropped.
+  optionsFor?: (id: string) => SectionOverrides | undefined
+): ReloadLoss[] {
+  const catalogue = new Set(
+    fenceLines(composedFromPresent(text, ctx, optionsFor))
+  );
   const trackers = new Set(trackerBlockLines(text));
   const out: ReloadLoss[] = [];
   for (const line of fenceLines(text)) {
@@ -190,6 +204,26 @@ export function wantFromJournalNote(
       });
     }
 
+    // ── A PAGE WIDGET'S ARGUMENT, READ BACK OFF ITS OWN LINE (5.26) ──
+    //
+    // A widget's argument is the WHOLE of its configuration — a `tasks-table`
+    // scoped to a folder is a different thing on the page from one that is
+    // not — so a layout that stored the id and dropped the answer would give a
+    // reader back a widget they did not arrange. That is the half-persistence
+    // `layout-transfer.ts` refuses to ship, and it is why the two keys
+    // `widgetQuestions` generates are fields on `SectionOverrides`.
+    //
+    // SCOPED TO THE WIDGET TAIL, DELIBERATELY. A catalogue section's folder
+    // answer is not carried here either and was not before this release;
+    // widening the read to every section would change what "Save as layout…"
+    // stores for every existing journal, which is a decision to make on its
+    // own rather than under a door's banner. The gap is real and is written
+    // down here rather than closed in passing.
+    const section = byId.get(id);
+    if (section && isPageWidgetId(id)) {
+      Object.assign(next, answersInText(text, section.questions?.(ctx) ?? []));
+    }
+
     if (Object.keys(next).length) options[id] = next;
   }
 
@@ -198,7 +232,11 @@ export function wantFromJournalNote(
   // and silence is the wrong one". A hand-written directive cannot become a
   // catalogue id, so a save that carried this page into a stored layout has to
   // say which lines it will not carry.
-  const drops = fenceContentLoss(text, ctx).map((l) => l.label);
+  const drops = fenceContentLoss(
+    text,
+    ctx,
+    (id) => options[id] ?? sectionOverrides(ctx, id)
+  ).map((l) => l.label);
 
   return { sections, options, drops };
 }

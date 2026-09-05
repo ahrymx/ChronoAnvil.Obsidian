@@ -21,16 +21,11 @@
 import { composeFlatNote, flatNoteModel, graphLinksSection } from "../core/note-sections";
 import { bannerSection } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
+import { sectionOf } from "../core/sections";
 import type { VaultLists } from "../core/widget-registry";
-import {
-  WIDGET_FORM,
-  formQuestion,
-  type SectionModel,
-} from "../core/section-model";
+import { type SectionModel } from "../core/section-model";
 import { HEADER_PREFIX, LOGBOOK_KEYWORD } from "../core/constants";
 import type { LogbookDef } from "../core/constants";
-
-const probe = (text: string, re: RegExp): number => text.search(re);
 
 // A directive matcher for one logbook.
 //
@@ -52,30 +47,23 @@ const directiveRe = (id: string): RegExp =>
 export function logbookSections(def: LogbookDef): FlatSection[] {
   return [
     bannerSection(),
-    {
+    sectionOf({
       id: LOGBOOK_KEYWORD,
       label: def.name,
       blurb:
         def.blurb ??
         "The items this logbook holds, newest last, each stamped with when it was written.",
       icon: def.icon,
+      category: "finding",
       // LOCKED, on `search-sections.ts`'s argument in its own words: "without
       // it the note stops being what it is instead of losing a feature". A
       // logbook note with no logbook on it is a file with an invisible region
       // in it — the items are still on disk and nothing can see them.
       locked: true,
-      render: (options?: Record<string, unknown>) => ({
-        fence: "chronoanvil",
-        lines: [
-          ...(options?.form === WIDGET_FORM
-            ? []
-            : [`${HEADER_PREFIX}${def.icon} ${def.name}`]),
-          `${LOGBOOK_KEYWORD}:${def.id}`,
-        ],
-      }),
-      questions: () => [formQuestion(`${HEADER_PREFIX}${def.icon} ${def.name}`)],
-      locate: (text) => probe(text, directiveRe(def.id)),
-    },
+      title: `${HEADER_PREFIX}${def.icon} ${def.name}`,
+      lines: [`${LOGBOOK_KEYWORD}:${def.id}`],
+      anchor: directiveRe(def.id),
+    }),
   ];
 }
 
@@ -148,28 +136,23 @@ export function logbooksFolderSections(
 ): FlatSection[] {
   return [
     bannerSection(),
-    ...books.map((def) => ({
-      id: `${LOGBOOK_KEYWORD}-${def.id}`,
-      label: def.name,
-      blurb: def.blurb ?? `The ${def.name} logbook, on the page about all of them.`,
-      icon: def.icon,
-      // UNLOCKED, where the same widget on the logbook's OWN note is locked.
-      // Removing it there empties a note of the only thing it is for; removing
-      // it here is a reader saying which logbooks they want on the index, which
-      // is a customisation and not a breakage.
-      locked: false,
-      render: (options?: Record<string, unknown>) => ({
-        fence: "chronoanvil",
-        lines: [
-          ...(options?.form === WIDGET_FORM
-            ? []
-            : [`${HEADER_PREFIX}${def.icon} ${def.name}`]),
-          `${LOGBOOK_KEYWORD}:${def.id}`,
-        ],
-      }),
-      questions: () => [formQuestion(`${HEADER_PREFIX}${def.icon} ${def.name}`)],
-      locate: (text: string) => probe(text, directiveRe(def.id)),
-    })),
+    ...books.map((def) =>
+      sectionOf({
+        id: `${LOGBOOK_KEYWORD}-${def.id}`,
+        label: def.name,
+        blurb: def.blurb ?? `The ${def.name} logbook, on the page about all of them.`,
+        icon: def.icon,
+        category: "finding",
+        // UNLOCKED, where the same widget on the logbook's OWN note is locked.
+        // Removing it there empties a note of the only thing it is for; removing
+        // it here is a reader saying which logbooks they want on the index, which
+        // is a customisation and not a breakage.
+        locked: false,
+        title: `${HEADER_PREFIX}${def.icon} ${def.name}`,
+        lines: [`${LOGBOOK_KEYWORD}:${def.id}`],
+        anchor: directiveRe(def.id),
+      })
+    ),
   ];
 }
 

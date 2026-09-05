@@ -16,6 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { FlatSection } from "../src/core/note-sections";
+import { fenceBlock } from "../src/core/sections";
 import {
   flatBlocks,
   flatNoteModel,
@@ -32,7 +33,7 @@ const one = (id: string, line: string): FlatSection => ({
   blurb: "",
   icon: "•",
   locked: false,
-  render: () => ({ fence: "chronoanvil", lines: [line] }),
+  render: () => fenceBlock({ fence: "chronoanvil", lines: [line] }),
   locate: (text) => text.split("\n").reduce(
     (at, l, i, all) =>
       at >= 0
@@ -48,7 +49,7 @@ const one = (id: string, line: string): FlatSection => ({
 // guess rather than a fact.
 const two = (id: string, header: string, line: string): FlatSection => ({
   ...one(id, line),
-  render: () => ({ fence: "chronoanvil", lines: [header, line] }),
+  render: () => fenceBlock({ fence: "chronoanvil", lines: [header, line] }),
 });
 
 const CAT: FlatSection[] = [
@@ -794,7 +795,7 @@ describe("a cell that stops being one takes its title back — 5.14", () => {
   // which is the shape every catalogue's barless cell has.
   const opener: FlatSection = {
     ...one("first", "alpha"),
-    render: () => ({ fence: "chronoanvil", lines: ["header:📖 The band", "alpha"] }),
+    render: () => fenceBlock({ fence: "chronoanvil", lines: ["header:📖 The band", "alpha"] }),
   };
   const cell: FlatSection = { ...one("second", "beta"), bar: "header:⏳ Beta" };
   const cat = [opener, cell];
@@ -926,7 +927,7 @@ describe("whether the group draws a head — 5.21", () => {
   // is the group's own.
   const opener: FlatSection = {
     ...one("first", "alpha"),
-    render: (opts) => ({
+    render: (_ctx, opts) => fenceBlock({
       fence: "chronoanvil",
       lines: [
         ...(opts?.form === "widget" ? [] : ["header:📖 The band"]),

@@ -563,7 +563,7 @@ export function composeTemplate(
       // wizard cannot untick the banner, but this function is also the one item
       // 4 and any future caller reach, and a note with no banner is the defect
       // 2.28 shipped to end.
-      .filter((s) => ids.has(s.id) || s.required),
+      .filter((s) => ids.has(s.id) || s.locked),
     ctx,
     (s) => layout?.options?.[s.id]
   ).filter(Boolean);

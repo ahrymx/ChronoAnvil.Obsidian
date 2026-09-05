@@ -23,6 +23,7 @@
 // of its own at the bottom.
 
 import { describe, expect, it } from "vitest";
+import { soleFence } from "../src/core/sections";
 import {
   DIARY_DASHBOARD_SECTIONS,
   composeDiaryDashboardNote,
@@ -205,7 +206,7 @@ describe("both catalogues are data, which is the point", () => {
           // top row has no such cell — every one of its members defaults to
           // WIDGET form — and a lone cell there is titleless because the page
           // is, which `soloBar` deliberately does not change.
-          if (!isHeaderLine(opener.render().lines[0] ?? "")) continue;
+          if (!isHeaderLine(soleFence(opener.render()).lines[0] ?? "")) continue;
           const survivor = rest[0];
           expect(survivor.bar, `${row}/${survivor.id}`).toBeTruthy();
 
@@ -216,7 +217,7 @@ describe("both catalogues are data, which is the point", () => {
           expect(out, `${row}: removing ${opener.id} changed nothing`).not.toBeNull();
           const fence = (out as string)
             .split("```")
-            .find((b) => b.includes(survivor.render().lines[0]));
+            .find((b) => b.includes(soleFence(survivor.render()).lines[0]));
           expect(fence, `${row}: ${survivor.id} is gone`).toBeTruthy();
           expect(fence, `${row}/${survivor.id}`).toContain(survivor.bar as string);
         }
@@ -253,7 +254,7 @@ describe("both catalogues are data, which is the point", () => {
           const members = live.filter((s) => s.row === row);
           if (members.length < 2) continue;
           const [opener, ...rest] = members;
-          if (!isHeaderLine(opener.render().lines[0] ?? "")) continue;
+          if (!isHeaderLine(soleFence(opener.render()).lines[0] ?? "")) continue;
           const survivor = rest[0];
           const kept = live.filter((s) => s.id !== opener.id).map((s) => s.id);
           const cut = page.model().apply(page.compose(), kept) as string;
@@ -266,7 +267,7 @@ describe("both catalogues are data, which is the point", () => {
             .plan(stale, kept.map((id) => ({ id })))
             .find((o) => o.sectionId === survivor.id);
 
-          const asks = (survivor.questions?.({ hostFolder: null }) ?? []).some(
+          const asks = (survivor.questions?.(undefined, { hostFolder: null }) ?? []).some(
             (q) => q.kind === "form"
           );
           if (asks) {
@@ -463,7 +464,7 @@ describe("where the pages live, and who agrees about it", () => {
     // is silent, and would look like the widget being broken.
     for (const page of PAGES) {
       for (const s of page.sections) {
-        for (const line of s.render().lines) {
+        for (const line of soleFence(s.render()).lines) {
           const keyword = line.split("|")[0].split(":")[0].trim();
           expect(
             Object.keys(RETIRED_WIDGETS),
@@ -702,7 +703,7 @@ describe("no card sits under a header bar", () => {
   for (const page of PAGES) {
     it(`keeps ${page.name}'s cards out of titled fences`, () => {
       for (const s of page.sections) {
-        const { lines } = s.render();
+        const { lines } = soleFence(s.render());
         const keywords = lines.map(keywordOf);
         const card = keywords.find((k) => CARD_DRAWING.includes(k));
         if (!card) continue;
@@ -760,11 +761,11 @@ describe("no card sits under a header bar", () => {
       const composed = page.sections.filter((x) => !x.optIn);
       const titledRows = new Set(
         composed
-          .filter((s) => s.row && s.render().lines.some((l) => /^header:/.test(l)))
+          .filter((s) => s.row && soleFence(s.render()).lines.some((l) => /^header:/.test(l)))
           .map((s) => s.row as string)
       );
       for (const s of composed) {
-        const { fence, lines } = s.render();
+        const { fence, lines } = soleFence(s.render());
         // The chart fence carries its header INSIDE itself — the charts
         // processor reads it and makes the whole section self-titled.
         if (fence !== "chronoanvil") continue;
@@ -1095,7 +1096,7 @@ describe("the widget form of a dashboard section — 5.14", () => {
     if (!offered) continue;
     it(`is offered on ${page.name} exactly where nothing is anchored into the bar`, () => {
       const asks = (s: FlatSection): boolean =>
-        (s.questions?.({ hostFolder: null }) ?? []).some((q) => q.kind === "form");
+        (s.questions?.(undefined, { hostFolder: null }) ?? []).some((q) => q.kind === "form");
       const ids = page.sections.map((s) => s.id);
       // The table is the whole catalogue, so a section added to the page
       // without an entry here fails rather than being swept past.
@@ -1115,7 +1116,7 @@ describe("the widget form of a dashboard section — 5.14", () => {
       // one exactly when the cell rejoins a row.
       for (const s of page.sections) {
         if (!offered.includes(s.id)) continue;
-        const form = (s.questions?.({ hostFolder: null }) ?? []).find(
+        const form = (s.questions?.(undefined, { hostFolder: null }) ?? []).find(
           (q) => q.kind === "form"
         );
         const bar = (form as { bar?: string } | undefined)?.bar;
@@ -1136,8 +1137,8 @@ describe("the widget form of a dashboard section — 5.14", () => {
       for (const s of page.sections) {
         if (!offered.includes(s.id)) continue;
         const oneLine =
-          s.render().lines.length === 1 ||
-          s.render({ form: "widget" }).lines.length === 1;
+          soleFence(s.render()).lines.length === 1 ||
+          soleFence(s.render(undefined, { form: "widget" })).lines.length === 1;
         expect(oneLine, `${page.name}/${s.id}`).toBe(true);
       }
     });

@@ -29,10 +29,9 @@
 import { composeFlatNote, flatNoteModel, graphLinksSection } from "../core/note-sections";
 import { bannerSection } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
+import { sectionOf } from "../core/sections";
 import type { VaultLists } from "../core/widget-registry";
-import { WIDGET_FORM, formQuestion, type SectionModel } from "../core/section-model";
-
-const probe = (text: string, re: RegExp): number => text.search(re);
+import { type SectionModel } from "../core/section-model";
 
 // ── 4.70 LOOKED AT THIS PAGE FOR A ROW AND DID NOT FIND ONE ──────────────
 //
@@ -69,31 +68,36 @@ export const SEARCH_SECTIONS: FlatSection[] = [
   // navigation, and which the editor could not show as a nav row because it was
   // not one. The page rendered two strips and reported one section.
   bannerSection(),
-  {
+  sectionOf({
     id: "search",
     label: "Search the diary",
     blurb: "Full-text search over everything you have written, with filters.",
     icon: "🔎",
+    category: "finding",
     // LOCKED. The note is named Search, it is the target of the ribbon entry
     // and of the "Search the diary" command, and a Search note with no search
     // box is a broken link rather than a customisation. `entry-header`'s
     // argument exactly: without it the note stops being what it is instead of
     // losing a feature.
     locked: true,
-    render: () => ({
-      fence: "chronoanvil",
-      // THE NAVIGATION ROW LEFT THIS FENCE IN 4.19 and is the banner's now. What
-      // stays is what this section is actually about: a titled bar and the
-      // search box under it.
-      lines: ["header:🔎 Search the diary", "diary-search"],
-    }),
-    locate: (text) => probe(text, /^diary-search\b/m),
-  },
-  {
+    // THE NAVIGATION ROW LEFT THIS FENCE IN 4.19 and is the banner's now. What
+    // stays is what this section is actually about: a titled bar and the search
+    // box under it.
+    //
+    // NO TOGGLE. This section is the note's reason to exist and its title says
+    // so; a reader who wanted the box without the words has the same block with
+    // one line fewer, which is not a form worth offering.
+    title: "header:🔎 Search the diary",
+    asks: false,
+    lines: ["diary-search"],
+    anchor: /^diary-search\b/m,
+  }),
+  sectionOf({
     id: "on-this-day",
     label: "On this day",
     blurb: "This date in previous years, holding its space even when empty.",
     icon: "🕘",
+    category: "diary",
     locked: false,
     // `:always`, WHERE THE HOMEPAGE'S COPY IS BARE, and the difference is the
     // reason these are two catalogue entries rather than one section carrying
@@ -108,32 +112,26 @@ export const SEARCH_SECTIONS: FlatSection[] = [
     // can give — which journal kind a bridge pulls — and this is not one of
     // those. It is two notes each having an opinion, and a catalogue is where
     // a note's opinions go.
-    render: (opts) => ({
-      fence: "chronoanvil",
-      lines: [
-        ...(opts?.form === WIDGET_FORM ? [] : ["header:🕘 On this day"]),
-        "on-this-day:always",
-      ],
-    }),
-    questions: () => [formQuestion("header:🕘 On this day")],
-    locate: (text) => probe(text, /^on-this-day\b/m),
-  },
-  {
+    title: "header:🕘 On this day",
+    lines: ["on-this-day:always"],
+    anchor: /^on-this-day\b/m,
+  }),
+  sectionOf({
     id: "timeline",
     label: "All entries",
     blurb: "Every entry, newest first, grouped by month.",
     icon: "📜",
+    category: "diary",
     // Freely removable. It is what the "All Entries" link opens, so removing
     // it leaves that link pointing at a note without the thing it names — but
     // that is a consequence a reader can see and undo, not a broken vault, and
     // the same is true of every unlocked section in every catalogue.
     locked: false,
-    render: () => ({
-      fence: "chronoanvil",
-      lines: ["header:📜 All entries", "timeline"],
-    }),
-    locate: (text) => probe(text, /^timeline\b/m),
-  },
+    title: "header:📜 All entries",
+    asks: false,
+    lines: ["timeline"],
+    anchor: /^timeline\b/m,
+  }),
 ];
 
 const SPEC: FlatNoteSpec = {

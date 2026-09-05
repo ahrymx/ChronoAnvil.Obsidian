@@ -27,6 +27,7 @@ import {
   PAGE_TITLE_LINE,
 } from "../src/core/note-sections";
 import type { FlatSection } from "../src/core/note-sections";
+import { fenceBlock, soleFence } from "../src/core/sections";
 import {
   SEARCH_SECTIONS,
   composeSearchNote,
@@ -214,7 +215,7 @@ describe("what the homepage composes to", () => {
       icon: "🔹",
       locked: false,
       ...(row ? { row } : {}),
-      render: () => ({ fence: "chronoanvil", lines: [line] }),
+      render: () => fenceBlock({ fence: "chronoanvil", lines: [line] }),
       locate: (t) => t.search(new RegExp(`^${line}\\b`, "m")),
     });
     const note = composeFlatNote([
@@ -240,7 +241,7 @@ describe("what the homepage composes to", () => {
       locked: false,
       row: "r",
       ...(name ? { cell: name } : {}),
-      render: () => ({ fence: "chronoanvil", lines: [line] }),
+      render: () => fenceBlock({ fence: "chronoanvil", lines: [line] }),
       locate: (t) => t.search(new RegExp(`^${line}\\b`, "m")),
     });
     const note = composeFlatNote([
@@ -271,7 +272,7 @@ describe("what the homepage composes to", () => {
         icon: "🅰️",
         locked: false,
         row: "r",
-        render: () => ({ fence: "chronoanvil", lines: ["diary"] }),
+        render: () => fenceBlock({ fence: "chronoanvil", lines: ["diary"] }),
         locate: (t) => t.search(/^diary\b/m),
       },
       {
@@ -281,7 +282,7 @@ describe("what the homepage composes to", () => {
         icon: "🅱️",
         locked: false,
         row: "r",
-        render: () => ({ fence: "chronoanvil-charts", lines: ["chart:Mood"] }),
+        render: () => fenceBlock({ fence: "chronoanvil-charts", lines: ["chart:Mood"] }),
         locate: (t) => t.search(/^chart:/m),
       },
     ];
@@ -310,7 +311,7 @@ describe("what the homepage composes to", () => {
         icon: "🅰️",
         locked: false,
         row: "r",
-        render: () => ({ fence: "chronoanvil", lines: ["diary"] }),
+        render: () => fenceBlock({ fence: "chronoanvil", lines: ["diary"] }),
         locate: (t) => t.search(/^diary\b/m),
       },
     ];
@@ -328,7 +329,7 @@ describe("what the homepage composes to", () => {
         icon: "🅱️",
         locked: false,
         row: "r",
-        render: () => ({ fence: "chronoanvil", lines: ["launcher"] }),
+        render: () => fenceBlock({ fence: "chronoanvil", lines: ["launcher"] }),
         locate: (t) => t.search(/^launcher\b/m),
       },
     ];
@@ -352,7 +353,7 @@ describe("what the homepage composes to", () => {
       icon: "🔹",
       locked: false,
       ...(row ? { row } : {}),
-      render: () => ({ fence: "chronoanvil", lines: [line] }),
+      render: () => fenceBlock({ fence: "chronoanvil", lines: [line] }),
       locate: (t) => t.search(new RegExp(`^${line}\\b`, "m")),
     });
     const note = composeFlatNote([
@@ -430,8 +431,8 @@ describe("what the homepage composes to", () => {
     // The rule it is here to pin is unchanged and still load-bearing: the
     // moment a reader adds Tags back, the folder has to be in the line.
     const tags = homeSections(ROOT).find((s) => s.id === "tags");
-    expect(tags?.render().lines).toContain(`tag-index:${ROOT}`);
-    expect(tags?.render().lines).not.toContain("tag-index");
+    expect(soleFence(tags!.render()).lines).toContain(`tag-index:${ROOT}`);
+    expect(soleFence(tags!.render()).lines).not.toContain("tag-index");
   });
 
   it("finds the tag section however the folder is repointed", () => {
@@ -686,7 +687,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
         if (run.sectionIds.length < 2) continue;
         for (const id of run.sectionIds) {
           const s = sections.find((x) => x.id === id);
-          expect(s?.render().lines.length, `${id} is a cell of more than one line`).toBe(1);
+          expect(soleFence(s!.render()).lines.length, `${id} is a cell of more than one line`).toBe(1);
         }
       }
     }
@@ -1132,11 +1133,15 @@ describe("on this day is offered again (3.13 §11, 4.70)", () => {
     // `composeFlatNote` may ask: `plan`, `apply`, `refusal`, `addable` and
     // `present` are all about the note in front of the reader, and this field
     // is about the note the plugin would write from nothing.
+    // AND THE DECLARATION MOVED OUT OF THIS FILE (5.22). `optIn` is a field of
+    // the shared `Section` now, so the first line naming it here is the
+    // composer's own skip rather than the type. The declaration is asserted
+    // where it now lives; the rule is asserted where it always was.
+    expect(readSrc("sections")).toContain("optIn?: boolean");
     const reads = t.split("\n").filter((l) => /\boptIn\b/.test(l) && !l.trim().startsWith("//"));
-    expect(reads[0]).toContain("optIn?: boolean");
     const at = t.indexOf("export function composeFlatNote(");
     const body = t.slice(at, t.indexOf("\n}", at));
-    for (const line of reads.slice(1)) {
+    for (const line of reads) {
       expect(body, `optIn is read outside the composer: ${line.trim()}`).toContain(line);
     }
   });
@@ -1309,11 +1314,16 @@ describe("the journals block, and the migration that upgrades it", () => {
       expect(constants).toContain("const JOURNALS_DIRECTIVE_BODY =");
       expect(constants).toContain("export const isJournalsDirective");
       expect(constants).toContain("export const JOURNALS_DIRECTIVE_LINE");
+      //
+      // THE TWO CATALOGUES SPELL IT `anchor:` AS OF 5.25, not `probe(text, …)`.
+      // Both entries are `DeclaredSection`s now, so the probe is a field rather
+      // than a closure — which is the same one definition reached by the same
+      // name, and is what this sweep is actually about.
       for (const [mod, use] of [
         ["journal", "isJournalsDirective(l)"],
         ["home-sections", "isJournalsDirective(line)"],
-        ["home-sections", "probe(text, JOURNALS_DIRECTIVE_LINE)"],
-        ["journals-dashboard-sections", "probe(text, JOURNALS_DIRECTIVE_LINE)"],
+        ["home-sections", "anchor: JOURNALS_DIRECTIVE_LINE"],
+        ["journals-dashboard-sections", "anchor: JOURNALS_DIRECTIVE_LINE"],
       ] as const) {
         expect(readSrc(mod), `${mod} stopped sharing the predicate`).toContain(use);
       }

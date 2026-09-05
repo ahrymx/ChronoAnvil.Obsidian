@@ -173,7 +173,7 @@ describe("the section catalogue", () => {
       // prose, and this is what stops that being expressible.
       everyRender((s, ctx) => {
         const emitsProse = s.render(ctx).some((b) => b.kind === "markdown");
-        const expected = !s.required && !emitsProse;
+        const expected = !s.locked && !emitsProse;
         expect(sectionRemovable(s, ctx), `${s.id} on ${ctx.typeValue}`).toBe(
           expected
         );
@@ -260,7 +260,7 @@ describe("the section catalogue", () => {
       // the one thing the wizard must not let you re-create. Everything else
       // is taste, and a catalogue that called more than one section mandatory
       // would be deciding layout rather than offering it.
-      expect(JOURNAL_SECTIONS.filter((s) => s.required).map((s) => s.id)).toEqual(
+      expect(JOURNAL_SECTIONS.filter((s) => s.locked).map((s) => s.id)).toEqual(
         ["banner"]
       );
     });
@@ -1003,8 +1003,21 @@ describe("the section catalogue", () => {
       // A leaf note holding a hand-written `review-queue` is legal — nothing
       // refuses it — but the picker offering to append a second one is not the
       // question this function answers.
+      //
+      // ── AND SINCE 5.26 THE LEAF ANSWERS IT AS A WIDGET ──────────────
+      //
+      // The rule above is unchanged and this is what honouring it now looks
+      // like. A leaf's catalogue has no Review section, so `review-queue` is a
+      // keyword the page-widget door leaves free there — and the reader's
+      // hand-written fence is the widget, found by its own instance id. The
+      // sentence that mattered is still true, and more so: the picker will not
+      // offer to append a second one, because it can see the first.
+      //
+      // The index is untouched. Its catalogue DOES claim the keyword, so the
+      // door never offered it and the fence is the Review section, exactly as
+      // it was.
       const text = "```chronoanvil\nreview-queue\n```";
-      expect(detectSections(text, lesson)).toEqual([]);
+      expect(detectSections(text, lesson)).toEqual(["w:review-queue#1"]);
       expect(detectSections(text, indexCtx(STUDY_JOURNAL, 0))).toEqual([
         "review",
       ]);

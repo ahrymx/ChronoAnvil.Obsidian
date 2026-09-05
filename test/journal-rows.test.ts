@@ -114,7 +114,10 @@ describe("a journal note's blocks (5.11)", () => {
     const row = model.blocks!(text).find((b) => b.ids.length > 1);
     expect(row?.ids).toEqual(["review", "tasks"]);
     // Both cells, not just the one that opens the fence — the pill the editor
-    // draws is "Column" for each of them and "Section" for none.
+    // draws is "Widget" for each of them and "Section" for none. (The word was
+    // "Column" when this was written and the sentence outlived it; the pill is
+    // still decided by ARRANGEMENT, which is the fact the assertion is about,
+    // and not by anything the 5.27 subjects touch.)
     expect([...(row?.column ?? [])].sort()).toEqual(["review", "tasks"]);
   });
 

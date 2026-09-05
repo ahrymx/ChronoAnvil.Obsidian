@@ -44,11 +44,13 @@
 // calls it.
 
 import { HEADER_PREFIX } from "./constants";
+import { sectionOf, soleFence } from "./sections";
 import { splitDirective } from "./directive-grammar";
 import type { FlatSection } from "./note-sections";
-import { joinParts, formQuestion, WIDGET_FORM } from "./section-model";
+import { joinParts } from "./section-model";
 import type { SectionQuestion } from "./section-model";
 import { WIDGETS } from "./widget-registry";
+import type { WidgetNeed } from "./widget-registry";
 import type {
   VaultLists,
   WidgetArg,
@@ -59,12 +61,23 @@ import type {
 
 // What marks a section id as a widget rather than a catalogue entry.
 //
-// A PREFIX RATHER THAN A FIELD ON `SectionView`, and this is the one place the
-// editor learns anything about kinds. The alternative was `SectionView.family`,
-// which three of the four models would never set, existing so that one `<select>`
-// could group its options. The prefix is imported rather than spelled at the call
-// site so the rule has one home — the same way `questionIsRequired`, `idsOf` and
-// `optionsFor` are asked rather than reimplemented.
+// A PREFIX RATHER THAN A FIELD ON `SectionView`. The prefix is imported rather
+// than spelled at the call site so the rule has one home — the same way
+// `questionIsRequired`, `idsOf` and `optionsFor` are asked rather than
+// reimplemented.
+//
+// ── AND THE EDITOR NO LONGER ASKS (5.27) ─────────────────────────────
+//
+// This used to end "and this is the one place the editor learns anything about
+// kinds", followed by a rejection: *"The alternative was `SectionView.family`,
+// which three of the four models would never set, existing so that one
+// `<select>` could group its options."* Both halves stopped being true in 5.26,
+// and `SectionView.category` — a SUBJECT, not a kind — is now the field that
+// groups the add list. `section-editor.ts` imports nothing from this file.
+//
+// THE PREFIX IS STILL THE RULE, and still has one home here. What changed is
+// who asks: four model-layer callers (`journal-template.ts`, `journal-plan.ts`,
+// `entry-sections.ts`, `section-model.ts`'s own note) and no window.
 export const WIDGET_ID_PREFIX = "w:";
 
 export const isPageWidgetId = (id: string): boolean =>
@@ -443,41 +456,36 @@ const widgetSection = (
   n: number
 ): FlatSection => {
   const isLogbook = keyword === "logbook";
-  const bar = `${HEADER_PREFIX}${spec.glyph} ${spec.label}`;
-  return {
+  return sectionOf({
     id: instanceId(keyword, n),
     label: spec.label,
     blurb: spec.blurb,
     icon: spec.glyph,
+    // THE REGISTRY'S, VERBATIM. A widget and a catalogue section on the same
+    // subject land under one heading in the add list, which is the whole point
+    // of the field being on the spec rather than derived from the keyword.
+    category: spec.category,
     // NOTHING A WIDGET SECTION DOES IS LOCKED OR PINNED. It is there because a
     // reader added it, so it is theirs to move and theirs to remove.
     locked: false,
     optIn: true,
-    render: (options) => ({
-      fence: "chronoanvil",
-      lines: [
-        ...(isLogbook && options?.form !== WIDGET_FORM ? [bar] : []),
-        renderLine(keyword, spec, options),
-      ],
-    }),
     // EVERY PAGE WIDGET REPEATS. The editor reads this to know that adding one
     // more is a legal thing to ask for.
-    repeatable: true as const,
-    ...(isLogbook || argsOf(spec).length
-      ? {
-          questions: (noteSpec: {
-            hostFolder?: string | null;
-            vault?: VaultLists;
-          }) => [
-            ...(isLogbook ? [formQuestion(bar)] : []),
-            ...argQuestions(keyword, spec, noteSpec.hostFolder ?? null, noteSpec.vault),
-          ],
-        }
+    repeatable: true,
+    // THE ONE WIDGET THAT WEARS A BAR, and the declaration says so by carrying
+    // a `title` where the others carry none. `logbook` draws a list of items
+    // and nothing that names which logbook it is — `logbook-sections.ts` makes
+    // the argument at length on the page where it bites hardest.
+    ...(isLogbook
+      ? { title: `${HEADER_PREFIX}${spec.glyph} ${spec.label}` }
       : {}),
+    // THE KEYWORD DOES THE REST: its line, with the reader's answers already in
+    // it, and its arguments as questions.
+    widget: keyword,
     // THE NTH LINE, ALWAYS — and for the single occurrence that is most pages,
     // this is `locateKeyword` exactly, since the first match is the 1st.
-    locate: locateNth(keyword, n),
-  };
+    nth: n,
+  });
 };
 
 // The section for any instance id, built from the id alone.
@@ -594,12 +602,13 @@ export function nextInstanceId(
 // the split is along the line the two questions were always on. `widgetInstances`
 // is the other half.
 export function pageWidgetKeywords(
-  catalogue: readonly FlatSection[]
+  catalogue: readonly FlatSection[],
+  supplies: readonly WidgetNeed[] = []
 ): string[] {
   const composed = catalogue
     .flatMap((s) => {
       try {
-        return s.render().lines;
+        return soleFence(s.render()).lines;
       } catch {
         // A catalogue whose `render` needs an argument it was not given has
         // nothing to say here. Nothing in the tree does this; it is cheaper to
@@ -613,6 +622,22 @@ export function pageWidgetKeywords(
   for (const keyword of Object.keys(WIDGETS)) {
     if (catalogue.some((s) => s.locate(keyword) >= 0)) continue;
     if (locateKeyword(keyword)(composed) >= 0) continue;
+    // ── AND WHAT THIS SURFACE CAN ANSWER (5.26) ──────────────────────
+    //
+    // The two questions above are about the CATALOGUE — has this page already
+    // claimed the keyword — and both were the whole of the rule until a door
+    // was opened onto a leaf note. A diary entry claims almost nothing, so
+    // every widget the registry has would have been offered on one, including
+    // the two that cannot work on a note with no period.
+    //
+    // A DEFAULT OF "SUPPLIES NOTHING", which is deliberately the strict end.
+    // Thirty of the thirty-two declare no need, so the default costs them
+    // nothing; the two that do are withheld until a surface says otherwise, and
+    // saying otherwise is one field on a spec. The other default would have
+    // been every new surface silently offering whatever a future `needs` value
+    // named, which is the failure this field exists to end.
+    const need = WIDGETS[keyword].needs;
+    if (need !== undefined && !supplies.includes(need)) continue;
     out.push(keyword);
   }
   return out;
@@ -626,7 +651,8 @@ export function pageWidgetKeywords(
 // this note offer" spelled once rather than at each call site.
 export function pageWidgetSections(
   catalogue: readonly FlatSection[],
-  text: string
+  text: string,
+  supplies: readonly WidgetNeed[] = []
 ): FlatSection[] {
-  return widgetInstances(pageWidgetKeywords(catalogue), text);
+  return widgetInstances(pageWidgetKeywords(catalogue, supplies), text);
 }

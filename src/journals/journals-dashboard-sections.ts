@@ -83,7 +83,7 @@ import {
   JOURNALS_DIRECTIVE_LINE,
   TRENDS_HEADING,
 } from "../core/constants";
-import { FRAME_KEYWORD, HEADER_KEYWORD, SCOPE_ALL } from "../core/directive-grammar";
+import { HEADER_KEYWORD, SCOPE_ALL } from "../core/directive-grammar";
 import {
   composeFlatNote,
   flatNoteModel,
@@ -91,6 +91,8 @@ import {
   graphLinksSection,
 } from "../core/note-sections";
 import type { FlatSection, FlatNoteSpec } from "../core/note-sections";
+import { fenceBlock, sectionOf } from "../core/sections";
+import type { QuestionEnv } from "../core/sections";
 import type { VaultLists } from "../core/widget-registry";
 import { WIDGET_FORM, formQuestion, type SectionModel } from "../core/section-model";
 
@@ -130,11 +132,12 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
   // page's whole navigation in one block rather than in none — the state 4.19
   // was written to reach, arrived at here by the page already being close.
   bannerSection(),
-  {
+  sectionOf({
     id: "journals",
     label: "Journals",
     blurb: "Every journal, subject and topic, as one card.",
     icon: "📚",
+    category: "journals",
     // LOCKED (§2.2: "a journals dashboard without it is nothing"), and note
     // that this is the one place the lock differs from the homepage's copy of
     // the same widget. There it is unlocked, because a vault can reasonably
@@ -144,14 +147,8 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // The widget already renders nothing when no journals are enabled, so the
     // lock costs an empty vault nothing but a heading.
     locked: true,
-    render: (opts) => ({
-      fence: "chronoanvil",
-      lines: [
-        ...(opts?.form === WIDGET_FORM ? [] : ["frame: section"]),
-        "journals",
-      ],
-    }),
-    questions: () => [formQuestion("frame: section", FRAME_KEYWORD)],
+    title: "frame: section",
+    lines: ["journals"],
     // ── THE PROBE MATCHES BOTH SPELLINGS (4.38.2) ─────────────────────────
     //
     // It was `/^journals\s*$/m`, and that strictness is what turned 4.37's
@@ -173,13 +170,14 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // A page arriving on the wrong spelling is recognised and left alone here;
     // putting it back is `collapseJournalsBlocks`' job, once, rather than
     // reconciliation's on every run.
-    locate: (text) => probe(text, JOURNALS_DIRECTIVE_LINE),
-  },
+    anchor: JOURNALS_DIRECTIVE_LINE,
+  }),
   {
     id: "review",
     label: "Review",
     blurb: "What is due for recall across every journal, soonest first.",
     icon: "🔁",
+    category: "tasks",
     // NOT A MOVE — the homepage has never carried one (§2.2). `review-queue`
     // exists today only on a journal's own index notes, so a vault with six
     // journals has six queues and no way to see them at once. This is that
@@ -187,7 +185,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // unavailable elsewhere.
     locked: false,
     row: DUE_ROW,
-    questions: (spec) => [
+    questions: (_ctx, spec: QuestionEnv = {}) => [
       formQuestion(DUE_BAR, HEADER_KEYWORD),
       {
         kind: "folder",
@@ -201,7 +199,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
         keywords: [{ value: SCOPE_ALL, label: "Every journal" }],
       },
     ],
-    render: (opts) => ({
+    render: (_ctx, opts) => fenceBlock({
       fence: "chronoanvil",
       lines: [
         ...(opts?.form === WIDGET_FORM ? [] : [DUE_BAR]),
@@ -215,6 +213,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     label: "Open tasks",
     blurb: "Still-open ChronoAnvil tasks from every note under the journals root.",
     icon: "⏳",
+    category: "tasks",
     // BARE, unlike the queue above it, and the two are not inconsistent.
     // `tasks-table` defaults to the host note's own folder, which on this
     // folder note is the journals root — so bare composes to the scope §2.2
@@ -236,7 +235,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // sits at the journals root, outside every registered journal, where that
     // keyword resolves to nothing.
     locked: false,
-    questions: (spec) => [
+    questions: (_ctx, spec: QuestionEnv = {}) => [
       {
         kind: "folder",
         key: "folder",
@@ -266,7 +265,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // automatically drawn as widgets"* — so the answer cannot be given from
     // inside the band whose bar belongs to the cell beside it.
     bar: OPEN_TASKS_BAR,
-    render: () => ({ fence: "chronoanvil", lines: ["tasks-table"] }),
+    render: () => fenceBlock({ fence: "chronoanvil", lines: ["tasks-table"] }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },
   {
@@ -274,6 +273,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     label: "Recent notes",
     blurb: "The notes you wrote most recently across every journal, newest first.",
     icon: "🕒",
+    category: "finding",
     // ── WHAT THIS PAGE HAD NO ANSWER FOR ────────────────────────────────
     //
     // Everything above it is a QUEUE. The journals card counts what each
@@ -293,7 +293,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // and composing `|8` would be the page pre-answering a question the reader
     // can answer themselves — the same call the homepage's time grid makes.
     locked: false,
-    questions: (spec) => [
+    questions: (_ctx, spec: QuestionEnv = {}) => [
       formQuestion("header:🕒 Recently written", HEADER_KEYWORD),
       {
         kind: "folder",
@@ -304,7 +304,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
         keywords: [{ value: SCOPE_ALL, label: "Every journal" }],
       },
     ],
-    render: (opts) => ({
+    render: (_ctx, opts) => fenceBlock({
       fence: "chronoanvil",
       lines: [
         ...(opts?.form === WIDGET_FORM ? [] : ["header:🕒 Recently written"]),
@@ -318,6 +318,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     label: "Trends and statistics",
     blurb: "The charts manager for the journals.",
     icon: "📊",
+    category: "trackers",
     // NOT LOCKED, AND NOT FREELY REMOVABLE EITHER, on the argument every other
     // catalogue makes for this section: an untick must not take nine
     // configured charts with it.
@@ -328,7 +329,7 @@ export const JOURNALS_DASHBOARD_SECTIONS: FlatSection[] = [
     // journal rather than inside one, so it takes the former.
     locked: false,
     holds: (text) => chartLinesIn(text),
-    render: () => ({
+    render: () => fenceBlock({
       fence: "chronoanvil-charts",
       lines: [`${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`],
     }),

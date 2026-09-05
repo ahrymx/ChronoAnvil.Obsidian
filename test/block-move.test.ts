@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import { blockIndexAt } from "../src/core/block-move";
-import { blockTitle } from "../src/ui/widgets/index";
+import { blockTitle, fieldBand } from "../src/ui/widgets/index";
 import { readCode, readCss, readSrc } from "./sources";
 
 // A note of three blocks with the composer's own spacing: one blank line
@@ -153,6 +153,97 @@ describe("what a block's head calls it", () => {
     // about — an untitled head is the honest answer for a fence of sliders.
     expect(blockTitle(["slider:mood|Mood", "button:new"])).toBeNull();
     expect(blockTitle([])).toBeNull();
+  });
+
+  it("never names a band after one widget in it", () => {
+    // ── THE 5.26 DEFECT, REPORTED FROM A VAULT ───────────────────────────
+    //
+    // A daily entry's shared band is ONE fence holding one directive per
+    // section. None of those keywords is in `SECTION_TITLES` — every field
+    // titles itself from the `|Title` after it — so before 5.26 the count in
+    // `blockTitle` saw a band as a fence with nothing nameable in it and drew no
+    // head, which was right by accident.
+    //
+    // 5.26 opened the widget door on the entry, a reader added Open tasks, and
+    // the band became a fence with EXACTLY ONE nameable thing in it: the head
+    // read "⏳ Open tasks" and `has-head` welded all eight sections into a single
+    // card named after the last of them.
+    const band = [
+      "note:focus#line:What are you focusing on today?|Today's focus",
+      "list:highlights:What went well?|Highlights",
+      "list:challenges:What got in the way?|Challenges",
+      "note:log:Notes, reflections & learnings…|Notes, reflections & learnings",
+      "attach:attachments|Attachments",
+      "tasks:todo|Tasks",
+      "note:capture#collapse:Captured thoughts land here…|Captured",
+    ];
+    expect(blockTitle(band)).toBeNull();
+    expect(blockTitle([...band, "tasks-table"])).toBeNull();
+
+    // AND IT IS THE BAND THAT REFUSES, NOT THE COUNT. Two widgets beside the
+    // fields would have been refused by the one-nameable-thing rule anyway, so
+    // the case that proves the clause is the single one above; this one proves
+    // the clause did not simply move the old answer.
+    expect(blockTitle([...band, "tasks-table", "logbook"])).toBeNull();
+
+    // THE SAME WIDGET IN A FENCE OF ITS OWN IS UNTOUCHED, which is what keeps
+    // this a rule about bands rather than a rule about `tasks-table`. It is also
+    // what an entry's widget looks like on every other surface: the flat
+    // catalogues compose one section per fence, so the block names it.
+    expect(blockTitle(["tasks-table"])).toBe("⏳ Open tasks");
+  });
+
+  it("asks one predicate which fences are bands", () => {
+    // A FIELD IS THE TELL. Every keyword in `FIELD_KINDS` owns a keyed span of
+    // the note body and draws its own head over it.
+    expect(fieldBand(["note:focus|Today's focus"])).toBe(true);
+    expect(fieldBand(["tasks:todo|Tasks", "tasks-table"])).toBe(true);
+    expect(fieldBand(["attach:attachments|Attachments"])).toBe(true);
+    // `tasks-table` IS NOT `tasks`, and a prefix test would have said it was —
+    // which would make every dashboard holding an open-tasks table a band.
+    expect(fieldBand(["tasks-table:02 - Diary"])).toBe(false);
+    expect(fieldBand(["diary:3", "on-this-day"])).toBe(false);
+    expect(fieldBand([])).toBe(false);
+  });
+
+  it("dresses a widget in a band as one of its fields", () => {
+    // THE TWO HALVES OF ONE SENTENCE, and the test is that they are asked with
+    // one predicate: the head refuses to name a band, and the dispatcher gives
+    // each named widget in one a head of its own. Written twice, the two would
+    // disagree about which fence is a band the first time either was edited —
+    // and a band that refused the head AND the frame is the reported defect
+    // traded for a nameless table.
+    const widgets = readCode("widgets");
+    expect(widgets).toContain("if (fieldBand(lines)) return null;");
+    expect(widgets).toContain("} else if (!fenceTitled && fieldBand(lines)) {");
+    // ONE DEFINITION. `FIELD_KINDS` is the list, `fieldBand` is the only reader
+    // of it that answers about a whole fence, and nothing else spells the rule.
+    expect(widgets.match(/const FIELD_KINDS/g) ?? []).toHaveLength(1);
+    expect(widgets.match(/export function fieldBand/g) ?? []).toHaveLength(1);
+
+    // ── AND IT IS `fieldFrame`, NOT `cardWidget` ──────────────────────────
+    //
+    // The row's card was tried first and gives the right box with a head that
+    // cannot be seen: `.ca-journal-widget-card > .ca-journal-block-head` is an
+    // overlay at `opacity: 0` with `pointer-events: none`, opened by the grip
+    // laid over it — and outside a row no per-widget grip is attached, so
+    // nothing on the page can open it. A field frame draws its title always,
+    // which is what every other section of the band does.
+    const at = widgets.indexOf("} else if (!fenceTitled && fieldBand(lines)) {");
+    const branch = widgets.slice(at, at + 700);
+    expect(branch).toContain("fieldFrame(");
+    expect(branch).not.toContain("cardWidget(");
+    // THE STAMP GOES WITH THE WIDGET INTO THE WRAPPER, which is the one thing a
+    // wrapper put around a stamped child must not forget — and it is the row
+    // card's own operation rather than a second spelling of it.
+    expect(branch).toContain("carryStamp(el, built.wrapper)");
+    expect(readCode("block-drag")).toContain("export function carryStamp");
+    // THE STYLESHEET IS WHAT MAKES THE TWO LOOK ALIKE, and it needs no rule
+    // added: a field frame in a widget block is already spaced and painted for
+    // exactly this, because the band's own fields are the same object.
+    expect(readCss("70-section-surface")).toContain(
+      ".ca-journal-sec-fold.ca-journal-field"
+    );
   });
 
   it("shares the section modifier's titles rather than keeping a second list", () => {

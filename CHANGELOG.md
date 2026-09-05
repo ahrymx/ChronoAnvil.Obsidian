@@ -9,6 +9,69 @@ This file covers the **5.x series**, in reader-facing summary. The unabridged
 notes — every entry as it was originally written, and the whole of the Almanac
 era through 4.84 — are in [CHANGELOG-ARCHIVE.md](./CHANGELOG-ARCHIVE.md).
 
+## [5.27.0] - 2026-09-05
+
+The *Add a section…* list is grouped by what a section is **about**.
+**Nothing in a vault is rewritten by this release, and nothing on a page moves.**
+Every note this plugin composes comes out byte for byte identical to the one
+5.26 composed. What changes is one list, in two places.
+
+### Changed
+
+- **The add list is grouped by subject, not by "Section" and "Widget".** Opening *Edit sections… → Add a section…* on the homepage offers thirty-two things; on a diary entry, forty. Until now those were sorted under two headings, **Sections** and **Widgets**, which put *Open tasks*, *On this day*, *Tags* and twenty-odd others below one label and the two or three the page was built around above the other. They are now filed under seven: **Writing**, **Diary**, **Journals**, **Tasks & events**, **Trackers**, **Finding** and **Structure** — so *Open tasks* sits with *Coming up* and *Review*, and the diary card sits with *On this day* and *The week by the hour*, wherever you opened the list from.
+- **The old split was sorting by something that isn't a property of a section.** Whether a section is drawn as a widget — a small titled card — or as a full section is a toggle you flip per section, on the page, whenever you like. Every one of the thirty-two "widgets" in that list is a section by any other measure; each already had a heading of its own. So the second heading named a distinction that was not there, and the first hid the rows it was meant to promote.
+- **Add a section here now shows the same headings.** The command in the note's own menu and the button inside the section editor list the same sections from the same catalogue, and one of them had been drawing a flat list while the other drew headings. Both read one table now, so neither can drift from the other in wording or in order.
+
+### Fixed
+
+- **The logbook is filed with the other ways to look something up.** It had been the one entry with a hand-written exception keeping it on the correct side of the two-way split. Under **Finding**, with search, tags and the navigator, no exception is needed.
+
+## [5.26.0] - 2026-09-05
+
+Widgets can be added to diary entries and to journal notes and templates.
+**Nothing in a vault is rewritten by this release, and nothing on a page moves.**
+Every note this plugin composes — homepage, Search, logbooks, the four period
+dashboards, journal dashboards, journal templates and diary entries — comes out
+byte for byte identical to the one 5.25 composed. What changes is what
+*Edit sections… → Add a section…* offers you on two surfaces where it had been
+offering nothing at all.
+
+### Added
+
+- **A diary entry can hold any widget the plugin has.** Open tasks, On this day, the logbook, the time grid, Coming up, a tracker readout — thirty of them, from the same list the homepage has always offered. They land in the block your entry's other sections already live in, below the rule, and they are dressed the way that block dresses everything else: a title, a chevron, a fold. Nothing you have written moves, because a widget owns no part of the note body — that is what separates one from a field.
+- **So can a journal note and a journal template.** Twenty-three on a journal's index, twenty-eight on a leaf. A widget added to a *template* is the one that could not be done by hand at all: a directive typed into a template was removed again by the next **Maintenance: refresh journal templates**, because the composer could not see it. Added through the editor, it survives.
+- **A widget you configure keeps its answer.** The folder an Open tasks table searches, the journal a Contents list indexes: asked when you add it, remembered in the template it was saved into, and carried across when a layout is transferred from one journal to another.
+
+### Changed
+
+- **Two widgets are no longer offered on pages that cannot draw them.** *What the days said* draws a refusal on a note with no period to roll up, and *Go to period* writes a `week-start` property onto whatever note it is on — which on a daily entry is enough to make the plugin read that day as a week. Both are still offered on the four period dashboards, where they are the point. Nothing composed changes: on the pages that keep them, those two were already part of the page.
+
+### Fixed
+
+- **A widget in a diary entry no longer welds the entry into a single card.** A daily entry's sections share one block, and the plugin puts a name over a block when the block is one nameable thing. Seven fields that each name themselves counted as none — so no name was drawn, which was right for the wrong reason — and the moment one widget joined them the whole block counted as *one*: Today's focus, Highlights, Challenges, Notes, Attachments, Tasks and Captured were drawn inside a single bordered surface titled after the widget that had just been added to them. A block of several sections is now never named after one of them, and the widget carries its own title instead.
+
+## [5.25.0] - 2026-09-05
+
+**Nothing in a vault is rewritten by this release, and nothing on a page moves.**
+Every note this plugin composes — homepage, Search, logbooks, the four period
+dashboards, journal dashboards, journal templates and diary entries — comes out
+byte for byte identical to the one 5.21 composed. That is the whole point of the
+release: the machinery underneath those nine composers was four near-copies of
+one thing, and it is now one thing.
+
+There are no version numbers between this one and 5.21. The work landed in four
+stages that were planned as separate releases and shipped as one, because none
+of them changed anything a reader could see.
+
+### Changed
+
+- **One kind of section, everywhere.** A section on a journal template, a period dashboard, a diary entry and the homepage were four different objects in the code, described by four types and edited by four sets of near-identical routines. They are one type now, read by one parser, with one shared vocabulary for working out what a note has and what it should have. What this buys is not speed — it is that a fix made once is a fix made everywhere. Two of the rules merged here had already drifted apart once and been repaired in only one of their two copies.
+- **A quarter of the section catalogue is now plain data.** Twenty-two of the sections this plugin offers — every page widget you can add to a note among them — are described by a small block of values rather than by code: their title, their directives, what they ask you, where to find them in a note. That is the shape a section would have to have for you to define one yourself from Settings, and this release is what makes the distance to that measurable rather than guessed at.
+
+### Fixed
+
+- **The count of unrecognised blocks in a note agrees with itself.** *Edit sections…* reported "1 block in this file aren't the catalogue's". It now says *isn't*.
+
 ## [5.21.0] - 2026-09-04
 
 A control that only ever half-worked is gone, and two that had no door on the

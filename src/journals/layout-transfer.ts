@@ -131,6 +131,16 @@ function portableOverrides(
   // it silently turns a bridge the reader configured into the generic default.
   if (from.tracker !== undefined) kept.tracker = from.tracker;
 
+  // A PAGE WIDGET'S ARGUMENT, ON `tracker`'s ARGUMENT (5.26). It is a folder
+  // path, a journal id or a kind id — something this module holds a
+  // `JournalType` and no vault to resolve — so it is carried and left for the
+  // reader to look at rather than dropped. A `tasks-table` scoped to a folder
+  // the target journal does not have draws an empty table, which is visible and
+  // one edit from right; dropping the answer turns a table the reader scoped
+  // into a vault-wide one, which looks correct and is not.
+  if (from.arg !== undefined) kept.arg = from.arg;
+  if (from.arg2 !== undefined) kept.arg2 = from.arg2;
+
   // NO GENERIC WALK OVER THE REMAINING KEYS. An earlier draft looked at every
   // object-valued field and treated its keys as kind ids, which was wrong twice
   // over: it would have mangled any nested shape that is not a kind map, and it
