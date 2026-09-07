@@ -1,0 +1,217 @@
+/* ── Bridges (2.57.0) ────────────────────────────────────────────────────
+   A block showing what the OTHER surface holds inside this note's period.
+
+   THE WINDOW LABEL IS NOT DECORATION. It sits in the header of every bridge,
+   always, and it is the one piece of chrome here that is load-bearing: the
+   reader did not choose this window, the host note did, so a bridge that does
+   not name its period is indistinguishable from one that has quietly lost most
+   of its rows. Same argument formatPeriodLabel was extracted for in 2.52,
+   binding harder because the scope is implicit rather than typed.
+
+   Deliberately NOT its own card. A bridge is normally written inside a section
+   that already drew a surface (70-section-surface.css paints the run), and a
+   second background inside that one is the box-in-a-box the empty-state rule
+   names. So: a title row, a muted period, rows. Nothing that competes with the
+   section it sits in.
+
+   Numbered 76 to land after the section surface and before the path/resources
+   block, so the muted colours here resolve against a surface that has already
+   been painted. */
+
+.ca-bridge {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  padding: 10px 12px;
+  margin: 0 0 0.9em;
+  transition: border-color 0.15s ease;
+}
+
+.ca-bridge:focus-within {
+  border-color: var(--interactive-accent);
+}
+
+/* Withhold surface when already inside a section card/block surface */
+.ca-journal-sec-block .ca-bridge,
+.ca-journal-sec-fold .ca-bridge {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.ca-bridge .ca-journal-sec {
+  padding: 2px 0;
+  margin-bottom: var(--ca-space-2);
+}
+
+/* ── THE FOLD IS THE FRAME'S (5.10) ──────────────────────────────────────
+   Thirty lines stood here drawing a bridge's own chevron on the LEFT, rotating
+   it by hand, and hiding `.ca-bridge-body` off a private `.is-collapsed` on the
+   block root. All four of those are `foldableSection`'s already — including the
+   SIDE, which is the part a reader sees, and which disagreed with every other
+   section on the same page for three releases.
+
+   What is left is the one thing that is genuinely this block's: a collapsed
+   bridge is a bar and nothing else, so the bar's own bottom margin — which
+   exists to separate it from the rows — has nothing to separate. The state now
+   sits on the wrapper, so the selector reaches it through the wrapper. */
+.ca-bridge .ca-journal-sec-fold.is-collapsed > .ca-journal-sec {
+  margin-bottom: 0;
+}
+
+.ca-bridge .ca-journal-sec.is-foldable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.ca-bridge .ca-journal-sec.is-foldable:hover .ca-journal-header-title {
+  color: var(--text-normal);
+}
+
+.ca-bridge-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ca-space-2);
+}
+
+.ca-bridge-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ca-bridge-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--size-4-2);
+  padding: var(--size-2-1) 0;
+}
+
+.ca-bridge-row + .ca-bridge-row {
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.ca-bridge-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.ca-bridge-card {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.ca-bridge-card:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.ca-bridge-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ca-bridge-card-title {
+  font-weight: 600;
+  font-size: var(--ca-text-sm);
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ca-bridge-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ca-text-xs);
+  color: var(--text-muted);
+}
+
+.ca-bridge-card-meta .tag {
+  font-size: var(--ca-text-2xs);
+  padding: 1px 5px;
+  background: var(--background-primary);
+  border-radius: var(--ca-radius-xs);
+  color: var(--text-muted);
+}
+
+.ca-bridge-card-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ca-bridge-badge {
+  font-size: var(--ca-text-2xs);
+  color: var(--text-muted);
+  background: var(--background-primary);
+  padding: 2px 6px;
+  border-radius: var(--ca-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.ca-bridge-date,
+.ca-bridge-value {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The value is the answer on a readings bridge, so it keeps the normal text
+   colour where the date beside it stays muted. */
+.ca-bridge-value {
+  color: var(--text-normal);
+}
+
+/* ── 3.8: a readings bridge drawn as a trend ─────────────────────────────
+   `bridge-readings:<tracker>#trend`. The same Chart.js canvas the diary's chart
+   tiles draw, over the window the host note declares.
+
+   IT NEEDS AN EXPLICIT HEIGHT AND A CHART TILE DOES NOT. A tile is a grid cell
+   whose height comes from the grid; `.ca-journal-chart-canvas-wrap` is `flex: 1 1
+   auto; min-height: 0` and fills whatever it is given. A bridge sits in the
+   ordinary flow of a note, so there is nothing above it deciding how tall it
+   is — and a Chart.js canvas in a zero-height box draws nothing at all and
+   reports no error, which is the failure mode this rule exists to prevent.
+
+   `flex` rather than `display: block`, because that is the shape the wrap
+   expects to be a child of. The height is the tile's small span, so a trend on
+   a journal note and a trend on a dashboard read at the same scale. */
+.ca-bridge-trend {
+  display: flex;
+  align-items: stretch;
+  height: 180px;
+  margin-top: var(--size-4-2);
+}
+.ca-bridge-trend > .ca-journal-chart-canvas-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* The title bar, the count pill, the muted window phrase and the overflow are
+   ALL the section frame's as of 2.57.7 — see `bridgeHeader`. Everything this
+   file used to declare for them is gone rather than corrected, including the
+   hover rule that made freeze unreachable on touch. A second mechanism for a
+   solved problem is not fixed by making it work; it is fixed by deleting it. */

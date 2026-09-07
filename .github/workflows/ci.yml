@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Node, `npm ci`, version agreement, tests, typecheck, lint. Shared with
+      # `release.yml` and `latest.yml` so a check added here is added to the
+      # workflows that publish — see the header on the action itself.
+      - name: Install and check
+        uses: ./.github/actions/checks
+
+      - name: Package plugin
+        run: npm run package

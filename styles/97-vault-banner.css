@@ -1,0 +1,1205 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+   Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+
+   Licensed under the GNU Affero General Public License v3.0 or later, with
+   attribution and naming terms under its section 7. See LICENSE and
+   LICENSING.md. */
+
+/* ── The vault banner ────────────────────────────────────────────────────
+   4.51. The strip above every ChronoAnvil note, injected into the note's scroll
+   container by `vault-banner.ts` rather than rendered from a directive.
+
+   ── IT IS ON THE LEAF, NOT IN THE NOTE (4.51.3) ────────────────────────
+
+   It is the first child of `.workspace-leaf-content`, above Obsidian's own view
+   header, so it spans the whole leaf and stays put while the note scrolls under
+   it. `flex: 0 0 auto` because that container is a column flexbox and the view
+   below is the part that grows.
+
+   THE ROUNDING AND THE MARGINS WENT WITH THE MOVE. A card floating at the top
+   of a text column is one thing; a strip welded between two toolbars is
+   another, and it takes a bottom border and square corners for the same reason
+   the toolbars either side of it do.
+
+   ── IT IS A TOOLBAR, AND IT HAD TO LOOK LIKE ONE (4.51.2) ──────────────
+
+   The first cut was a transparent strip with a hairline under it, on the
+   argument that chrome should be quiet. The vault render disagreed and the
+   reference the reader asked it to follow disagrees too: with no ground of its
+   own the bar reads as the first paragraph of the note rather than as furniture
+   above it, and its controls read as content.
+
+   So it has a ground, a border and a radius — the shape of a toolbar. What it
+   still does NOT have is `.ca-journal-page-banner`'s 45° hatch and accent wash.
+   Those are for the opening of a page, which is meant to be looked at. This is
+   the same on every note, and a reader who notices it twice a day is a reader
+   it has failed.
+
+   THE ACCENT IS SPENT ON THE TILE. One saturated square in the corner says
+   which plugin this belongs to; a second accented thing would make the strip
+   compete with the note under it.
+
+   AND IT NOW SPANS THE WHOLE LEAF FOR FREE, which 4.51.2 could not do: reaching
+   a pane edge from inside the sizer meant measuring in JavaScript on every
+   resize, or a fixed negative margin that overflows the moment a reader turns
+   *readable line length* off. Outside the note there is nothing to bleed past.
+
+   ── IT IS ITS OWN QUERY CONTAINER ──────────────────────────────────────
+   `container-type: inline-size` here, and NOT borrowed from
+   `.ca-journal-widget-block`. That block is what every other `@container` rule
+   in styles/ measures against, and this banner is not inside one. Declaring
+   its own is what makes the 330px collapse measure THE BANNER, which is what
+   was asked for (4.51, Q5), rather than the window. A sidebar leaf and a
+   narrow split get the collapsed strip; a wide window with a narrow note does
+   too. */
+.ca-vault-banner {
+  container-type: inline-size;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ca-space-3);
+  padding: var(--ca-space-3) var(--ca-space-5);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  position: relative;
+  overflow: hidden;
+  /* THE READER'S CURSOR IS NOT IN HERE. The banner sits inside the editor's
+     own sizer in Live Preview, so a click that lands on padding rather than
+     on a control would otherwise put a caret in the note behind it. */
+  user-select: none;
+}
+
+/* Ambient gradient glow layer */
+.ca-vault-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--ca-header-bg-gradient);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Textured art pattern layer */
+.ca-vault-banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--ca-header-art-pattern);
+  background-size: var(--ca-header-art-size);
+  background-repeat: var(--ca-header-art-repeat);
+  background-position: var(--ca-header-art-position);
+  opacity: var(--ca-header-art-opacity);
+  mix-blend-mode: var(--ca-header-art-blend);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── The six art presets (4.80) ──────────────────────────────────────────
+   Until 4.80 each of these was an SVG file scaffolded into
+   `00 - Infrastructure/Art/`, loaded back out of the vault through
+   `getResourcePath`, and painted with a geometry described in
+   `constants.ts` — four facts about how a background looks, held in
+   TypeScript because the pattern itself was a file TypeScript owned.
+
+   THE FOLDER IS GONE and the reason is what it invited rather than what it
+   cost: the settings dropdown listed every `.svg`, `.png` and `.jpg` the
+   reader had dropped in there, so a vault folder quietly became a styling
+   API for a plugin that does not ask anyone to write styles.
+
+   THE SOURCE IS VERBATIM. Each URI below is the file that shipped, minified
+   onto one line and percent-encoded — same geometry, same stroke opacities,
+   same tile. A banner set to Topography before 4.80 draws exactly what it
+   drew after it, which is the whole point of moving rather than redrawing.
+
+   EACH RULE SETS TOKENS, IT DOES NOT PAINT. `::after` above is still the only
+   thing that paints; a preset is a bundle of values it reads. That is what
+   lets the opacity slider stay a single property set from TypeScript while
+   everything else about a preset lives here.
+
+   `vault-banner.ts` puts `data-ca-art` on the root and nothing else. An id
+   here with no entry in `ART_PRESETS` is a pattern nothing can select; an id
+   there with no rule here is a dropdown entry that paints nothing. Neither is
+   visible by reading one file, so `test/vault-banner.test.ts` reads both. */
+
+/* Topography — contour lines */
+.ca-vault-banner[data-ca-art="topography"] {
+  --ca-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200' viewBox='0 0 400 200'%3E%3Cpath d='M0,50 Q100,10 200,60 T400,40 M0,90 Q120,40 220,100 T400,80 M0,130 Q140,80 240,140 T400,120 M0,170 Q160,120 260,180 T400,160 M50,0 Q150,100 250,30 T350,200 M150,0 Q220,80 320,50 T400,180' fill='none' stroke='%23ffffff' stroke-width='1.2' stroke-opacity='0.4'/%3E%3C/svg%3E");
+  --ca-header-art-size: 400px 200px;
+  --ca-header-art-repeat: repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-blend: soft-light;
+}
+
+/* Dot Matrix — technical grid */
+.ca-vault-banner[data-ca-art="dot-grid"] {
+  --ca-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23ffffff' fill-opacity='0.5'/%3E%3C/svg%3E");
+  --ca-header-art-size: 24px 24px;
+  --ca-header-art-repeat: repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-blend: soft-light;
+}
+
+/* Constellations — geometric nodes */
+.ca-vault-banner[data-ca-art="constellations"] {
+  --ca-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Ccircle cx='20' cy='30' r='2' fill='%23ffffff' fill-opacity='0.6'/%3E%3Ccircle cx='90' cy='20' r='1.5' fill='%23ffffff' fill-opacity='0.5'/%3E%3Ccircle cx='140' cy='70' r='2' fill='%23ffffff' fill-opacity='0.6'/%3E%3Ccircle cx='70' cy='110' r='2.5' fill='%23ffffff' fill-opacity='0.7'/%3E%3Ccircle cx='30' cy='130' r='1.5' fill='%23ffffff' fill-opacity='0.4'/%3E%3Cpath d='M20,30 L90,20 L140,70 L70,110 L30,130 L20,30 M90,20 L70,110' stroke='%23ffffff' stroke-width='0.75' stroke-opacity='0.25' fill='none'/%3E%3C/svg%3E");
+  --ca-header-art-size: 160px 160px;
+  --ca-header-art-repeat: repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-blend: soft-light;
+}
+
+/* Aurora Mesh — luminous gradient */
+.ca-vault-banner[data-ca-art="aurora-mesh"] {
+  --ca-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='150' viewBox='0 0 300 150'%3E%3Cdefs%3E%3CradialGradient id='g1' cx='70%25' cy='30%25' r='60%25'%3E%3Cstop offset='0%25' stop-color='%23a855f7' stop-opacity='0.6'/%3E%3Cstop offset='100%25' stop-color='%233b82f6' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='300' height='150' fill='url(%23g1)'/%3E%3C/svg%3E");
+  --ca-header-art-size: cover;
+  --ca-header-art-repeat: no-repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-blend: screen;
+}
+
+/* Isometric Grid — 3D cube lattice */
+.ca-vault-banner[data-ca-art="isometric-grid"] {
+  --ca-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='69.282' viewBox='0 0 40 69.282'%3E%3Cpath d='M40 34.641L20 23.094 0 34.641 0 57.735l20 11.547 20-11.547zM0 11.547L20 0l20 11.547v23.094L20 46.188 0 34.641z' fill='none' stroke='%23ffffff' stroke-width='0.8' stroke-opacity='0.35'/%3E%3C/svg%3E");
+  --ca-header-art-size: 40px 69.3px;
+  --ca-header-art-repeat: repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-blend: overlay;
+}
+
+/* Minimal Waves — ripples */
+.ca-vault-banner[data-ca-art="subtle-waves"] {
+  --ca-header-art-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='20' viewBox='0 0 100 20'%3E%3Cpath d='M0 10 Q25 20 50 10 T100 10' fill='none' stroke='%23ffffff' stroke-width='1' stroke-opacity='0.35'/%3E%3C/svg%3E");
+  --ca-header-art-size: 100px 20px;
+  --ca-header-art-repeat: repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-blend: soft-light;
+}
+
+.ca-vault-banner > * {
+  position: relative;
+  z-index: 3;
+}
+
+/* OBSIDIAN'S TITLE AND PROPERTY PANEL, STOOD IN FOR (4.51.6). Scoped to the
+   leaf the bar drew on — see `HIDE_TITLE_CLASS`, put on and taken off in the
+   same two lines as the bar itself — and only with `banner.absorb`, which is on
+   by default because ChronoAnvil puts something in each one's place: the page head
+   names the note, and the bar's Properties button holds the fields.
+
+   `visibility` RATHER THAN `display`, and it is not a preference: in Live
+   Preview both of these are editable regions CodeMirror measures, and removing
+   one from layout mid-session is a class of bug — a stranded cursor, a
+   mis-measured scroll — that this feature is nowhere near worth. Hidden, with
+   the height collapsed, and still there for anything that reaches for it. */
+.ca-absorb-host-chrome .inline-title,
+.ca-absorb-host-chrome .metadata-container {
+  visibility: hidden;
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  overflow: hidden;
+}
+/* AND THE THIRD NAMING (4.51.7). Obsidian centres the note's whole PATH in its
+   view header — `02 - Diary / Daily / Day-2026-08-20` — directly under a trail
+   reading `Diary › Thu 20 Aug 2026` and directly over a head reading the same
+   date. Three names in two centimetres, which is the count this release has
+   spent five patches bringing down.
+
+   THE TITLE TEXT ONLY, AND NOT THE HEADER. The back and forward arrows, the
+   reading/editing toggle and Obsidian's own ⋯ live in the same bar and none of
+   them is replaced by anything ChronoAnvil draws — hiding the bar would take four
+   controls to remove one label. `display: none` is safe here where it is not
+   safe on the other two: this is a static label, not an editable region
+   CodeMirror measures. */
+.ca-absorb-host-chrome .view-header-title-container {
+  display: none;
+}
+
+/* ── Row one: who you are, what you are looking for, where you can go ──── */
+
+.ca-vault-banner .ca-avb-global {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-4);
+}
+
+/* THE LOCKUP: the mark, the vault's name, and which part of it you are in.
+   One button — pressing any of the three opens ChronoAnvil's settings, which is
+   where the mark itself is set. */
+.ca-vault-banner .ca-avb-id {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-3);
+  padding: var(--ca-space-1) var(--ca-space-2);
+  margin: calc(-1 * var(--ca-space-1)) calc(-1 * var(--ca-space-2));
+  border-radius: var(--ca-radius-sm);
+  cursor: pointer;
+}
+.ca-vault-banner .ca-avb-id:hover {
+  background: var(--background-modifier-hover);
+}
+/* A FIXED SQUARE WITH CENTRED CONTENT, because the glyph is the reader's
+   (4.51, Q7) and may be an emoji, one letter, or three — and the row must not
+   change height for any of them. */
+.ca-vault-banner .ca-avb-tile {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ca-radius-sm);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: var(--ca-text-sm);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+/* THE TILE HOLDS EITHER A GLYPH OR THE MARK. When it is the mark, the drawing
+   is sized here rather than left to Obsidian's `--icon-size`: that variable is
+   tuned for icons sitting in text, and at its default the mark floats inside a
+   32px square that was measured for two capital letters. The colour comes from
+   the tile's own `color`, so one drawing serves the accent tile and the
+   settings preview without a second copy. */
+.ca-vault-banner .ca-avb-tile .svg-icon {
+  width: 20px;
+  height: 20px;
+}
+.ca-vault-banner .ca-avb-id-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.ca-vault-banner .ca-avb-id-name {
+  color: var(--text-normal);
+  font-size: var(--ca-text-sm);
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ca-vault-banner .ca-avb-id-sub {
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A BUTTON DRESSED AS A FIELD. It opens the search window; it is not one.
+   The affordance still has to read as "type here", which is what the icon and
+   the placeholder-coloured text do — and the shortcut is spelled on it so the
+   second time the reader wants it they do not need the mouse. */
+/* IT TAKES THE ROOM (4.51.9), AND THE CAP IS GONE.
+   4.51.5 capped it at 460px on the argument that an uncapped field left the bar
+   as *"a mark, a half-kilometre of empty input, and four buttons pinned to the
+   far edge — three groups that never settle into one object."* Two renders
+   answered that: at 460 the reader asked whether it had shrunk, at 620 a
+   1786px pane still showed 700px of nothing between the field and the tiles,
+   and the instruction was to make it *"scale to fit the full width."*
+
+   THE ARGUMENT WAS RIGHT ABOUT THE FAULT AND WRONG ABOUT THE CAUSE. What makes
+   three groups is the GAP, not the field's length — an empty middle is what
+   stops a row reading as one object, and a cap is what creates the empty
+   middle. Filled, the bar is a mark, a field and a nav: three parts touching,
+   which is a toolbar. `margin-right: auto` goes with the cap; with nothing left
+   to push, a rule that only fires when the field is short is a rule waiting to
+   be wrong. */
+.ca-vault-banner .ca-avb-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+  height: 34px;
+  padding: 0 var(--ca-space-4);
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+  cursor: text;
+}
+.ca-vault-banner .ca-avb-search:hover {
+  border-color: var(--background-modifier-border-hover);
+  background: var(--background-modifier-hover);
+}
+.ca-vault-banner .ca-avb-search-icon {
+  display: flex;
+  color: var(--text-faint);
+}
+.ca-vault-banner .ca-avb-search-icon .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.ca-vault-banner .ca-avb-search-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* `.avb-kbd` shared this rule until 5.0.1 — the banner's key chip, which went
+   with the command's default binding. The search modal's own chip stays: that
+   one names Enter and the arrow keys, which are bound by the modal itself and
+   are true whatever the reader has done in Settings → Hotkeys. */
+.ca-search-modal .ca-ams-kbd {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-secondary);
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-size: var(--ca-text-2xs);
+  line-height: 1.5;
+}
+
+/* THE DESTINATIONS ARE TILES, NOT LINKS (4.51.2). Four of them, read as a set
+   and pressed without aiming — the icon carries the meaning and the word
+   confirms it, stacked so both fit in a target the width of the word. Drawn as
+   a row of small buttons they were the least prominent thing on a bar whose
+   whole job is going somewhere.
+
+   AND IT IS THE GROUND THAT MADE THEM CARDS, NOT THE EDGE (4.51.8, corrected in
+   4.51.9). 4.51.2 gave each tile a border AND a filled ground, and the vault
+   render read them as *"punchout cards"* — four filled boxes on a bar that is
+   itself a filled box, which is one nesting more than a toolbar can carry.
+   Taking both away left the row with nothing to say where one target ends and
+   the next begins, reported in the same words one render later: *"the buttons
+   don't have any border lines."*
+
+   SO THE FILL GOES AND THE EDGE STAYS. A hairline on the bar's own ground is a
+   button's outline; a hairline around a second ground is a card sitting on a
+   card. The target keeps its size, the icon and the word still sit one over the
+   other, and what says "pressed" is the ground that appears UNDER THE POINTER
+   rather than one painted in advance — `94-native-tables.css`'s rule reaching
+   the bar, and the reason the trail's cog has always been hover-revealed. */
+.ca-vault-banner .ca-avb-nav {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: stretch;
+  gap: var(--ca-space-2);
+  flex-wrap: wrap;
+}
+.ca-vault-banner .ca-avb-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 56px;
+  padding: var(--ca-space-2) var(--ca-space-3);
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.ca-vault-banner .ca-avb-btn:hover {
+  border-color: var(--background-modifier-border-hover);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ca-vault-banner .ca-avb-btn:focus-visible {
+  outline: var(--ca-rule) solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+/* WHERE YOU ALREADY ARE IS NOT A DESTINATION, and saying so is cheaper than a
+   reader pressing Today on today's note and wondering why nothing happened.
+   Marked rather than disabled: it still opens the note, which is the harmless
+   thing to do, and a disabled control on a nav bar is a control that teaches
+   the reader this plugin's buttons are sometimes decoration. */
+/* AND "YOU ARE HERE" IS THE INK FIRST (4.51.8), WITH THE EDGE AGREEING (4.51.9).
+   While the tiles were edgeless an accent BORDER would have been the only box on
+   the row — which reads as the one tile that is still a card rather than as the
+   one you are on. Now that every tile is outlined that reading is gone, so the
+   accent takes both: the glyph and the word, where the reader is already
+   looking, and the outline, which is what carries across the row.
+
+   The label thickens too, so the mark survives a theme whose accent sits close
+   to its text colour. */
+.ca-vault-banner .ca-avb-btn.is-on {
+  border-color: var(--interactive-accent);
+  color: var(--text-accent);
+}
+.ca-vault-banner .ca-avb-btn.is-on .ca-avb-btn-label {
+  font-weight: 700;
+}
+.ca-vault-banner .ca-avb-btn.is-on:hover {
+  color: var(--text-accent-hover);
+}
+.ca-vault-banner .ca-avb-btn-icon {
+  display: flex;
+}
+.ca-vault-banner .ca-avb-btn-icon .svg-icon {
+  width: 17px;
+  height: 17px;
+}
+/* The menu tile's caret. Smaller than the icon and faint, because it is the
+   only part of this row that is not a destination — it says "there is a list
+   behind this one" and should not read as a fifth glyph. */
+.ca-vault-banner .ca-avb-btn-caret {
+  display: flex;
+  color: var(--text-faint);
+}
+.ca-vault-banner .ca-avb-btn-caret .svg-icon {
+  width: 11px;
+  height: 11px;
+}
+/* A MENU TILE IS WIDER THAN A DESTINATION, because its label is a scope's name
+   — "Quarterly Overview" — rather than one word, and eliding it would lose the
+   position reading the label is there to give. */
+.ca-vault-banner .ca-avb-btn-menu {
+  flex-direction: row;
+  gap: var(--ca-space-2);
+  min-width: 0;
+}
+.ca-vault-banner .ca-avb-btn-menu .ca-avb-btn-label {
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ca-vault-banner .ca-avb-btn-label {
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── Row two: where this note sits, ending in what it is called ────────── */
+
+.ca-vault-banner .ca-avb-trail {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+  font-size: var(--ca-text-xs);
+  color: var(--text-muted);
+}
+.ca-vault-banner .ca-avb-sep {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+/* The crumbs themselves are styled with the study header's, in
+   `30-header-bars.css`, because they are the same trail drawn by the same
+   `renderCrumb` — see the note there. */
+/* THE LAST CRUMB IS THIS NOTE, and it is the only one that is not a link —
+   `study-header`'s trail settled that: *a trail names a note's ancestors, never
+   the note itself.* Drawing it anyway is what tells the reader the trail is
+   finished rather than truncated.
+
+   TEXT, NOT AN EDITOR, SINCE 4.51.6. It was the bar's title for four patches,
+   because Obsidian's inline title made three names for one note and this was
+   the one worth keeping. The head below is the fourth answer and the right one:
+   a page names itself in a page's face, and a breadcrumb goes back to saying
+   where you are. `98-page-head.css` has the pencil now. */
+.ca-vault-banner .ca-avb-here {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  color: var(--text-normal);
+  font-weight: 650;
+}
+.ca-vault-banner .ca-avb-here-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ca-vault-banner .ca-avb-meta {
+  flex: 0 0 auto;
+  margin-left: var(--ca-space-2);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+/* THE COG IS PUSHED TO THE FAR CORNER, and that is not a layout preference.
+   `study-header.ts` states it: *"a control next to it would be a control one
+   slip away from renaming the note."* The title is click-to-edit; the gap is
+   the safety. */
+.ca-vault-banner .ca-avb-cog {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  padding: 3px;
+  border-radius: var(--ca-radius-sm);
+  color: var(--text-muted);
+  opacity: var(--ca-cog-opacity);
+  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
+  cursor: pointer;
+}
+.ca-vault-banner .ca-avb-cog .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.ca-vault-banner:hover .ca-avb-cog,
+.ca-vault-banner .ca-avb-cog:focus-visible,
+.ca-vault-banner .ca-avb-cog:hover {
+  opacity: 1;
+}
+.ca-vault-banner .ca-avb-cog:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+@media (hover: none) {
+  .ca-vault-banner .ca-avb-cog {
+    opacity: 0.65;
+  }
+}
+
+/* ── The collapse, at 540px and 330px of BANNER ────────────────────────
+   4.51, Q5: the nav loses its words and the strip wraps rather than shrinking
+   every control at once.
+
+   THE LABELS GO AND THE ICONS STAY, which is the order of what a nav bar can
+   afford to lose. A row of four glyphs is still four destinations in a fixed
+   order; four half-elided words are four things the reader has to read.
+   `aria-label` carries the name either way, so nothing is lost to a screen
+   reader — the labels were always the redundant half.
+
+   THE VAULT'S NAME GOES WITH THEM, and the mark stays. At this width the
+   lockup is the widest fixed thing on the row, and the two lines it carries
+   are the two the reader can most afford to lose: they know which vault they
+   opened, and the trail below already says which part of it they are in. */
+@container (max-width: 540px) {
+  .ca-vault-banner .ca-avb-global {
+    flex-wrap: wrap;
+    gap: var(--ca-space-2) var(--ca-space-3);
+  }
+  .ca-vault-banner .ca-avb-search {
+    order: 3;
+    flex: 1 0 100%;
+  }
+  .ca-vault-banner .ca-avb-nav {
+    margin-left: auto;
+    gap: var(--ca-space-3);
+  }
+  .ca-vault-banner .ca-avb-btn {
+    padding: var(--ca-space-2) var(--ca-space-3);
+  }
+  .ca-vault-banner .ca-avb-btn-icon .svg-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .ca-vault-banner .ca-avb-btn-caret .svg-icon {
+    width: 13px;
+    height: 13px;
+  }
+}
+@container (max-width: 440px) {
+  .ca-vault-banner .ca-avb-id-text {
+    display: none;
+  }
+  .ca-vault-banner .ca-avb-btn-label {
+    display: none;
+  }
+  .ca-vault-banner .ca-avb-nav {
+    gap: var(--ca-space-3);
+  }
+  .ca-vault-banner .ca-avb-btn {
+    min-width: 0;
+    padding: 7px 9px;
+  }
+  .ca-vault-banner .ca-avb-btn-icon .svg-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .ca-vault-banner .ca-avb-btn-caret .svg-icon {
+    width: 13px;
+    height: 13px;
+  }
+  .ca-vault-banner .ca-avb-btn-menu {
+    gap: var(--ca-space-1);
+  }
+}
+@container (max-width: 330px) {
+  .ca-vault-banner .ca-avb-global {
+    flex-wrap: wrap;
+  }
+  .ca-vault-banner .ca-avb-id-text {
+    display: none;
+  }
+  .ca-vault-banner .ca-avb-btn-label {
+    display: none;
+  }
+  .ca-vault-banner .ca-avb-btn {
+    min-width: 0;
+    padding: 7px 9px;
+  }
+  .ca-vault-banner .ca-avb-btn-icon .svg-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .ca-vault-banner .ca-avb-btn-caret .svg-icon {
+    width: 13px;
+    height: 13px;
+  }
+  /* The search takes the second row whole rather than sharing it: a field is
+     the one control here that is worse for being narrow, and at this width the
+     mark and the four tiles have the first row to themselves. There is no cap
+     to lift any more — 4.51.9 removed it everywhere. */
+  .ca-vault-banner .ca-avb-search {
+    order: 3;
+    flex: 1 0 100%;
+  }
+  /* The scope tile keeps its caret and loses its word with the rest. */
+  .ca-vault-banner .ca-avb-btn-menu {
+    gap: var(--ca-space-1);
+  }
+  .ca-vault-banner .ca-avb-nav {
+    margin-left: auto;
+    gap: var(--ca-space-3);
+  }
+}
+
+/* ── The search window ──────────────────────────────────────────────────
+   `search-all.ts`. One list over the diary and every journal, which is the
+   only place in the plugin where a result may come from either.
+
+   IT IS A PALETTE, NOT A DIALOGUE. Fixed height, so the list does not resize
+   under the reader's cursor as they type — a window that grows on every
+   keystroke is one where the third result is never in the same place twice. */
+.ca-search-modal {
+  --ams-height: 60vh;
+  padding: 0;
+  width: min(720px, 90vw);
+}
+.ca-search-modal .modal-close-button {
+  display: none;
+}
+.ca-search-modal .ca-ams-query {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+  padding: var(--ca-space-4) var(--ca-space-5);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
+}
+.ca-search-modal .ca-ams-query-icon {
+  display: flex;
+  color: var(--text-faint);
+}
+.ca-search-modal .ca-ams-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: var(--ca-text-base);
+  color: var(--text-normal);
+}
+.ca-search-modal .ca-ams-input:focus {
+  box-shadow: none;
+}
+.ca-search-modal .ca-ams-clear {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: var(--ca-text-sm);
+  line-height: 1;
+  border-radius: var(--ca-radius-xs);
+  box-shadow: none;
+}
+.ca-search-modal .ca-ams-clear:hover {
+  color: var(--text-normal);
+}
+
+.ca-search-modal .ca-ams-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--ca-space-2);
+  padding: var(--ca-space-2) var(--ca-space-5);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+.ca-search-modal .ca-ams-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ca-space-1);
+}
+
+.ca-search-modal .ca-ams-year-pills {
+  display: flex;
+  background: var(--background-secondary-alt);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-xs);
+  padding: 1px;
+  gap: 2px;
+}
+.ca-search-modal .ca-ams-year-pill {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: var(--ca-radius-xs);
+  cursor: pointer;
+  box-shadow: none;
+}
+.ca-search-modal .ca-ams-year-pill:hover {
+  color: var(--text-normal);
+}
+.ca-search-modal .ca-ams-year-pill.is-active {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: var(--ca-shadow-sm);
+}
+
+.ca-search-modal .ca-ams-filter-chip {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  padding: 2px 7px;
+  border-radius: var(--ca-radius-pill);
+  cursor: pointer;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.ca-search-modal .ca-ams-filter-chip:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ca-search-modal .ca-ams-filter-chip.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+.ca-search-modal .ca-ams-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--background-modifier-border);
+  margin: 0 2px;
+}
+
+.ca-search-modal .ca-ams-compact-btn {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  padding: 2px 7px;
+  border-radius: var(--ca-radius-xs);
+  cursor: pointer;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.ca-search-modal .ca-ams-compact-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ca-search-modal .ca-ams-compact-btn.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+.ca-search-modal .ca-ams-chip-icon {
+  display: inline-flex;
+}
+.ca-search-modal .ca-ams-chip-icon svg {
+  width: 11px;
+  height: 11px;
+}
+
+.ca-search-modal .ca-ams-chip {
+  padding: 2px var(--ca-space-3);
+  border-radius: var(--ca-radius-pill);
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  cursor: pointer;
+}
+.ca-search-modal .ca-ams-chip:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ca-search-modal .ca-ams-chip.is-on {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.ca-search-modal .ca-ams-count {
+  color: var(--text-faint);
+  font-size: var(--ca-text-xs);
+}
+.ca-search-modal .ca-ams-narrowed {
+  margin-left: var(--ca-space-2);
+  color: var(--text-faint);
+  font-size: var(--ca-text-xs);
+}
+
+.ca-search-modal .ca-ams-results {
+  height: var(--ams-height);
+  overflow-y: auto;
+  padding: var(--ca-space-2) 0;
+}
+.ca-search-modal .ca-ams-results.is-compact .ca-ams-snip {
+  display: none;
+}
+.ca-search-modal .ca-ams-results.is-compact .ca-ams-row {
+  padding: var(--ca-space-1) var(--ca-space-5);
+}
+.ca-search-modal .ca-ams-note {
+  padding: var(--ca-space-6) var(--ca-space-5);
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+  text-align: center;
+}
+.ca-search-modal .ca-ams-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-3);
+  padding: var(--ca-space-2) var(--ca-space-5);
+  cursor: pointer;
+}
+.ca-search-modal .ca-ams-row:hover,
+.ca-search-modal .ca-ams-row.is-sel {
+  background: var(--background-modifier-hover);
+}
+/* WHICH HALF IT CAME FROM, IN THE LEFT MARGIN. This is the first list in the
+   plugin where the rows above and below each other may be a diary entry and a
+   journal page, and the reader is entitled to know which without reading the
+   path. A GLYPH RATHER THAN A WORD, because it repeats on every row and a
+   repeated word is noise by the fourth one — and the two glyphs are the nav
+   bar's own for the same two places, so the mark is already learnt. */
+.ca-search-modal .ca-ams-mark {
+  flex: 0 0 auto;
+  display: flex;
+  align-self: center;
+  color: var(--ca-chart-series-2);
+}
+.ca-search-modal .ca-ams-mark.is-journal {
+  color: var(--interactive-accent);
+}
+.ca-search-modal .ca-ams-mark .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.ca-search-modal .ca-ams-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ca-search-modal .ca-ams-title {
+  color: var(--text-normal);
+  font-size: var(--ca-text-base);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ca-search-modal .ca-ams-field {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
+  text-transform: uppercase;
+}
+.ca-search-modal .ca-ams-where {
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* The snippet is one line and is allowed to be cut off. It is EVIDENCE that the
+   note matched, not the note — a reader who wants the rest presses the row. */
+.ca-search-modal .ca-ams-snip {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ca-space-2);
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ca-search-modal .ca-ams-snip > span:last-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ca-search-modal .ca-ams-date {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: var(--ca-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ca-search-modal .ca-ams-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-4);
+  padding: var(--ca-space-2) var(--ca-space-5);
+  border-top: var(--ca-rule-hair) solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-faint);
+  font-size: var(--ca-text-xs);
+}
+.ca-search-modal .ca-ams-foot-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+}
+.ca-search-modal .ca-ams-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Narrow windows: the palette is a phone-width sheet and the fixed list
+   height stops being right when the window is shorter than the list. */
+@media (max-width: 480px) {
+  .ca-search-modal {
+    --ams-height: 50vh;
+  }
+  .ca-search-modal .ca-ams-query,
+  .ca-search-modal .ca-ams-bar,
+  .ca-search-modal .ca-ams-row,
+  .ca-search-modal .ca-ams-foot {
+    padding-left: var(--ca-space-3);
+    padding-right: var(--ca-space-3);
+  }
+}
+
+
+/* ── The Properties button, and the window behind it ─────────────────────
+   4.51.6. A count and a glyph on the trail row, left of the cog — the same
+   corner every control that acts on the whole page has used since 4.20.
+
+   IT SHOWS ITS COUNT ALWAYS, where the cog is hover-revealed. The cog is a
+   menu of things a reader may never need; this is the only place a note's
+   property count exists once Obsidian's panel is stood in for, and a control
+   that is the sole route to something must not hide. */
+.ca-vault-banner .ca-avb-props {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--ca-space-2);
+  border-radius: var(--ca-radius-sm);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.ca-vault-banner .ca-avb-props:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ca-vault-banner .ca-avb-props-icon {
+  display: flex;
+}
+.ca-vault-banner .ca-avb-props-icon .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+/* THE COG GIVES UP ITS `margin-left: auto` TO THE BUTTON BESIDE IT. Two
+   elements both claiming the slack would put a gap between them. */
+.ca-vault-banner .ca-avb-props ~ .ca-avb-cog {
+  margin-left: 0;
+}
+
+.ca-props-modal {
+  width: min(560px, 92vw);
+}
+/* THE HEAD IS A HEAD, NOT THE FIRST ROW (4.51.7, and again in 4.51.8). Reported
+   from the vault twice: the rule under "Properties" landed on `journal-date`,
+   and the first fix — space on the body — was undone by the line that came with
+   it, which took the first row's own padding away. A `Setting`'s control is
+   taller than its label, so a row with no top padding puts an INPUT against the
+   rule; the words looked spaced and the boxes did not.
+
+   So: air under the head, air above the first control, and the row keeps its
+   padding. The only thing the first row gives up is its hairline, because the
+   head's is directly above it.
+
+   AND ROOM FOR THE CLOSE BUTTON. Obsidian draws its × in the modal's top-right
+   corner, over whatever is there — which was the note's name. */
+.ca-props-modal .ca-amp-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+  padding-right: var(--ca-space-6);
+  padding-bottom: var(--ca-space-4);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
+}
+.ca-props-modal .ca-amp-head-icon {
+  display: flex;
+  color: var(--text-faint);
+}
+.ca-props-modal .ca-amp-head-text {
+  font-size: var(--ca-text-lg);
+  font-weight: 650;
+  color: var(--text-normal);
+}
+/* The note's name, so a window opened from the wrong leaf says so. */
+.ca-props-modal .ca-amp-head-note {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-faint);
+  font-size: var(--ca-text-xs);
+}
+.ca-props-modal .ca-amp-body {
+  margin-top: var(--ca-space-3);
+  max-height: 55vh;
+  overflow-y: auto;
+  /* The scrollbar's own gutter, so a long list does not put its thumb through
+     the trash buttons. */
+  padding-right: var(--ca-space-2);
+}
+/* The first row brings no rule of its own — the head's is directly above it and
+   two hairlines a few pixels apart read as a mistake. It keeps its PADDING,
+   which is the half 4.51.7 got wrong. */
+.ca-props-modal .ca-amp-body > .setting-item:first-child {
+  border-top: none;
+}
+.ca-props-modal .ca-amp-empty {
+  padding: var(--ca-space-6) 0;
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+  text-align: center;
+}
+/* A PROPERTY NAME IS DATA, so it is set in the monospace face the rest of the
+   plugin gives to keys — and it does not take a whole row's weight the way a
+   settings label does. */
+.ca-props-modal .ca-amp-row .setting-item-name {
+  font-family: var(--font-monospace);
+  font-size: var(--ca-text-sm);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+  color: var(--text-muted);
+  user-select: none;
+}
+.ca-props-modal .ca-amp-row:hover .setting-item-name {
+  color: var(--text-normal);
+}
+.ca-props-modal .ca-amp-prop-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.ca-props-modal .ca-amp-row:hover .ca-amp-prop-icon {
+  color: var(--text-muted);
+}
+.ca-props-modal .ca-amp-prop-key {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ca-props-modal .ca-amp-row {
+  padding: var(--ca-space-1) var(--ca-space-2);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
+  align-items: center;
+  border-radius: var(--ca-radius-sm);
+  transition: background-color 0.12s ease;
+}
+.ca-props-modal .ca-amp-row:hover {
+  background-color: var(--background-modifier-hover);
+}
+.ca-props-modal .ca-amp-row .setting-item-info {
+  flex: 0 0 170px;
+  width: 170px;
+  margin-right: var(--ca-space-2);
+}
+/* A NAME AND ITS VALUE, NOT A SETTING AND ITS DESCRIPTION. Obsidian's own row
+   gives the label two thirds of the width because it usually carries a sentence
+   under it; a property name is one word and the value is the part being read,
+   so the control gets room and the field fills it. */
+.ca-props-modal .ca-amp-row .setting-item-control {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  gap: var(--ca-space-2);
+}
+.ca-props-modal .ca-amp-row .setting-item-control input[type="text"],
+.ca-props-modal .ca-amp-row .setting-item-control input[type="number"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--ca-radius-sm);
+  color: var(--text-normal);
+  font-size: var(--ca-text-sm);
+  padding: var(--ca-space-1) var(--ca-space-2);
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.ca-props-modal .ca-amp-row .setting-item-control input[type="text"]:hover,
+.ca-props-modal .ca-amp-row .setting-item-control input[type="number"]:hover {
+  background: var(--background-modifier-hover);
+}
+.ca-props-modal .ca-amp-row .setting-item-control input[type="text"]:focus,
+.ca-props-modal .ca-amp-row .setting-item-control input[type="number"]:focus {
+  background: var(--background-primary);
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+.ca-props-modal .ca-amp-row .setting-item-control input::placeholder {
+  color: var(--text-faint);
+  font-style: italic;
+  opacity: 0.75;
+}
+.ca-props-modal .ca-amp-row .setting-item-control .clickable-icon {
+  opacity: 0;
+  color: var(--text-faint);
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.ca-props-modal .ca-amp-row:hover .setting-item-control .clickable-icon {
+  opacity: 0.65;
+}
+.ca-props-modal .ca-amp-row:hover .setting-item-control .clickable-icon:hover {
+  opacity: 1;
+  color: var(--text-error);
+}
+@media (hover: none) {
+  .ca-props-modal .ca-amp-row .setting-item-control .clickable-icon {
+    opacity: 0.65;
+  }
+}
+.ca-props-modal .ca-amp-row-opaque {
+  opacity: 0.65;
+}
+/* THE FOOTER IS BELOW THE LIST, NOT ON IT. The body scrolls; without a rule and
+   a margin the last row runs straight into the buttons, which on a six-property
+   note put *Add a property…* across `Wake-Up`'s field. */
+.ca-props-modal .ca-amp-foot {
+  margin-top: var(--ca-space-3);
+  padding-top: var(--ca-space-3);
+  border-top: var(--ca-rule-hair) solid var(--background-modifier-border);
+}
+.ca-props-modal .ca-amp-foot .setting-item {
+  border-top: none;
+  padding: 0;
+}
+.ca-props-modal .ca-amp-name-input {
+  width: 100%;
+}

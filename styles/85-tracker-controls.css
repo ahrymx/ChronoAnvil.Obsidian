@@ -1,0 +1,2631 @@
+/* ── Mood emoji-face picker (built-in Mood tracker) ─────────────────────── */
+.ca-journal-mood-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  justify-content: space-between;
+}
+.ca-journal-scale-faces {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  justify-content: space-between;
+  flex: 1 1 auto;
+}
+/* The context-note pencil: a badge pinned to the corner of the SELECTED face,
+   rather than a button sitting after the row. It marks the reading it belongs
+   to instead of the widget as a whole, and gives the cell back the width the
+   old button cost on every scale tracker. Muted until a note exists, accented
+   once one does — so a filled pencil is a glanceable "this reading has a why".
+
+   pointer-events: none, deliberately: the badge is a mark, not a control. The
+   face underneath takes the click, which is what makes "press the value again
+   to annotate it" a single target rather than a 14px one sitting on a 28px
+   one. */
+.ca-journal-scale-note-mark {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.95em;
+  height: 0.95em;
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-secondary);
+  box-shadow: 0 0 0 1.5px var(--background-secondary);
+  color: var(--text-faint);
+  pointer-events: none;
+  transition: color 0.12s;
+}
+.ca-journal-scale-note-mark .svg-icon {
+  width: 0.62em;
+  height: 0.62em;
+  stroke-width: 2.6;
+}
+.ca-journal-scale-note-mark.has-note {
+  color: var(--interactive-accent);
+}
+.ca-journal-mood-face {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: var(--ca-radius-sm);
+  background: transparent;
+  padding: 3px 1px;
+  font-size: 1.18em;
+  line-height: 1;
+  cursor: pointer;
+  filter: grayscale(0.7) opacity(0.55);
+  transition: filter 0.12s, transform 0.12s, background 0.12s, border-color 0.12s, box-shadow 0.12s;
+  flex: 1 1 0px;
+  min-width: 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+/* The glyph is its own node so the badge above can be a sibling rather than a
+   stray child of a button whose text gets rewritten. */
+.ca-journal-mood-face-glyph {
+  display: inline-block;
+  font-size: 1.1em;
+  line-height: 1;
+  transition: transform 0.12s ease;
+}
+.ca-journal-mood-face-val {
+  display: none;
+}
+.ca-journal-mood-face:hover {
+  filter: grayscale(0) opacity(1);
+  transform: translateY(-1px);
+  background: var(--background-modifier-hover);
+}
+.ca-journal-mood-face:hover .ca-journal-mood-face-glyph {
+  transform: scale(1.08);
+}
+.ca-journal-mood-face.is-selected {
+  filter: grayscale(0) opacity(1);
+  transform: scale(1.06);
+  background: var(--ca-surface-raised);
+  border-color: var(--interactive-accent);
+  overflow: visible;
+}
+.ca-journal-mood-face.is-selected .ca-journal-mood-face-glyph {
+  transform: scale(1.12);
+}
+
+/* Star scale special treatment & progressive fill */
+.ca-journal-mood-picker.is-stars .ca-journal-mood-face-glyph {
+  opacity: 0.55;
+  filter: grayscale(0.5);
+  transition: transform 0.12s ease, opacity 0.12s ease, filter 0.12s ease;
+}
+.ca-journal-mood-picker.is-stars .ca-journal-mood-face:hover .ca-journal-mood-face-glyph,
+.ca-journal-mood-picker.is-stars .ca-journal-mood-face.is-star-trail .ca-journal-mood-face-glyph {
+  opacity: 1;
+  filter: none;
+  color: var(--text-accent);
+}
+.ca-journal-mood-picker.is-stars .ca-journal-mood-face.is-selected .ca-journal-mood-face-glyph {
+  opacity: 1;
+  filter: none;
+  color: var(--text-accent);
+}
+.ca-journal-mood-picker.is-stars .ca-journal-mood-face.is-star-trail {
+  background: var(--background-modifier-hover);
+}
+.ca-journal-mood-picker.is-stars .ca-journal-mood-face.is-star-trail .ca-journal-mood-face-val {
+  color: var(--text-muted);
+}
+
+/* ── Habit / boolean checkbox ───────────────────────────────────────────────
+   Three visual states, matching the widget's unset → done → not-done cycle.
+   Unset is an empty bordered box; done is an accent-filled ✓; not-done is a
+   muted ✗, so "I didn't do it" reads as a logged answer distinct from a blank
+   day rather than looking the same as unset. Sized to sit on the tracker
+   grid's baseline next to steppers and pickers. */
+.ca-journal-habit {
+  display: inline-flex;
+  align-items: center;
+}
+.ca-journal-habit-box {
+  width: 1.6em;
+  height: 1.6em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  /* `--ca-rule-hair`, and this is a no-op on screen rather than a retune.
+     It read `1.5px` from the day it was written and has never drawn 1.5px:
+     Chromium floors border-width to whole CSS pixels, so 1.4, 1.5 and 1.6 all
+     compute to 1px at every device pixel ratio. The declaration said one thing
+     and the browser did another for as long as it existed, which is precisely
+     the state the 3.6 scale is for — a weight nobody chose, that nobody could
+     see, that a reader of this file would have taken for a decision. */
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 0.95em;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.12s;
+}
+.ca-journal-habit-box:hover {
+  border-color: var(--interactive-accent);
+  transform: translateY(-1px);
+}
+.ca-journal-habit-box.is-done {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.ca-journal-habit-box.is-not-done {
+  color: var(--text-muted);
+  border-color: var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+/* ── The Habits cell ──────────────────────────────────────────────────────
+   Every boolean tracker on a note folds into ONE logging cell titled "Habits",
+   each becoming a named chip inside it. A boolean is one bit of information
+   and was being given a whole cell — an eyebrow, 76px of height and half the
+   grid's width — to hold it, so four habits filled the entry banner and pushed
+   the things that actually have a magnitude off the first screen.
+
+   The cell is a normal grid cell (it spans no track it was not given): the
+   banner's welded-panel rules count cells to find the column each one is in —
+   `nth-child(3n + 1)` and, where the grid folds, `nth-child(odd)` — and a
+   spanning cell would put every cell after it in a column the count does not
+   know about. Chips wrap instead, so the cell grows in height only, and only
+   when it has to. */
+.ca-journal-habits-cell {
+  justify-content: space-between;
+  gap: 3px;
+}
+.ca-journal-habits-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  gap: 4px 5px;
+  max-width: 100%;
+  max-height: 40px;
+  overflow: hidden;
+}
+
+/* A chip is a pill, not a checkbox with a caption. The tracker's own name
+   lives in it — an eyebrow reading "EXERCISE" over a lone checkbox says the
+   same thing twice — and the whole pill tints with the state, so a row of them
+   is readable at a glance rather than a row of small boxes you have to look
+   *at*. */
+.ca-journal-habit-chip {
+  /* Anchor for the remove ×, which floats on the corner rather than taking a
+     slot in the pill: a chip is a few characters wide, and a control inline
+     with the name would either crowd it or truncate it. */
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+.ca-journal-habit-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-primary);
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.ca-journal-habit-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The box inside a chip is smaller than the standalone one and never grows:
+   the pill carries the state now, and the box is the mark on it. */
+.ca-journal-habit-chip .ca-journal-habit-box {
+  flex: 0 0 auto;
+  width: 1.15em;
+  height: 1.15em;
+  font-size: 0.85em;
+  /* Same non-decision as the standalone box above; see the note there. */
+  border-width: var(--ca-rule-hair);
+}
+.ca-journal-habit-chip-btn:hover {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+.ca-journal-habit-chip.is-done .ca-journal-habit-chip-btn {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-weight: 500;
+}
+.ca-journal-habit-chip.is-not-done .ca-journal-habit-chip-btn {
+  color: var(--text-faint);
+}
+.ca-journal-habit-chip.is-not-done .ca-journal-habit-chip-name {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* Per-chip removal. The generic cell rule already positions
+   .ca-journal-tracker-remove absolutely and hides it until hover — but the cell
+   here holds many trackers, so the anchor is the chip and the reveal is the
+   chip's own hover, or every × in the cell would light up at once. */
+.ca-journal-tracker-bar .ca-journal-habits-cell .ca-journal-tracker-remove {
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-secondary);
+  box-shadow: 0 0 0 1px var(--background-modifier-border);
+}
+.ca-journal-tracker-bar .ca-journal-habits-cell .ca-journal-tracker-remove .svg-icon {
+  width: 10px;
+  height: 10px;
+}
+/* Cancel the cell-wide reveal, then re-grant it per chip. */
+.ca-journal-tracker-bar
+  .ca-journal-habits-cell:hover
+  .ca-journal-habit-chip
+  .ca-journal-tracker-remove {
+  opacity: 0;
+}
+.ca-journal-tracker-bar
+  .ca-journal-habits-cell
+  .ca-journal-habit-chip:hover
+  .ca-journal-tracker-remove,
+.ca-journal-tracker-bar
+  .ca-journal-habits-cell
+  .ca-journal-habit-chip
+  .ca-journal-tracker-remove:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .ca-journal-tracker-bar
+    .ca-journal-habits-cell
+    .ca-journal-habit-chip
+    .ca-journal-tracker-remove {
+    opacity: 0.45;
+  }
+}
+
+/* ── Derived value chip (Sleep, when shown as a bare tracker) ───────────── */
+.ca-journal-derived-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* ── Coupled Wake-Up + Bedtime sleep control ───────────────────────────────
+   The Sleep module is a full logging cell (it carries .ca-journal-tracker-cell),
+   so the bordered card, background and padding all come from the cell rule
+   above — .ca-journal-sleep itself is a transparent internal layout wrapper. It
+   stacks a single row of both time fields over the live readout, filling the
+   shared cell height rather than being an inline island of its own. */
+.ca-journal-sleep {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 4px;
+  /* Neutralise the standalone chrome now that the cell provides it. */
+  padding: 0;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+}
+/* Bedtime and Wake-Up sit side by side as dynamic time buttons that morph
+   from "Bed"/"Wake" into the chosen time upon setting. */
+.ca-journal-sleep-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  width: 100%;
+}
+.ca-journal-sleep-btn {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--ca-border-inner);
+  border-radius: var(--ca-radius-sm);
+  background: var(--ca-surface-inset);
+  padding: 2px 6px;
+  cursor: pointer;
+  user-select: none;
+  overflow: hidden;
+  height: 27px;
+  box-sizing: border-box;
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+}
+.ca-journal-sleep-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+  transform: translateY(-1px);
+}
+.ca-journal-sleep-btn.is-set {
+  background: var(--ca-surface-raised);
+  border-color: var(--interactive-accent);
+}
+.ca-journal-sleep-btn > * {
+  pointer-events: none;
+}
+.ca-journal-sleep-btn-icon {
+  font-size: 1.05em;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.ca-journal-sleep-btn-text {
+  font-size: var(--ca-text-2xs);
+  font-family: var(--font-monospace, monospace);
+  font-weight: 700;
+  color: var(--text-normal);
+  white-space: nowrap;
+}
+.ca-journal-sleep-btn.is-set .ca-journal-sleep-btn-text {
+  color: var(--interactive-accent);
+}
+.ca-journal-sleep-btn:not(.is-set) .ca-journal-sleep-btn-text {
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--ca-text-2xs);
+}
+.ca-journal-sleep-hidden-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.ca-journal-sleep-readout {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 4px;
+  font-size: var(--ca-text-2xs);
+  font-family: var(--font-monospace, monospace);
+  font-weight: 600;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  border-top-width: 1px;
+  border-top-style: solid;
+  border-top-color: var(--ca-border-inner);
+  padding-top: 1px;
+}
+.ca-journal-sleep-asleep {
+  color: var(--ca-mood-5);
+  font-weight: 600;
+}
+.ca-journal-sleep-divider {
+  color: var(--text-faint);
+  font-weight: 400;
+  opacity: 0.6;
+}
+.ca-journal-sleep-awake {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.ca-journal-sleep-hint {
+  color: var(--text-faint);
+  font-weight: 400;
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* ── Sleep summary (aggregate over daily entries) ──────────────────────── */
+.ca-journal-sleep-summary h3 {
+  margin: 0 0 8px;
+}
+.ca-journal-sleep-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.ca-journal-sleep-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 6.5em;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  background: var(--background-secondary);
+}
+.ca-journal-sleep-stat-value {
+  font-size: 1.2em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+.ca-journal-sleep-stat-label {
+  font-size: var(--ca-text-2xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* One radius, one weight, no fill.
+   RADIUS: was `--ca-radius-pill`, then the card's `--ca-radius-md`. It is the
+   CONTROL corner now (4.13.1 §1) — the tier `--ca-radius-sm` was defined for,
+   "inputs, selects, steppers, ghost icon buttons". A button is one of those and
+   was the only one drawing itself at the card's corner, which on a 22px box is
+   most of the way back to the pill this rule's first line took it off.
+   PADDING: was `3px 12px`, two literals typed against a desktop label. It reads
+   the control scale now — the scale 3.9 §3.3 added for exactly this and which
+   the mobile floor overrides in one place. Slimmer by a pixel vertically and
+   four horizontally, which is what "slimmer" was asked for.
+   FILL: was `--background-secondary`, which is exactly what a section card is
+   painted with as of §1.6. A secondary button was drawing itself in the card's
+   own colour and surviving on its border alone; saying `transparent` makes that
+   the intent rather than a collision waiting to be "fixed" by someone who
+   notices the button has no contrast.
+   WEIGHT: 600 was heavier than any label around it. */
+.ca-journal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  padding: var(--ca-control-pad-y) var(--ca-space-4);
+  font-size: var(--ca-text-xs);
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+
+/* MONOCHROME ON HOVER TOO (4.13.1 §1). This lit the accent, which is the colour
+   the rule below has just given up — a button that is grey at rest and violet
+   under the pointer has not stopped being an accent control, it has moved the
+   accent somewhere a screenshot does not show. */
+.ca-journal-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+/* THE PRIMARY TIER IS NOT A COLOUR ANY MORE (4.13.1 §1).
+ *
+ * `mod-cta` used to fill with `--interactive-accent`, which put two violet
+ * capsules on a homepage whose every other edge is a hairline — and the same
+ * two on a dashboard, where *Add chart* shouted next to a section title drawn in
+ * 11px faint caps.
+ *
+ * THE VALUES ARE NOT NEW. `90-nav-and-study-cards.css` worked them out for the
+ * study table in 2.56, under a comment saying that "repeated on every topic row
+ * that accent becomes noise" and drawing both actions as quiet pills instead.
+ * That was right about one table for a reason that is true of every page, so the
+ * exception is hoisted here and DELETED there — an exception that has become the
+ * rule is not kept as both.
+ *
+ * THE RULE STAYS, RATHER THAN THE CLASS BEING DROPPED FROM THE MARKUP. Obsidian
+ * styles `button.mod-cta` with the accent from its own stylesheet, so "flat"
+ * has to be said out loud here or the host says the opposite. The class also
+ * still MEANS something the sheet reads: 50-entry-header.css keeps a section's
+ * one primary action's label in a narrow pane and takes the words off the
+ * others. Flat is a look, not an erasure. */
+.ca-journal-btn.mod-cta {
+  background: var(--background-secondary);
+  border-color: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.ca-journal-btn.mod-cta:hover {
+  opacity: 1;
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+/* Icon-language (Phase 2): a button carries either a Lucide icon (chrome —
+   refresh, add, edit, remove, prev/next) or an identity emoji (a journal
+   kind's own glyph, e.g. a custom type's "New Lesson" button) — never
+   both. Both sit in a fixed-size slot so mixed icon/emoji/plain buttons
+   in the same row line up. */
+.ca-journal-btn-icon {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+}
+.ca-journal-btn-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.ca-journal-btn-emoji {
+  line-height: 1;
+}
+
+/* Icon-only ghost buttons — shared by every directional/utility icon button
+   in the plugin. `.jc-arrow` was a second selector here until 2.26: the home
+   calendar's month prev/next arrows were its only users, and the quarter rail
+   retired them (every month is one tap away, so a stepper had nothing left to
+   do). The rule stands on its own rather than overriding `.ca-journal-btn`
+   because these buttons are used standalone, without the wrapper class. */
+.ca-journal-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+  padding: var(--ca-space-3);
+  border-radius: var(--ca-radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.ca-journal-btn-ghost:hover {
+  background: var(--background-modifier-hover);
+  border-color: transparent;
+  color: var(--text-normal);
+}
+.ca-journal-btn-ghost .ca-journal-btn-icon {
+  width: 0.9em;
+  height: 0.9em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SETTINGS TAB
+   ═══════════════════════════════════════════════════════════════════════
+
+   The tab is built from three repeating parts, in this order of nesting:
+
+     group   — a collapsible <details> section (Trackers, Journal types…)
+     list    — a stack of rows inside a group
+     row     — one tracker / journal type / event: token, text, pills, actions
+
+   A row is a *summary*, never a form. Every field belongs to the editor
+   modal (.ca-editor-modal, below), which is what stopped the page
+   reflowing under the cursor every time an item was expanded or its type
+   changed. The rule that keeps this honest: nothing inside .ca-list
+   is an input, a dropdown or a textarea — only toggles, which are one
+   click and change nothing else's height. */
+
+.ca-settings {
+  --ca-set-gap: 10px;
+  container-type: inline-size;
+}
+
+/* Ensure setting items and dropdown controls never squish descriptions into vertical ribbons */
+.ca-settings .setting-item {
+  min-width: 0;
+}
+
+.ca-settings .setting-item-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ca-settings .setting-item-control {
+  flex: 0 1 auto;
+  max-width: 60%;
+}
+
+/* THE CONTROL COLUMN IS A COLUMN, NOT A SHRINK-WRAP.
+   `flex: 0 1 auto` sizes the control to its own content, so picking a longer
+   value made the control wider, which narrowed the description beside it,
+   which re-wrapped the description onto another line, which moved every row
+   below it down the page. Changing "Aesthetic preset" from "3. Technical HUD
+   (Monospace Telemetry)" to "1. Editorial Monastic (Default — Serif & Warm
+   Parchment)" shifted the four settings under it by 9px, and it is one of the
+   longer lists in the tab — the effect is proportional to how much longer the
+   reader's new answer is than their old one.
+
+   A FIXED BASIS COSTS NOTHING AND FIXES IT AT THE SOURCE. The right edge does
+   not move: `justify-content: flex-end` already pinned it there and still
+   does, so a button or a toggle sits exactly where it sat. What stops moving
+   is the LEFT edge, which is the one the description is measured against.
+
+   Scoped to a group body's own rows. A control inside a table cell answers to
+   its column, and a control in the editor modals answers to rules of its own —
+   neither has a description beside it to reflow. */
+.ca-settings-body > .setting-item > .setting-item-control,
+.ca-section-fold-body > .setting-item > .setting-item-control {
+  flex: 0 0 var(--ca-settings-control-w);
+  max-width: var(--ca-settings-control-w);
+  min-width: 0;
+}
+
+/* Filling the column rather than sizing to the current answer, for the same
+   reason: a select that grows with its selected option is the reflow wearing a
+   different hat. */
+.ca-settings-body > .setting-item > .setting-item-control > select,
+.ca-settings-body > .setting-item > .setting-item-control > .dropdown,
+.ca-settings-body > .setting-item > .setting-item-control > input[type="text"],
+.ca-section-fold-body > .setting-item > .setting-item-control > select,
+.ca-section-fold-body > .setting-item > .setting-item-control > .dropdown,
+.ca-section-fold-body
+  > .setting-item
+  > .setting-item-control
+  > input[type="text"] {
+  width: 100%;
+}
+
+.ca-settings .setting-item-control select,
+.ca-settings .setting-item-control .dropdown {
+  max-width: 100%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+/* Stacking for narrow panes / mobile sidebars */
+@container (max-width: 520px) {
+  .ca-settings .setting-item:not(.setting-item-inline) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .ca-settings .setting-item:not(.setting-item-inline) .setting-item-control {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+  /* Stacked, the control has the whole row and the description is above it
+     rather than beside it — so there is nothing left to reflow and a fixed
+     basis would only make the control narrower than the space it has. */
+  .ca-settings-body > .setting-item > .setting-item-control,
+  .ca-section-fold-body > .setting-item > .setting-item-control {
+    flex: 1 1 auto;
+    max-width: 100%;
+  }
+}
+
+/* --- Settings Hero Card ------------------------------------------------ */
+
+.ca-settings-hero-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  margin-bottom: 12px;
+  box-shadow: var(--ca-elev-1);
+}
+
+.ca-hero-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ca-hero-title {
+  font-weight: 600;
+  font-size: var(--ca-text-sm);
+  color: var(--text-normal);
+  line-height: 1.3;
+}
+
+.ca-hero-sub {
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  margin-top: 2px;
+}
+
+.ca-settings-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ca-settings-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--ca-radius-sm);
+  background: var(--ca-surface-inset);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: var(--ca-text-xs);
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.ca-settings-link:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+  color: var(--text-normal);
+}
+
+.ca-settings-link-kofi:hover {
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+
+.ca-settings-link svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* --- Settings Toolbar: Search row with Repair Button & Tabs ------------ */
+.ca-settings-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.ca-settings-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.ca-settings-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ca-settings-search-icon {
+  position: absolute;
+  left: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.ca-settings-search-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ca-settings-search-input {
+  width: 100%;
+  padding: 7px 32px 7px 34px !important;
+  background: var(--ca-surface-inset) !important;
+  border: 1px solid var(--background-modifier-border) !important;
+  border-radius: var(--ca-radius-sm) !important;
+  color: var(--text-normal) !important;
+  font-size: var(--ca-text-sm) !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ca-settings-search-input:focus {
+  border-color: var(--interactive-accent) !important;
+  box-shadow: 0 0 0 2px var(--ca-border-focus) !important;
+}
+
+.ca-settings-search-clear {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--ca-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ca-settings-search-clear:hover {
+  color: var(--text-normal);
+}
+
+.ca-settings-repair-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  color: var(--text-normal);
+  font-size: var(--ca-text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.ca-settings-repair-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+.ca-settings-repair-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ca-settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ca-settings-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.ca-settings-tab-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.ca-settings-tab-btn.is-active {
+  background: var(--ca-surface-inset);
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+/* The pill's only other states are hover and active, and both are colour on a
+ * low-contrast chip — which leaves a keyboard reader tabbing through five
+ * buttons with nothing to say which one they are on. The outline is drawn
+ * outside the border so it survives `.is-active` recolouring the border, and
+ * it is `:focus-visible` rather than `:focus` so a mouse click does not leave
+ * a ring behind on a control that was already showing its state. */
+.ca-settings-tab-btn:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+
+.ca-settings-no-match {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+  background: var(--background-secondary);
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  margin: 16px 0;
+}
+
+.ca-settings .is-hidden {
+  display: none !important;
+}
+
+.ca-settings-general {
+  margin-bottom: 18px;
+}
+.ca-settings-general .setting-item:last-child {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* --- Collapsible groups ------------------------------------------------
+   Native <details> rather than a custom widget: this is a plain settings
+   tab, not a note, so there's no need for the header bars' fold state /
+   levels machinery — just something that remembers whether the user left
+   it open or closed.
+
+   The summary is a card in its own right: icon token, title + one-line
+   description, a count badge and a chevron. A collapsed tab therefore
+   still answers "how many trackers do I have?" without opening anything,
+   which the old bare text summaries could not. */
+
+.ca-settings-group {
+  margin: var(--ca-set-gap) 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  background: var(--background-secondary);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--ca-elev-1);
+}
+.ca-settings-group:hover {
+  border-color: var(--background-modifier-border-hover);
+}
+.ca-settings-group[open] {
+  background: var(--background-secondary);
+}
+
+.ca-settings-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  background: var(--background-secondary);
+  transition: background 0.12s ease;
+}
+.ca-settings-summary::-webkit-details-marker { display: none; }
+.ca-settings-summary:hover {
+  background: var(--background-modifier-hover);
+}
+.ca-settings-group[open] > .ca-settings-summary {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ca-settings-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--ca-radius-sm);
+  background: var(--ca-surface-inset);
+  border: 1px solid var(--background-modifier-border);
+  font-size: 1.05em;
+  line-height: 1;
+}
+
+.ca-settings-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ca-settings-title {
+  font-weight: 600;
+  color: var(--text-normal);
+  line-height: 1.25;
+}
+.ca-settings-sub {
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  margin-top: 1px;
+}
+
+/* THE ONE RULE 4.27's SWEEP MISSED (4.35.1). The note a few hundred lines down
+   says "Every colour in this block was a literal — #e2e8f0, #ddd6fe, #1e293b
+   and nine more" and that it converted them; this badge sat in the same file
+   with the same three and was not reached. It is the section count in Settings,
+   so what it drew was a light-mode chip on whatever the reader's theme was
+   doing — legible in dark mode by luck, which is the tell 4.27 names.
+
+   It takes the sibling pill's vocabulary rather than a fourth opinion, so the
+   badge and the pills beside it read as one family. `--ca-rule` for the border
+   width, like every other rule since 4.11. */
+.ca-settings-badge {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-secondary);
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  color: var(--text-normal);
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ca-settings-chevron {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  transition: transform 0.18s ease;
+}
+.ca-settings-chevron svg {
+  width: 18px;
+  height: 18px;
+}
+.ca-settings-group[open] > .ca-settings-summary .ca-settings-chevron {
+  transform: rotate(180deg);
+}
+
+.ca-settings-body {
+  padding: 8px 14px 14px;
+  background: var(--ca-surface-card);
+}
+/* The first setting in a body already sits under the summary's border. */
+.ca-settings-body > .setting-item:first-child {
+  border-top: none;
+}
+
+/* Explanatory preamble. One muted block rather than three loose
+   descriptions, so the wall of text before the Trackers list reads as a
+   note and not as three settings that lost their controls. */
+.ca-settings-note {
+  margin: 8px 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--ca-radius-sm);
+  background: var(--ca-surface-inset);
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--interactive-accent);
+}
+.ca-settings-note p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  line-height: 1.5;
+}
+.ca-settings-note p + p {
+  margin-top: 5px;
+}
+
+/* --- Settings Banner Live Preview ------------------------------------- */
+.ca-settings-banner-preview-wrap {
+  margin: 6px 0 12px;
+  border-radius: var(--ca-radius-md);
+  border: 1px solid var(--background-modifier-border);
+  overflow: hidden;
+  box-shadow: var(--ca-elev-1);
+}
+.ca-settings-banner-preview {
+  border-bottom: none;
+}
+
+/* --- Settings Tables (for Trackers, Journals, etc.) -------------------- */
+.ca-settings-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin: 6px 0 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  background: var(--ca-surface-inset);
+  box-shadow: var(--ca-elev-1);
+}
+
+.ca-settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: var(--ca-text-xs);
+}
+
+/* ONE GRID FOR TABLES THAT SIT UNDER EACH OTHER.
+   The Trackers group draws three tables with the same five headings — diary
+   built-ins, journal built-ins, custom — and auto layout gave each one its own
+   column positions, because auto layout's whole job is to answer to the rows
+   it was handed. Measured as it shipped, "Surface" started at x=1057 in the
+   first table and x=1017 in the third. `settings.ts` hands all three the same
+   colgroup; `fixed` is what makes the colgroup binding rather than advisory.
+
+   The min-width is the width at which every column still holds its longest
+   shipped content — "Derived (hours)" in Type is the tightest — and below it
+   the wrap's own `overflow-x` takes over rather than the columns crushing. */
+.ca-settings-table.is-fixed {
+  table-layout: fixed;
+  min-width: 600px;
+}
+
+/* Fixed columns do not grow for a long pill, so a pill has to agree not to
+   demand it. `inline-block` because `text-overflow` has nothing to act on
+   while the pill is inline. */
+.ca-settings-table.is-fixed .ca-list-pill,
+.ca-settings-table.is-fixed .ca-col-name-sub {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A column of one control per cell, named by a heading that has to sit over
+   it. `th` inherits the table's left alignment, the cell centres its content,
+   and the two disagreed by 9px on the capture matrix — enough to read as a
+   fault and not enough to read as a decision. */
+.ca-settings-table th.ca-col-grain-head {
+  text-align: center;
+}
+
+.ca-settings-table th {
+  padding: 7px 12px;
+  font-size: var(--ca-text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  background: var(--ca-surface-card);
+  border-bottom: 1px solid var(--background-modifier-border);
+  white-space: nowrap;
+}
+
+.ca-settings-table td {
+  padding: 7px 12px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.ca-settings-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ca-settings-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+.ca-settings-table tbody tr:hover {
+  background: var(--background-modifier-hover);
+}
+
+.ca-settings-table tbody tr.is-locked {
+  opacity: 0.65;
+}
+.ca-settings-table tbody tr.is-locked:hover {
+  opacity: 1;
+}
+
+.ca-settings-table .ca-col-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.ca-settings-table .ca-col-name-token {
+  flex: 0 0 auto;
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.ca-settings-table .ca-list-pills {
+  margin-top: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+/* THE PILLS ARE THEME TOKENS NOW (4.27). Every colour in this block was a
+   literal — #e2e8f0, #ddd6fe, #1e293b and nine more — so the Trackers and
+   Journals tables drew a light-mode chip on top of whatever the reader's theme
+   was doing. Legible in dark mode by luck (light chip, dark text) and plainly
+   not the plugin's, which is the tell: nothing else in this stylesheet picks a
+   colour without going through a variable.
+   The base `.ca-list-pill` a few hundred lines down already had this
+   right; these overrode it. What is left overridden is the SHAPE — a table cell
+   wants a tighter pill than a card does — and the colours go back to the base
+   rule's vocabulary. */
+.ca-settings-table .ca-list-pill {
+  padding: var(--ca-space-1) var(--ca-space-4);
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-secondary);
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  color: var(--text-normal);
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.ca-settings-table .ca-list-pill.is-muted {
+  background: var(--background-secondary);
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+/* The one pill that means "on", so it is the one that takes the accent. */
+.ca-settings-table .ca-list-pill.is-on {
+  background: rgba(var(--interactive-accent-rgb, 138, 92, 245), 0.15);
+  border: var(--ca-rule) solid
+    rgba(var(--interactive-accent-rgb, 138, 92, 245), 0.4);
+  color: var(--text-accent);
+  font-weight: 600;
+}
+
+/* Dashed, because "off" is an absence — the border says so without needing a
+   second colour to mean it. */
+.ca-settings-table .ca-list-pill.is-off {
+  background: transparent;
+  border: var(--ca-rule) dashed var(--background-modifier-border);
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+.ca-settings-table code {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-secondary);
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  color: var(--text-normal);
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.3;
+  vertical-align: middle;
+}
+
+.ca-settings-table .ca-col-id {
+  white-space: nowrap;
+}
+
+.ca-settings-table th.ca-col-edit-head,
+.ca-settings-table .ca-col-edit-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ca-settings-table .ca-col-actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ca-settings-table .ca-col-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.ca-settings-table .ca-col-actions .ca-list-toggle {
+  margin-left: 0;
+}
+
+/* --- A grain column (4.27: Diary entries) -------------------------------
+   One cell per grain, holding either a control or a word about why there
+   isn't one. Centred, because a column of toggles reads as a column only if
+   they line up on their own axis rather than on their labels' — which is what
+   `.ca-col-actions` does one rule above, correctly, for a cluster pinned to the
+   right-hand edge of a row.
+   `.setting-item-control` is overridden for the same reason: `.ca-list-
+   toggle`'s own rule justifies it to flex-end, right for an actions cluster
+   and wrong for a cell whose whole width belongs to one control. */
+.ca-settings-table .ca-col-grain {
+  text-align: center;
+}
+
+/* CENTRED AT EVERY LEVEL, NOT JUST THE TOP ONE.
+   `.ca-list-toggle` centred its child, and its child was Obsidian's
+   `.setting-item`, whose own `.setting-item-control` justifies to flex-end and
+   carries the platform's control padding. So the box was centred and the
+   switch sat at one end of it: measured 9px left of the column's middle on
+   every grain but the first. Each level is told to fill its parent and centre
+   what it holds, which leaves nothing between the cell's centre line and the
+   switch. */
+.ca-settings-table .ca-col-grain .ca-list-toggle,
+.ca-settings-table .ca-col-grain .ca-list-toggle .setting-item,
+.ca-settings-table .ca-col-grain .ca-list-toggle .setting-item-control {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  justify-content: center;
+}
+.ca-settings-table .ca-col-grain .setting-item {
+  border: none;
+  padding: 0;
+}
+.ca-settings-table .ca-col-grain .dropdown {
+  max-width: 100%;
+  font-size: var(--ca-text-xs);
+  border-radius: var(--ca-radius-sm);
+  padding: 3px 6px;
+  cursor: pointer;
+  background-color: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+.ca-settings-table .ca-col-grain .dropdown:hover {
+  border-color: var(--interactive-accent);
+}
+.ca-settings-table .ca-col-grain .dropdown.has-value {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+  font-weight: 500;
+}
+
+/* The blurb under a row's name. THE ROW KEEPS ITS WORDS: a table of emoji and
+   toggles with nothing to read is a worse settings page than the stacked rows
+   it replaced, and the blurb is the only thing saying what a section IS. */
+.ca-settings-table .ca-col-name-sub {
+  margin-top: 2px;
+  font-weight: 400;
+  font-size: var(--ca-text-2xs);
+  color: var(--text-muted);
+  white-space: normal;
+  max-width: 34ch;
+}
+
+/* "Ships" and "—". Plain and quiet on purpose — see `renderEntrySections`. */
+.ca-cell-ships {
+  color: var(--text-success);
+  font-size: var(--ca-text-2xs);
+  font-weight: 500;
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--ca-radius-pill);
+  background: rgba(61, 214, 140, 0.1);
+}
+.ca-cell-absent {
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+}
+
+/* ── Logbooks Settings Table & Emoji Picker (4.72.0) ───────────────────── */
+.ca-emoji-btn {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.ca-emoji-btn:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  transform: scale(1.05);
+}
+.ca-logbook-name-input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--ca-radius-sm);
+  font-size: var(--ca-text-sm);
+  font-weight: 600;
+  color: var(--text-normal);
+  padding: 4px 8px;
+  width: 100%;
+  max-width: 220px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.ca-logbook-name-input:hover {
+  background: var(--background-secondary);
+  border-color: var(--background-modifier-border);
+}
+.ca-logbook-name-input:focus {
+  background: var(--background-secondary);
+  border-color: var(--interactive-accent);
+  outline: none;
+}
+.ca-logbook-path-cell {
+  font-size: var(--ca-text-xs);
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ca-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.ca-emoji-tile {
+  width: 38px;
+  height: 38px;
+  font-size: 20px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.ca-emoji-tile:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  transform: scale(1.1);
+}
+.ca-emoji-tile.is-selected {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-active-hover);
+}
+.ca-emoji-cat-title {
+  font-size: var(--ca-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 12px 0 6px;
+}
+
+/* --- Section header (label + optional action) --------------------------- */
+
+.ca-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0 8px;
+}
+/* A foldable section inside a settings group. The head keeps the same
+   small-caps look as a plain .ca-section-head; what it gains is a chevron
+   on the left, an optional count on the right of the title, and <details>
+   behaviour. */
+.ca-section-fold {
+  margin: 0;
+}
+summary.ca-section-head-fold {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  border-radius: var(--ca-radius-sm);
+}
+/* Safari/WebKit draws its own disclosure triangle; ours is the chevron. */
+summary.ca-section-head-fold::-webkit-details-marker {
+  display: none;
+}
+summary.ca-section-head-fold:hover .ca-section-title,
+summary.ca-section-head-fold:hover .ca-section-chevron {
+  color: var(--text-muted);
+}
+summary.ca-section-head-fold:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 3px;
+}
+/* The chevron leads the title, so the title stays where the eye already
+   expects it; the count sits immediately after so it reads as part of the
+   label rather than as a right-aligned statistic. Any action button keeps the
+   far right, pushed there by the spacer below. */
+.ca-section-chevron {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-faint);
+  transition: transform 0.14s ease, color 0.12s ease;
+}
+.ca-section-chevron svg {
+  width: 13px;
+  height: 13px;
+}
+details[open] > summary .ca-section-chevron {
+  transform: rotate(90deg);
+}
+/* The head is a flex row with space-between, which is right for
+   title-then-action but puts the count against the far edge. Growing the title
+   instead keeps title and count together and leaves the action alone. */
+.ca-section-head-fold .ca-section-title {
+  flex: 0 0 auto;
+}
+.ca-section-count {
+  flex: 1 1 auto;
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.ca-section-head-fold .ca-section-action {
+  flex: 0 0 auto;
+}
+.ca-section-fold-body {
+  padding-bottom: 2px;
+}
+/* A collapsed section shouldn't leave the gap its open body had. */
+.ca-section-fold:not([open]) + .ca-section-fold > .ca-section-head {
+  margin-top: 10px;
+}
+/* THE TITLE TAKES THE SLACK, SO THE ACTIONS GROUP ON THE RIGHT (4.35.1).
+   `.ca-section-head` is `space-between`, which is the right answer for the
+   two children it had — a title and one button. 3.20.1 gave a section a SECOND
+   action ("Presets" beside "Add journal") and nothing here was revisited, so
+   three children got equal gaps and the first button floated into the middle of
+   the row, equidistant from the title and from the button it belongs beside.
+
+   That also made settings.ts's own claim false: it puts the primary action last
+   "so it sits rightmost, nearest the reader's expectation of where a section's
+   main button lives" — true only if the buttons are adjacent.
+
+   The fold variant already solved this, with `.ca-section-count` growing
+   to absorb the slack; this is the plain head's equivalent. The fold's own
+   `flex: 0 0 auto` override is more specific, so it is unaffected. */
+.ca-section-title {
+  flex: 1 1 auto;
+  font-size: var(--ca-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.ca-section-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: var(--ca-space-2) var(--ca-space-6);
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+/* A BUTTON HOLDING AN OPEN MENU LOOKS PRESSED (4.35.3). The accent here is a
+   HOVER, so the moment the pointer left the button — to travel into the menu it
+   had just opened — every trace of which control owned that menu went with it.
+   `.is-open` is set while the menu is up and cleared on its `onHide`, so the
+   two states are the same treatment for the same reason: this button is the
+   live one. Listed beside `:hover` rather than duplicating the declarations, so
+   the two can never drift apart. */
+.ca-section-action:hover,
+.ca-section-action.is-open {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.ca-section-action-icon {
+  display: grid;
+  place-items: center;
+}
+.ca-section-action-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* --- List rows ----------------------------------------------------------
+   One row per tracker / journal type / event. Left to right: a token
+   (emoji or coloured event icon), the text column (title, subtitle,
+   pills), then the action cluster. The actions only appear on hover on
+   desktop — a list of eight trackers with four buttons each is a lot of
+   visual noise for controls you use once a month — but they stay visible
+   whenever the row has focus inside it, so keyboard users never chase a
+   button they can't see, and always on touch, which has no hover. */
+
+.ca-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ca-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  background: var(--background-secondary);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.ca-list-row:hover {
+  border-color: var(--background-modifier-border-hover);
+}
+/* A disabled item stays legible but visibly inert — it's still listed
+   because turning it back on is the point. */
+.ca-list-row.is-locked {
+  opacity: 0.6;
+}
+.ca-list-row.is-locked:hover {
+  opacity: 1;
+}
+
+/* ── The dense variant: a row on a NOTE rather than in Settings (2.56.5) ──
+   The component was written for a settings list — a bordered card with 10px
+   of padding and a background, which is right when six of them fill a modal
+   and wrong when a dozen sit under a section header on a dashboard. Twelve
+   cards is a page of cards.
+
+   Only spacing and the token change. Not the shape: the whole value of one
+   component is that a row is a row, so a reader who has seen the section
+   editor's list already knows how to read a lesson list. */
+.ca-list-row.is-dense {
+  gap: 8px;
+  padding: 6px;
+  border: none;
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0;
+  background: none;
+  align-items: baseline;
+}
+.ca-list-row.is-dense:hover {
+  background: var(--background-modifier-hover);
+}
+.ca-list-row.is-dense:last-child {
+  border-bottom: none;
+}
+/* An empty token takes no space. A note row has no glyph of its own — its
+   identity is its name — and a 30px empty box in front of every row would
+   indent the whole list to reserve room for nothing. */
+.ca-list-row.is-dense .ca-list-token:empty {
+  display: none;
+}
+.ca-list-row.is-dense .ca-list-title {
+  font-weight: 500;
+}
+
+.ca-list-token {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  font-size: 0.95em;
+  line-height: 1;
+}
+.ca-list-token svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ca-list-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ca-list-title {
+  font-weight: 600;
+  color: var(--text-normal);
+  line-height: 1.3;
+  word-break: break-word;
+}
+.ca-list-subtitle {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  line-height: 1.45;
+}
+
+.ca-list-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.ca-list-pill {
+  padding: var(--ca-space-1) var(--ca-space-4);
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.ca-list-pill.is-on {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+.ca-list-pill.is-off {
+  color: var(--text-faint);
+  border-style: dashed;
+}
+.ca-list-pill.is-muted {
+  color: var(--text-faint);
+}
+.ca-list-pill.is-accent,
+.ca-list-pill.is-section {
+  color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  border-color: rgba(var(--interactive-accent-rgb, 139, 92, 246), 0.35);
+  font-weight: 600;
+}
+
+.ca-list-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ── The actions row (4.15 §2) ───────────────────────────────────────────
+   The same layout the narrow-viewport rule at the foot of this file has
+   given every row below 620px since it was written — "a row's pills and
+   four action buttons no longer fit beside the text, so the actions drop
+   to their own line" — offered to a caller that wants it at every width.
+
+   The section editor is the caller. It puts a dropdown or a text field in
+   that slot beside a group button and a Remove button, and a field and a
+   title dividing one line is the title's loss: it is the one that may
+   shrink. Three separate workarounds had been written for the symptom.
+
+   `flex-wrap` AND `order`, NOT A SECOND CONTAINER. The lead keeps its
+   place before the token, so "move this up" stays where list-row.ts put
+   it and away from "remove this"; only the actions move, to a full-width
+   third line under the text. */
+.ca-list-row.has-actions-row {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.ca-list-row.has-actions-row .ca-list-main {
+  /* The text takes the rest of the first line; the actions take the next.
+     `100%` on the main region would push the token onto a line of its own. */
+  flex: 1 1 0;
+}
+.ca-list-row.has-actions-row .ca-list-actions {
+  order: 3;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ca-space-2);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: var(--ca-rule-hair) solid var(--background-modifier-border);
+}
+/* Nothing dead is drawn: a row whose actions slot stayed empty draws no
+   divider and pays no padding for it. The section editor produces these —
+   a locked row has no Remove button and may have no questions either. */
+.ca-list-row.has-actions-row .ca-list-actions:empty {
+  display: none;
+}
+
+.ca-list-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--ca-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  /* Dimmed rather than hidden. A fully transparent control makes the row
+     look inert — there is nothing to tell you a tracker can be edited at
+     all until you happen to hover it. Faint-but-present reads as quiet
+     while still advertising that the row has actions. */
+  opacity: 0.45;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.ca-list-row:hover .ca-list-btn,
+.ca-list-row:focus-within .ca-list-btn {
+  opacity: 1;
+}
+.ca-list-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.ca-list-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ca-list-btn.is-danger:hover {
+  background: var(--background-modifier-error);
+  color: var(--text-error);
+}
+/* A move button at the end of the list stays in place so the cluster
+   doesn't reflow, but reads as unavailable. */
+.ca-list-btn.is-disabled,
+.ca-list-row:hover .ca-list-btn.is-disabled,
+.ca-list-row:focus-within .ca-list-btn.is-disabled {
+  opacity: 0.15;
+  cursor: default;
+}
+/* Touch has no hover, so nothing would ever reach the full-strength state. */
+@media (hover: none) {
+  .ca-list-btn { opacity: 1; }
+}
+
+/* A toggle inside a row's action cluster. Obsidian's Setting always draws
+   a full-width flex row with its own padding and border; stripped back
+   here to just the switch. */
+.ca-list-toggle {
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
+}
+.ca-list-toggle .setting-item {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: block;
+}
+.ca-list-toggle .setting-item-info { display: none; }
+.ca-list-toggle .setting-item-control {
+  padding: 0;
+  justify-content: flex-end;
+}
+
+/* --- Empty state -------------------------------------------------------- */
+
+.ca-empty-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 14px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  line-height: 1.5;
+}
+.ca-empty-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+.ca-empty-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* A secondary action that belongs to the section but isn't part of the
+   list — "Sync now" under the trackers. Sits below with a rule above it so
+   it doesn't read as another list row. */
+.setting-item.ca-settings-footer-action {
+  margin-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+  border-bottom: none;
+}
+
+/* --- Editor modals ------------------------------------------------------
+   The shared frame behind the tracker, mood, journal-type and study-emoji
+   editors. A fixed max height with only the body scrolling keeps the
+   footer's Cancel/Save reachable no matter how many fields a type has —
+   the whole point of moving these off the settings page was that the
+   controls stopped being where you left them. */
+
+.ca-editor-modal {
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  padding-top: 4px;
+}
+
+.ca-editor-head {
+  flex: 0 0 auto;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.ca-editor-head h3 {
+  margin: 0;
+  font-size: 1.15em;
+}
+.ca-editor-subtitle {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  line-height: 1.5;
+}
+
+.ca-editor-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 4px 6px;
+  margin: 0 -2px;
+  scrollbar-gutter: stable;
+}
+.ca-editor-body::-webkit-scrollbar {
+  width: 6px;
+}
+.ca-editor-body::-webkit-scrollbar-thumb {
+  background: var(--background-modifier-border-hover);
+  border-radius: var(--ca-radius-pill);
+}
+.ca-editor-body::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+.ca-editor-body .setting-item {
+  padding: 12px 0;
+}
+.ca-editor-body > .setting-item:first-child {
+  border-top: none;
+}
+
+/* Grouped fields inside a longer editor (the journal type's Identity /
+   Folders / Structure / Note kinds), so a form with ten fields reads as
+   four short ones. */
+.ca-editor-section + .ca-editor-section {
+  margin-top: 6px;
+}
+.ca-editor-section-title {
+  margin: 14px 0 0;
+  font-size: var(--ca-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.ca-editor-section-title + .setting-item {
+  border-top: none;
+}
+
+/* Rows whose control is several small inputs side by side (min/max/step/
+   unit, noun + emoji) rather than one wide one. */
+.ca-editor-inline-fields .setting-item-control {
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.ca-editor-inline-fields input.ca-editor-num {
+  width: 5.5em;
+  text-align: center;
+}
+input.ca-editor-emoji {
+  width: 3.4em;
+  text-align: center;
+}
+
+/* Textarea rows stack: a label above a full-width field, since an emoji
+   map or a kinds list needs the whole width and several lines. */
+.ca-editor-textarea .setting-item-control {
+  width: 100%;
+}
+.ca-editor-textarea textarea {
+  width: 100%;
+  min-height: 7em;
+  resize: vertical;
+}
+.ca-editor-mono {
+  font-family: var(--font-monospace);
+  font-size: var(--ca-text-sm);
+}
+
+/* Validation message. Hidden until a save is blocked, so the modal doesn't
+   pre-emptively scold anyone for a form they haven't finished. */
+.ca-editor-error {
+  flex: 0 0 auto;
+  margin: 8px 0 0;
+  padding: 8px 11px;
+  border-radius: var(--ca-radius-sm);
+  /* RED TEXT ON A TINTED PANEL, NOT ON A RED ONE.
+
+     This was `background: var(--background-modifier-error)` with
+     `color: var(--text-error)`, and in Obsidian's current default themes those
+     two resolve to the same red — so the bar rendered as a solid red block with
+     its message invisible inside it. A validation message nobody can read is
+     worse than no message: the reader sees that something is wrong and is told
+     nothing about what, which is exactly the state a form is not allowed to
+     leave someone in.
+
+     The tint is composed from the theme's own red rather than from a fixed
+     colour, so it follows a custom theme the way the old rule intended to. The
+     border carries the strong red the fill used to, which is what keeps the bar
+     as visible as it was. */
+  background: rgba(var(--color-red-rgb), 0.12);
+  border: 1px solid rgba(var(--color-red-rgb), 0.35);
+  color: var(--text-error);
+  font-size: var(--ca-text-xs);
+}
+/* A message is the only reason this exists, so an empty one is a bug rather
+   than a state — but it renders as a bare red bar if it ever happens again, and
+   a bar with nothing in it should take up no room. */
+.ca-editor-error:empty {
+  display: none;
+}
+
+/* A refusal that can be acted on (4.17 §1). The message is now its own element
+   because a button had to sit under it rather than beside it: the strings here
+   run to two sentences, and a control on the same line as two sentences either
+   wraps into them or squeezes them. */
+.ca-editor-error-text {
+  white-space: pre-line;
+}
+/* NOT `mod-cta`, AND NOT `mod-warning`. This button sits inside a red panel that
+   is already saying "something is wrong" — a second alarm colour on top of it
+   reads as a second problem, and the accent CTA reads as the thing the reader
+   came here to press, which is the SAVE button in the footer. So it is an
+   ordinary button on a red ground: available, clearly a control, and not
+   competing with the one below it. */
+.ca-editor-error-action {
+  margin-top: 8px;
+  font-size: var(--ca-text-xs);
+}
+.ca-editor-error-action[disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* --- Derived folder paths ------------------------------------------------
+   A journal's folders follow its name, so they are shown rather than typed —
+   the same treatment Settings → Paths gives every path that follows a root. */
+.ca-derived-paths {
+  padding: 9px 11px;
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-secondary);
+}
+.ca-derived-path {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+.ca-derived-path-label {
+  flex: 0 0 5.5em;
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ca-derived-path-value {
+  font-family: var(--font-monospace);
+  font-size: var(--ca-text-xs);
+  color: var(--text-muted);
+  word-break: break-all;
+}
+.ca-derived-path-note {
+  margin-top: 7px;
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+  line-height: 1.45;
+}
+
+.ca-editor-hint {
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  line-height: 1.5;
+  padding: 8px 0 2px;
+}
+
+/* --- Note kinds, as rows -------------------------------------------------
+   Replaced a textarea with a grammar of its own. The rating is the choice
+   that matters most (Recall grades into it, the trend chart plots it), so it
+   is a dropdown of the journal's real trackers rather than an asterisk. */
+.ca-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+.ca-kind {
+  padding: 9px 11px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-secondary);
+}
+.ca-kind-head {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+input.ca-kind-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+}
+.ca-kind-remove {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.ca-kind-remove:hover:not(:disabled) {
+  color: var(--text-error);
+}
+.ca-kind-remove:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.ca-kind-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  align-items: center;
+  margin-top: 8px;
+}
+.ca-kind-field-label {
+  flex: 0 0 4.6em;
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding-top: 4px;
+}
+.ca-kind-field select.dropdown {
+  font-size: var(--ca-text-sm);
+  height: auto;
+  padding: 3px 22px 3px 7px;
+}
+.ca-kind-field-note {
+  flex: 1 1 100%;
+  margin-left: 5.6em;
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+  line-height: 1.4;
+}
+.ca-kind-add {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--ca-text-sm);
+  cursor: pointer;
+}
+
+/* A suggester row with a second line, for pickers whose choices need a
+   sentence (the section catalogue). The description is the section's own
+   blurb, the same string the wizard's checklist shows. */
+.ca-choice-detailed .ca-choice-label {
+  font-weight: 600;
+}
+.ca-choice-detailed .ca-choice-desc {
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  line-height: 1.4;
+}
+/* The run heading (4.15 §3, corrected in 4.16). It is a SIBLING of the first
+   row of its group, not a child of it: as a child it sat inside the suggestion's
+   own hover and selection highlight, so the heading lit up as part of the row
+   below it and could be clicked as that row.
+
+   Selected on the class alone, so it is styled the same whether it landed beside
+   the row or — where the item was not in the tree yet — inside it.
+
+   The section bar's own spec, from the tokens rather than by eye, because this
+   is the same object one surface over: a small ruled label over the things it
+   indexes. */
+.ca-choice-group {
+  /* ITS OWN PADDING, because a sibling of the rows is not indented by them.
+     Horizontal matches Obsidian's own suggestion padding so the heading and the
+     names below it start at one x position; the fallback is that variable's
+     shipped value, for a theme that has dropped it. */
+  padding: 10px var(--size-4-3, 12px) 4px;
+  margin-bottom: 2px;
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border-hover);
+  color: var(--ca-bar-ink);
+  font-size: var(--ca-bar-text);
+  font-weight: 600;
+  letter-spacing: var(--ca-bar-track);
+  text-transform: uppercase;
+}
+/* The first heading in the list needs no space above it — the modal's own
+   padding is already there, and a run heading is not a gap between two runs
+   when there is nothing before it. */
+.ca-choice-group:first-child {
+  padding-top: 2px;
+}
+
+/* --- The journal designer's Sections step -------------------------------
+   A step rail in the head, then a two-pane body: the type's templates on
+   the left, and the sections applicable to the selected one on the right
+   above a schematic of the arrangement. The schematic is deliberately a
+   drawing rather than a render — a live `topics-table` in a journal with no
+   notes is a column of empty states, which teaches nothing about layout. */
+
+.ca-wizard-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+.ca-wizard-pip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 4px;
+  border-radius: 999px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.ca-wizard-pip.is-done {
+  cursor: pointer;
+}
+.ca-wizard-pip.is-done:hover {
+  color: var(--text-normal);
+}
+.ca-wizard-pip.is-current {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.ca-wizard-pip-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: var(--background-primary);
+  color: inherit;
+}
+.ca-wizard-pip.is-current .ca-wizard-pip-n {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.ca-wizard-sections {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding-top: 12px;
+}
+
+.ca-wizard-templates {
+  flex: 0 0 30%;
+  min-width: 8.5em;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ca-wizard-template {
+  padding: 7px 9px;
+  border-radius: var(--ca-radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  line-height: 1.3;
+}
+.ca-wizard-template:hover {
+  background: var(--background-modifier-hover);
+}
+.ca-wizard-template.is-active {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border);
+}
+.ca-wizard-template-name {
+  font-size: var(--ca-text-sm);
+  font-weight: 600;
+}
+.ca-wizard-template-count {
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+}
+
+.ca-wizard-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ca-wizard-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ca-wizard-check {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 6px 2px;
+}
+.ca-wizard-check input[type="checkbox"] {
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+.ca-wizard-check-text {
+  min-width: 0;
+}
+.ca-wizard-check-label {
+  font-size: var(--ca-text-sm);
+  font-weight: 600;
+}
+.ca-wizard-check-blurb {
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  line-height: 1.45;
+}
+
+.ca-wizard-schematic {
+  margin-top: 14px;
+  padding-top: 11px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.ca-wizard-schematic-title {
+  font-size: var(--ca-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 7px;
+}
+.ca-wizard-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ca-wizard-block {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-secondary);
+  border-left: 3px solid var(--interactive-accent);
+  font-size: var(--ca-text-xs);
+}
+.ca-wizard-block.is-frontmatter {
+  border-left-color: var(--background-modifier-border);
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-size: var(--ca-text-2xs);
+}
+.ca-wizard-block-icon {
+  flex: 0 0 auto;
+}
+
+/* A block for somewhere the thing will NOT appear. The tracker editor's
+   placement schematic draws the negatives as well as the positives, because
+   "not a Diary.base column" is the half a reader gets wrong — and a list of
+   only the positives cannot be told apart from a list that is missing one. */
+.ca-wizard-block.is-off {
+  background: transparent;
+  border-left-style: dashed;
+  border-left-color: var(--background-modifier-border);
+  color: var(--text-faint);
+}
+.ca-wizard-block.is-off .ca-wizard-block-icon {
+  opacity: 0.45;
+}
+
+.ca-wizard-schematic-note {
+  margin-top: 8px;
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+  line-height: 1.45;
+}
+
+/* --- The chart editor's size preview ------------------------------------
+   Four cells, because four is the widest a dashboard row gets before it
+   wraps — so "Large (2×2)" fills the drawing exactly and the other three
+   sizes read as fractions of something rather than as abstract dimensions.
+   The label already says 2×1; this says two columns of what. */
+.ca-wizard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: 2.4em;
+  gap: 4px;
+  max-width: 17em;
+}
+.ca-wizard-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-secondary);
+  border: 1px solid var(--interactive-accent);
+  color: var(--text-normal);
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ca-wizard-tile.is-w2 {
+  grid-column: span 2;
+}
+.ca-wizard-tile.is-h2 {
+  grid-row: span 2;
+}
+.ca-wizard-ghost {
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+}
+
+.ca-editor-footer {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+/* ── The "+ Add tracker" picker ───────────────────────────────────────────
+   A window rather than a suggester, because the list is only half the
+   question: the other half is "what if the thing I want to log isn't a
+   tracker yet", and a suggester has nowhere to put the answer. Its footer
+   carries "New tracker…" as the CTA, which is why the create path costs one
+   press from here instead of a round trip through Settings.
+
+   It USES .ca-editor-modal's frame (head / scrolling body / footer) so the
+   two windows read as the same kind of object — pressing New tracker… opens the
+   editor, and the second window should look like the first one grew fields
+   rather than like a different app.
+
+   It said "borrows" until 2.56.11, and meant it: the window extended `Modal`
+   and then built `.ca-editor-head`, `.ca-editor-subtitle` and
+   `.ca-editor-footer` by hand, copying the class names of a frame it could
+   not reach. A component that wanted the shared thing badly enough to
+   reimplement its markup, described accurately in a comment by someone who
+   could see the problem and had no cheap way to fix it. That sentence was the
+   sharpest evidence in the 2.56 plan (§5.1) and it was already in this file.
+   `TrackerPickerModal extends EditorModal` now, so the word is "uses". */
+.ca-tracker-picker .ca-picker-search {
+  flex: 0 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 12px 0 8px;
+}
+.ca-tracker-picker .ca-picker-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 80px;
+  /* Bleed to the modal's edges so a hovered row's tint runs the full width,
+     the way a suggester's rows do. */
+  margin: 0 -6px;
+  padding: 2px 6px;
+}
+.ca-picker-row {
+  padding: var(--ca-space-4) var(--ca-space-5);
+  border-radius: var(--ca-radius-md);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.ca-picker-row:hover {
+  background: var(--background-modifier-hover);
+}
+.ca-picker-row-label {
+  color: var(--text-normal);
+  font-weight: 500;
+}
+/* The second line says what the choice WRITES — its type, its unit, its
+   property. A suggester could only fit that by cramming both into one string
+   with a separator, which is what it used to do. */
+.ca-picker-row-detail {
+  margin-top: 1px;
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+}
+.ca-picker-empty {
+  padding: 18px 10px;
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+  text-align: center;
+}
+/* The CTA leads with a + so it reads as "make one" rather than as the save
+   button of a form that isn't there. */
+.ca-tracker-picker .ca-editor-footer .mod-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ca-picker-new-icon {
+  display: inline-flex;
+}
+.ca-picker-new-icon .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* --- Narrow viewports ---------------------------------------------------
+   Below the mobile breakpoint a row's pills and four action buttons no
+   longer fit beside the text, so the actions drop to their own line. */
+@media (max-width: 620px) {
+  .ca-list-row {
+    flex-wrap: wrap;
+  }
+  .ca-list-main {
+    flex: 1 1 100%;
+    order: 2;
+  }
+  .ca-list-actions {
+    order: 3;
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 4px;
+    border-top: 1px solid var(--background-modifier-border);
+  }
+  .ca-settings-sub {
+    display: none;
+  }
+}
+
+/* ── The grain row (2.58.2) ──────────────────────────────────────────────
+   Five labelled checkboxes on one line: "which diary entries can carry this
+   tracker".
+
+   A ROW, NOT A COLUMN. The five grains are one question with five answers, and
+   stacking them makes the tracker editor's third step twice as tall for a
+   question that reads at a glance. It wraps rather than scrolls or truncates,
+   because a sixth grain is a table edit away and a layout that only works at
+   five is a layout that breaks silently when the table grows.
+
+   The label wraps the input, so the text is part of the hit target. A 13px
+   checkbox on its own is a small target on a laptop trackpad and a hostile one
+   on a touch screen — and this plugin ships `isDesktopOnly: false`. */
+
+/* Obsidian's `.setting-item` is a two-column flex — text left, control right —
+   which fits one widget and fights five. Stacked, the description gets the full
+   width and the row below it gets the full width, so neither is competing for
+   space with the other. */
+.ca-setting-stacked {
+  display: block;
+}
+
+.ca-setting-stacked .setting-item-control {
+  justify-content: flex-start;
+  margin-top: var(--size-4-2);
+  padding-top: 0;
+  width: 100%;
+}
+
+.ca-grain-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  /* Left, because it now sits under the description and reads with it as one
+     block. Right-alignment was a consequence of living in the control column,
+     not a decision. */
+  justify-content: flex-start;
+  gap: var(--size-4-2) var(--size-4-3);
+}
+
+.ca-grain-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-2);
+  cursor: var(--cursor);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  white-space: nowrap;
+}
+
+/* Ticked reads as normal text, unticked as muted: the row's state is legible
+   without reading the boxes, which is the whole reason the labels are here. */
+.ca-grain-option:has(input:checked) {
+  color: var(--text-normal);
+}
+
+.ca-grain-option input {
+  margin: 0;
+}
+
+/* The wizard's reorder arrows (3.18 §2). Sized and toned like the section
+   editor's, which is the control they were lifted from — a reader who has used
+   one should not have to learn the other. Inert rather than absent at the ends
+   of the list, on the same rule the chart range cycle follows. */
+.ca-wizard-arrows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ca-wizard-arrow {
+  padding: 0 var(--ca-space-2);
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+  line-height: 1.1;
+  cursor: pointer;
+}
+.ca-wizard-arrow:hover:not(:disabled) {
+  color: var(--text-normal);
+}
+.ca-wizard-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}

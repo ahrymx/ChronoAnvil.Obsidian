@@ -1,0 +1,209 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+   Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+
+   Licensed under the GNU Affero General Public License v3.0 or later, with
+   attribution and naming terms under its section 7. See LICENSE and
+   LICENSING.md. */
+
+/* THE PAGE HEAD — 4.51.6.
+
+   Its own file rather than the bar's, because it is not the bar: the bar is
+   chrome on the leaf, and this is the first thing IN the note. What ties them
+   together is only that the head exists because the bar absorbed Obsidian's
+   title — see `page-head.ts` for that argument, and `97-vault-banner.css` for
+   the rule that hides what it stands in for. */
+
+/* ── The page head ───────────────────────────────────────────────────────
+   The remade Banner section: what a page calls itself, over what kind of page
+   it is. See `page-head.ts` for why it carries no properties.
+
+   NO CARD, WHICH IS THE WHOLE OF ITS LOOK. Every other block on a ChronoAnvil
+   note is a bordered surface, and a note that opens with one more of them
+   opens with furniture. This is the note's own head — it takes the page's
+   ground, the way a heading does, with a spine down its left edge and a rule
+   under it separating it from the first block.
+
+   ── THE SPINE IS THE HEAD'S, NOT A GRAIN'S (5.31.2) ───────────────────
+
+   IT LIVED IN 99-aesthetic-presets.css UNTIL THIS RELEASE, and being there is
+   what made it conditional: four selectors, every one of them gated on
+   `[data-ca-grain]` or `[data-ca-journal]`. `page-head.ts` writes those on a
+   diary entry, on a period dashboard and on a note inside a registered journal
+   — and on nothing else. So SIX pages drew a bold line of text over a hairline
+   and no more: the Homepage, Search, the Diary folder note, every Logbook page
+   and the journals root's own folder note. Three of them printed an eyebrow
+   with nothing to colour it but the theme's `--text-accent`, over entries that
+   were amber.
+
+   `30-header-bars.css` had already met half of it and written it down —
+   *"page-head.ts sets neither on Home or on Search"* — and patched the symptom
+   it could reach (a stack's left inset) rather than the gate.
+
+   SO THE GATE IS GONE AND NOTHING REPLACED IT. Every page head has a spine;
+   what a grain or a journal changes is its COLOUR, which it does by binding
+   `--ca-grain-spine` and letting it inherit. A custom property reaches a
+   descendant on its own, so the four `[data-ca-grain] .ca-journal-page-head`
+   selectors that existed to reach a head under an ancestor carrying the
+   attribute are not needed either: the head reads one token and the binding
+   finds it wherever it is set. Where nothing binds it, `00-tokens.css` answers
+   `--interactive-accent`, which is the vault's own colour and the right answer
+   for a page that is not a grain and not a journal.
+
+   ── THE RULE UNDER IT TAKES THAT COLOUR TOO (5.31.2) ──────────────────
+
+   It was `--background-modifier-border`: the same grey as every card edge in
+   the vault, so the head's one horizontal line belonged to nothing in
+   particular and read as the top border of the block below it. Graded out of
+   the spine's own colour, the head closes with the colour it opened with and
+   the two marks read as one figure.
+
+   PAINTED BY A PSEUDO-ELEMENT, WITH THE BORDER KEPT AND MADE TRANSPARENT.
+   `border-image` was the shorter route and cannot be taken: a slice of `1`
+   applies the image to all four borders, and the left one is the spine. The
+   border stays so the box keeps the height it has always had — the rule is
+   drawn where the border sits rather than inside the padding, which is a
+   pixel nothing else in the sheet has to know about.
+
+   AND IT REACHES UNDER THE SPINE. An absolutely positioned child is laid out
+   against its parent's PADDING box, which begins on the far side of
+   `border-left`; a rule at `left: 0` would start 3px in and leave the corner
+   the mitred border used to fill. `--ca-head-spine` is the width both of them
+   read, which is the whole reason it is a token — see `00-tokens.css`. */
+.ca-journal-page-head {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* 6px, not 2px (5.31.2). A 0.7em cap line and a 1.35em serif two pixels apart
+     read as one clump rather than as a label over a name; the eyebrow is the
+     one line here that has to be seen as introducing the other. */
+  gap: 6px;
+  padding-bottom: var(--ca-space-4);
+  /* 14px, as a literal, because the spine's gutter is what
+     `30-header-bars.css` declares for a stacked head and the two must be the
+     same number. `--ca-space-7` is 14px on a desktop and 17.5px on a phone —
+     see the mobile block in `00-tokens.css` — so the scale cannot state it. */
+  padding-left: 14px;
+  border-left: var(--ca-head-spine) solid var(--ca-grain-spine);
+  border-bottom: var(--ca-rule-hair) solid transparent;
+  background: linear-gradient(
+    90deg,
+    var(--ca-grain-tint) 0%,
+    color-mix(in srgb, var(--ca-grain-tint) 52%, transparent) 58%,
+    transparent 100%
+  );
+}
+/* The wash used to fade DOWNWARD (5.31.2). `180deg` put the most colour along the
+   head's top edge, where there is no mark at all, and none of it beside the
+   spine at the bottom, where the mark is. `90deg` puts the colour where the
+   accent is and lets it go before the name runs out of room.
+
+   AND IT USED TO RUN OUT AT 62%, WHICH THE READER SAW AS A SMUDGE (5.31.2). Two
+   stops rather than one: the ramp off the spine is the one it always was, and
+   what changes is that it lands on HALF the tint at 58% and rides that out to
+   the head's right edge instead of hitting zero there. Measured on the reported
+   render, the old stop reached nothing by 59% of a 696px card, so two thirds of
+   a wide head was flat card and the colour read as a stain in the corner rather
+   than as a wash the name sits on. Nothing near the spine moves: the first
+   stop's value and position are unchanged, so the four heads the reader has
+   already signed off keep the density they were signed off at. */
+.ca-journal-page-head::after {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--ca-head-spine));
+  right: 0;
+  bottom: calc(-1 * var(--ca-rule-hair));
+  height: var(--ca-rule-hair);
+  background: linear-gradient(
+    90deg,
+    var(--ca-grain-spine) 0%,
+    color-mix(in srgb, var(--ca-grain-spine) 18%, transparent) 46%,
+    transparent 100%
+  );
+}
+/* `--ca-grain-accent` RATHER THAN `--text-accent` (5.31.2), for the same reason
+   the spine reads `--ca-grain-spine`: one token, bound where the grain is
+   known and answered by `00-tokens.css` where it is not. The old value is what
+   left the Diary folder note printing DIARY in the theme's purple over a
+   month of amber entries. */
+.ca-journal-page-head .ca-jph-eyebrow {
+  color: var(--ca-grain-accent);
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
+  text-transform: uppercase;
+}
+.ca-journal-page-head .ca-jph-titlerow {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+/* THE FACE OBSIDIAN'S INLINE TITLE HAD, because this stands in its place and a
+   reader should not be able to tell that anything moved — except that this one
+   knows what the note is and can be clicked. */
+.ca-journal-page-head .ca-jph-title {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--ca-space-3);
+  font-size: var(--ca-head-title-size);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-normal);
+  cursor: text;
+}
+/* A NAME THE READER DID NOT TYPE TAKES NO TEXT CURSOR (4.51.7). A period
+   dashboard's head prints *August 2026* — a fact about which window the page is
+   on, not a name anyone owns — so the row is text: no pencil is attached, and
+   the caret that says "click me" must not be either. */
+.ca-journal-page-head .ca-jph-title.is-fixed {
+  cursor: default;
+}
+.ca-journal-page-head .ca-jph-title-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Hover-revealed, at rest on touch — `94-native-tables.css`'s rule and the
+   same exception. */
+.ca-journal-page-head .ca-jph-title-edit {
+  display: flex;
+  align-self: center;
+  opacity: 0;
+  color: var(--text-faint);
+  transition: opacity 120ms ease;
+}
+.ca-journal-page-head .ca-jph-title-edit .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.ca-journal-page-head .ca-jph-title:hover .ca-jph-title-edit {
+  opacity: 1;
+}
+@media (hover: none) {
+  .ca-journal-page-head .ca-jph-title-edit {
+    opacity: 0.55;
+  }
+}
+/* In place, on the title's own metrics, so the row does not jump when clicked. */
+.ca-journal-page-head .ca-jph-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: none;
+  border-bottom: var(--ca-rule) solid var(--interactive-accent);
+  border-radius: 0;
+  background: transparent;
+  font-size: var(--ca-head-title-size);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-normal);
+}
+.ca-journal-page-head .ca-jph-title-input:focus {
+  box-shadow: none;
+}
+.ca-journal-page-head .ca-jph-sub {
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+  font-variant-numeric: tabular-nums;
+}

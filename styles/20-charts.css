@@ -1,0 +1,940 @@
+/* ── Trends & Statistics chart grid ──────────────────────────────────────
+   The whole Trends & Statistics section renders from a single ```chronoanvil-charts
+   block, so — unlike the old one-fence-per-chart stack — every chart shares a
+   real grid parent and can be laid out as an even set of tiles. This mirrors
+   the daily tracker bar (.ca-journal-tracker-bar) above: bordered cells, exactly
+   two per row, each cell capped at 50% of the row. Each row sizes to its own
+   charts (see the cell rule below). The Add / Edit… / Remove… toolbar sits in
+   the section header bar when the block is self-titled, or in a plain row
+   (.ca-journal-chart-toolbar) above the grid otherwise. */
+.ca-journal-chart-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0 0 10px;
+}
+/* An untitled charts section (no `header:` directive) has no bar to separate it
+   from whatever sits above, so the toolbar carries the boundary itself. Used by
+   the year note, which deliberately has no header bars: a collapsible bar whose
+   section is the whole page can only hide everything. */
+.ca-journal-widget-block > .ca-journal-chart-toolbar:first-child {
+  padding-top: 14px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+/* Folding a self-titled charts section (its toolbar lives in the header bar)
+   used to be done here, with a sibling combinator naming the three classes the
+   section could render: .ca-journal-chart-grid, .ca-journal-chart-empty and the
+   .ca-journal-live-widget host the grid moved into. A list of class names is the
+   wrong shape for the rule, and it failed the way lists do — the journal
+   charts region renders a .ca-journal-jchart-stack, which was never added, so a
+   subject page's Charts section turned its chevron and kept its charts. The
+   same omission hid nothing for Learning Path's `path:` field or Resources'
+   `attach:` shelves either.
+
+   HeaderBar now folds a bar's in-block siblings whatever they are, so there is
+   nothing to enumerate and nothing to keep in step with new widgets. */
+/* Empty state — shown under the toolbar when a note has no charts yet.
+   ITS BOX IS 91-card-surface.css §3a'S AS OF 4.11: the shared info card, at
+   `--ca-rule` and solid rather than 1px and dashed. The dash was this box saying
+   "provisional", which is a thing a border cannot say and which the sentence in it
+   says perfectly well — and it was the third of three appearances one homepage
+   render showed side by side. What stays here is the type and the centring, which
+   are about this widget rather than about what an empty state is. */
+.ca-journal-chart-empty {
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+  text-align: center;
+}
+/* ── The chart grid ────────────────────────────────────────────────────────
+   Two equal columns, and — since 2.46 — a fixed row track, so a chart can
+   occupy more than one cell and a span means what it says.
+
+   The row track is the load-bearing change here, and it replaced something
+   that looked like a feature, so it is worth writing down what that was. The
+   grid used to declare no `grid-auto-rows`, so each row sized to its own
+   content between a min-height/max-height pair on the cell. That produced
+   automatic-looking sizing: a calendar heatmap holding a year of week rows
+   stretched its row to the 460px cap, and whatever chart happened to sit
+   beside it was stretched to match. The heatmap got the height it needed; its
+   neighbour got the height *the heatmap* needed. Neither was sized on its own
+   merits, and moving either chart to a different row silently resized both.
+
+   Row spans cannot be built on top of that. A tile spanning two auto rows is
+   as tall as those two rows happened to become, which depends on the other
+   charts in them — so a `tall` heatmap flanked by two summary tiles would be
+   sized by the text beside it. That is not a layout, it is a coincidence. With
+   a fixed track a tile is exactly one row high, or `2 × row + gap` when it
+   spans, and "tall" becomes a property of the chart rather than of its
+   neighbours.
+
+   The cost is real and is named rather than hidden: a chart can no longer grow
+   its own row. An all-time heatmap that used to stretch a row now scrolls
+   inside its tile until it is given the room — which the automatic size does
+   give it (see defaultSpan in charts.ts), and which is the whole point of the
+   feature. `--ca-chart-row-track` is the escape hatch if you disagree: set it
+   to `minmax(220px, auto)` in a snippet and rows grow with their content
+   again, with the spans still holding as a floor. Note that with an `auto`
+   maximum there is no longer a cap above it, so a very long heatmap will grow
+   the row rather than scrolling; that cap was the deleted `max-height`.
+
+   The column count is a variable so widening to three or four columns is a
+   one-line change that no stored size has to be revisited for — a span says
+   "wider than one column", not "two columns". */
+.ca-journal-chart-grid {
+  --ca-chart-cols: 2;
+  --ca-chart-row-h: 220px;
+  --ca-chart-gap: 10px;
+  display: grid;
+  /* minmax(0, 1fr) lets a cell shrink inside its track so a wide chart can
+     never blow the column past its share of the row. */
+  grid-template-columns: repeat(var(--ca-chart-cols), minmax(0, 1fr));
+  grid-auto-rows: var(--ca-chart-row-track, var(--ca-chart-row-h));
+  align-items: stretch;
+  gap: var(--ca-chart-gap);
+  /* Plain row flow, and until 4.45 this said `row dense`.
+
+     THE LICENCE THE OLD LINE WROTE FOR ITSELF HAS EXPIRED, and it is worth
+     keeping what it said: dense packing pulls a later small tile forward into
+     the hole a `wide` one leaves, which stops a mixed-size dashboard reading as
+     a bug — and the cost, that rendered order can differ from directive order,
+     was "affordable because position is not something the system ever means …
+     and there is no UI to reorder them."
+
+     4.45 is that UI. With dense packing a reader could drag a tile in front of
+     another, watch the write succeed, and watch the packer put it back where it
+     was — a gesture that produces no visible change, which reads as a broken
+     feature rather than as a layout rule.
+
+     So the holes come back, and they are now the reader's to close by moving a
+     tile, which is a thing they can do and could not before. One line, and
+     still reversible — but not while the grid can be dragged. */
+  grid-auto-flow: row;
+}
+/* A tile's footprint. Custom properties rather than literal `grid-column`
+   values, specifically so the narrow-pane clamp further down can override the
+   column span without !important and without fighting specificity. */
+.ca-journal-chart-grid .ca-journal-chart-cell {
+  grid-column: span var(--ca-span-c, 1);
+  grid-row: span var(--ca-span-r, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  width: 100%;
+  height: 100%;
+  min-width: 0; /* shrink within the grid track instead of overflowing */
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  background: var(--background-secondary);
+  overflow: hidden;
+}
+.ca-journal-chart-grid .ca-journal-chart-cell.is-wide {
+  --ca-span-c: 2;
+}
+.ca-journal-chart-grid .ca-journal-chart-cell.is-tall {
+  --ca-span-r: 2;
+}
+.ca-journal-chart-grid .ca-journal-chart-cell.is-large {
+  --ca-span-c: 2;
+  --ca-span-r: 2;
+}
+
+/* ── Dragging a tile (4.45) ───────────────────────────────────────────────
+   `.ca-jjc-card`'s three rules in shape, because the tile has the two properties
+   that decided them: `overflow: hidden` and a 1px border of its own.
+
+   THE CARD BEING CARRIED FADES; the one that would receive it takes an edge.
+   Two signals for two roles, which is what stops a grid mid-drag reading as two
+   selected tiles.
+
+   AN INSET SHADOW, NOT A BORDER. A second border inside a clipping cell moves
+   the canvas by a pixel as it appears — and a canvas that resizes mid-drag is
+   Chart.js redrawing under the pointer. Recolouring the existing border would
+   shift nothing, but a 1px edge is not visible enough to say "here".
+
+   AFTER the span rules and prefixed with the grid, for the cascade reason the
+   narrow-pane clamp below documents at length. */
+.ca-journal-chart-grid .ca-journal-chart-cell[draggable="true"] {
+  cursor: grab;
+}
+.ca-journal-chart-grid .ca-journal-chart-cell[draggable="true"]:active {
+  cursor: grabbing;
+}
+.ca-journal-chart-grid .ca-journal-chart-cell.is-dragging {
+  opacity: 0.45;
+}
+.ca-journal-chart-grid .ca-journal-chart-cell.is-drop-target {
+  box-shadow: inset 0 0 0 2px var(--interactive-accent);
+}
+
+/* ── Narrow panes ─────────────────────────────────────────────────────────
+   A container query, not a media query, because the constraint is the width of
+   the *pane* and not of the window. Obsidian sidebars and split panes are
+   routinely 300px inside a 1600px display, and a media query cannot see that —
+   it would leave a two-column grid, and a `wide` tile inside it, in a pane
+   narrow enough that the tile is two half-tiles' worth of chart.
+
+   The grid had no responsive rule at all before 2.46. That was survivable
+   while every tile was one cell and merely cramped; it stops being survivable
+   once a tile can be two columns wide.
+
+   SPECIFICITY TRAP, written down because it otherwise costs an afternoon:
+   container queries add no specificity of their own. A bare
+   `.ca-journal-chart-grid .ca-journal-chart-cell` (0,2,0) inside the query does not
+   tie with `.ca-journal-chart-grid .ca-journal-chart-cell.is-wide` (0,3,0) — it
+   loses, and the clamp silently does nothing. So the clamp names the modifier
+   classes to match their specificity, and sits after them in the sheet. Do not
+   reach for !important; the variable indirection exists precisely so this can
+   be won on the cascade instead.
+
+   Row spans are deliberately *not* clamped. A tall tile is still readable, and
+   still wanted, in one column — height is not the scarce axis on a narrow
+   pane. Only the column span has to give. */
+.ca-journal-chart-host {
+  container-type: inline-size;
+}
+@container (max-width: 560px) {
+  .ca-journal-chart-grid {
+    --ca-chart-cols: 1;
+  }
+  .ca-journal-chart-grid .ca-journal-chart-cell.is-wide,
+  .ca-journal-chart-grid .ca-journal-chart-cell.is-large {
+    --ca-span-c: 1;
+  }
+}
+/* The tile's title bar: the eyebrow label on the left, the range cycle button
+   anchored right. One row rather than the label alone, because the range is
+   information the tile never used to carry — two charts of one tracker over
+   different windows were indistinguishable — and because the control that
+   changes it should sit next to the thing it describes. */
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+/* Eyebrow label — small, muted, uppercase, pinned top-left — matching the
+   tracker cell's treatment so the chart below is the cell's focus. */
+.ca-journal-chart-grid .ca-journal-chart-head > .ca-journal-chart-label,
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-label {
+  flex: 1 1 auto;
+  align-self: flex-start;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The range cycle. Quiet by default — it is a label that happens to be
+   pressable, and a chart tile should read as a chart rather than as a control
+   panel — and it lifts to the accent on hover so a reader who wonders whether
+   it does anything finds out by pointing at it. */
+.ca-journal-chart-grid .ca-journal-chart-range {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: auto;
+  padding: 1px 7px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-pill);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.ca-journal-chart-grid .ca-journal-chart-range:hover {
+  color: var(--text-normal);
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+/* Nowhere to cycle to (one available range). Still shown, because the range is
+   worth reading whether or not it can be changed — a control that vanishes on
+   some tiles and not others is harder to scan than a quiet one. */
+.ca-journal-chart-grid .ca-journal-chart-range.is-static {
+  cursor: default;
+  opacity: 0.55;
+}
+.ca-journal-chart-grid .ca-journal-chart-range.is-static:hover {
+  color: var(--text-faint);
+  border-color: var(--background-modifier-border);
+  background: transparent;
+}
+
+/* The scatter's clustering caption, under the plot. Only rendered when some
+   mark actually stands for more than one reading — see renderScatter. */
+.ca-journal-chart-note {
+  flex: 0 0 auto;
+  width: 100%;
+  padding-top: 4px;
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+  line-height: 1.4;
+  text-align: center;
+}
+/* The rendered ```tracker chart sits beneath the label and drives the cell's
+   height. Tracker emits an <svg> with intrinsic width/height; constraining
+   width to the column and letting height follow (height: auto) scales it down
+   proportionally with no cropping. max-height guards the (rare) very tall
+   chart against the cell's own max-height cap. */
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body :is(svg, canvas, img) {
+  max-width: 100%;
+  max-height: 100%;
+  height: auto;
+}
+/* Tracker wraps its output in its own containers; make them fill the body so
+   the chart uses the whole tile rather than sitting in a corner. */
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body > * {
+  max-width: 100%;
+  max-height: 100%;
+}
+/* A cell whose tracker went missing / non-chartable: a compact in-tile notice
+   instead of the chart, so the grid stays even. */
+.ca-journal-chart-grid .ca-journal-chart-cell.ca-journal-chart-missing > .ca-journal-chart-body {
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+  text-align: center;
+  padding: 0 8px;
+}
+
+/* ── Self-rendered charts (Chart.js line/bar, DOM summary + heatmap) ──────
+   ChronoAnvil now draws each chart itself (see chart-render.ts) rather than
+   embedding a Tracker ```tracker block, so bounded ranges render as reliably
+   as all-time. The three shapes share the tile/label/grid above; only the body
+   content differs. */
+
+/* Line/bar: a Chart.js <canvas> that must fill the body so it resizes with the
+   tile. The body normally centres its child (fine for the DOM shapes); for the
+   canvas we stretch instead and give it a positioned wrapper Chart.js can size
+   against. The absolute canvas + `!important` here override the generic
+   `svg,canvas,img { height:auto }` rule above, which would otherwise fight
+   Chart.js's own responsive sizing. */
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body.ca-chart-canvas {
+  align-items: stretch;
+}
+.ca-journal-chart-canvas-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+.ca-journal-chart-canvas-wrap > canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Summary: a 2×2 grid of avg / min / max / total (or entry-count) stat cards.
+   Four numbers is why `summary` is never automatically given more than one
+   cell — more room spreads them further apart rather than making them clearer.
+   But the size can be set by hand, and a 2×2 block of cards marooned in the
+   middle of a full-width tile looks like a rendering fault rather than a
+   choice, so a tile with the width for it lays them out in one row. */
+.ca-journal-chart-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+.ca-journal-chart-cell.is-wide .ca-journal-chart-summary,
+.ca-journal-chart-cell.is-large .ca-journal-chart-summary {
+  grid-template-columns: repeat(4, 1fr);
+}
+.ca-journal-chart-stat {
+  padding: 10px 8px;
+  border-radius: var(--ca-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  text-align: center;
+}
+.ca-journal-chart-stat-value {
+  font-size: 1.25em;
+  font-weight: 700;
+  color: var(--text-normal);
+  line-height: 1.2;
+}
+.ca-journal-chart-stat-label {
+  margin-top: 2px;
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Heatmap: a calendar that fills the tile it was given.
+
+   TWO LAYOUTS, ONE SIZING RULE. A window past HEAT_TRANSPOSE_DAYS (charts.ts)
+   transposes to the GitHub contribution shape: weeks as columns, seven fixed
+   weekday rows, month labels along the top. Anything shorter stays a
+   seven-column calendar whose row count grows with the window. Shades reuse
+   the diary calendar's mood palette.
+
+   -- WHY THE FLAT CELL TOKENS WENT, AND WHY THIS NEEDED A CONTAINER -----
+
+   Both layouts sized their cells off ONE fixed token: 13px for the year strip,
+   26px for the short grid. A tile is 220px per grid row and may be two rows
+   tall, so the graph's surface and the tile's had nothing to do with each
+   other. Measured on a 1050x450 tile: a 30-day window drew a 182x156 block of
+   squares marooned in the middle of it, and a year strip drew 109px of cells
+   in the same box. Both read as a rendering fault rather than as thin data —
+   the reader cannot tell whether the chart failed or the vault is empty.
+
+   A cell that fits has to come from BOTH the free width and the free height,
+   and inside the grid neither is knowable: a percentage resolves against the
+   wrap, and the wrap is auto-sized by the very cells being measured.
+   `container-type: size` on the body is what breaks that circle. The body's
+   height is definite — it is the flex remainder of a fixed-height tile — so
+   `cqw` and `cqh` are exactly the two numbers the fit needs, and NO RESIZE
+   LISTENER IS INVOLVED. A window listener could not see a pane split anyway,
+   which is the argument `.ca-jjh-strip` settled one widget over.
+
+   -- AND THE CLAMP IS WHAT MAKES IT SCROLL -------------------------------
+
+   `clamp(floor, fit, ceiling)` degrades in the one honest direction: past the
+   floor the cells stop shrinking and the body scrolls instead of drawing a
+   grid of 3px specks. The floor is also what keeps the maths STABLE under a
+   scrollbar. A scrollbar steals from `cqw`/`cqh`, so a fit that reacted to one
+   could oscillate — bar appears, cells shrink, content fits, bar goes, repeat.
+   It cannot: an axis only overflows once its cell size is already pinned at
+   the floor, and a pinned cell does not move when the container does. */
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body.ca-chart-heatmap-body {
+  container-type: size;
+  /* `safe` centring, not plain `center`. In an overflow container a plain
+     `center` pushes the overflowing START edge out of reach, so a year too wide
+     for its tile could be scrolled right but never back to January. */
+  align-items: safe center;
+  justify-content: safe center;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+/* The generic body rule caps a child at `max-height: 100%`, which would squash
+   the grid back into the box it is deliberately overflowing. */
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body.ca-chart-heatmap-body > * {
+  flex: 0 0 auto;
+  max-width: none;
+  max-height: none;
+}
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body.ca-chart-heatmap-body.has-drag-scroll {
+  cursor: grab;
+}
+.ca-journal-chart-grid .ca-journal-chart-cell > .ca-journal-chart-body.ca-chart-heatmap-body.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+.ca-journal-chart-heatmap-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ca-heat-gap);
+  width: max-content;
+}
+
+/* -- Strip layout: weeks as columns, seven weekday rows -----------------
+   HEIGHT-LED, AND THE WIDTH IS ALLOWED TO OVERFLOW. This is the half of the
+   fit that a first pass got backwards. Making the cell `min(width, height)`
+   does fill the tile's width — a year stops at 13px and lands flush against
+   both edges — but seven rows of 13px is 109px of graph in a 411px box, and
+   that reads as a chart zoomed out from its own tile rather than as one that
+   fits. It is the same picture the flat token drew, arrived at honestly.
+
+   So the strip sizes itself from the height alone and scrolls sideways for
+   whatever does not fit, which is the trade a contribution graph is built for:
+   the weekday rows are the axis a reader lines days up against and they must
+   be legible, while the weeks are a timeline that has always been longer than
+   the box. Weeks are also the axis with somewhere to go — the body drag-scrolls
+   and renders scrolled to the most recent week.
+
+   `/ 7.98` is `7 rows + 7 gaps` with the gap at 0.14 of a cell (see
+   `--ca-heat-strip-gap-k`) — six gaps between the rows and one between the
+   month labels and the grid. Solving it once here is what lets the gap grow
+   with the cell without the fit chasing its own tail, and it is why
+   `--ca-heat-strip-head` is the label row ALONE rather than the label row plus
+   a guessed gutter.
+
+   `--ca-heat-strip-bar` comes off the same term. The strip overflows sideways
+   by design, so its horizontal scrollbar is not an edge case — it is present on
+   every window worth scrolling, and it takes its height out of `cqh`. Ignoring
+   it sized seven rows for a box that then held eight rows' worth and clipped
+   Saturday off the bottom. */
+.ca-journal-chart-heatmap-wrap.is-strip {
+  --ca-heat-cell: clamp(
+    var(--ca-heat-strip-cell-min),
+    calc((100cqh - var(--ca-heat-strip-head) - var(--ca-heat-strip-bar)) / 7.98),
+    var(--ca-heat-strip-cell-max)
+  );
+  --ca-heat-strip-gap: calc(var(--ca-heat-cell) * var(--ca-heat-strip-gap-k));
+  gap: var(--ca-heat-strip-gap);
+  user-select: none;
+}
+/* The month row and the day column offset by ONE named gutter, and both track
+   the same cell size. Three literals for one distance is how the labels came to
+   sit a pixel off the weeks they name. */
+.ca-heat-months {
+  display: grid;
+  grid-template-columns:
+    var(--ca-heat-strip-gutter)
+    repeat(var(--ca-heat-strip-cols), var(--ca-heat-cell));
+  gap: var(--ca-heat-strip-gap);
+  width: max-content;
+  flex-shrink: 0;
+}
+.ca-heat-month-spacer {
+  width: 100%;
+}
+.ca-heat-month {
+  white-space: nowrap;
+  overflow: visible;
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  color: var(--text-faint);
+  line-height: 1;
+}
+.ca-heat-strip-row {
+  display: flex;
+  width: max-content;
+  gap: var(--ca-heat-strip-gap);
+  align-items: center;
+}
+.ca-heat-strip-days {
+  display: grid;
+  grid-template-rows: repeat(7, var(--ca-heat-cell));
+  gap: var(--ca-heat-strip-gap);
+  width: var(--ca-heat-strip-gutter);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 2px;
+}
+.ca-heat-strip-day {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  color: var(--text-faint);
+  line-height: 1;
+  height: var(--ca-heat-cell);
+}
+.ca-journal-chart-heatmap.is-strip {
+  display: grid;
+  grid-template-rows: repeat(7, var(--ca-heat-cell));
+  grid-template-columns: repeat(var(--ca-heat-strip-cols), var(--ca-heat-cell));
+  grid-auto-flow: column;
+  gap: var(--ca-heat-strip-gap);
+  width: max-content;
+}
+
+/* -- Calendar layout: seven weekday columns ----------------------------
+   Under a quarter, so at most about eight rows. NEITHER axis is fixed here —
+   seven columns and a row count that grows with the window — so unlike the
+   strip this is a genuine two-axis `min()`, and it can honestly satisfy both.
+   Past the floor the rows overflow and the body scrolls DOWN them, which is
+   the axis a calendar can be read on while scrolling. */
+.ca-journal-chart-heatmap-wrap:not(.is-strip) {
+  --ca-heat-cell: clamp(
+    var(--ca-heat-cell-min),
+    min(
+      calc(
+        (100cqw - (var(--ca-heat-cols) - 1) * var(--ca-heat-gap))
+        / var(--ca-heat-cols)
+      ),
+      calc(
+        (100cqh - var(--ca-heat-head)
+          - (var(--ca-heat-rows) - 1) * var(--ca-heat-gap))
+        / var(--ca-heat-rows)
+      )
+    ),
+    var(--ca-heat-cell-max)
+  );
+  align-items: center;
+}
+.ca-heat-weekdays {
+  display: grid;
+  grid-template-columns: repeat(var(--ca-heat-cols), var(--ca-heat-cell));
+  gap: var(--ca-heat-gap);
+  width: max-content;
+}
+.ca-heat-weekday {
+  text-align: center;
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  color: var(--text-faint);
+  line-height: 1;
+}
+.ca-journal-chart-heatmap:not(.is-strip) {
+  display: grid;
+  grid-template-columns: repeat(var(--ca-heat-cols), var(--ca-heat-cell));
+  grid-auto-rows: var(--ca-heat-cell);
+  gap: var(--ca-heat-gap);
+  width: max-content;
+}
+
+/* The cell fills its track and the track is square by construction, so there
+   is no `aspect-ratio` here any more — one that disagreed with the track would
+   quietly win and put the grid a pixel out of line with its own labels. */
+.ca-journal-chart-heat-cell {
+  width: 100%;
+  height: 100%;
+  border-radius: min(var(--ca-radius-sm), 22%);
+  background: var(--background-modifier-border);
+  box-sizing: border-box;
+}
+/* A day inside the range with no logged value: faint. A grid-padding day that
+   falls outside the range (leading/trailing partial week): invisible. */
+.ca-journal-chart-heat-cell.is-empty {
+  opacity: 0.4;
+}
+.ca-journal-chart-heat-cell.is-out {
+  background: transparent;
+}
+/* Days backed by a daily note are openable. */
+.ca-journal-chart-heat-cell.is-link {
+  cursor: pointer;
+}
+.ca-journal-chart-heat-cell.is-link:hover {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+.ca-journal-chart-heat-cell.ca-heat-1 { background: var(--ca-mood-1); }
+.ca-journal-chart-heat-cell.ca-heat-2 { background: var(--ca-mood-2); }
+.ca-journal-chart-heat-cell.ca-heat-3 { background: var(--ca-mood-3); }
+.ca-journal-chart-heat-cell.ca-heat-4 { background: var(--ca-mood-4); }
+.ca-journal-chart-heat-cell.ca-heat-5 { background: var(--ca-mood-5); }
+
+/* Study Activity heatmap — a navigable calendar month under the subject's
+   Progress header. Replaced a 260px stacked bar chart: at year scale the bars
+   were unreadable on a sparse subject, and a full-year cell strip renders one
+   active day as what looks like a fault. A month grid fits any pane width
+   without scrolling, so there's no flex-down floor or horizontal scroll here. */
+.ca-journal-activity-heatmap {
+  width: 100%;
+  margin: 4px 0 8px;
+}
+.ca-journal-act-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+/* Per-month totals, recomputed as you navigate. Deliberately not a streak:
+   a subject you don't touch for a week isn't failing, and the grid already
+   shows consecutive days spatially without asserting a judgement. */
+.ca-journal-act-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.ca-journal-act-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.ca-journal-act-stat-value {
+  font-size: var(--ca-text-base);
+  font-weight: 600;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+.ca-journal-act-stat-label {
+  font-size: var(--ca-text-xs);
+  color: var(--text-muted);
+}
+/* Divider between the lifetime stats (confidence, lessons) and the month-scoped
+   ones (active days, open, completed). The two groups sit in one rail at one
+   weight, which would otherwise imply the whole row moves with the chevrons. */
+.ca-journal-act-stat-sep {
+  width: 1px;
+  align-self: stretch;
+  min-height: 1.1em;
+  background: var(--background-modifier-border);
+}
+.ca-journal-act-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+/* The navigated period label ("Q3 2026"). A fixed min-width keeps the chevrons
+   from sliding as the label changes width between quarters. */
+.ca-journal-act-period {
+  min-width: 6em;
+  text-align: center;
+  font-size: var(--ca-text-base);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.ca-journal-act-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7em;
+  height: 1.7em;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--ca-radius-sm);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.ca-journal-act-arrow:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+/* Disabled at the range edges — no forward past this month, no back past the
+   subject's first dated note, so the chevrons can't walk into empty grids. */
+.ca-journal-act-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.ca-journal-act-arrow .svg-icon {
+  width: 1em;
+  height: 1em;
+}
+/* One quarter = three month panels in a row. The grids below are fixed-width by
+   design (see the note on 22px columns), so the panels cannot shrink — the only
+   question is what a pane too narrow for three of them does instead.
+
+   WRAPPING WAS THE ANSWER UNTIL 2.56.1, and the argument for it was sound and
+   wrong. A panel is 7x22px plus six 3px gaps = 172px, so a ~390px phone fits
+   exactly two and wraps the third; on a narrower one it fits one and wraps two.
+   An empty quarter then costs roughly 600px of vertical scroll to say nothing,
+   which is what it looked like on a phone: July, August and September stacked
+   in a column with the section below them pushed off the screen.
+
+   A RAIL instead, and only where it is needed. Fixed-width children in a
+   too-narrow container is the case horizontal scrolling exists for, and the
+   arithmetic is what makes it work here rather than merely tidy: two panels and
+   a bit are visible at any phone width, so the rail is self-evidently scrollable
+   without needing an affordance drawn on top of it. Snap points stop it
+   settling mid-month.
+
+   Above the breakpoint nothing changes — three panels fit, and a rail that
+   never scrolls is just a flex row with extra rules. */
+/* ── AND THE THREE MONTHS SHARE THE SECTION (4.38.4) ────────────────────
+ *
+ * This was a wrapping flex row of three fixed 172px panels, so on a 700px section
+ * the quarter ended around x=650 and left ~130px of ground at the right — the
+ * rail sat in the left two-thirds of a box it was the only occupant of. Measured
+ * on `dev-screenshots/20260818_16h03m37s_grim.png`.
+ *
+ * THREE EQUAL TRACKS, WHICH IS THE HEATMAP'S ANSWER one widget over: `drawStrip`
+ * asks for `minmax(cell, 1fr)` and lets the container decide how much each track
+ * gets. The same shape here, one level up — the PANELS take a third each — and
+ * the grid inside each panel does the same for its seven columns.
+ *
+ * `minmax(0, 1fr)` AND NOT `1fr`: a grid track's default minimum is `auto`, which
+ * is the panel's content, so three 172px panels in a 400px pane would overflow
+ * rather than shrink. The zero minimum is what lets the track be smaller than
+ * what is in it, and the mobile rail below is what handles that case properly. */
+.ca-journal-act-months {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 22px;
+  /* The panel is capped by its own grid's track maximum, so on a wide section it
+     is narrower than its third. Centred, the three months distribute across the
+     section instead of bunching at the left with the slack on the right — which
+     is the thing being fixed. */
+  justify-items: center;
+}
+@media (max-width: 500px) {
+  .ca-journal-act-months {
+    /* ONE ROW OF NATURAL-WIDTH PANELS, which is what `flex-wrap: nowrap` used to
+       buy and what `grid-auto-flow: column` buys now. `max-content` keeps a panel
+       at its legible width rather than squeezing three into 360px, so the rail is
+       self-evidently scrollable. */
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    justify-items: start;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    /* Room for the panel's focus ring, which a clipped overflow would shave. */
+    padding-bottom: 2px;
+    /* iOS/Android momentum without the horizontal scrollbar gutter stealing a
+       row of pixels from a grid that is already 22px to a cell. */
+    scrollbar-width: none;
+  }
+  .ca-journal-act-months::-webkit-scrollbar {
+    display: none;
+  }
+  .ca-journal-act-panel {
+    scroll-snap-align: start;
+  }
+}
+.ca-journal-act-panel {
+  display: flex;
+  flex-direction: column;
+  /* `flex: 0 0 auto` STOOD HERE and is inert now that the rail is a grid — a grid
+     item is sized by its track and by its own max. Removed rather than left as a
+     no-op that reads like it is doing something. */
+}
+/* Names the panel's month. The quarter label in the nav says which three these
+   are, but not which is which — and with three grids side by side, reading the
+   middle one off position alone is a guess. */
+.ca-journal-act-panel-title {
+  font-size: var(--ca-text-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  line-height: 1.2;
+}
+.ca-journal-act-panel.is-current .ca-journal-act-panel-title {
+  color: var(--text-normal);
+}
+/* A month later than this one can only be empty, which would otherwise read as
+   a gap in the work rather than a part of the calendar that hasn't happened. */
+.ca-journal-act-panel.is-future {
+  opacity: 0.55;
+}
+
+/* ── THE COLUMNS GROW, THE CELLS DO NOT (4.38.4) ────────────────────────
+ *
+ * This was `repeat(7, 22px)`, and the comment that stood here recorded a real
+ * regression: an earlier version used `1fr` columns with a max-width on the grid,
+ * and `aspect-ratio: 1` on the cell inflated each square to ~46px so one month
+ * towered over the section to show a handful of days. *"A calendar wants a
+ * legible cell, not a proportional one"* — that is still true and is still the
+ * rule.
+ *
+ * WHAT MAKES FLEXIBLE COLUMNS SAFE NOW is that the CELL states its own size
+ * (`width: 22px; height: 22px`, no `aspect-ratio`), so a wider track is wider
+ * SPACING and not a bigger square. That is exactly how the journals heatmap
+ * fills: `.ca-jjh-cell` is a fixed `var(--jjh-cell)` inside a `minmax(cell, 1fr)`
+ * track. The cell is pinned by a test for that reason.
+ *
+ * AND THE TRACK HAS A CEILING. `1fr` alone would give each column 46px on a
+ * 1050px dashboard and the month would read as a scatter of loose squares rather
+ * than as a calendar. 34px is where a 22px cell still reads as gridded — a third
+ * of the cell in air, no more. */
+.ca-journal-act-weekdays,
+.ca-journal-act-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(22px, 34px));
+  gap: 3px;
+  /* The cell is narrower than its track once the track grows, so it is centred
+     in it — otherwise the days drift left and the columns stop lining up with
+     the weekday letters above them. */
+  justify-items: center;
+  /* Six-row months are one row taller than five-row ones; without this the
+     legend and any panel beside them would sit at different heights. */
+  align-content: start;
+}
+.ca-journal-act-weekday {
+  text-align: center;
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  color: var(--text-faint);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+/* Day cells carry their date number: without it the grid is a texture — you can
+   see that something happened on a Thursday but not which Thursday. */
+.ca-journal-act-cell {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--background-modifier-border);
+  font-size: var(--ca-text-2xs);
+  line-height: 1;
+  color: var(--text-faint);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 2px 3px 0 0;
+  box-sizing: border-box;
+}
+/* Shaded days need a legible number against the ramp: the two darkest stops
+   take light text, the two lightest keep dark. */
+.ca-journal-act-cell.ca-act-1,
+.ca-journal-act-cell.ca-act-2 {
+  color: var(--ca-act-ink-dark);
+}
+.ca-journal-act-cell.ca-act-3,
+.ca-journal-act-cell.ca-act-4 {
+  color: var(--ca-act-ink-light);
+}
+/* A day in the month with no tasks: faint. A leading grid-padding day (so the
+   1st lands in its true weekday column): invisible. */
+/* An in-month day with no tasks still has to read as a cell — at 0.4 opacity it
+   dissolved into the panel and the grid looked like an empty box rather than a
+   calendar. A padding day outside the month stays fully invisible. */
+.ca-journal-act-cell.is-empty {
+  background: var(--background-modifier-border);
+  opacity: 0.65;
+}
+.ca-journal-act-cell.is-out {
+  background: transparent;
+  color: transparent;
+}
+/* Today. An inset ring rather than an outline so it doesn't overlap its
+   neighbours in a 3px-gap grid, and so it survives on a shaded cell. */
+.ca-journal-act-cell.is-today {
+  box-shadow: inset 0 0 0 1.5px var(--text-accent, var(--interactive-accent));
+}
+.ca-journal-act-cell.is-link {
+  cursor: pointer;
+}
+.ca-journal-act-cell.is-link:hover {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+/* Activity ramp: a single green scale, light to dark. Deliberately NOT the
+   --ca-mood-* palette the tracker heatmap uses — that's a red→green mood scale,
+   and on an activity count low is not "bad", it's just less. Top stop matches
+   the green the old chart used for completed tasks. */
+.ca-journal-act-cell.ca-act-1 { background: var(--ca-act-1); }
+.ca-journal-act-cell.ca-act-2 { background: var(--ca-act-2); }
+.ca-journal-act-cell.ca-act-3 { background: var(--ca-act-3); }
+.ca-journal-act-cell.ca-act-4 { background: var(--ca-act-4); }
+/* One legend for the whole quarter, not one per panel: the shade scale is
+   shared across the three grids (quarterActivityStats hands them a single max),
+   so three legends would imply three independent scales. */
+.ca-journal-act-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+}
+.ca-journal-act-legend .ca-journal-act-cell {
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  flex: 0 0 auto;
+}
+.ca-journal-act-legend-text {
+  font-size: var(--ca-text-2xs);
+  color: var(--text-faint);
+}

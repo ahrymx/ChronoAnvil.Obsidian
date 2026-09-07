@@ -1,0 +1,1504 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+//
+// Licensed under the GNU Affero General Public License v3.0 or later, with
+// attribution and naming terms under its section 7. See LICENSE and
+// LICENSING.md.
+
+// Moving a widget in and out of a row — 4.8 §1's arithmetic.
+//
+// WHY ALL OF IT IS PURE, for `block-move.test.ts`' reason one level down: the
+// drag is a gesture the suite cannot make, but what a drop MEANS is a function
+// from (a note, a run of lines, a slot) to a note. The delimiters are the half
+// that goes wrong quietly — a `cell` line on the wrong side of an arrival
+// renders as two widgets stacked in one column, which looks like a layout bug
+// and is a line in a file.
+
+import { describe, expect, it } from "vitest";
+import { moveCell, widgetCount, widgetRun } from "../src/core/cell-move";
+import { fnBody, readCode, readCss, readSrc } from "./sources";
+
+// The head class, spelled once so the assertion below cannot drift from it.
+const HEAD = "ca-journal-block-head";
+
+// The homepage's shape: a divided row of three, then a titled block, with the
+// composer's own spacing throughout.
+const PAGE = [
+  "`chronoanvil:spacer`",
+  "```chronoanvil",
+  "row",
+  "diary:3",
+  "cell",
+  "launcher",
+  "cell",
+  "journals",
+  "```",
+  "",
+  "```chronoanvil",
+  "header:⏳ Open tasks",
+  "tasks-table:,period",
+  "```",
+  "",
+];
+
+// A row that never divided itself: 4.2's markup, one cell per directive.
+const PLAIN = [
+  "```chronoanvil",
+  "row",
+  "diary:3",
+  "journals",
+  "```",
+  "",
+  "```chronoanvil",
+  "links:home",
+  "```",
+  "",
+];
+
+// The body of block `n`, as the lines between its fences.
+const body = (out: string[] | null, n: number): string[] => {
+  expect(out).not.toBeNull();
+  const fences: string[][] = [];
+  let open: string[] | null = null;
+  for (const line of out!) {
+    if (line.startsWith("```") && line.trim() !== "```") {
+      open = [];
+      continue;
+    }
+    if (line.trim() === "```" && open) {
+      fences.push(open);
+      open = null;
+      continue;
+    }
+    open?.push(line);
+  }
+  return fences[n];
+};
+
+describe("taking a widget out of a row", () => {
+  it("gives it a block of its own and leaves the row with the rest", () => {
+    const out = moveCell(PAGE, { block: 0, from: 5, to: 6 }, { kind: "block", at: 2 });
+    expect(body(out, 0)).toEqual(["row", "diary:3", "cell", "launcher"]);
+    expect(body(out, 2)).toEqual(["journals"]);
+  });
+
+  it("drops the delimiter that is left opening nothing", () => {
+    const out = moveCell(PAGE, { block: 0, from: 5, to: 6 }, { kind: "block", at: 2 });
+    // The `cell` line that used to open the third column would otherwise sit at
+    // the end of the body saying a cell is there.
+    expect(body(out, 0).filter((l) => l === "cell")).toHaveLength(1);
+  });
+
+  it("stops calling the block a row once one widget is left", () => {
+    const once = moveCell(PAGE, { block: 0, from: 5, to: 6 }, { kind: "block", at: 2 })!;
+    const twice = moveCell(once, { block: 0, from: 3, to: 4 }, { kind: "block", at: 3 })!;
+    expect(body(twice, 0)).toEqual(["diary:3"]);
+  });
+
+  it("puts it where the slot pointed rather than at the end", () => {
+    const out = moveCell(PAGE, { block: 0, from: 5, to: 6 }, { kind: "block", at: 0 });
+    expect(body(out, 0)).toEqual(["journals"]);
+    expect(body(out, 1)).toEqual(["row", "diary:3", "cell", "launcher"]);
+  });
+});
+
+describe("moving a card inside its row", () => {
+  it("re-opens the cell it landed in front of", () => {
+    // Third to first. The delimiter goes AFTER the arriving run: the one that
+    // used to open the diary's cell now opens the journals', so the added one
+    // is what re-opens the diary's.
+    const out = moveCell(PAGE, { block: 0, from: 5, to: 6 }, { kind: "cell", block: 0, at: 1 });
+    expect(body(out, 0)).toEqual([
+      "row",
+      "journals",
+      "cell",
+      "diary:3",
+      "cell",
+      "launcher",
+    ]);
+  });
+
+  it("takes the delimiter with it when it lands at the end", () => {
+    const out = moveCell(PAGE, { block: 0, from: 1, to: 2 }, { kind: "cell", block: 0, at: 8 });
+    expect(body(out, 0)).toEqual([
+      "row",
+      "cell",
+      "launcher",
+      "cell",
+      "journals",
+      "cell",
+      "diary:3",
+    ]);
+  });
+
+  it("refuses a drop on either side of where the card already is", () => {
+    expect(moveCell(PAGE, { block: 0, from: 3, to: 4 }, { kind: "cell", block: 0, at: 3 })).toBeNull();
+    // The slot after a card names the line below it, which is the same place.
+    expect(moveCell(PAGE, { block: 0, from: 3, to: 4 }, { kind: "cell", block: 0, at: 4 })).toBeNull();
+  });
+});
+
+describe("putting a widget into a row", () => {
+  it("carries the block's title in with it and drops the emptied fence", () => {
+    const out = moveCell(
+      PAGE,
+      { block: 1, from: 0, to: 2 },
+      { kind: "cell", block: 0, at: 8 }
+    );
+    expect(body(out, 0)).toEqual([
+      "row",
+      "diary:3",
+      "cell",
+      "launcher",
+      "cell",
+      "journals",
+      "cell",
+      "header:⏳ Open tasks",
+      "tasks-table:,period",
+    ]);
+    // One block left, and no run of blank lines where the other one was.
+    expect(out!.filter((l) => l.startsWith("```chronoanvil"))).toHaveLength(1);
+    expect(out!.join("\n")).not.toContain("\n\n\n");
+  });
+
+  it("leaves a row that never divided itself undivided", () => {
+    const out = moveCell(
+      PLAIN,
+      { block: 1, from: 0, to: 1 },
+      { kind: "cell", block: 0, at: 4 }
+    );
+    expect(body(out, 0)).toEqual(["row", "diary:3", "journals", "links:home"]);
+  });
+
+  it("refuses to move a line between fences of different kinds", () => {
+    const mixed = [
+      "```chronoanvil",
+      "row",
+      "diary:3",
+      "journals",
+      "```",
+      "",
+      "```chronoanvil-charts",
+      "chart: mood",
+      "```",
+      "",
+    ];
+    expect(
+      moveCell(mixed, { block: 1, from: 0, to: 1 }, { kind: "cell", block: 0, at: 3 })
+    ).toBeNull();
+  });
+});
+
+describe("what it will not do", () => {
+  it("refuses a range that names no widget", () => {
+    expect(
+      moveCell(PAGE, { block: 0, from: 4, to: 5 }, { kind: "block", at: 2 })
+    ).toBeNull();
+  });
+
+  it("refuses an empty range, and a block that is not there", () => {
+    expect(moveCell(PAGE, { block: 0, from: 3, to: 3 }, { kind: "block", at: 2 })).toBeNull();
+    expect(moveCell(PAGE, { block: 7, from: 0, to: 1 }, { kind: "block", at: 2 })).toBeNull();
+    expect(moveCell(PAGE, { block: 0, from: 3, to: 4 }, { kind: "cell", block: 9, at: 0 })).toBeNull();
+  });
+
+  it("leaves every line it did not move exactly as it read it", () => {
+    const out = moveCell(PAGE, { block: 0, from: 5, to: 6 }, { kind: "block", at: 2 })!;
+    expect(out[0]).toBe("`chronoanvil:spacer`");
+    expect(out).toContain("header:⏳ Open tasks");
+    expect(out).toContain("tasks-table:,period");
+  });
+});
+
+// ── the page head, which nothing may move and nothing may join (4.11) ─
+//
+// THE ARITHMETIC'S HALF OF AN ANSWER THE GEOMETRY ALSO GIVES. `attachBlockHead`
+// draws no grip and no slot on the block holding the head, so a reader cannot
+// reach any of these. A CALLER can — a command, a layout transfer, a gesture
+// written later by someone who read block-drag.ts and not this file — and the
+// refusal is worth having where the write is.
+describe("the page head is not a source and not a destination", () => {
+  // A page as 4.10 composes one: the head first, then a row, then a titled block.
+  const HEADED = [
+    "`chronoanvil:spacer`",
+    "```chronoanvil",
+    "title:home,diary,journals",
+    "```",
+    "",
+    "```chronoanvil",
+    "row",
+    "diary:3",
+    "cell",
+    "journals",
+    "```",
+    "",
+    "```chronoanvil",
+    "header:⏳ Open tasks",
+    "tasks-table:,period",
+    "```",
+    "",
+  ];
+
+  it("will not lift it, as a block or as a column", () => {
+    // ONE TEST FOR TWO SHAPES, because both are a run containing the directive:
+    // the whole body when the block travels, and the one line when it is dropped
+    // into somebody else's column.
+    expect(
+      moveCell(HEADED, { block: 0, from: 0, to: 1 }, { kind: "block", at: 2 })
+    ).toBeNull();
+    expect(
+      moveCell(HEADED, { block: 0, from: 0, to: 1 }, { kind: "cell", block: 1, at: 0 })
+    ).toBeNull();
+    expect(
+      moveCell(HEADED, { block: 0, from: 0, to: 1 }, { kind: "group", block: 2, side: "left" })
+    ).toBeNull();
+  });
+
+  it("will not put anything in its block, by any of the four merges", () => {
+    // `group` makes the head's block a row; `cell`, `stack` and `swap` put
+    // something inside one. All four are "something else now lives in the block
+    // that holds the page's name".
+    const from = { block: 2, from: 1, to: 2 };
+    expect(moveCell(HEADED, from, { kind: "group", block: 0, side: "left" })).toBeNull();
+    expect(moveCell(HEADED, from, { kind: "group", block: 0, side: "right" })).toBeNull();
+    expect(moveCell(HEADED, from, { kind: "cell", block: 0, at: 0 })).toBeNull();
+    expect(moveCell(HEADED, from, { kind: "stack", block: 0, at: 0 })).toBeNull();
+    expect(moveCell(HEADED, from, { kind: "swap", block: 0, at: 0 })).toBeNull();
+  });
+
+  it("will not put a block above it", () => {
+    // The same promise `holdPinned` makes in the section editor. Two surfaces
+    // must not disagree about which end of the page the name is at.
+    expect(
+      moveCell(HEADED, { block: 2, from: 1, to: 2 }, { kind: "block", at: 0 })
+    ).toBeNull();
+  });
+
+  it("still moves everything else on the page", () => {
+    // THE REFUSAL MUST NOT SPREAD, which is the assertion that makes the three
+    // above worth anything: a page with a head is otherwise an ordinary page.
+    const out = moveCell(
+      HEADED,
+      { block: 2, from: 0, to: 2 },
+      { kind: "block", at: 1 }
+    );
+    expect(out).not.toBeNull();
+    expect(out!.join("\n")).toContain("title:home,diary,journals");
+    // And the head is still the first fence.
+    expect(out!.filter((l) => l.startsWith("```"))[0]).toBe("```chronoanvil");
+    expect(out!.indexOf("title:home,diary,journals")).toBeLessThan(
+      out!.indexOf("header:⏳ Open tasks")
+    );
+  });
+
+  it("says nothing about a page that has no head", () => {
+    // Every fixture above this line is such a page, and they all still move —
+    // asserted directly so a `findIndex` returning -1 cannot start meaning
+    // "block -1 is the head".
+    expect(
+      moveCell(PAGE, { block: 1, from: 1, to: 2 }, { kind: "block", at: 0 })
+    ).not.toBeNull();
+  });
+});
+
+describe("stacking a widget into a column that already has one", () => {
+  it("adds no delimiter, so the two share the cell", () => {
+    // 4.8.6. A cell has held more than one widget since 4.4 §1 and nothing
+    // could put a second one there — every arrival opened a column.
+    const out = moveCell(
+      PAGE,
+      { block: 0, from: 5, to: 6 },
+      { kind: "stack", block: 0, at: 3, after: true }
+    );
+    expect(body(out, 0)).toEqual(["row", "diary:3", "cell", "launcher", "journals"]);
+  });
+
+  it("puts it above when that is the half that was pointed at", () => {
+    const out = moveCell(
+      PAGE,
+      { block: 0, from: 5, to: 6 },
+      { kind: "stack", block: 0, at: 3, after: false }
+    );
+    expect(body(out, 0)).toEqual(["row", "diary:3", "cell", "journals", "launcher"]);
+  });
+
+  it("writes an undivided row out before stacking into it", () => {
+    // In a row with no `cell` line the ABSENCE means one column per directive,
+    // so there is no way to say "these two share a column" without saying where
+    // every other column divides. Structure only: the row renders as it did.
+    const out = moveCell(
+      PLAIN,
+      { block: 1, from: 0, to: 1 },
+      { kind: "stack", block: 0, at: 1, after: true }
+    );
+    expect(body(out, 0)).toEqual(["row", "diary:3", "links:home", "cell", "journals"]);
+  });
+
+  it("carries a widget in from another block and drops the emptied fence", () => {
+    const out = moveCell(
+      PAGE,
+      { block: 1, from: 0, to: 2 },
+      { kind: "stack", block: 0, at: 1, after: true }
+    );
+    expect(body(out, 0)).toEqual([
+      "row",
+      "diary:3",
+      "header:⏳ Open tasks",
+      "tasks-table:,period",
+      "cell",
+      "launcher",
+      "cell",
+      "journals",
+    ]);
+    expect(out!.filter((l) => l.startsWith("```chronoanvil"))).toHaveLength(1);
+  });
+
+  it("refuses a widget dropped on its own two halves", () => {
+    // Every widget's stacking halves point at its own line, so this is the
+    // commonest drop a reader makes and it means "I have changed my mind".
+    for (const after of [true, false]) {
+      expect(
+        moveCell(PAGE, { block: 0, from: 5, to: 6 }, { kind: "stack", block: 0, at: 5, after })
+      ).toBeNull();
+    }
+  });
+});
+
+describe("a bare fence's widgets reorder themselves — 5.14", () => {
+  // ── WHAT THIS IS ABOUT ────────────────────────────────────────────────
+  //
+  // A diary entry composes three fences, and one of them — the shared band —
+  // holds all seven fields with no `header:` line anywhere. 5.14 drew those
+  // seven as seven cards, and a reader read the result back: *"only trackers
+  // and today's focus have the grabbers"*. The block's one grip sits on the
+  // block's top edge, which is the FIRST card's top edge, and six cards have
+  // nothing.
+  //
+  // THE ARITHMETIC WAS ALREADY THERE. `stack` has meant "beside the widget on
+  // line `at`, in that block" since 4.8.6, and nothing in it wants a row: the
+  // `delimit` branch fires only on a body that HAS a `row` line. So this is a
+  // gesture reaching a target that already worked, and these are its cases.
+
+  // Seven directives in one fence, no `header:`, no `row` — the shape of a
+  // diary entry's shared band, with the region blocks it owns left out because
+  // they are separate blocks and no drag touches them.
+  const BAND = [
+    "```chronoanvil",
+    "note:focus|Today's focus",
+    "list:highlights|Highlights",
+    "list:challenges|Challenges",
+    "note:log|Notes, reflections & learnings",
+    "attach:attachments|Attachments",
+    "tasks:todo|Tasks",
+    "note:capture#collapse|Captured",
+    "```",
+  ];
+
+  it("moves one field below another, adding no delimiter", () => {
+    // Challenges (line 2) dropped on the underside of Focus (line 0). No `cell`
+    // line is written, because a fence with no `row` in it is not a row and two
+    // adjacent directives are two widgets in a column either way.
+    const out = moveCell(
+      BAND,
+      { block: 0, from: 2, to: 3 },
+      { kind: "stack", block: 0, at: 0, after: true }
+    );
+    expect(body(out, 0)).toEqual([
+      "note:focus|Today's focus",
+      "list:challenges|Challenges",
+      "list:highlights|Highlights",
+      "note:log|Notes, reflections & learnings",
+      "attach:attachments|Attachments",
+      "tasks:todo|Tasks",
+      "note:capture#collapse|Captured",
+    ]);
+    expect(out!.some((l) => l.trim() === "cell")).toBe(false);
+    expect(out!.some((l) => l.trim() === "row")).toBe(false);
+  });
+
+  it("moves one upward, over the field it was pointed at", () => {
+    // Captured (the last line) onto the top half of Highlights. The run is
+    // lifted before the target is located — `moveCell` maps the index — so a
+    // drop from below lands where the reader aimed rather than one line off.
+    const out = moveCell(
+      BAND,
+      { block: 0, from: 6, to: 7 },
+      { kind: "stack", block: 0, at: 1, after: false }
+    );
+    expect(body(out, 0)).toEqual([
+      "note:focus|Today's focus",
+      "note:capture#collapse|Captured",
+      "list:highlights|Highlights",
+      "list:challenges|Challenges",
+      "note:log|Notes, reflections & learnings",
+      "attach:attachments|Attachments",
+      "tasks:todo|Tasks",
+    ]);
+  });
+
+  it("refuses the two drops that would change nothing", () => {
+    // Its own two halves, and the place it already occupies. Both are the
+    // commonest drop a reader makes, and both mean "I have changed my mind".
+    expect(
+      moveCell(BAND, { block: 0, from: 3, to: 4 }, {
+        kind: "stack",
+        block: 0,
+        at: 3,
+        after: true,
+      })
+    ).toBeNull();
+    expect(
+      moveCell(BAND, { block: 0, from: 3, to: 4 }, {
+        kind: "stack",
+        block: 0,
+        at: 2,
+        after: true,
+      })
+    ).toBeNull();
+  });
+
+  it("moves a tracker grid as its whole marked region (5.16)", () => {
+    // THE ARITHMETIC BEHIND `markRegion`, checked rather than argued. A grid is
+    // `# chronoanvil:trackers:start`, its cells, and the `end` — and both
+    // markers are filtered out before the dispatch loop, so no child is ever
+    // stamped with either. A range over the cells alone would land them
+    // somewhere else and leave the markers behind on nothing; the range the
+    // stamp names is marker to marker.
+    const NOTE = [
+      "```chronoanvil",
+      "row",
+      "# chronoanvil:trackers:start",
+      "tracker:mood|Mood",
+      "tracker:steps|Steps",
+      "# chronoanvil:trackers:end",
+      "cell",
+      "stats-band",
+      "```",
+      "",
+    ];
+    // Under the stats band, which is where its own two places point once the
+    // grid is one widget: after the LAST line of the run, not the first.
+    const out = moveCell(
+      NOTE,
+      { block: 0, from: 1, to: 5 },
+      { kind: "stack", block: 0, at: 6, after: true }
+    );
+    expect(out, "the region would not move whole").not.toBeNull();
+    const moved = body(out, 0);
+    // The four lines arrive in order, and nothing of the region is left behind.
+    const from = moved.indexOf("# chronoanvil:trackers:start");
+    expect(from).toBeGreaterThan(-1);
+    expect(moved.slice(from, from + 4)).toEqual([
+      "# chronoanvil:trackers:start",
+      "tracker:mood|Mood",
+      "tracker:steps|Steps",
+      "# chronoanvil:trackers:end",
+    ]);
+    expect(moved.filter((l) => l.startsWith("# chronoanvil:trackers")).length).toBe(2);
+    expect(moved.indexOf("stats-band")).toBeLessThan(from);
+    // AND THE MIDDLE OF A RUN IS NOT A PLACE. `wireCellSlots` draws no swap on
+    // a child with a span, and this is why: the swap trades one line of the
+    // destination for the run in hand, which here is a marker.
+    expect(
+      moveCell(NOTE, { block: 0, from: 6, to: 7 }, { kind: "swap", block: 0, at: 2 })
+    ).not.toBeNull();
+    expect(
+      moveCell(NOTE, { block: 0, from: 6, to: 7 }, { kind: "swap", block: 0, at: 1 })
+    ).toBeNull();
+  });
+
+  it("draws a grip and two stacking halves on each of them", () => {
+    // `readCode` strips comments, so the anchors are the code itself — the
+    // loop from the guard that opens it to the class that closes it.
+    const src = readCode("block-drag");
+    const at = src.indexOf("const loose =");
+    expect(at).toBeGreaterThan(0);
+    // ENDS AT THE BLOCK'S OWN GRIP, which the loop used to be followed by a
+    // class-add before — 5.15 deleted that line along with the grip it placed.
+    const chunk = src.slice(at, src.indexOf("if (!perWidget) {", at));
+    expect(chunk).toContain("ca-jbd-slot-over");
+    expect(chunk).toContain("ca-jbd-slot-under");
+    expect(chunk).toContain('kind: "stack"');
+    // ONE HELPER FOR THE RANGE AS OF 5.16, and it is what carries a widget
+    // bar's whole run as well as a `height:` line above an ordinary widget.
+    expect(chunk).toContain("runOf(bodyNow(), line, span)");
+    // The two ranges are the same run, exactly as they are for a widget in a
+    // cell: what it takes past its neighbour is what it takes out to a block.
+    expect(chunk).toContain("{ whole: run, cell: run }");
+  });
+
+  it("draws none of it where a row, a section or a lone widget says not to", () => {
+    const src = readCode("block-drag");
+    const at = src.indexOf("const loose =");
+    expect(at).toBeGreaterThan(0);
+    const chunk = src.slice(at, at + 400);
+    // A row's cells already draw all five places, and a cell is a stacking
+    // context that would seal these inside it.
+    expect(chunk).toContain("row || section");
+    // A fence that titles itself is a section: its lines are that section's
+    // body, and its own bar is one of the stamped children this would pick up.
+    expect(src.slice(at, at + 900)).toContain("loose.length > 1");
+    // AND THE WIDGET BAR IS IN IT AGAIN AS OF 5.16, WITH A RANGE. It is the one
+    // child that is not one directive — every inline kind lands in it together
+    // and `stampLines` gives it the line of the first — so 5.15 kept it out of
+    // both loops rather than move one tracker out from under the nine still
+    // drawn inside the element being held. A vault read the result as the head
+    // it left behind: *"these widgets headers are missing the drag icons."*
+    //
+    // `holdsBar` IS GONE WITH THE WITHHOLDING, and its absence is asserted
+    // rather than left to be noticed: a predicate that still existed would be
+    // the next release's way of writing the same refusal back in.
+    expect(src).not.toContain("holdsBar");
+    const looseLoop = src.slice(src.indexOf("if (perWidget) {"));
+    expect(looseLoop.slice(0, 500)).toContain("const span = spanOf(child);");
+    // `allCells` RATHER THAN `cells` AS OF 5.16 — every page's, not the open
+    // page's; see the pages test in block-move.test.ts.
+    const cellLoop = src.slice(src.indexOf("for (const cell of allCells) {"));
+    expect(cellLoop.slice(0, 600)).toContain("const span = spanOf(child);");
+  });
+
+  it("draws no block grip at all where the widgets took them (5.15)", () => {
+    // 4.8.6's duplicate, arriving in the one place 5.14 did not close: with no
+    // head and no bar, the block's grip lands on the first widget's top edge.
+    // 5.14 shoved it aside with `has-widget-grips`; a reader read the result
+    // for what it was — *"there seems to be a dragger for the entire group of
+    // sections on diary entries? it is not necessary."*
+    const src = readCode("block-drag");
+    // The gate is the same fact the widget loop turns on, named once.
+    expect(src).toContain("const perWidget = loose.length > 1;");
+    expect(src).toContain("if (perWidget) {");
+    const at = src.indexOf("if (!perWidget) {");
+    expect(at).toBeGreaterThan(0);
+    // And what it withholds is the BLOCK source, head/bar/container and all.
+    const chunk = src.slice(at, at + 500);
+    expect(chunk).toContain("head ?? bar ?? container");
+    expect(chunk).toContain("Drag to move this group");
+
+    // THE PARKING SPACE IS DELETED WITH THE PROBLEM, in the TS and in the
+    // sheet both — a class nothing adds and a rule nothing matches are the two
+    // halves of the same dead branch.
+    expect(src).not.toContain("has-widget-grips");
+    expect(readCss().replace(/\/\*[\s\S]*?\*\//g, "")).not.toContain(
+      "has-widget-grips"
+    );
+  });
+
+  it("keeps it for a fence holding one widget", () => {
+    // The fallback onto `container` is honest there — the block IS that widget
+    // — and taking it away is 4.8.1's removal again: *"the grips are missing"*.
+    const src = readCode("block-drag");
+    const at = src.indexOf("const loose =");
+    expect(src.slice(at, at + 900)).toContain("loose.length > 1");
+  });
+});
+
+describe("swapping two widgets", () => {
+  it("trades them, leaving every column with the count it had", () => {
+    const out = moveCell(
+      PAGE,
+      { block: 0, from: 1, to: 2 },
+      { kind: "swap", block: 0, at: 5 }
+    );
+    expect(body(out, 0)).toEqual(["row", "journals", "cell", "launcher", "cell", "diary:3"]);
+  });
+
+  it("works across two blocks, and takes the bar with the widget", () => {
+    const out = moveCell(
+      PAGE,
+      { block: 1, from: 0, to: 2 },
+      { kind: "swap", block: 0, at: 3 }
+    );
+    expect(body(out, 0)).toEqual([
+      "row",
+      "diary:3",
+      "cell",
+      "header:⏳ Open tasks",
+      "tasks-table:,period",
+      "cell",
+      "journals",
+    ]);
+    expect(body(out, 1)).toEqual(["launcher"]);
+  });
+
+  it("is undone by repeating it", () => {
+    const once = moveCell(PAGE, { block: 0, from: 1, to: 2 }, { kind: "swap", block: 0, at: 5 })!;
+    const twice = moveCell(once, { block: 0, from: 1, to: 2 }, { kind: "swap", block: 0, at: 5 })!;
+    expect(twice).toEqual([...PAGE]);
+  });
+
+  it("refuses a widget dropped on itself, and a range that overlaps", () => {
+    expect(moveCell(PAGE, { block: 0, from: 3, to: 4 }, { kind: "swap", block: 0, at: 3 })).toBeNull();
+    expect(moveCell(PAGE, { block: 1, from: 0, to: 2 }, { kind: "swap", block: 1, at: 1 })).toBeNull();
+  });
+
+  it("refuses a target that is not a widget", () => {
+    expect(moveCell(PAGE, { block: 0, from: 1, to: 2 }, { kind: "swap", block: 0, at: 2 })).toBeNull();
+  });
+});
+
+describe("what a whole block offers a row", () => {
+  it("refuses a block that titles itself", () => {
+    expect(widgetRun(["header:⏳ Open tasks", "tasks-table:,period"])).toBeNull();
+  });
+
+  it("refuses a bare header: too", () => {
+    expect(widgetRun(["header:", "tasks-table"])).toBeNull();
+  });
+
+  it("refuses a frame: section block", () => {
+    expect(widgetRun(["frame: section", "tasks-table"])).toBeNull();
+  });
+
+  it("extracts a widget in widget mode with inline button", () => {
+    expect(widgetRun(["month-summary", "button:new-month"])).toEqual({ from: 0, to: 2 });
+  });
+
+  it("leaves the modifier behind with the fence it describes", () => {
+    // `frame: none` is a fact about the block being emptied, not about the
+    // widget leaving it — carrying one into a row would restyle the row.
+    expect(widgetRun(["frame: none", "links:home"])).toEqual({ from: 1, to: 2 });
+  });
+
+  it("refuses a block holding two widgets", () => {
+    // Not because it is hard: because putting them in a row means deciding
+    // whether they are one column or two, and nobody has asked the reader.
+    expect(widgetRun(["diary:3", "journals"])).toBeNull();
+    expect(widgetRun(["row", "diary:3", "journals"])).toBeNull();
+  });
+
+  it("refuses a modifier caught between two content lines", () => {
+    expect(widgetRun(["header:x", "frame: none", "links:home"])).toBeNull();
+  });
+
+  it("leaves a height behind too (4.22 §5.3)", () => {
+    // A WHOLE BLOCK DRAGGED INTO A CELL. `HEIGHT_KEYWORD` is in `STRUCTURE`, so
+    // `isContent` says no and the content span stops short of it — which is the
+    // promise this file already makes about modifiers, and correct here for the
+    // same reason: a height describes a CARD, and the fence being emptied has
+    // none. The height that must travel is the one above a widget already inside
+    // a group, and `runWithHeight` carries that one.
+    expect(widgetRun(["height: 240", "links:home"])).toEqual({ from: 1, to: 2 });
+    expect(widgetRun(["height: 240"])).toBeNull();
+  });
+});
+
+describe("what a block keeps when a widget leaves it (4.22 §5.4)", () => {
+  // `pruned` is not exported — it is reached through `moveCell`, which is where
+  // the property actually matters: what the reader is left looking at.
+  const GROUP = [
+    "```chronoanvil",
+    "row",
+    "diary:3",
+    "cell",
+    "height: 240",
+    "on-this-day:always",
+    "```",
+    "",
+  ];
+
+  it("drops a height that has stopped sizing anything", () => {
+    // The widget under it went to a block of its own and took its height with
+    // it. Nothing must be left describing a card that is not there.
+    const out = moveCell(
+      GROUP,
+      { block: 0, from: 3, to: 5 },
+      { kind: "block", at: 1 }
+    );
+    expect(out).not.toBeNull();
+    const left = (out ?? []).slice(0, (out ?? []).indexOf("```") + 1);
+    expect(left).not.toContain("height: 240");
+  });
+
+  it("drops them with the row, because a card is only drawn inside one", () => {
+    // A ROW OF ONE IS NOT A ROW, so the `row` line goes — and with no row there
+    // are no cards, so a height left here would draw `parseHeights`' refusal on a
+    // block the reader never touched.
+    const out = moveCell(
+      GROUP,
+      { block: 0, from: 1, to: 2 },
+      { kind: "block", at: 1 }
+    );
+    expect(out).not.toBeNull();
+    const left = (out ?? []).slice(0, (out ?? []).indexOf("```") + 1);
+    expect(left).not.toContain("row");
+    expect(left).not.toContain("height: 240");
+  });
+});
+
+describe("the gesture that reaches this", () => {
+  const src = readSrc("block-drag");
+
+  it("speaks one type per shape the drag may take", () => {
+    // A column and a block are different shapes of the same move, and a source
+    // offers one, the other or both. The type is what a slot reads during
+    // `dragover` — it cannot read the data — so a slot declines before the
+    // reader has committed rather than on drop.
+    expect(src).toContain('const CELL_TYPE = "text/ca-cell"');
+    expect(src).toContain('const BLOCK_TYPE = "text/ca-block"');
+    // ONE `dragstart`, because there is one way to pick something up. Two
+    // sources feed it — a widget in a cell, and a block — and they differ in
+    // which types they set rather than in how they start.
+    expect(src.match(/addEventListener\("dragstart"/g) ?? []).toHaveLength(1);
+    const at = src.indexOf('addEventListener("dragstart"');
+    const body = src.slice(at, at + 900);
+    expect(body).toContain("evt.dataTransfer?.setData(BLOCK_TYPE, payload)");
+    expect(body).toContain("if (at.cell) evt.dataTransfer?.setData(CELL_TYPE, payload)");
+  });
+
+  it("carries a range per shape, because the answer depends on where it lands", () => {
+    // A block dropped onto another block moves its WHOLE body, modifiers and
+    // all. The same block dropped into a column moves only the widget and the
+    // bar over it, because a `frame:` or `row` line describes the block being
+    // emptied rather than the widget leaving it.
+    expect(src).toContain("whole: { from: number; to: number }");
+    expect(src).toContain("cell?: { from: number; to: number }");
+    // The slot that accepted the drag is the one that picks.
+    expect(src).toContain("slot(container, `ca-jbd-slot-above${edge}`, BLOCK_TYPE, (p) => p.whole");
+    expect(src).toContain('slot(child, "ca-jbd-slot-before", CELL_TYPE, (p) => p.cell');
+    // A block holding two widgets has no cell range, which is what withholds
+    // `CELL_TYPE` and with it every column slot on the page.
+    expect(src).toContain("cell: widgetRun(body) ?? undefined");
+  });
+
+  it("draws no slot that would open a third column (4.52.1)", () => {
+    // A ROW DRAWS TWO COLUMNS, so the two slots that OPEN one have nothing to
+    // offer once there are two — `empty.ts`'s rule applied to a landing place,
+    // which is the same reading 4.8.7 made of the block slots. The other three
+    // on every card are untouched: above, below and the swap in the middle do
+    // not open a column, and they are how a third widget joins a full row.
+    // ASKED OF THE PAGE BEING WIRED (5.16), which is every page rather than the
+    // one that happened to be open: a group's rows are all in the document at
+    // once and swapping pages toggles a class, so a count taken from the open
+    // row would be page 1's column count applied to page 2's slots.
+    expect(src).toContain("of.length < MAX_COLUMNS");
+    expect(src).toContain('slot(child, "ca-jbd-slot-before", CELL_TYPE, (p) => p.cell, () => {');
+    expect(src).toContain("}, hasRoom);");
+    expect(src).toContain('slot(child, "ca-jbd-slot-after", CELL_TYPE, (p) => p.cell, after, hasRoom);');
+    // AND NOT ON THE THREE THAT STACK OR SWAP, which is the half that would be
+    // silent if it were wrong: the reader would find a full group refusing every
+    // drop rather than refusing the two it must.
+    for (const cls of ["ca-jbd-slot-over", "ca-jbd-slot-under", "ca-jbd-slot-swap"]) {
+      const at = src.indexOf(`slot(child, "${cls}"`);
+      expect(at, cls).toBeGreaterThan(-1);
+      expect(src.slice(at, src.indexOf("});", at))).not.toContain("hasRoom");
+    }
+  });
+
+  it("still lets a widget already in the row change columns", () => {
+    // THE ESCAPE, AND WITHOUT IT THE CAP WOULD TAKE AWAY A GESTURE. A widget
+    // alone in a column of THIS row frees that column as the new one opens, so
+    // the count is unchanged — moving the right-hand widget to the left of the
+    // left-hand one is still a drag. Measured at `dragstart`, because a slot is
+    // asked during `dragover` where a drag's data is unreadable by design.
+    expect(src).toContain("inFlight !== null && inFlight.frees && inFlight.block === indexNow()");
+    expect(src).toContain("inFlight = { block, whole, frees: onlyInItsCell(host) }");
+    // The stamped children are the widgets: a divider is a child of the cell too
+    // and carries no line stamp, which is what makes the count exact.
+    expect(src).toContain("cell.querySelectorAll(`[${LINE_ATTR}]`).length === 1");
+  });
+
+  it("will not carry a card across a split into another note", () => {
+    // A block index means nothing outside the file it was counted in. Two notes
+    // open side by side would otherwise let a card name whichever block of the
+    // OTHER note happened to have that number — and move it.
+    expect(src).toContain("if (p.path !== path) return null;");
+    // `sourcePath` rather than `ctx.sourcePath` since 5.2: the slot factory
+    // was lifted to `makeSlot` and takes the path as an argument. Same value,
+    // asked of the same note.
+    expect(src).toContain("readPayload(evt, sourcePath)");
+  });
+
+  it("stops a slot's drop from also reaching the block under it", () => {
+    // A slot sits inside a block that is itself a drop target for the other
+    // gesture. Without this a drag carrying both types lands twice — once as a
+    // cell and once as a swap.
+    // The factory itself, which is where every slot's drop handler is written
+    // once — `makeSlot` since 5.2, `const slot` inside `attachBlockHead` before
+    // it. Read as a whole function rather than as a slice between two comments,
+    // so a later move cannot silently shrink what is being checked.
+    expect(fnBody("makeSlot", "block-drag")).toContain("evt.stopPropagation()");
+  });
+
+  it("asks where a slot points at the drop rather than at the render", () => {
+    // `indexNow`'s lesson, one level down: a block's index and its body length
+    // are both facts about a file that every drop rewrites.
+    const at = src.indexOf("slot(container, `ca-jbd-slot-above${edge}`");
+    expect(at).toBeGreaterThan(-1);
+    expect(src.slice(at, at + 400)).toContain("indexNow()");
+    expect(src).toContain("const dst = where();");
+  });
+
+  it("keeps a block's slots to itself, and puts them away again", () => {
+    // `dragleave` fires when the pointer crosses into a child, so an
+    // unconditional clear would close the slots at the moment the reader
+    // reaches for one.
+    expect(src).toContain("container.contains(to)");
+    // And a drag abandoned over a block it did not start on has no `dragend`
+    // to hear, so the first pointer movement afterwards clears up.
+    const at = src.indexOf('addEventListener("mouseover"');
+    expect(at).toBeGreaterThan(-1);
+    expect(src.slice(at, at + 200)).toContain('removeClass("is-slotting")');
+  });
+});
+
+describe("which line drew which widget", () => {
+  const widgets = readCode("widgets");
+
+  it("keeps the file's own numbering, not the loop's", () => {
+    // The filter drops comments, blanks and the modifiers, so the loop's index
+    // is a different number on any fence that has one of those in it — and
+    // writing the wrong one moves the wrong widget.
+    //
+    // ONE MORE FILTER IN 4.51.1 and the property is unchanged, which is the
+    // point of asserting `.at` rather than the list's name: a suppressed banner
+    // drops MORE lines, and each survivor still carries the number it had in
+    // the file. A filter that rebuilt the index instead of carrying it is the
+    // failure this row is for.
+    expect(widgets).toContain("const lineAt = drawable.map((k) => k.at)");
+    expect(widgets).toContain("drawn.push({ at: container.childElementCount");
+  });
+
+  it("stamps before either the cards or the row move anything", () => {
+    const stamp = widgets.indexOf("stampLines(container, drawn");
+    const card = widgets.indexOf("for (const { el, title } of named) cardWidget");
+    const row = widgets.indexOf("layOutRow(");
+    expect(stamp).toBeGreaterThan(-1);
+    expect(stamp).toBeLessThan(card);
+    expect(stamp).toBeLessThan(row);
+  });
+
+  it("hands the stamp to the wrapper built around the widget", () => {
+    // The wrapper is what a reader grabs, so the wrapper is what has to know
+    // which line it is.
+    //
+    // ONE OPERATION SINCE 5.26.1, WHERE THERE CAME TO BE TWO WRAPPERS. The row's
+    // card was the only one until a band started dressing an added widget as
+    // one of its fields (`widgets/index.ts`), and that second wrapper is built
+    // in a file that cannot see `LINE_ATTR` or `SPAN_ATTR` at all. So the six
+    // lines became `carryStamp`, and both wrappers carry the same two things
+    // rather than one carrying half of what the other does.
+    const src = readSrc("block-drag");
+    const at = src.indexOf("export function carryStamp");
+    const body = src.slice(at, src.indexOf("\n}", at));
+    expect(body).toContain("setAttribute(LINE_ATTR");
+    expect(body).toContain("setAttribute(SPAN_ATTR");
+    const card = src.indexOf("export function cardWidget");
+    expect(src.slice(card, src.indexOf("\n}", card))).toContain("carryStamp(");
+  });
+});
+
+describe("the landing places, as drawn", () => {
+  const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+  // The declarations of the rule this selector opens. Sliced from the BRACE
+  // rather than from the selector, so an anchor that reaches back past the
+  // previous rule's `}` still reads the right block.
+  const ruleFor = (sel: string): string => {
+    const at = rules.indexOf(sel);
+    expect(at, `no rule for ${sel}`).toBeGreaterThan(-1);
+    const open = rules.indexOf("{", at);
+    return rules.slice(open, rules.indexOf("}", open));
+  };
+
+  it("takes no space, so nothing moves under the pointer", () => {
+    const rule = ruleFor(".ca-jbd-slot {");
+    expect(rule).toContain("position: absolute");
+    // Drawn only while something is in the air — the rule the grip follows.
+    expect(rule).toContain("display: none");
+  });
+
+  it("is a target a hand can find, not a bar you must hit", () => {
+    // WHAT A VAULT REPORTED AS *"drag and drop does not work at all"*: the first
+    // version made the hit area and the indicator the same 18px, half of it
+    // outside the block, revealed only once the pointer was already inside. The
+    // column slots were 18px wide in a 10px gap, which is worse.
+    //
+    // The hit area is now half a block or half a column; the 3px bar is drawn by
+    // `::after`. Generosity in the target, precision in the drawing.
+    // A block's two halves, and a widget's five parts — each a share of what it
+    // is drawn on rather than a number of pixels.
+    expect(ruleFor(".ca-jbd-slot-above,")).toMatch(/height: 50%/);
+    for (const sel of [".ca-jbd-slot-before,", ".ca-jbd-slot-over,", ".ca-jbd-slot-swap {"]) {
+      expect(ruleFor(sel), sel).toMatch(/\d+%/);
+    }
+    expect(rules).toContain(".ca-jbd-slot::after {");
+    // And no fixed pixel size is left on either — that was the fault. (The row
+    // block's edge bands are the one deliberate exception; see `ca-jbd-slot-edge`.)
+    expect(ruleFor(".ca-jbd-slot-above,")).not.toMatch(/height: \d+px/);
+    expect(ruleFor(".ca-jbd-slot-before,")).not.toMatch(/width: \d+px/);
+  });
+
+  it("tiles what it covers, so no point on a block means nothing", () => {
+    // Above and below halve the block; before and after halve each column and
+    // sit above them, which is what makes the middle of a row mean "this
+    // column" while its top and bottom edges still mean "out of the row".
+    expect(ruleFor(".ca-jbd-slot-above {")).toContain("top: 0");
+    // Anchored on the previous rule's brace: `.ca-jbd-slot-below` also appears as
+    // the second selector of the pair's shared rule, and that one carries the
+    // height rather than the offset.
+    expect(ruleFor("}\n.ca-jbd-slot-below {")).toContain("top: 50%");
+    expect(ruleFor("}\n.ca-jbd-slot-before {")).toContain("left: 0");
+    expect(ruleFor("}\n.ca-jbd-slot-after {")).toContain("right: 0");
+    // TWO PER CELL, not one at each end of the row: a cell's right half names
+    // the boundary after it, which is the gap the first version left open.
+    const src = readSrc("block-drag");
+    const at = src.indexOf("cells.forEach((cell, n)");
+    expect(at, "the row is not tiled").toBeGreaterThan(-1);
+    const body = src.slice(at, src.indexOf("── WHAT CAN BE PICKED UP", at));
+    expect(body).toContain("ca-jbd-slot-before");
+    expect(body).toContain("ca-jbd-slot-after");
+    expect(body).toContain("opens[n + 1]");
+  });
+
+  it("keeps the two kinds of target off each other's ground", () => {
+    // THE BUG A VAULT FOUND: *"drag works for the row on the homepage, but not
+    // outside."* Both kinds were drawn on a row block, and the block's own slots
+    // painted over every cell slot — so a drag they DECLINE (a block being
+    // carried into a row) was declined across the whole row, with the slots that
+    // would have taken it sitting underneath, unreachable.
+    //
+    // IT IS NOT A `z-index` MISTAKE, which is why the fix is structural.
+    // `container-type: inline-size` is on the cell (4.2 §2) and implies layout
+    // containment, layout containment creates a stacking context, and a
+    // `z-index` inside one cannot rise above anything outside it. No ordering of
+    // the two numbers could have worked.
+    const src = readSrc("block-drag");
+    // On a row block the block's own slots become bands along its edges — the
+    // block's padding, which is the strip visibly outside the row — and the
+    // cells tile everything between them.
+    //
+    // AND ON A STACK, FOR THE SAME REASON, SINCE 5.15. A bare fence whose
+    // widgets draw their own places is the same shape as a row: something
+    // inside the block covers it, so the block's own two mean the one thing
+    // nothing inside it can say. The condition reads as the question rather
+    // than as two cases.
+    expect(src).toContain(
+      'const edge = row || perWidget ? " ca-jbd-slot-edge" : ""'
+    );
+    // A share of the block with a floor — it was a flat 16px, which is the
+    // block's own padding and about a fingertip.
+    expect(ruleFor(".ca-jbd-slot-edge {")).toContain("clamp(");
+    expect(ruleFor(".ca-jbd-slot-before,")).toContain("top: 0");
+    expect(ruleFor(".ca-jbd-slot-before,")).toContain("bottom: 0");
+  });
+
+  it("puts the columns OVER the block's own bands, not under them (4.54 §1)", () => {
+    // THE BUG A VAULT FOUND: *"a cell can not be dragged above a cell that is at
+    // the top, because the wrong box highlights."* Screenshotted mid-drag with
+    // the pointer on the first card of a column and the whole group lit as
+    // "above this block".
+    //
+    // The band was `clamp(24px, 25%, 72px)` at `z-index: 5`, so up to 72px of
+    // "outside the row" lay over the top of every column — and the test above
+    // says why no number on a cell slot could rise through it. So the GROUND is
+    // swapped: the cell outranks the band while a drag is in the air, and the
+    // band keeps only what no column covers.
+    //
+    // BOTH HALVES ASSERTED, because either one alone is the bug back. A band
+    // left above the cells hides the five places; a cell lifted over a band that
+    // still owns the whole top of the block leaves nothing to drop OUT of the
+    // group with.
+    const band = Number(/z-index: (\d+)/.exec(ruleFor(".ca-jbd-slot-edge {"))?.[1]);
+    const cell = Number(
+      /z-index: (\d+)/.exec(
+        ruleFor(
+          ".ca-journal-widget-block.is-slotting .ca-journal-block-row > .ca-journal-block-cell {"
+        )
+      )?.[1]
+    );
+    expect(band).toBeGreaterThan(0);
+    expect(cell).toBeGreaterThan(band);
+    // AND THE CEILING WENT WITH THE OVERLAP IT WAS RATIONING. What is left of a
+    // band is the group's padding and the reach outside the block, so the space
+    // it lost is paid back from the margin rather than from the columns.
+    expect(ruleFor(".ca-jbd-slot-edge {")).toContain("var(--ca-slot-reach)");
+    expect(ruleFor(".ca-jbd-slot-above.ca-jbd-slot-edge {")).toContain(
+      "calc(-1 * var(--ca-slot-reach))"
+    );
+    expect(ruleFor(".ca-jbd-slot-below.ca-jbd-slot-edge {")).toContain(
+      "calc(-1 * var(--ca-slot-reach))"
+    );
+    // The mark is put back on the block's own edge, or it floats in the margin
+    // and says the arrival lands in the gap between two blocks.
+    expect(ruleFor(".ca-jbd-slot-above.ca-jbd-slot-edge::after {")).toContain(
+      "var(--ca-slot-reach)"
+    );
+    expect(ruleFor(".ca-jbd-slot-below.ca-jbd-slot-edge::after {")).toContain(
+      "var(--ca-slot-reach)"
+    );
+  });
+
+  it("gives the whole card to its two places, and the block only its edges", () => {
+    // THE BUG A READER REPORTED: *"the drag-section editing system could use
+    // some refining. It seems to let the user place sections at odd
+    // positions."* Screenshotted mid-drag on an entry — the pointer is over the
+    // middle of a field and the accent bar lights on the block's own top edge,
+    // which is "take this field out of the fence".
+    //
+    // TWO HALVES, AND EITHER ONE ALONE IS THE BUG BACK. The widget's strips
+    // were a fifth of the card each (the cell's numbers, where the middle is a
+    // swap); a stack has no swap, so the middle 60% of every field belonged to
+    // nobody and fell through to the band underneath. Widening the strips with
+    // the band still tiling the block leaves the band on top; moving the band
+    // to the edges without widening the strips leaves the middle dead.
+    const src = readSrc("block-drag");
+    expect(src).toContain(
+      'const edge = row || perWidget ? " ca-jbd-slot-edge" : ""'
+    );
+    expect(src).toContain('"ca-jbd-slot-over ca-jbd-slot-loose"');
+    expect(src).toContain('"ca-jbd-slot-under ca-jbd-slot-loose"');
+    // Half each and full width, so the pair tiles the card.
+    expect(ruleFor(".ca-jbd-slot-loose {")).toContain("left: 0");
+    expect(ruleFor(".ca-jbd-slot-loose {")).toContain("right: 0");
+    expect(ruleFor(".ca-jbd-slot-over.ca-jbd-slot-loose {")).toContain(
+      "height: 50%"
+    );
+    // The lower one still carries the gap below the card, which is the rule the
+    // strip it widens was already drawn to.
+    expect(ruleFor(".ca-jbd-slot-under.ca-jbd-slot-loose {")).toContain(
+      "calc(50% + var(--ca-widget-gap))"
+    );
+    // AND THE WIDENED STRIPS OUTRANK THE BAND WITHOUT A LIFT. A row's cells
+    // needed one because a cell is `container-type` and seals its slots in; a
+    // loose widget is only `position: relative` (`.ca-jbd-host`), so its slots
+    // resolve in the block's own stacking context and the numbers decide.
+    const band = Number(/z-index: (\d+)/.exec(ruleFor(".ca-jbd-slot-edge {"))?.[1]);
+    const strip = Number(
+      /z-index: (\d+)/.exec(ruleFor(".ca-jbd-slot-over,"))?.[1]
+    );
+    expect(strip).toBeGreaterThan(band);
+  });
+
+  it("leaves no dead strip between two cards in a column (4.54 §1)", () => {
+    // The gap between two stacked cards was covered by whichever block band
+    // reached it. With the bands under the columns nothing does, so it would be
+    // the one place inside a group that means nothing. It goes to the card
+    // ABOVE — "below this one" and "above the next" are the same insertion point
+    // — because reaching upwards instead would take the strip the top band is
+    // now living on.
+    //
+    // MATCHED WHOLE, not through `ruleFor`. `.ca-jbd-slot-under` shares a rule with
+    // `.ca-jbd-slot-over` above it, so `indexOf` on the bare selector finds the
+    // pair rather than the override — the reason the older assertions here
+    // anchor on a preceding brace. An exact rule is the anchor that cannot pick
+    // the wrong one.
+    expect(rules).toContain(
+      ".ca-jbd-slot-under {\n  bottom: calc(-1 * var(--ca-widget-gap));\n" +
+        "  height: calc(20% + var(--ca-widget-gap));\n}"
+    );
+    // And the bar stays on the card's own bottom edge rather than being carried
+    // down against the top of the next card.
+    expect(rules).toContain(
+      ".ca-jbd-slot-under::after {\n  bottom: var(--ca-widget-gap);\n}"
+    );
+  });
+
+  it("draws the new-column bar in the gutter it names (4.54 §2)", () => {
+    // ARITHMETIC LEFT BEHIND BY A HIT AREA. The bar was placed half a gutter out
+    // from the CARD's edge, which was right while the slot's box started there.
+    // 4.8.3 moved the box out by `gap/2 + 9px` to widen the target and the bar,
+    // an `::after` inside the box, went with it — so the two slots naming ONE
+    // boundary drew their bars 20px apart, one on each card, neither on the seam.
+    //
+    // THE OVERHANG IS ADDED BACK AS A SUM rather than as the 8px it comes to, so
+    // the mark and the box that carries it cannot drift apart again.
+    const back = "var(--ca-widget-gap) / 2 + 9px - var(--ca-widget-gap) / 2 - 1px";
+    expect(rules).toContain(
+      `.ca-jbd-slot-before::after {\n  left: calc(${back});\n}`
+    );
+    expect(rules).toContain(
+      `.ca-jbd-slot-after::after {\n  right: calc(${back});\n}`
+    );
+    // The box's own inset, which is the half the sum above is compensating for.
+    // If this ever changes, the two `9px` stop agreeing and the bar drifts off
+    // the seam again — which is the whole of the defect.
+    expect(rules).toContain(
+      ".ca-jbd-slot-before {\n  left: calc(var(--ca-widget-gap) / -2 - 9px);\n}"
+    );
+    expect(rules).toContain(
+      ".ca-jbd-slot-after {\n  right: calc(var(--ca-widget-gap) / -2 - 9px);\n}"
+    );
+  });
+
+  it("keeps the grip out of anything that can be hidden", () => {
+    // THE OTHER HALF OF THE SAME REPORT: *"the bottom-most sections are missing
+    // their drag icons."* The grip used to sit inside the block's head, and a
+    // head is `display: none` on a block inside a section run and on an unframed
+    // one — so every block under a section header lost its grip.
+    const src = readSrc("block-drag");
+    const at = src.indexOf("function attachGrip(");
+    const fn = src.slice(at, src.indexOf("\n}", at));
+    expect(fn).not.toContain(HEAD);
+    expect(fn).toContain("host.createDiv(");
+    expect(fn).toContain('host.addClass("ca-jbd-host")');
+  });
+
+  it("puts one grip on a thing however many times it is asked", () => {
+    // From a vault: *"the drag icon can also duplicate for new widgets/sections
+    // moved into the block."* A drop rewrites the note, the block re-renders,
+    // and a widget whose element Obsidian reuses arrives already wearing one.
+    const src = readSrc("block-drag");
+    const at = src.indexOf("function attachGrip(");
+    const fn = src.slice(at, src.indexOf("\n}", at));
+    expect(fn).toContain("?.remove()");
+    expect(fn.indexOf("?.remove()")).toBeLessThan(fn.indexOf("host.createDiv("));
+  });
+
+  it("hangs a group's own grip on its head, and keeps nothing of the dodge", () => {
+    // Every grip is centred over the top edge of what it drags, so on a row of
+    // three the block's and the middle widget's landed on the same two
+    // coordinates. 4.8.6 shoved the block's aside; 4.9 §2.2 gave it the group's
+    // foot instead — the box's own edge, with nothing else on it — so the
+    // collision could not arise rather than being stepped around.
+    //
+    // AND 5.14 MOVED IT TO THE HEAD, which is the same argument with the box's
+    // OTHER own edge: a head is a strip ABOVE the cards, so the two grips are a
+    // band apart even sharing an x. The dodge stays gone, and so do the foot's
+    // overrides — a grip on the head is the base rule, centred at the top of
+    // what it drags like every other grip on the page.
+    const src = readSrc("block-drag");
+    expect(src).toContain("const head = box?.querySelector<HTMLElement>");
+    expect(src).toContain('head ? "Drag to move this group" : "Drag to move this block"');
+    expect(ruleFor(".ca-journal-group:hover .ca-journal-group-head > .ca-jbd-handle {")).toContain(
+      "opacity: 1"
+    );
+    expect(rules).not.toContain(".ca-journal-group-foot > .ca-jbd-handle");
+    // AND THE EXCEPTION IS GONE FROM BOTH SIDES. A rule kept "just in case"
+    // after the thing it worked around has been removed is the kind nobody can
+    // re-derive and nobody dares delete.
+    //
+    // THE USE, NOT THE WORD. Both files still explain the deletion in a comment,
+    // which is the record of why the foot is where it is; what must not survive
+    // is the class being applied or styled. `rules` has its comments stripped.
+    expect(src).not.toContain('addClass("jbd-aside")');
+    expect(rules).not.toContain(".jbd-aside");
+  });
+
+  it("dims the box, not the strip the grip sits in", () => {
+    // The grip is positioned against the thing it drags, and for a group that
+    // thing is the BOX while the grip lives in the foot. A 14px strip going half
+    // transparent on its own says nothing about what is moving.
+    const src = readSrc("block-drag");
+    const at = src.indexOf("dim: HTMLElement = host");
+    expect(at).toBeGreaterThan(-1);
+    expect(src).toContain('dim.addClass("is-dragging")');
+    expect(src).not.toContain('host.addClass("is-dragging")');
+  });
+
+  it("draws five places on a widget in a row, not one", () => {
+    // 4.8.6: *"inserting is only possible in a new column right now, which is
+    // half-baked."* A cell has held more than one widget since 4.4 §1 and every
+    // arrival opened a column. The five read outward — edges are the row, the
+    // middle is the widget.
+    for (const sel of ["before", "after", "over", "under", "swap"]) {
+      expect(readSrc("block-drag"), sel).toContain(`"ca-jbd-slot-${sel}"`);
+    }
+    // The middle is the largest of the five, because a swap is the one drop
+    // that needs no aim.
+    expect(ruleFor(".ca-jbd-slot-before,")).toContain("width: 20%");
+    expect(ruleFor(".ca-jbd-slot-over,")).toContain("height: 20%");
+    // And its mark is a ring rather than a bar: a bar says which side of a line
+    // the arrival goes, and a swap has no side.
+    expect(ruleFor(".ca-jbd-slot-swap::after {")).toContain("border");
+  });
+
+  it("refuses the two places a block is already in", () => {
+    // THE BUG A VAULT FOUND: *"the Trends section on the homepage doesn't seem
+    // to like to be moved (only the homepage instance)."* Trends is the last
+    // block of the homepage; the block above it is Journals; and "below
+    // Journals" is where Trends already is. `moveCell` returned null, nothing
+    // was written, and the block appeared to refuse to move.
+    //
+    // NOTHING WAS WRONG WITH THE ARITHMETIC. The fault is that a slot which
+    // cannot do anything still lit up and still took the drop — `empty.ts`'s
+    // "nothing dead is drawn", applied to a landing place.
+    const src = readSrc("block-drag");
+    expect(src).toContain("const noop = (at: number | null): boolean =>");
+    // AND IT FAILS OPEN. A slot that cannot work out its own index declines
+    // nothing — a refusal computed from a missing answer is how one uncertain
+    // block turns into a page where nothing can be dropped at all.
+    expect(src).toContain("at !== null &&");
+    // Asked before the slot lights up, not on drop.
+    const at = src.indexOf("if (!live()) return;");
+    expect(at).toBeGreaterThan(-1);
+    expect(src.slice(at, at + 120)).toContain("evt.preventDefault()");
+    // And only for a whole block: a WIDGET dropped below its own block has left
+    // its row, which is a real change.
+    expect(src).toContain("inFlight.whole &&");
+  });
+
+  it("opens a block's landing places for either shape of drag", () => {
+    // THE BUG A VAULT REPORTED TWICE. This condition read `CELL_TYPE` alone,
+    // from when a cell was the only thing a drag could be. 4.8.5 gave a whole
+    // block its drag back under a type of its own, and a block that cannot
+    // become a column sets ONLY that type — so dragging one added `is-slotting`
+    // nowhere, no slot was ever displayed, and nothing could be dropped
+    // anywhere on the page.
+    //
+    // The homepage's Trends fence is the clearest case: a `header:` line and no
+    // charts, so `widgetRun` withholds the cell range and it was the one block
+    // on that page that could not be moved.
+    const src = readSrc("block-drag");
+    const at = src.indexOf('container.addEventListener("dragover"');
+    expect(at).toBeGreaterThan(-1);
+    const body = src.slice(at, src.indexOf("});", at));
+    expect(body).toContain("CELL_TYPE");
+    expect(body).toContain("BLOCK_TYPE");
+  });
+
+  it("asks a block's index once per drag, not once per pointer movement", () => {
+    // `dragover` fires on every movement, and `indexNow` segments the whole
+    // note twice. Sixty times a second, on every block the pointer crosses, is
+    // enough to make the gesture feel as though it is refusing to work.
+    const src = readSrc("block-drag");
+    expect(src).toContain("if (cached?.seq !== dragSeq)");
+    expect(src).toContain("dragSeq++");
+    // The two callbacks that run per event use the cached answer.
+    expect(src).toContain("() => !noop(indexInDrag())");
+  });
+
+  it("draws a grip on every block, wherever the page is", () => {
+    // 4.8.5, from a vault: *"the 02 diary dashboard's sections can only be moved
+    // from the section editor and the grips are missing."* A page with no row
+    // had no sources and no targets — the gesture was homepage-only by accident
+    // of where rows happen to be composed.
+    const src = readSrc("block-drag");
+    // UNCONDITIONALLY, which is the whole of what 4.8.5 restored: the call is
+    // not inside any `if`, and the only thing 4.9 changed is WHERE the grip
+    // hangs — so a block with no group still gets its own.
+    //
+    // THREE PLACES IT CAN HANG AS OF 5.10, and the middle one is why the
+    // expression is asserted rather than a variable name: the group's own strip
+    // (its head since 5.14), the block's own section bar where it has one, then
+    // the block. What this pins is that the fallback chain still ends at
+    // `container`, so there is no shape of block the grip can miss.
+    expect(src).toContain("head ?? bar ?? container,");
+    expect(rules).not.toContain(".jbd-handle-join");
+  });
+});
+
+describe("making a group out of two blocks", () => {
+  // Two plain widgets, each in its own fence — which is what the gesture is
+  // aimed at as of 4.12 and what the homepage is actually made of.
+  //
+  // THIS FIXTURE USED TO CARRY A `header:` OVER EACH WIDGET, because that is
+  // what a dashboard is made of, and the whole describe was pinning the corrupt
+  // page §A exists to close. The titled version now lives one describe down as
+  // a refusal, which is the honest place for it: the shape is still what a
+  // dashboard writes, and it is still not a group.
+  const TWO = [
+    "```chronoanvil",
+    "tag-index",
+    "```",
+    "",
+    "```chronoanvil",
+    "tasks-table:,period",
+    "```",
+    "",
+  ];
+
+  it("puts the arrival beside what the target already held", () => {
+    // THE SHAPE IS `composeFlatNote`'S, WHICH IS THE POINT. That function has
+    // built a joined row as `row` / first / `cell` / second since 4.8, and the
+    // section editor's **Make a group** produces exactly it. Two ways of making
+    // one object must write one file, or a reader who uses both gets two
+    // spellings of the same page.
+    const out = moveCell(TWO, { block: 1, from: 0, to: 1 }, {
+      kind: "group",
+      block: 0,
+      side: "right",
+    });
+    expect(body(out, 0)).toEqual([
+      "row",
+      "tag-index",
+      "cell",
+      "tasks-table:,period",
+    ]);
+    // AND THE SOURCE FENCE IS GONE, with the blank line that separated it —
+    // `pruned` returns null for a body with nothing left in it, which is
+    // `applyLayout`'s manners and the reason a page's rhythm survives a drag.
+    expect(out?.filter((l) => l === "```chronoanvil").length).toBe(1);
+  });
+
+  it("puts it on the other side when the other side is asked for", () => {
+    const out = moveCell(TWO, { block: 1, from: 0, to: 1 }, {
+      kind: "group",
+      block: 0,
+      side: "left",
+    });
+    expect(body(out, 0)).toEqual([
+      "row",
+      "tasks-table:,period",
+      "cell",
+      "tag-index",
+    ]);
+  });
+
+  it("leaves a modifier at the top, above the row line", () => {
+    // `frame:` describes the block and is read before the loop, so where it sits
+    // does not change what it does — but it is the reader's line and it goes
+    // where `assets/documentation.md` shows it, not wherever a splice happened to put
+    // it. A `row` line buried under a directive is a fence nobody can scan.
+    const framed = [
+      "```chronoanvil",
+      "frame: none",
+      "tag-index",
+      "```",
+      "",
+      "```chronoanvil",
+      "tasks-table",
+      "```",
+      "",
+    ];
+    expect(
+      body(moveCell(framed, { block: 1, from: 0, to: 1 }, { kind: "group", block: 0, side: "right" }), 0)
+    ).toEqual(["frame: none", "row", "tag-index", "cell", "tasks-table"]);
+  });
+
+  it("refuses a target that is already a group", () => {
+    // A group has column slots of its own, which say exactly where an arrival
+    // goes. A SIDE cannot: it would have to name a boundary the reader did not
+    // point at. The gesture withholds the quarters from a row block, and this is
+    // the arithmetic saying the same thing.
+    expect(
+      moveCell(PAGE, { block: 1, from: 0, to: 2 }, { kind: "group", block: 0, side: "left" })
+    ).toBeNull();
+  });
+
+  it("refuses to make a group out of one block and itself", () => {
+    expect(
+      moveCell(TWO, { block: 0, from: 0, to: 1 }, { kind: "group", block: 0, side: "left" })
+    ).toBeNull();
+  });
+
+  it("refuses a destination that titles itself, which is the other end of §A", () => {
+    const titled = [
+      "```chronoanvil",
+      "header:🏷️ Tags",
+      "tag-index",
+      "```",
+      "",
+      "```chronoanvil",
+      "tasks-table:,period",
+      "```",
+      "",
+    ];
+    expect(
+      moveCell(titled, { block: 1, from: 0, to: 1 }, { kind: "group", block: 0, side: "right" })
+    ).toBeNull();
+    const framed = [
+      "```chronoanvil",
+      "frame: section",
+      "journals",
+      "```",
+      "",
+      "```chronoanvil",
+      "tasks-table:,period",
+      "```",
+      "",
+    ];
+    expect(
+      moveCell(framed, { block: 1, from: 0, to: 1 }, { kind: "group", block: 0, side: "right" })
+    ).toBeNull();
+  });
+
+  it("refuses to cross fence kinds", () => {
+    // `chronoanvil-charts` holds chart specs and `chronoanvil` holds directives; a line
+    // that crosses between them is a widget the block cannot render, and the
+    // reader would see a broken card rather than a refusal.
+    const mixed = [
+      "```chronoanvil",
+      "tag-index",
+      "```",
+      "",
+      "```chronoanvil-charts",
+      "activity",
+      "```",
+      "",
+    ];
+    expect(
+      moveCell(mixed, { block: 1, from: 0, to: 1 }, { kind: "group", block: 0, side: "right" })
+    ).toBeNull();
+  });
+
+  it("declines a block that has nothing to show", () => {
+    const hollow = ["```chronoanvil", "frame: none", "```", "", "```chronoanvil", "tag-index", "```", ""];
+    expect(
+      moveCell(hollow, { block: 1, from: 0, to: 1 }, { kind: "group", block: 0, side: "right" })
+    ).toBeNull();
+  });
+});
+
+describe("a leading delimiter, which is the one that carries a width", () => {
+  it("survives the tidy that removes the ones opening nothing", () => {
+    // `tidyCells` drops a delimiter that opens no column, and a LEADING one
+    // opens no run — what it leaves behind is its WEIGHT, which is the whole
+    // spelling that makes the first column widenable. `opensSomething` scans
+    // forward to the next widget, so `cell: 2` above `diary:3` is kept; a rule
+    // that looked only at what was immediately after it would take the width off
+    // the first column on the next unrelated move.
+    const wide = [
+      "```chronoanvil",
+      "row",
+      "cell: 2",
+      "diary:3",
+      "cell",
+      "launcher",
+      "cell",
+      "journals",
+      "```",
+      "",
+    ];
+    // Take the last column out to a block of its own, which runs `pruned` and
+    // `tidyCells` over what is left.
+    const out = moveCell(wide, { block: 0, from: 6, to: 7 }, { kind: "block", at: 1 });
+    expect(body(out, 0)).toEqual(["row", "cell: 2", "diary:3", "cell", "launcher"]);
+  });
+
+  it("is kept because of what it opens, not because of what follows it", () => {
+    // THE READING THAT HAS TO BE A SCAN. `opensSomething` looks FORWARD to the
+    // next widget rather than at the next line, because a `header:` bar is not a
+    // column (row.ts, `NOT_A_CELL`) — so a delimiter with a bar under it is
+    // still looking for its cell. A next-line reading gives the same answer on
+    // every fixture without a bar in it, which is why this one has two.
+    const barred = [
+      "```chronoanvil",
+      "row",
+      "cell: 3",
+      "header:🏷️ Tags",
+      "tag-index",
+      "cell",
+      "header:⏳ Open tasks",
+      "tasks-table",
+      "cell",
+      "journals",
+      "```",
+      "",
+    ];
+    const out = moveCell(barred, { block: 0, from: 8, to: 9 }, { kind: "block", at: 1 });
+    expect(body(out, 0)).toEqual([
+      "row",
+      "cell: 3",
+      "header:🏷️ Tags",
+      "tag-index",
+      "cell",
+      "header:⏳ Open tasks",
+      "tasks-table",
+    ]);
+  });
+});
+
+describe("how many widgets a block holds", () => {
+  it("counts directives and not the bar over them", () => {
+    // The count `widgetRun` turns on. It is ONE OF TWO CONDITIONS as of 4.12,
+    // and the comment here used to say it was the whole of "whether a block may
+    // become a column" — which was true when it was written and stopped being
+    // true the moment `isSectionFence` was added above it. Two widgets is still
+    // a question about delimiters nobody has been asked; one widget under a
+    // title bar is now a different refusal with a different reason, and this
+    // function does not make it. It still counts the directives and not the bar,
+    // which is what a `header:` line being content-but-not-a-cell means.
+    expect(widgetCount(["header:⏳ Open tasks", "tasks-table:,period"])).toBe(1);
+    expect(widgetCount(["row", "diary:3", "cell", "journals"])).toBe(2);
+    expect(widgetCount(["frame: none", "# a note to self", "", "links:home"])).toBe(1);
+  });
+});

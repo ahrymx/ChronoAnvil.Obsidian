@@ -1,0 +1,1744 @@
+/* ── Header bars (home / review / journal dashboards) ─────────
+   `header:<emoji + title>` in a ```chronoanvil block renders one of these:
+   the section title on the left, the section's own controls anchored on
+   the right. It replaces the old "markdown heading + loose button row"
+   pairing so a section reads as a single unified header. The bar sits at
+   the top of its .ca-journal-widget-block; anything after it (calendars,
+   summaries, tables) flows below as usual. */
+/* THE LOOK. `.ca-journal-header-bar` below is now only the fold walk's marker —
+   see section-frame.ts for why a section that owns its own children must not
+   carry it, and why both variants must nonetheless look identical. */
+/* THE RULE IS THE HAIRLINE TOKEN AS OF 4.11, which changes nothing on screen and
+   is the point: it was a raw `1px`, and the strip this bar now grows for its own
+   controls is `--ca-rule-hair` because `.ca-journal-group-foot` is. A bar with two
+   divisions in it that named the same number two ways is one retune away from
+   drawing two different lines. The weight itself is 2.56's decision and is
+   unchanged — `--ca-rule` (2px) is what a CARD divides itself with, and a rule that
+   heavy under every title was the thing that release deleted. */
+.ca-journal-sec {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-sec-gap) 10px;
+  flex-wrap: wrap;
+  padding: var(--ca-sec-pad) 2px;
+  margin: 2px 0 var(--ca-sec-gap);
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
+}
+/* A COLLAPSED SECTION IS ONE HEIGHT WHATEVER IT CARRIES (5.10). See
+   `--ca-sec-bar-h` in 00-tokens.css for why the title line is the floor, and
+   why an untitled control strip is not given one. `min-height` rather than a
+   height: a bar with a wrapped title or a taller control still grows. */
+.ca-journal-sec-l1:not(.ca-journal-header-bar-untitled) {
+  min-height: var(--ca-sec-bar-h);
+}
+/* The glyph, in a fixed slot.
+   It used to be the first characters of the title string, so "🎓 Study" and
+   "Learning Path" started their words at different x positions and a column
+   of section headers read as ragged. Splitting it out (section-frame.ts) is
+   what buys the alignment; a section with no glyph gets no slot, because
+   indenting every title to align the ones that have one is a worse trade. */
+.ca-journal-header-glyph {
+  flex: 0 0 auto;
+  width: var(--ca-sec-glyph);
+  text-align: center;
+  /* LARGER THAN THE TITLE, ON PURPOSE (4.13 §1). Every other part of this bar
+     came down to `--ca-bar-text`; the glyph did not, because an emoji at 11.2px
+     is a smudge and a slot full of smudges aligns nothing. `--ca-sec-glyph` was
+     re-tuned in the same release so the slot's PIXEL width is unchanged. */
+  font-size: var(--ca-bar-glyph);
+  line-height: 1.35;
+}
+.ca-journal-header-note {
+  flex: 0 0 auto;
+  font-size: var(--ca-bar-text);
+  color: var(--text-faint);
+  line-height: 1.6;
+}
+/* THE ONE BAR SPEC, READ FROM TOKENS (4.13 §1). This was 0.95em mixed-case in
+   `--text-normal` — a heading — while `.ca-journal-block-head-title` was a 0.7em
+   uppercase micro-label, and the first render of the three dashboards showed the
+   same widget wearing one or the other depending only on whether its fence
+   carried a modifier. The bar is one object now and this is the smaller of the
+   two scales, which is the one the maintainer chose: a section title is a label
+   on a band, not a heading competing with the page's own name.
+   Everything else in the bar — the count pill, the action pills — was already at
+   this size, so the band is now uniform. */
+.ca-journal-header-title {
+  font-size: var(--ca-sec-title-size);
+  font-weight: 600;
+  text-transform: none;
+  line-height: 1.35;
+  color: var(--ca-sec-title-ink);
+  letter-spacing: normal;
+  /* Shrinks before the actions do: a long section title should ellipsise on a
+     phone rather than push the section's one button onto a second row. That
+     wrap is what put the first chart below the fold in 2.53. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Click-to-edit, 3.18 follow-ups §2.
+
+   THE HOVER IS THE WHOLE AFFORDANCE, and the original report was about exactly
+   its absence: "hover does not show the field as editable". A tint on the title
+   alone — not the bar, which already has its own hover for folding — is what
+   separates the two gestures visually, the same way stopPropagation separates
+   them behaviourally.
+
+   `cursor: text` rather than `pointer`, matching .ca-jsh-title: the bar's own
+   cursor says "this folds", and a pointer over the title would say the same
+   thing about a control that does something else entirely. */
+.ca-journal-header-title-editable {
+  cursor: text;
+  padding: 1px 5px;
+  margin-left: -5px;
+  border-radius: var(--ca-radius-sm);
+  transition: background 0.12s;
+}
+.ca-journal-header-title-editable:hover {
+  background: var(--background-modifier-hover);
+}
+/* Inherits the slot's ellipsis; the span exists so the input can replace it
+   without the frame losing the rules that keep a long title from pushing the
+   section's buttons onto a second row. */
+.ca-journal-header-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* THE FIELD MUST NOT RESIZE THE BAR IT IS IN (4.13 §1). This was
+   `--ca-text-base` while the title beside it was too; after §1 brought the title
+   down to `--ca-bar-text`, clicking a section's name to rename it jumped from
+   11.2px to 15.2px and reflowed the bar under the reader's cursor.
+   AND IT IS NOT UPPERCASED, deliberately, where the title it replaces is. The
+   caps are a rendering of a stored string; an input that shouted them back would
+   be showing the reader something other than what is in their file, and what they
+   type would come out cased differently from what they saw. Showing the true
+   value on click is also what teaches that the caps were a style. */
+.ca-journal-header-title-input {
+  font-size: var(--ca-bar-text);
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: var(--ca-bar-track);
+  padding: var(--ca-space-1) var(--ca-space-3);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  width: 100%;
+  min-width: 8em;
+}
+
+/* How many things the body holds — the one piece of information a folded
+   section did not previously carry. Never rendered as 0; see the `count`
+   option in section-frame.ts for why that is the caller's decision. */
+.ca-journal-header-count {
+  flex: 0 0 auto;
+  /* The bar's own scale, not a second spelling of the same number (4.13 §1):
+     these resolve identically today and would part company the moment
+     `--ca-bar-text` was retuned, which is the only reason it is a token. */
+  font-size: var(--ca-bar-text);
+  font-weight: 600;
+  line-height: 1.6;
+  padding: 0 7px;
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
+/* The anchored controls: a widget-bar that hugs the right edge and stays
+   vertically centred against the title. */
+/* Anchored right. `margin-left: auto` rather than `margin-right: auto` on the
+   title, because the title is no longer the last thing before the actions —
+   the count sits between them and would have been pushed right with it. */
+.ca-journal-header-widgets.ca-journal-widget-bar {
+  flex: 0 1 auto;
+  margin-left: auto;
+  justify-content: flex-end;
+  gap: 4px 8px;
+}
+/* ONE AUTO MARGIN PER ROW, AND AT LEVEL 2 IT IS THE ACTIONS' (4.13 §1b).
+ *
+ * Two `margin-left: auto` in one flex line is one too many, and the failure is
+ * worse than it sounds: flexbox distributes free space EQUALLY between every auto
+ * margin on the main axis, so a second one does not lose — it strands the buttons
+ * half way along the bar with a gap on both sides. At LEVEL 1 there is no contest:
+ * the actions strip is `flex: 1 0 100%` and already gives its auto margin up to
+ * become its own row, so the toggle takes the end of the title row unopposed.
+ *
+ * At LEVEL 2 the actions stay inline and keep the auto margin, so the toggle
+ * gives its own up and takes `order: 1` instead — which puts it PAST the buttons.
+ * The fold acts on the whole section and the buttons act on things inside it, so
+ * the one that owns the most is the one furthest out. Both levels therefore end
+ * with the chevron at the right-hand edge, which is the whole point of moving it.
+ */
+.ca-journal-sec-l2 > .ca-journal-header-toggle {
+  margin-left: 0;
+  order: 1;
+}
+/* ── AND AT LEVEL 1 THE CONTROLS GET A STRIP OF THEIR OWN (4.11) ────
+ *
+ * WHAT WENT WRONG, FROM A VAULT RENDER. On one homepage: five widget blocks each
+ * wearing `.ca-journal-block-head` — a slim band, a micro-label, a hairline — and
+ * directly under them *📊 Trends and Statistics [0] [+ Add chart]*, a bar of a
+ * visibly different kind, with its button crowded onto the title's line. Two
+ * idioms for one job on one screen.
+ *
+ * So a level-1 title line carries the title and what NUMBERS it — glyph, count,
+ * note — and everything that ACTS goes below, on the `.ca-journal-group-foot` idiom:
+ * a hairline, 4px of air, right-aligned, at the `--ca-text-2xs` scale. The two
+ * strips are then the same object at two scales, which is the whole of the
+ * unification.
+ *
+ * NO NEW ELEMENT, WHICH IS WHY THIS IS FOUR DECLARATIONS AND NOT A REFACTOR.
+ * `.ca-journal-sec` is already `flex-wrap: wrap` with a row gap, so `flex: 1 0 100%`
+ * on the slot that already exists IS a second row. `frame.actions` keeps its
+ * element, its class and its position, so all eleven `sectionFrame` callers are
+ * untouched — including `header:`, where every following `button:`, `links:` and
+ * inline control already flows into this slot — and so do the two places that
+ * hard-code `.ca-journal-header-widgets` to keep a click on a control from folding
+ * the section (`foldableSection`, `HeaderBar`). A wrapper would have had to be
+ * added to both, and a button that folded its own section is the bug that would
+ * have shipped.
+ *
+ * `:empty` DECIDES, NOT THE RENDERER. The slot is always built and is often
+ * filled AFTER the frame exists — `buildAddCategoryButton` and every LiveWidget
+ * append into it later — so a render-time "has it got anything in
+ * it" would be wrong for exactly the sections that have the most in them. A
+ * pseudo-class is re-evaluated whenever the DOM changes, which is the one way to
+ * ask this question that cannot go stale.
+ *
+ * LEVEL 1 ONLY, AND THAT IS A DECISION. A Study index draws one level-2 section
+ * per subject, each carrying a single `+ Topic`; twenty subjects would become
+ * twenty two-line rows, which is the opposite of the density this buys. The rule
+ * one file over already argues it — "the type-management buttons in a level-2
+ * journal bar are section chrome … they read as small pills so the nested bar
+ * stays light" — and that scale is now what the strip uses, so the two are one
+ * decision rather than an exception.
+ *
+ * AND THE UNTITLED VARIANT IS EXCLUDED, because there is no first row there: it
+ * is a control strip under a real markdown heading, so a rule above it would be a
+ * rule above nothing.
+ *
+ * NOT FULL-BLEED, unlike the bar's own `border-bottom` inside a section card
+ * (70-section-surface.css). `.ca-journal-group-foot` does not bleed either, and two
+ * edge-to-edge hairlines 22px apart read as a banded table — this one divides the
+ * header, so it stops where the text does. */
+/* AND THE AIR IS 8px, NOT 4px, AS OF 4.13.8 §36 — which is the third and last
+ * pass at one report, so the arithmetic is written down here rather than in a
+ * changelog.
+ *
+ * Measured on the Monthly overview with the scope button selected in devtools:
+ * the strip's hairline at y=374, the button's border box at y=376–396, the next
+ * card's rule at y=409. **Two pixels above the control and thirteen below it.**
+ * A bordered, filled control two pixels under a rule reads as sitting ON the
+ * rule — which is what "still overlapping" meant, after §32 had taken the
+ * control from 32px to 21px and removed the actual overlap.
+ *
+ * 4px WAS RIGHT FOR WHAT THIS STRIP HELD IN 4.11 and is not right for what it
+ * holds now. The note below still describes it as the `.ca-journal-group-foot`
+ * idiom — "a hairline, 4px of air, right-aligned" — and that band holds a WORD.
+ * This one holds controls with their own edges and fills, and an edge needs
+ * clearance from a rule that a word does not.
+ *
+ * BOTH BANDS MOVE, or the pair stops being one object and the page has two kinds
+ * of strip again — which is the whole argument the two share. The foot gains 4px
+ * it does not need and loses nothing by having.
+ *
+ * A LITERAL, NOT `--ca-space-4`. 00-tokens.css §4.3 keeps layout paddings on
+ * literals and reserves the spacing scale for controls, with a test pinning that
+ * readership. This is a layout padding. */
+.ca-journal-sec-l1:not(.ca-journal-header-bar-untitled)
+  > .ca-journal-header-widgets.ca-journal-widget-bar {
+  flex: 1 0 100%;
+  margin-left: 0;
+  padding-top: 8px;
+  border-top: var(--ca-rule-hair) solid var(--background-modifier-border);
+}
+/* Nothing in it, nothing drawn — or every section without a control would carry a
+   hairline over 4px of empty space. */
+.ca-journal-sec-l1 > .ca-journal-header-widgets.ca-journal-widget-bar:empty {
+  display: none;
+}
+/* THE STRIP'S SCALE, WHICH IS LEVEL 2'S AND IS NOW BOTH LEVELS'. 50-entry-
+   header.css sized a nested bar's buttons down to `--ca-text-2xs` and argued it as
+   a fact about level 2; the argument turns out to be about a PLACE — chrome under
+   or beside a title, as against an action on the thing itself — and the strip is
+   that same place. So the rule moved here and grew one selector rather than being
+   copied, which is what makes the two levels one decision. It is also what buys
+   back the line the strip costs: a strip at ~22px against a title line at ~25px. */
+.ca-journal-sec-l1 > .ca-journal-header-widgets .ca-journal-btn,
+.ca-journal-sec-l2 .ca-journal-header-widgets .ca-journal-btn {
+  font-size: var(--ca-text-2xs);
+  padding: var(--ca-space-1) var(--ca-space-5);
+  gap: 4px;
+}
+
+/* ── A GROUP HEAD INSIDE A SECTION (5.12) ───────────────────────────────
+ *
+ * `header:2:` in a fence that already carries a section bar. The deepest index
+ * is the case it was written for: `children` composes one head per note kind,
+ * and until this release each of those was a level-1 bar — three of them in one
+ * card, identical in weight, hairline, type and chevron to the sections on
+ * either side. The card was the only thing saying they belonged together, and
+ * it said nothing about what they belonged to.
+ *
+ * A DIVISION, NOT A BAR, which is the whole of the treatment below. The rule
+ * goes ABOVE the head rather than under it: a hairline under a title says "this
+ * names what follows, as a section does", and a hairline over it says "a new
+ * part of the thing you are already in" — the `.ca-journal-group-foot` idiom
+ * turned the right way up. Everything else follows from that: no surface of its
+ * own, no fill on its button, the title a tier down and muted, the count an
+ * outline rather than a solid.
+ *
+ * WHY A CLASS AND NOT `.ca-journal-sec-l2`. Level 2 is a FOLD SCOPE and is
+ * already three other things': a subject group in the Journals section, a
+ * bridge, the tally band. Each of those draws inside its own widget's DOM where
+ * it is nobody's neighbour, and none of them wants a rule above it. This marks
+ * the one that is a neighbour — a head inside a card, dividing it — which is why
+ * the selectors below can be exact without reaching any of the others.
+ * `widgets/index.ts` adds it; nothing else may. */
+.ca-journal-sec.ca-journal-sec-group {
+  border-bottom: 0;
+  border-top: var(--ca-rule-hair) solid var(--background-modifier-border);
+  margin-top: var(--ca-sec-gap);
+  padding-top: 8px;
+  min-height: var(--ca-grp-head-h);
+}
+/* THE FIRST GROUP NEEDS NO RULE, because the section's own bar has just drawn
+   one. Two hairlines four pixels apart is a double line, which is what the
+   `--ca-rule` / `--ca-rule-hair` split exists to avoid one file up. */
+.ca-journal-sec-l1 + .ca-journal-sec-group {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: var(--ca-sec-pad);
+}
+/* A TIER DOWN, AND SAID THREE WAYS AT ONCE — size, case and ink. One of them
+   alone is a shade rather than a rank: 4.13 §1 brought the section title down to
+   `--ca-sec-title-size` and argued that a title is "a label on a band, not a
+   heading"; a group head is a label on a PART of one, and has to read as such
+   beside its own section's title six pixels above it. */
+.ca-journal-sec-group > .ca-journal-header-title {
+  font-size: var(--ca-text-sm);
+  text-transform: uppercase;
+  letter-spacing: var(--ca-bar-track);
+  color: var(--text-muted);
+}
+/* THE SLOT KEEPS ITS WIDTH AND LOSES ITS SIZE. The width is what aligns a
+   column of titles — the reason the glyph is its own element at all — so it
+   stays `--ca-sec-glyph`; only the emoji inside it comes down to sit on the
+   smaller title's line. */
+.ca-journal-sec-group > .ca-journal-header-glyph {
+  font-size: var(--ca-text-sm);
+}
+/* AN OUTLINE WHERE THE SECTION'S IS A SOLID. Both say how many; the section's
+   counts everything in the card and a group's counts its own rows, and a folded
+   group's pill is the only thing it has left to say. */
+.ca-journal-sec-group > .ca-journal-header-count {
+  background: transparent;
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  color: var(--text-faint);
+}
+/* A GROUP'S CREATE KEEPS ITS FILL, AND THE RULE THAT TOOK IT AWAY IS GONE.
+   It read "the fill is the section's": `mod-cta` is a filled pill against a
+   transparent one, and that one step of contrast separated "the action this
+   card is for" from "add a row to this part of it". The premise was the section
+   bar carrying the first kind's create — and it does not. Every create now sits
+   inline in the head of the rows it adds to, so the groups' buttons are the only
+   actions in the card, and de-tinting them would make the one thing a reader is
+   meant to press the quietest thing on the surface. They are already held a tier
+   down by the strip's scale, ~22px against a title line, which is the frame's
+   own way of saying subordinate and does not cost the affordance. */
+/* ── WHERE THE FIELD HEAD WENT (5.14) ──────────────────────────────────
+ *
+ * Six rules stood here under the heading *A FIELD HEAD*, drafted earlier in
+ * this same release, and they were a third size of this one bar: `.ca-journal-sec-field` with no hairline and
+ * a height of its own, an uppercase `--ca-text-xs` eyebrow in place of the
+ * title, a chevron sized down to match it, buttons at `--ca-text-2xs`, and two
+ * rules on `.ca-journal-field` cancelling the card 70-section-surface.css
+ * paints on every other `.ca-journal-sec-fold`.
+ *
+ * THE READER REJECTED THE EYEBROW, in those words, and asked for the head the
+ * journals surface already draws — a card, a full-bleed bar, a glyph in its
+ * slot, a mixed-case title at `--ca-sec-title-size`, a hairline under it and
+ * the chevron at the right-hand end. That head is `.ca-journal-sec-l1` inside
+ * `.ca-journal-sec-fold`, which is to say: it already existed, and every rule
+ * deleted here was a smaller copy of it.
+ *
+ * SO `fieldFrame` BUILDS AT LEVEL 1 AND THIS FILE SAYS NOTHING ABOUT FIELDS.
+ * Not one selector, which is the check that the revert is real — a field that
+ * needed a rule here would be a third size again under a different name. The
+ * eyebrow type itself is not gone from the plugin: `.ca-journal-sec-group` two
+ * screens up still wears it, because a group head IS a division of a card
+ * rather than a card of its own, and that is the distinction 5.14 lost.
+ *
+ * WHAT THE DRAFT KEEPS. All of it except the size. One builder still draws every
+ * field head (`section-frame.ts`), the four label classes and the two
+ * left-hand collapse bars stay retired, every field still folds, the fold is
+ * still keyed by region, and a field under a bar that already names it still
+ * draws no head and lifts its controls into that bar. The report about
+ * collapsed heights is answered by `--ca-sec-bar-h` instead of by a token of
+ * its own — better answered, because a closed field is now the same height as
+ * a closed section rather than merely the same height as another closed
+ * field. */
+
+/* A links row tucked into a header sheds the standalone navigator's
+   full-width border strip and bottom margin — inside the bar it's just a
+   pill group sitting beside the title. */
+.ca-journal-header-widgets .ca-journal-nav.ca-journal-links {
+  border: none;
+  padding: 0;
+  margin: 0;
+  gap: 6px;
+}
+/* AND THE PILLS COME DOWN TO THE STRIP'S SCALE (4.13.7 §32) — the last thing in
+ * this strip that was never brought to it.
+ *
+ * THE ARITHMETIC, WHICH IS THE WHOLE REPORT. A links pill drew at
+ * `--ca-text-sm` (0.85em) with `--ca-space-3` (6px) of vertical padding: about
+ * **32px**. Everything else in this strip draws at `--ca-text-2xs` (0.7em) with
+ * `--ca-space-1` (2px): about **21px**. A flex row centres what it holds, so the
+ * 11px difference is split — and the pill hangs about **5.5px above** the line
+ * everything else sits on.
+ *
+ * Measured on the Weekly overview: the `Today` chip paints y=29–60 while the
+ * hairline above the strip is at y=33. Four pixels, and the rule is drawn
+ * straight through the chip. It is not a spacing bug; it is one control in a
+ * band being half again the height of the band.
+ *
+ * WHY 4.13.6 DID NOT FIX IT. That release made `.ca-jn-right` a flex row, which was
+ * a real defect in the same element — the slot held its child on a text baseline
+ * where its two siblings held theirs in a row. But it was the wrong defect for
+ * this symptom: `Today` is a direct child of the row and was never in that slot,
+ * and the report came back saying so. The scale is what was actually wrong, and
+ * the two fixes are independent.
+ *
+ * THIS IS THE THIRD TIME THE SAME SENTENCE HAS BEEN WRITTEN. 4.11 brought this
+ * strip's `.ca-journal-btn`s down to `--ca-text-2xs` (see the rule below, and its
+ * note that the argument is about a PLACE rather than about a level). 4.13.1 §3
+ * brought `.ca-jc-actions`' links down for the diary card's strip, in the words this
+ * rule is named after: *"one strip is one size, or it is two strips that happen
+ * to touch."* `.ca-jdh-nav.ca-journal-links a.ca-jn-pill` in 60-heroes-and-banners.css is
+ * that fix, applied to one row and not to this one.
+ *
+ * ALL THREE SHAPES, because `renderTarget` builds three: an `<a class="jn-pill">`
+ * for a destination, `.ca-jn-flat.ca-jn-muted` for one that does not exist yet, and
+ * `.ca-jn-here` for the page you are on. A row where two of the three came down is
+ * the same defect with a smaller audience. */
+.ca-journal-header-widgets .ca-journal-nav.ca-journal-links a.ca-jn-pill,
+.ca-journal-header-widgets .ca-journal-nav.ca-journal-links .ca-jn-flat,
+.ca-journal-header-widgets .ca-journal-nav.ca-journal-links .ca-jn-here {
+  font-size: var(--ca-text-2xs);
+  padding: var(--ca-space-1) var(--ca-space-5);
+  gap: 4px;
+}
+/* The caret is the one glyph in the row with a pixel size rather than an `em`
+   one, so it does not come down with the text and would set the pill's height on
+   its own. Sized against the label it sits beside, like every other icon here. */
+.ca-journal-header-widgets .ca-journal-nav.ca-journal-links .ca-jn-scopes .ca-jn-caret svg {
+  width: 0.9em;
+  height: 0.9em;
+}
+
+/* Untitled variant — used by the Study and custom-journal home sections,
+   whose real `### {emoji} {title}` markdown heading (a structural section
+   boundary) stays as the visible title. The bar carries no title of its
+   own; it just anchors that section's buttons to the right, pulled up
+   snug under the heading. No bottom rule — the heading already separates. */
+.ca-journal-header-bar-untitled {
+  padding: 0 4px 2px;
+  margin: -0.35em 0 0.35em; /* close the gap Obsidian leaves under the heading */
+  border-bottom: none;
+  justify-content: flex-end;
+}
+.ca-journal-header-bar-untitled .ca-journal-header-widgets.ca-journal-widget-bar {
+  margin-left: auto;
+}
+
+/* ── THE SLIM BANNER (2.18.4, and one card as of 4.21.1) ─────────────────
+   One card at the top of a note you WRITE IN — a diary entry or a journal leaf
+   — holding the note's name, the row that says where it can go, and, on notes
+   composed before 4.20, the logging grid welded beneath them.
+
+   Before 2.18.4 the bands were separate ```chronoanvil fences, so Obsidian rendered
+   them as sibling blocks with the note's own spacing between — the same limit
+   journals-section.ts documents, where CSS can make a run of siblings resemble
+   one card only until the run changes length or something in it is hidden.
+   Merging the fences makes the block a single container, so the card is real
+   and the rules below are dividers rather than seams.
+
+   ── AND ONE CARD FOR BOTH PAGE KINDS, WHICH IS 4.21.1's WHOLE CHANGE ──
+
+   These numbers were written out twice, in two blocks a hundred lines apart,
+   under a comment on each saying they were the same numbers "because a reader
+   moving between an entry and a journal note should not see the strip change
+   height". They were not the same numbers. The entry's title band carried
+   `padding: 20px/19px` from a 3.7 rule further down the file and the leaf's
+   carried 7px/8px, so the two strips differed by about 24px — and the comment
+   claiming otherwise is why nobody looked.
+
+   TWO SELECTORS WERE THE MISTAKE, NOT TWO VALUES. `chromeClasses` puts
+   `journal-slim-banner` on both blocks now, so there is one card, one pair of
+   bands and one set of numbers, and a change to any of them cannot reach one
+   page kind without reaching the other.
+
+   Untinted, unlike the page banner. That is a dashboard and is allowed to be
+   the loudest thing on its page; this sits at the top of a note you write in,
+   and the wash there would compete with the entry itself. The card earns its
+   separation from the border and the surface change alone.
+
+   The grid gives up its tiles for internal rules — the 2.18.2 lesson from the
+   year summary, where a row of detached bordered cards read as floating pieces
+   and one bordered surface with dividers read as an instrument. A logging grid
+   is one instrument: the cells are read together, in one glance, every day. */
+.ca-journal-widget-block.ca-journal-slim-banner {
+  /* The block's usual inter-widget gap is what kept the bands apart; inside the
+     card each band's own rule is the divider. */
+  position: relative;
+  overflow: hidden;
+  gap: 0;
+  padding: 12px 14px;
+  background: var(--background-secondary);
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  box-shadow: inset 0 1px 0 var(--ca-edge-highlight);
+}
+/* ── BAND 1: THE NOTE'S NAME, AND THE COG (4.21.1) ─────────────────────
+ *
+ * THE NAME IS FIRST NOW. Both slim banners opened with their navigation — the
+ * entry with its pill row, the leaf with its crumb trail — and put the name
+ * underneath, while the page banner opened with the name and welded its
+ * destinations below. Three surfaces, two arrangements, one concept. The name
+ * leads on all three: it is what a reader looks for on a page they opened
+ * deliberately, and the row that says where else they could be is a second
+ * fact about it.
+ *
+ * A FLEX ROW, WHICH IS ALSO A DEFECT FIX. `.ca-journal-entry-header` was a plain
+ * block: `.ca-jeh-title-wrap` and the cog are both `display: flex`, so they
+ * stacked, and 4.21's "the cog comes up beside the name it acts on" rendered as
+ * a cog on a line of its own under the name. `margin-left: auto` cannot push
+ * anything in a block container, which is why the rule meant to place it did
+ * nothing at all.
+ *
+ * IT BLEEDS THE CARD'S PADDING and re-applies it inside, so its rule spans the
+ * full width — the manoeuvre every band in this plugin makes. The bleed travels
+ * out through `.ca-journal-live-widget` (and, on a leaf, `.ca-journal-study-header`),
+ * both of which carry no padding or border of their own for exactly this
+ * reason; `.ca-journal-overview-card > .ca-journal-live-widget` states the same
+ * requirement one card over.
+ *
+ * THE AIR IS EVEN TOP AND BOTTOM, which is 3.7's rule for this band kept rather
+ * than dropped: nothing in it is anchored to either edge, so an asymmetric
+ * inset would read as the title having slipped rather than as emphasis. */
+.ca-journal-slim-banner .ca-journal-banner-name {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px 12px;
+  margin: -12px -14px 0;
+  padding: 13px 14px 12px;
+  border-bottom: var(--ca-rule) solid var(--background-modifier-border);
+}
+/* ── BAND 2: WHERE THE NOTE CAN GO ─────────────────────────────────────
+ *
+ * An entry's is its `links:` pill row, a leaf's is its crumb trail; both are a
+ * row of destinations under the name, and this is the band they share. The pill
+ * card gives up its own frame — the banner supplies that — and keeps only the
+ * inset, which is 3.2 patch 5's handoff pointed the other way round now that
+ * the band is the card's LOWER edge rather than its upper one. */
+.ca-journal-slim-banner .ca-journal-banner-nav {
+  position: relative;
+  margin: 0 -14px;
+  padding: 7px 14px 8px;
+  border: none;
+  border-bottom: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: 0;
+  background: none;
+}
+/* Nothing under it — a note composed by 4.20 or later, whose logging grid is a
+   section of its own — so the nav band IS the card's bottom edge and has
+   nothing left to divide. One rule where the two banners had one each, and the
+   `:has()` tests are theirs: a grid, or the page-context strip an entry drew as
+   a footer before 4.21. */
+.ca-journal-slim-banner:not(:has(.ca-journal-tracker-bar)):not(:has(.ca-journal-entry-context))
+  .ca-journal-banner-nav {
+  margin-bottom: -12px;
+  padding-bottom: 9px;
+  border-bottom: none;
+  border-radius: 0 0 var(--ca-radius-md) var(--ca-radius-md);
+}
+
+/* The grid, welded to the card's lower edge. */
+.ca-journal-slim-banner .ca-journal-tracker-bar {
+  margin: 0 -14px -12px;
+  gap: 0;
+}
+/* Unless the footer is under it, in which case the footer owns that edge and
+   the grid stops at the rule between them. The study banner keeps the weld —
+   it has no footer — which is why this is scoped rather than folded into the
+   rule above. */
+.ca-journal-entry-banner:has(> .ca-journal-entry-context) .ca-journal-tracker-bar {
+  margin-bottom: 0;
+}
+/* Cells lose their own shell — the card provides it — and gain rules between
+   them. Row 1 needs no top rule because the header's own hairline is already
+   there, and column 1 needs no left rule because the card's border is.
+   Widths are zeroed through the shorthand rather than `border: none`, which
+   would leave the width at `medium` and hand any side a 3px rule the moment
+   something downstream re-declared its style. */
+:is(.ca-journal-slim-banner, .ca-journal-stack) .ca-journal-tracker-bar .ca-journal-tracker-cell {
+  border: 0 solid var(--background-modifier-border);
+  border-radius: 0;
+  background: transparent;
+  /* The logging grid is the entry card's own §4.4 surface: the same argument
+     as the day grid, one page kind over. Widths still go through the
+     shorthand's `0 solid` above, so a side that should have no rule keeps
+     none — zeroing with `border: none` would leave the width at `medium` and
+     hand any side a 3px rule the moment something re-declared its style. */
+  border-top-width: var(--ca-rule);
+  border-left-width: var(--ca-rule);
+}
+/* ── AND THE ARITHMETIC IS THE GRID'S, WHICH IS THREE (5.30) ──────────
+ *
+ * `odd` and `-n + 2` describe a grid two cells wide. This one is three —
+ * `10-tracker-modules.css` opens with `repeat(3, 1fr)` and folds to two only
+ * under the 640px queries — so on any note with three trackers the rules were
+ * drawn for a layout that is not on the page. Measured on a Study subject with
+ * Status, Confidence and Accuracy: no rule at all between the second cell and
+ * the third (cell 3 is odd, so it dropped the left rule that divides them), a
+ * second hairline over the third cell alone (cell 3 is outside the first two,
+ * so it drew a top rule directly under the head's own), and a stray rule down
+ * the card's inner left edge (the add tile is cell 4, even, so it drew one
+ * where the card's border already is).
+ *
+ * WHY PER-CELL ARITHMETIC AT ALL, when `96-stat-strip.css` opens by arguing
+ * against it — *"THE DIVIDERS ARE THE GAP … a gap over a coloured ground
+ * divides any number of cells in any number of rows with no per-cell
+ * arithmetic"* — and 4.46 deleted this shape's twin for needing three rules to
+ * fold. Because a ground shows through everywhere a cell is NOT. The stat
+ * strip is told its own count (`data-cols`), so its last row is always full;
+ * this grid's count is the stylesheet's and its cell count is the note's, so a
+ * part-filled last row is the ordinary case — four trackers on a note with no
+ * add tile would paint two solid blocks of border colour where the strip would
+ * paint none. The arithmetic is what a part-filled row costs. */
+:is(.ca-journal-slim-banner, .ca-journal-stack)
+  .ca-journal-tracker-bar
+  .ca-journal-tracker-cell:nth-child(3n + 1) {
+  border-left-width: 0;
+}
+:is(.ca-journal-slim-banner, .ca-journal-stack)
+  .ca-journal-tracker-bar
+  .ca-journal-tracker-cell:nth-child(-n + 3) {
+  border-top-width: 0;
+}
+/* The add tile gives up its dashed outline here. Dashed reads as "an empty slot"
+   against the note background, but inside a panel of solid rules it reads as a
+   broken cell — and the tile is already legible as an action from its button. */
+:is(.ca-journal-slim-banner, .ca-journal-stack)
+  .ca-journal-tracker-bar
+  .ca-journal-tracker-cell.ca-journal-tracker-add {
+  border-style: solid;
+  min-height: 44px;
+}
+/* An add tile alone on the final row would leave the panel with a visibly empty
+   half — the one place an even grid of cells cannot stay even. It spans instead,
+   which also makes the note's one *action* read as a footer to the grid rather
+   than as another reading of it.
+
+   IT SPANS WHAT IS LEFT OF ITS ROW, NOT ALWAYS A WHOLE ONE. Three across gives
+   two ways to be short — the tile opens a row alone, or it follows one cell —
+   and the reported render is the second thing that rule got wrong: with three
+   trackers the tile is cell 4, which `odd` does not match, so it took a third
+   of a row and left the panel two thirds empty. The third position needs no
+   rule: auto placement already puts a tile there in the last track, and
+   4.42.1's `auto / -1` is the record of what asking for it in a declaration
+   does instead (§8.1.1 gives an item with an auto start and a definite end a
+   span of one). */
+:is(.ca-journal-slim-banner, .ca-journal-stack)
+  .ca-journal-tracker-bar
+  .ca-journal-tracker-cell.ca-journal-tracker-add:nth-child(3n + 1):last-child {
+  grid-column: 1 / -1;
+}
+:is(.ca-journal-slim-banner, .ca-journal-stack)
+  .ca-journal-tracker-bar
+  .ca-journal-tracker-cell.ca-journal-tracker-add:nth-child(3n + 2):last-child {
+  grid-column: 2 / -1;
+}
+
+/* ── TWO ACROSS, WHERE THE GRID SAYS TWO ────────────────────────────────
+ *
+ * `10-tracker-modules.css` folds the grid at 640px and states that fold THREE
+ * times — a container query, a media query and `body.is-mobile` — because a
+ * pane can be narrow without the window being, and a phone can be neither.
+ * Arithmetic that answers one of the three is arithmetic that is wrong under
+ * the other two, so each is restated here in full: a cell the fold moves has
+ * to be told both what it now is and what it no longer is, `nth-child(3n + 1)`
+ * and `nth-child(odd)` disagreeing about every third cell.
+ *
+ * THE BLOCK THAT STOOD HERE DESCRIBED ONE COLUMN, at 520px, and this grid has
+ * never had one — it folds from three to two and stops. Under 520px it took
+ * every cell's left rule away and gave every cell a top one, so a narrow pane
+ * drew two columns with no divider between them and a rule across the middle
+ * of each row. It is deleted rather than corrected: there is no width at which
+ * it described the layout. */
+@container (max-width: 640px) {
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+    .ca-journal-tracker-bar
+    .ca-journal-tracker-cell {
+    border-top-width: var(--ca-rule);
+    border-left-width: var(--ca-rule);
+  }
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+    .ca-journal-tracker-bar
+    .ca-journal-tracker-cell:nth-child(odd) {
+    border-left-width: 0;
+  }
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+    .ca-journal-tracker-bar
+    .ca-journal-tracker-cell:nth-child(-n + 2) {
+    border-top-width: 0;
+  }
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+    .ca-journal-tracker-bar
+    .ca-journal-tracker-cell.ca-journal-tracker-add:last-child {
+    grid-column: auto;
+  }
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+    .ca-journal-tracker-bar
+    .ca-journal-tracker-cell.ca-journal-tracker-add:nth-child(odd):last-child {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 640px) {
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+    .ca-journal-tracker-bar
+    .ca-journal-tracker-cell {
+    border-top-width: var(--ca-rule);
+    border-left-width: var(--ca-rule);
+  }
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+    .ca-journal-tracker-bar
+    .ca-journal-tracker-cell:nth-child(odd) {
+    border-left-width: 0;
+  }
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+    .ca-journal-tracker-bar
+    .ca-journal-tracker-cell:nth-child(-n + 2) {
+    border-top-width: 0;
+  }
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+    .ca-journal-tracker-bar
+    .ca-journal-tracker-cell.ca-journal-tracker-add:last-child {
+    grid-column: auto;
+  }
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+    .ca-journal-tracker-bar
+    .ca-journal-tracker-cell.ca-journal-tracker-add:nth-child(odd):last-child {
+    grid-column: 1 / -1;
+  }
+}
+body.is-mobile
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+  .ca-journal-tracker-bar
+  .ca-journal-tracker-cell {
+  border-top-width: var(--ca-rule);
+  border-left-width: var(--ca-rule);
+}
+body.is-mobile
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+  .ca-journal-tracker-bar
+  .ca-journal-tracker-cell:nth-child(odd) {
+  border-left-width: 0;
+}
+body.is-mobile
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+  .ca-journal-tracker-bar
+  .ca-journal-tracker-cell:nth-child(-n + 2) {
+  border-top-width: 0;
+}
+body.is-mobile
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+  .ca-journal-tracker-bar
+  .ca-journal-tracker-cell.ca-journal-tracker-add:last-child {
+  grid-column: auto;
+}
+body.is-mobile
+  :is(.ca-journal-slim-banner, .ca-journal-stack)
+  .ca-journal-tracker-bar
+  .ca-journal-tracker-cell.ca-journal-tracker-add:nth-child(odd):last-child {
+  grid-column: 1 / -1;
+}
+
+/* ── THE STACK: SEVERAL SECTIONS IN ONE CARD (5.28) ───────────────────
+ *
+ * A journal note's banner, its logging grid and its index are composed into one
+ * fence — the `stack` line says so, and `chromeClasses` puts this class on the
+ * block. See `directive-grammar.ts` for the directive and `journal-sections.ts`
+ * for what the catalogue folds into it.
+ *
+ * ITS OWN CARD, NOT A BORROWED ONE, AND THAT IS THE READER'S ASK. The first cut
+ * let the block keep `.ca-journal-tracker-section` — the frame 4.21 gave a grid
+ * that had just been moved OUT of a banner — and the vault render showed why
+ * that cannot be a stack's figure: the page head paints a tinted spine and no
+ * box, the tracker card paints a box with 12px of inset, and the head sat inside
+ * it as a card within a card, its spine floating a dozen pixels clear of the
+ * edge it is a spine FOR. `chromeClasses` withholds the tracker class from a
+ * stack now, and this stands in its place.
+ *
+ * ZERO PADDING, BECAUSE THE BANDS CARRY IT. The slim banner pads the card and
+ * has every band bleed that padding back out with negative margins — four
+ * numbers per band, each of which has to agree with the card's. A stack does not
+ * know what its bands are: the catalogue composes them, the reader re-arranges
+ * them, and a section welded in brings whatever it is. So the card holds the box
+ * and each band states its own inset — the same 14px, which cannot fall out of
+ * step with an edge it never has to cancel.
+ *
+ * `overflow: hidden` so the head's spine and the grid's rules stop at the
+ * radius. The card is the only thing here that knows it is round. */
+.ca-journal-widget-block.ca-journal-stack {
+  position: relative;
+  overflow: hidden;
+  /* Each band's own rule is the divider, as in the two cards above. */
+  gap: 0;
+  padding: 0;
+  margin: 0 0 0.9em;
+  background: var(--background-secondary);
+  border: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  box-shadow: inset 0 1px 0 var(--ca-edge-highlight);
+}
+
+/* ── BAND 1: THE NOTE'S NAME, AND THE CHEVRONS ─────────────────────────
+ *
+ * The head keeps the tint `98-page-head.css` gives it, and its spine moves to
+ * the card's edge — see the block under this one. What it gives up is its
+ * bottom rule: the chevron strip under it belongs to the
+ * NAME, not to what the chevrons open, and a rule between the two would band
+ * the card in the wrong place. The divider is the next band's, and a band that
+ * is closed takes its divider with it.
+ *
+ * AND THE LEFT INSET IS DECLARED HERE (5.30), WHICH IT WAS NOT. 5.28 read it
+ * off 99-aesthetic-presets.css — *"keeps that file's `padding-left: 14px`, so
+ * its inset is the card's without being declared twice"* — and that was true of
+ * every note a stack could be on, because a stack could only be on a journal
+ * note. The preset's rule was `[data-ca-grain]` / `[data-ca-journal]`, and
+ * `page-head.ts` sets neither on Home or on Search: those are the two surfaces
+ * where the head is not a grain and not a journal. So the first dashboard stack
+ * put a name flush against the card's edge over bands inset a further 14px.
+ *
+ * THAT GATE IS GONE (5.31.2) AND THIS DECLARATION STAYS. The gutter is
+ * unconditional in `98-page-head.css` now, so the case above cannot recur and
+ * this states the same number a second time — which is what it was written to
+ * do: *"declared at the same value rather than guarded… this is what the card
+ * falls back to, not a competing answer."* A stack's bands are inset by the
+ * card, and a band that reads its inset off another file is a band that moves
+ * when that file is edited for a reason of its own.
+ *
+ * AND THE RULE UNDER THE HEAD GOES WITH ITS BORDER (5.31.2). The head's bottom
+ * rule is drawn by a pseudo-element as of this release, so cancelling
+ * `border-bottom` no longer cancels the line: the chevron strip beneath belongs
+ * to the NAME, and a rule between the two would band the card in the wrong
+ * place — which is the whole of the paragraph above. `content: none` rather
+ * than `display: none`, because the box is never generated at all. */
+.ca-journal-stack .ca-journal-page-head {
+  padding-top: 10px;
+  padding-right: 14px;
+  padding-bottom: 8px;
+  padding-left: 14px;
+  border-bottom: none;
+  /* And no spine of its own: it paints the CARD's left edge instead, from the
+     pseudo-element two rules down, which is where the argument is written. */
+  border-left-width: 0;
+  position: static;
+}
+.ca-journal-stack .ca-journal-page-head::after {
+  content: none;
+}
+
+/* ── AND THE SPINE BECOMES THE CARD'S OWN LEFT EDGE (5.31.2) ─────────
+ *
+ * REPORTED FROM THE VAULT, AND IT IS THREE FAULTS WITH ONE CAUSE: the head kept
+ * drawing its `border-left` inside a card that was already drawing one of its
+ * own. Decoding the reported render says exactly what that costs, left to right
+ * from the card's outer edge: two pixels of `--background-modifier-border`, then
+ * two of the journal's magenta, then the head's gutter. So —
+ *
+ *   A DOUBLE EDGE. Two vertical rules in two colours, four pixels wide, where
+ *   every other card in the vault has one.
+ *
+ *   A SPINE THAT STOPS. The head's border ends where the head's box ends, forty
+ *   pixels above the card's floor and — because the chevron strip beneath
+ *   belongs to the name and takes no rule, which is the paragraph above — at a
+ *   line where nothing else changes. It reads as a border that failed to draw
+ *   rather than as a mark that meant to end.
+ *
+ *   AND A NAME TWO PIXELS RIGHT OF EVERYTHING UNDER IT. Both bands state the
+ *   card's 14px, but the head states it after a border and the chevrons after
+ *   nothing, so the reader's eye follows the left edge down and the title is
+ *   the one thing off it. Three pixels under Technical HUD, which is worse.
+ *
+ * SO THE CARD GIVES UP ITS LEFT BORDER AND THE HEAD PAINTS IT INSTEAD, full
+ * height, in the grain's colour. One edge, one colour, running the whole card,
+ * and every band inset the same 14px from it.
+ *
+ * WHY A PSEUDO-ELEMENT AND NOT THE CARD'S OWN `border-left-color`, which is the
+ * shorter rule and the first thing to try: the card cannot see the colour.
+ * `page-head.ts` writes `data-ca-grain` and `data-ca-journal` on the HEAD, and
+ * 99-aesthetic-presets.css binds `--ca-grain-spine` there — a custom property
+ * reaches descendants and never an ancestor, so a card asking for it gets the
+ * `00-tokens.css` fallback and a journal note's magenta spine comes out the
+ * vault's accent. Reaching the card instead would mean six `:has()` selectors,
+ * one per grain plus one for a journal, which is the shape 5.31.2 just deleted.
+ *
+ * WHICH IS WHY THE HEAD GOES `position: static` HERE. The pseudo has to be the
+ * head's to read the colour and the CARD's to be as tall as the card, and an
+ * absolutely positioned box resolves against the nearest positioned ancestor.
+ * The stack's card is `position: relative` at the top of this block and nothing
+ * between them is positioned — `.ca-journal-live-widget` is a bare host and
+ * `test/journal-stack.test.ts` holds it to that, because a `position` added to
+ * that wrapper for a reason of its own would silently shorten this spine to the
+ * head again. The head's own `::after` is the only thing `relative` was for and
+ * it is `content: none` two rules up.
+ *
+ * `:has()` ON THE BORDER RULE so the card gives up an edge only where there is
+ * a head to replace it. Every stack has one today — the host is always the
+ * banner and all three banner directives draw a page head — and a card with no
+ * left edge at all is not the failure this should degrade into. */
+.ca-journal-widget-block.ca-journal-stack:has(.ca-journal-page-head) {
+  border-left: none;
+}
+.ca-journal-stack .ca-journal-page-head::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--ca-head-spine);
+  background: var(--ca-grain-spine);
+  /* Two pixels of decoration over the left edge of every band it crosses. */
+  pointer-events: none;
+}
+/* ── A PAGE BANNER THAT IS ALSO A STACK (5.30) ─────────────────────────
+ *
+ * The one combined case, and it is one rule because the rest of the two class
+ * lists already agree. `.ca-journal-page-banner` sets a border, a radius, a
+ * background and `overflow: hidden`; the stack's card sets every one of them
+ * from a selector one class heavier, at the values a stack wants — so a
+ * dashboard banner welded into a stack takes the stack's box with nothing to
+ * cancel and nothing to restate.
+ *
+ * WHAT DOES NOT AGREE IS THE LINKS BAND'S INSET. A page banner welds its links
+ * row to its own bottom edge at `7px 8px`, which is a small card's inset; in a
+ * stack that row is band 2 of a card whose every other band sits at 14px, and
+ * 6px of difference on the one band a reader's eye follows down the left edge
+ * is exactly the seam the card exists to dissolve. The hairline between the
+ * name and the links stays — see the page banner's own note on it, which is
+ * about two bands of ONE card and is as true here — and only the gutter moves.
+ *
+ * `>` AND BOTH CLASSES, so this cannot reach a links card inside a widget the
+ * stack holds, and cannot reach a page banner that is not in a stack. */
+.ca-journal-page-banner.ca-journal-stack > .ca-journal-links-card > .ca-journal-links-bar {
+  padding: 7px 14px;
+}
+/* The live host the head is built inside carries no inset of its own — the same
+   requirement `.ca-journal-overview-card > .ca-journal-live-widget` states one
+   card over, for the same reason: a band that meets the card's edges cannot have
+   a padded wrapper between it and them. */
+.ca-journal-stack > .ca-journal-live-widget {
+  padding: 0;
+}
+/* The chevrons finish the name band: no rule above them, the card's inset at the
+   sides, and the band's air underneath whether or not anything is open — with
+   everything closed this row is the card's last line. */
+.ca-journal-stack > .ca-journal-reveal-bar {
+  margin-top: 0;
+  /* 6px on top, not 2px (5.31.2). The pills wear an edge and a radius now, so
+     where a row of bare words could sit tight under the name a row of objects
+     cannot: the strip reads as a second line of the name band rather than as
+     its own row. The floor stays at 10 — it is the head's own top inset at the
+     other end of the card, and the card's air is that number on both. */
+  padding: 6px 14px 10px;
+}
+
+/* ── THE BANDS UNDER IT ────────────────────────────────────────────────
+ *
+ * One rule per band, drawn by the band that STARTS it — the logging grid, or a
+ * welded section's bar. WHICH bands exist is the reveal store's answer rather
+ * than the composer's, and a hidden band is `display: none` and takes its rule
+ * with it, so a card showing only its name ends under the chevrons with no line
+ * left hanging over nothing.
+ *
+ * `>`, DELIBERATELY: these are the stack's OWN bands. A section bar nested
+ * inside a widget the stack holds is that widget's business, and a rule that
+ * reached it would draw the stack's divider somewhere the stack does not end. */
+.ca-journal-stack > .ca-journal-tracker-bar,
+.ca-journal-stack > .ca-journal-sec-l1 {
+  border-top: var(--ca-rule) solid var(--background-modifier-border);
+}
+/* The grid is full-bleed: its cells carry their own inset and draw their own
+   rules — the shared block above — and the card's border closes the sides. */
+.ca-journal-stack > .ca-journal-tracker-bar {
+  gap: 0;
+}
+/* A WELDED SECTION'S BAR TAKES THE STACK'S INSET, NOT THE SURFACE'S.
+ *
+ * 70-section-surface.css gives a level-1 bar inside a section block
+ * `padding: 8px var(--ca-sec-pad-x) 6px` and a matching negative margin, so its
+ * rule meets the edges of the card the SURFACE draws — 12px, and bled outward
+ * from a padding this card does not have. Inside a stack that is 12px of bleed
+ * against a card with none, clipped by the `overflow: hidden` above and leaving
+ * the title two pixels shy of the head's spine.
+ *
+ * Four classes so it outranks that rule from an earlier file: the bar keeps its
+ * band's air and its hairline, and bleeds 14px — the stack's inset — so the rule
+ * under the title meets the card's sides the way every other band's does. */
+.ca-journal-widget-block.ca-journal-stack
+  > .ca-journal-sec-l1.ca-journal-header-bar {
+  padding: 8px 14px 6px;
+  margin: 0 -14px 7px;
+}
+/* And everything the section drew under its bar. */
+.ca-journal-stack > .ca-journal-sec-l1 ~ * {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+.ca-journal-stack > .ca-journal-sec-l1 ~ *:last-child {
+  padding-bottom: 10px;
+}
+
+/* ── AND THE SECTION'S BUTTONS COME BACK ONTO ITS TITLE ROW ────────────
+ *
+ * `flex: 1 0 100%` further up this file puts a level-1 section's controls on a
+ * row of their own under a hairline, which is right for a section that is a
+ * whole card: the strip is that card's header, and a header can afford two
+ * lines. Inside a stack it is a third rule and a third row in a card whose whole
+ * purpose is to spend less of the page — `+ Topic` alone on a full-width row,
+ * under a hairline, under a title, above an empty state.
+ *
+ * So they sit at the end of the title row, which is where the room is: a welded
+ * section's title is one short word and the rest of that line is empty. This is
+ * the reader's *"give the buttons a more fitting space on the banner"*.
+ *
+ * THE UNTITLED BAR IS EXCLUDED for the reason the rule above excludes it — with
+ * no title there is no row for them to sit at the end of. */
+.ca-journal-stack
+  .ca-journal-sec-l1:not(.ca-journal-header-bar-untitled)
+  > .ca-journal-header-widgets.ca-journal-widget-bar {
+  flex: 0 1 auto;
+  margin-left: auto;
+  padding-top: 0;
+  border-top: none;
+}
+/* ── AND THE CHEVRON GOES PAST THEM, WHICH IS LEVEL 2's RULE ──────────
+ *
+ * TWO `margin-left: auto` IN ONE ROW SPLIT THE FREE SPACE BETWEEN THEM, and
+ * that is the whole defect: the toggle takes one to reach the right-hand edge,
+ * the strip above now takes one to sit beside the title, and flexbox honours
+ * both — so the chevron landed in the MIDDLE of the bar with `+ Topic` at the
+ * end. Collapsed, the strip is `display: none` and the chevron went back to the
+ * edge, so it MOVED as the section opened, which is what the vault reported.
+ *
+ * `.ca-journal-sec-l2 > .ca-journal-header-toggle` has answered this since
+ * 4.13: give up the auto margin, take `order: 1`, end up past the buttons. Its
+ * comment already states the rule as both levels' — *"the fold acts on the
+ * whole section and the buttons act on things inside it, so the one that owns
+ * the most is the one furthest out"* — and it was true of every level-1 bar
+ * except that at level 1 the buttons were on a row of their own, so the
+ * question never came up. Inside a stack they are not, so it does. */
+.ca-journal-stack
+  .ca-journal-sec-l1:not(.ca-journal-header-bar-untitled)
+  > .ca-journal-header-toggle {
+  margin-left: 0;
+  order: 1;
+}
+
+/* ── THE BANNER'S REVEAL STRIP (5.28) ─────────────────────────────────
+ *
+ * One labelled chevron per revealable section, drawn in the banner between the
+ * note's name and whatever the chevrons open. See `ui/reveal.ts` for what a
+ * reveal is and why it is not a fold.
+ *
+ * A ROW OF QUIET PILLS, and the quiet is still the design brief: the strip is
+ * chrome that exists to REMOVE chrome, so anything that made it look like a
+ * toolbar would be the thing it was built to take away. The label sits at the
+ * bar's own text size in the muted colour every other secondary control on a
+ * card uses, and weight is earned only on hover and while the section is open.
+ * WHAT THE PILL IS MADE OF MOVED IN 5.31.2 — an outline at rest rather than
+ * nothing at all — and the block above `.ca-journal-reveal-toggle` argues both
+ * halves of why: the card it sits in now has an edge and a colour, and a
+ * `<button>` left at its defaults was never getting this file's answer anyway.
+ *
+ * `:empty` IS LOAD-BEARING, not tidying. The strip is appended to every journal
+ * banner before anything is known about the rest of the note — blocks render
+ * independently and a section's block may arrive later or never — so a note
+ * with nothing revealable has an empty strip, and an empty strip that still
+ * took a row's height would put a gap under the name of every note in the
+ * vault. */
+.ca-journal-reveal-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+.ca-journal-reveal-bar:empty {
+  display: none;
+}
+/* ── AND `button` IS AN ELEMENT SOMEBODY ELSE ALREADY STYLES (5.31.2) ──
+ *
+ * THE STRIP ABOVE HAS NEVER RENDERED THE WAY THIS FILE DESCRIBES IT. Decoding
+ * the reported vault render: every pill sat on a flat `#333333` ground with a
+ * lighter `#454545` top edge — a fill and an inset highlight, on a control
+ * whose rule said `background: transparent` and `box-shadow: none` — and stood
+ * about eight pixels taller than the padding here can account for. That is
+ * Obsidian's own chrome for a `<button>`, and it was winning.
+ *
+ * ONE CLASS IS NOT ENOUGH TO HOLD A `<button>`. `.ca-journal-reveal-toggle` is
+ * (0,1,0), and an app or theme rule needs only to name the element beside a
+ * class — `button:not(.clickable-icon)`, `.markdown-rendered button` — to reach
+ * (0,1,1) and take every property this one leaves at a default. Nothing else in
+ * this plugin draws a bare `<button>` on a card, which is why the strip is the
+ * one place it showed. So each rule below names the bar, the element AND the
+ * class, and states its ground, its edge and its shadow rather than trusting
+ * any of the three to be nothing.
+ *
+ * WHAT THE PILL LOOKS LIKE NOW, and the brief moved with it. 5.28 asked for
+ * *"no surface of its own, no border"*, which was right when the strip was the
+ * only chrome in a plain banner; it is inside a card with a coloured spine now,
+ * and a row of unbounded words there reads as a caption rather than as
+ * controls. An OUTLINED pill answers both: a hairline and a full radius say
+ * "press me", the transparent ground keeps the quiet, and the ground arrives
+ * only on hover and while the section is open, which is where the weight was
+ * always meant to be earned.
+ *
+ * NEUTRAL, NOT THE GRAIN'S COLOUR, AND THAT IS AN INHERITANCE FACT RATHER THAN
+ * A PREFERENCE. `page-head.ts` writes `data-ca-grain` on the HEAD; the strip is
+ * the head's SIBLING inside the block, so `--ca-grain-spine` does not reach it
+ * and resolves to the vault accent from `00-tokens.css`. Pills in the vault's
+ * purple beside a spine in a journal's magenta would be worse than pills in
+ * neither, so the colour here is the card's own vocabulary and the modernity is
+ * carried by the shape. */
+.ca-journal-reveal-bar > button.ca-journal-reveal-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  /* Nine on the chevron's side and ten on the label's: a round glyph needs less
+     air beside it than a stem does, and the pill looks lopsided at equal. */
+  padding: 4px 9px 4px 10px;
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--ca-bar-text);
+  font-weight: 500;
+  line-height: 1.45;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.ca-journal-reveal-bar > button.ca-journal-reveal-toggle:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+  color: var(--text-normal);
+}
+/* OPEN READS AS PRESSED. The button is the only thing on screen saying a
+   section is open once that section is drawn below it — the card itself says
+   nothing about which control opened it — so the state has to be legible on
+   the control rather than only in the chevron's angle. */
+.ca-journal-reveal-bar > button.ca-journal-reveal-toggle.is-open {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+  color: var(--text-normal);
+}
+/* ── AND THE CHEVRON SITS IN THE MIDDLE OF THE ROW IT IS ON (5.31.2) ───
+ *
+ * *"the chevrons … should sit a few pixels lower (in the middle of its row)"*,
+ * and the render says why they did not look centred when the geometry says they
+ * were. At `1em` of `--ca-text-2xs` the glyph's visible stroke measured FOUR
+ * pixels tall in a thirty-pixel pill, against a label whose ink ran eight and
+ * an emoji in the same label whose ink ran thirteen — so the eye compared the
+ * chevron to its neighbours on the row rather than to the box it was centred
+ * in, and read the tallest thing's extra depth as the chevron sitting high.
+ *
+ * SO IT IS DRAWN AT A REAL SIZE, in pixels rather than in ems of a 0.7em type
+ * scale, with a stroke heavy enough to survive it.
+ *
+ * AND THEN NUDGED ONE PIXEL, WHICH IS OPTICAL AND NOT ARITHMETIC. A `⌄` carries
+ * its mass in the two arms at the top and tapers to a point at the bottom, so
+ * centring its BOX leaves it reading high; a `⌃` is the same shape upside down
+ * and reads low. The nudge is therefore reversed with the glyph — see the
+ * rotation below, which is what makes the open state the other shape. */
+.ca-journal-reveal-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--text-faint);
+  transition: transform 120ms ease;
+}
+.ca-journal-reveal-chevron .svg-icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.25px;
+}
+.ca-journal-reveal-bar > button.ca-journal-reveal-toggle:hover .ca-journal-reveal-chevron,
+.ca-journal-reveal-bar > button.ca-journal-reveal-toggle.is-open .ca-journal-reveal-chevron {
+  color: var(--text-muted);
+}
+/* Down means closed, up means open — the idiom every fold in this plugin uses;
+   see `.ca-journal-header-toggle` for why the direction was chosen. `margin`
+   rather than a `translateY` in this transform, so the nudge and the turn do
+   not have to be written as one value and kept in step. */
+.ca-journal-reveal-toggle.is-open .ca-journal-reveal-chevron {
+  margin-top: -1px;
+  transform: rotate(180deg);
+}
+/* What a closed reveal does to the section it names. `display: none` and not a
+   height animation: the section is a whole block of somebody else's markdown,
+   and the two shapes it can be — a band inside the banner, a card of its own —
+   have nothing in common to animate. Mirrors `.ca-journal-section-hidden`,
+   which is the fold's equivalent and is deliberately a different class: a fold
+   and a reveal can be closed over the same block at once, and one class would
+   make either one's reopening undo the other's. */
+.ca-journal-reveal-hidden {
+  display: none !important;
+}
+
+/* ── M2: THE MINIMAL BANNER (4.19.1), NOW THE SLIM ONE (4.21.1) ────────
+ *
+ * 4.19 gave every page a banner and then asked what an ENTRY's and a LEAF's
+ * should be, given that neither is a page you land on — they are pages you write
+ * in, and the banner's whole job there is to say which note this is and get out
+ * of the way. The answer chosen was the tight card: keep the card, so the block
+ * is still an object a reader can point at and the cog stays discoverable, and
+ * drop everything that was making it loud.
+ *
+ * IT KEEPS: the card, the rule, and every control.
+ *
+ * IT DROPS: the padding — down a third from the page banner's, which is what
+ * makes it read as a strip rather than as a band.
+ *
+ * AND IT NEVER HAD THE FIGURE, which is worth writing down because it looks like
+ * an omission next to `.ca-journal-page-banner`. The wash and the hatch are how a
+ * page announces itself; a note you are writing in does not announce itself. The
+ * page banner is the loud one on purpose and this is the quiet one on purpose.
+ *
+ * WHAT 4.21.1 TOOK OUT OF THIS BLOCK. The card and the band lived here in one
+ * copy and in `30-header-bars.css`'s entry-banner block in another, under a
+ * comment on each pointing at the other. Both copies are gone; `.journal-slim-
+ * banner` above is the one that is left. What remains here is what is genuinely
+ * a JOURNAL LEAF's — its crumb trail, its title's face — and the wrapper, which
+ * now carries nothing so its two bands can bleed the card's padding themselves.
+ *
+ * THE ARRANGEMENT ALSO FLIPPED, and it flipped here rather than in CSS: 4.19.1's
+ * note above said this banner keeps "the crumb-above-name arrangement this
+ * header already had", and 4.21.1 is the release that stopped keeping it. See
+ * `buildStudyHeader`. */
+.ca-journal-study-banner .ca-journal-study-header {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+/* The name, at the size the minimal banner settled on.
+ *
+ * 1.15em WAS ALREADY THIS HEADER'S, and it is now the entry's too — that one was
+ * inheriting `--ca-bar-text` (0.7em), the size of a SECTION bar's label, which
+ * is the right size for "🔎 Search" and the wrong one for the note's own name.
+ * The weight goes to 700 so it holds its own against a crumb row that is now
+ * uppercase, and the tracking comes in a hair for the same reason `.ca-jtc-title`
+ * carries some: a name set larger than its surroundings needs it. */
+.ca-journal-study-header .ca-jsh-title-text,
+.ca-journal-study-header .ca-jsh-title-input {
+  font-size: var(--ca-text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+/* The crumb trail, as the context line — the same treatment `.ca-jtc-link` gives
+ * the page banner's destination row.
+ *
+ * ONE LINE ABOVE THE NAME, DRAWN ONE WAY. The page banner puts its destinations
+ * in small caps above its title; this puts its crumbs there; and until now they
+ * were an accent-coloured row at reading size, which made the trail the loudest
+ * thing on a note whose subject is the title beneath it. Faint until hovered,
+ * for `.ca-jtc-link`'s stated reason: a row you read at a glance to know where you
+ * are, rather than a menu you read every time.
+ *
+ * THE PADDING STAYS. It was doing the work the removed border used to do — the
+ * hit area — and shrinking a link's target to tidy its appearance is the trade
+ * this file already refused once when the pills became links. */
+.ca-jsh-crumbs a.ca-jn-pill {
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
+  text-transform: uppercase;
+  color: var(--text-faint) !important;
+}
+.ca-jsh-crumbs a.ca-jn-pill:hover {
+  color: var(--text-normal) !important;
+}
+.ca-jsh-sep {
+  font-size: var(--ca-text-2xs);
+}
+/* Band 2 on a leaf: the trail on the left, the note's date right-aligned. The
+   inset, the rule and the bottom-edge handoff are `.ca-journal-banner-nav`'s and
+   are not repeated here — this is only what is a TRAIL rather than a band. */
+.ca-jsh-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+}
+.ca-jsh-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+/* A trail, not a row of buttons.
+   Each crumb was a bordered pill on `--background-primary` that filled with the
+   accent on hover — the loudest chrome on the note, above a title that is the
+   actual subject of the page. A breadcrumb is a link: it should look like the
+   place it goes, and the boxes were doing the work the separators already do.
+   They are links now, muted for the trail and accented for the one you can
+   press, with the hit area kept by padding rather than by a border. */
+/* TWO HOSTS, ONE TRAIL (4.51.2). The vault banner draws the same crumbs
+   through the same `renderCrumb`, so it gets the same treatment here rather
+   than a near-copy in its own file. Restating these eight declarations one
+   stylesheet later is how the two trails come to disagree about a hover. */
+.ca-jsh-crumbs a.ca-jn-pill,
+.ca-vault-banner .ca-avb-trail a.ca-jn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: var(--ca-space-1) var(--ca-space-2);
+  border-radius: var(--ca-radius-sm);
+  background: none;
+  border: none;
+  color: var(--text-accent) !important;
+  text-decoration: none !important;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.ca-jsh-crumbs a.ca-jn-pill:hover,
+.ca-vault-banner .ca-avb-trail a.ca-jn-pill:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-accent) !important;
+}
+/* The crumb for a level this note has not got — dashed, because it is a gap in
+   the trail rather than a place. Kept as an outline for exactly that reason;
+   without it a missing level would read as absent rather than as empty. */
+.ca-jsh-crumbs .ca-jn-flat.ca-jn-muted,
+.ca-vault-banner .ca-avb-trail .ca-jn-flat.ca-jn-muted {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--ca-space-1) var(--ca-space-4);
+  border-radius: var(--ca-radius-sm);
+  color: var(--text-faint);
+  border: 1px dashed var(--background-modifier-border);
+  white-space: nowrap;
+}
+.ca-jsh-sep {
+  color: var(--text-faint);
+  font-size: var(--ca-text-sm);
+}
+.ca-jsh-date {
+  font-size: var(--ca-text-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+/* Home: icon-only, so the trail reads as this note's own position rather
+   than leading with a word every note in the vault repeats. Squared padding
+   keeps it circular instead of stretching into a stadium. */
+.ca-jsh-crumbs a.ca-jn-pill.ca-jsh-crumb-icon,
+.ca-jsh-crumbs .ca-jn-flat.ca-jn-muted.ca-jsh-crumb-icon,
+.ca-vault-banner .ca-avb-trail .ca-jsh-crumb-icon {
+  padding: var(--ca-space-2) var(--ca-space-4);
+}
+.ca-jsh-crumb-icon .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+/* The banner's trail is one line of small type, so its crumbs take the row's
+   size rather than the study header's. Everything else about them is shared. */
+.ca-vault-banner .ca-avb-trail a.ca-jn-pill,
+.ca-vault-banner .ca-avb-trail .ca-jn-flat.ca-jn-muted {
+  font-size: inherit;
+  flex: 0 0 auto;
+}
+
+/* Row 2: the note's title, click-to-edit. Same affordance as a diary
+   entry's (.ca-jeh-title): a hover wash over the whole hit area and a pencil
+   that only appears on hover, so the control is discoverable without adding
+   a permanent button to a strip that is otherwise all navigation. */
+/* The name band's own row. `.ca-journal-banner-name` supplies the flex, the inset
+   and the rule; the 6px of top margin went with the flip, because the band is
+   the card's top edge now and its air is the inset's. */
+.ca-jsh-titlerow {
+  min-width: 0;
+}
+/* THE NAME'S WRAPPER, ON BOTH SLIM BANNERS. It exists for a reason written in
+   `study-header.ts` — `attachNoteRename` empties the row it is given, so the cog
+   cannot be a sibling of the name inside it — and it earns a shared class
+   because it also carries the push that sends the cog to the far end.
+   `margin-right: auto` rather than `justify-content: space-between` on the band:
+   an entry drawn from a managed template has no cog at all, and a
+   space-between would strand the name in the middle of the band. */
+.ca-journal-banner-name > .ca-journal-banner-title {
+  min-width: 0;
+  margin-right: auto;
+}
+.ca-jsh-title-wrap {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.ca-jsh-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  cursor: text;
+  padding: 1px 6px;
+  margin-left: -6px;
+  border-radius: var(--ca-radius-sm);
+  transition: background 0.12s;
+}
+.ca-jsh-title:hover {
+  background: var(--background-modifier-hover);
+}
+.ca-jsh-title-text {
+  font-size: 1.15em;
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ca-jsh-title-edit {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.ca-jsh-title-edit svg {
+  width: 0.72em;
+  height: 0.72em;
+}
+.ca-jsh-title:hover .ca-jsh-title-edit {
+  opacity: 1;
+}
+.ca-jsh-title-input {
+  font-size: 1.15em;
+  font-weight: 600;
+  padding: var(--ca-space-1) var(--ca-space-4);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  min-width: 12em;
+  max-width: 100%;
+}
+
+/* ── Pages table ──────────────────────────────────────────────────────────
+   A promoted note's page index. Rows rather than a table: there is one thing
+   to say per page (which page, in what order) and a header row would be a
+   column heading over a column of numbers. */
+/* `.jpt-*` retired in 2.56.9 — the page index draws `createListRow` now. Its
+   four rules described a bordered column of rows with a small muted ordinal
+   before each name, which is the row component with something in its `token`
+   slot. The ordinal is the reading position, not the `order` property: a page
+   whose order is missing or duplicated still gets a sensible place, and the
+   number a reader sees always counts 1..n. */
+.ca-list-row.is-dense .ca-list-token:not(:empty) {
+  min-width: 1.6em;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--ca-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+.ca-list-row.is-dense .ca-list-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* `.ca-list-pills` is created on every row whether or not it has any, so a
+   caller filling it after an async read does not have to know whether it
+   exists. Harmless in a flex row; in a COLUMNED row it is a grid item, and an
+   empty one still holds a track open — which pushed every value one column
+   right and dropped the last off the end onto a second line. `display: none`
+   rather than a caller-side count: the callers should not have to know the
+   component's private children either. It reappears the moment it is filled. */
+.ca-list-main.is-columned > .ca-list-pills:empty {
+  display: none;
+}
+
+/* ── 3.2 patch 5: the links band, welded into the entry banner ─────────────
+   The merged fence puts `links:…#diary` in the same container as
+   `entry-header`, so buildLinks' standalone card arrives as one of the banner's
+   own children rather than as a block of its own. It sheds its frame — the
+   banner supplies that now — and keeps only its inset.
+
+   IT IS BAND 2 AS OF 4.21.1, WHERE IT WAS BAND 1. The card sat on the banner's
+   TOP edge from 3.2 patch 5 until then, and the rule that put it there is gone
+   rather than adjusted: everything about how the band is inset, ruled and
+   rounded is `.ca-journal-banner-nav`'s now, applied to whichever row a page kind
+   uses for its destinations. This block keeps only what is a LINKS CARD's — the
+   frame it gives up, and the rhythm its pills are set to.
+
+   A CHILD SELECTOR IS CORRECT HERE, unlike on the overview card: `links` is not
+   live-wrapped, so buildLinks' card really is the banner block's own child.
+
+   This is 2.18.4's merge one row further up: that one welded the nav strip to
+   the tracker grid and left the links row outside. One fence is one container,
+   so the card is real rather than a resemblance. */
+.ca-journal-entry-banner > .ca-journal-links-card {
+  border: none;
+  background: none;
+}
+/* The pill row is a band of the banner rather than the bottom of a small card,
+   so it breathes to the same rhythm as the name above it. */
+.ca-journal-entry-banner > .ca-journal-links-card > .ca-journal-links-bar {
+  padding: 0;
+}
+
+/* ── 3.7: the entry card's footer ─────────────────────────────────────────
+   The date stepper and the entry's `⋯`, welded to the card's underside — the
+   same band the overview masthead has carried since 3.6 patch 7, and the same
+   argument for it: "the footer is where a control that acts on the whole card
+   belongs". A stepper that moves to another day and a menu that adds a tracker
+   to this note both act on the whole entry, and until 3.7 they sat in a second
+   row inside the TITLE band, which put the card's chrome in the middle of the
+   thing it acts on.
+
+   NOT `.ca-journal-overview-actions` REUSED, though the shape is deliberately the
+   same. That class carries `border-left: var(--ca-rule-edge)` — the species
+   marker 3.2 gave the overview and 3.6 patch 1 finally made paint. An entry is
+   not a page that summarises the ones below it, and the whole point of the
+   marker is that the entry does not wear it. Two bands that look alike and mean
+   different things is exactly the pair 3.2 split.
+
+   The ground and the top rule are shared, because those are what make it a
+   footer rather than a stray row. */
+.ca-journal-entry-banner > .ca-journal-widget-bar.ca-journal-entry-context {
+  margin: 0 -14px -12px;
+  padding: 8px 14px;
+  border-top: var(--ca-rule) solid var(--background-modifier-border);
+  border-radius: 0 0 var(--ca-radius-md) var(--ca-radius-md);
+  background: var(--background-secondary-alt);
+  gap: 6px 10px;
+}
+/* WHERE THE COG'S `margin-left: auto` WENT (4.21.1).
+ *
+ * It was here, on `.ca-journal-entry-context > .ca-jeh-more` and — after 4.21 moved
+ * the control up into the banner — on `.ca-journal-entry-header > .ca-jeh-more` too.
+ * The push is now `.ca-journal-banner-title`'s `margin-right: auto`, one element
+ * to the left, and it had to become one or the other rather than both: two auto
+ * margins in one flex line do not compete, they SPLIT the free space equally,
+ * which would have parked the cog half way along the band. This file already
+ * records that failure at `.ca-journal-sec-l2`, in the same words.
+ *
+ * THE NAME'S SIDE IS THE RIGHT SIDE OF THE PAIR TO KEEP, because an entry drawn
+ * from a managed template has no cog at all (see attachEntryMenu: a control that
+ * opens a menu to say no is worse than no control), and a push that lives on the
+ * control disappears with it. */
+
+/* Touch has no hover to reveal this with, so it rests at a visible-but-quiet
+   opacity instead of at zero. 3.9 §3.3's policy rather than a fifth patch
+   noticed one at a time — see test/hover-reveal.test.ts, which fails the build
+   for a hover-revealed affordance that arrives without one of these. */
+@media (hover: none) {
+  .ca-jsh-title-edit {
+    opacity: 0.45;
+  }
+}
+
+/* ── Header actions compact to icons on a phone (3.12 §14.2) ──────────────
+   A section header is a fold arrow, an emoji, a title and a count on the left
+   and its actions on the right. On a phone the two halves do not fit, so the
+   actions wrapped onto a second row — right-aligned, under the title, roughly
+   doubling the height of the header on the surface with the least vertical
+   room. Worse on a FOLDED section, where it leaves a title with a button
+   floating under it and no content, which reads as an empty section rather
+   than a closed one.
+
+   Dropping the label rather than shrinking the button, because the row was
+   already half icon-only: the edit pencil is a ghost button and has never had
+   a label, so "+ Add chart" beside a bare pencil was two conventions in one
+   row. This makes it one.
+
+   NOTHING IS LOST TO A SCREEN READER OR A LONG-PRESS. buildButton sets both
+   `aria-label` and `title` from the same string it puts in the label span
+   (button-widgets.ts), so the accessible name and the tooltip are already
+   carried independently of the visible text. That is what makes hiding it
+   safe, and it is why this is a stylesheet change and not a renderer one. */
+body.is-mobile .ca-journal-header-widgets .ca-journal-btn .ca-journal-btn-label {
+  display: none;
+}
+/* With the label gone the button is an icon in a box padded for text, which
+   reads as lopsided. Square it against the same floor everything else on a
+   phone is sized by. */
+body.is-mobile .ca-journal-header-widgets .ca-journal-btn {
+  min-width: var(--ca-control-min);
+  justify-content: center;
+  padding-left: var(--ca-space-2);
+  padding-right: var(--ca-space-2);
+}
+
+/* ── The launcher: places to go, as tiles (4.5 §3) ─────────────────────
+ *
+ * BESIDE `.ca-jn-pill`, which is the same destination drawn small. A pill is
+ * navigation chrome welded to a header band; a tile is content in a cell,
+ * because getting somewhere is what that part of the page is for. They share
+ * `resolveTarget` and nothing else, which is why they share a file and not a
+ * class.
+ *
+ * THREE SHAPES, AND NEVER A FOURTH (4.8.1). Four tiles laid out by `auto-fit`
+ * with a floor is the obvious rule and it has a bad case in the middle: at a
+ * width that fits three, three go across and the fourth drops underneath on a
+ * line of its own. A ragged 3 + 1 is the one arrangement of four things that
+ * reads as a mistake, and the homepage's cell — `--ca-row-cell-min` is 320px —
+ * sits squarely in the band that produces it.
+ *
+ * So the count is declared rather than fitted: four across where there is room
+ * for four, two by two by default, one column where even two would be thin. The
+ * thresholds are the same arithmetic `auto-fit` was doing (a tile wants about
+ * 96px, plus the gaps, plus the card's own padding); saying it out loud is what
+ * lets the answer skip three.
+ *
+ * MEASURED AGAINST THE CELL, not the block: `container-type: inline-size` sits
+ * on `.ca-journal-block-cell` as well as on the block, so a launcher in a third of
+ * a row asks about that third. 4.2 §2 put it there for exactly this. */
+.ca-jlx-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+@container (min-width: 440px) {
+  .ca-jlx-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@container (max-width: 230px) {
+  .ca-jlx-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.ca-jlx-grid.is-empty {
+  display: block;
+}
+
+.ca-jlx-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.ca-jlx-tile:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  text-decoration: none;
+}
+.ca-jlx-icon {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.ca-jlx-tile:hover .ca-jlx-icon {
+  color: var(--interactive-accent);
+}
+/* The label is the destination's own, from `resolveTarget` — small caps like
+   every other key label in the plugin, which is `--ca-caps`'s whole job. */
+.ca-jlx-label {
+  font-size: var(--ca-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Mobile Overlay Controls Toggle ────────────────────────────────────── */
+.ca-mobile-toggle-btn {
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 1000;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-secondary);
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  color: var(--text-muted);
+  box-shadow: var(--ca-shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ca-mobile-toggle-btn:hover,
+.ca-mobile-toggle-btn:active {
+  opacity: 1;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.ca-mobile-toggle-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.ca-mobile-toggle-btn.ca-mobile-toggle-left {
+  left: calc(16px + env(safe-area-inset-left, 0px));
+}
+
+.ca-mobile-toggle-btn.ca-mobile-toggle-right {
+  right: calc(16px + env(safe-area-inset-right, 0px));
+}
+
+body.ca-hide-mobile-overlays .mobile-navbar,
+body.ca-hide-mobile-overlays .mobile-toolbar,
+body.ca-hide-mobile-overlays .view-header,
+body.ca-hide-mobile-overlays .mobile-header,
+body.ca-hide-mobile-overlays .workspace-mobile-header,
+body.ca-hide-mobile-overlays .app-header,
+body.ca-hide-mobile-overlays .status-bar {
+  display: none !important;
+}
+
+body.ca-hide-mobile-overlays .ca-vault-banner {
+  padding-top: calc(var(--ca-space-3) + max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px), 24px));
+}
+
+body.ca-hide-mobile-overlays.is-mobile .workspace-leaf:not(:has(.ca-vault-banner)) .view-content {
+  padding-top: max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px), 24px);
+}
+
+
+
+

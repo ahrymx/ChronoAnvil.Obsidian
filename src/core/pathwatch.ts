@@ -1,0 +1,270 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+//
+// Licensed under the GNU Affero General Public License v3.0 or later, with
+// attribution and naming terms under its section 7. See LICENSE and
+// LICENSING.md.
+
+// Keeps the configured paths pointing at the right folders when the user
+// renames or moves one in Obsidian.
+//
+// Every path ChronoAnvil uses — the diary root, the templates folder, a custom
+// journal's root — is a plain string in data.json. Obsidian rewrites *links*
+// on a rename, but it has no idea a plugin's settings mention the old path, so
+// before this the plugin would quietly start looking in a folder that no longer
+// existed: "Set up / repair vault" would helpfully recreate the old tree next
+// to the renamed one, and the daily-note command would fail to find its
+// template. That's a bad failure mode, because nothing about renaming a folder
+// suggests you're about to break anything.
+//
+// Reorganising a vault is a normal thing to do, and the numbered roots invite
+// it: the whole point of naming a folder for its role is that you can rename it
+// when the role changes. That should cost one drag, not a trip through the
+// settings tab to repair paths you didn't know were stale.
+//
+// Scope is deliberately narrow: it only ever *retargets* a setting that pointed
+// at the moved thing (or something inside it). It never creates, deletes or
+// moves anything on disk, and a path that had nothing to do with the rename is
+// left alone.
+
+import { App, Notice, TAbstractFile, TFile, TFolder } from "obsidian";
+import type ChronoAnvilPlugin from "../main";
+
+export class PathWatch {
+  constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
+
+  register(): void {
+    this.plugin.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) => {
+        void this.onRename(file, oldPath);
+      })
+    );
+  }
+
+  private async onRename(file: TAbstractFile, oldPath: string): Promise<void> {
+    // A folder rename can move a whole subtree; a file rename only matters for
+    // the one path setting that names a file (the homepage).
+    const isFolder = file instanceof TFolder;
+    if (!isFolder && !(file instanceof TFile)) return;
+
+    const changes = remapConfiguredPaths(
+      this.plugin.settings,
+      oldPath,
+      file.path,
+      isFolder
+    );
+    if (changes.length === 0) return;
+
+    await this.plugin.saveSettings();
+    // Worth announcing: the user renamed a folder and something *else* changed
+    // as a result. Silent config edits are the kind of thing people discover
+    // months later while wondering why a setting doesn't say what they set.
+    new Notice(
+      changes.length === 1
+        ? `ChronoAnvil: updated the ${changes[0]} path to match.`
+        : `ChronoAnvil: updated ${changes.length} paths to match.`
+    );
+  }
+}
+
+// The path settings that name a *file* rather than a folder. Everything else
+// is a folder, so a file rename can't legitimately affect it — and a folder
+// rename can still move one of these, which is why the check below is on the
+// event's kind, not on the key alone.
+const FILE_PATH_KEYS = new Set(["home", "events"]);
+
+// Human-readable names for the path keys, used only in the notice above.
+const PATH_LABELS: Record<string, string> = {
+  home: "homepage",
+  events: "events note",
+  staging: "staging folder",
+  diaryRoot: "diary root",
+  diaryDaily: "daily entries",
+  diaryWeekly: "weekly entries",
+  diaryMonthly: "monthly entries",
+  diaryQuarterly: "quarterly entries",
+  diaryYearly: "yearly entries",
+  diaryEntries: "entries folder",
+  diaryDashboards: "period dashboards",
+  materialRoot: "material root",
+  journalsRoot: "journals root",
+  infrastructureRoot: "infrastructure",
+  templates: "templates",
+  templatesDiary: "diary templates",
+  documentation: "documentation",
+  attachments: "attachments",
+  logbooks: "logbooks folder",
+};
+
+// Rewrite `value` if it names `oldPath` or something beneath it. Returns null
+// when the path is unrelated, so callers can tell "no change" from "changed to
+// the same string". Prefix matching is segment-aware: renaming `02 - Diary`
+// must not touch `02 - Diary Archive`.
+export function remapPath(
+  value: string,
+  oldPath: string,
+  newPath: string
+): string | null {
+  if (!value) return null;
+  if (value === oldPath) return newPath;
+  if (value.startsWith(`${oldPath}/`)) {
+    return newPath + value.slice(oldPath.length);
+  }
+  return null;
+}
+
+// Apply remapPath across every configured path — the `paths` record plus each
+// custom journal's own root/templates folder. Mutates `settings` and returns
+// the labels of what changed, so the caller can save once and report.
+export function remapConfiguredPaths(
+  settings: {
+    paths: Record<string, string>;
+    customJournals?: { name: string; root: string; templatesFolder: string }[];
+    // A LOGBOOK NAMES A FILE, which is what makes it the only entry here that
+    // a FILE rename may move (4.52). `LogbookDef.path` is stored rather than
+    // derived precisely so the note keeps its items when the label changes —
+    // the cost of that choice is that the string has to follow the file, and
+    // this is where it does. Structural, like the journals above it, so this
+    // module still needs nothing from `constants.ts`.
+    logbooks?: { name: string; path: string }[];
+    // Keyed `<notePath>::<section title>`. Not a configured path, but it holds
+    // note paths, so a rename invalidates it exactly as it invalidates the rest
+    // of this record.
+    collapsedNoteSections?: Record<string, boolean>;
+    revealedNoteSections?: Record<string, boolean>;
+    openGroupTabs?: Record<string, number>;
+    timeGridFilters?: Record<string, string[]>;
+  },
+  oldPath: string,
+  newPath: string,
+  isFolder: boolean
+): string[] {
+  const changed: string[] = [];
+
+  for (const key of Object.keys(settings.paths)) {
+    // A file rename can only retarget the settings that name a file (the home
+    // note, the events note); a folder rename can move any of them.
+    if (!isFolder && !FILE_PATH_KEYS.has(key)) continue;
+    const next = remapPath(settings.paths[key], oldPath, newPath);
+    if (next === null) continue;
+    settings.paths[key] = next;
+    changed.push(PATH_LABELS[key] ?? key);
+  }
+
+  // BEFORE THE `isFolder` GATE, and deliberately: every other configured path
+  // below names a folder, so only a folder rename can move it, and a logbook
+  // names a note. Dragging `Work log.md` into another folder is the ordinary way
+  // a reader moves one.
+  for (const book of settings.logbooks ?? []) {
+    const next = remapPath(book.path, oldPath, newPath);
+    if (next === null) continue;
+    book.path = next;
+    changed.push(`${book.name} logbook`);
+  }
+
+  if (isFolder) {
+    for (const journal of settings.customJournals ?? []) {
+      const root = remapPath(journal.root, oldPath, newPath);
+      if (root !== null) {
+        journal.root = root;
+        changed.push(`${journal.name} root`);
+      }
+      const tpl = remapPath(journal.templatesFolder, oldPath, newPath);
+      if (tpl !== null) {
+        journal.templatesFolder = tpl;
+        changed.push(`${journal.name} templates`);
+      }
+    }
+  }
+
+  // Per-note UI state, keyed by note path. Renaming a note — or a folder above
+  // it — silently reset every collapsed section inside it: the key still named
+  // the old path, nothing matched, and every bar reopened. The rest of this
+  // function has retargeted on rename since it was written; these records were
+  // added later and never joined in.
+  //
+  // ONE LOOP, FOUR RECORDS (5.28). This was three copies of the same eight
+  // lines, and the fourth — the banner's reveals — is why they became one: the
+  // copies had already drifted, since the fold one wrote `true` back where the
+  // other two preserved the value they moved. `remapNoteKeys` preserves it,
+  // which is strictly more correct for a record whose values are booleans and
+  // was already required of the two that hold numbers and lists.
+  const perNote: [Record<string, unknown> | undefined, string][] = [
+    [settings.collapsedNoteSections, "collapsed sections"],
+    [settings.revealedNoteSections, "revealed sections"],
+    [settings.openGroupTabs, "open group tabs"],
+    [settings.timeGridFilters, "time-grid filters"],
+  ];
+  for (const [record, label] of perNote) {
+    if (record && remapNoteKeys(record, oldPath, newPath) > 0) {
+      changed.push(label);
+    }
+  }
+
+  return changed;
+}
+
+// Retarget every `"<notePath>::<rest>"` key in one per-note record. Returns how
+// many moved, so the caller can name the record it changed.
+function remapNoteKeys(
+  record: Record<string, unknown>,
+  oldPath: string,
+  newPath: string
+): number {
+  let moved = 0;
+  for (const key of Object.keys(record)) {
+    const sep = key.indexOf(SECTION_KEY_SEP);
+    if (sep === -1) continue;
+    const next = remapPath(key.slice(0, sep), oldPath, newPath);
+    if (next === null) continue;
+    const value = record[key];
+    delete record[key];
+    record[`${next}${key.slice(sep)}`] = value;
+    moved++;
+  }
+  return moved;
+}
+
+// The separator between a note path and a section title in a fold key.
+//
+// EVERY SPLIT TAKES THE FIRST OCCURRENCE, and this comment used to say the
+// last — with the reasoning that proves the opposite sitting in the same
+// sentence (3.13 §6). Obsidian forbids `:` in file names, so a note path cannot
+// contain `::`; a section TITLE can. The side that cannot contain it is the
+// side before the separator, so the FIRST `::` is always the boundary. The last
+// one is the boundary only in the case where the title has none.
+//
+// A bar titled `header:📊 Before :: After` on `Home.md` makes the key
+// `Home.md::📊 Before :: After`. Split at the last, the path reads
+// `Home.md::📊 Before`, which matches no live note — so `pruneCollapsedSections`
+// deleted that section's fold state at EVERY startup, and `remapConfiguredPaths`
+// never retargeted it on a rename. Two call sites, one word each.
+export const SECTION_KEY_SEP = "::";
+
+// Drop fold state for notes that no longer exist.
+//
+// The record only ever grew: nothing removed a key when its note was deleted,
+// so a vault that had churned through notes carried their folds in data.json
+// forever, unbounded. Run once at load against the paths the vault actually
+// has. Pure so it can be tested without a vault.
+//
+// TAKES ANY VALUE TYPE, AS OF 4.34. The rule it applies is about the KEY — a
+// note path before the first `::` — and it never looks at what is stored under
+// one, so narrowing it to `boolean` was describing the one caller rather than
+// the function. `openGroupTabs` holds numbers on identical keys and needs
+// identical pruning, and two copies of this walk is how the two records come to
+// disagree about what a dead note is.
+export function pruneCollapsedSections(
+  folds: Record<string, unknown>,
+  livePaths: Set<string>
+): number {
+  let dropped = 0;
+  for (const key of Object.keys(folds)) {
+    const sep = key.indexOf(SECTION_KEY_SEP);
+    if (sep === -1) continue;
+    if (livePaths.has(key.slice(0, sep))) continue;
+    delete folds[key];
+    dropped++;
+  }
+  return dropped;
+}

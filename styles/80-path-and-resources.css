@@ -1,0 +1,283 @@
+/* ── Task Manager / Learning Path (path: widget) ───────────────────────────
+   A re-orderable checklist. Shares the task-line store with `tasks:` but is
+   presented as an ordered table: a step number, checkbox, editable text, and
+   up/down/delete controls. Order is the content, so the move buttons are a
+   first-class control rather than the priority/due pair a `tasks:` row carries. */
+.ca-journal-path {
+  display: block;
+  margin: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+/* The `path:` copy of the eyebrow, gone in 5.14 with the other three — see
+   75-home-dashboard.css where `note:`'s went for the whole argument. The head
+   that replaced all four was an eyebrow for one draft of that release and is a
+   section bar in the one that shipped; the four labels stay retired either way,
+   which was always the point of deleting them. */
+.ca-journal-path-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.ca-journal-path-add-icon {
+  color: var(--text-muted);
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.ca-journal-path-add-icon .svg-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+.ca-journal-path-add-input {
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--ca-text-base);
+  padding: var(--ca-space-2) var(--ca-space-4);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.ca-journal-path-add-input::placeholder {
+  color: var(--text-faint);
+}
+.ca-journal-path-add-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  background: var(--background-primary);
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 124, 58, 237), 0.15);
+}
+.ca-journal-path-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ca-journal-path-empty {
+  color: var(--text-faint);
+  font-size: var(--ca-text-sm);
+  padding: 8px 4px;
+}
+.ca-journal-path-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--ca-radius-sm);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.ca-journal-path-row:hover {
+  background: var(--background-secondary);
+  border-color: var(--background-modifier-border);
+}
+.ca-journal-path-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Step number: a clean, rounded pill badge */
+.ca-journal-path-num {
+  flex: 0 0 auto;
+  min-width: 1.6em;
+  height: 1.6em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-pill);
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ca-journal-path-check {
+  flex: 0 0 auto;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border-radius: var(--ca-radius-xs);
+}
+.ca-journal-path-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--ca-text-base);
+  line-height: 1.45;
+  padding: 2px 6px;
+  border-radius: var(--ca-radius-xs);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.ca-journal-path-text:hover {
+  background: var(--background-modifier-hover);
+}
+.ca-journal-path-text:focus {
+  outline: none;
+  background: var(--background-primary);
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+.ca-journal-path-row.is-done {
+  opacity: 0.55;
+}
+.ca-journal-path-row.is-done .ca-journal-path-text {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+.ca-journal-path-row.is-done .ca-journal-path-num {
+  opacity: 0.6;
+}
+.ca-journal-path-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.ca-journal-path-moves {
+  display: inline-flex;
+  gap: 2px;
+}
+.ca-journal-path-move,
+.ca-journal-path-del {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  border-radius: var(--ca-radius-sm);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.ca-journal-path-move:hover,
+.ca-journal-path-del:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+.ca-journal-path-move:disabled {
+  opacity: 0.3;
+  cursor: default;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-faint);
+}
+.ca-journal-path-del:hover {
+  color: var(--text-error, #e05561);
+  background: rgba(var(--color-red-rgb, 224, 85, 97), 0.12);
+}
+.ca-journal-path-move .svg-icon,
+.ca-journal-path-del .svg-icon {
+  width: 1em;
+  height: 1em;
+}
+
+/* Mobile layout & touch metrics */
+@media (max-width: 520px) {
+  .ca-journal-path-row {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .ca-journal-path-actions {
+    gap: 4px;
+  }
+}
+
+body.is-mobile .ca-journal-path-row {
+  padding: 10px 12px;
+}
+body.is-mobile .ca-journal-path-check {
+  width: 22px;
+  height: 22px;
+}
+body.is-mobile .ca-journal-path-move,
+body.is-mobile .ca-journal-path-del {
+  min-height: calc(var(--ca-control-min) * 0.75);
+  min-width: calc(var(--ca-control-min) * 0.75);
+}
+
+/* ── Resources: three attachment sections ─────────────────────────────────
+   Docs / Tutorials / Practice sit under one collapsible "Resources" header,
+   each with its own uppercase label and a fully-rounded input bar. The header
+   plus the labels do the grouping, so — unlike the monthly review's joined
+   highlights/challenges box — the sections are NOT fused into one squared-off
+   box: fusing them clipped each bar's inner corners, which read as a rendering
+   fault next to the per-section labels. Storage is three regions on disk. */
+.ca-journal-attach--res-docs .ca-journal-attach-zone,
+.ca-journal-attach--res-tutorials .ca-journal-attach-zone,
+.ca-journal-attach--res-practice .ca-journal-attach-zone {
+  transition: border-color 0.15s ease;
+}
+/* THE THREE SHELVES STILL KEEP THEIR NAMES (5.14), and this is the rule that
+   nearly cost them. `header:📚 Resources` names ONE thing and three `attach:`
+   shelves render under it, so the "a field under a bar that already names it
+   draws no head" rule cannot be read off the fence's `header:` alone — it would
+   have deleted Docs, Tutorials and Practice and left one anonymous stack of
+   chips. `widgets/index.ts` therefore withholds a head only when the titled
+   fence holds exactly ONE field directive (`soleField`). The margin this rule
+   tuned belongs to the head now, and is the same for all three. */
+
+.ca-journal-stepper {
+  gap: 2px;
+}
+
+.ca-journal-step-btn {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  width: 1.6em;
+  height: 1.6em;
+  line-height: 1;
+  font-size: var(--ca-text-base);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ca-journal-step-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.ca-journal-step-value {
+  min-width: 3em;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  padding: 0 2px;
+}
+
+/* THE TASK TABLE'S SCOPE CYCLE WAS STYLED HERE AND IS GONE (5.21). Five rules:
+   the button, its hover, its `is-static` state, a `position: relative` on the
+   table to give it a positioning context, and the absolute corner placement
+   that used that context on a fence with no header bar to host the control.
+
+   The button is gone from the plugin, not just from the stylesheet — see the
+   note where `buildScopeCycle` was, in `tables.ts`. The `position: relative`
+   goes with it because nothing else under `.ca-journal-tasks-table` is
+   positioned; leaving a stacking context behind for a control that no longer
+   exists is how the 3.19.2 orphan happened in the first place. */
+

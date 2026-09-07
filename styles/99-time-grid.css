@@ -1,0 +1,611 @@
+/* ── The time grid (4.55) ──────────────────────────────────────────────
+   `time-grid` — a week laid against the hours. The only calendar in the
+   plugin that positions anything by clock time, which is why it is a file
+   of its own rather than more of 93-calendars.css: that file is 2,300 lines
+   of month-and-day-cell grammar and shares no selector with this.
+
+   THE GEOMETRY IS ALL PERCENTAGES, AND IT IS SET FROM TypeScript. A block's
+   `top`, `height`, `left` and `width` come from `placeInWindow` and
+   `packDay`; nothing here knows how many hours are on screen except through
+   `--ca-tg-hours`, which the view sets on each column. Two places holding
+   the same number is how a grid comes to draw its lines an hour out from its
+   blocks. */
+
+.ca-tg {
+  container-type: inline-size;
+  margin: var(--ca-space-3) 0;
+}
+
+.ca-tg-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 0 0 8px;
+}
+
+.ca-tg-span {
+  font-weight: 600;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+.ca-tg-sources {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* A SOURCE, AS A CONTROL. It sat in this corner looking like one and doing
+   nothing; the only change is that pressing it now means something. Off is a
+   drawn-through outline rather than a fade, because a faded chip reads as a
+   chip that cannot be pressed. */
+.ca-tg-src {
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+  padding: 1px 7px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  box-shadow: none;
+  height: auto;
+  transition: all 0.15s ease;
+}
+
+.ca-tg-src.is-on {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.ca-tg-src-events.is-on {
+  border-color: var(--ca-tg-blue);
+  color: var(--ca-tg-blue);
+  background: color-mix(in srgb, var(--ca-tg-blue) 12%, transparent);
+}
+
+.ca-tg-src-logbooks.is-on {
+  border-color: var(--ca-tg-teal);
+  color: var(--ca-tg-teal);
+  background: color-mix(in srgb, var(--ca-tg-teal) 12%, transparent);
+}
+
+.ca-tg-src-tasks.is-on {
+  border-color: var(--ca-tg-red);
+  color: var(--ca-tg-red);
+  background: color-mix(in srgb, var(--ca-tg-red) 12%, transparent);
+}
+
+.ca-tg-src-captures.is-on {
+  border-color: var(--ca-tg-grey);
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--ca-tg-grey) 15%, transparent);
+}
+
+.ca-tg-status,
+.ca-tg-empty {
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  padding: 10px 2px;
+}
+
+/* WIDE CONTENT SCROLLS INSIDE ITSELF. Seven columns with a floor of 74px
+   each plus the rail is 576px, which is wider than a phone and wider than a
+   split pane — and a grid that widened the note would push every other
+   widget on the page sideways.
+
+   BOTH AXES ARE NAMED (4.62). `overflow-x: auto` alone already made the other
+   axis scroll — that is what the cascade does with one axis set — so the
+   vertical scrolling was there by accident, at whatever height the content
+   happened to be. Named, it can be capped: a midnight-to-midnight week is 24
+   rows and would otherwise be a widget two screens tall, and the cap is what
+   gives the open-on-now scroll something to scroll. */
+.ca-tg-scroll {
+  overflow: auto;
+  max-height: min(70vh, 620px);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: transparent;
+}
+
+.ca-tg-scroll.is-locked {
+  overflow: hidden !important;
+}
+
+/* THE PADDING IS THE LAST HOUR LABEL'S OVERHANG. `.ca-tg-hour` sits at
+   `top: 100%` with `translateY(-50%)`, so half of the final mark is below the
+   body it belongs to; without room for it the scroller clipped "6 PM" through
+   the middle, which reads as a rendering fault rather than as more content.
+   It is on the grid rather than on the body because a percentage `top` inside
+   the body resolves against the body's padding box — padding there would put
+   the now line a few minutes late. */
+/* AS WIDE AS THE COLUMNS IT IS DRAWING. A three-day grid in a row cell must
+   not keep a seven-day floor and scroll sideways forever; the floor is the
+   gutter plus one minimum column each. */
+.ca-tg-grid {
+  min-width: calc(var(--ca-tg-gutter) + var(--ca-tg-cols) * 74px);
+  padding-bottom: 9px;
+}
+
+/* THE BODY IS AS TALL AS THE WINDOW IS LONG, from the hour count the view
+   sets on it — which the columns then inherit for their hour lines, so the
+   height and the lines cannot disagree. */
+.ca-tg-body {
+  position: relative;
+  height: calc(var(--ca-tg-row) * var(--ca-tg-hours));
+}
+
+.ca-tg-head,
+.ca-tg-lane,
+.ca-tg-body {
+  display: grid;
+  grid-template-columns: var(--ca-tg-gutter) repeat(var(--ca-tg-cols), minmax(74px, 1fr));
+}
+
+.ca-tg-head {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ca-tg-corner {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--background-primary);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 6px 5px 0;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+.ca-tg-day {
+  text-align: center;
+  padding: 8px 4px 6px;
+  border-left: 1px solid var(--background-modifier-border-hover);
+  background: var(--background-primary);
+}
+
+.ca-tg-dow {
+  font-size: var(--font-ui-smaller);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.ca-tg-dnum {
+  font-size: 1.3em;
+  line-height: 1.3;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+
+.ca-tg-day.is-today .ca-tg-dow {
+  color: var(--text-accent);
+}
+
+.ca-tg-day.is-today .ca-tg-dnum {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  border-radius: var(--radius-l);
+  display: inline-block;
+  min-width: 1.9em;
+  padding: 0 0.2em;
+}
+
+/* ── the all-day lane ────────────────────────────────────────────────
+   Tasks due with no hour on them. Kept above the rail rather than at the
+   top of the first column, because a thing true of a whole day has no
+   position among the hours and putting it at 00:00 would be a claim. */
+
+.ca-tg-lane {
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary-alt);
+  min-height: 52px;
+}
+
+/* ONE LINE, WHATEVER THE GUTTER IS. Two words at this width wrapped, and the
+   second line landed beside the first hour mark. Lower case and hyphenated so
+   it reads as a label rather than as a heading of the lane. */
+.ca-tg-lane-label {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--background-secondary-alt);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 6px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-faint);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: var(--ca-tg-gutter);
+}
+
+.ca-tg-lane-cell {
+  border-left: 1px solid var(--background-modifier-border-hover);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.ca-tg-chip {
+  display: block;
+  font-size: var(--font-ui-smaller);
+  font-weight: 500;
+  color: var(--text-normal);
+  border-radius: var(--radius-s);
+  padding: 2px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--background-modifier-border);
+  border-left-width: 3px;
+  border-left-style: solid;
+  background: var(--background-primary);
+  transition: transform 0.1s ease, border-color 0.1s ease;
+}
+
+.ca-tg-chip:hover {
+  transform: translateY(-1px);
+}
+
+.ca-tg-chip.ca-tg-fill-red {
+  background: color-mix(in srgb, var(--ca-tg-red) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--ca-tg-red) 35%, var(--background-modifier-border));
+  border-left-color: var(--ca-tg-red);
+  color: var(--text-normal);
+}
+.ca-tg-chip.ca-tg-fill-amber {
+  background: color-mix(in srgb, var(--ca-tg-amber) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--ca-tg-amber) 35%, var(--background-modifier-border));
+  border-left-color: var(--ca-tg-amber);
+  color: var(--text-normal);
+}
+.ca-tg-chip.ca-tg-fill-green {
+  background: color-mix(in srgb, var(--ca-tg-green) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--ca-tg-green) 35%, var(--background-modifier-border));
+  border-left-color: var(--ca-tg-green);
+  color: var(--text-normal);
+}
+.ca-tg-chip.ca-tg-fill-teal {
+  background: color-mix(in srgb, var(--ca-tg-teal) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--ca-tg-teal) 35%, var(--background-modifier-border));
+  border-left-color: var(--ca-tg-teal);
+  color: var(--text-normal);
+}
+.ca-tg-chip.ca-tg-fill-blue {
+  background: color-mix(in srgb, var(--ca-tg-blue) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--ca-tg-blue) 35%, var(--background-modifier-border));
+  border-left-color: var(--ca-tg-blue);
+  color: var(--text-normal);
+}
+.ca-tg-chip.ca-tg-fill-purple {
+  background: color-mix(in srgb, var(--ca-tg-purple) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--ca-tg-purple) 35%, var(--background-modifier-border));
+  border-left-color: var(--ca-tg-purple);
+  color: var(--text-normal);
+}
+.ca-tg-chip.ca-tg-fill-pink {
+  background: color-mix(in srgb, var(--ca-tg-pink) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--ca-tg-pink) 35%, var(--background-modifier-border));
+  border-left-color: var(--ca-tg-pink);
+  color: var(--text-normal);
+}
+.ca-tg-chip.ca-tg-fill-grey {
+  background: color-mix(in srgb, var(--ca-tg-grey) 15%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--ca-tg-grey) 35%, var(--background-modifier-border));
+  border-left-color: var(--ca-tg-grey);
+  color: var(--text-normal);
+}
+
+/* ── the rail and the columns ──────────────────────────────────────── */
+
+.ca-tg-rail {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--background-primary);
+}
+
+.ca-tg-hour {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ca-tg-col {
+  position: relative;
+  border-left: 1px solid var(--background-modifier-border-hover);
+  /* One line per hour, from the hour count the view puts on this element.
+     `calc(100% / var(--ca-tg-hours))` rather than a pixel step, so the lines
+     stay welded to the blocks when the grid is any height at all. */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--background-modifier-border-hover) 0 1px,
+    transparent 1px calc(100% / var(--ca-tg-hours))
+  );
+}
+
+.ca-tg-col.is-today {
+  background-color: var(--background-modifier-hover);
+}
+
+/* ── the now line (4.62) ─────────────────────────────────────────────
+   ACROSS EVERY COLUMN, CAPPED ON TODAY. A rule that stopped at today's
+   column would be a rule about one day, and the whole grid is one clock:
+   Tuesday 10:40 has already happened by exactly as much as Thursday's has
+   not. `--ca-tg-at` is the fraction of the window, set on the body by the
+   view and moved by the minute; the dot is a child of today's column, so it
+   is positioned by the same fraction without either element having to know
+   where the other one is.
+
+   IT NEVER TAKES A CLICK. A hairline across the middle of the grid sits over
+   whatever is at that hour, which is the one block a reader is most likely to
+   be reaching for. */
+.ca-tg-now,
+.ca-tg-now-dot {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.ca-tg-now {
+  left: var(--ca-tg-gutter);
+  right: 0;
+  top: calc(var(--ca-tg-at) * 100%);
+  border-top: 1px solid var(--ca-tg-now);
+  opacity: 0.75;
+}
+
+.ca-tg-now-dot {
+  left: -3px;
+  top: calc(var(--ca-tg-at) * 100%);
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--ca-tg-now);
+}
+
+/* ── a block ─────────────────────────────────────────────────────────
+   `min-height` IS LOAD-BEARING AND COSTS A LITTLE ACCURACY. A quarter-hour
+   in a ten-hour window is 1.5% of a 320px column — five pixels, which is
+   less than one line of text. A block that cannot show its own title is not
+   a smaller block, it is a bug, so the floor wins and the foot of a very
+   short block sits a few minutes late. */
+
+.ca-tg-blk {
+  position: absolute;
+  min-height: 17px;
+  border-radius: var(--radius-s);
+  padding: 1px 4px;
+  overflow: hidden;
+  color: var(--ca-tg-ink);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.25;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  box-shadow: var(--ca-shadow-sm);
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.ca-tg-blk:hover {
+  border-color: rgba(0, 0, 0, 0.38);
+  box-shadow: var(--ca-shadow-md);
+}
+
+.ca-tg-blk-title {
+  display: block;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ca-tg-blk-when {
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A MOMENT IS NOT A SHORT SPAN. An item with no duration claims one minute,
+   not seventeen pixels of it, so it is drawn with a flat foot and a rule
+   where a span's fill would keep going. */
+.ca-tg-blk.is-moment {
+  border-radius: var(--radius-s) var(--radius-s) 0 0;
+  border-bottom: 2px solid var(--ca-tg-ink);
+}
+
+.ca-tg-blk-open {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  opacity: 0;
+  display: flex;
+}
+
+.ca-tg-blk-open svg {
+  width: 11px;
+  height: 11px;
+}
+
+.ca-tg-blk:hover .ca-tg-blk-open,
+.ca-tg-blk:focus-visible .ca-tg-blk-open {
+  opacity: 0.8;
+}
+
+/* NOTHING HOVERS ON A TOUCHSCREEN, so an affordance revealed only on hover is
+   an affordance that does not exist there. Shown at rest instead — the rule
+   every hover-revealed control in this plugin follows, and the one a test
+   checks for by name. */
+@media (hover: none) {
+  .ca-tg-blk-open {
+    opacity: 0.55;
+  }
+}
+
+.ca-tg-blk.is-clickable,
+.ca-tg-chip.is-clickable {
+  cursor: pointer;
+}
+
+.ca-tg-blk.is-clickable:hover {
+  filter: brightness(1.08);
+}
+
+/* ── the grid as somewhere to write (4.62) ───────────────────────────
+   Three cursors, and each of them is a promise about what the next press
+   will do: an empty column draws, a block moves, its bottom edge resizes.
+   A task block promises nothing — it is drawn here and edited in its own
+   note — so it keeps the pointer that only ever meant "this opens". */
+
+.ca-tg-col {
+  cursor: crosshair;
+}
+
+.ca-tg-blk {
+  cursor: grab;
+}
+
+.ca-tg-blk.is-fixed {
+  cursor: pointer;
+}
+
+/* The handle on the bottom edge: an expanded target area with a centered grip pill
+   so it is easy to land the cursor or finger on to resize without eating block text. */
+.ca-tg-grip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 12px;
+  cursor: ns-resize;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 1px;
+}
+
+.ca-tg-grip::after {
+  content: "";
+  display: block;
+  width: 22px;
+  height: 3px;
+  border-radius: var(--ca-radius-pill);
+  background: var(--ca-tg-ink);
+  opacity: 0.3;
+  transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+  pointer-events: none;
+}
+
+.ca-tg-blk:hover .ca-tg-grip::after {
+  opacity: 0.65;
+}
+
+.ca-tg-grip:hover::after {
+  opacity: 0.95;
+  background: var(--interactive-accent);
+  transform: scaleY(1.3);
+}
+
+@media (hover: none) {
+  .ca-tg-grip {
+    height: 18px;
+    bottom: -5px;
+  }
+  .ca-tg-grip::after {
+    opacity: 0.5;
+    width: 28px;
+    height: 4px;
+  }
+}
+
+/* WHILE A DRAG IS LIVE. The moving block stays where the FILE says it is and
+   dims; the ghost says where it is going. Nothing else on the grid takes a
+   pointer, so a drag cannot end by opening something. */
+.ca-tg-body.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+  touch-action: none;
+}
+
+.ca-tg-body.is-dragging .ca-tg-blk {
+  pointer-events: none;
+}
+
+.ca-tg-blk.is-moving {
+  opacity: 0.35;
+}
+
+.ca-tg-ghost {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  min-height: 15px;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: var(--radius-s);
+  border: 1px dashed var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  padding: 1px 4px;
+  overflow: hidden;
+}
+
+/* A block is a tab stop now, because the arrows edit it. The ring is the
+   theme's own, drawn outside the block so it is visible on a fill of any
+   colour. */
+.ca-tg-blk:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+/* ── the fills ───────────────────────────────────────────────────────
+   THE STORED VALUE IS A NAME AND THIS IS WHERE IT BECOMES A COLOUR, which
+   is `ca-ev-chip-*`'s arrangement one file over and exists for the same
+   reason: nothing user-controlled reaches a style attribute.
+
+   THE NINE `--ca-tg-*` TOKENS ARE IN `00-tokens.css`, beside the eight they
+   are darkened from — a raw colour belongs in the token file and nowhere
+   else, which is the rule `appearance.test.ts` enforces about rules. */
+
+.ca-tg-fill-red { background: var(--ca-tg-red); }
+.ca-tg-fill-amber { background: var(--ca-tg-amber); }
+.ca-tg-fill-green { background: var(--ca-tg-green); }
+.ca-tg-fill-teal { background: var(--ca-tg-teal); }
+.ca-tg-fill-blue { background: var(--ca-tg-blue); }
+.ca-tg-fill-purple { background: var(--ca-tg-purple); }
+.ca-tg-fill-pink { background: var(--ca-tg-pink); }
+.ca-tg-fill-grey { background: var(--ca-tg-grey); }
+
+/* One column per line below a phone's width would be seven screens of
+   scrolling, so the grid keeps its shape and the container scrolls. What
+   changes is the rail, which has no room for "12 PM" at this width. */
+@container (max-width: 400px) {
+  .ca-tg {
+    --ca-tg-gutter: 40px;
+  }
+}

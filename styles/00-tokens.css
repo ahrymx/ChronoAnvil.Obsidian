@@ -1,0 +1,1060 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+ *
+ * Licensed under the GNU Affero General Public License v3.0 or later, with
+ * attribution and naming terms under its section 7. See LICENSE and
+ * LICENSING.md.
+ */
+
+/* ============================================================
+ *  ChronoAnvil plugin — bundled styles
+ *  Obsidian loads this automatically; no CSS snippets required.
+ *  Sections:
+ *    1. Inline widgets (sliders, pickers, selects, buttons)
+ *    2. [!nav] pills + [!study] cards        (was nav-buttons.css)
+ *    3. [!note] cards                         (was note-cards.css)
+ *    4. Per-entry navigator                   (was journal-nav.css)
+ *    5. Diary / year calendars                (was journal-calendar.css)
+ *    6. Native tables (tag-index / topics-table / confidence-summary)
+ *    7. Tokens (radius / type scale / mood palette) — defined once below,
+ *       referenced everywhere above no longer applies; every section now
+ *       reads these instead of its own magic numbers.
+ * ============================================================ */
+
+:root {
+  /* Radius: four tiers — tight square controls, small controls, cards, and pills. */
+  --ca-radius-xs: 3px;   /* tight square tags, stamps, badges */
+  --ca-radius-sm: 6px;   /* inputs, selects, steppers, ghost icon buttons */
+  --ca-radius-md: 10px;  /* cards: callouts, calendar, tracker rows, tag groups */
+  --ca-radius-pill: 999px; /* every pill-shaped button, link and badge */
+
+  /* Page-ground strength (4.80). How much of a ground's pattern film is let
+     through, as the film's own opacity. Three settings pick between three
+     values and `12-grounds.css` reads nothing else, so a ground gets quieter
+     without any of its nineteen layer stacks being touched.
+
+     A LITERAL, AND UNCONDITIONAL, so the read carries no fallback. The strength
+     classes below override it on `body`, which wins over `:root` for `body` and
+     everything under it. */
+  --ca-tex-strength: 0.75;
+
+  /* THE SURFACE AND BORDER ALIASES MOVED TO `body` IN 4.42 — see the block at
+     the foot of this file. Every one of them names an OBSIDIAN variable, and
+     Obsidian declares its colours on `body` (`.theme-dark` / `.theme-light` are
+     classes on `body`); `:root` is the `html` element and has none of them. A
+     custom property's `var()` references are substituted **on the element that
+     declares it**, so a theme colour aliased here resolved against an element
+     that has never had it. Nothing about that is specific to `color-mix`, which
+     is what 4.40.1 got wrong. */
+
+  /* Subtle border & edge highlight */
+  /* ── AN EDGE FOR A CARD THAT IS ALREADY INSIDE ONE (4.35.2) ──────────
+     The card sits inside the section card, whose edge is `--background-
+     modifier-border`, so an inner card wearing the same ink drew one boundary
+     twice a dozen pixels apart — the shape 4.13.5 §23 spent a release removing.
+     The outer edge is the boundary and the inner one is a SEAM, and they were
+     saying it at the same volume. This is the seam: a step off the surface the
+     card sits on, quieter than the boundary outside it.
+
+     ── A PLAIN VALUE, AFTER THREE RELEASES OF IT NOT DRAWING AT ALL (4.42) ─
+     It was `color-mix(in srgb, var(--background-modifier-border) 55%,
+     var(--ca-surface-inset))`, and on every screenshot from 4.35.2 to 4.41.0 the
+     cards that read it came back with a **`#dadada`** edge — `currentColor`, the
+     initial `border-color`, which is what an element gets when the colour it
+     asked for is invalid.
+
+     4.40 blamed the shorthand (real, fixed, not the cause). 4.40.1 blamed
+     `:root` and moved the mix to `body` (right about the placement, still white
+     on the next render). At that point the remaining unresolved term was
+     `var(--ca-surface-inset)` — itself a `:root` alias of a theme variable — and
+     the mix could ALSO be failing simply because a `color-mix` over `var()`s
+     inside a custom property does not compute here. **A screenshot cannot
+     separate those two, and it does not have to: a plain value is immune to
+     both.**
+
+     WHAT IS GIVEN UP, STATED HONESTLY. The mix adapted to whatever border
+     colour a theme declared; a white-alpha hair does not. That was the better
+     idea and it has never once drawn — an adaptive value that renders as
+     `currentColor` is not adaptive, it is broken. `--ca-edge-highlight` and
+     `--ca-slot-edge` are the same decision, and `--ca-slot-edge` is the reason
+     to trust this one: measured at `#333333` over `#232323` on
+     `20260818_20h59m08s_grim.png`, exactly what the arithmetic says.
+
+     0.06 over the card's `#232323` is `#303030` — a step off the surface,
+     quieter than the `#333333` boundary outside it, which is the whole point of
+     the token. */
+  --ca-border-inner: rgba(255, 255, 255, 0.06);
+  --ca-edge-highlight: rgba(255, 255, 255, 0.04);
+  /* ── THE EDGE OF AN EMPTY SLOT, AND IT MUST NOT MARCH (4.40) ──────────
+     MEASURED COMPLAINT: *"the tiles have ant-pattern lines around them now, and
+     it is too jarring"*, on `20260818_20h01m16s_grim.png`. The add card's dash
+     came back **3px wide in `#dadada`** — a near-white rope around a box whose
+     ground is `#232323`. See the fault note at `.ca-jjs-card` for why it was white
+     and 3px, which is a different bug from this one.
+
+     THIS TOKEN IS THE OTHER HALF: what the edge should say. A dashed border is
+     already the loudest edge in the vocabulary — it is broken, so it flickers as
+     the eye travels it — and it does not also need contrast. It marks WHERE a
+     card would go; the tile's label says what pressing it does. So it sits a
+     hair above the surface and no more.
+
+     A PLAIN VALUE, NOT A MIX, AND IT STAYS ONE (4.40.1). `--ca-border-inner`'s
+     mix is the fault that opened this file, and although the cause turned out to
+     be WHERE it was declared rather than the mix itself, the conclusion holds:
+     the one edge on the page that is drawn ONLY as an edge should not depend on
+     a computation at all. `--ca-edge-highlight` two lines up is the same decision
+     for the same reason, and both resolve per theme by having a twin below. */
+  --ca-slot-edge: rgba(255, 255, 255, 0.07);
+
+  /* Card shadow elevation */
+  --ca-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --ca-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+  /* Group page swipe tint opacities (0..1) */
+  --ca-swipe-tint-left: 0;
+  --ca-swipe-tint-right: 0;
+
+  /* Vertical rhythm between stacked widgets in one ```chronoanvil block. Named
+     because it is a flex `gap`, not a margin — a widget that wants to butt up
+     against its neighbour (the joined highlights/challenges box) has to cancel
+     it with a negative margin of exactly this size, and a magic -10px there
+     silently breaks the day someone retunes the spacing here. */
+  --ca-widget-gap: 10px;
+
+  /* How far a row block's drop bands reach BEYOND the block, into the margin
+     between it and its neighbour (4.54 §1).
+
+     THE BANDS LOST THE INSIDE OF THE BLOCK and had to be given something back.
+     They used to lie over the columns — a quarter of the block, up to 72px —
+     which is what made the top of the first widget in a column mean "above this
+     whole group" instead of "above this widget". The columns now win everything
+     they cover, so what is left of a band is the strip that is genuinely
+     outside the row: the group's own padding, and this.
+
+     16px BECAUSE IT IS THE BLOCK'S OWN BOTTOM MARGIN. `.ca-journal-widget-block`
+     sits in `margin: 0.5em 0 1em`, so a band reaching this far stops on the
+     neighbouring block's edge rather than over anything the neighbour drew. Two
+     adjacent blocks therefore TILE the space between them — the lower one's
+     "above" band and the upper one's "below" band both name the same insertion
+     point, so the overlap in the middle is one place with two names rather than
+     an ambiguity. */
+  --ca-slot-reach: 16px;
+
+  /* How wide a page of widgets is allowed to get (4.2 §2). Read by the
+     homepage's `ca-wide` class and by nothing else yet.
+
+     THE NUMBER IS DERIVED, not chosen. A row splits the page into equal cells,
+     and 520px is the width at which every widget in this plugin collapses to
+     its narrow layout — the number the tracker modules, the journal views, the
+     header bars and the heroes all already use. Two cells above that threshold
+     is 2 x 520 + one --ca-widget-gap = 1050, and this is that rounded up so the
+     cells clear it rather than sit on it.
+
+     TWO, because two is what a row of full-size widgets is: the reference
+     design's big row is a pair, and a row of three at this width gives 360px
+     cells, which is the collapsed layout ON PURPOSE — three small widgets are
+     small. A width that kept three cells wide would be 1600px, which is not a
+     page, it is a wall.
+
+     NOT `--file-line-width`. That is a number about TEXT — how many characters
+     read comfortably in one line — and this page is a calendar, a card and a
+     grid. Borrowing it would make the dashboard's shape a consequence of a
+     prose setting; see HOME_CSS_CLASS in home-sections.ts. */
+  --ca-page-width: 1100px;
+
+  /* The narrowest a cell of a `row` may get before the row wraps (4.3.1).
+
+     MEASURED, NOT PICKED. A three-cell homepage row in a 720px pane gives each
+     widget 225px, and at 225px the diary calendar's quarter rail — two quarter
+     groups per line, a label and three month names in each — has about 28px per
+     month and renders `JaFeMar` on top of itself. The same row at 355px per cell
+     reads correctly. The floor sits above the broken width and below the known
+     good one, which is the most that can honestly be claimed for it.
+
+     IT IS NOT 520px, the width at which the widgets themselves switch to their
+     narrow layout. Below 520 a widget is compact; below roughly 300 it is
+     broken, and those are different questions. A row wants the second number:
+     a compact widget in a narrow cell is the point of the primitive. */
+  --ca-row-cell-min: 320px;
+
+  /* The shortest a widget's card may be dragged to (4.22 §3.2).
+
+     A HEAD AND A FEW LINES UNDER IT, which is the least a card can be and still
+     be a card rather than a strip. The head is 6px and 5px of padding around one
+     line of small type over a hairline, which measures about 30px; the card's
+     own padding is 12px top and bottom; and what is left of 120 is a body of
+     roughly three lines. Below that a scrolling card shows less than it costs to
+     draw.
+
+     ROUNDED TO THE SNAP. `HEIGHT_STEP` is 20, so a floor that is not a multiple
+     of it would be a height the drag can reach and then never return to.
+
+     READ BACK THROUGH `pxToken` AND NEVER COPIED INTO TYPESCRIPT, which is the
+     rule block-drag.ts states where it defines that function: a length written
+     in the stylesheet is derived rather than repeated, so there is no second
+     place for the two to disagree. */
+  --ca-card-h-min: 120px;
+
+  /* Type: four sizes. Micro meta -> emphasized numbers/titles. */
+  --ca-text-2xs: 0.7em;
+
+  /* ── The page head's own two, and it is the only object with any (4.10) ──
+   *
+   * THE FACE. The plugin's UI is one sans everywhere else, deliberately — a
+   * dashboard of widgets that each chose a typeface is the "assembled from
+   * parts" fault the caps voice below was written to end. The head is the one
+   * exception, and it earns it by being the one thing on the page that is about
+   * the PAGE rather than about something on it: a different voice is how a
+   * reader tells the two apart without being told.
+   *
+   * A chronoanvil is a printed annual reference, so a book face is the subject's
+   * own vernacular rather than a decoration borrowed from somewhere else.
+   *
+   * A STACK, SO NOTHING IS SHIPPED. Every entry is a face an OS already has and
+   * the last two are generic, so this resolves everywhere and adds no asset to
+   * a plugin that has never had one. A webfont here would be a download on every
+   * vault for one line of text.
+   */
+  --ca-head-face: "Iowan Old Style", "Palatino Linotype", Palatino,
+                  "Book Antiqua", Georgia, ui-serif, serif;
+
+  /* One small-caps voice for every key label in the plugin: the diary eyebrow,
+     the stat captions, the weekday header, the agenda heading and its month
+     abbreviation. Up to 2.51.1 these ran at 0.04em / 0.06em / 0.08em / 0.12em
+     with weights 600 and 700 — five labels all saying the same thing ("this is
+     a key, not content") set five different ways, which is most of why the card
+     read as assembled from parts. The tracking is the widest of the old values
+     because these are 0.7em words: at that size letter-spacing is what makes
+     small caps legible rather than merely small. */
+  --ca-caps-weight: 700;
+  --ca-caps-tracking: 0.12em;
+
+  /* `--ca-band-recess` STOOD HERE AND IS DELETED (4.13.1 §3b). It named the
+     recess every band on the diary card was sunk by — the stats readout, the
+     navigator, the agenda — after those three had been written out separately at
+     0.13 / 0.13 / 0.12 with three light-theme overrides to match. Naming it was
+     right and it did the job it was named for: all three moved together, once,
+     when the card stopped being made of sunk bands. Its last reader went with
+     the agenda's fill, and a token nothing reads is the dangling reference the
+     guard in `test/tokens.test.ts` exists to catch, arrived at from the other
+     end. The light-theme override below went with it. */
+
+  --ca-text-xs: 0.8em;
+  --ca-text-sm: 0.85em;
+  --ca-text-base: 0.95em;
+
+  /* ── Header Art & Vault Banner Customization Tokens ────────────────── */
+  --ca-header-bg-gradient: none;
+  --ca-header-art-pattern: none;
+  --ca-header-art-size: auto;
+  --ca-header-art-repeat: repeat;
+  --ca-header-art-position: center;
+  --ca-header-art-opacity: 0.18;
+  --ca-header-art-blend: soft-light;
+  --ca-cog-opacity: 0.65;
+
+  /* The section frame (2.56). A section header used to spend about 52px of
+     vertical block on a 1.25em/700 title, 16px of padding and a 2px rule —
+     five of those on one journal note is a third of a phone viewport spent on
+     chrome. Named here rather than written into .ca-journal-header-bar because
+     §1 of the 2.56 plan retires 39 header-shaped components onto one frame,
+     and the whole point of one frame is that its rhythm is one number.
+
+     The indent is what replaces the full-width rule as the thing that says
+     "this belongs to that heading" — a rule under every title draws five
+     horizontal lines down a page and separates nothing in particular.
+
+     THE PADDING CAME DOWN A PIXEL IN 4.11, when the section bar was brought into
+     line with the widget head — the slim band `.ca-journal-block-head` draws over
+     every widget on a page, which a section bar sat beside looking like a
+     different kind of object.
+
+     AND 4.11 SAID THE BAND COULD NOT BE MATCHED, because "a section keeps a
+     readable title". 4.13 gave that up, and the reason is a picture rather than
+     an argument: the first vault render of all three dashboards showed the SAME
+     widget titled two ways — `tasks-table` as `⏳ OPEN TASKS` at 11.2px on the
+     homepage, which composes a bare directive, and as `⏳ Open Tasks` at 15.2px
+     on both dashboards, which compose a `header:` line. One string in
+     `SECTION_TITLES`, two objects on screen, and nobody had decided it. So the
+     bar is now ONE thing at ONE scale — the smaller one — and `--ca-bar-*` below
+     is where that scale lives. What 4.11 took from the head was its rule weight
+     and its padding; 4.13 takes the rest. */
+  --ca-sec-gap: 4px;
+  --ca-sec-pad: 2px;
+  --ca-sec-indent: 1.1em;
+  /* ── ONE COLLAPSED HEIGHT FOR EVERY SECTION (5.10) ──────────────────
+     A collapsed section is its title row and nothing else, so five closed
+     sections down a page are five bars — and they have to be five of the SAME
+     bar. What made them differ was what happened to be IN each one: a count
+     pill, a muted window phrase, an actions strip, a glyph, or none of those.
+     Each of those has its own type scale, and the tallest thing in a bar was
+     deciding the bar's height.
+
+     THE TITLE IS THE FLOOR, because it is the one part every section has.
+     `1.35` is `.ca-journal-header-title`'s line-height and `--ca-sec-pad` is the
+     bar's own, so this is the height a bar carrying nothing but its name already
+     draws — a floor rather than a new size, which is why no open section moves.
+     A bar whose contents are taller than this still grows; a bar with nothing
+     but a short title no longer shrinks below its neighbours.
+
+     NOT APPLIED TO THE UNTITLED CONTROL STRIP, which has no title line to be
+     the floor of — the same exception `30-header-bars.css` already draws for the
+     actions row. */
+  --ca-sec-bar-h: calc(1.35 * var(--ca-sec-title-size) + 2 * var(--ca-sec-pad));
+  /* ── AND ONE HEIGHT FOR EVERY GROUP HEAD (5.12) ─────────────────────
+     The same argument one tier down. A group head inside a card is a division
+     of it, and three of them down one card have to be three of the same object
+     — a count pill on one and a create button on the next must not make the
+     first shorter.
+
+     ITS OWN TITLE IS THE FLOOR, on `--ca-sec-bar-h`'s rule: `--ca-text-sm` at
+     the same 1.35 line-height the frame sets, plus the head's own 8px of air
+     above the rule and `--ca-sec-pad` below it. Smaller than a section bar on
+     purpose — a group that collapsed to the same height as the section holding
+     it would be the tiering this token exists to draw, undone by a number. */
+  --ca-grp-head-h: calc(1.35 * var(--ca-text-sm) + 8px + var(--ca-sec-pad));
+  /* ── AND THERE IS NO THIRD HEIGHT (5.14) ───────────────────────────
+     `--ca-field-bar-h` stood here for one draft of this release: a smaller floor for the head
+     a `note:`, `list:`, `attach:`, `tasks:` or capture directive draws over its
+     own body, chevron-floored rather than title-floored because that head's
+     title was an eyebrow two tiers under its own chevron.
+
+     THE HEAD IT SIZED IS GONE. The eyebrow was rejected on sight and a field is
+     drawn as a level-1 section now (`fieldFrame`), so `--ca-sec-bar-h` above is
+     its floor — which is the same answer to the same report. The defect was
+     never that fields wanted a height of their own; it was that four renderers
+     each picked one, and a token no other tier reads is a fourth pick with a
+     nicer name. */
+  /* A WIDTH, ON AN ELEMENT WHOSE OWN FONT-SIZE RESOLVES IT — which is the whole
+     reason this number moved in 4.13 rather than staying put. `em` on a `width`
+     is relative to the element's own type, so when the glyph came down from
+     `--ca-text-base` to `--ca-bar-glyph` the slot would have silently shrunk
+     from ~19.8px to ~17.7px and taken the title alignment with it. 1.5 × 0.85em
+     lands back at ~20px, so the slot is the same on the page and only the
+     spelling changed. See `.ca-journal-header-glyph`. */
+  --ca-sec-glyph: 1.5em;
+
+  /* ── ONE HEADER BAR, AT ONE SCALE (4.13 §1) ────────────────────────────
+     Two implementations title a block and they must not drift: `sectionFrame`
+     draws `.ca-journal-header-title` for a `header:` or `frame: section` fence, and
+     `buildHead` draws `.ca-journal-block-head-title` for a bare one. They cannot be
+     merged — `NOT_A_CELL` evicts a `.ca-journal-sec` from a row cell by design, so a
+     widget inside a group can only ever be titled by a block head — so instead
+     they read one set of tokens and agree by construction rather than by
+     inspection.
+
+     THE GLYPH IS DELIBERATELY LARGER THAN THE TITLE, and it is the one place
+     "one scale" is not literal. An emoji at 11.2px is a smudge; the slot exists
+     to align a column of titles, and it can only do that if what sits in it is
+     legible. 0.85em is the smallest size at which the shipped glyphs still read.
+
+     THIS SAID "NO THEME VARIABLE IS READ HERE, WHICH IS WHY THESE MAY LIVE IN
+     `:root`" AND IT WAS FALSE (4.42) — two lines below it, `--ca-bar-ink` read
+     `--text-muted` and `--ca-sec-title-ink` read `--text-normal`. The rule the
+     sentence states is right; the claim that these obeyed it was not. Both have
+     moved to `body`, and the guard in `tokens.test.ts` now checks the rule
+     rather than trusting a comment to have been kept true. */
+  --ca-bar-text: var(--ca-text-2xs);
+  --ca-bar-track: 0.06em;
+  --ca-bar-glyph: var(--ca-text-sm);
+  --ca-sec-title-size: var(--ca-text-lg);
+  /* Added in 2.53 for the week table's date, the first place in the sheet that
+     wanted type *above* body size. Named rather than written as a literal so
+     the next one that does agrees with it. It is now the size a NOTE'S NAME is
+     set at, on all three banners. */
+  --ca-text-lg: 1.15em;
+  /* One step further up, added in 4.21.1 for the page-context strip's alias.
+     It is the only type in the plugin set larger than a note's own name, and
+     that is the decision rather than an oversight: the file's name identifies
+     the note and the alias SAYS WHAT THE DAY WAS, which is what a reader came
+     to the page to read. `2026-08-13` is an address; "Started the new job" is
+     the entry. A ratio rather than a size a band happened to need — 1.35 to
+     1.15 is the same step 1.15 takes over body text. */
+  --ca-text-xl: 1.35em;
+  /* THE PAGE HEAD'S OWN NAME SIZE (5.31.2), one step above `--ca-text-xl` and
+     NOT that token widened. `--ca-text-xl` is also the entry header's title
+     and its rename input (50-entry-header.css), and those two are a band
+     INSIDE a card; this is the page naming itself on the page's own ground,
+     with nothing above it but the bar. Widening the shared token would have
+     grown the band as well, which is the reason a size gets a name here
+     rather than being retyped: two rules reading one number are two rules
+     that cannot disagree, and two rules that must NOT agree need two. */
+  --ca-head-title-size: 1.5em;
+
+  /* The rule-weight scale (3.6). Three tiers, and like the radii above,
+     nothing in this sheet should type a raw px border width outside them.
+
+     WHY THIS IS A SCALE AND NOT A NUMBER. §4.3 and §4.4 of the 3.6 plan both
+     ask for "slightly larger", and there was nowhere to put the answer — the
+     token file had three radii and no weight at all. Applying "slightly" by
+     hand across dividers, tables, day cells, month cells and tracker cells is
+     how a plugin ends up with borders nobody chose, and that is not a
+     hypothetical here. A survey of this sheet before the scale existed found
+     163 borders at 1px, two at 1.5px, six at 2px and five at 3px — and the 2px
+     and 3px sets are doing THE SAME JOB. Every one of the eleven is a
+     `border-left` spine on an inset block: a quoted region, a nav rail, an
+     event row, the overview card's own accent edge. Eleven marks, one meaning,
+     two weights, and no rule anywhere saying which. That is what the scale is
+     for; §4.3's "make the dividers heavier" is the smaller half of it.
+
+     THE THREE TIERS ARE JOBS, NOT SIZES.
+
+     `hair` subdivides one object — the rows inside a table, the cells inside
+     one grid. It stays at the theme's own hairline because that is what a
+     subdivision should be: present, and not a boundary.
+
+     `rule` divides one object from the next — a card's bands from each other,
+     one card from its neighbour, a grid of cells from the surface it sits on.
+     This is the number §4.3 and §4.4 want, and the ONE number worth tuning:
+     when it lands wrong it lands wrong everywhere at once, which is the whole
+     reason for putting it here rather than at twenty call sites. It is also
+     the one value in this file with no defensible answer in advance — 1px
+     against a hairline is a doubling on some themes and invisible on others,
+     and ChronoAnvil renders inside whatever theme the reader has.
+
+     `edge` is the species marker and the spine: the accent bar that says "this
+     page summarises", the left rail on a quoted block. Already 3px at five
+     call sites and 2px at six more; naming it is what stops the twelfth from
+     picking a third value.
+
+     THE SCALE HAS NO HALF STEP, AND CANNOT. Chromium — which is what Obsidian
+     is — floors border-width to whole CSS pixels: 1.4px, 1.5px and 1.6px all
+     compute to 1px, at every device pixel ratio. A box-shadow's spread does
+     not floor. So a `--ca-rule` of 1.5px would draw every divider at 1px while
+     drawing every cell ring at 1.5px, and the one number this scale exists to
+     keep in step would be out of step by construction. The two borders in this
+     sheet that were written at 1.5px had been drawing 1px since the day they
+     were typed; they read `--ca-rule-hair` now, which changed nothing on
+     screen and stopped the file claiming a weight it never had.
+
+     Rings may still be 1.5px where a control wants a stroke rather than a
+     rule — that is the drawing of a control, not a division between things,
+     and folding it in would make the scale mean "every edge", which is how a
+     scale stops being able to say anything. */
+  --ca-rule-hair: 1px;
+  --ca-rule: 2px;
+  --ca-rule-edge: 3px;
+
+  /* THE PAGE HEAD'S SPINE, AND WHY IT IS A TOKEN RATHER THAN `--ca-rule-edge`
+     TYPED TWICE (5.31.2).
+
+     TWO RULES HAVE TO AGREE ON THIS NUMBER, and until 5.31.2 only one of them
+     existed. The spine is `border-left` on `.ca-journal-page-head`; the rule
+     under the head is a pseudo-element, and an absolutely positioned child is
+     laid out against its parent's PADDING box — which starts on the far side of
+     that border. So the rule has to be pulled back by exactly the spine's width
+     to reach the corner the border occupies, and a literal in each place is how
+     the two come apart the first time a preset changes one of them.
+
+     AND A PRESET REALLY DOES CHANGE IT. Editorial draws a 2px spine and
+     Technical a 3px one, stated as `border-left-width` overrides until this
+     release. They set this instead, so the rule beneath follows the spine on
+     every preset without either of them naming the other.
+
+     NOT `--ca-rule-edge` ITSELF. That is the sheet's heaviest general weight
+     and a dozen edges read it; a preset that wanted a 2px spine would have
+     been re-weighting all of them. */
+  --ca-head-spine: var(--ca-rule-edge);
+
+  /* Mood palette — the only hardcoded hues in the sheet, named once so
+     the tracker chart's barColor and any future use point at the same
+     five values instead of a copy-pasted hex literal. */
+  --ca-mood-1: #e0575b;
+  --ca-mood-2: #e0925a;
+  --ca-mood-3: #d9b64e;
+  --ca-mood-4: #8bbf5d;
+  --ca-mood-5: #4caf7d;
+
+  /* The second chart series (4.45). A line chart may draw two trackers, and the
+     first keeps the theme's own accent — a chart that changed colour the moment
+     you added a second tracker would be worse than one that did not. This is
+     the other hue.
+
+     ORANGE AGAINST THE ACCENT'S USUAL BLUE, which is the standard first pair of
+     a categorical order and stays separable for the common forms of colour
+     blindness, where a second blue or a green would not. Named here rather than
+     written into chart-render.ts so a theme whose accent IS orange can move it —
+     the one case this default cannot answer for itself. */
+  --ca-chart-series-2: #eb6834;
+
+  /* Activity ramp — the study heatmap's four shades, light to dark. Separate
+     from the mood palette on purpose: mood runs red→green because low mood is
+     bad, whereas a low task count is simply less work, so it wants a single
+     hue at increasing strength. The darkest stop is the green the old activity
+     chart used for completed tasks, so the section's colour story is unchanged. */
+  --ca-act-1: #c7e3ae;
+  --ca-act-2: #94ca7c;
+  --ca-act-3: #5aa84c;
+  --ca-act-4: #22c55e;
+  --ca-act-ink-dark: #173404;
+  --ca-act-ink-light: #f2fbf4;
+
+  /* Event palette — the eight swatches a special event can be decorated with.
+     Named rather than free-form on purpose: a hex picker lets you choose
+     something that vanishes into one of the two themes, and these have to stay
+     legible as a 3px bar and an 11px icon on both. Mid-tone, roughly equal
+     luminance, and distinguishable from the mood ramp above so a red event
+     doesn't read as a bad day. */
+  --ca-ev-red: #d9534f;
+  --ca-ev-amber: #d98b34;
+  --ca-ev-green: #58a55c;
+  --ca-ev-teal: #3fa3a3;
+  --ca-ev-blue: #4a8fd4;
+  --ca-ev-purple: #8b6fd1;
+  --ca-ev-pink: #cc6699;
+  --ca-ev-grey: #8a8f98;
+
+  /* ── the same eight, as a GROUND (4.55) ──────────────────────────────
+     The time grid fills a block with a swatch and puts white type on it, and
+     the eight above are tuned for the opposite job: a 3px bar and an 11px
+     icon, drawn as a foreground on the page's own ground. White on
+     `--ca-ev-amber` is about 2.4:1, which is unreadable at the smallest size
+     in the plugin.
+
+     So each fill is the same hue taken down until white clears 4.5:1 on it.
+     Nine tokens rather than eight because the ink is one of them: it is white
+     in BOTH themes, since the fills stay dark in both, and a rule that read
+     `--text-on-accent` would follow the theme away from the only colour that
+     works here. */
+  --ca-tg-ink: #ffffff;
+  --ca-tg-red: #c2403c;
+  --ca-tg-amber: #a2661d;
+  --ca-tg-green: #3f7f43;
+  --ca-tg-teal: #2c7676;
+  --ca-tg-blue: #376fa8;
+  --ca-tg-purple: #6b53ac;
+  --ca-tg-pink: #a84e79;
+  --ca-tg-grey: #626973;
+
+  /* ── Semantic Grain Palette & Typography (4.80) ──────────────────────
+     Each temporal diary grain and journal has a dedicated signature accent
+     and RGB components for adaptive alpha layering and micro-spines. */
+  --ca-grain-daily: #e58e26;
+  --ca-grain-daily-rgb: 229, 142, 38;
+  --ca-grain-weekly: #0fb9b1;
+  --ca-grain-weekly-rgb: 15, 185, 177;
+  --ca-grain-monthly: #8854d0;
+  --ca-grain-monthly-rgb: 136, 84, 208;
+  --ca-grain-quarterly: #eb6834;
+  --ca-grain-quarterly-rgb: 235, 104, 52;
+  --ca-grain-yearly: #f1c40f;
+  --ca-grain-yearly-rgb: 241, 196, 15;
+  --ca-font-heading: inherit;
+  --ca-font-telemetry: inherit;
+
+  /* ── the grid's own geometry, and the now line (4.62) ────────────────
+     THE GUTTER IS ONE NUMBER BECAUSE IT IS ONE COLUMN. The hour rail, the
+     corner cell above it and the all-day lane's label are the same strip of
+     the grid seen in three rows, and they were three literals — which is how
+     "all day" came to wrap onto a second line and land beside the 8 AM mark.
+     The container query narrows the token, not the three templates.
+
+     THE ROW HEIGHT MAKES THE BODY A WHOLE NUMBER OF HOURS. It was a
+     `min-height` on the rail, so a window of any span drew the same box and
+     the last hour label — absolutely positioned at 100% and pulled up half
+     its own height — hung over the foot of the scroller and was clipped
+     through the middle. Height from the hour count means an eight-hour week
+     is a shorter grid than a fourteen-hour one, which is also the honest
+     drawing of it.
+
+     THE NOW LINE IS RED IN BOTH THEMES, on `--ca-tg-ink`'s reasoning one
+     block up: it is drawn over fills that stay dark in both, and the one
+     thing on this widget that must never be mistaken for a block. It is not
+     `--ca-tg-red`, which is a fill a reader may have chosen for an event. */
+  --ca-tg-gutter: 52px;
+  --ca-tg-row: 50px;
+  --ca-tg-now: #e0484d;
+
+  /* ── The spacing scale (3.9 §4) ────────────────────────────────────────
+     DEFINED HERE AND READ BY NOTHING IN THE PATCH THAT ADDS IT. That is the
+     same shape 3.8's patch 4 used and it is deliberate: a scale is reviewable
+     on its own, and a scale plus two hundred edits is not. This block changes
+     no rendered pixel. Patch 6 is the list of deliberate moves.
+
+     NUMERIC, WHERE THE OTHER SCALES IN THIS FILE ARE NAMED — and the house
+     precedent does not reach this one. Radii are `sm`/`md`/`pill`, type is
+     `2xs`..`lg`, rules are `hair`/`rule`/`edge`, and every one of those is
+     ORDINAL: there is no arithmetic relating a card's radius to a pill's, and
+     the rule scale says so out loud ("the three tiers are jobs, not sizes").
+     Names are right for a set of jobs.
+
+     This scale is arithmetic. `--ca-space-N` is exactly `2N` px, and that
+     property is the whole reason it is a scale rather than a list of seven
+     numbers someone liked. Spelling it `sm`/`md`/`lg` would hide the one thing
+     worth knowing about it and would make "one step tighter" a lookup instead
+     of a subtraction.
+
+     WHY SEVEN STEPS, AND WHY EVEN. A survey of this sheet before the scale
+     existed found 250 padding declarations carrying a literal, using every
+     whole pixel from 1 to 14, with 110 of those uses at an odd value. The
+     peaks are unambiguous and they are all even: 2px (51 uses), 4px (48),
+     6px (34), 8px (53), 10px (55), 12px (45), 14px (33). The design language
+     already IS a 2px grid; the odd values are where it was typed by hand.
+
+     So this scale DESCRIBES the sheet rather than reforming it, and that is a
+     decision rather than a shortfall. A more opinionated ladder — 4/8/12/16,
+     or a doubling — would move 6px, 10px and 14px, which is 122 declarations
+     at three of the seven peaks, and every moved pixel would be a design
+     change arriving inside a diff described as mechanical. Fewer steps is a
+     real argument and it is a DESIGN argument; it should be made on its own,
+     against a sheet that already reads from a scale, and not smuggled in by
+     the patch that introduces one. */
+  --ca-space-1: calc(var(--ca-space-unit) * 1);
+  --ca-space-2: calc(var(--ca-space-unit) * 2);
+  --ca-space-3: calc(var(--ca-space-unit) * 3);
+  --ca-space-4: calc(var(--ca-space-unit) * 4);
+  --ca-space-5: calc(var(--ca-space-unit) * 5);
+  --ca-space-6: calc(var(--ca-space-unit) * 6);
+  --ca-space-7: calc(var(--ca-space-unit) * 7);
+
+  /* THE STEP, AND THE WHOLE OF PATCH 7's RATIO FIX (3.9 §3).
+     `--ca-space-N` is N of these, which is what makes the numeric naming
+     honest and what makes the mobile override one line rather than seven. */
+  --ca-space-unit: 2px;
+
+  /* ── The control scale (3.9 §3.3 / §4.3) ───────────────────────────────
+     What an interactive control is padded by, and how small it may get.
+
+     THE PREREQUISITE FOR §3, which is why it lands with the spacing scale
+     rather than with the mobile work that needs it. "Fine on PC, way too large
+     on mobile" is not one complaint but two, and neither is about the box
+     being too big:
+
+       - Font sizes here are RELATIVE (`--ca-text-xs: 0.8em`) and paddings are
+         ABSOLUTE. So a control on a phone renders 16px text inside a box padded
+         for 13px text: proportionally LESS padding than the same control on a
+         desktop, while looking like more, because the eye reads the ratio.
+       - Nothing anywhere asserts a touch target. The pill buttons get their
+         height from vertical padding chosen against desktop text, so they are
+         simultaneously too tall and too small to hit.
+
+     One place to change that decision instead of forty. Values here are the
+     desktop ones and are exactly what the controls already compute to, so this
+     block also changes nothing. The mobile override is patch 7's, and the
+     floor is deliberately unset until then — a `min-height` invented here
+     would be patch 7 arriving early and unreviewed. */
+  --ca-control-pad-y: var(--ca-space-1);
+  --ca-control-pad-x: var(--ca-space-4);
+  /* The touch-target floor, off by default. `auto` rather than a number
+     because a desktop control's height should stay whatever its content and
+     padding make it — asserting 40px on a pointer device would grow every pill
+     in the plugin to no purpose. The mobile scope below is the only thing that
+     turns this on. */
+  --ca-control-min: auto;
+  /* A floored control's corner. Full capsule by default, which is what a pill
+     has always been and what it should stay while controls are short: at a
+     desktop control's ~26px height, 999px resolves to a 13px corner and reads
+     as a pill.
+     It stops reading as one when the box gets tall. 3.10 gave mobile controls
+     a 40px floor and a capsule on a 40×62 button is a lozenge — 3.12 §14.1,
+     where the recap notice's two-word "Add it" came out as a blob.
+     So the corner is DERIVED FROM THE SAME TOKEN AS THE HEIGHT rather than
+     picked separately: both read `--ca-control-min`, so a future change to the
+     floor moves the corner with it and the two cannot drift into disagreeing
+     about what shape a control is. 0.35 rather than 0.5 because 0.5 IS a
+     capsule — halving the height is the definition of the shape being fixed. */
+  --ca-control-round: var(--ca-radius-pill);
+
+  /* How much of a settings row belongs to its control.
+     A number rather than "whatever the control needs" because the control's
+     width is the description's width subtracted from the row, and a
+     description that re-wraps moves every row under it. See the note on
+     `.ca-settings-body > .setting-item > .setting-item-control` in
+     85-tracker-controls.css for what that looked like. 250px holds the longest
+     shipped dropdown label — the aesthetic-preset list — without ellipsis at
+     the tab's usual width, and the narrow-pane stack releases it. */
+  --ca-settings-control-w: 250px;
+
+  /* The calendar-heatmap layout tokens.
+     Year ranges transpose into GitHub-style horizontal strips — weeks as
+     columns, seven fixed weekday rows. Shorter ranges use a seven-column
+     calendar whose row count grows with the window.
+
+     THE CELL SIZE IS NO LONGER ONE OF THESE. Through 5.5 it was: a flat 13px for
+     the year strip and 26px for the short grid, which is why a heatmap and the
+     tile it was drawn in had nothing to do with each other — a 30-day window
+     drew a 182x156 block of squares in the middle of a 1050x450 tile. What is
+     here now is the FLOOR, the CEILING and the chrome the fit has to subtract;
+     20-charts.css measures the rest against the tile with container units and
+     explains the whole mechanism.
+
+     The two counts are placeholders. `renderHeatmap` sets both on the wrap
+     from the window it actually resolved, and a value is kept here because the
+     grid templates read them unconditionally. */
+  --ca-heat-cols: 7;
+  --ca-heat-rows: 5;
+  --ca-heat-strip-cols: 53;
+
+  /* Short grid: gap, the weekday header the fit must leave room for, and the
+     range a cell may take. The floor is a legible square rather than the
+     smallest drawable one — below ~14px a calendar day stops being clickable
+     with any confidence, and scrolling is the better failure. The ceiling
+     stops a six-row month in a 2x2 tile from inflating into loose tiles. */
+  --ca-heat-gap: 4px;
+  --ca-heat-head: 16px;
+  --ca-heat-cell-min: 14px;
+  --ca-heat-cell-max: 64px;
+
+  /* Strip: the weekday-initial gutter on the left, the month-label row on
+     top, and the cell range.
+
+     NO GAP TOKEN. The strip's gap is a fraction of its own cell, because a 3px
+     gutter that reads as a mosaic between 13px cells reads as a hairline
+     between 50px ones. The fraction is not iterated on — seven rows and six
+     gaps is `cell * (7 + 6k)`, so it folds into the fit as a single divisor.
+     Change `k` and change the 7.98 in 20-charts.css with it.
+
+     THE CEILING IS HIGH ON PURPOSE, and it is the number this pass turns on.
+     Seven rows is a constant here, so the only thing a taller tile can buy the
+     strip is bigger cells; stopping at 26px is what left 109px of graph in a
+     411px box and read as a chart zoomed out from its own tile. The floor is
+     low for the opposite reason — a reader scanning a contribution graph is
+     reading density rather than picking a day. */
+  --ca-heat-strip-gap-k: 0.14;
+  --ca-heat-strip-gutter: 18px;
+  --ca-heat-strip-head: 12px;
+  /* Room for the horizontal scrollbar, reserved unconditionally.
+     The strip is the one layout that overflows sideways BY DESIGN, so on any
+     window worth scrolling a bar is always there taking height out of `cqh` —
+     and the fit that ignored it sized seven rows for a box that then had eight
+     rows' worth of content, clipping the last weekday off the bottom. Reserved
+     rather than reacted to: a term that appears only when the bar does is the
+     oscillation this file's own note warns about. Costs 14px on a quarter that
+     happens to fit. */
+  --ca-heat-strip-bar: 14px;
+  --ca-heat-strip-cell-min: 8px;
+  --ca-heat-strip-cell-max: 56px;
+
+  /* ── The elevation scale (3.9 §4.1) ────────────────────────────────────
+     Three heights and one direction variant, for the four drop shadows this
+     sheet had written inline.
+
+     3.8's patch 11 wrote `0 -8px 24px rgba(0,0,0,0.4)` at a call site for one
+     drop-up menu, which is the shape of the problem §4.1 names: a value
+     invented where it was needed because there was nothing to reach for. It
+     was invented CORRECTLY — it is the existing menu shadow, mirrored — and
+     that is the point. The next one will not be.
+
+     `up` is a separate token rather than a sign flip because a drop-up is a
+     different object from a drop-down, not the same object upside down: only
+     the offset mirrors, and the blur and alpha must not.
+
+     THESE CARRY A DARK-THEME ASSUMPTION AND DO NOT SAY SO — `rgba(0,0,0,…)`
+     over a light theme is a heavier shadow than intended. That is the same
+     defect §6 recorded against `--ca-band-recess`, which answered it with a
+     `.theme-light` override and has since been deleted outright; it is not fixed
+     here, and naming the values at least moves it from four call sites to one. */
+  --ca-elev-1: 0 1px 4px rgba(0, 0, 0, 0.25);
+  --ca-elev-2: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --ca-elev-2-up: 0 -8px 24px rgba(0, 0, 0, 0.4);
+  --ca-elev-3: 0 10px 40px rgba(0, 0, 0, 0.5);
+
+}
+
+/* ══ The mobile scope (3.9 §3) ══════════════════════════════════════════
+   THE ONLY PLATFORM READ IN THE PLUGIN. Before this, `Platform.isMobile` and
+   Obsidian's `.is-mobile` body class appeared nowhere in src/ or styles/, and
+   everything responsive was `@container` (right, and staying), five
+   `@media (max-width)` rules, and five `@media (hover: none)` branches added
+   one at a time as each hover-revealed control was noticed.
+
+   `(hover: none)` stays for what it actually means — a device with no hover —
+   which is NOT the same question as "is this a phone". A desktop with a
+   touchscreen answers one way and a phone the other, and the two questions had
+   been sharing an answer.
+
+   ── WHY THE STEP CHANGES AND NOT THE HEIGHTS ────────────────────────────
+   The complaint was "fine on PC, way too large on mobile", and the box is not
+   too large: the RATIO is wrong and the eye reads the ratio.
+
+   Type in this sheet is relative — `--ca-text-xs: 0.8em` — and padding was
+   absolute. So a control that was tuned as 2px of padding around a 13px label
+   renders as 2px of padding around a 16px label on a phone: proportionally
+   LESS padding than the same control on a desktop, inside a box that grew.
+   That reads as bloated even though every number in it is unchanged, which is
+   why "make the pills smaller" would have made it worse — it would have taken
+   padding off a control that was already short of it.
+
+   So the step grows with the text instead. 2.5px is the 13→16px ratio, near
+   enough, applied in one place. Nothing about a pill's radius changes: a 999px
+   radius on a control of any height is a pill, and 34 controls use it.
+
+   ── WHAT THIS CAN REACH ─────────────────────────────────────────────────
+   Exactly the controls patch 6 converted, because they are the only rules in
+   the sheet reading the spacing scale — layout paddings still hold literals by
+   §4.3's decision. That is a real dependency and it is stated rather than
+   assumed: the day a layout padding reads `--ca-space-N`, this block starts
+   moving it too, and that will be a decision to take deliberately rather than
+   a surprise. A test pins the scale's readership to controls for now. */
+body.is-mobile {
+  --ca-space-unit: 2.5px;
+  --ca-control-min: 40px;
+  --ca-control-round: calc(var(--ca-control-min) * 0.35);
+}
+
+/* The touch-target floor, asserted rather than hoped for (§3.3).
+   40px, not the 44px both mobile platforms publish: this is a dense
+   information app and a diary entry carries a lot of small controls, so the
+   floor is the top of the range that decision leaves — as close to the
+   guidance as the density allows rather than as far from it as possible.
+
+   TAP TARGETS ONLY. A display chip that reports a count is not a target and
+   growing it to 40px would push a table row half again as tall for nothing.
+   The list is what a reader clicks, types into or taps, and it is written out
+   so the diff is auditable against it. */
+body.is-mobile .ca-journal-btn,
+body.is-mobile .ca-journal-btn-ghost,
+body.is-mobile .ca-journal-btn-subtle,
+body.is-mobile .ca-jc-today-btn,
+body.is-mobile .ca-jpn-now-btn,
+body.is-mobile a.ca-jn-pill,
+body.is-mobile .ca-section-action,
+body.is-mobile .ca-tpl-tab,
+body.is-mobile .ca-tpl-toggle,
+body.is-mobile .ca-picker-row,
+body.is-mobile .ca-journal-attach-btn,
+body.is-mobile .ca-journal-tracker-add-btn,
+body.is-mobile .ca-journal-habit-chip-btn,
+body.is-mobile .ca-jq-recap-moved-btn,
+body.is-mobile .ca-jc-jump-row button,
+body.is-mobile .ca-jc-jump-row input,
+body.is-mobile .ca-journal-select select,
+body.is-mobile .ca-jrc-grade button {
+  min-height: var(--ca-control-min);
+  /* Same list, same token, one rule: a control that got taller here is exactly
+     the control whose corner has to stop being a capsule. Splitting these into
+     two selector lists is how one of them would gain a member and the other
+     would not. */
+  border-radius: var(--ca-control-round);
+}
+
+/* Vault-area hues — the one place the two home-page sections are allowed to
+   differ (see area-titlebar.ts). Only the titlebars read these; the banners
+   below them stay on the theme accent, so the page keeps one colour story.
+   Diary follows the theme's own accent because it is the page's default
+   subject; Journals borrows --ca-ev-blue rather than introducing a ninth hue,
+   so it is already tuned for legibility against both themes. The -rgb pairs
+   exist because the bars tint with rgba() at low alpha.
+
+   ON `body`, NOT IN `:root`, AND THAT IS THE WHOLE OF 3.6 PATCH 1.
+
+   Obsidian defines `--interactive-accent` on `body`. These two tokens are the
+   only ones in this file that read a THEME variable rather than declaring a
+   literal, and a custom property is substituted where it is DECLARED, not
+   where it is used. Declared in `:root` — which is `html`, one level ABOVE
+   `body` — `var(--interactive-accent)` had nothing to resolve against, so
+   `--ca-area-diary` computed to the guaranteed-invalid value and every
+   descendant inherited that, because custom properties inherit their computed
+   value rather than their declaration.
+
+   What that looked like is worse than it sounds, and it is why it survived
+   four releases: it fails SILENTLY and DIFFERENTLY per property. A
+   `color: var(--ca-area-diary)` falls back to the inherited text colour, so
+   the DIARY eyebrow simply looked grey — a styling opinion, not a defect. A
+   `border-left: 3px solid var(--ca-area-diary)` is invalid at computed-value
+   time as a whole shorthand, so it unsets to `border-left-style: none` and the
+   overview card's accent edge — the species marker 3.2 exists for — did not
+   paint at all. Nothing errors; one rule looks like a choice and the other
+   looks like it was never written.
+
+   The `-rgb` pairs hid it further. They carry a literal fallback, so they kept
+   working — at the fallback, meaning every tint in the plugin has been showing
+   Obsidian's DEFAULT accent rather than the reader's, and a reader on the
+   default accent could not have told the difference.
+
+   The fix is the declaration site, not a fallback. A fallback here would be a
+   second hardcoded hue that silently wins whenever the real lookup breaks,
+   which is the same failure with the evidence removed. */
+body {
+  /* ── EVERY TOKEN THAT NAMES A THEME COLOUR LIVES HERE (4.42) ───────────
+     NOT A STYLE CHOICE. Obsidian declares its colours on `body` — `.theme-dark`
+     and `.theme-light` are classes on `body` — and a custom property's `var()`
+     references are substituted on the element that DECLARES it, not on the
+     element that uses it. A theme colour aliased on `:root` therefore resolves
+     against the `html` element, which has never had one, and the token is
+     invalid for everything that inherits it.
+
+     That is the fault behind three releases of white card borders, and it is not
+     specific to `color-mix`: a lone `var(--background-secondary)` on `:root` is
+     wrong for exactly the same reason. `tokens.test.ts` refuses any `:root`
+     token that reads a variable `:root` does not itself define, so this cannot
+     drift back one alias at a time. */
+
+  /* Surface depth hierarchy & Frames (4.24 §1) */
+  --ca-surface-card: var(--background-secondary);
+  --ca-surface-raised: var(--background-secondary-alt);
+  --ca-surface-inset: var(--background-primary-alt);
+
+  /* Subtle border & edge */
+  --ca-border-subtle: var(--background-modifier-border);
+  --ca-border-hover: var(--background-modifier-border-hover);
+  --ca-border-focus: var(--interactive-accent);
+
+  /* Header-bar and section-title ink */
+  --ca-bar-ink: var(--text-muted);
+  --ca-sec-title-ink: var(--text-normal);
+  --ca-area-diary: var(--interactive-accent);
+  --ca-area-diary-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+  --ca-area-journals: var(--ca-ev-blue);
+  --ca-area-journals-rgb: 74, 143, 212;
+  --ca-surface-accent-subtle: color-mix(
+    in srgb,
+    var(--interactive-accent) 6%,
+    var(--background-secondary)
+  );
+
+  /* ── THE TWO ARRANGEMENTS, AS WASHES (5.28) ──────────────────────────
+     The section editor draws one card for every block holding more than one
+     section, and there are two kinds of those: a GROUP, whose members sit
+     beside each other as columns, and a STACK, whose members sit under each
+     other as bands. The card said which in a word and in nothing else.
+
+     TWO HUES, AND THE ACCENT IS THE GROUP'S because a group is the older and
+     commoner of the two — a reader who has never made a stack sees the colour
+     their theme already uses everywhere. The stack borrows `--ca-ev-teal` for
+     `--ca-area-journals`' reason one section up: an event swatch is already
+     tuned to stay legible in both themes, so this introduces no ninth hue and
+     no new judgement about contrast.
+
+     MIXED INTO THE CARD'S OWN GROUND rather than laid over it at an alpha. The
+     wash is one end of a gradient whose other end IS `--background-primary-alt`,
+     and a translucent end would let whatever is behind the card through at that
+     end only — a wash that changed with the pane rather than with the card.
+
+     AND THE COLOUR IS THE THIRD CUE, NEVER THE ONLY ONE. The card names itself
+     in words on its bar and its button, and the gradient's DIRECTION says the
+     same thing again — see `.ca-tpl-block.is-stack`. A reader who cannot
+     separate the two hues, or whose accent happens to be teal, has lost nothing
+     but a convenience. */
+  --ca-tpl-group-wash: color-mix(
+    in srgb,
+    var(--interactive-accent) 12%,
+    var(--background-primary-alt)
+  );
+  --ca-tpl-stack-wash: color-mix(
+    in srgb,
+    var(--ca-ev-teal) 15%,
+    var(--background-primary-alt)
+  );
+
+  /* Active Grain and Journal Context Tokens (4.80) */
+  --ca-grain-accent: var(--interactive-accent);
+  --ca-grain-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+  --ca-grain-tint: rgba(var(--ca-grain-accent-rgb), 0.08);
+  --ca-grain-spine: var(--ca-grain-accent);
+  --ca-journal-accent: var(--interactive-accent);
+  --ca-journal-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+
+  /* Editorial Monastic Presets */
+  --ca-preset-editorial-bg: #1a1815;
+  --ca-preset-editorial-card: #24201c;
+  --ca-preset-editorial-raised: #2e2a25;
+  --ca-preset-editorial-inset: #1e1b18;
+  --ca-preset-editorial-border: rgba(214, 188, 153, 0.22);
+  --ca-preset-editorial-border-inner: rgba(214, 188, 153, 0.12);
+  --ca-preset-editorial-bg-light: #f7f3eb;
+  --ca-preset-editorial-card-light: #ffffff;
+  --ca-preset-editorial-raised-light: #ede6d8;
+  --ca-preset-editorial-inset-light: #f0ebd9;
+  --ca-preset-editorial-border-light: rgba(139, 111, 71, 0.25);
+  --ca-preset-editorial-border-inner-light: rgba(139, 111, 71, 0.15);
+
+  /* Technical HUD Presets */
+  --ca-preset-technical-bg: #0b0e14;
+  --ca-preset-technical-card: #131822;
+  --ca-preset-technical-raised: #1a202c;
+  --ca-preset-technical-inset: #0f141c;
+  --ca-preset-technical-border: #263040;
+  --ca-preset-technical-border-inner: rgba(255, 255, 255, 0.1);
+  --ca-preset-technical-slot-edge: rgba(88, 166, 255, 0.35);
+  --ca-preset-technical-bg-light: #edf2f7;
+  --ca-preset-technical-card-light: #ffffff;
+  --ca-preset-technical-raised-light: #e2e8f0;
+  --ca-preset-technical-inset-light: #e6ecf2;
+  --ca-preset-technical-border-light: #94a3b8;
+  --ca-preset-technical-border-inner-light: rgba(0, 0, 0, 0.08);
+
+  /* ── PAGE-GROUND INK (4.80) ─────────────────────────────────────────────
+     Seven values and two noise fields carry all nineteen grounds in
+     `12-grounds.css`. A ground is a base colour it does not set, a film of
+     gradients drawn from these, and one shared grain layer.
+
+     DARK IS THE BASE HERE, like every other pair in this file, and
+     `body.theme-light` at the foot of the file carries the twin. The numbers
+     are not one sign flip apart: a 7.5% white hairline over a near-black note
+     and a 7.5% black one over a near-white note are the same measurement and
+     not the same line, which is the argument the edge-highlight pair already
+     makes two hundred lines up.
+
+     THE ACCENT IS A MIX OVER A THEME COLOUR, which is the whole reason this
+     block is `body` and not `:root` — see the header of this rule. */
+  --ca-tex-ink: rgba(214, 228, 242, 0.075);
+  --ca-tex-ink-2: rgba(214, 228, 242, 0.15);
+  --ca-tex-fill: rgba(214, 228, 242, 0.05);
+  --ca-tex-shade: rgba(0, 0, 0, 0.34);
+  --ca-tex-hi: rgba(214, 228, 242, 0.13);
+  --ca-tex-accent: color-mix(in srgb, var(--interactive-accent) 26%, transparent);
+
+  /* The grain every ground wears, and the one thing that stops a gradient
+     pattern reading as clip art. Theme-independent: it is greyscale noise
+     composited in `overlay`, so it lightens a dark ground and darkens a light
+     one from the same bytes.
+
+     A DATA URI AND NOT A FILE, so nothing ships in `assets/` and neither
+     `scaffold.ts` nor `tools/package.mjs` gains an entry for a background. */
+  --ca-tex-grain: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='200' height='200' filter='url(%23g)' opacity='0.4'/></svg>");
+}
+
+/* NO TOKEN IN THIS FILE DIFFERS BY THEME ANY MORE (4.13.1 §3b). The one that did
+   was `--ca-band-recess`, and it is deleted with the bands it sank.
+
+   THE RULE IT LEAVES BEHIND IS THE POINT, AND IT IS WHY THIS COMMENT STAYS:
+   anything theme-specific goes BELOW this line, after `:root` closes, and never
+   as a `.theme-light {` opened partway through the block. That is how 2.51.5
+   shipped — it closed `:root` early and swept the type scale, the mood palette,
+   the activity ramp and the event palette into the light-theme rule with it, so
+   every one of them went undefined on a dark theme: the study heatmap lost its
+   greens, the calendar its mood dots, the events their hues. The next
+   theme-specific token goes here. */
+body.theme-light {
+  --ca-edge-highlight: rgba(0, 0, 0, 0.03);
+  /* DARKER, AND STRONGER THAN THE DARK TWIN. A 6% white hair over a near-black
+     card is a visible step; 6% black over a near-white one is not — the eye's
+     response to a light increment on a dark ground is not the response to a dark
+     increment on a light one, which is why every pair in this file is two numbers
+     rather than one sign flip. */
+  --ca-border-inner: rgba(0, 0, 0, 0.09);
+  /* Darker rather than lighter, and slightly stronger: an 0.07 white hair over a
+     near-white card is invisible, and the slot has to be findable to be pressed. */
+  --ca-slot-edge: rgba(0, 0, 0, 0.1);
+  --ca-surface-accent-subtle: color-mix(
+    in srgb,
+    var(--interactive-accent) 5%,
+    var(--background-secondary)
+  );
+  /* Weaker on a light ground, which is this file's rule for every pair in it:
+     a tint that reads as a wash over a near-black card reads as a fill over a
+     near-white one, and the card has to stay a card. */
+  --ca-tpl-group-wash: color-mix(
+    in srgb,
+    var(--interactive-accent) 9%,
+    var(--background-primary-alt)
+  );
+  --ca-tpl-stack-wash: color-mix(
+    in srgb,
+    var(--ca-ev-teal) 12%,
+    var(--background-primary-alt)
+  );
+
+  /* ── PAGE-GROUND INK, LIGHT (4.80) ──────────────────────────────────────
+     Ink goes dark and the highlight goes white, and neither is the dark value
+     negated. `--ca-tex-shade` is the pair that moves furthest: on a dark note a
+     weave's shadow side is 34% black over near-black and still reads as a
+     shadow, while 34% black over parchment is a stain. */
+  --ca-tex-ink: rgba(46, 52, 62, 0.075);
+  --ca-tex-ink-2: rgba(46, 52, 62, 0.15);
+  --ca-tex-fill: rgba(46, 52, 62, 0.045);
+  --ca-tex-shade: rgba(46, 52, 62, 0.07);
+  --ca-tex-hi: rgba(255, 255, 255, 0.66);
+}

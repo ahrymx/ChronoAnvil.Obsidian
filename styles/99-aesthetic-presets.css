@@ -1,0 +1,333 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * Copyright (C) 2026 AhryMX <contact@ahrymx.dev>
+ *
+ * Licensed under the GNU Affero General Public License v3.0 or later, with
+ * attribution and naming terms under its section 7. See LICENSE and
+ * LICENSING.md.
+ */
+
+/* ============================================================
+ *  ChronoAnvil Aesthetic Presets & Grain Accents (4.80)
+ *  Presets: Modern Fluent (Default), Editorial Monastic, Technical HUD
+ * ============================================================ */
+
+/* --- Grain Context Binding ---------------------------------- */
+[data-ca-grain="daily"],
+.ca-journal-page-head[data-ca-grain="daily"],
+.ca-vault-banner[data-ca-grain="daily"] {
+  --ca-grain-accent: var(--ca-grain-daily);
+  --ca-grain-accent-rgb: var(--ca-grain-daily-rgb);
+  --ca-grain-tint: rgba(var(--ca-grain-daily-rgb), 0.08);
+  --ca-grain-spine: var(--ca-grain-daily);
+}
+
+[data-ca-grain="weekly"],
+.ca-journal-page-head[data-ca-grain="weekly"],
+.ca-vault-banner[data-ca-grain="weekly"] {
+  --ca-grain-accent: var(--ca-grain-weekly);
+  --ca-grain-accent-rgb: var(--ca-grain-weekly-rgb);
+  --ca-grain-tint: rgba(var(--ca-grain-weekly-rgb), 0.08);
+  --ca-grain-spine: var(--ca-grain-weekly);
+}
+
+[data-ca-grain="monthly"],
+.ca-journal-page-head[data-ca-grain="monthly"],
+.ca-vault-banner[data-ca-grain="monthly"] {
+  --ca-grain-accent: var(--ca-grain-monthly);
+  --ca-grain-accent-rgb: var(--ca-grain-monthly-rgb);
+  --ca-grain-tint: rgba(var(--ca-grain-monthly-rgb), 0.08);
+  --ca-grain-spine: var(--ca-grain-monthly);
+}
+
+[data-ca-quarterly="quarterly"],
+[data-ca-grain="quarterly"],
+.ca-journal-page-head[data-ca-grain="quarterly"],
+.ca-vault-banner[data-ca-grain="quarterly"] {
+  --ca-grain-accent: var(--ca-grain-quarterly);
+  --ca-grain-accent-rgb: var(--ca-grain-quarterly-rgb);
+  --ca-grain-tint: rgba(var(--ca-grain-quarterly-rgb), 0.08);
+  --ca-grain-spine: var(--ca-grain-quarterly);
+}
+
+[data-ca-grain="yearly"],
+.ca-journal-page-head[data-ca-grain="yearly"],
+.ca-vault-banner[data-ca-grain="yearly"] {
+  --ca-grain-accent: var(--ca-grain-yearly);
+  --ca-grain-accent-rgb: var(--ca-grain-yearly-rgb);
+  --ca-grain-tint: rgba(var(--ca-grain-yearly-rgb), 0.08);
+  --ca-grain-spine: var(--ca-grain-yearly);
+}
+
+[data-ca-journal],
+.ca-journal-page-head[data-ca-journal],
+.ca-vault-banner[data-ca-journal] {
+  --ca-grain-accent: var(--ca-journal-accent);
+  --ca-grain-accent-rgb: var(--ca-journal-accent-rgb);
+  --ca-grain-tint: rgba(var(--ca-journal-accent-rgb), 0.08);
+  --ca-grain-spine: var(--ca-journal-accent);
+}
+
+/* --- Grain Intensity Modifiers ------------------------------- */
+body.ca-grain-monochrome {
+  --ca-grain-accent: var(--interactive-accent);
+  --ca-grain-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+  --ca-grain-tint: rgba(var(--interactive-accent-rgb, 138, 92, 245), 0.05);
+  --ca-grain-spine: var(--interactive-accent);
+  --ca-journal-accent: var(--interactive-accent);
+  --ca-journal-accent-rgb: var(--interactive-accent-rgb, 138, 92, 245);
+}
+
+body.ca-grain-subtle {
+  --ca-grain-tint: rgba(var(--ca-grain-accent-rgb), 0.03);
+}
+
+/* --- Micro-Spine & Eyebrow Accents on Page Head & Banner ----
+
+   THE PAGE HEAD'S EIGHT SELECTORS ARE GONE FROM HERE (5.31.2), and this is where
+   the argument for that has to sit, because this is where the defect was.
+
+   Two rules stood here: the head's spine, gutter and wash, and its eyebrow
+   colour, each written four ways — `[data-ca-grain]` and `[data-ca-journal]`,
+   on the head and on an ancestor. Every one of them was a GATE. A page head
+   whose note is neither a grain nor a journal matched none of the eight and
+   drew none of it, which is six pages of this vault: the Homepage, Search, the
+   Diary folder note, the Logbook, and the journals root's own folder note.
+
+   BOTH RULES ARE NOW UNCONDITIONAL, IN `98-page-head.css`, WHERE THE HEAD IS.
+   What is left here is what this file is actually for: binding
+   `--ca-grain-accent`, `--ca-grain-tint` and `--ca-grain-spine` to a grain or a
+   journal. A custom property inherits, so the bindings above reach the head
+   whether they landed on it or on an ancestor — which is what the four
+   descendant selectors were doing by hand, and one reason there were eight
+   rules for one idea.
+
+   The vault banner's own accent stays, because it is one rule and it really is
+   conditional: a border-top the banner takes only where a grain is known. */
+.ca-vault-banner[data-ca-grain],
+.ca-vault-banner[data-ca-journal],
+[data-ca-grain] .ca-vault-banner,
+[data-ca-journal] .ca-vault-banner {
+  border-top: 2px solid var(--ca-grain-spine);
+}
+
+/* Accents on Task Buckets and Telemetry */
+[data-ca-grain] .ca-jtt-bucket-head,
+[data-ca-journal] .ca-jtt-bucket-head {
+  background: var(--ca-grain-tint);
+  color: var(--ca-grain-accent);
+}
+
+[data-ca-grain] .ca-stat-ring-val,
+[data-ca-journal] .ca-stat-ring-val {
+  stroke: var(--ca-grain-accent);
+}
+
+/* Section Card Surface Propagation */
+.ca-journal-sec-block {
+  background: var(--ca-surface-card);
+  border-left-color: var(--ca-border-subtle);
+  border-right-color: var(--ca-border-subtle);
+}
+.ca-journal-sec-block.is-first {
+  border-top-color: var(--ca-border-subtle);
+}
+.ca-journal-sec-block.is-last {
+  border-bottom-color: var(--ca-border-subtle);
+}
+
+.ca-stat {
+  background: var(--ca-surface-card);
+}
+.ca-stats {
+  background: var(--ca-border-subtle);
+}
+
+/* Sunken / Inset Input Surfaces (prevents washed out punchouts) */
+.ca-input,
+.ca-search-input,
+.ca-journal-tracker-input,
+.ca-journal-scale-note-input {
+  background: var(--ca-surface-inset);
+  border: 1px solid var(--ca-border-subtle);
+  color: var(--text-normal);
+}
+
+/* ============================================================
+ *  Preset 2: Editorial Monastic (Candidate 2)
+ *  Classical serif typography, warm parchment borders, crisp seams
+ * ============================================================ */
+body.ca-preset-editorial {
+  --ca-font-heading: var(--font-serif, "Lora", "Georgia", "Merriweather", "Cambria", serif);
+  --ca-radius-xs: 2px;
+  --ca-radius-sm: 4px;
+  --ca-radius-md: 6px;
+  --ca-radius-pill: 4px;
+}
+
+body.ca-preset-editorial .ca-jph-title,
+body.ca-preset-editorial .ca-sec-title,
+body.ca-preset-editorial .ca-bar-title,
+body.ca-preset-editorial .callout-title,
+body.ca-preset-editorial .ca-vb-title,
+body.ca-preset-editorial .ca-vb-crumb,
+body.ca-preset-editorial .ca-jtt-bucket-title,
+body.ca-preset-editorial .ca-journal-task-main {
+  font-family: var(--ca-font-heading);
+}
+
+/* A LIGHTER SPINE, SET AS THE TOKEN RATHER THAN AS A BORDER WIDTH (5.31.2).
+   `border-left-width: 2px` reached the border and not the rule beneath it, so
+   under this preset the head's bottom rule went on being pulled back by 3px and
+   overhung the spine by one. The token is read by both — see `--ca-head-spine`
+   in `00-tokens.css` — and the four gated selectors collapse to the body class
+   for the same reason the spine's own rule did. */
+body.ca-preset-editorial {
+  --ca-head-spine: 2px;
+}
+
+body.theme-dark.ca-preset-editorial {
+  --background-primary: var(--ca-preset-editorial-bg);
+  --background-primary-alt: var(--ca-preset-editorial-inset);
+  --background-secondary: var(--ca-preset-editorial-card);
+  --background-secondary-alt: var(--ca-preset-editorial-raised);
+  --background-modifier-border: var(--ca-preset-editorial-border);
+  --ca-surface-card: var(--ca-preset-editorial-card);
+  --ca-surface-raised: var(--ca-preset-editorial-raised);
+  --ca-surface-inset: var(--ca-preset-editorial-inset);
+  --ca-border-subtle: var(--ca-preset-editorial-border);
+  --ca-border-inner: var(--ca-preset-editorial-border-inner);
+}
+
+body.theme-light.ca-preset-editorial {
+  --background-primary: var(--ca-preset-editorial-bg-light);
+  --background-primary-alt: var(--ca-preset-editorial-inset-light);
+  --background-secondary: var(--ca-preset-editorial-card-light);
+  --background-secondary-alt: var(--ca-preset-editorial-raised-light);
+  --background-modifier-border: var(--ca-preset-editorial-border-light);
+  --ca-surface-card: var(--ca-preset-editorial-card-light);
+  --ca-surface-raised: var(--ca-preset-editorial-raised-light);
+  --ca-surface-inset: var(--ca-preset-editorial-inset-light);
+  --ca-border-subtle: var(--ca-preset-editorial-border-light);
+  --ca-border-inner: var(--ca-preset-editorial-border-inner-light);
+}
+
+body.ca-preset-editorial .workspace-leaf-content[data-type="markdown"],
+body.ca-preset-editorial .markdown-reading-view,
+body.ca-preset-editorial .markdown-preview-view {
+  background-color: var(--background-primary);
+}
+
+body.ca-preset-editorial .ca-vault-banner {
+  background-color: var(--ca-surface-card);
+  border-bottom: 1px solid var(--ca-border-subtle);
+}
+
+body.ca-preset-editorial .ca-vb-tile {
+  background-color: var(--ca-surface-raised);
+  border: 1px solid var(--ca-border-subtle);
+}
+
+body.ca-preset-editorial .ca-journal-mood-face.is-selected,
+body.ca-preset-editorial .ca-journal-scale-face.is-selected {
+  background-color: var(--ca-surface-raised);
+  border-color: var(--ca-grain-accent);
+}
+
+/* ============================================================
+ *  Preset 3: Technical HUD (Candidate 3)
+ *  High-contrast telemetry, monospace figures, angular corners
+ * ============================================================ */
+body.ca-preset-technical {
+  --ca-font-telemetry: var(--font-monospace, "JetBrains Mono", "Fira Code", monospace);
+  --ca-radius-xs: 1px;
+  --ca-radius-sm: 2px;
+  --ca-radius-md: 4px;
+  --ca-radius-pill: 2px;
+}
+
+body.ca-preset-technical .ca-jph-title,
+body.ca-preset-technical .ca-sec-title,
+body.ca-preset-technical .ca-bar-title,
+body.ca-preset-technical .callout-title,
+body.ca-preset-technical .ca-stat-val,
+body.ca-preset-technical .ca-stat-label,
+body.ca-preset-technical .ca-journal-task-main,
+body.ca-preset-technical .ca-jtt-tag,
+body.ca-preset-technical .ca-jtt-prio,
+body.ca-preset-technical .ca-jtt-bucket-title,
+body.ca-preset-technical .ca-vb-title,
+body.ca-preset-technical .ca-vb-crumb,
+body.ca-preset-technical .ca-vb-tile,
+body.ca-preset-technical .ca-btn {
+  font-family: var(--ca-font-telemetry);
+}
+
+/* Stated rather than inherited, and it is the default value (5.31.2). This preset
+   is the one that would widen it if any did, and a number written down is what
+   makes the editorial override above readable as a departure from something. */
+body.ca-preset-technical {
+  --ca-head-spine: 3px;
+}
+
+body.theme-dark.ca-preset-technical {
+  --background-primary: var(--ca-preset-technical-bg);
+  --background-primary-alt: var(--ca-preset-technical-inset);
+  --background-secondary: var(--ca-preset-technical-card);
+  --background-secondary-alt: var(--ca-preset-technical-raised);
+  --background-modifier-border: var(--ca-preset-technical-border);
+  --ca-surface-card: var(--ca-preset-technical-card);
+  --ca-surface-raised: var(--ca-preset-technical-raised);
+  --ca-surface-inset: var(--ca-preset-technical-inset);
+  --ca-border-subtle: var(--ca-preset-technical-border);
+  --ca-border-inner: var(--ca-preset-technical-border-inner);
+  --ca-slot-edge: var(--ca-preset-technical-slot-edge);
+}
+
+body.theme-light.ca-preset-technical {
+  --background-primary: var(--ca-preset-technical-bg-light);
+  --background-primary-alt: var(--ca-preset-technical-inset-light);
+  --background-secondary: var(--ca-preset-technical-card-light);
+  --background-secondary-alt: var(--ca-preset-technical-raised-light);
+  --background-modifier-border: var(--ca-preset-technical-border-light);
+  --ca-surface-card: var(--ca-preset-technical-card-light);
+  --ca-surface-raised: var(--ca-preset-technical-raised-light);
+  --ca-surface-inset: var(--ca-preset-technical-inset-light);
+  --ca-border-subtle: var(--ca-preset-technical-border-light);
+  --ca-border-inner: var(--ca-preset-technical-border-inner-light);
+}
+
+body.ca-preset-technical .workspace-leaf-content[data-type="markdown"],
+body.ca-preset-technical .markdown-reading-view,
+body.ca-preset-technical .markdown-preview-view {
+  background-color: var(--background-primary);
+}
+
+body.ca-preset-technical .ca-vault-banner {
+  background-color: var(--ca-surface-card);
+  border-bottom: 1px solid var(--ca-border-subtle);
+}
+
+body.ca-preset-technical .ca-vb-tile {
+  background-color: var(--ca-surface-raised);
+  border: 1px solid var(--ca-border-subtle);
+}
+
+body.ca-preset-technical .ca-journal-sec-block,
+body.ca-preset-technical .callout[data-callout="note"],
+body.ca-preset-technical .ca-journal-calendar,
+body.ca-preset-technical .ca-stat {
+  border-radius: 4px;
+}
+
+body.ca-preset-technical .ca-btn,
+body.ca-preset-technical .ca-jtt-prio,
+body.ca-preset-technical .ca-jtt-tag {
+  border-radius: 2px;
+}
+
+body.ca-preset-technical .ca-journal-mood-face.is-selected,
+body.ca-preset-technical .ca-journal-scale-face.is-selected {
+  background-color: var(--ca-surface-raised);
+  border-color: var(--ca-grain-accent);
+}

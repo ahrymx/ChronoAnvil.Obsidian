@@ -1,0 +1,817 @@
+/* ── Journal trend (`journal-chart`, and its `confidence-trend` preset) ───
+   A single line, drawn outside the chart system (see renderJournalTrend), so
+   it borrows the chart body's canvas rules without the grid or the tile
+   chrome around them. `.journal-confidence-trend` is still emitted by the
+   preset spelling so a CSS snippet written against it keeps working. */
+.ca-journal-trend {
+  margin: 0;
+}
+.ca-journal-trend .ca-journal-chart-body {
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+}
+/* Only present when the directive names a tracker (or carries an explicit
+   label). The preset stays untitled: it sits under a header bar in the shipped
+   Topic template, and a second title there would stutter. */
+.ca-journal-trend-title {
+  font-size: var(--ca-text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+/* ── Review queue ─────────────────────────────────────────────────────────
+   A short list of notes worth reopening. Rows rather than a table: there are
+   only two things to say per item (which note, how cold) and a table would
+   spend a header row saying so. The check button is the whole interaction, so
+   it keeps a fixed slot on the right rather than appearing on hover — this is
+   the one control on the page you came here to press. */
+.ca-journal-review-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ca-jrq-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  overflow: hidden;
+}
+.ca-jrq-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  background: var(--background-secondary);
+  border-top: 1px solid var(--background-modifier-border);
+}
+.ca-jrq-row:first-child {
+  border-top: none;
+}
+.ca-jrq-row:hover {
+  background: var(--background-modifier-hover);
+}
+.ca-jrq-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.ca-jrq-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Deliberately muted, and deliberately the same muted at any lateness. A row
+   that reddens as it ages turns a prompt into a reproach — see the design note
+   in review-queue.ts. */
+.ca-jrq-meta {
+  font-size: var(--ca-text-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ca-jrq-done {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: var(--ca-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.ca-jrq-done:hover:not(:disabled) {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.ca-jrq-done:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ca-jrq-done .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.ca-jrq-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+}
+/* THIS RULE MOVED TO `91-card-surface.css` IN 4.13 §2, and the move is the whole
+   release in miniature. It said — correctly — that inside a section card the box
+   is a box-in-a-box and the card is the edge, and it said it for ONE widget while
+   every callout beside it kept its own. So the journals dashboard drew both
+   answers at once, and this was the one that read right.
+   It is now one rule covering every empty state and both kinds of section card:
+   this variant only ever handled `.ca-journal-sec-block`, so a review queue inside a
+   `frame: section` still drew its dashed box. */
+.ca-jrq-empty-icon {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+.ca-jrq-empty-icon .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.ca-jrq-more {
+  font-size: var(--ca-text-xs);
+  color: var(--text-faint);
+}
+
+/* ── Journal breakdown ────────────────────────────────────────────────────
+   Weakest-first bars. Horizontal rather than vertical because the labels are
+   folder names of arbitrary length, and a vertical bar chart with six topic
+   names under it is six rotated labels. The bar is a plain fill with no axis:
+   the number is printed at the end of the row, so an axis would be a second
+   way of reading the same value. */
+.ca-journal-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ca-jbd-title {
+  font-size: var(--ca-text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.ca-jbd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ca-jbd-row {
+  display: grid;
+  grid-template-columns: minmax(6em, 11em) 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+.ca-jbd-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ca-text-sm);
+}
+.ca-jbd-track {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+/* One colour at every value. A bar that reddens as it drops turns a ranking
+   into a scolding, which is the same objection review-queue.ts makes to an
+   overdue counter — and the ranking already puts the worst one at the top, so
+   colour would be a second, louder way of saying what the order says. */
+.ca-jbd-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: var(--interactive-accent);
+}
+.ca-jbd-value {
+  font-size: var(--ca-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  min-width: 3.5em;
+  text-align: right;
+}
+
+/* ── Journal search ───────────────────────────────────────────────────────
+   The journals' counterpart to `diary-search`. Rows rather than the diary's
+   date-gutter layout: a journal result is located by its crumb trail, not by
+   when it was written, and half of them have no date at all. */
+.ca-jjs-search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ca-jjs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  background: var(--background-secondary);
+}
+.ca-jjs-bar:focus-within {
+  border-color: var(--interactive-accent);
+}
+.ca-jjs-icon {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+.ca-jjs-icon .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.ca-jjs-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  padding: 2px 0;
+  box-shadow: none;
+}
+.ca-jjs-input:focus {
+  box-shadow: none;
+  outline: none;
+}
+.ca-jjs-hint {
+  font-size: var(--ca-text-xs);
+  color: var(--text-faint);
+}
+.ca-jjs-status {
+  font-size: var(--ca-text-xs);
+  color: var(--text-muted);
+}
+.ca-jjs-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ca-jjs-row {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--ca-radius-sm);
+}
+.ca-jjs-row:hover {
+  background: var(--background-modifier-hover);
+}
+.ca-jjs-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.ca-jjs-title {
+  font-weight: 600;
+}
+/* Where the hit lives. On a page this names the lesson it belongs to, so a
+   match three pages into a long lesson says which lesson without being
+   opened — the crumb trail doing the job pages made necessary. */
+.ca-jjs-crumbs {
+  font-size: var(--ca-text-xs);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ca-jjs-snippet {
+  font-size: var(--ca-text-sm);
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.ca-jjs-snippet-key {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-modifier-border);
+  color: var(--text-faint);
+  font-size: var(--ca-text-xs);
+}
+.ca-jjs-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--ca-text-xs);
+  color: var(--text-faint);
+}
+.ca-jjs-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.ca-jjs-fact-icon .svg-icon {
+  width: 12px;
+  height: 12px;
+}
+.ca-jjs-fact-kind {
+  text-transform: lowercase;
+}
+.ca-jjs-fact-tag {
+  color: var(--text-accent);
+}
+
+/* ── Recent notes (4.70) ──────────────────────────────────────────────────
+   `journal-recent` — the journals' answer to `timeline`. A ROW PER NOTE, and
+   the row is `.ca-jrq-row`'s proportions rather than `.jjs-result`'s: a search
+   result carries a snippet and needs the height for it, and this carries a
+   title and one line of facts, which is what the review queue's row is.
+
+   Two columns, not the queue's three: nothing here is actionable, so there is
+   no button on the right and the title takes the width the button would have
+   had. That is the whole difference between "what is due" and "what happened",
+   drawn. */
+.ca-journal-recent {
+  display: flex;
+  flex-direction: column;
+}
+.ca-jrn-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 12px;
+  background: var(--background-secondary);
+  border-top: 1px solid var(--background-modifier-border);
+}
+.ca-jrn-row:first-child {
+  border-top: none;
+}
+.ca-jrn-row:hover {
+  background: var(--background-modifier-hover);
+}
+.ca-jrn-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* WRAPS, WHERE THE QUEUE'S META TRUNCATES. A queue row's meta is a due date
+   and the first words are the ones that matter; these facts are a journal, a
+   container, a date and a rating, and the rating is last — clipping the line
+   in a narrow column would drop exactly the fact the reader came for. */
+.ca-jrn-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--ca-text-xs);
+  color: var(--text-faint);
+}
+.ca-jrn-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.ca-jrn-fact-icon .svg-icon {
+  width: 12px;
+  height: 12px;
+}
+/* The journal and the container, which are the two facts that say WHERE — set
+   apart from the date and the rating, which say what. */
+.ca-jrn-where {
+  color: var(--text-muted);
+}
+
+/* ── Recall cards ─────────────────────────────────────────────────────────
+   Question/answer cards with the answer behind a reveal. Cards rather than
+   rows: a row is for scanning a list, and the one thing this widget must not
+   let you do is take in the answer while reading the question. So each card is
+   a bounded block with the answer occupying space only once you have asked for
+   it, and the grade buttons appear in that same space rather than sitting
+   permanently on the right where they could be pressed by reflex. */
+.ca-journal-recall {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  padding: 10px 12px;
+  margin: 0 0 0.9em;
+  gap: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.ca-journal-sec-block .ca-journal-recall,
+.ca-journal-sec-block.ca-journal-recall {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* ── THE RECALL HEAD IS THE SECTION'S (5.10) ───────────────────────────
+ *
+ * Forty lines stood here: a private fold bar for the Recall widget with the
+ * chevron on the LEFT, an uppercase micro-label and no hairline, plus a
+ * `.ca-journal-sec-block .ca-journal-recall-head { display: none }` rule to
+ * take it away again wherever the `recall` section's own `header:🧠 Recall`
+ * bar was already drawing one. A bar built in TypeScript so that CSS could
+ * unbuild it is two mechanisms disagreeing about one object.
+ *
+ * The section bar is the head. What is left below is the widget: a label slot
+ * for a bare `recall:` fence that nothing else names, and its tools. */
+/* AND IN 5.14 THE LABEL SLOT WENT TOO. What 5.10 left standing was a head for
+   the bare `recall:` case — the last private one on this widget — and the field
+   frame is that head for every kind at once. `fieldHead` in note-field.ts is
+   where the two branches this comment describes now live, stated once. */
+/* AND THE TOOLS WRAPPER WENT WITH IT (5.14). Its two jobs were a 4px gap and
+   `margin-left: auto`, and `.ca-journal-header-widgets` — the slot the frame
+   already anchors to the right of every head — does both. A second auto margin
+   inside the first is the stranding failure 30-header-bars.css documents. */
+.ca-jrc-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--ca-radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.ca-jrc-tool:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ca-jrc-tool.is-active {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+.ca-jrc-tool .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.ca-jrc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ca-jrc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  background: var(--background-secondary);
+}
+/* The only colour in the widget, and it marks what you said rather than how
+   you are doing. There is no running colour on the tally line for the same
+   reason the review queue does not redden with lateness — see review-queue.ts. */
+.ca-jrc-card.is-got {
+  border-left-color: var(--color-green, var(--interactive-accent));
+}
+.ca-jrc-card.is-missed {
+  border-left-color: var(--color-orange, var(--text-faint));
+}
+.ca-jrc-q {
+  font-weight: 600;
+  line-height: 1.4;
+}
+.ca-jrc-a {
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding-top: 6px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.ca-jrc-reveal {
+  align-self: flex-start;
+  padding: 4px 10px;
+  font-size: var(--ca-text-xs);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+}
+.ca-jrc-reveal:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ca-jrc-grade {
+  display: flex;
+  gap: 6px;
+}
+.ca-jrc-grade button {
+  padding: var(--ca-space-2) var(--ca-space-6);
+  font-size: var(--ca-text-xs);
+  border-radius: var(--ca-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  box-shadow: none;
+}
+.ca-jrc-got:hover {
+  border-color: var(--color-green, var(--interactive-accent));
+  color: var(--color-green, var(--interactive-accent));
+}
+.ca-jrc-missed:hover {
+  border-color: var(--color-orange, var(--text-muted));
+  color: var(--color-orange, var(--text-muted));
+}
+.ca-jrc-verdict {
+  font-size: var(--ca-text-xs);
+  color: var(--text-faint);
+}
+/* The recall deck's empty state. Its box moved to the info card in 4.13 §2 —
+   this was the last 1px-dashed empty state in the tree, and 4.11's own inventory
+   had missed it while deleting three others exactly like it. Only the type and
+   the ink stay here; the edge, the ground and the padding come from
+   `91-card-surface.css` with everything else that stands in for a widget. */
+.ca-jrc-empty {
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+}
+.ca-jrc-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ca-jrc-edit-q,
+.ca-jrc-edit-a {
+  flex: 1 1 50%;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: var(--ca-text-sm);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+.ca-jrc-edit-q {
+  font-weight: 600;
+}
+.ca-jrc-edit-del {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--ca-radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  box-shadow: none;
+}
+.ca-jrc-edit-del:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-error, var(--text-normal));
+}
+.ca-jrc-edit-del .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+.ca-jrc-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--ca-text-xs);
+  color: var(--text-muted);
+}
+/* Where the grades land. Only shown when it isn't this note — on a page, which
+   carries no rating of its own. */
+.ca-jrc-target {
+  color: var(--text-faint);
+}
+.ca-jrc-inert {
+  font-style: italic;
+}
+
+/* ── The topic stats band STOOD HERE AND IS GONE (4.46) ───────────────────
+   Fifty-five declarations drawing `.journal-topic-stats` and four `.jts-*`
+   children: a grid of four, a border, a radius, an overflow clip, per-cell
+   left borders, and a `@container (max-width: 520px)` fold with two more rules
+   to unpick those borders on the second row.
+
+   EVERY ONE OF THEM WAS `.ca-stats` SPELLED AGAIN. The shared stat strip four
+   sheets down does the same job with the dividers as the GAP over a coloured
+   ground, so it needs no per-cell border arithmetic and no rules to undo it
+   when the grid folds — which is the argument `96-stat-strip.css` opens with,
+   made against the rules that used to be here.
+
+   AND THE TWO FOLDED AT DIFFERENT WIDTHS. This band folded at 520px and the
+   strip at 480px, so a Media shelf drawing both — which every Media shelf did
+   until 4.46 — had two bands of four cells that became two-by-two forty pixels
+   apart. Nothing was wrong with either number; there were two of them.
+
+   `stats-band` draws `.ca-stats`, so there is nothing left to declare here but
+   the wrapper below. */
+
+/* ── The tally (4.35) ────────────────────────────────────────────────────
+   How many of the things below sit at each value of a select — one pill per
+   option, in the tracker's DECLARED order rather than by count, so the row
+   reads as a pipeline (Planned → Active → Done) instead of reshuffling itself
+   every time a note moves. That ordering is a decision in the widget; what the
+   stylesheet owes it is a row that keeps reading as a sequence.
+
+   PILLS RATHER THAN THE BREAKDOWN'S BARS, and the two sit on the same page.
+   `journal-breakdown` ranks containers by a magnitude, so a bar's LENGTH is
+   the value and the rows must stack to be comparable. A tally has no magnitude
+   to draw — four projects and two projects are two counts, not a short bar and
+   a long one — so making it a second bar chart would be a picture that invites
+   a comparison the numbers do not support. A count printed at readable size,
+   with its option beside it, is the whole content.
+
+   WRAPS RATHER THAN SCROLLS. Six options at a phone width is two rows of
+   three, which is legible; a horizontal scroller would hide the end of a
+   pipeline, and the end of a pipeline is the half a reader is looking for. */
+.ca-journal-tally {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+/* THE SECTION'S HEAD IS THE SECTION'S. What stood in this space was a private
+   fold bar — a label and a chevron on the LEFT with no rule under it, which is
+   the `note:` FIELD's bar and not a section's — drawn on a block that sits
+   between Find and Charts on a journal index wearing the frame they both wear.
+   `.ca-jtly-head`, `.ca-jtly-title-left`, `.ca-jtly-chevron`,
+   `.ca-jtly-label-title` and the `is-collapsed` rules that drove them went with
+   it in 5.6.
+
+   THE PARAGRAPH THAT STOOD HERE WAS OUT OF DATE BY THE TIME IT SHIPPED (5.10).
+   It said the head was `foldableSection`'s and that `SECTION_TITLES` had no
+   `journal-tally` entry — a reverted design and a table that had gained the
+   entry in the same wave. Both halves described code nobody could find.
+
+   WHAT IS TRUE: a tally under a `header:🧮 Status` bar, or in a `frame: section`
+   fence, is named by the section and draws no title of its own. Anywhere else —
+   a reader's own note, a page holding two of them — it says what it counts, in
+   `.ca-jtly-title`, at `journal-breakdown`'s scale beside it, because two
+   widgets doing the same job at two sizes is what the pair is here to avoid. */
+.ca-jtly-title {
+  font-size: var(--ca-text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.ca-jtly-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ca-jtly-pill {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  background: var(--background-primary);
+  min-width: 0;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.ca-jtly-count {
+  font-size: 1.05em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+.ca-jtly-label {
+  font-size: var(--ca-text-sm);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* An option nothing carries is DIMMED, NOT DROPPED. A pipeline with its empty
+   stage removed reads as a stage that does not exist — "no Blocked column"
+   rather than "nothing blocked" — which is the opposite of what a tally is
+   read for. Faint rather than hidden says the stage is there and empty. */
+.ca-jtly-pill.ca-jtly-empty {
+  background: transparent;
+  border-style: dashed;
+}
+.ca-jtly-pill.ca-jtly-empty .ca-jtly-count,
+.ca-jtly-pill.ca-jtly-empty .ca-jtly-label {
+  color: var(--text-faint);
+}
+
+/* The stats band's wrapper and its optional title. The band itself is
+   `.ca-stats` — the shared stat strip, not a copy of it — so there is nothing
+   else to declare here; see 96-stat-strip.css.
+
+   `.ca-stats-band`, WHERE `.journal-totals` AND `.journal-topic-stats` BOTH WERE
+   (4.46). One widget draws one band now, so there is one wrapper; the class is
+   named for the widget rather than for one of the four arrangements it can be
+   set to, which is what `.journal-totals` was named for and why it read as a
+   different object from the band above it. */
+.ca-stats-band {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ca-sb-title {
+  font-size: var(--ca-text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ── The control a CELL carries (4.48) ──────────────────────────────────
+   Each cell of a band is chosen from its own `⋯`, which is why these rules are
+   scoped to `.ca-stats-band .ca-stat` and never to `.ca-stat` alone: that strip is
+   also the year dashboard's body and three period mastheads, and a control that
+   edits a directive must not appear on a surface that has no directive to edit.
+
+   HIDDEN UNTIL HOVER, because a row of four numbers with four `⋯` on it reads
+   as a toolbar. The reveal is on the CELL rather than on the button, so the
+   whole cell is the target — the same shape `.ca-jsh-title` uses for its pencil.
+
+   `:focus-within` IS NOT DECORATION HERE. It is the only way the button can be
+   reached by keyboard: a control at `opacity: 0` is still focusable, and one
+   that stays invisible while focused is a control nobody can see they are on.
+   The touch resting state is at the foot of this file's family — see the
+   `(hover: none)` branch — and `hover-reveal.test.ts` fails the build without
+   it. */
+.ca-stats-band .ca-stat {
+  position: relative;
+}
+.ca-sb-cell-menu {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.ca-sb-cell-menu svg {
+  width: 0.8em;
+  height: 0.8em;
+}
+.ca-stats-band .ca-stat:hover .ca-sb-cell-menu,
+.ca-stats-band .ca-stat:focus-within .ca-sb-cell-menu {
+  opacity: 1;
+}
+.ca-sb-cell-menu:hover {
+  opacity: 1;
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+/* A touchscreen has no hover to reveal it with, so it rests visible and faint
+   — 3.9 §3.3's rule, which is checked mechanically rather than remembered. */
+@media (hover: none) {
+  .ca-sb-cell-menu {
+    opacity: 0.55;
+  }
+}
+
+/* ── Two cells trading places (4.49) ────────────────────────────────────
+   The journal cards' gesture on a smaller surface, so it wears the journal
+   cards' two classes. THE CURSOR IS ON `[draggable="true"]` RATHER THAN ON THE
+   CELL, which is the derivation this stylesheet prefers to a second rule: the
+   attribute is set only where there is somewhere to drop, so a one-cell band
+   never offers a grip for a gesture that cannot start.
+
+   SCOPED TO `.ca-stats-band` for the reason the `⋯` above it is: `.ca-stat` is
+   also the year dashboard's body and three period mastheads, and none of those
+   cells came from a directive anybody can rewrite. */
+.ca-stats-band .ca-stat[draggable="true"] {
+  cursor: grab;
+}
+.ca-stats-band .ca-stat.is-dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+/* The target says where the thing in the air would land, in the accent the rest
+   of this plugin uses for the same promise. An inset shadow rather than an
+   outline: the cells are divided by borders and an outline over one of them
+   reads as the divider moving. */
+.ca-stats-band .ca-stat.is-drop-target {
+  background: var(--background-modifier-hover);
+  box-shadow: inset 0 0 0 2px var(--interactive-accent);
+}
+
+/* Related-lessons: a Practice banner's own property cell — removable pill
+   chips over a body-backed list (see widgets.ts::buildRelatedLessons), plus
+   a dashed circular add button matching the tracker grid's add-tile
+   language at a scale that fits inside one cell. */
+
+.ca-journal-pages-table {
+  padding: 2px 0;
+}
+.ca-journal-pages-table .ca-list {
+  gap: 2px;
+}
+.ca-journal-pages-table .ca-empty-line {
+  padding: 6px 4px;
+}
