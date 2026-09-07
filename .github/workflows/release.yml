@@ -1,11 +1,51 @@
 name: Release
 
 # Obsidian resolves a plugin version by looking for a GitHub release whose TAG
-# IS THE BARE VERSION -- 5.2.0, never v5.2.0 -- and by reading the three files
+# IS THE BARE VERSION -- 1.2.0, never v1.2.0 -- and by reading the three files
 # attached to it as individual assets. The community installer downloads those
 # assets; it never reads the repository tree. That is why `main.js` and
 # `styles.css` are gitignored and built here instead of committed: a copy in git
 # would go stale the first commit after someone edited a part file.
+#
+# ── A RELEASE IS A MINOR OR A MAJOR, NEVER A PATCH (1.0.0) ────────────────
+#
+# The trigger below still matches every three-part tag, and the FIRST STEP
+# refuses the ones that do not end in `.0`.
+#
+# NARROWING THE PATTERN TO `[0-9]+.[0-9]+.0` WAS THE SHORTER ROUTE AND IS THE
+# WRONG ONE. A patch tag would then start nothing at all, and a workflow that
+# never ran is indistinguishable, on the Actions page, from one that ran and
+# decided to do nothing. A tag is something a person wrote down meaning it, so
+# it gets an answer. This repository refuses rather than ignores everywhere the
+# choice comes up -- `row: 3`, `tab: Charts`, a `cell` outside a row -- and a
+# tag naming a version that will not be released is the same kind of mistake.
+#
+# WHERE A PATCH GOES INSTEAD, because it does not go nowhere. `latest.yml`
+# republishes the rolling `latest` release on EVERY version change, patches
+# included, so a patch build is downloadable from a permanent address the
+# moment it lands on the default branch. What it does not get is a numbered
+# release and a line in `versions.json` -- and that pair is what Obsidian's
+# installer resolves, so a patch reaches whoever follows the rolling link and
+# reaches everyone else in the next minor.
+#
+# AND THIS WORKFLOW PUBLISHES THE ROLLING RELEASE FOR ITS OWN VERSION, at the
+# end, through `.github/actions/rolling-release`. `latest.yml` handles patches
+# and declines everything else, so without the tail below the three `latest`
+# addresses in the README would serve the previous minor's last patch build for
+# as long as the new minor went without one -- a real build, downloading fine,
+# silently a version old. Doing it here rather than there is also what keeps the
+# full suite running ONCE per version: this job has already checked out,
+# installed and passed everything by the time it gets there.
+#
+# THE LEDGER SAYS THE SAME THING FROM THE OTHER SIDE. `versions.json` lists
+# what a store install may resolve, so under this policy it holds minor and
+# major versions only; `test/workflows.test.ts` sweeps it for a patch key. Two
+# guards rather than one, because they fail at different moments: the sweep
+# fails on the commit that adds the key, and the step below fails on the tag.
+# That same test RUNS the step below against six tags rather than reading it --
+# the only test in the suite that starts a process, and the argument is in the
+# comment on it: the difference between a right and a wrong way to spell this
+# question is invisible to any assertion that only reads the script.
 on:
   push:
     tags:
@@ -20,6 +60,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # FIRST, AND AHEAD OF THE CHECKOUT. This reads nothing but the ref name,
+      # so a patch tag costs a runner start and stops there: no clone, no
+      # `npm ci`, no test run. It is the argument the two checks below make
+      # about sitting ahead of the composite, taken one step further because
+      # this one needs no files at all.
+      #
+      # `${tag##*.}` IS THE PATCH COMPONENT, and it is asked for rather than
+      # glob-matched. A `case "$tag" in *.0)` reads the same and is not the
+      # same: `1.0.10` ends in a zero, does not end in `.0`, and is a patch --
+      # which the glob happens to get right and gets right by accident. The
+      # trigger guarantees three numeric components, so the last one is the
+      # whole question.
+      - name: Refuse a patch version
+        run: |
+          tag="$GITHUB_REF_NAME"
+          patch="${tag##*.}"
+          if [ "$patch" != "0" ]; then
+            printf '### Not a release\n\n' >> "$GITHUB_STEP_SUMMARY"
+            printf '**%s** is a patch version, and this repository publishes a numbered release on minor and major versions only.\n\n' "$tag" >> "$GITHUB_STEP_SUMMARY"
+            printf 'The build is already attached to the rolling **latest** release, which republishes on every version change. Delete the tag with `git push --delete origin %s` and let the next minor carry the fix.\n' "$tag" >> "$GITHUB_STEP_SUMMARY"
+            echo "$tag is a patch version; releases are minor or major only."
+            exit 1
+          fi
+          echo "$tag is a release version."
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -61,8 +126,13 @@ jobs:
       - name: Install and check
         uses: ./.github/actions/checks
 
+      # `package`, NOT `build`. The numbered release needs only the three loose
+      # files, and `npm run build` is what produces those -- but the rolling
+      # release published at the end of this job carries the plugin FOLDER as a
+      # zip, and `tools/archive.mjs` zips `dist/`, which is what packaging lays
+      # out and verifies.
       - name: Build
-        run: npm run build
+        run: npm run package
 
       # The installer writes exactly these three files and creates no
       # subdirectories. A zero-byte styles.css would install silently and render
@@ -101,3 +171,14 @@ jobs:
             --title "$GITHUB_REF_NAME" \
             --notes-file release-notes.md \
             main.js manifest.json styles.css
+
+      # LAST, AND AFTER THE NUMBERED RELEASE EXISTS. This one moves a tag and
+      # overwrites assets on a release readers have bookmarked, so it goes after
+      # the step that cannot be undone by re-running the job -- if creating the
+      # numbered release fails, `latest` has not been moved onto a version that
+      # has no release behind it.
+      - name: Publish the rolling release
+        uses: ./.github/actions/rolling-release
+        with:
+          version: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}

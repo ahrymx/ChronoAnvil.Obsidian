@@ -1,0 +1,152 @@
+name: Publish the rolling release
+description: >
+  Archive the current build, move the `latest` tag onto this commit, and
+  overwrite the assets on the rolling pre-release.
+
+inputs:
+  version:
+    description: The version being published, as `manifest.json` spells it.
+    required: true
+  token:
+    description: >
+      A token with `contents: write`. Taken as an input rather than read from
+      the caller's environment because a composite action does not inherit the
+      `env:` of the step that calls it.
+    required: true
+
+# ── WHY THIS IS AN ACTION AND NOT A SECOND COPY IN `release.yml` (1.0.0) ───
+#
+# The rolling `latest` release used to have exactly one publisher: a version
+# bump landing on the default branch, whatever kind of bump it was. Under the
+# minor-and-major release cadence it has two, because the two kinds of version
+# now arrive by different routes:
+#
+#   a patch          -- pushed to the default branch, never tagged, and
+#                       `latest.yml` is the only thing that will ever publish it
+#   a minor or major -- tagged, and `release.yml` is already standing there with
+#                       the tree checked out, `npm ci` done and the suite passed
+#
+# SO THE ALTERNATIVE WAS `latest.yml` REPUBLISHING ON EVERY BUMP, which is what
+# it did before, and the cost is that a minor runs the whole suite twice on the
+# same commit -- once to publish the numbered release and once to move a tag.
+# Letting the tagged build do both is one run and one build.
+#
+# THE PART THAT MUST NOT DRIFT is what a rolling release IS: the tag moves
+# rather than being deleted, the asset names carry no version, and the zips are
+# `tools/archive.mjs`'s rather than hand-made. Two copies of that would drift,
+# and the direction it would drift is the one nobody notices -- a rolling
+# release that still publishes, still goes green, and quietly stops matching the
+# numbered one. `.github/actions/checks` exists for the same reason and its
+# header makes the same argument.
+#
+# WHAT IS DELIBERATELY NOT IN IT: the checkout, the checks and the build. The
+# callers differ on all three -- `latest.yml` needs full history to answer its
+# gate, `release.yml` needs none; and this runs after whatever build the caller
+# already did, because it archives `dist/` rather than producing it.
+runs:
+  using: composite
+  steps:
+    # THE ZIPS ARE `tools/archive.mjs`'s, NOT THIS FILE'S. That script reads
+    # back every archive it writes and deletes any that does not hold what its
+    # name claims -- the whole reason it exists -- and its header says why a
+    # hollow zip is the failure that gets believed later. Attaching a zip a
+    # workflow made by hand would be a second, unverified spelling of the one
+    # thing this repository has been most careful about.
+    #
+    # `--force` because a runner is fresh but a re-run of the same commit is
+    # not: without it the second attempt fails on `claim`, which is correct
+    # behaviour for a working tree and noise here.
+    - name: Archive
+      run: npm run archive -- --force
+      shell: bash
+
+    # RENAMED, NOT REBUILT. The versioned name is what is verified and what
+    # `../archives/` keeps; these two are copies under the stable names the
+    # rolling release publishes at.
+    #
+    # THE ASSET NAMES CARRY NO VERSION, which is what makes `--clobber` below a
+    # REPLACE rather than an accumulation: `chronoanvil-1.0.2-plugin.zip` beside
+    # `chronoanvil-1.1.0-plugin.zip` would leave a stale build attached to a
+    # release claiming to be current. The version is in the release body, in the
+    # title, and in the `manifest.json` inside both zips.
+    - name: Name the assets for a moving release
+      run: |
+        v="${{ inputs.version }}"
+        cp "../archives/chronoanvil-builds/chronoanvil-$v-plugin.zip" chronoanvil-plugin.zip
+        cp "../archives/chronoanvil-source/chronoanvil-source-$v.zip" chronoanvil-source.zip
+        for f in main.js manifest.json styles.css chronoanvil-plugin.zip chronoanvil-source.zip; do
+          if [ ! -s "$f" ]; then
+            echo "missing or empty release asset: $f"
+            exit 1
+          fi
+          echo "$f  $(wc -c < "$f") bytes"
+        done
+      shell: bash
+
+    # The same changelog section the tagged release publishes, under a line
+    # saying what this release IS -- because a reader who lands here from a
+    # bookmark has no tag in the URL to tell them which version they are about
+    # to download. Written to its own file: `release.yml` has already built a
+    # `release-notes.md` for the NUMBERED release by the time it calls this, and
+    # the two notes are not the same text.
+    - name: Write the release notes
+      run: |
+        v="${{ inputs.version }}"
+        {
+          printf 'This is **%s**, built from `%s`.\n\n' "$v" "$GITHUB_SHA"
+          printf 'It is overwritten every time the version changes, so the links below always point at the newest build. For a specific version, use the [tagged releases](../../releases) — note that a numbered release is cut on minor and major versions only, so a patch build lives here and nowhere else.\n\n'
+          printf -- '- `chronoanvil-plugin.zip` — unzip into `<vault>/.obsidian/plugins/`\n'
+          printf -- '- `main.js`, `manifest.json`, `styles.css` — the same three files, loose\n'
+          printf -- '- `chronoanvil-source.zip` — the source tree at this version\n\n'
+          printf -- '---\n\n'
+        } > latest-notes.md
+        awk -v tag="$v" '
+          $0 ~ "^## \\[" tag "\\]" { found = 1; next }
+          found && /^## \[/ { exit }
+          found { print }
+        ' CHANGELOG.md >> latest-notes.md
+      shell: bash
+
+    # ── WHY THE TAG IS FORCE-MOVED RATHER THAN THE RELEASE DELETED ────────
+    #
+    # Delete-and-recreate is the shorter script and leaves a window -- seconds,
+    # but a window -- in which a URL written down in the README is a 404. It is
+    # also the moment a failure half way through costs the release entirely.
+    # Moving the tag and clobbering the assets never has a state with no release
+    # in it.
+    - name: Move the tag
+      run: |
+        git tag -f latest
+        git push -f origin latest
+      shell: bash
+
+    # CREATE OR EDIT, so the first run and every run after it take the same path
+    # to the same end state. `gh release create` on a tag that already exists
+    # reuses it rather than making a second one.
+    #
+    # A PRE-RELEASE, AND THAT IS NOT MODESTY. GitHub's "Latest release" pointer
+    # means "the newest stable version", and pre-releases are excluded from it --
+    # so marking this one keeps `releases/latest` resolving to the real numbered
+    # release rather than to a rolling tag. Both things can be true at once only
+    # because one of them is flagged.
+    - name: Publish
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+      run: |
+        title="[pre-release] Latest"
+        if gh release view latest > /dev/null 2>&1; then
+          gh release edit latest \
+            --title "$title" \
+            --notes-file latest-notes.md \
+            --prerelease
+        else
+          gh release create latest \
+            --title "$title" \
+            --notes-file latest-notes.md \
+            --prerelease
+        fi
+        gh release upload latest \
+          main.js manifest.json styles.css \
+          chronoanvil-plugin.zip chronoanvil-source.zip \
+          --clobber
+      shell: bash

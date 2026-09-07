@@ -17,24 +17,29 @@ name: Latest
 # is a permanent address for the newest build. The versioned releases are
 # untouched and stay installable; this sits above them.
 #
-# A PRE-RELEASE, AND THAT IS NOT MODESTY. GitHub's "Latest release" pointer
-# means "the newest stable version", and pre-releases are excluded from it — so
-# marking this one keeps `releases/latest` resolving to the real numbered
-# release rather than to a rolling tag. Both things can be true at once only
-# because one of them is flagged.
+# ── THIS FILE PUBLISHES THE PATCHES, AND ONLY THE PATCHES (1.0.0) ─────────
 #
-# ── WHY THE TAG IS FORCE-MOVED RATHER THAN THE RELEASE DELETED ────────────
+# A numbered release is cut on a minor or a major and never on a patch, so the
+# two kinds of version reach a reader by different routes and the rolling
+# release is the ONLY route a patch has. That is what this workflow is for now.
 #
-# Delete-and-recreate is the shorter script and leaves a window — seconds, but a
-# window — in which the address above is a 404. It is also the moment a failure
-# half way through costs the release entirely. Moving the tag and clobbering the
-# assets never has a state with no release in it.
+# A MINOR OR A MAJOR IS PUBLISHED HERE TOO -- BY `release.yml`, NOT BY THIS
+# FILE. Both call `.github/actions/rolling-release`, which is where the
+# mechanics live. The tagged build is already checked out, installed and past
+# the full suite by the time it cuts its numbered release, so letting it move
+# the `latest` tag as well costs a handful of seconds; letting THIS workflow do
+# it would mean running the entire suite a second time, on the same commit, to
+# reach the same end state.
 #
-# THE ASSET NAMES CARRY NO VERSION, which is what makes `--clobber` a REPLACE
-# rather than an accumulation: `chronoanvil-5.20.0-plugin.zip` beside
-# `chronoanvil-5.21.0-plugin.zip` would leave a stale build attached to a
-# release claiming to be current. The version is in the release body, in the
-# title, and in the `manifest.json` inside both zips.
+# SO `latest` IS NEVER BEHIND, which is the property that matters and is easy to
+# lose. Declining a minor here and forgetting to publish it there would leave
+# the three addresses in the README serving the previous minor's last patch --
+# still a real build, still downloading fine, silently a version old.
+#
+# AND THE TWO PUBLISHERS CANNOT RACE, because the gate below excludes exactly
+# the versions `release.yml` handles. A minor bump landing on the default branch
+# starts this workflow and it stops at the gate; the tag that follows is what
+# moves the tag.
 
 on:
   push:
@@ -93,10 +98,24 @@ jobs:
       # direction: the worst case is a rolling release republished at the version
       # it already held, and the alternative is silently not publishing a real
       # release.
-      - name: Has the version changed?
+      #
+      # THE PATCH QUESTION IS ASKED FIRST, AND IS NOT SUBJECT TO THAT. It reads
+      # the manifest alone, so there is no unsure case to be generous about: a
+      # version ending in `.0` is a minor or a major, `release.yml` publishes the
+      # rolling release for it off the tag, and this workflow declining is the
+      # whole design rather than a build being dropped. `${now##*.}` is the patch
+      # component -- the same spelling `release.yml`'s first step uses, and for
+      # the same reason it is not a `*.0` glob.
+      - name: Should this push move the rolling release?
         id: gate
         run: |
           now=$(node -p "require('./manifest.json').version")
+          if [ "${now##*.}" = "0" ]; then
+            echo "version=$now" >> "$GITHUB_OUTPUT"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "$now is a minor or a major — release.yml publishes the rolling release for it, off the tag."
+            exit 0
+          fi
           before="${{ github.event.before }}"
           was=""
           if [ -n "$before" ] && git cat-file -e "$before^{commit}" 2>/dev/null; then
@@ -133,87 +152,12 @@ jobs:
         if: steps.gate.outputs.changed == 'true'
         run: npm run package
 
-      # THE ZIPS ARE `tools/archive.mjs`'s, NOT THIS FILE'S. That script reads
-      # back every archive it writes and deletes any that does not hold what its
-      # name claims — the whole reason it exists — and its header says why a
-      # hollow zip is the failure that gets believed later. Attaching a zip this
-      # workflow made by hand would be a second, unverified spelling of the one
-      # thing this repository has been most careful about.
-      #
-      # `--force` because a runner is fresh but a re-run of the same commit is
-      # not: without it the second attempt fails on `claim`, which is correct
-      # behaviour for a working tree and noise here.
-      - name: Archive
+      # EVERYTHING FROM HERE IS `release.yml`'s TOO. See the action's header for
+      # why it is an action; the short version is that a rolling release which
+      # quietly stops matching the numbered one is the failure nobody notices.
+      - name: Publish the rolling release
         if: steps.gate.outputs.changed == 'true'
-        run: npm run archive -- --force
-
-      # RENAMED, NOT REBUILT. The versioned name is what is verified and what
-      # `../archives/` keeps; these two are copies under the stable names the
-      # rolling release publishes at. See the header on why the version comes
-      # out of the filename here and nowhere else.
-      - name: Name the assets for a moving release
-        if: steps.gate.outputs.changed == 'true'
-        run: |
-          v="${{ steps.gate.outputs.version }}"
-          cp "../archives/chronoanvil-builds/chronoanvil-$v-plugin.zip" chronoanvil-plugin.zip
-          cp "../archives/chronoanvil-source/chronoanvil-source-$v.zip" chronoanvil-source.zip
-          for f in main.js manifest.json styles.css chronoanvil-plugin.zip chronoanvil-source.zip; do
-            if [ ! -s "$f" ]; then
-              echo "missing or empty release asset: $f"
-              exit 1
-            fi
-            echo "$f  $(wc -c < "$f") bytes"
-          done
-
-      # The same changelog section the tagged release publishes, under a line
-      # saying what this release IS — because a reader who lands here from a
-      # bookmark has no tag in the URL to tell them which version they are
-      # about to download.
-      - name: Write the release notes
-        if: steps.gate.outputs.changed == 'true'
-        run: |
-          v="${{ steps.gate.outputs.version }}"
-          {
-            printf 'This is **%s**, built from `%s`.\n\n' "$v" "$GITHUB_SHA"
-            printf 'It is overwritten every time the version changes, so the links below always point at the newest build. For a specific version, use the [tagged releases](../../releases).\n\n'
-            printf -- '- `chronoanvil-plugin.zip` — unzip into `<vault>/.obsidian/plugins/`\n'
-            printf -- '- `main.js`, `manifest.json`, `styles.css` — the same three files, loose\n'
-            printf -- '- `chronoanvil-source.zip` — the source tree at this version\n\n'
-            printf -- '---\n\n'
-          } > release-notes.md
-          awk -v tag="$v" '
-            $0 ~ "^## \\[" tag "\\]" { found = 1; next }
-            found && /^## \[/ { exit }
-            found { print }
-          ' CHANGELOG.md >> release-notes.md
-
-      - name: Move the tag
-        if: steps.gate.outputs.changed == 'true'
-        run: |
-          git tag -f latest
-          git push -f origin latest
-
-      # CREATE OR EDIT, so the first run and every run after it take the same
-      # path to the same end state. `gh release create` on a tag that already
-      # exists reuses it rather than making a second one.
-      - name: Publish
-        if: steps.gate.outputs.changed == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          title="[pre-release] Latest"
-          if gh release view latest > /dev/null 2>&1; then
-            gh release edit latest \
-              --title "$title" \
-              --notes-file release-notes.md \
-              --prerelease
-          else
-            gh release create latest \
-              --title "$title" \
-              --notes-file release-notes.md \
-              --prerelease
-          fi
-          gh release upload latest \
-            main.js manifest.json styles.css \
-            chronoanvil-plugin.zip chronoanvil-source.zip \
-            --clobber
+        uses: ./.github/actions/rolling-release
+        with:
+          version: ${{ steps.gate.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
