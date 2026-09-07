@@ -85,6 +85,11 @@ unzipped into `<vault>/.obsidian/plugins/`. The
 the same release. For a particular version rather than the newest one, every
 release is listed [here](../../releases).
 
+A numbered release is cut on a minor or a major version only. Patches go to the
+rolling **latest** links above and nowhere else, so that is the address to
+follow if you want fixes as they happen — it is refreshed on every version
+change, patch or not, and is never behind the numbered list.
+
 ## Keyboard
 
 No shortcut is claimed by default. Every command lives in the palette under

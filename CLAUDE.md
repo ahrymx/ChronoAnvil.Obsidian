@@ -140,6 +140,24 @@ npm run package
 
 ### Phase 3: Version Bump & Release Archiving
 !Only proceed if the reader/prompter has said the testing dist is in a good enough spot to be worthy of archiving.
+!A NUMBERED RELEASE IS A MINOR OR A MAJOR, NEVER A PATCH. A patch version is
+built, packaged and archived exactly like any other, and it reaches readers
+through the rolling `latest` release. What a patch does not get is a tag, a
+GitHub release or a line in `versions.json` — `release.yml`'s first step fails
+the job on a tag whose last component is not `0`, and `test/workflows.test.ts`
+fails the suite on a patch key in the ledger. Bump the patch freely; add the
+`versions.json` line when the version that carries it is a minor.
+!THE ROLLING RELEASE HAS TWO PUBLISHERS AND THEY PARTITION THE VERSIONS.
+`.github/actions/rolling-release` holds the mechanics — archive, move the
+`latest` tag, clobber the assets — and both workflows call it. `latest.yml`
+fires on a patch bump landing on the default branch and declines anything
+ending in `.0`; `release.yml` does it in the same job as the numbered release,
+where the tree is already installed and past the suite, so the full suite runs
+once per version. `test/workflows.test.ts` executes both gates and fails if a
+version would be published by two workflows or by none — which is the failure
+that is otherwise silent, since both jobs go green deciding it was the other
+one's turn. A caller must `npm run package` before the action: it archives
+`dist/`, and `npm run build` does not produce one.
 When releasing a new version:
 1. Update `version` in `package.json` and `manifest.json`.
 2. Add the release notes section at the top of `CHANGELOG.md`.
