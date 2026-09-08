@@ -39,7 +39,7 @@ queries, no Templater scripts, no external chart plugins.
 
 | Journals, defined in settings | Modular section & widget catalogue |
 | :---: | :---: |
-| ![The Journals settings panel listing four presets with their folders and structure](docs/screenshots/journals.png) | ![The section and widget palette modal](docs/screenshots/section-composer.png) |
+| ![The Journals settings panel listing four presets with their folders and structure](docs/screenshots/journals.png) | ![The section and widget composer modal](docs/screenshots/section-composer.png) |
 | *Identifiers, root folders, levels and note types* | *Modular drag-and-drop section composer* |
 
 | Quick capture | Logbooks |

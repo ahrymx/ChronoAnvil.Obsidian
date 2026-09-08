@@ -5,6 +5,16 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-09-08
+
+### Changed
+
+- **Visual tour screenshots.** Updated the visual tour captures with clean,
+  sidebar-free screenshots taken from a freshly seeded development vault.
+  Updated `dashboard.png` with a clean hero capture, `study-journal.png` with
+  modern styling, and `section-composer.png` to demonstrate the active
+  drag-and-drop section composer modal.
+
 ## [1.0.0] - 2026-09-07
 
 First public release.

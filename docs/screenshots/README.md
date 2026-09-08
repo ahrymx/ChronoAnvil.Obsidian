@@ -21,7 +21,7 @@ deleting a row without deleting the file.
 | `study-journal.png` | The Study journal dashboard: subject cards (Linear Algebra, Organic Chemistry, Spanish), topics, confidence ratings, statistics strip, and activity heat map. |
 | `period-dashboard.png` | A yearly / period overview dashboard: annual stats, entry density histogram, quarters breakdown cards, and highlights recap digest. |
 | `journals.png` | The **Journals** settings panel: the four presets with their identifiers, root folders and structure, and the vault-wide folder emoji list. |
-| `section-composer.png` | The section and widget palette modal: modular catalogue of drag-and-drop sections and widgets for customizing notes and dashboards. |
+| `section-composer.png` | The section and widget composer modal: reordering sections, grouping side-by-side widgets, and customizing notes and dashboards. |
 | `quick-capture.png` | The Quick capture modal — destination note, timestamp, and the box. |
 | `logbook.png` | A logbook widget with its sub-logbook menu open: named books with entry counts, the Open / Done / Timed tabs, and the composer with its **Now** button. |
 | `settings.png` | Configuration and theme customizer: rich page ground textures (scanlines, dot grid, graph paper, weaves) and custom vault banner styling. |
