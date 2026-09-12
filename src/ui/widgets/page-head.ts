@@ -48,7 +48,8 @@ import { BannerSurface, bannerSurfaceOf, titleTargetFor } from "../../core/banne
 import { bannerScopeOf } from "../vault-banner";
 import { attachNoteRename, attachPropertyRename } from "../header-title";
 import { TITLE_PROP, entryDateLabel } from "../../diary/entryheader";
-import { hueOf, journalNounOf, journalTypeAtPath } from "../../journals/journal";
+import { journalAccent, journalNounOf, journalTypeAtPath } from "../../journals/journal";
+import type { JournalType } from "../../journals/journal";
 import { CLASS_DEFS, noteKindOf, TrackerClass } from "../../trackers/trackers";
 import { OVERVIEW_LABELS, OverviewUnit } from "../../diary/calendar";
 import { periodAnchor, valueLabel } from "../../diary/periodnav";
@@ -57,7 +58,7 @@ import { periodAnchor, valueLabel } from "../../diary/periodnav";
 // the one cast and the `MomentLike` surface every date-doing module in the tree
 // already reads. It is also the import `eslint`'s `no-restricted-globals` rule
 // leaves standing — the global is the error, not the module.
-import { dashboardGrainOf, folderNotePath, folderPrefix, frontmatterOf, moment, noteTypeOf } from "../../core/util";
+import { dashboardGrainOf, folderNotePath, folderPrefix, frontmatterOf, moment, normaliseTypeValue, noteTypeOf } from "../../core/util";
 import { LOGBOOK_TITLE } from "../../core/vocabulary";
 
 /** The class the head carries. Named once — `headerbar.ts` reads it too. */
@@ -344,11 +345,28 @@ export function buildPageHead(
     const type = journalTypeAtPath(plugin, file.path);
     if (type) {
       root.setAttr("data-ca-journal", type.id);
-      root.style.setProperty("--ca-journal-accent", `hsl(${hueOf(type.id)}, 65%, 55%)`);
+      // BOTH HALVES, AND THE SECOND ONE WAS MISSING. `--ca-journal-accent-rgb`
+      // is what `--ca-grain-tint` is computed from, so setting only the first
+      // left the spine and the label taking the journal's own hue while the
+      // WASH behind them fell through to the vault accent — every journal in
+      // the vault washing the same purple, on the surface whose whole job is to
+      // say which journal this is.
+      const accent = journalAccent(type.id);
+      root.style.setProperty("--ca-journal-accent", accent.css);
+      root.style.setProperty("--ca-journal-accent-rgb", accent.rgb);
     }
   }
 
-  if (said.eyebrow) root.createDiv({ cls: "ca-jph-eyebrow", text: said.eyebrow });
+  // THE RAIL REPLACES THE EYEBROW, AND `eyebrowFor` IS UNTOUCHED. Those are one
+  // decision: `pageHeadSays` splits the eyebrow on `·` so the tracker card's
+  // context strip can withhold what the head already states, and
+  // `study-header.ts` records what happens when that predicate and the head
+  // disagree — the true half of the strip suppressed and a fabricated level left
+  // showing. So what changes here is what the head DRAWS. What it SAYS is the
+  // same string it has always said.
+  const rail = railOf(plugin, file, said.surface);
+  if (rail) buildRail(root, rail);
+  else if (said.eyebrow) root.createDiv({ cls: "ca-jph-eyebrow", text: said.eyebrow });
 
   const row = root.createDiv({ cls: "ca-jph-titlerow" });
   const date = dateLabel(plugin, file);
@@ -457,6 +475,104 @@ function eyebrowFor(
   // the page about everything rather than about now, so it is the honest place
   // to split this arm — on the day there is a second fact for it to say.
   return moment().format("dddd · D MMMM YYYY");
+}
+
+// ── WHICH LAYER OF THE JOURNAL THIS IS ──────────────────────────────────
+//
+// THE EYEBROW WAS THE ONLY ANSWER AND IT WAS THE WRONG SHAPE. `PROJECTS ·
+// JOURNAL`, `PROJECTS · AREA` and `PROJECTS · PROJECT` are three heads that
+// differ by one word, set at 0.7em in the same accent as the word beside it, on
+// three pages that are otherwise identical — same wash, same spine, same title
+// face. A reader two folders down could not tell the three apart at a glance,
+// and none of them said how many layers there were to come.
+//
+// The rail says all of it in one line: a step per layer, the current one marked,
+// the ones behind filled and the ones ahead hollow. Depth stops being a word to
+// read and becomes a position to see, and "there is another level under this
+// one" — which the eyebrow could not express at all — is the hollow step on the
+// end.
+//
+// THE JOURNAL IS THE FIRST STEP, under its own name. That is what lets the rail
+// REPLACE the eyebrow rather than sit beside it: `Projects` was the eyebrow's
+// first half, and a rail whose first step is the journal carries that fact in
+// the place it already occupied.
+export interface LevelRail {
+  // One per step, outermost first. `steps[0]` is the journal itself.
+  steps: string[];
+  // Index into `steps` of the layer this note IS. Always in range.
+  here: number;
+}
+
+// The rail a note draws, or null for a note that is not a layer.
+//
+// PURE, AND TAKES THE TYPE RATHER THAN THE PLUGIN. The decision is "given this
+// journal and what this note calls itself, which step is it" — no vault, no
+// settings, no file. The lookup that answers the two arguments stays in
+// `buildPageHead`, which is the only place that has a file to ask about.
+//
+// BY THE NOTE'S OWN `type:`, NOT BY ITS PATH. `JournalLevel.id` is documented as
+// "the `type:` frontmatter value an index note at this depth carries", so the
+// note already states which layer it is and `containerDepth` would be a second
+// derivation of a fact that is written down. It would also drag
+// `page-head → tables → kind-create → settings-editors` into the import graph
+// for one line of arithmetic.
+//
+// NULL FOR A LEAF, A PAGE AND A STRAY, and that is a scope decision rather than
+// a gap: an Update is not a layer of the journal, it is what the layers hold, so
+// it keeps the eyebrow that names its kind.
+export function railFor(
+  type: JournalType,
+  isJournalHome: boolean,
+  typeValue: unknown
+): LevelRail | null {
+  if (!type.levels.length) return null;
+  const steps = [type.name, ...type.levels.map((l) => l.noun)];
+  // The journal's own folder note — the page `eyebrowFor` answers `… · Journal`
+  // for, which is the string this step replaces.
+  if (isJournalHome) return { steps, here: 0 };
+
+  const value = normaliseTypeValue(typeValue);
+  const depth = value == null ? -1 : type.levels.findIndex((l) => l.id === value);
+  if (depth < 0) return null;
+  // `+ 1` FOR THE JOURNAL STEP. Written once, here, because every other reader
+  // of this shape would otherwise have to know that `steps` is one longer than
+  // `levels` and which end the extra one is on.
+  return { steps, here: depth + 1 };
+}
+
+// The same question asked of a file, which is what the head has.
+function railOf(
+  plugin: ChronoAnvilPlugin,
+  file: TFile,
+  surface: BannerSurface
+): LevelRail | null {
+  if (surface !== "journal") return null;
+  // The lenient resolver, for the reason `eyebrowFor` gives one screen down: a
+  // journal's own dashboard declares no `type:` at all, and the strict one
+  // answers "no journal" for the single page whose whole subject is the journal.
+  const type = journalTypeAtPath(plugin, file.path);
+  if (!type) return null;
+  return railFor(
+    type,
+    file.path === folderNotePath(type.root),
+    noteTypeOf(plugin.app, file)
+  );
+}
+
+// The rail's markup. One node per step; the connectors are drawn in CSS, so a
+// three-layer journal is three elements rather than five.
+//
+// NOT LINKS. Obsidian's breadcrumb sits directly above this note and already
+// goes to every one of these places. A second set of links to the same folders
+// would be chrome competing with navigation that works.
+function buildRail(root: HTMLElement, rail: LevelRail): void {
+  const el = root.createDiv({ cls: "ca-jph-rail" });
+  rail.steps.forEach((label, i) => {
+    const state = i < rail.here ? "is-past" : i === rail.here ? "is-here" : "is-ahead";
+    const step = el.createDiv({ cls: `ca-jph-step ${state}` });
+    step.createSpan({ cls: "ca-jph-step-dot" });
+    step.createSpan({ cls: "ca-jph-step-label", text: label });
+  });
 }
 
 function dateLabel(plugin: ChronoAnvilPlugin, file: TFile): string | null {

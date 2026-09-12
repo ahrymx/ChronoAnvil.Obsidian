@@ -40,6 +40,12 @@ import { isTitleLine } from "../src/core/directive-grammar";
 import { DEFAULT_PATHS } from "../src/core/constants";
 import { LAUNCHER_DEFAULT } from "../src/ui/widgets/launcher";
 import { TRACKER_CLASSES } from "../src/trackers/trackers";
+import { railFor } from "../src/ui/widgets/page-head";
+import {
+  PROJECTS_CONFIG,
+  STUDY_JOURNAL,
+  buildJournalType,
+} from "../src/journals/journal";
 
 const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
@@ -450,5 +456,184 @@ describe("nothing on the page can pick the head up", () => {
     // The disagreement, stated as a test so nobody "fixes" it into one rule.
     expect(isTitleLine("title: My Page")).toBe(true);
     expect(locateTitle("title: My Page")).toBe(-1);
+  });
+});
+
+
+// ── the level rail (1.1) ──────────────────────────────────────────────────
+//
+// THE EYEBROW WAS THE ONLY THING SEPARATING THREE PAGES. A journal home, an
+// area index and a project index draw the same wash, the same spine and the same
+// title face, and differed by one word — `PROJECTS · JOURNAL` against `PROJECTS ·
+// AREA` against `PROJECTS · PROJECT` — set at 0.7em in the same accent as the
+// word beside it. The rail says the same thing as a position instead, and says
+// two things the eyebrow could not: how deep the journal goes, and whether there
+// is a layer below this one.
+//
+// `railFor` IS PURE AND TAKES THE TYPE, so these are real assertions about the
+// decision rather than source-text about the wiring. The wiring — which file
+// gets asked, and that the eyebrow is what it replaces — is at the bottom.
+
+const PROJECTS = buildJournalType(PROJECTS_CONFIG);
+
+describe("which layer the rail says you are on", () => {
+  it("has a step per level, with the journal itself first", () => {
+    // The journal's own name is what lets the rail REPLACE the eyebrow rather
+    // than sit beside it: `Projects` was the eyebrow's first half.
+    const rail = railFor(PROJECTS, true, null);
+    expect(rail?.steps).toEqual(["Projects", "Area", "Project"]);
+  });
+
+  it("puts the journal's own note on the first step", () => {
+    expect(railFor(PROJECTS, true, null)?.here).toBe(0);
+  });
+
+  it("reads the layer off the note's own type, not off its path", () => {
+    // `JournalLevel.id` IS the `type:` value an index note at that depth carries,
+    // so the note states its own layer and `containerDepth` would be a second
+    // derivation of a written-down fact.
+    expect(railFor(PROJECTS, false, "area")?.here).toBe(1);
+    expect(railFor(PROJECTS, false, "project")?.here).toBe(2);
+  });
+
+  it("marks exactly one step, and it is in range", () => {
+    for (const value of ["area", "project"]) {
+      const rail = railFor(PROJECTS, false, value)!;
+      expect(rail.here).toBeGreaterThanOrEqual(0);
+      expect(rail.here).toBeLessThan(rail.steps.length);
+    }
+  });
+
+  it("counts the journal's levels rather than assuming two", () => {
+    // Study is two-level like Projects; a flat journal must draw two steps, not
+    // three, and nothing here may hard-code a depth.
+    expect(railFor(STUDY_JOURNAL, true, null)?.steps).toEqual([
+      "Study",
+      "Subject",
+      "Topic",
+    ]);
+    const flat = buildJournalType({
+      ...PROJECTS_CONFIG,
+      levels: [PROJECTS_CONFIG.levels[0]],
+    });
+    expect(railFor(flat, true, null)?.steps).toEqual(["Projects", "Area"]);
+    expect(railFor(flat, false, "area")?.here).toBe(1);
+  });
+
+  it("draws nothing for a note that is not a layer", () => {
+    // A leaf and a page are what the layers HOLD. The reader was offered the
+    // rail on them and did not take it, so an Update keeps the eyebrow naming
+    // its kind.
+    expect(railFor(PROJECTS, false, "update")).toBeNull();
+    expect(railFor(PROJECTS, false, "decision")).toBeNull();
+    expect(railFor(PROJECTS, false, "page")).toBeNull();
+    // And a note carrying nothing at all is a stray, not a guess.
+    expect(railFor(PROJECTS, false, null)).toBeNull();
+    expect(railFor(PROJECTS, false, "")).toBeNull();
+  });
+});
+
+describe("where the rail is drawn, and what it replaces", () => {
+  const head = () => code("page-head");
+
+  it("stands where the eyebrow stood, and only one of the two draws", () => {
+    expect(head()).toContain("if (rail) buildRail(root, rail);");
+    expect(head()).toContain(
+      'else if (said.eyebrow) root.createDiv({ cls: "ca-jph-eyebrow", text: said.eyebrow });'
+    );
+  });
+
+  it("leaves what the head SAYS exactly as it was", () => {
+    // THE ONE CONSTRAINT. `pageHeadSays` splits the eyebrow on `·` so the
+    // tracker card's context strip can withhold what the head already states,
+    // and `study-header.ts` records the defect from the two disagreeing — the
+    // true half of the strip suppressed and a fabricated level left showing. So
+    // the rail changes what the head DRAWS and `eyebrowFor` is untouched.
+    const src = head();
+    expect(src).toContain("return `${type.name} · Journal`;");
+    expect(src).toContain(
+      "return named ? `${type.name} · ${named}` : type.name;"
+    );
+    // The predicate reads the text, never the rail.
+    expect(src).toContain("const eyebrow = pageHeadText(plugin, file)?.eyebrow;");
+    expect(src).not.toContain("railFor(plugin");
+  });
+
+  it("asks the lenient resolver, because a journal's own note declares nothing", () => {
+    expect(head()).toContain("journalTypeAtPath(plugin, file.path)");
+    expect(head()).toContain("file.path === folderNotePath(type.root)");
+  });
+
+  it("is not a second set of breadcrumbs", () => {
+    // Obsidian's own trail sits directly above the note and goes to every one of
+    // these folders already.
+    const src = head();
+    expect(src).not.toContain('createEl("a"');
+    expect(src).not.toContain("openFile(");
+  });
+});
+
+describe("how the rail reads", () => {
+  it("speaks in the voice the eyebrow spoke in", () => {
+    // Still the head's top line. What changed is what the line is made of, and
+    // it should not announce itself as a new component.
+    const rail = ruleFor(".ca-journal-page-head .ca-jph-rail");
+    expect(rail).toContain("var(--ca-text-2xs)");
+    expect(rail).toContain("var(--ca-caps-weight)");
+    expect(rail).toContain("var(--ca-caps-tracking)");
+    expect(rail).toContain("text-transform: uppercase");
+  });
+
+  it("tells the three states apart by shape, not only by ink", () => {
+    // This sheet's standing rule. The dot is filled behind, filled-and-ringed
+    // here, hollow ahead — so the rail survives a monochrome theme.
+    const here = ruleFor(
+      ".ca-journal-page-head .ca-jph-step.is-here .ca-jph-step-dot"
+    );
+    const ahead = ruleFor(
+      ".ca-journal-page-head .ca-jph-step.is-ahead .ca-jph-step-dot"
+    );
+    expect(here).toContain("box-shadow: 0 0 0");
+    expect(ahead).toContain("background: transparent");
+    expect(ahead).toContain("inset 0 0 0");
+  });
+
+  it("draws the connector from the step rather than as an element", () => {
+    // Three layers is three elements, and the last step needs no case of its own
+    // beyond not having a connector.
+    expect(
+      ruleFor(".ca-journal-page-head .ca-jph-step:not(:last-child)::after")
+    ).toContain('content: ""');
+    expect(code("page-head")).not.toContain("ca-jph-step-line");
+  });
+
+  it("takes its marker size from a token, so no state can wobble", () => {
+    expect(
+      ruleFor(".ca-journal-page-head .ca-jph-step-dot")
+    ).toContain("var(--ca-dot-size)");
+    expect(sheet("00-tokens")).toContain("--ca-dot-size:");
+  });
+});
+
+describe("the journal's colour reaches the wash, not just the spine", () => {
+  it("sets both halves of the accent", () => {
+    // `--ca-grain-tint` is an `rgba()` over the CHANNELS, so setting only the
+    // colour left the spine and the label taking the journal's own hue while the
+    // wash behind them fell through to the vault accent — every journal in the
+    // vault washing the same purple, on the surface whose job is to say which
+    // journal this is.
+    for (const name of ["page-head", "vault-banner"]) {
+      const src = code(name);
+      expect(src, name).toContain("journalAccent(type.id)");
+      expect(src, name).toContain('"--ca-journal-accent-rgb"');
+    }
+  });
+
+  it("names the hue once, where the two readers can share it", () => {
+    // `hsl(…, 65%, 55%)` was written out in both files, which is how two copies
+    // of one colour drift the first time either is tuned.
+    expect(code("journal")).toContain("css: `hsl(${h}, ${ACCENT_S * 100}%");
+    expect(code("page-head")).not.toContain("65%, 55%");
+    expect(code("vault-banner")).not.toContain("65%, 55%");
   });
 });

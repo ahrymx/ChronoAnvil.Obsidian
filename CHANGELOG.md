@@ -5,6 +5,36 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-09-12
+
+### Added
+
+- **A level rail on journal index notes.** A journal home, an area index and a
+  project index drew the same wash, the same spine and the same title, and were
+  separated only by one word in a small-caps line — `PROJECTS · JOURNAL` against
+  `PROJECTS · AREA` against `PROJECTS · PROJECT` — set in the same colour and at
+  the same size as the journal name beside it. That line is now a rail: one step
+  per layer of the journal, filled behind the reader, ringed where they are and
+  hollow ahead. It answers two questions the old line could not, namely how deep
+  the journal goes and whether there is a layer below this one. The steps come
+  from the journal's own levels, so a flat journal draws two and a two-level
+  journal draws three. The layer is read from the note's own `type:` value, which
+  is what an index note at that depth already carries.
+
+  Leaf notes are unchanged: an Update or a Decision is what the layers hold
+  rather than a layer, so it keeps the line naming its note type. The rail does
+  not navigate, because Obsidian's own breadcrumb sits directly above the note
+  and already goes to every one of those folders.
+
+### Fixed
+
+- **A journal's colour reached its spine but not its background.** The note head
+  and the view banner both set the journal's accent colour without setting the
+  channel triple the background wash is computed from, so the wash fell through
+  to the theme's accent. Every journal in the vault washed the same purple while
+  its spine and its label took its own hue. Both now set both, through one
+  function that also ends the colour being written out in two places.
+
 ## [1.0.4] - 2026-09-12
 
 ### Added

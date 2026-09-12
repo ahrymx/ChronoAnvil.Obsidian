@@ -76,7 +76,7 @@ import {
 } from "../journals/study-header";
 import { entryDateLabel, TITLE_PROP } from "../diary/entryheader";
 import { entryContext } from "../diary/nav";
-import { hueOf, journalTypeAtPath } from "../journals/journal";
+import { journalAccent, journalTypeAtPath } from "../journals/journal";
 import { openVaultSearch } from "./search-all";
 import { openProperties } from "./properties";
 import { sectionsMenuFor } from "./widgets/page-title";
@@ -239,9 +239,14 @@ export class VaultBanner {
       if (type) {
         root.setAttr("data-ca-journal", type.id);
         view.setAttr("data-ca-journal", type.id);
-        const hue = `hsl(${hueOf(type.id)}, 65%, 55%)`;
-        root.style.setProperty("--ca-journal-accent", hue);
-        view.style.setProperty("--ca-journal-accent", hue);
+        // BOTH TOKENS, for the reason `journalAccent` states: `--ca-grain-tint`
+        // is an `rgba()` over the channels, so a view setting only the colour
+        // washed every journal in the vault accent's purple.
+        const accent = journalAccent(type.id);
+        for (const el of [root, view]) {
+          el.style.setProperty("--ca-journal-accent", accent.css);
+          el.style.setProperty("--ca-journal-accent-rgb", accent.rgb);
+        }
       }
     }
 

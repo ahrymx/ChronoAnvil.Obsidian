@@ -132,6 +132,85 @@
   letter-spacing: var(--ca-caps-tracking);
   text-transform: uppercase;
 }
+/* ── THE LEVEL RAIL, WHERE THE EYEBROW WAS ────────────────────────────────
+
+   `PROJECTS · JOURNAL`, `PROJECTS · AREA` and `PROJECTS · PROJECT` are three
+   heads that differ by one word, in the same colour and at the same size as the
+   word beside it. The rail says the same thing as a POSITION — a step per layer,
+   the one you are on marked, the ones behind filled and the ones ahead hollow —
+   so depth reads before any of it is read.
+
+   IT SPEAKS IN THE EYEBROW'S VOICE, deliberately: same size, same weight, same
+   tracking, same caps. This is still the head's top line and it should not
+   announce itself as a new component; what changed is what the line is made of.
+
+   AND COLOUR IS NEVER THE ONLY CUE, which is this sheet's standing rule. Past,
+   here and ahead differ by the DOT — filled, ringed, hollow — before they differ
+   by ink, so the rail survives a monochrome theme and a reader who cannot
+   separate the two ends of the accent. */
+.ca-journal-page-head .ca-jph-rail {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ca-space-1);
+  font-size: var(--ca-text-2xs);
+  font-weight: var(--ca-caps-weight);
+  letter-spacing: var(--ca-caps-tracking);
+  text-transform: uppercase;
+}
+.ca-journal-page-head .ca-jph-step {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-1);
+  min-width: 0;
+}
+/* The connector, drawn by the step it leads AWAY from, so a rail of three layers
+   is three elements rather than five and the last step needs no special case
+   beyond not having one. */
+.ca-journal-page-head .ca-jph-step:not(:last-child)::after {
+  content: "";
+  width: var(--ca-space-4);
+  height: var(--ca-rule-hair);
+  background: var(--background-modifier-border);
+}
+.ca-journal-page-head .ca-jph-step-dot {
+  width: var(--ca-dot-size);
+  height: var(--ca-dot-size);
+  border-radius: var(--ca-radius-pill);
+  flex: none;
+}
+.ca-journal-page-head .ca-jph-step-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* BEHIND: the layers this note is inside. Present, and not competing with the
+   one the reader is on. */
+.ca-journal-page-head .ca-jph-step.is-past .ca-jph-step-dot {
+  background: color-mix(in srgb, var(--ca-grain-accent) 55%, transparent);
+}
+.ca-journal-page-head .ca-jph-step.is-past .ca-jph-step-label {
+  color: var(--text-muted);
+}
+/* HERE: the ring is what makes this one findable without reading, and it is a
+   different SHAPE from both neighbours rather than a third shade of one. */
+.ca-journal-page-head .ca-jph-step.is-here .ca-jph-step-dot {
+  background: var(--ca-grain-accent);
+  box-shadow: 0 0 0 var(--ca-rule) var(--ca-grain-tint);
+}
+.ca-journal-page-head .ca-jph-step.is-here .ca-jph-step-label {
+  color: var(--ca-grain-accent);
+}
+/* AHEAD: a layer this journal has and this note is not in yet. Hollow, because
+   the fact worth carrying is that it EXISTS — the eyebrow could not say this at
+   all, and it is the answer to "is there anything under this?". */
+.ca-journal-page-head .ca-jph-step.is-ahead .ca-jph-step-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 var(--ca-rule-hair) var(--background-modifier-border);
+}
+.ca-journal-page-head .ca-jph-step.is-ahead .ca-jph-step-label {
+  color: var(--text-faint);
+}
 .ca-journal-page-head .ca-jph-titlerow {
   display: flex;
   align-items: baseline;

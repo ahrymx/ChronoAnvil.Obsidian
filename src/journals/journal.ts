@@ -365,6 +365,51 @@ export function hueOf(id: string): number {
   return (sum * 59) % 360;
 }
 
+// The journal's accent, in both the forms the stylesheet needs.
+//
+// TWO TOKENS, ONE COLOUR, AND THE SECOND ONE WAS NOT BEING SET. The sheet binds
+// `--ca-grain-accent` and `--ca-grain-spine` off `--ca-journal-accent`, and
+// `--ca-grain-tint` off `--ca-journal-accent-rgb` — an `rgba()` needs channels,
+// not a colour. Both callers set only the first, so the spine and the label took
+// the journal's own hue while the WASH behind them fell through to
+// `--interactive-accent-rgb`: every journal in the vault washing the same
+// purple, on the one surface whose job is to say which journal this is.
+//
+// AND THE 65/55 WAS WRITTEN TWICE, which is how the two would have drifted the
+// first time either was tuned. One function, two readers — `page-head.ts` for
+// the note's own head and `vault-banner.ts` for the view around it.
+const ACCENT_S = 0.65;
+const ACCENT_L = 0.55;
+
+export function journalAccent(id: string): { css: string; rgb: string } {
+  const h = hueOf(id);
+  return {
+    css: `hsl(${h}, ${ACCENT_S * 100}%, ${ACCENT_L * 100}%)`,
+    rgb: hslChannels(h, ACCENT_S, ACCENT_L),
+  };
+}
+
+// `h` in degrees, `s`/`l` in 0..1, out as the `r, g, b` an `rgba()` takes.
+//
+// Written out rather than reached for through a colour library: this is the
+// plugin's only conversion, it is six lines, and a dependency has to be declared
+// in `NOTICE` and in the esbuild banner in the same commit.
+function hslChannels(h: number, s: number, l: number): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  const seg = Math.floor(h / 60) % 6;
+  const [r, g, b] = [
+    [c, x, 0],
+    [x, c, 0],
+    [0, c, x],
+    [0, x, c],
+    [x, 0, c],
+    [c, 0, x],
+  ][seg];
+  return [r, g, b].map((v) => Math.round((v + m) * 255)).join(", ");
+}
+
 // ── Folder emoji ─────────────────────────────────────────────────────────
 //
 // ONE POOL FOR THE WHOLE VAULT, as of 2.39. Subject and Topic had shared a map

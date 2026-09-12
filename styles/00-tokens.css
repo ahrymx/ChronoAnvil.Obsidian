@@ -457,6 +457,13 @@
      been re-weighting all of them. */
   --ca-head-spine: var(--ca-rule-edge);
 
+  /* The level rail's marker. Its own token rather than a number in
+     `98-page-head.css`, because the three states are three rules and a dot that
+     changed size between them would read as a wobble rather than as a state.
+     6px is the smallest circle that still reads as filled-or-hollow at the
+     0.7em the rail is set in. */
+  --ca-dot-size: 6px;
+
   /* Mood palette — the only hardcoded hues in the sheet, named once so
      the tracker chart's barColor and any future use point at the same
      five values instead of a copy-pasted hex literal. */
