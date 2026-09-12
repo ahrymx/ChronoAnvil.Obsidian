@@ -122,6 +122,27 @@ export function manifestCarriesTracker(
   return tracker.surface.typeId === null && !tracker.builtin;
 }
 
+// Does anything under this folder declare a ChronoAnvil type?
+//
+// THE RULE HAS TWO CALLERS AND THAT IS WHY IT IS OUT HERE. `looksLikeAJournal`
+// asks it to decide whether a folder is worth offering under "Found in the
+// vault"; the journal wizard's folder-collision refusal asks it to decide
+// whether to POINT AT that offer, and a refusal that advertises a route the
+// discovery half would not have opened is the dead end this was extracted to
+// close. Two copies of the predicate could only ever disagree about which
+// folders those are, and the refusal is the copy nobody would notice drifting.
+//
+// FREE, because the metadata cache already holds every note's frontmatter. No
+// note is read, which is what lets both callers ask it synchronously.
+export function holdsTypedNotes(app: App, folderPath: string): boolean {
+  const prefix = `${normalizePath(folderPath)}/`;
+  for (const file of app.vault.getMarkdownFiles()) {
+    if (!normalizePath(file.path).startsWith(prefix)) continue;
+    if (noteTypeOf(app, file)) return true;
+  }
+  return false;
+}
+
 export class JournalImporter {
   constructor(private app: App, private plugin: ChronoAnvilPlugin) {}
 
@@ -206,13 +227,7 @@ export class JournalImporter {
   // up to a hundred and twenty notes of it, to reach the same null it reached
   // last time. The cheap question has the same answer and costs no IO.
   private looksLikeAJournal(folder: TFolder): boolean {
-    const rootPath = normalizePath(folder.path);
-    const prefix = `${rootPath}/`;
-    for (const file of this.app.vault.getMarkdownFiles()) {
-      if (!normalizePath(file.path).startsWith(prefix)) continue;
-      if (noteTypeOf(this.app, file)) return true;
-    }
-    return false;
+    return holdsTypedNotes(this.app, folder.path);
   }
 
   // Read a candidate folder into a JournalScan.

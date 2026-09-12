@@ -33,21 +33,42 @@ const PATHS = {
 };
 
 // Only what the validation path reads. `getAbstractFileByPath` is the vault
-// probe `occupiedFolder` uses, and `occupied` is the list of paths this fake
+// probe `occupiedFolders` uses, and `occupied` is the list of paths this fake
 // vault claims already exist.
+//
+// `notes` MAPS A NOTE PATH TO ITS `type:`, and it is what makes the adoption
+// half of the refusal testable at all. The old fake had no notes in it, so the
+// test below that claimed to check the adoption route "when that folder is
+// already a journal's" was checking a folder that held nothing — it passed for
+// every collision, including the ones where adoption is not on offer, which is
+// the bug it was supposed to be guarding.
 const fakePlugin = (
   journals: JournalConfig[] = [],
-  occupied: string[] = []
-): ChronoAnvilPlugin =>
-  ({
-    settings: { customJournals: journals, paths: PATHS },
+  occupied: string[] = [],
+  notes: Record<string, string> = {},
+  dismissed: string[] = []
+): ChronoAnvilPlugin => {
+  const files = Object.keys(notes).map((path) => ({ path }));
+  return {
+    settings: {
+      customJournals: journals,
+      paths: PATHS,
+      dismissedJournalFolders: dismissed,
+    },
     app: {
       vault: {
         getAbstractFileByPath: (p: string) =>
           occupied.includes(p) ? ({} as never) : null,
+        getMarkdownFiles: () => files,
+      },
+      metadataCache: {
+        getFileCache: (f: { path: string }) => ({
+          frontmatter: notes[f.path] ? { type: notes[f.path] } : {},
+        }),
       },
     },
-  }) as unknown as ChronoAnvilPlugin;
+  } as unknown as ChronoAnvilPlugin;
+};
 
 class Probe extends JournalEditModal {
   identityProblem(): string | null {
@@ -105,8 +126,96 @@ describe("starting from a preset", () => {
     // folder, so a reader putting Study back should adopt those notes rather
     // than create a second journal beside them. The old wording offered only
     // the two answers that lose them.
-    const p = wizard(fakePlugin([], ["03 - Journals/Study"]), studyDraft());
-    expect(p.identityProblem()).toContain("adopt it");
+    //
+    // THE NOTES ARE THE POINT OF THE FIXTURE. This is the route being offered
+    // because the folder holds notes that say what they are, which is the same
+    // question discovery asks before offering the folder under "Found in the
+    // vault". Without one, the test below is what happens instead.
+    const p = wizard(
+      fakePlugin([], ["03 - Journals/Study"], {
+        "03 - Journals/Study/Maths/Surds.md": "topic",
+      }),
+      studyDraft()
+    );
+    expect(p.identityProblem()).toContain('can import "03 - Journals/Study"');
+  });
+
+  it("does not point at adoption for a folder of ordinary notes", () => {
+    // THE REPORTED DEAD END. The refusal closed with "adopt it from Settings →
+    // Journals if those notes are already a journal's" for every collision,
+    // and discovery ignores a folder of ordinary notes on purpose — stated as
+    // an invariant in journal-discovery.test.ts. So a reader who copied a
+    // folder of plain notes into the journals tree was refused, sent to a
+    // section that was not on the page, and left with no route at all.
+    const p = wizard(
+      fakePlugin([], ["03 - Journals/Study"], {
+        "03 - Journals/Study/Notes from last term.md": "",
+      }),
+      studyDraft()
+    );
+    const problem = p.identityProblem() ?? "";
+    expect(problem).toContain("already exists");
+    expect(problem).not.toContain("can import");
+  });
+
+  it("does not point at adoption for a folder the reader has set aside", () => {
+    // "Not a journal — stop offering it" is the reader saying so out loud. The
+    // refusal must not then tell them to go and import it.
+    const p = wizard(
+      fakePlugin(
+        [],
+        ["03 - Journals/Study"],
+        { "03 - Journals/Study/Maths/Surds.md": "topic" },
+        ["03 - Journals/Study"]
+      ),
+      studyDraft()
+    );
+    expect(p.identityProblem() ?? "").not.toContain("can import");
+  });
+
+  it("counts what claiming the folder would take in", () => {
+    // "14 notes" is a thing a reader pictures; "everything in it" is not.
+    const p = wizard(
+      fakePlugin([], ["03 - Journals/Study"], {
+        "03 - Journals/Study/Maths/Surds.md": "topic",
+        "03 - Journals/Study/Maths/Logs.md": "topic",
+        "03 - Journals/Physics/Optics.md": "topic",
+      }),
+      studyDraft()
+    );
+    // Two, not three: the note under a sibling folder is not this folder's.
+    expect(p.identityProblem()).toContain("the 2 notes in it");
+  });
+
+  it("names both folders at once rather than one refusal each", () => {
+    // THE REPORTED TRIP. The check stopped at the notes root, so a reader who
+    // had copied a journal in with its templates moved the folder it named,
+    // pressed Next, and was refused a second time over a templates folder the
+    // first refusal had never mentioned.
+    const p = wizard(
+      fakePlugin([], [
+        "03 - Journals/Study",
+        "00 - Infrastructure/Templates/Study",
+      ]),
+      studyDraft()
+    );
+    const problem = p.identityProblem() ?? "";
+    expect(problem).toContain("03 - Journals/Study");
+    expect(problem).toContain("00 - Infrastructure/Templates/Study");
+    expect(problem).toContain("already exist.");
+  });
+
+  it("describes a templates collision as a templates collision", () => {
+    // One string used to cover both paths, because the check only ever
+    // returned one of them — so a templates folder that was in the way was
+    // described as a claim on notes that are not in it.
+    const p = wizard(
+      fakePlugin([], ["00 - Infrastructure/Templates/Study"]),
+      studyDraft()
+    );
+    const problem = p.identityProblem() ?? "";
+    expect(problem).toContain("templates would be written into it");
+    expect(problem).not.toContain("trackers and crumbs");
   });
 });
 

@@ -94,6 +94,7 @@ import {
 } from "../journals/journal-sections";
 import { notify } from "./notify";
 import { journalFoldersOnDisk, removeJournal } from "./journal-removal";
+import { holdsTypedNotes } from "../journals/journal-import";
 
 export const TRACKER_TYPE_LABELS: Record<TrackerType, string> = {
   number: "Number (stepper)",
@@ -2686,14 +2687,127 @@ export class JournalEditModal extends SteppedEditorModal {
   // Both folders, because the templates folder is derived from the same name
   // and colliding with someone's existing templates folder is the same
   // accident with the same silence.
-  private occupiedFolder(): string | null {
-    if (this.isEstablished) return null;
-    for (const path of [this.draft.root, this.draft.templatesFolder]) {
-      const norm = path.trim().replace(/\/+$/, "");
+  //
+  // BOTH IN ONE ANSWER, NOT THE FIRST ONE FOUND. This returned a single path
+  // and stopped at the notes root, so a reader who had copied a journal in with
+  // its templates was refused twice: once naming the notes folder, and then —
+  // after moving that folder out of the way and pressing Next again — once more
+  // naming a templates folder the first refusal had never mentioned. That is
+  // the reported case, and it reads as the wizard changing its mind rather than
+  // as one collision with two halves. Naming both is what makes it one trip.
+  private occupiedFolders(): { role: "notes" | "templates"; path: string }[] {
+    if (this.isEstablished) return [];
+    const out: { role: "notes" | "templates"; path: string }[] = [];
+    const pairs = [
+      { role: "notes" as const, path: this.draft.root },
+      { role: "templates" as const, path: this.draft.templatesFolder },
+    ];
+    for (const { role, path } of pairs) {
+      const norm = (path ?? "").trim().replace(/\/+$/, "");
       if (norm === "") continue;
-      if (this.app.vault.getAbstractFileByPath(norm)) return norm;
+      if (this.app.vault.getAbstractFileByPath(norm)) out.push({ role, path: norm });
     }
-    return null;
+    return out;
+  }
+
+  // How many notes sit under a folder the wizard is about to refuse.
+  //
+  // Counted at the moment of refusing, for the reason countNotesOfKind states
+  // one screen over: "14 notes" is a thing a reader pictures and "everything in
+  // it" is not, and the whole job of this refusal is to make the reader picture
+  // what claiming the folder would take in.
+  private notesUnder(path: string): number {
+    const prefix = `${path}/`;
+    return this.app.vault
+      .getMarkdownFiles()
+      .filter((f) => f.path.startsWith(prefix)).length;
+  }
+
+  // The refusal for a derived folder that is already on disk.
+  //
+  // THE OLD WORDING SENT THE READER SOMEWHERE THERE WAS NOTHING TO FIND, and
+  // that is the whole of this change. It closed with "or adopt it from Settings
+  // → Journals if those notes are already a journal's" — advice written for a
+  // folder that discovery is offering, printed for every collision including
+  // the ones discovery has already declined. A folder of ordinary notes is
+  // ignored by discovery on purpose (journal-discovery.test.ts states it as an
+  // invariant), so a reader who had copied plain notes in was told to go and
+  // adopt them from a section that was not on the page. The sentence is offered
+  // now only when `holdsTypedNotes` says the same thing discovery asks.
+  //
+  // AND IT SAID "its notes would start showing this journal's trackers" ABOUT
+  // THE TEMPLATES FOLDER. One string covered both paths because the check only
+  // ever returned one of them, so the templates collision was described as a
+  // claim on notes that are not there. The two halves have different
+  // consequences and now say so.
+  private folderTakenMessage(
+    taken: { role: "notes" | "templates"; path: string }[]
+  ): string {
+    const notes = taken.find((t) => t.role === "notes");
+    const templates = taken.find((t) => t.role === "templates");
+    const quoted = taken.map((t) => `"${t.path}"`).join(" and ");
+    const parts: string[] = [
+      `${quoted} already ${taken.length === 1 ? "exists" : "exist"}.`,
+    ];
+
+    const n = notes ? this.notesUnder(notes.path) : 0;
+    const claims: string[] = [];
+    if (notes) {
+      claims.push(
+        n === 0
+          ? "that folder would become this journal's notes folder"
+          : `the ${n === 1 ? "one note" : `${n} notes`} in ${
+              taken.length === 1 ? "it" : "the first"
+            } would start showing this journal's trackers and crumbs`
+      );
+    }
+    if (templates) {
+      claims.push(
+        `this journal's templates would be written into ${
+          taken.length === 1 ? "it" : "the second"
+        } beside whatever is already there`
+      );
+    }
+    parts.push(
+      `A new journal would claim ${
+        taken.length === 1 ? "it" : "both"
+      } — ${claims.join(", and ")}.`
+    );
+    parts.push(
+      `Pick a different name, or move ${
+        taken.length === 1 ? "that folder" : "those folders"
+      } somewhere else first.`
+    );
+
+    // THE ADOPTION ROUTE, OFFERED ONLY WHEN IT IS REALLY ON OFFER. `holdsTypedNotes`
+    // is the predicate discovery itself uses to decide whether a folder is worth
+    // reading back, and `dismissedJournalFolders` is the reader having already
+    // said this one is not a journal — so both have to agree before this points
+    // at Settings → Journals.
+    //
+    // It does not promise a row is on screen this second. A folder copied in
+    // mid-session WITH its manifest is restored on the next load rather than
+    // offered, so the reader following this lands in the right window either
+    // way, and naming the window rather than the row is what keeps that true.
+    if (notes && this.offersImport(notes.path)) {
+      // NAMED, not "the folder". With both halves in the way this paragraph
+      // follows a sentence about two of them, and the one it means is the one
+      // with the reader's notes in it.
+      parts.push(
+        `${
+          n === 1 ? "That note already carries" : "Those notes already carry"
+        } ChronoAnvil types, so Settings → Journals ` +
+          `can import "${notes.path}" as it stands — which keeps the kinds ` +
+          `and trackers already in use there instead of re-typing them here.`
+      );
+    }
+    return parts.join(" ");
+  }
+
+  private offersImport(path: string): boolean {
+    const dismissed = this.plugin.settings.dismissedJournalFolders ?? [];
+    if (dismissed.includes(path)) return false;
+    return holdsTypedNotes(this.app, path);
   }
 
   private resizeLevels(depth: number): void {
@@ -2730,7 +2844,7 @@ export class JournalEditModal extends SteppedEditorModal {
     // whose folder they could see was gone. The advice — pick a different name —
     // is advice for a collision with something that exists.
     //
-    // The branch below already knew this. `occupiedFolder` was rewritten in 3.21
+    // The branch below already knew this. `occupiedFolders` was rewritten in 3.21
     // to offer three routes out precisely because "the old wording offered only
     // the two answers that lose the notes", and that judgement was applied to
     // one of a pair of adjacent refusals.
@@ -2766,21 +2880,14 @@ export class JournalEditModal extends SteppedEditorModal {
         },
       };
     }
-    const taken = this.occupiedFolder();
-    if (taken)
-      return (
-        `"${taken}" already exists. A new journal would claim that folder and ` +
-        `everything in it — its notes would start showing this journal's ` +
-        `trackers and crumbs. Pick a different name, move that folder first, ` +
-        // THE THIRD ROUTE, WHICH IS THE RIGHT ONE WHEN THE FOLDER IS ALREADY A
-        // JOURNAL'S (3.21). Removing a journal no longer reserves its folder,
-        // so a reader who removed one and wants it back — or who is starting
-        // from the preset that made it — should adopt the folder rather than
-        // create a second journal beside it. The old wording offered only the
-        // two answers that lose the notes.
-        `or adopt it from Settings → Journals if those notes are already a ` +
-        `journal's.`
-      );
+    // THE THIRD ROUTE, WHICH IS THE RIGHT ONE WHEN THE FOLDER IS ALREADY A
+    // JOURNAL'S (3.21). Removing a journal no longer reserves its folder, so a
+    // reader who removed one and wants it back — or who is starting from the
+    // preset that made it — should adopt the folder rather than create a second
+    // journal beside it. It is conditional now rather than always printed; see
+    // folderTakenMessage for what went wrong with printing it unconditionally.
+    const taken = this.occupiedFolders();
+    if (taken.length > 0) return this.folderTakenMessage(taken);
     return null;
   }
 

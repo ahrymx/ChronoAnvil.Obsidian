@@ -5,6 +5,22 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-09-12
+
+### Fixed
+
+- **The journal wizard's folder-collision refusal.** Creating a journal whose
+  derived folders are already on disk is still refused, but the refusal now
+  says something a reader can act on. It names both folders at once instead of
+  stopping at the first, so a journal copied in with its templates no longer
+  produces two refusals in a row about two halves of one collision; it counts
+  the notes claiming the folder would take in; it describes a templates
+  collision as one rather than as a claim on notes that are not there; and it
+  offers the adoption route only when that route exists. The last of those was
+  the reported dead end — the message pointed every collision at "Found in the
+  vault" in Settings → Journals, including folders of ordinary notes, which
+  discovery ignores on purpose.
+
 ## [1.0.1] - 2026-09-08
 
 ### Changed
@@ -73,7 +89,3 @@ standalone `.base` files, and is the only thing kept.
 ChronoAnvil was developed privately before this release. No build was published,
 distributed or installed by anyone other than its author, and the notes for
 those iterations are not part of this repository.
-
-1.0.0 is the first version anyone else can install, and the first entry in
-`versions.json` — which is the file Obsidian reads to decide which release a
-given app version may install.
