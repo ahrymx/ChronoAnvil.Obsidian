@@ -5,6 +5,34 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2026-09-12
+
+### Added
+
+- **The note-type confirmation now covers folder depth.** A journal's depth and
+  its note types are the same fact wearing two hats: both derive an id from a
+  word the reader typed, both write that id as a `type:` value, both keep it
+  across a rename, and removing either stops every note carrying it being
+  recognised. Only one of them asked. Dropping a journal from two levels to flat
+  declassified every sub-index note it had written, with no window at all, while
+  the identical change to a note type opened a warning-coloured confirmation
+  with a count read off the vault. Both now go through that one window, which is
+  titled for whichever the reader actually changed.
+
+  Both directions of a depth change are counted. Removing a level says how many
+  index notes stop being recognised and what each one loses. Adding a level says
+  how many notes are sitting directly in a folder that will hold sub-folders
+  from then on, since the structure decides what a folder holds rather than its
+  current contents, and it says that moving each note down one folder puts it
+  back. That second cost is why adding a level gets the warning-coloured button
+  where adding a note type does not.
+
+### Fixed
+
+- **Singular grammar in the declassification warning.** With exactly one note
+  affected it read "That note stop being recognised", followed by five plural
+  verbs under a singular subject.
+
 ## [1.0.3] - 2026-09-12
 
 ### Added

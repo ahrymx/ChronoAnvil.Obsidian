@@ -153,7 +153,16 @@ describe("where the offer is made", () => {
   it("only after a kind was ADDED", () => {
     // A rename or a removal cannot leave a dashboard short, so offering after
     // one would be a window that appears to say there is nothing to confirm.
-    expect(settings()).toContain('changes.some((c) => c.kind === "added")');
+    //
+    // AND ONLY A KIND, SINCE THE SAME WINDOW STARTED COVERING FOLDER DEPTH.
+    // `findDashboardCatchups` looks for an index note with no table for a note
+    // type it should list. A level added opens a different gap entirely — the
+    // notes that were the deepest indexes now need a folder table where they
+    // have a note table — and half-answering that here would leave a shape
+    // neither the reader nor `previewRepair` expects.
+    expect(settings()).toContain(
+      'changes.some((c) => c.subject === "kind" && c.kind === "added")'
+    );
   });
 
   it("after the save, so the plan sees the kinds just added", () => {

@@ -2448,8 +2448,24 @@ export type KindChangeKind =
   | "rated"
   | "paged";
 
+// WHAT THE CHANGE IS ABOUT, and the reason one window covers two things.
+//
+// A note kind and a folder level are the same fact wearing two hats. Both
+// derive an id from a word the reader typed, both write that id as the `type:`
+// value of every note they produce, both preserve it across a rename for the
+// same reason, and removing either stops every note carrying it being
+// recognised. The confirmation was built for one of them and the other had
+// none at all: a journal could be dropped from two levels to flat with no
+// window, silently declassifying every sub-index note it had ever written.
+//
+// So the subject is a FIELD rather than a second window. What differs between
+// the two is the sentences, not the decision — see `levelRemovalCost` and
+// `levelAdditionCost` beside `declassificationCost`.
+export type KindChangeSubject = "kind" | "level";
+
 export interface KindChange {
   kind: KindChangeKind;
+  subject: KindChangeSubject;
   id: string;
   label: string;
   detail: string;
@@ -2481,6 +2497,7 @@ export function diffKinds(before: KindLike[], after: KindLike[]): KindChange[] {
     if (!was) {
       out.push({
         kind: "added",
+        subject: "kind",
         id: k.id,
         label: k.label,
         detail: `a create button, a ${k.id}.md template, and type: ${k.id} on new notes.`,
@@ -2493,6 +2510,7 @@ export function diffKinds(before: KindLike[], after: KindLike[]): KindChange[] {
       // about to do anything to their notes.
       out.push({
         kind: "relabelled",
+        subject: "kind",
         id: k.id,
         label: k.label,
         detail: `“${was.label}” is now “${k.label}”. Notes keep type: ${k.id} — nothing is rewritten.`,
@@ -2501,6 +2519,7 @@ export function diffKinds(before: KindLike[], after: KindLike[]): KindChange[] {
     if ((was.rating ?? "") !== (k.rating ?? "")) {
       out.push({
         kind: "rated",
+        subject: "kind",
         id: k.id,
         label: k.label,
         detail: k.rating
@@ -2511,6 +2530,7 @@ export function diffKinds(before: KindLike[], after: KindLike[]): KindChange[] {
     if (Boolean(was.pages) !== Boolean(k.pages)) {
       out.push({
         kind: "paged",
+        subject: "kind",
         id: k.id,
         label: k.label,
         detail: k.pages
@@ -2524,9 +2544,101 @@ export function diffKinds(before: KindLike[], after: KindLike[]): KindChange[] {
     if (afterIds.has(k.id)) continue;
     out.push({
       kind: "removed",
+      subject: "kind",
       id: k.id,
       label: k.label,
       detail: `${k.id}.md stays on disk. Delete it yourself if you want it gone.`,
+    });
+  }
+
+  return out;
+}
+
+// Minimal shape, matching `KindLike` one function up and for the same reason.
+//
+// `id` IS OPTIONAL BECAUSE THE STORED SHAPE'S IS. A level gained one in 2.43
+// and `normalizeJournalConfigs` backfills it on load, so a row reaching here
+// without one has never been written to disk under any id — there is nothing on
+// disk for it to have declassified and nothing for the window to warn about. It
+// is dropped rather than given a derived id, because deriving one here would be
+// the second id rule this file exists to avoid.
+export interface LevelLike {
+  id?: string;
+  noun: string;
+}
+
+interface IdentifiedLevel {
+  id: string;
+  noun: string;
+}
+
+function identified(rows: LevelLike[]): IdentifiedLevel[] {
+  return rows.flatMap((l) => (l.id ? [{ id: l.id, noun: l.noun }] : []));
+}
+
+// What changed between two level lists, by id.
+//
+// BY ID, FOR THE REASON `diffKinds` GIVES. `normaliseLevels(…, { preserveIds:
+// true })` keeps an established journal's level ids across a noun change,
+// because those ids are the `type:` value on every index note the journal has
+// written and the frontmatter key every leaf note names its folder with.
+// Reading a renamed "Topic" as a delete-and-add would offer to destroy
+// something a rename did not touch.
+//
+// DEPTH IS A DROPDOWN, NOT A LIST, so in practice this reports one entry: the
+// second level arriving or leaving. It is written as a diff anyway because the
+// stored shape is an array and the editor is free to grow the dropdown into a
+// third option without this having to be found and rewritten.
+export function diffLevels(
+  beforeRows: LevelLike[],
+  afterRows: LevelLike[]
+): KindChange[] {
+  const before = identified(beforeRows);
+  const after = identified(afterRows);
+  const out: KindChange[] = [];
+  const byId = new Map(before.map((l) => [l.id, l]));
+  const afterIds = new Set(after.map((l) => l.id));
+
+  after.forEach((lvl, depth) => {
+    const was = byId.get(lvl.id);
+    if (!was) {
+      // The level above is what the reader is actually changing the meaning
+      // of: its folders stop holding notes and start holding folders.
+      const parent = after[depth - 1]?.noun;
+      out.push({
+        kind: "added",
+        subject: "level",
+        id: lvl.id,
+        label: lvl.noun,
+        detail: parent
+          ? `every ${parent} folder holds ${lvl.noun} folders from here on, each with its own index note carrying type: ${lvl.id}.`
+          : `folders at the top of the journal carry type: ${lvl.id}.`,
+      });
+      return;
+    }
+    if (was.noun !== lvl.noun) {
+      // Harmless, and reported *because* it is harmless — the same argument
+      // `diffKinds` makes for a relabelled kind. A reader renaming "Topic" to
+      // "Module" should be able to see that the window is not about to touch
+      // a single note.
+      out.push({
+        kind: "relabelled",
+        subject: "level",
+        id: lvl.id,
+        label: lvl.noun,
+        detail: `“${was.noun}” is now “${lvl.noun}”. Index notes keep type: ${lvl.id} and leaf notes keep their ${lvl.id}: property — nothing is rewritten.`,
+      });
+    }
+  });
+
+  for (const lvl of before) {
+    if (afterIds.has(lvl.id)) continue;
+    out.push({
+      kind: "removed",
+      subject: "level",
+      id: lvl.id,
+      label: lvl.noun,
+      detail: `${lvl.id}.md stays on disk, and so does every folder. Nothing is moved or deleted.`,
     });
   }
 
@@ -2542,8 +2654,18 @@ export function kindChangeNeedsConfirming(changes: KindChange[]): boolean {
   return changes.some((c) => c.kind !== "relabelled");
 }
 
+// AND AN ADDED LEVEL IS THE ONE ADDITION THAT COSTS SOMETHING. Every note a
+// flat journal holds sits directly in a top-level folder; declaring a level
+// beneath that folder means the folder now lists FOLDERS, and `hasLevelBelow`
+// answers from the structure rather than from what is currently on disk. So
+// the notes do not move, do not lose their type and do not stop being
+// recognised — they simply stop being listed anywhere until each is moved down
+// one folder. That is not a declassification, and it is not the quiet
+// non-event an added kind is either.
 export function kindChangeIsDestructive(changes: KindChange[]): boolean {
-  return changes.some((c) => c.kind === "removed");
+  return changes.some(
+    (c) => c.kind === "removed" || (c.subject === "level" && c.kind === "added")
+  );
 }
 
 // What a removed kind costs the notes that carry it.
@@ -2558,14 +2680,73 @@ export function kindChangeIsDestructive(changes: KindChange[]): boolean {
 // written in those words rather than in the plugin's.
 export function declassificationCost(typeName: string, count: number): string[] {
   if (count === 0) return [];
+  // WRITTEN FOR ONE NOTE AND FOR FOURTEEN. The lead sentence agrees with the
+  // count because it names it; every bullet takes "each" as its subject, which
+  // is true at any count and is what stops this needing a singular and a plural
+  // of each line. It read "That note stop being recognised" for a single note
+  // until 1.0.4 — five lines of plural verbs under a lead that had been given a
+  // singular subject and nothing else.
   const these = count === 1 ? "That note" : `Those ${count} notes`;
+  const stop = count === 1 ? "stops" : "stop";
+  const keep =
+    count === 1
+      ? "It keeps its text and stays where it is"
+      : "They keep their text and stay where they are";
   return [
-    `${these} stop being recognised as ${typeName} notes. They keep their text and stay where they are, but:`,
-    "• they lose their breadcrumbs at the top of the note",
-    "• they drop out of the review queue",
-    "• they stop appearing in their parent's tables — still in the folder, gone from the index",
-    "• the tracker picker stops offering this journal's trackers on them",
+    `${these} ${stop} being recognised as ${typeName} notes. ${keep}, but:`,
+    "• each loses its breadcrumbs at the top of the note",
+    "• each drops out of the review queue",
+    "• each stops appearing in its parent's tables — still in the folder, gone from the index",
+    "• each loses this journal's trackers from its tracker picker",
     `Adding this note type back with the same name restores all of it.`,
+  ];
+}
+
+// What dropping a level costs the index notes that carry it.
+//
+// SEPARATE FROM `declassificationCost` BECAUSE THE SIX BULLETS ARE NOT TRUE OF
+// AN INDEX NOTE. A leaf note that stops being recognised falls out of the
+// review queue and loses its tracker picker; an index note was never in either.
+// What an index note loses is its whole reason to exist — it is the note that
+// DRAWS the tables, so an unrecognised one is markdown with a fence in it that
+// nothing renders, and the notes it was listing have nothing listing them.
+//
+// Reusing the other function's wording would have been six sentences, four of
+// them false, in a window whose entire job is to be believed.
+export function levelRemovalCost(
+  typeName: string,
+  noun: string,
+  count: number
+): string[] {
+  if (count === 0) return [];
+  const many =
+    count === 1 ? `one ${noun} index note` : `${count} ${noun} index notes`;
+  return [
+    `The journal has ${many}. Dropping the level stops ${typeName} recognising them. Each keeps its text and stays exactly where it is, but:`,
+    "• each stops drawing its tables — the fence in it renders as nothing",
+    "• each loses its breadcrumbs at the top of the note",
+    "• the notes inside each one drop out of the index: the folder above lists notes directly now, and these sit one folder deeper",
+    "Setting the depth back restores all of it.",
+  ];
+}
+
+// What adding a level costs the notes that are already where it is going.
+//
+// The counterpart above, and the reason the addition is treated as a real
+// consequence rather than as growth. It is also the one cost in this file that
+// the reader can undo by hand rather than by changing the setting back, so the
+// last line says how.
+export function levelAdditionCost(noun: string, count: number): string[] {
+  if (count === 0) return [];
+  const lead =
+    count === 1
+      ? "One note sits directly in a folder"
+      : `${count} notes sit directly in folders`;
+  return [
+    `${lead} that will hold ${noun} folders from here on. Nothing is rewritten, but:`,
+    "• each keeps its type: value, its text and its trackers",
+    "• each drops out of its folder's table — still in the folder, gone from the index",
+    `• moving each into a ${noun} folder puts it back`,
   ];
 }
 

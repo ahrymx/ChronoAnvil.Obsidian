@@ -32,6 +32,7 @@ import { EditorModal, SteppedEditorModal } from "../ui/editor-modal";
 import type { WizardStep, ValidationProblem } from "../ui/editor-modal";
 import {
   diffKinds,
+  diffLevels,
   isHandEdited,
   kindChangeNeedsConfirming,
   sectionsPresent,
@@ -74,6 +75,7 @@ import { registeredJournalTypes, variantKinds } from "../journals/journal";
 import {
   JournalConfig,
   JournalKindConfig,
+  JournalLevelConfig,
   JournalVariantConfig,
   buildJournalType,
   deriveJournalFolders,
@@ -1319,10 +1321,12 @@ export class JournalEditModal extends SteppedEditorModal {
     // what changed. Taken from `cfg` rather than from `draft`, which the form
     // mutates in place — a diff against a live reference would always be empty.
     this.kindsOnOpen = cfg.kinds.map((k) => ({ ...k }));
+    this.levelsOnOpen = cfg.levels.map((l) => ({ ...l }));
   }
 
   // See the constructor. Only read by commit.
   private kindsOnOpen: JournalKindConfig[];
+  private levelsOnOpen: JournalLevelConfig[];
 
   private get paths(): { journalsRoot: string; templates: string } {
     return this.plugin.settings.paths;
@@ -2917,6 +2921,32 @@ export class JournalEditModal extends SteppedEditorModal {
   // is cheap and because a stale number here would be worse than none: the
   // whole point of showing it is that "14 notes" is a thing a reader pictures
   // and "those notes" is not.
+  // Notes a new level strands: the ones sitting directly in a folder that is
+  // about to hold sub-folders instead.
+  //
+  // COUNTED BY `type:`, NOT BY PATH ALONE. A folder's own index note lives at
+  // the same depth as the notes beside it, and it is not a casualty — it stays
+  // exactly where it is and goes on being that folder's index. Filtering to the
+  // journal's KIND ids leaves it out, along with anything in the tree that this
+  // journal never wrote.
+  //
+  // `depth` IS THE NEW LEVEL'S INDEX, so a note stranded by it is one whose path
+  // under the root has `depth` folder segments and then a filename. At depth 1 —
+  // the flat-to-two-levels case, and for now the only one the dropdown offers —
+  // that is every leaf note the journal has.
+  private notesStrandedByLevel(root: string, depth: number): number {
+    if (depth < 1) return 0;
+    const kindIds = new Set(this.draft.kinds.map((k) => k.id));
+    let n = 0;
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      if (!file.path.startsWith(`${root}/`)) continue;
+      const parts = file.path.slice(root.length + 1).split("/");
+      if (parts.length !== depth + 1) continue;
+      if (kindIds.has(noteTypeOf(this.app, file) ?? "")) n++;
+    }
+    return n;
+  }
+
   private countNotesOfKind(root: string, kindId: string): number {
     let n = 0;
     for (const file of this.app.vault.getMarkdownFiles()) {
@@ -2952,14 +2982,23 @@ export class JournalEditModal extends SteppedEditorModal {
   // stays here is this window's own gate: which changes are worth offering
   // after. Declining is free from either door, and the plan, the sentence and
   // the notice are the same because there is one of each.
+  // KINDS ONLY, AND THE LEVEL IS NOT AN OVERSIGHT. `findDashboardCatchups`
+  // looks for an index note that has no table for a note type it should list,
+  // which is a gap an added KIND opens and a depth change does not. A depth
+  // change asks a much larger question — the notes that were the deepest
+  // indexes now have folders under them and need a folder table where they have
+  // a note table — and answering half of it here would leave the vault in a
+  // state neither the reader nor `previewRepair` expected. That belongs to
+  // `Set up / repair vault`, which recomposes from the catalogue.
   private async offerDashboardCatchup(changes: KindChange[]): Promise<void> {
-    if (!changes.some((c) => c.kind === "added")) return;
+    if (!changes.some((c) => c.subject === "kind" && c.kind === "added")) return;
     await offerDashboardCatchup(this.app, buildJournalType(this.draft));
   }
 
   protected async commit(): Promise<void> {
     this.draft.name = this.draft.name.trim();
     const kindsBefore = this.kindsOnOpen;
+    const levelsBefore = this.levelsOnOpen;
     this.draft.kinds = normaliseKinds(this.draft.kinds, {
       preserveIds: this.isEstablished,
     });
@@ -2977,12 +3016,29 @@ export class JournalEditModal extends SteppedEditorModal {
     // settings changed and the folder not: the same reading of "I did not
     // answer" the tracker-orphan picker settled on.
     if (this.isEstablished) {
-      const changes = diffKinds(kindsBefore, this.draft.kinds);
+      // BOTH DIFFS, ONE WINDOW. A level is an id that becomes a `type:` value
+      // exactly as a kind is, and dropping a journal from two levels to flat
+      // used to declassify every sub-index note with no confirmation at all —
+      // the identical change to a note type has opened a warning-coloured
+      // window with a count in it since 2.56. See `KindChangeSubject`.
+      const changes = [
+        ...diffKinds(kindsBefore, this.draft.kinds),
+        ...diffLevels(levelsBefore, this.draft.levels),
+      ];
       if (kindChangeNeedsConfirming(changes)) {
         const counts: KindChangeCounts = {};
         for (const c of changes) {
           if (c.kind === "removed") {
             counts[c.id] = this.countNotesOfKind(this.draft.root, c.id);
+          } else if (c.subject === "level" && c.kind === "added") {
+            // The one entry whose count is not "notes carrying this id" —
+            // there is no note carrying it yet. It is the notes the new level
+            // strands, and `costOf` in the window is where the two meanings are
+            // told apart and given different sentences.
+            counts[c.id] = this.notesStrandedByLevel(
+              this.draft.root,
+              this.draft.levels.findIndex((l) => l.id === c.id)
+            );
           }
         }
         const ok = await confirmKindChange(
