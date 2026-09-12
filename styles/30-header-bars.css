@@ -48,6 +48,47 @@
   font-size: var(--ca-bar-glyph);
   line-height: 1.35;
 }
+/* THE ICON, AS A CONTROL (1.0.9). The glyph was a character in the title string
+   and was edited by typing it into the name; it is a button now, and the slot
+   above is the box it fills.
+
+   THE BUTTON TAKES NOTHING FROM THE SLOT. Every rule that positions and sizes
+   the glyph stays on the span — the fixed width is what aligns a column of
+   titles, and a button that set its own would align the bars to one number and
+   the group heads under them to another. So this is a button stripped back to
+   nothing: no box, no padding, and the type inherited from the slot it sits in.
+
+   THE HOVER IS THE AFFORDANCE, on `.ca-journal-header-title-editable`'s
+   argument and with its own shape: a tint under the icon alone says the icon is
+   the target, where a tint on the bar would say the bar folds — which it also
+   does, from the same click the button stops. */
+.ca-journal-header-glyph-btn {
+  all: unset;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  cursor: pointer;
+  border-radius: var(--ca-radius-sm);
+  transition: background 0.12s, opacity 0.12s;
+}
+.ca-journal-header-glyph-btn:hover {
+  background: var(--background-modifier-hover);
+}
+.ca-journal-header-glyph-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+/* A SECTION WITH NO ICON STILL SHOWS THE BOX, because a control a reader cannot
+   see is not one. Faint until the pointer is on it: the placeholder is an offer
+   rather than a thing the section has, and at full strength a column of plus
+   signs would read as content. */
+.ca-journal-header-glyph-btn.is-empty {
+  opacity: 0.25;
+}
+.ca-journal-header-glyph-btn.is-empty:hover,
+.ca-journal-header-glyph-btn.is-empty:focus-visible {
+  opacity: 1;
+}
 .ca-journal-header-note {
   flex: 0 0 auto;
   font-size: var(--ca-bar-text);
@@ -1017,12 +1058,35 @@ body.is-mobile
  * the title two pixels shy of the head's spine.
  *
  * Four classes so it outranks that rule from an earlier file: the bar keeps its
- * band's air and its hairline, and bleeds 14px — the stack's inset — so the rule
- * under the title meets the card's sides the way every other band's does. */
+ * band's air and its hairline, and the rule under the title meets the card's
+ * sides the way every other band's does.
+ *
+ * AND IT MUST NOT BLEED, WHICH IS WHAT THIS RULE GOT WRONG UNTIL 1.0.9. It
+ * carried `margin: 0 -14px 7px` alongside the 14px inset, copying the surface's
+ * shape without its premise: a bar inside a SECTION BLOCK bleeds because the
+ * block pads it, and the stack's card states `padding: 0` twenty lines up,
+ * precisely so that each band can state its own. Bleeding out of a padding that
+ * is not there and padding back in by the same number leaves the bar's content
+ * flush against the card, so a welded section's glyph began at the exact pixel
+ * the card's border ends — reported as a clipped folder icon, and it is not
+ * clipped: it is a 16px emoji with no air on one side of it and 14px on the
+ * other, which is what an eye reads as a cut edge.
+ *
+ * THE MEASURABLE FAULT IS THE COLUMN, and it is why the answer is the inset
+ * rather than a gap on the glyph. Every other band in the card starts at 14px —
+ * the page's name, the chevron strip, the logging grid, and `~ *` below for
+ * everything the section itself draws — so the one band out of line was the
+ * section title, and the group heads under it sat 14px to the RIGHT of the
+ * title they belong to.
+ *
+ * This is `.ca-journal-stack .ca-journal-page-head`'s defect one band down —
+ * *"their name sat flush against the card's edge over bands inset 14px"* — and
+ * it takes the same answer. The hairline still meets both sides, because with
+ * no margin the bar's border box IS the card's padding box. */
 .ca-journal-widget-block.ca-journal-stack
   > .ca-journal-sec-l1.ca-journal-header-bar {
   padding: 8px 14px 6px;
-  margin: 0 -14px 7px;
+  margin: 0 0 7px;
 }
 /* And everything the section drew under its bar. */
 .ca-journal-stack > .ca-journal-sec-l1 ~ * {

@@ -69,7 +69,7 @@ import { splitGlyph } from "./section-frame";
 import type ChronoAnvilPlugin from "../main";
 import { journalTypeAtPath } from "../journals/journal";
 import type { JournalKind, JournalType } from "../journals/journal";
-import { promptKindRename } from "./modals";
+import { promptEmoji, promptKindRename } from "./modals";
 import { notify } from "../core/notify";
 import { repaintOpenNotes } from "./livewidget";
 
@@ -394,6 +394,16 @@ function fenceHeadsAt(
   return { first: heads[0] === at, count: heads.length };
 }
 
+// One title, rejoined from the two halves the reader edits separately.
+//
+// A SINGLE SPACE, ALWAYS. `splitGlyph` accepts any run of whitespace between the
+// glyph and the first word and the reader's own spacing survives a rename
+// untouched — but this function is the WRITE path for a picked icon, where
+// there is no spacing to preserve because the reader typed none.
+export function joinGlyph(glyph: string, text: string): string {
+  return glyph ? `${glyph} ${text}` : text;
+}
+
 // Make a bar's title slot click-to-edit.
 //
 // ON THE TITLE SLOT, NOT THE BAR. The bar is already a click target — the whole
@@ -401,6 +411,30 @@ function fenceHeadsAt(
 // make folding and renaming one slip apart. `stopPropagation` on the title is
 // what keeps the two separable, and it is why the pencil sits inside the slot:
 // the affordance has to name the smaller target it belongs to.
+//
+// ── AND THE ICON IS ITS OWN CONTROL (1.0.9) ──────────────────────────────
+//
+// The glyph used to be edited by typing it into the name: the input carried the
+// title as WRITTEN, emoji and all, and the note below argued that it had to,
+// because "an input pre-filled with the text half alone would silently drop the
+// glyph on every save". That argument was about a field that is the whole
+// string. It stops applying the moment the glyph has a control of its own,
+// which is what the slot beside the title now is — and the saving path rejoins
+// the two halves, so nothing is dropped by a reader who never touches the icon.
+//
+// WHY IT IS WORTH THE SECOND CONTROL. The field is where a section is NAMED, and
+// an emoji in a text box is the one character in it a reader cannot type on most
+// keyboards, cannot see the options for, and cannot correct without selecting
+// exactly the right one or two code points — `🗂️` is two. Picking from a grid is
+// what the plugin already offers for a logbook's icon (settings.ts), and a
+// section bar is the more visible of the two places an icon is chosen.
+//
+// TYPING ONE STILL WORKS, and is not a fallback so much as the rule the split
+// implies: if what the reader types into the name begins with a glyph, that
+// glyph is the section's — the same `splitGlyph` question the bar asks when it
+// renders. So the old gesture keeps working, a pasted `📕 Lessons` does not
+// become `📖 📕 Lessons`, and the picker is the discoverable route rather than
+// the only one.
 export function attachHeaderRename(
   plugin: ChronoAnvilPlugin,
   slot: HTMLElement,
@@ -420,23 +454,96 @@ export function attachHeaderRename(
   // it needs, because the directive's argument is the whole string and that is
   // what a rename rewrites — so it has to do the same split before displaying.
   //
-  // EDITING STILL SEES THE WHOLE STRING. The glyph is part of the title as the
-  // note carries it, and a reader who wants "📕 Lessons" should be able to type
-  // it; an input pre-filled with the text half alone would silently drop the
-  // glyph on every save.
+  // THE FIELD IS THE NAME AND THE SLOT IS THE ICON, since 1.0.9 — see the note
+  // above this function for what that replaced and why.
   const glyphSlot = (): HTMLElement | null =>
     slot.parentElement?.querySelector(".ca-journal-header-glyph") ?? null;
+  const glyphOf = (): string => splitGlyph(title).glyph;
+  const textOf = (): string => {
+    const shown = splitGlyph(title);
+    return shown.glyph ? shown.text : title;
+  };
 
   const render = (): void => {
     slot.empty();
     slot.addClass("ca-journal-header-title-editable");
-    const shown = splitGlyph(title);
     slot.createSpan({
       cls: "ca-journal-header-title-text",
-      text: shown.glyph ? shown.text : title,
+      text: textOf(),
     });
     slot.setAttribute("aria-label", `Rename “${title}”`);
     slot.title = "Click to rename this section";
+    renderGlyph();
+  };
+
+  // The icon, as a button in the slot the frame drew for it.
+  //
+  // A BUTTON INSIDE THE SPAN RATHER THAN A SPAN MADE PRESSABLE. The span is the
+  // frame's — its width is what aligns a column of titles down the page — and a
+  // `<button>` is what a screen reader and a keyboard both already understand.
+  // The button fills the slot, so the pressable area is the box the reader sees
+  // and the alignment is untouched.
+  //
+  // EMPTY IS A STATE AND IT IS DRAWN. A section that carries no emoji shows a
+  // faint placeholder rather than nothing: an invisible control in a box a
+  // reader has no reason to suspect is a control is the same as no control.
+  const renderGlyph = (): void => {
+    const box = glyphSlot();
+    if (!box) return;
+    box.empty();
+    const glyph = glyphOf();
+    const btn = box.createEl("button", {
+      cls: "ca-journal-header-glyph-btn",
+      text: glyph || "➕",
+      attr: {
+        type: "button",
+        "aria-label": glyph
+          ? `Change the icon for “${textOf()}”`
+          : `Add an icon to “${textOf()}”`,
+        title: "Click to choose an icon",
+      },
+    });
+    if (!glyph) btn.addClass("is-empty");
+    btn.addEventListener("click", (evt) => {
+      // Same reason the title stops its own click: the bar under both of these
+      // folds the section, and one gesture may not mean two things.
+      evt.preventDefault();
+      evt.stopPropagation();
+      void pickGlyph();
+    });
+  };
+
+  // ONE WRITE PATH FOR BOTH HALVES. A picked icon goes through
+  // `commitHeaderTitle` exactly as a rename does, which is what carries the
+  // reader's fold across it and repaints the note once. `offerKindRename`
+  // already declines when only the glyph moved, so choosing an icon does not
+  // ask about renaming a note type.
+  let picking = false;
+  const pickGlyph = async (): Promise<void> => {
+    if (picking) return;
+    picking = true;
+    try {
+      const picked = await promptEmoji(plugin.app, glyphOf(), true);
+      // Dismissed. `""` is the reader asking for no icon and is not this.
+      if (picked === null) return;
+      const next = joinGlyph(picked.trim(), textOf());
+      if (next === title) return;
+      const refusal = headerTitleRefusal(next);
+      if (refusal) {
+        new Notice(refusal);
+        return;
+      }
+      const ok = await commitHeaderTitle(
+        plugin,
+        notePath,
+        { ...site, title },
+        next
+      );
+      if (ok) title = next;
+      render();
+    } finally {
+      picking = false;
+    }
   };
 
   const beginEdit = (): void => {
@@ -447,7 +554,8 @@ export function attachHeaderRename(
       type: "text",
       cls: "ca-journal-header-title-input",
     });
-    input.value = title;
+    // THE NAME, NOT THE WHOLE STRING. The icon is the button beside this field.
+    input.value = textOf();
 
     // ONE COMMIT PER EDIT, the flag `study-header.ts` needed and for the same
     // reason: Enter commits, the write repaints the note, the repaint detaches
@@ -459,12 +567,27 @@ export function attachHeaderRename(
     const finish = async (save: boolean): Promise<void> => {
       if (settled) return;
       settled = true;
-      const next = input.value.trim();
+      const typed = input.value.trim();
+      // A GLYPH TYPED INTO THE NAME IS STILL A GLYPH, which is the same question
+      // the bar asks of the stored string when it renders. Without it, pasting
+      // "📕 Lessons" back into a field that has already had its icon taken out
+      // would compose "📖 📕 Lessons" on disk.
+      const typedSplit = splitGlyph(typed);
+      const next = typedSplit.glyph
+        ? typed
+        : joinGlyph(glyphOf(), typed);
+      // The refusal is about the NAME. `headerTitleRefusal` reads a whole
+      // argument and would accept a bare "📖" as non-empty, leaving a section
+      // titled by its icon and nothing else — which no reader asked for by
+      // clearing the field.
+      const refusal =
+        typedSplit.text.trim() === ""
+          ? "A section heading can't be empty."
+          : headerTitleRefusal(next);
       if (!save || next === title) {
         render();
         return;
       }
-      const refusal = headerTitleRefusal(next);
       if (refusal) {
         new Notice(refusal);
         render();
@@ -474,14 +597,10 @@ export function attachHeaderRename(
       // On success the write repaints the note and this element goes with it;
       // repainting here anyway keeps the bar honest in the window before that
       // lands, and is the only visible state on failure.
-      if (ok) {
-        title = next;
-        // The glyph lives outside this slot, so a rename that changed it would
-        // otherwise leave the old one showing beside the new text until the
-        // repaint landed.
-        const box = glyphSlot();
-        if (box) box.setText(splitGlyph(title).glyph);
-      }
+      if (ok) title = next;
+      // `render` redraws the icon as well as the name, so a rename that carried
+      // a new glyph in leaves no stale one beside it in the window before the
+      // repaint lands.
       render();
     };
 

@@ -1464,6 +1464,15 @@
   color: var(--text-muted);
   margin: 12px 0 6px;
 }
+/* How to ask for no icon at all, for the caller that allows it — the section
+   bar, whose glyph is a control rather than a stored preference. A line of
+   text rather than a tile, because a tile for absence has to be a picture of
+   nothing and reads as a bug. */
+.ca-emoji-none-hint {
+  font-size: var(--ca-text-xs);
+  color: var(--text-faint);
+  margin: -8px 0 12px;
+}
 
 /* --- Section header (label + optional action) --------------------------- */
 

@@ -752,6 +752,45 @@ describe("the stack's card", () => {
     expect(at).toBeGreaterThan(0);
     expect(css().slice(at, css().indexOf("}", at))).toContain("flex: 0 1 auto");
   });
+
+  it("insets a welded section's title band rather than bleeding it", () => {
+    // 1.0.9, REPORTED AS A CLIPPED FOLDER ICON. The rule below carried
+    // `margin: 0 -14px 7px` beside its 14px inset, which is the shape
+    // 70-section-surface.css uses for a bar inside a section BLOCK — and that
+    // shape only makes sense where the block pads the bar, which is exactly
+    // what the stack's card refuses to do two tests up. Bleeding out of a
+    // padding that is not there and padding back in by the same number leaves
+    // the content flush: the section's glyph started at the pixel the card's
+    // border ends, with 14px of air on its other side.
+    const at = css().indexOf(
+      ".ca-journal-widget-block.ca-journal-stack\n  > .ca-journal-sec-l1.ca-journal-header-bar {"
+    );
+    expect(at).toBeGreaterThan(0);
+    const rule = css().slice(at, css().indexOf("}", at));
+    expect(rule).toContain("padding: 8px 14px 6px");
+    // THE WHOLE OF THE FIX, and it must be stated as an absence: any negative
+    // horizontal margin here cancels the inset again.
+    expect(rule).not.toMatch(/margin:[^;]*-14px/);
+    expect(rule).toContain("margin: 0 0 7px");
+  });
+
+  it("puts the title in the same column as every other band", () => {
+    // WHY THE ANSWER IS THE INSET AND NOT A GAP ON THE GLYPH. The card is one
+    // column of bands and 14px is what every one of them starts at, including
+    // the section's OWN body — so a bar that starts at 0 puts a section title
+    // to the left of the group heads inside it.
+    for (const selector of [
+      ".ca-journal-stack .ca-journal-page-head",
+      ".ca-journal-stack > .ca-journal-reveal-bar",
+      ".ca-journal-stack > .ca-journal-sec-l1 ~ *",
+    ]) {
+      const at = css().indexOf(`${selector} {`);
+      expect(at, selector).toBeGreaterThan(0);
+      expect(css().slice(at, css().indexOf("}", at)), selector).toMatch(
+        /padding(-left)?:[^;]*\b14px/
+      );
+    }
+  });
 });
 
 describe("what a stack may not do", () => {

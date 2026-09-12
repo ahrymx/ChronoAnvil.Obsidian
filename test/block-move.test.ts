@@ -17,6 +17,51 @@ import { describe, expect, it } from "vitest";
 import { blockIndexAt } from "../src/core/block-move";
 import { blockTitle, fieldBand } from "../src/ui/widgets/index";
 import { readCode, readCss, readSrc } from "./sources";
+import { stampLines } from "../src/ui/widgets/block-drag";
+
+// ── A DOM SMALL ENOUGH TO RUN `stampLines` AGAINST ──────────────────────
+//
+// The suite has no jsdom (see `vitest.config.ts`, which sets no environment),
+// and nearly everything here is asserted about the SHAPE of the source. This is
+// the one thing in this file worth actually running: `stampLines` is arithmetic
+// over a child list, the bug below is an off-by-one in it, and a source-shape
+// assertion about where the call sits cannot tell a correct order from a
+// plausible-looking wrong one.
+//
+// `HTMLElement` IS DEFINED HERE BECAUSE THE FUNCTION ASKS FOR IT. It filters
+// `container.children` with `instanceof`, which throws outright with no such
+// global — so the fake extends a shim standing in for it. Nothing else in the
+// function touches the DOM: it reads `children` and writes two attributes.
+class Shim {}
+(globalThis as { HTMLElement?: unknown }).HTMLElement = Shim;
+
+class Kid extends Shim {
+  attrs = new Map<string, string>();
+  children: Kid[] = [];
+  setAttribute(k: string, v: string): void {
+    this.attrs.set(k, v);
+  }
+  getAttribute(k: string): string | null {
+    return this.attrs.get(k) ?? null;
+  }
+  get childElementCount(): number {
+    return this.children.length;
+  }
+}
+
+// A block the loop drew `n` children into, in order, from the lines given.
+const drew = (lines: readonly number[]): { box: Kid; drawn: { at: number; line: number }[] } => {
+  const box = new Kid();
+  const drawn: { at: number; line: number }[] = [];
+  for (const line of lines) {
+    drawn.push({ at: box.childElementCount, line });
+    box.children.push(new Kid());
+  }
+  return { box, drawn };
+};
+
+const stamps = (box: Kid): (string | null)[] =>
+  box.children.map((c) => c.getAttribute("data-ca-line"));
 
 // A note of three blocks with the composer's own spacing: one blank line
 // between fences, and a spacer on the body's first line.
@@ -612,6 +657,87 @@ describe("the gesture around it", () => {
     // the region and holds no trackers is a child no directive drew, so the
     // stamp `stampLines` handed it names somebody else's line.
     expect(widgets).toContain("else clearStamp(trackerBar);");
+  });
+
+  // ── THE CHROME PREPENDED UNDER THE HEAD (1.0.9) ───────────────────────
+  //
+  // *"diary trackers section drag icon is appearing before the widget's
+  // overlayed header."*
+  //
+  // `drawn` records `container.childElementCount` at the top of each iteration,
+  // so its entries are positions in the child list THE LOOP BUILT. Four things
+  // no directive drew are put into that list afterwards — the empty grid, the
+  // add-kind row, a diary entry's page-context strip and a journal note's facts
+  // row — and two of them go in at the front. `stampLines` ran below all four,
+  // so on an entry's tracker block the strip took index 0 and was handed the
+  // tracker directive's line.
+  //
+  // WHAT THE READER SAW FROM THAT. `loose` counts stamped children, so a block
+  // holding one widget looked like two: `perWidget` turned on, the block's own
+  // grip was withheld, and the STRIP got a per-widget grip. A grip sits over the
+  // top edge of what it drags, the strip is the first child, so those dots
+  // landed exactly where the block's head opens — and 5.16's pairing is written
+  // over `.has-head > .ca-jbd-handle`, a DIRECT child, so it could hold neither
+  // half of a grip one level further down. Dots on a hover of the date stepper,
+  // with no name beside them.
+  it("stamps the children before any chrome is inserted", () => {
+    const widgets = readCode("widgets");
+    const stamp = widgets.indexOf("stampLines(container, drawn, rawLines.length);");
+    expect(stamp, "nothing stamps the block").toBeGreaterThan(-1);
+    // The four insertions, each of which changes an index `drawn` has already
+    // recorded. Named one at a time rather than swept, because a fifth added
+    // above the call is the same bug and this list is where it gets noticed.
+    for (const insert of [
+      "container.createDiv({\n          cls: \"ca-journal-widget-bar ca-journal-tracker-bar\",",
+      "if (addKind) container.appendChild(addKind);",
+      "container.prepend(strip);",
+      "container.prepend(facts);",
+    ]) {
+      const at = widgets.indexOf(insert);
+      expect(at, insert).toBeGreaterThan(-1);
+      expect(at, insert).toBeGreaterThan(stamp);
+    }
+  });
+
+  it("gives a prepended child no line of its own", () => {
+    // The strip's own stamp, which is what turned one widget into two.
+    const { box, drawn } = drew([3]);
+    stampLines(box as never, drawn, 5);
+    // Stamped while the list is the loop's: the one widget gets the one line.
+    expect(stamps(box)).toEqual(["3"]);
+    // And the strip, prepended after, carries nothing — so `loose` counts one
+    // child, `perWidget` stays off, and the grip goes on the block where the
+    // head can pair with it.
+    box.children.unshift(new Kid());
+    expect(stamps(box)).toEqual([null, "3"]);
+
+    // AND THE GUARD THE WHOLE FIX RESTS ON, stated on its own: a child sitting
+    // before every position the loop recorded is not the loop's, and takes no
+    // line rather than the first one's. Without it, moving the call up would
+    // trade a chrome element stamped with its neighbour's line for one stamped
+    // with the first widget's.
+    const early = drew([3]);
+    early.box.children.unshift(new Kid());
+    early.drawn[0].at = 1;
+    stampLines(early.box as never, early.drawn, 5);
+    expect(stamps(early.box)).toEqual([null, "3"]);
+  });
+
+  it("would have shifted every sibling after it, not just the chrome", () => {
+    // THE HALF NOBODY REPORTED, and the reason the answer is to move the call
+    // rather than to clear one element's stamp. A prepend shifts every index
+    // after it, so stamping afterwards hands each widget the NEXT directive's
+    // line — a drag that moves somebody else's lines. It stayed invisible
+    // because the one block this reaches draws a single widget.
+    const { box, drawn } = drew([2, 4, 6]);
+    box.children.unshift(new Kid());
+    stampLines(box as never, drawn, 9);
+    expect(stamps(box)).toEqual(["2", "4", "6", "6"]);
+    // Which is wrong about two of the three: the widget drawn from line 2 is
+    // now stamped 4, and the one from line 4 is stamped 6.
+    const right = drew([2, 4, 6]);
+    stampLines(right.box as never, right.drawn, 9);
+    expect(stamps(right.box)).toEqual(["2", "4", "6"]);
   });
 
   it("puts no head on a widget that already has a band", () => {

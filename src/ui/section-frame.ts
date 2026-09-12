@@ -178,6 +178,16 @@ export interface SectionFrameOptions {
   // counted is worse than no pill, and only the caller knows the difference
   // between "none" and "not counted".
   count?: number | null;
+  // Draw the glyph's slot even when the title carries no glyph.
+  //
+  // FOR A BAR WHOSE GLYPH IS EDITABLE, and there is one — `attachHeaderRename`
+  // turns the slot into the button that opens the icon picker. Without it a
+  // section that has lost its emoji has nowhere to press to get one back, and
+  // the empty box is drawn by the frame rather than conjured by the caller for
+  // the reason every other part of this bar is: the slot's width is what aligns
+  // a column of titles, and a second element claiming to be it would align them
+  // to a different number.
+  glyphSlot?: boolean;
   // The glyph, given rather than split out of `title`.
   //
   // Most sections carry theirs inside the title string because a `header:`
@@ -289,7 +299,14 @@ export function sectionFrame(
   // is what buys the fixed slot. A section with no glyph still gets no slot —
   // an empty 16px box in front of every untitled-glyph section would align the
   // titles by indenting all of them, which is a worse trade than ragged.
-  if (glyph) {
+  //
+  // UNLESS THE SLOT IS A CONTROL (1.0.9), which is what `glyphSlot` says. The
+  // rule above is about a box that DISPLAYS nothing, and it is unchanged: dead
+  // space in front of a title earns no indent. A box a reader can press to
+  // choose the section's icon is not dead space, and a bar whose title can be
+  // renamed but whose icon can only be reached by typing one into the name is
+  // the split this option exists to close.
+  if (glyph || opts.glyphSlot) {
     root.createSpan({ cls: "ca-journal-header-glyph", text: glyph });
   }
 

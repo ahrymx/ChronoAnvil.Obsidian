@@ -5,6 +5,42 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] - 2026-09-12
+
+### Changed
+
+- **A section's icon is its own button, and the name field holds only the
+  name.** Clicking a section heading opened one text box over the icon and the
+  title together, so changing a picture meant knowing which emoji you had typed
+  and retyping it beside the words. The icon is now a button of its own: press
+  it and the plugin's icon picker opens, with an entry for no icon at all, so a
+  section can lose its picture as easily as it gained one. The name beside it
+  edits as before and shows the name alone. A heading with no icon yet draws a
+  faint slot to press rather than nothing, and an icon typed at the front of the
+  name is still read as the icon, so pasting a title that already carries one
+  cannot end up with two.
+
+### Fixed
+
+- **A welded section heading sits in the same column as everything above it.**
+  On a page drawn as one stack, a section's title band pulled itself 14px wider
+  than the card on both sides while keeping its own inset, and the two cancelled:
+  the heading's icon began at the exact pixel the card's border ends, with no air
+  on one side of it and the page name, the chevron strip and every group head
+  indented past it. The band now states the inset the rest of the stack states,
+  so the titles line up and the icon reads as an icon rather than as something
+  cut off at the edge.
+
+- **A diary entry's tracker section keeps its drag handle with its header.** The
+  handle a widget offers when you hover it is meant to appear over the head it
+  belongs to. In an entry it appeared above the section instead, on a strip of
+  page context that is not a widget at all, because the plugin recorded which
+  line each drawn thing came from before inserting that strip and read the record
+  back afterwards — so the strip took the first slot and, with it, the line
+  belonging to the trackers. Everything is now stamped as it is drawn. The
+  handle pairs with its own header again, and a widget that had something
+  inserted above it no longer answers with the next widget's line.
+
 ## [1.0.8] - 2026-09-12
 
 ### Fixed

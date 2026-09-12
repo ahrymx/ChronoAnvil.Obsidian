@@ -36,11 +36,44 @@ describe("an editable title is drawn once", () => {
     expect(readSrc("header-title")).toContain("splitGlyph(title)");
   });
 
-  it("edits the whole string, glyph included", () => {
-    // The directive's argument is the title as written. An input pre-filled
-    // with the text half alone would silently drop the glyph on every save, and
-    // a reader who wants "📕 Lessons" could never type it.
-    expect(readSrc("header-title")).toContain("input.value = title;");
+  it("edits the NAME, and leaves the icon to its own control", () => {
+    // THE CLAIM HERE WAS THE OPPOSITE UNTIL 1.0.9: *"an input pre-filled with
+    // the text half alone would silently drop the glyph on every save, and a
+    // reader who wants '📕 Lessons' could never type it"*. Both halves of that
+    // are answered rather than overruled — the save path rejoins the glyph
+    // (`joinGlyph`), and a glyph typed into the name is still read as one — so
+    // what is left of the old argument is an emoji sitting in a text box that
+    // is otherwise the section's name.
+    //
+    // ANCHORED TO THIS CONTROL, because the file holds three renames and
+    // `attachNoteRename` genuinely does edit a whole string: the assertion this
+    // replaces went on passing after the change by matching THAT one, which is
+    // the quiet pass this suite's helpers exist to stop.
+    const src = readSrc("header-title");
+    const at = src.indexOf("export function attachHeaderRename");
+    const end = src.indexOf("export function attachPropertyRename");
+    expect(at).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(at);
+    const body = src.slice(at, end);
+    expect(body).toContain("input.value = textOf();");
+    expect(body).not.toContain("input.value = title;");
+  });
+
+  it("rejoins the two halves on the way back to the file", () => {
+    // The directive's argument is still the title as written — one string with
+    // the icon in it — so nothing about the FILE changed, only which control
+    // edits which half of it.
+    const src = readSrc("header-title");
+    expect(src).toContain("export function joinGlyph");
+    expect(src).toContain("joinGlyph(glyphOf(), typed)");
+  });
+
+  it("reads a glyph typed into the name as the icon", () => {
+    // Otherwise pasting "📕 Lessons" into a field whose icon is already 📖
+    // composes "📖 📕 Lessons" on disk. The same `splitGlyph` question the bar
+    // asks when it renders, asked on the way in.
+    expect(readSrc("header-title")).toContain("const typedSplit = splitGlyph(typed);");
+    expect(readSrc("header-title")).toContain("typedSplit.glyph\n        ? typed");
   });
 
   it("is the split the frame itself performs", () => {
@@ -54,7 +87,17 @@ describe("an editable title is drawn once", () => {
     // The glyph lives outside the slot, so renaming "📖 Lessons" to
     // "📕 Lessons" would otherwise leave the old one beside the new text until
     // the note repainted.
-    expect(readSrc("header-title")).toContain("box.setText(splitGlyph(title).glyph)");
+    //
+    // ONE REDRAW RATHER THAN A PATCH TO THE OLD ELEMENT (1.0.9). This used to
+    // be `box.setText(splitGlyph(title).glyph)` — right while the slot held a
+    // character, wrong now it holds a button, because setting text on the box
+    // would delete the control. `render` draws both halves from `title`, so
+    // there is one description of what the bar shows instead of two.
+    const src = readSrc("header-title");
+    expect(src).not.toContain("box.setText(splitGlyph(title).glyph)");
+    const at = src.indexOf("  const render = (): void => {");
+    expect(at).toBeGreaterThan(0);
+    expect(src.slice(at, src.indexOf("\n  };", at))).toContain("renderGlyph();");
   });
 });
 

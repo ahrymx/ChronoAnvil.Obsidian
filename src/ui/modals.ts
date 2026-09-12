@@ -1045,18 +1045,43 @@ export function confirmPlan(
 }
 
 // ── Emoji Picker Modal ──────────────────────────────────────────────────
+//
+// DISMISSAL IS AN ANSWER, AND IT WAS NOT ONE UNTIL 1.0.9. `onClose` emptied the
+// element and resolved nothing, so a reader who pressed Escape left the caller
+// awaiting a promise that could never settle. Nothing depended on it — the one
+// caller was a `.then` on a settings row, and a `.then` that never runs looks
+// exactly like a cancel — but the section bar's icon button awaits this to
+// decide whether to write the note, and a hung await there is an edit that
+// silently never happens.
+//
+// `settled` rather than a nulled callback, for `attachHeaderRename`'s reason:
+// choosing a tile closes the modal, closing fires `onClose`, and `onClose`
+// would otherwise report a cancel over the choice just made.
 export class EmojiPickerModal extends Modal {
   private resolve: (value: string | null) => void = () => {};
+  private settled = false;
   private current: string;
+  private allowNone: boolean;
 
-  constructor(app: App, current: string) {
+  constructor(app: App, current: string, allowNone = false) {
     super(app);
     this.current = current || "🗒️";
+    this.allowNone = allowNone;
   }
 
   openAndGetValue(resolve: (value: string | null) => void): void {
     this.resolve = resolve;
     this.open();
+  }
+
+  // `null` is "the reader backed out"; `""` is "the reader asked for no icon".
+  // Two outcomes rather than one falsy value, because a caller that cannot tell
+  // them apart either refuses to clear an icon or clears it every time the
+  // window is dismissed.
+  private settle(value: string | null): void {
+    if (this.settled) return;
+    this.settled = true;
+    this.resolve(value);
   }
 
   onOpen(): void {
@@ -1073,21 +1098,26 @@ export class EmojiPickerModal extends Modal {
         t.setValue(this.current);
         t.inputEl.addClass("ca-emoji-input");
         t.inputEl.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") {
-            const val = t.getValue().trim();
-            this.resolve(val || this.current);
-            this.close();
-          }
+          if (e.key === "Enter") this.saveTyped(t.getValue());
         });
       })
       .addButton((b) =>
         b.setButtonText("Save").setCta().onClick(() => {
           const input = contentEl.querySelector(".ca-emoji-input") as HTMLInputElement;
-          const val = input?.value?.trim();
-          this.resolve(val || this.current);
-          this.close();
+          this.saveTyped(input?.value ?? "");
         })
       );
+
+    // CLEARING THE FIELD IS HOW AN ICON IS REMOVED, where the caller allows it.
+    // A tile for "none" would need a picture of absence; the field a reader is
+    // already typing into is where they would try it, and emptying a box is
+    // what emptying a box means everywhere else in this plugin.
+    if (this.allowNone) {
+      contentEl.createDiv({
+        cls: "ca-emoji-none-hint",
+        text: "Leave the field empty and save to use no icon.",
+      });
+    }
 
     const categories: { label: string; emojis: string[] }[] = [
       {
@@ -1116,20 +1146,35 @@ export class EmojiPickerModal extends Modal {
         });
         if (emoji === this.current) btn.addClass("is-selected");
         btn.addEventListener("click", () => {
-          this.resolve(emoji);
+          this.settle(emoji);
           this.close();
         });
       }
     }
   }
 
+  // An empty field means the current icon for a caller that cannot take "none",
+  // and means "none" for one that can. The two callers differ in exactly this,
+  // which is why it is one flag rather than two windows.
+  private saveTyped(raw: string): void {
+    const val = raw.trim();
+    if (!val && !this.allowNone) this.settle(this.current);
+    else this.settle(val);
+    this.close();
+  }
+
   onClose(): void {
     this.contentEl.empty();
+    this.settle(null);
   }
 }
 
-export function promptEmoji(app: App, current = "🗒️"): Promise<string | null> {
+export function promptEmoji(
+  app: App,
+  current = "🗒️",
+  allowNone = false
+): Promise<string | null> {
   return new Promise((resolve) => {
-    new EmojiPickerModal(app, current).openAndGetValue(resolve);
+    new EmojiPickerModal(app, current, allowNone).openAndGetValue(resolve);
   });
 }

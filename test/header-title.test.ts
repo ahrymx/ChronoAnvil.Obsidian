@@ -24,7 +24,7 @@
 
 import { describe, expect, it } from "vitest";
 import { studyComposed } from "./study-template";
-import { readCode, readCss, readSrc } from "./sources";
+import { cssRule, readCode, readCss, readSrc } from "./sources";
 import {
   MODIFIER_KEYWORDS,
   argSpanIn,
@@ -368,5 +368,119 @@ describe("the two gestures on one bar", () => {
     // The original report was "hover does not show the field as editable".
     const css = readCss();
     expect(css).toContain(".ca-journal-header-title-editable:hover");
+  });
+});
+
+// ── THE ICON IS THE THIRD GESTURE ON THE BAR (1.0.9) ─────────────────────
+//
+// *"detach section title's icons from the text field so that the icon is a
+// separate button; when clicked it opens an emoji picker."*
+//
+// The bar now carries three targets that are three different writes: the strip
+// folds the section, the name renames it, and the box in front of the name
+// chooses its icon. Two of those are inside the third, so the interesting
+// property is still separation — and the one below it is that BOTH halves
+// travel the same write path, because a second one is how a picked icon starts
+// forgetting the fold key or the note-type offer that a rename carries.
+describe("the section's icon, as its own control", () => {
+  const src = () => readSrc("header-title");
+
+  it("draws the glyph slot as a button", () => {
+    expect(src()).toContain('cls: "ca-journal-header-glyph-btn"');
+    // INSIDE THE FRAME'S SLOT, not instead of it. The span's fixed width is
+    // what aligns a column of titles down the page, so a control that replaced
+    // it would align the section bars to one number and the group heads under
+    // them to another.
+    expect(src()).toContain(
+      'slot.parentElement?.querySelector(".ca-journal-header-glyph")'
+    );
+    // THE BUTTON TAKES NOTHING FROM THE SLOT, which is the half of this a
+    // stylesheet can state: `all: unset` and a width of 100% make it fill the
+    // box the frame sized rather than size one of its own.
+    const rule = cssRule(".ca-journal-header-glyph-btn");
+    expect(rule).toContain("all: unset");
+    expect(rule).toContain("width: 100%");
+    expect(rule).toContain("cursor: pointer");
+  });
+
+  it("opens the picker the plugin already had", () => {
+    // `settings.ts` has chosen a logbook's icon from this window since 4.x. A
+    // second grid of emoji is how two surfaces start offering different ones.
+    expect(src()).toContain("await promptEmoji(plugin.app, glyphOf(), true)");
+  });
+
+  it("stops the click that would fold the section", () => {
+    // The same rule the title has, and the reason it has to be stated twice:
+    // both controls sit inside the strip whose own click folds.
+    const at = src().indexOf("const renderGlyph = (): void => {");
+    expect(at).toBeGreaterThan(0);
+    const body = src().slice(at, src().indexOf("\n  };", at));
+    expect(body).toContain("evt.stopPropagation()");
+  });
+
+  it("writes through the rename's own path, not a second one", () => {
+    // `commitHeaderTitle` is what carries the reader's fold across a retitle,
+    // repaints the note once, and asks about the note type. An icon written any
+    // other way would drop all three.
+    const at = src().indexOf("const pickGlyph = async");
+    expect(at).toBeGreaterThan(0);
+    const body = src().slice(at, src().indexOf("\n  };", at));
+    expect(body).toContain("await commitHeaderTitle(");
+  });
+
+  it("does not ask about renaming a note type when only the icon moved", () => {
+    // Already true and worth pinning now that a control exists which changes
+    // ONLY the glyph — before this, reaching that branch meant editing the name
+    // and putting it back.
+    expect(src()).toContain("if (!nowText || nowText === wasText) return;");
+  });
+
+  it("tells a dismissed picker from a cleared one", () => {
+    // `null` is "backed out" and `""` is "no icon, please". Collapsing them into
+    // one falsy value either refuses to clear an icon or clears it every time
+    // the window is dismissed with Escape.
+    expect(src()).toContain("if (picked === null) return;");
+    const modals = readSrc("modals");
+    expect(modals).toContain("if (!val && !this.allowNone) this.settle(this.current);");
+  });
+
+  it("settles the picker when it is dismissed", () => {
+    // THE BUG THE BUTTON WOULD HAVE INHERITED. `onClose` emptied the element and
+    // resolved nothing, so Escape left the caller awaiting a promise that could
+    // never settle. The settings row that was the only caller could not show it
+    // — a `.then` that never runs looks exactly like a cancel — and an `await`
+    // in the middle of a write path can.
+    const modals = readSrc("modals");
+    const at = modals.indexOf("export class EmojiPickerModal");
+    expect(at).toBeGreaterThan(0);
+    const body = modals.slice(at, modals.indexOf("export function promptEmoji", at));
+    expect(body).toMatch(/onClose\(\): void \{[^}]*this\.settle\(null\);/);
+    // And once: choosing a tile closes the window, which fires `onClose`, which
+    // would otherwise report a cancel over the choice just made.
+    expect(body).toContain("if (this.settled) return;");
+  });
+
+  it("gives a glyphless bar a slot to press", () => {
+    // A section whose emoji has been taken out is the one section that cannot
+    // reach the picker, unless the frame draws the empty box. The rule it bends
+    // is `sectionFrame`'s "no glyph, no slot", and only where the slot is a
+    // control — which is what the option is named for.
+    expect(readSrc("section-frame")).toContain("if (glyph || opts.glyphSlot) {");
+    expect(readSrc("widgets")).toContain("glyphSlot: true,");
+    // Drawn faintly rather than not at all: an invisible control in a box a
+    // reader has no reason to suspect is a control is the same as no control.
+    expect(cssRule(".ca-journal-header-glyph-btn.is-empty")).toContain("opacity");
+    expect(
+      cssRule(".ca-journal-header-glyph-btn.is-empty:hover")
+    ).toContain("opacity: 1");
+  });
+
+  it("refuses a name cleared down to its icon", () => {
+    // `headerTitleRefusal` reads a whole argument, so with the halves split it
+    // would accept a bare "📖" as non-empty and leave a section titled by its
+    // icon alone. Nobody asks for that by emptying the name field.
+    expect(src()).toContain('typedSplit.text.trim() === ""');
+    expect(headerTitleRefusal("📖 Lessons")).toBeNull();
+    expect(headerTitleRefusal("")).toContain("empty");
   });
 });

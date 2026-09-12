@@ -1404,6 +1404,13 @@ export class Widgets implements
               ? {
                   titleRender: (slot: HTMLElement) =>
                     attachHeaderRename(this.plugin, slot, ctx, site),
+                  // AND THE ICON IS EDITABLE WHEREVER THE NAME IS (1.0.9).
+                  // `attachHeaderRename` turns the glyph's slot into the button
+                  // that opens the picker, so the slot has to exist even on a
+                  // bar whose title carries no emoji — otherwise the one section
+                  // that cannot reach the picker is the one with nothing to
+                  // press it from.
+                  glyphSlot: true,
                 }
               : {}),
           });
@@ -1657,6 +1664,41 @@ export class Widgets implements
         }
       }
 
+      // ── AND EVERY CHILD IS TOLD WHICH LINE IT CAME FROM ────────────────
+      //
+      // HERE, WHICH IS THE LAST MOMENT `drawn` MEANS ANYTHING. Its entries are
+      // `container.childElementCount` taken at the top of each iteration, so
+      // they are positions in the child list THE LOOP BUILT. The statements
+      // below insert four things that no directive drew — the empty grid, the
+      // add-kind row, the entry's page-context strip and a journal note's facts
+      // row — and two of those go in at the FRONT.
+      //
+      // A PREPEND SHIFTS EVERY INDEX AFTER IT, WHICH IS THE BUG THIS MOVE
+      // FIXES. `stampLines` ran below all four until 1.0.9, so on a diary
+      // entry's tracker block the strip was prepended, took index 0, and was
+      // handed the tracker directive's line — a stamp naming a directive that
+      // did not draw it. `loose` counts stamped children, so the block looked
+      // like two widgets rather than one: `perWidget` turned on, the block's
+      // own grip was withheld, and the strip got a per-widget grip of its own.
+      // That grip sits over the top edge of the first child, which is the block's
+      // top edge, which is where the head opens — so a reader hovering the date
+      // stepper got the dots with no name beside them, and the pairing 5.16
+      // built (`.has-head > .ca-jbd-handle`, a DIRECT child) could not see a
+      // grip one level further down to hold either half of it.
+      //
+      // The reader's words: *"diary trackers section drag icon is appearing
+      // before the widget's overlayed header."*
+      //
+      // AND THE SHIFT WAS NOT ONLY THE CHROME'S OWN STAMP. Every sibling after
+      // an inserted element takes the NEXT directive's line, so a fence that
+      // drew three widgets under a strip would hand two of them a range
+      // belonging to their neighbour — a drag that moves the wrong lines, which
+      // is worse than a grip in the wrong place and was never reported because
+      // the one block this reaches draws a single widget. Stamping before
+      // anything is inserted closes both, and it is the rule the file already
+      // states one screen down: a child no directive drew has no line.
+      stampLines(container, drawn, rawLines.length);
+
       // Every logging grid gets the add tile, including grids in notes that
       // predate it — the note needs no migration to gain the control.
       //
@@ -1801,13 +1843,6 @@ export class Widgets implements
       // counts still point at the same boundaries. Wrapping AFTER the row would
       // have to find the widgets again inside the cells; wrapping before is the
       // same operation with nothing to look up.
-      // AND EVERY CHILD IS TOLD WHICH LINE IT CAME FROM, before either of them
-      // moves it. `stampLines` reads the counts taken during the loop against
-      // the children as they stand now — which is the last moment the two agree,
-      // since `layOutRow` is about to move them into cells and `cardWidget` is
-      // about to put a wrapper where a widget was.
-      stampLines(container, drawn, rawLines.length);
-
       // ── AND A MARKED REGION IS STAMPED AS ITS MARKERS (5.16) ────────
       //
       // A tracker grid is not the run of `tracker:` lines a reader sees. It is
@@ -1824,11 +1859,15 @@ export class Widgets implements
       // against. `kept`'s indices would be a second numbering to keep in step.
       //
       // AND AN EMPTY REGION IS NOT A WIDGET. A note that declares the region and
-      // holds no trackers draws a grid with only the add tile in it: a child no
-      // directive drew, which `stampLines` would hand the line of whatever came
-      // before it. That stamp names another widget, so it is cleared — the grid
-      // keeps its head and its add tile and offers no drag, which is honest
-      // about there being nothing in it to move.
+      // holds no trackers draws a grid with only the add tile in it, and it must
+      // offer no drag: there is nothing in it to move. Two shapes reach that,
+      // and `clearStamp` is the answer to both — the grid built below the loop,
+      // which since 1.0.9 is never stamped at all because `stampLines` has
+      // already run, and a bar the loop DID draw over a region that turns out
+      // empty, which is stamped and has to be told otherwise. The call is kept
+      // for the second and is inert for the first, which is the right way round:
+      // a clear that has nothing to clear costs a line, and the one that was
+      // needed being absent costs a grid that drags another widget's lines.
       if (trackerBar && hasTrackerRegion) {
         const start = rawLines.indexOf(TRACKER_MARK_START);
         const end = rawLines.indexOf(TRACKER_MARK_END, start + 1);
