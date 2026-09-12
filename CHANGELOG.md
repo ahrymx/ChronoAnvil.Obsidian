@@ -5,6 +5,21 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] - 2026-09-12
+
+### Fixed
+
+- **The blank row below a note's markers has gone with them.** Every note ends
+  with a newline, and that break drew one last empty row underneath the whole
+  marker tail. It looked exactly like the row above it and wrote somewhere quite
+  different: anything typed there landed after every marker, which is where the
+  plugin appends a region it finds missing and a graph block it finds absent, so
+  the next repair would wedge the sentence between two of its own lines. There is
+  now one row to land on and it sits above the tail, where what you write stays
+  where you put it. A note that already carries writing below its markers is
+  unchanged, and the file still ends in the newline it always did — this is what
+  the editor draws, never what the note says.
+
 ## [1.0.6] - 2026-09-12
 
 ### Fixed

@@ -302,8 +302,9 @@ describe("the empty rows at the bottom of a note", () => {
   });
 
   it("leaves one separator where it left one per region", () => {
-    // The separator the last card is entitled to, and the note's final row.
-    expect(seen(STACK.join("\n"))).toBe("```chronoanvil\nentry-header\n```\n\n");
+    // ONE ROW, not two: the separator the last card is entitled to. The note's
+    // own final row went with the markers — see the group below.
+    expect(seen(STACK.join("\n"))).toBe("```chronoanvil\nentry-header\n```\n");
   });
 
   it("stops joining the moment a reader has written on a separator", () => {
@@ -377,6 +378,44 @@ describe("the empty rows at the bottom of a note", () => {
         "-->",
         "",
       ].join("\n")
+    );
+  });
+});
+
+describe("the row below the markers", () => {
+  // Every composed note ends with one newline, and that break used to paint an
+  // empty row BELOW the whole marker tail. It looked exactly like the row above
+  // it and wrote somewhere quite different: after every marker, which is where
+  // `writeNoteRegion` appends a missing region and `setGraphLinks` appends an
+  // absent graph block. The next repair would wedge the sentence between two of
+  // ours.
+
+  it("goes with the markers when they are the last thing in the note", () => {
+    expect(seen("prose\n%% chronoanvil-graph %%\n%% [[Weekly|\u200b]] %%\n")).toBe("prose");
+  });
+
+  it("stays when the reader has already written below them", () => {
+    // The note does not match, so nothing anybody has typed changes what is
+    // painted — and their words keep a row of their own.
+    expect(
+      seen("prose\n%% chronoanvil-graph %%\n%% [[Weekly|\u200b]] %%\nafter\n")
+    ).toBe("prose\nafter\n");
+  });
+
+  it("leaves the note's own trailing newline exactly where it was", () => {
+    // THIS CHANGES WHAT THE EDITOR DRAWS AND NEVER WHAT THE NOTE SAYS. Every
+    // composer guarantees the single trailing break and `composed-notes.test.ts`
+    // holds all 35 fixtures to it byte for byte.
+    const doc = "prose\n%% chronoanvil-graph %%\n%% [[Weekly|\u200b]] %%\n";
+    expect(stateFor(doc, true).doc.toString()).toBe(doc);
+  });
+
+  it("rests the cursor above the tail rather than below it", () => {
+    // The whole point of taking the row away: there is one landing row left and
+    // it writes where the reader meant it to.
+    const doc = "prose\n%% chronoanvil-graph %%\n%% [[Weekly|\u200b]] %%\n";
+    expect(afterEdit(doc, { from: restsAt(doc, doc.length), insert: "more" }, "input.type")).toBe(
+      "prosemore\n%% chronoanvil-graph %%\n%% [[Weekly|\u200b]] %%\n"
     );
   });
 });

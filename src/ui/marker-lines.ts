@@ -294,6 +294,24 @@ interface HiddenRange {
   safe: number;
 }
 
+// A run that is the last thing in the note takes the trailing break with it.
+//
+// Every composed note ends with exactly one newline, and that break paints a
+// final empty row BELOW the whole marker tail. It is a row a reader can put the
+// cursor on, and what they type there lands after every marker — which is where
+// `writeNoteRegion` appends a missing region and where `setGraphLinks` appends
+// an absent graph block, so the next repair wedges the sentence between two of
+// ours. One landing row, the separator ABOVE the tail, is the one that writes
+// where the reader meant it to.
+//
+// ONLY WHERE THE MARKERS REALLY ARE LAST. A note that already carries prose
+// below them does not match, so nothing anybody has written changes what is
+// painted — and the file still ends in the newline it always did, because this
+// changes what the editor draws and never what the note says.
+function endsNote(doc: Text, span: MarkerSpan): boolean {
+  return span.to + 2 === doc.lines && doc.line(doc.lines).length === 0;
+}
+
 function hiddenRanges(doc: Text, spans: readonly MarkerSpan[]): HiddenRange[] {
   return spans.map((span) => {
     const first = doc.line(span.from + 1);
@@ -301,7 +319,7 @@ function hiddenRanges(doc: Text, spans: readonly MarkerSpan[]): HiddenRange[] {
     if (span.keepLine) return { from: first.from, to: last.to, safe: first.from };
     if (span.from > 0) {
       const from = doc.line(span.from).to;
-      return { from, to: last.to, safe: from };
+      return { from, to: endsNote(doc, span) ? doc.length : last.to, safe: from };
     }
     if (span.to + 1 < doc.lines) {
       const to = doc.line(span.to + 2).from;
