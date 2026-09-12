@@ -73,7 +73,7 @@
 // — *Edit sections…*, which writes through the vault and never touches an
 // editor transaction — so nothing this refuses was a capability.
 
-import { EditorState, type Extension, type Text } from "@codemirror/state";
+import { EditorSelection, EditorState, type Extension, type Text } from "@codemirror/state";
 
 // A run of lines, 0-based and inclusive on both ends: what `fenceLinesIn` and
 // `markerLinesIn` both already answer with.
@@ -114,5 +114,71 @@ export function protectLines(
     if (!tr.isUserEvent("input") && !tr.isUserEvent("delete")) return true;
     const out = protectedRanges(tr.startState.doc, spansFor(tr.startState));
     return out.length ? out : true;
+  });
+}
+
+// ── A KEYSTROKE AIMED AT A LINE THAT IS ALL OURS LANDS BELOW IT ──────────
+//
+// THIS IS NOT THE TRANSACTION FILTER 5.31 REJECTED, and the difference is the
+// whole of the argument for it. What was thrown away was a filter that BOUNCES,
+// on the grounds — written at the top of this file — that *"a filter that
+// bounces a transaction turns one protected character into a keystroke that
+// appears to do nothing at all"*. That objection stands, and this is its answer
+// rather than its contradiction: nothing is bounced, the insertion is MOVED, and
+// the reader sees their character appear. `protectLines` keeps both its user
+// events and its full extent.
+//
+// IT EXISTS FOR ONE SHAPE. `marker-lines.ts` gives every hidden run a resting
+// point that is outside the marker text, except where there is no such point
+// because the whole line is ours — the spacer. That row is the landing strip the
+// cursor is MEANT to spawn on, so a reader typing there is doing the thing the
+// row was written to invite, and the old answer was to rewrite the spacer line
+// until the markup showed.
+//
+// THE THREE NARROWINGS, EACH LOAD BEARING:
+//
+//   - `input` ONLY. A refused deletion stays refused. Redirecting one would
+//     delete something the reader did not aim at, which is the failure this
+//     whole file exists to prevent, arriving by the door meant to fix it.
+//   - PURE INSERTIONS, AND ONE OF THEM. A selection typed over is a removal
+//     wearing an input event and stays `protectLines`' business; a multi-cursor
+//     edit has no single place to move to.
+//   - ON ONE OF THE HANDED-IN LINES. The caller decides which runs qualify, so
+//     nothing here has to know what a spacer is.
+//
+// The change filter has already run by the time a transaction filter is called
+// (`filterTransaction`, in @codemirror/state), and CodeMirror resolves what a
+// transaction filter returns with filtering OFF — so the moved insertion is not
+// re-examined and cannot be swallowed on its way back out.
+export function redirectTyping(
+  spansFor: (state: EditorState) => readonly LineSpan[]
+): Extension {
+  return EditorState.transactionFilter.of((tr) => {
+    if (!tr.docChanged || !tr.isUserEvent("input")) return tr;
+    const spans = spansFor(tr.startState);
+    if (!spans.length) return tr;
+
+    let at = -1;
+    let text = "";
+    let usable = true;
+    tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+      if (at !== -1 || fromA !== toA) usable = false;
+      else {
+        at = fromA;
+        text = inserted.toString();
+      }
+    });
+    if (!usable || at === -1 || !text) return tr;
+
+    const line = tr.startState.doc.lineAt(at).number - 1;
+    const span = spans.find((s) => line >= s.from && line <= s.to);
+    if (!span) return tr;
+
+    const below = tr.startState.doc.line(span.to + 1).to;
+    return {
+      changes: { from: below, insert: `\n${text}` },
+      selection: EditorSelection.cursor(below + 1 + text.length),
+      userEvent: "input.type",
+    };
   });
 }

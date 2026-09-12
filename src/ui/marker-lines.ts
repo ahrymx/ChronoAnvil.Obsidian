@@ -82,10 +82,18 @@
 // document changes or when the mode does.
 
 import { editorLivePreviewField } from "obsidian";
-import { StateField, type EditorState, type Extension, type Text } from "@codemirror/state";
+import {
+  EditorSelection,
+  EditorState,
+  StateField,
+  Transaction,
+  type Extension,
+  type Text,
+  type TransactionSpec,
+} from "@codemirror/state";
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 
-import { protectLines } from "./protected-lines";
+import { protectLines, redirectTyping } from "./protected-lines";
 
 // One run of lines this plugin wrote, 0-based and inclusive.
 //
@@ -202,7 +210,13 @@ export function markerLinesIn(lines: readonly string[]): MarkerSpan[] {
 
     i++;
   }
-  return merged(out);
+  return merged(out, lines);
+}
+
+// Adjacent, or with one blank line between them.
+function joins(last: MarkerSpan, span: MarkerSpan, lines: readonly string[]): boolean {
+  if (last.to + 1 === span.from) return true;
+  return last.to + 2 === span.from && lines[last.to + 1].trim() === "";
 }
 
 // Touching runs joined into one.
@@ -212,11 +226,38 @@ export function markerLinesIn(lines: readonly string[]): MarkerSpan[] {
 // none before), and the span for any other run eats the break BEFORE it, so a
 // run at line 0 followed by a run at line 1 would claim the same break twice.
 // Joining first is one rule instead of a case analysis at the offsets.
-function merged(spans: MarkerSpan[]): MarkerSpan[] {
+//
+// A SINGLE BLANK LINE BETWEEN TWO RUNS JOINS THEM TOO, and that is not the same
+// rule wearing a wider hat — it is the fix for what the bottom of a note looked
+// like. A run swallows the break BEFORE itself, so the blank separator above it
+// survives as a painted row, and a diary entry ends in seven empty regions one
+// blank apart (`entry-sections.ts`) and therefore ended in eight identical empty
+// rows. A reader cannot tell which of those are their note and which are ours,
+// which is the whole of the report this answers: *"the user can accidentally put
+// the cursor into these hidden blocks and start typing their prose there
+// unknowingly."* Joined, the stack paints as the one separator that follows the
+// last card.
+//
+// THE BLANK HAS TO BE BLANK, AND THAT IS THE SAFETY ARGUMENT. The moment a
+// reader types on one of those separators the line stops matching and the two
+// runs stay apart, so their words are painted like any other prose. This can
+// never swallow something that was written. It is also why the skeleton's
+// headings are safe on both sides: the bracket's opener joins the regions above
+// it and its closer joins the graph block below, and the lines between the two
+// brackets are not blank.
+//
+// NOTHING DOWNSTREAM HAD TO MOVE. A joined span is still one run, so
+// `hiddenRanges` takes it through the same case B it took each half through, and
+// the result is one strictly larger range where there were two — which cannot
+// overlap anything. `protectedRanges` was already joining these: a run's
+// `last.to + 1` lands exactly on the next run's `doc.line(span.from).to` when
+// the line between is empty, and its own join clause absorbed that. What
+// survives a select-all is therefore the same text before and after.
+function merged(spans: MarkerSpan[], lines: readonly string[]): MarkerSpan[] {
   const out: MarkerSpan[] = [];
   for (const span of spans) {
     const last = out[out.length - 1];
-    if (last && !last.keepLine && !span.keepLine && last.to + 1 === span.from) {
+    if (last && !last.keepLine && !span.keepLine && joins(last, span, lines)) {
       last.to = span.to;
       continue;
     }
@@ -232,15 +273,48 @@ function merged(spans: MarkerSpan[]): MarkerSpan[] {
 // wrong for everything else — a note would gain a blank line per marker. So a
 // removed run takes the break BEFORE it (joining it onto the line above), or,
 // when it starts the document and something follows, the break AFTER it.
-function hiddenRanges(doc: Text, spans: readonly MarkerSpan[]): { from: number; to: number }[] {
+//
+// AND EACH RANGE NAMES THE END A CURSOR MAY REST AT. `atomicRanges` steps motion
+// over a range whole, but it leaves the range's own two endpoints legal — that
+// is where the step lands — and for a run below line 0 the far endpoint sits
+// immediately after the `-->`, on a line the reader cannot see. Both endpoints
+// paint at the SAME screen point there, the end of the visible line above, so
+// naming one of them and mapping the other onto it is invisible to the reader
+// and closes the position they were typing into blind.
+//
+// It is the range's `from` for three of the four shapes and its `to` for the
+// one that starts the document, which is the same asymmetry the ranges
+// themselves have: whichever end is outside the marker text is the one to rest
+// at. The spacer and an all-markers note have no end that is outside — every
+// character of the line is ours — so they name their start and `redirectTyping`
+// takes it from there.
+interface HiddenRange {
+  from: number;
+  to: number;
+  safe: number;
+}
+
+function hiddenRanges(doc: Text, spans: readonly MarkerSpan[]): HiddenRange[] {
   return spans.map((span) => {
     const first = doc.line(span.from + 1);
     const last = doc.line(span.to + 1);
-    if (span.keepLine) return { from: first.from, to: last.to };
-    if (span.from > 0) return { from: doc.line(span.from).to, to: last.to };
-    if (span.to + 1 < doc.lines) return { from: first.from, to: doc.line(span.to + 2).from };
-    return { from: first.from, to: last.to };
+    if (span.keepLine) return { from: first.from, to: last.to, safe: first.from };
+    if (span.from > 0) {
+      const from = doc.line(span.from).to;
+      return { from, to: last.to, safe: from };
+    }
+    if (span.to + 1 < doc.lines) {
+      const to = doc.line(span.to + 2).from;
+      return { from: first.from, to, safe: to };
+    }
+    return { from: first.from, to: last.to, safe: first.from };
   });
+}
+
+// Where a cursor asking for `pos` actually belongs.
+function restingAt(pos: number, ranges: readonly HiddenRange[]): number {
+  for (const r of ranges) if (pos >= r.from && pos <= r.to) return r.safe;
+  return pos;
 }
 
 function hiddenIn(doc: Text, spans: readonly MarkerSpan[]): DecorationSet {
@@ -284,11 +358,64 @@ const markers = StateField.define<Hidden>({
   provide: (f) => EditorView.decorations.from(f, (v) => v.deco),
 });
 
+// WHERE THE CURSOR COMES TO REST, which is a selection-only transaction — a
+// click, an arrow, a search hit, a restored cursor. `atomicRanges` is consulted
+// by the VIEW (`moveByChar`, `skipAtomsForSelection`) and its whole answer is
+// "step over this range", so the position it steps to is one of the range's own
+// endpoints and one of those is inside a line the reader cannot see. A reader
+// who clicks the end of a visible line and presses the right arrow once used to
+// land there, and the keystroke that followed went into a comment.
+//
+// A DOC-CHANGING TRANSACTION IS SOMEBODY ELSE'S. Its selection comes from the
+// change, which `protectLines` has already refused or `redirectTyping` has
+// already moved, and re-parsing the note on every keystroke to second-guess
+// that would cost more than it buys.
+//
+// CURSORS ONLY, NOT SELECTIONS. A drag that spans a hidden run is the select-all
+// shape, and forcing its ends onto a resting point would silently shrink what
+// the reader had selected. That case is `protected-lines.ts`'.
+function cursorRest(): Extension {
+  return EditorState.transactionFilter.of((tr) => {
+    const sel = tr.selection;
+    if (tr.docChanged || !sel) return tr;
+    const hidden = tr.startState.field(markers, false);
+    if (!hidden?.live || !hidden.spans.length) return tr;
+
+    const ranges = hiddenRanges(tr.startState.doc, hidden.spans);
+    let moved = false;
+    const next = sel.ranges.map((r) => {
+      if (!r.empty) return r;
+      const at = restingAt(r.head, ranges);
+      if (at === r.head) return r;
+      moved = true;
+      return EditorSelection.cursor(at);
+    });
+    if (!moved) return tr;
+
+    const spec: TransactionSpec = {
+      selection: EditorSelection.create(next, sel.mainIndex),
+      effects: tr.effects,
+      scrollIntoView: tr.scrollIntoView,
+    };
+    const event = tr.annotation(Transaction.userEvent);
+    if (event) spec.userEvent = event;
+    return spec;
+  });
+}
+
 export function hiddenMarkers(): Extension {
   return [
     markers,
     EditorView.atomicRanges.of(
       (view) => view.state.field(markers, false)?.deco ?? Decoration.none
+    ),
+    cursorRest(),
+    // AND A KEYSTROKE AIMED AT THE SPACER LANDS BELOW IT. Only the `keepLine`
+    // runs are handed over, because they are the only ones whose resting point
+    // is itself inside marker text — the spacer's row is the landing strip, so
+    // the cursor is MEANT to be there and the words have to go somewhere.
+    redirectTyping(
+      (state) => state.field(markers, false)?.spans.filter((s) => s.keepLine) ?? []
     ),
     // AND WHAT IS HIDDEN DOES NOT GO WITH A SELECT-ALL. 5.31.1, and the sharper
     // half of that rule here than on a fence: a fence is recomposed by *Set up

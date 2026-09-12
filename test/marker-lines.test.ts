@@ -30,6 +30,7 @@ import { join } from "node:path";
 
 import { fenceCursorGuard, fenceLinesIn } from "../src/ui/fence-cursor";
 import { hiddenMarkers, markerLinesIn } from "../src/ui/marker-lines";
+import { redirectTyping } from "../src/ui/protected-lines";
 import { ROOT, readSrc } from "./sources";
 
 interface Span {
@@ -114,6 +115,12 @@ describe("what an entry looks like once its markers are gone", () => {
     // renders it as the card, and `fence-cursor.ts` is what keeps the cursor
     // out of it — and everything else that renders as nothing in reading view
     // now renders as nothing here.
+    //
+    // AND THE BLANK SEPARATORS BETWEEN MARKERS GO WITH THEM. The region, the
+    // skeleton's opener, its closer and the graph block were four runs a blank
+    // line apart, and each left that blank behind as a painted row. What is left
+    // above and below the reader's heading is the one separator its own section
+    // is entitled to.
     expect(seen(ENTRY)).toBe(
       [
         "",
@@ -123,9 +130,7 @@ describe("what an entry looks like once its markers are gone", () => {
         "```",
         "",
         "",
-        "",
         "## What happened",
-        "",
         "",
       ].join("\n")
     );
@@ -186,7 +191,11 @@ describe("which lines are this plugin's", () => {
     // The widgets read `<!--almanac:` regions and the graph block still says
     // `almanac-graph` until `tools/migrate-vault.mjs` runs. A marker that is
     // still live is a marker still worth hiding.
-    const note = ["<!--almanac:focus", "typed", "-->", "", "%% almanac-graph %%", "%% %%"];
+    //
+    // THE TWO ARE HELD APART BY A LINE OF PROSE rather than by a blank one,
+    // because a blank between two runs now joins them and this test is about the
+    // spellings rather than about the join.
+    const note = ["<!--almanac:focus", "typed", "-->", "prose", "%% almanac-graph %%", "%% %%"];
     expect(markerLinesIn(note)).toEqual([
       { from: 0, to: 2, keepLine: false },
       { from: 4, to: 5, keepLine: false },
@@ -269,6 +278,286 @@ describe("where a hidden line's break goes", () => {
     expect(next.doc.sliceString(span.from, span.to)).toBe("\n<!--chronoanvil-skeleton-->");
   });
 });
+
+describe("the empty rows at the bottom of a note", () => {
+  // ── THE REPORT THIS GROUP IS ── *"the user can accidentally put the cursor
+  // into these hidden blocks and start typing their prose there unknowingly."*
+  //
+  // A run swallows the break BEFORE itself, so the blank separator above it is
+  // left painted. A diary entry ends in seven empty regions one blank apart, so
+  // it ended in eight empty rows that look exactly like the rows a reader
+  // writes on. The stack is built here rather than read out of `test/golden/`
+  // so the shape is legible in the assertion; `composed-notes.test.ts` is what
+  // holds it to the real one.
+  const STACK = ["```chronoanvil", "entry-header", "```", ""].concat(
+    ...["focus", "highlights", "challenges", "log"].map((k) => [
+      `<!--chronoanvil:${k}`,
+      "-->",
+      "",
+    ])
+  );
+
+  it("joins the whole stack into one run", () => {
+    expect(markerLinesIn(STACK)).toEqual([{ from: 4, to: 14, keepLine: false }]);
+  });
+
+  it("leaves one separator where it left one per region", () => {
+    // The separator the last card is entitled to, and the note's final row.
+    expect(seen(STACK.join("\n"))).toBe("```chronoanvil\nentry-header\n```\n\n");
+  });
+
+  it("stops joining the moment a reader has written on a separator", () => {
+    // THE WHOLE SAFETY ARGUMENT, and the reason this cannot swallow anything.
+    // The join is keyed on the line being blank, so a line with a word on it
+    // holds the two runs apart and is painted like any other prose.
+    const typed = [...STACK];
+    typed[6] = "a stray thought";
+    expect(markerLinesIn(typed)).toEqual([
+      { from: 4, to: 5, keepLine: false },
+      { from: 7, to: 14, keepLine: false },
+    ]);
+    expect(seen(typed.join("\n"))).toContain("a stray thought");
+  });
+
+  it("never joins across the reader's own headings", () => {
+    // The skeleton's opener joins the region above it and its closer joins the
+    // graph block below, and what is between the two brackets is untouched —
+    // because those lines are not blank.
+    const note = [
+      "<!--chronoanvil:focus",
+      "-->",
+      "",
+      "<!--chronoanvil-skeleton-->",
+      "",
+      "## What happened",
+      "",
+      "<!--/chronoanvil-skeleton-->",
+      "",
+      "%% chronoanvil-graph %%",
+      "%% [[Weekly|\u200b]] %%",
+    ];
+    expect(markerLinesIn(note)).toEqual([
+      { from: 0, to: 3, keepLine: false },
+      { from: 7, to: 10, keepLine: false },
+    ]);
+    expect(seen(note.join("\n"))).toContain("## What happened");
+  });
+
+  it("never joins the spacer to anything, in either direction", () => {
+    // `keepLine` is excluded from the join for the same reason it exists: the
+    // spacer's row is the landing strip, and a join would take it away and hand
+    // the cursor straight back to the fence below.
+    expect(
+      markerLinesIn(["`chronoanvil:spacer`", "", "<!--chronoanvil-skeleton-->"])
+    ).toEqual([
+      { from: 0, to: 0, keepLine: true },
+      { from: 2, to: 2, keepLine: false },
+    ]);
+  });
+
+  it("leaves what survives a select-all exactly where it was", () => {
+    // `protectedRanges` was already joining these — a run's `last.to + 1` lands
+    // on the next run's leading break when the line between is empty, and its
+    // own join clause absorbed that. So the reader gets back the same page they
+    // got back before, and this is the assertion that says so out loud.
+    const after = afterEdit(STACK.join("\n"), { from: 0, to: STACK.join("\n").length }, "delete.selection");
+    expect(after).toBe(
+      [
+        "",
+        "<!--chronoanvil:focus",
+        "-->",
+        "",
+        "<!--chronoanvil:highlights",
+        "-->",
+        "",
+        "<!--chronoanvil:challenges",
+        "-->",
+        "",
+        "<!--chronoanvil:log",
+        "-->",
+        "",
+      ].join("\n")
+    );
+  });
+});
+
+describe("where a cursor is allowed to come to rest", () => {
+  // `atomicRanges` steps motion over a hidden run whole, and the position it
+  // steps TO is one of the run's own endpoints. For three of the four shapes one
+  // of those endpoints is inside a line the reader cannot see, so the reader
+  // arrives somewhere invisible and the next keystroke goes there.
+
+  it("sends a run below line 0 back to the end of the visible line", () => {
+    // THE ONE THAT MATTERS IN A REAL NOTE. Both endpoints paint at the same
+    // point — the end of "a" — so the reader sees nothing move, and the far one,
+    // which sits just after the `-->`, stops existing as a place to type.
+    const doc = "a\n<!--chronoanvil-skeleton-->\nb";
+    const r = ends(doc);
+    expect(restsAt(doc, r.to)).toBe(r.from);
+    expect(restsAt(doc, r.from)).toBe(r.from);
+  });
+
+  it("sends a run that starts the note forward, past it", () => {
+    // There is no visible line above to go back to, so the resting point is the
+    // start of the first one below.
+    const doc = "<!--chronoanvil-skeleton-->\nb";
+    const r = ends(doc);
+    expect(restsAt(doc, r.from)).toBe(r.to);
+  });
+
+  it("holds the spacer's cursor at the start of its row", () => {
+    // Every character of that line is ours, so neither end is outside the
+    // markup. It names its start and `redirectTyping` takes it from there.
+    const doc = "`chronoanvil:spacer`\n\nprose";
+    const r = ends(doc);
+    expect(restsAt(doc, r.to)).toBe(r.from);
+  });
+
+  it("holds a note that is nothing but markers at its start", () => {
+    const doc = "%% chronoanvil-graph %%\n%% %%";
+    const r = ends(doc);
+    expect(restsAt(doc, r.to)).toBe(r.from);
+  });
+
+  it("leaves a cursor in the reader's own text where they put it", () => {
+    const doc = "a\n<!--chronoanvil-skeleton-->\nbcd";
+    expect(restsAt(doc, doc.length - 1)).toBe(doc.length - 1);
+  });
+
+  it("does none of it in source mode", () => {
+    // The escape hatch is the same one: nothing is hidden there, so nothing is
+    // out of reach.
+    const doc = "a\n<!--chronoanvil-skeleton-->\nb";
+    expect(restsAt(doc, 5, false)).toBe(5);
+  });
+
+  it("leaves a drag selection the length the reader gave it", () => {
+    // Cursors only. Shrinking a selection that spans a hidden run would take
+    // back what the reader had highlighted; that case is the change filter's.
+    //
+    // THE ANCHOR IS THE RUN'S FAR END, deliberately: a drag that starts nowhere
+    // near a hidden range cannot tell the rule from its absence, which is what
+    // the first version of this test failed to notice.
+    const doc = "a\n<!--chronoanvil-skeleton-->\nb";
+    //
+    // THE HEAD IS THE RUN'S FAR END, deliberately, and the anchor is elsewhere.
+    // The head is the end the rule reads, so a drag that ends anywhere else
+    // cannot tell the rule from its absence — which is what the first two
+    // versions of this test failed to notice.
+    const r = ends(doc);
+    const sel = stateFor(doc, true)
+      .update({ selection: { anchor: doc.length, head: r.to }, userEvent: "select.pointer" })
+      .state.selection.main;
+    expect([sel.from, sel.to]).toEqual([r.to, doc.length]);
+  });
+});
+
+describe("a keystroke aimed at the spacer", () => {
+  const SPACER = "`chronoanvil:spacer`\n\n```chronoanvil\nentry-header\n```";
+
+  it("lands on a line below it, with the spacer left standing", () => {
+    // The row exists so the cursor spawns there rather than in the fence below,
+    // so a reader typing on it is doing the thing the row invites. The old
+    // answer was to rewrite the spacer line until the markup showed.
+    expect(afterEdit(SPACER, { from: 0, insert: "Hello" }, "input.type")).toBe(
+      "`chronoanvil:spacer`\nHello\n\n```chronoanvil\nentry-header\n```"
+    );
+  });
+
+  it("puts the cursor after what was typed", () => {
+    const next = stateFor(SPACER, true).update({
+      changes: { from: 0, insert: "Hello" },
+      userEvent: "input.type",
+    }).state;
+    expect(next.doc.sliceString(0, next.selection.main.head)).toBe(
+      "`chronoanvil:spacer`\nHello"
+    );
+  });
+
+  it("is not how a deletion is answered", () => {
+    // A refused deletion stays refused. Moving one would delete something the
+    // reader did not aim at — this file's own failure, by its own new door.
+    const doc = "`chronoanvil:spacer`\n\nprose";
+    expect(afterEdit(doc, { from: 0, to: 20 }, "delete.selection")).toBe(doc);
+  });
+
+  it("leaves a selection typed over to the change filter", () => {
+    // A replacement is a removal wearing an input event, and it has no single
+    // place to be moved to. Here the change filter has already refused it, which
+    // is why the group below reaches the branch a different way.
+    const doc = "`chronoanvil:spacer`\n\nprose";
+    expect(afterEdit(doc, { from: 0, to: 20, insert: "X" }, "input.type")).toBe(doc);
+  });
+
+  it("leaves typing anywhere else exactly where it was typed", () => {
+    expect(afterEdit(SPACER, { from: 22, insert: "X" }, "input.type")).toBe(
+      "`chronoanvil:spacer`\n\nX```chronoanvil\nentry-header\n```"
+    );
+  });
+
+  it("lets a programmatic write through untouched", () => {
+    // The rule that carries the risk, unchanged: Obsidian syncing a file into
+    // an open editor must never be second-guessed.
+    expect(afterEdit(SPACER, { from: 0, insert: "Hello" }, "set")).toBe(
+      `Hello${SPACER}`
+    );
+  });
+
+  it("does nothing in source mode", () => {
+    expect(afterEdit(SPACER, { from: 0, insert: "Hello" }, "input.type", false)).toBe(
+      `Hello${SPACER}`
+    );
+  });
+});
+
+describe("what the redirect refuses to move", () => {
+  // WITHOUT `protectLines` BESIDE IT, which is the only way to see these two
+  // branches at all. Paired as `hiddenMarkers` pairs them, a replacement that
+  // touches a protected line is already gone before the redirect runs, so a test
+  // written against the pair proves nothing about either — which is exactly what
+  // the first version of this suite did, and what mutating the guards caught.
+  const only = (doc: string): EditorState =>
+    EditorState.create({
+      doc,
+      extensions: [redirectTyping(() => [{ from: 0, to: 0 }])],
+    });
+
+  const typed = (doc: string, changes: unknown): string =>
+    only(doc).update({ changes, userEvent: "input.type" } as never).state.doc.toString();
+
+  it("moves a plain insertion on the line, which is the case it exists for", () => {
+    expect(typed("marker\nprose", { from: 0, insert: "Hi" })).toBe("marker\nHi\nprose");
+  });
+
+  it("leaves a replacement where the reader aimed it", () => {
+    expect(typed("marker\nprose", { from: 0, to: 6, insert: "Hi" })).toBe("Hi\nprose");
+  });
+
+  it("leaves a multi-cursor edit alone, having nowhere single to put it", () => {
+    // BOTH CURSORS ON THE LINE, because a second cursor somewhere else is
+    // answered by the line test further down and proves nothing about this one.
+    expect(
+      typed("marker\nprose", [
+        { from: 0, insert: "Hi" },
+        { from: 6, insert: "Ho" },
+      ])
+    ).toBe("HimarkerHo\nprose");
+  });
+});
+
+/** Where a cursor asking for `pos` actually comes to rest. */
+function restsAt(doc: string, pos: number, live = true): number {
+  return stateFor(doc, live)
+    .update({ selection: { anchor: pos }, userEvent: "select.pointer" })
+    .state.selection.main.head;
+}
+
+/** A hidden run's two endpoints, in the order the reader meets them. */
+function ends(doc: string): Span {
+  const [r] = hidden(doc);
+  expect(r).toBeDefined();
+  return r;
+}
 
 /** The note after one of the reader's own keystrokes. */
 function afterEdit(
@@ -458,6 +747,23 @@ describe("how it is wired", () => {
     expect(src).toContain("EditorView.decorations.from");
     // And a user edit cannot take a hidden line with it — 5.31.1.
     expect(src).toContain("protectLines(");
+    // And the cursor cannot come to rest on the wrong side of a hidden run,
+    // which `atomicRanges` alone never covered: it is consulted by the VIEW and
+    // its whole answer is which endpoint to step to.
+    expect(src).toContain("EditorState.transactionFilter");
+    // Only the `keepLine` runs are handed to the redirect, because they are the
+    // only ones whose resting point is inside marker text.
+    expect(src).toContain("spans.filter((s) => s.keepLine)");
+  });
+
+  it("keeps the change filter that 5.31.1 chose over a bouncing one", () => {
+    // THE REDIRECT IS NOT THAT REVERSAL. What was rejected was a filter that
+    // BOUNCES a transaction; this one moves the insertion and the reader sees
+    // their character appear. So the change filter keeps both its user events
+    // and its full extent, and the two run on disjoint halves of the problem.
+    const src = readSrc("protected-lines").replace(/^\s*\/\/.*$/gm, "");
+    expect(src).toContain('if (!tr.isUserEvent("input") && !tr.isUserEvent("delete")) return true;');
+    expect(src).toContain('if (!tr.docChanged || !tr.isUserEvent("input")) return tr;');
   });
 
   it("no longer lets notestore claim Live Preview does this itself", () => {

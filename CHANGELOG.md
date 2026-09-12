@@ -5,6 +5,34 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-09-12
+
+### Fixed
+
+- **The empty rows at the bottom of a note are gone.** A hidden marker takes the
+  line break above it, so the blank line separating one marker from the next was
+  left painted. A diary entry ends in seven parked regions one blank apart and
+  therefore ended in eight identical empty rows, none of which were part of the
+  note and all of which looked exactly like a row to write on. Two markers with
+  one blank line between them are now hidden together, so that entry ends in the
+  single blank line its last card is entitled to. The rule is keyed on the line
+  actually being blank: write on one of those separators and the markers stay
+  apart, so nothing you have typed can ever be swallowed by it.
+
+- **The cursor no longer comes to rest inside a hidden marker.** Motion steps
+  over a marker whole, but the position it steps *to* is the marker's own edge,
+  and on one side that edge sits after the `-->` on a line you cannot see. Every
+  hidden marker now names the one edge the cursor may hold, and it is the edge
+  that is really visible — for a marker in the middle of a note the two edges
+  draw at the same point on screen, so nothing appears to move and the invisible
+  one stops existing.
+
+- **Typing on the blank line at the top of a note works.** That line is put there
+  so the cursor lands somewhere harmless when a note opens, and typing on it used
+  to rewrite it until the plugin's own markup appeared in the middle of your
+  sentence. Your text now goes on a fresh line below it and the line itself
+  survives. Deleting is unchanged: it is still refused rather than moved.
+
 ## [1.0.5] - 2026-09-12
 
 ### Added
