@@ -48,6 +48,7 @@ import {
 } from "../journals/journal";
 import { kindPlural, plural, typeRating } from "../journals/journal-sections";
 import { pageOrderOf } from "../journals/page-default";
+import { promptAddKind } from "../journals/kind-create";
 // The band's own table: which measures a preset names, which of them a scope
 // can answer, and how many cells a band may have. Pure — see `stats-band.ts`
 // for why the arithmetic that reads a vault is here and the decisions are not.
@@ -2324,6 +2325,74 @@ function ratingCell(
       cls: `ca-list-seg${i <= filled ? " is-on" : ""}`,
     });
   }
+}
+
+// ── the row that adds a kind ─────────────────────────────────────────
+//
+// `What's below` draws one group per note kind, and until 1.1 the way to add
+// one was Settings → ChronoAnvil → Journals → Edit journal → Structure. This is
+// the affordance at the end of the list, in the vocabulary the vault already
+// uses for exactly that: `.ca-jld-add`'s dashed slot — no ground, muted ink,
+// lifting to the accent on hover — which is how a tracker is added to an entry
+// and how a journal is added to the Journals section. A reader who has met it
+// once should not have to learn a third way of being offered a blank.
+//
+// A ROW, NOT A TILE, because a card's groups are rows. `addTile`'s own note
+// makes the same split one file up: "the grid lists cards so its control is
+// card-shaped, and a card's body lists rows so its control is a row". A group
+// here is a head over a table, stacked; the slot for the next one is the width
+// of the card and the height of a line.
+//
+// TWO CLASSES, NOT THREE. `.ca-jld-add` is the vocabulary and
+// `.ca-journal-kind-add` is this row's shape and placement. No third, generic
+// name is coined for "the row-shaped variant" beside `.ca-jld-add-tile`: a
+// shared name with one user is a decision nobody else has taken, and 4.37 has
+// already deleted one row-shaped slot from a card for being in the wrong place.
+// If a second surface ever wants this shape, that is when it earns a name.
+//
+// HOSTED RATHER THAN DIRECTED, which is `buildAddCategoryButton`'s argument and
+// matters more here. This cannot be a `button:` line — those resolve to
+// registered create-actions, and this one edits the journal's settings — and it
+// must not be a directive of its own either, because every deepest index note
+// already in a vault would then need a migration to gain it. Drawn by the
+// renderer, it is on those notes at the next repaint and there is nothing to
+// write anywhere.
+//
+// NULL WHERE THERE IS NOTHING TO ADD TO. The fence draws `kind-table:` lines on
+// a template as readily as on a note, and a template has no journal at its path
+// — `hostType` returns null there, and so does this.
+export function buildAddKindRow(
+  plugin: ChronoAnvilPlugin,
+  ctx: MarkdownPostProcessorContext
+): HTMLElement | null {
+  const file = hostFile(plugin.app, ctx);
+  if (!file) return null;
+  const type = hostType(plugin, file.path);
+  if (!type) return null;
+
+  const label = "Add note type";
+  const btn = createEl("button", {
+    cls: "ca-jld-add ca-journal-kind-add",
+    attr: { type: "button" },
+  });
+  setIcon(btn.createSpan({ cls: "ca-jld-add-icon" }), "plus");
+  btn.createSpan({ cls: "ca-jld-add-label", text: label });
+  // THE TOOLTIP SAYS WHAT THE LABEL CANNOT. `addTile` drops its `title` because
+  // there the two strings are the same sentence; here they differ — the label
+  // is the gesture and the tooltip is the consequence, which is the case
+  // `addHeadButton` keeps its own tooltip for.
+  const hint = `Add a kind of note to ${type.name}`;
+  btn.setAttr("aria-label", hint);
+  btn.setAttr("title", hint);
+  btn.addEventListener("click", (evt) => {
+    evt.preventDefault();
+    // The card's head folds it on click and its rows open notes. Neither should
+    // fire because a note type was asked for — the same separation every other
+    // control inside a section makes.
+    evt.stopPropagation();
+    void promptAddKind(plugin.app, plugin, type.id);
+  });
+  return btn;
 }
 
 // ── pages-table ──────────────────────────────────────────────────────

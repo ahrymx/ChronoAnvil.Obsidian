@@ -5,6 +5,24 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-09-12
+
+### Added
+
+- **"Add note type" on the *What's below* card.** A journal's note types could
+  only be changed in Settings → ChronoAnvil → Journals → Edit journal →
+  Structure, which is four steps from the page a reader is looking at when the
+  thought occurs. The card that draws a group per note type now ends in a
+  dashed slot in the same vocabulary as "+ Add tracker" and "+ New journal";
+  pressing it asks for one name and adds the type. The emoji, the rating and
+  the pages toggle stay in Settings, and the prompt says so. The row is drawn
+  by the renderer rather than composed into a note, so every deepest index note
+  already in a vault gains it at the next repaint with no migration. The name
+  becomes the `type:` value through the editor's own rule with existing ids
+  preserved, the template is written, and the dashboards are offered their new
+  table through the same window the editor uses. A name the journal already has
+  is refused rather than filed under a suffix.
+
 ## [1.0.2] - 2026-09-12
 
 ### Fixed

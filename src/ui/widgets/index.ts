@@ -105,6 +105,11 @@ import {
   buildLevelCardsRegion,
   buildLevelIndexRegion,
 } from "./directive-regions";
+// Straight from `tables.ts`, where it sits beside the `kind-table` it ends the
+// list of. It is not a region — nothing wraps it, nothing scopes it, it has no
+// directive — so routing it through `directive-regions.ts` would be a
+// pass-through added only to keep an import in a tidier place.
+import { buildAddKindRow } from "../tables";
 import {
   liveScopedWidget,
   liveFrontmatterWidget,
@@ -1226,6 +1231,19 @@ export class Widgets implements
       // which is this one.
       const shelfHeader = headerOwning("attach");
 
+      // ── DOES THIS FENCE LIST A JOURNAL'S NOTE KINDS? (1.1) ────────────
+      //
+      // `kind-table:<id>` is one kind's notes, and the `children` section emits
+      // one per kind — so a fence carrying any of them IS the card a reader
+      // sees as *What's below*, whether it holds one group or four. That is the
+      // card the "Add note type" row belongs at the end of.
+      //
+      // OFF THE LINES, LIKE `hasTrackerRegion`, and not off what got built: a
+      // `kind-table:` naming a kind that has since been removed draws an error
+      // rather than a table, and a card in that state is one a reader especially
+      // wants the control on.
+      const hasKindTable = lines.some((l) => keywordOf(l) === "kind-table");
+
       // WHERE EACH CELL OF THE ROW ENDS, as the number of children the block
       // had when the dispatcher met the delimiter. 4.4 §1, and `cellPlan` says
       // why it is a count rather than a node: a directive may append nothing,
@@ -1657,6 +1675,23 @@ export class Widgets implements
       }
       if (trackerBar && !isManagedTemplate(this.plugin, ctx.sourcePath)) {
         trackerBar.appendChild(buildTrackerAddCell(this, ctx));
+      }
+
+      // ── AND EVERY *WHAT'S BELOW* CARD GETS THE ROW THAT ADDS A KIND ───
+      //
+      // The tracker tile's own placement, two lines up, for the same reasons:
+      // after the loop so it is last in the card, and on every note that draws
+      // the card including the ones composed before this existed, so no note
+      // needs a migration to gain the control.
+      //
+      // `buildAddKindRow` DECIDES WHETHER THERE IS ONE. A `kind-table:` line
+      // renders on an index TEMPLATE too, where the path resolves to no journal
+      // and where adding a kind to "whatever journal this template belongs to"
+      // is not a question the surface can answer — it returns null there and
+      // nothing is appended.
+      if (hasKindTable) {
+        const addKind = buildAddKindRow(this.plugin, ctx);
+        if (addKind) container.appendChild(addKind);
       }
 
 

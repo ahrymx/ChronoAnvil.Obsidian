@@ -349,6 +349,33 @@
    meant to press the quietest thing on the surface. They are already held a tier
    down by the strip's scale, ~22px against a title line, which is the frame's
    own way of saying subordinate and does not cost the affordance. */
+/* ── THE SLOT FOR THE NEXT GROUP (1.1) ─────────────────────────────────
+ *
+ * `What's below` lists a journal's note kinds, one group each, and the row at
+ * the end of that list is how another one is added. It wears `.ca-jld-add` —
+ * dashed edge, no ground, muted ink, lifting to the accent on hover — which is
+ * already how a tracker is added to an entry and how a journal is added to the
+ * Journals section, so this is a vocabulary a reader has met rather than a
+ * third way of being offered a blank.
+ *
+ * A ROW, BECAUSE THE THING IT ADDS IS A ROW. `.ca-jld-add-tile` is the
+ * card-shaped variant, for a grid that lists cards; a card whose body is a stack
+ * of head-over-table groups gets the width of the card and the height of a line.
+ * There is no `min-height` here for the same reason the tile has one: the tile
+ * stands in a row of cards and has to match them, and this stands under a table
+ * and has nothing to match.
+ *
+ * THE GAP IS THE GROUPS' OWN. `--ca-sec-gap` is what separates one group head
+ * from the table above it, so the slot sits where the next head would, rather
+ * than at a distance chosen for it. */
+.ca-journal-widget-block > .ca-journal-kind-add {
+  width: 100%;
+  margin-top: var(--ca-sec-gap);
+  padding: var(--ca-space-2) var(--ca-space-3);
+  border-radius: var(--ca-radius-md);
+  font-size: var(--ca-text-sm);
+}
+
 /* ── WHERE THE FIELD HEAD WENT (5.14) ──────────────────────────────────
  *
  * Six rules stood here under the heading *A FIELD HEAD*, drafted earlier in

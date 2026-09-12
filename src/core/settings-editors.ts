@@ -50,10 +50,7 @@ import type { SectionOverrides } from "../journals/journal-sections";
 import { getFile, noteTypeOf, plural } from "./util";
 import { repaintOpenNotes } from "../ui/livewidget";
 import { confirmKindChange } from "../journals/kind-change";
-import {
-  applyDashboardCatchups,
-  findDashboardCatchups,
-} from "../journals/dashboard-catchup";
+import { offerDashboardCatchup } from "../journals/dashboard-catchup";
 import type { KindChangeCounts } from "../journals/kind-change";
 import type ChronoAnvilPlugin from "../main";
 import { DEFAULT_MOOD_FACES } from "./constants";
@@ -2945,56 +2942,19 @@ export class JournalEditModal extends SteppedEditorModal {
   // confirmations without reading them (`setupVault`'s argument, and the rule
   // it follows itself).
   //
-  // NOTHING TO DO OPENS NOTHING, for the same reason.
-  //
   // AFTER THE SAVE, NOT BEFORE. The plan is computed against the journal as it
   // now is: the kinds just added are what make a dashboard short in the first
   // place, so scanning before `onSave` would find nothing every time.
   //
-  // DECLINING IS FREE AND STAYS FREE. The kind change is already committed by
-  // this point; this is a second, separate consent about the reader's
-  // dashboards, and refusing it leaves a vault behaving exactly as 3.17.1 did —
-  // the notes exist, carry the right frontmatter, and are simply not listed
-  // until the reader says so here or in the section editor later.
+  // THE WINDOW ITSELF MOVED TO `dashboard-catchup.ts` (1.1), where the second
+  // door onto it can reach it — the "Add kind" row on a journal's *What's
+  // below* card, which adds a kind without this editor being open at all. What
+  // stays here is this window's own gate: which changes are worth offering
+  // after. Declining is free from either door, and the plan, the sentence and
+  // the notice are the same because there is one of each.
   private async offerDashboardCatchup(changes: KindChange[]): Promise<void> {
     if (!changes.some((c) => c.kind === "added")) return;
-
-    const type = buildJournalType(this.draft);
-    const pending = await findDashboardCatchups(this.app, type);
-    if (!pending.length) return;
-
-    // THE DIALOG IS THE PLAN, not a summary of it — `previewRepair`'s property,
-    // and the reason `extend` carries a detail string rather than the word
-    // "unchanged". Each line is the op's own detail ("Practice has no table
-    // here — it will be added"), so what the reader accepts is what was
-    // computed.
-    const ok = await confirmPlan(
-      this.app,
-      `List the new note type on ${pending.length} dashboard${
-        pending.length === 1 ? "" : "s"
-      }?`,
-      "These index notes and templates were written before the note type " +
-        "existed, so they have no table for it. Only the missing tables are " +
-        "added — nothing already in them is moved, rewritten or removed, and " +
-        "no note you have written is touched.",
-      pending.map((p) => ({
-        label: p.file.basename,
-        lines: p.ops.map((o) => `${o.label} — ${o.detail}`),
-      })),
-      "Add the tables"
-    );
-    if (!ok) return;
-
-    const written = await applyDashboardCatchups(
-      this.app,
-      type,
-      pending.map((p) => p.file)
-    );
-    if (written) {
-      new Notice(
-        `ChronoAnvil: updated ${written} dashboard${written === 1 ? "" : "s"} ✅`
-      );
-    }
+    await offerDashboardCatchup(this.app, buildJournalType(this.draft));
   }
 
   protected async commit(): Promise<void> {

@@ -44,7 +44,8 @@
 // already writes missing templates, and already names what it is about to do.
 // One window, one decision, at the only moment the reader is thinking about it.
 
-import { App, TFile } from "obsidian";
+import { App, Notice, TFile } from "obsidian";
+import { confirmPlan } from "../ui/modals";
 import {
   SectionContext,
   detectSections,
@@ -166,6 +167,62 @@ export async function applyDashboardCatchups(
     if (next == null || next === text) continue;
     await app.vault.modify(file, next);
     written++;
+  }
+  return written;
+}
+
+// ── The offer itself ──────────────────────────────────────────────────────
+//
+// EXTRACTED IN 1.1 BECAUSE IT GREW A SECOND DOOR. It was a private method on
+// the journal editor, which was the only place a kind could be added; the
+// "Add kind" row on a journal's *What's below* card is a second, and a second
+// copy of this would be a second answer to "what is a reader shown before their
+// dashboards are written to". The window, the sentence and the `Notice` are the
+// same from both doors because there is one of each.
+//
+// THE DIALOG IS THE PLAN, not a summary of it — `previewRepair`'s property, and
+// the reason `extend` carries a detail string rather than the word "unchanged".
+// Each line is the op's own detail ("Practice has no table here — it will be
+// added"), so what the reader accepts is what was computed.
+//
+// DECLINING IS FREE AND STAYS FREE. The kind is already committed by the time
+// this runs; this is a second, separate consent about the reader's dashboards,
+// and refusing it leaves a vault where the notes exist, carry the right
+// frontmatter, and are simply not listed until the reader says so here or in
+// the section editor later. Returns what was written so a caller can say so.
+export async function offerDashboardCatchup(
+  app: App,
+  type: JournalType
+): Promise<number> {
+  const pending = await findDashboardCatchups(app, type);
+  if (!pending.length) return 0;
+
+  const ok = await confirmPlan(
+    app,
+    `List the new note type on ${pending.length} dashboard${
+      pending.length === 1 ? "" : "s"
+    }?`,
+    "These index notes and templates were written before the note type " +
+      "existed, so they have no table for it. Only the missing tables are " +
+      "added — nothing already in them is moved, rewritten or removed, and " +
+      "no note you have written is touched.",
+    pending.map((p) => ({
+      label: p.file.basename,
+      lines: p.ops.map((o) => `${o.label} — ${o.detail}`),
+    })),
+    "Add the tables"
+  );
+  if (!ok) return 0;
+
+  const written = await applyDashboardCatchups(
+    app,
+    type,
+    pending.map((p) => p.file)
+  );
+  if (written) {
+    new Notice(
+      `ChronoAnvil: updated ${written} dashboard${written === 1 ? "" : "s"} ✅`
+    );
   }
   return written;
 }

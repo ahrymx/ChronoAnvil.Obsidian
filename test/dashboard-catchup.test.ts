@@ -146,6 +146,9 @@ describe("what applying it writes", () => {
 
 describe("where the offer is made", () => {
   const settings = () => readCode("settings-editors");
+  // The window's own source. It was `settings-editors`' until 1.1; see the
+  // test below for why it moved.
+  const offer = () => readCode("dashboard-catchup");
 
   it("only after a kind was ADDED", () => {
     // A rename or a removal cannot leave a dashboard short, so offering after
@@ -164,7 +167,13 @@ describe("where the offer is made", () => {
   it("renders the plan rather than a summary of it", () => {
     // Each line is the op's own detail, which is what makes the preview unable
     // to drift from the action.
-    expect(settings()).toContain("p.ops.map((o) => `${o.label} — ${o.detail}`)");
+    //
+    // READ FROM `dashboard-catchup` SINCE 1.1, where the window moved when the
+    // "Add note type" row on a What's below card became a second door onto it.
+    // The gate above stayed in the editor — which changes are worth offering
+    // after — and the window itself is shared, so there is one plan, one
+    // sentence and one notice however a kind arrives.
+    expect(offer()).toContain("p.ops.map((o) => `${o.label} — ${o.detail}`)");
   });
 
   it("keeps the promise the kind-change window makes", () => {
@@ -177,14 +186,14 @@ describe("where the offer is made", () => {
   it("writes nothing without an answer", () => {
     // §8 of the roadmap ruled out a background sweep and the ruling stands: the
     // guarantee that survives 3.18 is that nothing is written until accepted.
-    const src = settings();
+    const src = offer();
     // `lastIndexOf`, because the import at the head of the file is also a
     // match and would make this pass whatever order the body used.
     const ask = src.indexOf("Add the tables");
     const write = src.lastIndexOf("applyDashboardCatchups");
     expect(ask).toBeGreaterThan(-1);
     expect(write).toBeGreaterThan(ask);
-    expect(src).toMatch(/if \(!ok\) return;[\s\S]{0,200}applyDashboardCatchups/);
+    expect(src).toMatch(/if \(!ok\) return 0;[\s\S]{0,200}applyDashboardCatchups/);
   });
 
   it("scans index surfaces only, never a leaf note", () => {
