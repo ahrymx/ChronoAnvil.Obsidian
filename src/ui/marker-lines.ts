@@ -93,7 +93,7 @@ import {
 } from "@codemirror/state";
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 
-import { protectLines, redirectTyping } from "./protected-lines";
+import { protectLines, redirectTyping, type LineSpan } from "./protected-lines";
 
 // One run of lines this plugin wrote, 0-based and inclusive.
 //
@@ -103,6 +103,20 @@ export interface MarkerSpan {
   from: number;
   to: number;
   keepLine: boolean;
+  // Does this run OPEN with a region?
+  //
+  // The one shape whose contents are a widget's value, and the one that has to
+  // stay contiguous with the fence above it — `src/core/sections.ts`: *"written
+  // immediately after its fence so the section stays one contiguous run, which
+  // is what makes cut-and-paste move the whole thing, and a splice
+  // well-defined."* `parseSections` enforces that by stopping a section's run at
+  // the first raw segment holding somebody else's prose, so a sentence typed
+  // into the gap above a region detaches the region from the card that owns it.
+  // `typingGaps` is what that fact is for.
+  //
+  // THE RUN'S FIRST LINE, not its contents, because a merge only ever extends
+  // `to` and the gap in question is above `from`.
+  opensRegion: boolean;
 }
 
 // A region opener, on a line of its own — `notestore.ts`'s two prefixes, and
@@ -164,7 +178,7 @@ export function markerLinesIn(lines: readonly string[]): MarkerSpan[] {
 
     if (REGION_OPEN.test(t)) {
       if (t.endsWith("-->")) {
-        out.push({ from: i, to: i, keepLine: false });
+        out.push({ from: i, to: i, keepLine: false, opensRegion: true });
         i++;
         continue;
       }
@@ -183,13 +197,13 @@ export function markerLinesIn(lines: readonly string[]): MarkerSpan[] {
         i++;
         continue;
       }
-      out.push({ from: i, to: close, keepLine: false });
+      out.push({ from: i, to: close, keepLine: false, opensRegion: true });
       i = close + 1;
       continue;
     }
 
     if (BRACKET.test(t)) {
-      out.push({ from: i, to: i, keepLine: false });
+      out.push({ from: i, to: i, keepLine: false, opensRegion: false });
       i++;
       continue;
     }
@@ -197,13 +211,13 @@ export function markerLinesIn(lines: readonly string[]): MarkerSpan[] {
     if (GRAPH_HEAD.test(t)) {
       const linked = i + 1 < lines.length && GRAPH_LINKS.test(lines[i + 1].trim());
       const to = linked ? i + 1 : i;
-      out.push({ from: i, to, keepLine: false });
+      out.push({ from: i, to, keepLine: false, opensRegion: false });
       i = to + 1;
       continue;
     }
 
     if (SPACERS.includes(t)) {
-      out.push({ from: i, to: i, keepLine: true });
+      out.push({ from: i, to: i, keepLine: true, opensRegion: false });
       i++;
       continue;
     }
@@ -421,6 +435,42 @@ function cursorRest(): Extension {
   });
 }
 
+// THE ROWS A READER CAN SEE AND LAND ON WHOSE POSITION IN THE FILE IS WRONG.
+//
+// `redirectTyping` moves an insertion anywhere inside one of these spans to the
+// line below the span's END, so each one reads as *"typing in this gap belongs
+// after it"*. Two shapes qualify, and they are the same shape twice — a visible
+// row that invites the cursor and a file position that must not take prose.
+//
+//   THE SPACER'S OWN ROW. It exists so the cursor spawns there rather than in
+//   the fence below, so a reader typing on it is doing what the row invites. The
+//   old answer was to rewrite the spacer line until the markup showed.
+//
+//   THE BLANK ROW DIRECTLY ABOVE A REGION. That blank is the separator the
+//   composer writes between a section's fence and the region holding its widget
+//   value, and `parseSections` stops a section's run at the first raw segment
+//   holding somebody else's prose. A sentence typed there detaches the region
+//   from the card that owns it: the Recall card's own measurement went from
+//   three segments to one, so a later *Edit sections…* would move or delete the
+//   card and strand the value. The text goes below the region instead, which is
+//   the one place in that neighbourhood that owns nothing.
+//
+// ONLY A RUN THAT OPENS WITH A REGION. The blank above the prose skeleton's
+// CLOSING bracket is the reader's own paragraph break — they are writing inside
+// the skeleton, and moving that keystroke to the bottom of the note would be the
+// rudest thing this file could do.
+function typingGaps(doc: Text, spans: readonly MarkerSpan[]): LineSpan[] {
+  const out: LineSpan[] = [];
+  for (const span of spans) {
+    if (span.keepLine) {
+      out.push({ from: span.from, to: span.to });
+    } else if (span.opensRegion && span.from > 0 && doc.line(span.from).length === 0) {
+      out.push({ from: span.from - 1, to: span.to });
+    }
+  }
+  return out;
+}
+
 export function hiddenMarkers(): Extension {
   return [
     markers,
@@ -428,13 +478,10 @@ export function hiddenMarkers(): Extension {
       (view) => view.state.field(markers, false)?.deco ?? Decoration.none
     ),
     cursorRest(),
-    // AND A KEYSTROKE AIMED AT THE SPACER LANDS BELOW IT. Only the `keepLine`
-    // runs are handed over, because they are the only ones whose resting point
-    // is itself inside marker text — the spacer's row is the landing strip, so
-    // the cursor is MEANT to be there and the words have to go somewhere.
-    redirectTyping(
-      (state) => state.field(markers, false)?.spans.filter((s) => s.keepLine) ?? []
-    ),
+    redirectTyping((state) => {
+      const hidden = state.field(markers, false);
+      return hidden?.live ? typingGaps(state.doc, hidden.spans) : [];
+    }),
     // AND WHAT IS HIDDEN DOES NOT GO WITH A SELECT-ALL. 5.31.1, and the sharper
     // half of that rule here than on a fence: a fence is recomposed by *Set up
     // / repair vault* and the graph block is rewritten on the next render, but

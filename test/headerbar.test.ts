@@ -379,7 +379,39 @@ describe("section bodies are marked for the surface", () => {
     // always had.
     const body = method("bodyInOwnFence");
     expect(body).toContain("return false;");
-    expect(body).toContain("this.rendersSomething(sib)");
+    // A fence that drew nothing has no sibling after its bar, so the walk over
+    // the blocks below it is reached by the empty `some` rather than by a
+    // second rule.
+    expect(body).toContain("const after = kin.slice(kin.indexOf(last) + 1);");
+    expect(body).toContain("return after.some(");
+  });
+
+  it("counts a widget whose content has not arrived yet as the body", () => {
+    // THE BUG (1.0.8), REPORTED AS TWO MODES DISAGREEING ABOUT ONE FILE. A line
+    // typed under a Recall card rendered BELOW the card in Live Preview and
+    // INSIDE its border in reading mode.
+    //
+    // `buildRecall` returns its wrapper with an empty body and fills it when a
+    // `vault.read` resolves. Asking `rendersSomething` of that wrapper answers
+    // a question about the frame the pass happened to run in: the fence looks
+    // as though it drew nothing, the section does not end at its own block, and
+    // the reader's next block is shaded and folded into the card.
+    //
+    // Reading mode has no second chance at it — `SectionPass` observes
+    // `childList` on the block container and nothing deeper, so a widget
+    // filling itself inside a block raises no mutation. Live Preview gets one
+    // for free from CodeMirror's `.cm-line` churn, which is the whole of why
+    // the two modes disagreed.
+    const body = method("bodyInOwnFence");
+    expect(body).not.toContain("this.rendersSomething(sib)");
+    // And the widget really is async, so the predicate cannot go back to
+    // asking what it drew.
+    const recall = readSrc("recall-widgets");
+    expect(recall).toContain("void deps.app.vault.read(file).then((text) => {");
+    // The pass that would have corrected it watches the container's own
+    // children only. Widening that is the other repair and is not this one.
+    const at = src.indexOf("this.observer.observe(");
+    expect(src.slice(at, src.indexOf(";", at))).not.toContain("subtree");
   });
 
   it("stops the level-2 indent there too", () => {

@@ -156,7 +156,9 @@ describe("which lines are this plugin's", () => {
     // comment and the widget is where the words are edited, so this takes the
     // same extent.
     const note = ["before", "<!--chronoanvil:focus", "typed", "-->", "after"];
-    expect(markerLinesIn(note)).toEqual([{ from: 1, to: 3, keepLine: false }]);
+    expect(markerLinesIn(note)).toEqual([
+      { from: 1, to: 3, keepLine: false, opensRegion: true },
+    ]);
   });
 
   it("takes a bracket's two edges and keeps what is between them", () => {
@@ -165,14 +167,16 @@ describe("which lines are this plugin's", () => {
     // a region, in this file as in `stripPluginMarkup`.
     const note = ["<!--chronoanvil-skeleton-->", "## Heading", "<!--/chronoanvil-skeleton-->"];
     expect(markerLinesIn(note)).toEqual([
-      { from: 0, to: 0, keepLine: false },
-      { from: 2, to: 2, keepLine: false },
+      { from: 0, to: 0, keepLine: false, opensRegion: false },
+      { from: 2, to: 2, keepLine: false, opensRegion: false },
     ]);
   });
 
   it("takes the graph block's links line with its head", () => {
     const note = ["prose", "%% chronoanvil-graph %%", "%% [[Weekly|​]] %%"];
-    expect(markerLinesIn(note)).toEqual([{ from: 1, to: 2, keepLine: false }]);
+    expect(markerLinesIn(note)).toEqual([
+      { from: 1, to: 2, keepLine: false, opensRegion: false },
+    ]);
   });
 
   it("leaves the spacer its line, because the line is the point", () => {
@@ -181,7 +185,7 @@ describe("which lines are this plugin's", () => {
     // row away and the cursor goes back into the fence — the exact failure the
     // spacer was written to prevent.
     expect(markerLinesIn(["`chronoanvil:spacer`", "", "prose"])).toEqual([
-      { from: 0, to: 0, keepLine: true },
+      { from: 0, to: 0, keepLine: true, opensRegion: false },
     ]);
     const doc = "`chronoanvil:spacer`\n\nprose";
     expect(seen(doc)).toBe("\n\nprose");
@@ -197,8 +201,8 @@ describe("which lines are this plugin's", () => {
     // spellings rather than about the join.
     const note = ["<!--almanac:focus", "typed", "-->", "prose", "%% almanac-graph %%", "%% %%"];
     expect(markerLinesIn(note)).toEqual([
-      { from: 0, to: 2, keepLine: false },
-      { from: 4, to: 5, keepLine: false },
+      { from: 0, to: 2, keepLine: false, opensRegion: true },
+      { from: 4, to: 5, keepLine: false, opensRegion: false },
     ]);
   });
 });
@@ -261,7 +265,9 @@ describe("where a hidden line's break goes", () => {
     // BEFORE it, so two adjacent runs would overlap — and two overlapping
     // replace decorations are a rendering CodeMirror is entitled to refuse.
     const note = ["<!--chronoanvil-skeleton-->", "<!--/chronoanvil-skeleton-->", "b"];
-    expect(markerLinesIn(note)).toEqual([{ from: 0, to: 1, keepLine: false }]);
+    expect(markerLinesIn(note)).toEqual([
+      { from: 0, to: 1, keepLine: false, opensRegion: false },
+    ]);
     expect(hidden(note.join("\n"))).toHaveLength(1);
     expect(seen(note.join("\n"))).toBe("b");
   });
@@ -298,7 +304,9 @@ describe("the empty rows at the bottom of a note", () => {
   );
 
   it("joins the whole stack into one run", () => {
-    expect(markerLinesIn(STACK)).toEqual([{ from: 4, to: 14, keepLine: false }]);
+    expect(markerLinesIn(STACK)).toEqual([
+      { from: 4, to: 14, keepLine: false, opensRegion: true },
+    ]);
   });
 
   it("leaves one separator where it left one per region", () => {
@@ -314,8 +322,8 @@ describe("the empty rows at the bottom of a note", () => {
     const typed = [...STACK];
     typed[6] = "a stray thought";
     expect(markerLinesIn(typed)).toEqual([
-      { from: 4, to: 5, keepLine: false },
-      { from: 7, to: 14, keepLine: false },
+      { from: 4, to: 5, keepLine: false, opensRegion: true },
+      { from: 7, to: 14, keepLine: false, opensRegion: true },
     ]);
     expect(seen(typed.join("\n"))).toContain("a stray thought");
   });
@@ -338,8 +346,8 @@ describe("the empty rows at the bottom of a note", () => {
       "%% [[Weekly|\u200b]] %%",
     ];
     expect(markerLinesIn(note)).toEqual([
-      { from: 0, to: 3, keepLine: false },
-      { from: 7, to: 10, keepLine: false },
+      { from: 0, to: 3, keepLine: false, opensRegion: true },
+      { from: 7, to: 10, keepLine: false, opensRegion: false },
     ]);
     expect(seen(note.join("\n"))).toContain("## What happened");
   });
@@ -351,8 +359,8 @@ describe("the empty rows at the bottom of a note", () => {
     expect(
       markerLinesIn(["`chronoanvil:spacer`", "", "<!--chronoanvil-skeleton-->"])
     ).toEqual([
-      { from: 0, to: 0, keepLine: true },
-      { from: 2, to: 2, keepLine: false },
+      { from: 0, to: 0, keepLine: true, opensRegion: false },
+      { from: 2, to: 2, keepLine: false, opensRegion: false },
     ]);
   });
 
@@ -546,6 +554,97 @@ describe("a keystroke aimed at the spacer", () => {
     expect(afterEdit(SPACER, { from: 0, insert: "Hello" }, "input.type", false)).toBe(
       `Hello${SPACER}`
     );
+  });
+});
+
+describe("the gap between a card and its stored region", () => {
+  // A `<!--chronoanvil:key -->` region holds a widget's value and has to stay
+  // contiguous with the fence above it — `src/core/sections.ts` — because
+  // `parseSections` stops a section's run at the first raw segment holding
+  // somebody else's prose. Measured on the reported note, a sentence typed into
+  // that gap took the Recall card from three segments to one, so a later
+  // *Edit sections…* would move the card and strand `x+y :: z`.
+  //
+  // The gap paints as ONE EMPTY ROW directly under the card, which is the most
+  // natural place in the whole note to start writing.
+  const CARD = [
+    "```chronoanvil",
+    "header:🧠 Recall",
+    "recall:recall",
+    "```",
+    "",
+    "<!--chronoanvil:recall",
+    "x+y :: z",
+    "-->",
+    "",
+  ].join("\n");
+
+  const gap = (doc: string): number => stateFor(doc, true).doc.line(5).to;
+
+  it("takes the keystroke below the region instead", () => {
+    expect(afterEdit(CARD, { from: gap(CARD), insert: "test2" }, "input.type")).toBe(
+      [
+        "```chronoanvil",
+        "header:🧠 Recall",
+        "recall:recall",
+        "```",
+        "",
+        "<!--chronoanvil:recall",
+        "x+y :: z",
+        "-->",
+        "test2",
+        "",
+      ].join("\n")
+    );
+  });
+
+  it("leaves the card and its region adjacent, which is the point", () => {
+    // The property `parseSections` reads: nothing but a blank line stands
+    // between the closing fence and the region's opener.
+    const after = afterEdit(CARD, { from: gap(CARD), insert: "test2" }, "input.type").split("\n");
+    const fence = after.lastIndexOf("```");
+    const region = after.indexOf("<!--chronoanvil:recall");
+    expect(region - fence).toBe(2);
+    expect(after[fence + 1].trim()).toBe("");
+  });
+
+  it("puts the cursor with the text it moved", () => {
+    const next = stateFor(CARD, true).update({
+      changes: { from: gap(CARD), insert: "test2" },
+      userEvent: "input.type",
+    }).state;
+    expect(next.doc.sliceString(next.selection.main.head - 5, next.selection.main.head)).toBe("test2");
+  });
+
+  it("leaves a line the reader has already written on alone", () => {
+    // THE GAP IS A BLANK ROW, and a row with a word on it is the reader's
+    // paragraph — typing at the end of it must behave like typing anywhere
+    // else. Without this the whole rule could be keyed on nothing but "there is
+    // a region below", which reads the same on every fixture that has one.
+    const doc = ["prose", "<!--chronoanvil:recall", "x+y :: z", "-->", ""].join("\n");
+    const at = stateFor(doc, true).doc.line(1).to;
+    expect(afterEdit(doc, { from: at, insert: " more" }, "input.type").split("\n")[0]).toBe(
+      "prose more"
+    );
+  });
+
+  it("does not touch the blank above the skeleton's closing bracket", () => {
+    // THE READER IS WRITING INSIDE THE SKELETON THERE, and their paragraph break
+    // is not a gap. Moving that keystroke to the bottom of the note would be the
+    // rudest thing this file could do — which is why the rule asks whether the
+    // run OPENS with a region rather than whether it has a blank above it.
+    const doc = [
+      "<!--chronoanvil-skeleton-->",
+      "",
+      "## Overview",
+      "",
+      "text",
+      "",
+      "<!--/chronoanvil-skeleton-->",
+      "",
+    ].join("\n");
+    const at = stateFor(doc, true).doc.line(6).to;
+    expect(afterEdit(doc, { from: at, insert: "more" }, "input.type").split("\n")[5]).toBe("more");
   });
 });
 
@@ -792,7 +891,7 @@ describe("how it is wired", () => {
     expect(src).toContain("EditorState.transactionFilter");
     // Only the `keepLine` runs are handed to the redirect, because they are the
     // only ones whose resting point is inside marker text.
-    expect(src).toContain("spans.filter((s) => s.keepLine)");
+    expect(src).toContain("typingGaps(state.doc, hidden.spans)");
   });
 
   it("keeps the change filter that 5.31.1 chose over a bouncing one", () => {

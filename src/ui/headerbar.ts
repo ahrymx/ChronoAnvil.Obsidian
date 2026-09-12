@@ -1082,14 +1082,34 @@ export class HeaderBar extends MarkdownRenderChild {
   // does, and a trailing bar with nothing under it is a section still waiting
   // for its blocks.
   //
-  // RENDERING SIBLINGS THAT ARE NOT FURNITURE. A storage region welded into the
-  // same fence draws nothing, so it is skipped by `rendersSomething` already;
-  // `BLOCK_FURNITURE` is the other half — the grip and the drop slots
-  // `attachBlockHead` hangs on every block are appended after whatever was
-  // drawn, and they belong to the page's editing gestures rather than to the
-  // section. They happen to be empty divs today, so this changes no answer; it
-  // is here so that giving the grip an icon does not silently end every
-  // section at its own bar.
+  // A SIBLING THE FENCE DREW IS THE BODY, WHETHER OR NOT ITS CONTENT HAS
+  // ARRIVED YET.
+  //
+  // This asked `rendersSomething` of each sibling until 1.0.8, which made the
+  // answer a fact about the FRAME rather than about the section — the hazard
+  // `claimOwnBlock` names when it refuses to claim `is-last` at mount, one
+  // pass later and with nothing to correct it. A `recall:`, `list:`, `tasks:`
+  // or `note:` widget builds its wrapper synchronously and fills it when a
+  // `vault.read` resolves, so at the moment the pass runs the fence looks as
+  // though it drew nothing and the section swallows the blocks below it.
+  //
+  // READING MODE IS WHERE A READER MEETS THAT, and only there. The note's
+  // `SectionPass` observes `childList` on the container the note's blocks are
+  // children of, and nothing deeper — so a widget filling itself INSIDE a
+  // block raises no mutation and no second pass. In Live Preview CodeMirror
+  // adds and removes `.cm-line` children of that same container constantly, a
+  // later pass asks again, and the answer silently corrects itself. Hence the
+  // report: a line typed under a Recall card rendered below the card while
+  // editing and inside its border while reading, from one file.
+  //
+  // EVERY SIBLING HERE IS SOMETHING THIS PLUGIN PUT THERE. The host is the
+  // `.ca-journal-widget-block` the fence built, and the only things appended
+  // to it are bars, widgets, and `BLOCK_FURNITURE` — the grip and the drop
+  // slots `attachBlockHead` hangs on a block, which belong to the page's
+  // editing gestures rather than to the section. So excluding the furniture is
+  // the whole of the question, and it stays an EXPLICIT exclusion rather than
+  // a consequence of emptiness: they are empty divs today, and giving the grip
+  // an icon would otherwise end every section at its own bar.
   private bodyInOwnFence(block: HTMLElement): boolean {
     const bars = Array.from(
       block.querySelectorAll<HTMLElement>(".ca-journal-header-bar")
@@ -1122,10 +1142,7 @@ export class HeaderBar extends MarkdownRenderChild {
     const kin = Array.from(host.children);
     const after = kin.slice(kin.indexOf(last) + 1);
     return after.some(
-      (sib) =>
-        sib instanceof HTMLElement &&
-        !sib.matches(BLOCK_FURNITURE) &&
-        this.rendersSomething(sib)
+      (sib) => sib instanceof HTMLElement && !sib.matches(BLOCK_FURNITURE)
     );
   }
 

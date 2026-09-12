@@ -5,6 +5,28 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2026-09-12
+
+### Fixed
+
+- **A line typed under a card stays out of it.** A card whose cards, list, tasks
+  or notes are stored in the note is drawn before its contents are read back off
+  disk, and the plugin asked whether the fence had drawn a body at the moment it
+  looked rather than once the answer had settled. In reading mode nothing ever
+  asked again, so a card that was still loading was treated as a heading with
+  nothing under it and took the next block into itself: a sentence written below
+  a Recall card sat below the card while you were editing and inside its border
+  when you read it back, from the same file. The question is now answered by what
+  the fence drew rather than by what had finished arriving, so both views agree.
+
+- **Prose typed in the gap under a card no longer detaches its contents.** A card
+  and the region holding what it stores have to stay one unbroken run, and a
+  sentence typed on the blank row between them cut the region loose — the card
+  kept rendering, and the next thing that rewrote the note wrote the region back
+  somewhere else. That row now behaves like the one above the markers at the
+  bottom of a note: what you type moves to its own line below, where you can see
+  it, and the card keeps hold of what it stores.
+
 ## [1.0.7] - 2026-09-12
 
 ### Fixed
