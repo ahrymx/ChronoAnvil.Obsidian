@@ -1081,14 +1081,19 @@ export function viewOf<Ctx>(
     //
     // `weldable` IS A DIFFERENT QUESTION AND IS THE SURFACE'S (5.30). Not *does
     // this note have a banner* but *can this surface rearrange its blocks at
-    // all* — and a diary entry cannot: `entrySectionModel` implements neither
-    // `blocks` nor `regroup`, so it has no groups, no pages and no stacks. The
-    // editor already withholds every block control there (`hasRows`), so a
-    // `stacks` on an entry row is inert rather than broken — but it is a claim
-    // the catalogue cannot honour, and the day entries gain an arrangement it
-    // would turn a deferred decision into a shipped one without anybody
-    // deciding it. What the two bands mean for a block partition is the
-    // question that has to be answered first; see `SectionView.group`.
+    // all* — a surface implementing neither `blocks` nor `regroup` has no
+    // groups, no pages and no stacks, so a `stacks` on one of its rows is a
+    // claim the catalogue cannot honour.
+    //
+    // AND NOTHING PASSES IT ANY MORE (1.0.10). The one caller was
+    // `entry-sections.ts`, where the deferral read *"what the two bands mean
+    // for a block partition is the question that has to be answered first"*.
+    // It is answered: the banner and the grid are one display group, a block
+    // may not cross into the page below, and `entrySectionModel` implements
+    // both methods over the structural half of its catalogue. The policy stays
+    // because the QUESTION stays — a surface may still gain a weldable section
+    // before it gains an arrangement — and the day that happens it says so here
+    // rather than shipping a button that writes nothing.
     ...(WELDS_INTO_BANNER.has(section.id) && policy.weldable !== false
       ? { stacks: BANNER_ID }
       : {}),

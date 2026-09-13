@@ -203,6 +203,7 @@ import {
   markRegion,
   markSpan,
   stampLines,
+  stampedWithin,
 } from "./block-drag";
 import { livePageHead } from "./page-head";
 import { buildLauncher, LAUNCHER_DEFAULT } from "./launcher";
@@ -2104,15 +2105,27 @@ export class Widgets implements
       // drawn — the strip below is placed above the first of them.
       const revealAnchors: HTMLElement[] = [];
       if (!isManagedTemplate(this.plugin, ctx.sourcePath)) {
-        // WHERE A PART'S LINES BECOME A PART'S CHILDREN. `drawn` records the
-        // child count the block had when the loop reached each line, against
-        // that line's number in the FENCE'S OWN BODY — which is the numbering
-        // `stackParts` speaks, and the reason the two can be read together with
-        // no DOM walking at all. A part whose lines all drew nothing (a divider
-        // over a comment run) finds no entry and takes the end of the block.
+        // WHERE A PART'S LINES BECOME A PART'S CHILDREN, read off the stamp
+        // each child already carries — see `stampedWithin` for why it is not
+        // the child count `drawn` recorded. Short version: two of the four
+        // things inserted after the loop go in at the FRONT, so every index
+        // taken from that record points one child early by the time this runs,
+        // and a diary entry is exactly where both of them land.
         const kids = Array.from(container.children) as HTMLElement[];
-        const childAt = (bodyLine: number): number =>
-          drawn.find((d) => d.line >= bodyLine)?.at ?? kids.length;
+
+        // AND AN EMPTY LOGGING GRID IS NOT STAMPED AT ALL. Weekly, monthly,
+        // quarterly and yearly entries compose the marked region with nothing
+        // between the markers, so no directive drew the grid — it is built
+        // below the loop and `clearStamp` takes the stamp off a bar the loop
+        // drew over a region that turns out empty. Four of the five grains
+        // would therefore weld the grid into the banner and get a chevron that
+        // hid nothing. The bar IS the part on those notes, so the part takes
+        // it.
+        const childrenOf = (part: { id: string; from: number; to: number }) => {
+          const own = stampedWithin(container, part.from, part.to);
+          if (own.length) return own;
+          return part.id === "tracker" && trackerBar ? [trackerBar] : [];
+        };
 
         // ONE REVEAL PER SECTION WELDED INTO THE BANNER. `nameOf` is the
         // dispatcher's own naming, handed in rather than duplicated: the grid
@@ -2124,7 +2137,7 @@ export class Widgets implements
             )
           : [];
         for (const part of parts) {
-          for (const el of kids.slice(childAt(part.from), childAt(part.to))) {
+          for (const el of childrenOf(part)) {
             revealAnchors.push(el);
             ctx.addChild(
               new RevealTargetChild(el, ctx.sourcePath, {

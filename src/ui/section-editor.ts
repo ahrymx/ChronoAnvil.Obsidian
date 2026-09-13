@@ -1020,7 +1020,12 @@ export class SectionEditorModal extends EditorModal {
           : "One of these widgets' lines can't be told apart from the others in its block, so the group can't be broken up. Move it out of the block by hand first.";
     }
     split.addEventListener("click", () => {
-      this.settle(breakUp(this.arrangement, band, group[0]));
+      // `stackBand` FOR THE SAME REASON THE WELD USES IT, at the other end of
+      // the gesture: this card may be opened by a pinned banner, and a band
+      // without it is a band `blockOf` finds no block in. The arrows above keep
+      // the movable band — moving the card IS moving rows past each other, and
+      // a block a fixed row opens does not move.
+      this.settle(breakUp(this.arrangement, this.stackBand(group[0]), group[0]));
     });
 
     this.renderBlockTitle(bar, group);
@@ -1261,6 +1266,38 @@ export class SectionEditorModal extends EditorModal {
     );
   }
 
+  // The same band, with the rows that cannot be moved left in it — 1.0.10.
+  //
+  // A SECOND ACCESSOR RATHER THAN A FLAG ON THE FIRST, because the two answer
+  // different questions and only one of them is about moving. `bandOf` is the
+  // list a row is REARRANGED inside, and everything above is the argument for
+  // leaving a fixed row out of it: not in the band, so not a drag source, not a
+  // drop target, and no arrows. This one is the list a row is WELDED inside,
+  // and a weld does not move anything past anything — it puts one section into
+  // the fence of another, which is a thing a fixed row can perfectly well be
+  // the host of.
+  //
+  // AND WITHOUT IT THE BUTTON CANNOT BE DRAWN AT ALL. `weldInto` and `breakUp`
+  // both cut blocks from the band they are handed, and both need the host in
+  // that band — so on every surface whose banner is pinned the window was
+  // offering a weld over a band the banner was not in, and `blockOf` answered
+  // `[]`. A diary entry is the surface that made it visible; Home and Search
+  // have had it since 5.30 and the sweep missed it because it calls `weldInto`
+  // directly, with a band of its own.
+  //
+  // A ROW ON ITS WAY OUT IS STILL EXCLUDED. That omission is about the FILE the
+  // Save writes rather than about movement, and it is as true of a weld as of a
+  // swap: a section that will not be there cannot be welded into anything.
+  private stackBand(id: string): string[] {
+    const band = this.view(id)?.group ?? null;
+    return this.rows.filter(
+      (x) =>
+        this.view(x) !== undefined &&
+        !this.removed.has(x) &&
+        (this.view(x)?.group ?? null) === band
+    );
+  }
+
   private renderRow(host: HTMLElement, section: SectionView): void {
     const gone = this.removed.has(section.id);
     const isNew = !this.original.includes(section.id);
@@ -1412,7 +1449,11 @@ export class SectionEditorModal extends EditorModal {
       // `SectionView.stacks`. The window never learns that trackers and the
       // index are the two; it asks each row what it may be welded under and
       // draws a button where there is an answer.
-      this.renderStackJoin(lead, section, band);
+      // THE BAND WITH THE FIXED ROWS LEFT IN, which is the one a weld is cut
+      // from. See `stackBand`: the host of a stack is a banner, a banner is
+      // pinned on four of the five surfaces that have one, and the movable band
+      // does not contain it.
+      this.renderStackJoin(lead, section, this.stackBand(section.id));
       if (unit === "cell") {
         // AN ICON UNDER THE ARROWS, NOT A PILL IN THE ACTIONS ROW (4.53.1).
         //

@@ -1028,6 +1028,113 @@ body.is-mobile
   padding: 6px 14px 10px;
 }
 
+/* ── AND THE STRIP THAT SAYS WHICH NOTE THIS IS (1.0.10) ──────────────
+ *
+ * A diary entry's page-context strip — the alias, the date stepper and the
+ * entry's `⋯` — and a journal note's facts row, which is the same object one
+ * surface over. The dispatcher puts either of them directly under the page
+ * head, so in a stack they are the name band's second line.
+ *
+ * WITHOUT THIS THEY HAVE NO BAND AT ALL. Their only rules are
+ * `.ca-journal-tracker-section > …` in 50-entry-header.css, and `chromeClasses`
+ * withholds that class from a block inside a stack — *a fence is a banner or it
+ * is the tracker section* — so the strip arrives as a bare div: no flex, no
+ * gutter, no air. That is what an entry welded from the section editor drew
+ * before this rule, and a journal note whose facts row is in its stack has
+ * drawn it since 5.28.
+ *
+ * NO RULE AND NO BLEED, WHICH IS THE WHOLE DIFFERENCE FROM THE TWIN. The
+ * tracker section's version bleeds out of a 12px card padding and bands itself
+ * top and bottom, because there it is the card's top strip over the grid. Here
+ * it is under the note's NAME, the card states `padding: 0` so each band states
+ * its own inset, and a rule between the name and the thing that says which note
+ * it is would band the card in the wrong place — the same sentence the head's
+ * cancelled bottom border makes two rules up.
+ *
+ * AND NOTHING IS CANCELLED UNDER IT, because nothing meets it. The chevron
+ * strip is inserted above the first element a reveal registered, which on a
+ * welded entry is the logging grid — so the order is name, strip, chevrons,
+ * grid, and the only hairline in the card is the grid's own. With the grid
+ * closed it is `display: none` and takes its rule with it, which is the rule
+ * the band block below already states. */
+.ca-journal-stack > .ca-journal-entry-context,
+.ca-journal-stack > .ca-journal-note-context {
+  display: flex;
+  align-items: center;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0 14px 4px;
+}
+
+/* ── AND THE NAVIGATOR COMES BACK TO ITS OWN SCALE (1.0.10) ────────────
+ *
+ * `jec-nav-only` in 50-entry-header.css enlarges this row's three controls —
+ * 2.2em pills where the pill's own rule says 2em, a base-size 600-weight label
+ * where the trigger's says small — and the reason is written where it is set:
+ * *"It spans the full width of the TRACKER CARD TOP ROW with arrows on both
+ * sides and the date selector centered and enlarged."* There the strip IS the
+ * card's first line, and the enlargement is that card's own emphasis.
+ *
+ * In a stack it is the name band's SECOND line, and the emphasis costs twice.
+ * The row becomes the tallest band in a card whose whole purpose is to be
+ * short — 2.2em of box for a 1em glyph, under a title in heading type and over
+ * a chevron pill half its height. And the picker states the entry's date in
+ * 600-weight base type four pixels under the same date in heading type, so the
+ * card says one thing twice in two sizes and the second one argues with the
+ * first.
+ *
+ * THE GEOMETRY IS THE READER'S AND IS UNCHANGED. The arrows keep the card's two
+ * edges and the picker keeps the middle, which is the shape the unwelded card
+ * has and the one they asked to keep. What comes out is the height.
+ *
+ * FOUR CLASSES, to outrank `.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-…`
+ * from a later file — the same arithmetic, and the same reason, as the welded
+ * section bar's rule further down this block. */
+/* ── AND THE BAND GETS THE CARD'S AIR (1.0.10) ──────────────────────────
+ *
+ * `jec-nav-only` states `padding-top: 0; padding-bottom: 0`, and there it is
+ * right: the strip is the tracker card's own first line, its controls carry
+ * the card's top inset themselves, and a band cannot pad above the card's edge.
+ * In a stack the strip is band 3 of five — under the name in heading type, over
+ * the chevrons — and zero is the one value a band between two bands cannot
+ * have. The row arrived hard against the title with its floor on the chevron
+ * pill's ceiling: three rows of controls stacked with no air between them, read
+ * as one cramped block rather than as three lines of a name band.
+ *
+ * TEN ABOVE, FOUR BELOW, WHICH IS TEN ON BOTH. The card's air is 10 — the head
+ * states it as a top inset and the chevron strip as a floor, and the note on
+ * that rule says so. The floor here is four because the band under it opens
+ * with six of its own, and the pair is the same ten measured across the seam.
+ *
+ * FOUR CLASSES, for the reason the block below states: `jec-nav-only`'s zeroes
+ * are longhands in a later file and a shorthand cannot reach them. */
+.ca-journal-widget-block.ca-journal-stack
+  > .ca-journal-entry-context.ca-jec-nav-only {
+  padding-top: 10px;
+  padding-bottom: 4px;
+}
+
+.ca-journal-widget-block.ca-journal-stack
+  > .ca-journal-entry-context.ca-jec-nav-only
+  .ca-jeh-navpill {
+  width: 2em;
+  height: 2em;
+}
+.ca-journal-widget-block.ca-journal-stack
+  > .ca-journal-entry-context.ca-jec-nav-only
+  .ca-jeh-datenav-trigger {
+  height: 2em;
+  padding: 0 12px;
+  font-size: var(--ca-text-sm);
+}
+.ca-journal-widget-block.ca-journal-stack
+  > .ca-journal-entry-context.ca-jec-nav-only
+  .ca-jeh-datenav-trigger
+  .ca-jeh-datenav-label {
+  font-size: var(--ca-text-sm);
+}
+
 /* ── THE BANDS UNDER IT ────────────────────────────────────────────────
  *
  * One rule per band, drawn by the band that STARTS it — the logging grid, or a

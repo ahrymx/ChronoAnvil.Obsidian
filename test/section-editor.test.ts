@@ -223,19 +223,21 @@ describe("a section cannot be dragged across the rule", () => {
     expect(body.match(/this\.accepts\(id, scope\)/g) ?? []).toHaveLength(2);
   });
 
-  it("and an entry really does report three bands", () => {
+  it("and an entry really does report two bands", () => {
     const e = entry();
     const bands = new Map<string | null, string[]>();
     for (const s of e.model.sections()) {
       bands.set(s.group, [...(bands.get(s.group) ?? []), s.id]);
     }
-    // THREE AS OF 4.20. The banner and the tracker grid are each one row in a
-    // band of their own above the rule, and the reader's writing is below it.
-    // Two bands above rather than one is what stops the grid being dragged back
-    // into the card 4.20 took it out of.
-    expect(bands.size).toBe(3);
-    expect(bands.get("The banner")).toEqual(["banner"]);
-    expect(bands.get("The trackers")).toEqual(["trackers"]);
+    // TWO AS OF 1.0.10, WHERE IT WAS THREE. 4.20 gave the grid a band of its own
+    // so it could not be dragged back into the card it had just left, and the
+    // drag is still refused — the banner is pinned and the grid is alone among
+    // the movable rows of the group, so there is no slot and no arrow. What one
+    // group buys is the weld: a block cannot span two of these strings, and the
+    // whole of the arrangement this surface gained is a block holding both.
+    expect(bands.size).toBe(2);
+    expect(bands.get("The banner")).toEqual(["banner", "trackers"]);
+    expect(bands.get("The page below")?.[0]).toBe("focus");
   });
 
   it("and a dashboard reports two, one row in the top one", () => {
@@ -463,6 +465,43 @@ describe("what a fixed row offers", () => {
     expect(editor()).toContain(
       "if (this.view(id)?.movable === false) return [];"
     );
+  });
+
+  it("but it IS in the band a weld is cut from, which is a different question", () => {
+    // 1.0.10. `bandOf` is the list a row is REARRANGED inside, and a fixed row
+    // is left out of it so that three gestures refuse from one omission. A weld
+    // moves nothing past anything — it puts one section into the fence of
+    // another — and the HOST of every stack this plugin composes is a banner,
+    // which is pinned on four of the five surfaces that have one.
+    //
+    // SO THE BUTTON COULD NOT BE DRAWN AT ALL. `weldInto` and `breakUp` both
+    // cut blocks from the band they are handed and both need the host in it,
+    // and `blockOf` over a band without it answers `[]`. A diary entry made it
+    // visible; Home and Search have had it since 5.30, and the sweep in
+    // `journal-stack.test.ts` missed it because it calls `weldInto` directly
+    // with a band of its own.
+    const body = editor();
+    const at = body.indexOf("private stackBand(id: string): string[] {");
+    expect(at, "there is no band a weld can be cut from").toBeGreaterThan(0);
+    const rule = body.slice(at, body.indexOf("\n  }", at));
+    // The one line it does NOT have, which is the whole of the difference.
+    expect(rule).not.toContain("movable === false");
+    expect(rule).not.toContain("movable !== false");
+    // A row on its way out is still excluded: that omission is about the file
+    // the Save writes rather than about movement, and is as true of a weld.
+    expect(rule).toContain("!this.removed.has(x)");
+
+    // AND BOTH ENDS OF THE GESTURE READ IT. The join and the break-up are one
+    // question in two states; a band that differed between them would draw a
+    // button whose undo was refused.
+    expect(body).toContain("this.renderStackJoin(lead, section, this.stackBand(section.id));");
+    expect(body).toContain(
+      "this.settle(breakUp(this.arrangement, this.stackBand(group[0]), group[0]));"
+    );
+    // And the arrows on the same card keep the movable band — moving a block IS
+    // moving rows past each other, and a block a fixed row opens does not move.
+    expect(body).toContain("const band = this.bandOf(group[0]);");
+    expect(body).toContain("canMoveBlock(band, this.joined, group[0], delta)");
   });
 
   it("still renders, with the reason in place", () => {

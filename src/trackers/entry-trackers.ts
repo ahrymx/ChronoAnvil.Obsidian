@@ -39,6 +39,11 @@ import {
   TRACKER_MARK_START,
   isTrackerMarkStart,
 } from "../core/constants";
+import {
+  STACK_KEYWORD,
+  isStackLine,
+  stackParts,
+} from "../core/directive-grammar";
 import type {
   EntryPathConfig,
   JournalRootRef,
@@ -393,29 +398,48 @@ export function createTrackerRegion(lines: string[]): string[] {
   return [...lines.slice(0, at), "", ...block, ...lines.slice(at)];
 }
 
-// ── Migration: fold a note's tracker fence into its entry banner ─────────
+// ── The weld: an entry's banner and its trackers as one card (1.0.10) ────
 //
-// Entries written before 2.18.4 carry two consecutive ```chronoanvil fences — the
-// `entry-header` strip, then the trackers. Obsidian renders each as its own
-// block, so the banner cannot enclose the grid no matter how they are styled.
-// This folds the second fence's body into the first, which is the whole of the
-// change: the directives, their order and the markers are all preserved, and
-// what moves is one pair of fence lines.
+// A journal note has been able to hold its name, its grid and its index in one
+// card since 5.28, and to be welded into one by its reader since 5.29. A diary
+// entry was named as next in both releases and deferred in both. This is the
+// write half of that gesture, and the reason it is a pair of functions of its
+// own rather than `regroupFlatNote`: FOUR OF THE FIVE GRAINS HAVE AN EMPTY
+// TRACKER REGION. Weekly, monthly, quarterly and yearly compose two `#` marker
+// lines and nothing between them, and `moveCell` declines a run with no content
+// line — so the generic mover refuses the very notes this exists for, and on
+// the one grain it accepts it puts the unwelded fence below the `---`.
 //
-// Deliberately narrow. It fires only when the tracker fence is the *next* fence
-// after the banner with nothing but blank lines between them — the shape the
-// shipped template wrote. A note whose trackers sit further down, or that has
-// prose between the two, is left alone: the reordering that would be needed
-// there is a judgement about the note's layout, not a migration.
+// WHAT THE WELD WRITES is the 5.29 spelling: one `stack` line per part,
+// INCLUDING the host's, so the banner's strip and the tracker region can still
+// be told apart inside the fence they now share. The undivided 5.28 spelling —
+// one `stack` line for the whole block — would read as a single region, and the
+// reader who welded would be unable to break the two apart again.
+//
+// WHAT IT DOES NOT WRITE is anything the catalogue composes. Every
+// `test/golden/entry-*.md` fixture is byte-identical after this change, and an
+// entry in a reader's vault moves only when its reader presses the button.
+//
+// DELIBERATELY NARROW, and narrow in the same place `mergeEntryFences` was
+// before it: the tracker fence must be the *next* fence after the banner with
+// nothing but blank lines between them, which is the shape all five shipped
+// templates write. A note whose trackers sit further down, or that has prose
+// between the two, is left alone — the reordering that would be needed there is
+// a judgement about the note's layout, not a gesture.
 //
 // Returns null when there is nothing to do, so a caller can skip the write.
-export function mergeEntryFences(text: string): string | null {
+export function weldEntryFences(text: string): string | null {
   const lines = text.split("\n");
   const fences = chronoanvilFences(lines);
 
   const banner = bannerFence(lines, fences);
   if (!banner) return null;
-  // Already merged.
+  // Already welded.
+  if (fenceBodyHas(lines, banner, isStackLine)) return null;
+  // A PRE-4.20 MERGED FENCE IS NOT A WELD AND IS NOT OURS. It holds the markers
+  // with no `stack` line above them, which is one region wearing two sections'
+  // worth of directives — `splitEntryFences` exists to take it apart, and
+  // folding a second copy of the grid into it would be the wrong repair.
   if (fenceBodyHas(lines, banner, (l) => isTrackerMarkStart(l))) return null;
   if (fenceBodyHas(lines, banner, isTrackerDirective)) return null;
 
@@ -426,20 +450,73 @@ export function mergeEntryFences(text: string): string | null {
     if (lines[i].trim() !== "") return null;
   }
 
-  const nextBody = lines.slice(next.open + 1, next.close);
+  const trackerBody = lines.slice(next.open + 1, next.close);
   const isTrackerFence =
-    nextBody.some((l) => isTrackerMarkStart(l)) ||
-    nextBody.some(isTrackerDirective);
+    trackerBody.some((l) => isTrackerMarkStart(l)) ||
+    trackerBody.some(isTrackerDirective);
   if (!isTrackerFence) return null;
+  // A FENCE THAT ALREADY CARRIES AN ARRANGEMENT KEEPS IT. Folding a stacked
+  // block into another one would silently merge two sets of parts, and a `row`
+  // read beside a `stack` is the refusal `parseStack` already names.
+  if (trackerBody.some(isStackLine)) return null;
 
-  const merged = [
-    ...lines.slice(0, banner.close),
-    ...nextBody,
-    ...lines.slice(banner.close, banner.close + 1), // the banner's closing fence
+  const welded = [
+    ...lines.slice(0, banner.open + 1),
+    STACK_KEYWORD,
+    ...lines.slice(banner.open + 1, banner.close),
+    STACK_KEYWORD,
+    ...trackerBody,
+    lines[banner.close],
     ...lines.slice(next.close + 1),
   ];
 
-  const out = merged.join("\n");
+  const out = welded.join("\n");
+  return out === text ? null : out;
+}
+
+// The inverse, and it has to be exact: the two fences and the one blank line
+// between them that `composeEntryTemplate` writes, so a reader who welds and
+// then breaks up comes back to the file they started with. That is the property
+// the tests assert on all five grains, and the one `regroupFlatNote` failed.
+//
+// Returns null when the note is not a welded entry — one part, three parts, a
+// second part holding no trackers, or no banner at all.
+export function unweldEntryFences(text: string): string | null {
+  const lines = text.split("\n");
+  const fences = chronoanvilFences(lines);
+
+  const banner = bannerFence(lines, fences);
+  if (!banner) return null;
+
+  const body = lines.slice(banner.open + 1, banner.close);
+  const parts = stackParts(body);
+  if (parts.length !== 2) return null;
+
+  // THE LINES ABOVE THE FIRST `stack` LINE ARE THE BLOCK'S, not the banner's —
+  // a `frame:` a reader wrote there says something about the card rather than
+  // about the strip, so it stays at the top of the fence the strip keeps.
+  const prefix = body.slice(0, parts[0].from);
+  const head = body.slice(parts[0].from + 1, parts[0].to);
+  const tail = body.slice(parts[1].from + 1, parts[1].to);
+
+  // The parts have to be the two this wrote, in the order it wrote them.
+  if (!head.some(isBannerDirective)) return null;
+  if (!tail.some((l) => isTrackerMarkStart(l)) && !tail.some(isTrackerDirective)) {
+    return null;
+  }
+
+  const unwelded = [
+    ...lines.slice(0, banner.open + 1),
+    ...prefix,
+    ...head,
+    FENCE_CLOSE,
+    "",
+    FENCE_OPEN,
+    ...tail,
+    ...lines.slice(banner.close),
+  ];
+
+  const out = unwelded.join("\n");
   return out === text ? null : out;
 }
 
@@ -457,6 +534,18 @@ export function splitEntryFences(text: string): string | null {
 
   const banner = bannerFence(lines, fences);
   if (!banner) return null;
+
+  // A WELDED ENTRY IS NOT A NOTE THIS REPAIRS (1.0.10). A reader who welds the
+  // grid into the banner from *Edit sections…* gets one fence holding both, and
+  // this migration's whole job is to take a single fence apart — so without
+  // this line the next vault repair would quietly undo the reader's gesture,
+  // and do it again after every weld.
+  //
+  // THE `stack` LINE IS THE TELL, and it is the right one: the notes this
+  // exists for are pre-4.20, written years before the keyword existed, and
+  // carry the markers with nothing above them. Every one of them is still
+  // repaired.
+  if (fenceBodyHas(lines, banner, isStackLine)) return null;
 
   // If there's no tracker marker or tracker directive in the banner fence, it's already split.
   let trackerStartLine = -1;

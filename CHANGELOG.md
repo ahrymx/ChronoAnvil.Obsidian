@@ -5,6 +5,58 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.10] - 2026-09-13
+
+### Added
+
+- **A diary entry can be one card.** A journal note has been able to fold its
+  name, its bars and its index into a single card since 5.28, and an entry has
+  been the one page that could not: its name band floated above a second card
+  holding the date stepper and the tracker grid, two surfaces with a gap between
+  them and the note's name belonging to neither. Open *Edit sections…* on an
+  entry and the trackers row now offers the same weld button every other surface
+  offers. Nothing moves unless you press it — the entries the plugin writes are
+  composed exactly as before, and an entry you already have changes only when you
+  weld it. Press it again to break the card back into two.
+
+- **The navigator inside a welded card is sized for the card it is in.** The
+  date stepper was drawn for the top line of the tracker card, where it is the
+  card's own first row and is meant to carry its emphasis. Welded under a title,
+  that emphasis read as a second, louder statement of the date the title had just
+  made. Inside a stack the arrows and the picker come back to the scale of the
+  controls around them, and the row keeps the air a band between two bands needs.
+  The stepper's shape is unchanged: the arrows hold the card's two edges and the
+  picker holds the middle.
+
+### Fixed
+
+- **The weld button draws on every surface that can weld.** Home and Search
+  could not offer it at all, and neither could an entry. Their banners are pinned
+  rows, and the editor was reading the band a weld joins from a list it had
+  already filtered the pinned rows out of — so the surfaces whose banner cannot
+  be dragged were the surfaces whose banner could not be welded either.
+
+- **An entry's chevron hides its logging grid.** On a weekly, monthly, quarterly
+  or yearly entry the grid is written as an empty region, and the reveal read a
+  region's first content line to decide what it was looking at — finding none, it
+  drew no chevron, so the grid could not be collapsed. The region's own opening
+  marker is enough to name it now. A welded card's chevrons also select what they
+  hide by the line each element was drawn from rather than by counting children,
+  which is what they had been doing before the card's own chrome was inserted
+  among them.
+
+- **A welded entry keeps its page-context strip.** The strip carrying the date
+  stepper took all of its styling from the tracker card, which a welded entry is
+  not, and arrived inside the card as a bare row: no gutter, no spacing, nothing
+  aligned to the bands above and below it. It now sits at the card's inset like
+  every other band.
+
+- **The vault repair leaves a welded entry alone.** The pass that splits an
+  entry's merged fence back into two exists for notes written before 4.20, which
+  have no divider in them. A welded entry is a fence with two parts and a divider
+  between them, and the repair would have pulled it apart. It is now left as its
+  reader arranged it.
+
 ## [1.0.9] - 2026-09-12
 
 ### Changed

@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { blockIndexAt } from "../src/core/block-move";
 import { blockTitle, fieldBand } from "../src/ui/widgets/index";
 import { readCode, readCss, readSrc } from "./sources";
-import { stampLines } from "../src/ui/widgets/block-drag";
+import { stampLines, stampedWithin } from "../src/ui/widgets/block-drag";
 
 // ── A DOM SMALL ENOUGH TO RUN `stampLines` AGAINST ──────────────────────
 //
@@ -738,6 +738,45 @@ describe("the gesture around it", () => {
     const right = drew([2, 4, 6]);
     stampLines(right.box as never, right.drawn, 9);
     expect(stamps(right.box)).toEqual(["2", "4", "6"]);
+  });
+
+  // ── AND THE RANGE THE REVEAL READS IS THE STAMP, NOT THE COUNT (1.0.10) ──
+  //
+  // The fix above put the STAMPING before the four insertions; this is the same
+  // shift arriving at the other reader of `drawn`. A welded banner's chevron
+  // hides a RUN of the block's children, and that run was cut with
+  // `kids.slice(childAt(from), childAt(to))` — indices out of the loop's own
+  // child list, read after two things had been prepended to it. On a diary
+  // entry both prepends land in exactly the block the chevron is drawn for.
+  it("cuts a stack's part by the stamp rather than by the recorded count", () => {
+    const { box, drawn } = drew([2, 5]);
+    stampLines(box as never, drawn, 8);
+    // Two widgets, one per part of a two-part stack. Before anything is
+    // inserted, both readings agree.
+    expect(stampedWithin(box as never, 4, 8).length).toBe(1);
+    // The page-context strip goes in at the front. The child list is now three
+    // long and every index the loop recorded is one too small — `slice(1, 3)`
+    // would take the banner's widget and the grid, which is a chevron that
+    // hides the note's own name.
+    box.children.unshift(new Kid());
+    const part = stampedWithin(box as never, 4, 8);
+    expect(part.length).toBe(1);
+    expect(part[0]).toBe(box.children[2]);
+    // And the unstamped strip belongs to no part at all.
+    expect(stampedWithin(box as never, 0, 99)).toEqual(box.children.slice(1));
+  });
+
+  it("leaves a part empty when nothing in the block came from its lines", () => {
+    // WHICH IS WHY THE REVEAL NEEDS A FALLBACK. An empty logging grid is built
+    // below the loop and `clearStamp` takes the stamp off one the loop drew
+    // over a region that turned out empty — so on four of the five diary grains
+    // the tracker part owns no stamped child, and the chevron would hide
+    // nothing. `index.ts` hands it `trackerBar`; this is the fact that makes
+    // that necessary.
+    const { box, drawn } = drew([2]);
+    stampLines(box as never, drawn, 8);
+    box.children.push(new Kid());
+    expect(stampedWithin(box as never, 4, 8)).toEqual([]);
   });
 
   it("puts no head on a widget that already has a band", () => {

@@ -408,6 +408,34 @@ export function clearStamp(el: HTMLElement): void {
   el.removeAttribute(SPAN_ATTR);
 }
 
+// The direct children of a block whose stamp falls inside a half-open range of
+// the fence body — 1.0.10.
+//
+// THE STAMP RATHER THAN THE CHILD INDEX, and that is the whole of it. The
+// dispatcher records a child COUNT beside each line on its way past, which is a
+// position in the list THE LOOP BUILT — and four things are inserted after the
+// loop, two of them at the front. Every index taken from that record is
+// therefore one or two too small by the time anything reads the finished block,
+// so a range of children read that way starts early and ends early.
+//
+// The stamp does not move. `stampLines` writes it before any of those four go
+// in, a child no directive drew never gets one, and `markRegion` gives a marked
+// tracker region the line of its opening marker — so asking each child which
+// line drew it is exact whatever else was put in the block afterwards.
+//
+// HALF-OPEN, because that is what `stackParts` hands out: a part runs from its
+// own `stack` line up to the next one.
+export function stampedWithin(
+  container: HTMLElement,
+  from: number,
+  to: number
+): HTMLElement[] {
+  return (Array.from(container.children) as HTMLElement[]).filter((el) => {
+    const line = lineOf(el);
+    return line !== null && line >= from && line < to;
+  });
+}
+
 // The line a stamped element came from, or null on anything unstamped.
 function lineOf(el: Element | null): number | null {
   const raw = el?.getAttribute(LINE_ATTR);

@@ -6,6 +6,7 @@
 // LICENSING.md.
 
 import { MarkdownRenderChild, setIcon } from "obsidian";
+import { isTrackerMarkStart } from "../core/constants";
 import {
   MODIFIER_KEYWORDS,
   headerLevel,
@@ -129,6 +130,26 @@ export function firstHeaderTitleIn(lines: readonly string[]): string | null {
 export function revealAnchorIn(lines: readonly string[]): string | null {
   for (const line of lines) {
     const text = line.trim();
+    // ── AND THE TRACKER REGION'S MARKER IS AN ANCHOR (1.0.10) ─────────
+    //
+    // THE `#` RULE IS RIGHT AND THIS IS THE ONE THING IT SWALLOWS. A `#` line
+    // is a comment the reader cannot see, so naming a button after one would
+    // name it after nothing — except here, where the pair of them IS the
+    // section: a weekly, monthly, quarterly or yearly entry composes
+    // `# chronoanvil:trackers:start` and `:end` with nothing in between, which
+    // is an empty logging grid and draws the grid's own head and its add
+    // control.
+    //
+    // WITHOUT THIS, FOUR OF THE FIVE GRAINS WELD AND GET NO CHEVRON. The part
+    // is real, it draws, and `revealPartsIn` drops it for having no anchor — so
+    // the reader would weld the grid into the banner and lose the only way to
+    // hide it again. A daily entry alone would have hidden the defect, because
+    // its region carries `tracker:Mood` on the next line.
+    //
+    // `tracker`, WHICH IS THE KEYWORD ITS DIRECTIVES CARRY, so the grid answers
+    // one anchor whether it is empty or full and `nameOf` needs no second
+    // entry.
+    if (isTrackerMarkStart(line)) return "tracker";
     if (!text || text.startsWith("#")) continue;
     const kind = line.split("|")[0].split(":")[0].trim();
     if (MODIFIER_KEYWORDS.has(kind) || kind === "button") continue;

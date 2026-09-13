@@ -48,8 +48,9 @@ import {
 } from "../core/section-model";
 import { regionHasContent } from "../core/notestore";
 import { TRACKER_MARK_END, TRACKER_MARK_START } from "../core/constants";
-import { rowRuns } from "../core/note-sections";
-import { BANNER_ID } from "../core/sections";
+import { flatBlocks, rowRuns } from "../core/note-sections";
+import { BANNER_ID, WELDS_INTO_BANNER } from "../core/sections";
+import { unweldEntryFences, weldEntryFences } from "../trackers/entry-trackers";
 import {
   addOps,
   fenceBlock,
@@ -397,7 +398,14 @@ const ENTRY_DECLS: EntryDecl[] = [
     // The OPENING marker only — see `EntrySection.probe`. Anchored whole so the
     // closing one, which shares every character up to the last token, cannot
     // match and report the section a second time.
-    probe: new RegExp(`^${TRACKER_MARK_START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`),
+    //
+    // MULTILINE, FOR `locate`'s SAKE (1.0.10). See `probeFor`, which carries the
+    // whole argument: a probe is asked two questions, and only one of them hands
+    // it a single line.
+    probe: new RegExp(
+      `^${TRACKER_MARK_START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+      "m"
+    ),
     // Nothing of the reader's PROSE lives here, so there is no region to keep.
     ownsRegion: false,
   },
@@ -993,11 +1001,31 @@ export function isRemovable(section: EntrySection): boolean {
 // the catalogue's contents and would go stale the moment a third structural
 // section arrived. A `movable: false` written by hand on `entry-header` would
 // still be there, wrong, on the release that gave it a neighbour.
+//
+// ── AND A THIRD WAY TO HAVE SOMEWHERE, WHICH IS NOT A SLOT (1.0.10) ──
+//
+// A section that may be WELDED into the banner has somewhere to go without
+// having a second slot to go to: the card above it. `bandOf` in the section
+// editor drops an immovable row from its own band, and the weld is read off
+// that band — so a grid that answers false here is a grid whose weld button
+// cannot be drawn, whatever the catalogue says about it.
+//
+// ASKED OF `WELDS_INTO_BANNER` RATHER THAN OF THE ID, for the reason the list
+// exists: the editor may not learn which surface it is on, and neither may
+// this. The day another entry section becomes weldable it is movable by the
+// same sentence.
+//
+// AND IT IS NOT A REORDER. The band the arrows read still holds this row alone
+// — the banner is pinned and `bandOf` filters it out — so `canMoveRow` answers
+// false on a band of one and no arrow appears. What changes is only that the
+// row is one the weld can see.
 export function isMovable(section: EntrySection): boolean {
   if (section.pinned) return false;
+  if (WELDS_INTO_BANNER.has(section.id)) return true;
   return (
-    ENTRY_SECTIONS.filter((s) => s.band === section.band && !s.pinned).length >
-    1
+    ENTRY_SECTIONS.filter(
+      (s) => BANDS[s.band] === BANDS[section.band] && !s.pinned
+    ).length > 1
   );
 }
 
@@ -1258,11 +1286,29 @@ function probeFor(section: EntrySection, ctx: EntrySectionContext): RegExp | nul
   const directive = directiveFor(section, { ...ctx, extra: [section.id] });
   if (directive == null) return null;
   const keyword = escapeForLine(directive.split(":")[0]);
+  // ── MULTILINE, BECAUSE A PROBE IS ASKED TWO QUESTIONS (1.0.10) ──────
+  //
+  // `parseEntry` tests these against ONE LINE at a time (`p.re.test(line.trim())`)
+  // and `^` matches the start of that string whatever the flags say. `locate` —
+  // which `Section` promises and which `entrySection` derives from this — runs
+  // `text.search(...)` over a JOINED body, where `^` without `m` can only match
+  // at offset 0.
+  //
+  // SO EVERY ENTRY SECTION'S `locate` ANSWERED -1, and had since the field
+  // existed: an entry's directives all sit on line 2 or later of their fence.
+  // Nothing in the product asked — this file reads an entry line by line, which
+  // is why the header of `parseEntry` says it is not `parseSectionRuns` — so the
+  // answer was wrong in a place nothing looked, until `flatBlocks` looked. A
+  // note whose sections cannot be located is a note with no blocks at all, and
+  // the arrangement this release gives an entry is built out of blocks.
+  //
+  // The flag changes nothing for the line-at-a-time caller, which is what makes
+  // it the whole fix rather than the start of one.
   // Head only for a structural section (no second token to key on) and for one
   // that owns no region (its second token is an argument, not its id).
   return section.band === "own" || section.ownsRegion === false
-    ? new RegExp(`^${keyword}\\b`)
-    : new RegExp(`^${keyword}:${escapeForLine(section.id)}\\b`);
+    ? new RegExp(`^${keyword}\\b`, "m")
+    : new RegExp(`^${keyword}:${escapeForLine(section.id)}\\b`, "m");
 }
 
 // Read an entry into the parts an edit can act on.
@@ -2011,12 +2057,29 @@ export function applyEntrySections(
 // enforced by the model, stated in the UI, and needs no surface test in either.
 const BANDS: Record<EntrySection["band"], string> = {
   own: "The banner",
-  // ITS OWN BAND, NOT THE BANNER'S (4.20). Three bands where there were two, and
-  // the third exists for the reason `fence` gives: the grid is above the rule
-  // and is not part of the banner, so it cannot share a band with it — a band is
-  // what the editor lets a row move WITHIN, and one band would let the grid be
-  // dragged back into the card it was just taken out of.
-  trackers: "The trackers",
+  // ── AND THE GRID IS SHOWN WITH IT AGAIN (1.0.10) ──────────────────
+  //
+  // WHAT 4.20 SAID HERE, AND WHY IT IS ANSWERED RATHER THAN REVERSED. It read:
+  // *"ITS OWN BAND, NOT THE BANNER'S… the grid is above the rule and is not part
+  // of the banner, so it cannot share a band with it — a band is what the editor
+  // lets a row move WITHIN, and one band would let the grid be dragged back into
+  // the card it was just taken out of."* Every clause of that is still true of
+  // DRAGGING, and dragging is still refused: `isMovable` answers false for the
+  // banner (pinned) and the band the arrows read holds the grid alone, so there
+  // is no slot to drag to and no arrow to press.
+  //
+  // WHAT CHANGED IS THAT PUTTING THE GRID BACK IN THE CARD IS NOW A THING A
+  // READER CAN MEAN. The weld is a button, it says what it does, it is undone
+  // by another button, and the file records it — none of which was true of the
+  // accident 4.20 was guarding against. A block cannot span two of these
+  // strings, so the guard and the gesture cannot both be had.
+  //
+  // THE FIELD KEEPS ITS THREE VALUES. This is what the EDITOR groups by;
+  // `composeEntryTemplate` still emits `own`, then the tracker fence, then the
+  // rule, and `probeFor` still asks whether a section is structural. Collapsing
+  // the field would weld every entry at compose time, which is the one thing
+  // this release is not doing.
+  trackers: "The banner",
   // "THE PAGE BELOW", NOT "BELOW THE RULE" (4.21). Every band on every surface
   // is named for WHAT IT HOLDS — the banner, the trackers, the overview — and
   // this one was named for where it sits relative to a horizontal rule the
@@ -2046,16 +2109,78 @@ const rowFor =
       questions: s.questions?.(ctx),
       movable: isMovable(s),
       group: BANDS[s.band],
-      // AND NO WELD, BECAUSE THERE IS NO ARRANGEMENT TO WELD INTO (5.30). This
-      // model implements neither `blocks` nor `regroup`, so an entry has no
-      // groups, no pages and no stacks — and `trackers`, which is in
-      // `WELDS_INTO_BANNER` for the journal note it was written for, is an
-      // entry section too. Saying so here rather than letting the editor's
-      // `hasRows` swallow it: the day this surface gains an arrangement, the
-      // weld arrives with the decision it needs — what the two bands mean for a
-      // block partition — rather than by symmetry with a list.
-      weldable: false,
     });
+
+// ── the arrangement an entry has, which is one weld (1.0.10) ────────────
+//
+// WHAT 5.30 SAID HERE, AND WHY IT IS ANSWERED RATHER THAN REVERSED. The row
+// above used to carry `weldable: false` and this sentence: *"AND NO WELD,
+// BECAUSE THERE IS NO ARRANGEMENT TO WELD INTO. This model implements neither
+// `blocks` nor `regroup` … the day this surface gains an arrangement, the weld
+// arrives with the decision it needs — what the two bands mean for a block
+// partition — rather than by symmetry with a list."* The decision is made: the
+// banner and the grid are one display group, a block may not cross into the
+// page below, and this is the arrangement arriving with it.
+//
+// ONLY THE STRUCTURAL HALF IS BOUND, AND THAT IS THE REFUSAL. Everything below
+// the rule composes as one fence of seven field directives, and a reader must
+// not be offered a column of it: splitting that fence is a judgement about the
+// note's writing rather than about its chrome. Withholding the sections here
+// withholds `loose` and `column` for all seven at their source — so the window
+// draws no split, `readCaps` never learns their ids, and no Save can ask for
+// one. Guarding the BUTTON instead would leave the capability true and the
+// refusal somewhere else.
+const structuralFlats = (ctx: EntrySectionContext): FlatSection[] =>
+  offerableEntrySections(ctx)
+    .filter((s) => s.band !== "shared")
+    .map((s) => bindSection(s, ctx));
+
+// The one rearrangement this surface has, and it refuses everything else.
+//
+// NOT `regroupFlatNote`, WHICH IS THE FUNCTION EVERY OTHER SURFACE USES. Four
+// of the five grains compose an EMPTY tracker region — two `#` marker lines and
+// nothing between them — and `moveCell` declines a run with no content line, so
+// the general mover refuses the very notes this exists for. On daily it welds
+// and then unwelds wrongly, landing the tracker fence below the `---`. The pair
+// in `entry-trackers.ts` is written against the layout `composeEntryTemplate`
+// actually writes, and is an exact inverse on all five.
+//
+// NARROW ON PURPOSE. The partition is read for one fact: what is in the
+// banner's block. Nothing, and the note is taken apart; the grid and nothing
+// else, welded, and it is put together. Any other shape — a third member, a
+// guest that is not weldable, a block the banner does not open, or a ROW rather
+// than a stack — is refused rather than approximated, because the file has no
+// spelling for it and a Save that silently did something else is worse than one
+// that does nothing.
+const regroupEntry = (
+  text: string,
+  blocks: readonly (readonly string[])[],
+  stacks?: readonly string[]
+): string | null => {
+  // ABSENT MEANS LEAVE THE ARRANGEMENT ALONE, which is `pages`' convention and
+  // is not the same as an empty list. A caller that never mentions stacks is
+  // not asking for the weld to be undone.
+  if (stacks === undefined) return null;
+  const want = blocks.filter((b) => b.length > 0);
+  const home = want.find((b) => b.includes(BANNER_ID));
+  if (!home) return null;
+  // EVERYTHING IN THE BANNER'S BLOCK BUT THE BANNER, AND THE BANNER MUST OPEN
+  // IT. Both facts fall out of one line: `WELDS_INTO_BANNER` is a list of
+  // GUESTS and the host is not on it, so a block the banner does not open puts
+  // the banner itself among these and is refused by the rule below rather than
+  // by a second check saying the same thing.
+  const guests = home.slice(1);
+  if (guests.some((id) => !WELDS_INTO_BANNER.has(id))) return null;
+  // ONE GUEST. An entry has one weldable section and the pair in
+  // `entry-trackers.ts` folds one fence into one other; a partition naming two
+  // is asking for a card this cannot write.
+  if (guests.length > 1) return null;
+  // Every OTHER block here must hold one section. An entry has no other
+  // arrangement, so a partition claiming one is a partition this cannot write.
+  if (want.some((b) => b !== home && b.length > 1)) return null;
+  if (guests.length === 0) return unweldEntryFences(text);
+  return stacks.includes(guests[0]) ? weldEntryFences(text) : null;
+};
 
 // This entry, as the editor sees it.
 export function entrySectionModel(ctx: EntrySectionContext): SectionModel {
@@ -2082,5 +2207,7 @@ export function entrySectionModel(ctx: EntrySectionContext): SectionModel {
     },
     plan: (text, want) => planEntrySections(text, ctx, want),
     apply: (text, want) => applyEntrySections(text, ctx, want),
+    blocks: (text) => flatBlocks(text, structuralFlats(ctx)),
+    regroup: (text, blocks, _pages, stacks) => regroupEntry(text, blocks, stacks),
   };
 }

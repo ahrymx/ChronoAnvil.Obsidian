@@ -352,9 +352,12 @@ describe("which sections may weld into a banner", () => {
     // button that cannot work. It needs the host — `BANNER_ID` is the same word
     // on all ten catalogues, which is what made one list possible — and it
     // needs `blocks`/`regroup`, because the weld is a block operation and a
-    // model without them has no arrangement to change. A diary entry is the
-    // surface that fails the second half today, and that is why entries are
-    // deferred rather than shipped.
+    // model without them has no arrangement to change.
+    //
+    // AND THE ENTRY WAS THE SURFACE THAT FAILED THE SECOND HALF (1.0.10). It
+    // was named here as deferred for two releases running; it now implements
+    // both, over the structural half of its catalogue only, so this sweep
+    // covers it rather than excusing it.
     let welding = 0;
     for (const { name, model } of catalogues()) {
       const views = model.sections();
@@ -672,15 +675,16 @@ describe("bands are data, not a branch", () => {
     }
   });
 
-  it("is three on a diary entry, because a section may not cross the rule", () => {
+  it("is two on a diary entry, because a section may not cross the rule", () => {
     const model = entrySectionModel({ grain: "daily" });
     const groups = new Set(model.sections().map((s) => s.group));
-    // TWO UNTIL 4.20, WHEN THE GRID GOT A BAND OF ITS OWN. The rule is unchanged
-    // — a section may not cross the rule — and there is now a third band ABOVE
-    // it, because the trackers left the banner and a band is what the editor
-    // lets a row move within. One band for the two would let the grid be dragged
-    // back into the card it was just taken out of.
-    expect(groups.size).toBe(3);
+    // TWO, THEN THREE IN 4.20, AND TWO AGAIN IN 1.0.10. The rule this counts has
+    // not moved once: a section may not cross the rule, and the count above it
+    // is a question about what the editor lets a row move within. 4.20 split the
+    // grid off so it could not be dragged back into the banner's card; the drag
+    // is still refused by `isMovable`, and the two share a group now because a
+    // block cannot span two of them and the weld is a block.
+    expect(groups.size).toBe(2);
     expect([...groups].every((g) => typeof g === "string")).toBe(true);
   });
 

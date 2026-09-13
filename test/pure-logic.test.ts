@@ -172,7 +172,8 @@ import {
   insertTrackerDirective,
   isEmptyValue,
   locateTrackerRegion,
-  mergeEntryFences,
+  weldEntryFences,
+  unweldEntryFences,
   splitEntryFences,
   removeTrackerDirective,
   trackerOptions,
@@ -6621,9 +6622,9 @@ describe("per-entry trackers", () => {
     });
   });
 
-  describe("mergeEntryFences", () => {
-    // The pre-2.18.4 shape: two consecutive fences, which Obsidian renders as
-    // two blocks — the reason the banner could not enclose the grid.
+  describe("weldEntryFences / unweldEntryFences", () => {
+    // The shape all five shipped templates write: the banner's own fence, one
+    // blank line, then the trackers'.
     const twoFence = [
       "---",
       "journal-date: 2026-07-23",
@@ -6645,7 +6646,7 @@ describe("per-entry trackers", () => {
     ].join("\n");
 
     it("folds the tracker fence into the banner, preserving order and markers", () => {
-      const out = mergeEntryFences(twoFence)!;
+      const out = weldEntryFences(twoFence)!;
       const lines = out.split("\n");
       expect(lines.filter((l) => l.trim() === FENCE)).toHaveLength(1);
       expect(noteTrackerDirectives(lines)).toEqual(["tracker:Mood", "sleep"]);
@@ -6660,24 +6661,38 @@ describe("per-entry trackers", () => {
       expect(out.endsWith("---\nbody")).toBe(true);
     });
 
-    it("is a no-op on a note that is already merged", () => {
-      const merged = mergeEntryFences(twoFence)!;
-      expect(mergeEntryFences(merged)).toBeNull();
+    it("writes one stack line per part, so the two can still be told apart", () => {
+      const body = weldEntryFences(twoFence)!
+        .split("\n")
+        .slice(5, -4);
+      expect(body[0]).toBe("stack");
+      expect(body[1]).toBe("entry-header");
+      expect(body[2]).toBe("stack");
+      expect(body[3]).toBe(START);
+      // THE 5.28 SPELLING WOULD BE ONE LINE, and a reader who welded could then
+      // never break the two apart — `stackParts` reads a single `stack` line as
+      // one region holding everything in the fence.
+      expect(body.filter((l) => l === "stack")).toHaveLength(2);
+    });
+
+    it("is a no-op on a note that is already welded", () => {
+      const welded = weldEntryFences(twoFence)!;
+      expect(weldEntryFences(welded)).toBeNull();
     });
 
     it("is a no-op when the note has no entry banner", () => {
       const noBanner = [FENCE, START, "tracker:Mood", END, CLOSE].join("\n");
-      expect(mergeEntryFences(noBanner)).toBeNull();
+      expect(weldEntryFences(noBanner)).toBeNull();
     });
 
     it("is a no-op when the banner has no tracker fence after it", () => {
       const bare = [FENCE, "entry-header", CLOSE, "", "body"].join("\n");
-      expect(mergeEntryFences(bare)).toBeNull();
+      expect(weldEntryFences(bare)).toBeNull();
     });
 
     it("leaves the note alone when prose separates the two fences", () => {
       // Reordering a note whose layout someone has deliberately changed is a
-      // judgement about that layout, not a migration.
+      // judgement about that layout, not a gesture.
       const spaced = [
         FENCE,
         "entry-header",
@@ -6691,28 +6706,106 @@ describe("per-entry trackers", () => {
         END,
         CLOSE,
       ].join("\n");
-      expect(mergeEntryFences(spaced)).toBeNull();
+      expect(weldEntryFences(spaced)).toBeNull();
     });
 
     it("does not fold a following fence that holds no trackers", () => {
       const next = [FENCE, "entry-header", CLOSE, "", FENCE, "tasks:todo", CLOSE].join("\n");
-      expect(mergeEntryFences(next)).toBeNull();
+      expect(weldEntryFences(next)).toBeNull();
     });
 
-    it("merges an unmarked tracker fence too", () => {
+    it("does not fold a fence that carries an arrangement of its own", () => {
+      const arranged = [
+        FENCE,
+        "entry-header",
+        CLOSE,
+        "",
+        FENCE,
+        "stack",
+        START,
+        "tracker:Mood",
+        END,
+        CLOSE,
+      ].join("\n");
+      expect(weldEntryFences(arranged)).toBeNull();
+    });
+
+    it("declines a pre-4.20 merged fence, which is the other migration's note", () => {
+      // Markers inside the banner with no `stack` line above them: one region
+      // wearing two sections' directives. `splitEntryFences` takes that apart;
+      // welding a second copy of the grid into it would be the wrong repair.
+      // Followed by a second tracker fence, which is the only shape where the
+      // refusal has anything to do: a merged banner on its own has no next
+      // fence to fold, and would be declined for that reason instead.
+      const merged = [
+        FENCE,
+        "entry-header",
+        START,
+        "tracker:Mood",
+        END,
+        CLOSE,
+        "",
+        FENCE,
+        "tracker:KM",
+        CLOSE,
+      ].join("\n");
+      expect(weldEntryFences(merged)).toBeNull();
+      expect(splitEntryFences(merged)).not.toBeNull();
+    });
+
+    it("welds an unmarked tracker fence too", () => {
       const unmarked = [FENCE, "entry-header", CLOSE, "", FENCE, "tracker:Mood", CLOSE].join("\n");
-      const out = mergeEntryFences(unmarked)!;
+      const out = weldEntryFences(unmarked)!;
       expect(out.split("\n").filter((l) => l.trim() === FENCE)).toHaveLength(1);
       expect(noteTrackerDirectives(out.split("\n"))).toEqual(["tracker:Mood"]);
     });
 
     it("carries an empty region across, so a monthly review keeps somewhere to add to", () => {
       const empty = [FENCE, "entry-header", CLOSE, "", FENCE, START, END, CLOSE].join("\n");
-      const out = mergeEntryFences(empty)!;
+      const out = weldEntryFences(empty)!;
       const lines = out.split("\n");
       expect(lines.filter((l) => l.trim() === FENCE)).toHaveLength(1);
       expect(locateTrackerRegion(lines)!.marked).toBe(true);
       expect(noteTrackerDirectives(lines)).toEqual([]);
+    });
+
+    // THE PROPERTY THE WHOLE GESTURE RESTS ON. A reader welds, looks at it,
+    // and breaks it up again — and the file has to be the one they started
+    // with, byte for byte, on every grain. `regroupFlatNote` fails this: four
+    // of the five have an empty tracker region, which `moveCell` refuses, and
+    // on the fifth it lands the unwelded fence below the `---`.
+    for (const grain of ["daily", "weekly", "monthly", "quarterly", "yearly"] as const) {
+      it(`welds and unwelds a ${grain} entry back to the file it started as`, () => {
+        const text = composeEntryTemplate(grain);
+        const welded = weldEntryFences(text)!;
+        expect(welded).not.toBeNull();
+        expect(welded.split("\n").filter((l) => l.trim() === FENCE)).toHaveLength(2);
+        expect(unweldEntryFences(welded)).toBe(text);
+      });
+    }
+
+    it("refuses to unweld a note that was never welded", () => {
+      expect(unweldEntryFences(twoFence)).toBeNull();
+      expect(unweldEntryFences(composeEntryTemplate("daily"))).toBeNull();
+    });
+
+    it("refuses to unweld a stack whose second part holds no trackers", () => {
+      const other = [FENCE, "stack", "entry-header", "stack", "tasks:todo", CLOSE].join("\n");
+      expect(unweldEntryFences(other)).toBeNull();
+    });
+
+    it("keeps a line written above the first stack with the block, not the strip", () => {
+      const framed = [FENCE, "frame:section", "stack", "entry-header", "stack", START, END, CLOSE].join(
+        "\n"
+      );
+      const out = unweldEntryFences(framed)!;
+      expect(out.split("\n").slice(0, 4)).toEqual([FENCE, "frame:section", "entry-header", CLOSE]);
+    });
+
+    it("leaves a welded entry alone when the vault is repaired", () => {
+      // The migration that would otherwise undo the gesture, every time.
+      const welded = weldEntryFences(twoFence)!;
+      expect(splitEntryFences(welded)).toBeNull();
     });
   });
 

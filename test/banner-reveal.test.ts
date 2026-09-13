@@ -349,9 +349,16 @@ describe("one chevron per welded section", () => {
     // Modifiers are not directives and a comment is not a line.
     expect(revealAnchorIn(["stack", "frame: section", "# a marker", "", "pages-table"]))
       .toBe("pages-table");
-    // And a divider with nothing under it is not a section, so it gets no
+    // AND THE TRACKER REGION'S MARKER IS THE EXCEPTION (1.0.10). It was in this
+    // line as an example of a comment that names nothing, and it is the one
+    // comment that does: the marker pair IS the logging grid, and four of the
+    // five diary grains compose the region with nothing between them. Dropping
+    // the part for having no anchor welded the grid into a reader's banner with
+    // no chevron to hide it again.
+    expect(revealAnchorIn(["stack", "", "# chronoanvil:trackers:start"])).toBe("tracker");
+    // A divider with nothing under it is still not a section, so it gets no
     // button rather than an unlabelled one.
-    expect(revealAnchorIn(["stack", "", "# chronoanvil:trackers:start"])).toBeNull();
+    expect(revealAnchorIn(["stack", "", "# a marker"])).toBeNull();
     expect(revealPartsIn(["stack", "journal-header", "stack", ""], nameOf)).toEqual([]);
   });
 
@@ -511,6 +518,33 @@ describe("what the dispatcher registers, and where the strip goes", () => {
     expect(region).toContain("const span = undivided ? belowSpanIn(lines) : null;");
   });
 
+  it("reads each part's children off the stamp, and takes the empty grid whole", () => {
+    // TWO FAULTS ON THE DIVIDED PATH, BOTH OF THEM THE DIARY ENTRY'S (1.0.10).
+    //
+    // The first is `drawn`'s: its entries are child COUNTS taken inside the
+    // dispatch loop, and a diary entry's tracker block is where two of the four
+    // after-the-loop insertions land — the page-context strip and the facts
+    // row, both prepended. A part cut with those indices starts one child early,
+    // which on a two-part stack means the banner's own strip is inside the
+    // chevron that should hide the grid. `stampedWithin` asks each child which
+    // line drew it instead, and `stampLines` runs before any of the four.
+    //
+    // The second is the empty grid's. Weekly, monthly, quarterly and yearly
+    // compose the marked region with nothing between the markers, so the bar is
+    // built below the loop and carries no stamp at all — the part resolves to
+    // no children and the chevron hides nothing. On those notes the bar IS the
+    // part.
+    const at = widgets.indexOf("const childrenOf = (part:");
+    expect(at, "the parts are not cut by stamp").toBeGreaterThan(-1);
+    const region = widgets.slice(at, widgets.indexOf("};", at));
+    expect(region).toContain("stampedWithin(container, part.from, part.to)");
+    expect(region).toContain('part.id === "tracker" && trackerBar ? [trackerBar] : []');
+    expect(widgets).toContain("for (const el of childrenOf(part)) {");
+    // AND THE COUNT IS NOT READ ANY MORE. `childAt` was the reader; a second
+    // one added back here would be the same bug returning under a new name.
+    expect(widgets).not.toContain("childAt(part.from)");
+  });
+
   it("reaches every banner for a divided stack and only journal notes without one", () => {
     // WHY TWO FENCE TESTS (5.30). A DIVIDED stack was written by this release's
     // own gestures and says what it is, so it is honoured on every page head
@@ -527,7 +561,12 @@ describe("what the dispatcher registers, and where the strip goes", () => {
       "const isJournalBanner = fenceKinds.some((k) => JOURNAL_BANNER_KINDS.has(k));"
     );
     // And the strip is still withheld where nothing registered, which is what
-    // makes the wider reach safe: an entry welds nothing, so it draws nothing.
+    // makes the wider reach safe. An entry composes no stack, so an unwelded
+    // one draws nothing — and a reader who welds one (1.0.10) gets the DIVIDED
+    // reading, which is the fence saying what it is. The undivided fallback
+    // stays journal-only: widening it would put a chevron on every entry ever
+    // written, whose trackers have sat in the banner's fence since long before
+    // any of this.
     expect(region.slice(region.indexOf("const parts = isBannerFence"))).toContain(
       "isJournalBanner && parts.length === 0"
     );

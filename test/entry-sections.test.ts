@@ -29,7 +29,9 @@ import {
   addSectionToNote,
   detectEntrySections,
   addableEntrySections,
+  entrySectionModel,
 } from "../src/diary/entry-sections";
+import { weldEntryFences } from "../src/trackers/entry-trackers";
 import { WIDGETS } from "../src/core/widget-registry";
 import { isPageWidgetId } from "../src/core/widget-sections";
 import { blockTitle, fieldBand } from "../src/ui/widgets/index";
@@ -523,7 +525,34 @@ describe("immovability is derived, not declared", () => {
     expect(band.map((s) => s.id)).toEqual(["banner"]);
     // One unpinned member is what makes it false; the rule reads "more than
     // one", so the day a second arrives it flips on its own.
-    expect(readSrc("entry-sections")).toContain("!s.pinned).length >");
+    //
+    // AND IT COUNTS THE GROUP RATHER THAN THE BAND FIELD (1.0.10). The two
+    // stopped being the same thing when the grid's band started displaying as
+    // the banner's: what the arithmetic is about is a second SLOT in the list
+    // the reader is looking at, and the list is grouped by the string.
+    expect(readSrc("entry-sections")).toContain("!s.pinned\n    ).length > 1");
+  });
+
+  it("makes the grid movable because it can be welded, not because it can swap", () => {
+    // THE THIRD WAY TO HAVE SOMEWHERE TO GO (1.0.10), and the one that is not a
+    // slot. `bandOf` in the section editor drops an immovable row out of its own
+    // band, and the weld is read off that band — so a grid answering false here
+    // is a grid whose weld button cannot be drawn, whatever `WELDS_INTO_BANNER`
+    // says about it.
+    const grid = ENTRY_SECTIONS.find((s) => s.id === "trackers")!;
+    expect(isMovable(grid)).toBe(true);
+    // NOT BY THE ARITHMETIC, which is the part worth pinning: the grid shares
+    // its group with one pinned section and nothing else, so the count route
+    // answers false and the weld clause is the only thing that can be making
+    // this true.
+    expect(
+      ENTRY_SECTIONS.filter((s) => s.band !== "shared" && !s.pinned).map(
+        (s) => s.id
+      )
+    ).toEqual(["trackers"]);
+    // AND IT IS STILL NOT A REORDER. The banner is pinned, so the band the
+    // arrows read holds this row alone.
+    expect(isMovable(ENTRY_SECTIONS.find((s) => s.id === "banner")!)).toBe(false);
   });
 
   it("leaves everything below the rule movable", () => {
@@ -909,5 +938,102 @@ describe("the widget door, on an entry (5.26)", () => {
       expect(fieldBand(fence), grain).toBe(true);
       expect(blockTitle([...fence, "tasks-table"]), grain).toBeNull();
     }
+  });
+});
+
+// ── the one arrangement an entry has (1.0.10) ─────────────────────────────
+//
+// The banner and the logging grid can be welded into one card from *Edit
+// sections…*, exactly as a journal note's can. Nothing the catalogue composes
+// changes: an entry moves only when its reader presses the button, which is
+// what every `entry-*` golden above still being byte-identical says.
+describe("an entry's blocks and the weld that changes them", () => {
+  const model = (grain: TrackerClass = "daily") => entrySectionModel({ grain });
+
+  it("reports the banner and the grid as two blocks, and the page below as none", () => {
+    const blocks = model().blocks!(composeEntryTemplate("daily"));
+    expect(blocks.map((b) => b.ids)).toEqual([["banner"], ["trackers"]]);
+    expect(blocks.every((b) => b.stack)).toBe(false);
+  });
+
+  it("never reports a section below the rule, on any grain", () => {
+    // THE REFUSAL, EXPRESSED WHERE CAPABILITY IS READ RATHER THAN AT A BUTTON.
+    // The seven field sections share one fence, and splitting it is a judgement
+    // about the reader's writing. Withholding them here withholds `loose` and
+    // `column` for all seven at once — the window draws no split and no Save
+    // can ask for one.
+    for (const grain of TRACKER_CLASSES) {
+      const ids = model(grain)
+        .blocks!(composeEntryTemplate(grain))
+        .flatMap((b) => b.ids);
+      expect(ids, grain).not.toContain("focus");
+      expect(ids, grain).not.toContain("log");
+      expect(ids.every((id) => id === "banner" || id === "trackers"), grain).toBe(true);
+    }
+  });
+
+  it("welds the grid into the banner when the reader asks for a stack", () => {
+    for (const grain of TRACKER_CLASSES) {
+      const text = composeEntryTemplate(grain);
+      const out = model(grain).regroup!(text, [["banner", "trackers"]], [], ["trackers"]);
+      expect(out, grain).toBe(weldEntryFences(text));
+      expect(model(grain).blocks!(out!).map((b) => b.ids), grain).toEqual([
+        ["banner", "trackers"],
+      ]);
+      expect(model(grain).blocks!(out!)[0].stack, grain).toBe(true);
+    }
+  });
+
+  it("takes it back out again, byte for byte", () => {
+    for (const grain of TRACKER_CLASSES) {
+      const text = composeEntryTemplate(grain);
+      const welded = weldEntryFences(text)!;
+      expect(model(grain).regroup!(welded, [["banner"], ["trackers"]], [], []), grain).toBe(
+        text
+      );
+    }
+  });
+
+  it("refuses a row, because the file has no spelling for one here", () => {
+    // Same partition, no weld named: the reader would be asking for the grid
+    // BESIDE the banner, which is not an arrangement this surface composes.
+    const text = composeEntryTemplate("daily");
+    expect(model().regroup!(text, [["banner", "trackers"]], [], [])).toBeNull();
+  });
+
+  it("refuses a block the banner does not open, or one with a second guest", () => {
+    const text = composeEntryTemplate("daily");
+    // The banner is not on `WELDS_INTO_BANNER`, so a block it does not open
+    // offers it as a guest of something else.
+    expect(model().regroup!(text, [["trackers", "banner"]], [], ["banner"])).toBeNull();
+    expect(
+      model().regroup!(text, [["banner", "trackers", "focus"]], [], ["trackers", "focus"])
+    ).toBeNull();
+    // TWO WELDABLE GUESTS IS STILL REFUSED, and this is the one the guest rule
+    // above cannot catch: `children` is on the list, for the journal note it
+    // was written for, and the pair here folds one fence into one other.
+    expect(
+      model().regroup!(text, [["banner", "trackers", "children"]], [], [
+        "trackers",
+        "children",
+      ])
+    ).toBeNull();
+  });
+
+  it("refuses a second arrangement somewhere else in the note", () => {
+    // Asked of a WELDED note, so the refusal is visible: without it the
+    // banner's own block reads as "take it apart" and the Save would unweld
+    // while quietly dropping the group the reader asked for.
+    const welded = weldEntryFences(composeEntryTemplate("daily"))!;
+    expect(
+      model().regroup!(welded, [["banner"], ["trackers", "focus"]], [], ["focus"])
+    ).toBeNull();
+  });
+
+  it("leaves the arrangement alone when nobody mentions one", () => {
+    // `undefined` is not an empty list — see `SectionModel.regroup`. A caller
+    // written before stacks existed must not have this note taken apart.
+    const welded = weldEntryFences(composeEntryTemplate("daily"))!;
+    expect(model().regroup!(welded, [["banner"], ["trackers"]], [])).toBeNull();
   });
 });

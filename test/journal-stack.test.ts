@@ -512,7 +512,7 @@ describe("every section the list says may weld, actually can", () => {
   it("welds, renders as a card, divides, and comes back", () => {
     // Three tallies, because a sweep that counted only successes would pass on
     // a release where every weld had quietly become a refusal.
-    let welded = 0;
+    const welds: string[] = [];
     let already = 0;
     const refused: string[] = [];
 
@@ -594,16 +594,30 @@ describe("every section the list says may weld, actually can", () => {
           ...apart!.stacked,
         ]);
         expect(back ?? text, `${note.name}/${id} round trip`).toBe(note.text);
-        welded++;
+        welds.push(`${note.name}/${id}`);
       }
     }
 
     // NOT VACUOUS IN ANY OF THE THREE DIRECTIONS. A weld was performed on a
     // surface that had none; the shipped stacks were read back; and the one
     // refusal is the one that is written down rather than a new one.
-    expect(welded).toBeGreaterThan(0);
+    expect(welds.length).toBeGreaterThan(0);
     expect(already).toBeGreaterThan(10);
     expect(refused).toEqual(["home/launcher"]);
+
+    // AND ALL FIVE DIARY ENTRIES ARE IN IT NOW (1.0.10). This sweep ran over
+    // the entry goldens for two releases and skipped every one of them at the
+    // `blocks`/`regroup` line above, which is the same deferral the catalogue
+    // stated in prose. Naming them is what keeps the skip from coming back
+    // silently: the grain whose model stopped implementing an arrangement would
+    // vanish from this list rather than fail anything.
+    expect(welds.filter((w) => w.startsWith("entry-"))).toEqual([
+      "entry-daily/trackers",
+      "entry-weekly/trackers",
+      "entry-monthly/trackers",
+      "entry-quarterly/trackers",
+      "entry-yearly/trackers",
+    ]);
   });
 });
 
@@ -620,6 +634,89 @@ describe("the stack's card", () => {
     // are, so none of them may be measured against a card padding they would
     // each have to cancel.
     expect(rule).toContain("padding: 0");
+  });
+
+  it("gives the page-context strip a band, which the tracker section owned", () => {
+    // 1.0.10. The entry's alias-and-stepper strip and the journal note's facts
+    // row are laid out by `.ca-journal-tracker-section > …` in
+    // 50-entry-header.css, and `chromeClasses` withholds that class inside a
+    // stack — *a fence is a banner or it is the tracker section* — so welding
+    // the grid into the banner left the strip a bare div: no flex, no gutter,
+    // no air. The card's own 14px, which is what every band in it states.
+    const at = css().indexOf(".ca-journal-stack > .ca-journal-entry-context,");
+    expect(at, "the strip has no band inside a stack").toBeGreaterThan(0);
+    const rule = css().slice(at, css().indexOf("}", at));
+    expect(rule).toContain(".ca-journal-note-context");
+    expect(rule).toContain("display: flex");
+    expect(rule).toContain("padding: 0 14px 4px");
+    // AND NO BLEED AND NO RULE, which is the whole difference from the twin it
+    // replaces. That one bleeds out of the tracker section's 12px card padding
+    // and bands itself top and bottom; this card states `padding: 0` so each
+    // band states its own inset, and the strip belongs to the NAME above it.
+    expect(rule).toContain("margin: 0");
+    expect(rule).not.toContain("border-top");
+    expect(rule).not.toContain("border-bottom");
+    // The twin is still there for the unwelded note, which is most of them.
+    expect(css()).toContain(".ca-journal-tracker-section > .ca-journal-entry-context,");
+  });
+
+  it("brings the navigator back to its own scale inside the card", () => {
+    // 1.0.10, from a vault screenshot. `jec-nav-only` enlarges the three
+    // controls for the TRACKER CARD's top row, where the strip is the card's
+    // first line. In a stack it is the name band's second, so the row became
+    // the tallest band in a card built to be short, and the picker stated the
+    // entry's date in 600-weight base type four pixels under the same date in
+    // heading type.
+    //
+    // THE GEOMETRY IS UNTOUCHED, which is the decision: the arrows keep the
+    // card's two edges and the picker keeps the middle. Only the height comes
+    // out — so the rules must not restate `width: 100%` or `justify-content`,
+    // which would be this card answering a question the strip already answered.
+    // Selectors keep the source's line breaks through the build, so the match
+    // is made on whitespace-collapsed text rather than on the wrapped form.
+    const flat = css().replace(/\s+/g, " ");
+    const at = flat.indexOf(
+      ".ca-journal-widget-block.ca-journal-stack > .ca-journal-entry-context.ca-jec-nav-only .ca-jeh-navpill {"
+    );
+    expect(at, "the navigator keeps the tracker card's scale").toBeGreaterThan(0);
+    const block = flat.slice(at, at + 700);
+    expect(block).toContain("height: 2em");
+    expect(block).toContain("padding: 0 12px");
+    expect(block).toContain("font-size: var(--ca-text-sm)");
+    expect(block).not.toContain("justify-content");
+    expect(block).not.toContain("width: 100%");
+    // FOUR CLASSES, because the rule it corrects sits in a LATER file. Three
+    // would lose the cascade and leave the row exactly as it was, which is a
+    // fix that reads right in the source and changes nothing on the page.
+    expect(flat).not.toContain(
+      " .ca-journal-stack > .ca-journal-entry-context.ca-jec-nav-only .ca-jeh-navpill {"
+    );
+    // And the tracker card keeps its own emphasis, which is what it was for.
+    expect(flat).toContain(
+      " .ca-journal-entry-context.ca-jec-nav-only .ca-jeh-navpill { width: 2.2em;"
+    );
+  });
+
+  it("gives the navigator band air on both sides inside the card", () => {
+    // 1.0.10, the second pass on the same screenshot. `jec-nav-only` zeroes
+    // padding-top and padding-bottom, which is right where it is set — there
+    // the strip is the tracker card's first line. In a stack it is band 3 of
+    // five, and a band between two bands cannot have zero: the row arrived
+    // hard against the title with its floor on the chevron pill's ceiling.
+    const flat = css().replace(/\s+/g, " ");
+    const at = flat.indexOf(
+      ".ca-journal-widget-block.ca-journal-stack > .ca-journal-entry-context.ca-jec-nav-only { "
+    );
+    expect(at, "the navigator band states its own air").toBeGreaterThan(0);
+    const block = flat.slice(at, flat.indexOf("}", at));
+    // Ten above, four below — which is ten on both, because the chevron strip
+    // under it opens with six of its own. Longhands, because the zeroes this
+    // corrects are longhands in a later file and a shorthand cannot reach them.
+    expect(block).toContain("padding-top: 10px");
+    expect(block).toContain("padding-bottom: 4px");
+    // The side inset is the band rule's and is not restated here: two numbers
+    // for one gutter is how the card's left edge stops being one line.
+    expect(block).not.toContain("14px");
   });
 
   it("stands the section surface down around it", () => {
