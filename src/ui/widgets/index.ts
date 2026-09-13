@@ -109,7 +109,7 @@ import {
 // list of. It is not a region — nothing wraps it, nothing scopes it, it has no
 // directive — so routing it through `directive-regions.ts` would be a
 // pass-through added only to keep an import in a tidier place.
-import { buildAddKindRow } from "../tables";
+import { buildBelowFoot } from "./below-edit";
 import {
   liveScopedWidget,
   liveFrontmatterWidget,
@@ -1274,6 +1274,20 @@ export class Widgets implements
       // shape `blockTitle` exists to avoid one level up.
       const named: { el: HTMLElement; title: string }[] = [];
 
+      // The live hosts that drew a journal's note rows, for the foot's edit mode.
+      //
+      // RECORDED AT THE APPEND, for `named`'s stated reason one line up: this is
+      // the only place both halves are in hand, the element and the directive
+      // `kind` that produced it. A `querySelectorAll` afterwards would have to
+      // read classes to guess at directives and would sweep up the stats band, the
+      // chart and the tasks table along with the tables it wants.
+      //
+      // THE HOST IS STABLE FOR THE LIFE OF THE BLOCK. `LiveWidget.rerender`
+      // empties its `containerEl` and appends a new subtree; it never replaces the
+      // host. So holding these and re-walking their descendants is sound, which is
+      // what lets a selection survive a repaint.
+      const kindHosts: HTMLElement[] = [];
+
       // AND A TRACKER GRID IS ONE OF THEM (5.15). Three paths build the grid —
       // a habit chip, an ordinary `tracker:`/`sleep` cell, and an empty marked
       // region that gets the tile alone — and all three call this, so the name
@@ -1543,6 +1557,15 @@ export class Widgets implements
           continue;
         }
 
+        // AND A KIND TABLE IS A HOST THE FOOT'S EDIT MODE HAS TO REACH.
+        // `named`'s rule, one variable over: recorded here because this is the
+        // only place both halves are in hand — the element, and the directive
+        // `kind` that produced it. `buildFromSpec` wraps it in the
+        // `div.ca-journal-live-widget` a `liveScopedWidget` rebuilds into, and
+        // that host is stable for the life of the block, so the controller can
+        // hold it and re-walk its rows after every repaint.
+        if (kind === "kind-table") kindHosts.push(widget);
+
         // ── AN EMPTY INDEX HANDS ITS SENTENCE TO THE HEAD (5.28) ────────
         //
         // A Topics or Pages table with nothing in it draws a callout: an icon,
@@ -1751,11 +1774,20 @@ export class Widgets implements
       // was therefore hiding a card down to its last row and leaving the row
       // that adds to it sitting under a closed section. The reader's words:
       // *"the add note type should only appear when 'whats under this note' is
-      // expanded."* `addKindRow` is what the reveal block claims it by.
-      let addKindRow: HTMLElement | null = null;
+      // expanded."* The foot below is what the reveal block claims it by.
+      //
+      // ── AND IT IS A FOOT RATHER THAN A ROW AS OF 1.0.13 ─────────────────
+      //
+      // `buildBelowFoot` wraps the add row and an **Edit** toggle in one
+      // `div.ca-journal-below-foot`, and the reveal below claims THAT. Two loose
+      // children would mean claiming two names in both of the places this one is
+      // claimed, a second direct-child CSS rule, and a third of each the next time
+      // the foot grows a control — which is 1.0.12's defect re-armed structurally.
+      // The wrapper makes the reveal code below shorter, not longer.
+      let belowFoot: HTMLElement | null = null;
       if (hasKindTable) {
-        addKindRow = buildAddKindRow(this.plugin, ctx);
-        if (addKindRow) container.appendChild(addKindRow);
+        belowFoot = buildBelowFoot(this.plugin, ctx, kindHosts);
+        if (belowFoot) container.appendChild(belowFoot);
       }
 
 
@@ -2184,8 +2216,8 @@ export class Widgets implements
         const childrenOf = (part: { id: string; from: number; to: number }) => {
           const own = stampedWithin(container, part.from, part.to);
           const adds =
-            addKindRow && kindTableAt >= part.from && kindTableAt < part.to
-              ? [addKindRow]
+            belowFoot && kindTableAt >= part.from && kindTableAt < part.to
+              ? [belowFoot]
               : [];
           if (own.length || adds.length) return [...own, ...adds];
           return part.id === "tracker" && trackerBar ? [trackerBar] : [];
@@ -2263,7 +2295,7 @@ export class Widgets implements
           const from = drawn[span.from]?.at ?? 0;
           const to = drawn[span.to]?.at ?? kids.length;
           const within = kids.slice(from, to);
-          if (addKindRow && !within.includes(addKindRow)) within.push(addKindRow);
+          if (belowFoot && !within.includes(belowFoot)) within.push(belowFoot);
           for (const el of within) {
             revealAnchors.push(el);
             welded.add("below");

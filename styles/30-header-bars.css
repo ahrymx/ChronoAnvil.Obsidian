@@ -406,15 +406,160 @@
  * stands in a row of cards and has to match them, and this stands under a table
  * and has nothing to match.
  *
- * THE GAP IS THE GROUPS' OWN. `--ca-sec-gap` is what separates one group head
- * from the table above it, so the slot sits where the next head would, rather
- * than at a distance chosen for it. */
-.ca-journal-widget-block > .ca-journal-kind-add {
-  width: 100%;
+ * THE GAP IS THE GROUPS' OWN, AND IT BELONGS TO THE FOOT NOW (1.0.13). Nothing
+ * about this changed except the element that pays it: `--ca-sec-gap` is what
+ * separates one group head from the table above it, so the strip sits where the
+ * next head would rather than at a distance chosen for it — and the strip is what
+ * has a top edge, the slot inside it no longer does. */
+.ca-journal-widget-block > .ca-journal-below-foot {
+  display: flex;
+  align-items: stretch;
+  gap: var(--ca-space-2);
   margin-top: var(--ca-sec-gap);
+}
+.ca-journal-below-foot > .ca-journal-kind-add {
+  /* `flex` RATHER THAN `width: 100%`. The slot was the only child of the block
+     and took the whole width; it is now the wide half of a two-control strip, so
+     it grows into whatever the Edit button leaves and keeps its dashed edge over
+     exactly that. */
+  flex: 1 1 auto;
   padding: var(--ca-space-2) var(--ca-space-3);
   border-radius: var(--ca-radius-md);
   font-size: var(--ca-text-sm);
+}
+
+/* ── THE FOOT'S SECOND CONTROL, AND THE MODE IT OPENS (1.0.13) ──────────
+ *
+ * *"what's below would benefit from a 'edit' button which allows selection of
+ * entries to either delete or move."*
+ *
+ * ONE CLASS IS NOT ENOUGH TO HOLD A `<button>`, which this file learned the
+ * expensive way in 5.31.2 and states in full over the reveal strip: a single
+ * class is (0,1,0), and an app or theme rule needs only to name the element
+ * beside a class — `button:not(.clickable-icon)`, `.markdown-rendered button` —
+ * to reach (0,1,1) and take every property a rule here leaves at a default. The
+ * reveal pills shipped a release sitting on a `#333333` ground their own rule
+ * called transparent. So every rule below names the parent, the element AND the
+ * class, and states its ground, its edge and its shadow rather than trusting any
+ * of the three to be nothing.
+ *
+ * IT IS NOT DRESSED AS THE SLOT BESIDE IT. `.ca-jld-add`'s dashed edge means
+ * *"there could be another one of these here"*, which is true of a note kind and
+ * false of a mode. This is an ordinary quiet control — a hairline, a full radius
+ * — which is the reveal pill's shape, because both are "press this to change what
+ * you can see and do here" and a reader who has met one should not have to learn
+ * a second. */
+.ca-journal-below-foot > button.ca-journal-below-edit {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  padding: var(--ca-space-2) var(--ca-space-3);
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-md);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.ca-journal-below-foot > button.ca-journal-below-edit:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+  color: var(--text-normal);
+}
+/* PICKING READS AS PRESSED, on the reveal toggle's own argument: while the mode
+   is on, the control is the only thing on screen that says which gesture opened
+   it — the ticks say a mode is on and not what turns it off. */
+.ca-journal-below-foot > button.ca-journal-below-edit.is-on {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+  color: var(--text-normal);
+}
+.ca-journal-below-edit-icon {
+  display: inline-flex;
+  align-items: center;
+}
+.ca-journal-below-edit-icon svg {
+  width: var(--ca-bar-glyph);
+  height: var(--ca-bar-glyph);
+}
+
+/* ── THE PICKING BAR ────────────────────────────────────────────────────
+ *
+ * It REPLACES the add row rather than sitting under it, which the controller
+ * does by hiding one and building the other — `+ Add note type` alters the card
+ * and this acts on notes, and leaving a live card-altering slot beside a
+ * destructive act is what 4.37 deleted a row-shaped slot from a card for.
+ *
+ * THE COUNT LEADS AND THE WAY OUT TRAILS, with the two acts between them, so the
+ * reading order is *what is selected → what can be done → how to stop*. The
+ * count is the only thing here that is not a control, which is why it takes the
+ * muted ink and the flexible width. */
+.ca-journal-below-foot > .ca-journal-below-pick {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ca-space-2);
+}
+.ca-journal-below-count {
+  flex: 1 1 auto;
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+}
+.ca-journal-below-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+}
+/* NAMED THROUGH THE BAR, THE ELEMENT AND THE CLASS for the specificity reason
+   above — and `.mod-warning` is Obsidian's own, so *Delete…* takes its red from
+   the app rather than from a colour chosen here. The rule below therefore states
+   only the geometry both buttons share and leaves the ground to whichever of them
+   has one. */
+.ca-journal-below-pick button {
+  min-height: 0;
+  padding: var(--ca-space-2) var(--ca-space-3);
+  border-radius: var(--ca-radius-md);
+  font-size: var(--ca-text-sm);
+  line-height: 1.2;
+  cursor: pointer;
+}
+.ca-journal-below-pick > .ca-journal-below-acts > button:not(.mod-warning) {
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+}
+.ca-journal-below-pick > .ca-journal-below-acts > button:not(.mod-warning):hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+}
+/* DEAD RATHER THAN HIDDEN AT ZERO, which is the one exception the repair window
+   states to this codebase's rule against drawing a dead control: a control
+   momentarily inapplicable because of a choice the reader just made, in a strip
+   where it is the only route back to acting. A hidden button would make the strip
+   change shape on every tick. */
+.ca-journal-below-pick button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ca-journal-below-pick > button.ca-journal-below-done {
+  border: var(--ca-rule-hair) solid transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+}
+.ca-journal-below-pick > button.ca-journal-below-done:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
 }
 
 /* ── WHERE THE FIELD HEAD WENT (5.14) ──────────────────────────────────

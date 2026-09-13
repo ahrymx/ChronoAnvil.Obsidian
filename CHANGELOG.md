@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.13] - 2026-09-13
 
+### Added
+
+- **Move or delete several entries at once, from the card that lists them.**
+  *What's below* has a second control at its foot beside **+ Add note type**: an
+  **Edit** button. Press it and every note the card lists grows a tick box; tick
+  as many as you like, across as many groups as you like, and the foot becomes a
+  small bar telling you how many you have chosen and offering two things to do
+  with them.
+
+  **Move…** asks one question — where do these go — and answers it with one list
+  in two parts:
+
+  - **Note type** re-files them as another of the journal's kinds. Nothing moves
+    on disk; the notes stop appearing under the head they are under now and start
+    appearing under the other one. The list says so on every row, because the
+    button says *Move* and you are entitled to expect a file to move.
+  - **Index note** moves the files into another of the journal's index notes. Links
+    elsewhere in your vault are updated to follow. If a note already sitting there
+    has the same name, that one note is left where it is and named in the report
+    rather than quietly renamed around.
+
+  **Delete…** does what everything else in 1.0.13 now does, and names the
+  destination your *Deleted files* setting gives it before you press anything.
+
+  In both cases a note with its own pages takes them with it, whatever else
+  happens is reported per note — what moved, not what was asked for, with the
+  ones that did not named — and the mode leaves the way it came: **Done**, or the
+  banner's chevron, which folds the whole foot away with the rest of the card.
+
+  Two things it deliberately does not do. It does not appear on a card with
+  nothing on it yet, and the **Edit** button comes and goes on its own as a card
+  gains or loses its first note. And it offers no *pages only* option: that scope
+  belongs to a single row's `⋯`, where it has one answer, rather than to a
+  selection of ten where it has ten.
+
 ### Changed
 
 - **Deleting a note now does what your vault's own setting says, and says so

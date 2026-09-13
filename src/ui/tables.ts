@@ -576,6 +576,20 @@ interface RecordRow {
 interface RecordSlots {
   main: HTMLElement;
   actions: HTMLElement;
+  // AND THE ROW, ADDED IN 1.0.13 FOR A STAMP RATHER THAN FOR A SLOT. A caller
+  // that has to say WHICH NOTE a row is needs the row; a third content slot is
+  // not what is missing.
+  //
+  // AND `lead` IS STILL NOT HERE, deliberately. `createListRow` builds
+  // `.ca-list-lead` on every row and `:empty` collapses it — *"always created,
+  // even when empty: a caller that fills it in later should not have to know
+  // whether it exists"*, which is the rule this file already states about `pills`.
+  // Edit mode is a caller that fills it in later, so it needs the row and nothing
+  // else. Returning `lead` would put a MODE's control in a TABLE's hands, and a
+  // table rebuilt by its own `LiveWidget` would then have to find the controller
+  // that owns the mode — which is the path-keyed registry problem coming back in
+  // through the side door.
+  row: HTMLElement;
 }
 
 // PRIVATE AGAIN AS OF 4.13.3, AND THE ROUND TRIP IS WORTH RECORDING. 4.13.2
@@ -637,6 +651,7 @@ function recordList(
       return {
         main: row.querySelector<HTMLElement>(".ca-list-main") ?? row,
         actions,
+        row,
       };
     },
   };
@@ -2265,12 +2280,29 @@ export function kindTable(
   const { row: addRow } = recordList(root, [kind.label, ...columns.map(heading)], true);
 
   for (const { note, date, done } of sorted) {
-    const { main, actions } = addRow({
+    const { main, actions, row } = addRow({
       title: note.file.basename,
       titleRender: (slot) =>
         internalLink(slot, app, note.file, note.file.basename, ctx.sourcePath),
       cls: ["is-done-able", done ? "is-done" : ""],
     });
+    // WHICH NOTE THIS ROW IS, written where a mode can read it back (1.0.13).
+    //
+    // A PATH STRING AND NOT A `TFile`, which is 4.50.2's identity rule: Obsidian
+    // MUTATES a `TFile` in place on rename, so anything holding the object holds a
+    // live handle to wherever that note went while the table still shows the old
+    // row. Every act re-resolves with `getFile` at the moment it acts.
+    //
+    // THE FULL PATH, EXTENSION AND ALL, because that is the string `getFile`
+    // takes. Explicitly NOT the title anchor's `data-href`, which is
+    // `noExt(file.path)` — a link target rather than an identity — and
+    // reconstructing `${href}.md` from it is a rule that will be wrong the first
+    // time something that is not markdown lands in one of these folders.
+    //
+    // `data-ca-*`, which is the house convention: `data-ca-line` for a fence's
+    // line numbering, `data-ca-page` for a page row, `data-ca-span` for a welded
+    // range.
+    row.setAttr(ROW_NOTE_ATTR, note.file.path);
     // WHAT THIS NOTE'S PAGES ARE MADE FROM, AND WHETHER IT SHOULD STILL EXIST —
     // both facts about the one note the row is, so the control goes on the row.
     // See `kind-row-menu.ts`, which owns all of it; this file draws tables.
@@ -2326,6 +2358,15 @@ function ratingCell(
     });
   }
 }
+
+// Which note a `kind-table` row is, for a caller that has to act on it later.
+//
+// DEFINED WHERE IT IS WRITTEN. `block-drag.ts` keeps `LINE_ATTR` and `SPAN_ATTR`
+// beside the code that reads them and `row.ts` keeps `ROW_PAGE_ATTR` beside the
+// code that writes them; the rule underneath both is that one file owns the
+// spelling. This one is written here, in `kindTable`'s row loop, and read by
+// `widgets/below-edit.ts`.
+export const ROW_NOTE_ATTR = "data-ca-note";
 
 // ── the row that adds a kind ─────────────────────────────────────────
 //

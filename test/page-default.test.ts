@@ -773,7 +773,7 @@ describe("the actions slot on a record row", () => {
     // values as though it were one.
     const text = readCode("tables.ts");
     expect(text).toContain("interface RecordSlots");
-    expect(text).toContain("const { main, actions } = addRow({");
+    expect(text).toContain("const { main, actions, row } = addRow({");
   });
 
   it("makes the heading strip pay the same reserve as the rows", () => {

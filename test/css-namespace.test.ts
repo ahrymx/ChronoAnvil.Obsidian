@@ -41,7 +41,7 @@ const ALLOWED = new Set([
   "cm-sizer", "dropdown", "inline-title", "internal-link",
   "markdown-preview-sizer", "markdown-preview-view", "markdown-reading-view",
   "markdown-source-view", "metadata-container", "mobile-header",
-  "mobile-navbar", "mobile-toolbar", "mod-cta",
+  "mobile-navbar", "mobile-toolbar", "mod-cta", "mod-warning",
   "modal-button-container", "modal-close-button", "modal-content", "open",
   "setting-item", "setting-item-control",
   "setting-item-info", "setting-item-inline", "setting-item-name",

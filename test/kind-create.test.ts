@@ -217,7 +217,7 @@ describe("where the row is drawn", () => {
       'const hasKindTable = lines.some((l) => keywordOf(l) === "kind-table");'
     );
     expect(widgets()).toMatch(
-      /if \(hasKindTable\) \{[\s\S]{0,200}container\.appendChild\(addKindRow\)/
+      /if \(hasKindTable\) \{[\s\S]{0,200}container\.appendChild\(belowFoot\)/
     );
   });
 
@@ -242,13 +242,19 @@ describe("where the row is drawn", () => {
     // modifiers filtered out of it, so a range read in the wrong one lands a
     // line or two early on any fence carrying a `stack` or a `frame:`.
     expect(src).not.toContain("const kindTableAt = lines.findIndex(");
+    // AND IT CLAIMS THE FOOT, WHICH IS WHAT THE ROW IS INSIDE NOW (1.0.13).
+    // 1.0.13 wrapped this row and an **Edit** toggle in one
+    // `div.ca-journal-below-foot`, for exactly this reason: two loose children
+    // would mean naming two nodes in both of the two places one is named here,
+    // and a third of each the next time the foot grows a control — which is this
+    // defect re-armed structurally. One wrapper keeps both claims at one name.
     expect(src).toContain(
-      "addKindRow && kindTableAt >= part.from && kindTableAt < part.to"
+      "belowFoot && kindTableAt >= part.from && kindTableAt < part.to"
     );
     // And the 5.28 spelling, where the whole fence is one part and the span is
     // a range of children rather than of lines.
     expect(src).toContain(
-      "if (addKindRow && !within.includes(addKindRow)) within.push(addKindRow);"
+      "if (belowFoot && !within.includes(belowFoot)) within.push(belowFoot);"
     );
   });
 
@@ -281,9 +287,21 @@ describe("where the row is drawn", () => {
   it("takes its gap from the groups, and its edge from the vocabulary", () => {
     // The slot sits where the next group head would, so the spacing is the
     // groups' own token rather than a number picked for this row.
-    const rule = cssRule(".ca-journal-widget-block > .ca-journal-kind-add");
-    expect(rule).toContain("margin-top: var(--ca-sec-gap)");
-    expect(rule).toContain("width: 100%");
+    //
+    // THE STRIP PAYS THE GAP AS OF 1.0.13, because the strip is what has a top
+    // edge — the row is inside it now and a second `margin-top` in there would
+    // be the gap charged twice. The decision did not change; the element that
+    // carries it did.
+    const strip = cssRule(".ca-journal-widget-block > .ca-journal-below-foot");
+    expect(strip).toContain("margin-top: var(--ca-sec-gap)");
+    // AND `width: 100%` BECAME `flex`, for the same reason: the row was the
+    // block's only child and took the whole of it; it is now the wide half of a
+    // two-control strip, so it grows into whatever the toggle leaves rather than
+    // insisting on a width that would push the toggle off the end.
+    const rule = cssRule(".ca-journal-below-foot > .ca-journal-kind-add");
+    expect(rule).toContain("flex: 1 1 auto");
+    expect(rule).not.toContain("width: 100%");
+    expect(rule).not.toContain("margin-top");
     // AND IT DOES NOT RESTATE THE DASH. `.ca-jld-add` owns the dashed edge, the
     // absent ground and the hover — three `!important` declarations that exist
     // because a theme's `button` rule outranks a single class. A copy here would

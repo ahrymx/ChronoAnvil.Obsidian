@@ -786,6 +786,50 @@ body.is-mobile .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-check {
 .ca-list.has-row-actions .ca-list-heads {
   padding-right: calc(6px + var(--ca-row-action-w));
 }
+
+/* ── AND THE SAME RESERVE ON THE OTHER SIDE, WHILE PICKING (1.0.13) ─────
+ *
+ * *What's below* can be put into a mode where every row carries a tick, so the
+ * reader can move or delete several notes at once. The tick goes in `.ca-list-lead`
+ * — the slot `createListRow` keeps in front of the token for a row that is a
+ * choice rather than a record — and a leading column is the reserve above
+ * mirrored: without it every value column sits a checkbox's width to the RIGHT of
+ * its own heading.
+ *
+ * A STATE CLASS, NOT A CONSTRUCTOR ARGUMENT, AND THAT IS THE ONE DIFFERENCE.
+ * `has-row-actions` is a build-time flag because the `⋯` is on every row on every
+ * paint. A tick is on no row until the reader asks for it, so paying a permanent
+ * left reserve would indent every kind table in every vault for a mode nobody is
+ * in — which is why this is `is-editing`, put on and taken off by the controller
+ * that owns the mode.
+ *
+ * ONE CUSTOM PROPERTY, READ BY BOTH, so the strip and the rows cannot drift when
+ * the box is resized — the rule the reserve above already keeps. */
+.ca-list.is-editing {
+  --ca-row-tick-w: 18px;
+}
+.ca-list.is-editing .ca-list-heads {
+  padding-left: calc(6px + var(--ca-row-tick-w));
+}
+.ca-list.is-editing .ca-list-lead {
+  width: var(--ca-row-tick-w);
+  justify-content: center;
+}
+.ca-list-tick {
+  width: var(--ca-row-tick-w);
+  margin: 0;
+  cursor: pointer;
+}
+/* THE WHOLE ROW IS THE TARGET WHILE PICKING, so it has to say so — a tick that
+   only responds to its own 18px would be a mode a reader fights. The picked state
+   is a ground rather than a border: a border would reflow the row a pixel and the
+   list would jitter as ticks went on and off. */
+.ca-list.is-editing .ca-list-row {
+  cursor: pointer;
+}
+.ca-list.is-editing .ca-list-row.is-picked {
+  background: var(--background-modifier-hover);
+}
 .ca-list-menu {
   display: flex;
   align-items: center;

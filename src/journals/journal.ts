@@ -1249,6 +1249,42 @@ export function journalTypeOfNote(
 //
 // LABELS ASK THIS ONE; REFUSALS ASK THE OTHER. Written down here because the
 // two names are one word apart.
+// Every folder of a journal that may hold a note. 1.0.13.
+//
+// EXTRACTED FROM `pickContainerFolder`, WHICH IS A DIALOGUE. That method asks the
+// reader where to create a note; *What's below*'s edit mode asks where to move
+// several. Two different questions over one fact — and the fact is the part that
+// must not be written twice, which is `folderActivity`'s extraction argument
+// exactly: two copies of "which folders may hold a note" is how a move comes to
+// offer a folder the create path refuses.
+//
+// `depth >= type.levels.length` IS THE WHOLE RULE. A journal's levels say how deep
+// its hierarchy goes; the folders BELOW the deepest level are a promoted note's
+// own folder, which holds pages rather than notes. Walking past it would offer a
+// reader the inside of a dashboard as a destination.
+//
+// A PLAIN `string[]`, IN WALK ORDER, so a caller may filter it — the edit mode
+// drops the folder the notes are already in — without re-deriving it. Nothing here
+// notifies or refuses: the two callers have genuinely different things to say when
+// the answer is empty.
+export function containerFoldersOf(
+  plugin: ChronoAnvilPlugin,
+  type: JournalType
+): string[] {
+  const root = getFolder(plugin.app, type.root);
+  if (!root) return [];
+  const options: string[] = [];
+  const walk = (folder: TFolder, depth: number) => {
+    if (depth >= type.levels.length) return;
+    for (const child of journalChildFolders(plugin, type, folder)) {
+      options.push(child.path);
+      walk(child, depth + 1);
+    }
+  };
+  walk(root, 0);
+  return options;
+}
+
 export function journalTypeAtPath(
   plugin: ChronoAnvilPlugin,
   notePath: string
@@ -1874,6 +1910,47 @@ export class JournalManager {
     });
   }
 
+  // Which kind a note is, read off its own `type:`.
+  //
+  // NORMALISED, LIKE EVERY OTHER READ OF THIS PROPERTY (5.20). `type: Lesson`
+  // against a lowercase id matched nothing, and the two callers that got it wrong
+  // fell through to a text-reading fallback that lowercases — so the bug was a
+  // file read per New Page for anybody who had ever capitalised a `type:` by hand,
+  // not a visible failure. There is one normaliser and everything goes through it.
+  //
+  // THE ID, NOT THE KIND, because the caller that wants this wants to compare it
+  // against the destination it is about to offer — and a kind object would make
+  // "is this already what they picked" a question about identity.
+  noteKindOf(file: TFile): string | null {
+    const fm = frontmatterOf(this.app, file);
+    return normaliseTypeValue(fm["type"]) ?? null;
+  }
+
+  // Change which kind a note is. 1.0.13.
+  //
+  // A FRONTMATTER WRITE AND NOTHING ELSE, because **a kind is not a folder**.
+  // `JournalKind` has no folder field, every kind at one journal level shares a
+  // folder, and `kind-table` selects its rows by frontmatter — so re-filing a note
+  // as another kind moves no bytes and the row reappears under a different head at
+  // the next repaint, which the live widget does by itself.
+  //
+  // `setPageLayout`'S SHAPE, WITH ONE DIFFERENCE. That one DELETES its key for the
+  // default, because absent means "the journal's page default" there and one state
+  // must not have two spellings. A kind has no default — absent means the note is
+  // not one of the journal's at all — so this always writes.
+  //
+  // AND IT WRITES THE ID, NEVER THE LABEL. That is the whole of 5.20's scar:
+  // `type: Lesson` where a lowercase `lesson` was expected matched nothing and the
+  // pages vanished from their own index. One writer is what keeps `noteKindOf` and
+  // `normaliseTypeValue` honest.
+  async setNoteKind(file: TFile, kindId: string): Promise<void> {
+    const id = kindId.trim();
+    if (!id) return;
+    await this.app.fileManager.processFrontMatter(file, (front) => {
+      front["type"] = id;
+    });
+  }
+
   // ── Pages: splitting one note across several ────────────────────────────
   //
   // The kind a note belongs to, and its page config, resolved from the note's
@@ -2179,22 +2256,11 @@ export class JournalManager {
   private async pickContainerFolder(
     type: JournalType
   ): Promise<string | null> {
-    const root = getFolder(this.app, type.root);
-    if (!root) {
+    if (!getFolder(this.app, type.root)) {
       notify.fail("Journals folder not found");
       return null;
     }
-    // Offer every container folder down the hierarchy so a note can be
-    // created at any level that can hold one.
-    const options: string[] = [];
-    const walk = (folder: TFolder, depth: number) => {
-      if (depth >= type.levels.length) return;
-      for (const child of journalChildFolders(this.plugin, type, folder)) {
-        options.push(child.path);
-        walk(child, depth + 1);
-      }
-    };
-    walk(root, 0);
+    const options = containerFoldersOf(this.plugin, type);
     if (options.length === 0) {
       notify.fail("No folders yet — create one first.");
       return null;
