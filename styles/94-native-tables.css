@@ -787,7 +787,7 @@ body.is-mobile .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-check {
   padding-right: calc(6px + var(--ca-row-action-w));
 }
 
-/* ── AND THE SAME RESERVE ON THE OTHER SIDE, WHILE PICKING (1.0.13) ─────
+/* ── AND THE SAME RESERVE ON THE OTHER SIDE, WHILE PICKING (1.0.14) ─────
  *
  * *What's below* can be put into a mode where every row carries a tick, so the
  * reader can move or delete several notes at once. The tick goes in `.ca-list-lead`

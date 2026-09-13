@@ -5,7 +5,7 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// The foot of the *What's below* card, and the mode it can be put into. 1.0.13.
+// The foot of the *What's below* card, and the mode it can be put into. 1.0.14.
 //
 // ── ONE WRAPPER, WHICH MAKES 1.0.12 SMALLER RATHER THAN LONGER ───────────
 //
@@ -40,7 +40,7 @@
 // ── THE MODE IS A CONTROLLER THE BLOCK OWNS, NOT A REGISTRY ──────────────
 //
 // `reveal.ts` keys its targets by `ctx.sourcePath`, deliberately wider than one
-// block so a card rendered after the banner still gets its chevron — and 1.0.13
+// block so a card rendered after the banner still gets its chevron — and 1.0.12
 // has just paid for that width: a registration nothing had cleaned up drew a
 // chevron for a section that had left the stack, and the fix was to hand
 // `RevealBar` the set its own fence declared.

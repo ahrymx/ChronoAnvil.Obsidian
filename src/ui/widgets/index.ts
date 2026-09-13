@@ -1776,7 +1776,7 @@ export class Widgets implements
       // *"the add note type should only appear when 'whats under this note' is
       // expanded."* The foot below is what the reveal block claims it by.
       //
-      // ── AND IT IS A FOOT RATHER THAN A ROW AS OF 1.0.13 ─────────────────
+      // ── AND IT IS A FOOT RATHER THAN A ROW AS OF 1.0.14 ─────────────────
       //
       // `buildBelowFoot` wraps the add row and an **Edit** toggle in one
       // `div.ca-journal-below-foot`, and the reveal below claims THAT. Two loose

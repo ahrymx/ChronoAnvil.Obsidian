@@ -1249,7 +1249,7 @@ export function journalTypeOfNote(
 //
 // LABELS ASK THIS ONE; REFUSALS ASK THE OTHER. Written down here because the
 // two names are one word apart.
-// Every folder of a journal that may hold a note. 1.0.13.
+// Every folder of a journal that may hold a note. 1.0.14.
 //
 // EXTRACTED FROM `pickContainerFolder`, WHICH IS A DIALOGUE. That method asks the
 // reader where to create a note; *What's below*'s edit mode asks where to move
@@ -1926,7 +1926,7 @@ export class JournalManager {
     return normaliseTypeValue(fm["type"]) ?? null;
   }
 
-  // Change which kind a note is. 1.0.13.
+  // Change which kind a note is. 1.0.14.
   //
   // A FRONTMATTER WRITE AND NOTHING ELSE, because **a kind is not a folder**.
   // `JournalKind` has no folder field, every kind at one journal level shares a

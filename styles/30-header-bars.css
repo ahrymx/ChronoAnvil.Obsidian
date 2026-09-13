@@ -406,7 +406,7 @@
  * stands in a row of cards and has to match them, and this stands under a table
  * and has nothing to match.
  *
- * THE GAP IS THE GROUPS' OWN, AND IT BELONGS TO THE FOOT NOW (1.0.13). Nothing
+ * THE GAP IS THE GROUPS' OWN, AND IT BELONGS TO THE FOOT NOW (1.0.14). Nothing
  * about this changed except the element that pays it: `--ca-sec-gap` is what
  * separates one group head from the table above it, so the strip sits where the
  * next head would rather than at a distance chosen for it — and the strip is what
@@ -428,7 +428,7 @@
   font-size: var(--ca-text-sm);
 }
 
-/* ── THE FOOT'S SECOND CONTROL, AND THE MODE IT OPENS (1.0.13) ──────────
+/* ── THE FOOT'S SECOND CONTROL, AND THE MODE IT OPENS (1.0.14) ──────────
  *
  * *"what's below would benefit from a 'edit' button which allows selection of
  * entries to either delete or move."*

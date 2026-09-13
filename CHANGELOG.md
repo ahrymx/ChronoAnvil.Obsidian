@@ -5,7 +5,7 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.13] - 2026-09-13
+## [1.0.14] - 2026-09-13
 
 ### Added
 
@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gains or loses its first note. And it offers no *pages only* option: that scope
   belongs to a single row's `⋯`, where it has one answer, rather than to a
   selection of ten where it has ten.
+
+## [1.0.13] - 2026-09-13
 
 ### Changed
 

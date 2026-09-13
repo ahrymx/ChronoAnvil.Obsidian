@@ -5,7 +5,7 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// Selecting, moving and deleting entries from *What's below*. 1.0.13.
+// Selecting, moving and deleting entries from *What's below*. 1.0.14.
 //
 // *"what's below would benefit from a 'edit' button which allows selection of
 // entries to either delete or move."*

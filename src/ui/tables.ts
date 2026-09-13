@@ -576,7 +576,7 @@ interface RecordRow {
 interface RecordSlots {
   main: HTMLElement;
   actions: HTMLElement;
-  // AND THE ROW, ADDED IN 1.0.13 FOR A STAMP RATHER THAN FOR A SLOT. A caller
+  // AND THE ROW, ADDED IN 1.0.14 FOR A STAMP RATHER THAN FOR A SLOT. A caller
   // that has to say WHICH NOTE a row is needs the row; a third content slot is
   // not what is missing.
   //
@@ -2286,7 +2286,7 @@ export function kindTable(
         internalLink(slot, app, note.file, note.file.basename, ctx.sourcePath),
       cls: ["is-done-able", done ? "is-done" : ""],
     });
-    // WHICH NOTE THIS ROW IS, written where a mode can read it back (1.0.13).
+    // WHICH NOTE THIS ROW IS, written where a mode can read it back (1.0.14).
     //
     // A PATH STRING AND NOT A `TFile`, which is 4.50.2's identity rule: Obsidian
     // MUTATES a `TFile` in place on rename, so anything holding the object holds a

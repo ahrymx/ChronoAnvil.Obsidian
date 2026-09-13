@@ -242,8 +242,8 @@ describe("where the row is drawn", () => {
     // modifiers filtered out of it, so a range read in the wrong one lands a
     // line or two early on any fence carrying a `stack` or a `frame:`.
     expect(src).not.toContain("const kindTableAt = lines.findIndex(");
-    // AND IT CLAIMS THE FOOT, WHICH IS WHAT THE ROW IS INSIDE NOW (1.0.13).
-    // 1.0.13 wrapped this row and an **Edit** toggle in one
+    // AND IT CLAIMS THE FOOT, WHICH IS WHAT THE ROW IS INSIDE NOW (1.0.14).
+    // 1.0.14 wrapped this row and an **Edit** toggle in one
     // `div.ca-journal-below-foot`, for exactly this reason: two loose children
     // would mean naming two nodes in both of the two places one is named here,
     // and a third of each the next time the foot grows a control — which is this
@@ -288,7 +288,7 @@ describe("where the row is drawn", () => {
     // The slot sits where the next group head would, so the spacing is the
     // groups' own token rather than a number picked for this row.
     //
-    // THE STRIP PAYS THE GAP AS OF 1.0.13, because the strip is what has a top
+    // THE STRIP PAYS THE GAP AS OF 1.0.14, because the strip is what has a top
     // edge — the row is inside it now and a second `margin-top` in there would
     // be the gap charged twice. The decision did not change; the element that
     // carries it did.
