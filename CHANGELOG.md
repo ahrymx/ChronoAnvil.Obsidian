@@ -19,34 +19,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Move…** asks one question — where do these go — and answers it with one list
   in three parts:
 
-  - **Note type** re-files them as another of the journal's kinds. Nothing moves
-    on disk; the notes stop appearing under the head they are under now and start
-    appearing under the other one. The list says so on every row, because the
-    button says *Move* and you are entitled to expect a file to move.
+  - **Note type** re-files them as another of the journal's own note types.
+    Nothing moves on disk; the notes stop appearing under the head they are under
+    now and start appearing under the other one. The list says so on every row,
+    because the button says *Move* and you are entitled to expect a file to move.
   - **Index note** moves the files into another of the same journal's index notes.
     Links elsewhere in your vault are updated to follow. If a note already sitting
     there has the same name, that one note is left where it is and named in the
     report rather than quietly renamed around.
-  - **Another journal**, listed under its own name and glyph. Note types belong to
-    a journal, so a note arriving in one is re-filed as one of *its* types — the
-    row says so before you pick it, and ChronoAnvil asks which type only when the
+  - **Another journal**, listed under its own name and glyph. Links are updated to
+    follow exactly as they are within a journal. Note types belong to a journal,
+    though, so a note arriving in one is re-filed as one of *its* types — the row
+    says so before you pick it, and ChronoAnvil asks which type only when the
     destination journal has more than one to choose between. Properties the new
     journal does not use stay on the note, unread, so nothing is lost if it ever
     goes back.
 
+  If there is genuinely nowhere for a note to go — one journal, one folder, one
+  note type, and no second journal in the vault — **Move…** is not drawn at all
+  rather than drawn dead. *Delete…* is always there.
+
   **Delete…** does what everything else in 1.0.13 now does, and names the
   destination your *Deleted files* setting gives it before you press anything.
 
-  In both cases a note with its own pages takes them with it, whatever else
+  Whichever you pick, a note with its own pages takes them with it, whatever else
   happens is reported per note — what moved, not what was asked for, with the
   ones that did not named — and the mode leaves the way it came: **Done**, or the
   banner's chevron, which folds the whole foot away with the rest of the card.
 
   Two things the edit mode deliberately does not do. It does not appear on a card
   with nothing on it yet, and the **Edit** button comes and goes on its own as a
-  card gains or loses its first note. And it offers no *pages only* option: that scope
-  belongs to a single row's `⋯`, where it has one answer, rather than to a
+  card gains or loses its first note. And it offers no *pages only* option: that
+  scope belongs to a single row's `⋯`, where it has one answer, rather than to a
   selection of ten where it has ten.
+
+### Changed
+
+- **The dashed + Add note type row is narrower, because it now shares its line.**
+  It was the only control at the foot of *What's below* and took the full width of
+  the card. The **Edit** button sits beside it, so the dashed slot grows into
+  whatever is left instead. Nothing else about it moved: same gap above it, same
+  dashed edge, same place in the card — and the banner's chevron still folds the
+  pair away together.
+
+  While you are selecting, the dashed row is hidden rather than left live beside a
+  delete: `+ Add note type` changes the card and the picking bar acts on notes, and
+  those two do not belong on screen at the same moment.
 
 ### Fixed
 
@@ -65,10 +83,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parked at an intermediate level, it stays exactly where it is** — drag it into
   one of that folder's own sub-folders and it reappears on that index.
 
-- **A note type's own plural is used where you are asked to confirm one.** A kind
-  that overrides the plural ChronoAnvil would guess — *Practice*, not *Practices*
-  — said the guess in the window asking whether to re-file notes as it, while
-  every other surface in the plugin said the override.
+- **A note type's own plural is used where you are asked to confirm one.** A note
+  type that overrides the plural ChronoAnvil would guess — *Practice*, not
+  *Practices* — said the guess in the window asking whether to re-file notes as
+  it, while every other surface in the plugin said the override.
 
 ## [1.0.13] - 2026-09-13
 
