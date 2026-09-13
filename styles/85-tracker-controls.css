@@ -2531,16 +2531,35 @@ input.ca-kind-label {
 
 /* --- Narrow viewports ---------------------------------------------------
    Below the mobile breakpoint a row's pills and four action buttons no
-   longer fit beside the text, so the actions drop to their own line. */
+   longer fit beside the text, so the actions drop to their own line.
+
+   AND NOT ON A DENSE ROW, WHICH IS 1.0.15 UNDOING A REACH THIS NEVER MEANT
+   TO HAVE. Every clause above is about the SETTINGS list: four action
+   buttons, a dropdown, pills. `is-dense` is the variant that sits on a NOTE
+   — a kind table's rows, a lesson list — where the actions slot holds one
+   `⋯` and the lead holds one tick, and stacking those into three full-width
+   bands turned a two-line row on a phone into a 250px tower: the tick alone
+   on the first line, the values on the second, a rule and a single `⋯` on
+   the third. The reader's screenshot is that tower.
+
+   THE DEEPER REASON IT REACHED THEM AT ALL is that this is a `@media` query
+   — a question about the WINDOW — asked on behalf of a component whose
+   problem is the width of its BOX. 3.9 §3 states the policy plainly:
+   everything responsive here is `@container`, and a dense row already has
+   its own container query (`94-native-tables.css`, at 460px) collapsing the
+   columns. It is that one's job. This one is not converted wholesale,
+   because a settings list sits in a modal with no container to query and
+   would simply stop wrapping; it is narrowed to the rows it was written
+   for. */
 @media (max-width: 620px) {
-  .ca-list-row {
+  .ca-list-row:not(.is-dense) {
     flex-wrap: wrap;
   }
-  .ca-list-main {
+  .ca-list-row:not(.is-dense) .ca-list-main {
     flex: 1 1 100%;
     order: 2;
   }
-  .ca-list-actions {
+  .ca-list-row:not(.is-dense) .ca-list-actions {
     order: 3;
     width: 100%;
     justify-content: flex-end;

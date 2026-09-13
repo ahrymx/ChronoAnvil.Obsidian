@@ -657,6 +657,28 @@ function recordList(
   };
 }
 
+// WHAT A ROW WRITES WHERE IT HAS NOTHING TO SAY. One spelling, named, because
+// as of 1.0.15 the stylesheet acts on it: a cell holding this is not drawn at
+// all once the columns collapse, where it would otherwise be a whole line of
+// screen carrying a dash. `relativeActivity` (`core/query.ts`) returns the same
+// character for a folder that has never been touched, and `test/tables.test.ts`
+// pins the two together — the day they drift, one of the two producers starts
+// printing dashes on a phone again and nothing else says why.
+const EMPTY_CELL = "—";
+
+// The cell's text and, with it, whether the cell HAS one. A separate function
+// rather than a line in `recordCell`, because two of the three producers write
+// after the row is built: the open-task count arrives from an async body read,
+// and a rating cell decides between a digit, a gauge and a dash. A cell whose
+// text is set past `recordCell` and is not passed through here keeps whatever
+// emptiness it was created with, which for the gauge would mean a drawn bar in
+// a cell the sheet has hidden.
+function cellText(cell: HTMLElement, text: string): HTMLElement {
+  cell.setText(text);
+  cell.toggleClass("is-empty", text === "" || text === EMPTY_CELL);
+  return cell;
+}
+
 function recordCell(
   main: HTMLElement,
   text: string,
@@ -664,8 +686,8 @@ function recordCell(
 ): HTMLElement {
   const cell = main.createDiv({
     cls: extra ? `ca-list-cell ${extra}` : "ca-list-cell",
-    text,
   });
+  cellText(cell, text);
   cell.setAttr("role", "cell");
   return cell;
 }
@@ -792,7 +814,7 @@ export function folderRollup(
 
     for (const kind of type.kinds) {
       const n = typed.filter((p) => p.fm["type"] === kind.id).length;
-      recordCell(main, n ? String(n) : "—");
+      recordCell(main, n ? String(n) : EMPTY_CELL);
     }
     recordCell(main, relativeActivity(lastActive), "is-text");
 
@@ -801,7 +823,7 @@ export function folderRollup(
     // ships a placeholder and fills once the bodies are read (see sumBodyTasks).
     const openCell = recordCell(main, "…");
     void sumBodyTasks(app, pages.map((p) => p.file)).then(({ open }) => {
-      openCell.setText(open ? `${open} ◻` : "—");
+      cellText(openCell, open ? `${open} ◻` : EMPTY_CELL);
     });
   }
 
@@ -2309,9 +2331,9 @@ export function kindTable(
     attachKindRowMenu({ plugin, type, kind }, actions, note.file);
     for (const property of columns) {
       if (property === "date") {
-        recordCell(main, date ?? "—");
+        recordCell(main, date ?? EMPTY_CELL);
       } else if (property === statusId) {
-        recordCell(main, statusOf(note.fm) || "—", "is-text");
+        recordCell(main, statusOf(note.fm) || EMPTY_CELL, "is-text");
       } else {
         const v = Number(note.fm[property]);
         const cell = recordCell(main, "");
@@ -2339,17 +2361,20 @@ function ratingCell(
   def: TrackerDef | null
 ): void {
   if (!Number.isFinite(value)) {
-    host.setText("—");
+    cellText(host, EMPTY_CELL);
     return;
   }
   const min = def?.min ?? null;
   const max = def?.max ?? null;
   if (min == null || max == null || max <= min || max - min > 10) {
-    host.setText(String(value));
+    cellText(host, String(value));
     return;
   }
   const steps = Math.round(max - min) + 1;
   const filled = Math.round(value - min) + 1;
+  // A DRAWN CELL, THOUGH IT HOLDS NO TEXT. The cell was created empty and is
+  // therefore marked as having nothing to say; the gauge is what it has to say.
+  host.removeClass("is-empty");
   const bar = host.createDiv({ cls: "ca-list-gauge" });
   bar.setAttr("aria-label", `${value} of ${max}`);
   for (let i = 1; i <= steps; i++) {

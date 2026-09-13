@@ -21,6 +21,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A desktop with a touchscreen keeps all three, faint but present, because that
   reader can still drag with a mouse.
 
+### Fixed
+
+- **The logbook's cards no longer run off the side of a phone.** The time stamp
+  on a card had quietly turned into a fat grey button on mobile — Obsidian styles
+  every `<button>` on a phone, and the rule that was supposed to keep the stamp
+  looking like text was not strong enough to stop it — which pushed the ✓, the
+  pencil and the ✕ off the edge of the card, the last one cut in half. The stamp
+  is plain text again, a type tag no longer breaks in half to make room, and the
+  head of a card now wraps: on a narrow screen the three controls drop to their
+  own line instead of leaving. They are also full-size targets there now, rather
+  than the 27px marks they were.
+
+- **A note listed under *What's below* is a row again on a phone, not a tower.**
+  Every row was being broken into three full-width bands — the tick alone on one
+  line, the note's name and values on the next, then a rule with a single `⋯`
+  under it — which is a layout that belongs to the settings lists it was written
+  for, where a row carries four buttons and a dropdown. It was reaching the note
+  rows because it asked about the width of the *window* rather than the width of
+  the card. Those rows keep their own layout now: the tick beside the name, where
+  you tick it, and the `⋯` where it has always been.
+
+- **A value a note does not have no longer takes a line to say so.** Once the
+  columns collapse on a narrow card, each value was given a line of its own —
+  so a project with three note types it has none of read as its name followed by
+  three lines each containing a dash. The values are one line under the name now,
+  separated by a dot, and the ones with nothing in them are simply not drawn:
+  *ChronoAnvil · 1 · Today* where there were six lines.
+
+- **Pressing Edit on *What's below* now puts the dashed + Add note type row
+  away.** It was meant to from the start — a slot that changes the card does not
+  belong beside a **Delete…** that acts on notes — and the mode said so in its
+  own notes while leaving both on screen. Same for the **Edit** button itself on
+  a card with nothing on it yet: it was supposed to be absent and was merely
+  meant to be.
+
+  The picking bar also wraps now instead of pushing its buttons past the edge of
+  the card, which is what a phone did with four controls on one line.
+
 ## [1.0.14] - 2026-09-13
 
 ### Added

@@ -414,8 +414,25 @@
 .ca-journal-widget-block > .ca-journal-below-foot {
   display: flex;
   align-items: stretch;
+  /* IT WRAPS (1.0.15). The strip is two controls at rest and four while picking,
+     and a phone is not wide enough for four — the reader's screenshot had the
+     count, both acts and *Done* spilling past the card's right edge. Wrapping is
+     the whole fix: the acts drop to a second line and stay full-size, rather than
+     being squeezed to fit a width they were never going to fit. */
+  flex-wrap: wrap;
   gap: var(--ca-space-2);
   margin-top: var(--ca-sec-gap);
+}
+/* ONE MODE AT A TIME, AND THIS IS WHAT ENFORCES IT (1.0.15). The controller had
+   been setting `el.hidden`, which does nothing to either of these: `[hidden]`
+   is a user-agent rule and both elements are given a `display` by an author
+   one — see the essay over `hide()` in `below-edit.ts`. So the dashed slot and
+   the picking bar were on screen together, which is the arrangement the mode
+   exists to prevent. Named through the foot and, for the button, through its
+   element too, so a theme cannot out-rank it either. */
+.ca-journal-below-foot > .ca-journal-kind-add.is-hidden,
+.ca-journal-below-foot > button.ca-journal-below-edit.is-hidden {
+  display: none;
 }
 .ca-journal-below-foot > .ca-journal-kind-add {
   /* `flex` RATHER THAN `width: 100%`. The slot was the only child of the block

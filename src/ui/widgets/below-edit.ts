@@ -364,6 +364,27 @@ export function moveReport(
   return `Moved ${done} of ${done + skipped.length} to ${where} — these did not: ${skipped.join(", ")}`;
 }
 
+// A CLASS, NOT THE `hidden` PROPERTY, AND THIS SHIPPED WRONG IN 1.0.14. Both
+// halves of the foot set `el.hidden` and neither of them disappeared: the reader
+// saw the dashed `+ Add note type` slot sitting beside a live *Delete…*, which is
+// the exact arrangement the mode's own comment says it exists to prevent.
+//
+// `[hidden] { display: none }` is a USER-AGENT rule, and an author rule of any
+// specificity beats every user-agent rule outright — the cascade compares origins
+// before it compares selectors. `.ca-jld-add` declares `display: flex` and
+// `.ca-journal-below-edit` declares `display: inline-flex`, so both elements went
+// on being laid out with the attribute set. There is no specificity to add here;
+// the property is simply unreachable once anything in `styles/` states a `display`
+// for the element, which is why the plugin hides things with `is-hidden`
+// everywhere else (`.ca-journal-task-at-wrap`, `.ca-settings .is-hidden`).
+//
+// The `hidden` attribute stays alongside it, because it is what a screen reader
+// reads and a class is not.
+function hide(el: HTMLElement, away: boolean): void {
+  el.toggleClass("is-hidden", away);
+  el.hidden = away;
+}
+
 // ── the controller ───────────────────────────────────────────────────────
 
 interface BelowEditDeps {
@@ -440,7 +461,7 @@ export class BelowEdit extends MarkdownRenderChild {
   // reload.
   private syncAvailable(): void {
     const any = this.pathsOnScreen().length > 0;
-    this.toggle.hidden = !any;
+    hide(this.toggle, !any);
     if (!any && this.picking) this.setPicking(false);
   }
 
@@ -464,7 +485,7 @@ export class BelowEdit extends MarkdownRenderChild {
       // else's half-made choice waiting.
       this.chosen.clear();
       this.release();
-      this.addRow.hidden = false;
+      hide(this.addRow, false);
       return;
     }
     // THE BAR REPLACES THE ADD ROW RATHER THAN JOINING IT. `+ Add note type`
@@ -473,7 +494,7 @@ export class BelowEdit extends MarkdownRenderChild {
     // reader's attention is on a destructive one is what 4.37 deleted a
     // row-shaped slot from a card for. One strip, two arrangements, chosen by
     // mode, which is `actionsRow`'s own idiom.
-    this.addRow.hidden = true;
+    hide(this.addRow, true);
     this.bar = this.buildBar();
     this.apply();
   }

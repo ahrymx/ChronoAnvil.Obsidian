@@ -1526,14 +1526,35 @@ body.is-mobile .ca-jcl-action-chip {
   border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border-hover));
   box-shadow: var(--ca-shadow-md);
 }
+/* ── THE HEAD WRAPS, AND ITS TWO BUTTONS STOPPED BEING BUTTONS (1.0.15) ──
+ *
+ * A tag, a stamp and three controls on one unwrapping line is a desktop card's
+ * arrangement, and on a phone the reader's screenshot shows what it costs: the
+ * tag broke `WORK LOG` across two lines to make room, the stamp took a ground
+ * and a button's padding, and the third control was cut off outside the card.
+ *
+ * WHY THE STAMP AND THE THREE ICONS GREW, AND IT IS THE TRAP THIS SHEET WARNS
+ * ABOUT TWICE. Both are `<button>` elements held by ONE class. That is (0,1,0),
+ * and the app's own mobile rules reach (0,1,1) by naming the element beside a
+ * class — so on a phone `background: none`, `border: none` and `padding: 0` all
+ * lost, and the stamp rendered as the pill in the screenshot. Nothing was wrong
+ * with the intent; the selector could not carry it. Naming the parent, the
+ * element AND the class is the fix `30-header-bars.css` states in full over the
+ * reveal strip, and it fixes the desktop themes that do the same thing.
+ *
+ * AND THEN IT WRAPS ANYWAY, because a phone is narrow enough that a long stamp
+ * and three targets will not share a line with a tag however honestly they are
+ * drawn. `margin-left: auto` on the actions means they land right-aligned on
+ * the second line rather than at its start. */
 .ca-journal-capture-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--ca-space-2);
 }
 /* Tabular so a column of stamps lines up, which is what makes the list read as
    a chronology rather than as a stack of paragraphs. */
-.ca-journal-capture-time {
+.ca-journal-capture-head > button.ca-journal-capture-time {
   font-size: var(--ca-text-2xs);
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
@@ -1545,12 +1566,19 @@ body.is-mobile .ca-jcl-action-chip {
      to find and not enough to shout. */
   background: none;
   border: none;
+  border-radius: 0;
   box-shadow: none;
   padding: 0;
+  /* STATED, BECAUSE THE APP STATES IT. A mobile `button` is given a height to
+     be tappable with; this one is a stamp in a line of text and takes the
+     line's height. What a finger aims at on this card is the three controls
+     beside it, which is where §3.3's floor is paid. */
+  min-height: 0;
+  height: auto;
   cursor: pointer;
   font-family: inherit;
 }
-.ca-journal-capture-time:hover {
+.ca-journal-capture-head > button.ca-journal-capture-time:hover {
   color: var(--text-normal);
   text-decoration: underline dotted;
 }
@@ -1590,12 +1618,13 @@ body.is-mobile .ca-jcl-action-chip {
     opacity: 0.45;
   }
 }
-.ca-journal-capture-btn {
+.ca-journal-capture-actions > button.ca-journal-capture-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 1.7em;
   height: 1.7em;
+  min-height: 0;
   padding: 0;
   background: none;
   border: none;
@@ -1604,13 +1633,24 @@ body.is-mobile .ca-jcl-action-chip {
   cursor: pointer;
   box-shadow: none;
 }
-.ca-journal-capture-btn:hover {
+.ca-journal-capture-actions > button.ca-journal-capture-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 .ca-journal-capture-btn .svg-icon {
   width: 14px;
   height: 14px;
+}
+/* AND ON A PHONE THEY ARE TARGETS RATHER THAN MARKS. 1.7em is 27px at a phone's
+   text size, under §3.3's 40px floor, and these three are the only way to cross
+   an item off, correct it or remove it. Written here rather than joined to the
+   shared list in `00-tokens.css` because that rule sets `min-height` alone and
+   these are SQUARES — a floor on one axis would leave a 27×40 target. The token
+   is still what they read, so the floor stays one decision. */
+body.is-mobile .ca-journal-capture-actions > button.ca-journal-capture-btn {
+  width: var(--ca-control-min);
+  height: var(--ca-control-min);
+  border-radius: var(--ca-control-round);
 }
 .ca-journal-capture-text {
   margin-top: 2px;
@@ -1750,6 +1790,10 @@ body.is-mobile .ca-jcl-action-chip {
 .ca-journal-capture-type-tag {
   display: inline-flex;
   align-items: center;
+  /* IT IS A LABEL, NOT A PARAGRAPH. `WORK LOG` broken over two lines reads as
+     two tags, and the head wraps now, so a tag that will not fit beside the
+     stamp takes the line above it whole instead of folding in half. */
+  white-space: nowrap;
   gap: 3px;
   padding: 1px 6px;
   border-radius: var(--ca-radius-xs);

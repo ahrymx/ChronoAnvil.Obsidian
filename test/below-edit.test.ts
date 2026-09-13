@@ -465,7 +465,7 @@ describe("how the mode reaches the rows", () => {
     // button with no reload.
     const text = src();
     expect(text).toContain("private syncAvailable(): void {");
-    expect(text).toContain("this.toggle.hidden = !any;");
+    expect(text).toContain("hide(this.toggle, !any);");
     const load = text.indexOf("onload(): void {");
     expect(text.indexOf("this.syncAvailable();", load)).toBeGreaterThan(load);
   });
@@ -919,6 +919,41 @@ describe("how the foot is drawn", () => {
     );
     expect(cssRule(".ca-list.is-editing .ca-list-lead")).toContain(
       "var(--ca-row-tick-w)"
+    );
+  });
+
+  it("swaps the two arrangements with a class, not the hidden attribute", () => {
+    // THE DEFECT 1.0.14 SHIPPED, AND WHY IT IS NOT A SPECIFICITY PROBLEM.
+    // `setPicking` set `el.hidden` on the add row and `syncAvailable` set it on
+    // the toggle, and neither element went away: `[hidden] { display: none }` is
+    // a USER-AGENT rule, and the cascade compares ORIGINS before selectors — so
+    // `.ca-jld-add { display: flex }`, an author rule of one class, beats it
+    // outright. The reader's screenshot is a dashed `+ Add note type` sitting
+    // beside a live *Delete…*, which is the pairing the mode's own comment says
+    // it exists to prevent. There is no selector to strengthen; the property is
+    // unreachable once anything in `styles/` gives the element a `display`.
+    const text = readCode("ui/widgets/below-edit");
+    expect(text).toContain("hide(this.addRow, true);");
+    expect(text).toContain("hide(this.addRow, false);");
+    expect(text).toContain("hide(this.toggle, !any);");
+    // The class does the hiding and the attribute stays for the screen reader,
+    // which a class alone says nothing to.
+    expect(text).toContain('el.toggleClass("is-hidden", away);');
+    expect(text).toContain("el.hidden = away;");
+    // And the sheet honours it, through the foot and — for the button — through
+    // its element, so a theme cannot out-rank the rule that hides it either.
+    expect(readCss()).toContain(
+      ".ca-journal-below-foot > .ca-journal-kind-add.is-hidden,\n.ca-journal-below-foot > button.ca-journal-below-edit.is-hidden"
+    );
+  });
+
+  it("lets the strip wrap rather than squeezing four controls onto one line", () => {
+    // Picking puts a count, two acts and a way out where two controls were, and
+    // a phone is not wide enough for that. Wrapping keeps every one of them
+    // full-size on a second line; the alternative squeezed them past the card's
+    // right edge.
+    expect(cssRule(".ca-journal-widget-block > .ca-journal-below-foot")).toContain(
+      "flex-wrap: wrap"
     );
   });
 

@@ -188,7 +188,9 @@ describe("note surfaces draw rows with the shared component", () => {
     expect(body).toContain("def?.max");
     // Falls back to the digit where there are no declared bounds: a gauge with
     // no scale is a decoration.
-    expect(body).toContain("host.setText(String(value))");
+    // Through `cellText` since 1.0.15, which writes the text and says whether
+    // the cell has one — a digit is a value and the collapsed layout draws it.
+    expect(body).toContain("cellText(host, String(value))");
   });
 
   it("names the shared slots after the component, not the first caller", () => {

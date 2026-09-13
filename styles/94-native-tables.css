@@ -147,17 +147,57 @@
    pseudo-content would cost a line of screen each to repeat the value. What
    genuinely needed the header row is sorting, and that belongs in the
    section's overflow rather than in a strip that vanishes at 460px. */
+/* AND 1.0.15 KEEPS THE ARGUMENT AND CHANGES THE SHAPE. One track was still a
+   TABLE — a column of values, one per line, in a column with no heading — and
+   what that produces on a phone is a subject row reading
+   `ChronoAnvil / — / 1 / — / Today / —`: six lines, three of them a dash. The
+   paragraph above is right that a date reads as a date; it assumed every cell
+   HAS a value, and the placeholder is what breaks the assumption. A cell with
+   nothing in it says nothing, and a line of screen is too much to pay for that.
+
+   SO THE VALUES BECOME A META LINE UNDER THE TITLE. The title takes the width,
+   the cells flow after it and wrap, the empty ones are not drawn, and what is
+   left is separated by a mark rather than by a guess about spacing — `2026-09-12
+   · In Progress`, which is one line where there were three.
+
+   THE SEPARATOR IS ON THE GENERAL SIBLING COMBINATOR, and that is load-bearing
+   rather than fussy: `+` would put a mark in front of a cell whose only
+   predecessor is an undrawn one, i.e. a leading `·` on exactly the rows this
+   rule exists for. `~ .ca-list-cell:not(.is-empty)` asks "is there a drawn cell
+   before me", which is the question.
+
+   LITERALS, NOT THE SPACING SCALE. §4.3's boundary still holds — the scale is
+   read by controls, and 12px here is the grid's own column gap two rules up, so
+   the collapsed line keeps the table's spacing rather than inventing one. */
 @container (max-width: 460px) {
   .ca-list-heads {
     display: none;
   }
   .ca-list-main.is-columned {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 12px;
+    row-gap: 2px;
+  }
+  /* The three regions that are their own line: the name, anything written under
+     it, and the pill strip. Everything else in `main` is a value. */
+  .ca-list-main.is-columned > .ca-list-title,
+  .ca-list-main.is-columned > .ca-list-subtitle,
+  .ca-list-main.is-columned > .ca-list-pills {
+    flex: 0 0 100%;
   }
   .ca-list-cell {
     font-size: var(--ca-text-sm);
     color: var(--text-muted);
+  }
+  .ca-list-cell.is-empty {
+    display: none;
+  }
+  .ca-list-cell:not(.is-empty) ~ .ca-list-cell:not(.is-empty)::before {
+    content: "\00b7";
+    margin-right: 12px;
+    color: var(--text-faint);
   }
 }
 
@@ -815,10 +855,28 @@ body.is-mobile .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-check {
   width: var(--ca-row-tick-w);
   justify-content: center;
 }
-.ca-list-tick {
+/* NAMED THROUGH THE LEAD AND THE ELEMENT (1.0.15), AND SIZED IN BOTH AXES. As
+   one class this lost to the app's own `input[type="checkbox"]` rule on mobile —
+   `.is-mobile input` is a class and an element, which is (0,1,1) against this
+   rule's (0,1,0), the trap `30-header-bars.css` states in full over the reveal
+   strip. The box rendered at the app's size, overflowed an 18px reserve, and the
+   row it was in wrapped. Height was never declared at all, which is the half of
+   it this file got wrong on its own. */
+.ca-list.is-editing .ca-list-lead > input.ca-list-tick {
   width: var(--ca-row-tick-w);
+  height: var(--ca-row-tick-w);
+  min-height: 0;
   margin: 0;
   cursor: pointer;
+}
+/* BIGGER ON A PHONE, AND NOT 40px. §3.3's floor is for the thing a finger aims
+   at, and while picking that is the ROW — the whole of it toggles the box, which
+   is why `.ca-list.is-editing .ca-list-row` carries the pointer cursor. The box
+   is the STATE, so it is sized to be read rather than to be hit, and 18px of
+   read at a phone's text size is small. One property moves and the heading
+   reserve follows it, which is what the shared custom property is for. */
+body.is-mobile .ca-list.is-editing {
+  --ca-row-tick-w: 24px;
 }
 /* THE WHOLE ROW IS THE TARGET WHILE PICKING, so it has to say so — a tick that
    only responds to its own 18px would be a mode a reader fights. The picked state
