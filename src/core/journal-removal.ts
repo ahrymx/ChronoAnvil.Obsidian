@@ -28,192 +28,93 @@
 // ASK. The row asks with a confirm and two pickers; the refusal asks with a
 // button, because in its case there is nothing on disk to ask about.
 
-import { App, normalizePath, TAbstractFile, TFile, TFolder } from "obsidian";
+import { App, normalizePath, TFolder } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
 import type { JournalConfig } from "../journals/custom-journal";
-import { ROOT_INFRASTRUCTURE } from "./constants";
-import { ensureFolder } from "./util";
+import { trashItem } from "./trash";
 import {
   OrphanResolution,
   resolveOrphanedTrackers,
   trackersScopedToType,
 } from "../trackers/trackers";
 
-// Where a binned journal's folders go.
+// ── WHAT USED TO BE HERE, AND WHY IT IS NOT (1.0.13) ─────────────────────
 //
-// UNDER `00 - Infrastructure` BECAUSE THAT CONSTANT ALREADY MEANS "the
-// machinery" — the templates, the documentation, the `.base` files — as opposed
-// to the reader's own writing. A bin is machinery. Putting it at the vault root
-// would add a top-level folder to every vault that ever deletes a journal, and
-// putting it under the journals root would leave a folder that journal-typing
-// has to be taught to ignore.
-export const BIN_FOLDER = `${ROOT_INFRASTRUCTURE}/Bin`;
-
-// `<bin>/<name>-<date>`, with a suffix when that is taken.
-//
-// THE DATE IS NOT UNIQUE AND THE SUFFIX IS NOT DECORATION. Deleting two
-// journals called Cooking on one day — or the same one twice, after re-adopting
-// it — would otherwise put both into one folder, interleaving two journals'
-// subjects with no way to tell which came from which. The suffix is what makes
-// each binning its own object.
-//
-// PURE, TAKING `taken` RATHER THAN AN APP, so the numbering rule is testable
-// without a vault. Everything else in this module needs one; this does not, and
-// it is the part with an off-by-one in it.
-//
-// `ext` IS FOR BINNING A FILE (4.50.1). A journal is folders and needed none;
-// a title that was never promoted is a single `.md`, and a binned note that has
-// lost its extension is a note Obsidian will not open. **The suffix goes before
-// the extension**, or the collision rule produces `Quadratics-2026-08-20.md-2`.
-export function binPathFor(
-  folderName: string,
-  date: string,
-  taken: (path: string) => boolean,
-  ext = ""
-): string {
-  const stem = `${BIN_FOLDER}/${folderName}-${date}`;
-  if (!taken(`${stem}${ext}`)) return `${stem}${ext}`;
-  // From 2, because the unsuffixed path IS the first one.
-  for (let n = 2; ; n++) {
-    const candidate = `${stem}-${n}${ext}`;
-    if (!taken(candidate)) return candidate;
-  }
-}
-
-// Move a journal's folders into the bin. Returns what actually moved.
-//
-// A MOVE, NEVER A DELETE, and the wording everywhere this surfaces says so.
-// ChronoAnvil has never removed a reader's note and this is not where that starts:
-// the bin is an ordinary folder in the vault, the reader empties it themselves,
-// and until they do the notes are all still there.
-//
-// `fileManager.renameFile`, NOT `vault.rename` — the former updates every link
-// that pointed into the folder, which is the difference between a binned journal
-// whose notes still resolve and a vault full of broken links. `journal.ts` and
-// `header-title.ts` both argue this at length for the rename case; a move is the
-// same operation with a different destination.
-//
-// BOTH FOLDERS, because both are the journal's own and are derived from its
-// name. Leaving the templates behind would leave a folder that nothing
-// references and that the next journal of the same name would collide with —
-// which is the bug this release came from, one folder over.
-export async function binJournalFolders(
-  app: App,
-  cfg: JournalConfig,
-  date: string
-): Promise<string[]> {
-  const moved: string[] = [];
-  for (const path of [cfg.root, cfg.templatesFolder]) {
-    const clean = normalizePath((path ?? "").trim().replace(/\/+$/, ""));
-    if (!clean) continue;
-    const folder = app.vault.getAbstractFileByPath(clean);
-    if (!(folder instanceof TFolder)) continue;
-    const name = clean.split("/").pop() ?? clean;
-    const target = binPathFor(
-      name,
-      date,
-      (p) => app.vault.getAbstractFileByPath(p) !== null
-    );
-    await ensureFolder(app, BIN_FOLDER);
-    await app.fileManager.renameFile(folder, target);
-    moved.push(target);
-  }
-  return moved;
-}
-
-// Bin one thing the reader is finished with: a note, or a folder note and
-// everything in it. 4.50.1.
-//
-// ── WHY THIS EXISTS, AND WHAT IT REPLACES ────────────────────────────────
-//
-// 4.50 gave a title's row a *Move to bin*, and it went to OBSIDIAN's trash
-// through `fileManager.trashFile`. That is a second bin behind the same word,
-// and the module it should have read is this one — which had already decided
-// where a bin goes, why it goes there, and that **a move is not a delete**:
+// This module owned ChronoAnvil's bin: `BIN_FOLDER` at `00 - Infrastructure/Bin`,
+// a `binPathFor` that named `<journal>-<date>` with a collision suffix, and a
+// `binAway` / `binTogether` pair that every deletion in the plugin went through.
+// Above them stood the invariant the whole design served:
 //
 //   *A MOVE, NEVER A DELETE, and the wording everywhere this surfaces says so.
 //   ChronoAnvil has never removed a reader's note and this is not where that
 //   starts.*
 //
-// A `trashFile` on a reader's journal note is exactly where that starts. It was
-// reported from a vault as *"vault's trash doesn't seem to exist"*, which is the
-// symptom; the fault is that the plugin had an answer and the new surface did
-// not use it.
+// That paragraph is superseded rather than deleted, because the next reader will
+// otherwise re-derive the bin from first principles — it is a good idea, and it
+// was ours twice.
 //
-// ── A FOLDER NOTE BINS AS ITS FOLDER ─────────────────────────────────────
+// ITS PREMISE WAS THAT THE READER HAD NOT BEEN ASKED. 4.50 sent a note to
+// Obsidian's trash, a vault reported *"vault's trash doesn't seem to exist"*
+// within the day, and 4.50.1 concluded that a plugin must not pick a destination
+// the reader never chose. The bin was how it avoided picking one.
 //
-// A promoted title is `Quadratics/Quadratics.md` with its pages beside it, so
-// binning it is ONE rename of the folder — the pages come with it by
-// construction rather than by a list that could be wrong. That is also what
-// makes the bin honest: what comes back out is the note and its pages arranged
-// the way they were.
+// The reader has now picked one: *"I did not know obsidian had these options.
+// This should be the default way for all chronoanvil's deletion processes; so
+// remove the bin folder from 00 - infrastructure."*
 //
-// `fileManager.renameFile`, NEVER `vault.rename`, for `binJournalFolders`'
-// reason one screen up: the former updates every link that pointed at what
-// moved, which is the difference between a binned note that still resolves from
-// the rest of the vault and a page of broken links.
-export async function binAway(
-  app: App,
-  item: TAbstractFile,
-  date: string
-): Promise<string | null> {
-  const isFile = item instanceof TFile;
-  const name = isFile ? item.basename : item.name;
-  const ext = isFile ? `.${item.extension}` : "";
-  const target = binPathFor(
-    name,
-    date,
-    (p) => app.vault.getAbstractFileByPath(p) !== null,
-    ext
-  );
-  try {
-    await ensureFolder(app, BIN_FOLDER);
-    await app.fileManager.renameFile(item, target);
-    return target;
-  } catch (e) {
-    console.error("[ChronoAnvil] could not bin", item.path, e);
-    return null;
-  }
-}
+// So the premise was half right. A plugin must not choose — and **Obsidian
+// already asks this question once**, in Settings → Files and links → *Deleted
+// files*, for every file in the vault. A bin of our own was a second answer to a
+// question the reader had already answered somewhere else, and the thing 4.50
+// actually got wrong was never the destination: it was that nothing on screen
+// said what the destination WAS. `trash.ts` carries that sentence now, and
+// carrying it is the whole of what the bin was for.
+//
+// WHAT IS GENUINELY LOST, AND IT IS NOT NOTHING. `binAway` moved through
+// `fileManager.renameFile`, so every link that pointed at a binned note followed
+// it and still resolved. A deletion cannot do that, and no wording makes it
+// untrue. Every confirm that reaches this behaviour says the links will break,
+// in `attachment-widgets.ts`' own words, because that is the cost the reader is
+// agreeing to and it is theirs to weigh.
 
-// Bin several files together, into one folder of their own.
+// Delete a journal's folders. Returns what actually went.
 //
-// ONE FOLDER RATHER THAN N LOOSE FILES, and this is the whole reason it is not
-// `binAway` in a loop. A note's pages are *Roots*, *Graphs*, *Examples* — names
-// that mean something under their parent and nothing at the top of a bin, where
-// next week they sit beside another note's *Examples*. The folder is what says
-// which note they came out of.
+// BOTH FOLDERS, because both are the journal's own and are derived from its
+// name. Leaving the templates behind would leave a folder that nothing
+// references and that the next journal of the same name would collide with —
+// which is the bug 4.17 came from, one folder over.
 //
-// RETURNS THE FOLDER AND HOW MANY LANDED IN IT, because `renameFile` can fail
-// per file and a report of what was ASKED FOR is the kind that costs an hour.
-export async function binTogether(
+// PER-FOLDER, THROUGH THE ONE HELPER, and it returns the paths rather than a
+// boolean: `trashItem` can fail on one folder and succeed on the other — a sync
+// holding a note open, a read-only path — and the caller's notice has to be able
+// to say which. A flat "deleted" over a journal half of which is still on disk is
+// the kind of report that costs an hour.
+//
+// IT NO LONGER TAKES A DATE. The date existed to name a bin folder; a deletion
+// has nowhere to write one.
+export async function trashJournalFolders(
   app: App,
-  items: readonly TAbstractFile[],
-  folderName: string,
-  date: string
-): Promise<{ target: string; moved: number }> {
-  const target = binPathFor(
-    folderName,
-    date,
-    (p) => app.vault.getAbstractFileByPath(p) !== null
-  );
-  let moved = 0;
-  await ensureFolder(app, target);
-  for (const item of items) {
-    try {
-      await app.fileManager.renameFile(item, `${target}/${item.name}`);
-      moved += 1;
-    } catch (e) {
-      console.error("[ChronoAnvil] could not bin", item.path, e);
-    }
+  cfg: JournalConfig
+): Promise<string[]> {
+  const gone: string[] = [];
+  for (const path of [cfg.root, cfg.templatesFolder]) {
+    const clean = normalizePath((path ?? "").trim().replace(/\/+$/, ""));
+    if (!clean) continue;
+    const folder = app.vault.getAbstractFileByPath(clean);
+    if (!(folder instanceof TFolder)) continue;
+    // A FOLDER GOES WHOLE, IN ONE CALL. `trashItem` takes a `TAbstractFile` for
+    // exactly this: the notes inside come with it by construction rather than by
+    // a list this function would have to build and could get wrong.
+    if (await trashItem(app, folder)) gone.push(clean);
   }
-  return { target, moved };
+  return gone;
 }
 
 // Which of a journal's folders are actually on disk.
 //
-// The question the row has to ask BEFORE offering the bin, and the question the
-// wizard's refusal asks to decide whether it may offer a delete at all. Both
+// The question the row has to ask before offering to delete them, and the
+// question the wizard's refusal asks to decide whether it may offer a delete at
+// all. Both
 // want the same answer and neither should be re-deriving "does this exist" from
 // its own idea of the paths.
 export function journalFoldersOnDisk(app: App, cfg: JournalConfig): string[] {

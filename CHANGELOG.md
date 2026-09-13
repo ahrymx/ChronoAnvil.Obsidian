@@ -5,6 +5,34 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.13] - 2026-09-13
+
+### Changed
+
+- **Deleting a note now does what your vault's own setting says, and says so
+  first.** ChronoAnvil used to move a deleted note into a folder of its own —
+  `00 - Infrastructure/Bin/` — rather than delete it, and every window that
+  offered to do it said *"Nothing is deleted"*. That folder is gone. A deletion
+  now goes wherever Obsidian's **Settings → Files and links → Deleted files**
+  sends everything else in your vault, and the window in front of the button says
+  which of the three that is: your system trash, the vault's own `.trash` folder,
+  or — if that is what you have chosen — **permanently**, in those words, with the
+  setting named so you can go and change your mind before you press anything.
+
+  This is your call rather than ours, and it reverses a decision from 4.50.1. The
+  one thing it genuinely costs: the old bin *moved* a note, so links pointing at
+  it followed and still resolved. A deletion cannot do that, and every window now
+  says the links will break.
+
+  **If you already have a `00 - Infrastructure/Bin/`, nothing touches it.** It is
+  an ordinary folder and what is in it is yours — drag anything you still want
+  back out and delete the folder when you are ready. ChronoAnvil will not make
+  another one.
+
+  One place this shows up that is easy to miss: deleting a *journal* in Settings
+  used to offer to move its folders to the bin. It now offers to delete them, and
+  the picker itself names where they will go.
+
 ## [1.0.12] - 2026-09-13
 
 ### Added

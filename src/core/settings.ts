@@ -69,11 +69,10 @@ import {
   EVENT_COLORS,
 } from "../events/events";
 import { confirmAction, promptEmoji, promptSuggester } from "../ui/modals";
-import { today } from "./util";
 import { BRAND_ICON_ID } from "../ui/brand-icon";
+import { trashClause, trashDestination } from "./trash";
 import {
-  BIN_FOLDER,
-  binJournalFolders,
+  trashJournalFolders,
   journalFoldersOnDisk,
   removeJournal,
 } from "./journal-removal";
@@ -2507,20 +2506,28 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
         // — skips this entirely, because a picker offering to move two folders
         // that do not exist is a question with no true answer.
         const onDisk = journalFoldersOnDisk(this.app, cfg);
-        let bin = false;
+        let deleteFolders = false;
         if (onDisk.length > 0) {
+          // THE PICKER ITSELF TEACHES THE SETTING (1.0.13). This used to offer
+          // *Move them to `00 - Infrastructure/Bin/`* — a destination the reader
+          // could open and look inside, which is what made the offer safe to
+          // make. The bin is gone at the reader's own request, so the sentence
+          // has to carry what the folder used to: `trashClause` names where the
+          // folders go, in the words Obsidian's own *Deleted files* setting uses,
+          // and says outright when that destination is permanent.
           const LEAVE = "Leave its folders and notes where they are";
-          const BIN = `Move them to ${BIN_FOLDER}/`;
+          const DELETE = "Delete its folders and notes";
+          const them = onDisk.length === 1 ? "it" : "them";
           const chosen = await promptSuggester(
             this.app,
-            [LEAVE, BIN],
-            `${onDisk.join(", ")} — what should happen to ${onDisk.length === 1 ? "it" : "them"}?`
+            [LEAVE, DELETE],
+            `${onDisk.join(", ")} — what should happen to ${them}? If deleted, ${them} ${trashClause(trashDestination(this.app))}.`
           );
           // Cancelling abandons the deletion, on the same rule the tracker
           // picker below states in full: the safe reading of "I did not answer"
           // is that nothing should happen.
           if (!chosen) return;
-          bin = chosen === BIN;
+          deleteFolders = chosen === DELETE;
         }
 
         // Trackers scoped to this type would otherwise be orphaned: still in
@@ -2558,23 +2565,36 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
         // the reader can act on. The other order leaves an unregistered journal
         // whose folders are exactly where they were, which is the stale shape
         // this whole release is about.
-        let moved: string[] = [];
-        if (bin) {
+        let gone: string[] = [];
+        if (deleteFolders) {
           try {
-            moved = await binJournalFolders(this.app, cfg, today());
+            gone = await trashJournalFolders(this.app, cfg);
           } catch (err) {
-            console.error("ChronoAnvil: couldn't move journal folders to the bin", err);
+            console.error("ChronoAnvil: couldn't delete journal folders", err);
             new Notice(
-              `ChronoAnvil: couldn't move ${cfg.name}'s folders — nothing was changed.`
+              `ChronoAnvil: couldn't delete ${cfg.name}'s folders — nothing was changed.`
+            );
+            return;
+          }
+          // PARTIAL IS ITS OWN OUTCOME AND IT STOPS HERE. `trashJournalFolders`
+          // returns the folders that actually went, so a journal whose root was
+          // deleted and whose templates folder was not leaves the registration
+          // in place and says so — the same argument as the order rule above,
+          // one step finer. An unregistered journal with half its folders still
+          // on disk is a state nothing describes.
+          if (gone.length < onDisk.length) {
+            const left = onDisk.filter((p) => !gone.includes(p));
+            new Notice(
+              `ChronoAnvil: couldn't delete ${left.join(", ")} — “${cfg.name}” is still registered.`
             );
             return;
           }
         }
 
         await removeJournal(this.plugin, index, how);
-        if (moved.length) {
+        if (gone.length) {
           new Notice(
-            `ChronoAnvil: deleted “${cfg.name}” — its folders are in ${BIN_FOLDER}/ 🗑️`
+            `ChronoAnvil: deleted “${cfg.name}” and its folders 🗑️`
           );
         }
         this.refresh();

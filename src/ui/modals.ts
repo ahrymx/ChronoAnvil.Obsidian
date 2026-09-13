@@ -639,6 +639,23 @@ export interface ActionChoice {
   // Paints it `mod-cta`. At most one, and it is the answer a reader who is not
   // reading wants — never the wider-reaching of two.
   cta?: boolean;
+  // Paints it `mod-warning` instead, and outranks `cta` where both are set —
+  // `ConfirmModal`'s own arrangement, which picks one class rather than stacking
+  // two. Added in 1.0.13, when this modal's first caller stopped being a move.
+  //
+  // IT IS PER CHOICE AND NOT PER WINDOW because the scope is the question: a
+  // window can honestly offer one answer that removes something and one that
+  // does not, and a flag on the modal would have to paint both the same. Today's
+  // one caller sets it on both of its answers, which is a fact about that caller.
+  //
+  // WHY IT EXISTS AT ALL. 4.50.2 argued that this modal must NOT go red: *"red
+  // says this is gone, and this files something into a folder the reader can
+  // open. Overstating it is how they learn to distrust the confirmations that
+  // mean it."* That argument was right about the modal and was an argument about
+  // the ACT — and in 1.0.13 the act changed. The bin is retired at the reader's
+  // request and *Delete note…* means it. Understating a deletion is the same
+  // fault as overstating a move, one direction over.
+  destructive?: boolean;
 }
 
 class ActionModal extends Modal {
@@ -666,9 +683,13 @@ class ActionModal extends Modal {
     const cancel = btnRow.createEl("button", { text: "Cancel" });
     cancel.addEventListener("click", () => this.close());
     for (const choice of this.choices) {
+      // ONE CLASS, CHOSEN — never `mod-warning mod-cta` together, which is two
+      // statements about the same button. `ConfirmModal` picks the same way, on
+      // the same precedence.
+      const cls = choice.destructive ? "mod-warning" : choice.cta ? "mod-cta" : "";
       const b = btnRow.createEl("button", {
         text: choice.label,
-        ...(choice.cta ? { cls: "mod-cta" } : {}),
+        ...(cls ? { cls } : {}),
       });
       b.addEventListener("click", () => {
         this.picked = choice.value;

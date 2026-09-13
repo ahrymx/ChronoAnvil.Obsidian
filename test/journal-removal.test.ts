@@ -6,156 +6,136 @@
 // LICENSING.md.
 
 import { describe, it, expect } from "vitest";
-import { BIN_FOLDER, binPathFor } from "../src/core/journal-removal";
-import { ROOT_INFRASTRUCTURE } from "../src/core/constants";
-import { readCode } from "./sources";
+import { readCode, readSrc, srcFiles } from "./sources";
 
-// ── the bin (4.17 §3) ─────────────────────────────────────────────────────
+// ── the bin is gone, and the reader retired it (1.0.13) ───────────────────
 //
-// Deleting a journal used to leave its folders exactly where they were and say
-// so, which is the whole reason this release exists: a reader who wanted them
-// gone did it by hand in the file explorer, and doing THAT before deleting the
-// journal is what leaves a registration whose folder is missing.
+// THIS BLOCK USED TO BE TWENTY-ONE ASSERTIONS ABOUT A PATH. `BIN_FOLDER` sat
+// under `00 - Infrastructure`, `binPathFor` named `<journal>-<date>` with a
+// collision suffix that counted from 2 and put itself before the extension, and
+// `binAway` / `binTogether` moved single items and sets through it. All of it was
+// 4.17 §3 and 4.50.1, and all of it went in 1.0.13 because the reader asked for
+// it to: *"I did not know obsidian had these options. This should be the default
+// way for all chronoanvil's deletion processes; so remove the bin folder from
+// 00 - infrastructure."*
+//
+// THE TESTS THAT GO WITH A FUNCTION ARE GONE; THE TESTS THAT WERE ABOUT A RULE
+// ARE NOT. Three rules outlived the bin and are asserted below in their new
+// form, because a rule dropped alongside the code it happened to be written
+// about is a rule nobody will notice re-breaking:
+//
+//   * A FOLDER GOES WHOLE, IN ONE CALL. It was `renameFile` on the folder; it is
+//     `trashItem` on the folder. The reason is unchanged — the notes inside come
+//     with it by construction rather than by a list this code would have to
+//     build and could get wrong.
+//   * BOTH OF A JOURNAL'S FOLDERS, or the next journal of the same name collides
+//     with the templates folder nothing references. That is the bug 4.17 came
+//     from, one folder over, and it has nothing to do with destinations.
+//   * WHAT ACTUALLY WENT, NOT WHAT WAS ASKED FOR, because the operation can fail
+//     per folder.
+//
+// AND `vault.rename` IS STILL WRONG EVERYWHERE. This module no longer moves
+// anything, so its own negative assertion had nowhere to live; `renameFile` vs
+// `vault.rename` is a rule about links, not about bins, and it is pinned across
+// the whole tree below rather than dropped with the function that used to keep it.
 
-describe("where a binned journal's folders go", () => {
-  it("puts the bin under the infrastructure root", () => {
-    // NOT AT THE VAULT ROOT, which would add a top-level folder to every vault
-    // that ever deletes a journal, and NOT under the journals root, which would
-    // leave a folder that journal-typing has to be taught to ignore.
-    // `ROOT_INFRASTRUCTURE` already means "the machinery" as against the
-    // reader's own writing, and a bin is machinery.
-    expect(BIN_FOLDER).toBe(`${ROOT_INFRASTRUCTURE}/Bin`);
-  });
-
-  it("names the folder after the journal and the day", () => {
-    expect(binPathFor("Cooking", "2026-08-10", () => false)).toBe(
-      `${BIN_FOLDER}/Cooking-2026-08-10`
-    );
-  });
-
-  it("suffixes rather than merging when the day is already taken", () => {
-    // THE DATE IS NOT UNIQUE, and this is the case that proves the suffix is
-    // load-bearing rather than decoration: two journals binned on one day would
-    // otherwise land in one folder, interleaving two journals' subjects with
-    // nothing to say which came from which.
-    const taken = new Set([`${BIN_FOLDER}/Cooking-2026-08-10`]);
-    expect(binPathFor("Cooking", "2026-08-10", (p) => taken.has(p))).toBe(
-      `${BIN_FOLDER}/Cooking-2026-08-10-2`
-    );
-  });
-
-  it("counts from 2, because the unsuffixed path is the first one", () => {
-    // The off-by-one this function exists to get right. Starting at 1 would
-    // name the SECOND binning "-1" while the first had no number at all.
-    const taken = new Set([
-      `${BIN_FOLDER}/Cooking-2026-08-10`,
-      `${BIN_FOLDER}/Cooking-2026-08-10-2`,
-      `${BIN_FOLDER}/Cooking-2026-08-10-3`,
-    ]);
-    expect(binPathFor("Cooking", "2026-08-10", (p) => taken.has(p))).toBe(
-      `${BIN_FOLDER}/Cooking-2026-08-10-4`
-    );
-  });
-
-  // ── binning a FILE, added in 4.50.1 ─────────────────────────────────────
-  //
-  // A journal is folders and needed no extension. A title that was never
-  // promoted is a single `.md`, and this function is now what names its
-  // destination too.
-
-  it("keeps a binned note's extension, or Obsidian will not open it", () => {
-    expect(binPathFor("Quadratics", "2026-08-20", () => false, ".md")).toBe(
-      `${BIN_FOLDER}/Quadratics-2026-08-20.md`
-    );
-  });
-
-  it("puts the collision suffix BEFORE the extension", () => {
-    // `Quadratics-2026-08-20.md-2` is not a markdown file. The suffix rule and
-    // the extension rule have to compose, and this is the one way they do.
-    const taken = new Set([`${BIN_FOLDER}/Quadratics-2026-08-20.md`]);
-    expect(
-      binPathFor("Quadratics", "2026-08-20", (p) => taken.has(p), ".md")
-    ).toBe(`${BIN_FOLDER}/Quadratics-2026-08-20-2.md`);
-  });
-
-  it("tests the path it will actually return, extension and all", () => {
-    // The `taken` probe must be asked about the full name. Asking about the
-    // stem would report a folder called `Quadratics-2026-08-20` as a collision
-    // with a FILE of that name plus `.md`, and — worse — would miss a real one.
-    const taken = new Set([`${BIN_FOLDER}/Quadratics-2026-08-20`]);
-    expect(
-      binPathFor("Quadratics", "2026-08-20", (p) => taken.has(p), ".md")
-    ).toBe(`${BIN_FOLDER}/Quadratics-2026-08-20.md`);
-  });
-
-  it("is unchanged for every caller that bins a folder", () => {
-    // `ext` defaults to empty, so 4.17's two callers get byte-for-byte what
-    // they got before — which is what makes this a widening rather than a
-    // change.
-    expect(binPathFor("Cooking", "2026-08-10", () => false)).toBe(
-      `${BIN_FOLDER}/Cooking-2026-08-10`
-    );
-  });
-
-  it("hands a file's own extension to the namer", () => {
-    // `binPathFor` is told the extension; the caller is what decides there is
-    // one. A mutation dropping this left the suite green because every
-    // assertion about extensions was aimed at the namer.
+describe("deleting a journal's folders", () => {
+  it("sends each folder whole, through the one deletion", () => {
+    // A `TAbstractFile`, so the notes inside come along by construction. A loop
+    // over the files would be a list to get wrong, and it is the model 4.50 built
+    // the bin on before 4.50.1 threw it out.
     const src = readCode("journal-removal");
-    expect(src).toContain("const ext = isFile ? `.${item.extension}` : \"\";");
-    // AND A FOLDER GETS NONE. `item.name` on a folder is already the whole
-    // name; appending anything would rename the folder on the way in.
-    expect(src).toContain("const name = isFile ? item.basename : item.name;");
+    expect(src).toContain("if (await trashItem(app, folder)) gone.push(clean);");
+    expect(readCode("trash.ts")).toContain(
+      "export async function trashItem(app: App, item: TAbstractFile)"
+    );
   });
 
-  it("moves a single item through the same mover, never a delete", () => {
-    // 4.50 shipped a *Move to bin* on a title's row that called
-    // `fileManager.trashFile`, which is Obsidian's trash — a second bin behind
-    // the same word, and a DELETE where this module's own header says ChronoAnvil
-    // has never removed a reader's note.
-    const src = readCode("journal-removal");
-    expect(src).toContain("app.fileManager.renameFile(item, target)");
-    expect(src).not.toContain("trashFile");
-  });
-
-  it("bins several files into one folder rather than loose at the top", () => {
-    // A note's pages are *Roots*, *Graphs*, *Examples* — names that mean
-    // something under their parent and nothing beside another note's *Examples*
-    // next week. The folder is what says which note they came out of.
-    const src = readCode("journal-removal");
-    expect(src).toContain("export async function binTogether(");
-    expect(src).toContain("await ensureFolder(app, target)");
-    expect(src).toContain("`${target}/${item.name}`");
-  });
-
-  it("counts what actually moved, because renameFile can fail per file", () => {
-    expect(readCode("journal-removal")).toContain("return { target, moved };");
-  });
-
-  it("moves rather than deletes, through the mover that fixes links", () => {
-    // `fileManager.renameFile`, NOT `vault.rename` — the former updates every
-    // link that pointed into the folder, which is the difference between a
-    // binned journal whose notes still resolve and a vault full of dead links.
-    // A source assertion because the move needs a vault, which this suite has
-    // no stub for; what it pins is the choice, which is the part that has been
-    // got wrong elsewhere before.
-    const src = readCode("journal-removal");
-    expect(src).toContain("app.fileManager.renameFile(folder, target)");
-    expect(src).not.toContain("vault.rename(");
-    // AND NOTHING DELETES. ChronoAnvil has never removed a reader's note and the
-    // bin is not where that starts — if either of these ever appears in this
-    // module, a "bin" has become a shredder.
-    expect(src).not.toContain("vault.delete(");
-    expect(src).not.toContain("vault.trash(");
-  });
-
-  it("bins both of a journal's folders, not just its notes", () => {
+  it("deletes both of a journal's folders, not just its notes", () => {
     // Leaving the templates behind would leave a folder nothing references —
     // and one the NEXT journal of the same name collides with, which is the bug
-    // one folder over from the one this release came from.
+    // one folder over from the one 4.17 came from. Unchanged by the destination.
     expect(readCode("journal-removal")).toContain(
       "for (const path of [cfg.root, cfg.templatesFolder])"
     );
+  });
+
+  it("returns what went rather than a boolean", () => {
+    // A delete can fail on one folder and succeed on the other — a sync holding
+    // a note open, a read-only path — and the caller's notice has to be able to
+    // say which. A flat "deleted" over a journal half of which is still on disk
+    // is the kind of report that costs an hour.
+    const src = readCode("journal-removal");
+    expect(src).toContain("Promise<string[]>");
+    expect(src).toContain("return gone;");
+  });
+
+  it("takes no date, because there is no folder to name", () => {
+    // The date existed to name `<journal>-<date>` inside the bin. A deletion has
+    // nowhere to write one, and a parameter kept for symmetry is a parameter the
+    // next caller will try to mean something by.
+    const src = readCode("journal-removal");
+    expect(src).toContain(
+      "export async function trashJournalFolders(\n  app: App,\n  cfg: JournalConfig\n)"
+    );
+    expect(src).not.toContain("today()");
+  });
+
+  it("keeps no bin of its own", () => {
+    // Not merely unused — ABSENT. A constant still naming
+    // `00 - Infrastructure/Bin` would be read by the next reader as the
+    // destination, and a `binPathFor` still exported would be called.
+    const src = readCode("journal-removal");
+    for (const gone of ["BIN_FOLDER", "binPathFor", "binAway", "binTogether"]) {
+      expect(src, gone).not.toContain(gone);
+    }
+  });
+
+  it("supersedes the invariant rather than deleting it", () => {
+    // *A MOVE, NEVER A DELETE. ChronoAnvil has never removed a reader's note and
+    // this is not where that starts.* That paragraph was the whole design, and a
+    // reader who finds it simply gone will re-derive the bin from first
+    // principles — it is a good idea, and it was ours twice. So the module has to
+    // carry why it existed, who retired it, and what the reversal costs.
+    // `readSrc`, NOT `readCode` — the latter strips comment lines, and the
+    // superseded argument IS a comment. This is the one assertion in this file
+    // whose subject is the prose rather than the code.
+    const src = readSrc("journal-removal");
+    expect(src).toContain("A MOVE, NEVER A DELETE");
+    expect(src).toContain("remove the bin folder from 00 - infrastructure");
+    // THE COST, NAMED. `binAway` used `fileManager.renameFile`, so links followed
+    // a binned note. A delete cannot, and that is the one genuine loss in the
+    // reversal rather than a wording change.
+    expect(src).toContain("says the links will break");
+    // AND THE SURFACE THAT SAYS IT ACTUALLY SAYS IT. A header promising a
+    // sentence nothing prints is the shape this whole patch is about.
+    expect(readCode("kind-row-menu.ts")).toContain(
+      "Links from your other notes to ${them} will break."
+    );
+  });
+});
+
+describe("a move is always the mover that fixes links", () => {
+  it("is never vault.rename, anywhere in the tree", () => {
+    // `fileManager.renameFile` updates every link that pointed at what moved;
+    // `vault.rename` does not. That is the difference between a moved note that
+    // still resolves from the rest of the vault and a page of broken links, and
+    // `journal.ts` and `header-title.ts` both argue it at length.
+    //
+    // IT LIVED HERE BECAUSE THIS MODULE USED TO MOVE THINGS. It no longer does,
+    // and a rule dropped with the function it was written about is a rule nobody
+    // notices re-breaking — so it is swept over the whole of `src/` instead,
+    // which is where it was always true.
+    const offenders = srcFiles()
+      .filter((f) => f.code.includes("vault.rename("))
+      .map((f) => f.path);
+    expect(offenders).toEqual([]);
+  });
+
+  it("and this module deletes rather than moving at all now", () => {
+    const src = readCode("journal-removal");
+    expect(src).not.toContain("renameFile(");
+    expect(src).toContain("trashItem(");
   });
 });
 
@@ -197,7 +177,7 @@ describe("taking a journal out of settings", () => {
     // sit exactly where they were, which is the stale shape this whole release
     // is about.
     const src = readCode("settings");
-    const moved = src.indexOf("moved = await binJournalFolders(");
+    const moved = src.indexOf("gone = await trashJournalFolders(");
     const removed = src.indexOf("await removeJournal(this.plugin, index, how)");
     expect(moved).toBeGreaterThan(0);
     expect(removed).toBeGreaterThan(0);

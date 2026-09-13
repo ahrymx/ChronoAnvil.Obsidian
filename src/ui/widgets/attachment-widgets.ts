@@ -43,6 +43,7 @@ import { isValidNoteKey, readNoteRegion } from "../../core/notestore";
 import { panDuringDrag } from "../drag-scroll";
 import { slugify } from "../../core/util";
 import { confirmAction, promptText } from "../modals";
+import { trashClause, trashDestination, trashItem } from "../../core/trash";
 import {
   Attachment,
   applyTokens,
@@ -436,41 +437,46 @@ export async function deleteAttachmentFile(
     return true;
   }
   if (deps.plugin.settings.attachments.confirmDelete) {
+    // THE DESTINATION IS NAMED NOW (1.0.13). This said "will be moved to the
+    // trash", which is true of two of the three things the vault's *Deleted
+    // files* setting can mean and false of the third. `trashClause` is the one
+    // place that sentence lives, and it is the whole of what the retired bin
+    // folder was for — see `core/trash.ts`.
     const ok = await confirmAction(
       deps.app,
       "Delete attachment?",
-      `${file.path} will be moved to the trash and its link removed from this note. Other notes linking to it will break.`,
+      `${file.path} ${trashClause(trashDestination(deps.app))}, and its link is removed from this note. Other notes linking to it will break.`,
       "Delete file",
       true
     );
     if (!ok) return false;
   }
-  // ── PRIVATE AGAIN AS OF 4.50.1, AND THE ROUND TRIP IS WORTH RECORDING ──
+  // ── SHARED AGAIN AS OF 1.0.13, AND BOTH ROUND TRIPS ARE THE RECORD ──
   //
-  // 4.50 lifted this probe into `util.ts` because a title row's *Move to bin*
-  // had become a second caller. It should never have been one: a journal note
-  // goes to `00 - Infrastructure/Bin/` by a rename, which is ChronoAnvil's own bin
-  // and the thing `journal-removal.ts` had already decided. With that caller
-  // gone this is a shared helper with one user, which is `recordList`'s round
-  // trip in 4.13.3 for the same reason — **a component is worth sharing when two
+  // This call has been private, then shared in `util.ts`, then private again,
+  // and is now shared in `core/trash.ts`. The history is worth keeping because
+  // each move had a reason and only one of them was wrong.
+  //
+  // 4.50 lifted it into `util.ts` for a title row's *Move to bin*, and that
+  // caller should never have existed: a journal note went to
+  // `00 - Infrastructure/Bin/` by a rename, which `journal-removal.ts` had
+  // already decided. 4.50.1 took the caller away and the helper with it, on
+  // `recordList`'s 4.13.3 rule — **a component is worth sharing when two
   // surfaces do the same thing, and these two never did.**
   //
-  // AN ATTACHMENT IS THE CASE WHERE OBSIDIAN'S TRASH IS RIGHT. It is a binary
-  // the reader added to a note rather than a note they wrote, the vault's
-  // *Deleted files* setting is the answer they already gave for files like it,
-  // and the confirmation above says "moved to the trash" in those words.
+  // THEY DO NOW, AND THAT IS THE READER'S OWN DOING: *"This should be the
+  // default way for all chronoanvil's deletion processes."* There is one
+  // deletion in this plugin, every surface reaches it, and the argument for
+  // where it lives is at the top of `core/trash.ts`. The 4.13.3 rule is
+  // satisfied rather than bent.
   //
-  // `fileManager.trashFile` IS THE ONE THAT ASKS THAT SETTING — system trash,
-  // `.trash/`, or permanent — and it is only on newer API versions, so it is
-  // probed with `vault.trash(file, true)` behind it.
-  try {
-    const fm = deps.app.fileManager as unknown as {
-      trashFile?: (f: TFile) => Promise<void>;
-    };
-    if (typeof fm.trashFile === "function") await fm.trashFile(file);
-    else await deps.app.vault.trash(file, true);
-  } catch (e) {
-    console.error("[ChronoAnvil] could not trash attachment", e);
+  // AND THE PROBE ITSELF IS GONE. `fileManager.trashFile` is public and
+  // `@since 1.6.6`; `manifest.json` asks for 1.7.0. The
+  // `typeof fm.trashFile === "function"` guard and its `vault.trash(file, true)`
+  // fallback were protecting against a version Obsidian will not run this on —
+  // and the fallback forced the system trash, so it silently disagreed with the
+  // sentence the confirm above now prints.
+  if (!(await trashItem(deps.app, file))) {
     new Notice(`Couldn't delete ${file.path}.`);
     return false;
   }

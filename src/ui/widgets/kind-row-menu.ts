@@ -39,8 +39,13 @@ import { Menu, TAbstractFile, TFile } from "obsidian";
 import type ChronoAnvilPlugin from "../../main";
 import { overflowButton } from "../section-frame";
 import { promptAction } from "../modals";
-import { childFiles, frontmatterOf, getFile, plural, today } from "../../core/util";
-import { BIN_FOLDER, binAway, binTogether } from "../../core/journal-removal";
+import { childFiles, frontmatterOf, getFile, plural } from "../../core/util";
+import {
+  trashClause,
+  trashDestination,
+  trashItem,
+  trashSeveral,
+} from "../../core/trash";
 import { notify } from "../../core/notify";
 import type { JournalKind, JournalType } from "../../journals/journal";
 import {
@@ -94,7 +99,7 @@ export function attachKindRowMenu(
       return;
     }
     if (kind.pages) addPageLayoutRows(menu, table, live, path);
-    addBinRows(menu, table, path);
+    addDeleteRows(menu, table, path);
   });
   // NAMED AFTER THE ROW IT ACTS ON, which is 4.48's rule for the same reason:
   // `overflowButton` writes "More", and a table of ten of them would read out
@@ -148,43 +153,59 @@ async function setLayout(
   await plugin.journals.setPageLayout(file, layoutId);
 }
 
-// ── The bin ──────────────────────────────────────────────────────────────
+// ── Deleting it ──────────────────────────────────────────────────────────
 //
-// CHRONOANVIL'S BIN, NOT OBSIDIAN'S (4.50.1). 4.50 shipped this through
-// `fileManager.trashFile` and was reported from a vault within the day —
-// *"vault's trash doesn't seem to exist"*. The symptom is that Obsidian's
-// *Deleted files* setting can be set to permanent, or to a `.trash` folder the
-// file explorer does not show. The FAULT is that this plugin had already
-// decided where a bin goes and why, in `journal-removal.ts`, and had written
-// down the invariant the trash call broke:
+// ── THE BIN IS GONE, AND THE READER RETIRED IT (1.0.13) ──────────────────
 //
-//   *A MOVE, NEVER A DELETE. ChronoAnvil has never removed a reader's note and this
-//   is not where that starts.*
+// This row read *Move to bin* and moved the note to `00 - Infrastructure/Bin/`
+// by a rename, which is 4.50.1's answer to 4.50 sending it to Obsidian's trash
+// and being reported from a vault inside the day. The reader has now reversed
+// that: *"This should be the default way for all chronoanvil's deletion
+// processes; so remove the bin folder from 00 - infrastructure."* `trash.ts`
+// holds the whole argument and the sentence that makes the destination knowable,
+// which is the job the bin folder was doing.
 //
-// `00 - Infrastructure/Bin/` is an ordinary folder. The reader can open it, look
-// at what is in it, drag a note back out, and empty it when they mean to.
+// THE DETAIL SENTENCE IS NOT COSMETIC AND IT IS WHERE THE CARE GOES. Two things
+// it must no longer say and one it must now say:
 //
-// ── ONE ROW, TWO ANSWERS (4.50.2) ────────────────────────────────────────
+//   * NOT "Nothing is deleted". It was true of a rename and it is a lie about a
+//     delete, and it is the single most dangerous sentence this plugin could
+//     keep from the old design.
+//   * NOT a folder path. `00 - Infrastructure/Bin/` told the reader where to go
+//     and look; `trashClause` tells them the same thing about a destination they
+//     chose themselves, and names the setting when that destination is permanent.
+//   * THE LINKS WILL BREAK, which is the one real loss in the reversal.
+//     `binAway` went through `fileManager.renameFile`, so every link pointing at
+//     a binned note followed it. A delete cannot, and `attachment-widgets.ts`
+//     already says so in these words — *"Other notes linking to it will break"* —
+//     so the wording is the house's rather than this file's.
+//
+// ── ONE ROW, TWO ANSWERS (4.50.2), UNCHANGED ─────────────────────────────
 //
 // 4.50.1 drew *Move to bin* and *Move pages to bin* as two menu rows, and they
 // are not two things — they are one action at two scopes. **The scope belongs in
 // the dialogue, beside the sentence describing what it takes**, because a reader
-// choosing between two menu rows is choosing before reading either
-// consequence. Same move 4.48 made putting a control on the thing it changes.
+// choosing between two menu rows is choosing before reading either consequence.
+// Same move 4.48 made putting a control on the thing it changes.
 //
-// AND THE SECOND ANSWER IS ABSENT WHERE IT WOULD BE A NO-OP: a title with no
+// That decision was about SCOPE and survives the change of destination whole.
+// The second answer is still absent where it would be a no-op: a title with no
 // pages gets an ordinary two-button confirm, which is what it always was.
 
-function addBinRows(menu: Menu, table: KindRowContext, path: string): void {
+function addDeleteRows(menu: Menu, table: KindRowContext, path: string): void {
   menu.addItem((item) =>
     item
-      .setTitle("Move to bin")
+      // AN ELLIPSIS, BECAUSE IT OPENS A DIALOGUE — the convention every other
+      // menu row in this plugin keeps, down to `attachment-widgets.ts`' own
+      // *Remove and delete file…*. *Move to bin* had none, and it was the one
+      // row here that acted on a reader's note.
+      .setTitle("Delete note…")
       .setIcon("trash-2")
-      .onClick(() => void bin(table, path))
+      .onClick(() => void remove(table, path))
   );
 }
 
-async function bin(table: KindRowContext, path: string): Promise<void> {
+async function remove(table: KindRowContext, path: string): Promise<void> {
   const { plugin, kind } = table;
   const file = getFile(plugin.app, path);
   if (!file) {
@@ -200,53 +221,61 @@ async function bin(table: KindRowContext, path: string): Promise<void> {
   const many = plural(pageLabel).toLowerCase();
   const promoted = isPromotedPath(file.path);
 
-  // A PROMOTED TITLE BINS AS ITS FOLDER. `Quadratics/Quadratics.md` and its
-  // pages move in ONE rename, so the pages come along by construction rather
-  // than by a list that could be wrong — and what comes back out is the note
-  // and its pages arranged the way they were.
+  // A PROMOTED TITLE GOES AS ITS FOLDER. `Quadratics/Quadratics.md` and its pages
+  // go in ONE call, so the pages come along by construction rather than by a list
+  // that could be wrong. `trashItem` takes a `TAbstractFile` for exactly this.
   const whole: TAbstractFile = promoted ? (file.parent ?? file) : file;
 
-  const detail = `${
-    pages.length
-      ? `${file.basename} and its ${pages.length} ${many} will be moved`
-      : `${file.basename} will be moved`
-  } to ${BIN_FOLDER}/. Nothing is deleted — links from your other notes are updated to follow, and you can drag it back out or empty the bin yourself.`;
+  // ASKED BEFORE THE QUESTION IS WRITTEN, not after the answer. The destination
+  // is what the reader is agreeing to, so it has to be in the sentence they read.
+  const where = trashClause(trashDestination(plugin.app));
+  const subject = pages.length
+    ? `${file.basename} and its ${pages.length} ${many}`
+    : file.basename;
+  const them = pages.length ? "them" : "it";
+  const detail = `${subject} ${where}. Links from your other notes to ${them} will break.`;
 
   const choice = await promptAction(
     plugin.app,
-    `Move ${file.basename} to the bin?`,
+    `Delete ${file.basename}?`,
     detail,
     [
-      // THE CTA IS THE WHOLE MOVE, because it is what the row's own control
+      // THE CTA IS THE WHOLE DELETION, because it is what the row's own control
       // says, and a reader who presses the highlighted button without reading
       // should get the thing they asked for rather than a narrower half of it.
-      { value: "all", label: pages.length ? `Note and ${many}` : "Move to bin", cta: true },
-      ...(pages.length ? [{ value: "pages", label: `${plural(pageLabel)} only` }] : []),
+      // BOTH ANSWERS GO RED. 4.50.2 argued this window must not — *"red says
+      // this is gone, and this files something into a folder the reader can
+      // open"* — and that was an argument about the act rather than about the
+      // modal. The act is now a deletion, so the red is the honest half of the
+      // same rule.
+      { value: "all", label: pages.length ? `Note and ${many}` : "Delete", cta: true, destructive: true },
+      ...(pages.length ? [{ value: "pages", label: `${plural(pageLabel)} only`, destructive: true }] : []),
     ]
   );
-  if (choice === "all") await binWhole(plugin, whole);
-  else if (choice === "pages") await binPages(plugin, file, pages, many);
+  if (choice === "all") await removeWhole(plugin, whole);
+  else if (choice === "pages") await removePages(plugin, file, pages, many);
 }
 
-async function binWhole(
+async function removeWhole(
   plugin: ChronoAnvilPlugin,
   item: TAbstractFile
 ): Promise<void> {
-  const target = await binAway(plugin.app, item, today());
-  if (!target) {
-    notify.fail(`ChronoAnvil could not move ${item.name} to ${BIN_FOLDER}/.`);
+  if (!(await trashItem(plugin.app, item))) {
+    notify.fail(`ChronoAnvil could not delete ${item.name}.`);
     return;
   }
-  notify.ok(`Moved to ${target}`);
+  notify.ok(`Deleted ${item.name}`);
 }
 
-// The pages, into one folder of their own.
+// The pages, one at a time.
 //
-// A FOLDER RATHER THAN LOOSE FILES. *Roots*, *Graphs*, *Examples* mean something
-// under their parent and nothing at the top of a bin, where next week they sit
-// beside another note's *Examples*. The folder is what says which note they came
-// out of — see `binTogether`, which owns that rule.
-async function binPages(
+// NO FOLDER TO PUT THEM IN ANY MORE, and that is the shape of the change rather
+// than a loss. `binTogether` gathered them into a folder of their own because
+// *Roots*, *Graphs*, *Examples* mean something under their parent and nothing at
+// the top of a bin, where next week they sit beside another note's *Examples*.
+// A trash is not somewhere the reader browses by name — it is somewhere they
+// undo from — so the naming problem the folder solved does not arise.
+async function removePages(
   plugin: ChronoAnvilPlugin,
   host: TFile,
   pages: readonly string[],
@@ -259,25 +288,21 @@ async function binPages(
     .map((p) => getFile(plugin.app, p))
     .filter((f): f is TFile => f != null);
   if (files.length === 0) {
-    notify.info(`${host.basename} has no ${many} left to move.`);
+    notify.info(`${host.basename} has no ${many} left to delete.`);
     return;
   }
 
-  const { target, moved } = await binTogether(
-    plugin.app,
-    files,
-    `${host.basename} ${many}`,
-    today()
-  );
-  // REPORTS WHAT MOVED, NOT WHAT WAS ASKED FOR. `renameFile` can fail per file —
-  // a read-only path, a sync holding one open — and a flat "moved" over a folder
-  // half of which is still there is the kind of report that costs an hour.
-  const missed = files.length - moved;
-  if (missed > 0) {
+  const { deleted, failed } = await trashSeveral(plugin.app, files);
+  // REPORTS WHAT WENT, NOT WHAT WAS ASKED FOR, and NAMES what did not. A delete
+  // can fail per file — a read-only path, a sync holding one open — and a flat
+  // "deleted" over a set half of which is still there is the kind of report that
+  // costs an hour. The paths are in the notice because the next thing a reader
+  // does with them is go and look.
+  if (failed.length > 0) {
     notify.fail(
-      `ChronoAnvil moved ${moved} of ${files.length} ${many} to ${target}/ — ${missed} could not be moved.`
+      `ChronoAnvil deleted ${deleted} of ${files.length} ${many} — these could not be deleted: ${failed.join(", ")}`
     );
     return;
   }
-  notify.ok(`Moved ${moved} ${many} to ${target}/`);
+  notify.ok(`Deleted ${deleted} ${many}`);
 }

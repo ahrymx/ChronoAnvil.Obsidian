@@ -29,7 +29,7 @@ import {
   pagePathsOf,
 } from "../src/journals/page-default";
 import type { JournalConfig, JournalVariantConfig } from "../src/journals/custom-journal";
-import { readCode, readCss, readSrc } from "./sources";
+import { readCode, readCss, readSrc, srcFiles } from "./sources";
 
 // A config with only what these questions read. Cast at the boundary rather
 // than built in full: `JournalConfig` carries two dozen fields, none of which
@@ -392,16 +392,30 @@ describe("the control on a title's row", () => {
     expect(src()).toContain("setChecked(row.id === shown)");
   });
 
-  it("is ONE bin row, with the scope asked in the dialogue", () => {
+  it("is ONE delete row, with the scope asked in the dialogue", () => {
     // 4.50.1 drew two menu rows whose difference is a scope, under a menu whose
     // other rows are a single list. They are one action at two scopes, and the
     // scope belongs beside the sentence describing what it takes — a reader
     // choosing between two menu rows is choosing before reading either
     // consequence.
+    //
+    // THAT DECISION WAS ABOUT SCOPE AND SURVIVES 1.0.13 WHOLE. What changed is
+    // the destination, not the shape of the question, so this assertion is the
+    // same assertion with the row's new name in it.
     const text = src();
-    expect(text.match(/setTitle\("Move to bin"\)/g) ?? []).toHaveLength(1);
+    expect(text.match(/setTitle\("Delete note…"\)/g) ?? []).toHaveLength(1);
     expect(text).not.toContain("Move pages to bin");
+    // AND THE BIN'S WORDING IS GONE FROM THE ROW, not merely unused: a menu that
+    // still says "bin" over a call that deletes is the 4.50 report again.
+    expect(text).not.toContain("Move to bin");
     expect(text).toContain("promptAction(");
+  });
+
+  it("ends the row in an ellipsis, because it opens a dialogue", () => {
+    // The convention every other menu row in this plugin keeps, down to
+    // `attachment-widgets.ts`' own *Remove and delete file…*. *Move to bin* had
+    // none, and it was the one row here that acted on a reader's note.
+    expect(src()).toContain('setTitle("Delete note…")');
   });
 
   it("offers the pages-only answer only where there are pages", () => {
@@ -430,14 +444,31 @@ describe("the control on a title's row", () => {
     expect(text.slice(at, at + 160)).toContain("cta: true");
   });
 
-  it("does NOT dress a move as a deletion", () => {
-    // `promptAction` has no `destructive` flag at all, and that is deliberate:
-    // red says *this is gone*, and this files something into a folder the
-    // reader can open. Overstating it is how they learn to distrust the
-    // confirmations that mean it.
-    expect(readCode("modals.ts")).toContain("export function promptAction(");
-    const at = readCode("modals.ts").indexOf("class ActionModal extends Modal");
-    expect(readCode("modals.ts").slice(at, at + 1800)).not.toContain("mod-warning");
+  it("dresses a deletion AS one, both answers (1.0.13)", () => {
+    // 4.50.1 asserted the opposite, and its argument is worth keeping because it
+    // is still right about what it was arguing: *"red says this is gone, and this
+    // files something into a folder the reader can open. Overstating it is how
+    // they learn to distrust the confirmations that mean it."*
+    //
+    // THAT WAS AN ARGUMENT ABOUT THE ACT, NOT ABOUT THE MODAL, and the act
+    // changed — the bin is retired at the reader's own request and *Delete
+    // note…* means it. Understating a deletion is the same fault one direction
+    // over, so `ActionChoice` grew a `destructive` and both scopes set it.
+    const text = src();
+    expect(text.match(/destructive: true/g) ?? []).toHaveLength(2);
+    const modals = readCode("modals.ts");
+    expect(modals).toContain("destructive?: boolean;");
+  });
+
+  it("paints one class rather than stacking two", () => {
+    // `mod-warning mod-cta` on one button is two statements about it.
+    // `ConfirmModal` picks one on the same precedence, and this modal now does
+    // too — which is what makes the whole-deletion answer red rather than blue
+    // while still being the one a reader who is not reading presses.
+    const modals = readCode("modals.ts");
+    expect(modals).toContain(
+      'const cls = choice.destructive ? "mod-warning" : choice.cta ? "mod-cta" : "";'
+    );
   });
 
   it("dismissing the window is not an answer", () => {
@@ -460,10 +491,15 @@ describe("the control on a title's row", () => {
     );
   });
 
-  it("reports what moved rather than what was asked for", () => {
-    // `renameFile` can fail per file, and a flat "moved" over a folder half of
-    // which is still there costs a reader an hour.
-    expect(src()).toContain("const missed = files.length - moved");
+  it("reports what went rather than what was asked for, and names it", () => {
+    // A delete can fail per file, and a flat "deleted" over a set half of which
+    // is still there costs a reader an hour. 4.50.1 counted the misses;
+    // `trashSeveral` returns their PATHS, because the next thing a reader does
+    // with a note that would not delete is go and look at it.
+    const text = src();
+    expect(text).toContain("const { deleted, failed } = await trashSeveral(");
+    expect(text).toContain("if (failed.length > 0) {");
+    expect(text).toContain("${failed.join(\", \")}");
   });
 
   it("resolves the pages at the click rather than when the menu opened", () => {
@@ -480,57 +516,98 @@ describe("the control on a title's row", () => {
   });
 });
 
-// ── the bin, which the plugin already had (4.50.1) ────────────────────────
+// ── the bin is retired, and the reader retired it (1.0.13) ────────────────
 //
 // 4.50 sent a title's row to OBSIDIAN's trash through `fileManager.trashFile`,
 // and it was reported from a vault within the day: *"vault's trash doesn't seem
-// to exist."* The symptom is that the *Deleted files* setting can be permanent,
-// or a `.trash` folder the explorer does not show. The fault is that
-// `journal-removal.ts` had already decided where a bin goes and had written down
-// the invariant the trash call broke — **ChronoAnvil has never removed a reader's
-// note and this is not where that starts.**
+// to exist."* 4.50.1 read that as a design fault — the *Deleted files* setting
+// can be permanent, or a `.trash` folder the explorer does not show — and built
+// ChronoAnvil a bin of its own at `00 - Infrastructure/Bin/`, under an invariant:
+// **ChronoAnvil has never removed a reader's note and this is not where that
+// starts.**
+//
+// The reader has now reversed that, knowing what the setting is: *"I did not know
+// obsidian had these options. This should be the default way for all
+// chronoanvil's deletion processes; so remove the bin folder from
+// 00 - infrastructure."*
+//
+// SO THE DIAGNOSIS SURVIVES AND THE TREATMENT CHANGES, and this block is the
+// 4.50.1 block inverted rather than deleted — every assertion it made has a
+// counterpart here, because the thing that has to stay true is not *where the
+// note goes* but *that the reader was told where it goes before they agreed*.
+// The bin made the destination knowable by being a folder; `trashClause` makes it
+// knowable by being a sentence, and the sentence is what 4.50 was missing.
 
-describe("a journal note goes to ChronoAnvil's own bin", () => {
+describe("a journal note goes where the reader's vault says deleted files go", () => {
   const src = () => readCode("kind-row-menu.ts");
 
-  it("never reaches Obsidian's trash", () => {
-    expect(src()).not.toContain("trashFile");
-    expect(src()).not.toContain("vault.trash(");
+  it("goes through the one deletion this plugin has", () => {
+    // Not a second probe and not a second wording. `core/trash.ts` owns the call,
+    // the destination read and the sentence, and none of the three is restated
+    // here — which is the 4.50 fault stated positively: that release had an
+    // answer in the tree and the new surface did not use it.
+    expect(src()).toContain("trashItem(");
+    expect(src()).toContain("trashSeveral(");
+    expect(src()).toContain("trashClause(trashDestination(plugin.app))");
   });
 
-  it("moves through the module that already owns the bin", () => {
-    // Not a second constant and not a second path rule. `BIN_FOLDER`,
-    // `binPathFor`'s collision suffix and the `renameFile` that keeps links
-    // resolving are all 4.17's, and none of them is restated here.
-    expect(src()).toContain("binAway(");
-    expect(src()).toContain("binTogether(");
-    expect(src()).toContain("BIN_FOLDER");
+  it("keeps no trace of the bin", () => {
+    // A menu that still says "bin" over a call that deletes is the 4.50 report
+    // again, one word further on. Nothing here may name the folder or the
+    // module's retired helpers.
+    const text = src();
+    expect(text).not.toContain("BIN_FOLDER");
+    expect(text).not.toContain("binAway(");
+    expect(text).not.toContain("binTogether(");
   });
 
   it("names the destination in the question", () => {
-    // A bin the reader cannot find is the report this patch came from.
-    expect(src()).toContain("to ${BIN_FOLDER}/.");
+    // THE WHOLE OF THE PATCH IS IN THIS ASSERTION. The reader did not know the
+    // setting existed; a confirm that names it is the bin's job, discharged as
+    // prose. A destination nobody states is the 4.50 report.
+    expect(src()).toContain("const where = trashClause(trashDestination(plugin.app));");
+    expect(src()).toContain("const detail = `${subject} ${where}.");
   });
 
-  it("says nothing is deleted, in those words", () => {
-    // `journal-removal.ts`: *a move, never a delete, and the wording everywhere
-    // this surfaces says so.*
-    expect(src()).toContain("Nothing is deleted");
+  it("no longer says nothing is deleted, because something is", () => {
+    // 4.50.1 asserted this phrase was PRESENT, in `journal-removal.ts`' words:
+    // *a move, never a delete, and the wording everywhere this surfaces says so.*
+    // It was true of a rename and it is a lie about a delete — the single most
+    // dangerous sentence the old design could have left behind.
+    expect(src()).not.toContain("Nothing is deleted");
   });
 
-  it("bins a promoted title as its folder, so its pages come with it", () => {
-    // ONE rename rather than a list of files. The pages are carried by the
-    // structure rather than by an array that could be wrong, and what comes
-    // back out is the note and its pages arranged the way they were.
+  it("says the links will break, which is the one real loss", () => {
+    // `binAway` went through `fileManager.renameFile`, so every link pointing at
+    // a binned note followed it and still resolved. A delete cannot, and no
+    // wording makes that untrue — so the wording says it, in
+    // `attachment-widgets.ts`' own words rather than in a second spelling.
+    expect(src()).toContain("will break.");
+    expect(readCode("attachment-widgets.ts")).toContain(
+      "Other notes linking to it will break."
+    );
+  });
+
+  it("deletes a promoted title as its folder, so its pages go with it", () => {
+    // ONE call rather than a list of files. The pages are carried by the
+    // structure rather than by an array that could be wrong — the rule `binAway`
+    // kept, and `trashItem` takes a `TAbstractFile` so that it still can.
     expect(src()).toContain("isPromotedPath(file.path)");
     expect(src()).toContain("? (file.parent ?? file)");
+    expect(readCode("trash.ts")).toContain(
+      "export async function trashItem(app: App, item: TAbstractFile)"
+    );
   });
 
-  it("bins loose pages together, into a folder named after their note", () => {
-    // *Roots*, *Graphs*, *Examples* mean something under their parent and
-    // nothing at the top of a bin, where next week they sit beside another
-    // note's *Examples*.
-    expect(src()).toContain("`${host.basename} ${many}`");
+  it("needs no folder to gather loose pages into any more", () => {
+    // 4.50.1 put them in a folder of their own because *Roots*, *Graphs*,
+    // *Examples* mean something under their parent and nothing at the top of a
+    // bin, beside another note's *Examples* next week. A trash is not somewhere
+    // the reader browses by name — it is somewhere they undo from — so the
+    // naming problem the folder solved does not arise, and the folder would be a
+    // thing created in order to be deleted.
+    expect(src()).not.toContain("`${host.basename} ${many}`");
+    expect(src()).not.toContain("ensureFolder(");
   });
 });
 
@@ -608,14 +685,14 @@ describe("a menu row identifies its note by path, never by TFile", () => {
     // CALL SITE, because a helper that is defined and not called is exactly the
     // mutation this is here to catch.
     expect(src()).toContain("void setLayout(plugin, path, row.id)");
-    expect(src()).toContain("void bin(table, path)");
+    expect(src()).toContain("void remove(table, path)");
   });
 
   it("refuses rather than acting on whatever the handle now points at", () => {
     // THE BUG, stated as a rule: a stale row that ACTS is worse than a stale row
     // that says it is stale. Each resolve is immediately followed by its
     // refusal, so a mutation that keeps the lookup and drops the guard is red.
-    for (const fn of ["async function setLayout(", "async function bin("]) {
+    for (const fn of ["async function setLayout(", "async function remove("]) {
       const at = src().indexOf(fn);
       expect(at, fn).toBeGreaterThan(0);
       const body = src().slice(at, at + 320);
@@ -628,26 +705,62 @@ describe("a menu row identifies its note by path, never by TFile", () => {
     expect(src()).toContain("This note has moved — the list is out of date");
   });
 
-  it("passes no TFile into the bin at all", () => {
+  it("passes no TFile into the deletion at all", () => {
     // The signature is what keeps the rule: a function that cannot be handed a
     // stale object cannot act on one.
     expect(src()).toContain(
-      "function addBinRows(menu: Menu, table: KindRowContext, path: string): void"
+      "function addDeleteRows(menu: Menu, table: KindRowContext, path: string): void"
     );
   });
 });
 
-describe("Obsidian's trash keeps its one honest caller", () => {
-  it("is the attachment, and the probe is private to it again", () => {
-    // PRIVATE AGAIN, and the round trip is the point — 4.50 lifted the probe
-    // into `util.ts` for a second caller that should never have been one. An
-    // attachment is a binary the reader added to a note rather than a note they
-    // wrote, so the vault's *Deleted files* setting is the answer they already
-    // gave for files like it.
-    expect(readCode("attachment-widgets.ts")).toContain(
-      "typeof fm.trashFile === \"function\""
-    );
+describe("one deletion, in one module", () => {
+  // THE TEST THIS REPLACES HAD ITS PREMISE RETIRED. It asserted that Obsidian's
+  // trash had exactly one honest caller — the attachment — and that the probe was
+  // private to it, after 4.50 had shared it in `util.ts` for a caller that should
+  // never have existed. The reader has now made every deletion this one, so the
+  // rule is no longer "one caller" but "one implementation", which is strictly
+  // stronger: it is what stops the next surface re-rolling the call.
+
+  it("has exactly one module that calls Obsidian's trash", () => {
+    const homes = srcFiles()
+      // THE CALL, NOT THE WORD. This module's own comments name
+      // `typeof fm.trashFile` to record the probe that was dropped, and a sweep
+      // that could not tell a history from a call would force the history out of
+      // the tree — which is the opposite of what these comments are for.
+      .filter((f) => f.code.includes("trashFile("))
+      .map((f) => f.path);
+    expect(homes).toEqual(["src/core/trash.ts"]);
+  });
+
+  it("is not in `util.ts`, which everything imports", () => {
+    // 4.50 put it there and 4.50.1 took it out, and that reason outlived the
+    // bin: the one call in this plugin that can lose a reader's writing should
+    // not sit in the module nothing can avoid importing. A named module says at
+    // the import line what the file is about to do.
     expect(readCode("util.ts")).not.toContain("trashFile");
+  });
+
+  it("needs no probe, because the API it calls is public", () => {
+    // `fileManager.trashFile` is `@since 1.6.6` and `manifest.json` asks for
+    // 1.7.0, so the `typeof fm.trashFile === "function"` guard was protecting
+    // against a version Obsidian will not run this on. Dropping it is not only
+    // tidiness: the `vault.trash(file, true)` behind it FORCED the system trash
+    // and asked the setting nothing, so it silently disagreed with the sentence
+    // `trashClause` now prints.
+    const text = readCode("trash.ts");
+    expect(text).toContain("await app.fileManager.trashFile(item);");
+    expect(text).not.toContain("typeof fm.trashFile");
+    expect(text).not.toContain("vault.trash(");
+  });
+
+  it("is what all three deleting surfaces reach", () => {
+    // The attachment, a title's row, and a journal's folders. Three surfaces,
+    // one call — which is the first time `recordList`'s 4.13.3 bar has actually
+    // been met here rather than bent.
+    for (const mod of ["attachment-widgets.ts", "kind-row-menu.ts", "journal-removal.ts"]) {
+      expect(readCode(mod), mod).toContain("trashItem(");
+    }
   });
 });
 
