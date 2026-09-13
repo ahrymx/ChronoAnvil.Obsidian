@@ -27,7 +27,7 @@
 // was not merely faint but the only route to that menu at all.
 
 import { describe, expect, it } from "vitest";
-import { readCss } from "./sources";
+import { cssRule, readCss } from "./sources";
 
 // Rules that hide an element outright. `opacity: 0` specifically: a control
 // that is `display: none` until a class is toggled is a different mechanism
@@ -141,5 +141,74 @@ describe("the mobile scope is read once (3.9 §3.4)", () => {
     expect(css).toMatch(/min-height:\s*var\(--ca-control-min\)/);
     // Off by default: a pointer device keeps whatever height its content makes.
     expect(css).toMatch(/--ca-control-min:\s*auto/);
+  });
+});
+
+// 1.0.15 — and the other half of the same split: what the phone loses outright.
+//
+// `(hover: none)` above is about a control being FINDABLE without a pointer over
+// it. This is about a control being USABLE at all, which is a different question
+// with a different answer, and the two are one file apart on purpose: the reader
+// who widens one has to walk past the other.
+describe("a gesture a phone cannot perform draws no control (1.0.15)", () => {
+  // The block furniture, and why each one is here:
+  //   the grip drags with the HTML5 API, which fires no `dragstart` on touch;
+  //   both dividers resize on `pointerdown`, which touch does fire — but with no
+  //   `touch-action: none` the browser takes the movement for a scroll.
+  const GONE = [
+    ".ca-jbd-handle",
+    ".ca-journal-group-divider",
+    ".ca-journal-card-divider",
+  ];
+
+  it("hides the grip and both resize dividers on a phone", () => {
+    for (const cls of GONE) {
+      expect(cssRule(`body.is-mobile ${cls}`)).toMatch(/display:\s*none/);
+    }
+  });
+
+  it("keeps the touch resting opacities, because a touchscreen desktop drags", () => {
+    // The mistake this guards is the tidy one: seeing `display: none` land on
+    // the grip and deleting the `(hover: none)` branch as superseded. It is not
+    // superseded — it covers a device that has no hover AND can drag, which is
+    // the whole reason §3.4 Q1 stopped the two questions sharing an answer.
+    const css = readCss();
+    for (const cls of GONE) {
+      const branch = css.match(
+        new RegExp(`@media\\s*\\(hover:\\s*none\\)\\s*\\{\\s*\\${cls}\\s*\\{[^}]*opacity:\\s*0\\.\\d+`)
+      );
+      expect(branch, `${cls} lost its (hover: none) resting opacity`).not.toBeNull();
+    }
+  });
+
+  it("takes nothing else away from a phone", () => {
+    // THE LIST IS CLOSED, and this is the assertion that keeps it closed. Every
+    // affordance on a card that is not a drag is the reader's only route to the
+    // thing it does — the title pencil, the group `+`, a row's `⋯`, *What's
+    // below*'s Edit — and this file's own history is the warning: the attachment
+    // chip's `⋯` was, on a phone, "not merely faint but the only route to that
+    // menu at all". So a `body.is-mobile` rule may hide the three above and
+    // nothing more; a fourth is a decision, not a tidy-up.
+    //
+    // The two exceptions are not controls. They are the LABELS inside controls
+    // that stay — a header button and a card's action chip go icon-only where
+    // the pane is narrow, which subtracts words rather than reach.
+    const LABELS = [".ca-journal-btn-label", ".ca-jcl-action-label"];
+    const css = readCss();
+    const hidden = new Set<string>();
+    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/(^|[;\s])display:\s*none;/.test(m[2])) continue;
+      // Comments carry commas and prose, and in the sources they sit inside the
+      // capture — strip them before splitting or the first selector of every
+      // documented rule is a sentence.
+      const selectors = m[1].replace(/\/\*[\s\S]*?\*\//g, " ").split(",");
+      for (const sel of selectors) {
+        const s = sel.replace(/\s+/g, " ").trim();
+        if (!s.startsWith("body.is-mobile")) continue;
+        const last = subject(s);
+        if (last) hidden.add(last);
+      }
+    }
+    expect([...hidden].sort()).toEqual([...GONE, ...LABELS].sort());
   });
 });

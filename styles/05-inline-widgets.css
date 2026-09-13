@@ -1718,6 +1718,58 @@
   }
 }
 
+/* ── AND ON A PHONE IT IS NOT FAINT, IT IS GONE (1.0.15) ─────────────
+ *
+ * *"hide drag icon and controls completely on mobile"*, and the reason the ask
+ * is right is that none of these three gestures can be performed there.
+ *
+ * THE GRIP DRAGS WITH AN API TOUCH DOES NOT HAVE. `drag-scroll.ts` states it for
+ * the whole plugin — *"ChronoAnvil drags with the HTML5 drag-and-drop API —
+ * `draggable`, `dragstart`, `dataTransfer` — in all three places it drags at
+ * all"* — and a touch that presses a `draggable` element fires no `dragstart`
+ * on any mobile browser. The dots have been drawn at 0.3 on a phone since 3.9
+ * as a hover-revealed control that cannot be revealed; what that policy could
+ * not know is that this one has nothing behind it either way. A visible control
+ * that does nothing when pressed is worse than an absent one, because the
+ * reader spends the press finding that out.
+ *
+ * THE TWO DIVIDERS DO HAVE A POINTER GESTURE, AND STILL CANNOT BE USED. They
+ * resize on `pointerdown`, which touch does fire — but neither carries
+ * `touch-action: none`, so the browser claims the same movement for a scroll and
+ * cancels the pointer a few pixels in. (`.ca-tg-grip` in the time grid is the
+ * contrast, and the reason this is a fact about these two rather than about
+ * `pointerdown`: that one declares `touch-action: none` and works.) Making them
+ * work instead of hiding them is a real piece of work — a 12px strip is also
+ * well under the 40px floor §3.3 asserts for anything a finger aims at — and it
+ * is not this change. What is wrong today is that the page draws three
+ * affordances a phone cannot take up.
+ *
+ * `body.is-mobile`, NOT `(hover: none)`, and the branch above stays exactly as
+ * it is. §3.4 Q1 split the two questions apart and `hover-reveal.test.ts` holds
+ * the split: `(hover: none)` means *this device cannot hover*, which a desktop
+ * with a touchscreen answers yes to — and that reader CAN drag, so they keep the
+ * resting 0.3 that makes the grip findable without a pointer over it. Only a
+ * phone loses the controls, and "is this a phone" has exactly one mechanism.
+ *
+ * ONE RULE FOR THE THREE, THOUGH THE DIVIDERS ARE ARGUED HALF A FILE ABOVE. The
+ * argument is one argument — the gesture is unavailable, so the furniture for it
+ * is not drawn — and the tokens file already states what splitting a shared
+ * selector list costs: *"Splitting these into two selector lists is how one of
+ * them would gain a member and the other would not."*
+ *
+ * ALL THREE ARE ABSOLUTELY POSITIONED, so `display: none` takes them out of the
+ * paint and nothing moves. And there is no fourth line here for the drop slots:
+ * `.ca-jbd-slot` is already `display: none` at rest and only
+ * `.is-slotting` shows it — a class a `dragover` puts on the block — so on a
+ * device that cannot start a drag the slots have never been drawn. A rule
+ * hiding them would be a rule that never fires, which is the kind a later reader
+ * has to prove is dead before they may delete it. */
+body.is-mobile .ca-jbd-handle,
+body.is-mobile .ca-journal-group-divider,
+body.is-mobile .ca-journal-card-divider {
+  display: none;
+}
+
 /* Whatever is being carried, dimmed. Keyed on `jbd-host` rather than on the card
    class, because the thing with a grip on it is a card, a bare widget with a
    band of its own, or a whole block — one rule for all three, and nothing to add

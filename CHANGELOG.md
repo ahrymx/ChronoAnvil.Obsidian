@@ -5,6 +5,22 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.15] - 2026-09-13
+
+### Changed
+
+- **On a phone, the drag handles and the resize bars are no longer drawn.** A
+  widget's dotted grip, the vertical bar between two columns and the horizontal one
+  under a card were all still faintly visible on mobile, and none of the three
+  worked there: the grip drags with the browser's drag-and-drop machinery, which a
+  finger never starts, and the two resize bars lose their gesture to the page
+  scroll the moment you move. They are simply absent on a phone now — the layouts
+  they edit are still there and still yours to rearrange from a desktop, and
+  nothing else on the card changes.
+
+  A desktop with a touchscreen keeps all three, faint but present, because that
+  reader can still drag with a mouse.
+
 ## [1.0.14] - 2026-09-13
 
 ### Added
