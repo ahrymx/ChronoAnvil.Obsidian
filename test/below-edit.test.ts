@@ -31,11 +31,17 @@ import {
   moveChoices,
   moveReport,
   moveTargets,
-  parseMoveChoice,
+  moveValue,
   prunedSelection,
   selectionLabel,
+  targetOf,
 } from "../src/ui/widgets/below-edit";
+import type { JournalFolders } from "../src/ui/widgets/below-edit";
+import { containerFoldersOf } from "../src/journals/journal";
 import type { JournalType } from "../src/journals/journal";
+import type { JournalConfig } from "../src/journals/custom-journal";
+import type ChronoAnvilPlugin from "../src/main";
+import { TFolder } from "obsidian";
 import { cssRule, readCode, readCss, readSrc } from "./sources";
 
 // The reader's own journal, which is where the ask came from: `type: project`,
@@ -53,6 +59,24 @@ const PROJECTS: JournalType = {
   ],
 };
 
+// And a second journal, two levels deep, so "another journal" and "an
+// intermediate level" are both real in this file rather than hypothetical.
+const STUDY: JournalType = {
+  id: "study",
+  name: "Study",
+  emoji: "🎓",
+  root: "03 - Journals/Study",
+  templatesFolder: "00 - Infrastructure/Templates/Study",
+  levels: [
+    { id: "subject", noun: "Subject", fallbackEmoji: "📚" },
+    { id: "topic", noun: "Topic", fallbackEmoji: "📄" },
+  ],
+  kinds: [
+    { id: "lesson", emoji: "📖", label: "Lesson", rating: "confidence" },
+    { id: "practice", emoji: "🛠️", label: "Practice", plural: "Practice" },
+  ],
+};
+
 const FOLDERS = [
   "03 - Journals/Projects/Website",
   "03 - Journals/Projects/Almanac",
@@ -60,6 +84,19 @@ const FOLDERS = [
 ];
 
 const HERE = "03 - Journals/Projects/Website";
+
+// One journal in the vault, which is what a reader who has never made a second
+// one sees — and the list they saw before cross-journal transfer existed.
+const ALONE: JournalFolders[] = [{ type: PROJECTS, folders: FOLDERS }];
+
+// Two, with Study's deepest level being Topics.
+const BOTH: JournalFolders[] = [
+  { type: PROJECTS, folders: FOLDERS },
+  {
+    type: STUDY,
+    folders: ["03 - Journals/Study/Maths/Algebra", "03 - Journals/Study/Maths/Calculus"],
+  },
+];
 
 // ── the count ────────────────────────────────────────────────────────────
 
@@ -90,13 +127,13 @@ describe("where a set of ticked notes can go", () => {
     // and two buttons would make them classify their own intent before seeing
     // either list — `kind-row-menu.ts`' argument for putting a scope in the
     // dialogue rather than in the menu.
-    const targets = moveTargets(PROJECTS, FOLDERS, HERE, []);
+    const targets = moveTargets(PROJECTS, ALONE, HERE, []);
     expect(targets.filter((t) => t.kind === "type")).toHaveLength(2);
     expect(targets.filter((t) => t.kind === "folder")).toHaveLength(2);
   });
 
   it("puts the note types first, because the folder run is the long one", () => {
-    const kinds = moveTargets(PROJECTS, FOLDERS, HERE, []).map((t) => t.kind);
+    const kinds = moveTargets(PROJECTS, ALONE, HERE, []).map((t) => t.kind);
     expect(kinds.indexOf("folder")).toBeGreaterThan(kinds.lastIndexOf("type"));
   });
 
@@ -104,7 +141,7 @@ describe("where a set of ticked notes can go", () => {
     // A "move" that does nothing is not an option, it is a report waiting to be
     // filed. The host index note IS its folder — `Projects/Website/Website.md` —
     // so this is the one exclusion the folder walk cannot make for itself.
-    const paths = moveTargets(PROJECTS, FOLDERS, HERE, [])
+    const paths = moveTargets(PROJECTS, ALONE, HERE, [])
       .filter((t) => t.kind === "folder")
       .map((t) => (t.kind === "folder" ? t.path : ""));
     expect(paths).not.toContain(HERE);
@@ -115,7 +152,7 @@ describe("where a set of ticked notes can go", () => {
   });
 
   it("never offers the kind every ticked note already is", () => {
-    const ids = moveTargets(PROJECTS, FOLDERS, HERE, ["update"])
+    const ids = moveTargets(PROJECTS, ALONE, HERE, ["update"])
       .filter((t) => t.kind === "type")
       .map((t) => (t.kind === "type" ? t.id : ""));
     expect(ids).toEqual(["decision"]);
@@ -127,31 +164,119 @@ describe("where a set of ticked notes can go", () => {
     // for the two decisions, and withholding it because something in the set is
     // already an update would leave the reader unable to say the one thing they
     // are most likely to mean: *make these all the same*.
-    const ids = moveTargets(PROJECTS, FOLDERS, HERE, ["update", "decision"])
+    const ids = moveTargets(PROJECTS, ALONE, HERE, ["update", "decision"])
       .filter((t) => t.kind === "type")
       .map((t) => (t.kind === "type" ? t.id : ""));
     expect(ids).toEqual(["update", "decision"]);
   });
 
   it("offers nothing where there is nowhere else, rather than a list of one", () => {
-    // A one-kind journal whose only container folder is this note's own. The bar
-    // reads this to decide whether *Move…* is drawn AT ALL, which is the
-    // difference between "momentarily inapplicable" and "structurally
-    // impossible" — `discoverability.test.ts`' rule that a menu which opens and
-    // then explains it cannot help is worse than no menu.
+    // A one-kind journal whose only container folder is this note's own, in a
+    // vault holding no other journal. The bar reads this to decide whether
+    // *Move…* is drawn AT ALL, which is the difference between "momentarily
+    // inapplicable" and "structurally impossible" — `discoverability.test.ts`'
+    // rule that a menu which opens and then explains it cannot help is worse than
+    // no menu.
     const solo: JournalType = { ...PROJECTS, kinds: [PROJECTS.kinds[0]] };
-    expect(moveTargets(solo, [HERE], HERE, ["update"])).toEqual([]);
+    expect(
+      moveTargets(solo, [{ type: solo, folders: [HERE] }], HERE, ["update"])
+    ).toEqual([]);
+  });
+});
+
+// ── and another journal is a destination ─────────────────────────────────
+
+describe("crossing into another journal", () => {
+  it("offers every journal's folders, not just this one's", () => {
+    // *"allow cross journal transfer."*
+    const folders = moveTargets(PROJECTS, BOTH, HERE, [])
+      .filter((t) => t.kind === "folder")
+      .map((t) => (t.kind === "folder" ? t.path : ""));
+    expect(folders).toContain("03 - Journals/Projects/Almanac");
+    expect(folders).toContain("03 - Journals/Study/Maths/Algebra");
+  });
+
+  it("keeps the home journal's folders first", () => {
+    // A reader with one journal sees exactly the list they saw before this
+    // existed, and a reader with four does not have to hunt for their own.
+    const folders = moveTargets(PROJECTS, BOTH, HERE, []).filter(
+      (t) => t.kind === "folder"
+    );
+    const firstForeign = folders.findIndex(
+      (t) => t.kind === "folder" && t.foreign
+    );
+    const lastHome = folders.reduce(
+      (at, t, i) => (t.kind === "folder" && !t.foreign ? i : at),
+      -1
+    );
+    expect(firstForeign).toBeGreaterThan(lastHome);
+  });
+
+  it("marks a foreign folder as foreign, and its own as not", () => {
+    // Derived once because four surfaces ask it — the confirm, the report, the
+    // branch and the group heading — and four comparisons against the host's id
+    // is four chances to write one of them backwards.
+    for (const t of moveTargets(PROJECTS, BOTH, HERE, [])) {
+      if (t.kind !== "folder") continue;
+      expect(t.foreign, t.path).toBe(t.journalId !== PROJECTS.id);
+    }
+  });
+
+  it("carries the journal on the folder, because the destination decides the type", () => {
+    const study = moveTargets(PROJECTS, BOTH, HERE, []).find(
+      (t) => t.kind === "folder" && t.foreign
+    );
+    expect(study).toMatchObject({
+      journalId: "study",
+      journalName: "Study",
+      journalEmoji: "🎓",
+    });
+  });
+
+  it("still refuses to offer a foreign NOTE TYPE on its own", () => {
+    // A foreign kind without a move would leave the note where it is carrying a
+    // `type:` its own journal does not recognise — the invisible-note failure by
+    // a second route. Crossing a journal is always a move.
+    const ids = moveTargets(PROJECTS, BOTH, HERE, [])
+      .filter((t) => t.kind === "type")
+      .map((t) => (t.kind === "type" ? t.id : ""));
+    expect(ids).toEqual(["update", "decision"]);
+    expect(ids).not.toContain("lesson");
+  });
+
+  it("gives a journal with nowhere of its own somewhere to go", () => {
+    // The one-kind, one-folder journal above had no destination at all. It does
+    // now, and that is the point of the feature rather than a side effect of it.
+    const solo: JournalType = { ...PROJECTS, kinds: [PROJECTS.kinds[0]] };
+    const targets = moveTargets(
+      solo,
+      [{ type: solo, folders: [HERE] }, BOTH[1]],
+      HERE,
+      ["update"]
+    );
+    expect(targets).toHaveLength(2);
+    expect(targets.every((t) => t.kind === "folder" && t.foreign)).toBe(true);
   });
 });
 
 // ── how the destinations read ────────────────────────────────────────────
 
 describe("the rows the destination picker draws", () => {
-  const rows = () => moveChoices(moveTargets(PROJECTS, FOLDERS, HERE, []));
+  const rows = () => moveChoices(moveTargets(PROJECTS, ALONE, HERE, []));
+  const both = () => moveChoices(moveTargets(PROJECTS, BOTH, HERE, []));
 
   it("groups the two runs under headings the suggester already draws", () => {
     const groups = [...new Set(rows().map((r) => r.group))];
     expect(groups).toEqual(["Note type", "Index note"]);
+  });
+
+  it("names each other journal, and leaves the home run's heading alone", () => {
+    // "Index note" for the journal this card belongs to — unchanged, so a
+    // single-journal vault reads what it always read — and the journal's own
+    // name and glyph for each of the others, which is how four of them stay
+    // told apart at a glance.
+    const groups = [...new Set(both().map((r) => r.group))];
+    expect(groups).toEqual(["Note type", "Index note", "🎓 Study"]);
   });
 
   it("says outright that a type change moves nothing", () => {
@@ -175,35 +300,65 @@ describe("the rows the destination picker draws", () => {
     expect(folder?.description).toBe("03 - Journals/Projects/Almanac");
   });
 
-  it("tags each row so the answer parses back to exactly one destination", () => {
-    for (const row of rows()) {
-      const back = parseMoveChoice(row.value);
-      expect(back, row.value).not.toBeNull();
-      expect(back?.kind, row.value).toBe(
-        row.group === "Note type" ? "type" : "folder"
-      );
+  it("warns on the row that crossing a journal re-files the note", () => {
+    // NOT LEFT TO THE CONFIRM. A reader picking a destination is choosing, and
+    // the second thing that will happen to their notes belongs in the row they
+    // are choosing from — the path stays, because it is still what tells two
+    // folders of one name apart.
+    const foreign = both().find((r) => r.group === "🎓 Study");
+    expect(foreign?.label).toBe("Algebra");
+    expect(foreign?.description).toBe(
+      "03 - Journals/Study/Maths/Algebra — re-filed as one of Study's note types."
+    );
+  });
+
+  it("round-trips every row back to the exact target it was made from", () => {
+    // BY LOOKUP RATHER THAN BY PARSE, which is what makes this exact instead of
+    // merely consistent: the answer comes back off the list the question was
+    // asked from, carrying the journal a parser could not have known.
+    const targets = moveTargets(PROJECTS, BOTH, HERE, []);
+    for (const row of moveChoices(targets)) {
+      expect(targetOf(targets, row.value), row.value).not.toBeNull();
+    }
+    for (const t of targets) {
+      expect(targetOf(targets, moveValue(t))).toBe(t);
     }
   });
 
-  it("refuses an answer it did not write", () => {
+  it("refuses an answer it did not offer", () => {
     // The suggester can be dismissed, and `promptDetailedSuggester` answers
-    // `null` for that. An untagged string is not a destination either.
-    expect(parseMoveChoice(null)).toBeNull();
-    expect(parseMoveChoice("")).toBeNull();
-    expect(parseMoveChoice("decision")).toBeNull();
-    expect(parseMoveChoice("type:")).toBeNull();
-    expect(parseMoveChoice("folder:")).toBeNull();
+    // `null` for that. A value that is not on the list is not a destination
+    // either — where the old parser would have manufactured one.
+    const targets = moveTargets(PROJECTS, ALONE, HERE, []);
+    expect(targetOf(targets, null)).toBeNull();
+    expect(targetOf(targets, "")).toBeNull();
+    expect(targetOf(targets, "decision")).toBeNull();
+    expect(targetOf(targets, "type:lesson")).toBeNull();
+    expect(targetOf(targets, "folder:/etc/passwd")).toBeNull();
+    // And the folder this card is on, which was never offered.
+    expect(targetOf(targets, `folder:${HERE}`)).toBeNull();
   });
 
   it("keeps a folder path whole, slashes and all", () => {
-    // `folder:` is a prefix and not a separator — splitting on ":" would take
-    // the path apart at the first colon a reader ever puts in a folder name.
-    expect(parseMoveChoice("folder:03 - Journals/Projects/Almanac")).toEqual({
-      kind: "folder",
-      path: "03 - Journals/Projects/Almanac",
-    });
+    // `folder:` is a prefix and not a separator, and the journal is deliberately
+    // NOT in the string — a path is unique in a vault, so there is no second
+    // delimiter to get wrong in a field that already contains slashes.
+    expect(moveValue({ kind: "type", id: "decision", label: "Decision" })).toBe(
+      "type:decision"
+    );
+    expect(
+      moveValue({
+        kind: "folder",
+        path: "03 - Journals/Study/Maths/Algebra",
+        journalId: "study",
+        journalName: "Study",
+        journalEmoji: "🎓",
+        foreign: true,
+      })
+    ).toBe("folder:03 - Journals/Study/Maths/Algebra");
   });
 });
+
 
 // ── what survives a repaint ──────────────────────────────────────────────
 
@@ -411,11 +566,194 @@ describe("what the two moves actually write", () => {
 
   it("reads one answer for which folders can hold a note", () => {
     // The walk was inside `pickContainerFolder`. Extracted rather than copied, so
-    // "which folders can hold a note" cannot come to have two answers.
+    // "which folders can hold a note" cannot come to have two answers — and that
+    // extraction is what let the deepest-level rule below reach the create path
+    // in the same change.
     const journal = readCode("journals/journal");
     expect(journal).toContain("export function containerFoldersOf(");
     expect(journal).toContain("const options = containerFoldersOf(this.plugin, type);");
-    expect(src()).toContain("containerFoldersOf(this.deps.plugin, this.deps.type)");
+    expect(readCode("ui/widgets/below-edit")).toContain(
+      "containerFoldersOf(plugin, type)"
+    );
+  });
+
+  it("asks every journal in the vault, not only the host's", () => {
+    const text = readCode("ui/widgets/below-edit");
+    expect(text).toContain("registeredJournalTypes(plugin)");
+    // A JOURNAL WITH NO FOLDERS YET IS DROPPED, because an empty group heading is
+    // a promise the list cannot keep: the reader opens *Move…*, reads the name of
+    // a journal, and finds nothing under it.
+    expect(text).toContain("filter((j) => j.folders.length > 0)");
+  });
+
+  it("moves the file before it rewrites the type", () => {
+    // THE ORDER IS THE RECOVERABLE ONE. A type written before a failed move leaves
+    // the note in its OLD journal carrying a `type:` that journal does not
+    // recognise — listed by nothing, in the folder the reader is looking at. This
+    // way a refused move leaves the note exactly as it was.
+    const text = readCode("ui/widgets/below-edit");
+    const move = text.indexOf("fileManager.renameFile(whole, target)");
+    const retype = text.indexOf("if (into) await plugin.journals.setNoteKind(", move);
+    expect(move).toBeGreaterThan(-1);
+    expect(retype).toBeGreaterThan(move);
+  });
+
+  it("is one mover, with or without the retype", () => {
+    // Two methods would mean two copies of the collision refusal, the per-item
+    // `try` and the report — the three parts most worth having exactly once.
+    const text = readCode("ui/widgets/below-edit");
+    expect(text).toContain("into: { kind: JournalKind; journal: JournalType } | null");
+    expect((text.match(/fileManager\.renameFile\(/g) ?? []).length).toBe(1);
+  });
+
+  it("asks which kind only when there is a choice to make", () => {
+    // `only()`'s rule points the other way exactly once, and this is it. Its rule
+    // is about the act the reader CHOSE — *"'there was only one' is not consent"*.
+    // This is a consequence forced by the destination, not the act; a journal with
+    // one note type offers nothing to decide, and the confirm names the type
+    // either way, which is where the consent actually lives.
+    const text = readCode("ui/widgets/below-edit");
+    expect(text).toContain("if (into.kinds.length === 1) return into.kinds[0];");
+    expect(text).toContain("`Become which kind of ${into.name} note?`");
+  });
+
+  it("names the kind by its own plural, not the crude one", () => {
+    // `plural("Practice")` is "Practices" and the kind declares "Practice". Every
+    // other surface that names a run of these reads the override; the confirm
+    // asking for consent said the pluraliser's answer.
+    const text = readCode("ui/widgets/below-edit");
+    expect(text).toContain("kindPlural(kind).toLowerCase()");
+    expect(text).not.toContain("plural(kind.label)");
+  });
+});
+
+// ── which folders a note may live in at all ───────────────────────────────
+
+describe("the folders a journal offers as a home for a note", () => {
+  // A REAL WALK OVER A REAL TREE, because this is the rule that changed and a
+  // source assertion cannot tell a `>=` from a `===`. Enough vault for
+  // `containerFoldersOf`: a folder tree it can resolve and read children from,
+  // and the stored journals `journalChildFolders` needs to recognise a foreign
+  // root.
+  const tree = (paths: readonly string[]): Map<string, TFolder> => {
+    const folders = new Map<string, TFolder>();
+    const ensure = (path: string): TFolder => {
+      const had = folders.get(path);
+      if (had) return had;
+      const folder = new TFolder(path);
+      folders.set(path, folder);
+      const at = path.lastIndexOf("/");
+      if (at > 0) ensure(path.slice(0, at)).children.push(folder);
+      return folder;
+    };
+    for (const p of paths) ensure(p);
+    return folders;
+  };
+
+  const harness = (
+    paths: readonly string[],
+    configs: readonly JournalConfig[]
+  ): ChronoAnvilPlugin => {
+    const folders = tree(paths);
+    return {
+      app: {
+        vault: {
+          getAbstractFileByPath: (path: string) => folders.get(path) ?? null,
+        },
+      },
+      settings: { customJournals: configs },
+    } as unknown as ChronoAnvilPlugin;
+  };
+
+  const STUDY_CFG: JournalConfig = {
+    id: "study",
+    name: "Study",
+    emoji: "🎓",
+    root: "03 - Journals/Study",
+    templatesFolder: "00 - Infrastructure/Templates/Study",
+    levels: [
+      { id: "subject", noun: "Subject", fallbackEmoji: "📚" },
+      { id: "topic", noun: "Topic", fallbackEmoji: "📄" },
+    ],
+    kinds: [{ id: "lesson", emoji: "📖", label: "Lesson" }],
+  };
+
+  const STUDY_TREE = [
+    "03 - Journals/Study",
+    "03 - Journals/Study/Maths",
+    "03 - Journals/Study/Maths/Algebra",
+    "03 - Journals/Study/Maths/Calculus",
+    "03 - Journals/Study/History",
+    "03 - Journals/Study/History/Rome",
+  ];
+
+  it("offers the deepest level and nothing above it", () => {
+    // THE READER'S QUESTION, ANSWERED BY CHANGING THE ANSWER. Moving a note up to
+    // a Subject put it somewhere nothing lists: `buildLevelIndex` branches on
+    // `hasLevelBelow` — a question about the LEVEL, not about contents — so a
+    // Subject index draws a folder rollup, and a note is not a folder. It still
+    // counted on the journal's card, because that sweep is recursive from the
+    // root. A note that exists, counts, and is reachable only by link or search.
+    const plugin = harness(STUDY_TREE, [STUDY_CFG]);
+    const type = { ...STUDY, kinds: [STUDY.kinds[0]] };
+    expect(containerFoldersOf(plugin, type)).toEqual([
+      "03 - Journals/Study/History/Rome",
+      "03 - Journals/Study/Maths/Algebra",
+      "03 - Journals/Study/Maths/Calculus",
+    ]);
+  });
+
+  it("still walks THROUGH the levels it does not offer", () => {
+    // Two bounds, two different questions: `depth >= deepest` stops the walk,
+    // `depth + 1 === deepest` decides what is collected on the way down. A single
+    // bound would either offer the Subjects or never reach the Topics.
+    const plugin = harness(STUDY_TREE, [STUDY_CFG]);
+    const found = containerFoldersOf(plugin, { ...STUDY, kinds: [STUDY.kinds[0]] });
+    expect(found).not.toContain("03 - Journals/Study/Maths");
+    expect(found).toContain("03 - Journals/Study/Maths/Algebra");
+  });
+
+  it("offers a flat journal's own containers, which ARE its deepest level", () => {
+    // The rule must not empty the list for a one-level journal — every Area of
+    // Projects is both an intermediate and the deepest level, and `depth + 1 ===
+    // 1` is what keeps them.
+    const cfg: JournalConfig = {
+      id: "projects",
+      name: "Projects",
+      emoji: "🚀",
+      root: "03 - Journals/Projects",
+      templatesFolder: "00 - Infrastructure/Templates/Projects",
+      levels: [{ id: "area", noun: "Area", fallbackEmoji: "📁" }],
+      kinds: [{ id: "update", emoji: "📋", label: "Update" }],
+    };
+    const plugin = harness(
+      [
+        "03 - Journals/Projects",
+        "03 - Journals/Projects/Website",
+        "03 - Journals/Projects/Almanac",
+      ],
+      [cfg]
+    );
+    expect(containerFoldersOf(plugin, PROJECTS)).toEqual([
+      "03 - Journals/Projects/Almanac",
+      "03 - Journals/Projects/Website",
+    ]);
+  });
+
+  it("never descends into a promoted note's own folder", () => {
+    // The folders below the deepest level hold PAGES rather than notes, so
+    // descending would offer a reader the inside of a dashboard as a destination.
+    const plugin = harness(
+      [...STUDY_TREE, "03 - Journals/Study/Maths/Algebra/Quadratics"],
+      [STUDY_CFG]
+    );
+    expect(containerFoldersOf(plugin, { ...STUDY, kinds: [STUDY.kinds[0]] })).not.toContain(
+      "03 - Journals/Study/Maths/Algebra/Quadratics"
+    );
+  });
+
+  it("says nothing at all where the journal's root is not there", () => {
+    expect(containerFoldersOf(harness([], [STUDY_CFG]), STUDY)).toEqual([]);
   });
 });
 

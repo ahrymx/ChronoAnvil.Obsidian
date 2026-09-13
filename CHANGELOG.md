@@ -17,16 +17,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with them.
 
   **Move…** asks one question — where do these go — and answers it with one list
-  in two parts:
+  in three parts:
 
   - **Note type** re-files them as another of the journal's kinds. Nothing moves
     on disk; the notes stop appearing under the head they are under now and start
     appearing under the other one. The list says so on every row, because the
     button says *Move* and you are entitled to expect a file to move.
-  - **Index note** moves the files into another of the journal's index notes. Links
-    elsewhere in your vault are updated to follow. If a note already sitting there
-    has the same name, that one note is left where it is and named in the report
-    rather than quietly renamed around.
+  - **Index note** moves the files into another of the same journal's index notes.
+    Links elsewhere in your vault are updated to follow. If a note already sitting
+    there has the same name, that one note is left where it is and named in the
+    report rather than quietly renamed around.
+  - **Another journal**, listed under its own name and glyph. Note types belong to
+    a journal, so a note arriving in one is re-filed as one of *its* types — the
+    row says so before you pick it, and ChronoAnvil asks which type only when the
+    destination journal has more than one to choose between. Properties the new
+    journal does not use stay on the note, unread, so nothing is lost if it ever
+    goes back.
 
   **Delete…** does what everything else in 1.0.13 now does, and names the
   destination your *Deleted files* setting gives it before you press anything.
@@ -36,11 +42,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ones that did not named — and the mode leaves the way it came: **Done**, or the
   banner's chevron, which folds the whole foot away with the rest of the card.
 
-  Two things it deliberately does not do. It does not appear on a card with
-  nothing on it yet, and the **Edit** button comes and goes on its own as a card
-  gains or loses its first note. And it offers no *pages only* option: that scope
+  Two things the edit mode deliberately does not do. It does not appear on a card
+  with nothing on it yet, and the **Edit** button comes and goes on its own as a
+  card gains or loses its first note. And it offers no *pages only* option: that scope
   belongs to a single row's `⋯`, where it has one answer, rather than to a
   selection of ten where it has ten.
+
+### Fixed
+
+- **A journal note can no longer be filed where nothing will list it.** When a
+  journal has more than one level — Study's *Subject → Topic*, say — both
+  **New …** and the new **Move…** offered every level as a home, including the
+  intermediate ones. A note put directly in a Subject folder was then listed by
+  nothing: that index draws a list of its *folders*, and a note is not a folder,
+  while the tables that would show it live one level further down. It still
+  counted on the journal's card, because that count sweeps the whole journal — so
+  the note existed, still counted, and was reachable only by link or search,
+  having quietly left the structure that displays it.
+
+  Only the deepest level is offered now, by both the create and the move, and
+  nothing changes for a journal with a single level. **If you already have a note
+  parked at an intermediate level, it stays exactly where it is** — drag it into
+  one of that folder's own sub-folders and it reappears on that index.
+
+- **A note type's own plural is used where you are asked to confirm one.** A kind
+  that overrides the plural ChronoAnvil would guess — *Practice*, not *Practices*
+  — said the guess in the window asking whether to re-file notes as it, while
+  every other surface in the plugin said the override.
 
 ## [1.0.13] - 2026-09-13
 

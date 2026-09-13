@@ -1258,10 +1258,35 @@ export function journalTypeOfNote(
 // exactly: two copies of "which folders may hold a note" is how a move comes to
 // offer a folder the create path refuses.
 //
-// `depth >= type.levels.length` IS THE WHOLE RULE. A journal's levels say how deep
-// its hierarchy goes; the folders BELOW the deepest level are a promoted note's
-// own folder, which holds pages rather than notes. Walking past it would offer a
-// reader the inside of a dashboard as a destination.
+// ── THE DEEPEST LEVEL, AND ONLY THE DEEPEST ──────────────────────────────
+//
+// This walked every level and offered all of them, which is how it read when the
+// extraction was made and is not what it should have said. The reader asked what
+// moving a note up to an intermediate level actually did. Traced:
+//
+// `buildLevelIndex` branches on `hasLevelBelow` — `containerDepth + 1 <
+// levels.length`, a question about the LEVEL rather than about today's contents —
+// so a Subject index draws `folderRollup`, which lists FOLDERS. A note sitting
+// directly in `Study/Maths/` is not a folder, and the Topic-level `kind-table`s
+// are scoped to folders below it. Nothing lists it.
+//
+// It is not gone: `journals-cards.ts` counts by `type:` over `pagesUnder(root)`,
+// a recursive sweep, so it still counts on the journal's card and still feeds the
+// rating average, and trackers still classify it. The outcome is worse than
+// disappearing — a note that exists, still counts, and is reachable only by link
+// or search, having quietly left the hierarchy that displays it.
+//
+// So an intermediate folder is not a place a note may be. Both callers get the
+// rule, which is the whole reason there is one list: the edit mode cannot offer a
+// destination the create path refuses, and the create path can no longer put a
+// note somewhere nothing will show it.
+//
+// TWO BOUNDS, NOT ONE, AND THEY ARE DIFFERENT QUESTIONS. `depth >= deepest` stops
+// the WALK — the folders below the deepest level are a promoted note's own folder,
+// holding pages rather than notes, and descending would offer a reader the inside
+// of a dashboard. `depth + 1 === deepest` decides what is COLLECTED on the way
+// down. The walk still has to pass through the intermediate levels to reach the
+// bottom; it just no longer writes them down.
 //
 // A PLAIN `string[]`, IN WALK ORDER, so a caller may filter it — the edit mode
 // drops the folder the notes are already in — without re-deriving it. Nothing here
@@ -1273,11 +1298,12 @@ export function containerFoldersOf(
 ): string[] {
   const root = getFolder(plugin.app, type.root);
   if (!root) return [];
+  const deepest = type.levels.length;
   const options: string[] = [];
   const walk = (folder: TFolder, depth: number) => {
-    if (depth >= type.levels.length) return;
+    if (depth >= deepest) return;
     for (const child of journalChildFolders(plugin, type, folder)) {
-      options.push(child.path);
+      if (depth + 1 === deepest) options.push(child.path);
       walk(child, depth + 1);
     }
   };

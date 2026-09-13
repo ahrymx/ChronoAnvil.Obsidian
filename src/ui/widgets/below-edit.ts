@@ -37,6 +37,27 @@
 // two travel together or not at all, and that is the honest way to leave it —
 // stated here so the next reader does not read it as an oversight.
 //
+// ── WHERE A NOTE MAY GO, WHICH IS NOT WHERE IT USED TO BE ALLOWED ────────
+//
+// The reader asked what moving a note up to an intermediate index level did. The
+// honest answer was: nothing visible lists it afterwards. `buildLevelIndex`
+// branches on `hasLevelBelow`, a question about the LEVEL rather than about
+// contents, so an intermediate index draws a folder rollup — and a note is not a
+// folder. It still counted on the journal's card, because that sweep is recursive
+// from the root, so the note existed, counted, and was reachable only by link or
+// search. `containerFoldersOf` now collects the deepest level only, and BOTH
+// callers get the rule, which was the reason for having one list: the create path
+// can no longer put a note where nothing will show it either.
+//
+// AND THE OTHER HALF OF THE SAME ASK: *"allow cross journal transfer."* So the
+// folder run is every journal's. Crossing one re-writes the note's `type:`,
+// because a kind belongs to a journal and the destination's tables select on it —
+// a note carried across with a foreign `type:` would be the invisible-note failure
+// again by a second route. That makes a cross-journal move a move AND a
+// frontmatter write, which is why it is the one destination that asks a second
+// question, and why `reparent` takes an optional `into` rather than there being
+// two movers.
+//
 // ── THE MODE IS A CONTROLLER THE BLOCK OWNS, NOT A REGISTRY ──────────────
 //
 // `reveal.ts` keys its targets by `ctx.sourcePath`, deliberately wider than one
@@ -68,19 +89,45 @@ import {
 import type ChronoAnvilPlugin from "../../main";
 import { ROW_NOTE_ATTR, buildAddKindRow } from "../tables";
 import { LIVE_REDRAW_EVENT } from "../livewidget";
-import { getFile, plural } from "../../core/util";
+import { getFile } from "../../core/util";
 import { notify } from "../../core/notify";
 import { trashClause, trashDestination, trashSeveral } from "../../core/trash";
 import { confirmAction, promptDetailedSuggester } from "../modals";
 import type { DetailedChoice } from "../modals";
 import { isPromotedPath } from "../../journals/page-default";
-import { containerFoldersOf, journalTypeAtPath } from "../../journals/journal";
-import type { JournalType } from "../../journals/journal";
+import {
+  containerFoldersOf,
+  getJournalType,
+  journalTypeAtPath,
+  registeredJournalTypes,
+} from "../../journals/journal";
+import type { JournalKind, JournalType } from "../../journals/journal";
+import { kindPlural } from "../../journals/journal-sections";
+
+/** One journal, and the folders of it that may hold a note. */
+export interface JournalFolders {
+  type: JournalType;
+  folders: readonly string[];
+}
 
 /** Where a picked set of notes can be sent. */
 export type MoveTarget =
   | { kind: "type"; id: string; label: string }
-  | { kind: "folder"; path: string };
+  // A FOLDER CARRIES ITS JOURNAL, WHICH IS WHAT MAKES A CROSS-JOURNAL MOVE
+  // POSSIBLE TO DESCRIBE. The destination decides which note types are available
+  // to the note afterwards, so "where" and "what it becomes" are one answer and
+  // have to travel together. `foreign` is derived once here rather than compared
+  // at each of the four places that ask — the confirm, the report, the branch and
+  // the heading — because four comparisons against the host's id is four chances
+  // to write one of them backwards.
+  | {
+      kind: "folder";
+      path: string;
+      journalId: string;
+      journalName: string;
+      journalEmoji: string;
+      foreign: boolean;
+    };
 
 // ── the foot ─────────────────────────────────────────────────────────────
 
@@ -166,23 +213,53 @@ export function selectionLabel(n: number): string {
 // not an option, it is a mistake waiting to be reported — and `fromKind` is the
 // kind whose table the reader ticked in, which is why this takes it rather than
 // deriving it.
+//
+// ── AND ANOTHER JOURNAL IS A DESTINATION ─────────────────────────────────
+//
+// *"allow cross journal transfer."* So the folder run is every journal's, not one
+// journal's, and `journals` is the whole registry rather than a list of paths.
+//
+// THE HOME JOURNAL'S FOLDERS COME FIRST and keep their old heading, which is what
+// a single-journal vault still sees — exactly the list it saw before this
+// existed. The others follow in registry order, under their own names, so the
+// reader who has one journal is not made to read about a feature they cannot use
+// and the reader who has four can tell them apart at a glance.
+//
+// THE TYPE RUN STAYS HOME-ONLY, and that is not an omission. A foreign kind
+// without a move would leave the note where it is, carrying a `type:` its own
+// journal does not recognise — which is `recognisedTypeValues`' whole subject and
+// the invisible-note failure by a second route. Crossing a journal is always a
+// move; re-filing in place is always within one.
 export function moveTargets(
-  type: JournalType,
-  folders: readonly string[],
+  home: JournalType,
+  journals: readonly JournalFolders[],
   here: string,
   fromKinds: readonly string[]
 ): MoveTarget[] {
   const out: MoveTarget[] = [];
-  for (const kind of type.kinds) {
+  for (const kind of home.kinds) {
     // A SET OF ROWS CAN SPAN TWO TABLES, so "the kind they are already" is a
     // list. A kind is excluded only when EVERY ticked note is already of it —
     // otherwise it is a real destination for the ones that are not.
     if (fromKinds.length === 1 && fromKinds[0] === kind.id) continue;
     out.push({ kind: "type", id: kind.id, label: kind.label });
   }
-  for (const path of folders) {
-    if (path === here) continue;
-    out.push({ kind: "folder", path });
+  const ordered = [
+    ...journals.filter((j) => j.type.id === home.id),
+    ...journals.filter((j) => j.type.id !== home.id),
+  ];
+  for (const j of ordered) {
+    for (const path of j.folders) {
+      if (path === here) continue;
+      out.push({
+        kind: "folder",
+        path,
+        journalId: j.type.id,
+        journalName: j.type.name,
+        journalEmoji: j.type.emoji,
+        foreign: j.type.id !== home.id,
+      });
+    }
   }
   return out;
 }
@@ -195,40 +272,60 @@ export function moveTargets(
 // folder, and `kind-table` selects its rows by frontmatter — so changing a note's
 // type is a frontmatter write. A reader who pressed a button called *Move…*
 // expects a file to move, and the honest thing is to say it will not.
+// AND A FOREIGN ROW SAYS THE SECOND THING THAT WILL HAPPEN TO IT. Moving into
+// another journal re-writes the note's `type:`, because a kind belongs to a
+// journal and the destination's tables select on it — so the row carries the
+// consequence rather than leaving the reader to meet it in the confirm. The path
+// stays, because it is what tells two folders of one name apart.
 export function moveChoices(targets: readonly MoveTarget[]): DetailedChoice[] {
   return targets.map((t) =>
     t.kind === "type"
       ? {
-          value: `type:${t.id}`,
+          value: moveValue(t),
           label: t.label,
           description: "Re-file as this. Nothing moves on disk.",
           group: "Note type",
         }
       : {
-          value: `folder:${t.path}`,
+          value: moveValue(t),
           label: t.path.split("/").pop() ?? t.path,
-          description: t.path,
-          group: "Index note",
+          description: t.foreign
+            ? `${t.path} — re-filed as one of ${t.journalName}'s note types.`
+            : t.path,
+          group: t.foreign ? `${t.journalEmoji} ${t.journalName}` : "Index note",
         }
   );
 }
 
-// And back again, once.
+// The one place a target is spelled as a string.
 //
-// A TAGGED STRING RATHER THAN TWO PICKERS, following `promptChoice`'s own
-// precedent for carrying a row's identity through a list of strings. Parsed in
-// one place so the two prefixes cannot drift apart.
-export function parseMoveChoice(value: string | null): MoveTarget | null {
+// A TAGGED STRING, following `promptChoice`'s own precedent for carrying a row's
+// identity through a list of strings. A path is unique in a vault, so `folder:`
+// needs no journal in it — which is the encoding question this avoids rather than
+// answers, and the reason there is no delimiter to get wrong.
+export function moveValue(target: MoveTarget): string {
+  return target.kind === "type" ? `type:${target.id}` : `folder:${target.path}`;
+}
+
+// And back again — by LOOKUP, not by parse.
+//
+// WHY THIS IS NOT A PARSER ANY MORE. It was one, and a parser can only return
+// what the string holds: a `{ kind: "folder", path }` and nothing about which
+// journal that path is in. A cross-journal move needs the journal to pick the
+// note type, so a parser would have had to put it in the string and then take it
+// back out — a second delimiter, in a field that already contains slashes, for a
+// fact the caller is holding in its hand.
+//
+// So the answer comes from the list the question was asked from. That also makes
+// the round trip exact rather than merely consistent: a value the picker did not
+// offer resolves to nothing, where a parser would happily manufacture a target
+// for `folder:/etc/passwd`.
+export function targetOf(
+  targets: readonly MoveTarget[],
+  value: string | null
+): MoveTarget | null {
   if (!value) return null;
-  if (value.startsWith("type:")) {
-    const id = value.slice("type:".length);
-    return id ? { kind: "type", id, label: id } : null;
-  }
-  if (value.startsWith("folder:")) {
-    const path = value.slice("folder:".length);
-    return path ? { kind: "folder", path } : null;
-  }
-  return null;
+  return targets.find((t) => moveValue(t) === value) ?? null;
 }
 
 // What survived a repaint.
@@ -558,17 +655,32 @@ export class BelowEdit extends MarkdownRenderChild {
     return out;
   }
 
-  private folders(): string[] {
-    return containerFoldersOf(this.deps.plugin, this.deps.type);
+  // Every journal in the vault, with the folders of it that may hold a note.
+  //
+  // READ AT THE MOMENT IT IS ASKED, not held. A journal added in Settings while
+  // this card is on screen is a destination the next press of *Move…* should
+  // offer, and `registeredJournalTypes` is a map over stored settings rather than
+  // a scan — cheap enough that caching it would be buying nothing with staleness.
+  //
+  // A JOURNAL WITH NO FOLDERS YET IS DROPPED HERE rather than in the picker,
+  // because an empty group heading is a promise the list cannot keep — the reader
+  // would open *Move…*, read the name of a journal, and find nothing under it.
+  private journalFolders(): JournalFolders[] {
+    const { plugin } = this.deps;
+    return registeredJournalTypes(plugin)
+      .map((type) => ({ type, folders: containerFoldersOf(plugin, type) }))
+      .filter((j) => j.folders.length > 0);
   }
 
   private anyDestination(): boolean {
     // Asked without a selection, because the BUTTON's existence is a fact about
-    // the journal rather than about what is ticked. `moveTargets` with no
-    // from-kind excludes nothing, which is the right question here: *is there
-    // anywhere at all for a note on this card to go.*
+    // the vault rather than about what is ticked. `moveTargets` with no from-kind
+    // excludes nothing, which is the right question here: *is there anywhere at
+    // all for a note on this card to go.*
     const here = this.deps.here;
-    return moveTargets(this.deps.type, this.folders(), here, []).length > 0;
+    return (
+      moveTargets(this.deps.type, this.journalFolders(), here, []).length > 0
+    );
   }
 
   // The files a set of paths names, re-resolved, with a promoted note standing
@@ -616,19 +728,20 @@ export class BelowEdit extends MarkdownRenderChild {
 
     const targets = moveTargets(
       type,
-      this.folders(),
+      this.journalFolders(),
       this.deps.here,
       this.kindsPicked()
     );
     if (targets.length === 0) {
-      notify.info("There is nowhere else in this journal for these to go.");
+      notify.info("There is nowhere else for these to go.");
       return;
     }
     // NO `only()` SHORT-CIRCUIT. Its own rule names this case: auto-picking a
     // sole option is right for incidental bookkeeping and wrong for a
     // substantive act — *"'there was only one' is not consent"*. Moving a
     // reader's notes is the second kind.
-    const chosen = parseMoveChoice(
+    const chosen = targetOf(
+      targets,
       await promptDetailedSuggester(
         plugin.app,
         moveChoices(targets),
@@ -636,8 +749,52 @@ export class BelowEdit extends MarkdownRenderChild {
       )
     );
     if (!chosen) return;
-    if (chosen.kind === "type") await this.retype(picked, chosen.id);
-    else await this.reparent(picked, chosen.path);
+    if (chosen.kind === "type") {
+      await this.retype(picked, chosen.id);
+      return;
+    }
+    if (!chosen.foreign) {
+      await this.reparent(picked, chosen.path, null);
+      return;
+    }
+    // CROSSING A JOURNAL ASKS ONE MORE QUESTION, and only one. The destination
+    // decides which note types exist, so the note cannot keep the one it has.
+    const into = getJournalType(plugin, chosen.journalId);
+    if (!into) {
+      notify.fail(`${chosen.journalName} is no longer a journal in this vault.`);
+      return;
+    }
+    const kind = await this.pickForeignKind(into);
+    if (!kind) return;
+    await this.reparent(picked, chosen.path, { kind, journal: into });
+  }
+
+  // Which of the destination journal's note types these become.
+  //
+  // THE ONE PLACE `only()`'s RULE POINTS THE OTHER WAY, and it is worth saying
+  // why. Its rule is about the act the reader CHOSE: auto-picking a sole option
+  // is wrong for a substantive act, because *"'there was only one' is not
+  // consent"*. This is not the act the reader chose — it is a consequence of it,
+  // forced by the destination. A journal with one note type offers no choice to
+  // make, and asking a question with a single answer would read as though there
+  // were a decision here. The reader is told rather than asked: the confirm names
+  // the type either way, which is where the consent actually lives.
+  private async pickForeignKind(into: JournalType): Promise<JournalKind | null> {
+    if (into.kinds.length === 0) {
+      notify.fail(`${into.name} has no note types to file these under.`);
+      return null;
+    }
+    if (into.kinds.length === 1) return into.kinds[0];
+    const id = await promptDetailedSuggester(
+      this.deps.plugin.app,
+      into.kinds.map((k) => ({
+        value: k.id,
+        label: `${k.emoji} ${k.label}`,
+        description: `File them as ${kindPlural(k).toLowerCase()} in ${into.name}.`,
+      })),
+      `Become which kind of ${into.name} note?`
+    );
+    return into.kinds.find((k) => k.id === id) ?? null;
   }
 
   private async retype(paths: readonly string[], kindId: string): Promise<void> {
@@ -649,10 +806,16 @@ export class BelowEdit extends MarkdownRenderChild {
     // reader is entitled to expect a file to move. A kind is not a folder; this
     // is a frontmatter write and the row simply reappears under another head at
     // the next repaint, which the live widget does by itself.
+    // `kindPlural`, NOT `plural`. A kind may declare its own plural and two of
+    // the shipped ones do — `plural("Practice")` is "Practices" and the kind says
+    // "Practice". Every other surface that names a run of these reads the
+    // override; this said the crude pluraliser's answer in a window asking for
+    // consent.
+    const many = kindPlural(kind).toLowerCase();
     const ok = await confirmAction(
       plugin.app,
-      `Re-file ${n} note${n === 1 ? "" : "s"} as ${plural(kind.label).toLowerCase()}?`,
-      `They become ${plural(kind.label).toLowerCase()}. Nothing moves on disk — they stop showing under the head they are under now and start showing under ${kind.label}.`,
+      `Re-file ${n} note${n === 1 ? "" : "s"} as ${many}?`,
+      `They become ${many}. Nothing moves on disk — they stop showing under the head they are under now and start showing under ${kind.label}.`,
       "Change the type"
     );
     if (!ok) return;
@@ -671,20 +834,45 @@ export class BelowEdit extends MarkdownRenderChild {
     this.report(moveReport(done, skipped, kind.label));
   }
 
-  private async reparent(paths: readonly string[], folder: string): Promise<void> {
+  // ONE MOVER, WITH OR WITHOUT THE RETYPE. A cross-journal transfer is a move
+  // plus a frontmatter write, and writing it as a second method would mean two
+  // copies of the collision refusal, the per-item `try` and the report — the three
+  // parts most worth having exactly once. `into` is the only difference, and it
+  // reaches the sentence, the loop and nothing else.
+  private async reparent(
+    paths: readonly string[],
+    folder: string,
+    into: { kind: JournalKind; journal: JournalType } | null
+  ): Promise<void> {
     const { plugin } = this.deps;
     const n = paths.length;
+    const notes = `${n} note${n === 1 ? "" : "s"}`;
+    // THE SECOND CHANGE IS IN THE SENTENCE, because a reader who pressed a button
+    // called *Move…* is not expecting their notes to be re-filed as something
+    // else. It is not a side effect to discover afterwards: a kind belongs to a
+    // journal, the destination's tables select on `type:`, and a note carrying a
+    // foreign one would sit in the new folder listed by nothing — which is the
+    // failure this whole round removed from the create path.
+    //
+    // AND WHAT IS NOT TOUCHED IS SAID TOO. The other properties stay: a Lesson
+    // rated on `confidence` keeps its reading after becoming a Project note that
+    // does not rate on it. Dropping them would be destroying a reader's data to
+    // tidy a table, and they are still there if the note ever goes back.
     const ok = await confirmAction(
       plugin.app,
-      `Move ${n} note${n === 1 ? "" : "s"} to ${folder.split("/").pop() ?? folder}?`,
-      `They move into ${folder}. Links from your other notes are updated to follow. A note with its own pages takes them with it.`,
-      "Move them"
+      into
+        ? `Move ${notes} to ${into.journal.name}?`
+        : `Move ${notes} to ${folder.split("/").pop() ?? folder}?`,
+      into
+        ? `They move into ${folder} and become ${kindPlural(into.kind).toLowerCase()}, because note types belong to a journal and ${into.journal.name} has its own. Links from your other notes are updated to follow. Any properties ${into.journal.name} does not use stay on the notes, unread. A note with its own pages takes them with it.`
+        : `They move into ${folder}. Links from your other notes are updated to follow. A note with its own pages takes them with it.`,
+      into ? `Move and re-file` : "Move them"
     );
     if (!ok) return;
 
     let done = 0;
     const skipped: string[] = [];
-    for (const { whole } of this.resolve(paths)) {
+    for (const { file, whole } of this.resolve(paths)) {
       const target = `${folder}/${whole.name}`;
       // A COLLISION REFUSES AND SAYS SO, rather than suffixing. `header-title.ts`
       // and `promoteToDashboard` both refuse for the same reason: silently
@@ -700,13 +888,26 @@ export class BelowEdit extends MarkdownRenderChild {
         // every link that pointed at what moved, which is the difference between
         // a moved note that still resolves and a page of broken links.
         await plugin.app.fileManager.renameFile(whole, target);
+        // THE MOVE FIRST, THEN THE TYPE, and the order is the recoverable one. A
+        // type written before a failed move leaves the note in its OLD journal
+        // carrying a `type:` that journal does not recognise — listed by nothing,
+        // in the folder the reader was looking at. This way a refused move leaves
+        // the note exactly as it was, and the only partial state possible is a
+        // note that arrived and kept its old type, which the report names.
+        //
+        // `file`, NOT a fresh lookup, and 4.50.2's identity rule is why it works
+        // rather than why it does not. Obsidian MUTATES a `TFile` in place on
+        // rename — including the children of a renamed folder — so the handle
+        // FOLLOWS the note to its new path, which is exactly what is wanted here.
+        // The rule is about holding one to remember where something WAS.
+        if (into) await plugin.journals.setNoteKind(file, into.kind.id);
         done += 1;
       } catch (e) {
         console.error("[ChronoAnvil] could not move", whole.path, e);
         skipped.push(whole.name);
       }
     }
-    this.report(moveReport(done, skipped, folder));
+    this.report(moveReport(done, skipped, into ? into.journal.name : folder));
   }
 
   // ── delete ────────────────────────────────────────────────────────────
