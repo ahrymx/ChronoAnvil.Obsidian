@@ -1742,9 +1742,20 @@ export class Widgets implements
       // and where adding a kind to "whatever journal this template belongs to"
       // is not a question the surface can answer — it returns null there and
       // nothing is appended.
+      //
+      // AND IT IS HELD RATHER THAN APPENDED AND FORGOTTEN (1.0.12), because a
+      // chevron has to be able to take it away again. Every other thing in the
+      // *what's below* card is a child a directive drew, so `stampedWithin`
+      // finds it inside the part's lines; this one is drawn by the renderer and
+      // carries no stamp, which is the whole reason it exists — and the reveal
+      // was therefore hiding a card down to its last row and leaving the row
+      // that adds to it sitting under a closed section. The reader's words:
+      // *"the add note type should only appear when 'whats under this note' is
+      // expanded."* `addKindRow` is what the reveal block claims it by.
+      let addKindRow: HTMLElement | null = null;
       if (hasKindTable) {
-        const addKind = buildAddKindRow(this.plugin, ctx);
-        if (addKind) container.appendChild(addKind);
+        addKindRow = buildAddKindRow(this.plugin, ctx);
+        if (addKindRow) container.appendChild(addKindRow);
       }
 
 
@@ -2114,6 +2125,26 @@ export class Widgets implements
       // Every element in this block a chevron hides, in the order they were
       // drawn — the strip below is placed above the first of them.
       const revealAnchors: HTMLElement[] = [];
+      // ── AND WHICH SECTIONS THIS FENCE WELDS (1.0.12) ──────────────────
+      //
+      // THE FENCE IS THE AUTHORITY ON WHICH BUTTONS EXIST, and the registry is
+      // the authority on what each one acts upon. `RevealBar` reads the note's
+      // whole set of targets — that is what lets a target registered after the
+      // banner was drawn still get a button — and the set is keyed by PATH, so
+      // it holds every registration made for this note by anything: a render of
+      // this block that has not finished unloading, the same file open in a
+      // second pane, a hover preview.
+      //
+      // WHAT THAT COST WAS A CHEVRON FOR A SECTION THAT HAD LEFT. Moving a
+      // welded section out gives it a fence and a card of its own — the card
+      // draws its own head and its own fold, which is the control that replaces
+      // the chevron — and the banner went on drawing a button for it out of a
+      // registration the departed render had left behind. The reader's words:
+      // *"if a section is outside of the stack group, its respective chevron in
+      // the stack shouldn't be visible."* This pass over this fence is the only
+      // thing that knows which sections are welded RIGHT NOW, so it says so,
+      // and the bar draws nothing the fence did not name.
+      const welded = new Set<string>();
       if (!isManagedTemplate(this.plugin, ctx.sourcePath)) {
         // WHERE A PART'S LINES BECOME A PART'S CHILDREN, read off the stamp
         // each child already carries — see `stampedWithin` for why it is not
@@ -2131,9 +2162,32 @@ export class Widgets implements
         // would therefore weld the grid into the banner and get a chevron that
         // hid nothing. The bar IS the part on those notes, so the part takes
         // it.
+        //
+        // ── AND THE ROW THAT ADDS A KIND IS THE SECTION'S TOO (1.0.12) ──
+        //
+        // `addKindRow` is the one child of a *what's below* card that no
+        // directive drew, so it has no stamp and no range can contain it. It
+        // belongs to the section all the same — it is the last row of that
+        // card and it edits what the card lists — so it is handed to whichever
+        // part holds the `kind-table:` line it was built for. Without this the
+        // chevron closed the section and left one dashed row behind, sitting
+        // under a head that had gone.
+        //
+        // `rawLines`, BECAUSE THAT IS THE NUMBERING A PART SPEAKS. `parts` are
+        // indices into the fence as the file has it; `lines` has had the
+        // modifiers and the comments filtered out of it, and reading one range
+        // in the other's numbering is the off-by-a-modifier defect `lineAt`
+        // exists to have fixed once.
+        const kindTableAt = rawLines.findIndex(
+          (l) => keywordOf(l) === "kind-table"
+        );
         const childrenOf = (part: { id: string; from: number; to: number }) => {
           const own = stampedWithin(container, part.from, part.to);
-          if (own.length) return own;
+          const adds =
+            addKindRow && kindTableAt >= part.from && kindTableAt < part.to
+              ? [addKindRow]
+              : [];
+          if (own.length || adds.length) return [...own, ...adds];
           return part.id === "tracker" && trackerBar ? [trackerBar] : [];
         };
 
@@ -2149,6 +2203,7 @@ export class Widgets implements
         for (const part of parts) {
           for (const el of childrenOf(part)) {
             revealAnchors.push(el);
+            welded.add(part.id);
             ctx.addChild(
               new RevealTargetChild(el, ctx.sourcePath, {
                 id: part.id,
@@ -2177,6 +2232,7 @@ export class Widgets implements
         const undivided = isJournalBanner && parts.length === 0;
         if (trackerBar && undivided) {
           revealAnchors.push(trackerBar);
+          welded.add("trackers");
           ctx.addChild(
             new RevealTargetChild(trackerBar, ctx.sourcePath, {
               id: "trackers",
@@ -2194,12 +2250,23 @@ export class Widgets implements
         // the target is that SPAN, one registration per element. `revealButtons`
         // gathers every target of an id under one button, which is what makes
         // several elements one control.
+        //
+        // AND THE ADD ROW HERE TOO (1.0.12), for the reason `childrenOf` takes
+        // it two screens up. The span is a range of CHILDREN and the row is
+        // appended after every one of them, so it falls inside the slice only
+        // where this section happens to be the last thing in the fence — which
+        // is true of the note the reader reported and false of the one above
+        // it. Adding it by name rather than by position is the same answer in
+        // both, and `includes` is what keeps it from being claimed twice.
         const span = undivided ? belowSpanIn(lines) : null;
         if (span) {
           const from = drawn[span.from]?.at ?? 0;
           const to = drawn[span.to]?.at ?? kids.length;
-          for (const el of kids.slice(from, to)) {
+          const within = kids.slice(from, to);
+          if (addKindRow && !within.includes(addKindRow)) within.push(addKindRow);
+          for (const el of within) {
             revealAnchors.push(el);
+            welded.add("below");
             ctx.addChild(
               new RevealTargetChild(el, ctx.sourcePath, {
                 id: "below",
@@ -2243,7 +2310,7 @@ export class Widgets implements
             .sort((a, b) => a - b)[0];
           if (at !== undefined) container.insertBefore(strip, kids[at]);
           ctx.addChild(
-            new RevealBar(strip, ctx.sourcePath, this.revealStore())
+            new RevealBar(strip, ctx.sourcePath, this.revealStore(), welded)
           );
         }
       }

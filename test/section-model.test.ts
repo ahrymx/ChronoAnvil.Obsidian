@@ -567,7 +567,23 @@ describe("the editor cannot learn which surface it is on", () => {
     // is still the control that does. The OPENER's box is a different question
     // wearing the same field — its bar is the group's own title — so it is not
     // drawn on the row at all and appears on the card as **Title header**.
+    //
+    // AND A SEVENTH KIND IN 1.0.11, WHICH PUTS THE BANNER ON THIS LIST FOR THE
+    // FIRST TIME. `flag` asks whether the block wears one MODIFIER LINE, and the
+    // banner's is `actions` — the menu of things a reader can do to the page,
+    // composed into every journal note, journal dashboard and diary entry since
+    // 1.0.11 and until now editable only as one vault-wide switch in Settings.
+    // Like `form` it is never required and its answer is a line's existence
+    // rather than a directive's argument; unlike `form` a section may wear
+    // several, because a modifier says nothing about any other modifier.
+    //
+    // THREE ROWS, ONE PER CATALOGUE THAT COMPOSES THE LINE, and `banner` is a
+    // section that declared no question at all before this. The fourth banner —
+    // a flat page's — is not on this list because `surfaces()` covers three
+    // catalogue types; it is swept in `test/page-actions.test.ts`, which asks the
+    // question of every composed note instead.
     expect(asking).toEqual([
+      "journal index/banner",
       "journal index/stats",
       "journal index/find",
       "journal index/review",
@@ -577,6 +593,7 @@ describe("the editor cannot learn which surface it is on", () => {
       "journal index/tags",
       "journal index/path",
       "journal index/resources",
+      "journal leaf/banner",
       "journal leaf/resources",
       // A SIXTH KIND IN 5.6, AND THE FIRST WHOSE ANSWER IS NOT A DIRECTIVE'S
       // ARGUMENT AT ALL. `lines` asks for the note's opening headings, which
@@ -600,6 +617,7 @@ describe("the editor cannot learn which surface it is on", () => {
       "diary dashboard/entry-rollup",
       "diary dashboard/open-tasks",
       "diary dashboard/tags",
+      "diary entry/banner",
       "diary entry/bridge",
     ]);
 

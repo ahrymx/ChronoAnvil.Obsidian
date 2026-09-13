@@ -251,14 +251,33 @@ export function revealKey(path: string, id: string): string {
 // several elements are several registrations under one id — and two buttons
 // saying the same word, each hiding half of a section, is a control that lies
 // about what it does.
+// ── AND ONLY FOR A SECTION THE FENCE STILL WELDS (1.0.12) ────────────────
+//
+// `welded` is the set of ids the banner's own pass registered, handed back in
+// so the strip cannot outlive them. The registry is keyed by PATH and is
+// deliberately wider than one block — that is what lets a card rendered after
+// the banner get its button — and the price of that width is that a
+// registration nothing has cleaned up yet is indistinguishable from a live one.
+//
+// A SECTION THAT LEAVES THE STACK GETS A CARD, AND A CARD HAS ITS OWN FOLD, so
+// the chevron for it is not merely stale: it is a second control over something
+// that already has one, in the head of a section that no longer holds it. The
+// reader reported exactly that. The fence says which sections are welded; this
+// filter is that answer applied.
+//
+// OMITTED MEANS EVERY ID, which is what the unit tests below pass and what a
+// caller with no fence in hand would mean. There is one production caller and
+// it always says.
 export function revealButtons(
-  targets: readonly RevealTarget[]
+  targets: readonly RevealTarget[],
+  welded?: ReadonlySet<string>
 ): { id: string; label: string; targets: RevealTarget[] }[] {
+  const mine = welded ? targets.filter((t) => welded.has(t.id)) : targets;
   const order: string[] = [];
-  for (const t of targets) if (!order.includes(t.id)) order.push(t.id);
+  for (const t of mine) if (!order.includes(t.id)) order.push(t.id);
   return order.map((id) => {
-    const mine = targets.filter((t) => t.id === id);
-    return { id, label: mine[0].label, targets: mine };
+    const of = mine.filter((t) => t.id === id);
+    return { id, label: of[0].label, targets: of };
   });
 }
 
@@ -447,7 +466,11 @@ export class RevealBar extends MarkdownRenderChild {
   constructor(
     private barEl: HTMLElement,
     private path: string,
-    private store: RevealStore
+    private store: RevealStore,
+    // The ids this bar's own fence welds — see `revealButtons`. A bar built
+    // before 1.0.12 drew whatever the note had registered, which outlived the
+    // sections it was drawn for.
+    private welded: ReadonlySet<string>
   ) {
     super(barEl);
   }
@@ -476,7 +499,7 @@ export class RevealBar extends MarkdownRenderChild {
     this.release();
     this.barEl.empty();
 
-    const buttons = revealButtons(revealTargetsFor(this.path));
+    const buttons = revealButtons(revealTargetsFor(this.path), this.welded);
     for (const { id, label, targets } of buttons) {
       const open = this.store.isOpen(revealKey(this.path, id));
       const btn = this.barEl.createEl("button", {

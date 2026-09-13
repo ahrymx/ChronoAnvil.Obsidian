@@ -23,6 +23,9 @@ import {
 } from "../src/core/widget-registry";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
 import { goldenNotes } from "./golden-notes";
+import type { GoldenNote } from "./golden-notes";
+import { FLAG_OFF, FLAG_ON } from "../src/core/section-model";
+import type { SectionWant } from "../src/core/section-model";
 import {
   applySections,
   journalSectionModel,
@@ -34,6 +37,38 @@ import { STUDY_JOURNAL } from "../src/journals/journal";
 import { readCss, readSrc } from "./sources";
 
 const ACTIONS_LINE = "actions";
+
+// The banner's own fence body, trimmed, on any of the nine surfaces.
+//
+// HOISTED OUT OF `bannerFenceOf` BELOW so the toggle's sweeps can ask the same
+// question the composition sweeps ask. A second spelling of "which fence is the
+// banner's" is a second chance for one of the two to be looking at the wrong
+// block.
+const bannerFence = (text: string): string[] => {
+  const lines = text.split("\n");
+  const open = lines.findIndex(
+    (l, i) =>
+      l.trim() === "```chronoanvil" &&
+      lines.slice(i + 1).some((n) => /^(title|journal-header|entry-header)\b/.test(n.trim()))
+  );
+  if (open === -1) return [];
+  const close = lines.findIndex((l, i) => i > open && l.trim() === "```");
+  return lines.slice(open + 1, close).map((l) => l.trim());
+};
+
+// `want`, with the banner answering the flag one way or the other.
+const answering = (present: readonly string[], answer: string): SectionWant[] =>
+  present.map((id) =>
+    id === "banner" ? { id, options: { actions: answer } } : id
+  );
+
+// A text with every `actions` line struck out of it — the form in which two
+// files that should differ by exactly that line can be compared.
+const struck = (text: string): string =>
+  text
+    .split("\n")
+    .filter((l) => l.trim() !== ACTIONS_LINE)
+    .join("\n");
 
 // The surfaces that compose the row, by golden-note name prefix, and the ones
 // that must not. Stated as data because the whole decision is which list a
@@ -109,17 +144,9 @@ describe("which actions a reader is left with", () => {
 });
 
 describe("which pages compose the row", () => {
-  const bannerFenceOf = (text: string): string[] => {
-    const lines = text.split("\n");
-    const open = lines.findIndex(
-      (l, i) =>
-        l.trim() === "```chronoanvil" &&
-        lines.slice(i + 1).some((n) => /^(title|journal-header|entry-header)\b/.test(n.trim()))
-    );
-    if (open === -1) return [];
-    const close = lines.findIndex((l, i) => i > open && l.trim() === "```");
-    return lines.slice(open + 1, close).map((l) => l.trim());
-  };
+  // `bannerFence` at the top of this file, which is where it moved in 1.0.11 so
+  // the toggle's sweeps could ask the same question these do.
+  const bannerFenceOf = bannerFence;
 
   it("puts it in the banner's own fence on every page that has it", () => {
     // NOT MERELY PRESENT IN THE NOTE — in the BANNER's fence, which is what
@@ -302,6 +329,184 @@ describe("a note written before the row existed", () => {
     // And it is still the banner's own line, which is what `claims` records.
     const journal = readSrc("journals/journal-sections.ts");
     expect(journal).toContain(`claims: ["journal-header", ACTIONS_KEYWORD]`);
+  });
+});
+
+describe("the toggle over it, in Edit sections…", () => {
+  // 1.0.11 shipped the menu with one place to change your mind about it: a
+  // vault-wide switch in Settings. That is the right home for WHICH ITEMS the
+  // menu holds and the wrong one for WHETHER A PAGE HAS IT — a fact about that
+  // page, which belongs where the rest of the page's structure is edited. The
+  // toggle is a `flag` question on the banner's row; `FlagQuestion` holds the
+  // argument and this holds the contract.
+  //
+  // THE NOTES ARE THE SAME 24 the sweep above uses, for its reason: a composed
+  // note is the only file whose exact bytes are known in advance, so "nothing
+  // else moved" can be asserted rather than eyeballed.
+  const flagOf = (note: GoldenNote) => {
+    const view = note
+      .model()
+      .sections(note.text)
+      .find((v) => v.id === "banner");
+    return {
+      view,
+      question: (view?.questions ?? []).find((q) => q.kind === "flag"),
+    };
+  };
+
+  const wearing = () =>
+    goldenNotes().filter((n) => bannerFence(n.text).includes(ACTIONS_LINE));
+
+  it("is declared by every banner that composes the line, and by no other", () => {
+    // THE SURFACE CHOICE, ASKED OF THE QUESTION RATHER THAN OF THE RENDER. A
+    // banner with the line and no toggle is a menu a reader cannot turn off; a
+    // toggle on a banner with no line is an offer to turn on a menu whose two
+    // items mean nothing on a page you pass through — see `BannerSpec.actions`.
+    // The two lists have to be the same list, and this is the only place both
+    // are computed.
+    let asked = 0;
+    for (const note of goldenNotes()) {
+      const composes = bannerFence(note.text).includes(ACTIONS_LINE);
+      const { question } = flagOf(note);
+      expect(Boolean(question), note.name).toBe(composes);
+      if (!question) continue;
+      asked++;
+      expect(question.key, note.name).toBe("actions");
+      expect(question.line, note.name).toBe(ACTIONS_LINE);
+      // ONE DECLARATION, THREE CATALOGUES. `actionsQuestion` is the factory and
+      // the labels are its, so the row a reader compares against another row
+      // cannot be worded differently on two surfaces.
+      expect(question.label, note.name).toBe("the action menu");
+      expect(question.on, note.name).toBe("Show the action menu");
+      expect(question.off, note.name).toBe("Hide the action menu");
+    }
+    expect(asked).toBeGreaterThan(20);
+  });
+
+  it("names the line it is composed under, and is composed under it", () => {
+    // `FlagQuestion.after` is where the write puts the modifier back, and the
+    // whole reason it is declared rather than derived is that it must match what
+    // the composer did — a line written back somewhere the composer would never
+    // have put it makes the note read as hand-edited to anybody comparing it,
+    // `isHandEdited` included, for no gain at all.
+    for (const note of wearing()) {
+      const { question } = flagOf(note);
+      const body = bannerFence(note.text);
+      const at = body.indexOf(ACTIONS_LINE);
+      expect(at, note.name).toBeGreaterThan(0);
+      expect(
+        body[at - 1].split(":")[0],
+        `${note.name} sits under ${question!.after}`
+      ).toBe(question!.after);
+    }
+  });
+
+  it("reads the answer off the fence, on a note that has the line and one that does not", () => {
+    // A FLAG'S ANSWER IS A LINE'S EXISTENCE, so `answerInText` cannot reach it —
+    // it finds a directive's argument span — and the model has to supply it. The
+    // failure this forbids is the quiet one: an unsupplied answer draws the inert
+    // *"set when added"* wording over a control that could perfectly well have
+    // been drawn, on every note in every vault.
+    for (const note of wearing()) {
+      expect(flagOf(note).view?.answered?.actions, note.name).toBe(FLAG_ON);
+      const old = { ...note, text: note.text.replace(`\n${ACTIONS_LINE}\n`, "\n") };
+      expect(flagOf(old).view?.answered?.actions, `${note.name} without`).toBe(
+        FLAG_OFF
+      );
+    }
+  });
+
+  it("plans a reconfigure and says which way, in the catalogue's own words", () => {
+    // The Changes tab is the reason "generates, never regenerates" was allowed
+    // to stop being the rule, so a write this window performs has to be a write
+    // it named. `describeAnswers` reads the flag's two side labels rather than
+    // the bare token it carries.
+    for (const note of wearing()) {
+      const model = note.model();
+      const present = model.present(note.text);
+      const op = model
+        .plan(note.text, answering(present, FLAG_OFF))
+        .find((o) => o.sectionId === "banner");
+      expect(op?.kind, note.name).toBe("reconfigure");
+      expect(op?.detail, note.name).toBe("the action menu → Hide the action menu");
+    }
+  });
+
+  it("takes the line out, and puts nothing else in the note out of place", () => {
+    // THE WHOLE PROMISE OF THE WRITE, over every note the plugin composes. A
+    // flag is one line: the file that comes back must differ from the one that
+    // went in by exactly that line and by nothing else — not a blank line, not a
+    // fence that lost its modifier, not a region re-indented.
+    //
+    // ASSERTED BY SUBTRACTION rather than by eye: both texts with every
+    // `actions` line struck out must be identical, which is the only form of
+    // "nothing else moved" that cannot be satisfied by a near miss.
+    let seen = 0;
+    for (const note of wearing()) {
+      seen++;
+      const model = note.model();
+      const next = model.apply(
+        note.text,
+        answering(model.present(note.text), FLAG_OFF)
+      );
+      expect(next, note.name).not.toBeNull();
+      expect(bannerFence(next!), note.name).not.toContain(ACTIONS_LINE);
+      expect(struck(next!), note.name).toBe(struck(note.text));
+    }
+    expect(seen).toBeGreaterThan(20);
+  });
+
+  it("puts it back exactly where the composer had it", () => {
+    // THE OTHER DIRECTION, AND THE ONE EVERY EXISTING VAULT IS IN. Every note
+    // written before 1.0.11 is the file with the line cut out, so ticking the box
+    // is the gesture a reader will actually make — and what it must produce is
+    // the note the composer would have written, byte for byte. Anything else and
+    // `isHandEdited` starts reporting a note nobody hand-edited.
+    let seen = 0;
+    for (const note of wearing()) {
+      seen++;
+      const model = note.model();
+      const old = note.text.replace(`\n${ACTIONS_LINE}\n`, "\n");
+      expect(old, note.name).not.toBe(note.text);
+      const back = model.apply(old, answering(model.present(old), FLAG_ON));
+      expect(back, note.name).toBe(note.text);
+    }
+    expect(seen).toBeGreaterThan(20);
+  });
+
+  it("writes nothing at all when the box was not touched", () => {
+    // READING A CONTROL IS NOT ANSWERING IT. `reconfigured` keys on the PRESENCE
+    // of options, which the editor attaches only to a row it touched, so a reader
+    // who opens the window, looks at the tick and closes it again has changed
+    // nothing. The sweep above already asserts this for the old note; this is the
+    // same promise on the note that HAS the row, where a write would be silent
+    // rather than visible.
+    for (const note of wearing()) {
+      const model = note.model();
+      const present = model.present(note.text);
+      expect(model.apply(note.text, present), note.name).toBeNull();
+      // And the same answer the note already holds is still not a write.
+      expect(
+        model.apply(note.text, answering(present, FLAG_ON)),
+        `${note.name} idempotent`
+      ).toBeNull();
+    }
+  });
+
+  it("is a checkbox whose tick means the line is there", () => {
+    // THE ONE PLACE THIS INVERTS THE FORM TOGGLE, and it is worth pinning
+    // because the two controls sit in the same slot and share a stylesheet. A
+    // form's box is ticked for `widget` — the answer the catalogue does NOT
+    // compose — because the question is "depart from the default". A flag's
+    // default is composed too, so a box labelled *Show the action menu* that is
+    // ticked to HIDE it would be a control lying about its own state.
+    const src = readSrc("ui/section-editor.ts");
+    expect(src).toContain('this.shownAnswer(section, q) !== FLAG_OFF');
+    expect(src).toContain("box.checked ? FLAG_ON : FLAG_OFF");
+    // AND IT IS NEVER PROMPTED FOR AT ADD TIME, on the form's argument exactly:
+    // a banner is locked on every surface, so there is no add for a flag answer
+    // to ride along with.
+    expect(readSrc("ui/section-insert.ts")).toContain('if (q.kind === "flag") continue;');
   });
 });
 

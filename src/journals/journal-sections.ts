@@ -33,7 +33,7 @@ import {
   leadingBar,
   splitDirective,
 } from "../core/directive-grammar";
-import { rowRuns } from "../core/note-sections";
+import { actionsQuestion, rowRuns } from "../core/note-sections";
 import type { FlatSection } from "../core/note-sections";
 import type { VaultLists } from "../core/widget-registry";
 import {
@@ -1328,6 +1328,13 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // anchors on `journal-header` alone — so the banner is found, reported
     // present, and repaired by ADDING the row rather than replacing the block.
     claims: ["journal-header", ACTIONS_KEYWORD],
+    // AND THE ROW IS A TOGGLE ON THIS ROW (1.0.11). The menu is composed into
+    // every journal note this release writes, and whether a given note keeps it
+    // is a fact about that note — so the answer lives where the rest of the
+    // note's structure is edited rather than only in the vault-wide switch.
+    // `actionsQuestion` is the one declaration; the anchor is the line the
+    // `render` below composes the modifier under.
+    questions: () => [actionsQuestion("journal-header")],
     locate: (t) => probe(t, /^journal-header\s*$/m),
     render: () => [
       // Tight against the fence below it: the spacer is documented as

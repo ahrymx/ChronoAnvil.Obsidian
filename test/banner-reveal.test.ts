@@ -126,6 +126,67 @@ describe("which buttons a banner draws", () => {
     ]);
     expect(revealButtons([])).toEqual([]);
   });
+
+  it("draws nothing for a section that has left the stack (1.0.12)", () => {
+    // *"if a section is outside of the stack group, its respective chevron in
+    // the stack shouldn't be visible."*
+    //
+    // THE REGISTRY IS WIDER THAN THE FENCE ON PURPOSE. It is keyed by PATH, so
+    // a card rendered after the banner still gets its button — and the price of
+    // that width is that a registration nothing has cleaned up yet reads
+    // exactly like a live one. Moving a welded section out gives it a fence and
+    // a card of its own, with its own head and its own fold; the banner went on
+    // drawing a chevron for it, which is a second control over a section the
+    // strip no longer holds.
+    //
+    // THE FENCE DECIDES WHICH BUTTONS EXIST, and the registry decides what each
+    // one acts upon. `welded` is the set the banner's own pass registered this
+    // time round; nothing outside it draws.
+    const grid = target("tracker", "Trackers");
+    const gone = target("kind-table", "What's below");
+    expect(revealButtons([grid, gone]).map((b) => b.id)).toEqual([
+      "tracker",
+      "kind-table",
+    ]);
+    expect(
+      revealButtons([grid, gone], new Set(["tracker"])).map((b) => b.id)
+    ).toEqual(["tracker"]);
+    // AND THE SURVIVOR KEEPS EVERY TARGET OF ITS OWN ID, which is the rule the
+    // test two up states: filtering the list must not cost a button one of the
+    // cards it drives.
+    const second = target("tracker", "Second grid");
+    const kept = revealButtons([grid, gone, second], new Set(["tracker"]));
+    expect(kept).toHaveLength(1);
+    expect(kept[0].targets).toEqual([grid, second]);
+    // A fence that welds nothing draws nothing, whatever the note has left
+    // lying in the registry under its path.
+    expect(revealButtons([grid, gone], new Set())).toEqual([]);
+  });
+
+  it("hands the bar the fence's own list, once per render", () => {
+    // THE HALF THAT IS NOT PURE, asserted the way this suite asserts every
+    // other DOM rule: there is no jsdom here, so the wiring is read off the
+    // source. Three things have to agree — the bar takes the list, the bar
+    // filters by it, and the dispatcher fills it from the registrations it has
+    // just made rather than from a second reading of the fence.
+    const reveal = readCode("ui/reveal");
+    expect(reveal).toContain("private welded: ReadonlySet<string>");
+    expect(reveal).toContain(
+      "revealButtons(revealTargetsFor(this.path), this.welded)"
+    );
+
+    const widgets = readCode("widgets");
+    expect(widgets).toContain("const welded = new Set<string>();");
+    // One `add` per registration site: the divided parts, the 5.28 grid and the
+    // 5.28 span. A fourth site added without one would give the reader a
+    // chevron the bar refuses to draw, which is the failure this pairs.
+    expect(widgets).toContain("welded.add(part.id);");
+    expect(widgets).toContain('welded.add("trackers");');
+    expect(widgets).toContain('welded.add("below");');
+    expect(widgets).toContain(
+      "new RevealBar(strip, ctx.sourcePath, this.revealStore(), welded)"
+    );
+  });
 });
 
 describe("what a reveal calls itself", () => {

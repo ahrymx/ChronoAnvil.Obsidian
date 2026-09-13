@@ -5,6 +5,35 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.12] - 2026-09-13
+
+### Added
+
+- **Turn the page's action menu on or off, one page at a time.** 1.0.11 gave every
+  journal note, journal dashboard and diary entry a menu of things you can do to
+  the page, and one place to change your mind about it: a switch in Settings that
+  covers the whole vault. Settings still decides which items the menu holds; the
+  banner's own row in *Edit sections…* now decides whether this page offers one at
+  all. Untick **Show the action menu** and the control leaves that page's name;
+  tick it and it comes back. Nothing else in the note moves either way — the line
+  goes back exactly where the page would have been written with it.
+
+  It is also how you give the menu to a note you already have. Pages written
+  before 1.0.11 have no menu and are still not rewritten behind your back; the
+  tick is the same write, asked for.
+
+### Fixed
+
+- **Closing *What's below* now closes all of it.** The dashed **+ Add note type**
+  row at the foot of the card stayed on the page when the banner's chevron folded
+  the section away, leaving one control sitting under a head that had gone.
+
+- **A section you move out of the banner takes its chevron with it.** Dragging
+  *Trackers* or *What's below* into a card of its own gives it that card's own
+  fold, and the banner used to go on offering a second control for it — a chevron
+  in the stack for a section that had left the stack. The strip now draws a button
+  only for the sections the banner is actually holding.
+
 ## [1.0.11] - 2026-09-13
 
 ### Added

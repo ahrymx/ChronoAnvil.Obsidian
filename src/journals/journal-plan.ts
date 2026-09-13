@@ -2815,7 +2815,13 @@ function answeredIn(
   // would have been replaced by its `settled` wording on every section that has
   // one. `answersOn` is the read the other two models already use, and what it
   // wants is the section's anchor, which `locate` is.
-  if (questions.some((q) => q.kind === "form")) {
+  //
+  // AND A FLAG IS THE SECOND OF THEM (1.0.11), read off the same fence by the
+  // same function and for the same reason: the answer is a modifier LINE'S
+  // existence rather than a span inside one. The banner's action toggle is the
+  // one that has it, and without this branch its box would have come up under
+  // the inert *"set when added"* wording on every note in every vault.
+  if (questions.some((q) => q.kind === "form" || q.kind === "flag")) {
     Object.assign(out, answersOn(section.locate(text, ctx), questions, text));
   }
   // THE KEY IS READ OFF THE QUESTION, not written here. This file knows that a

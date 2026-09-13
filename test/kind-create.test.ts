@@ -217,7 +217,38 @@ describe("where the row is drawn", () => {
       'const hasKindTable = lines.some((l) => keywordOf(l) === "kind-table");'
     );
     expect(widgets()).toMatch(
-      /if \(hasKindTable\) \{[\s\S]{0,200}container\.appendChild\(addKind\)/
+      /if \(hasKindTable\) \{[\s\S]{0,200}container\.appendChild\(addKindRow\)/
+    );
+  });
+
+  it("goes away with the section, under the banner's chevron (1.0.12)", () => {
+    // *"the add note type should only appear when 'whats under this note' is
+    // expanded."*
+    //
+    // WHY IT DID NOT. A reveal hides the children a part's lines DREW, found by
+    // the stamp each one carries; this row is drawn by the renderer after the
+    // loop and carries none, which is the same fact the test above it asserts
+    // from the other side. So the chevron closed the card down to its last row
+    // and left the dashed slot behind, under a head that had gone.
+    //
+    // BY THE LINE IT WAS BUILT FOR, not by position. The row is appended last
+    // in the block, so a section that happens to be the fence's last part would
+    // have been fixed by a range that reached the end and every other one would
+    // not — and a banner welding the index above the grid is a fence the reader
+    // can arrange today.
+    const src = widgets();
+    expect(src).toContain("const kindTableAt = rawLines.findIndex(");
+    // `rawLines`, WHICH IS THE NUMBERING A PART SPEAKS. `lines` has had the
+    // modifiers filtered out of it, so a range read in the wrong one lands a
+    // line or two early on any fence carrying a `stack` or a `frame:`.
+    expect(src).not.toContain("const kindTableAt = lines.findIndex(");
+    expect(src).toContain(
+      "addKindRow && kindTableAt >= part.from && kindTableAt < part.to"
+    );
+    // And the 5.28 spelling, where the whole fence is one part and the span is
+    // a range of children rather than of lines.
+    expect(src).toContain(
+      "if (addKindRow && !within.includes(addKindRow)) within.push(addKindRow);"
     );
   });
 

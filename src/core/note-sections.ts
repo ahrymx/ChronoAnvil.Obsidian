@@ -128,7 +128,9 @@ import {
   SectionView,
   SectionWant,
   WIDGET_FORM,
+  FlagQuestion,
   formAt,
+  flagAt,
   describeAnswers,
   partsOf,
   holdPinned,
@@ -384,6 +386,46 @@ export interface BannerSpec {
   actions?: boolean;
 }
 
+// ── THE TOGGLE OVER THE ACTION MENU (1.0.11) ─────────────────────
+//
+// ONE QUESTION, THREE CATALOGUES, AND THAT IS THE WHOLE REASON IT IS A FACTORY.
+// `actions` is composed by a flat note's banner, a journal note's and a diary
+// entry's, and those three banners are declared in three files — so the wording,
+// the key and the two side labels would otherwise be written three times, in a
+// window where the reader compares one row against another. `bannerSection` made
+// exactly this argument about the banner itself in 4.19 and it applies unchanged
+// to the question about it.
+//
+// HERE BECAUSE THE BANNER IS HERE. This module owns `BANNER_ID`, the flat
+// banner's composition and the argument for what a banner IS, and the other two
+// catalogues already import from it. `core/page-actions.ts` owns the MENU and
+// would be the other candidate; it is the wrong one, because it imports the
+// diary's link writer and the plugin, which is a runtime edge a section
+// catalogue has no business acquiring for the sake of one string.
+//
+// THE ANCHOR IS THE CALLER'S, because it is the line the caller composes the
+// modifier under and only the caller knows it — `journal-header` on a journal
+// note, `entry-header` on an entry, `links` or the title line on a flat page.
+// See `FlagQuestion.after`.
+export function actionsQuestion(after: string): FlagQuestion {
+  return {
+    kind: "flag",
+    key: "actions",
+    // A NOUN PHRASE, like every question's label, and it is read into three
+    // places: the field name above the box (`fieldLabelOf` takes its head word,
+    // so the box is called "Action"), the plan's reconfigure line, and the inert
+    // wording where a note cannot be read. See `SectionQuestionCommon`.
+    label: "the action menu",
+    line: ACTIONS_KEYWORD,
+    after,
+    // WHAT TICKING IT DOES, rather than what each state is called.
+    // `formQuestion` sets the idiom — "Show as widget" — and the reason is the
+    // folder box's: a control that describes its own effect needs no legend.
+    on: "Show the action menu",
+    off: "Hide the action menu",
+  };
+}
+
 // The banner, as a flat note's catalogue composes it.
 //
 // A FACTORY RATHER THAN A CONSTANT, which is what 4.19 changes about the shape
@@ -404,6 +446,22 @@ export function bannerSection(spec: BannerSpec = {}): FlatSection {
     category: "structure",
     locked: true,
     pinned: true,
+    // ASKED ONLY WHERE THE LINE IS COMPOSED (1.0.11). The four singleton pages
+    // pass no `actions` at all — `BannerSpec.actions` argues why — and a toggle
+    // on one of them would be an offer to turn on a menu whose two items mean
+    // nothing on a page a reader passes through. A page that HAS the menu is the
+    // only page with a choice to make about it, which is what this spread says.
+    //
+    // UNDER THE NAVIGATION, WHERE THE RENDER PUTS IT: `links` where this page has
+    // a row and the title line where it does not, which is the last line of the
+    // banner either way.
+    ...(spec.actions
+      ? {
+          questions: () => [
+            actionsQuestion(spec.links ? LINKS_KEYWORD : TITLE_KEYWORD),
+          ],
+        }
+      : {}),
     render: () => fenceBlock({
       fence: "chronoanvil",
       lines: [
@@ -1647,6 +1705,15 @@ export function answersOn(
     // answer rather than the absence of one.
     if (q.kind === "form") {
       out[q.key] = formAt(lines, line);
+      continue;
+    }
+    // AND A FLAG IS READ OFF THE FENCE TOO (1.0.11), for the same reason and one
+    // line later: its answer is a modifier's EXISTENCE in the block this
+    // section's anchor sits in, which no argument span can hold. `flagAt` is the
+    // read, and it answers `FLAG_OFF` rather than nothing for a fence without the
+    // line — a fence with no modifier in it has answered the question.
+    if (q.kind === "flag") {
+      out[q.key] = flagAt(lines, line, q);
       continue;
     }
     if (!q.directive) continue;

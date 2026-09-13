@@ -39,6 +39,8 @@ import {
   SectionOp,
   SectionView,
   SectionWant,
+  FLAG_ON,
+  FlagQuestion,
   describeAnswers,
   desiredOrder,
   idsOf,
@@ -48,7 +50,7 @@ import {
 } from "../core/section-model";
 import { regionHasContent } from "../core/notestore";
 import { TRACKER_MARK_END, TRACKER_MARK_START } from "../core/constants";
-import { flatBlocks, rowRuns } from "../core/note-sections";
+import { actionsQuestion, answersOn, flatBlocks, rowRuns } from "../core/note-sections";
 import { BANNER_ID, WELDS_INTO_BANNER } from "../core/sections";
 import { unweldEntryFences, weldEntryFences } from "../trackers/entry-trackers";
 import {
@@ -81,6 +83,7 @@ import {
   isCellLine,
   isRowLine,
   splitDirective,
+  withFlagLine,
 } from "../core/directive-grammar";
 import type { TrackerClass } from "../trackers/trackers";
 
@@ -345,6 +348,12 @@ const ENTRY_DECLS: EntryDecl[] = [
     // the card with the name, which is the whole point of composing it here
     // rather than as a section of its own that would have to be welded in.
     below: () => [ACTIONS_KEYWORD],
+    // AND THE READER MAY TURN IT OFF, FROM THIS ROW (1.0.11). Composed into
+    // every entry this release writes; whether a given entry keeps it is a fact
+    // about that entry, so the answer is edited where the rest of its structure
+    // is. `actionsQuestion` is the one declaration across all three catalogues
+    // that compose the line, and the anchor is the directive `below` sits under.
+    questions: () => [actionsQuestion("entry-header")],
   },
   {
     id: "trackers",
@@ -1859,6 +1868,39 @@ export function planEntrySections(
   return ops;
 }
 
+// The fence the structural directive on line `at` sits in, as file indices.
+//
+// A WALK RATHER THAN A FIELD, because `EntryShape.own` deliberately keeps a LINE
+// and not an extent: patch 2 of 3.2 narrowed it from `{ from, to }` exactly so
+// that a fence holding two structural directives reads the same as two fences
+// holding one each, and the field's own comment says the extent "stopped
+// mattering when its permutation did". It matters again for one write — a
+// modifier line inside that fence — and the honest shape of that is to ask the
+// question where it is asked rather than to widen a field nine readers share.
+//
+// NULL FOR AN UNTERMINATED FENCE, which is `segment`'s rule and for its reason: a
+// note whose fence never closes is malformed, and guessing where it ends is how
+// a reconciler eats the rest of the file.
+function ownFenceAround(
+  lines: readonly string[],
+  at: number
+): { open: number; close: number } | null {
+  let open = -1;
+  for (let i = Math.min(at, lines.length - 1); i >= 0; i--) {
+    if (lines[i].startsWith(ENTRY_FENCE_MARK)) {
+      open = i;
+      break;
+    }
+  }
+  if (open < 0) return null;
+  for (let i = open + 1; i < lines.length; i++) {
+    if (lines[i].startsWith(ENTRY_FENCE_MARK)) return { open, close: i };
+  }
+  return null;
+}
+
+const ENTRY_FENCE_MARK = "```";
+
 // The entry with `want`'s sections, or null if nothing would change.
 //
 // REBUILT BY SPLICE, NOT BY COMPOSITION. `composeEntryTemplate` exists two
@@ -1896,7 +1938,7 @@ export function applyEntrySections(
   // rearranged by hand.
   if (!shape.shared.length && (removing.size || adding.length)) return null;
 
-  // ── the structural half: nothing happens to it ──
+  // ── the structural half: one modifier, and otherwise nothing ──
   //
   // 3.1 permuted these blocks against `want`. 3.2 §4 pins `links` and thereby
   // strands `entry-header` alone among its band's movable members, so the
@@ -1904,10 +1946,52 @@ export function applyEntrySections(
   // fifteen lines producing a copy of its input. `planEntrySections` no longer
   // emits a structural move, so nothing downstream is expecting one either.
   //
-  // The blocks fall through to the verbatim re-emit at the bottom of this
-  // function, which is what every other untouched line of the reader's file
-  // gets — a stronger guarantee than the one they had, since it cannot rewrite
-  // them even in principle.
+  // Every other line of this half falls through to the verbatim re-emit at the
+  // bottom of this function, which is what every untouched line of the reader's
+  // file gets.
+  //
+  // ── AND THE ONE THING THAT DOES HAPPEN (1.0.11) ──────────────────────
+  //
+  // THE HEADING ABOVE SAID "NOTHING HAPPENS TO IT" AND THAT IS NO LONGER TRUE,
+  // so it says what is true instead. The banner carries a `flag` question — the
+  // toggle over its action menu — and a flag's answer is a modifier LINE inside
+  // the banner's fence. There is nowhere else for that write to go: the shared
+  // half's `withAnswers` runs over the fences BELOW the rule, and the structural
+  // half had no write path at all.
+  //
+  // A WHOLE FENCE BODY, REPLACED BY `withFlagLine` — the same function the other
+  // three surfaces reach through `withAnswers`, so there is one rule about where
+  // a modifier is written and what it displaces. Everything in the body that is
+  // not the modifier is copied through it untouched, including the reader's own
+  // lines and their spacing, which is the promise this function is otherwise
+  // keeping by not touching the half at all.
+  //
+  // KEYED ON THE OPENING FENCE so the re-emit below can recognise it the way it
+  // already recognises a shared one, and ACCUMULATED, because two structural
+  // sections share one fence on a composed entry — a second flag on `links`
+  // would otherwise write over the first's answer rather than beside it.
+  const ownBodies = new Map<number, { close: number; body: string[] }>();
+  for (const { id, at } of shape.own) {
+    if (!rewriting.has(id)) continue;
+    const section = byId.get(id);
+    if (!section) continue;
+    const flags = (section.questions?.(ctx) ?? []).filter(
+      (q): q is FlagQuestion => q.kind === "flag"
+    );
+    if (!flags.length) continue;
+    const fence = ownFenceAround(lines, at);
+    if (!fence) continue;
+    const held =
+      ownBodies.get(fence.open) ??
+      { close: fence.close, body: lines.slice(fence.open + 1, fence.close) };
+    let body = held.body;
+    for (const flag of flags) {
+      const answer = optionsFor(want, id)?.[flag.key];
+      if (typeof answer !== "string") continue;
+      body = withFlagLine(body, flag.line, flag.after, answer === FLAG_ON);
+    }
+    ownBodies.set(fence.open, { close: held.close, body });
+  }
 
   // ── the personal half: directive lines trade slots ──
   //
@@ -2027,6 +2111,22 @@ export function applyEntrySections(
   const out: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     if (regionSkip.has(i)) continue;
+    // A STRUCTURAL FENCE WHOSE MODIFIER MOVED (1.0.11), re-emitted the way a
+    // shared one is: its own opening and closing lines, and the body between
+    // them as `withFlagLine` left it. A fence with no flag answer never reaches
+    // the map and is copied line by line below, exactly as it always was.
+    //
+    // AHEAD OF THE SHARED BRANCH AND NOT IN COMPETITION WITH IT. `parseEntry`
+    // draws its widget-fence candidates from the fences that own no structural
+    // directive, so a fence in `shape.own` is never a fence in `shape.shared`
+    // and the two lookups cannot both hit. Stated because the order reads like a
+    // precedence and is not one.
+    const own = ownBodies.get(i);
+    if (own) {
+      out.push(lines[i], ...own.body, lines[own.close]);
+      i = own.close;
+      continue;
+    }
     const fence = shape.shared.findIndex((f) => f.open === i);
     if (fence >= 0) {
       // A FENCE EMPTIED BY THE REMOVALS GOES WITH THEM, and its blank separator
@@ -2108,19 +2208,44 @@ const BANDS: Record<EntrySection["band"], string> = {
 // cannot be computed from the catalogue entry, and the context is where the
 // vault's half of it already lives.
 const rowFor =
-  (ctx: EntrySectionContext) =>
-  (s: EntrySection): SectionView =>
+  (ctx: EntrySectionContext, text?: string) =>
+  (s: EntrySection): SectionView => {
+    const questions = s.questions?.(ctx);
     // THE SHAPE IS `viewOf`'s, IN `core/sections.ts` (5.22). The argument this
     // file used to keep beside its own copy is that function's now, and it is
     // the reason `questions` is spread conditionally rather than set: a key
     // present and undefined on all nine sections of an entry would have said
     // "every section here asks something" in the one place written to catch
     // that claim.
-    viewOf(s, {
-      questions: s.questions?.(ctx),
+    return viewOf(s, {
+      questions,
       movable: isMovable(s),
       group: BANDS[s.band],
+      // ── WHAT THIS ENTRY ALREADY SAYS, FOR A FLAG (1.0.11) ─────────────
+      //
+      // THE FIRST ANSWER ON THIS SURFACE THE EDITOR CANNOT READ FOR ITSELF. The
+      // window falls back to `answerInText`, which finds a directive's argument
+      // span in the whole file; a flag's answer is a modifier LINE'S existence
+      // inside one fence, so that read returns null by construction and the box
+      // would have been replaced by its inert *"set when added"* wording on
+      // every entry in every vault.
+      //
+      // `answersOn` IS THE READ THE OTHER TWO MODELS ALREADY USE, and what it
+      // wants is the section's anchor, which `locate` is. The entry catalogue
+      // has carried one since 3.8 patch 7 and nothing in this file called it —
+      // "it is here because a `Section` promises it, and because the answer is
+      // not in doubt". This is the caller that turned up.
+      //
+      // ASKED ONLY WHERE A FLAG ASKS IT, which is the journal model's own gate
+      // and is a narrowing rather than a shortcut: `answersOn` answers every
+      // question in the list off the section's own line, and widening the
+      // bridge's target read from the whole file to one line is a change to a
+      // shipped control that this release has no reason to make.
+      ...(text !== undefined && questions?.some((q) => q.kind === "flag")
+        ? { answered: answersOn(s.locate(text, ctx), questions, text) }
+        : {}),
     });
+  };
 
 // ── the arrangement an entry has, which is one weld (1.0.10) ────────────
 //
@@ -2209,9 +2334,9 @@ export function entrySectionModel(ctx: EntrySectionContext): SectionModel {
       (text === undefined
         ? entryCatalogueSections(ctx)
         : offerableEntrySections(ctx)
-      ).map(rowFor(ctx)),
+      ).map(rowFor(ctx, text)),
     present: (text) => detectEntrySections(text, ctx),
-    addable: (text) => addableEntrySections(ctx, text).map(rowFor(ctx)),
+    addable: (text) => addableEntrySections(ctx, text).map(rowFor(ctx, text)),
     refusal: (id, text) => {
       const s = find(id);
       return s ? entryRemovalRefusal(s, text) : null;

@@ -448,13 +448,24 @@ describe("patch 8: From the journals", () => {
     // anything, and that is the healthy state; a second one is not forbidden
     // but must be deliberate, because the editor's "not addable until
     // answered" rule would start applying to a row nobody thought about.
+    //
+    // THE BANNER IS THE SECOND, AS OF 1.0.11, AND IT IS THAT DELIBERATE CASE.
+    // Its question is the `flag` over the action menu — `actions`, composed into
+    // every entry this release writes — and the rule the paragraph above is
+    // guarding cannot reach it: `questionIsRequired` is false for every kind but
+    // an unlabelled `choice`, and the banner is locked, so there is no "addable"
+    // state for an unanswered flag to hold back. It is on EVERY grain, including
+    // yearly, because every grain's banner composes the line.
     for (const grain of TRACKER_CLASSES) {
       const asking = entrySectionModel({ grain })
         .sections()
         .filter((s) => s.questions?.length)
         .map((s) => s.id);
-      // Not offered on a yearly entry at all, so there is nothing to ask.
-      expect(asking, grain).toEqual(grain === "yearly" ? [] : ["bridge"]);
+      // The bridge is not offered on a yearly entry at all, so there is nothing
+      // to ask it; the banner is on every entry there is.
+      expect(asking, grain).toEqual(
+        grain === "yearly" ? ["banner"] : ["banner", "bridge"]
+      );
     }
   });
 

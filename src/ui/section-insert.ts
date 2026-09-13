@@ -1059,6 +1059,13 @@ export class SectionInserter {
       // retype it into a prompt would be offering the worse of two editors. The
       // box is in the section window, and their own `##` lines are in the note.
       if (q.kind === "lines") continue;
+      // AND A FLAG IS SKIPPED FOR THE FORM'S REASON, WORD FOR WORD (1.0.11). The
+      // section is about to be written with the modifiers its catalogue composes,
+      // which is the answer an unanswered flag means; and the only flag in the
+      // tree is on a banner, which this command cannot add to a note at all —
+      // every banner is locked. The toggle is in the editor, on the row that
+      // describes the block the line is in.
+      if (q.kind === "flag") continue;
       if (!q.values.length) {
         new Notice(`ChronoAnvil: ${q.empty}`);
         return;

@@ -104,6 +104,7 @@ import type { Arrangement, MoveUnit, NextArrangement } from "../core/row-order";
 import { categoryLabel, categoryRank } from "../core/sections";
 import { panDuringDrag } from "./drag-scroll";
 import type {
+  FlagQuestion,
   FolderQuestion,
   FormQuestion,
   SectionModel,
@@ -114,7 +115,7 @@ import type {
   TitleQuestion,
   SectionWant,
 } from "../core/section-model";
-import { SECTION_FORM, WIDGET_FORM } from "../core/section-model";
+import { FLAG_OFF, FLAG_ON, SECTION_FORM, WIDGET_FORM } from "../core/section-model";
 import { ArgSuggest } from "./arg-suggest";
 
 // The four panes, one at a time.
@@ -1828,6 +1829,10 @@ export class SectionEditorModal extends EditorModal {
         this.renderLinesQuestion(field(q), section, q);
         continue;
       }
+      if (q.kind === "flag") {
+        this.renderFlagQuestion(field(q), section, q);
+        continue;
+      }
       // NOTHING TO CHOOSE FROM IS A SENTENCE, NOT AN EMPTY MENU. A dropdown
       // with no entries is a control that looks broken; the catalogue supplied
       // wording for this case precisely so the reader is told what is missing
@@ -2042,6 +2047,64 @@ export class SectionEditorModal extends EditorModal {
     box.setAttribute("aria-label", q.widget);
     box.addEventListener("change", () => {
       this.answer(section.id, q.key, box.checked ? WIDGET_FORM : SECTION_FORM);
+      this.refreshFrame();
+    });
+  }
+
+  // A modifier line, on or off. 1.0.11.
+  //
+  // THE FORM'S CONTROL, WITH NONE OF THE FORM'S ARITHMETIC — and the absence is
+  // the whole difference. `renderFormQuestion` above spends most of its body on
+  // the fact that a group's title is the opening cell's bar, so the box belongs
+  // on the card for one member and is disabled for the rest. A flag has no such
+  // question to answer: a modifier says one thing about the block it is in, the
+  // block is the fence, and the section that declares the flag is the one whose
+  // fence it is. There is no neighbour whose answer this could be.
+  //
+  // A CHECKBOX FOR `renderFormQuestion`'s REASON. Two answers, one of which is
+  // what every catalogue composes, so it is a thing that is either on or off
+  // rather than a value picked from a list. The label says what ticking it DOES,
+  // which is `q.on` — a control that describes its own effect needs no legend.
+  //
+  // TICKED IS ON, WHICH IS THE ONE PLACE THIS INVERTS THE FORM. A form's box is
+  // ticked for `widget`, the answer the catalogue does NOT compose, because the
+  // question is "depart from the default". A flag's default is composed too, and
+  // ticking a box labelled "Show the action menu" to HIDE the menu would be a
+  // control that lies about its own state. So the box shows the fence: ticked
+  // means the line is there.
+  //
+  // AND THE ANSWER IS NEVER ABSENT, unlike every other kind here. `flagAt`
+  // answers `FLAG_OFF` for a fence with no modifier in it rather than answering
+  // nothing, so a model that located the section always has something to show —
+  // which is why this draws no empty state and has no `settled` wording to fall
+  // back to. Where the model could NOT locate the section, `readable` has
+  // already replaced this control with that wording before it is called.
+  private renderFlagQuestion(
+    host: HTMLElement,
+    section: SectionView,
+    q: FlagQuestion
+  ): void {
+    const wrap = host.createDiv({ cls: "ca-tpl-form" });
+    const box = wrap.createEl("input", {
+      type: "checkbox",
+      cls: "ca-tpl-form-box",
+    });
+    // ITS OWN PREFIX, so a section carrying a form AND a flag cannot hand two
+    // boxes one `id` — which is a label that focuses the wrong control, in a
+    // window where the two controls mean opposite things.
+    const id = `ca-flag-${q.key}-${section.id.replace(/[^a-z0-9]+/gi, "-")}`;
+    box.id = id;
+    const label = wrap.createEl("label", {
+      cls: "ca-tpl-form-label",
+      text: q.on,
+    });
+    label.htmlFor = id;
+
+    box.checked = this.shownAnswer(section, q) !== FLAG_OFF;
+    box.title = box.checked ? q.off : q.on;
+    box.setAttribute("aria-label", q.on);
+    box.addEventListener("change", () => {
+      this.answer(section.id, q.key, box.checked ? FLAG_ON : FLAG_OFF);
       this.refreshFrame();
     });
   }

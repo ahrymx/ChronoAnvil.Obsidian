@@ -47,6 +47,7 @@ import {
   FRAME_KEYWORD,
   HEADER_KEYWORD,
   argSpanIn,
+  hasFlagLine,
   hasSectionBar,
   insertBar,
   isFrameLine,
@@ -56,6 +57,7 @@ import {
   renameSoleKeyword,
   soleArgSpanIn,
   spliceArg,
+  withFlagLine,
 } from "./directive-grammar";
 
 // ── operations ────────────────────────────────────────────────────────
@@ -592,6 +594,79 @@ export interface LinesQuestion extends SectionQuestionCommon {
   rows?: number;
 }
 
+// Whether this section's fence wears one MODIFIER LINE. 1.0.11.
+//
+// THE SIXTH KIND, AND THE SECOND THAT IS NOT ABOUT A DIRECTIVE'S ARGUMENT.
+// `form` was the first, and the two are near neighbours: both answer "what
+// should this section BE" and both write a LINE in or out of a fence rather
+// than splicing a span inside one. The difference is which line and what it
+// means. A `form` answer writes the section's own BAR — the strip that titles
+// it — so the two answers are exclusive and a section has exactly one form. A
+// flag writes a modifier: a line that draws nothing itself and says one thing
+// about the block under it, which is a question a section may be asked several
+// times over without any of the answers touching another.
+//
+// `actions` IS THE FIRST AND THE REASON THIS EXISTS. 1.0.11 composed the
+// banner's action menu into every journal note, journal dashboard and diary
+// entry and gave a reader one place to change their mind about it: a vault-wide
+// switch in Settings. That is the right home for WHICH ITEMS the menu holds —
+// the set is one answer for the whole vault — and the wrong one for WHETHER A
+// PAGE HAS IT, which is a fact about that page and belongs where every other
+// fact about a page's chrome is already edited.
+//
+// SO THE TOGGLE IS IN *EDIT SECTIONS…*, ON THE BANNER'S OWN ROW, which is the
+// row that describes the block the line is in. `wide` is the modifier this is
+// most like and it is edited from the head's own control; the difference is
+// that a width is something a reader changes while looking at the page, and
+// whether the page offers a menu of things to do to it is something they decide
+// once, beside the rest of the page's structure.
+//
+// ── WHY THE ANSWER IS NOT WRITTEN AT COMPOSE TIME ─────────────────────
+//
+// A flag's `render` is unconditional: the catalogues that compose `actions`
+// compose it for every note they write, and the toggle only ever edits a note
+// that exists. That is what keeps every composed note byte-identical — see
+// `test/golden-notes.ts`, which is the invariant a conditional compose would
+// spend — and it is honest about what the control is for. Nobody arranges a
+// banner before the page exists; they turn the menu off on a page that has one.
+export interface FlagQuestion extends SectionQuestionCommon {
+  kind: "flag";
+  // The line written into the fence when the answer is `FLAG_ON`, and taken out
+  // of it when it is `FLAG_OFF`.
+  //
+  // THE CATALOGUE'S OWN STRING, on `FormQuestion.bar`'s rule and for its
+  // reason: it is the line the catalogue would have composed anyway, so this
+  // file never invents a modifier and the two halves cannot disagree about its
+  // spelling.
+  line: string;
+  // The KEYWORD this line is composed below.
+  //
+  // WHY THE POSITION IS DECLARED RATHER THAN DERIVED. A modifier is read off a
+  // fence regardless of where in it the line sits — `parseWide` says so in as
+  // many words — so any position renders identically and the choice is about
+  // what the reader's file LOOKS like afterwards. A line written back somewhere
+  // the composer would never have put it makes the note read as hand-edited to
+  // anybody comparing it, `isHandEdited` included, for no gain at all.
+  //
+  // So the catalogue names the line its modifier follows, and the write puts it
+  // exactly where composition would have. It is a keyword rather than an index
+  // because a reader's fence is not the composed one — a welded stack has three
+  // sections' lines in it — and the anchor is the only position that means the
+  // same thing in both.
+  after: string;
+  // What to call each side of the toggle, in the surface's own words. The
+  // control is a checkbox, so `on` is what ticking it means.
+  on: string;
+  off: string;
+}
+
+// The two answers a `FlagQuestion` takes, spelled as strings for
+// `SECTION_FORM`'s reason: `SectionChoice.options` is read as strings the whole
+// way down, and a boolean would be a second shape for `withAnswers`,
+// `answersOn` and the editor's `shownAnswer` to agree about.
+export const FLAG_ON = "on";
+export const FLAG_OFF = "off";
+
 // The two answers a `FormQuestion` takes. Strings rather than a boolean because
 // `SectionChoice.options` is `Record<string, unknown>` read as strings
 // everywhere — a fourth shape through that plumbing would be a fourth thing for
@@ -637,6 +712,41 @@ export function formOf(lines: readonly string[]): string {
 // question is about the BLOCK either way. A directive that is in no fence has
 // no bar and cannot gain one, which is a widget by the same definition.
 export function formAt(lines: readonly string[], line: number): string {
+  const body = fenceBodyAround(lines, line);
+  return body ? formOf(body) : WIDGET_FORM;
+}
+
+// Whether the fence holding the directive at `line` carries this flag's line.
+//
+// THE SAME WALK `formAt` MAKES, AND DELIBERATELY THE SAME ANSWER SHAPE (1.0.11):
+// a modifier is read off a FENCE rather than out of an argument, so the question
+// is about the block the section's anchor sits in rather than about the anchor
+// line. `answersOn` is the one caller and it has the anchor.
+//
+// ABSENT IS `FLAG_OFF`, NOT AN ABSENT ANSWER. A fence with no modifier in it has
+// answered the question — the banner does not wear its menu — which is the same
+// judgement `formAt` makes about a fence with no bar. It matters because an
+// absent answer draws the inert *"set when added"* wording over a control that
+// could perfectly well have been drawn.
+export function flagAt(
+  lines: readonly string[],
+  line: number,
+  flag: FlagQuestion
+): string {
+  const body = fenceBodyAround(lines, line);
+  return body && hasFlagLine(body, flag.line) ? FLAG_ON : FLAG_OFF;
+}
+
+// The body of the fence `line` falls inside, or null when it falls inside none.
+//
+// HOISTED OUT OF `formAt` IN 1.0.11, unchanged in what it does and in what it
+// does not promise. A directive in no fence answers null, which both callers
+// read as "there is nothing here to have" — a fence is the only thing either a
+// bar or a modifier can be written into.
+function fenceBodyAround(
+  lines: readonly string[],
+  line: number
+): string[] | null {
   let open = -1;
   for (let i = Math.min(line, lines.length - 1); i >= 0; i--) {
     if (lines[i].startsWith(FENCE_MARK)) {
@@ -644,13 +754,13 @@ export function formAt(lines: readonly string[], line: number): string {
       break;
     }
   }
-  if (open < 0) return WIDGET_FORM;
+  if (open < 0) return null;
   const body: string[] = [];
   for (let i = open + 1; i < lines.length; i++) {
     if (lines[i].startsWith(FENCE_MARK)) break;
     body.push(lines[i]);
   }
-  return formOf(body);
+  return body;
 }
 
 const FENCE_MARK = "```";
@@ -660,7 +770,8 @@ export type SectionQuestion =
   | FolderQuestion
   | TitleQuestion
   | FormQuestion
-  | LinesQuestion;
+  | LinesQuestion
+  | FlagQuestion;
 
 // Whether a section may be composed without an answer to this.
 //
@@ -722,6 +833,14 @@ export function answerInText(text: string, q: SectionQuestion): string | null {
   // see `LinesQuestion`. Its callers fall back to the model's own `answered`,
   // exactly as a form's do.
   if (q.kind === "lines") return null;
+  // AND A FLAG IS NOT AN ARGUMENT EITHER (1.0.11). Its answer is a LINE'S
+  // EXISTENCE inside one fence, and this read is over the whole file — so it has
+  // nothing to answer from and its callers fall back to the model's own
+  // `answered`, which is where `flagAt` puts it. Skipped by name rather than by
+  // having no `directive`, on `lines`' rule: a flag that ever named a keyword —
+  // to say which line its section is anchored by, say — must not start having
+  // its answer read out of an argument span.
+  if (q.kind === "flag") return null;
   if (!q.directive) return null;
   const lines = text.split("\n");
   const span = soleArgSpanIn(lines, q.directive, q.part?.join);
@@ -1134,6 +1253,21 @@ export function withAnswers(
       out = insertBar(out, form.bar);
     }
   }
+  // ── AND THE FLAGS BESIDE IT, FOR THE SAME REASON (1.0.11) ───────────
+  //
+  // The other write that is a LINE rather than a span, so it is taken with the
+  // form and before every splice below: a modifier written in after a span was
+  // read would have moved the line the span was measured in.
+  //
+  // ALL OF THEM, WHERE A FORM IS ONE. A section has exactly one form — the two
+  // answers are exclusive — and may wear any number of modifiers, none of which
+  // is about any of the others. See `FlagQuestion`.
+  for (const flag of questions) {
+    if (flag.kind !== "flag") continue;
+    const want = options[flag.key];
+    if (typeof want !== "string") continue;
+    out = withFlagLine(out, flag.line, flag.after, want === FLAG_ON);
+  }
   // A DIRECTIVE IS WRITTEN ONCE, HOWEVER MANY QUESTIONS ANSWER IT (4.16). Two
   // splices of one span is the second overwriting the first — so the questions
   // are grouped by the directive they name, and a group with more than one piece
@@ -1152,6 +1286,11 @@ export function withAnswers(
     // ever gained one — to say which keyword its section is anchored by, say —
     // could not start having its prose spliced into an argument.
     if (q.kind === "lines") continue;
+    // AND A FLAG IS WRITTEN ABOVE, AS A WHOLE LINE (1.0.11). Skipped by name for
+    // the reason the two above are: a flag carries no `directive` today, and one
+    // that ever gained one must not have the token "on" spliced into its
+    // argument — which is the exact mistake 4.59.0's first cut made with a form.
+    if (q.kind === "flag") continue;
     if (!q.directive) continue;
     byDirective.set(q.directive, [...(byDirective.get(q.directive) ?? []), q]);
   }
@@ -1247,6 +1386,13 @@ export function describeAnswers(
       parts.push(
         `${q.label} → ${answer.trim() === WIDGET_FORM ? q.widget : q.section}`
       );
+      continue;
+    }
+    // AND A FLAG IN ITS OWN TWO, which is the same arrangement and the same
+    // reason: the catalogue writes both sides, so the plan reads "the action
+    // menu \u2192 Hide the action menu" rather than the bare token.
+    if (q.kind === "flag") {
+      parts.push(`${q.label} \u2192 ${answer.trim() === FLAG_ON ? q.on : q.off}`);
       continue;
     }
     // A LIST READS AS A LIST. The answer is newline-separated because that is

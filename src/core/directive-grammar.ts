@@ -1555,6 +1555,65 @@ export function insertBar(lines: readonly string[], bar: string): string[] {
   return out;
 }
 
+// ── A MODIFIER LINE, WRITTEN IN OR OUT OF A FENCE (1.0.11) ────────────
+//
+// `insertBar` above writes the line that TITLES a block; these two read and
+// write a line that MODIFIES one — `actions`, and whatever follows it. They are
+// the grammar half of `FlagQuestion`, which is the catalogue-facing half, and
+// they live here for the reason every other `is*Line` does: the keyword is the
+// whole of the question, and a caller matching a modifier with a regex of its
+// own is a caller that can disagree with `splitDirective` about where a keyword
+// ends.
+
+// Whether these lines carry the modifier `flag` spells.
+//
+// BY KEYWORD, NOT BY EXACT STRING, which is `isActionsLine`'s own rule and the
+// one the dispatcher reads a fence with. A reader who typed `actions:` or left a
+// trailing space has written the modifier, and a read that missed it would show
+// them an unticked box over a banner that is wearing its menu.
+export function hasFlagLine(lines: readonly string[], flag: string): boolean {
+  const keyword = splitDirective(flag).keyword;
+  return lines.some((l) => splitDirective(l.trim()).keyword === keyword);
+}
+
+// These lines with the modifier `flag` present, or absent.
+//
+// INSERTED UNDER `after`, WHICH IS WHERE COMPOSITION PUTS IT. See
+// `FlagQuestion.after` for why the position is declared by the catalogue rather
+// than chosen here: any position renders the same, and only one of them leaves
+// the reader's file looking like the one the composer would have written.
+//
+// THE ANCHOR'S ABSENCE IS A WRITE THAT DOES NOT HAPPEN, and the lines come back
+// untouched. That is `withAnswers`' standing rule for a question whose directive
+// is not in the chunk it was handed — skipped rather than guessed at — and it is
+// vacuous in practice, because the anchor is the line that reported the section
+// present in the first place.
+//
+// THE LAST ANCHOR, where a chunk somehow holds two. A welded stack is several
+// sections' lines in one fence, so the safe reading of two matches is "the one
+// nearest the end of the block", which puts the modifier inside the last of them
+// rather than above a section that never asked for it.
+export function withFlagLine(
+  lines: readonly string[],
+  flag: string,
+  after: string,
+  on: boolean
+): string[] {
+  const keyword = splitDirective(flag).keyword;
+  if (!on) {
+    return lines.filter((l) => splitDirective(l.trim()).keyword !== keyword);
+  }
+  if (hasFlagLine(lines, flag)) return [...lines];
+  let at = -1;
+  lines.forEach((l, i) => {
+    if (splitDirective(l.trim()).keyword === after) at = i;
+  });
+  if (at < 0) return [...lines];
+  const out = [...lines];
+  out.splice(at + 1, 0, flag);
+  return out;
+}
+
 // Every titled `header:` line in a fence, in file order.
 //
 // TITLED ONLY, on `leadingBar`'s rule and for its reason: an untitled `header:`
