@@ -215,7 +215,12 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
     // NO `links:` ROW, matching the journals dashboard. The contents grid below
     // is entirely destinations and the crumb trail on every note in this journal
     // now ends here, so a navigation row would be the second answer on one page.
-    bannerSection(),
+    // THE ACTION ROW, AND THIS IS THE ONE FLAT PAGE THAT GETS IT (1.0.11). A
+    // journal's folder note is a page a reader works on — it is about a subject,
+    // it can be dated, and it is worth copying out — where the homepage, Search
+    // and the two folder notes above the journals are places you pass through.
+    // `BannerSpec.actions` states the same argument from the other end.
+    bannerSection({ actions: true }),
 
     // ── CONTENTS, THEN THE NUMBERS, THEN THE YEAR (5.18) ──────────────
     //

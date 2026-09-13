@@ -250,7 +250,16 @@ describe("the exclusions say why, and the reasons are the ones claimed", () => {
     expect(of("region")).toEqual(regions);
   });
 
-  it("excludes the two banners and the two structural directives", () => {
+  it("excludes the banner, what it draws, and the two structural directives", () => {
+    // TWO UNDER `banner`, AND `actions` IS NOT A THIRD — though it was for a
+    // draft of 1.0.11, and the reason it is not is worth keeping. The banner's
+    // action menu plainly belongs to this family: it is composed in the
+    // banner's own fence on the three surfaces that ship it, and a reader
+    // adding a second one would be putting the page's controls somewhere that
+    // is not the page's banner. But this table describes the DISPATCHER, and
+    // the keyword stopped dispatching when it became a modifier — the test
+    // above requires every key in either table to be a `case` in the switch.
+    // A modifier is unofferable already: the picker is built from `WIDGETS`.
     expect(of("banner")).toEqual(["entry-header", "journal-header"]);
     expect(of("structural")).toEqual(["spacer", "title"]);
   });

@@ -27,6 +27,7 @@ import {
 import {
   SCOPE_ALL,
   SCOPE_JOURNAL,
+  ACTIONS_KEYWORD,
   STACK_KEYWORD,
   isHeaderLine,
   leadingBar,
@@ -1316,14 +1317,24 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // THE TRACKER GRID LEFT THIS SECTION IN 4.20 — see `trackers` below. What is
     // claimed here is now exactly what the banner draws: the strip that names
     // the note.
-    claims: ["journal-header"],
+    // AND `actions` SINCE 1.0.11, which is what stops the row belonging to no
+    // section. A line in a fence that no section claims is a line the planner
+    // deals to nobody: `ownersBySignature` cannot match the block, *Edit
+    // sections…* reports the banner missing and composes a SECOND one. That is
+    // the 5.28 defect exactly, and the claim is the whole of the fix.
+    //
+    // CLAIMED EVEN ON A NOTE THAT DOES NOT HAVE IT. Every journal note written
+    // before this release has a banner fence of one line, and `locate` still
+    // anchors on `journal-header` alone — so the banner is found, reported
+    // present, and repaired by ADDING the row rather than replacing the block.
+    claims: ["journal-header", ACTIONS_KEYWORD],
     locate: (t) => probe(t, /^journal-header\s*$/m),
     render: () => [
       // Tight against the fence below it: the spacer is documented as
       // sitting on line 0 of the body, directly above the banner it stops a
       // top-of-note click landing inside.
       markdown(["`chronoanvil:spacer`"], true),
-      fence(["journal-header"]),
+      fence(["journal-header", ACTIONS_KEYWORD]),
     ],
   },
 

@@ -286,3 +286,55 @@
   font-size: var(--ca-text-sm);
   font-variant-numeric: tabular-nums;
 }
+
+/* ── THE PAGE'S ACTION MENU (1.0.11) ──────────────────────────────────────
+ *
+ * One glyph in the name's far corner, opening the list of things a reader can
+ * do TO this note. `ui/widgets/actions-menu.ts` holds why it is a menu rather
+ * than the row of buttons it was for one draft, and why the glyph is not the
+ * cog.
+ *
+ * `margin-left: auto` IS THE WHOLE OF THE PLACEMENT. The title row is a flex
+ * line holding the name and its pencil, both of which shrink; an auto margin
+ * pushes this to the far edge without the row needing to know it is there, and
+ * without a second column that would collapse to nothing on a narrow pane.
+ *
+ * `align-self: center` BECAUSE THE ROW IS BASELINE-ALIGNED. The name sets that
+ * baseline at a 700-weight 1.25 line height, and a 16px square sitting ON it
+ * hangs below the letterforms. Centring takes the glyph out of the baseline
+ * argument entirely, which is the same move `.ca-jph-title-edit` makes one rule
+ * up for the pencil beside it.
+ *
+ * AND IT RESTS VISIBLE, WHICH IS THE OPPOSITE OF `.ca-jsh-more`. That control
+ * is an OVERFLOW — a second door to things the banner already offers — so
+ * fading out of the way is right for it. This is the ONLY door: the two actions
+ * behind it were reachable from the command palette and nowhere else, which is
+ * the whole reason the menu exists. The plugin's own note applies — *"a control
+ * revealed by hover is a control that does not exist"* — so it sits at
+ * `--text-faint` at rest and brightens rather than appearing. */
+.ca-journal-page-head .ca-jph-actions {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 2px 4px;
+  border-radius: var(--ca-radius-sm);
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.ca-journal-page-head:hover .ca-jph-actions {
+  color: var(--text-muted);
+}
+.ca-journal-page-head .ca-jph-actions:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+/* THE GLYPH'S SIZE IS STATED, for the reason `60-heroes-and-banners.css` states
+   it one file over: an icon that inherits the head's 700-weight title metrics is
+   a 24px glyph beside a 15px pencil. Same size as that pencil, because they are
+   the two controls on this row. */
+.ca-journal-page-head .ca-jph-actions .svg-icon {
+  width: 15px;
+  height: 15px;
+}

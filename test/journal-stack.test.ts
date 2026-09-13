@@ -380,7 +380,12 @@ describe("a stack that does not say it is one is repaired", () => {
     expect(after).toContain("header:🗂️ My topics");
     const block = journalSectionModel(ctx).blocks!(after).find((b) => b.stack)!;
     expect(block.ids.length).toBeGreaterThan(1);
-    expect(block.loose).toEqual([block.ids[0]]);
+    // AND NOTHING IS LOOSE IN IT AS OF 1.0.11 — the banner was, and now renders
+    // two lines (its name and its action row), so `hasKnownExtent` refuses to
+    // bound it on a one-line anchor. A fence this could not divide is a fence
+    // nothing can be cut out of, which is the more consistent of the two
+    // answers: the decline above and this one are now the same decline.
+    expect(block.loose).toEqual([]);
   });
 
   it("puts it inside the fence it describes", () => {

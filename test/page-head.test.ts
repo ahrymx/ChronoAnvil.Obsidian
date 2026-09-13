@@ -133,7 +133,9 @@ describe("what the head carries, and what it stopped carrying", () => {
     const dispatch = code("ui/widgets/index");
     const at = dispatch.indexOf('case "title":');
     expect(at).toBeGreaterThan(-1);
-    expect(dispatch.slice(at, at + 120)).toContain("livePageHead(this.plugin, ctx)");
+    expect(dispatch.slice(at, at + 120)).toContain(
+      "livePageHead(this.plugin, ctx, wearsActions)"
+    );
   });
 
   it("takes no argument, in the grammar and in the renderer alike", () => {

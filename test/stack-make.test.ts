@@ -360,7 +360,12 @@ const APART = [
   "type: subject",
   "---",
   "`chronoanvil:spacer`",
-  fence("journal-header"),
+  // THE BANNER'S TWO LINES, because the composer writes two since 1.0.11 and
+  // this fixture is the same note taken apart. The assertion below is that a
+  // reader's weld and the composer's weld are ONE object — a fixture missing a
+  // line the composer writes would turn that into a comparison of two different
+  // notes and pass for the wrong reason.
+  fence("journal-header", "actions"),
   "",
   fence(
     "header:📊 Trackers",
@@ -490,7 +495,15 @@ describe("the fence the reader makes", () => {
       .filter((l, at) => at === first || !isStackLine(l.trim()))
       .join("\n");
     const ids = model.blocks!(undivided).flatMap((b) => b.ids);
-    expect(model.blocks!(undivided)[0].loose).toEqual([ids[0]]);
+    // NOTHING IS LOOSE HERE AS OF 1.0.11, where the banner alone used to be.
+    // An undivided shared fence bounds its members by `hasKnownExtent` — "does
+    // this section render ONE line" — and the banner now renders two, its name
+    // and its action row. Cutting it out on a one-line anchor would leave the
+    // `actions` line behind in a fence that no longer holds a banner, which is
+    // the guess `hasKnownExtent` exists to refuse. The offer is gone and the
+    // refusal is right: this is a fence the plugin has already declined to
+    // divide, and the banner is the host of the stack in any case.
+    expect(model.blocks!(undivided)[0].loose).toEqual([]);
     const out = model.regroup!(undivided, ids.map((id) => [id]), [], []);
     expect(out === null || bodyOf(out).some((l) => isStackLine(l.trim()))).toBe(true);
   });

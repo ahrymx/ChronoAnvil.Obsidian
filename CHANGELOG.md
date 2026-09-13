@@ -5,6 +5,37 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.11] - 2026-09-13
+
+### Added
+
+- **Every banner carries a menu of what you can do to the page.** Copying a note
+  out as plain markdown was a command in the palette and nowhere else; linking a
+  page to the diary was not possible at all, even though the diary index has
+  always read the property it needed. Both are now items on one menu, behind a
+  small control in the corner of the page's own name, on journal notes, journal
+  dashboards and diary entries. Which items it holds is yours to set in
+  Settings → Page actions, for the whole vault at once; turning the menu off
+  hides the control and changes no note, so turning it back on restores it
+  exactly as it was.
+
+- **Link this page to the diary.** It writes the page's date — asking for one if
+  the page has none — opens or creates the diary entry for that day, and links
+  back to the page from that entry's Attachments. Dating a page is what joins it
+  to the diary's timeline, so search, *on this day* and the bridge all start
+  finding it together. Pressing it a second time does nothing rather than
+  linking the page twice.
+
+- **Copy as plain markdown, as a button.** The same text the command has always
+  produced, with the plugin's own markup stripped out, from the page you are
+  looking at rather than the one the workspace thinks is active.
+
+### Notes
+
+- Pages already in your vault are not rewritten. The menu is composed into notes
+  made from here on; an existing note is left exactly as you have it, and
+  opening *Edit sections…* on one plans no change.
+
 ## [1.0.10] - 2026-09-13
 
 ### Added

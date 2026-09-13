@@ -60,6 +60,7 @@ import { periodAnchor, valueLabel } from "../../diary/periodnav";
 // leaves standing — the global is the error, not the module.
 import { dashboardGrainOf, folderNotePath, folderPrefix, frontmatterOf, moment, normaliseTypeValue, noteTypeOf } from "../../core/util";
 import { LOGBOOK_TITLE } from "../../core/vocabulary";
+import { addPageActionsControl } from "./actions-menu";
 
 /** The class the head carries. Named once — `headerbar.ts` reads it too. */
 export const PAGE_HEAD_CLASS = "ca-journal-page-head";
@@ -88,14 +89,25 @@ export const PAGE_HEAD_CLASS = "ca-journal-page-head";
 // THE NULL CASE IS AN UNCLASSED DIV, NOT AN EMPTY HEAD. `.ca-journal-page-head`
 // paints a bottom rule, so a head with nothing in it is a line across a note
 // that has no head — which is `nothing dead is drawn` with the sign flipped.
+//
+// ── AND THE ACTION MENU IS BUILT HERE, NOT DOCKED HERE (1.0.11) ──────────
+//
+// `withActions` is the banner fence's `actions` line, read off the body before
+// the dispatcher's loop and handed down. It is a parameter rather than a node
+// the block moves into the title row afterwards, and the wrapper above is
+// exactly why: `LiveWidget` empties this host and calls `build` again on every
+// write to the note's frontmatter, so a control docked in from outside would
+// survive until the reader's next property edit and then silently vanish. What
+// the head draws, the head redraws.
 export function livePageHead(
   plugin: ChronoAnvilPlugin,
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext,
+  withActions = false
 ): HTMLElement {
   return liveFrontmatterWidget(
     plugin,
     ctx,
-    () => buildPageHead(plugin, ctx) ?? createDiv()
+    () => buildPageHead(plugin, ctx, withActions) ?? createDiv()
   );
 }
 
@@ -290,7 +302,8 @@ export function pageHeadSays(
 // return null on a file that vanished between the render and the call.
 export function buildPageHead(
   plugin: ChronoAnvilPlugin,
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext,
+  withActions = false
 ): HTMLElement | null {
   const app = plugin.app;
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
@@ -383,6 +396,17 @@ export function buildPageHead(
   } else {
     attachPropertyRename(app, row, file, "ca-jph-title", TITLE_PROP, date ?? file.basename);
   }
+
+  // IN THE TITLE ROW AND LAST, which is where 4.5 put the cog it describes as
+  // "a cog in the far corner" and where the CSS floats it with `margin-left:
+  // auto`. Beside the name rather than under it: the control acts on the note
+  // the name identifies, and a row of its own is the band the first cut drew
+  // and the vault rejected.
+  //
+  // AFTER THE PENCIL, so tab order is name-then-control — reading order and
+  // screen order agree, which is the property the entry banner's band reorder
+  // was careful about for the same reason.
+  if (withActions) addPageActionsControl(row, plugin, file.path);
 
   if (said.sub) root.createDiv({ cls: "ca-jph-sub", text: said.sub });
   return root;

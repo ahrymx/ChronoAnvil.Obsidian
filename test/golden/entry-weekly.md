@@ -7,6 +7,7 @@ journal: Weekly Entry
 `chronoanvil:spacer`
 ```chronoanvil
 entry-header
+actions
 ```
 
 ```chronoanvil

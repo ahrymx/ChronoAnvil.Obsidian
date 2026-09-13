@@ -76,6 +76,7 @@ import {
   widgetQuestions,
 } from "../core/widget-sections";
 import {
+  ACTIONS_KEYWORD,
   MODIFIER_KEYWORDS,
   isCellLine,
   isRowLine,
@@ -334,6 +335,16 @@ const ENTRY_DECLS: EntryDecl[] = [
     // a dashboard's dropped it, because on an entry nothing else offers it.
     above: () => [],
     directive: () => "entry-header",
+    // THE ACTION ROW, UNDER THE NAME (1.0.11). `below` rather than `above` for
+    // `bannerSection`'s reason on the other seven surfaces: the banner reads as
+    // what this note is and then what you can do to it, and the controls are
+    // the half a reader looks at less often.
+    //
+    // AND IT IS IN THE BANNER'S OWN FENCE, which on an entry is the fence every
+    // `band: "own"` section shares — so on a welded entry the row lands inside
+    // the card with the name, which is the whole point of composing it here
+    // rather than as a section of its own that would have to be welded in.
+    below: () => [ACTIONS_KEYWORD],
   },
   {
     id: "trackers",

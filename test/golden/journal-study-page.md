@@ -9,6 +9,7 @@ created: {{created}}
 `chronoanvil:spacer`
 ```chronoanvil
 journal-header
+actions
 ```
 
 <!--chronoanvil-skeleton-->

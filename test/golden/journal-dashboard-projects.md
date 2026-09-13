@@ -1,6 +1,7 @@
 `chronoanvil:spacer`
 ```chronoanvil
 title
+actions
 ```
 
 ```chronoanvil

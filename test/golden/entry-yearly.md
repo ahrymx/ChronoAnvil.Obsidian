@@ -7,6 +7,7 @@ journal: Yearly Entry
 `chronoanvil:spacer`
 ```chronoanvil
 entry-header
+actions
 ```
 
 ```chronoanvil

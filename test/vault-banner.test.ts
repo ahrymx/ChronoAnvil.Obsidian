@@ -370,7 +370,12 @@ describe("the in-note header defers to the bar", () => {
     // directives that share an arm, once for `title`. Asserted as the pair
     // rather than as a distance from each `case`, which is a measurement of the
     // comments between them and nothing else.
-    const pair = "return livePageHead(this.plugin, ctx);";
+    //
+    // AND THE HEAD TAKES A THIRD ARGUMENT AS OF 1.0.11 — `wearsActions`, the
+    // banner's `actions` modifier read off the fence — which is why the pair is
+    // spelled with it. All three banners pass it: the action menu is a control
+    // of the banner, and a dashboard's banner is a banner.
+    const pair = "return livePageHead(this.plugin, ctx, wearsActions);";
     expect(t.split(pair).length - 1).toBe(2);
     for (const kind of ["entry-header", "journal-header", "title"]) {
       expect(t, kind).toContain(`case "${kind}":`);

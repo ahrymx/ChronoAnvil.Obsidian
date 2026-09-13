@@ -203,6 +203,24 @@ export type { SectionOpKind, SectionOp };
 // a `frame:` line, and now a `row`, counted as a widget, so a fence carrying one
 // matched no signature and the section in it read as absent. Same list, same
 // release, same reason as `assetUnits`.
+//
+// ── AND A BANNER'S OWN CONTROL IS A MODIFIER, FOR THIS REASON (1.0.11) ──
+//
+// 1.0.11 adds `actions` to what every banner composes, and every note already
+// in a reader's vault has a banner fence WITHOUT it. Had it been a widget the
+// catalogue's signature would have grown a keyword no such file can carry:
+// `ownerOf` fails on exact equality, the sub-multiset fallback only forgives an
+// EXTENSIBLE section and a banner is not one, and inside a welded stack it is
+// worse — this function's caller deals off the front, finds no signature for
+// the first member and returns the empty array. Probed on a Study topic index:
+// the composed note reported `banner, trackers, children` and the same note
+// with the one line cut out reported NOTHING AT ALL.
+//
+// The line is a modifier instead — it draws nothing, the head draws the
+// control — so the filter below already drops it from BOTH sides of every
+// comparison, which is the rule the tracker region states directly above and
+// the property `stack` has for the same reason. `directive-grammar.ts` holds
+// the argument; this paragraph is why this function is where it is checked.
 function fenceKeywords(lines: string[]): string[] {
   return outsideRegions(lines)
     .map(keywordOf)

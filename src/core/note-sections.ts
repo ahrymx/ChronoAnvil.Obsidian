@@ -95,6 +95,7 @@ import type { CellTarget } from "./cell-move";
 import {
   CELL_KEYWORD,
   TAB_KEYWORD,
+  ACTIONS_KEYWORD,
   LINKS_KEYWORD,
   MAX_COLUMNS,
   dealInto,
@@ -373,6 +374,14 @@ export interface BannerSpec {
   // read from the block that draws its title (4.11), so it belongs to whichever
   // section that is — which is now this one.
   wide?: boolean;
+  // Whether this page's banner carries the action menu (1.0.11).
+  //
+  // ONE OF THE SIX FLAT CALLERS PASSES IT, and the field is how that choice is
+  // expressed. The menu is for pages a reader WORKS on — a journal dashboard is
+  // one — and not for the four singletons the plugin owns: the homepage, Search
+  // and the two folder notes are places you pass through, and neither shipped
+  // action means anything on a page that is not about a subject or a day.
+  actions?: boolean;
 }
 
 // The banner, as a flat note's catalogue composes it.
@@ -406,6 +415,10 @@ export function bannerSection(spec: BannerSpec = {}): FlatSection {
         ...(spec.wide ? [WIDE_KEYWORD] : []),
         TITLE_KEYWORD,
         ...(spec.links ? [`${LINKS_KEYWORD}:${spec.links}`] : []),
+        // LAST, UNDER THE NAVIGATION. The banner reads top to bottom as what
+        // this page is, where it goes, and what you can do to it — and the row
+        // of controls is the one of the three a reader looks at least often.
+        ...(spec.actions ? [ACTIONS_KEYWORD] : []),
       ],
     }),
     // TWO ANCHORS, AND THE SECOND ONE IS NOT BELT-AND-BRACES.

@@ -11,6 +11,7 @@ status: in-progress
 ```chronoanvil
 stack
 journal-header
+actions
 stack
 # chronoanvil:trackers:start
 tracker:accuracy

@@ -11,6 +11,7 @@ Sleep:
 `chronoanvil:spacer`
 ```chronoanvil
 entry-header
+actions
 ```
 
 ```chronoanvil

@@ -175,6 +175,7 @@ import {
   cellWeightOf,
   hasTitledBar,
   headerLevel,
+  isActionsLine,
   isFrameLine,
   isHeightLine,
   isRowLine,
@@ -922,12 +923,20 @@ export class Widgets implements
           ({ l }) =>
             l.length > 0 &&
             !l.startsWith("#") &&
+            !isActionsLine(l) &&
             !isFrameLine(l) &&
             !isRowLine(l) &&
             !isStackLine(l) &&
             !isWideLine(l) &&
             !isHeightLine(l)
         );
+      // THE BANNER'S ACTION MENU, READ OFF THE FENCE AND NOT DISPATCHED. The
+      // line is a modifier — it is filtered out of `kept` directly above with
+      // `frame:`, `stack` and `wide` — and what it says is that this fence's
+      // banner wears its menu. `rawLines` rather than `kept`, for the obvious
+      // reason that `kept` is the list it has just been removed from.
+      const wearsActions = rawLines.some((l) => isActionsLine(l));
+
       // ── AND THE BANNER'S OWN LINES, WHEN THE VAULT BAR IS DRAWING ──────
       //
       // 4.51.1, and it is the second attempt. 4.51 suppressed a banner by
@@ -1512,7 +1521,8 @@ export class Widgets implements
           // So the head is withheld exactly when the bar can be read as naming
           // the field: the fence is titled AND holds one region field.
           fenceTitled && soleField,
-          headerGroup
+          headerGroup,
+          wearsActions
         );
 
         if (!widget) {
@@ -2645,7 +2655,12 @@ export class Widgets implements
     // controls. Null where nothing in the fence offers one — a `frame: section`
     // wrapper, or a fence with no header at all — and `fieldHead` then builds
     // the field a bare strip of its own rather than dropping the controls.
-    barActions: HTMLElement | null = null
+    barActions: HTMLElement | null = null,
+    // Whether this fence carries the banner's `actions` line. Read off the body
+    // with the other modifiers and threaded here rather than met in the loop:
+    // the line draws nothing of its own, and the only case that reads it is the
+    // banner's. False for the legacy inline path, which has no fence.
+    wearsActions = false
   ): HTMLElement | null {
     const barIdx = spec.indexOf("|");
     const label = barIdx === -1 ? null : spec.slice(barIdx + 1).trim();
@@ -2844,9 +2859,19 @@ export class Widgets implements
       // case is how this switch says *unknown directive*, so the first cut drew
       // a red "Unknown ChronoAnvil widget: journal-header" where each banner had
       // been. A line with nothing to draw is a fact about the fence.
+      //
+      // AND `actions` IS NOT A CASE (1.0.11). The banner's action menu is a
+      // MODIFIER on this fence — read off the body above, dropped from `kept`
+      // with `frame:` and `stack`, and handed to the head as `withActions`.
+      // There is nothing for a case to return: the control is a node in the
+      // head's own title row, because `livePageHead` wraps a `LiveWidget` that
+      // rebuilds the head on every frontmatter write and would throw away
+      // anything docked into it from out here. See `directive-grammar.ts` for
+      // the rest of that argument, and why the keyword being a modifier is also
+      // what lets a note composed before 1.0.11 still attribute its sections.
       case "entry-header":
       case "journal-header":
-        return livePageHead(this.plugin, ctx);
+        return livePageHead(this.plugin, ctx, wearsActions);
       case "links":
         return buildLinksRegion(this.plugin, rest, ctx);
       case "period-nav": {
@@ -3038,7 +3063,7 @@ export class Widgets implements
       case "activity-chart":
         return buildActivityChartRegion(this.plugin, ctx);
       case "title":
-        return livePageHead(this.plugin, ctx);
+        return livePageHead(this.plugin, ctx, wearsActions);
       case "launcher":
         // A grid of places to go. `launcher` alone draws the default four;
         // `launcher:diary,search` draws those two. A LIST rather than a single

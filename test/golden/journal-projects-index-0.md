@@ -7,6 +7,7 @@ created: {{created}}
 ```chronoanvil
 stack
 journal-header
+actions
 stack
 # chronoanvil:trackers:start
 tracker:status

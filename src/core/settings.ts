@@ -23,6 +23,7 @@ import {
   ROOT_CHILDREN,
   ART_PRESETS,
 } from "./constants";
+import { PAGE_ACTIONS } from "./page-actions";
 import type { LogbookDef } from "./constants";
 import {
   PAGE_GROUND_FAMILIES,
@@ -116,6 +117,16 @@ export interface AttachmentOptions {
 }
 
 // What the vault banner is allowed to vary.
+export interface PageActionOptions {
+  // Off hides the row everywhere without touching a note: the `actions` line
+  // stays in every banner's fence and simply draws nothing, so turning it back
+  // on restores the row exactly as it was. The same shape `eventsEnabled` has,
+  // and for the same reason — a toggle is not a migration.
+  enabled: boolean;
+  // The `PAGE_ACTIONS` ids this reader does not want a button for.
+  off: string[];
+}
+
 export interface BannerOptions {
   // Optional legacy flag; banner is standard and always active on recognized surfaces.
   enabled?: boolean;
@@ -179,6 +190,13 @@ export interface ChronoAnvilSettings {
   // the whole reason this is a toggle rather than a migration. See
   // `ui/vault-banner.ts`.
   banner: BannerOptions;
+  // The banner's action menu: whether it draws at all, and which of
+  // `PAGE_ACTIONS` this reader has turned off. 1.0.11.
+  //
+  // THE LIST RECORDS REFUSALS, NOT ACCEPTANCES — `pageActionsOn` opens with
+  // why, and it is the difference between a new action reaching every vault and
+  // reaching none of them.
+  pageActions: PageActionOptions;
   sleepEnabled: boolean;
   // Whether special events are read and drawn. Off hides every decoration and
   // the upcoming list without touching the events note itself, so turning it
@@ -334,6 +352,7 @@ export const DEFAULT_SETTINGS: ChronoAnvilSettings = {
   // banner is what 4.51 is; shipping it off would make the release a setting
   // nobody finds. Turning it off restores the in-note banners exactly, and
   // nothing in any note has to change either way.
+  pageActions: { enabled: true, off: [] },
   banner: {
     enabled: true,
     glyph: "",
@@ -974,6 +993,17 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       )
     );
 
+    this.renderPageActions(
+      this.group(
+        containerEl,
+        "page-actions",
+        "🔘",
+        "Page actions",
+        "The menu of things you can do to a page, in its banner",
+        false
+      )
+    );
+
     this.renderMobile(
       this.group(
         containerEl,
@@ -1546,6 +1576,57 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
   }
 
   // ── Mobile ──────────────────────────────────────────────────────────────
+  // ── Page actions ────────────────────────────────────────────────────────
+  // The row `PAGE_ACTIONS` draws in every banner. One master toggle and one
+  // switch per action, in table order.
+  //
+  // A GROUP OF ITS OWN AND NOT A CORNER OF *Vault banner*, which is about the
+  // strip ABOVE a note; this row is inside the note's own banner card. Two
+  // objects a reader can see at once should not share one heading.
+  //
+  // THE TOGGLES WRITE REFUSALS. `off` holds the ids that are OFF, so a switch
+  // turned on removes an id rather than adding one — see `pageActionsOn` for
+  // why that direction is the one that survives a new action shipping.
+  private renderPageActions(containerEl: HTMLElement): void {
+    const s = this.plugin.settings;
+    this.note(
+      containerEl,
+      "A menu in the banner of your journal notes, journal dashboards and diary entries — things you do to the page itself rather than write in it."
+    );
+
+    new Setting(containerEl)
+      .setName("Show the action menu")
+      .setDesc(
+        "Off hides the control without changing a single note, so turning it back on restores it exactly as it was."
+      )
+      .addToggle((t) =>
+        t.setValue(s.pageActions.enabled).onChange(async (v) => {
+          s.pageActions.enabled = v;
+          await this.plugin.saveSettings();
+          // The per-action switches below only exist while the menu is on, so
+          // the tab is rebuilt — through `refresh()`, which is the one door
+          // that keeps the reader's scroll position (`settings-page-quirks`).
+          this.refresh();
+        })
+      );
+
+    if (!s.pageActions.enabled) return;
+
+    for (const action of PAGE_ACTIONS) {
+      new Setting(containerEl)
+        .setName(action.label)
+        .setDesc(action.blurb)
+        .addToggle((t) =>
+          t.setValue(!s.pageActions.off.includes(action.id)).onChange(async (v) => {
+            s.pageActions.off = v
+              ? s.pageActions.off.filter((id) => id !== action.id)
+              : [...s.pageActions.off, action.id];
+            await this.plugin.saveSettings();
+          })
+        );
+    }
+  }
+
   private renderMobile(containerEl: HTMLElement): void {
     const s = this.plugin.settings;
     if (!s.mobile) {

@@ -613,6 +613,68 @@ export function isLinksLine(line: string): boolean {
   return splitDirective(line).keyword === LINKS_KEYWORD;
 }
 
+// ── the banner's third half (1.0.11) ──────────────────────────────────
+//
+// `actions` IS THE MENU OF THINGS A READER CAN DO TO THE PAGE — copy it out as
+// plain markdown, join it to the diary — and it is composed by the banner, in
+// the banner's own fence, exactly the way `links:` is. It takes NO ARGUMENT:
+// which items the menu holds is a Settings answer, vault-wide, so a per-page
+// argument would be a second place to ask one question. `PAGE_ACTIONS` is the
+// list and `settings.pageActions.off` is the reader's edit to it.
+//
+// WHAT THE BANNER IS, AND WHETHER THIS BREAKS IT. `widget-registry.ts` states
+// the rule in as many words: a banner is "the file's NAME, its NAVIGATION and
+// the CONTROL that edits the page — those three, and nothing else", and 4.20
+// threw the tracker grid out of both banners on the strength of it. This is not
+// a fourth thing: it is a second CONTROL, in the corner beside the first, and
+// the clause 4.20 was drawing is between the page and what a reader WRITES in
+// it. The grid was a reading; this is a control.
+//
+// ── AND IT IS A MODIFIER, WHICH IS THE WHOLE OF ITS SECOND DRAFT ────────
+//
+// IT DREW A ROW OF BUTTONS FIRST, and the vault showed two things wrong with
+// that in one screenshot. A row of call-to-action buttons under the page's own
+// name is heavier than the name; and a banner fence that is NOT welded into a
+// stack has no card — `chromeClasses` withholds every banner class unless the
+// block is a stack — so the row rendered loose on the page background, below
+// the head's box and above the navigator's. The reader's words: *"the button is
+// appearing on the page without a stack group. It should also be a drop down
+// context menu, similar to the cog wheel on the header banner."*
+//
+// So the line draws NOTHING OF ITS OWN. It is read off the fence before the
+// dispatcher's loop, like `frame:`, `row`, `stack` and `wide`, and what it says
+// is *this banner wears its action menu* — a fact about the block. The head
+// draws the control, in its own title row, which is the only place a node can
+// live and survive `liveFrontmatterWidget` rebuilding the head on every
+// frontmatter write. `ui/widgets/page-head.ts` holds that half.
+//
+// AND THAT IS WHY AN OLD NOTE STILL READS. `fenceKeywords` drops every modifier
+// from both sides of a signature comparison, so a banner fence with this line
+// and one without are the same fence — which is the property `stack` has, for
+// the same reason, and the reason a note composed before the keyword existed
+// still attributes its sections. Without it the catalogue's signature grows a
+// keyword no file in any vault can have: `ownerOf` fails on exact equality, the
+// sub-multiset fallback only forgives an EXTENSIBLE section, and inside a
+// welded stack `ownersBySignature` finds no signature for the first member and
+// returns nothing at all. Probed before the fix, on a Study topic index: the
+// composed note reports `banner, trackers, children` and the same note with the
+// one line cut out reports NOTHING. That is 5.28's data-corruption shape and
+// `test/page-actions.test.ts` sweeps every composed note for it.
+export const ACTIONS_KEYWORD = "actions";
+
+// Whether this fence body line is the banner's action menu.
+//
+// A PREDICATE BECAUSE THE LOOP NEEDS ONE. The dispatcher chooses the lines it
+// dispatches with a list of `is*Line` calls rather than by asking
+// `MODIFIER_KEYWORDS`, so a modifier with no predicate is a modifier the loop
+// still walks into — and `case "actions"` does not exist, which is how this
+// switch says *unknown directive*. A red "Unknown ChronoAnvil widget" where the
+// banner should be is 4.51's mistake, made twice already in this file's
+// history.
+export function isActionsLine(line: string): boolean {
+  return splitDirective(line).keyword === ACTIONS_KEYWORD;
+}
+
 // ── how wide the page is (4.11) ───────────────────────────────────────
 //
 // A THIRD MODIFIER, ON `frame:`'s AND `row`'s SLOT: one line, read before the
@@ -1310,6 +1372,7 @@ export function headerLevel(rest: string, firstInFence: boolean): number {
 // is the parsed list a fence declares, and asking it about a keyword avoids
 // reconstructing a line to hand to a predicate.
 export const MODIFIER_KEYWORDS: ReadonlySet<string> = new Set([
+  ACTIONS_KEYWORD,
   HEADER_KEYWORD,
   FRAME_KEYWORD,
   ROW_KEYWORD,

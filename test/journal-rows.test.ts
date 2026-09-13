@@ -545,6 +545,11 @@ describe("the tracker grid and the stats band (5.18, rewritten in 5.28)", () => 
         // could not be while the boundary was something only the composer knew.
         "stack",
         "journal-header",
+        // AND THE ACTION ROW WITH IT (1.0.11), which is the banner's own second
+        // line and therefore inside the banner's PART of the stack rather than
+        // a part of its own. What this test is about is where the divider falls,
+        // and it falls after everything the banner composes.
+        "actions",
         "stack",
         "# chronoanvil:trackers:start",
         "tracker:status",
@@ -610,7 +615,7 @@ describe("the tracker grid and the stats band (5.18, rewritten in 5.28)", () => 
           // was welded into. What this is asserting is unchanged: the two are
           // in ONE fence, with nothing but structure between them.
           expect(file.content, file.name).toContain(
-            "journal-header\nstack\n# chronoanvil:trackers:start"
+            "journal-header\nactions\nstack\n# chronoanvil:trackers:start"
           );
           expect(file.content, file.name).not.toContain("header:📊 Trackers");
         }
@@ -638,7 +643,7 @@ describe("the tracker grid and the stats band (5.18, rewritten in 5.28)", () => 
     // The banner is untouched by the band's leaving — the grid is inside it and
     // stays there.
     expect(without).toContain(
-      "```chronoanvil\nstack\njournal-header\nstack\n# chronoanvil:trackers:start"
+      "```chronoanvil\nstack\njournal-header\nactions\nstack\n# chronoanvil:trackers:start"
     );
     expect(applySections(without, ctx, present)).toBe(text);
   });

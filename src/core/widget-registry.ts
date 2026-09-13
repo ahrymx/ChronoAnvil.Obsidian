@@ -998,7 +998,17 @@ export const NOT_PAGE_WIDGETS: Record<string, WidgetExclusion> = {
   },
 
   // What a page is.
-  "entry-header": { reason: "banner", note: "the strip that makes a note a diary entry" },
+  //
+  // AND `actions` IS NOT HERE, THOUGH IT WAS FOR A DRAFT (1.0.11). The banner's
+  // action menu is composed in the banner's fence on the three surfaces that
+  // ship it, and it plainly belongs to the same family as the two below — but
+  // this table describes the DISPATCHER, and the keyword stopped dispatching
+  // when it became a modifier. A modifier is already unofferable: the picker is
+  // built from `WIDGETS`, and `test/widget-registry.test.ts` requires every key
+  // in either table to be a `case` in the switch. Which items the menu holds is
+  // Settings → Page actions, vault-wide, which is also why there is nothing
+  // here for a reader to configure by adding one.
+   "entry-header": { reason: "banner", note: "the strip that makes a note a diary entry" },
   "journal-header": { reason: "banner", note: "the strip that makes a note a journal note" },
 
   // Structure.
