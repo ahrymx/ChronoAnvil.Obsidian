@@ -5,6 +5,47 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.20] - 2026-09-14
+
+### Fixed
+
+- **An edit to a meeting in the logbook list is kept.** The Meetings logbook is
+  a view of the events note rather than a note of its own — a meeting is an
+  event with an hour on it, which is what puts it on the calendar and on the
+  time grid at the same time. The unified logbook list drew those meetings as
+  ordinary cards, and its two write callbacks returned early on them. So an
+  edit was made on the card, drawn, and then dropped: the calendar and the grid
+  went on showing the meeting as it was, and the next reload rebuilt the card
+  from the store. An edit accepted, displayed and silently discarded is the one
+  shape of bug you cannot work around, because nothing about it looks wrong.
+
+  A card now writes back to the event it was drawn from. The first line is the
+  title and the rest is the note, the *when* control sets the hour and the
+  length, and a single meeting moves to another day — with a span of days
+  carried, if it had one. Deleting the card deletes the event.
+
+  **Three edits are refused rather than half-made**, each said in a notice with
+  the card put back the way the store has it:
+
+  - **Moving one date of a repeating meeting.** Events repeat annually or
+    weekly and the model holds no exceptions by design, so moving this
+    Wednesday's stand-up would move every one there has ever been. Everything
+    else on a series — its name, its note, its hour, its length — is a fact
+    about the series and is taken.
+  - **Deleting a repeating meeting from the list**, for the same reason, and
+    because this list deletes without confirming.
+  - **Taking the hour off a meeting, or crossing one off.** An event with an
+    hour is what a meeting is, so clearing it would not edit the meeting but
+    remove it from the list it was cleared in; and nothing in the store holds
+    "attended" — a tick that stuck until the next reload would be the same bug
+    in miniature.
+
+- **The logbook list notices a meeting that changed somewhere else.** It
+  watched each book's `path`, and the Meetings book's path is a note nothing is
+  ever written to — its items live in the events note. A meeting added, moved
+  or deleted from the calendar, the grid or the event editor now reaches the
+  list without a reload.
+
 ## [1.0.19] - 2026-09-14
 
 ### Changed

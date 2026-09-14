@@ -42,11 +42,19 @@ import { findLogbook } from "../../diary/logbooks";
 import { composeLogbookNote } from "../../diary/logbook-sections";
 import { buildLogList, type LogTypeOption } from "./log-list";
 import { moment, today } from "../../core/util";
-import { readEvents } from "../../events/eventstore";
 import {
+  deleteEvent,
+  eventsNotePath,
+  readEvents,
+  saveEvent,
+} from "../../events/eventstore";
+import {
+  deletedMeeting,
   describeEventWhen,
   describeRelative,
+  editedMeeting,
   upcomingEvents,
+  type EventDef,
 } from "../../events/events";
 import { draftEvent, openEventEditor } from "../../events/event-ui";
 import { emptyLine } from "../empty";
@@ -93,6 +101,25 @@ export function buildAllLogbooks(
   }));
 
   const itemLogbookMap = new WeakMap<LogItem, LogbookDef>();
+  // AND, FOR A MEETING, THE EVENT IT WAS DRAWN FROM — the definition and the
+  // one date of it this card stands for. Without the date an edit could not
+  // tell a moved meeting from an untouched one, and without the definition
+  // there is nothing to write back to. Both are facts about the item that no
+  // amount of re-reading the item recovers, so they are recorded where the
+  // item is built.
+  const itemEventMap = new WeakMap<LogItem, { def: EventDef; iso: string }>();
+
+  // The list's own refresh, handed over as it is built. See `onReady`: a write
+  // this widget REFUSES leaves a card showing something the store does not
+  // hold, and no file has changed for the watcher to notice.
+  let refreshList: (() => Promise<void>) | null = null;
+
+  // A meeting edit that cannot be made, said where the reader is looking and
+  // then undone on screen.
+  const refuse = async (why: string): Promise<void> => {
+    new Notice(`ChronoAnvil: ${why}.`);
+    await refreshList?.();
+  };
 
   const loadAllItems = async (): Promise<LogItem[]> => {
     const all: LogItem[] = [];
@@ -108,6 +135,7 @@ export function buildAllLogbooks(
             mins: ev.def.duration ?? null,
           };
           itemLogbookMap.set(item, book);
+          itemEventMap.set(item, { def: ev.def, iso: ev.iso });
           all.push(item);
         }
       } else {
@@ -179,7 +207,27 @@ export function buildAllLogbooks(
     },
     onItemUpdate: async (item, prevItem) => {
       const book = itemLogbookMap.get(item) ?? itemLogbookMap.get(prevItem);
-      if (!book || book.source === "events") return;
+      if (!book) return;
+
+      // A MEETING IS WRITTEN BACK TO THE EVENT IT CAME FROM. This used to
+      // return here, so an edit to a meeting was made on the card, drawn, and
+      // then dropped — the calendar and the time grid went on showing what
+      // they had, and the next reload rebuilt the card from the store. See
+      // `editedMeeting`, which decides what one card can tell one event.
+      if (book.source === "events") {
+        const occ = itemEventMap.get(item) ?? itemEventMap.get(prevItem);
+        if (!occ) return;
+        const edit = editedMeeting(occ.def, occ.iso, item);
+        if (!edit.ok) {
+          await refuse(edit.why);
+          return;
+        }
+        if (!(await saveEvent(app, plugin, edit.def))) {
+          await refuse("could not write the events note");
+        }
+        return;
+      }
+
       const file = app.vault.getAbstractFileByPath(book.path);
       if (file instanceof TFile) {
         const text = await app.vault.read(file);
@@ -200,7 +248,22 @@ export function buildAllLogbooks(
     },
     onItemDelete: async (item) => {
       const book = itemLogbookMap.get(item);
-      if (!book || book.source === "events") return;
+      if (!book) return;
+
+      if (book.source === "events") {
+        const occ = itemEventMap.get(item);
+        if (!occ) return;
+        const gone = deletedMeeting(occ.def);
+        if (!gone.ok) {
+          await refuse(gone.why);
+          return;
+        }
+        if (!(await deleteEvent(app, plugin, occ.def.id))) {
+          await refuse("could not write the events note");
+        }
+        return;
+      }
+
       const file = app.vault.getAbstractFileByPath(book.path);
       if (file instanceof TFile) {
         const text = await app.vault.read(file);
@@ -220,7 +283,21 @@ export function buildAllLogbooks(
       }
     },
     itemsProvider: loadAllItems,
-    watchPaths: logbooks.map((b) => b.path),
+    // A BOOK'S `path` IS NOT ALWAYS ITS STORE. The Meetings book has a note at
+    // its path like every other one, and nothing is ever written there: its
+    // items live in the events note's frontmatter. Watching only the paths
+    // meant this list never noticed a meeting added, moved or deleted
+    // anywhere else in the plugin — including by its own cards, now that they
+    // write.
+    watchPaths: [
+      ...logbooks.map((b) => b.path),
+      ...(logbooks.some((b) => b.source === "events")
+        ? [eventsNotePath(plugin)]
+        : []),
+    ],
+    onReady: (api) => {
+      refreshList = api.refresh;
+    },
   });
 
   return wrap;

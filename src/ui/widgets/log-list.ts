@@ -194,6 +194,18 @@ export interface LogListOptions {
   onItemUpdate?: (item: LogItem, prevItem: LogItem) => Promise<void>;
   onItemDelete?: (item: LogItem) => Promise<void>;
   itemsProvider?: () => Promise<LogItem[]>;
+  /**
+   * Handed this list's own refresh, once, as it is built.
+   *
+   * FOR A CALLER WHOSE WRITE CAN BE REFUSED. A card commits as it is used: it
+   * mutates the item, redraws and calls back, and the callback is where the
+   * write happens. A caller that declines the write — the Meetings book, where
+   * one date of a repeating series cannot be moved — has a card on screen
+   * showing something the store does not hold, and no file has changed, so the
+   * watcher that would otherwise put it right never fires. This is how it asks
+   * for the list to be rebuilt from the store it actually came from.
+   */
+  onReady?: (api: { refresh: () => Promise<void> }) => void;
 }
 
 function highlightMatches(el: HTMLElement, text: string, query: string): void {
@@ -971,6 +983,8 @@ export function buildLogList(
     ...(opts.watchPath ? [opts.watchPath] : []),
     ...(file ? [file.path] : []),
   ];
+
+  opts.onReady?.({ refresh });
 
   if (opts.itemsProvider) {
     void refresh();

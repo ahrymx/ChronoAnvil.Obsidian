@@ -940,3 +940,122 @@ export function describeDay(occurrences: EventOccurrence[]): string {
     })
     .join("\n");
 }
+
+// ── a meeting, edited on a logbook card (1.0.20) ─────────────────────
+//
+// THE MEETINGS LOGBOOK IS A VIEW OF THIS STORE AND NOT A STORE. `logbook:all`
+// draws every book in one list, and for the Meetings book the items in it are
+// events with an hour on them — built in the widget out of `EventDef`s and
+// never parsed from a region, because there is no region. So the list's
+// ordinary write path, which serialises the items back into a note, has
+// nothing to write to, and the two callbacks that reach it returned early on
+// an events-backed book.
+//
+// WHAT THAT LOOKED LIKE, AND WHY IT WAS WORSE THAN A REFUSAL. The card commits
+// as it is used — it mutates the item, redraws itself and calls back. The
+// callback did nothing, so the edit was on screen and nowhere else: the
+// calendar and the time grid went on showing the meeting as it was, and the
+// next reload rebuilt the card from the store and the edit was gone. An edit
+// that is accepted, displayed and then silently dropped is the one shape of
+// bug a reader cannot work around, because nothing about it looks wrong.
+//
+// SO THE CARD WRITES BACK, AND WHERE IT CANNOT IT SAYS SO. This decides which
+// of the two it is. It is here and not in the widget because it is a question
+// about the event model — what a series can be told from one of its
+// occurrences — and the answer is the same whatever surface asks.
+
+// The fields a log card can change. Structural rather than `LogItem` itself:
+// the item type belongs to the diary's log grammar, and this module knows
+// about events.
+export interface MeetingCard {
+  text: string;
+  date: string | null;
+  time: string | null;
+  mins: number | null;
+  done: string | null;
+}
+
+export type MeetingEdit =
+  | { ok: true; def: EventDef }
+  | { ok: false; why: string };
+
+export function editedMeeting(
+  def: EventDef,
+  iso: string,
+  card: MeetingCard
+): MeetingEdit {
+  // THE CARD HOLDS ONE TEXT AND THE EVENT HOLDS TWO FIELDS. The widget builds
+  // the card as the title, then the note under it; this is that sentence read
+  // backwards, and it is why deleting the second line deletes the note.
+  const lines = card.text.split("\n");
+  const title = lines[0].trim();
+  const note = lines.slice(1).join("\n").trim();
+  if (!title) return { ok: false, why: "a meeting needs a name" };
+
+  // AN EVENT WITH AN HOUR IS WHAT A MEETING IS — the definition the Meetings
+  // book is built on, not a filter over one. Clearing the hour would not edit
+  // this meeting, it would stop it being one, and the card it was cleared on
+  // would vanish from the list it was cleared in.
+  if (!card.time) {
+    return {
+      ok: false,
+      why: "a meeting is an event with an hour on it — open it from the calendar to make it a whole-day event",
+    };
+  }
+
+  // NOTHING IN THE STORE HOLDS "ATTENDED". A logbook item is crossed off and a
+  // meeting is not: it happened at the hour it says, and the calendar keeps it
+  // whether or not anybody turned up.
+  if (card.done) {
+    return {
+      ok: false,
+      why: "a meeting is not crossed off — it is on the calendar at the hour it says",
+    };
+  }
+
+  const next: EventDef = {
+    ...def,
+    title,
+    note: note || undefined,
+    time: card.time,
+    duration: card.mins ?? undefined,
+  };
+
+  // THE DAY IS THE ONE FIELD A SERIES CANNOT BE TOLD FROM ONE OF ITS DAYS.
+  // `EventDef`'s own header settles this: no skipped occurrences and no
+  // editing one occurrence of a series, because both need an exception store.
+  // Moving Thursday's stand-up from this card would either move every
+  // stand-up there has ever been or need the store this model does not have.
+  if (card.date && card.date !== iso) {
+    if (def.kind === "recurring") {
+      return {
+        ok: false,
+        why: "this meeting repeats, and one date of a series cannot be moved on its own — open it from the calendar to move the series",
+      };
+    }
+    // A LENGTH IN DAYS IS KEPT, which is all but unheard of on a meeting and
+    // costs one line to be right about: a two-day event dragged to Monday ends
+    // on Tuesday, not on the day it used to end on.
+    const span = def.start && def.end ? daysBetween(def.start, def.end) : 0;
+    next.start = card.date;
+    next.end = span > 0 ? addDays(card.date, span) : undefined;
+  }
+
+  return { ok: true, def: next };
+}
+
+// THE SAME QUESTION ABOUT A DELETE, and the same answer for a series: this
+// list deletes without confirming — the log card's own call, on the grounds
+// that Ctrl+Z holds a note — and "every Wednesday for ever" is not a thing to
+// delete without confirming from a list that is showing one Wednesday.
+export function deletedMeeting(
+  def: EventDef
+): { ok: true } | { ok: false; why: string } {
+  if (def.kind === "recurring") {
+    return {
+      ok: false,
+      why: "this meeting repeats — deleting it here would delete every one of them, so open it from the calendar instead",
+    };
+  }
+  return { ok: true };
+}

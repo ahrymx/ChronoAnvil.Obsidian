@@ -45,7 +45,14 @@ import { shippedNotes, isReconcilable } from "../src/core/scaffold";
 import { remapConfiguredPaths } from "../src/core/pathwatch";
 import { WIDGET_FORM } from "../src/core/section-model";
 import { LOGBOOK, LOGBOOKS } from "../src/core/vocabulary";
-import { DEFAULT_EVENT_COLOR, EVENT_COLORS } from "../src/events/events";
+import {
+  DEFAULT_EVENT_COLOR,
+  EVENT_COLORS,
+  deletedMeeting,
+  editedMeeting,
+  type EventDef,
+  type MeetingCard,
+} from "../src/events/events";
 import { readSrc } from "./sources";
 import { toPlainMarkdown } from "../src/core/plain-markdown";
 import { writeNoteRegion } from "../src/core/notestore";
@@ -450,5 +457,184 @@ describe("a logbook exports as what it holds", () => {
     const out = toPlainMarkdown(note, logbookSectionModel(WORK));
     expect(out).toContain("- 2026-08-21 14:32 — rewrote the remap");
     expect(out).toContain("- [x] 2026-08-20 09:00 — read the roadmap");
+  });
+});
+
+// ── a meeting, edited on its card (1.0.20) ───────────────────────────
+//
+// THE BUG THESE EXIST FOR. `logbook:all` draws the Meetings book from the
+// event store, and its two write callbacks returned early on an events-backed
+// book — so an edit to a meeting was mutated onto the card, drawn, and then
+// dropped. The calendar and the time grid went on showing the meeting as it
+// was, and the next reload rebuilt the card from the store. An edit that is
+// accepted, displayed and silently discarded is the one shape of bug a reader
+// cannot work around, because nothing about it looks wrong.
+//
+// SO: what one card may tell one event, and where it must say no instead.
+
+describe("a meeting edited on a logbook card", () => {
+  const single: EventDef = {
+    id: "review",
+    title: "Design review",
+    kind: "single",
+    start: "2026-09-18",
+    time: "11:30",
+    duration: 30,
+  };
+  const weekly: EventDef = {
+    id: "standup",
+    title: "Stand-up",
+    kind: "recurring",
+    every: "week",
+    weekday: 3,
+    time: "09:30",
+    duration: 15,
+  };
+  const card = (over: Partial<MeetingCard> = {}): MeetingCard => ({
+    text: "Design review",
+    date: "2026-09-18",
+    time: "11:30",
+    mins: 30,
+    done: null,
+    ...over,
+  });
+
+  it("writes the title back, and the rest of the text as the note", () => {
+    const out = editedMeeting(single, "2026-09-18", card({
+      text: "Design review\nbring the mock-ups",
+    }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.def.title).toBe("Design review");
+    expect(out.def.note).toBe("bring the mock-ups");
+    // THE ID IS NEVER REWRITTEN, which is what keeps an entry's `events:`
+    // frontmatter pointing at the same meeting after it is renamed.
+    expect(out.def.id).toBe("review");
+  });
+
+  it("drops the note when the line holding it is deleted", () => {
+    const out = editedMeeting({ ...single, note: "bring the mock-ups" }, "2026-09-18", card());
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.def.note).toBeUndefined();
+  });
+
+  it("writes the hour and the length", () => {
+    const out = editedMeeting(single, "2026-09-18", card({ time: "14:00", mins: 90 }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.def.time).toBe("14:00");
+    expect(out.def.duration).toBe(90);
+  });
+
+  it("lets a length be taken off without taking the meeting off the clock", () => {
+    const out = editedMeeting(single, "2026-09-18", card({ mins: null }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.def.duration).toBeUndefined();
+    expect(out.def.time).toBe("11:30");
+  });
+
+  it("moves a single meeting to another day", () => {
+    const out = editedMeeting(single, "2026-09-18", card({ date: "2026-09-21" }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.def.start).toBe("2026-09-21");
+  });
+
+  it("carries a span of days with it", () => {
+    const twoDay: EventDef = { ...single, start: "2026-09-18", end: "2026-09-19" };
+    const out = editedMeeting(twoDay, "2026-09-18", card({ date: "2026-09-21" }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.def.start).toBe("2026-09-21");
+    expect(out.def.end).toBe("2026-09-22");
+  });
+
+  it("refuses to move one date of a series", () => {
+    // `EventDef`'s own header: no skipped occurrences and no editing one
+    // occurrence of a series, because both need an exception store. Moving
+    // this Wednesday would move every Wednesday there has ever been.
+    const out = editedMeeting(weekly, "2026-09-16", {
+      text: "Stand-up",
+      date: "2026-09-17",
+      time: "09:30",
+      mins: 15,
+      done: null,
+    });
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.why).toContain("repeats");
+  });
+
+  it("takes every other edit on a series, because those are the series'", () => {
+    const out = editedMeeting(weekly, "2026-09-16", {
+      text: "Stand-up\nmoved to the big room",
+      date: "2026-09-16",
+      time: "09:45",
+      mins: 20,
+      done: null,
+    });
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.def.time).toBe("09:45");
+    expect(out.def.duration).toBe(20);
+    expect(out.def.weekday).toBe(3);
+  });
+
+  it("refuses a meeting with the hour taken off it", () => {
+    // An event with an hour is what a meeting IS — the definition the book is
+    // built on, not a filter over one. Clearing it would not edit this
+    // meeting, it would take it out of the list it was cleared in.
+    const out = editedMeeting(single, "2026-09-18", card({ time: null }));
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.why).toContain("hour");
+  });
+
+  it("refuses a meeting with no name", () => {
+    const out = editedMeeting(single, "2026-09-18", card({ text: "   " }));
+    expect(out.ok).toBe(false);
+  });
+
+  it("refuses to cross a meeting off", () => {
+    // Nothing in the store holds "attended", and a tick that stuck until the
+    // next reload is the same bug in miniature.
+    const out = editedMeeting(single, "2026-09-18", card({ done: "2026-09-18" }));
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.why).toContain("crossed off");
+  });
+
+  it("deletes a single meeting and refuses to delete a series", () => {
+    expect(deletedMeeting(single).ok).toBe(true);
+    const out = deletedMeeting(weekly);
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.why).toContain("every one of them");
+  });
+});
+
+describe("the logbook widget writes a meeting where a meeting lives", () => {
+  it("no longer drops an edit to an events-backed book", () => {
+    const src = readSrc("ui/widgets/logbook-widget");
+    // The two callbacks returned early on `source === "events"`, which is what
+    // made the edit vanish. Both now reach the event store.
+    expect(src).not.toContain('if (!book || book.source === "events") return;');
+    expect(src).toContain("editedMeeting(occ.def, occ.iso, item)");
+    expect(src).toContain("saveEvent(app, plugin, edit.def)");
+    expect(src).toContain("deleteEvent(app, plugin, occ.def.id)");
+  });
+
+  it("watches the store a meeting is actually in", () => {
+    const src = readSrc("ui/widgets/logbook-widget");
+    // The Meetings book has a note at its `path` and nothing is written there.
+    expect(src).toContain("eventsNotePath(plugin)");
+  });
+
+  it("puts a refused edit back the way the store has it", () => {
+    const src = readSrc("ui/widgets/logbook-widget");
+    expect(src).toContain("refreshList?.()");
+    expect(readSrc("ui/widgets/log-list")).toContain("opts.onReady?.({ refresh })");
   });
 });
