@@ -68,6 +68,7 @@ import {
   DEFAULT_EVENT_COLOR,
   EVENT_COLORS,
 } from "../events/events";
+import type { EventKindFilter, EventSort } from "../events/events";
 import { confirmAction, promptEmoji, promptSuggester } from "../ui/modals";
 import { BRAND_ICON_ID } from "../ui/brand-icon";
 import { trashClause, trashDestination } from "./trash";
@@ -261,6 +262,25 @@ export interface ChronoAnvilSettings {
   // the absence of a row rather than a stored `false`, and a vault that has
   // never pressed the control writes nothing.
   timeGridExpanded?: Record<string, boolean>;
+  // How the events manager is currently looking at the list: which kind chip is
+  // pressed, how rows are ordered inside a group, and which groups are folded.
+  //
+  // ONE RECORD, NOT KEYED BY NOTE — the one place this differs from the two
+  // above, which are per-note because two grids can be showing different weeks.
+  // There is ONE events list in a vault. A reader who folded "Earlier" folded
+  // it about that list, not about the page the manager happened to be on, and
+  // keying it by path would hand them an unfolded list on the next page and no
+  // way to see why. Nothing goes into `pathwatch.ts` for the same reason: there
+  // is no note key here to remap when a note is renamed.
+  //
+  // EVERY FIELD OPTIONAL, AND THE RECORD ITSELF TOO. The resting state — every
+  // event, by date, nothing folded — writes nothing at all, so a vault that has
+  // never touched the deck carries no key.
+  eventsView?: {
+    kind?: EventKindFilter;
+    sort?: EventSort;
+    folded?: string[];
+  };
   // Unsaved quick-capture text, kept so closing the box doesn't lose it.
   // Lives here rather than in memory so it survives a restart.
   captureDraft: string;

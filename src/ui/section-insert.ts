@@ -17,6 +17,7 @@ import { diaryDashboardSectionModel } from "../diary/diary-dashboard-sections";
 import { journalsDashboardSectionModel } from "../journals/journals-dashboard-sections";
 import { journalDashboardSectionModel } from "../journals/journal-dashboard-sections";
 import { searchSectionModel } from "../diary/search-sections";
+import { eventsSectionModel } from "../events/events-sections";
 import type { EntrySectionContext } from "../diary/entry-sections";
 import { isManagedTemplate } from "../trackers/entry-trackers";
 import { openSectionEditor } from "./section-editor";
@@ -206,6 +207,11 @@ export type ResolvedSurface =
   // AND THE SEARCH NOTE, on the same argument and with the same shape: one
   // configured file, no context, nothing about it that varies.
   | { kind: "search" }
+  // AND THE EVENTS NOTE, AS OF 1.0.21 — one configured file, no context, the
+  // same shape again. It was the last page the plugin ships that resolved to
+  // nothing here, which is why the note that manages the events was the one
+  // note a reader could not edit the sections of.
+  | { kind: "events" }
   // THE TWO FOLDER-NOTE DASHBOARDS, AS OF 4.1 §2. Same shape as `search` and
   // for the same reason — one note each, no context, nothing that varies by
   // grain, kind or depth.
@@ -302,6 +308,9 @@ export function modelForSurface(
   }
   if (surface.kind === "search") {
     return { model: searchSectionModel(vault), noun: "Search note" };
+  }
+  if (surface.kind === "events") {
+    return { model: eventsSectionModel(vault), noun: "Events note" };
   }
   if (surface.kind === "logbook") {
     return {
@@ -602,6 +611,14 @@ export class SectionInserter {
       return { kind: "home", diaryRoot: this.plugin.settings.paths.diaryRoot };
     }
     if (notePath === this.plugin.settings.paths.search) return { kind: "search" };
+    // THE EVENTS NOTE, BY ITS CONFIGURED PATH AND FOR THE SAME REASONS AS THE
+    // TWO ABOVE — and, like the logbooks below, BEFORE the diary resolvers.
+    // It lives under the diary root, so `entryContextFor` is the next thing
+    // that would be asked about it, and `page-head.ts` records what that costs:
+    // a note in no grain folder falls back to `daily`, which is a confident
+    // wrong answer rather than a missing one. Here it would offer the DAILY
+    // ENTRY catalogue on the events list.
+    if (notePath === this.plugin.settings.paths.events) return { kind: "events" };
 
     // THE LOGBOOKS (4.52), BY THE PATH ON THE DEF — the one identity in this
     // resolver that is neither a settings key nor derived from a folder.

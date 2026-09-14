@@ -679,7 +679,9 @@ describe("a dashboard holds page widgets", () => {
     }
 
     const next = applyDiarySections(text, ctx, want)!;
-    expect(next).toContain("```chronoanvil\nevents\n```");
+    // WITH ITS HEADING, as of 1.0.22 — a widget added from the window composes
+    // the bar the registry declares for it, and the directive under it.
+    expect(next).toContain("```chronoanvil\nheader:🎉 Events\nevents\n```");
     expect(detectDiarySections(next, ctx)).toEqual(want);
   });
 
@@ -840,8 +842,12 @@ describe("a dashboard holds page widgets", () => {
       diarySectionModel(ctx)
         .sections(text)
         .find((v) => v.id === id)!.answered;
-    expect(answered("w:journal-card#1")).toEqual({ arg: "study" });
-    expect(answered("w:journal-card#2")).toEqual({ arg: "work" });
+    // `form: "section"` IS READ OFF THE FENCE and is not a stored answer: both
+    // cards were composed by the window, so both carry their heading. The
+    // property this case is about is the ARGUMENT — each card reads its own
+    // journal back rather than the first one's.
+    expect(answered("w:journal-card#1")).toEqual({ form: "section", arg: "study" });
+    expect(answered("w:journal-card#2")).toEqual({ form: "section", arg: "work" });
     // And the spare behind them has answered nothing, because it is not there.
     expect(answered("w:journal-card#3")).toEqual({});
   });
@@ -854,10 +860,13 @@ describe("a dashboard holds page widgets", () => {
     const q = diarySectionModel(withVault)
       .addable(base())
       .find((v) => v.id === "w:journal-card#1")!.questions!;
-    expect(q).toHaveLength(1);
-    expect(q[0].kind).toBe("choice");
+    // THE TOGGLE, THEN THE ARGUMENT (1.0.22). The vault's lists are what this
+    // case is about, so the argument is found by key rather than by index.
+    expect(q.map((x) => x.key)).toEqual(["form", "arg"]);
+    const arg = q.find((x) => x.key === "arg")!;
+    expect(arg.kind).toBe("choice");
     expect(
-      (q[0] as { values: { value: string }[] }).values.map((v) => v.value)
+      (arg as { values: { value: string }[] }).values.map((v) => v.value)
     ).toEqual(["study"]);
   });
 

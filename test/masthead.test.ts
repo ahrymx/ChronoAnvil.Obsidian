@@ -16,6 +16,7 @@
 // this file fails first.
 
 import { describe, expect, it } from "vitest";
+import { WIDGETS } from "../src/core/widget-registry";
 
 import { PAGE_TITLE_LINE } from "../src/core/note-sections";
 import { isTitleLine } from "../src/core/directive-grammar";
@@ -489,7 +490,10 @@ describe("3.5: the span above, the value as a control", () => {
     // which is the same sentence in the page's own voice — so the destination
     // that argument chose is now the block head.
     expect(readCode("links")).not.toContain("${base} overview");
-    expect(readCode("widgets")).toContain('"week-summary": "📅 This week"');
+    // THE HEADING, ASKED OF THE REGISTRY (1.0.22). It was scraped out of the
+    // dispatcher's own table until that release moved the strings to
+    // `WidgetSpec.bar`; the sentence being pinned is the same one.
+    expect(WIDGETS["week-summary"].bar).toBe("📅 This week");
   });
 });
 

@@ -13,7 +13,7 @@ It replaces Templater, Meta Bind, Tracker, Tasks and Dataview for this workflow.
 
 | | |
 | --- | --- |
-| **Diary** | Daily and monthly entries, overview calendar with heat maps and special events, week / month / quarter / year dashboards, full-text search filtered by date, tag and tracker, on-this-day and timeline recaps. |
+| **Diary** | Daily and monthly entries, overview calendar with heat maps and special events, a manager page for those events, week / month / quarter / year dashboards, full-text search filtered by date, tag and tracker, on-this-day and timeline recaps. |
 | **Journals** | Define your own custom journals with folder levels and note types. Presets for Study (*Subjects → Topics → Lessons/Practice*), Projects, Fitness, and Media ship ready to use. |
 | **Trackers** | Defined once, synced everywhere. Numberless rating scales, dynamic bedtime & wake-up buttons with live sleep/wake duration, steppers, dropdowns, multi-row tag flow, and habit pills. Any tracker can be added to individual entries on the fly. |
 | **Charts** | Line, bar, calendar heat map, scatter correlation, streak and summary stat cards, rendered natively from your frontmatter onto dashboards and journal indexes. |
@@ -72,6 +72,18 @@ press opens what is in a box, or offers the list when it holds several. It is
 read-only there — nothing moves — and the **⤢** button beside the source names
 hands back the full grid, gestures and all, with that note remembering which
 you chose.
+
+### Every dated thing, on one page
+
+Birthdays, trips, a standing Tuesday call: the events note lists them all,
+grouped into Repeating, Coming up and Earlier, each group counted and foldable.
+Search and the kind chips are always there, a row is pressed to edit it, and the
+**⋯** at its end turns it off, duplicates it or deletes it — the same with a
+finger as with a mouse. An event turned off keeps its place in the list and
+leaves every calendar, which is what a holiday you observe some years wants.
+
+The page itself is customisable like any other: a banner, a section editor, and
+the manager above the week ahead beside the week's events.
 
 ## Install
 

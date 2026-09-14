@@ -39,12 +39,100 @@
   height: 17px;
 }
 
+/* ── The manager's deck ───────────────────────────────────────────
+   Two rows: the add button and the filter box, then the kind chips and the
+   sort. Below the container query they wrap further; see the end of this
+   section. */
+.ca-ev-deck {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
 .ca-ev-toolbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 10px;
+}
+/* The caret that says the add button opens a menu rather than a form. */
+.ca-ev-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ca-ev-add-caret {
+  display: inline-flex;
+}
+.ca-ev-add-caret svg {
+  width: 13px;
+  height: 13px;
+}
+/* One question drawn as four chips — what rhythm, and is it on. `is-on` is the
+   pressed one; there is always exactly one. */
+.ca-ev-kinds {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ca-ev-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  cursor: pointer;
+  box-shadow: none;
+}
+.ca-ev-kind:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+/* The theme's own tint over the page's ground, which is this plugin's house
+   style for "this one is selected" since 1.0.19's time grid. */
+.ca-ev-kind.is-on {
+  color: var(--text-normal);
+  border-color: var(--ca-ev-chip-edge);
+  background: var(--ca-ev-chip-bg);
+}
+.ca-ev-kind-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+.ca-ev-kind.is-on .ca-ev-kind-count {
+  color: var(--text-muted);
+}
+/* The sort sits at the far end of the chip strip: the chips say what the list
+   holds, the sort says how it is stacked, and one is a subset of the list
+   while the other is not. */
+.ca-ev-sort {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+  cursor: pointer;
+  box-shadow: none;
+}
+.ca-ev-sort:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+.ca-ev-sort-icon {
+  display: inline-flex;
+}
+.ca-ev-sort svg {
+  width: 12px;
+  height: 12px;
 }
 .ca-ev-count {
   font-size: var(--ca-text-2xs);
@@ -63,23 +151,50 @@
   letter-spacing: 0.06em;
   color: var(--text-faint);
 }
+/* Every group folds, and each one carries its own count — a fold that does not
+   say how many it is hiding is a fold a reader has to open to read. */
+.ca-ev-group > summary.ca-ev-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style-position: inside;
+}
+.ca-ev-group > summary.ca-ev-section::marker {
+  color: var(--text-faint);
+}
+.ca-ev-group[open] > summary.ca-ev-section {
+  margin-bottom: 2px;
+}
+.ca-ev-section-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
 .ca-ev-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
+/* THE ROW IS THE CONTROL. A press opens the event — the same rule the compact
+   time grid took in 1.0.18 — so it takes a pointer, a focus ring and a tab
+   stop, and nothing on it is revealed by hovering. */
 .ca-ev-row {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 6px 8px;
   border-radius: var(--ca-radius-sm);
+  cursor: pointer;
 }
 .ca-ev-row:hover {
   background: var(--background-modifier-hover);
 }
+.ca-ev-row:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
 /* A disabled event stays in the list — it's still defined, just not drawn —
-   so it's dimmed rather than hidden. */
+   so it's dimmed rather than hidden, and wears the pill below that says so. */
 .ca-ev-row.is-disabled {
   opacity: 0.5;
 }
@@ -87,13 +202,32 @@
   flex: 1;
   min-width: 0;
 }
+/* Two lines rather than one ellipsis. With one action button instead of four
+   there is width on a phone for a title to wrap, and a truncated event name is
+   a row a reader cannot tell from the one above it. */
 .ca-ev-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--ca-text-sm);
   font-weight: 600;
   color: var(--text-normal);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.ca-ev-pill {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--ca-text-3xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .ca-ev-meta {
   font-size: var(--ca-text-2xs);
@@ -102,70 +236,38 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ca-ev-edit {
+/* ONE CONTROL, ALWAYS VISIBLE. It was four buttons at `opacity: 0` until
+   `:hover`, with a `@media (hover: none)` arm dropping them to 0.45 on touch —
+   a fallback rather than an affordance: four 24px targets at not-quite-half
+   opacity, on a row that was not itself pressable, beside a countdown widget
+   drawing the same rows with nothing on them. `overflowButton` is the shared
+   `⋯`, and its own comment says what it means: more things about this row. */
+.ca-ev-more {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 4px;
-  border: none;
-  background: transparent;
+  border-radius: var(--ca-radius-sm);
   color: var(--text-faint);
   cursor: pointer;
-  border-radius: var(--ca-radius-sm);
-  opacity: 0;
 }
-.ca-ev-row:hover .ca-ev-edit {
-  opacity: 1;
-}
-.ca-ev-edit:hover {
+.ca-ev-more:hover {
   color: var(--text-normal);
   background: var(--background-modifier-hover);
 }
-.ca-ev-edit svg {
+.ca-ev-more svg {
   width: 14px;
   height: 14px;
 }
-/* Four icon buttons on a row, and the row is only 24px tall — they sit in one
-   group so the gap between them is the group's, not four separate margins. */
-.ca-ev-actions {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-/* Hidden until hover is fine for a mouse and useless for a keyboard, so focus
-   shows them too — otherwise tabbing lands on a control nobody can see. */
-.ca-ev-edit:focus-visible {
-  opacity: 1;
-  color: var(--text-normal);
-  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
-}
-
-/* The filter sits at the far end of the toolbar: the button is what you reach
-   for first, the count is a fact about the list, and the box is the thing you
-   only use once the list has outgrown a glance. */
 .ca-ev-filter {
   margin-left: auto;
   max-width: 190px;
   font-size: var(--ca-text-2xs);
 }
 
-/* "Earlier" folds. The summary keeps the section heading's type, loses the
-   default triangle's indent, and takes a pointer so it reads as openable. */
-.ca-ev-past > summary.ca-ev-section {
-  cursor: pointer;
-  list-style-position: inside;
-}
-.ca-ev-past > summary.ca-ev-section::marker {
-  color: var(--text-faint);
-}
-.ca-ev-past[open] > summary.ca-ev-section {
-  margin-bottom: 2px;
-}
-
-/* The relative time on the right of an upcoming row — the one thing that list
-   says which the calendar can't. */
+/* The relative time on the right of a row — how long until it, or how far into
+   it you are. The countdown widget had this column to itself until 1.0.21. */
 .ca-ev-when {
   flex-shrink: 0;
   font-size: var(--ca-text-2xs);
@@ -175,6 +277,25 @@
 .ca-ev-upcoming-row.is-ongoing .ca-ev-when {
   color: var(--interactive-accent);
   font-weight: 600;
+}
+
+/* ── The deck on a phone ──────────────────────────────────────────
+   The same breakpoint the time grid uses, and the same answer it reached in
+   1.0.19: let the bar wrap rather than shrink its parts. The filter box takes
+   a row of its own, and the sort loses its `margin-left: auto` because a strip
+   that has wrapped has no far end. */
+@container (max-width: 400px) {
+  .ca-ev-filter {
+    margin-left: 0;
+    flex: 1 0 100%;
+    max-width: none;
+  }
+  .ca-ev-sort {
+    margin-left: auto;
+  }
+  .ca-ev-when {
+    display: none;
+  }
 }
 
 /* ── Event Modal Chrome & Controls ───────────────────────────── */
@@ -3161,13 +3282,6 @@ body.is-mobile .ca-journal-capture-actions > button.ca-journal-capture-btn {
 }
 .ca-list-lead:empty {
   display: none;
-}
-
-/* Touch has no hover to reveal this with. See 3.9 §3.3's policy. */
-@media (hover: none) {
-  .ca-ev-edit {
-    opacity: 0.45;
-  }
 }
 
 /* ── The repair window (4.18.1 §7) ──────────────────────────────────────────

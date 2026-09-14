@@ -52,7 +52,7 @@ beforeAll(() => {
 });
 
 describe("every composed note is enumerated", () => {
-  it("covers all nine composers", () => {
+  it("covers all ten composers", () => {
     // A FLOOR, because every assertion below iterates `notes`. An enumeration
     // that stopped enumerating would leave the loop empty and this whole file
     // would pass while asserting nothing — the failure `widget-registry.test.ts`

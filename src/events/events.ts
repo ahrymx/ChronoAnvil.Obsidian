@@ -678,57 +678,70 @@ export interface UpcomingEvent {
 // window would silently hide it. An in-progress span is included and sorts by
 // its start date, which puts "you are on this trip right now" at the top where
 // it belongs.
+// ONE DEFINITION'S NEXT TURN, or null when it has none left.
+//
+// LIFTED OUT OF `upcomingEvents` IN 1.0.21, unchanged line for line, because
+// the manager needs the same answer on a row and computing it a second time is
+// how the two lists come to disagree about when a birthday next falls. The
+// countdown loops over this; the manager calls it once per row.
+//
+// IT DOES NOT ASK WHETHER THE EVENT IS ENABLED. That is the caller's question
+// and the two callers answer it differently: the countdown draws only what is
+// drawn on the calendars, the manager draws everything it manages and says
+// which of it is off. The guard stays in the loop below, where it was.
+export function nextOccurrence(
+  def: EventDef,
+  fromIso: string
+): UpcomingEvent | null {
+  if (!isValidIso(fromIso)) return null;
+  const year = Number(fromIso.slice(0, 4));
+
+  if (isWeeklyEvent(def)) {
+    // ONE ROW, NOT FIFTY-TWO. The agenda answers "what is next"; a standing
+    // meeting's answer is the next one of it, and a weekly event that filled
+    // the list with its own occurrences would push every other event in the
+    // vault off the bottom of a five-row widget.
+    const iso = nextWeeklyIso(def, fromIso);
+    if (!iso) return null;
+    return { def, iso, daysAway: daysBetween(fromIso, iso), ongoing: false };
+  }
+
+  if (def.kind === "recurring") {
+    // This year's date if it hasn't passed, otherwise next year's.
+    const thisYear = recurringIso(def, year);
+    const hit =
+      thisYear && thisYear.iso >= fromIso ? thisYear : recurringIso(def, year + 1);
+    if (!hit) return null;
+    return {
+      def,
+      iso: hit.iso,
+      daysAway: daysBetween(fromIso, hit.iso),
+      ongoing: false,
+    };
+  }
+
+  const span = eventSpan(def);
+  if (!span || span.end < fromIso) return null;
+  return {
+    def,
+    iso: span.start,
+    daysAway: daysBetween(fromIso, span.start),
+    ongoing: span.start < fromIso,
+  };
+}
+
 export function upcomingEvents(
   defs: EventDef[],
   fromIso: string,
   count: number
 ): UpcomingEvent[] {
   if (!isValidIso(fromIso) || count <= 0) return [];
-  const year = Number(fromIso.slice(0, 4));
   const out: UpcomingEvent[] = [];
 
   for (const def of defs) {
     if (!isEnabled(def)) continue;
-
-    if (isWeeklyEvent(def)) {
-      // ONE ROW, NOT FIFTY-TWO. The agenda answers "what is next"; a standing
-      // meeting's answer is the next one of it, and a weekly event that filled
-      // the list with its own occurrences would push every other event in the
-      // vault off the bottom of a five-row widget.
-      const iso = nextWeeklyIso(def, fromIso);
-      if (!iso) continue;
-      out.push({
-        def,
-        iso,
-        daysAway: daysBetween(fromIso, iso),
-        ongoing: false,
-      });
-      continue;
-    }
-
-    if (def.kind === "recurring") {
-      // This year's date if it hasn't passed, otherwise next year's.
-      const thisYear = recurringIso(def, year);
-      const hit =
-        thisYear && thisYear.iso >= fromIso ? thisYear : recurringIso(def, year + 1);
-      if (!hit) continue;
-      out.push({
-        def,
-        iso: hit.iso,
-        daysAway: daysBetween(fromIso, hit.iso),
-        ongoing: false,
-      });
-      continue;
-    }
-
-    const span = eventSpan(def);
-    if (!span || span.end < fromIso) continue;
-    out.push({
-      def,
-      iso: span.start,
-      daysAway: daysBetween(fromIso, span.start),
-      ongoing: span.start < fromIso,
-    });
+    const hit = nextOccurrence(def, fromIso);
+    if (hit) out.push(hit);
   }
 
   // DATE, THEN HOUR, THEN TITLE (4.52). The hour is new and it is a fix rather
@@ -874,6 +887,74 @@ export function matchesEventFilter(def: EventDef, query: string): boolean {
     def.title.toLowerCase().includes(q) ||
     (def.note ?? "").toLowerCase().includes(q)
   );
+}
+
+// ── The manager's deck ────────────────────────────────────────────────
+//
+// Everything the deck decides is a pure function here rather than a branch in
+// `event-widgets.ts`, for the reason `test/events-manager.test.ts` states in
+// its own header: that file builds DOM and the suite has no document. The
+// widget draws these answers and owns none of them.
+
+// WHICH CHIP IS PRESSED. `all` is the strip's resting state.
+export type EventKindFilter = "all" | "repeating" | "single" | "off";
+
+// HOW THE ROWS INSIDE A GROUP ARE ORDERED. The GROUPS never reorder — that is
+// `partitionEvents`' job and its by-month ordering of the recurring list is
+// what makes a missing birthday visible.
+export type EventSort = "date" | "name";
+
+// ── `off` CROSSES THE OTHER TWO, IT DOES NOT SIT BESIDE THEM ─────────────
+//
+// The strip reads as one row of four, and it is two questions: what kind of
+// rhythm is this, and is it switched on. A disabled birthday answers `repeating`
+// AND `off`, so `all` is `repeating + single` and NOT the sum of all four
+// counts. Drawn as one strip anyway because a reader pressing "Off" is asking
+// the same shape of question as one pressing "Repeating" — show me the subset —
+// and two strips for one gesture is a deck that has outgrown its list.
+export function matchesEventKind(def: EventDef, kind: EventKindFilter): boolean {
+  if (kind === "all") return true;
+  if (kind === "off") return def.enabled === false;
+  if (kind === "repeating") return def.kind === "recurring";
+  return def.kind === "single";
+}
+
+export function tallyEventKinds(
+  defs: EventDef[]
+): Record<EventKindFilter, number> {
+  const out: Record<EventKindFilter, number> = {
+    all: 0,
+    repeating: 0,
+    single: 0,
+    off: 0,
+  };
+  for (const key of Object.keys(out) as EventKindFilter[]) {
+    out[key] = defs.filter((d) => matchesEventKind(d, key)).length;
+  }
+  return out;
+}
+
+// "in 3 weeks" / "day 2 of 5" / "" — the relative phrasing, for ANY definition.
+//
+// `describeRelative` takes an `UpcomingEvent`, which until now only the
+// countdown built; this is the same sentence for a row in the manager, where
+// the list includes recurring events and events that have already finished.
+// An event with nothing left to happen gets the empty string rather than a
+// phrase about the past: the row already prints the date it was.
+export function eventRelative(def: EventDef, todayIso: string): string {
+  const hit = nextOccurrence(def, todayIso);
+  return hit ? describeRelative(hit) : "";
+}
+
+// The order INSIDE one of `partitionEvents`' three groups.
+//
+// `date` IS THE IDENTITY, deliberately. The group arrived sorted — by month for
+// recurring, by start ascending for coming, descending for earlier — and
+// re-sorting it here would be a second opinion about an order three paragraphs
+// of `partitionEvents` argue for. `name` is the only thing this actually does.
+export function sortEvents(defs: EventDef[], by: EventSort): EventDef[] {
+  if (by !== "name") return defs;
+  return [...defs].sort((a, b) => a.title.localeCompare(b.title));
 }
 
 // "45 min" / "1 h" / "1 h 30" — a length, said the way a reader would say it.

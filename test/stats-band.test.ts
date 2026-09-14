@@ -476,7 +476,11 @@ describe("the band reaches the pages outside every journal", () => {
     } as never);
     const band = model.sections("").find((s) => s.id === "w:stats-band#1");
     expect(band, "the homepage's add list").toBeTruthy();
-    expect(band!.questions ?? []).toHaveLength(0);
+    // ONE QUESTION, AND IT IS THE TOGGLE (1.0.22). This asserted none until
+    // every widget instance gained a heading; what 4.48 settled and this case
+    // still holds is that the BAND asks nothing — no four `choice` rows drawing
+    // a model of the band beside the band.
+    expect((band!.questions ?? []).map((q) => q.key)).toEqual(["form"]);
     // AT THE TABLE AS WELL AS AT THE MODEL, because `argsOf` reads three fields
     // and a leftover in any one of them would put a box back on the row.
     expect(WIDGETS["stats-band"].args).toBeUndefined();

@@ -383,20 +383,60 @@ describe("the exclusions say why, and the reasons are the ones claimed", () => {
 });
 
 describe("SECTION_TITLES and the registry answer different questions", () => {
-  // THEY ARE NOT MERGED, and this is the assertion that says how far they may
-  // agree. `SECTION_TITLES` maps a keyword to the HEADING a `frame: section`
-  // block wears — "⏳ Open tasks", glyph included — and the registry maps it to
-  // a NOUN for a list of things you could add. Two questions, two tables. What
-  // must be true is that the smaller one names no word the larger one has never
-  // heard of, because such a word is a heading for a widget that does not exist.
+  // THEY WERE TWO TABLES UNTIL 1.0.22, AND THE ASSERTIONS SURVIVE THE MERGE.
+  //
+  // `SECTION_TITLES` maps a keyword to the HEADING a `frame: section` block
+  // wears — "⏳ Open tasks", glyph included — and the registry maps it to a NOUN
+  // for a list of things you could add. Two questions, and they still are: the
+  // heading is `WidgetSpec.bar` now and the noun is `WidgetSpec.label`, one row
+  // apart in the same entry, which is where they are hardest to confuse.
+  //
+  // WHAT CHANGED IS WHERE THE FIRST ANSWER LIVES, and the four cases below did
+  // not have to change with it, because each is about the SET of keywords a
+  // heading exists for. That set is now "every `WIDGETS` key, plus the five
+  // aliases the dispatcher still names" — derived rather than typed, so the case
+  // that used to find a missing entry is a compile error instead.
   const widgets = readSrc("widgets");
-  const titles = (
-    /const SECTION_TITLES: Record<string, string> = \{([\s\S]*?)\n\};/.exec(widgets)?.[1] ?? ""
+  const aliases = (
+    /const ALIAS_TITLES: Record<string, string> = \{([\s\S]*?)\n\};/.exec(widgets)?.[1] ?? ""
   );
-  const keys = [...titles.matchAll(/^\s*"?([a-z0-9-]+)"?:/gm)].map((m) => m[1]);
+  const aliasKeys = [...aliases.matchAll(/^\s*"?([a-z0-9-]+)"?:/gm)].map((m) => m[1]);
+  const keys = [...widgetKeys, ...aliasKeys];
 
-  it("finds the title table", () => {
+  it("finds both halves of the title map", () => {
     expect(keys.length).toBeGreaterThanOrEqual(15);
+    // NON-VACUOUS ON THE HALF THAT IS STILL SCRAPED. The registry half cannot
+    // be empty — it is imported — but a renamed `ALIAS_TITLES` would leave this
+    // reading the registry alone and quietly stop testing the five.
+    expect(aliasKeys.length).toBeGreaterThan(0);
+  });
+
+  it("gives every page widget a heading that says something", () => {
+    // THE FIELD IS REQUIRED, so the old "every `WIDGETS` key has an entry" case
+    // is now the type system's. What a type cannot say is that the string has
+    // words in it — an entry added as `bar: ""` compiles and draws a head with
+    // nothing in it, which is the 4.8.1 defect wearing a card.
+    for (const [keyword, spec] of Object.entries(WIDGETS)) {
+      expect(spec.bar.trim(), keyword).not.toBe("");
+      // GLYPH AND WORDS, which is what every one of these has always been and
+      // what a `header:` line composed from it needs: a bar of one emoji is a
+      // head a reader cannot read.
+      expect(spec.bar.trim().split(/\s+/).length, keyword).toBeGreaterThan(1);
+    }
+  });
+
+  it("keeps the heading and the noun as two different sentences", () => {
+    // THE CONFUSION THE MERGE MADE POSSIBLE, pinned. `label` is "Time grid" in
+    // a picker and `bar` is "The week by the hour" over the block; five entries
+    // do happen to agree (On this day, Events, Journals, Journal card, Open
+    // tasks, Overview navigator) because the noun IS the heading for those, and
+    // that is fine. What would not be is the two fields becoming one by drift —
+    // so this asserts the split is still real rather than that any given row
+    // takes a side.
+    const differ = Object.values(WIDGETS).filter(
+      (spec) => spec.bar !== `${spec.glyph} ${spec.label}`
+    );
+    expect(differ.length).toBeGreaterThan(20);
   });
 
   it("names no keyword the switch does not dispatch", () => {
@@ -438,6 +478,10 @@ describe("SECTION_TITLES and the registry answer different questions", () => {
   // What can be asserted about the other table is what its reasons actually say.
   // See below.
   it("gives every page widget a heading, so none can render frameless", () => {
+    // STRUCTURAL AS OF 1.0.22 — `bar` is a required field, so the list this
+    // filters can only be empty. Kept because the property is the one the six
+    // widgets of 4.15 §1 failed, and a case that cannot fail beside a comment
+    // saying why is how the next reader learns the field is load-bearing.
     const titled = new Set(keys);
     expect(widgetKeys.filter((k) => !titled.has(k))).toEqual([]);
   });

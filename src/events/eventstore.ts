@@ -26,49 +26,27 @@ import {
   serializeEvents,
   slugifyEventId,
 } from "./events";
-import { basename, createFileEnsuringFolders, frontmatterOf, getFile } from "../core/util";
-import { graphLinksSection } from "../core/note-sections";
+import { createFileEnsuringFolders, frontmatterOf, getFile } from "../core/util";
+import { composeEventsNote } from "./events-sections";
 
-// The events note's initial content. It carries the `events` widget in its own
-// body, so the note isn't just a data file — it's the page where you manage
-// events, which is why the list lives in a note the user can actually open.
+// The events note's initial content.
 //
-// EXPORTED SO A REPAIR CAN SURVEY IT WITHOUT CREATING IT. `ensureEventsNote`
-// reads the vault and writes in one call, which is right for every caller that
-// wants the note to exist; the repair window has to say what it would create
-// before it creates anything, and that needs the content on its own.
+// ── A ONE-LINE WRAPPER AS OF 1.0.21, AND WHY THE NAME SURVIVES ──────────
 //
-// TAKES THE DIARY ROOT, AS OF 4.81, for the hidden parent link at the bottom.
-// The events note sits beside the entries it decorates and belongs to the diary
-// in the graph as well as in the folder tree; without the link it is a note
-// with no edges, which draws as a loose dot however tidy the rest is. The name
-// is the root's own basename rather than the literal `02 - Diary`, because a
-// reader who renames the folder renames the note the link has to resolve to —
-// and an unresolved wikilink is not inert, Obsidian draws a phantom node for it.
+// This was a string literal: two fences with three lines of loose prose between
+// them, no `title`, therefore no banner. `events-sections.ts` is that page as a
+// catalogue now, which is what makes the note a SURFACE — repairable by
+// "set up / repair vault", editable by the section editor, openable in reading
+// mode. The old header's policy paragraph ("written at creation, not repaired
+// in") is gone with the reason for it.
 //
-// WRITTEN AT CREATION, NOT REPAIRED IN. An events note that already exists is
-// the reader's file — its frontmatter is the only part this plugin owns — so an
-// older vault's note stays loose until it is re-created.
+// THE NAME STAYS because this is the question `ensureEventsNote` asks, and it
+// asks it from the calendar's right-click menu in a vault that may predate
+// events entirely. That caller wants "what does a fresh one contain", not "what
+// does the catalogue compose", and those are the same answer only for as long
+// as nobody puts a second thing in the file.
 export function eventsNoteTemplate(diaryRoot: string): string {
-  return [
-    "---",
-    `${EVENTS_PROPERTY}: []`,
-    "---",
-    "`chronoanvil:spacer`",
-    "```chronoanvil",
-    "header:🗓️ Special events",
-    "```",
-    "",
-    "Recurring events (birthdays, holidays) fall on the same date every year.",
-    "Single events (trips, sick days, milestones) can span a range of days.",
-    "Both decorate the diary calendars — neither creates a diary entry.",
-    "",
-    "```chronoanvil",
-    "events",
-    "```",
-    // The block below opens with its own blank line, which is where the note's
-    // trailing newline went.
-  ].join("\n") + graphLinksSection([basename(diaryRoot)]);
+  return composeEventsNote(diaryRoot);
 }
 
 export function eventsNotePath(plugin: ChronoAnvilPlugin): string {

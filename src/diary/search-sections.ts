@@ -84,11 +84,18 @@ export const SEARCH_SECTIONS: FlatSection[] = [
     // stays is what this section is actually about: a titled bar and the search
     // box under it.
     //
-    // NO TOGGLE. This section is the note's reason to exist and its title says
+    // ── THE TOGGLE, WHICH THIS ENTRY DECLINED UNTIL 1.0.22 ────────────────
+    //
+    // It said: "this section is the note's reason to exist and its title says
     // so; a reader who wanted the box without the words has the same block with
-    // one line fewer, which is not a form worth offering.
+    // one line fewer, which is not a form worth offering". The second clause is
+    // the answer to the first — a reader who wants the box without the words
+    // was being told to edit markdown to get a form the catalogue can compose.
+    //
+    // LOCKED IS THE PART THAT MATTERS AND IT IS UNTOUCHED. The section cannot
+    // be removed, which is what keeps the note from stopping being what it is.
+    // How it is DRAWN was never what the lock was protecting.
     title: "header:🔎 Search the diary",
-    asks: false,
     lines: ["diary-search"],
     anchor: /^diary-search\b/m,
   }),
@@ -127,8 +134,10 @@ export const SEARCH_SECTIONS: FlatSection[] = [
     // that is a consequence a reader can see and undo, not a broken vault, and
     // the same is true of every unlocked section in every catalogue.
     locked: false,
+    // AND THE TOGGLE, AS OF 1.0.22. Nothing is anchored into this bar, which is
+    // the whole of the rule now: a section with an action row in its title
+    // cannot lose the title, and every other section can be asked.
     title: "header:📜 All entries",
-    asks: false,
     lines: ["timeline"],
     anchor: /^timeline\b/m,
   }),

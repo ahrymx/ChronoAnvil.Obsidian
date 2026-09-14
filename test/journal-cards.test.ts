@@ -14,6 +14,7 @@
 // banner source — are exercised directly.
 
 import { describe, expect, it } from "vitest";
+import { WIDGETS } from "../src/core/widget-registry";
 import {
   buildJournalType,
   hueOf,
@@ -52,12 +53,18 @@ describe("the grid is an arrangement, not a second widget", () => {
   });
 
   it("shares one section title with the keyword it belongs to", () => {
-    // `frame: section` reads SECTION_TITLES off the KEYWORD. A second entry
-    // would be a second name for one section, and the arrangement is not what
-    // a title bar should announce.
-    const widgets = readSrc("widgets");
-    expect(widgets).toContain('journals: "📚 Journals"');
-    expect(widgets).not.toContain('"journals:cards":');
+    // `frame: section` reads the title off the KEYWORD. A second entry would be
+    // a second name for one section, and the arrangement is not what a title
+    // bar should announce.
+    //
+    // ASKED OF THE REGISTRY AS OF 1.0.22, where the string now lives. The
+    // property is unchanged and so is its reason; what moved is that `bar` is a
+    // field on the one entry `journals` has, so a second name for the
+    // arrangement would need a second entry — and `journals:cards` is an
+    // ARGUMENT, which cannot have one.
+    expect(WIDGETS.journals.bar).toBe("📚 Journals");
+    expect(Object.keys(WIDGETS)).not.toContain("journals:cards");
+    expect(readSrc("widgets")).not.toContain('"journals:cards":');
   });
 });
 

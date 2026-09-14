@@ -541,13 +541,16 @@ describe("canvas-builder · pruning", () => {
 describe("canvas-builder · entry points", () => {
   it("gives the baseline and the live map the same shape", () => {
     // The property the rewrite exists for: two entry points, one arrangement.
-    // A vault holding everything the scaffold writes, PLUS the events note,
-    // which `Scaffold.plan` writes separately — so nothing is pruned and the
-    // two maps have to agree down to the pixel.
-    const app = mockApp([
-      ...shippedNotes(DEFAULT_PATHS, [STUDY], DEFAULT_LOGBOOKS).map((n) => ({ path: n.dest })),
-      { path: DEFAULT_PATHS.events },
-    ]);
+    // A vault holding everything the scaffold writes, so nothing is pruned and
+    // the two maps have to agree down to the pixel.
+    //
+    // THE EVENTS NOTE USED TO BE A SECOND ENTRY IN THIS LIST, because
+    // `Scaffold.plan` pushed it separately under an `eventsEnabled` guard. It
+    // joined `shippedNotes` in 1.0.21 — which is what made it a page repair can
+    // reconcile — so naming it here again would be listing one note twice.
+    const app = mockApp(
+      shippedNotes(DEFAULT_PATHS, [STUDY], DEFAULT_LOGBOOKS).map((n) => ({ path: n.dest }))
+    );
     const live = buildVaultCanvas(app, mockPlugin());
     const baseline = initialVaultCanvas(DEFAULT_PATHS, [STUDY], DEFAULT_LOGBOOKS);
     const shape = (d: CanvasDocument) =>
@@ -782,12 +785,18 @@ describe("chronoanvil-graph links", () => {
     );
   });
 
-  // The events note is not in `shippedNotes` — `Scaffold.plan` writes it
-  // separately, because it is conditional — so it gets its own hop. It sits
-  // beside the entries it decorates and names the diary, and the name comes
-  // from the root the caller passes rather than the literal `02 - Diary`: a
-  // reader who renames the folder renames the note this has to resolve to, and
-  // an unresolved name is a phantom node rather than a missing edge.
+  // The events note sits beside the entries it decorates and names the diary,
+  // and the name comes from the root the caller passes rather than the literal
+  // `02 - Diary`: a reader who renames the folder renames the note this has to
+  // resolve to, and an unresolved name is a phantom node rather than a missing
+  // edge.
+  //
+  // ASKED THROUGH `eventsNoteTemplate` STILL, though the template is a wrapper
+  // over the catalogue's composer as of 1.0.21 and the note is in
+  // `shippedNotes` with everything else. This is the question
+  // `ensureEventsNote` asks from the calendar's right-click menu — "what does a
+  // fresh one contain" — and it is worth keeping a hop on the one caller that
+  // can create this note without repair ever having run.
   it("hangs the events note off the diary, by the root's own name", () => {
     expect(graphLinks(eventsNoteTemplate(DEFAULT_PATHS.diaryRoot))).toEqual(["02 - Diary"]);
     expect(graphLinks(eventsNoteTemplate("Journal/My days"))).toEqual(["My days"]);

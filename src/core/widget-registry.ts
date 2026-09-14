@@ -192,18 +192,51 @@ export type WidgetNeed = "period";
 
 // One widget, as a list of widgets needs it.
 export interface WidgetSpec {
-  // A NOUN, and this is the one field most easily got wrong. `SECTION_TITLES`
-  // (`ui/widgets/index.ts`) also maps a keyword to a name and answers a
-  // different question: what the bar over this block on THIS PAGE should say.
-  // `tasks-table` is "⏳ Open tasks" there — a heading — and "Open tasks" here,
-  // an item in a list of things you could add. The two tables are kept apart on
-  // purpose; a test asserts every `SECTION_TITLES` key is a keyword this one
-  // knows, which is as far as they may agree.
+  // A NOUN, and this is the one field most easily got wrong. `bar` directly
+  // below answers the OTHER question — what the heading over this block says —
+  // and the two are different sentences on purpose: `tasks-table` is
+  // "⏳ Open tasks" as a heading and "Open tasks" as an item in a list of
+  // things you could add, and `time-grid` is "The week by the hour" over the
+  // block and "Time grid" in the picker.
   label: string;
   // The glyph a row is tokened with, on `FlatSection.icon`'s idiom. An emoji,
   // because every glyph the catalogues write is one and a section list that
   // mixed emoji with Lucide ids would draw two sizes of the same slot.
   glyph: string;
+  // WHAT THE BAR OVER A BLOCK OF THIS WIDGET SAYS — glyph and words, exactly as
+  // a `header:` line carries them and with no `header:` prefix of its own.
+  //
+  // ── THIS WAS `SECTION_TITLES`, AND IT LIVED IN THE DISPATCHER (1.0.22) ──
+  //
+  // `ui/widgets/index.ts` held a second table keyed by the same 32 words, and
+  // this file's own header used to say the two were "kept apart on purpose,
+  // and a test asserts every `SECTION_TITLES` key is a keyword this one knows,
+  // which is as far as they may agree". That was the right rule for as long as
+  // only the RENDERER needed the string: `blockTitle` and `frame: section` read
+  // it to draw a head over a fence, and a table that lives beside its one
+  // reader is not a duplicate.
+  //
+  // It stopped being true when a widget added through the section window began
+  // composing its bar (`widgetSection`). The composer is in `core` and the
+  // dispatcher imports half the plugin, so the string had to be reachable from
+  // here — and a `bar` in `core` beside a `SECTION_TITLES` in `ui` would be the
+  // two tables finally disagreeing, which is what the old rule was guarding
+  // against in the first place. So the literals moved here, beside the `label`
+  // they are so easily confused with, and `SECTION_TITLES` is derived from
+  // them: one string per keyword, read by the renderer and by the composer.
+  //
+  // THE FIVE ALIASES ARE NOT HERE. `topics-table`, `topic-stats`,
+  // `journal-totals`, `journal-tally` and `kind-table` wear heads and are in
+  // `NOT_PAGE_WIDGETS` — nothing composes them, so they have no `WidgetSpec` to
+  // carry a field. They stay in the dispatcher as `ALIAS_TITLES`, which is
+  // exactly the set this table cannot speak for.
+  //
+  // REQUIRED, NOT OPTIONAL, and that is the check `test/widget-registry.test.ts`
+  // used to make from the other side: a widget the renderer cannot name draws
+  // its content onto the page's own background with no card and no head, which
+  // is the defect 4.8.1 fixed for the launcher and 4.15 §1 found on six more.
+  // A required field is that test made structural.
+  bar: string;
   // One sentence, for `DetailedChoice.description` in the add prompt and for
   // `FlatSection.blurb` in the row. Says what the widget puts on the page, in
   // the reader's words rather than the directive's.
@@ -383,6 +416,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   diary: {
     label: "Diary card",
     glyph: "📆",
+    bar: "📆 Today",
     blurb:
       "The greeting, today's numbers, the month grid and what is coming up, as one card.",
     category: "diary",
@@ -390,24 +424,28 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "diary-search": {
     label: "Diary search",
     glyph: "🔍",
+    bar: "🔎 Search",
     blurb: "Full-text search across every diary entry, filters typed into the box.",
     category: "finding",
   },
   timeline: {
     label: "Entry timeline",
     glyph: "📜",
+    bar: "📜 All entries",
     blurb: "Every entry, newest first, grouped by the month it was written in.",
     category: "diary",
   },
   "on-this-day": {
     label: "On this day",
     glyph: "🕘",
+    bar: "🕘 On this day",
     blurb: "This date in earlier years, one group per year that has an entry.",
     category: "diary",
   },
   events: {
     label: "Events",
     glyph: "🎉",
+    bar: "🎉 Events",
     blurb: "The special-events manager: every recurring and one-off event, with an Add button.",
     category: "tasks",
   },
@@ -441,6 +479,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   upcoming: {
     label: "Upcoming events",
     glyph: "⏭️",
+    bar: "⏭️ Coming up",
     blurb: "The next few events, each with how long until it — or how far into it you are.",
     category: "tasks",
     arg: {
@@ -461,6 +500,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "time-grid": {
     label: "Time grid",
     glyph: "\u23F1\uFE0F",
+    bar: "⏱️ The week by the hour",
     blurb:
       "The week laid against the hours — meetings, logbook items and what is due, each in its own place.",
     category: "diary",
@@ -509,6 +549,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "sleep-summary": {
     label: "Sleep summary",
     glyph: "😴",
+    bar: "😴 Sleep",
     blurb:
       "Nights logged, average sleep, typical bedtime and wake-up, across every daily entry.",
     category: "trackers",
@@ -535,6 +576,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "tracker-stat": {
     label: "Tracker numbers",
     glyph: "📉",
+    bar: "📉 Tracker",
     blurb:
       "One tracker's latest reading, its average and its streak, over a month-long density strip.",
     category: "trackers",
@@ -551,24 +593,28 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "week-summary": {
     label: "Week summary",
     glyph: "📅",
+    bar: "📅 This week",
     blurb: "The seven-day table in a banner card, driven by this note's week-start.",
     category: "diary",
   },
   "month-summary": {
     label: "Month summary",
     glyph: "🗓️",
+    bar: "📅 This month",
     blurb: "The day grid and the year of reviews in a banner card, driven by month-start.",
     category: "diary",
   },
   "quarter-summary": {
     label: "Quarter summary",
     glyph: "📊",
+    bar: "📅 This quarter",
     blurb: "The quarter's banner over a rollup of the three months it spans.",
     category: "diary",
   },
   "year-summary": {
     label: "Year summary",
     glyph: "🗓️",
+    bar: "📅 This year",
     blurb:
       "The year's statistics band: entries, coverage, longest streak and a twelve-month density strip.",
     category: "diary",
@@ -576,6 +622,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "entry-rollup": {
     label: "Entry rollup",
     glyph: "📋",
+    bar: "📖 What the days said",
     blurb:
       "One dated line per day in this period that wrote something worth rolling up, oldest first.",
     category: "diary",
@@ -592,6 +639,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "period-recap": {
     label: "Period recap",
     glyph: "📝",
+    bar: "📝 Recap",
     blurb: "Goals, highlights and challenges gathered from the months this period covers.",
     category: "diary",
     arg: {
@@ -609,6 +657,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "period-nav": {
     label: "Period navigator",
     glyph: "⏮️",
+    bar: "⏮️ Go to period",
     blurb:
       "A prev/next pair around a date picker that re-scopes this page to another week, month, quarter or year.",
     category: "diary",
@@ -641,12 +690,14 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   journals: {
     label: "Journals",
     glyph: "📚",
+    bar: "📚 Journals",
     blurb: "Every enabled journal, with its notes and where to go next.",
     category: "journals",
   },
   "journal-card": {
     label: "Journal card",
     glyph: "📓",
+    bar: "📓 Journal card",
     blurb:
       "One journal as a card — its banner, its containers and where to go next. Add as many as you like.",
     category: "journals",
@@ -667,6 +718,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "journals-header": {
     label: "Journals activity",
     glyph: "🔥",
+    bar: "🔥 Activity",
     blurb:
       "At-a-glance numbers over a 53-week activity strip — every enabled journal at once, or one you name.",
     category: "journals",
@@ -695,6 +747,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "level-index": {
     label: "Journal level index",
     glyph: "🗂️",
+    bar: "🗂️ What's below",
     blurb:
       "What is below this note, as a live table — the folders inside it, or its notes where there are no folders left.",
     category: "journals",
@@ -744,6 +797,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "level-cards": {
     label: "Journal level cards",
     glyph: "🗂️",
+    bar: "🗂️ Contents",
     blurb:
       "What is below this note, as cards — one per folder, paired with what is inside it where there is a level below.",
     category: "journals",
@@ -787,18 +841,21 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "stats-band": {
     label: "Stats band",
     glyph: "🔢",
+    bar: "🔢 Stats",
     blurb: "A row of numbers about what is below this note — you pick each one.",
     category: "trackers",
   },
   "pages-table": {
     label: "Pages table",
     glyph: "📄",
+    bar: "📄 Pages",
     blurb: "The pages beneath this folder, one row each.",
     category: "journals",
   },
   "review-queue": {
     label: "Review queue",
     glyph: "🔁",
+    bar: "🔁 Review",
     blurb: "What is due for recall, soonest first.",
     category: "tasks",
     arg: {
@@ -810,6 +867,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "journal-search": {
     label: "Journal search",
     glyph: "🔎",
+    bar: "🔎 Find",
     blurb: "Full-text search over journal notes — what did I write about this?",
     category: "finding",
     arg: {
@@ -842,6 +900,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "journal-recent": {
     label: "Recent notes",
     glyph: "🕒",
+    bar: "🕒 Lately",
     blurb: "The notes you wrote most recently, newest first, with where each one lives.",
     category: "finding",
     args: [
@@ -875,6 +934,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "tasks-table": {
     label: "Open tasks",
     glyph: "⏳",
+    bar: "⏳ Open tasks",
     blurb: "Every still-open ChronoAnvil task from the notes under a folder, grouped by note.",
     category: "tasks",
     arg: {
@@ -900,6 +960,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "tag-index": {
     label: "Tag index",
     glyph: "🏷️",
+    bar: "🏷️ Tags",
     blurb: "A table of tags, most-used first, counted under a folder.",
     category: "finding",
     arg: { kind: "folder", label: "the folder to count tags under" },
@@ -907,18 +968,21 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "activity-chart": {
     label: "Activity chart",
     glyph: "📊",
+    bar: "📈 Activity",
     blurb: "Open and completed tasks bucketed by date, drawn as three month heatmaps.",
     category: "trackers",
   },
   launcher: {
     label: "Overview navigator",
     glyph: "🧭",
+    bar: "🧭 Overview navigator",
     blurb: "Tiles for the weekly, monthly, quarterly, and yearly overviews.",
     category: "finding",
   },
   links: {
     label: "Quick links",
     glyph: "🔗",
+    bar: "🔗 Links",
     blurb: "A row of destination pills.",
     category: "structure",
   },
@@ -927,6 +991,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   logbook: {
     label: "Logbook",
     glyph: "🗒️",
+    bar: "🗒️ Logbook",
     blurb:
       "Standing notes and captured items, filterable by logbook category or status.",
     category: "finding",

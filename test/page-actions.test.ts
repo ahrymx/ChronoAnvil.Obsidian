@@ -74,7 +74,20 @@ const struck = (text: string): string =>
 // that must not. Stated as data because the whole decision is which list a
 // surface is in — see `BannerSpec.actions`.
 const COMPOSES = ["journal-", "entry-"];
-const WITHHOLDS = ["home", "search", "diary-folder", "logbooks-folder", "period-", "logbook-"];
+// `events` JOINED THIS LIST IN 1.0.21, on the same argument as the four
+// singletons already in it: the Events note is one configured file a reader
+// passes through to manage a list, not a page about a subject or a day, and
+// neither shipped action — "add this to today's entry", "open the day" — means
+// anything on it.
+const WITHHOLDS = [
+  "home",
+  "search",
+  "events",
+  "diary-folder",
+  "logbooks-folder",
+  "period-",
+  "logbook-",
+];
 
 describe("the action table", () => {
   it("gives every action an id, a label, an icon and a blurb", () => {

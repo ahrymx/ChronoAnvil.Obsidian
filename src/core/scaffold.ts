@@ -85,7 +85,6 @@ import {
   mergeTrendsSection,
   retitleTrends,
 } from "../charts/charts";
-import { eventsNoteTemplate } from "../events/eventstore";
 import {
   applyDashboardCatchups,
   findDashboardCatchups,
@@ -95,6 +94,7 @@ import { composeHomeNote, collapseJournalsBlocks } from "../diary/home-sections"
 import { composeDiaryDashboardNote } from "../diary/diary-dashboard-sections";
 import { composeJournalsDashboardNote } from "../journals/journals-dashboard-sections";
 import { composeSearchNote } from "../diary/search-sections";
+import { composeEventsNote } from "../events/events-sections";
 import { configureGraphGroups } from "./graph-groups";
 import { notify } from "./notify";
 
@@ -365,6 +365,29 @@ export function shippedNotes(
     },
     // COMPOSED AS OF 3.11 §3, and `assets/search.md` is gone with it.
     { content: composeSearchNote(), dest: p.search, surface: { kind: "search" } },
+    // AND THE EVENTS NOTE, COMPOSED AND SHIPPED AS OF 1.0.21.
+    //
+    // ── WHY IT IS IN THIS LIST NOW, AND WHAT THAT CHANGES ────────────────
+    //
+    // It used to be pushed separately, further down in `plan()`, under a
+    // `settings.eventsEnabled &&` guard — and the cost of not being here was
+    // the whole of what was wrong with the page. `reconcileLayouts` walks THIS
+    // list, so an Events note was created once and never visited again; the
+    // template's own header stated that as policy. A page the plugin composes
+    // and then never repairs is a page that falls behind the release it was
+    // written by, which is precisely what had happened: it had not changed
+    // shape in several major versions.
+    //
+    // THE `eventsEnabled` GATE MOVED TO THE CREATE LOOP rather than being
+    // dropped. A vault with events switched off is still not GIVEN the note;
+    // one that already has it still gets it reconciled — which is the posture
+    // `readEvents` argues for in eventstore.ts, that the toggle governs whether
+    // events are DRAWN and not whether they exist.
+    {
+      content: composeEventsNote(p.diaryRoot),
+      dest: p.events,
+      surface: { kind: "events" },
+    },
     {
       content: composeDiaryDashboard("quarterly"),
       dest: quarterOverviewPath(p),
@@ -1564,6 +1587,13 @@ export class Scaffold {
       // The note is not missing; it is somewhere else, and the migration is the
       // group that knows what to do about that.
       if (this.dashboardAwaitingMove(dest)) continue;
+      // AND DON'T CREATE THE EVENTS NOTE IN A VAULT THAT HAS TURNED EVENTS OFF
+      // (1.0.21). This is the one gate that used to live outside `shippedNotes`
+      // and it is a gate on CREATION only — see the entry there. Everything
+      // else in that list is unconditional, which is why this is a guard on one
+      // destination rather than a field on `ShippedNote`: a second conditional
+      // note would be the moment to invent one.
+      if (dest === p.events && !this.plugin.settings.eventsEnabled) continue;
       const content =
         note.content ?? (asset == null ? null : await this.readAsset(asset));
       if (content == null) {
@@ -1632,12 +1662,6 @@ export class Scaffold {
         }
       }
       files.push({ dest, content, hidden: true });
-    }
-
-    // The special-events note, through the store's own definition of what a
-    // fresh one contains rather than from a bundled asset.
-    if (this.plugin.settings.eventsEnabled && !getFile(this.app, p.events)) {
-      files.push({ dest: p.events, content: eventsNoteTemplate(p.diaryRoot) });
     }
 
     return { folders, files, missingAssets };

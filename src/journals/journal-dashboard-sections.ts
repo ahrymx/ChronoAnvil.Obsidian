@@ -187,6 +187,10 @@ const LATELY_BAR = `${HEADER_KEYWORD}:🕒 Lately`;
 // below; two spellings would be two titles for one section, each written by a
 // different gesture and neither able to take the other off.
 const OPEN_TASKS_BAR = `${HEADER_KEYWORD}:⏳ Open tasks`;
+// And the tags bar, said once for the same reason (1.0.22): the render below
+// omits it in the widget form and `formQuestion` splices it back when the
+// reader unticks, so the two writes must agree on the byte.
+const TAGS_BAR = `${HEADER_KEYWORD}:🏷️ Tags`;
 
 // The whole catalogue for one journal, shipped and offered together.
 //
@@ -380,6 +384,18 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       // single id every journal is guaranteed to define, unified across every
       // journal and every note type in `constants.ts`, and the only select this
       // catalogue can name without reading a registry it cannot see.
+      // ── A TITLE, AND WITH IT THE TOGGLE (1.0.22) ──────────────────────
+      //
+      // This was the one section on this page that composed no name for itself.
+      // The dispatcher draws a head over the block from the same string — the
+      // tally is one of the five keywords `ALIAS_TITLES` still speaks for — so
+      // the page has always SHOWN "🧮 Status" and the file has never said it.
+      //
+      // 4.46's reason for the tally having no `WIDGETS` entry is about the ADD
+      // LIST, not about the head: a page can hold two tallies and one row
+      // saying "Tally" would name neither. This page holds one, composed by the
+      // catalogue, and the catalogue is allowed to name what it writes.
+      title: `${HEADER_PREFIX}🧮 Status`,
       lines: [`journal-tally:${DEFAULT_TALLY_TRACKER}`],
       anchor: /^journal-tally:/m,
     }),
@@ -552,10 +568,14 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
           directive: "tag-index",
           hostFolder: spec.hostFolder ?? null,
         },
+        // AND THE TOGGLE (1.0.22), with the bar made conditional to earn it —
+        // the same edit the other three copies of this section took, and
+        // `home-sections.ts` carries the argument for all of them.
+        formQuestion(TAGS_BAR, HEADER_KEYWORD),
       ],
-      render: () => fenceBlock({
+      render: (_ctx, opts) => fenceBlock({
         fence: "chronoanvil",
-        lines: ["header:🏷️ Tags", "tag-index"],
+        lines: [...(opts?.form === WIDGET_FORM ? [] : [TAGS_BAR]), "tag-index"],
       }),
       // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who repoints the
       // cloud at their own folder still has a section the editor can find.

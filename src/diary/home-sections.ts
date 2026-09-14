@@ -52,7 +52,12 @@ import { fenceBlock, sectionOf } from "../core/sections";
 import type { QuestionEnv } from "../core/sections";
 import { WIDGETS } from "../core/widget-registry";
 import type { VaultLists } from "../core/widget-registry";
-import { SECTION_FORM, formQuestion, type SectionModel } from "../core/section-model";
+import {
+  SECTION_FORM,
+  WIDGET_FORM,
+  formQuestion,
+  type SectionModel,
+} from "../core/section-model";
 import { HEADER_KEYWORD } from "../core/directive-grammar";
 
 const probe = (text: string, re: RegExp): number => text.search(re);
@@ -319,12 +324,26 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // BARE, so the note carries no list to keep in step with the destinations
     // the plugin knows about. `launcher` alone draws the default four, and a
     // reader who wants their own writes them after it.
-    // NO `bar`, AND IT IS NOT AN OVERSIGHT. `soloBar` gives a barless cell the
-    // title its row's opener was composing for it; this row has no opener that
-    // does. Every cell here — the Today card, the tasks list, the logbook —
-    // defaults to WIDGET form and composes no `header:` at all, so the top row
-    // ships with no band title and a lone launcher is titleless because the
-    // page is, not because a section was removed from it.
+    //
+    // ── IT HAD NO `bar` UNTIL 1.0.22, AND THAT WAS NOT AN OVERSIGHT EITHER ──
+    //
+    // The argument was about the ROW: `soloBar` gives a barless cell the title
+    // its row's opener was composing for it, this row has no opener that does,
+    // and every cell here — the Today card, the tasks list, the logbook —
+    // defaults to WIDGET form and composes no `header:` at all. So a lone
+    // launcher was titleless "because the page is, not because a section was
+    // removed from it".
+    //
+    // WHAT CHANGED IS THE RULE, NOT THE ROW. Every section that has no control
+    // anchored into its bar is offered the section/widget answer now, and a
+    // section with nothing in `bar` and nothing in `title` has no answer to
+    // give — it is the one row in the window with no way to say what it is.
+    // The title is the registry's own, which is the same string `blockTitle`
+    // has painted over this block since 4.8.1; the cell still composes nothing
+    // while the row stands, because that is what the widget form means and it
+    // is what the toggle defaults to here.
+    bar: `${HEADER_PREFIX}${WIDGETS.launcher.bar}`,
+    asks: true,
     lines: ["launcher"],
     anchor: /^launcher\b/m,
   }),
@@ -480,6 +499,15 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // block that draws nothing at all for a year is a worse answer to that than
     // one saying what it is waiting for.
     optIn: true,
+    // AND A TITLE OF ITS OWN AS OF 1.0.22, which Search's copy of this section
+    // has carried since it was written. This one is no longer a cell — 4.70
+    // gave the slot to `upcoming` — so it is a standalone block that had no
+    // name in the file, on a page where every other standalone block has one.
+    // Composed by default and declinable through the toggle, like the rest.
+    //
+    // NOTHING SHIPPED MOVES: the section is `optIn`, so the only note that
+    // gains the line is one a reader adds it to.
+    title: `${HEADER_PREFIX}${WIDGETS["on-this-day"].bar}`,
     lines: ["on-this-day:always"],
     anchor: /^on-this-day\b/m,
   }),
@@ -635,9 +663,12 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     // The folder is filled in by `homeSections` — see there. This default is
     // the bare form and is never the one composed; it exists so the shape of
     // the section is readable here beside its siblings.
-    render: () => fenceBlock({
+    render: (_ctx, options) => fenceBlock({
       fence: "chronoanvil",
-      lines: [TAGS_BAR, "tag-index"],
+      lines: [
+        ...(options?.form === WIDGET_FORM ? [] : [TAGS_BAR]),
+        "tag-index",
+      ],
     }),
     // AND NOW THE DIALOG CAN REPOINT IT (3.15). The folder is written into the
     // note by `homeSections` and read back out of it by the section editor;
@@ -651,21 +682,32 @@ const HOME_SECTION_DEFS: FlatSection[] = [
         directive: "tag-index",
         hostFolder: spec.hostFolder ?? null,
       },
-      // AND NO FORM TOGGLE, WHICH IS DELIBERATE (5.11). Every other section
-      // composing a `header:` bar over one directive is offered "a section of
-      // its own, or a widget?", and this one reads like the copy that was
-      // missed. It is not. `hasKnownExtent` asks whether a section renders one
-      // line IN EITHER FORM, and a toggle here would make it answer yes for
-      // every Tags block — including one a reader has hand-built into a row
-      // WITH its bar, where the anchor is `tag-index` and cutting that one line
-      // leaves the title standing over nothing. The other toggled sections do
-      // not have this problem because their bar is opt-IN (`SECTION_FORM ?
-      // [bar] : []`) and a cell of theirs is barless already. Offering it here
-      // needs `hasKnownExtent` to ask about the form the FILE is in rather than
-      // the two the catalogue can compose, which is a change to machinery four
-      // catalogues share; until then the refusal in `home-sections.test.ts`
-      // ("refuses a cell whose extent is more than one line") is the one that
-      // stands.
+      // ── THE TOGGLE 5.11 WITHHELD, AND WHAT ANSWERED IT (1.0.22) ────────
+      //
+      // It was withheld on this argument: `hasKnownExtent` asks whether a
+      // section renders one line IN EITHER FORM, a toggle here would make it
+      // answer yes for every Tags block, and cutting the one line `tag-index`
+      // sits on out of a fence that also holds the bar leaves the title
+      // standing over nothing. "The other toggled sections do not have this
+      // problem because their bar is opt-IN and a cell of theirs is barless
+      // already." The fix it named was making `hasKnownExtent` ask about the
+      // form the FILE is in — machinery four catalogues share.
+      //
+      // THE CHEAPER HALF OF THAT WAS THE REAL ANSWER. The difference it
+      // describes is not between Tags and the others, it is between an
+      // UNCONDITIONAL bar and a conditional one — and the bar above is
+      // conditional now. This section renders one line in the widget form, one
+      // line plus its title in the section form, and declares its extent the
+      // same way `upcoming`, `logbook` and the Today card have since 4.59.
+      //
+      // WHAT IS LEFT OVER IS NOT THIS SECTION'S. A titled section whose reader
+      // chose the section form and then hand-built it into a shared fence can
+      // still be cut a line at a time — true of every toggled section that
+      // composes a `title`, true since 4.59, and unchanged by this entry
+      // joining them. `widgetRun` refuses a self-titling fence as a column, so
+      // the editor will not put one there; what it cannot stop is a reader
+      // writing it.
+      formQuestion(TAGS_BAR, HEADER_KEYWORD),
     ],
     // MATCHES THE KEYWORD, NOT THE ARGUMENT, so a reader who repoints the
     // cloud at their own folder still has a section the editor can find.

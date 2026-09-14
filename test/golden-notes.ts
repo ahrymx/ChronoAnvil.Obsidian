@@ -71,6 +71,10 @@ import {
 import { composeHomeNote, homeSectionModel } from "../src/diary/home-sections";
 import { composeSearchNote, searchSectionModel } from "../src/diary/search-sections";
 import {
+  composeEventsNote,
+  eventsSectionModel,
+} from "../src/events/events-sections";
+import {
   composeLogbookNote,
   logbookSectionModel,
   composeLogbooksFolderNote,
@@ -177,6 +181,17 @@ export function goldenNotes(): GoldenNote[] {
       name: "search",
       text: composeSearchNote(),
       model: () => searchSectionModel(),
+    },
+    // THE EVENTS NOTE, WHICH JOINED THE COMPOSERS IN 1.0.21 — and it is the
+    // one fixture here that carries FRONTMATTER. Every other composed note is a
+    // body; this one is both the page and the store, so the `chronoanvil-events`
+    // key is part of what the composer writes. The three read-back assertions in
+    // `composed-notes.test.ts` are therefore also the proof that the flat
+    // machinery locates, plans and rewrites a page with a head on it.
+    {
+      name: "events",
+      text: composeEventsNote(DEFAULT_PATHS.diaryRoot),
+      model: () => eventsSectionModel(),
     },
     {
       name: "diary-folder",

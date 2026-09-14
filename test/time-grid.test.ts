@@ -664,9 +664,25 @@ describe("the rail, when there is no room for it", () => {
 // The tail of the stylesheet, from the container query to the end of the file.
 function compactRules(): string {
   const css = readCss();
-  const at = css.indexOf("@container (max-width: 400px)");
+  // ── THE GRID'S OWN CONTAINER QUERY, NOT THE FIRST ONE IN THE SHEET ──────
+  //
+  // This took `indexOf("@container (max-width: 400px)")`, which held for
+  // exactly as long as the time grid was the only widget with a compact form.
+  // 1.0.21 gave the events deck one at the same breakpoint, in a stylesheet
+  // that sorts BEFORE this one — so the slice started there and ran to the end
+  // of the file, which still contained every assertion below and also contained
+  // `.ca-tg-corner`'s BASE rule. `indexOf` found that one, and a test about
+  // what the corner does when compact started reading what it does at every
+  // width. It failed on `overflow: hidden`, which is the honest outcome: the
+  // assertion had stopped being about the compact block.
+  //
+  // Anchored on the declaration that IS this block — the flag the view reads
+  // back — so a fourth widget at the same breakpoint cannot move it again.
+  const at = css.indexOf("--ca-tg-compact: 1");
   expect(at).toBeGreaterThan(-1);
-  return css.slice(at);
+  const open = css.lastIndexOf("@container (max-width: 400px)", at);
+  expect(open).toBeGreaterThan(-1);
+  return css.slice(open);
 }
 
 describe("the compact week", () => {

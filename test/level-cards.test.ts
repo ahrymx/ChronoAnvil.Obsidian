@@ -198,15 +198,16 @@ describe("one question, one resolver", () => {
 
 describe("the block's chrome, which the composed page depends on", () => {
   it("names itself, so `frame: section` has a title to use", () => {
-    // A directive with no `SECTION_TITLES` entry cannot title itself, so
-    // `frame: section` on it is refused out loud — and the journal dashboard
-    // composes exactly that fence.
-    const widgets = readSrc("widgets");
-    expect(widgets).toContain('"level-cards": "🗂️ Contents"');
+    // A directive with no heading cannot title itself, so `frame: section` on
+    // it is refused out loud — and the journal dashboard composes exactly that
+    // fence. `WidgetSpec.bar` is where the heading lives as of 1.0.22, and it
+    // is required, so "has one at all" is the compiler's question now; what is
+    // asserted here is WHICH one.
+    expect(WIDGETS["level-cards"].bar).toBe("🗂️ Contents");
     // AND NOT THE SAME NAME AS ITS SIBLING. `level-index` is "What's below";
     // two blocks on one page headed identically would read as a duplicate
     // rather than as two arrangements a reader chose between.
-    expect(widgets).toContain('"level-index": "🗂️ What\'s below"');
+    expect(WIDGETS["level-index"].bar).toBe("🗂️ What's below");
   });
 
   it("declares itself a card, so a section frame withholds the block's own", () => {

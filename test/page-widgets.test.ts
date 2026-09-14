@@ -14,6 +14,7 @@
 // only witness to.
 
 import { describe, expect, it } from "vitest";
+import { WIDGETS } from "../src/core/widget-registry";
 import { LAUNCHER_DEFAULT } from "../src/ui/widgets/launcher";
 import { readCode, readCss, readSrc } from "./sources";
 
@@ -192,7 +193,7 @@ describe("the launcher's grid answers to its cell", () => {
     // A widget the title map cannot name gets no head and no card, so this was
     // four tiles on the page's own background beside three widgets that each
     // had one. The name is the catalogue's own, not a second one.
-    expect(readCode("widgets")).toContain('launcher: "🧭 Overview navigator"');
+    expect(WIDGETS.launcher.bar).toBe("🧭 Overview navigator");
     expect(readCode("home-sections")).toContain('label: "Overview navigator"');
   });
 });

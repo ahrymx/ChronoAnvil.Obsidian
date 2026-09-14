@@ -716,7 +716,13 @@ export { rowOf, soloBarOf };
 // has nowhere to go once the bar does. The grid's Add is a tile in the grid
 // (`buildTrackerAddCell`) and travels with it, so dropping the bar costs the
 // reader nothing — which is the question, and it is theirs to answer.
-const BAR_ANCHORED = new Set([
+// EXPORTED SINCE 1.0.22, because the rule stopped being one catalogue's. The
+// reader's sentence — everything is a section, and a section without a special
+// actions row has the widget toggle — is now the rule EVERY catalogue is held
+// to, and `test/section-form-rule.test.ts` sweeps all of them against this set.
+// Keeping the set private would have meant the sweep spelling the three
+// keywords again, which is how a fourth one gets added here and missed there.
+export const BAR_ANCHORED = new Set([
   // The action row itself. `button:` resolves to a registered create-action and
   // the dispatcher anchors it into the bar ABOVE it — "New Topic", "New page" —
   // so a fence with no bar has one action loose above its table.

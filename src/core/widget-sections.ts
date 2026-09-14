@@ -455,7 +455,6 @@ const widgetSection = (
   // `pageWidgetSections` carried about generating both. One form, one rule.
   n: number
 ): FlatSection => {
-  const isLogbook = keyword === "logbook";
   return sectionOf({
     id: instanceId(keyword, n),
     label: spec.label,
@@ -472,13 +471,33 @@ const widgetSection = (
     // EVERY PAGE WIDGET REPEATS. The editor reads this to know that adding one
     // more is a legal thing to ask for.
     repeatable: true,
-    // THE ONE WIDGET THAT WEARS A BAR, and the declaration says so by carrying
-    // a `title` where the others carry none. `logbook` draws a list of items
-    // and nothing that names which logbook it is — `logbook-sections.ts` makes
-    // the argument at length on the page where it bites hardest.
-    ...(isLogbook
-      ? { title: `${HEADER_PREFIX}${spec.glyph} ${spec.label}` }
-      : {}),
+    // ── EVERY WIDGET WEARS A BAR NOW, AND `logbook` WAS THE ONLY ONE (1.0.22)
+    //
+    // The declaration used to carry a `title` for `logbook` alone, on the
+    // argument `logbook-sections.ts` makes at length: it draws a list of items
+    // and nothing that names which logbook it is. That argument is right and it
+    // was never special — every one of the 32 keywords in this registry has a
+    // heading, the dispatcher has drawn one over every block since 4.15 §1, and
+    // the only thing the note did not carry was the LINE.
+    //
+    // WHAT THE LINE BUYS OVER THE DRAWN HEAD. `blockTitle` reads the keyword and
+    // paints a card and a title; a composed `header:` is the same title made
+    // into an object — renameable in place (`attachHeaderRename`), collapsible
+    // with its section remembered, and countable by every reconciler that reads
+    // a fence rather than a rendered page. A widget added from the window was
+    // the one block on a page whose name existed only while it was being looked
+    // at.
+    //
+    // AND IT IS A TOGGLE, NOT A DECREE. `sectionOf` derives the section/widget
+    // question from the presence of a `title`, so every widget instance now
+    // offers one and a reader who wants the bare block unticks it — which is
+    // also what they must do to group the block into a row, since
+    // `isSectionFence` refuses a self-titling fence as a column.
+    //
+    // `spec.bar`, NOT `glyph` + `label`. Those are the picker's noun — "Time
+    // grid" — and this is the heading — "The week by the hour". The two are one
+    // row apart in `widget-registry.ts` and say so.
+    title: `${HEADER_PREFIX}${spec.bar}`,
     // THE KEYWORD DOES THE REST: its line, with the reader's answers already in
     // it, and its arguments as questions.
     widget: keyword,

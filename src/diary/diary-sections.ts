@@ -898,28 +898,15 @@ export const DIARY_SECTIONS: DiarySection[] = [
         // and the composed path is what the reader actually finds in the field.
         hostFolder: ctx.hostFolder ?? null,
       },
-      // AND NO FORM TOGGLE, WHICH IS THE HOMEPAGE'S REFUSAL AND ITS REASON —
-      // see the long note on `tags` in `home-sections.ts`, which is the same
-      // section on another surface and states this once.
-      //
-      // WRITTEN, THEN TAKEN BACK OUT (5.14), so the reason is recorded here
-      // rather than rediscovered. The rule this release carried into the diary
-      // catalogues — offered unless something is anchored into the bar — says
-      // yes for this section, and nothing IS anchored into its bar. The
-      // obstacle is one layer down. A toggled section branches its own render
-      // (`opts?.form === WIDGET_FORM ? [] : [BAR]`), which is what makes
-      // `hasKnownExtent` answer yes for it, and a yes here reaches every Tags
-      // block in the vault — including one a reader hand-built into a row WITH
-      // its bar, where the anchor is `tag-index` and cutting the one line the
-      // extent claims leaves their title standing over nothing.
-      //
-      // WHICH IS WHY THE FOUR SECTIONS THIS RELEASE DID TOGGLE ARE SAFE and
-      // this one is not: `open-tasks`, `tags` and `sleep` on the dashboards
-      // render ONE line in both forms and declare their bar in `bar`, so their
-      // extent was already known and the toggle changes nothing about it. This
-      // one renders two. Lifting the refusal needs `hasKnownExtent` to ask
-      // about the form the FILE is in rather than the two the catalogue can
-      // compose, which is machinery four catalogues share.
+      // THE FORM TOGGLE, WHICH 5.14 WROTE AND TOOK BACK OUT — see the long note
+      // on `tags` in `home-sections.ts`, which is the same section on another
+      // surface and makes the argument once. The short version: the refusal was
+      // that this entry composed its bar UNCONDITIONALLY, so `hasKnownExtent`
+      // said no about it where it said yes about `open-tasks` and `sleep`. The
+      // bar is conditional now, this section renders one line in the widget
+      // form like the rest of them, and the difference the refusal rested on is
+      // gone.
+      formQuestion(TAGS_BAR, HEADER_KEYWORD),
     ],
     id: "tags",
     label: "Tags",
@@ -938,10 +925,10 @@ export const DIARY_SECTIONS: DiarySection[] = [
     // which is `optIn`.
     applies: always,
     optIn: true,
-    render: (ctx) => fenceBlock({
+    render: (ctx, opts) => fenceBlock({
       fence: "chronoanvil",
       lines: [
-        TAGS_BAR,
+        ...(opts?.form === WIDGET_FORM ? [] : [TAGS_BAR]),
         `tag-index:${ctx.diaryRoot ?? DEFAULT_PATHS.diaryRoot}`,
       ],
     }),

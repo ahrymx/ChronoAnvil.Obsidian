@@ -110,7 +110,7 @@ Directives:
 - `quarter-summary` — the Quarterly Overview's whole summary: the quarter's banner over a rollup of the three months it spans, driven by that note's `quarter-start` property.
 - `year-summary` — the year's statistics band: entries, what share of the days that covers, longest streak and a twelve-month density strip. Driven by the note's `year-start`.
 - `period-recap:quarter|year` — goals, highlights and challenges gathered from the months the period covers, so a quarter or a year reads back what its months said rather than restating their numbers.
-- `events` — the special-events manager: every recurring and one-off event, grouped, with an **Add event** button. Lives in the body of the events note by default.
+- `events` — the special-events manager: every repeating and one-off event, grouped into Repeating / Coming up / Earlier with counts and folds, over a deck carrying search, kind chips, a sort toggle and an **Add event ▾** menu. Press a row to edit it; its `⋯` turns it off, duplicates or deletes it. The main section of the events note.
 - `events:upcoming[:N]` — the next `N` events (default 5), each with a relative "in 3 days" / "day 2 of 5" readout. A standalone list, for a page that wants upcoming events without a calendar; the homepage's `diary` card already ends with this list.
 - `upcoming[:N]` — the same list under its own keyword, for a page that wants it as a block of its own rather than as part of the events manager. `3`, `5` (the default) and `10` are what the section editor offers; any number works if you type it.
 - `time-grid[:<what>][:<days>]` — the week laid against the hours: meetings, logbook items, captures and tasks that are due, each in its own place. `what` is one of `events`, `logbooks`, `tasks`, `captures` and defaults to all four; `days` is `3` (around today) or `1`, and defaults to the whole week. Written together the two are joined with a bar — `time-grid:events|3`. It reads the whole vault rather than the note's folder, because events and due dates live wherever their notes do.
@@ -738,24 +738,39 @@ label (`+1 📖`, `−0.5 km`) is generated from the tracker's own settings.
 
 ## Special events
 
-Two kinds of dated thing that aren't diary entries:
+Dated things that aren't diary entries, in three rhythms:
 
-- **Recurring** — birthdays, anniversaries, fixed-date holidays. A month and a day, repeating every year.
-- **Single** — trips, sick days, milestones. One date, or a range of them.
+- **Repeats every year** — birthdays, anniversaries, fixed-date holidays. A month and a day.
+- **Repeats every week** — a class, a standing call, bin day. A weekday and a time.
+- **One-off** — trips, sick days, milestones. One date, or a range of them.
 
-Both are stored as one list in the frontmatter of **`02 - Diary/Events.md`** (configurable in **Settings → Special events**), under the `chronoanvil-events` key. They live in the vault rather than in the plugin's config because an event is *content* — a fact about your life, the same as the mood score beside it — and content should stay readable in plain text without the plugin. The note also carries the `events` widget in its body, so the file that stores the list is the page where you manage it.
+Both are stored as one list in the frontmatter of **`02 - Diary/Events.md`** (configurable in **Settings → Special events**), under the `chronoanvil-events` key. They live in the vault rather than in the plugin's config because an event is *content* — a fact about your life, the same as the mood score beside it — and content should stay readable in plain text without the plugin. That note is also a **page**, with the events manager as its main section — so the file that stores the list is the page where you manage it.
 
 ### Adding and editing
 
 Three doors, one editor:
 
 - **Settings → Special events** — the full list, with an **Add event** button.
-- The `events` widget on the events note itself.
+- The **events manager** on the events note itself (below).
 - **Right-click any day** on the homepage calendar — adds an event already dated to that day, or edits one already on it.
 
 Plus the **New special event…** command and the ChronoAnvil ribbon menu.
 
 Entering a run of holidays is what **Save and add another** is for: it keeps the icon, colour and kind, and clears the title and date for the next one.
+
+### The events manager
+
+The `events` widget is the manager. It draws every event you have, grouped into **Repeating**, **Coming up** and **Earlier** — each group counted and foldable, and the fold is remembered.
+
+- **Add event ▾** asks which rhythm before it opens the form: *One-off* / *Repeats every year* / *Repeats every week*. The editor can still change it afterwards; the menu just means you don't start on the wrong form.
+- **Search** is always there, and the **kind chips** beside it — `All` / `Repeating` / `One-off` / `Off` — carry counts. They are two questions drawn as one strip: `Off` crosses the other two, so a switched-off birthday is counted under both `Repeating` and `Off`.
+- **Sort** toggles between date order and name order. Name order reorders *inside* each group; the three groups stay where they are.
+- **Press a row** to edit that event — with a finger, a mouse or the keyboard. The **`⋯`** at its end holds the rest: **Turn off / Turn on**, **Duplicate**, **Delete**.
+- A switched-off event dims and wears an **Off** pill rather than only dimming, and every row shows when it next comes round on the right.
+
+Turning an event off leaves it in the list and takes it off every calendar — which is what you want for a holiday you observe some years and not others.
+
+The events note is a full ChronoAnvil page: it has a banner, the **`⚙`** section editor and the **`⋯`** page menu like any other, so you can add sections to it, reorder them, or drop the ones you don't use. The manager itself can't be removed — a note named Events with no events list is a broken link rather than a customisation — and as shipped it sits above one two-column row holding **Coming up** beside the week's events grid.
 
 ### How they appear
 
@@ -905,7 +920,7 @@ Every widget in a **group** has a grip — a small patch of dots, shown when you
 
 **Edit sections…** still does everything a drag does and more: it plans the change and shows it to you before it happens, and it can add, remove and split as well as reorder. It is also the only place a **widget** can be added — see below. It is also where a group is broken up — **Take out of the group**, the icon under that row's two arrows, gives a member a block of its own directly outside the group, leaving the rest of the group as it was; **Break up the group** does that for every member at once; and **Make a group** / **Add to group** — the link icon under a row's arrows, where a section already in a group gets the unlink — puts a section beside the block above it **or into any group already on the page**, asking which when there is more than one. It arrives at the near edge of the group it joins, so taking a member out and putting it back leaves the group as it was. The list there has two levels and its arrows follow them: a section on its own moves past the block above or below it, so a section under a group steps **over the whole group** rather than into it, and a section inside a group moves among that group's columns. The card carries its own arrows for moving the whole group, and is the handle for dragging one. Dragging is the fast path. The card also says **whether the group has a head**: tick **Title header** and one full-width bar is drawn over the whole group, worded by its first cell; untick it and the group captions itself from the names of its cells instead — *Lately · Open tasks* — inside a light box of its own. Both are how a group can look, and this is where you choose. The title belongs to the first cell, so it is that cell's own *draw it as a widget* box being asked from the card; the cells after it are always widgets, and their boxes say so.
 
-**Adding a widget.** *Edit this note's sections…* lists every page widget under **Widgets**, on the homepage, Search and both folder-note dashboards. It arrives as a fence of its own at the end of the note and is then a section like any other — it moves, it groups, it removes, and where the widget takes a folder or a fixed choice the row carries a control you can change later. A widget the page already writes is not offered twice, and where you write a second copy of one by hand, ChronoAnvil manages the first and leaves yours alone. Not offered: anything bound to one frontmatter property, anything owning a keyed region of the note body, the two banners, and the few whose argument names a tracker or a note type — the window has no list of those to offer you, and they still work written by hand.
+**Adding a widget.** *Edit this note's sections…* lists every page widget under **Widgets**, on the homepage, Search and both folder-note dashboards. It arrives as a fence of its own at the end of the note, **with its own title bar**, and is then a section like any other — it moves, it groups, it removes, it folds, it can be renamed in place, and where the widget takes a folder or a fixed choice the row carries a control you can change later. The title is a toggle, not a decree: untick **Show as section** on its row and the bar comes off. One thing follows from that — a section that titles itself cannot be a column of a group, because the bar belongs to the whole block rather than to a cell of it, so **Add to group** appears on the widget's row only once you have unticked the box. A widget the page already writes is not offered twice, and where you write a second copy of one by hand, ChronoAnvil manages the first and leaves yours alone. Not offered: anything bound to one frontmatter property, anything owning a keyed region of the note body, the two banners, and the few whose argument names a tracker or a note type — the window has no list of those to offer you, and they still work written by hand.
 
 **Every block wears a slim head** carrying its name — the same names Edit sections… uses, so what you rearrange there is called what you see here. A block that already has a header bar of its own uses that one, and a block nobody can name in one word gets no head rather than an empty bar. No grip appears inside an embed or an export, where ChronoAnvil cannot tell where the block is in the file.
 
@@ -1046,6 +1061,17 @@ and neither is a section welded into the banner — the grid composes no bar of
 its own to take off, and the index's bar belongs to the banner's card. There is no vault-wide switch for it on purpose: a Lesson you
 read every day and a Subject index you visit once a month do not want the same
 answer, and the place that already knows the difference is the note.
+
+**This is now the rule on every page, not only on journal notes.** Everything
+ChronoAnvil writes into a note is a section: it has a name, it folds, it can be
+renamed in place and it is counted when **Set up / repair vault** looks at the
+page. The only things that are not are the note's own head — the title card and
+its controls — and the charts region, whose **+ Add chart** and **Edit…** sit in
+its bar. Everything else carries the **Show as widget** box, so what used to be
+"a section here and a bare widget there" is one thing with two forms, and which
+one you get is your answer rather than the page's. Where the box is ticked by
+default it is because the section was drawn bare before, and untick it to give
+that section a title of its own.
 
 ## Reading mode on ChronoAnvil's pages
 

@@ -1087,9 +1087,16 @@ describe("on this day is offered again (3.13 §11, 4.70)", () => {
     // ADDED RATHER THAN RE-ADDED AS OF 4.70, and the property is the same one:
     // a section that is not in the composed page arrives in a block of its own
     // when the reader asks for it, and the page is coherent afterwards.
+    // AND IT ARRIVES WEARING ITS BAR, as of 1.0.22. The block was bare here
+    // until the rule reached this catalogue — a section composes its own name
+    // unless a control is anchored into it — and `on-this-day` is `optIn`, so
+    // nothing shipped moved: the only page that can show this block is one a
+    // reader asked for it on, and it is the reader's to untick.
     const back = model.apply(home(), [...composedIds, "on-this-day"]) as string;
     expect(back).toContain("on-this-day");
-    expect(back).toContain("```chronoanvil\non-this-day:always\n```");
+    expect(back).toContain(
+      "```chronoanvil\nheader:🕘 On this day\non-this-day:always\n```"
+    );
     // And the rows it did not join are untouched.
     expect(back).toContain(TOP_ROW);
   });

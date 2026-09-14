@@ -35,6 +35,8 @@ import { readCode } from "./sources";
 import { flatBlocks, flatNoteModel } from "../src/core/note-sections";
 import type { FlatSection } from "../src/core/note-sections";
 import { fenceBlock, soleFence } from "../src/core/sections";
+import { WIDGET_FORM } from "../src/core/section-model";
+import type { SectionQuestion } from "../src/core/section-model";
 import {
   composeHomeNote,
   homeSectionModel,
@@ -137,16 +139,39 @@ describe("what the generator makes", () => {
     }
   });
 
-  it("renders exactly one line, which is what makes it a column", () => {
+  it("renders one directive line in the widget form, which is what makes it a column", () => {
     // `hasKnownExtent` IS "RENDERS ONE LINE", so this is the property that gives
     // a widget section everything the rejected design wrote off: it can be cut
     // out of a shared fence, it is `loose`, and it is a legal column of a group.
+    //
+    // ── ASKED IN THE WIDGET FORM, AND UNTIL 1.0.22 ONLY `logbook` HAD TO BE ──
+    //
+    // Every widget instance composes its heading now — `widgetSection` carries
+    // the argument — so the bare directive is the answer to the TOGGLE rather
+    // than the shape of the section. The property this case is about is
+    // unchanged and still exactly what "can be grouped" rests on; what changed
+    // is that reaching it is one tick, which the block below states from the
+    // other end.
     for (const s of tail) {
-      const rendered = s.id.startsWith("w:logbook")
-        ? soleFence(s.render(undefined, { form: "widget" }))
-        : soleFence(s.render());
+      const rendered = soleFence(s.render(undefined, { form: WIDGET_FORM }));
       expect(rendered.lines, s.id).toHaveLength(1);
       expect(rendered.fence, s.id).toBe("chronoanvil");
+    }
+  });
+
+  it("composes its heading in the section form, which is the default", () => {
+    // THE OTHER HALF, AND THE 1.0.22 CHANGE ITSELF. A widget added from the
+    // window used to arrive as one bare directive whose name existed only while
+    // somebody was looking at it — `blockTitle` painted a head from the same
+    // string, and nothing in the file carried it. Two lines now: the heading the
+    // registry declares, then the directive.
+    for (const s of tail) {
+      const rendered = soleFence(s.render());
+      expect(rendered.lines, s.id).toHaveLength(2);
+      expect(rendered.lines[0], s.id).toMatch(/^header:/);
+      // AND IT IS THE REGISTRY'S OWN `bar`, not a second string assembled here.
+      const keyword = instanceIdOf(s.id)?.keyword as string;
+      expect(rendered.lines[0], s.id).toBe(`header:${WIDGETS[keyword].bar}`);
     }
   });
 
@@ -156,19 +181,28 @@ describe("what the generator makes", () => {
     // hand-built `want` carrying one must not compose `timeline:6` behind a row
     // that shows nothing to change it.
     const timeline = tail.find((s) => s.id === "w:timeline#1") as FlatSection;
-    expect(timeline.questions).toBeUndefined();
-    expect(soleFence(timeline.render(undefined, { arg: "6" })).lines).toEqual(["timeline"]);
+    // ONE QUESTION, AND IT IS THE TOGGLE. This asserted `questions` was
+    // undefined until 1.0.22, when every widget instance gained a heading and
+    // with it the section/widget answer about that heading. The property being
+    // pinned is the same: there is no control here for a COUNT, so a hand-built
+    // `want` carrying one composes nothing.
+    expect(timeline.questions?.(undefined).map((q) => q.key)).toEqual(["form"]);
+    expect(
+      soleFence(timeline.render(undefined, { arg: "6", form: WIDGET_FORM })).lines
+    ).toEqual(["timeline"]);
   });
 
   it("writes the answer into the directive, and nothing when there is none", () => {
+    // IN THE WIDGET FORM THROUGHOUT, so the case reads the directive alone. The
+    // heading is the toggle's business and is asserted where the toggle is.
     const tasks = tail.find((s) => s.id === "w:tasks-table#1") as FlatSection;
-    expect(soleFence(tasks.render()).lines).toEqual(["tasks-table"]);
-    expect(soleFence(tasks.render(undefined, { arg: "02 - Diary" })).lines).toEqual([
-      "tasks-table:02 - Diary",
-    ]);
+    const lines = (opts: Record<string, unknown>): string[] =>
+      soleFence(tasks.render(undefined, { ...opts, form: WIDGET_FORM })).lines;
+    expect(lines({})).toEqual(["tasks-table"]);
+    expect(lines({ arg: "02 - Diary" })).toEqual(["tasks-table:02 - Diary"]);
     // A blank answer is the folder question's DEFAULT — the host note's own
     // folder — and composes the bare directive rather than a trailing colon.
-    expect(soleFence(tasks.render(undefined, { arg: "   " })).lines).toEqual(["tasks-table"]);
+    expect(lines({ arg: "   " })).toEqual(["tasks-table"]);
   });
 
   it("asks one question per piece the registry declares", () => {
@@ -218,9 +252,14 @@ describe("what the generator makes", () => {
   it("offers a vault question the vault's own answers, and says so when there are none", () => {
     const card = widgetInstances(["journal-card"], "")[0];
     expect(card.id).toBe("w:journal-card#1");
-    const q = card.questions?.(undefined, {
+    // FOUND BY KEY, NOT BY POSITION. The form question leads every widget
+    // instance's list as of 1.0.22, and an index here would have started
+    // asserting things about the toggle.
+    const argOf = (qs: SectionQuestion[] | undefined): SectionQuestion | undefined =>
+      qs?.find((x) => x.key === "arg");
+    const q = argOf(card.questions?.(undefined, {
       vault: { journals: [{ value: "study", label: "Study" }] },
-    } as never)[0];
+    } as never));
     expect(q?.kind === "choice" && q.values).toEqual([
       { value: "study", label: "Study" },
     ]);
@@ -228,16 +267,18 @@ describe("what the generator makes", () => {
     // `ChoiceQuestion.empty` was written for, and the first widget that can
     // actually reach it. A caller with no vault in hand is the same case as a
     // vault with no journals, and gets the same answer.
-    const none = card.questions?.(undefined, {} as never)[0];
+    const none = argOf(card.questions?.(undefined, {} as never));
     expect(none?.kind === "choice" && none.values).toEqual([]);
     expect(none?.kind === "choice" && none.empty).toMatch(/Settings/);
   });
 
   it("resolves a folder question against the note the window opened on", () => {
     const tags = tail.find((s) => s.id === "w:tag-index#1") as FlatSection;
-    const q = tags.questions?.(undefined, { hostFolder: "02 - Diary" } as never)[0];
+    const folderOf = (qs: SectionQuestion[] | undefined): SectionQuestion | undefined =>
+      qs?.find((x) => x.key === "arg");
+    const q = folderOf(tags.questions?.(undefined, { hostFolder: "02 - Diary" } as never));
     expect(q?.kind === "folder" && q.hostFolder).toBe("02 - Diary");
-    const none = tags.questions?.(undefined, {} as never)[0];
+    const none = folderOf(tags.questions?.(undefined, {} as never));
     // Null leaves the control inert rather than promising a default the caller
     // could not name — `FolderQuestion.hostFolder`'s own rule.
     expect(none?.kind === "folder" && none.hostFolder).toBeNull();
@@ -400,12 +441,30 @@ describe("a widget added from the window behaves like any other section", () => 
     expect(back).toBe(home());
   });
 
-  it("is loose, is a column, and can therefore be grouped", () => {
-    const block = flatBlocks(withEvents, WITH_WIDGETS).find((b) =>
-      b.ids.includes("w:events#1")
-    );
-    expect(block?.loose).toContain("w:events#1");
-    expect(block?.column).toContain("w:events#1");
+  it("is loose either way, and is a column once the heading comes off", () => {
+    // ── THE ONE THING 1.0.22 TOOK, SAID PLAINLY ─────────────────────────
+    //
+    // `widgetRun` refuses a fence that TITLES ITSELF as a column — a bar is not
+    // cell content, so `layOutRow` would insert the group below the line that
+    // was supposed to head it. Every widget instance composes its heading now,
+    // so a widget added from the window is no longer a legal column on arrival:
+    // **Add to group** appears after the reader unticks *Show as section*, and
+    // not before.
+    //
+    // THAT IS THE TOGGLE DOING ITS JOB rather than a capability lost. The
+    // journal catalogue has worked exactly this way since 5.11 — "a section
+    // cannot be grouped; a widget can" — and this is the flat surfaces catching
+    // up with it. `loose` is unaffected either way: a section alone in its fence
+    // owns the whole fence, whatever is in it.
+    const blockOf = (text: string) =>
+      flatBlocks(text, WITH_WIDGETS).find((b) => b.ids.includes("w:events#1"));
+    expect(blockOf(withEvents)?.loose).toContain("w:events#1");
+    expect(blockOf(withEvents)?.column).toEqual([]);
+
+    const bare = withEvents.replace(/^header:.*\n(?=events$)/m, "");
+    expect(bare).not.toBe(withEvents);
+    expect(blockOf(bare)?.loose).toContain("w:events#1");
+    expect(blockOf(bare)?.column).toContain("w:events#1");
   });
 
   it("re-points its argument in place, without touching anything else", () => {
@@ -561,7 +620,9 @@ describe("as many copies of a widget as a page wants", () => {
     // rather than from a pool whose depth nobody could pick.
     const far = instanceSectionFor("w:journal-card#9");
     expect(far?.id).toBe("w:journal-card#9");
-    expect(soleFence(far!.render(undefined, { arg: "study" })).lines).toEqual(["journal-card:study"]);
+    expect(
+      soleFence(far!.render(undefined, { arg: "study", form: WIDGET_FORM })).lines
+    ).toEqual(["journal-card:study"]);
     expect(instanceSectionFor("w:not-a-widget#9")).toBeNull();
   });
 
@@ -679,7 +740,7 @@ describe("as many copies of a widget as a page wants", () => {
       undefined,
     ]);
     // And the vault's own journals are what it offers to change them to.
-    const q = cards[0].questions?.[0];
+    const q = cards[0].questions?.find((x) => x.key === "arg");
     expect(q?.kind === "choice" && q.values.map((v) => v.value)).toEqual([
       "study",
       "cooking",
@@ -710,8 +771,11 @@ describe("as many copies of a widget as a page wants", () => {
     const vault = { journals: [{ value: "study", label: "Study" }] };
     const m = homeSectionModel(ROOT, "", vault);
     const at = m.sections("").find((x) => x.id === "w:level-index#1");
-    expect(at?.questions?.map((q) => q.key)).toEqual(["arg", "arg2"]);
-    expect(at?.questions?.map((q) => q.kind)).toEqual(["choice", "folder"]);
+    // THE TOGGLE LEADS, THEN THE TWO PIECES (1.0.22). The order is
+    // `sectionOf`'s and it is the same on every catalogue section that offers a
+    // form answer; what this case is about is the two pieces behind it.
+    expect(at?.questions?.map((q) => q.key)).toEqual(["form", "arg", "arg2"]);
+    expect(at?.questions?.map((q) => q.kind)).toEqual(["form", "choice", "folder"]);
 
     const line = (text: string | null): string =>
       (text ?? "").split("\n").find((l) => l.startsWith("level-index")) ?? "";
@@ -792,7 +856,15 @@ describe("as many copies of a widget as a page wants", () => {
     // THE LAST PIECE TAKES THE REMAINDER, which is what lets a nested folder be
     // the second half of a two-piece argument — split as a list it would be
     // three pieces, two of which nobody asked for.
-    expect(view?.answered).toEqual({ arg: "study", arg2: "Maths/Algebra" });
+    // `form: "widget"` IS READ OFF THE FENCE, not stored: the block in this
+    // fixture is a bare directive with no heading over it, which is what the
+    // widget form IS. It appears here as of 1.0.22 because the section now has
+    // a heading to be missing.
+    expect(view?.answered).toEqual({
+      form: "widget",
+      arg: "study",
+      arg2: "Maths/Algebra",
+    });
 
     // AND ANSWERING ONE PIECE LEAVES THE OTHER AS THE READER LEFT IT, which is
     // the promise a single-question splice already makes about the rest of the

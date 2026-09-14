@@ -16,6 +16,7 @@ import { buildQuarterSummary } from "../../review/quarter-view";
 import { buildPeriodRecap } from "../../review/recap-view";
 import { buildEntryRollup, rollupGrainOf } from "../../diary/entry-rollup";
 import { keywordOf } from "../../core/layout";
+import { WIDGETS } from "../../core/widget-registry";
 import {
   buildDiarySearch,
 } from "../../diary/diary-retrieval";
@@ -464,104 +465,59 @@ export function chromeClasses(
 
 
 
-const SECTION_TITLES: Record<string, string> = {
-  diary: "📆 Today",
-  "week-summary": "📅 This week",
-  "month-summary": "📅 This month",
-  "quarter-summary": "📅 This quarter",
-  "year-summary": "📅 This year",
-  journals: "📚 Journals",
-  // `journals:cards` shares the keyword, so it shares the title — the table is
-  // keyed on the KEYWORD, which is what `frame: section` reads off the fence.
-  // Two entries would be two names for one section, and the arrangement is not
-  // what the bar should be announcing.
-  //
-  // TWO ENTRIES WERE DELETED HERE IN 4.12, and both had been dead for a while:
-  // `calendar`, retired in 3.11 (see `RETIRED_WIDGETS`), and `month-nav`, which
-  // was never a keyword at all — the directive is `period-nav`. A title for a
-  // widget nothing dispatches is not inert: `frame: section` looks up the first
-  // line whose keyword is in this table, so a dead entry is a fence that would
-  // have folded under a name for a widget that cannot render. Nothing found
-  // them because nothing compared this table against the switch;
-  // `test/widget-registry.test.ts` now does, in both directions.
-  "entry-rollup": "📖 What the days said",
-  "period-recap": "📝 Recap",
-  timeline: "📜 All entries",
-  // ONE TITLE FOR EVERY LOGBOOK, and it is generic where the widget is not.
-  // This table is keyed on the KEYWORD — `journals:cards` shares its entry with
-  // `journals` two dozen lines up for the same reason — so it cannot say "Work
-  // log" for one argument and "Meetings" for another. It does not need to: both
-  // catalogues that compose a logbook write a `header:` bar naming it, and this
-  // is what a fence titled by `frame: section` alone falls back to.
-  logbook: "🗒️ Logbook",
-  "time-grid": "⏱️ The week by the hour",
-  "on-this-day": "🕘 On this day",
-  upcoming: "⏭️ Coming up",
-  "tracker-stat": "📉 Tracker",
-  "tasks-table": "⏳ Open tasks",
-  "tag-index": "🏷️ Tags",
-  "review-queue": "🔁 Review",
-  "journal-search": "🔎 Find",
-  "journal-recent": "🕒 Lately",
-  "diary-search": "🔎 Search",
-  "topics-table": "🗂 Topics",
-  // The band gets a head; the tally does not, because it draws its own title
-  // from the tracker it names — exactly as `journal-breakdown` beside it does,
-  // and for the same reason: a page can hold two tallies and one head saying
-  // "Tally" over both would name neither.
+// ── THE TABLE MOVED, THE MAP STAYED (1.0.22) ──────────────────────────
+//
+// Every literal that was written out here is now `WidgetSpec.bar`, beside the
+// `label` it was so easily confused with, and that file's field carries the
+// argument for the move at length. The short version: a widget added through
+// the section window composes its own bar now, the composer is in `core`, and
+// a second copy of these strings in `ui` is exactly the drift the old
+// "kept apart on purpose" rule was written to prevent.
+//
+// WHAT IS LEFT HERE IS THE MAP ITSELF, because the question this answers is
+// still the dispatcher's: given a keyword on a line of a fence, what would a
+// head over that fence say. `blockTitle` and `frame: section` read it the way
+// they always did, and nothing below this line changed.
+const ALIAS_TITLES: Record<string, string> = {
+  // THE FIVE THAT WEAR A HEAD AND ARE NOT IN `WIDGETS`, which is the whole of
+  // what the registry cannot speak for: each is in `NOT_PAGE_WIDGETS`, so it
+  // has no `WidgetSpec` to carry a `bar` — and each still DISPATCHES, so a
+  // fence already in a reader's vault must go on drawing the head it has.
   //
   // THREE WORDS, ONE BAND, AND THE HEADS DIFFER ON PURPOSE (4.46). A
   // `frame: section` fence is titled from the KEYWORD on its first line, so the
-  // two aliases must keep entries or a note composed before this release loses
-  // its head and draws onto the page's own background — the exact defect 4.15
-  // §1 found on six widgets, one of which was `topic-stats`. Each alias keeps
-  // the name it has always drawn, because the note on disk did not change; the
-  // aliases' entries are further down this table where they have always been.
-  "stats-band": "🔢 Stats",
+  // two `stats-band` aliases must keep entries or a note composed before that
+  // release loses its head and draws onto the page's own background — the exact
+  // defect 4.15 §1 found on six widgets, one of which was `topic-stats`. Each
+  // alias keeps the name it has always drawn, because the note on disk did not
+  // change.
+  //
+  // The tally has no `WIDGETS` entry for the reason 4.46 gave it: it draws its
+  // own title from the tracker it names, exactly as `journal-breakdown` does,
+  // and a page can hold two tallies that one head saying "Tally" would name
+  // neither of.
+  "topics-table": "🗂 Topics",
+  "topic-stats": "📈 Topics",
   "journal-totals": "🧮 Totals",
   "journal-tally": "🧮 Status",
-  "pages-table": "📄 Pages",
   "kind-table": "🗂 Notes",
-  "activity-chart": "📈 Activity",
-  // THE NAME THE CATALOGUE ALREADY GIVES IT (`home-sections.ts`, "Overview navigator"), and
-  // it is here for what the name BRINGS rather than for the name. A widget the
-  // map cannot name gets no head and no card, so the launcher was four tiles on
-  // the page's own background beside three widgets that each had a surface —
-  // the one block on the homepage that looked unfinished. 4.8.1.
-  launcher: "🧭 Overview navigator",
-  // ── the six that had none, 4.15 §1 ──────────────────────────────────
-  //
-  // THE COMMENT ABOVE WAS TRUE OF SIX MORE WIDGETS AND SAID SO ABOUT ONE. A
-  // widget this map cannot name gets no head and no card, so `events`,
-  // `sleep-summary`, `period-nav`, `journals-header`, `topic-stats` and `links`
-  // drew their content straight onto the page's background beside neighbours
-  // that each had a surface. 4.8.1 diagnosed exactly this for the launcher and
-  // fixed the one instance in front of it; nothing compared the two tables, so
-  // the other six kept the defect the fix was written for.
-  //
-  // NOW ASSERTED RATHER THAN NOTICED. `test/widget-registry.test.ts` pins that
-  // every `WIDGETS` key has a line here, which is the check that would have
-  // caught all six and the reason a seventh cannot appear.
-  //
-  // THE GLYPH IS THE REGISTRY'S OWN, not a second choice made here. The two
-  // tables answer different questions and are kept apart on purpose, but a
-  // widget wearing one emoji in the add list and another over its card would be
-  // them disagreeing about what a thing looks like, which is not one of the
-  // questions either is for.
-  "journal-card": "📓 Journal card",
-  "level-index": "🗂️ What's below",
-  // THE SECTION'S OWN NAME ON THE PAGE THAT COMPOSES IT (4.36). Not "What's
-  // below" a second time: `level-index` and `level-cards` answer one question,
-  // and two blocks on one page headed identically would read as a duplicate
-  // rather than as two arrangements a reader chose between.
-  "level-cards": "🗂️ Contents",
-  events: "🎉 Events",
-  "sleep-summary": "😴 Sleep",
-  "period-nav": "⏮️ Go to period",
-  "journals-header": "🔥 Activity",
-  "topic-stats": "📈 Topics",
-  links: "🔗 Links",
 };
+
+// What the bar over a block of this widget says — the registry's string for a
+// page widget, the alias table's for the five that have no spec.
+//
+// DERIVED, NOT DECLARED, which is what makes "every `WIDGETS` key has a
+// heading" structural instead of asserted: `bar` is a required field, so a
+// widget that would draw its content onto the page's own background with no
+// card and no head — 4.8.1's defect, and 4.15 §1's six more — cannot be added
+// to the registry at all.
+const SECTION_TITLES: Record<string, string> = {
+  ...Object.fromEntries(
+    Object.entries(WIDGETS).map(([keyword, spec]) => [keyword, spec.bar])
+  ),
+  ...ALIAS_TITLES,
+};
+
 
 // The directives that own a region of the note body and draw a field head over
 // it. `fieldHead` in note-field.ts is the head; this is the list of what wears

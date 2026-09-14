@@ -5,6 +5,83 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.22] - 2026-09-14
+
+### Changed
+
+- **Everything ChronoAnvil writes into a note is a section now, and a section
+  that does not hold a control in its bar carries the section/widget toggle.**
+  The rule was already in the plugin, derived, for journal notes — a section
+  without an action row is convertible — and every other page declared it one
+  entry at a time, so the pages had drifted apart. Tags offered the toggle on
+  the diary dashboard and nowhere else; On this day offered it on Search and
+  not on the homepage; Search and Timeline refused it outright; the journal
+  tally composed no name at all while the page drew one over it. None of those
+  were decisions.
+
+  So the toggle is now on every section of every page, and a widget **added**
+  from *Edit this note's sections…* arrives with its own title bar rather than
+  bare — which means it folds, it can be renamed in place, and repair can see
+  it. Untick **Show as section** on its row to get the bare form back.
+
+  **Shipped pages are unchanged, byte for byte.** Every section that composed a
+  bar still composes the same one, every section that did not still does not,
+  and no note anywhere is rewritten. What changed is what is **offered**.
+
+- **One thing this costs, stated plainly.** A section that titles itself cannot
+  be a column of a group — the bar belongs to the whole block rather than to a
+  cell of it — so **Add to group** now appears on a freshly added widget's row
+  only after you untick **Show as section**. This is how journal notes have
+  worked since the toggle existed; it is new on the other pages because the
+  title is.
+
+## [1.0.21] - 2026-09-14
+
+### Changed
+
+- **The `events` widget is a manager, not a second countdown.** It drew the
+  same three rows as `upcoming` directly above it, in the same order, under the
+  heading COMING UP — which is literally the other widget's name. Three things
+  hid the manager that was already in there: the four row actions were revealed
+  by `:hover`, with a touch fallback that drew them at not-quite-half opacity
+  on a row that was not itself pressable; the search box appeared only from the
+  eighth event; and with nothing recurring and nothing past, the three groups
+  collapsed to the one the countdown was already showing.
+
+  It is now a deck. **Search is always drawn**, beside **kind chips carrying
+  counts** — All / Repeating / One-off / Off — and a **sort** toggle for date
+  or name order. The three groups keep their order and gain counts and folds,
+  and the fold is remembered. **Add event ▾** asks which rhythm before opening
+  the form: one-off, repeats every year, repeats every week.
+
+  **A row is pressed to edit it** — with a finger, a mouse, or Enter on the
+  keyboard — and the four buttons collapse into one **⋯** holding Turn off /
+  Turn on, Duplicate and Delete. A switched-off event wears an **Off** pill
+  rather than only dimming, and every row shows when it next comes round.
+
+- **`02 - Diary/Events.md` is a page.** It was the one note ChronoAnvil ships
+  that was not a surface: composed from a string literal, absent from the
+  scaffold's list of shipped notes and from the section editor's resolver. The
+  consequences were exact and all of them invisible — repair created the file
+  once and never visited it again, so it had not changed across several major
+  versions; there was no banner, no **⚙**, no page **⋯** and no "Add a
+  section…"; and it was the one composed page that opened in edit mode.
+
+  It is now composed like every other page, with a banner, the events manager
+  as its locked main section, and one two-column row beneath holding **Coming
+  up** beside the **week's events** grid. Everything but the manager is yours
+  to move or remove.
+
+  **An existing events note is repaired additively**: the next "set up / repair
+  vault" offers the banner and any missing section under **Pages**, and leaves
+  your prose, your order and your `chronoanvil-events` frontmatter alone. The
+  shipped two-column layout is offered separately under **Migrations**,
+  unticked — take it or don't.
+
+  A vault with **Settings → Special events** switched off is still not given
+  the note; a vault that already has one still gets it repaired. The toggle
+  governs drawing, not existing.
+
 ## [1.0.20] - 2026-09-14
 
 ### Fixed

@@ -198,6 +198,7 @@
 
   /* Type: four sizes. Micro meta -> emphasized numbers/titles. */
   --ca-text-2xs: 0.7em;
+  --ca-text-3xs: 0.62em; /* the Off pill on an event row, and nothing larger */
 
   /* ── The page head's own two, and it is the only object with any (4.10) ──
    *
@@ -932,6 +933,19 @@ body {
   --ca-tg-lane-edge: color-mix(in srgb, var(--interactive-accent) 28%, var(--background-modifier-border));
   --ca-tg-today-bg: color-mix(in srgb, var(--interactive-accent) 7%, transparent);
   --ca-tg-line-major: var(--background-modifier-border-focus);
+
+  /* THE EVENTS DECK'S PRESSED CHIP, HERE AND NOT BESIDE THE TEXT SCALE, for
+     the reason the four lines above it are here: both read a theme colour, and
+     Obsidian's `.theme-dark` / `.theme-light` are classes on `body`. A custom
+     property's `var()` is substituted on the element that DECLARES it, so one
+     of these on `:root` would resolve against the light palette in a dark vault
+     and never change. `test/tokens.test.ts` is the check.
+
+     Same tint, same reason as the time grid's lane: the accent over the page's
+     own ground, rather than a neutral grey that is within a shade of the row
+     behind it on a dark theme. */
+  --ca-ev-chip-bg: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  --ca-ev-chip-edge: color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
 
   /* Surface depth hierarchy & Frames (4.24 §1) */
   --ca-surface-card: var(--background-secondary);
