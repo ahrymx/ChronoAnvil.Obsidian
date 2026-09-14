@@ -23,6 +23,7 @@ import {
 import { cardStatChoices } from "../src/journals/journals-cards";
 import { kindPlural } from "../src/journals/journal-sections";
 import { scopesForMeasure } from "../src/journals/stats-band";
+import { kindNoteCount } from "../src/ui/tables";
 import { cssRule, cssRules, readCode, readCss, readSrc } from "./sources";
 
 describe("the grid is an arrangement, not a second widget", () => {
@@ -503,6 +504,55 @@ describe("a subject is a card", () => {
     const at = tables.indexOf("export function folderRollup(");
     expect(at, "the folder rollup").toBeGreaterThan(0);
     expect(tables.slice(at)).toContain("folderActivity(app, tf.path)");
+  });
+
+  it("counts the notes in a child folder the way the table one level up does", () => {
+    // 1.0.16 gave the rollup ONE count column in place of a column per kind,
+    // and that made a number the card had always drawn — its `notes` cell —
+    // the same number the table now draws about the same folder. They
+    // disagreed: the card counted `pages.length`, everything under the folder
+    // including its own index note, and the table counts the journal's declared
+    // kinds. `folderActivity`'s header states why that is a defect rather than
+    // a difference — *"a subject's numbers about a topic and the topic's
+    // numbers about itself come from one place and cannot drift"* — and one
+    // helper is what "one place" means here.
+    const tables = readSrc("tables");
+    expect(tables).toContain("export function kindNoteCount(");
+    // The table's column.
+    const rollup = tables.indexOf("export function folderRollup(");
+    const level = tables.indexOf("export function buildLevelIndex(");
+    expect(tables.slice(rollup, level)).toContain("kindNoteCount(typed, type)");
+    // And the card's cell, which is the one that had the other number.
+    const card = tables.indexOf("function containerCard(");
+    expect(card, "the container card").toBeGreaterThan(0);
+    const body = tables.slice(card, tables.indexOf("\nfunction ", card + 10));
+    expect(body).toContain('{ label: "notes", value: String(kindNoteCount(typed, type)) }');
+    expect(body).not.toContain("String(pages.length)");
+  });
+
+  it("counts kinds, not typed pages, and not a kind the journal dropped", () => {
+    // THE RULE THE NAME EXISTS FOR. A Topic folder holds its own index note,
+    // carrying `type: topic` — so `typed.length` reports three notes for a
+    // Topic with two lessons, and the per-kind columns this replaced reported
+    // two. The count has to be the sum of the columns it stands in for or the
+    // change is a silent renumbering rather than a consolidation.
+    const type = { id: "study", kinds: [{ id: "lesson" }, { id: "practice" }] };
+    const page = (t: unknown) => ({ fm: { type: t } });
+    const count = (pages: unknown[]) =>
+      kindNoteCount(pages as never, type as never);
+
+    // The folder's own index note is typed and is not one of the kinds.
+    expect(count([page("topic"), page("lesson"), page("lesson")])).toBe(2);
+    // A renamed or deleted note type leaves its notes on disk with the old
+    // word. The per-kind columns dropped them by having no column to put them
+    // in; a total that re-admitted them would show a number no earlier release
+    // ever drew.
+    expect(count([page("lesson"), page("seminar")])).toBe(1);
+    // Both kinds, and nothing else in the folder.
+    expect(count([page("lesson"), page("practice")])).toBe(2);
+    expect(count([])).toBe(0);
+    // Frontmatter is the reader's, so a non-string value must not throw.
+    expect(count([page(3), page(null), page(["lesson"])])).toBe(0);
   });
 
   it("gives the record list back, because a card is not a table", () => {

@@ -894,15 +894,8 @@ describe("section actions in a narrow pane", () => {
     // The kind's label is "Lesson" and the button reads "New Lesson", so the
     // callout pointed at something not on the screen. Both derive from
     // `kind.label`, so they agree by construction now.
-    //
-    // AND BOTH SPELLINGS SINCE 1.0.16, which is the same rule with a second
-    // case rather than a weaker one: a table over several note types sits under
-    // one create that asks which, so the button reads "New" and the sentence
-    // has to as well. It is derived from the same source in both, which is what
-    // makes it impossible for one to move without the other.
     const t = readSrc("tables");
-    expect(t).toContain('const press = kind ? `New ${kind.label}` : "New";');
-    expect(t).toContain("Press “${press}” above");
+    expect(t).toContain("Press “New ${kind.label}” above");
   });
 
   it("draws every create action at the same weight", () => {

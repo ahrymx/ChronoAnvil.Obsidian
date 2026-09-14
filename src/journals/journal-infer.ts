@@ -511,21 +511,10 @@ export function inferJournalFromScan(
   // not cosmetic: it is the order of the create buttons, of the tables in
   // every index template, and of the views in the type's .base file.
   //
-  // The deepest index template wrote one bar per kind by mapping over
+  // The deepest index template writes one headerBar per kind by mapping over
   // `type.kinds` in order (journal-sections.ts), so the sequence of
   // `new-<kind>` buttons down that file IS the declaration order. Anything not
   // mentioned there keeps its existing relative position at the end.
-  //
-  // ── AND IT IS NOT IN A NOTE THIS RELEASE WROTE (1.0.16) ───────────────
-  //
-  // The deepest index composes ONE create button now — `button:<type>:new`,
-  // which asks which type — so a folder written by this release states no order
-  // at all and `declared` comes back empty, leaving the alphabetical fallback
-  // both sources already produce. The walk is kept exactly as it is because the
-  // folders it reads are the ones that exist: every vault written before today
-  // carries the per-kind buttons, and a `new-<kind>` a reader put in a note by
-  // hand still counts. What this release cannot recover, it says out loud —
-  // see the guesses line below the kinds.
   const declared: string[] = [];
   const noteIndexes = scan.notes.filter((n) => isIndexFile(n.segments));
   for (const file of [...templateFiles, ...noteIndexes]) {
@@ -601,30 +590,6 @@ export function inferJournalFromScan(
       ...(ratingOf(files) ? { rating: ratingOf(files) } : {}),
     };
   });
-
-  // ── WHAT A CONSOLIDATED INDEX CANNOT TELL US (1.0.16) ───────────────────
-  //
-  // The emoji and the declared plural above are read off a `header:📖 Lessons`
-  // sitting over a `kind-table:lesson` — three lines the deepest index composed
-  // PER KIND until this release, and does not compose at all now: one table
-  // lists every kind and names none of them. So a folder written by an older
-  // release still comes back with its glyphs exactly, and one written by this
-  // release comes back with 📝 for each. The declaration order is the same loss
-  // for the same reason — it was read from the sequence of `new-<kind>` buttons
-  // down the index, and there is one `new` button now.
-  //
-  // SAID OUT LOUD RATHER THAN QUIETLY DEFAULTED, which is this function's whole
-  // manner: *"a journal that comes back with every kind labelled 📝 reads as a
-  // failed recovery even when the structure is perfect"*. The answer to that is
-  // a line in the guesses list, not a glyph invented from a folder that states
-  // none — and the reader fixes both in one visit to the editor, where they are
-  // two clicks and a drag.
-  if (kinds.length > 1 && kinds.every((k) => !labels.get(k.id)?.emoji)) {
-    guesses.push(
-      "an icon and an order for each note type — its index notes list them " +
-        "in one table, which names neither"
-    );
-  }
 
   // ── trackers ────────────────────────────────────────────────────────────
   const wanted = new Set<string>();

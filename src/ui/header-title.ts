@@ -332,16 +332,6 @@ async function offerKindRename(
 // ("🍽️ Recipes") over that kind's table, so the section's bar and the kind's
 // heading are one line, and renaming it does mean what the offer asks about.
 //
-// ── AND NULL ON A CONSOLIDATED CARD, WHICH COSTS NOTHING (1.0.16) ────────
-//
-// The deepest index composes one table over every note kind, so the card's only
-// head is the section's bar and the line this walk looks for is a BARE
-// `kind-table`. It names no id, so nothing is returned, and the rename offer is
-// not made — which is the truth about a bar over a table listing all of them:
-// retitling it retitles the card and nothing else, and that is what the reader
-// did. The per-kind heads are still read exactly as below on every note written
-// before that release, which is what the offer is for.
-//
 // THE COST IS ONE HEAD ON AN UNREPAIRED NOTE, and it is the right way round. A
 // Topic index composed before this release opens with a bare `header:📖 Lessons`
 // above a `header:🛠️ Practice`, and the demotion rule reads the first —

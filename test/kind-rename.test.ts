@@ -23,27 +23,12 @@ import { argSpansIn, readArg } from "../src/core/directive-grammar";
 import { plural, singularGuess } from "../src/core/util";
 import { STUDY_JOURNAL } from "../src/journals/journal";
 import { studyTemplate } from "./study-template";
-import { asPerKindTables } from "./legacy-children";
 import { readCode, readSrc } from "./sources";
 import { normaliseKinds } from "../src/core/settings-editors";
 import { kindPlural } from "../src/journals/journal-sections";
 import type { JournalKind } from "../src/journals/journal";
 
-// ── THE FIXTURE IS 1.0.15's COMPOSITION, DELIBERATELY (1.0.16) ────────────
-//
-// The offer reads a FILE, and the files with a heading per note type are the
-// ones every vault already has: every release up to 1.0.15 composed a head, a
-// create button and a table for each kind, and 4.16 §3's rule is that what is
-// on disk goes on rendering forever. This release composes one table over every
-// kind instead, so the shipped Topic index has no per-kind head left to ask
-// about — and reading the question off the shipped template would have deleted
-// the test rather than the shape.
-//
-// So the shape moved to `test/legacy-children.ts` and this file ages the
-// template it used to read. What the offer does on a CONSOLIDATED card is the
-// last test in the describe: nothing, because no head there names a kind.
-const topic = (): string[] =>
-  asPerKindTables(studyTemplate("topic-index.md"), STUDY_JOURNAL).split("\n");
+const topic = (): string[] => studyTemplate("topic-index.md").split("\n");
 
 describe("which headings name a note type", () => {
   it("finds the kind under each per-kind heading", () => {
@@ -81,19 +66,6 @@ describe("which headings name a note type", () => {
       (s) => readArg(lines, s) === "2:📖 Lessons"
     )!;
     expect(kindHeadedBy(lines, lessons, STUDY_JOURNAL)?.id).toBe("lesson");
-  });
-
-  it("offers nothing on a card that lists every kind in one table", () => {
-    // 1.0.16, and it falls out of the walk rather than needing a rule of its
-    // own: the consolidated fence's only head is the section's bar, and the line
-    // the walk then looks for is `kind-table:<id>`. A bare `kind-table` names no
-    // id, so there is no note type to offer a rename for — which is the truth
-    // about a card listing all of them. A reader who retitles that bar has
-    // retitled their card and nothing else, which is what they did.
-    const lines = studyTemplate("topic-index.md").split("\n");
-    for (const s of argSpansIn(lines, "header")) {
-      expect(kindHeadedBy(lines, s, STUDY_JOURNAL), readArg(lines, s)).toBeNull();
-    }
   });
 
   it("still finds the kind after the heading has been renamed", () => {
@@ -389,9 +361,23 @@ describe("a stored plural survives an edit", () => {
     // whose own section header, buttons and empty states — all of which go
     // through `kindPlural` — said "Practice". One kind, two spellings, on two
     // pages a click apart.
+    //
+    // THE ROLLUP'S HEADING IS NO LONGER PER KIND, as of 1.0.16 — one count
+    // column replaced the column per kind, for the emptiness `folderRollup`
+    // measures in prose. Its heading still reads a kind's plural in the one
+    // case where it names one (`soleKindOf`), and the per-kind derivation this
+    // test exists for is unchanged everywhere it survives. The rule being
+    // pinned is the NEGATIVE — no surface in this file re-derives a plural from
+    // a label — plus every positive still standing.
     const tables = readCode("tables");
     expect(tables).not.toMatch(/plural\(k(?:ind)?\.label\)/);
-    expect(tables).toContain("type.kinds.map((k) => kindPlural(k))");
+    // The rollup's count column, where the journal has one kind.
+    expect(tables).toContain("const countHead = sole ? kindPlural(sole) : ");
+    // `level-index`'s per-kind heading.
+    expect(tables).toContain("text: `${kind.emoji} ${kindPlural(kind)}`");
+    // And the stats band's labels, singular from the label and plural from the
+    // override.
+    expect(tables).toContain("(n === 1 ? kind.label : kindPlural(kind))");
   });
 
   it("drops an override the new label already produces", () => {

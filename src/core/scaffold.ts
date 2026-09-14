@@ -92,10 +92,7 @@ import {
   indexSurfaces,
 } from "../journals/dashboard-catchup";
 import type { DashboardCatchup } from "../journals/dashboard-catchup";
-import {
-  consolidateChildren,
-  consolidateDetail,
-} from "../journals/children-consolidate";
+import { splitChildren, splitDetail } from "../journals/children-split";
 import { composeHomeNote, collapseJournalsBlocks } from "../diary/home-sections";
 import { composeDiaryDashboardNote } from "../diary/diary-dashboard-sections";
 import { composeJournalsDashboardNote } from "../journals/journals-dashboard-sections";
@@ -778,8 +775,9 @@ export class Scaffold {
     if (regrouped != null) await this.app.vault.modify(file, regrouped);
   }
 
-  // One journal's index notes and index templates, with their per-kind tables
-  // merged into the single table this release composes. 1.0.16.
+  // One journal's index notes and index templates, with 1.0.16's single table
+  // split back into the per-kind stack. See `children-split.ts` for why a
+  // release nobody had still needs a migration.
   //
   // `regroupPage`'s SHAPE EXACTLY, which is `titleSummary`'s before it and
   // `weldBanner`'s before that: read, call a pure function, write only on a
@@ -795,15 +793,15 @@ export class Scaffold {
   // ERRORS ARE PER FILE, on `splitEntryBanners`' rule rather than the shipped
   // pages' — one unreadable index note in a journal of forty must not stop the
   // other thirty-nine, and there is no outer `try` here to fall into.
-  private async mergeChildrenTables(type: JournalType): Promise<number> {
+  private async splitChildrenTables(type: JournalType): Promise<number> {
     if (type.kinds.length < 2) return 0;
     let written = 0;
     for (const { file } of indexSurfaces(this.app, type)) {
       try {
         const original = await this.app.vault.read(file);
-        const merged = consolidateChildren(original, type);
-        if (merged == null || merged === original) continue;
-        await this.app.vault.modify(file, merged);
+        const split = splitChildren(original, type);
+        if (split == null || split === original) continue;
+        await this.app.vault.modify(file, split);
         written++;
       } catch (e) {
         console.error(
@@ -1880,7 +1878,7 @@ export class Scaffold {
       }
     }
 
-    // ── AND EVERY JOURNAL INDEX NOTE'S STACK OF TABLES (1.0.16) ────────
+    // ── AND EVERY JOURNAL INDEX NOTE 1.0.16 MERGED ─────────────────────
     //
     // A WALK OF ITS OWN, because these are not shipped notes. Everything above
     // reads `shippedNotes` — pages the plugin composed and can compose again —
@@ -1890,29 +1888,32 @@ export class Scaffold {
     // of files.
     //
     // THE TEMPLATES ARE IN IT TOO, and deliberately: a journal's index template
-    // is what the NEXT subject's note is made from, so leaving it on the old
+    // is what the NEXT subject's note is made from, so leaving it on the merged
     // shape would have the migration undone one folder at a time. The
     // `templates` group would eventually rewrite it wholesale — this reaches it
-    // in the same diff as the notes it matches, and a template already
-    // consolidated is a no-op there.
+    // in the same diff as the notes it matches, and a template already split is
+    // a no-op there.
     //
-    // ONE ROW PER FILE, which is why `findDashboardCatchups` is NOT asked to
-    // merge (see `CatchupScope`): the `journals` group reports the same files
-    // for a different reason and promises it touches nothing in them.
+    // ONE ROW PER FILE. The `journals` group reports the same files for a
+    // different reason and promises that *"nothing already in them is
+    // touched"*, which is exactly true of the `extend` it offers and exactly
+    // false of this rewrite — so the rewrite is reported from here, where the
+    // group's whole subject is notes an older release wrote and every row
+    // carries a diff.
     for (const type of registeredJournalTypes(this.plugin)) {
       if (type.kinds.length < 2) continue;
       for (const { file } of indexSurfaces(this.app, type)) {
         try {
           const original = await this.app.vault.read(file);
-          const merged = consolidateChildren(original, type);
-          if (merged == null || merged === original) continue;
+          const split = splitChildren(original, type);
+          if (split == null || split === original) continue;
           out.push({
             path: file.path,
             // BY PATH, on `findCatchups`' rule: one index note per subject makes
             // identically named files the common case here rather than an edge.
             label: file.path,
-            ops: [{ kind: "migrate", detail: consolidateDetail(type) }],
-            diff: diffText(original, merged),
+            ops: [{ kind: "migrate", detail: splitDetail(type) }],
+            diff: diffText(original, split),
           });
         } catch (e) {
           console.error(
@@ -2013,7 +2014,7 @@ export class Scaffold {
           id: "migrations",
           title: "Run format migrations",
           blurb:
-            "Notes written by an older release, brought up to the shape this one reads: entry banners separated from their tracker grid, Trends sections given their title, page names welded to their navigation row, a journal index's table per note type merged into one.",
+            "Notes written by an older release, brought up to the shape this one reads: entry banners separated from their tracker grid, Trends sections given their title, page names welded to their navigation row, a journal index's single table split back into one per note type.",
           glyph: "🔧",
           noun: "note",
           items: migrations,
@@ -2291,14 +2292,14 @@ export class Scaffold {
           console.error(`[ChronoAnvil] Trends migration failed for ${dash}`, e);
         }
       }
-      // AND THE JOURNAL INDEX NOTES' TABLES, LAST OF THE EIGHT (1.0.16).
+      // AND THE JOURNAL INDEX NOTES' TABLES, LAST OF THE EIGHT.
       //
       // AFTER THE SHIPPED PAGES because the two sets do not overlap — a journal
       // index note is nobody's dashboard — so the order is simply the order the
       // dry run reports them in, which is what keeps the notice's count and the
       // window's rows the same list.
       for (const type of registeredJournalTypes(this.plugin)) {
-        await this.mergeChildrenTables(type);
+        await this.splitChildrenTables(type);
       }
       const migrated = survey.groups.find((g) => g.id === "migrations")?.items.length ?? 0;
       if (migrated > 0) parts.push(`migrated ${migrated} note(s)`);

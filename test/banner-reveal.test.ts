@@ -58,7 +58,6 @@ import { STUDY_JOURNAL } from "../src/journals/journal";
 import { JOURNAL_SECTIONS, templateTargets } from "../src/journals/journal-sections";
 import { composeTemplate, journalTemplateFiles } from "../src/journals/custom-journal";
 import { defaultSectionIds } from "../src/journals/journal-sections";
-import { asPerKindTables } from "./legacy-children";
 import { journalSectionModel } from "../src/journals/journal-plan";
 import { readCode, readCss } from "./sources";
 
@@ -257,23 +256,10 @@ describe("which lines of a welded fence the index owns", () => {
   // banner's own fence now, so the thing a chevron hides is no longer a block —
   // it is a RUN OF LINES inside somebody else's block, and `belowSpanIn` is the
   // rule that says which. Hiding the fence would take the banner with it.
-  const fenceOf = (file: string, aged = false): string[] => {
-    const raw = journalTemplateFiles(STUDY_JOURNAL).find(
+  const fenceOf = (file: string): string[] => {
+    const content = journalTemplateFiles(STUDY_JOURNAL).find(
       (f) => f.name === file
     )!.content;
-    // ── AND THE OLD SHAPE IS A FIXTURE NOW (1.0.16) ───────────────────
-    //
-    // The chevron's whole subject is which lines of somebody else's fence the
-    // index owns, and until this release the deepest index put a GROUP inside
-    // its span per note kind. It composes one table over every kind now, so the
-    // level-2 head the rule turns on is not in a template any more — and it is
-    // in every vault, on every index note written before today. `aged` is that
-    // note (`test/legacy-children.ts`), because a rule about a line the fixture
-    // no longer contains is a rule nothing is testing.
-    const content =
-      aged && raw.includes("button:study:new\nkind-table")
-        ? asPerKindTables(raw, STUDY_JOURNAL)
-        : raw;
     return content
       .split("```chronoanvil\n")[1]
       .split("```")[0]
@@ -301,7 +287,7 @@ describe("which lines of a welded fence the index owns", () => {
     // what the chevron is for — while a second level-1 head is another section
     // welded after this one, and closes the span. The level is the whole
     // difference, which is why this reads it rather than counting heads.
-    const lines = fenceOf("topic-index.md", true);
+    const lines = fenceOf("topic-index.md");
     const span = belowSpanIn(lines)!;
     expect(span.label).toBe("🗂️ What's below");
     expect(lines.slice(span.from, span.to).filter((l) => l.startsWith("header:2:")).length)
@@ -311,23 +297,6 @@ describe("which lines of a welded fence the index owns", () => {
     const andAnother = [...lines, "header:1:📚 Resources", "resource-shelf:reading"];
     const shorter = belowSpanIn(andAnother)!;
     expect(andAnother[shorter.to]).toBe("header:1:📚 Resources");
-  });
-
-  it("owns the one table this release composes, the same way", () => {
-    // The consolidated card, which is the shape the chevron actually meets on a
-    // note written today: one bar, one create, one table, and the span still
-    // runs from the bar to the end of the fence. No group head is not a special
-    // case — it is the same rule with nothing to include.
-    const lines = fenceOf("topic-index.md");
-    const span = belowSpanIn(lines)!;
-    expect(span.label).toBe("🗂️ What's below");
-    expect(lines.slice(span.from, span.to)).toEqual([
-      "header:🗂️ What's below",
-      "button:study:new",
-      "kind-table",
-    ]);
-    expect(lines.slice(span.from, span.to)).not.toContain("journal-header");
-    expect(span.to).toBe(lines.length);
   });
 
   it("answers null for a fence with no index in it", () => {

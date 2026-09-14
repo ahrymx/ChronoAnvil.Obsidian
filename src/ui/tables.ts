@@ -731,11 +731,39 @@ export function folderActivity(app: App, folderPath: string): FolderActivity {
   return { pages, typed, lastActive };
 }
 
+// How many of a journal's own notes are under one container folder.
+//
+// `typed` IS NOT THE ANSWER, and this is the whole reason the count is a named
+// function rather than a `.length`. A Topic folder holds its own index note,
+// and that note carries `type: topic` — so it is typed, and counting typed
+// pages says a Topic with two lessons holds three notes. What the reader is
+// counting is the notes the journal declares as KINDS at the level below,
+// which is exactly the sum of the per-kind columns this replaces (1.0.16).
+//
+// AND A KIND THE JOURNAL NO LONGER DECLARES IS NOT COUNTED. A renamed or
+// deleted note type leaves its notes on disk with the old word in their
+// frontmatter; the per-kind columns dropped them by having no column to put
+// them in, and a total that silently re-admitted them would report a number
+// no column of any earlier release ever showed.
+//
+// THE COMPARISON IS THE COLUMNS' OWN, exactly: `p.fm["type"] === k.id` against
+// the raw frontmatter value. Coercing it first would count `type: [lesson]` —
+// a list Obsidian's property editor can produce — which no per-kind column ever
+// counted, and this is standing in for those columns rather than improving on
+// them.
+export function kindNoteCount(
+  typed: readonly PageInfo[],
+  type: JournalType
+): number {
+  const ids = new Set<unknown>(type.kinds.map((k) => k.id));
+  return typed.filter((p) => ids.has(p.fm["type"])).length;
+}
+
 // ── topics-table ─────────────────────────────────────────────────────
 // Per-topic rollup for a subject: lesson count, practice count, relative
 // last-activity, open-task count. Scope = the host note's own folder (the
 // subject folder), topics = its immediate child folders.
-// The folder rollup: one row per child folder, with a column per note kind.
+// The folder rollup: one row per child folder, with a count of the notes in it.
 //
 // TAKES ITS SCOPE RATHER THAN READING THE HOST, as of 4.16 §1. It read the note
 // it was rendered in and could therefore only ever describe that note's own
@@ -782,19 +810,35 @@ export function folderRollup(
     return emptyHead(root, "none yet");
   }
 
-  // One column per note kind, named after the kind. Study still reads
-  // "Lessons | Practice" because those are its kinds; a Cooking journal reads
-  // "Recipes" because that is what is in its folders.
+  // ── ONE COUNT COLUMN, AS OF 1.0.16 ──────────────────────────────────
   //
-  // `kindPlural`, NOT `plural(k.label)`. A kind carries a `plural` override for
-  // exactly the words the pluraliser gets wrong, and Study's Practice is the
-  // one shipped example of it — so the column read "Practices" while the
-  // section header, the buttons and the empty states one level down all read
-  // "Practice", every one of them derived from the kind. This was the only
-  // place that re-derived it and it was the only place that disagreed.
+  // IT WAS ONE COLUMN PER NOTE KIND, named after the kind, and the argument was
+  // that a journal's own words belong in its own table: Study read "Lessons |
+  // Practice" because those are its kinds, a Cooking journal read "Recipes"
+  // because that is what is in its folders.
+  //
+  // WHAT THE READER SAW. A Subject index over four Topics: `Topic | Lessons |
+  // Practice | Activity | Open`, with **Practice empty on all four rows**. A
+  // journal declares the kinds it might use, not the kinds it has used, and a
+  // kind nobody has written yet costs a column on every row of every container
+  // index in the vault. Their words: *"the index pages above the deepest depth
+  // should gain a 'Notes' column for the count"*.
+  //
+  // THE COUNT IS THE SUM OF THE COLUMNS IT REPLACES — see `kindNoteCount`,
+  // which is why it is not `typed.length`.
+  //
+  // AND IT IS NAMED AFTER THE KIND WHERE THERE IS ONLY ONE. `soleKindOf` is the
+  // derivation the stats band's `notes` measure already uses for exactly this
+  // case: a Media journal's one kind makes "Notes" a generic word for a column
+  // that could say "Films", and the journal's own word is better wherever it is
+  // unambiguous. `kindPlural`, NOT `plural(k.label)` — a kind carries a `plural`
+  // override for the words the pluraliser gets wrong, and Study's Practice is
+  // the one shipped example of it.
+  const sole = soleKindOf(type);
+  const countHead = sole ? kindPlural(sole) : "Notes";
   const { row: addRow } = recordList(root, [
     noun,
-    ...type.kinds.map((k) => kindPlural(k)),
+    countHead,
     "Activity",
     "Open",
   ]);
@@ -812,10 +856,12 @@ export function folderRollup(
         : undefined,
     });
 
-    for (const kind of type.kinds) {
-      const n = typed.filter((p) => p.fm["type"] === kind.id).length;
-      recordCell(main, n ? String(n) : EMPTY_CELL);
-    }
+    // An em dash rather than `0`, which is the rule the per-kind columns kept
+    // and it is not cosmetic: the phone collapse at 460px drops `is-empty`
+    // cells entirely (94-native-tables.css), so a folder with nothing in it
+    // shows one fewer mark instead of a "· 0" the reader has to read.
+    const n = kindNoteCount(typed, type);
+    recordCell(main, n ? String(n) : EMPTY_CELL);
     recordCell(main, relativeActivity(lastActive), "is-text");
 
     // Open tasks are ChronoAnvil `- ( )` lines in each note's body (the templates'
@@ -892,30 +938,59 @@ export function buildLevelIndex(
   }
 
   // The deepest level: its children are notes, so one table per kind rather
-  // than a folder rollup. PER KIND rather than one combined table because the
-  // kinds are rated on different things — a single table would need a column
-  // for every rating in the type and leave most of it blank. That was the
-  // catalogue's argument for emitting several fences and it is unchanged; what
-  // changed is that one widget now draws them, so the note does not have to
-  // have been written knowing how many kinds its journal has.
-  //
-  // A HEADING PER TABLE, because two tables with no names between them read as
-  // one table that changed its columns halfway down.
-  //
-  // THE KIND'S OWN EMOJI AND THE KIND'S OWN PLURAL, which is what
-  // `childrenParts` writes into the composed fence — "📖 Lessons", "🛠️
-  // Practice". This drew "🗂️ Lessons" and "🗂️ Practices": the folder glyph over
-  // tables of notes, and a pluralisation the kind explicitly overrides. Two
-  // spellings of one heading is one too many when the composer's is on the next
-  // note down.
+  // than a folder rollup.
+  perKindTables(root, plugin, ctx, type, folder.path);
+  return root;
+}
+
+// A head and a table per note kind, appended to one element.
+//
+// PER KIND rather than one combined table because the kinds are rated on
+// different things — a single table would need a column for every rating in the
+// type and leave most of it blank. That was the catalogue's argument for
+// emitting several fences and it is unchanged; what changed is that one widget
+// can draw them, so a note does not have to have been written knowing how many
+// kinds its journal has.
+//
+// 1.0.16 COMBINED THEM, WITH A TYPE COLUMN, and the objection above was
+// answered rather than denied: one column per DISTINCT rating, and 1.0.15 had
+// already stopped drawing an empty cell at the width where blankness hurt. On
+// the reader's own Topic index it drew `Name | Type | Date | Confidence |
+// Accuracy | Status` over two Lessons — "Lesson" twice down the Type column and
+// Accuracy empty on both rows. Reversed on their verdict: *"the type field can
+// be removed entirely and reverted to the collapsible sections"*. What was
+// right about it moved up a level, where a column per kind is paid for by every
+// row — see `folderRollup`.
+//
+// EXTRACTED FOR TWO CALLERS, which is the whole reason it is a function. The
+// bare `kind-table` directive 1.0.16 composed still stands in the notes it
+// wrote, and it draws THIS rather than a second combined table of its own, so
+// an unmigrated note shows the shape it is about to be migrated into. See
+// `buildKindTable`; both go when the migration does.
+//
+// A HEADING PER TABLE, because two tables with no names between them read as
+// one table that changed its columns halfway down.
+//
+// THE KIND'S OWN EMOJI AND THE KIND'S OWN PLURAL, which is what
+// `childrenParts` writes into the composed fence — "📖 Lessons", "🛠️
+// Practice". This drew "🗂️ Lessons" and "🗂️ Practices": the folder glyph over
+// tables of notes, and a pluralisation the kind explicitly overrides. Two
+// spellings of one heading is one too many when the composer's is on the next
+// note down.
+export function perKindTables(
+  root: HTMLElement,
+  plugin: ChronoAnvilPlugin,
+  ctx: MarkdownPostProcessorContext,
+  type: JournalType,
+  folderPath: string
+): void {
   for (const kind of type.kinds) {
     root.createDiv({
       cls: "ca-journal-level-index-head",
       text: `${kind.emoji} ${kindPlural(kind)}`,
     });
-    root.appendChild(kindTable(plugin, ctx, type, folder.path, kind.id));
+    root.appendChild(kindTable(plugin, ctx, type, folderPath, kind.id));
   }
-  return root;
 }
 
 // Which journal and which folder this index is about, or the sentence to draw
@@ -1457,7 +1532,7 @@ function containerCard(
   // rather than an `@media` one, which is the difference between a card that
   // reads correctly in a 400px pane and one that does not, and rediscovering
   // that correctly on the first try is what `RESUME.md` §2.5 is about.
-  const { pages, lastActive } = folderActivity(plugin.app, folder.path);
+  const { pages, typed, lastActive } = folderActivity(plugin.app, folder.path);
   const ratingDef = ratingDefOf(plugin, type);
   const ratingId = ratingDef?.id ?? confidenceProperty(plugin);
   const conf = ratingDef
@@ -1469,7 +1544,17 @@ function containerCard(
     : null;
 
   const cards: StatCard[] = [
-    { label: "notes", value: String(pages.length) },
+    // `kindNoteCount`, NOT `pages.length`, AS OF 1.0.16. The rollup row for
+    // this folder one level up and this card about the folder itself both say
+    // "notes", and they said different numbers: the card counted everything
+    // under the folder — its own index note, a hand-written page — while the
+    // table counted the journal's kinds. `folderActivity`'s own header states
+    // the rule that made that a defect rather than a difference: *"the numbers
+    // a subject shows about a topic and the topic's numbers about itself come
+    // from one place and cannot drift."* Nothing noticed while the table drew a
+    // column per kind and the card drew a total; one count column put the two
+    // numbers side by side.
+    { label: "notes", value: String(kindNoteCount(typed, type)) },
     { label: "last", value: relativeActivity(lastActive) || "—" },
     { label: "open", value: "…" },
   ];
@@ -1691,12 +1776,24 @@ export function buildStatsBand(
         break;
       }
       case "kinds": {
-        // One cell per kind the journal declares, named after the kind — the
-        // derivation `level-index` uses one level up, so a subject's numbers
-        // about a topic and the topic's numbers about itself keep coming from
-        // one place. A kind with no notes still draws its cell: a Study Topic
-        // with no Practice yet is a fact about the topic, not an absent
-        // quantity, and unlike a tracker it is declared rather than logged.
+        // One cell per kind the journal declares, named after the kind. A kind
+        // with no notes still draws its cell: a Study Topic with no Practice
+        // yet is a fact about the topic, not an absent quantity, and unlike a
+        // tracker it is declared rather than logged.
+        //
+        // THIS CITED `level-index` UNTIL 1.0.16, as the surface a subject's
+        // numbers about a topic were shared with. That table now draws one
+        // count column rather than a column per kind, for the reason
+        // `folderRollup` states — the same emptiness that is a FACT in a
+        // declared cell here was a COST there, on every row of every container
+        // index. A band is opted into per note and names what it measures; a
+        // table's columns are paid for by every row whether or not the reader
+        // asked. The two surfaces genuinely differ, so this cell keeps its
+        // shape and stops claiming a sibling.
+        //
+        // IT ALSO CANNOT READ `kindNoteCount`, which is the rollup's answer to
+        // the same arithmetic: the band's scope may be the whole vault, where
+        // there is no one `type` whose kinds could be the filter.
         for (const kind of type?.kinds ?? []) {
           const n = typed.filter((p) => p.fm["type"] === kind.id).length;
           add({
@@ -2110,6 +2207,13 @@ export function buildJournalTally(
 // its kind's `pages.id`, deliberately not one of the type's kinds, so a filter
 // on the kind id cannot match one.
 //
+// ONE KIND, AND THE ARGUMENT IS ALWAYS ITS ID. 1.0.16 let the id be empty and
+// read that as "every kind of this journal", with a Type column naming which
+// each row was; `perKindTables` records what that looked like on the reader's
+// own index and why it is gone. The bare directive is still honoured, but one
+// level up and by drawing the per-kind stack — nothing here has two shapes to
+// keep in step.
+//
 // NO VIEW SWITCHER. The base table shipped three views — Not Completed,
 // Completed, All — and reproducing them would mean interactive state, which a
 // LiveWidget cannot keep: it rebuilds the whole subtree on every change in
@@ -2154,50 +2258,6 @@ export function kindTableProperties(
   ];
 }
 
-// THE COLUMN THAT SAYS WHICH NOTE TYPE A ROW IS, and it is a real frontmatter
-// property rather than a pseudo-column: `type:` is what a kind IS — the field
-// `kind-table` has always selected rows by. So it is spelled here as the
-// property it reads, and the row loop below renders it as the kind's LABEL
-// rather than its id, which is the one thing the raw value is not fit for.
-const TYPE_COLUMN = "type";
-
-// The columns a table over SEVERAL kinds carries. 1.0.16.
-//
-// ── THE OBJECTION THIS ANSWERS, WHICH THE CATALOGUE HAD WRITTEN DOWN ─────
-//
-// `journal-sections.ts` said, above the render that emitted one table per kind:
-// *"Per kind rather than one combined table because the kinds are rated on
-// different things — a single table would need a column for every rating in the
-// type and leave most of it blank."* That was true and it is still true: this
-// returns one column per DISTINCT rating tracker across the kinds, and a Study
-// journal whose Lessons carry confidence and whose Practice carries a score gets
-// both, each half empty.
-//
-// WHAT CHANGED IS THE COST OF BLANK. 1.0.15 stopped drawing an empty cell at all
-// once the columns collapse, so on the width where blankness actually hurt — a
-// phone, where every column is a line — the sparse half is simply not there. On
-// a desktop a dash under a column heading is what a table is for.
-//
-// AND WHAT IT BUYS. The reader's project card drew three heads, three create
-// buttons, three chevrons and three empty states for one note. One table with a
-// Type column is that card, honestly.
-//
-// A TRACKER IS THE COLUMN, NOT A KIND. Two kinds rating the same tracker share
-// one column, which is why this is distinct rather than one per kind — and it is
-// also why a row fills whichever rating column its own note carries rather than
-// only the one its kind declares. The column is the tracker's question; a note
-// that answered it says so.
-export function kindTablePropertiesFor(
-  kinds: readonly JournalKind[],
-  statusProperty = "status"
-): string[] {
-  const ratings: string[] = [];
-  for (const kind of kinds) {
-    if (kind.rating && !ratings.includes(kind.rating)) ratings.push(kind.rating);
-  }
-  return [TYPE_COLUMN, "date", ...ratings, statusProperty];
-}
-
 // Open work first, then newest first, then by name.
 //
 // Pure given the rows, exactly as sortBreakdown is, and for the same reason:
@@ -2225,6 +2285,21 @@ export function sortKindRows<T extends KindRow>(rows: T[]): T[] {
   });
 }
 
+// ── AND THE BARE WORD, FOR AS LONG AS AN UNMIGRATED NOTE HAS IT ──────
+//
+// `kind-table` with no kind is 1.0.16's spelling for "every kind of this
+// journal in one table". That release is reversed (`perKindTables` says what
+// the reader saw), and the notes it wrote are being migrated back
+// (`children-split.ts`) — but the migration is a tick in the repair window, so
+// between installing this build and pressing it a reader's index note carries
+// the bare word and must draw something. It draws the shape it is about to
+// become: a head and a table per kind, through the same function the composed
+// fence's own renderer uses.
+//
+// TRANSITIONAL, AND DATED. This branch, the bare `new` button, `newNoteAsking`
+// and `children-split.ts` are one set and go together, the release after the
+// development vaults are migrated — which is the rule CLAUDE.md states for a
+// shape no reader outside this machine can have.
 export function buildKindTable(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
@@ -2237,6 +2312,11 @@ export function buildKindTable(
   }
   const type = hostType(plugin, file.path);
   if (!type) return createDiv({ cls: "ca-journal-table ca-journal-kind-table" });
+  if (!kindId) {
+    const root = createDiv({ cls: "ca-journal-level-index" });
+    perKindTables(root, plugin, ctx, type, file.parent.path);
+    return root;
+  }
   return kindTable(plugin, ctx, type, file.parent.path, kindId);
 }
 
@@ -2254,72 +2334,46 @@ export function kindTable(
 ): HTMLElement {
   const app = plugin.app;
   const root = createDiv({ cls: "ca-journal-table ca-journal-kind-table" });
-  // ── AN EMPTY ID MEANS EVERY KIND (1.0.16) ────────────────────────────
-  //
-  // *"I think page types can be consolidated on journal index pages,
-  // [Updates Decisions scratchpads] can become one."*
-  //
-  // THE BARE DIRECTIVE, NOT A NEW WORD. `kind-table:update` is one kind's notes
-  // and `kind-table` is all of them, which is the grammar this plugin already
-  // uses for exactly this distinction: `level-index` bare means "what is below
-  // THIS note", `launcher` bare means the default four. A second keyword would
-  // be a second thing to name, register, document and keep rendering forever,
-  // for a question the existing word already asks — and it would make the two
-  // shapes look unrelated in a fence where they are one section either way.
-  //
-  // BOTH SHAPES RENDER, PERMANENTLY. Every index note in every vault carries the
-  // per-kind spelling, and 4.16 §3's rule is that a word already on disk goes on
-  // working: what changes is what the catalogue COMPOSES. See `childrenParts`.
-  const kind = kindId ? type.kinds.find((k) => k.id === kindId) : null;
+  const kind = type.kinds.find((k) => k.id === kindId);
   // Named rather than silent, and this is the case that will actually happen:
   // removing a note kind leaves this directive behind in every template and
   // index note that carried it, and "nothing rendered here" is the least
   // useful thing to say about that. Same wording as the unknown-widget error
   // the block processor already prints, for the same reason.
-  if (kindId && !kind) {
+  if (!kind) {
     root.createDiv({
       cls: "ca-journal-widget-error",
       text: `Unknown ${type.name} note type: ${kindId}`,
     });
     return root;
   }
-  // The kinds this table is over: the one named, or all of them. Everything
-  // below reads THIS rather than `kind`, so the two shapes are one code path
-  // with two column sets and not two tables that have to be kept in step.
-  const shown = kind ? [kind] : type.kinds;
 
   // Both resolved from the registry rather than spelled out, the same rule
   // reviewProperties follows — a relabelled or re-keyed built-in must not
   // leave this reading a dead property.
   const statusId = getBuiltinTracker(plugin, "status")?.id ?? "status";
   const statusDef = getTracker(plugin, statusId) ?? null;
+  const ratingId = kind.rating ?? null;
+  const ratingDef = ratingId ? getTracker(plugin, ratingId) ?? null : null;
 
-  const wanted = new Set(shown.map((k) => k.id));
-  const kindOf = (fm: Record<string, unknown>): JournalKind | null => {
-    const id = typeof fm["type"] === "string" ? fm["type"] : "";
-    return shown.find((k) => k.id === id) ?? null;
-  };
-  const notes = pagesUnder(app, folderPath).filter((p) =>
-    wanted.has(typeof p.fm["type"] === "string" ? p.fm["type"] : "")
+  const notes = pagesUnder(app, folderPath).filter(
+    (p) => p.fm["type"] === kind.id
   );
 
   if (notes.length === 0) {
-    // BOTH SENTENCES NAME THE BUTTON THAT IS ACTUALLY ON THE SCREEN, which is
-    // the rule the per-kind wording already kept and the reason it is derived
-    // rather than typed: with one kind the button reads "New Lesson" and with
-    // several it reads "New", because it is one control that asks which. An
-    // empty state pointing at a control nobody can see is the near-miss that
-    // makes a page feel written rather than checked.
-    const noun = kind ? kindPlural(kind).toLowerCase() : "notes";
-    const press = kind ? `New ${kind.label}` : "New";
-    const rating = kind?.rating ? getTracker(plugin, kind.rating) ?? null : null;
     root.appendChild(
       emptyCallout(
         "file-plus",
-        `No ${noun} yet`,
-        `Press “${press}” above to add one — it'll appear here with its ${
-          kind ? "" : "type, "
-        }date${kind?.rating ? `, ${ratingWord(rating)}` : ""} and status.`
+        `No ${kindPlural(kind).toLowerCase()} yet`,
+        // “New Lesson”, matching the button, not “Lesson”, matching the kind.
+        // The button is labelled `New ${kind.label}` (journalButtonSpec), so
+        // this told a reader to press something that is not on the screen —
+        // close enough to guess, and the sort of near-miss that makes an empty
+        // state feel written rather than checked. Both strings are derived from
+        // `kind.label`, so they agree by construction now.
+        `Press “New ${kind.label}” above to add one — it'll appear here with its date${
+          ratingId ? `, ${ratingWord(ratingDef)}` : ""
+        } and status.`
       )
     );
     // THE SAME LIFT, ONE LEVEL DOWN (5.28) — a topic index's Lessons card is
@@ -2355,20 +2409,11 @@ export function kindTable(
   // `displayName` the base table set — "Lesson", not "Title" — then one per
   // property the kind carries, labelled from the registry where it has an
   // entry and from the property name where it doesn't.
-  const columns = kind
-    ? kindTableProperties(kind, statusId)
-    : kindTablePropertiesFor(shown, statusId);
-  // EVERY RATING COLUMN NAMED FROM ITS OWN TRACKER. With one kind there is at
-  // most one and `ratingDef` was enough; over several there is one per distinct
-  // tracker, so the definition is looked up per column rather than held in a
-  // variable that could only ever describe the first.
-  const defOf = (property: string): TrackerDef | null =>
-    getTracker(plugin, property) ?? null;
+  const columns = kindTableProperties(kind, statusId);
   const heading = (property: string): string => {
-    if (property === TYPE_COLUMN) return "Type";
     if (property === "date") return "Date";
     if (property === statusId) return ratingNoun(statusDef, "Status");
-    return ratingNoun(defOf(property), property);
+    return ratingNoun(ratingDef, property);
   };
 
   // Was a `<table>`; see `recordList` above for why these three dashboards'
@@ -2378,16 +2423,7 @@ export function kindTable(
   // THE THIRD ARGUMENT IS "EVERY ROW CARRIES A `⋯`" (4.50), so the heading strip
   // reserves the same width the rows spend. A slot that appeared only on hover
   // would shift the whole row's columns under the pointer.
-  // THE TITLE COLUMN IS NAMED BY THE KIND WHERE THERE IS ONE — "Lesson", not
-  // "Title", which is the `displayName` the ```base table set and the reason
-  // this column has never said "Title". Over several kinds no single kind's
-  // name is true of the column, and the Type column beside it says what each
-  // row is, so it takes the neutral word rather than a list of three.
-  const { row: addRow } = recordList(
-    root,
-    [kind ? kind.label : "Name", ...columns.map(heading)],
-    true
-  );
+  const { row: addRow } = recordList(root, [kind.label, ...columns.map(heading)], true);
 
   for (const { note, date, done } of sorted) {
     const { main, actions, row } = addRow({
@@ -2416,27 +2452,16 @@ export function kindTable(
     // WHAT THIS NOTE'S PAGES ARE MADE FROM, AND WHETHER IT SHOULD STILL EXIST —
     // both facts about the one note the row is, so the control goes on the row.
     // See `kind-row-menu.ts`, which owns all of it; this file draws tables.
-    // THE ROW'S OWN KIND, NOT THE TABLE'S. With one kind these are the same
-    // object; over several the menu on a Decision's row must offer a Decision's
-    // acts. `kindOf` cannot return null here — the notes were filtered by the
-    // same set — and the fallback is a type guard rather than a case.
-    const rowKind = kindOf(note.fm) ?? shown[0];
-    attachKindRowMenu({ plugin, type, kind: rowKind }, actions, note.file);
+    attachKindRowMenu({ plugin, type, kind }, actions, note.file);
     for (const property of columns) {
-      if (property === TYPE_COLUMN) {
-        // THE LABEL, NOT THE ID. `type: decision` is the identity and "Decision"
-        // is what the reader called it — the same choice every other surface
-        // makes, and the reason this column is worth a cell rather than being
-        // left to the raw value.
-        recordCell(main, rowKind.label, "is-text");
-      } else if (property === "date") {
+      if (property === "date") {
         recordCell(main, date ?? EMPTY_CELL);
       } else if (property === statusId) {
         recordCell(main, statusOf(note.fm) || EMPTY_CELL, "is-text");
       } else {
         const v = Number(note.fm[property]);
         const cell = recordCell(main, "");
-        ratingCell(cell, v, defOf(property));
+        ratingCell(cell, v, property === ratingId ? ratingDef : null);
       }
     }
   }

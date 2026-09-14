@@ -802,13 +802,8 @@ describe("the actions slot on a record row", () => {
     // The wiring, which nothing else in this file reaches: `tables.ts` draws
     // tables and `kind-row-menu.ts` owns the menu, so the one line joining them
     // is the whole of the contract between the two.
-    //
-    // `rowKind`, NOT THE TABLE'S KIND (1.0.16). One table lists every note type
-    // of the host's journal now, so there IS no table kind — the menu on a
-    // Decision's row has to offer a Decision's acts, which means the kind comes
-    // from the row's own frontmatter rather than from the directive.
     expect(readCode("tables.ts")).toContain(
-      "attachKindRowMenu({ plugin, type, kind: rowKind }, actions, note.file);"
+      "attachKindRowMenu({ plugin, type, kind }, actions, note.file);"
     );
   });
 
@@ -817,12 +812,10 @@ describe("the actions slot on a record row", () => {
     // no pages to bin — so a reserve there would push its columns off their own
     // headings in the opposite direction.
     const text = readCode("tables.ts");
-    // THE HEADING ROW IS DERIVED SINCE 1.0.16 — the title column is named by the
-    // kind where there is one and takes a neutral word over several — so the
-    // call spans lines and the literal it used to be matched on is gone. The
-    // claim is unchanged: one list asks for the reserve, and it is this one.
-    expect(text).toContain("[kind ? kind.label : \"Name\", ...columns.map(heading)],");
-    expect(text.match(/recordList\(\s*root,[^;]*?true\s*\)/g) ?? []).toHaveLength(1);
+    expect(text).toContain(
+      "recordList(root, [kind.label, ...columns.map(heading)], true)"
+    );
+    expect(text.match(/recordList\(root, \[[^;]*\], true\)/g) ?? []).toHaveLength(1);
   });
 
   it("keeps the control in the shared class family", () => {

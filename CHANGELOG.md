@@ -9,58 +9,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **A journal index note lists everything below it in ONE table, with a Type
-  column.** *What's below* drew a group per note type — a heading, a **New …**
-  button, a chevron and a table each — so a project with Updates, Decisions and
-  Scratchpads showed three of everything over a folder that might hold one note.
-  It is one card now: the bar, one **New** button that asks which type you want,
-  and one table whose first column says what each row is.
+- **A container index note counts the notes below it in one column.** A subject
+  index drew a count column per note type — `Topic | Lessons | Practice |
+  Activity | Open` — which is the journal's own words in the journal's own
+  table, and on a real subject it read `Practice` empty on all four rows. A
+  journal declares the types it might use, not the ones it has used, so a type
+  nobody has written yet cost a column on every row of every container index in
+  the vault. It is one **Notes** column now, counting whatever types the journal
+  declares, and the table reads `Topic | Notes | Activity | Open`.
 
-  The objection the old shape was built on has an answer rather than a
-  dismissal. Note types are scored on different trackers, and a combined table
-  needs a column for each — so it has one per distinct tracker, and a journal
-  whose Lessons carry Confidence and whose Practice carries Accuracy gets both,
-  each half empty. On a phone, where blank columns actually cost a line, 1.0.15
-  had already stopped drawing an empty value at all.
+  A journal with a single note type heads that column with its own word, so a
+  Media journal's shelves read **Films** rather than **Notes**.
 
-  Your existing index notes go on working exactly as they are: the per-type
-  tables are still read and still drawn, and nothing needs repairing for a vault
-  to keep opening. Bringing them onto the new shape is offered, with the diff
-  beside it, under **Run format migrations** in *Set up / repair vault* — it is
-  the only thing in this release that moves lines you may have edited, so it is a
-  tick and never a default. A journal's index templates are in the same offer,
-  because the next subject's note is made from one.
+  The number is the sum of the columns it replaces, which is not the same as
+  "everything in the folder" — a topic's own index note is not one of its
+  lessons. A card describing that same folder used to count it and now does not,
+  so the table and the card finally agree about the word "notes".
 
-  A journal with a single note type is untouched in every respect: its card is
-  still named after that type, its button still says **New Lesson**, and the
-  migration refuses it.
+- **The deepest index note keeps its collapsible section per note type.** This
+  release spent a round consolidating that card the way the one above it has now
+  been consolidated: one table over every type, with a **Type** column saying
+  what each row was. On a topic with two lessons it drew `Name | Type | Date |
+  Confidence | Accuracy | Status` — the Type column repeating one word down the
+  whole table, and the second type's rating empty on both rows. The objection
+  the per-type shape was built on turned out to be the right one, so the card is
+  what it was: a heading, a **New …** button, a chevron and a table for each
+  note type, each group folding on its own.
 
-- **Adding a note type to a journal offers to merge the tables, rather than to
-  add one.** The window after *Add note type* promised that dashboards would
-  offer to list the new type, and it kept that promise by offering the missing
-  table. A single table lists a type added a minute ago without being touched —
-  so on an index note still carrying the old per-type stack, merging IS how the
-  new type appears, and that is what the window now offers. Its wording says
-  which of the two is happening: the reassurance that nothing already on the note
-  is moved or rewritten belongs to the insert-only case and is not made over a
-  rewrite.
+  Nothing in your vault changes. If you installed the intermediate build, its
+  merged tables are offered back under **Run format migrations** in *Set up /
+  repair vault*, with the diff beside them — it moves lines you may have edited,
+  so it is a tick and never a default — and a merged note goes on drawing the
+  right thing until you press it.
 
-- **A note type's heading is no longer a place to rename the type.** Renaming a
-  heading on an index note used to offer to rename the note type under it, which
-  worked because the heading sat directly above that type's table. A card
-  listing every type has one bar and it names the card, so retitling it retitles
-  your card and nothing else. The offer is unchanged on every note written before
-  this release, where the per-type headings are still there. Settings → Custom
-  Journals renames a type on every note at once, as it always has.
+- **Adding a note type to a journal offers the missing tables again.** The
+  window after *Add note type* promises that dashboards will offer to list the
+  new type, and with a table per type it keeps that promise by offering the one
+  that is missing — insert-only, with the assurance that nothing already on the
+  note is moved, rewritten or removed.
 
-- **Importing a journal folder this release wrote recovers its structure but not
-  its icons.** Adopting a folder with no manifest reads each note type's icon and
-  order off the index notes' per-type headings and create buttons, and a
-  consolidated card carries neither. The ids, levels, trackers, ratings and which
-  type has pages all come back exactly as before; the icons default and the order
-  is alphabetical, and the window says so in its list of guesses rather than
-  quietly handing you a journal of 📝. A folder written by an earlier release
-  still recovers everything.
+- **Renaming a note type's heading still offers to rename the type**, on every
+  index note, because every index note has a heading per type again.
 
 ## [1.0.15] - 2026-09-13
 

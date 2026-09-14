@@ -175,10 +175,17 @@ export function journalSubActionSpec(
   // "Refresh" beside a type name was exactly the false per-type scope the
   // consolidation removed. runJournalAction still routes it.
   if (sub === "refresh") return { label: "Refresh all", icon: "refresh-cw" };
-  // BARE `new` IS "A NOTE OF ANY KIND" (1.0.16), the other half of the grammar
-  // `kind-table` bare takes in the same release: one table over every kind gets
-  // one create button, and the button asks which kind instead of the bar
-  // answering it. See `JournalManager.newNoteAsking`.
+  // BARE `new` IS "A NOTE OF ANY KIND", the other half of the grammar
+  // `kind-table` bare took in 1.0.16: one table over every kind got one create
+  // button, and the button asked which kind instead of the bar answering it.
+  // See `JournalManager.newNoteAsking`.
+  //
+  // NOTHING COMPOSES IT ANY MORE. That release is reversed — `childrenParts`
+  // carries the reader's words and `perKindTables` what they were looking at —
+  // and the per-kind buttons are back beside their own heads. This spelling
+  // survives for the notes 1.0.16 already wrote, which press it until the
+  // repair window's migration takes it out (`children-split.ts`), and it goes
+  // with that migration and the bare `kind-table` branch in one release.
   //
   // BARE, RATHER THAN `new-note`, AND THE COLLISION IS THE WHOLE REASON. A kind
   // labelled "Note" slugs to `note`, so `new-note` is already the create action

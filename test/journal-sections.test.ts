@@ -444,23 +444,20 @@ describe("the section catalogue", () => {
       const rendered = renderSection(section, indexCtx(twoKind, 0));
       expect(rendered.match(/```chronoanvil/g)?.length).toBe(1);
       expect(rendered).not.toContain("```base");
-      // ── ONE BAR, ONE CREATE, ONE TABLE (1.0.16) ──────────────────────
-      //
-      // 5.12 composed a bar and then a GROUP PER KIND — a level-2 head, a
-      // create button inline in it and a table under it — and the section bar
-      // carried no actions strip at all, on the argument that an action belongs
-      // beside the rows it adds to and every row was inside a group.
-      //
-      // *"I think page types can be consolidated on journal index pages,
-      // [Updates Decisions scratchpads] can become one."* There is one set of
-      // rows now, so the bar IS beside them: the argument is kept and the
-      // groups are what went. The create asks which type, because no kind's
-      // glyph is true of a button that can make any of them.
+      // ONE BAR, THEN A GROUP PER KIND (5.12). The fence opens with the
+      // section's own name — and only that. Each kind is a level-2 head with
+      // its own create button inline in it and its own table under it, so the
+      // section bar has no actions strip at all: an action belongs beside the
+      // rows it adds to, and every row here is inside a group.
       expect(rendered.split("\n").filter((l) => l.trim())).toEqual([
         "```chronoanvil",
         "header:🗂️ What's below",
-        "button:cooking:new",
-        "kind-table",
+        "header:2:🍽️ Recipes",
+        "button:cooking:new-recipe",
+        "kind-table:recipe",
+        "header:2:🔥 Attempts",
+        "button:cooking:new-attempt",
+        "kind-table:attempt",
         "```",
       ]);
     });

@@ -338,11 +338,12 @@ export function buildKindTableRegion(
   // is exactly what the ```base block this replaces did (see
   // tables.ts::buildKindTable).
   //
-  // AND BARE IT IS EVERY KIND (1.0.16), which is where the empty argument stops
-  // being a refusal and becomes the other half of the grammar — `level-index`
-  // bare and `launcher` bare read the same way. It drew NOTHING before this, so
-  // no note on disk means anything by the bare word and there is nothing to be
-  // compatible with.
+  // AND BARE IT IS THE PER-KIND STACK, TRANSITIONALLY. 1.0.16 composed the bare
+  // word for "every kind in one table"; that release is reversed and its notes
+  // are migrated by a tick in the repair window, so until a reader presses it
+  // the word is still on their index note and has to draw. See
+  // `tables.ts::buildKindTable`, which is where the branch and its expiry date
+  // are argued.
   const file = fileOfCtx(plugin, ctx);
   if (!file?.parent) return null;
   return liveScopedWidget(plugin, ctx, file.parent.path, () =>

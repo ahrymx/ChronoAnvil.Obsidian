@@ -362,25 +362,8 @@ describe("a folder with no manifest", () => {
       folderNamed(h, "03 - Journals/Cooking")
     );
     expect(found?.source).toBe("inferred");
-    // ── ALPHABETICAL SINCE 1.0.16, AND SAID OUT LOUD ─────────────────
-    //
-    // This read `["recipe", "attempt"]` — the declaration order, recovered from
-    // the sequence of `new-<kind>` buttons down the deepest index. The index
-    // composes ONE create button now, which asks which type, so the sequence
-    // that stated the order is not in the folder any more and the two sources
-    // left (a directory listing, a note walk) are both alphabetical.
-    //
-    // THE FOLDER HERE IS ONE THIS RELEASE WROTE, which is why the loss shows up
-    // in this file: `populate` composes the current templates. The old shape is
-    // still read exactly as it always was — `test/journal-import.test.ts` ages
-    // the same fixture and asserts the recovery from it, which is what every
-    // vault that exists today actually carries.
-    expect(found?.config.kinds.map((k) => k.id)).toEqual(["attempt", "recipe"]);
+    expect(found?.config.kinds.map((k) => k.id)).toEqual(["recipe", "attempt"]);
     expect(found?.guesses.join(" ")).toContain("difficulty");
-    // And the gap is named rather than defaulted past, which is the rule the
-    // inference states about itself: a journal that comes back with every kind
-    // labelled 📝 reads as a failed recovery even when the structure is perfect.
-    expect(found?.guesses.join(" ")).toContain("an icon and an order");
     // This is the path that reads notes — and the only one.
     expect(h.vault.reads.length).toBeGreaterThan(0);
   });

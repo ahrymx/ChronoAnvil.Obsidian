@@ -1820,8 +1820,14 @@ export class JournalManager {
 
   // ── Create a leaf note, ASKING WHICH KIND FIRST (1.0.16) ────────────────
   //
-  // *"I think page types can be consolidated on journal index pages, [Updates
-  // Decisions scratchpads] can become one."*
+  // TRANSITIONAL, AND IT IS THE ONLY REASON THIS IS STILL HERE. 1.0.16 drew a
+  // consolidated *What's below* — one table over every kind — so it drew one
+  // create button, and that button had to ask the question the per-kind buttons
+  // answered by which one you pressed. The reader reversed that release
+  // (`childrenParts` quotes them), so nothing composes the bare `new` any more;
+  // the notes it already wrote still carry it, and this answers them until the
+  // repair window's migration replaces those lines. It goes with
+  // `children-split.ts`.
   //
   // A consolidated *What's below* draws ONE table over every kind, so it draws
   // one create button, so that button has to ask the question the three buttons

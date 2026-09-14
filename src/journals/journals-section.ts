@@ -341,6 +341,13 @@ function buildGroup(
   // in it". Per-kind counts and an average rating were both considered and
   // refused there, and a card does not revive them.
   //
+  // AND THE TABLE CAME ROUND TO IT IN 1.0.16. `folderRollup` drew a column per
+  // note kind until its own emptiness was measured on a real subject — Practice
+  // blank on four of four rows — and it now draws one count column. The refusal
+  // written here was the same objection reached two releases earlier about the
+  // same numbers; what the table kept, and a card still has no room for, is the
+  // count itself.
+  //
   // NOT `recordList` ANY MORE, AND THAT IS THE ONE THING THIS RELEASE GIVES UP.
   // 4.13.2 drew these through the shared record list for its heading strip, its
   // tracks and its ARIA roles. A card has no heading strip — that was the
